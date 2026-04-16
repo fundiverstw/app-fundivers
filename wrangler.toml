@@ -1,0 +1,5 @@
+name = "app-fundiverstw"
+compatibility_date = "2025-04-16"
+
+[assets]
+directory = "./dist"
