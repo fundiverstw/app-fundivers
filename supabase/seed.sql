@@ -1,0 +1,8 @@
+-- Dev test user: dev@dev.dev / devdevdev
+-- Created via admin API; this seed just documents the intent.
+-- To recreate after db reset, run:
+--   curl -s -X POST http://127.0.0.1:54321/auth/v1/admin/users \
+--     -H "apikey: $SERVICE_ROLE_KEY" \
+--     -H "Authorization: Bearer $SERVICE_ROLE_KEY" \
+--     -H "Content-Type: application/json" \
+--     -d '{"email":"dev@dev.dev","password":"devdevdev","email_confirm":true}'
