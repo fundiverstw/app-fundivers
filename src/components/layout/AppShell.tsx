@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
+import { usePWAInstall } from '../../hooks/usePWAInstall'
 
 const navItems = [
   { to: '/calendar', label: 'Calendar', icon: '📅' },
@@ -11,6 +12,7 @@ const navItems = [
 export function AppShell() {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
+  const { canInstall, install } = usePWAInstall()
 
   async function handleSignOut() {
     await signOut()
@@ -23,6 +25,14 @@ export function AppShell() {
       <header className="bg-slate-800 border-b border-slate-700 px-4 py-3 flex items-center justify-between">
         <span className="font-bold text-sky-400 text-lg">FunDivers TW</span>
         <div className="flex items-center gap-3">
+          {canInstall && (
+            <button
+              onClick={install}
+              className="text-xs bg-sky-500 hover:bg-sky-600 text-white px-2 py-1 rounded-md transition-colors"
+            >
+              Install app
+            </button>
+          )}
           <span className="text-sm text-slate-400">{profile?.display_name ?? profile?.full_name}</span>
           <button
             onClick={handleSignOut}
