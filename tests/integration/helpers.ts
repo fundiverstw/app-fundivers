@@ -66,23 +66,42 @@ export async function deleteTestUser(admin: DB, userId: string) {
 }
 
 /**
- * Insert an activity for tests that need something bookable. Returns the row.
+ * Insert an EO_dive row for tests that need something bookable. Returns the _id.
+ * EO_dives uses text _id (not uuid) and text date/time columns.
  */
-export async function createActivity(
-  admin: DB,
-  overrides: Partial<Database['public']['Tables']['activities']['Insert']> = {}
-) {
-  const { data, error } = await admin
-    .from('activities')
-    .insert({
-      title: 'Test Dive ' + Math.random().toString(36).slice(2, 8),
-      type: 'dive',
-      start_time: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      is_published: true,
-      ...overrides,
-    })
-    .select()
-    .single()
-  if (error || !data) throw new Error(`createActivity failed: ${error?.message}`)
-  return data
+export async function createTestDive(admin: DB = adminClient()): Promise<string> {
+  const id = `test_dive_${Math.random().toString(36).slice(2, 10)}`
+  const startDate = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10)
+  const { error } = await admin.from('EO_dives' as never).insert({
+    _id: id,
+    dive_title: 'Test Dive',
+    notes: '',
+    start_date: startDate,
+    time: '09:00:00',
+    end_date: startDate,
+  } as never)
+  if (error) throw new Error(`createTestDive failed: ${error.message}`)
+  return id
+}
+
+export async function createTestCourse(admin: DB = adminClient()): Promise<string> {
+  const id = `test_course_${Math.random().toString(36).slice(2, 10)}`
+  const startDate = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10)
+  const { error } = await admin.from('EO_courses' as never).insert({
+    _id: id,
+    course_title: 'Test Course',
+    start_date: startDate,
+    start_time: '09:00:00',
+    end_date: startDate,
+  } as never)
+  if (error) throw new Error(`createTestCourse failed: ${error.message}`)
+  return id
+}
+
+export async function deleteTestDive(admin: DB, id: string) {
+  await admin.from('EO_dives' as never).delete().eq('_id', id)
+}
+
+export async function deleteTestCourse(admin: DB, id: string) {
+  await admin.from('EO_courses' as never).delete().eq('_id', id)
 }

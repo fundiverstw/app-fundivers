@@ -2,7 +2,6 @@ export type Json = string | number | boolean | null | { [key: string]: Json } | 
 
 export interface Database {
   public: {
-    Views: Record<string, never>
     Functions: Record<string, never>
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
@@ -69,56 +68,13 @@ export interface Database {
         }
         Relationships: []
       }
-      activities: {
-        Row: {
-          id: string
-          created_at: string
-          title: string
-          description: string | null
-          type: 'dive' | 'course' | 'event'
-          start_time: string
-          end_time: string | null
-          location: string | null
-          capacity: number | null
-          price: number | null
-          currency: string
-          is_published: boolean
-        }
-        Insert: {
-          id?: string
-          created_at?: string
-          title: string
-          description?: string | null
-          type: 'dive' | 'course' | 'event'
-          start_time: string
-          end_time?: string | null
-          location?: string | null
-          capacity?: number | null
-          price?: number | null
-          currency?: string
-          is_published?: boolean
-        }
-        Update: {
-          id?: string
-          title?: string
-          description?: string | null
-          type?: 'dive' | 'course' | 'event'
-          start_time?: string
-          end_time?: string | null
-          location?: string | null
-          capacity?: number | null
-          price?: number | null
-          currency?: string
-          is_published?: boolean
-        }
-        Relationships: []
-      }
       bookings: {
         Row: {
           id: string
           created_at: string
           user_id: string
-          activity_id: string
+          eo_dive_id: string | null
+          eo_course_id: string | null
           status: 'pending' | 'confirmed' | 'cancelled' | 'waitlisted'
           notes: string | null
         }
@@ -126,14 +82,16 @@ export interface Database {
           id?: string
           created_at?: string
           user_id: string
-          activity_id: string
+          eo_dive_id?: string | null
+          eo_course_id?: string | null
           status?: 'pending' | 'confirmed' | 'cancelled' | 'waitlisted'
           notes?: string | null
         }
         Update: {
           id?: string
           user_id?: string
-          activity_id?: string
+          eo_dive_id?: string | null
+          eo_course_id?: string | null
           status?: 'pending' | 'confirmed' | 'cancelled' | 'waitlisted'
           notes?: string | null
         }
@@ -178,11 +136,27 @@ export interface Database {
         Relationships: []
       }
     }
+    Views: {
+      events: {
+        Row: {
+          id: string
+          type: 'dive' | 'course'
+          title: string
+          start_time: string
+          end_time: string | null
+          featured: boolean
+          fully_booked: boolean
+          price: number | null
+          deposit_amount: number | null
+          currency: string
+        }
+      }
+    }
   }
 }
 
 // Convenience row types
 export type Profile = Database['public']['Tables']['profiles']['Row']
-export type Activity = Database['public']['Tables']['activities']['Row']
 export type Booking = Database['public']['Tables']['bookings']['Row']
 export type Payment = Database['public']['Tables']['payments']['Row']
+export type Event = Database['public']['Views']['events']['Row']
