@@ -140,6 +140,7 @@ export interface Database {
           status: 'pending' | 'confirmed' | 'cancelled' | 'waitlisted'
           notes: string | null
           details: BookingDetails
+          refund_requested_at: string | null
         }
         Insert: {
           id?: string
@@ -150,6 +151,7 @@ export interface Database {
           status?: 'pending' | 'confirmed' | 'cancelled' | 'waitlisted'
           notes?: string | null
           details?: BookingDetails
+          refund_requested_at?: string | null
         }
         Update: {
           id?: string
@@ -159,6 +161,7 @@ export interface Database {
           status?: 'pending' | 'confirmed' | 'cancelled' | 'waitlisted'
           notes?: string | null
           details?: BookingDetails
+          refund_requested_at?: string | null
         }
         Relationships: []
       }
