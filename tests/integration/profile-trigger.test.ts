@@ -12,7 +12,7 @@ afterEach(async () => {
 })
 
 describe('handle_new_user trigger', () => {
-  it('creates a profile row with default role=customer when an auth user is inserted', async () => {
+  it('creates a profile row with default role=diver when an auth user is inserted', async () => {
     const u = await createTestUser(admin)
     cleanupIds.push(u.id)
 
@@ -25,7 +25,9 @@ describe('handle_new_user trigger', () => {
     expect(error).toBeNull()
     expect(data).not.toBeNull()
     expect(data!.id).toBe(u.id)
-    expect(data!.role).toBe('customer')
+    expect(data!.role).toBe('diver')
+    expect(data!.nitrox_certified).toBe(false)
+    expect(data!.logged_dives).toBe(0)
   })
 
   it('deleting an auth user cascades to remove the profile row', async () => {
