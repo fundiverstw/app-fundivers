@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { usePWAInstall } from '../../hooks/usePWAInstall'
 
@@ -32,6 +32,11 @@ export function AppShell() {
             >
               Install app
             </button>
+          )}
+          {profile?.role === 'admin' && (
+            <Link to="/admin" className="text-xs text-amber-400 hover:text-amber-300 transition-colors">
+              View as admin
+            </Link>
           )}
           <span className="text-sm text-slate-400">{profile?.display_name ?? profile?.full_name}</span>
           <button
