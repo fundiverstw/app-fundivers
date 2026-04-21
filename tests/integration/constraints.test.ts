@@ -25,6 +25,63 @@ afterAll(async () => {
   if (user) await deleteTestUser(admin, user.id).catch(() => {})
 })
 
+describe('bookings.details JSONB', () => {
+  it('defaults to an empty object on insert', async () => {
+    const freshDive = await createTestDive(admin)
+    const { data, error } = await admin
+      .from('bookings')
+      .insert({ user_id: user.id, eo_dive_id: freshDive, status: 'pending' })
+      .select().single()
+    expect(error).toBeNull()
+    expect(data!.details).toEqual({})
+    if (data) bookingIds.push(data.id)
+    await admin.from('bookings').delete().eq('id', data!.id)
+    await deleteTestDive(admin, freshDive)
+  })
+
+  it('rejects non-object JSON (array, scalar)', async () => {
+    for (const bad of [[], 'string', 42, true] as unknown[]) {
+      const { error } = await admin
+        .from('bookings')
+        .insert({
+          user_id: user.id,
+          eo_dive_id: diveId,
+          status: 'pending',
+          // @ts-expect-error — testing invalid shape
+          details: bad,
+        })
+      expect(error, `expected rejection for details=${JSON.stringify(bad)}`).toBeTruthy()
+    }
+  })
+
+  it('round-trips a populated details payload', async () => {
+    const payload = {
+      gear: { rent: true, mode: 'full', items: ['BCD', 'Regulator', 'Wetsuit'] },
+      room: { option_id: 'eo_room_xyz', notes: 'twin share' },
+      add_ons: ['nitrox_fills', 'go_pro_rental'],
+      transportation: true,
+      payment_method: 'bank_transfer',
+      total: 15000,
+      deposit: 6000,
+    }
+    const freshDive = await createTestDive(admin)
+    const { data, error } = await admin
+      .from('bookings')
+      .insert({
+        user_id: user.id,
+        eo_dive_id: freshDive,
+        status: 'confirmed',
+        details: payload,
+      })
+      .select().single()
+    expect(error).toBeNull()
+    expect(data!.details).toEqual(payload)
+    if (data) bookingIds.push(data.id)
+    await admin.from('bookings').delete().eq('id', data!.id)
+    await deleteTestDive(admin, freshDive)
+  })
+})
+
 describe('bookings constraints', () => {
   it('requires exactly one of eo_dive_id or eo_course_id (XOR check)', async () => {
     // both null → rejected
