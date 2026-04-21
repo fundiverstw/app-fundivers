@@ -234,12 +234,18 @@ function MonthGrid({ month, days, ranges, trackRows, onPickEvent }: MonthGridPro
   const cellMinHeight = 22 + Math.max(1, trackRows) * (TRACK_HEIGHT + TRACK_GAP) + 6
 
   return (
-    <div className="grid grid-cols-7 gap-px bg-slate-700 rounded-xl overflow-hidden text-sm">
+    // No grid gap — cells touch edge-to-edge so bars span continuously.
+    // Week rows get a subtle top border via the DayCell itself.
+    <div className="grid grid-cols-7 bg-slate-800 rounded-xl overflow-hidden text-sm">
       {['S','M','T','W','T','F','S'].map((d, i) => (
-        <div key={i} className="bg-slate-800 text-center text-xs text-slate-500 py-1">{d}</div>
+        <div key={i} className="bg-slate-900/40 text-center text-xs text-slate-500 py-1 border-b border-slate-700">{d}</div>
       ))}
       {Array.from({ length: leading }).map((_, i) => (
-        <div key={`empty-${i}`} className="bg-slate-800" style={{ minHeight: cellMinHeight }} />
+        <div
+          key={`empty-${i}`}
+          className="bg-slate-800 border-b border-slate-700/60"
+          style={{ minHeight: cellMinHeight }}
+        />
       ))}
       {days.map(day => (
         <DayCell
@@ -279,11 +285,13 @@ function DayCell({
 
   return (
     <div
-      className={`bg-slate-800 relative px-0.5 pt-1 ${!inMonth ? 'opacity-40' : ''}`}
+      className={`relative pt-1 border-b border-slate-700/60 ${
+        isToday ? 'bg-rose-900/30' : 'bg-slate-800'
+      } ${!inMonth ? 'opacity-40' : ''}`}
       style={{ minHeight }}
     >
-      <span className={`text-[10px] block text-center rounded-full w-5 h-5 flex items-center justify-center mx-auto ${
-        isToday ? 'bg-sky-500 text-white font-bold' : 'text-slate-300'
+      <span className={`text-[10px] block text-center w-5 h-5 flex items-center justify-center mx-auto ${
+        isToday ? 'text-rose-200 font-bold' : 'text-slate-300'
       }`}>
         {format(day, 'd')}
       </span>
@@ -291,7 +299,12 @@ function DayCell({
         {Array.from(segMap.entries())
           .filter(([track]) => track < visibleTracks)
           .map(([track, seg]) => (
-            <EventBar key={`${seg.event.id}`} seg={seg} track={track} onClick={() => onPickEvent(seg.event)} />
+            <EventBar
+              key={`${seg.event.id}_${seg.event.start_time}`}
+              seg={seg}
+              track={track}
+              onClick={() => onPickEvent(seg.event)}
+            />
           ))}
       </div>
       {overflow > 0 && (
@@ -303,19 +316,26 @@ function DayCell({
 
 function EventBar({ seg, track, onClick }: { seg: CellSegment; track: number; onClick: () => void }) {
   const baseClass = TYPE_BAR[seg.event.type]
-  const left = seg.isStart ? 'rounded-l-sm ml-0.5' : ''
-  const right = seg.isEnd ? 'rounded-r-sm mr-0.5' : ''
   const featuredRing = seg.event.featured ? 'ring-1 ring-amber-300' : ''
+  // Leave a 2px inset on the true edges of the event so successive events on
+  // adjacent days still look distinct. Middle cells use 0 inset so the bar
+  // reads as one continuous pill across cell boundaries.
+  const leftInset = seg.isStart ? 2 : 0
+  const rightInset = seg.isEnd ? 2 : 0
+  const leftRadius = seg.isStart ? 'rounded-l-sm' : ''
+  const rightRadius = seg.isEnd ? 'rounded-r-sm' : ''
 
   return (
     <button
       type="button"
       onClick={onClick}
       title={seg.event.title}
-      className={`absolute left-0 right-0 text-[10px] font-semibold truncate text-left px-1 ${baseClass} ${left} ${right} ${featuredRing}`}
+      className={`absolute text-[10px] font-semibold truncate text-left px-1 ${baseClass} ${leftRadius} ${rightRadius} ${featuredRing}`}
       style={{
         top: track * (TRACK_HEIGHT + TRACK_GAP),
         height: TRACK_HEIGHT,
+        left: leftInset,
+        right: rightInset,
       }}
     >
       {seg.showTitle ? (
