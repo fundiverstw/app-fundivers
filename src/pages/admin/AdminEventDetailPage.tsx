@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { fetchEventsForBookings } from '../../lib/events'
+import { EventMemos } from '../../components/admin/EventMemos'
 import type { AppEvent, Booking, BookingDetails, Payment, Profile } from '../../types/database'
 
 interface Registrant {
@@ -90,6 +91,8 @@ export function AdminEventDetailPage() {
         )}
         <p className="text-sm text-amber-400 mt-2">{registrants.length} registrant{registrants.length === 1 ? '' : 's'}</p>
       </header>
+
+      {type && id && <EventMemos eventType={type} eventId={id} />}
 
       {registrants.length === 0 ? (
         <p className="text-slate-500 text-sm">No one has registered for this event yet.</p>
