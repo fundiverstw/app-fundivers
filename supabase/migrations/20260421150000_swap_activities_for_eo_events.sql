@@ -1,11 +1,8 @@
 -- Replace the bespoke `public.activities` table with the existing
 -- catalog tables `EO_dives` and `EO_courses`. `bookings` now FKs the
 -- specific event it was made for (XOR: exactly one of eo_dive_id or
--- eo_course_id must be set).
---
--- A `public.events` view UNIONs dives + courses into a normalized shape
--- so the UI can render both with one query. Text date/time columns on
--- the EO_* tables are parsed inside the view.
+-- eo_course_id must be set). The UI queries the two catalog tables
+-- directly; normalization happens in app code.
 
 begin;
 
@@ -34,43 +31,5 @@ create unique index bookings_user_dive_uniq
 create unique index bookings_user_course_uniq
   on public.bookings (user_id, eo_course_id)
   where eo_course_id is not null;
-
--- 4. Normalized events view: UNION of EO_dives + EO_courses.
-create or replace view public.events as
-select
-  d._id                                                                                  as id,
-  'dive'::text                                                                           as type,
-  coalesce(nullif(d.dive_title, ''), nullif(d.title, ''), 'Dive')                        as title,
-  (d.start_date || ' ' || coalesce(nullif(d.time, ''), '00:00:00'))::timestamptz         as start_time,
-  case when nullif(d.end_date, '') is null then null
-       else (d.end_date || ' ' || coalesce(nullif(d.time, ''), '23:59:59'))::timestamptz
-  end                                                                                    as end_time,
-  coalesce(d.featured, false)                                                            as featured,
-  coalesce(d.fully_booked, false)                                                        as fully_booked,
-  p.starting_at::numeric                                                                 as price,
-  p.deposit_amount::numeric                                                              as deposit_amount,
-  'TWD'::text                                                                            as currency
-from public."EO_dives" d
-left join public."EO_prices" p on p._id = d.price
-
-union all
-
-select
-  c._id                                                                                  as id,
-  'course'::text                                                                         as type,
-  coalesce(nullif(c.course_title, ''), nullif(c.title, ''), 'Course')                    as title,
-  (c.start_date || ' ' || coalesce(nullif(c.start_time, ''), '00:00:00'))::timestamptz   as start_time,
-  case when nullif(c.end_date, '') is null then null
-       else (c.end_date || ' ' || coalesce(nullif(c.start_time, ''), '23:59:59'))::timestamptz
-  end                                                                                    as end_time,
-  false                                                                                  as featured,
-  false                                                                                  as fully_booked,
-  p.starting_at::numeric                                                                 as price,
-  p.deposit_amount::numeric                                                              as deposit_amount,
-  'TWD'::text                                                                            as currency
-from public."EO_courses" c
-left join public."EO_prices" p on p._id = c.price;
-
-grant select on public.events to authenticated, anon, service_role;
 
 commit;

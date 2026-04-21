@@ -2,48 +2,43 @@ import { useEffect, useState } from 'react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import type { Event, Booking } from '../types/database'
+import { fetchEventsInRange } from '../lib/events'
+import type { AppEvent, Booking } from '../types/database'
 
-const TYPE_COLORS: Record<Event['type'], string> = {
+const TYPE_COLORS: Record<AppEvent['type'], string> = {
   dive: 'bg-sky-500',
   course: 'bg-emerald-500',
 }
 
-const TYPE_LABELS: Record<Event['type'], string> = {
+const TYPE_LABELS: Record<AppEvent['type'], string> = {
   dive: 'Dive',
   course: 'Course',
 }
 
-function fkFor(ev: Event) {
+function fkFor(ev: AppEvent) {
   return ev.type === 'dive'
     ? { col: 'eo_dive_id' as const, payload: { eo_dive_id: ev.id, eo_course_id: null } }
     : { col: 'eo_course_id' as const, payload: { eo_dive_id: null, eo_course_id: ev.id } }
 }
 
-function bookingMatches(b: Booking, ev: Event) {
+function bookingMatches(b: Booking, ev: AppEvent) {
   return ev.type === 'dive' ? b.eo_dive_id === ev.id : b.eo_course_id === ev.id
 }
 
 export function CalendarPage() {
   const { user } = useAuth()
   const [month, setMonth] = useState(new Date())
-  const [events, setEvents] = useState<Event[]>([])
+  const [events, setEvents] = useState<AppEvent[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
-  const [selected, setSelected] = useState<Event | null>(null)
+  const [selected, setSelected] = useState<AppEvent | null>(null)
   const [bookingLoading, setBookingLoading] = useState(false)
 
   const days = eachDayOfInterval({ start: startOfMonth(month), end: endOfMonth(month) })
 
   useEffect(() => {
-    const from = startOfMonth(month).toISOString()
-    const to = endOfMonth(month).toISOString()
-    supabase
-      .from('events')
-      .select('*')
-      .gte('start_time', from)
-      .lte('start_time', to)
-      .order('start_time')
-      .then(({ data }) => setEvents(data ?? []))
+    const from = startOfMonth(month).toISOString().slice(0, 10)
+    const to = endOfMonth(month).toISOString().slice(0, 10)
+    fetchEventsInRange(from, to).then(setEvents)
   }, [month])
 
   useEffect(() => {
@@ -59,7 +54,7 @@ export function CalendarPage() {
     return events.filter(e => isSameDay(new Date(e.start_time), day))
   }
 
-  function isBooked(ev: Event) {
+  function isBooked(ev: AppEvent) {
     return bookings.some(b => bookingMatches(b, ev) && b.status !== 'cancelled')
   }
 
@@ -90,23 +85,20 @@ export function CalendarPage() {
 
   return (
     <div className="max-w-lg mx-auto space-y-4">
-      {/* Month nav */}
       <div className="flex items-center justify-between">
         <button onClick={() => setMonth(m => subMonths(m, 1))} className="p-2 text-slate-400 hover:text-slate-100">‹</button>
         <h1 className="text-lg font-bold text-slate-100">{format(month, 'MMMM yyyy')}</h1>
         <button onClick={() => setMonth(m => addMonths(m, 1))} className="p-2 text-slate-400 hover:text-slate-100">›</button>
       </div>
 
-      {/* Legend */}
       <div className="flex gap-3 text-xs text-slate-400">
-        {(Object.keys(TYPE_COLORS) as Event['type'][]).map(t => (
+        {(Object.keys(TYPE_COLORS) as AppEvent['type'][]).map(t => (
           <span key={t} className="flex items-center gap-1">
             <span className={`w-2 h-2 rounded-full ${TYPE_COLORS[t]}`} />{TYPE_LABELS[t]}
           </span>
         ))}
       </div>
 
-      {/* Calendar grid */}
       <div className="grid grid-cols-7 gap-px bg-slate-700 rounded-xl overflow-hidden text-sm">
         {['S','M','T','W','T','F','S'].map((d, i) => (
           <div key={i} className="bg-slate-800 text-center text-xs text-slate-500 py-1">{d}</div>
@@ -139,7 +131,6 @@ export function CalendarPage() {
         })}
       </div>
 
-      {/* Event list for month */}
       <div className="space-y-2">
         <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">This month</h2>
         {events.length === 0 && (
@@ -172,7 +163,6 @@ export function CalendarPage() {
         ))}
       </div>
 
-      {/* Event detail modal */}
       {selected && (
         <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-50" onClick={() => setSelected(null)}>
           <div className="bg-slate-800 rounded-t-2xl w-full max-w-lg p-6 space-y-4" onClick={e => e.stopPropagation()}>

@@ -1,10 +1,16 @@
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[]
 
+/**
+ * EO_* table Row shapes are minimal here — only the columns the app
+ * actually reads. Those tables carry dozens of legacy columns from the
+ * Wix import; if the app ever needs more, add them.
+ */
 export interface Database {
   public: {
     Functions: Record<string, never>
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
+    Views: Record<string, never>
     Tables: {
       profiles: {
         Row: {
@@ -135,21 +141,70 @@ export interface Database {
         }
         Relationships: []
       }
-    }
-    Views: {
-      events: {
+      EO_dives: {
         Row: {
-          id: string
-          type: 'dive' | 'course'
-          title: string
-          start_time: string
-          end_time: string | null
-          featured: boolean
-          fully_booked: boolean
-          price: number | null
-          deposit_amount: number | null
-          currency: string
+          _id: string
+          dive_title: string | null
+          title: string | null
+          start_date: string | null
+          time: string | null
+          end_date: string | null
+          featured: boolean | null
+          fully_booked: boolean | null
+          price: string | null
         }
+        Insert: {
+          _id: string
+          dive_title?: string | null
+          title?: string | null
+          start_date?: string | null
+          time?: string | null
+          end_date?: string | null
+          featured?: boolean | null
+          fully_booked?: boolean | null
+          price?: string | null
+          notes?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['EO_dives']['Insert']>
+        Relationships: []
+      }
+      EO_courses: {
+        Row: {
+          _id: string
+          course_title: string | null
+          title: string | null
+          start_date: string | null
+          start_time: string | null
+          end_date: string | null
+          price: string | null
+        }
+        Insert: {
+          _id: string
+          course_title?: string | null
+          title?: string | null
+          start_date?: string | null
+          start_time?: string | null
+          end_date?: string | null
+          price?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['EO_courses']['Insert']>
+        Relationships: []
+      }
+      EO_prices: {
+        Row: {
+          _id: string
+          title: string
+          starting_at: number | null
+          deposit_amount: number | null
+        }
+        Insert: {
+          _id: string
+          title: string
+          starting_at?: number | null
+          deposit_amount?: number | null
+        }
+        Update: Partial<Database['public']['Tables']['EO_prices']['Insert']>
+        Relationships: []
       }
     }
   }
@@ -159,4 +214,19 @@ export interface Database {
 export type Profile = Database['public']['Tables']['profiles']['Row']
 export type Booking = Database['public']['Tables']['bookings']['Row']
 export type Payment = Database['public']['Tables']['payments']['Row']
-export type Event = Database['public']['Views']['events']['Row']
+export type EODive = Database['public']['Tables']['EO_dives']['Row']
+export type EOCourse = Database['public']['Tables']['EO_courses']['Row']
+export type EOPrice = Database['public']['Tables']['EO_prices']['Row']
+
+/** Normalized event shape used across Calendar + Bookings UI. */
+export interface AppEvent {
+  id: string
+  type: 'dive' | 'course'
+  title: string
+  start_time: string // ISO timestamp
+  end_time: string | null
+  featured: boolean
+  fully_booked: boolean
+  price: number | null
+  currency: string
+}

@@ -305,7 +305,11 @@ INSERT INTO "public"."profiles" ("id", "created_at", "updated_at", "full_name", 
 	('44444444-4444-4444-4444-444444444444', '2026-04-21 01:31:27.817174+00', '2026-04-21 01:31:27.817174+00', 'Staff Member', 'Staff', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'staff');
 
 
--- Old bookings (activity_id references) dropped as part of migration 20260421150000.
+-- Seed bookings for dev@dev.dev (11111111…). Real EO_dive / EO_course _ids above.
+INSERT INTO "public"."bookings" ("id", "created_at", "user_id", "eo_dive_id", "eo_course_id", "status", "notes") VALUES
+	('b0000000-0000-0000-0000-000000000001', '2026-04-21 01:31:27.817174+00', '11111111-1111-1111-1111-111111111111', '829d3ca3-6b4a-4d4d-b74a-51fea5cf0287', NULL, 'confirmed', NULL),
+	('b0000000-0000-0000-0000-000000000002', '2026-04-21 01:31:27.817174+00', '11111111-1111-1111-1111-111111111111', '08ae6dd9-e926-4ae3-b6a3-490d25acc4f9', NULL, 'pending', 'Ask about tank rental'),
+	('b0000000-0000-0000-0000-000000000003', '2026-04-21 01:31:27.817174+00', '11111111-1111-1111-1111-111111111111', NULL, 'a39a1c3f-c108-42e5-b800-d85ba1dfe9a8', 'confirmed', NULL);
 
 
 --
