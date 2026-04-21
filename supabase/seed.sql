@@ -289,18 +289,7 @@ INSERT INTO "public"."Other_Addons" ("title", "price", "display_name", "currency
 	('SMB 3 Day', 300, 'SMB Rental (3 Days)', 'NTD', '["08ae6dd9-e926-4ae3-b6a3-490d25acc4f9"]', NULL, 'e1046878-d0d3-4a13-bcd4-c3c4520b3c64', '2026-04-07 06:20:59+00', '2026-04-09 08:41:01+00', 'b37fefa3-09b1-4e00-a824-f6b884e43572');
 
 
---
--- Data for Name: activities; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-INSERT INTO "public"."activities" ("id", "created_at", "title", "description", "type", "start_time", "end_time", "location", "capacity", "price", "currency", "is_published") VALUES
-	('aaaaaaaa-0001-0000-0000-000000000000', '2026-04-21 01:31:27.817174+00', 'Fun Dive — Xiaoliuqiu', 'Two-tank fun dive around Little Liuqiu island. Sea turtles almost guaranteed! Suitable for Open Water certified divers and above.', 'dive', '2026-04-24 01:31:27.817174+00', '2026-04-24 09:31:27.817174+00', 'Xiaoliuqiu (小琉球), Pingtung', 8, 2800.00, 'TWD', true),
-	('aaaaaaaa-0002-0000-0000-000000000000', '2026-04-21 01:31:27.817174+00', 'PADI Open Water Course', 'Full PADI Open Water Diver certification. Includes 5 knowledge development sessions, 5 confined water dives, and 4 open water dives. Materials included.', 'course', '2026-04-28 01:31:27.817174+00', '2026-05-02 01:31:27.817174+00', 'FunDivers TW Shop + Kenting', 4, 18000.00, 'TWD', true),
-	('aaaaaaaa-0003-0000-0000-000000000000', '2026-04-21 01:31:27.817174+00', 'Night Dive — Kenting', 'Experience the reef after dark. Witness nocturnal marine life including octopus, lobster, and sleeping fish. Min. Advanced OW certification.', 'dive', '2026-05-01 01:31:27.817174+00', '2026-05-01 05:31:27.817174+00', 'Kenting National Park (墾丁)', 6, 1800.00, 'TWD', true),
-	('aaaaaaaa-0004-0000-0000-000000000000', '2026-04-21 01:31:27.817174+00', 'PADI Advanced Open Water Course', 'Expand your skills with 5 adventure dives including Deep, Navigation, and 3 electives of your choice.', 'course', '2026-05-05 01:31:27.817174+00', '2026-05-07 01:31:27.817174+00', 'FunDivers TW Shop + Kenting', 4, 12000.00, 'TWD', true),
-	('aaaaaaaa-0005-0000-0000-000000000000', '2026-04-21 01:31:27.817174+00', 'Ocean Clean-Up Dive', 'Join us for our quarterly ocean clean-up dive. Free for all certified divers. Equipment provided. Help keep our reefs beautiful!', 'event', '2026-05-09 01:31:27.817174+00', '2026-05-09 06:31:27.817174+00', 'Cijin Island (旗津), Kaohsiung', 20, 0.00, 'TWD', true),
-	('aaaaaaaa-0006-0000-0000-000000000000', '2026-04-21 01:31:27.817174+00', 'Fun Dive — Green Island', 'Three-tank dive trip to Green Island (Lyudao). Famous for its crystal clear water and diverse marine life. Overnight trip available.', 'dive', '2026-05-12 01:31:27.817174+00', '2026-05-12 11:31:27.817174+00', 'Green Island (綠島), Taitung', 6, 3800.00, 'TWD', true),
-	('aaaaaaaa-0007-0000-0000-000000000000', '2026-04-21 01:31:27.817174+00', 'Dive & BBQ Social', 'Two fun dives followed by a BBQ on the beach. Great way to meet fellow divers. Family and non-divers welcome for the BBQ portion.', 'event', '2026-05-16 01:31:27.817174+00', '2026-05-16 08:31:27.817174+00', 'Baisha Bay (白沙灣), New Taipei', 15, 1200.00, 'TWD', true);
+-- activities table was removed (see migration 20260421150000).
 
 
 --
@@ -316,17 +305,7 @@ INSERT INTO "public"."profiles" ("id", "created_at", "updated_at", "full_name", 
 	('44444444-4444-4444-4444-444444444444', '2026-04-21 01:31:27.817174+00', '2026-04-21 01:31:27.817174+00', 'Staff Member', 'Staff', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'staff');
 
 
---
--- Data for Name: bookings; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-INSERT INTO "public"."bookings" ("id", "created_at", "user_id", "activity_id", "status", "notes") VALUES
-	('7134ac40-ba6d-4a77-ac1b-a097fa12c209', '2026-04-21 01:31:27.817174+00', '22222222-2222-2222-2222-222222222222', 'aaaaaaaa-0001-0000-0000-000000000000', 'confirmed', NULL),
-	('5c7de75d-d574-41b7-881f-61f998e03b54', '2026-04-21 01:31:27.817174+00', '33333333-3333-3333-3333-333333333333', 'aaaaaaaa-0001-0000-0000-000000000000', 'confirmed', NULL),
-	('39f67a70-84e6-4db9-b131-e4b080c8709f', '2026-04-21 01:31:27.817174+00', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-0001-0000-0000-000000000000', 'pending', NULL),
-	('e138c0e8-dfcc-4c9a-b0a7-48e471eb7b09', '2026-04-21 01:31:27.817174+00', '33333333-3333-3333-3333-333333333333', 'aaaaaaaa-0002-0000-0000-000000000000', 'confirmed', NULL),
-	('6aafc4d7-cfeb-44ae-8837-5c4110895eb3', '2026-04-21 01:31:27.817174+00', '22222222-2222-2222-2222-222222222222', 'aaaaaaaa-0005-0000-0000-000000000000', 'confirmed', NULL),
-	('6239cd4e-c1a1-4eed-bf7f-8277299c894b', '2026-04-21 01:31:27.817174+00', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-0006-0000-0000-000000000000', 'pending', NULL);
+-- Old bookings (activity_id references) dropped as part of migration 20260421150000.
 
 
 --
@@ -334,10 +313,10 @@ INSERT INTO "public"."bookings" ("id", "created_at", "user_id", "activity_id", "
 --
 
 INSERT INTO "public"."payments" ("id", "created_at", "user_id", "booking_id", "amount", "currency", "status", "method", "note", "recorded_by") VALUES
-	('24e2e45a-6cf2-4f18-9003-da723f45ea5a', '2026-04-21 01:31:27.817174+00', '22222222-2222-2222-2222-222222222222', '7134ac40-ba6d-4a77-ac1b-a097fa12c209', 2800.00, 'TWD', 'paid', 'Bank transfer', 'Paid in full', '44444444-4444-4444-4444-444444444444'),
-	('26325f69-72fe-4c5f-b30e-914686a485d2', '2026-04-21 01:31:27.817174+00', '33333333-3333-3333-3333-333333333333', '5c7de75d-d574-41b7-881f-61f998e03b54', 2800.00, 'TWD', 'paid', 'Bank transfer', 'Paid in full', '44444444-4444-4444-4444-444444444444'),
-	('0ac31368-add0-4d96-a98e-597b525bf80c', '2026-04-21 01:31:27.817174+00', '33333333-3333-3333-3333-333333333333', 'e138c0e8-dfcc-4c9a-b0a7-48e471eb7b09', 18000.00, 'TWD', 'paid', 'Bank transfer', 'Paid in full', '44444444-4444-4444-4444-444444444444'),
-	('23a69e47-269a-4f36-a9a7-3992e532c338', '2026-04-21 01:31:27.817174+00', '11111111-1111-1111-1111-111111111111', '39f67a70-84e6-4db9-b131-e4b080c8709f', 2800.00, 'TWD', 'pending', NULL, 'Awaiting payment', '44444444-4444-4444-4444-444444444444');
+	('24e2e45a-6cf2-4f18-9003-da723f45ea5a', '2026-04-21 01:31:27.817174+00', '22222222-2222-2222-2222-222222222222', NULL, 2800.00, 'TWD', 'paid', 'Bank transfer', 'Paid in full', '44444444-4444-4444-4444-444444444444'),
+	('26325f69-72fe-4c5f-b30e-914686a485d2', '2026-04-21 01:31:27.817174+00', '33333333-3333-3333-3333-333333333333', NULL, 2800.00, 'TWD', 'paid', 'Bank transfer', 'Paid in full', '44444444-4444-4444-4444-444444444444'),
+	('0ac31368-add0-4d96-a98e-597b525bf80c', '2026-04-21 01:31:27.817174+00', '33333333-3333-3333-3333-333333333333', NULL, 18000.00, 'TWD', 'paid', 'Bank transfer', 'Paid in full', '44444444-4444-4444-4444-444444444444'),
+	('23a69e47-269a-4f36-a9a7-3992e532c338', '2026-04-21 01:31:27.817174+00', '11111111-1111-1111-1111-111111111111', NULL, 2800.00, 'TWD', 'pending', NULL, 'Awaiting payment', '44444444-4444-4444-4444-444444444444');
 
 
 --

@@ -4,15 +4,17 @@ import userEvent from '@testing-library/user-event'
 import { CalendarPage } from './CalendarPage'
 import { renderWithRouter, mockQueryBuilder } from '../../tests/test-utils'
 
-const from = vi.fn()
-const insert = vi.fn()
-const update = vi.fn()
+const { from, insert, update, useAuthMock } = vi.hoisted(() => ({
+  from: vi.fn(),
+  insert: vi.fn(),
+  update: vi.fn(),
+  useAuthMock: vi.fn(),
+}))
 
 vi.mock('../lib/supabase', () => ({
   supabase: { from: (...a: unknown[]) => from(...a) },
 }))
 
-const useAuthMock = vi.fn()
 vi.mock('../hooks/useAuth', () => ({
   useAuth: () => useAuthMock(),
 }))
@@ -25,34 +27,28 @@ beforeEach(() => {
   useAuthMock.mockReturnValue({ user: { id: 'u1' } })
 })
 
-function futureDate(daysAhead = 7) {
+function future(daysAhead = 7) {
   return new Date(Date.now() + daysAhead * 86_400_000).toISOString()
 }
 
-function buildActivity(overrides: Partial<{ id: string; type: 'dive' | 'course' | 'event'; title: string }> = {}) {
+function buildEvent(overrides: Partial<{ id: string; type: 'dive' | 'course'; title: string; featured: boolean; fully_booked: boolean; price: number | null }> = {}) {
   return {
-    id: overrides.id ?? 'a1',
+    id: overrides.id ?? 'dive_a1',
     type: overrides.type ?? 'dive',
     title: overrides.title ?? 'Green Island Dive',
-    description: 'Test',
-    start_time: futureDate(),
+    start_time: future(),
     end_time: null,
-    location: 'Green Island',
-    capacity: 10,
-    price: 1500,
+    featured: overrides.featured ?? false,
+    fully_booked: overrides.fully_booked ?? false,
+    price: overrides.price ?? 1500,
+    deposit_amount: 500,
     currency: 'TWD',
-    is_published: true,
-    created_at: new Date().toISOString(),
   }
 }
 
-/**
- * from('activities') -> chain returning activities data
- * from('bookings')   -> chain returning bookings data OR an insert/update chain
- */
-function setupFrom(activities: unknown[], bookings: unknown[], inserted?: unknown) {
+function setupFrom(events: unknown[], bookings: unknown[], inserted?: unknown) {
   from.mockImplementation((table: string) => {
-    if (table === 'activities') return mockQueryBuilder({ data: activities })
+    if (table === 'events') return mockQueryBuilder({ data: events })
     return {
       ...mockQueryBuilder({ data: bookings }),
       insert: (...a: unknown[]) => {
@@ -72,78 +68,109 @@ function setupFrom(activities: unknown[], bookings: unknown[], inserted?: unknow
 }
 
 describe('CalendarPage', () => {
-  it('shows an empty state when there are no activities', async () => {
+  it('shows an empty state when there are no events', async () => {
     setupFrom([], [])
     renderWithRouter(<CalendarPage />)
-    expect(await screen.findByText(/no activities scheduled/i)).toBeInTheDocument()
+    expect(await screen.findByText(/no events scheduled/i)).toBeInTheDocument()
   })
 
-  it('renders activities in the month list with type badge', async () => {
-    const a = buildActivity({ title: 'Beginner Course', type: 'course' })
-    setupFrom([a], [])
+  it('renders events with a type badge', async () => {
+    const ev = buildEvent({ title: 'Beginner Course', type: 'course' })
+    setupFrom([ev], [])
     renderWithRouter(<CalendarPage />)
     expect(await screen.findByText('Beginner Course')).toBeInTheDocument()
-    // "Course" appears once in the legend plus once per course activity — so 2x here
+    // "Course" appears once in the legend + once per course event → 2x here
     expect(screen.getAllByText('Course')).toHaveLength(2)
   })
 
-  it('tags activities the current user has booked', async () => {
-    const a = buildActivity()
-    setupFrom([a], [{ id: 'b1', user_id: 'u1', activity_id: a.id, status: 'confirmed' }])
+  it('tags events the current user has booked', async () => {
+    const ev = buildEvent({ id: 'dive_a1', type: 'dive' })
+    setupFrom([ev], [{ id: 'b1', user_id: 'u1', eo_dive_id: 'dive_a1', eo_course_id: null, status: 'confirmed' }])
     renderWithRouter(<CalendarPage />)
-    await screen.findByText(a.title)
+    await screen.findByText(ev.title)
     expect(screen.getByText(/^booked$/i)).toBeInTheDocument()
   })
 
-  it('opens the detail modal when an activity is clicked', async () => {
-    const a = buildActivity()
-    setupFrom([a], [])
+  it('opens the detail modal on click', async () => {
+    const ev = buildEvent()
+    setupFrom([ev], [])
     const user = userEvent.setup()
     renderWithRouter(<CalendarPage />)
-    await user.click(await screen.findByText(a.title))
+    await user.click(await screen.findByText(ev.title))
     expect(await screen.findByRole('button', { name: /register/i })).toBeInTheDocument()
-    expect(screen.getByText(/Capacity: 10/)).toBeInTheDocument()
+    expect(screen.getByText(/TWD\s*1,500/)).toBeInTheDocument()
   })
 
-  it('clicking "Register" calls bookings.insert with pending status', async () => {
-    const a = buildActivity()
-    const insertedRow = { id: 'b-new', user_id: 'u1', activity_id: a.id, status: 'pending' }
-    setupFrom([a], [], insertedRow)
+  it('Register inserts with eo_dive_id for a dive event', async () => {
+    const ev = buildEvent({ id: 'dive_xyz', type: 'dive' })
+    const insertedRow = { id: 'b-new', user_id: 'u1', eo_dive_id: ev.id, eo_course_id: null, status: 'pending' }
+    setupFrom([ev], [], insertedRow)
 
     const user = userEvent.setup()
     renderWithRouter(<CalendarPage />)
-    await user.click(await screen.findByText(a.title))
+    await user.click(await screen.findByText(ev.title))
     await user.click(screen.getByRole('button', { name: /register/i }))
 
     await waitFor(() => expect(insert).toHaveBeenCalledOnce())
     const payload = insert.mock.calls[0][0] as Record<string, unknown>
-    expect(payload).toMatchObject({ user_id: 'u1', activity_id: a.id, status: 'pending' })
+    expect(payload).toMatchObject({
+      user_id: 'u1',
+      eo_dive_id: 'dive_xyz',
+      eo_course_id: null,
+      status: 'pending',
+    })
   })
 
-  it('clicking "Cancel booking" updates booking status to cancelled', async () => {
-    const a = buildActivity()
-    setupFrom([a], [{ id: 'b1', user_id: 'u1', activity_id: a.id, status: 'confirmed' }])
+  it('Register inserts with eo_course_id for a course event', async () => {
+    const ev = buildEvent({ id: 'course_xyz', type: 'course', title: 'AOW' })
+    const insertedRow = { id: 'b-new', user_id: 'u1', eo_dive_id: null, eo_course_id: ev.id, status: 'pending' }
+    setupFrom([ev], [], insertedRow)
 
     const user = userEvent.setup()
     renderWithRouter(<CalendarPage />)
-    await user.click(await screen.findByText(a.title))
+    await user.click(await screen.findByText(ev.title))
+    await user.click(screen.getByRole('button', { name: /register/i }))
+
+    await waitFor(() => expect(insert).toHaveBeenCalledOnce())
+    const payload = insert.mock.calls[0][0] as Record<string, unknown>
+    expect(payload).toMatchObject({
+      user_id: 'u1',
+      eo_dive_id: null,
+      eo_course_id: 'course_xyz',
+      status: 'pending',
+    })
+  })
+
+  it('Cancel booking updates status to cancelled using the right FK column', async () => {
+    const ev = buildEvent({ id: 'dive_xyz', type: 'dive' })
+    setupFrom([ev], [{ id: 'b1', user_id: 'u1', eo_dive_id: 'dive_xyz', eo_course_id: null, status: 'confirmed' }])
+
+    const user = userEvent.setup()
+    renderWithRouter(<CalendarPage />)
+    await user.click(await screen.findByText(ev.title))
     await user.click(screen.getByRole('button', { name: /cancel booking/i }))
 
     await waitFor(() => expect(update).toHaveBeenCalledOnce())
     expect(update.mock.calls[0][0]).toEqual({ status: 'cancelled' })
   })
 
-  it('advances and reverses the month with the nav arrows', async () => {
+  it('disables Register for a fully-booked event', async () => {
+    const ev = buildEvent({ fully_booked: true })
+    setupFrom([ev], [])
+    const user = userEvent.setup()
+    renderWithRouter(<CalendarPage />)
+    await user.click(await screen.findByText(ev.title))
+    const btn = await screen.findByRole('button', { name: /register/i })
+    expect(btn).toBeDisabled()
+  })
+
+  it('advances the month with the arrow buttons', async () => {
     setupFrom([], [])
     const user = userEvent.setup()
     renderWithRouter(<CalendarPage />)
-
-    const now = new Date()
     const heading = await screen.findByRole('heading', { level: 1 })
-    const monthLabel = heading.textContent
-    expect(monthLabel).toMatch(new RegExp(`${now.getFullYear()}`))
-
+    const initial = heading.textContent
     await user.click(screen.getByRole('button', { name: '›' }))
-    await waitFor(() => expect(heading.textContent).not.toBe(monthLabel))
+    await waitFor(() => expect(heading.textContent).not.toBe(initial))
   })
 })
