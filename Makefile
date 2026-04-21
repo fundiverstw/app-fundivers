@@ -1,4 +1,4 @@
-.PHONY: help dev studio mail start stop status reset diff link pull push dump-data verify test
+.PHONY: help dev studio mail start stop status reset diff link pull push dump-data verify test deploy
 
 help:
 	@echo "Local dev:"
@@ -20,6 +20,9 @@ help:
 	@echo ""
 	@echo "Testing:"
 	@echo "  make test        — run every local test (unit + component + integration)"
+	@echo ""
+	@echo "Deploy:"
+	@echo "  make deploy      — build + wrangler deploy to Cloudflare Workers"
 
 start:      ; @npm run db:start
 stop:       ; @npm run db:stop
@@ -32,6 +35,7 @@ push:       ; @npm run db:push
 dump-data:  ; @npm run db:dump-data
 verify:     ; @bash scripts/verify-sync.sh
 test:       ; @npm run test:all
+deploy:     ; @npm run deploy
 
 dev:
 	@if ! docker ps --format '{{.Names}}' | grep -q supabase_db_app-fundivers; then \
