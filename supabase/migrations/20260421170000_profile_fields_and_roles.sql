@@ -9,12 +9,14 @@
 
 begin;
 
--- 1. Migrate existing rows BEFORE swapping the CHECK.
+-- 1. Drop the old CHECK first so the data migration can introduce new values.
+alter table public.profiles drop constraint profiles_role_check;
+
+-- 2. Migrate existing rows.
 update public.profiles set role = 'diver' where role = 'customer';
 update public.profiles set role = 'admin' where role = 'staff';
 
--- 2. Swap the CHECK constraint + default.
-alter table public.profiles drop constraint profiles_role_check;
+-- 3. Install the new CHECK + default.
 alter table public.profiles
   add constraint profiles_role_check check (role in ('diver','admin'));
 alter table public.profiles alter column role set default 'diver';
