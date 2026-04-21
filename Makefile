@@ -1,7 +1,12 @@
-.PHONY: help start stop status reset diff link pull push dump-data verify test
+.PHONY: help dev studio mail start stop status reset diff link pull push dump-data verify test
 
 help:
-	@echo "Supabase local dev targets:"
+	@echo "Local dev:"
+	@echo "  make dev         — start Vite against the local supabase stack"
+	@echo "  make studio      — open Supabase Studio (DB browser) in your browser"
+	@echo "  make mail        — open Inbucket (local email inbox) in your browser"
+	@echo ""
+	@echo "Supabase stack:"
 	@echo "  make start       — boot local stack"
 	@echo "  make stop        — tear down local stack"
 	@echo "  make status      — print local URLs + keys"
@@ -12,7 +17,9 @@ help:
 	@echo "  make push        — push local migrations to cloud"
 	@echo "  make dump-data   — dump cloud data into supabase/seed.sql"
 	@echo "  make verify      — check local is in sync with cloud (schema + row counts)"
-	@echo "  make test    — run every local test (unit + component + integration)"
+	@echo ""
+	@echo "Testing:"
+	@echo "  make test        — run every local test (unit + component + integration)"
 
 start:      ; @npm run db:start
 stop:       ; @npm run db:stop
@@ -24,4 +31,14 @@ pull:       ; @npm run db:pull
 push:       ; @npm run db:push
 dump-data:  ; @npm run db:dump-data
 verify:     ; @bash scripts/verify-sync.sh
-test:   ; @npm run test:all
+test:       ; @npm run test:all
+
+dev:
+	@if ! docker ps --format '{{.Names}}' | grep -q supabase_db_app-fundivers; then \
+	  echo "Local supabase stack not running — starting it first…"; \
+	  npm run db:start; \
+	fi
+	@npm run dev
+
+studio: ; @command -v xdg-open >/dev/null && xdg-open http://127.0.0.1:64323 || echo "Open http://127.0.0.1:64323"
+mail:   ; @command -v xdg-open >/dev/null && xdg-open http://127.0.0.1:64324 || echo "Open http://127.0.0.1:64324"
