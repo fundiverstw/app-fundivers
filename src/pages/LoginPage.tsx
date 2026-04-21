@@ -25,9 +25,20 @@ export function LoginPage() {
 
   async function onSubmit(data: FormData) {
     setServerError('')
-    const { error } = await supabase.auth.signInWithPassword(data)
+    const { data: signIn, error } = await supabase.auth.signInWithPassword(data)
     if (error) { setServerError(error.message); return }
-    navigate('/calendar')
+
+    // Fetch role so admins land on /admin, divers on /calendar.
+    let role: 'diver' | 'admin' = 'diver'
+    if (signIn?.user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', signIn.user.id)
+        .single()
+      if (profile?.role === 'admin') role = 'admin'
+    }
+    navigate(role === 'admin' ? '/admin' : '/calendar')
   }
 
   function fill(account: typeof DEV_ACCOUNTS[number]) {
