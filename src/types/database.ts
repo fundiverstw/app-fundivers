@@ -255,6 +255,7 @@ export interface Database {
           price: string | null
           other_addons: string | null
           dive_days: number | null
+          special_date: string | null
         }
         Insert: {
           _id: string
@@ -266,6 +267,7 @@ export interface Database {
           price?: string | null
           other_addons?: string | null
           dive_days?: number | null
+          special_date?: string | null
         }
         Update: Partial<Database['public']['Tables']['EO_courses']['Insert']>
         Relationships: []

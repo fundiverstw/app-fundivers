@@ -15,6 +15,9 @@ function mk(id: string, type: AppEvent['type'], start: string, end?: string): Ap
   }
 }
 
+// Re-exported helper so events.test.ts can reuse the shape
+export { mk }
+
 describe('assignTracks', () => {
   it('places non-overlapping events on track 0', () => {
     const ranges = assignTracks([
