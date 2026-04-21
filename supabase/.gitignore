@@ -2,6 +2,9 @@
 .branches
 .temp
 
+# Local backups of committed seeds (produced when dumping cloud data)
+seed.sql.*.bak
+
 # dotenvx
 .env.keys
 .env.local
