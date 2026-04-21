@@ -22,6 +22,15 @@ const TRANSPORT_FEE = 1300
 type Step = 1 | 2 | 3
 
 export function RegisterForm({ event, profile, userId, onClose, onBooked }: Props) {
+  // Gating derived from the event
+  const diveDays = Math.max(1, event.dive_days ?? 1)
+  const showGear = event.type === 'dive'
+    ? !!event.gear_rental_info
+    : (event.dive_days ?? 0) > 0
+  const showRooms = event.has_rooms && event.room_type_ids.length > 0
+  const showAddons = event.has_addons && event.addon_ids.length > 0
+  const showNitroxAddon = event.nitrox_required && !(profile?.nitrox_certified ?? false)
+
   const [step, setStep] = useState<Step>(1)
   const [rooms, setRooms] = useState<EORoom[]>([])
   const [addons, setAddons] = useState<EOAddon[]>([])
@@ -40,26 +49,33 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked }: Prop
   const [payment, setPayment] = useState<'bank_transfer' | 'credit_card' | 'cash'>('bank_transfer')
   const [notes, setNotes] = useState('')
 
-  // Assume one dive-day for gear full-set calc; real engine lives in Wix import
-  const diveDays = 1
-
   useEffect(() => {
+    let cancelled = false
     ;(async () => {
-      const [roomsRes, addonsRes] = await Promise.all([
-        supabase.from('EO_rooms' as never).select('_id, title, display_name, added_price, currency'),
-        supabase.from('Other_Addons' as never).select('_id, title, display_name, price, currency'),
-      ])
-      setRooms((roomsRes.data ?? []) as EORoom[])
-      setAddons((addonsRes.data ?? []) as EOAddon[])
+      if (showRooms && event.room_type_ids.length > 0) {
+        const { data } = await supabase
+          .from('EO_rooms' as never)
+          .select('_id, title, display_name, added_price, currency')
+          .in('_id', event.room_type_ids)
+        if (!cancelled) setRooms((data ?? []) as EORoom[])
+      }
+      if (showAddons && event.addon_ids.length > 0) {
+        const { data } = await supabase
+          .from('Other_Addons' as never)
+          .select('_id, title, display_name, price, currency')
+          .in('_id', event.addon_ids)
+        if (!cancelled) setAddons((data ?? []) as EOAddon[])
+      }
     })()
-  }, [])
+    return () => { cancelled = true }
+  }, [event.id, showRooms, showAddons, event.room_type_ids, event.addon_ids])
 
   const gearCost = useMemo(() => {
-    if (!rentGear) return 0
+    if (!showGear || !rentGear) return 0
     if (gearMode === 'full') return GEAR_FULLSET_DAILY * diveDays
     if (gearMode === 'a-la-carte') return gearItems.reduce((s, item) => s + (GEAR_ALACARTE_PRICES[item] ?? 0) * diveDays, 0)
     return 0
-  }, [rentGear, gearMode, gearItems])
+  }, [showGear, rentGear, gearMode, gearItems, diveDays])
 
   const roomCost = useMemo(() => rooms.find(r => r._id === roomId)?.added_price ?? 0, [rooms, roomId])
   const addonsCost = useMemo(() => {
@@ -69,7 +85,7 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked }: Prop
   }, [addons, addonIds])
   const paymentSurcharge = payment === 'credit_card' ? 0.05 : 0
   const base = event.price ?? 0
-  const subTotal = base + gearCost + roomCost + addonsCost + (needsTransport ? TRANSPORT_FEE : 0) + (addNitroxCourse ? NITROX_COURSE_FEE : 0)
+  const subTotal = base + gearCost + roomCost + addonsCost + (needsTransport ? TRANSPORT_FEE : 0) + ((showNitroxAddon && addNitroxCourse) ? NITROX_COURSE_FEE : 0)
   const total = Math.round(subTotal * (1 + paymentSurcharge))
 
   function toggleItem(item: string) {
@@ -86,7 +102,7 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked }: Prop
   async function submit() {
     setSaving(true); setErr('')
     const details: BookingDetails = {
-      gear: rentGear
+      gear: showGear && rentGear
         ? {
             rent: true,
             mode: gearMode,
@@ -98,12 +114,13 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked }: Prop
             },
           }
         : { rent: false },
-      room: roomId ? { option_id: roomId, notes: roomNotes || null } : undefined,
-      add_ons: [...addonIds],
+      room: (showRooms && roomId) ? { option_id: roomId, notes: roomNotes || null } : undefined,
+      add_ons: showAddons ? [...addonIds] : [],
       transportation: needsTransport,
       payment_method: payment,
-      nitrox_course_addon: addNitroxCourse,
+      nitrox_course_addon: showNitroxAddon && addNitroxCourse,
       total,
+      deposit: event.deposit_amount ?? undefined,
     }
 
     const fk = event.type === 'dive'
@@ -142,6 +159,9 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked }: Prop
               {format(new Date(event.start_time), 'EEEE, MMMM d · HH:mm')}
               {event.end_time && ` → ${format(new Date(event.end_time), 'MMMM d')}`}
             </p>
+            {event.price != null && (
+              <p className="text-sm text-slate-300">From {event.currency} {event.price.toLocaleString()}</p>
+            )}
             <div className="text-sm text-slate-300 bg-slate-900/50 rounded-lg p-3 space-y-1">
               <p><strong>{profile?.full_name ?? '—'}</strong></p>
               {profile?.cert_agency && profile.cert_level && (
@@ -158,39 +178,48 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked }: Prop
           <section className="space-y-4">
             <h2 className="text-lg font-bold text-slate-100">Extras</h2>
 
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm text-slate-300">
-                <input type="checkbox" checked={rentGear} onChange={e => setRentGear(e.target.checked)} className="accent-sky-500" />
-                Rent gear
-              </label>
-              {rentGear && (
-                <div className="pl-6 space-y-2">
-                  <select
-                    value={gearMode}
-                    onChange={e => setGearMode(e.target.value as typeof gearMode)}
-                    className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-100"
-                  >
-                    <option value="full">Full set ({GEAR_FULLSET_DAILY.toLocaleString()}/day)</option>
-                    <option value="a-la-carte">À-la-carte</option>
-                    <option value="provided">Provided by shop</option>
-                  </select>
-                  {gearMode === 'a-la-carte' && (
-                    <div className="grid grid-cols-2 gap-1">
-                      {GEAR_ITEMS.map(item => (
-                        <label key={item} className="flex items-center gap-1 text-xs text-slate-300">
-                          <input type="checkbox" checked={gearItems.includes(item)} onChange={() => toggleItem(item)} className="accent-sky-500" />
-                          {item} ({GEAR_ALACARTE_PRICES[item]})
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            {!showGear && !showRooms && !showAddons && !showNitroxAddon && (
+              <p className="text-slate-400 text-sm">No extras for this event.</p>
+            )}
 
-            {rooms.length > 0 && (
+            {showGear && (
               <div className="space-y-2">
-                <p className="text-sm text-slate-300 font-semibold">Room (optional)</p>
+                <label className="flex items-center gap-2 text-sm text-slate-300">
+                  <input type="checkbox" checked={rentGear} onChange={e => setRentGear(e.target.checked)} className="accent-sky-500" />
+                  Rent gear
+                </label>
+                {event.gear_rental_info && (
+                  <p className="text-xs text-slate-500 pl-6">{event.gear_rental_info}</p>
+                )}
+                {rentGear && (
+                  <div className="pl-6 space-y-2">
+                    <select
+                      value={gearMode}
+                      onChange={e => setGearMode(e.target.value as typeof gearMode)}
+                      className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-100"
+                    >
+                      <option value="full">Full set ({GEAR_FULLSET_DAILY.toLocaleString()}/day)</option>
+                      <option value="a-la-carte">À-la-carte</option>
+                      <option value="provided">Provided by shop</option>
+                    </select>
+                    {gearMode === 'a-la-carte' && (
+                      <div className="grid grid-cols-2 gap-1">
+                        {GEAR_ITEMS.map(item => (
+                          <label key={item} className="flex items-center gap-1 text-xs text-slate-300">
+                            <input type="checkbox" checked={gearItems.includes(item)} onChange={() => toggleItem(item)} className="accent-sky-500" />
+                            {item} ({GEAR_ALACARTE_PRICES[item]})
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {showRooms && rooms.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm text-slate-300 font-semibold">Room</p>
                 <select value={roomId} onChange={e => setRoomId(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-100">
                   <option value="">— none —</option>
                   {rooms.map(r => (
@@ -205,7 +234,7 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked }: Prop
               </div>
             )}
 
-            {addons.length > 0 && (
+            {showAddons && addons.length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm text-slate-300 font-semibold">Add-ons</p>
                 <div className="max-h-40 overflow-y-auto grid grid-cols-1 gap-1 pr-1">
@@ -225,7 +254,7 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked }: Prop
               Need transportation (+{TRANSPORT_FEE.toLocaleString()})
             </label>
 
-            {!profile?.nitrox_certified && (
+            {showNitroxAddon && (
               <label className="flex items-center gap-2 text-sm text-slate-300">
                 <input type="checkbox" checked={addNitroxCourse} onChange={e => setAddNitroxCourse(e.target.checked)} className="accent-sky-500" />
                 Add Nitrox course (+{NITROX_COURSE_FEE.toLocaleString()})
@@ -253,11 +282,11 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked }: Prop
 
             <div className="text-sm text-slate-300 bg-slate-900/50 rounded-lg p-3 space-y-1">
               <Row label="Base"                value={base} currency={event.currency} />
-              {gearCost > 0        && <Row label="Gear"           value={gearCost}     currency={event.currency} />}
-              {roomCost > 0        && <Row label="Room"           value={roomCost}     currency={event.currency} />}
-              {addonsCost > 0      && <Row label="Add-ons"        value={addonsCost}   currency={event.currency} />}
-              {needsTransport      && <Row label="Transport"      value={TRANSPORT_FEE} currency={event.currency} />}
-              {addNitroxCourse     && <Row label="Nitrox course"  value={NITROX_COURSE_FEE} currency={event.currency} />}
+              {gearCost > 0         && <Row label="Gear"           value={gearCost}     currency={event.currency} />}
+              {roomCost > 0         && <Row label="Room"           value={roomCost}     currency={event.currency} />}
+              {addonsCost > 0       && <Row label="Add-ons"        value={addonsCost}   currency={event.currency} />}
+              {needsTransport       && <Row label="Transport"      value={TRANSPORT_FEE} currency={event.currency} />}
+              {(showNitroxAddon && addNitroxCourse) && <Row label="Nitrox course" value={NITROX_COURSE_FEE} currency={event.currency} />}
               {paymentSurcharge > 0 && <Row label="Credit surcharge (5%)" value={total - subTotal} currency={event.currency} />}
               <div className="border-t border-slate-700 pt-1 mt-1">
                 <Row label="Total" value={total} currency={event.currency} bold />
