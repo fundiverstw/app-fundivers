@@ -1,6 +1,35 @@
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[]
 
 /**
+ * Structured payload on public.bookings.details. Mirrors the selections the
+ * Wix register form collects (gear/room/addons/transport/payment). The DB
+ * stores this as jsonb with an "is object" check — TypeScript is the
+ * source of truth for shape.
+ */
+export interface BookingDetails {
+  gear?: {
+    rent: boolean
+    mode?: 'full' | 'a-la-carte' | 'provided'
+    items?: string[]
+    size_overrides?: {
+      height_cm?: number | null
+      weight_kg?: number | null
+      shoe_size?: string | null
+    }
+  }
+  room?: {
+    option_id?: string | null
+    notes?: string | null
+  }
+  add_ons?: string[]
+  transportation?: boolean
+  payment_method?: 'bank_transfer' | 'credit_card' | 'cash'
+  nitrox_course_addon?: boolean
+  total?: number
+  deposit?: number
+}
+
+/**
  * EO_* table Row shapes are minimal here — only the columns the app
  * actually reads. Those tables carry dozens of legacy columns from the
  * Wix import; if the app ever needs more, add them.
@@ -110,6 +139,7 @@ export interface Database {
           eo_course_id: string | null
           status: 'pending' | 'confirmed' | 'cancelled' | 'waitlisted'
           notes: string | null
+          details: BookingDetails
         }
         Insert: {
           id?: string
@@ -119,6 +149,7 @@ export interface Database {
           eo_course_id?: string | null
           status?: 'pending' | 'confirmed' | 'cancelled' | 'waitlisted'
           notes?: string | null
+          details?: BookingDetails
         }
         Update: {
           id?: string
@@ -127,6 +158,7 @@ export interface Database {
           eo_course_id?: string | null
           status?: 'pending' | 'confirmed' | 'cancelled' | 'waitlisted'
           notes?: string | null
+          details?: BookingDetails
         }
         Relationships: []
       }
