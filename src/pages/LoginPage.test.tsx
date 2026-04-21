@@ -72,15 +72,22 @@ describe('LoginPage', () => {
     expect(navigate).not.toHaveBeenCalled()
   })
 
-  it('dev-fill button populates dev credentials (DEV mode only)', async () => {
-    // vitest default: import.meta.env.DEV is true
+  it('dev-fill buttons populate diver and admin credentials (DEV mode only)', async () => {
     const user = userEvent.setup()
     renderWithRouter(<LoginPage />)
-    const devBtn = screen.queryByRole('button', { name: /dev@dev\.dev/i })
-    expect(devBtn).toBeInTheDocument()
-    await user.click(devBtn!)
-    expect((byName('email') as HTMLInputElement).value).toBe('dev@dev.dev')
-    expect((byName('password') as HTMLInputElement).value).toBe('devdevdev')
+
+    const diverBtn = screen.getByRole('button', { name: /diver@diver\.diver/i })
+    const adminBtn = screen.getByRole('button', { name: /admin@admin\.admin/i })
+    expect(diverBtn).toBeInTheDocument()
+    expect(adminBtn).toBeInTheDocument()
+
+    await user.click(diverBtn)
+    expect((byName('email') as HTMLInputElement).value).toBe('diver@diver.diver')
+    expect((byName('password') as HTMLInputElement).value).toBe('diverdiver')
+
+    await user.click(adminBtn)
+    expect((byName('email') as HTMLInputElement).value).toBe('admin@admin.admin')
+    expect((byName('password') as HTMLInputElement).value).toBe('adminadmin')
   })
 
   it('renders a link to the signup page', () => {

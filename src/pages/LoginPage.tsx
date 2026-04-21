@@ -11,8 +11,10 @@ const schema = z.object({
 })
 type FormData = z.infer<typeof schema>
 
-const DEV_EMAIL = 'dev@dev.dev'
-const DEV_PASSWORD = 'devdevdev'
+const DEV_ACCOUNTS = [
+  { label: 'diver@diver.diver', email: 'diver@diver.diver', password: 'diverdiver' },
+  { label: 'admin@admin.admin', email: 'admin@admin.admin', password: 'adminadmin' },
+] as const
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -28,9 +30,9 @@ export function LoginPage() {
     navigate('/calendar')
   }
 
-  function fillDev() {
-    setValue('email', DEV_EMAIL)
-    setValue('password', DEV_PASSWORD)
+  function fill(account: typeof DEV_ACCOUNTS[number]) {
+    setValue('email', account.email)
+    setValue('password', account.password)
   }
 
   return (
@@ -40,13 +42,18 @@ export function LoginPage() {
         <p className="text-slate-400 text-center mb-8 text-sm">Sign in to your account</p>
 
         {import.meta.env.DEV && (
-          <button
-            type="button"
-            onClick={fillDev}
-            className="w-full mb-4 border border-dashed border-slate-600 text-slate-400 text-xs py-1.5 rounded-lg hover:border-slate-400 hover:text-slate-200 transition-colors"
-          >
-            dev@dev.dev
-          </button>
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            {DEV_ACCOUNTS.map(acc => (
+              <button
+                key={acc.email}
+                type="button"
+                onClick={() => fill(acc)}
+                className="border border-dashed border-slate-600 text-slate-400 text-xs py-1.5 rounded-lg hover:border-slate-400 hover:text-slate-200 transition-colors"
+              >
+                {acc.label}
+              </button>
+            ))}
+          </div>
         )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

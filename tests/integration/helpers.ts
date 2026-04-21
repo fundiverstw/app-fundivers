@@ -37,7 +37,7 @@ export interface TestUser {
  */
 export async function createTestUser(
   admin: DB = adminClient(),
-  overrides: { role?: 'customer' | 'staff' | 'admin' } = {}
+  overrides: { role?: 'diver' | 'admin' } = {}
 ): Promise<TestUser> {
   const rand = Math.random().toString(36).slice(2, 10)
   const email = `test_${rand}@example.test`
@@ -50,7 +50,7 @@ export async function createTestUser(
   })
   if (error || !data.user) throw new Error(`createUser failed: ${error?.message}`)
 
-  if (overrides.role && overrides.role !== 'customer') {
+  if (overrides.role && overrides.role !== 'diver') {
     const { error: rerr } = await admin
       .from('profiles')
       .update({ role: overrides.role })

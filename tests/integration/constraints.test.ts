@@ -105,17 +105,86 @@ describe('bookings constraints', () => {
   })
 })
 
-describe('other constraints', () => {
-  it('profiles.role CHECK rejects values outside (customer, staff, admin)', async () => {
-    const { error } = await admin
-      .from('profiles')
-      // @ts-expect-error — intentionally bad role
-      .update({ role: 'hacker' })
-      .eq('id', user.id)
-    expect(error).toBeTruthy()
-    expect(String(error?.message ?? '')).toMatch(/role/i)
+describe('profiles constraints', () => {
+  it('role CHECK rejects anything outside (diver, admin)', async () => {
+    for (const bad of ['customer', 'staff', 'hacker', '']) {
+      const { error } = await admin
+        .from('profiles')
+        // @ts-expect-error — intentionally bad role
+        .update({ role: bad })
+        .eq('id', user.id)
+      expect(error, `expected rejection for role=${JSON.stringify(bad)}`).toBeTruthy()
+    }
   })
 
+  it('accepts role=diver and role=admin', async () => {
+    for (const good of ['diver', 'admin'] as const) {
+      const { error } = await admin
+        .from('profiles')
+        .update({ role: good })
+        .eq('id', user.id)
+      expect(error).toBeNull()
+    }
+  })
+
+  it('logged_dives CHECK rejects negative values', async () => {
+    const { error } = await admin
+      .from('profiles')
+      .update({ logged_dives: -5 })
+      .eq('id', user.id)
+    expect(error).toBeTruthy()
+  })
+
+  it('contact_method CHECK rejects values outside the enum', async () => {
+    const { error } = await admin
+      .from('profiles')
+      // @ts-expect-error
+      .update({ contact_method: 'carrier-pigeon' })
+      .eq('id', user.id)
+    expect(error).toBeTruthy()
+  })
+
+  it('accepts all documented contact_method values', async () => {
+    for (const m of ['whatsapp', 'line', 'phone', 'email'] as const) {
+      const { error } = await admin
+        .from('profiles')
+        .update({ contact_method: m })
+        .eq('id', user.id)
+      expect(error).toBeNull()
+    }
+  })
+
+  it('round-trips the new diver fields', async () => {
+    const { error } = await admin
+      .from('profiles')
+      .update({
+        height_cm: 175.5,
+        weight_kg: 70.2,
+        shoe_size: 'EU 42',
+        gender: 'female',
+        contact_method: 'line',
+        contact_id: 'alice-line',
+        nitrox_certified: true,
+        logged_dives: 42,
+        last_dive_date: '2026-04-01',
+      })
+      .eq('id', user.id)
+    expect(error).toBeNull()
+
+    const { data } = await admin.from('profiles').select('*').eq('id', user.id).single()
+    expect(data!.height_cm).toBe(175.5)
+    expect(data!.weight_kg).toBe(70.2)
+    expect(data!.shoe_size).toBe('EU 42')
+    expect(data!.gender).toBe('female')
+    expect(data!.contact_method).toBe('line')
+    expect(data!.contact_id).toBe('alice-line')
+    expect(data!.nitrox_certified).toBe(true)
+    expect(data!.logged_dives).toBe(42)
+    expect(data!.last_dive_date).toBe('2026-04-01')
+  })
+})
+
+describe('payments constraints', () => {
   it('payments.status CHECK rejects invalid status', async () => {
     const { error } = await admin
       .from('payments')
