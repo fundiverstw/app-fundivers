@@ -65,11 +65,14 @@ export function EventMemos({ eventType, eventId }: Props) {
   async function addMemo() {
     if (!user || !content.trim()) return
     setSaving(true)
+    const fk = eventType === 'dive'
+      ? { eo_dive_id: eventId, eo_course_id: null }
+      : { eo_dive_id: null, eo_course_id: eventId }
     await supabase.from('event_memos').insert({
       created_by: user.id,
-      [eventType === 'dive' ? 'eo_dive_id' : 'eo_course_id']: eventId,
       tag,
       content: content.trim(),
+      ...fk,
     })
     setContent('')
     setTag('note')
