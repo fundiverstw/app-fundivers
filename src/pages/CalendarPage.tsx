@@ -3,6 +3,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameM
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { fetchEventsInRange } from '../lib/events'
+import { RegisterForm } from '../components/register/RegisterForm'
 import type { AppEvent, Booking } from '../types/database'
 
 const TYPE_COLORS: Record<AppEvent['type'], string> = {
@@ -26,11 +27,12 @@ function bookingMatches(b: Booking, ev: AppEvent) {
 }
 
 export function CalendarPage() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const [month, setMonth] = useState(new Date())
   const [events, setEvents] = useState<AppEvent[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [selected, setSelected] = useState<AppEvent | null>(null)
+  const [registering, setRegistering] = useState<AppEvent | null>(null)
   const [bookingLoading, setBookingLoading] = useState(false)
 
   const days = eachDayOfInterval({ start: startOfMonth(month), end: endOfMonth(month) })
@@ -58,29 +60,30 @@ export function CalendarPage() {
     return bookings.some(b => bookingMatches(b, ev) && b.status !== 'cancelled')
   }
 
-  async function handleBook() {
+  async function cancelBooking() {
     if (!user || !selected) return
     setBookingLoading(true)
-    const { col, payload } = fkFor(selected)
-
-    if (isBooked(selected)) {
-      await supabase
-        .from('bookings')
-        .update({ status: 'cancelled' })
-        .eq('user_id', user.id)
-        .eq(col, selected.id)
-      setBookings(prev => prev.map(b =>
-        bookingMatches(b, selected) ? { ...b, status: 'cancelled' } : b
-      ))
-    } else {
-      const { data } = await supabase
-        .from('bookings')
-        .insert({ user_id: user.id, status: 'pending', ...payload })
-        .select()
-        .single()
-      if (data) setBookings(prev => [...prev, data])
-    }
+    const { col } = fkFor(selected)
+    await supabase
+      .from('bookings')
+      .update({ status: 'cancelled' })
+      .eq('user_id', user.id)
+      .eq(col, selected.id)
+    setBookings(prev => prev.map(b =>
+      bookingMatches(b, selected) ? { ...b, status: 'cancelled' } : b
+    ))
     setBookingLoading(false)
+  }
+
+  function startRegister() {
+    if (!selected) return
+    setRegistering(selected)
+    setSelected(null)
+  }
+
+  function handleBooked(booking: unknown) {
+    setBookings(prev => [...prev, booking as Booking])
+    setRegistering(null)
   }
 
   return (
@@ -184,7 +187,7 @@ export function CalendarPage() {
               {selected.fully_booked && <p className="text-rose-400">Fully booked</p>}
             </div>
             <button
-              onClick={handleBook}
+              onClick={isBooked(selected) ? cancelBooking : startRegister}
               disabled={bookingLoading || (!isBooked(selected) && selected.fully_booked)}
               className={`w-full py-3 rounded-xl font-semibold transition-colors disabled:opacity-50 ${
                 isBooked(selected)
@@ -196,6 +199,16 @@ export function CalendarPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {registering && user && (
+        <RegisterForm
+          event={registering}
+          profile={profile}
+          userId={user.id}
+          onClose={() => setRegistering(null)}
+          onBooked={handleBooked}
+        />
       )}
     </div>
   )

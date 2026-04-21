@@ -107,46 +107,19 @@ describe('CalendarPage', () => {
     expect(screen.getByText(/TWD\s*1,500/)).toBeInTheDocument()
   })
 
-  it('Register inserts with eo_dive_id for a dive event', async () => {
+  it('Register opens the multi-step register form', async () => {
     const ev = buildEvent({ id: 'dive_xyz', type: 'dive' })
     fetchEventsInRange.mockResolvedValue([ev])
-    const insertedRow = { id: 'b-new', user_id: 'u1', eo_dive_id: ev.id, eo_course_id: null, status: 'pending' }
-    setupBookings([], insertedRow)
+    setupBookings([])
 
     const user = userEvent.setup()
     renderWithRouter(<CalendarPage />)
     await user.click(await screen.findByText(ev.title))
     await user.click(screen.getByRole('button', { name: /register/i }))
 
-    await waitFor(() => expect(insert).toHaveBeenCalledOnce())
-    const payload = insert.mock.calls[0][0] as Record<string, unknown>
-    expect(payload).toMatchObject({
-      user_id: 'u1',
-      eo_dive_id: 'dive_xyz',
-      eo_course_id: null,
-      status: 'pending',
-    })
-  })
-
-  it('Register inserts with eo_course_id for a course event', async () => {
-    const ev = buildEvent({ id: 'course_xyz', type: 'course', title: 'AOW' })
-    fetchEventsInRange.mockResolvedValue([ev])
-    const insertedRow = { id: 'b-new', user_id: 'u1', eo_dive_id: null, eo_course_id: ev.id, status: 'pending' }
-    setupBookings([], insertedRow)
-
-    const user = userEvent.setup()
-    renderWithRouter(<CalendarPage />)
-    await user.click(await screen.findByText(ev.title))
-    await user.click(screen.getByRole('button', { name: /register/i }))
-
-    await waitFor(() => expect(insert).toHaveBeenCalledOnce())
-    const payload = insert.mock.calls[0][0] as Record<string, unknown>
-    expect(payload).toMatchObject({
-      user_id: 'u1',
-      eo_dive_id: null,
-      eo_course_id: 'course_xyz',
-      status: 'pending',
-    })
+    expect(await screen.findByText(/step 1 of 3/i)).toBeInTheDocument()
+    // The event detail modal closes; only the register form is now visible.
+    expect(screen.queryByRole('button', { name: /^register$/i })).not.toBeInTheDocument()
   })
 
   it('Cancel booking updates status to cancelled', async () => {

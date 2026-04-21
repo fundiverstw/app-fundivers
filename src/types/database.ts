@@ -303,6 +303,42 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['EO_prices']['Insert']>
         Relationships: []
       }
+      EO_rooms: {
+        Row: {
+          _id: string
+          title: string | null
+          display_name: string | null
+          added_price: number | null
+          currency: string | null
+        }
+        Insert: {
+          _id: string
+          title?: string | null
+          display_name?: string | null
+          added_price?: number | null
+          currency?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['EO_rooms']['Insert']>
+        Relationships: []
+      }
+      Other_Addons: {
+        Row: {
+          _id: string
+          title: string | null
+          display_name: string | null
+          price: number | null
+          currency: string | null
+        }
+        Insert: {
+          _id: string
+          title?: string | null
+          display_name?: string | null
+          price?: number | null
+          currency?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['Other_Addons']['Insert']>
+        Relationships: []
+      }
     }
   }
 }
@@ -314,6 +350,8 @@ export type Payment = Database['public']['Tables']['payments']['Row']
 export type EODive = Database['public']['Tables']['EO_dives']['Row']
 export type EOCourse = Database['public']['Tables']['EO_courses']['Row']
 export type EOPrice = Database['public']['Tables']['EO_prices']['Row']
+export type EORoom = Database['public']['Tables']['EO_rooms']['Row']
+export type EOAddon = Database['public']['Tables']['Other_Addons']['Row']
 export type EventMemo = Database['public']['Tables']['event_memos']['Row']
 export const MEMO_TAGS = ['urgent','payment','gear','logistics','cert','medical','note'] as const
 export type MemoTag = typeof MEMO_TAGS[number]
