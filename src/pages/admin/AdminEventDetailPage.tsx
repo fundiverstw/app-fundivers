@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { fetchEventsForBookings } from '../../lib/events'
-import type { AppEvent, Booking, Payment, Profile } from '../../types/database'
+import type { AppEvent, Booking, BookingDetails, Payment, Profile } from '../../types/database'
 
 interface Registrant {
   booking: Booking
@@ -160,11 +160,36 @@ function RegistrantCard({ r }: { r: Registrant }) {
         </div>
       )}
 
+      {renderDetails(r.booking.details) && (
+        <div className="text-xs text-slate-300 bg-slate-900/40 rounded p-2 space-y-1">
+          {renderDetails(r.booking.details)}
+        </div>
+      )}
+
       {r.booking.notes && (
         <p className="text-xs text-slate-300 bg-slate-900/40 rounded p-2">📝 {r.booking.notes}</p>
       )}
     </div>
   )
+}
+
+function renderDetails(d: BookingDetails) {
+  const bits: React.ReactNode[] = []
+  if (d.gear?.rent) {
+    const items = d.gear.items?.length ? ` (${d.gear.items.join(', ')})` : ''
+    bits.push(<p key="gear">🧰 Gear: {d.gear.mode ?? 'full'}{items}</p>)
+  }
+  if (d.room?.option_id) {
+    bits.push(<p key="room">🛏️ Room: {d.room.option_id}{d.room.notes ? ` · ${d.room.notes}` : ''}</p>)
+  }
+  if (d.add_ons?.length) {
+    bits.push(<p key="addons">➕ Add-ons: {d.add_ons.join(', ')}</p>)
+  }
+  if (d.transportation) bits.push(<p key="transport">🚐 Needs ride</p>)
+  if (d.nitrox_course_addon) bits.push(<p key="nitrox">🟢 Nitrox course add-on</p>)
+  if (d.payment_method) bits.push(<p key="pay">💳 {d.payment_method.replace('_', ' ')}</p>)
+  if (d.total != null) bits.push(<p key="total">Total: {d.total.toLocaleString()}{d.deposit != null && ` · Deposit ${d.deposit.toLocaleString()}`}</p>)
+  return bits.length ? bits : null
 }
 
 function methodEmoji(m: NonNullable<Profile['contact_method']>) {
