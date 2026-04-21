@@ -70,6 +70,13 @@ export function AdminEventDetailPage() {
     return () => { cancelled = true }
   }, [type, id])
 
+  async function updateStatus(bookingId: string, newStatus: Booking['status']) {
+    await supabase.from('bookings').update({ status: newStatus }).eq('id', bookingId)
+    setRegistrants(prev => prev.map(r =>
+      r.booking.id === bookingId ? { ...r, booking: { ...r.booking, status: newStatus } } : r
+    ))
+  }
+
   if (loading) {
     return <div className="flex justify-center pt-12"><div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" /></div>
   }
@@ -98,14 +105,18 @@ export function AdminEventDetailPage() {
         <p className="text-slate-500 text-sm">No one has registered for this event yet.</p>
       ) : (
         <section className="space-y-2">
-          {registrants.map(r => <RegistrantCard key={r.booking.id} r={r} />)}
+          {registrants.map(r => (
+            <RegistrantCard key={r.booking.id} r={r} onStatusChange={updateStatus} />
+          ))}
         </section>
       )}
     </div>
   )
 }
 
-function RegistrantCard({ r }: { r: Registrant }) {
+const BOOKING_STATUSES: Booking['status'][] = ['pending', 'confirmed', 'waitlisted', 'cancelled']
+
+function RegistrantCard({ r, onStatusChange }: { r: Registrant; onStatusChange: (id: string, s: Booking['status']) => void }) {
   const totalPaid = r.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
   const totalDue = r.payments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0)
   const paymentStatus = r.payments.length === 0
@@ -140,8 +151,16 @@ function RegistrantCard({ r }: { r: Registrant }) {
             </p>
           )}
         </div>
-        <div className="text-right text-xs shrink-0">
-          <p className={`font-medium capitalize ${statusStyles[r.booking.status]}`}>{r.booking.status}</p>
+        <div className="text-right text-xs shrink-0 space-y-1">
+          <select
+            value={r.booking.status}
+            onChange={e => onStatusChange(r.booking.id, e.target.value as Booking['status'])}
+            className={`bg-slate-900 border border-slate-600 rounded px-1.5 py-0.5 text-xs font-medium capitalize ${statusStyles[r.booking.status]}`}
+          >
+            {BOOKING_STATUSES.map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
           <p className={`${payStyles[paymentStatus]} capitalize`}>
             {paymentStatus === 'paid'    && `Paid ${totalPaid.toLocaleString()}`}
             {paymentStatus === 'partial' && `${totalPaid.toLocaleString()} paid · ${totalDue.toLocaleString()} due`}

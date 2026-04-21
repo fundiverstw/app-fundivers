@@ -19,6 +19,20 @@ const sampleEvent: AppEvent = {
   start_time: new Date(Date.now() + 86_400_000).toISOString(),
   end_time: null, featured: false, fully_booked: false,
   price: 2800, currency: 'TWD',
+  has_rooms: true, room_type_ids: ['room-a'],
+  has_addons: true, addon_ids: ['addon-a'],
+  gear_rental_info: 'Full set 1500/day',
+  nitrox_required: true, dive_days: 1,
+}
+
+const noExtrasEvent: AppEvent = {
+  id: 'course_xyz', type: 'course', title: 'EFR Course',
+  start_time: new Date(Date.now() + 86_400_000).toISOString(),
+  end_time: null, featured: false, fully_booked: false,
+  price: 4900, currency: 'TWD',
+  has_rooms: false, room_type_ids: [],
+  has_addons: false, addon_ids: [],
+  gear_rental_info: null, nitrox_required: false, dive_days: 0,
 }
 
 const sampleProfile: Profile = {
@@ -139,6 +153,25 @@ describe('RegisterForm', () => {
     expect(details.nitrox_course_addon).toBe(true)
     // base 2800 + gear wetsuit 200 + transport 1300 + nitrox 6000 + addon 100 = 10400
     expect(details.total).toBe(10400)
+  })
+
+  it('hides gear/room/addon/nitrox sections when the event does not offer them', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={noExtrasEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    // Step 2 should show "no extras" copy and hide all optional sections
+    expect(await screen.findByText(/no extras/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/rent gear/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^room$/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^add-ons$/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/add nitrox course/i)).not.toBeInTheDocument()
+    // Transportation is always available
+    expect(screen.getByLabelText(/need transportation/i)).toBeInTheDocument()
   })
 
   it('applies a 5% surcharge for credit card payment on the total', async () => {
