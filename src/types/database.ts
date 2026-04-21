@@ -31,7 +31,16 @@ export interface Database {
           cert_date: string | null
           medical_notes: string | null
           avatar_url: string | null
-          role: 'customer' | 'staff' | 'admin'
+          role: 'diver' | 'admin'
+          height_cm: number | null
+          weight_kg: number | null
+          shoe_size: string | null
+          gender: string | null
+          contact_method: 'whatsapp' | 'line' | 'phone' | 'email' | null
+          contact_id: string | null
+          nitrox_certified: boolean
+          logged_dives: number
+          last_dive_date: string | null
         }
         Insert: {
           id: string
@@ -51,7 +60,16 @@ export interface Database {
           cert_date?: string | null
           medical_notes?: string | null
           avatar_url?: string | null
-          role?: 'customer' | 'staff' | 'admin'
+          role?: 'diver' | 'admin'
+          height_cm?: number | null
+          weight_kg?: number | null
+          shoe_size?: string | null
+          gender?: string | null
+          contact_method?: 'whatsapp' | 'line' | 'phone' | 'email' | null
+          contact_id?: string | null
+          nitrox_certified?: boolean
+          logged_dives?: number
+          last_dive_date?: string | null
         }
         Update: {
           id?: string
@@ -70,7 +88,16 @@ export interface Database {
           cert_date?: string | null
           medical_notes?: string | null
           avatar_url?: string | null
-          role?: 'customer' | 'staff' | 'admin'
+          role?: 'diver' | 'admin'
+          height_cm?: number | null
+          weight_kg?: number | null
+          shoe_size?: string | null
+          gender?: string | null
+          contact_method?: 'whatsapp' | 'line' | 'phone' | 'email' | null
+          contact_id?: string | null
+          nitrox_certified?: boolean
+          logged_dives?: number
+          last_dive_date?: string | null
         }
         Relationships: []
       }
