@@ -249,6 +249,44 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['EO_courses']['Insert']>
         Relationships: []
       }
+      event_memos: {
+        Row: {
+          id: string
+          created_at: string
+          created_by: string
+          eo_dive_id: string | null
+          eo_course_id: string | null
+          tag: 'urgent' | 'payment' | 'gear' | 'logistics' | 'cert' | 'medical' | 'note'
+          content: string
+          resolved: boolean
+          resolved_by: string | null
+          resolved_at: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          created_by: string
+          eo_dive_id?: string | null
+          eo_course_id?: string | null
+          tag: 'urgent' | 'payment' | 'gear' | 'logistics' | 'cert' | 'medical' | 'note'
+          content: string
+          resolved?: boolean
+          resolved_by?: string | null
+          resolved_at?: string | null
+        }
+        Update: {
+          id?: string
+          created_by?: string
+          eo_dive_id?: string | null
+          eo_course_id?: string | null
+          tag?: 'urgent' | 'payment' | 'gear' | 'logistics' | 'cert' | 'medical' | 'note'
+          content?: string
+          resolved?: boolean
+          resolved_by?: string | null
+          resolved_at?: string | null
+        }
+        Relationships: []
+      }
       EO_prices: {
         Row: {
           _id: string
@@ -276,6 +314,9 @@ export type Payment = Database['public']['Tables']['payments']['Row']
 export type EODive = Database['public']['Tables']['EO_dives']['Row']
 export type EOCourse = Database['public']['Tables']['EO_courses']['Row']
 export type EOPrice = Database['public']['Tables']['EO_prices']['Row']
+export type EventMemo = Database['public']['Tables']['event_memos']['Row']
+export const MEMO_TAGS = ['urgent','payment','gear','logistics','cert','medical','note'] as const
+export type MemoTag = typeof MEMO_TAGS[number]
 
 /** Normalized event shape used across Calendar + Bookings UI. */
 export interface AppEvent {
