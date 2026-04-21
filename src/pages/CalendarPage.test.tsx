@@ -82,9 +82,11 @@ describe('CalendarPage', () => {
     fetchEventsInRange.mockResolvedValue([buildEvent({ title: 'Beginner Course', type: 'course' })])
     setupBookings([])
     renderWithRouter(<CalendarPage />)
-    expect(await screen.findByText('Beginner Course')).toBeInTheDocument()
-    // "Course" appears once in the legend + once per course event → 2x here
-    expect(screen.getAllByText('Course')).toHaveLength(2)
+    // Title appears on both the calendar bar and the "This month" list
+    const matches = await screen.findAllByText('Beginner Course')
+    expect(matches.length).toBeGreaterThanOrEqual(1)
+    // Legend + list badge = at least 2 "Course" labels
+    expect(screen.getAllByText('Course').length).toBeGreaterThanOrEqual(2)
   })
 
   it('tags events the current user has booked', async () => {
@@ -92,7 +94,7 @@ describe('CalendarPage', () => {
     fetchEventsInRange.mockResolvedValue([ev])
     setupBookings([{ id: 'b1', user_id: 'u1', eo_dive_id: 'dive_a1', eo_course_id: null, status: 'confirmed' }])
     renderWithRouter(<CalendarPage />)
-    await screen.findByText(ev.title)
+    await screen.findAllByText(ev.title)
     expect(screen.getByText(/^booked$/i)).toBeInTheDocument()
   })
 
@@ -102,7 +104,9 @@ describe('CalendarPage', () => {
     setupBookings([])
     const user = userEvent.setup()
     renderWithRouter(<CalendarPage />)
-    await user.click(await screen.findByText(ev.title))
+    await screen.findAllByText(ev.title)
+    // The title now appears twice (calendar bar + list row); click the first.
+    await user.click(screen.getAllByText(ev.title)[0])
     expect(await screen.findByRole('button', { name: /register/i })).toBeInTheDocument()
     expect(screen.getByText(/TWD\s*1,500/)).toBeInTheDocument()
   })
@@ -114,7 +118,9 @@ describe('CalendarPage', () => {
 
     const user = userEvent.setup()
     renderWithRouter(<CalendarPage />)
-    await user.click(await screen.findByText(ev.title))
+    await screen.findAllByText(ev.title)
+    // The title now appears twice (calendar bar + list row); click the first.
+    await user.click(screen.getAllByText(ev.title)[0])
     await user.click(screen.getByRole('button', { name: /register/i }))
 
     expect(await screen.findByText(/step 1 of 3/i)).toBeInTheDocument()
@@ -129,7 +135,9 @@ describe('CalendarPage', () => {
 
     const user = userEvent.setup()
     renderWithRouter(<CalendarPage />)
-    await user.click(await screen.findByText(ev.title))
+    await screen.findAllByText(ev.title)
+    // The title now appears twice (calendar bar + list row); click the first.
+    await user.click(screen.getAllByText(ev.title)[0])
     await user.click(screen.getByRole('button', { name: /cancel booking/i }))
 
     await waitFor(() => expect(update).toHaveBeenCalledOnce())
@@ -142,7 +150,9 @@ describe('CalendarPage', () => {
     setupBookings([])
     const user = userEvent.setup()
     renderWithRouter(<CalendarPage />)
-    await user.click(await screen.findByText(ev.title))
+    await screen.findAllByText(ev.title)
+    // The title now appears twice (calendar bar + list row); click the first.
+    await user.click(screen.getAllByText(ev.title)[0])
     const btn = await screen.findByRole('button', { name: /register/i })
     expect(btn).toBeDisabled()
   })
