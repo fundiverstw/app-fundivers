@@ -1,20 +1,30 @@
-import { useEffect, useState } from 'react'
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths } from 'date-fns'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth,
+  addMonths, subMonths, startOfWeek, endOfWeek,
+} from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { fetchEventsInRange } from '../lib/events'
 import { RegisterForm } from '../components/register/RegisterForm'
+import { assignTracks, segmentsForDay, type CellSegment, type EventRange } from '../lib/calendar-layout'
 import type { AppEvent, Booking } from '../types/database'
 
-const TYPE_COLORS: Record<AppEvent['type'], string> = {
+const TYPE_BAR: Record<AppEvent['type'], string> = {
+  dive: 'bg-sky-500 hover:bg-sky-400 text-white',
+  course: 'bg-emerald-500 hover:bg-emerald-400 text-white',
+}
+const TYPE_DOT: Record<AppEvent['type'], string> = {
   dive: 'bg-sky-500',
   course: 'bg-emerald-500',
 }
-
 const TYPE_LABELS: Record<AppEvent['type'], string> = {
   dive: 'Dive',
   course: 'Course',
 }
+
+const TRACK_HEIGHT = 18 // px per bar
+const TRACK_GAP = 2     // px between bars
 
 function fkFor(ev: AppEvent) {
   return ev.type === 'dive'
@@ -38,9 +48,11 @@ export function CalendarPage() {
   const days = eachDayOfInterval({ start: startOfMonth(month), end: endOfMonth(month) })
 
   useEffect(() => {
-    const from = startOfMonth(month).toISOString().slice(0, 10)
-    const to = endOfMonth(month).toISOString().slice(0, 10)
-    fetchEventsInRange(from, to).then(setEvents)
+    // Widen fetch by ±7 days so bars that begin/end outside the visible month
+    // (but cross into it) still render continuously.
+    const fromDate = new Date(startOfMonth(month).getTime() - 7 * 86_400_000).toISOString().slice(0, 10)
+    const toDate = new Date(endOfMonth(month).getTime() + 7 * 86_400_000).toISOString().slice(0, 10)
+    fetchEventsInRange(fromDate, toDate).then(setEvents)
   }, [month])
 
   useEffect(() => {
@@ -52,9 +64,24 @@ export function CalendarPage() {
       .then(({ data }) => setBookings(data ?? []))
   }, [user])
 
-  function eventsOnDay(day: Date) {
-    return events.filter(e => isSameDay(new Date(e.start_time), day))
-  }
+  const ranges: EventRange[] = useMemo(() => assignTracks(events), [events])
+
+  // Max track used within *visible cells* determines cell height
+  const cellTrackRows = useMemo(() => {
+    let max = 0
+    for (const r of ranges) {
+      const monthStart = startOfMonth(month)
+      const monthEnd = endOfMonth(month)
+      if (r.end < monthStart || r.start > monthEnd) continue
+      if (r.track + 1 > max) max = r.track + 1
+    }
+    return Math.min(max, 3) // cap visible tracks for mobile; overflow handled via +N more
+  }, [ranges, month])
+
+  const inMonthEvents = useMemo(
+    () => events.filter(e => isSameMonth(new Date(e.start_time), month) || (e.end_time && isSameMonth(new Date(e.end_time), month))),
+    [events, month]
+  )
 
   function isBooked(ev: AppEvent) {
     return bookings.some(b => bookingMatches(b, ev) && b.status !== 'cancelled')
@@ -95,51 +122,27 @@ export function CalendarPage() {
       </div>
 
       <div className="flex gap-3 text-xs text-slate-400">
-        {(Object.keys(TYPE_COLORS) as AppEvent['type'][]).map(t => (
+        {(Object.keys(TYPE_DOT) as AppEvent['type'][]).map(t => (
           <span key={t} className="flex items-center gap-1">
-            <span className={`w-2 h-2 rounded-full ${TYPE_COLORS[t]}`} />{TYPE_LABELS[t]}
+            <span className={`w-2 h-2 rounded-full ${TYPE_DOT[t]}`} />{TYPE_LABELS[t]}
           </span>
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-px bg-slate-700 rounded-xl overflow-hidden text-sm">
-        {['S','M','T','W','T','F','S'].map((d, i) => (
-          <div key={i} className="bg-slate-800 text-center text-xs text-slate-500 py-1">{d}</div>
-        ))}
-        {Array.from({ length: days[0].getDay() }).map((_, i) => (
-          <div key={`empty-${i}`} className="bg-slate-800 h-14" />
-        ))}
-        {days.map(day => {
-          const dayEvents = eventsOnDay(day)
-          const isToday = isSameDay(day, new Date())
-          const inMonth = isSameMonth(day, month)
-          return (
-            <div
-              key={day.toISOString()}
-              className={`bg-slate-800 h-14 p-1 cursor-pointer hover:bg-slate-700 transition-colors ${!inMonth ? 'opacity-30' : ''}`}
-              onClick={() => dayEvents.length > 0 && setSelected(dayEvents[0])}
-            >
-              <span className={`text-xs block text-center rounded-full w-5 h-5 flex items-center justify-center mx-auto ${
-                isToday ? 'bg-sky-500 text-white font-bold' : 'text-slate-300'
-              }`}>
-                {format(day, 'd')}
-              </span>
-              <div className="flex flex-wrap gap-0.5 mt-0.5 justify-center">
-                {dayEvents.map(e => (
-                  <span key={e.id} className={`w-1.5 h-1.5 rounded-full ${TYPE_COLORS[e.type]}`} />
-                ))}
-              </div>
-            </div>
-          )
-        })}
-      </div>
+      <MonthGrid
+        month={month}
+        days={days}
+        ranges={ranges}
+        trackRows={cellTrackRows}
+        onPickEvent={setSelected}
+      />
 
       <div className="space-y-2">
         <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">This month</h2>
-        {events.length === 0 && (
+        {inMonthEvents.length === 0 && (
           <p className="text-slate-500 text-sm">No events scheduled.</p>
         )}
-        {events.map(ev => (
+        {inMonthEvents.map(ev => (
           <button
             key={ev.id}
             onClick={() => setSelected(ev)}
@@ -148,7 +151,7 @@ export function CalendarPage() {
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full text-white ${TYPE_COLORS[ev.type]}`}>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full text-white ${TYPE_DOT[ev.type]}`}>
                     {TYPE_LABELS[ev.type]}
                   </span>
                   <span className="font-medium text-slate-100 text-sm">{ev.title}</span>
@@ -156,6 +159,7 @@ export function CalendarPage() {
                 </div>
                 <p className="text-xs text-slate-400 mt-1">
                   {format(new Date(ev.start_time), 'EEE, MMM d · HH:mm')}
+                  {ev.end_time && ` → ${format(new Date(ev.end_time), 'MMM d')}`}
                 </p>
               </div>
               {isBooked(ev) && (
@@ -170,7 +174,7 @@ export function CalendarPage() {
         <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-50" onClick={() => setSelected(null)}>
           <div className="bg-slate-800 rounded-t-2xl w-full max-w-lg p-6 space-y-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <span className={`text-xs px-2 py-1 rounded-full text-white ${TYPE_COLORS[selected.type]}`}>
+              <span className={`text-xs px-2 py-1 rounded-full text-white ${TYPE_DOT[selected.type]}`}>
                 {TYPE_LABELS[selected.type]}
               </span>
               <button onClick={() => setSelected(null)} className="text-slate-400 text-xl leading-none">×</button>
@@ -211,5 +215,117 @@ export function CalendarPage() {
         />
       )}
     </div>
+  )
+}
+
+interface MonthGridProps {
+  month: Date
+  days: Date[]
+  ranges: EventRange[]
+  trackRows: number
+  onPickEvent: (ev: AppEvent) => void
+}
+
+function MonthGrid({ month, days, ranges, trackRows, onPickEvent }: MonthGridProps) {
+  // Leading padding so the first cell lines up under the correct weekday (Sun = 0).
+  const leading = days[0].getDay()
+
+  // Minimum cell height: day number row (22) + tracks * (row + gap).
+  const cellMinHeight = 22 + Math.max(1, trackRows) * (TRACK_HEIGHT + TRACK_GAP) + 6
+
+  return (
+    <div className="grid grid-cols-7 gap-px bg-slate-700 rounded-xl overflow-hidden text-sm">
+      {['S','M','T','W','T','F','S'].map((d, i) => (
+        <div key={i} className="bg-slate-800 text-center text-xs text-slate-500 py-1">{d}</div>
+      ))}
+      {Array.from({ length: leading }).map((_, i) => (
+        <div key={`empty-${i}`} className="bg-slate-800" style={{ minHeight: cellMinHeight }} />
+      ))}
+      {days.map(day => (
+        <DayCell
+          key={day.toISOString()}
+          day={day}
+          ranges={ranges}
+          month={month}
+          trackRows={trackRows}
+          minHeight={cellMinHeight}
+          onPickEvent={onPickEvent}
+        />
+      ))}
+    </div>
+  )
+}
+
+function DayCell({
+  day, ranges, month, trackRows, minHeight, onPickEvent,
+}: {
+  day: Date
+  ranges: EventRange[]
+  month: Date
+  trackRows: number
+  minHeight: number
+  onPickEvent: (ev: AppEvent) => void
+}) {
+  const weekStart = startOfWeek(day, { weekStartsOn: 0 })
+  const weekEnd = endOfWeek(day, { weekStartsOn: 0 })
+  const segMap = segmentsForDay(day, ranges, weekStart, weekEnd)
+  const isToday = isSameDay(day, new Date())
+  const inMonth = isSameMonth(day, month)
+
+  // Total number of overlapping events on this day regardless of trackRows cap
+  const totalOnDay = segMap.size
+  const visibleTracks = Math.max(1, trackRows)
+  const overflow = Math.max(0, totalOnDay - visibleTracks)
+
+  return (
+    <div
+      className={`bg-slate-800 relative px-0.5 pt-1 ${!inMonth ? 'opacity-40' : ''}`}
+      style={{ minHeight }}
+    >
+      <span className={`text-[10px] block text-center rounded-full w-5 h-5 flex items-center justify-center mx-auto ${
+        isToday ? 'bg-sky-500 text-white font-bold' : 'text-slate-300'
+      }`}>
+        {format(day, 'd')}
+      </span>
+      <div className="mt-1 relative" style={{ height: visibleTracks * (TRACK_HEIGHT + TRACK_GAP) }}>
+        {Array.from(segMap.entries())
+          .filter(([track]) => track < visibleTracks)
+          .map(([track, seg]) => (
+            <EventBar key={`${seg.event.id}`} seg={seg} track={track} onClick={() => onPickEvent(seg.event)} />
+          ))}
+      </div>
+      {overflow > 0 && (
+        <div className="text-[9px] text-slate-400 text-center -mt-0.5">+{overflow} more</div>
+      )}
+    </div>
+  )
+}
+
+function EventBar({ seg, track, onClick }: { seg: CellSegment; track: number; onClick: () => void }) {
+  const baseClass = TYPE_BAR[seg.event.type]
+  const left = seg.isStart ? 'rounded-l-sm ml-0.5' : ''
+  const right = seg.isEnd ? 'rounded-r-sm mr-0.5' : ''
+  const featuredRing = seg.event.featured ? 'ring-1 ring-amber-300' : ''
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={seg.event.title}
+      className={`absolute left-0 right-0 text-[10px] font-semibold truncate text-left px-1 ${baseClass} ${left} ${right} ${featuredRing}`}
+      style={{
+        top: track * (TRACK_HEIGHT + TRACK_GAP),
+        height: TRACK_HEIGHT,
+      }}
+    >
+      {seg.showTitle ? (
+        <>
+          {seg.event.featured && '★ '}
+          {seg.event.title}
+        </>
+      ) : (
+        <>&nbsp;</>
+      )}
+    </button>
   )
 }
