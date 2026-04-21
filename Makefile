@@ -1,4 +1,4 @@
-.PHONY: help start stop status reset diff link pull push dump-data verify
+.PHONY: help start stop status reset diff link pull push dump-data verify test
 
 help:
 	@echo "Supabase local dev targets:"
@@ -12,6 +12,7 @@ help:
 	@echo "  make push        — push local migrations to cloud"
 	@echo "  make dump-data   — dump cloud data into supabase/seed.sql"
 	@echo "  make verify      — check local is in sync with cloud (schema + row counts)"
+	@echo "  make test    — run every local test (unit + component + integration)"
 
 start:      ; @npm run db:start
 stop:       ; @npm run db:stop
@@ -23,3 +24,4 @@ pull:       ; @npm run db:pull
 push:       ; @npm run db:push
 dump-data:  ; @npm run db:dump-data
 verify:     ; @bash scripts/verify-sync.sh
+test:   ; @npm run test:all
