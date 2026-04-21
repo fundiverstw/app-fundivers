@@ -3,16 +3,22 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { CalendarPage } from './CalendarPage'
 import { renderWithRouter, mockQueryBuilder } from '../../tests/test-utils'
+import type { AppEvent } from '../types/database'
 
-const { from, insert, update, useAuthMock } = vi.hoisted(() => ({
+const { from, insert, update, useAuthMock, fetchEventsInRange } = vi.hoisted(() => ({
   from: vi.fn(),
   insert: vi.fn(),
   update: vi.fn(),
   useAuthMock: vi.fn(),
+  fetchEventsInRange: vi.fn(),
 }))
 
 vi.mock('../lib/supabase', () => ({
   supabase: { from: (...a: unknown[]) => from(...a) },
+}))
+
+vi.mock('../lib/events', () => ({
+  fetchEventsInRange: (...a: unknown[]) => fetchEventsInRange(...a),
 }))
 
 vi.mock('../hooks/useAuth', () => ({
@@ -23,6 +29,7 @@ beforeEach(() => {
   from.mockReset()
   insert.mockReset()
   update.mockReset()
+  fetchEventsInRange.mockReset()
   useAuthMock.mockReset()
   useAuthMock.mockReturnValue({ user: { id: 'u1' } })
 })
@@ -31,52 +38,49 @@ function future(daysAhead = 7) {
   return new Date(Date.now() + daysAhead * 86_400_000).toISOString()
 }
 
-function buildEvent(overrides: Partial<{ id: string; type: 'dive' | 'course'; title: string; featured: boolean; fully_booked: boolean; price: number | null }> = {}) {
+function buildEvent(overrides: Partial<AppEvent> = {}): AppEvent {
   return {
     id: overrides.id ?? 'dive_a1',
     type: overrides.type ?? 'dive',
     title: overrides.title ?? 'Green Island Dive',
-    start_time: future(),
-    end_time: null,
+    start_time: overrides.start_time ?? future(),
+    end_time: overrides.end_time ?? null,
     featured: overrides.featured ?? false,
     fully_booked: overrides.fully_booked ?? false,
     price: overrides.price ?? 1500,
-    deposit_amount: 500,
-    currency: 'TWD',
+    currency: overrides.currency ?? 'TWD',
   }
 }
 
-function setupFrom(events: unknown[], bookings: unknown[], inserted?: unknown) {
-  from.mockImplementation((table: string) => {
-    if (table === 'events') return mockQueryBuilder({ data: events })
-    return {
-      ...mockQueryBuilder({ data: bookings }),
-      insert: (...a: unknown[]) => {
-        insert(...a)
-        return {
-          select: () => ({
-            single: () => Promise.resolve({ data: inserted ?? null, error: null }),
-          }),
-        }
-      },
-      update: (...a: unknown[]) => {
-        update(...a)
-        return mockQueryBuilder({ data: null })
-      },
-    }
-  })
+function setupBookings(bookings: unknown[], inserted?: unknown) {
+  from.mockImplementation(() => ({
+    ...mockQueryBuilder({ data: bookings }),
+    insert: (...a: unknown[]) => {
+      insert(...a)
+      return {
+        select: () => ({
+          single: () => Promise.resolve({ data: inserted ?? null, error: null }),
+        }),
+      }
+    },
+    update: (...a: unknown[]) => {
+      update(...a)
+      return mockQueryBuilder({ data: null })
+    },
+  }))
 }
 
 describe('CalendarPage', () => {
   it('shows an empty state when there are no events', async () => {
-    setupFrom([], [])
+    fetchEventsInRange.mockResolvedValue([])
+    setupBookings([])
     renderWithRouter(<CalendarPage />)
     expect(await screen.findByText(/no events scheduled/i)).toBeInTheDocument()
   })
 
   it('renders events with a type badge', async () => {
-    const ev = buildEvent({ title: 'Beginner Course', type: 'course' })
-    setupFrom([ev], [])
+    fetchEventsInRange.mockResolvedValue([buildEvent({ title: 'Beginner Course', type: 'course' })])
+    setupBookings([])
     renderWithRouter(<CalendarPage />)
     expect(await screen.findByText('Beginner Course')).toBeInTheDocument()
     // "Course" appears once in the legend + once per course event → 2x here
@@ -85,7 +89,8 @@ describe('CalendarPage', () => {
 
   it('tags events the current user has booked', async () => {
     const ev = buildEvent({ id: 'dive_a1', type: 'dive' })
-    setupFrom([ev], [{ id: 'b1', user_id: 'u1', eo_dive_id: 'dive_a1', eo_course_id: null, status: 'confirmed' }])
+    fetchEventsInRange.mockResolvedValue([ev])
+    setupBookings([{ id: 'b1', user_id: 'u1', eo_dive_id: 'dive_a1', eo_course_id: null, status: 'confirmed' }])
     renderWithRouter(<CalendarPage />)
     await screen.findByText(ev.title)
     expect(screen.getByText(/^booked$/i)).toBeInTheDocument()
@@ -93,7 +98,8 @@ describe('CalendarPage', () => {
 
   it('opens the detail modal on click', async () => {
     const ev = buildEvent()
-    setupFrom([ev], [])
+    fetchEventsInRange.mockResolvedValue([ev])
+    setupBookings([])
     const user = userEvent.setup()
     renderWithRouter(<CalendarPage />)
     await user.click(await screen.findByText(ev.title))
@@ -103,8 +109,9 @@ describe('CalendarPage', () => {
 
   it('Register inserts with eo_dive_id for a dive event', async () => {
     const ev = buildEvent({ id: 'dive_xyz', type: 'dive' })
+    fetchEventsInRange.mockResolvedValue([ev])
     const insertedRow = { id: 'b-new', user_id: 'u1', eo_dive_id: ev.id, eo_course_id: null, status: 'pending' }
-    setupFrom([ev], [], insertedRow)
+    setupBookings([], insertedRow)
 
     const user = userEvent.setup()
     renderWithRouter(<CalendarPage />)
@@ -123,8 +130,9 @@ describe('CalendarPage', () => {
 
   it('Register inserts with eo_course_id for a course event', async () => {
     const ev = buildEvent({ id: 'course_xyz', type: 'course', title: 'AOW' })
+    fetchEventsInRange.mockResolvedValue([ev])
     const insertedRow = { id: 'b-new', user_id: 'u1', eo_dive_id: null, eo_course_id: ev.id, status: 'pending' }
-    setupFrom([ev], [], insertedRow)
+    setupBookings([], insertedRow)
 
     const user = userEvent.setup()
     renderWithRouter(<CalendarPage />)
@@ -141,9 +149,10 @@ describe('CalendarPage', () => {
     })
   })
 
-  it('Cancel booking updates status to cancelled using the right FK column', async () => {
+  it('Cancel booking updates status to cancelled', async () => {
     const ev = buildEvent({ id: 'dive_xyz', type: 'dive' })
-    setupFrom([ev], [{ id: 'b1', user_id: 'u1', eo_dive_id: 'dive_xyz', eo_course_id: null, status: 'confirmed' }])
+    fetchEventsInRange.mockResolvedValue([ev])
+    setupBookings([{ id: 'b1', user_id: 'u1', eo_dive_id: 'dive_xyz', eo_course_id: null, status: 'confirmed' }])
 
     const user = userEvent.setup()
     renderWithRouter(<CalendarPage />)
@@ -156,7 +165,8 @@ describe('CalendarPage', () => {
 
   it('disables Register for a fully-booked event', async () => {
     const ev = buildEvent({ fully_booked: true })
-    setupFrom([ev], [])
+    fetchEventsInRange.mockResolvedValue([ev])
+    setupBookings([])
     const user = userEvent.setup()
     renderWithRouter(<CalendarPage />)
     await user.click(await screen.findByText(ev.title))
@@ -165,7 +175,8 @@ describe('CalendarPage', () => {
   })
 
   it('advances the month with the arrow buttons', async () => {
-    setupFrom([], [])
+    fetchEventsInRange.mockResolvedValue([])
+    setupBookings([])
     const user = userEvent.setup()
     renderWithRouter(<CalendarPage />)
     const heading = await screen.findByRole('heading', { level: 1 })

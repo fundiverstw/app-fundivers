@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import type { Booking, Event } from '../types/database'
+import { fetchEventsForBookings } from '../lib/events'
+import type { AppEvent, Booking } from '../types/database'
 
-type BookingWithEvent = Booking & { event: Event | null }
+type Row = Booking & { event: AppEvent | null }
 
 const STATUS_STYLES: Record<Booking['status'], string> = {
   pending: 'text-amber-400',
@@ -15,11 +16,11 @@ const STATUS_STYLES: Record<Booking['status'], string> = {
 
 export function BookingsPage() {
   const { user } = useAuth()
-  const [rows, setRows] = useState<BookingWithEvent[]>([])
+  const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!user) { return }
+    if (!user) return
     let cancelled = false
     ;(async () => {
       const { data: bookings } = await supabase
@@ -30,19 +31,13 @@ export function BookingsPage() {
 
       if (cancelled) return
 
-      const eventIds = (bookings ?? [])
-        .map(b => b.eo_dive_id ?? b.eo_course_id)
-        .filter((id): id is string => !!id)
+      const diveIds = (bookings ?? []).map(b => b.eo_dive_id).filter((x): x is string => !!x)
+      const courseIds = (bookings ?? []).map(b => b.eo_course_id).filter((x): x is string => !!x)
+      const eventMap = diveIds.length || courseIds.length
+        ? await fetchEventsForBookings(diveIds, courseIds)
+        : new Map()
 
-      let eventMap = new Map<string, Event>()
-      if (eventIds.length) {
-        const { data: events } = await supabase
-          .from('events')
-          .select('*')
-          .in('id', eventIds)
-        if (cancelled) return
-        eventMap = new Map((events ?? []).map(e => [e.id, e]))
-      }
+      if (cancelled) return
 
       setRows((bookings ?? []).map(b => ({
         ...b,
@@ -65,7 +60,7 @@ export function BookingsPage() {
     return <div className="flex justify-center pt-12"><div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" /></div>
   }
 
-  function BookingCard({ row }: { row: BookingWithEvent }) {
+  function Card({ row }: { row: Row }) {
     return (
       <div className="bg-slate-800 rounded-xl p-4 space-y-1">
         <div className="flex items-start justify-between">
@@ -93,14 +88,14 @@ export function BookingsPage() {
         <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-2">Upcoming</h2>
         {upcoming.length === 0
           ? <p className="text-slate-500 text-sm">No upcoming bookings. Check the calendar!</p>
-          : <div className="space-y-2">{upcoming.map(r => <BookingCard key={r.id} row={r} />)}</div>
+          : <div className="space-y-2">{upcoming.map(r => <Card key={r.id} row={r} />)}</div>
         }
       </section>
 
       {past.length > 0 && (
         <section>
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-2">Past / Cancelled</h2>
-          <div className="space-y-2">{past.map(r => <BookingCard key={r.id} row={r} />)}</div>
+          <div className="space-y-2">{past.map(r => <Card key={r.id} row={r} />)}</div>
         </section>
       )}
     </div>
