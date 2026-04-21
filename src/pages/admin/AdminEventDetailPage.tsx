@@ -77,6 +77,15 @@ export function AdminEventDetailPage() {
     ))
   }
 
+  async function approveRefund(bookingId: string) {
+    // Processing the actual refund happens off-app (bank transfer etc.);
+    // admin approval just marks the booking cancelled.
+    await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', bookingId)
+    setRegistrants(prev => prev.map(r =>
+      r.booking.id === bookingId ? { ...r, booking: { ...r.booking, status: 'cancelled' } } : r
+    ))
+  }
+
   if (loading) {
     return <div className="flex justify-center pt-12"><div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" /></div>
   }
@@ -106,7 +115,12 @@ export function AdminEventDetailPage() {
       ) : (
         <section className="space-y-2">
           {registrants.map(r => (
-            <RegistrantCard key={r.booking.id} r={r} onStatusChange={updateStatus} />
+            <RegistrantCard
+              key={r.booking.id}
+              r={r}
+              onStatusChange={updateStatus}
+              onApproveRefund={approveRefund}
+            />
           ))}
         </section>
       )}
@@ -116,7 +130,11 @@ export function AdminEventDetailPage() {
 
 const BOOKING_STATUSES: Booking['status'][] = ['pending', 'confirmed', 'waitlisted', 'cancelled']
 
-function RegistrantCard({ r, onStatusChange }: { r: Registrant; onStatusChange: (id: string, s: Booking['status']) => void }) {
+function RegistrantCard({ r, onStatusChange, onApproveRefund }: {
+  r: Registrant
+  onStatusChange: (id: string, s: Booking['status']) => void
+  onApproveRefund: (id: string) => void
+}) {
   const totalPaid = r.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
   const totalDue = r.payments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0)
   const paymentStatus = r.payments.length === 0
@@ -185,6 +203,20 @@ function RegistrantCard({ r, onStatusChange }: { r: Registrant; onStatusChange: 
       {renderDetails(r.booking.details) && (
         <div className="text-xs text-slate-300 bg-slate-900/40 rounded p-2 space-y-1">
           {renderDetails(r.booking.details)}
+        </div>
+      )}
+
+      {r.booking.refund_requested_at && r.booking.status !== 'cancelled' && (
+        <div className="flex items-center justify-between text-xs bg-amber-950/50 border border-amber-900 rounded p-2">
+          <span className="text-amber-300">
+            🔄 Refund requested {format(new Date(r.booking.refund_requested_at), 'MMM d, HH:mm')}
+          </span>
+          <button
+            onClick={() => onApproveRefund(r.booking.id)}
+            className="bg-amber-700 hover:bg-amber-600 text-white text-xs font-semibold px-2 py-1 rounded"
+          >
+            Approve refund
+          </button>
         </div>
       )}
 
