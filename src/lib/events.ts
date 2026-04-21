@@ -8,14 +8,35 @@ import type { AppEvent, EOCourse, EODive, EOPrice } from '../types/database'
 function toIso(date: string | null | undefined, time: string | null | undefined): string | null {
   if (!date) return null
   const t = time && time.trim() ? time.trim() : '00:00:00'
-  // Ensure 'T' separator for ISO-ish parsing. Treating as local time (no TZ suffix).
   return new Date(`${date}T${t}`).toISOString()
+}
+
+/** `"id1,id2"` → `['id1','id2']`. Handles null/whitespace. */
+function parseCsvIds(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  return raw.split(',').map(s => s.trim()).filter(Boolean)
+}
+
+/** `'["id1","id2"]'` → `['id1','id2']`. Tolerates CSV fallback and null. */
+function parseJsonIds(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  const s = raw.trim()
+  if (s.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(s)
+      return Array.isArray(parsed) ? parsed.map(String).filter(Boolean) : []
+    } catch {
+      return []
+    }
+  }
+  return parseCsvIds(s)
 }
 
 function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>): AppEvent | null {
   const start = toIso(d.start_date, d.time)
   if (!start) return null
   const p = d.price ? priceIndex.get(d.price) : undefined
+  const gearText = d.gear_rental && d.gear_rental.trim() ? d.gear_rental.trim() : null
   return {
     id: d._id,
     type: 'dive',
@@ -25,7 +46,15 @@ function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>): AppEvent | nu
     featured: d.featured ?? false,
     fully_booked: d.fully_booked ?? false,
     price: p?.starting_at ?? null,
+    deposit_amount: p?.deposit_amount ?? null,
     currency: 'TWD',
+    has_rooms: Boolean(d.has_rooms),
+    room_type_ids: parseCsvIds(d.room_types),
+    has_addons: Boolean(d.hasotheraddons),
+    addon_ids: parseJsonIds(d.other_addons),
+    gear_rental_info: gearText,
+    nitrox_required: (d.nitrox_required ?? '').toLowerCase() === 'true',
+    dive_days: d.dive_days ?? null,
   }
 }
 
@@ -42,7 +71,15 @@ function courseToEvent(c: EOCourse, priceIndex: Map<string, EOPrice>): AppEvent 
     featured: false,
     fully_booked: false,
     price: p?.starting_at ?? null,
+    deposit_amount: p?.deposit_amount ?? null,
     currency: 'TWD',
+    has_rooms: false,
+    room_type_ids: [],
+    has_addons: !!c.other_addons && parseJsonIds(c.other_addons).length > 0,
+    addon_ids: parseJsonIds(c.other_addons),
+    gear_rental_info: null,
+    nitrox_required: false,
+    dive_days: c.dive_days ?? null,
   }
 }
 
@@ -62,21 +99,14 @@ async function attachPrices(dives: EODive[], courses: EOCourse[]): Promise<Map<s
   return new Map((data ?? []).map(p => [p._id, p as EOPrice]))
 }
 
+const DIVE_COLS = '_id, dive_title, title, start_date, time, end_date, featured, fully_booked, price, has_rooms, room_types, hasotheraddons, other_addons, gear_rental, nitrox_required, dive_days'
+const COURSE_COLS = '_id, course_title, title, start_date, start_time, end_date, price, other_addons, dive_days'
+
 /** Fetch dives + courses whose start_date falls within [fromDate, toDate] (inclusive, 'YYYY-MM-DD'). */
 export async function fetchEventsInRange(fromDate: string, toDate: string): Promise<AppEvent[]> {
   const [divesResp, coursesResp] = await Promise.all([
-    supabase
-      .from('EO_dives')
-      .select('_id, dive_title, title, start_date, time, end_date, featured, fully_booked, price')
-      .gte('start_date', fromDate)
-      .lte('start_date', toDate)
-      .order('start_date'),
-    supabase
-      .from('EO_courses')
-      .select('_id, course_title, title, start_date, start_time, end_date, price')
-      .gte('start_date', fromDate)
-      .lte('start_date', toDate)
-      .order('start_date'),
+    supabase.from('EO_dives').select(DIVE_COLS).gte('start_date', fromDate).lte('start_date', toDate).order('start_date'),
+    supabase.from('EO_courses').select(COURSE_COLS).gte('start_date', fromDate).lte('start_date', toDate).order('start_date'),
   ])
 
   const dives = (divesResp.data ?? []) as EODive[]
@@ -96,10 +126,10 @@ export async function fetchEventsForBookings(
 ): Promise<Map<string, AppEvent>> {
   const [divesResp, coursesResp] = await Promise.all([
     diveIds.length
-      ? supabase.from('EO_dives').select('_id, dive_title, title, start_date, time, end_date, featured, fully_booked, price').in('_id', diveIds)
+      ? supabase.from('EO_dives').select(DIVE_COLS).in('_id', diveIds)
       : Promise.resolve({ data: [] as EODive[] }),
     courseIds.length
-      ? supabase.from('EO_courses').select('_id, course_title, title, start_date, start_time, end_date, price').in('_id', courseIds)
+      ? supabase.from('EO_courses').select(COURSE_COLS).in('_id', courseIds)
       : Promise.resolve({ data: [] as EOCourse[] }),
   ])
 

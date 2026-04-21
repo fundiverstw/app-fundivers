@@ -211,6 +211,13 @@ export interface Database {
           featured: boolean | null
           fully_booked: boolean | null
           price: string | null
+          has_rooms: boolean | null
+          room_types: string | null
+          hasotheraddons: boolean | null
+          other_addons: string | null
+          gear_rental: string | null
+          nitrox_required: string | null
+          dive_days: number | null
         }
         Insert: {
           _id: string
@@ -223,6 +230,13 @@ export interface Database {
           fully_booked?: boolean | null
           price?: string | null
           notes?: string | null
+          has_rooms?: boolean | null
+          room_types?: string | null
+          hasotheraddons?: boolean | null
+          other_addons?: string | null
+          gear_rental?: string | null
+          nitrox_required?: string | null
+          dive_days?: number | null
         }
         Update: Partial<Database['public']['Tables']['EO_dives']['Insert']>
         Relationships: []
@@ -236,6 +250,8 @@ export interface Database {
           start_time: string | null
           end_date: string | null
           price: string | null
+          other_addons: string | null
+          dive_days: number | null
         }
         Insert: {
           _id: string
@@ -245,6 +261,8 @@ export interface Database {
           start_time?: string | null
           end_date?: string | null
           price?: string | null
+          other_addons?: string | null
+          dive_days?: number | null
         }
         Update: Partial<Database['public']['Tables']['EO_courses']['Insert']>
         Relationships: []
@@ -366,5 +384,17 @@ export interface AppEvent {
   featured: boolean
   fully_booked: boolean
   price: number | null
+  deposit_amount: number | null
   currency: string
+  /** Source table gating flags — parsed from EO_dives/EO_courses columns. */
+  has_rooms: boolean
+  room_type_ids: string[]
+  has_addons: boolean
+  addon_ids: string[]
+  /** Free text describing gear-rental pricing on dives; null/empty = no gear offered. */
+  gear_rental_info: string | null
+  /** dive: nitrox_required flag; course: always false (courses handle cert separately). */
+  nitrox_required: boolean
+  /** Number of in-water days. Used to gate the gear section on courses. */
+  dive_days: number | null
 }
