@@ -5,44 +5,45 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 
-const optString = () => z.string().optional().nullable().transform(v => v || null)
-const optNumber = () =>
-  z.union([z.string(), z.number(), z.null(), z.undefined()])
-   .transform(v => {
-     if (v === null || v === undefined || v === '') return null
-     const n = typeof v === 'number' ? v : parseFloat(v)
-     return Number.isFinite(n) ? n : null
-   })
-
+// Schema intentionally matches what the HTML form emits (strings for text +
+// number inputs, booleans for checkboxes). Numeric/enum coercion happens in
+// onSubmit so the input and output types of this schema are identical, which
+// keeps react-hook-form happy.
 const schema = z.object({
   full_name: z.string().min(1, 'Required'),
-  display_name: optString(),
-  phone: optString(),
-  date_of_birth: optString(),
-  nationality: optString(),
-  id_number: optString(),
-  emergency_contact_name: optString(),
-  emergency_contact_phone: optString(),
-  cert_agency: optString(),
-  cert_level: optString(),
-  cert_number: optString(),
-  cert_date: optString(),
-  medical_notes: optString(),
-  // New (Phase 1) diver fields
-  height_cm: optNumber(),
-  weight_kg: optNumber(),
-  shoe_size: optString(),
-  gender: optString(),
-  contact_method: z.preprocess(
-    v => (v === '' || v === undefined ? null : v),
-    z.enum(['whatsapp','line','phone','email']).nullable()
-  ),
-  contact_id: optString(),
-  nitrox_certified: z.boolean().optional().transform(v => v ?? false),
-  logged_dives: optNumber().transform(v => v ?? 0),
-  last_dive_date: optString(),
+  display_name: z.string().optional(),
+  phone: z.string().optional(),
+  date_of_birth: z.string().optional(),
+  nationality: z.string().optional(),
+  id_number: z.string().optional(),
+  emergency_contact_name: z.string().optional(),
+  emergency_contact_phone: z.string().optional(),
+  cert_agency: z.string().optional(),
+  cert_level: z.string().optional(),
+  cert_number: z.string().optional(),
+  cert_date: z.string().optional(),
+  medical_notes: z.string().optional(),
+  height_cm: z.union([z.string(), z.number()]).optional(),
+  weight_kg: z.union([z.string(), z.number()]).optional(),
+  shoe_size: z.string().optional(),
+  gender: z.string().optional(),
+  contact_method: z.string().optional(),
+  contact_id: z.string().optional(),
+  nitrox_certified: z.boolean().optional(),
+  logged_dives: z.union([z.string(), z.number()]).optional(),
+  last_dive_date: z.string().optional(),
 })
 type FormData = z.infer<typeof schema>
+
+function numOrNull(v: unknown): number | null {
+  if (v === '' || v === null || v === undefined) return null
+  const n = typeof v === 'number' ? v : parseFloat(String(v))
+  return Number.isFinite(n) ? n : null
+}
+function strOrNull(v: unknown): string | null {
+  if (v === '' || v === null || v === undefined) return null
+  return String(v)
+}
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -67,7 +68,33 @@ export function ProfilePage() {
 
   async function onSubmit(data: FormData) {
     if (!user) return
-    await supabase.from('profiles').upsert({ id: user.id, ...data, updated_at: new Date().toISOString() })
+    const method = data.contact_method
+    await supabase.from('profiles').upsert({
+      id: user.id,
+      full_name: data.full_name,
+      display_name: strOrNull(data.display_name),
+      phone: strOrNull(data.phone),
+      date_of_birth: strOrNull(data.date_of_birth),
+      nationality: strOrNull(data.nationality),
+      id_number: strOrNull(data.id_number),
+      emergency_contact_name: strOrNull(data.emergency_contact_name),
+      emergency_contact_phone: strOrNull(data.emergency_contact_phone),
+      cert_agency: strOrNull(data.cert_agency),
+      cert_level: strOrNull(data.cert_level),
+      cert_number: strOrNull(data.cert_number),
+      cert_date: strOrNull(data.cert_date),
+      medical_notes: strOrNull(data.medical_notes),
+      height_cm: numOrNull(data.height_cm),
+      weight_kg: numOrNull(data.weight_kg),
+      shoe_size: strOrNull(data.shoe_size),
+      gender: strOrNull(data.gender),
+      contact_method: (method === 'whatsapp' || method === 'line' || method === 'phone' || method === 'email') ? method : null,
+      contact_id: strOrNull(data.contact_id),
+      nitrox_certified: Boolean(data.nitrox_certified),
+      logged_dives: numOrNull(data.logged_dives) ?? 0,
+      last_dive_date: strOrNull(data.last_dive_date),
+      updated_at: new Date().toISOString(),
+    })
     reset(data)
   }
 
@@ -76,7 +103,6 @@ export function ProfilePage() {
       <h1 className="text-xl font-bold text-slate-100">My Profile</h1>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        {/* Personal */}
         <section className="bg-slate-800 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Personal Info</h2>
           <Field label="Full name">
@@ -99,7 +125,6 @@ export function ProfilePage() {
           </Field>
         </section>
 
-        {/* Preferred contact */}
         <section className="bg-slate-800 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Preferred contact</h2>
           <Field label="Method">
@@ -116,7 +141,6 @@ export function ProfilePage() {
           </Field>
         </section>
 
-        {/* Sizing */}
         <section className="bg-slate-800 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Sizing</h2>
           <Field label="Height (cm)"><input {...register('height_cm')} type="number" step="0.1" className={inputClass} /></Field>
@@ -124,14 +148,12 @@ export function ProfilePage() {
           <Field label="Shoe size"><input {...register('shoe_size')} className={inputClass} placeholder="e.g. EU 41 / US 9" /></Field>
         </section>
 
-        {/* Emergency */}
         <section className="bg-slate-800 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Emergency Contact</h2>
           <Field label="Name"><input {...register('emergency_contact_name')} className={inputClass} /></Field>
           <Field label="Phone"><input {...register('emergency_contact_phone')} type="tel" className={inputClass} /></Field>
         </section>
 
-        {/* Certification */}
         <section className="bg-slate-800 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Certification</h2>
           <Field label="Agency (e.g. PADI, SSI)"><input {...register('cert_agency')} className={inputClass} /></Field>
@@ -146,7 +168,6 @@ export function ProfilePage() {
           </label>
         </section>
 
-        {/* Medical */}
         <section className="bg-slate-800 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Medical Notes</h2>
           <textarea
