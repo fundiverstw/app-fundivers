@@ -2,15 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { LoginPage } from './LoginPage'
-import { renderWithRouter, byName } from '../../tests/test-utils'
+import { renderWithRouter, byName, mockQueryBuilder } from '../../tests/test-utils'
 
-const { signInWithPassword, navigate } = vi.hoisted(() => ({
+const { signInWithPassword, navigate, from } = vi.hoisted(() => ({
   signInWithPassword: vi.fn(),
   navigate: vi.fn(),
+  from: vi.fn(),
 }))
 
 vi.mock('../lib/supabase', () => ({
-  supabase: { auth: { signInWithPassword } },
+  supabase: {
+    auth: { signInWithPassword },
+    from: (...a: unknown[]) => from(...a),
+  },
 }))
 
 vi.mock('react-router-dom', async () => {
@@ -21,7 +25,16 @@ vi.mock('react-router-dom', async () => {
 beforeEach(() => {
   signInWithPassword.mockReset()
   navigate.mockReset()
+  from.mockReset()
 })
+
+function okSignIn(role: 'diver' | 'admin' = 'diver', userId = 'u1') {
+  signInWithPassword.mockResolvedValue({
+    data: { user: { id: userId } },
+    error: null,
+  })
+  from.mockReturnValue(mockQueryBuilder({ data: { role } }))
+}
 
 describe('LoginPage', () => {
   it('shows validation errors for empty submit', async () => {
@@ -43,8 +56,8 @@ describe('LoginPage', () => {
     expect(signInWithPassword).not.toHaveBeenCalled()
   })
 
-  it('calls signInWithPassword and navigates on success', async () => {
-    signInWithPassword.mockResolvedValue({ error: null })
+  it('calls signInWithPassword and navigates a diver to /calendar', async () => {
+    okSignIn('diver')
     const user = userEvent.setup()
     renderWithRouter(<LoginPage />)
     await user.type(byName('email'), 'ada@example.com')
@@ -57,7 +70,19 @@ describe('LoginPage', () => {
         password: 'secret123',
       })
     )
-    expect(navigate).toHaveBeenCalledWith('/calendar')
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/calendar'))
+    expect(from).toHaveBeenCalledWith('profiles')
+  })
+
+  it('navigates an admin to /admin after sign-in', async () => {
+    okSignIn('admin')
+    const user = userEvent.setup()
+    renderWithRouter(<LoginPage />)
+    await user.type(byName('email'), 'admin@admin.admin')
+    await user.type(byName('password'), 'adminadmin')
+    await user.click(screen.getByRole('button', { name: /sign in/i }))
+
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/admin'))
   })
 
   it('surfaces auth error and does not navigate', async () => {
