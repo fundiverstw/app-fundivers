@@ -8,7 +8,16 @@
     "build": "tsc -b && vite build",
     "deploy": "npm run build && wrangler deploy",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:status": "supabase status",
+    "db:reset": "supabase db reset",
+    "db:diff": "supabase db diff",
+    "db:link": "dotenv -e .env.local -- sh -c 'supabase link --project-ref \"$SUPABASE_PROJECT_REF\" --password \"$SUPABASE_DB_PASSWORD\"'",
+    "db:pull": "dotenv -e .env.local -- sh -c 'supabase db pull --password \"$SUPABASE_DB_PASSWORD\"'",
+    "db:push": "dotenv -e .env.local -- sh -c 'supabase db push --password \"$SUPABASE_DB_PASSWORD\"'",
+    "db:dump-data": "dotenv -e .env.local -- sh -c 'supabase db dump --data-only --schema auth,public --password \"$SUPABASE_DB_PASSWORD\" -f supabase/seed.sql'"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -27,6 +36,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
