@@ -4,6 +4,7 @@ import {
   convertShoeSize,
   formatShoeSize,
   parseShoeSize,
+  shoeAsJp,
   shoeSizesFor,
 } from './shoe-size'
 
@@ -76,6 +77,23 @@ describe('formatShoeSize / parseShoeSize', () => {
 
   it('returns null for garbage', () => {
     expect(parseShoeSize('not a size')).toBeNull()
+  })
+})
+
+describe('shoeAsJp', () => {
+  it('converts a canonical EU men size to JP', () => {
+    // EU 41 men → JP 26
+    expect(shoeAsJp('EU 41 M')).toBe('JP 26')
+  })
+
+  it('returns null for empty / garbage input', () => {
+    expect(shoeAsJp(null)).toBeNull()
+    expect(shoeAsJp('')).toBeNull()
+    expect(shoeAsJp('nope')).toBeNull()
+  })
+
+  it('leaves JP input unchanged', () => {
+    expect(shoeAsJp('JP 26 M')).toBe('JP 26')
   })
 })
 
