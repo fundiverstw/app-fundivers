@@ -217,12 +217,12 @@ export function ProfilePage() {
           <Field label="Weight (kg)"><input {...register('weight_kg')} type="number" step="0.1" className={inputClass} /></Field>
           <div>
             <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wide">Shoe size</label>
-            <div className="flex gap-2">
+            <div className="flex gap-1.5">
               <select
                 aria-label="Shoe size unit"
                 value={shoeUnit}
                 onChange={e => handleUnitChange(e.target.value as ShoeUnit)}
-                className={`${inputClass} w-20`}
+                className="shrink-0 w-16 bg-slate-800 border border-slate-600 rounded-lg px-1.5 py-2 text-slate-100 text-sm focus:outline-none focus:border-sky-500"
               >
                 {SHOE_UNITS.map(u => <option key={u} value={u}>{u.toUpperCase()}</option>)}
               </select>
@@ -230,7 +230,7 @@ export function ProfilePage() {
                 aria-label="Shoe size gender"
                 value={shoeGender}
                 onChange={e => handleGenderChange(e.target.value as ShoeGender)}
-                className={`${inputClass} w-16`}
+                className="shrink-0 w-14 bg-slate-800 border border-slate-600 rounded-lg px-1.5 py-2 text-slate-100 text-sm focus:outline-none focus:border-sky-500"
               >
                 {SHOE_GENDERS.map(g => <option key={g} value={g}>{g.toUpperCase()}</option>)}
               </select>
@@ -238,7 +238,7 @@ export function ProfilePage() {
                 aria-label="Shoe size value"
                 value={shoeValue}
                 onChange={e => { setShoeValue(e.target.value); setDirtyExtras(true) }}
-                className={`${inputClass} flex-1`}
+                className={`${inputClass} flex-1 min-w-0`}
               >
                 <option value="">—</option>
                 {shoeOptions.map(s => <option key={s} value={s}>{s}</option>)}
