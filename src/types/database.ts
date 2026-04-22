@@ -362,6 +362,48 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['Other_Addons']['Insert']>
         Relationships: []
       }
+      push_subscriptions: {
+        Row: {
+          id: string
+          user_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          user_agent: string | null
+          created_at: string
+          last_seen_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          user_agent?: string | null
+          created_at?: string
+          last_seen_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['push_subscriptions']['Insert']>
+        Relationships: []
+      }
+      push_notifications_sent: {
+        Row: {
+          user_id: string
+          event_id: string
+          event_type: 'dive' | 'course'
+          kind: string
+          sent_at: string
+        }
+        Insert: {
+          user_id: string
+          event_id: string
+          event_type: 'dive' | 'course'
+          kind: string
+          sent_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['push_notifications_sent']['Insert']>
+        Relationships: []
+      }
     }
   }
 }

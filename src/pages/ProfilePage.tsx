@@ -1,9 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { pushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
 
 // Schema intentionally matches what the HTML form emits (strings for text +
 // number inputs, booleans for checkboxes). Numeric/enum coercion happens in
@@ -102,6 +103,8 @@ export function ProfilePage() {
     <div className="max-w-lg mx-auto space-y-6">
       <h1 className="text-xl font-bold text-slate-100">My Profile</h1>
 
+      <NotificationsToggle />
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <section className="bg-slate-800 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Personal Info</h2>
@@ -187,5 +190,74 @@ export function ProfilePage() {
         </button>
       </form>
     </div>
+  )
+}
+
+type PushState = 'loading' | 'unsupported' | 'on' | 'off'
+
+export function NotificationsToggle() {
+  const [state, setState] = useState<PushState>('loading')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      if (!pushSupported()) { if (!cancelled) setState('unsupported'); return }
+      const sub = await getPushSubscription()
+      if (!cancelled) setState(sub ? 'on' : 'off')
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  async function toggle(on: boolean) {
+    setError(null)
+    setBusy(true)
+    try {
+      if (on) { await subscribeToPush();   setState('on') }
+      else    { await unsubscribeFromPush(); setState('off') }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update notifications.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (state === 'loading') return null
+
+  if (state === 'unsupported') {
+    return (
+      <section className="bg-slate-800 rounded-xl p-4 space-y-2" aria-label="Push Notifications">
+        <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Push Notifications</h2>
+        <p className="text-sm text-slate-400">
+          Your device doesn't support push notifications in this browser.
+          On iPhone/iPad, install FunDivers to your Home Screen
+          (Share → Add to Home Screen), open the app from there, and the toggle will appear.
+        </p>
+      </section>
+    )
+  }
+
+  return (
+    <section className="bg-slate-800 rounded-xl p-4 space-y-3" aria-label="Push Notifications">
+      <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Push Notifications</h2>
+      <label className="flex items-center justify-between gap-3">
+        <span className="text-sm text-slate-200">Event &amp; payment reminders</span>
+        <input
+          type="checkbox"
+          aria-label="Enable push notifications"
+          className="accent-sky-500 scale-125"
+          disabled={busy}
+          checked={state === 'on'}
+          onChange={(e) => toggle(e.target.checked)}
+        />
+      </label>
+      <p className="text-xs text-slate-500">
+        Reminders fire 1 week and 1 day before each event, plus payment nudges
+        at 3 / 2 / 1 weeks and 3 / 1 days before. iOS requires installing the
+        app to your Home Screen.
+      </p>
+      {error && <p className="text-red-400 text-xs">{error}</p>}
+    </section>
   )
 }
