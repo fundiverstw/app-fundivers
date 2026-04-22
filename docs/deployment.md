@@ -32,9 +32,20 @@ described below.
 
 See [push-notifications.md § Configure the worker](./push-notifications.md#4-configure-the-worker).
 
-## Frontend deploy
+## Workers
 
-`npm run deploy` expands to:
+Two Cloudflare Workers are deployed separately:
+
+| Worker | Config | Make target |
+| --- | --- | --- |
+| `app-fundiverstw`  | `./wrangler.toml`              | `make deploy-app` |
+| `fundivers-push`   | `./workers/push/wrangler.toml` | `make deploy-push` |
+
+`make deploy` runs both in sequence.
+
+### `app-fundiverstw` (SPA)
+
+`make deploy-app` runs `npm run deploy`, which expands to:
 
 ```sh
 npm run build                                       # tsc -b && vite build
@@ -52,6 +63,13 @@ directory = "./dist"
 
 No custom fetch handler — it's a pure static-asset Worker. On first
 deploy you may need `wrangler login` to authenticate.
+
+### `fundivers-push` (cron sender)
+
+`make deploy-push` runs `wrangler deploy` from `workers/push/`. The
+target installs deps on first run. Secrets are set separately via
+`wrangler secret put` — see
+[push-notifications.md § Configure the worker](./push-notifications.md#4-configure-the-worker).
 
 ## Supabase schema workflow
 
@@ -100,9 +118,9 @@ Small feature or bug fix:
 1. Run `make test` locally — unit + integration.
 2. If the change touches the schema: `make reset` first, then
    `make test`, then `make push` after review.
-3. `make deploy` for the frontend.
-4. If push notifications are affected: `cd workers/push && npm run deploy`.
-5. `make verify` — confirm cloud schema + row counts match local
+3. `make deploy` — ships both workers (SPA + push cron). Use
+   `make deploy-app` or `make deploy-push` if you're touching only one.
+4. `make verify` — confirm cloud schema + row counts match local
    expectations post-deploy.
 
 ## Rollback

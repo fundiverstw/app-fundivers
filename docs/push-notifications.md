@@ -79,7 +79,7 @@ curl "http://localhost:8787/__scheduled?cron=0+2+*+*+*"
 ### 5. Deploy the worker
 
 ```sh
-cd workers/push && npm run deploy
+make deploy-push        # or: make deploy (to ship both workers together)
 ```
 
 The cron fires at `0 2 * * *` UTC (= 10:00 Asia/Taipei) — edit
