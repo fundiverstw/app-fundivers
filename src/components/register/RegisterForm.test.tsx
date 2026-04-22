@@ -46,6 +46,7 @@ const sampleProfile: Profile = {
   height_cm: 170, weight_kg: 65, shoe_size: 'EU 40',
   gender: 'female', contact_method: 'line', contact_id: 'ada-line',
   nitrox_certified: false, logged_dives: 12, last_dive_date: null,
+  gear_owned: [],
 }
 
 const sampleRooms: EORoom[] = [
@@ -113,8 +114,14 @@ describe('RegisterForm', () => {
     setupFrom()
     const onBooked = vi.fn()
     const user = userEvent.setup()
+    // Diver "owns everything" so the a-la-carte list starts empty and
+    // clicking Wetsuit adds only Wetsuit (keeps the original test intent).
+    const profileOwnsAll: Profile = {
+      ...sampleProfile,
+      gear_owned: ['BCD', 'Regulator', 'Wetsuit', 'Fins', 'Mask', 'Boots'],
+    }
     render(
-      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+      <RegisterForm event={sampleEvent} profile={profileOwnsAll} userId="u1"
         onClose={() => {}} onBooked={onBooked} />
     )
     await user.click(screen.getByRole('button', { name: /next/i }))
@@ -172,6 +179,39 @@ describe('RegisterForm', () => {
     expect(screen.queryByLabelText(/add nitrox course/i)).not.toBeInTheDocument()
     // Transportation is always available
     expect(screen.getByLabelText(/need transportation/i)).toBeInTheDocument()
+  })
+
+  it('prefills a-la-carte rental list with items the diver does NOT already own', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    render(
+      <RegisterForm
+        event={sampleEvent}
+        profile={{ ...sampleProfile, gear_owned: ['BCD', 'Regulator', 'Fins'] }}
+        userId="u1"
+        onClose={() => {}}
+        onBooked={() => {}}
+      />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    await user.click(screen.getByLabelText(/rent gear/i))
+    const gearSelect = await screen.findByDisplayValue(/full set/i)
+    await user.selectOptions(gearSelect, 'a-la-carte')
+
+    // Items the diver owns should be unchecked; the rest should be pre-checked.
+    await waitFor(() => {
+      expect((screen.getByLabelText(/BCD/i) as HTMLInputElement).checked).toBe(false)
+      expect((screen.getByLabelText(/Regulator/i) as HTMLInputElement).checked).toBe(false)
+      expect((screen.getByLabelText(/Fins/i) as HTMLInputElement).checked).toBe(false)
+      expect((screen.getByLabelText(/Wetsuit/i) as HTMLInputElement).checked).toBe(true)
+      expect((screen.getByLabelText(/Mask/i) as HTMLInputElement).checked).toBe(true)
+      expect((screen.getByLabelText(/Boots/i) as HTMLInputElement).checked).toBe(true)
+    })
+
+    // Once the user toggles any item, explicit choice wins (no re-seed on re-render).
+    await user.click(screen.getByLabelText(/Wetsuit/i)) // uncheck
+    expect((screen.getByLabelText(/Wetsuit/i) as HTMLInputElement).checked).toBe(false)
   })
 
   it('applies a 5% surcharge for credit card payment on the total', async () => {

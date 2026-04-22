@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
+import { GEAR_ITEMS } from '../../lib/gear'
 import type { AppEvent, BookingDetails, EOAddon, EORoom, Profile } from '../../types/database'
 
 interface Props {
@@ -11,7 +12,6 @@ interface Props {
   onBooked: (booking: unknown) => void
 }
 
-const GEAR_ITEMS = ['BCD', 'Regulator', 'Wetsuit', 'Fins', 'Mask', 'Boots']
 const GEAR_ALACARTE_PRICES: Record<string, number> = {
   BCD: 450, Regulator: 500, Wetsuit: 200, Fins: 100, Mask: 100, Boots: 100,
 }
@@ -41,6 +41,10 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked }: Prop
   const [rentGear, setRentGear] = useState(false)
   const [gearMode, setGearMode] = useState<'full' | 'a-la-carte' | 'provided'>('full')
   const [gearItems, setGearItems] = useState<string[]>([])
+  // Auto-prefill the a-la-carte rental list with items the diver does NOT
+  // already own, the first time they enter that mode. Once they touch the
+  // list we back off so their explicit choice wins.
+  const [gearEdited, setGearEdited] = useState(false)
   const [roomId, setRoomId] = useState<string>('')
   const [roomNotes, setRoomNotes] = useState('')
   const [addonIds, setAddonIds] = useState<Set<string>>(new Set())
@@ -48,6 +52,13 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked }: Prop
   const [addNitroxCourse, setAddNitroxCourse] = useState(false)
   const [payment, setPayment] = useState<'bank_transfer' | 'credit_card' | 'cash'>('bank_transfer')
   const [notes, setNotes] = useState('')
+
+  useEffect(() => {
+    if (gearMode === 'a-la-carte' && !gearEdited) {
+      const owned = new Set(profile?.gear_owned ?? [])
+      setGearItems((GEAR_ITEMS as readonly string[]).filter(item => !owned.has(item)))
+    }
+  }, [gearMode, gearEdited, profile])
 
   useEffect(() => {
     let cancelled = false
@@ -89,6 +100,7 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked }: Prop
   const total = Math.round(subTotal * (1 + paymentSurcharge))
 
   function toggleItem(item: string) {
+    setGearEdited(true)
     setGearItems(prev => prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item])
   }
   function toggleAddon(id: string) {

@@ -1,10 +1,21 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { pushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
+import { GEAR_ITEMS } from '../lib/gear'
+import {
+  SHOE_UNITS,
+  SHOE_GENDERS,
+  convertShoeSize,
+  formatShoeSize,
+  parseShoeSize,
+  shoeSizesFor,
+  type ShoeGender,
+  type ShoeUnit,
+} from '../lib/shoe-size'
 
 // Schema intentionally matches what the HTML form emits (strings for text +
 // number inputs, booleans for checkboxes). Numeric/enum coercion happens in
@@ -26,7 +37,6 @@ const schema = z.object({
   medical_notes: z.string().optional(),
   height_cm: z.union([z.string(), z.number()]).optional(),
   weight_kg: z.union([z.string(), z.number()]).optional(),
-  shoe_size: z.string().optional(),
   gender: z.string().optional(),
   contact_method: z.string().optional(),
   contact_id: z.string().optional(),
@@ -63,13 +73,68 @@ export function ProfilePage() {
     resolver: zodResolver(schema),
   })
 
+  const [gearOwned, setGearOwned] = useState<string[]>([])
+  const [shoeUnit, setShoeUnit] = useState<ShoeUnit>('eu')
+  const [shoeGender, setShoeGender] = useState<ShoeGender>('m')
+  const [shoeValue, setShoeValue] = useState<string>('') // select value as a string
+  const [dirtyExtras, setDirtyExtras] = useState(false)
+
   useEffect(() => {
-    if (profile) reset(profile as unknown as FormData)
+    if (!profile) return
+    reset(profile as unknown as FormData)
+    setGearOwned(Array.isArray(profile.gear_owned) ? [...profile.gear_owned] : [])
+    const parsed = parseShoeSize(profile.shoe_size)
+    if (parsed) {
+      setShoeUnit(parsed.unit)
+      setShoeGender(parsed.gender)
+      setShoeValue(String(parsed.value))
+    } else {
+      setShoeUnit('eu'); setShoeGender('m'); setShoeValue('')
+    }
+    setDirtyExtras(false)
   }, [profile, reset])
+
+  const shoeOptions = useMemo(() => shoeSizesFor(shoeUnit, shoeGender), [shoeUnit, shoeGender])
+  const jpHint = useMemo(() => {
+    if (!shoeValue || shoeUnit === 'jp') return null
+    const converted = convertShoeSize(parseFloat(shoeValue), shoeUnit, 'jp', shoeGender)
+    return converted != null ? `JP: ${converted}` : null
+  }, [shoeValue, shoeUnit, shoeGender])
+
+  function toggleGearOwned(item: string) {
+    setGearOwned(prev => prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item])
+    setDirtyExtras(true)
+  }
+
+  // Switching unit/gender snaps the current size to the nearest row in the new
+  // unit so the user's selection isn't lost when they change the selector.
+  function handleUnitChange(next: ShoeUnit) {
+    if (shoeValue) {
+      const converted = convertShoeSize(parseFloat(shoeValue), shoeUnit, next, shoeGender)
+      if (converted != null) setShoeValue(String(converted))
+    }
+    setShoeUnit(next)
+    setDirtyExtras(true)
+  }
+  function handleGenderChange(next: ShoeGender) {
+    if (shoeValue) {
+      // Map through JP (body reference) so the physical size is preserved.
+      const asJp = convertShoeSize(parseFloat(shoeValue), shoeUnit, 'jp', shoeGender)
+      if (asJp != null) {
+        const back = convertShoeSize(asJp, 'jp', shoeUnit, next)
+        if (back != null) setShoeValue(String(back))
+      }
+    }
+    setShoeGender(next)
+    setDirtyExtras(true)
+  }
 
   async function onSubmit(data: FormData) {
     if (!user) return
     const method = data.contact_method
+    const shoeSizeCanonical = shoeValue
+      ? formatShoeSize(parseFloat(shoeValue), shoeUnit, shoeGender)
+      : null
     await supabase.from('profiles').upsert({
       id: user.id,
       full_name: data.full_name,
@@ -87,16 +152,18 @@ export function ProfilePage() {
       medical_notes: strOrNull(data.medical_notes),
       height_cm: numOrNull(data.height_cm),
       weight_kg: numOrNull(data.weight_kg),
-      shoe_size: strOrNull(data.shoe_size),
+      shoe_size: shoeSizeCanonical,
       gender: strOrNull(data.gender),
       contact_method: (method === 'whatsapp' || method === 'line' || method === 'phone' || method === 'email') ? method : null,
       contact_id: strOrNull(data.contact_id),
       nitrox_certified: Boolean(data.nitrox_certified),
       logged_dives: numOrNull(data.logged_dives) ?? 0,
       last_dive_date: strOrNull(data.last_dive_date),
+      gear_owned: gearOwned,
       updated_at: new Date().toISOString(),
     })
     reset(data)
+    setDirtyExtras(false)
   }
 
   return (
@@ -148,7 +215,57 @@ export function ProfilePage() {
           <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Sizing</h2>
           <Field label="Height (cm)"><input {...register('height_cm')} type="number" step="0.1" className={inputClass} /></Field>
           <Field label="Weight (kg)"><input {...register('weight_kg')} type="number" step="0.1" className={inputClass} /></Field>
-          <Field label="Shoe size"><input {...register('shoe_size')} className={inputClass} placeholder="e.g. EU 41 / US 9" /></Field>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wide">Shoe size</label>
+            <div className="flex gap-2">
+              <select
+                aria-label="Shoe size unit"
+                value={shoeUnit}
+                onChange={e => handleUnitChange(e.target.value as ShoeUnit)}
+                className={`${inputClass} w-20`}
+              >
+                {SHOE_UNITS.map(u => <option key={u} value={u}>{u.toUpperCase()}</option>)}
+              </select>
+              <select
+                aria-label="Shoe size gender"
+                value={shoeGender}
+                onChange={e => handleGenderChange(e.target.value as ShoeGender)}
+                className={`${inputClass} w-16`}
+              >
+                {SHOE_GENDERS.map(g => <option key={g} value={g}>{g.toUpperCase()}</option>)}
+              </select>
+              <select
+                aria-label="Shoe size value"
+                value={shoeValue}
+                onChange={e => { setShoeValue(e.target.value); setDirtyExtras(true) }}
+                className={`${inputClass} flex-1`}
+              >
+                <option value="">—</option>
+                {shoeOptions.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            {jpHint && <p className="text-xs text-sky-400 mt-1">{jpHint}</p>}
+          </div>
+        </section>
+
+        <section className="bg-slate-800 rounded-xl p-4 space-y-3">
+          <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Gear I own</h2>
+          <p className="text-xs text-slate-400">
+            Checked items will be skipped when you choose à-la-carte rental at registration.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {GEAR_ITEMS.map(item => (
+              <label key={item} className="flex items-center gap-2 text-sm text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={gearOwned.includes(item)}
+                  onChange={() => toggleGearOwned(item)}
+                  className="accent-sky-500"
+                />
+                {item}
+              </label>
+            ))}
+          </div>
         </section>
 
         <section className="bg-slate-800 rounded-xl p-4 space-y-3">
@@ -183,7 +300,7 @@ export function ProfilePage() {
 
         <button
           type="submit"
-          disabled={isSubmitting || !isDirty}
+          disabled={isSubmitting || (!isDirty && !dirtyExtras)}
           className="w-full bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-white font-semibold py-2 rounded-lg transition-colors"
         >
           {isSubmitting ? 'Saving…' : 'Save changes'}
