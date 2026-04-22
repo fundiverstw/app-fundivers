@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
-import { MEMO_TAGS, type EventMemo, type MemoTag, type Profile } from '../../types/database'
+import { NOTE_TAGS, type AdminNote, type NoteTag, type Profile } from '../../types/database'
 
-const TAG_STYLES: Record<MemoTag, string> = {
+const TAG_STYLES: Record<NoteTag, string> = {
   urgent:    'bg-rose-700 text-rose-100',
   payment:   'bg-amber-700 text-amber-100',
   gear:      'bg-sky-700 text-sky-100',
@@ -12,33 +12,57 @@ const TAG_STYLES: Record<MemoTag, string> = {
   cert:      'bg-emerald-700 text-emerald-100',
   medical:   'bg-fuchsia-700 text-fuchsia-100',
   note:      'bg-slate-700 text-slate-200',
+  general:   'bg-slate-700 text-slate-200',
 }
 
-type MemoWithAuthors = EventMemo & {
+type NoteWithAuthors = AdminNote & {
   author: Pick<Profile, 'id' | 'display_name' | 'full_name'> | null
   resolver: Pick<Profile, 'id' | 'display_name' | 'full_name'> | null
 }
 
+export type NoteTarget =
+  | { kind: 'dive'; id: string }
+  | { kind: 'course'; id: string }
+  | { kind: 'booking'; id: string }
+
 interface Props {
-  eventType: 'dive' | 'course'
-  eventId: string
+  target: NoteTarget
+  /** Optional: restrict both reads and new-note inserts to this tag. */
+  tagFilter?: NoteTag
+  /** Optional: override the section heading. */
+  title?: string
 }
 
-export function EventMemos({ eventType, eventId }: Props) {
+function columnFor(target: NoteTarget): 'eo_dive_id' | 'eo_course_id' | 'booking_id' {
+  return target.kind === 'dive' ? 'eo_dive_id'
+       : target.kind === 'course' ? 'eo_course_id'
+       : 'booking_id'
+}
+
+function fkPayload(target: NoteTarget) {
+  return {
+    eo_dive_id:   target.kind === 'dive'   ? target.id : null,
+    eo_course_id: target.kind === 'course' ? target.id : null,
+    booking_id:   target.kind === 'booking' ? target.id : null,
+  }
+}
+
+export function AdminNotes({ target, tagFilter, title = 'Notes' }: Props) {
   const { user } = useAuth()
-  const [memos, setMemos] = useState<MemoWithAuthors[]>([])
+  const [notes, setNotes] = useState<NoteWithAuthors[]>([])
   const [showResolved, setShowResolved] = useState(false)
-  const [tag, setTag] = useState<MemoTag>('note')
+  const [tag, setTag] = useState<NoteTag>(tagFilter ?? 'note')
   const [content, setContent] = useState('')
   const [saving, setSaving] = useState(false)
 
   async function refetch() {
-    const column = eventType === 'dive' ? 'eo_dive_id' : 'eo_course_id'
-    const { data: rows } = await supabase
-      .from('event_memos')
+    let q = supabase
+      .from('admin_notes')
       .select('*')
-      .eq(column, eventId)
+      .eq(columnFor(target), target.id)
       .order('created_at', { ascending: false })
+    if (tagFilter) q = q.eq('tag', tagFilter)
+    const { data: rows } = await q
 
     const ids = [
       ...(rows ?? []).map(r => r.created_by),
@@ -53,61 +77,54 @@ export function EventMemos({ eventType, eventId }: Props) {
       profMap = new Map((profs ?? []).map(p => [p.id, p]))
     }
 
-    setMemos((rows ?? []).map(r => ({
+    setNotes((rows ?? []).map(r => ({
       ...r,
       author: profMap.get(r.created_by) ?? null,
       resolver: r.resolved_by ? (profMap.get(r.resolved_by) ?? null) : null,
     })))
   }
 
-  useEffect(() => { refetch() }, [eventType, eventId])
+  useEffect(() => { refetch() }, [target.kind, target.id, tagFilter])
 
-  async function addMemo() {
+  async function addNote() {
     if (!user || !content.trim()) return
     setSaving(true)
-    const fk = eventType === 'dive'
-      ? { eo_dive_id: eventId, eo_course_id: null }
-      : { eo_dive_id: null, eo_course_id: eventId }
-    await supabase.from('event_memos').insert({
+    await supabase.from('admin_notes').insert({
       created_by: user.id,
-      tag,
+      tag: tagFilter ?? tag,
       content: content.trim(),
-      ...fk,
+      ...fkPayload(target),
     })
     setContent('')
-    setTag('note')
+    if (!tagFilter) setTag('note')
     await refetch()
     setSaving(false)
   }
 
-  async function resolve(memoId: string) {
+  async function resolve(noteId: string) {
     if (!user) return
     await supabase
-      .from('event_memos')
-      .update({
-        resolved: true,
-        resolved_by: user.id,
-        resolved_at: new Date().toISOString(),
-      })
-      .eq('id', memoId)
+      .from('admin_notes')
+      .update({ resolved: true, resolved_by: user.id, resolved_at: new Date().toISOString() })
+      .eq('id', noteId)
     await refetch()
   }
 
-  async function unresolve(memoId: string) {
+  async function unresolve(noteId: string) {
     await supabase
-      .from('event_memos')
+      .from('admin_notes')
       .update({ resolved: false, resolved_by: null, resolved_at: null })
-      .eq('id', memoId)
+      .eq('id', noteId)
     await refetch()
   }
 
-  const open = memos.filter(m => !m.resolved)
-  const resolved = memos.filter(m => m.resolved)
+  const open = notes.filter(m => !m.resolved)
+  const resolved = notes.filter(m => m.resolved)
 
   return (
     <section className="bg-slate-800 rounded-xl p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-amber-400 uppercase tracking-wider">Memos</h2>
+        <h2 className="text-sm font-semibold text-amber-400 uppercase tracking-wider">{title}</h2>
         {resolved.length > 0 && (
           <button
             onClick={() => setShowResolved(v => !v)}
@@ -120,35 +137,37 @@ export function EventMemos({ eventType, eventId }: Props) {
 
       <div className="space-y-2">
         {open.length === 0 && (
-          <p className="text-xs text-slate-500">No open memos.</p>
+          <p className="text-xs text-slate-500">No open notes.</p>
         )}
         {open.map(m => (
-          <MemoCard key={m.id} memo={m} onResolve={() => resolve(m.id)} />
+          <NoteCard key={m.id} note={m} onResolve={() => resolve(m.id)} />
         ))}
         {showResolved && resolved.map(m => (
-          <MemoCard key={m.id} memo={m} onUnresolve={() => unresolve(m.id)} />
+          <NoteCard key={m.id} note={m} onUnresolve={() => unresolve(m.id)} />
         ))}
       </div>
 
       <div className="pt-2 border-t border-slate-700 space-y-2">
         <div className="flex gap-2">
-          <select
-            value={tag}
-            onChange={e => setTag(e.target.value as MemoTag)}
-            className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-xs text-slate-100"
-          >
-            {MEMO_TAGS.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
+          {!tagFilter && (
+            <select
+              value={tag}
+              onChange={e => setTag(e.target.value as NoteTag)}
+              className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-xs text-slate-100"
+            >
+              {NOTE_TAGS.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          )}
           <input
             type="text"
             value={content}
             onChange={e => setContent(e.target.value)}
-            placeholder="New memo…"
+            placeholder="New note…"
             className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-1 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
-            onKeyDown={e => { if (e.key === 'Enter') addMemo() }}
+            onKeyDown={e => { if (e.key === 'Enter') addNote() }}
           />
           <button
-            onClick={addMemo}
+            onClick={addNote}
             disabled={saving || !content.trim()}
             className="bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-white text-xs px-3 rounded-lg"
           >
@@ -160,19 +179,19 @@ export function EventMemos({ eventType, eventId }: Props) {
   )
 }
 
-function MemoCard({ memo, onResolve, onUnresolve }: {
-  memo: MemoWithAuthors
+function NoteCard({ note, onResolve, onUnresolve }: {
+  note: NoteWithAuthors
   onResolve?: () => void
   onUnresolve?: () => void
 }) {
-  const author = memo.author?.display_name ?? memo.author?.full_name ?? 'unknown'
+  const author = note.author?.display_name ?? note.author?.full_name ?? 'unknown'
   return (
-    <div className={`bg-slate-900/50 rounded-lg p-3 text-sm ${memo.resolved ? 'opacity-60' : ''}`}>
+    <div className={`bg-slate-900/50 rounded-lg p-3 text-sm ${note.resolved ? 'opacity-60' : ''}`}>
       <div className="flex items-start gap-2">
-        <span className={`text-xs font-semibold uppercase px-2 py-0.5 rounded-full shrink-0 ${TAG_STYLES[memo.tag]}`}>
-          {memo.tag}
+        <span className={`text-xs font-semibold uppercase px-2 py-0.5 rounded-full shrink-0 ${TAG_STYLES[note.tag]}`}>
+          {note.tag}
         </span>
-        <p className={`flex-1 text-slate-100 ${memo.resolved ? 'line-through' : ''}`}>{memo.content}</p>
+        <p className={`flex-1 text-slate-100 ${note.resolved ? 'line-through' : ''}`}>{note.content}</p>
         {onResolve && (
           <button onClick={onResolve} className="text-xs text-slate-400 hover:text-emerald-400 shrink-0">✓ resolve</button>
         )}
@@ -181,9 +200,9 @@ function MemoCard({ memo, onResolve, onUnresolve }: {
         )}
       </div>
       <p className="text-xs text-slate-500 mt-1">
-        {author} · {format(new Date(memo.created_at), 'MMM d · HH:mm')}
-        {memo.resolved && memo.resolved_at && (
-          <> · resolved by {memo.resolver?.display_name ?? memo.resolver?.full_name ?? 'unknown'} {format(new Date(memo.resolved_at), 'MMM d')}</>
+        {author} · {format(new Date(note.created_at), 'MMM d · HH:mm')}
+        {note.resolved && note.resolved_at && (
+          <> · resolved by {note.resolver?.display_name ?? note.resolver?.full_name ?? 'unknown'} {format(new Date(note.resolved_at), 'MMM d')}</>
         )}
       </p>
     </div>
