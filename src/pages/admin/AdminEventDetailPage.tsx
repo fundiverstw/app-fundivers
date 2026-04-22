@@ -4,6 +4,7 @@ import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { fetchEventsForBookings } from '../../lib/events'
 import { AdminNotes } from '../../components/admin/AdminNotes'
+import { shoeAsJp } from '../../lib/shoe-size'
 import type { AppEvent, Booking, BookingDetails, Payment, Profile } from '../../types/database'
 
 interface Registrant {
@@ -12,10 +13,15 @@ interface Registrant {
   payments: Payment[]
 }
 
+type AddonNameMap = Map<string, string>
+type RoomNameMap = Map<string, string>
+
 export function AdminEventDetailPage() {
   const { type, id } = useParams<{ type: 'dive' | 'course'; id: string }>()
   const [event, setEvent] = useState<AppEvent | null>(null)
   const [registrants, setRegistrants] = useState<Registrant[]>([])
+  const [addonNames, setAddonNames] = useState<AddonNameMap>(new Map())
+  const [roomNames, setRoomNames] = useState<RoomNameMap>(new Map())
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -58,6 +64,27 @@ export function AdminEventDetailPage() {
         arr.push(p)
         paymentsByBooking.set(p.booking_id, arr)
       }
+
+      // Resolve any add-on / room IDs referenced in the bookings to display
+      // names so the admin doesn't see raw UUIDs.
+      const addonIds = new Set<string>()
+      const roomIds = new Set<string>()
+      for (const b of bookings) {
+        const d = b.details as BookingDetails
+        for (const id of d.add_ons ?? []) addonIds.add(id)
+        if (d.room?.option_id) roomIds.add(d.room.option_id)
+      }
+      const [addonRes, roomRes] = await Promise.all([
+        addonIds.size
+          ? supabase.from('Other_Addons').select('_id, display_name, title').in('_id', [...addonIds])
+          : Promise.resolve({ data: [] as { _id: string; display_name: string | null; title: string | null }[] }),
+        roomIds.size
+          ? supabase.from('EO_rooms').select('_id, display_name, title').in('_id', [...roomIds])
+          : Promise.resolve({ data: [] as { _id: string; display_name: string | null; title: string | null }[] }),
+      ])
+      if (cancelled) return
+      setAddonNames(new Map((addonRes.data ?? []).map(a => [a._id, a.display_name || a.title || a._id])))
+      setRoomNames(new Map((roomRes.data ?? []).map(r => [r._id, r.display_name || r.title || r._id])))
 
       setRegistrants(bookings.map(b => ({
         booking: b,
@@ -130,6 +157,8 @@ export function AdminEventDetailPage() {
             <RegistrantCard
               key={r.booking.id}
               r={r}
+              addonNames={addonNames}
+              roomNames={roomNames}
               onStatusChange={updateStatus}
               onApproveRefund={approveRefund}
             />
@@ -142,11 +171,15 @@ export function AdminEventDetailPage() {
 
 const BOOKING_STATUSES: Booking['status'][] = ['pending', 'confirmed', 'waitlisted', 'cancelled']
 
-function RegistrantCard({ r, onStatusChange, onApproveRefund }: {
+function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRefund }: {
   r: Registrant
+  addonNames: AddonNameMap
+  roomNames: RoomNameMap
   onStatusChange: (id: string, s: Booking['status']) => void
   onApproveRefund: (id: string) => void
 }) {
+  const [expanded, setExpanded] = useState(false)
+
   const totalPaid = r.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
   const totalDue = r.payments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0)
   const paymentStatus = r.payments.length === 0
@@ -167,89 +200,106 @@ function RegistrantCard({ r, onStatusChange, onApproveRefund }: {
 
   return (
     <div className="bg-slate-800 rounded-xl p-4 space-y-2">
-      <div className="flex items-start justify-between gap-3">
+      <button
+        type="button"
+        onClick={() => setExpanded(v => !v)}
+        aria-expanded={expanded}
+        className="w-full text-left flex items-start justify-between gap-3 focus:outline-none"
+      >
         <div>
           <p className="font-medium text-slate-100 text-sm">
+            <span aria-hidden="true" className="text-slate-500 mr-1.5">{expanded ? '▾' : '▸'}</span>
             {r.profile?.full_name ?? '(no profile)'}
             {r.profile?.display_name && <span className="text-slate-400"> “{r.profile.display_name}”</span>}
           </p>
           {r.profile && (
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-400 pl-4">
               {r.profile.cert_agency && r.profile.cert_level && `${r.profile.cert_agency} ${r.profile.cert_level}`}
-              {r.profile.logged_dives > 0 && ` · ${r.profile.logged_dives} logged dives`}
               {r.profile.nitrox_certified && ' · Nitrox'}
             </p>
           )}
         </div>
         <div className="text-right text-xs shrink-0 space-y-1">
-          <select
-            value={r.booking.status}
-            onChange={e => onStatusChange(r.booking.id, e.target.value as Booking['status'])}
-            className={`bg-slate-900 border border-slate-600 rounded px-1.5 py-0.5 text-xs font-medium capitalize ${statusStyles[r.booking.status]}`}
-          >
-            {BOOKING_STATUSES.map(s => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
+          {/* Wrapped in a click-stopper so opening the select doesn't collapse/expand the card. */}
+          <span onClick={e => e.stopPropagation()}>
+            <select
+              value={r.booking.status}
+              onChange={e => onStatusChange(r.booking.id, e.target.value as Booking['status'])}
+              className={`bg-slate-900 border border-slate-600 rounded px-1.5 py-0.5 text-xs font-medium capitalize ${statusStyles[r.booking.status]}`}
+            >
+              {BOOKING_STATUSES.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </span>
           <p className={`${payStyles[paymentStatus]} capitalize`}>
             {paymentStatus === 'paid'    && `Paid ${totalPaid.toLocaleString()}`}
             {paymentStatus === 'partial' && `${totalPaid.toLocaleString()} paid · ${totalDue.toLocaleString()} due`}
             {paymentStatus === 'none'    && 'No payment'}
           </p>
         </div>
-      </div>
+      </button>
 
-      {r.profile && (
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-400 pt-1 border-t border-slate-700">
-          {r.profile.phone       && <span>📞 {r.profile.phone}</span>}
-          {r.profile.contact_method && r.profile.contact_id && (
-            <span>{methodEmoji(r.profile.contact_method)} {r.profile.contact_id}</span>
+      {expanded && (
+        <>
+          {r.profile && (
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-400 pt-1 border-t border-slate-700">
+              {r.profile.phone       && <span>📞 {r.profile.phone}</span>}
+              {r.profile.contact_method && r.profile.contact_id && (
+                <span>{methodEmoji(r.profile.contact_method)} {r.profile.contact_id}</span>
+              )}
+              {r.profile.logged_dives > 0 && <span>📖 {r.profile.logged_dives} logged</span>}
+              {r.profile.height_cm && r.profile.weight_kg && (
+                <span>📏 {r.profile.height_cm}cm / {r.profile.weight_kg}kg</span>
+              )}
+              {r.profile.shoe_size && (
+                <span>👟 {shoeAsJp(r.profile.shoe_size) ?? r.profile.shoe_size}</span>
+              )}
+            </div>
           )}
-          {r.profile.height_cm && r.profile.weight_kg && (
-            <span>📏 {r.profile.height_cm}cm / {r.profile.weight_kg}kg</span>
+
+          {renderDetails(r.booking.details, { addonNames, roomNames }) && (
+            <div className="text-xs text-slate-300 bg-slate-900/40 rounded p-2 space-y-1">
+              {renderDetails(r.booking.details, { addonNames, roomNames })}
+            </div>
           )}
-          {r.profile.shoe_size && <span>👟 {r.profile.shoe_size}</span>}
-        </div>
-      )}
 
-      {renderDetails(r.booking.details) && (
-        <div className="text-xs text-slate-300 bg-slate-900/40 rounded p-2 space-y-1">
-          {renderDetails(r.booking.details)}
-        </div>
-      )}
+          {r.booking.refund_requested_at && r.booking.status !== 'cancelled' && (
+            <div className="flex items-center justify-between text-xs bg-amber-950/50 border border-amber-900 rounded p-2">
+              <span className="text-amber-300">
+                🔄 Refund requested {format(new Date(r.booking.refund_requested_at), 'MMM d, HH:mm')}
+              </span>
+              <button
+                onClick={() => onApproveRefund(r.booking.id)}
+                className="bg-amber-700 hover:bg-amber-600 text-white text-xs font-semibold px-2 py-1 rounded"
+              >
+                Approve refund
+              </button>
+            </div>
+          )}
 
-      {r.booking.refund_requested_at && r.booking.status !== 'cancelled' && (
-        <div className="flex items-center justify-between text-xs bg-amber-950/50 border border-amber-900 rounded p-2">
-          <span className="text-amber-300">
-            🔄 Refund requested {format(new Date(r.booking.refund_requested_at), 'MMM d, HH:mm')}
-          </span>
-          <button
-            onClick={() => onApproveRefund(r.booking.id)}
-            className="bg-amber-700 hover:bg-amber-600 text-white text-xs font-semibold px-2 py-1 rounded"
-          >
-            Approve refund
-          </button>
-        </div>
-      )}
-
-      {r.booking.notes && (
-        <p className="text-xs text-slate-300 bg-slate-900/40 rounded p-2">📝 {r.booking.notes}</p>
+          {r.booking.notes && (
+            <p className="text-xs text-slate-300 bg-slate-900/40 rounded p-2">📝 {r.booking.notes}</p>
+          )}
+        </>
       )}
     </div>
   )
 }
 
-function renderDetails(d: BookingDetails) {
+function renderDetails(d: BookingDetails, names: { addonNames: AddonNameMap; roomNames: RoomNameMap }) {
   const bits: React.ReactNode[] = []
   if (d.gear?.rent) {
     const items = d.gear.items?.length ? ` (${d.gear.items.join(', ')})` : ''
     bits.push(<p key="gear">🧰 Gear: {d.gear.mode ?? 'full'}{items}</p>)
   }
   if (d.room?.option_id) {
-    bits.push(<p key="room">🛏️ Room: {d.room.option_id}{d.room.notes ? ` · ${d.room.notes}` : ''}</p>)
+    const roomLabel = names.roomNames.get(d.room.option_id) ?? d.room.option_id
+    bits.push(<p key="room">🛏️ Room: {roomLabel}{d.room.notes ? ` · ${d.room.notes}` : ''}</p>)
   }
   if (d.add_ons?.length) {
-    bits.push(<p key="addons">➕ Add-ons: {d.add_ons.join(', ')}</p>)
+    const labels = d.add_ons.map(id => names.addonNames.get(id) ?? id)
+    bits.push(<p key="addons">➕ Add-ons: {labels.join(', ')}</p>)
   }
   if (d.transportation) bits.push(<p key="transport">🚐 Needs ride</p>)
   if (d.nitrox_course_addon) bits.push(<p key="nitrox">🟢 Nitrox course add-on</p>)

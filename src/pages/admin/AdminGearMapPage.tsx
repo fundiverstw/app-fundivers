@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { fetchEventsForBookings } from '../../lib/events'
 import { AdminNotes } from '../../components/admin/AdminNotes'
 import { GEAR_ITEMS } from '../../lib/gear'
+import { shoeAsJp } from '../../lib/shoe-size'
 import type { AppEvent, Booking, Profile } from '../../types/database'
 
 // What items the shop actually needs to pack for this diver. Derived from
@@ -104,10 +105,11 @@ function DiverGearCard({ row }: { row: Row }) {
   const { profile, booking } = row
   const pack = packList(booking)
   const owned = new Set(profile?.gear_owned ?? [])
+  const shoeLabel = profile?.shoe_size ? (shoeAsJp(profile.shoe_size) ?? profile.shoe_size) : null
   const sizing = [
     profile?.height_cm && `${profile.height_cm}cm`,
     profile?.weight_kg && `${profile.weight_kg}kg`,
-    profile?.shoe_size,
+    shoeLabel,
   ].filter(Boolean).join(' · ')
 
   return (

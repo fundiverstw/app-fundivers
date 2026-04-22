@@ -339,4 +339,13 @@ SELECT pg_catalog.setval('"auth"."refresh_tokens_id_seq"', 15, true);
 
 -- \unrestrict TtMW9zHTPlP95fyaFWtgpdwfT52R8gYglW1bXVX6rCkCKWcLOIQTJTb0Hk7t6gQ
 
+-- The seed ran with session_replication_role = replica, which disables
+-- user triggers. Re-enable them and touch `other_addons` so the junction
+-- tables (eo_dive_addons / eo_course_addons) get populated locally. On
+-- cloud this is handled by the backfill INSERT in the junction migration,
+-- which runs after Bubble has already written data.
+SET session_replication_role = DEFAULT;
+UPDATE public."EO_dives"   SET other_addons = other_addons WHERE other_addons IS NOT NULL;
+UPDATE public."EO_courses" SET other_addons = other_addons WHERE other_addons IS NOT NULL;
+
 RESET ALL;

@@ -365,6 +365,18 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['Other_Addons']['Insert']>
         Relationships: []
       }
+      eo_dive_addons: {
+        Row: { eo_dive_id: string; addon_id: string }
+        Insert: { eo_dive_id: string; addon_id: string }
+        Update: Partial<{ eo_dive_id: string; addon_id: string }>
+        Relationships: []
+      }
+      eo_course_addons: {
+        Row: { eo_course_id: string; addon_id: string }
+        Insert: { eo_course_id: string; addon_id: string }
+        Update: Partial<{ eo_course_id: string; addon_id: string }>
+        Relationships: []
+      }
       push_subscriptions: {
         Row: {
           id: string
