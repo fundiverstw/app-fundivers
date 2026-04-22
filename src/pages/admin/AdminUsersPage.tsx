@@ -3,6 +3,7 @@ import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { fetchEventsForBookings } from '../../lib/events'
 import { getCertCardSignedUrl } from '../../lib/cert-card'
+import { shoeAsJp } from '../../lib/shoe-size'
 import type { AppEvent, Booking, Payment, Profile } from '../../types/database'
 
 interface UserExtras {
@@ -159,7 +160,7 @@ function ProfileDetails({ user }: { user: Profile }) {
   const sizing = [
     user.height_cm ? `${user.height_cm} cm` : null,
     user.weight_kg ? `${user.weight_kg} kg` : null,
-    user.shoe_size ? `shoe ${user.shoe_size}` : null,
+    user.shoe_size ? `shoe ${shoeAsJp(user.shoe_size) ?? user.shoe_size}` : null,
   ].filter(Boolean).join(' · ')
 
   return (

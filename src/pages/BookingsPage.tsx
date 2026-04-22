@@ -11,6 +11,8 @@ type Row = Booking & {
   paidSum: number
 }
 
+type AddonNameMap = Map<string, string>
+
 const STATUS_STYLES: Record<Booking['status'], string> = {
   pending: 'text-amber-400',
   confirmed: 'text-emerald-400',
@@ -23,6 +25,7 @@ export function BookingsPage() {
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [addonNames, setAddonNames] = useState<AddonNameMap>(new Map())
 
   async function refetch(uid: string) {
     const [bookingsRes, paymentsRes] = await Promise.all([
@@ -56,6 +59,23 @@ export function BookingsPage() {
         paidSum,
       }
     }))
+
+    // Resolve add-on IDs → display names so the breakdown doesn't show UUIDs.
+    const addonIds = new Set<string>()
+    for (const b of bookings) {
+      const d = b.details as Booking['details']
+      for (const id of d?.add_ons ?? []) addonIds.add(id)
+    }
+    if (addonIds.size) {
+      const { data } = await supabase
+        .from('Other_Addons')
+        .select('_id, display_name, title')
+        .in('_id', [...addonIds])
+      setAddonNames(new Map((data ?? []).map(a => [a._id, a.display_name || a.title || a._id])))
+    } else {
+      setAddonNames(new Map())
+    }
+
     setLoading(false)
   }
 
@@ -102,6 +122,7 @@ export function BookingsPage() {
                 <Card
                   key={r.id}
                   row={r}
+                  addonNames={addonNames}
                   open={expanded === r.id}
                   onToggle={() => setExpanded(expanded === r.id ? null : r.id)}
                   onCancel={cancelBooking}
@@ -120,6 +141,7 @@ export function BookingsPage() {
               <Card
                 key={r.id}
                 row={r}
+                addonNames={addonNames}
                 open={expanded === r.id}
                 onToggle={() => setExpanded(expanded === r.id ? null : r.id)}
                 onCancel={cancelBooking}
@@ -134,9 +156,10 @@ export function BookingsPage() {
 }
 
 function Card({
-  row, open, onToggle, onCancel, onRefund,
+  row, addonNames, open, onToggle, onCancel, onRefund,
 }: {
   row: Row
+  addonNames: AddonNameMap
   open: boolean
   onToggle: () => void
   onCancel: (id: string) => void
@@ -199,7 +222,7 @@ function Card({
             </div>
           )}
 
-          <Breakdown details={details} />
+          <Breakdown details={details} addonNames={addonNames} />
 
           {row.notes && (
             <p className="text-xs text-slate-400 bg-slate-900/40 rounded p-2">📝 {row.notes}</p>
@@ -232,7 +255,7 @@ function Card({
   )
 }
 
-function Breakdown({ details }: { details: Booking['details'] | undefined }) {
+function Breakdown({ details, addonNames }: { details: Booking['details'] | undefined; addonNames: AddonNameMap }) {
   const d = details ?? {}
   const items: Array<[string, string | null]> = []
   if (d.gear?.rent) {
@@ -240,7 +263,10 @@ function Breakdown({ details }: { details: Booking['details'] | undefined }) {
     items.push([`Gear (${d.gear.mode ?? 'full'})`, extras])
   }
   if (d.room?.option_id) items.push(['Room', d.room.notes ?? null])
-  if ((d.add_ons?.length ?? 0) > 0) items.push([`${d.add_ons!.length} add-on(s)`, null])
+  if ((d.add_ons?.length ?? 0) > 0) {
+    const labels = d.add_ons!.map(id => addonNames.get(id) ?? id)
+    items.push(['Add-ons', labels.join(', ')])
+  }
   if (d.transportation) items.push(['Transportation', null])
   if (d.nitrox_course_addon) items.push(['Nitrox course add-on', null])
   if (d.payment_method) items.push(['Payment', d.payment_method.replace('_', ' ')])

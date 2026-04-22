@@ -62,6 +62,16 @@ export function formatShoeSize(value: number, unit: ShoeUnit, gender: ShoeGender
   return `${unit.toUpperCase()} ${value} ${gender.toUpperCase()}`
 }
 
+// Display helper: shoe size expressed in Japanese (JP) for admin surfaces.
+// The shop packs by JP/body size. Returns null for empty/unparseable input
+// so callers can fall back to their own placeholder.
+export function shoeAsJp(raw: string | null | undefined): string | null {
+  const parsed = parseShoeSize(raw)
+  if (!parsed) return null
+  const jp = convertShoeSize(parsed.value, parsed.unit, 'jp', parsed.gender)
+  return jp != null ? `JP ${jp}` : null
+}
+
 // Accepts both the new canonical format ("EU 41 M") and the older loose
 // strings users typed before the picker existed ("EU 41", "41", "US 9").
 export function parseShoeSize(text: string | null | undefined):
