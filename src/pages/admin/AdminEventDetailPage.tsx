@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { fetchEventsForBookings } from '../../lib/events'
-import { EventMemos } from '../../components/admin/EventMemos'
+import { AdminNotes } from '../../components/admin/AdminNotes'
 import type { AppEvent, Booking, BookingDetails, Payment, Profile } from '../../types/database'
 
 interface Registrant {
@@ -108,7 +108,19 @@ export function AdminEventDetailPage() {
         <p className="text-sm text-amber-400 mt-2">{registrants.length} registrant{registrants.length === 1 ? '' : 's'}</p>
       </header>
 
-      {type && id && <EventMemos eventType={type} eventId={id} />}
+      {type && id && (
+        <>
+          <div className="flex items-center justify-end">
+            <Link
+              to={`/admin/events/${type}/${id}/gear-map`}
+              className="text-xs bg-sky-900/50 hover:bg-sky-900 text-sky-200 px-3 py-1 rounded-lg"
+            >
+              Gear map →
+            </Link>
+          </div>
+          <AdminNotes target={{ kind: type, id }} title="Memos" />
+        </>
+      )}
 
       {registrants.length === 0 ? (
         <p className="text-slate-500 text-sm">No one has registered for this event yet.</p>
