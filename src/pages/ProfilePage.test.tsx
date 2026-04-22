@@ -4,10 +4,13 @@ import userEvent from '@testing-library/user-event'
 import { ProfilePage } from './ProfilePage'
 import { renderWithRouter, mockQueryBuilder } from '../../tests/test-utils'
 
-const { upsert, from, useAuthMock } = vi.hoisted(() => ({
+const { upsert, from, useAuthMock, uploadCertCard, getCertCardSignedUrl, deleteCertCard } = vi.hoisted(() => ({
   upsert: vi.fn(),
   from: vi.fn(),
   useAuthMock: vi.fn(),
+  uploadCertCard: vi.fn(),
+  getCertCardSignedUrl: vi.fn(),
+  deleteCertCard: vi.fn(),
 }))
 
 vi.mock('../lib/supabase', () => ({
@@ -16,6 +19,12 @@ vi.mock('../lib/supabase', () => ({
 
 vi.mock('../hooks/useAuth', () => ({
   useAuth: () => useAuthMock(),
+}))
+
+vi.mock('../lib/cert-card', () => ({
+  uploadCertCard: (...a: unknown[]) => uploadCertCard(...a),
+  getCertCardSignedUrl: (...a: unknown[]) => getCertCardSignedUrl(...a),
+  deleteCertCard: (...a: unknown[]) => deleteCertCard(...a),
 }))
 
 function input(name: string): HTMLInputElement | HTMLTextAreaElement {
@@ -28,6 +37,9 @@ beforeEach(() => {
   upsert.mockReset()
   from.mockReset()
   useAuthMock.mockReset()
+  uploadCertCard.mockReset()
+  getCertCardSignedUrl.mockReset()
+  deleteCertCard.mockReset()
 })
 
 describe('ProfilePage', () => {
@@ -150,6 +162,44 @@ describe('ProfilePage', () => {
     const payload = upsert.mock.calls[0][0] as Record<string, unknown>
     expect(payload.shoe_size).toBe('EU 42 M')
     expect(payload.gear_owned).toEqual(['BCD', 'Fins'])
+  })
+
+  it('uploads and saves a cert card when the user picks a file', async () => {
+    useAuthMock.mockReturnValue({
+      user: { id: 'u1' },
+      profile: { id: 'u1', full_name: 'Ada' },
+    })
+    from.mockReturnValue(mockQueryBuilder({ data: { cert_card_path: null } }))
+    uploadCertCard.mockResolvedValue('u1/card_123.jpg')
+    getCertCardSignedUrl.mockResolvedValue('https://signed.example/card.jpg')
+
+    const user = userEvent.setup()
+    renderWithRouter(<ProfilePage />)
+
+    const fileInput = await screen.findByLabelText('Upload certification card')
+    const fakeFile = new File(['x'], 'cert.jpg', { type: 'image/jpeg' })
+    await user.upload(fileInput, fakeFile)
+
+    await waitFor(() => expect(uploadCertCard).toHaveBeenCalledOnce())
+    expect(uploadCertCard).toHaveBeenCalledWith('u1', fakeFile)
+  })
+
+  it('removes the cert card on demand', async () => {
+    useAuthMock.mockReturnValue({
+      user: { id: 'u1' },
+      profile: { id: 'u1', full_name: 'Ada' },
+    })
+    from.mockReturnValue(mockQueryBuilder({ data: { cert_card_path: 'u1/existing.jpg' } }))
+    getCertCardSignedUrl.mockResolvedValue('https://signed.example/existing.jpg')
+    deleteCertCard.mockResolvedValue(undefined)
+
+    const user = userEvent.setup()
+    renderWithRouter(<ProfilePage />)
+
+    const removeBtn = await screen.findByRole('button', { name: /^remove$/i })
+    await user.click(removeBtn)
+
+    await waitFor(() => expect(deleteCertCard).toHaveBeenCalledWith('u1/existing.jpg'))
   })
 
   it('no-ops submit when there is no authenticated user', async () => {

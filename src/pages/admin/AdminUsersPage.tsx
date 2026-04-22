@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { fetchEventsForBookings } from '../../lib/events'
+import { getCertCardSignedUrl } from '../../lib/cert-card'
 import type { AppEvent, Booking, Payment, Profile } from '../../types/database'
 
 interface UserExtras {
@@ -65,7 +66,7 @@ export function AdminUsersPage() {
 
   const visible = users.filter(u => {
     if (!filter) return true
-    const haystack = [u.full_name, u.display_name, u.contact_id, u.phone, u.cert_number]
+    const haystack = [u.full_name, u.display_name, u.contact_id, u.phone]
       .filter(Boolean).join(' ').toLowerCase()
     return haystack.includes(filter.toLowerCase())
   })
@@ -179,11 +180,10 @@ function ProfileDetails({ user }: { user: Profile }) {
 
       <Section title="Certification">
         <Row k="Agency + level" v={user.cert_agency && user.cert_level ? `${user.cert_agency} ${user.cert_level}` : null} />
-        <Row k="Cert number" v={user.cert_number} />
-        <Row k="Cert date" v={user.cert_date ? format(new Date(user.cert_date), 'MMM d, yyyy') : null} />
         <Row k="Logged dives" v={String(user.logged_dives ?? 0)} />
         <Row k="Last dive" v={user.last_dive_date ? format(new Date(user.last_dive_date), 'MMM d, yyyy') : null} />
         <Row k="Nitrox" v={user.nitrox_certified ? 'certified' : 'no'} />
+        {user.cert_card_path && <CertCardPreview path={user.cert_card_path} />}
       </Section>
 
       <Section title="Sizing">
@@ -267,4 +267,23 @@ function statusColor(s: Booking['status']) {
     : s === 'pending'    ? 'text-amber-400'
     : s === 'waitlisted' ? 'text-violet-400'
     :                      'text-slate-500'
+}
+
+function CertCardPreview({ path }: { path: string }) {
+  const [url, setUrl] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    getCertCardSignedUrl(path).then(u => { if (!cancelled) setUrl(u) })
+    return () => { cancelled = true }
+  }, [path])
+  if (!url) return null
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="block mt-2">
+      <img
+        src={url}
+        alt="Certification card"
+        className="w-full rounded-lg border border-slate-700"
+      />
+    </a>
+  )
 }
