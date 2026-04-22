@@ -1,4 +1,4 @@
-.PHONY: help dev studio mail start stop status reset diff link pull push dump-data verify test deploy
+.PHONY: help dev studio mail start stop status reset diff link pull push dump-data verify test deploy deploy-app deploy-push
 
 help:
 	@echo "Local dev:"
@@ -22,7 +22,9 @@ help:
 	@echo "  make test        — run every local test (unit + component + integration)"
 	@echo ""
 	@echo "Deploy:"
-	@echo "  make deploy      — build + wrangler deploy to Cloudflare Workers"
+	@echo "  make deploy      — deploy both workers (SPA + push cron)"
+	@echo "  make deploy-app  — deploy just the SPA (app-fundiverstw)"
+	@echo "  make deploy-push — deploy just the push cron (fundivers-push)"
 
 start:      ; @npm run db:start
 stop:       ; @npm run db:stop
@@ -35,7 +37,17 @@ push:       ; @npm run db:push
 dump-data:  ; @npm run db:dump-data
 verify:     ; @bash scripts/verify-sync.sh
 test:       ; @npm run test:all
-deploy:     ; @npm run deploy
+
+deploy: deploy-app deploy-push
+
+deploy-app: ; @npm run deploy
+
+deploy-push:
+	@if [ ! -d workers/push/node_modules ]; then \
+	  echo "Installing workers/push deps…"; \
+	  cd workers/push && npm install; \
+	fi
+	@cd workers/push && npm run deploy
 
 dev:
 	@if ! docker ps --format '{{.Names}}' | grep -q supabase_db_app-fundivers; then \

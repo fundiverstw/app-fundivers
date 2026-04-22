@@ -34,5 +34,5 @@ make start     # boot local supabase stack (Docker)
 make test      # full test suite (unit + integration)
 make push      # push local migrations to cloud
 make verify    # confirm local schema + row counts match cloud
-make deploy    # build + wrangler deploy
+make deploy    # deploy both workers (SPA + push cron)
 ```
