@@ -1,0 +1,16 @@
+name = "fundivers-push"
+main = "src/index.ts"
+compatibility_date = "2026-04-01"
+# web-push depends on node:crypto / Buffer — Workers supports these under the
+# nodejs_compat flag. No polyfills needed.
+compatibility_flags = ["nodejs_compat"]
+
+# 02:00 UTC = 10:00 Asia/Taipei — sensible time to land a daily reminder in
+# the app. Change to taste; Cloudflare cron triggers are always UTC.
+[triggers]
+crons = ["0 2 * * *"]
+
+# Non-secret env can live here; secrets go via `wrangler secret put …`.
+# See docs/push-notifications.md for the deploy runbook.
+[vars]
+VAPID_SUBJECT = "mailto:ops@fundivers.tw"
