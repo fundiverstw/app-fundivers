@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { CalendarPage } from './CalendarPage'
 import { renderWithRouter, mockQueryBuilder } from '../../tests/test-utils'
@@ -85,8 +85,9 @@ describe('CalendarPage', () => {
     // Title appears on both the calendar bar and the "This month" list
     const matches = await screen.findAllByText('Beginner Course')
     expect(matches.length).toBeGreaterThanOrEqual(1)
-    // Legend + list badge = at least 2 "Course" labels
-    expect(screen.getAllByText('Course').length).toBeGreaterThanOrEqual(2)
+    // List row badge says "Course"; legend chip says "Courses"
+    expect(screen.getByText('Course')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /filter courses/i })).toBeInTheDocument()
   })
 
   it('tags events the current user has booked', async () => {
@@ -155,6 +156,62 @@ describe('CalendarPage', () => {
     await user.click(screen.getAllByText(ev.title)[0])
     const btn = await screen.findByRole('button', { name: /register/i })
     expect(btn).toBeDisabled()
+  })
+
+  it('toggling Dive off hides dive events from the month list', async () => {
+    fetchEventsInRange.mockResolvedValue([
+      buildEvent({ id: 'dive_a', type: 'dive', title: 'Green Island Dive' }),
+      buildEvent({ id: 'course_a', type: 'course', title: 'Open Water Course' }),
+    ])
+    setupBookings([])
+    const user = userEvent.setup()
+    renderWithRouter(<CalendarPage />)
+    // Title shows on the bar + list row = 2 matches when visible
+    await waitFor(() => {
+      expect(screen.getAllByText('Green Island Dive').length).toBeGreaterThanOrEqual(2)
+      expect(screen.getAllByText('Open Water Course').length).toBeGreaterThanOrEqual(2)
+    })
+
+    await user.click(screen.getByRole('button', { name: /toggle dives/i }))
+
+    expect(screen.queryByText('Green Island Dive')).not.toBeInTheDocument()
+    // Course is unaffected
+    expect(screen.getAllByText('Open Water Course').length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('course popover filters by category (OW / AOW)', async () => {
+    fetchEventsInRange.mockResolvedValue([
+      buildEvent({ id: 'ow_1', type: 'course', title: 'Open Water Course' }),
+      buildEvent({ id: 'aow_1', type: 'course', title: 'Advanced Open Water' }),
+    ])
+    setupBookings([])
+    const user = userEvent.setup()
+    renderWithRouter(<CalendarPage />)
+    await waitFor(() => {
+      expect(screen.getAllByText('Open Water Course').length).toBeGreaterThanOrEqual(2)
+      expect(screen.getAllByText('Advanced Open Water').length).toBeGreaterThanOrEqual(2)
+    })
+
+    // Popover is closed by default
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /filter courses/i }))
+    const menu = await screen.findByRole('menu')
+    // Short label "OW" identifies the checkbox in the popover
+    const owChip = within(menu).getByRole('checkbox', { name: /^OW\b/i })
+    const aowChip = within(menu).getByRole('checkbox', { name: /^AOW\b/i })
+    expect(owChip).toBeChecked()
+    expect(aowChip).toBeChecked()
+
+    // Uncheck OW → OW event disappears from the calendar bar and list row.
+    // Only the popover's own "Open Water Course" label remains.
+    await user.click(owChip)
+    expect(screen.getAllByText('Open Water Course')).toHaveLength(1)
+    expect(screen.getAllByText('Advanced Open Water').length).toBeGreaterThanOrEqual(2)
+
+    // Popover still open, AOW still checked
+    expect(menu).toBeInTheDocument()
+    expect(aowChip).toBeChecked()
   })
 
   it('advances the month with the arrow buttons', async () => {
