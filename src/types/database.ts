@@ -70,6 +70,7 @@ export interface Database {
           nitrox_certified: boolean
           logged_dives: number
           last_dive_date: string | null
+          gear_owned: string[]
         }
         Insert: {
           id: string
@@ -99,6 +100,7 @@ export interface Database {
           nitrox_certified?: boolean
           logged_dives?: number
           last_dive_date?: string | null
+          gear_owned?: string[]
         }
         Update: {
           id?: string
@@ -127,6 +129,7 @@ export interface Database {
           nitrox_certified?: boolean
           logged_dives?: number
           last_dive_date?: string | null
+          gear_owned?: string[]
         }
         Relationships: []
       }

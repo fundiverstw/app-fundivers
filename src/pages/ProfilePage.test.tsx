@@ -92,6 +92,66 @@ describe('ProfilePage', () => {
     expect(from).toHaveBeenCalledWith('profiles')
   })
 
+  it('toggles gear owned and includes it in the upsert payload', async () => {
+    useAuthMock.mockReturnValue({
+      user: { id: 'u1' },
+      profile: { id: 'u1', full_name: 'Ada', gear_owned: [] },
+    })
+    from.mockImplementation(() => ({
+      ...mockQueryBuilder(),
+      upsert: (...a: unknown[]) => { upsert(...a); return mockQueryBuilder() },
+    }))
+
+    const user = userEvent.setup()
+    renderWithRouter(<ProfilePage />)
+    await waitFor(() => expect((input('full_name') as HTMLInputElement).value).toBe('Ada'))
+
+    await user.click(screen.getByLabelText('BCD'))
+    await user.click(screen.getByLabelText('Fins'))
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(upsert).toHaveBeenCalledOnce())
+    const payload = upsert.mock.calls[0][0] as Record<string, unknown>
+    expect(payload.gear_owned).toEqual(['BCD', 'Fins'])
+  })
+
+  it('prefills existing gear_owned and canonicalizes shoe_size on save', async () => {
+    useAuthMock.mockReturnValue({
+      user: { id: 'u1' },
+      profile: { id: 'u1', full_name: 'Ada', gear_owned: ['BCD', 'Fins'], shoe_size: 'EU 41 M' },
+    })
+    from.mockImplementation(() => ({
+      ...mockQueryBuilder(),
+      upsert: (...a: unknown[]) => { upsert(...a); return mockQueryBuilder() },
+    }))
+
+    const user = userEvent.setup()
+    renderWithRouter(<ProfilePage />)
+
+    // BCD + Fins already ticked; Mask is not
+    await waitFor(() => {
+      expect((screen.getByLabelText('BCD') as HTMLInputElement).checked).toBe(true)
+      expect((screen.getByLabelText('Fins') as HTMLInputElement).checked).toBe(true)
+      expect((screen.getByLabelText('Mask') as HTMLInputElement).checked).toBe(false)
+    })
+
+    // Shoe selector seeded from canonical string
+    const unitSel = screen.getByLabelText('Shoe size unit') as HTMLSelectElement
+    const genderSel = screen.getByLabelText('Shoe size gender') as HTMLSelectElement
+    const sizeSel = screen.getByLabelText('Shoe size value') as HTMLSelectElement
+    expect(unitSel.value).toBe('eu')
+    expect(genderSel.value).toBe('m')
+    expect(sizeSel.value).toBe('41')
+
+    // Change size, save, confirm canonical format flows through
+    await user.selectOptions(sizeSel, '42')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await waitFor(() => expect(upsert).toHaveBeenCalledOnce())
+    const payload = upsert.mock.calls[0][0] as Record<string, unknown>
+    expect(payload.shoe_size).toBe('EU 42 M')
+    expect(payload.gear_owned).toEqual(['BCD', 'Fins'])
+  })
+
   it('no-ops submit when there is no authenticated user', async () => {
     useAuthMock.mockReturnValue({ user: null, profile: null })
     from.mockReturnValue({
