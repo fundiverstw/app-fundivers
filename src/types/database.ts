@@ -56,8 +56,7 @@ export interface Database {
           emergency_contact_phone: string | null
           cert_agency: string | null
           cert_level: string | null
-          cert_number: string | null
-          cert_date: string | null
+          cert_card_path: string | null
           medical_notes: string | null
           avatar_url: string | null
           role: 'diver' | 'admin'
@@ -86,8 +85,7 @@ export interface Database {
           emergency_contact_phone?: string | null
           cert_agency?: string | null
           cert_level?: string | null
-          cert_number?: string | null
-          cert_date?: string | null
+          cert_card_path?: string | null
           medical_notes?: string | null
           avatar_url?: string | null
           role?: 'diver' | 'admin'
@@ -115,8 +113,7 @@ export interface Database {
           emergency_contact_phone?: string | null
           cert_agency?: string | null
           cert_level?: string | null
-          cert_number?: string | null
-          cert_date?: string | null
+          cert_card_path?: string | null
           medical_notes?: string | null
           avatar_url?: string | null
           role?: 'diver' | 'admin'
