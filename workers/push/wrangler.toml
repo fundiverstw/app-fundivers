@@ -13,4 +13,4 @@ crons = ["0 2 * * *"]
 # Non-secret env can live here; secrets go via `wrangler secret put …`.
 # See docs/push-notifications.md for the deploy runbook.
 [vars]
-VAPID_SUBJECT = "mailto:ops@fundivers.tw"
+VAPID_SUBJECT = "mailto:fundiverstw@gmail.com"
