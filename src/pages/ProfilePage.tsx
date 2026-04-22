@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { pushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
 import { GEAR_ITEMS } from '../lib/gear'
+import { uploadCertCard, getCertCardSignedUrl, deleteCertCard } from '../lib/cert-card'
 import {
   SHOE_UNITS,
   SHOE_GENDERS,
@@ -32,8 +33,6 @@ const schema = z.object({
   emergency_contact_phone: z.string().optional(),
   cert_agency: z.string().optional(),
   cert_level: z.string().optional(),
-  cert_number: z.string().optional(),
-  cert_date: z.string().optional(),
   medical_notes: z.string().optional(),
   height_cm: z.union([z.string(), z.number()]).optional(),
   weight_kg: z.union([z.string(), z.number()]).optional(),
@@ -147,8 +146,6 @@ export function ProfilePage() {
       emergency_contact_phone: strOrNull(data.emergency_contact_phone),
       cert_agency: strOrNull(data.cert_agency),
       cert_level: strOrNull(data.cert_level),
-      cert_number: strOrNull(data.cert_number),
-      cert_date: strOrNull(data.cert_date),
       medical_notes: strOrNull(data.medical_notes),
       height_cm: numOrNull(data.height_cm),
       weight_kg: numOrNull(data.weight_kg),
@@ -278,8 +275,6 @@ export function ProfilePage() {
           <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Certification</h2>
           <Field label="Agency (e.g. PADI, SSI)"><input {...register('cert_agency')} className={inputClass} /></Field>
           <Field label="Level (e.g. Open Water)"><input {...register('cert_level')} className={inputClass} /></Field>
-          <Field label="Cert number"><input {...register('cert_number')} className={inputClass} /></Field>
-          <Field label="Cert date"><input {...register('cert_date')} type="date" className={inputClass} /></Field>
           <Field label="Logged dives"><input {...register('logged_dives')} type="number" min="0" className={inputClass} /></Field>
           <Field label="Last dive"><input {...register('last_dive_date')} type="date" className={inputClass} /></Field>
           <label className="flex items-center gap-2 text-sm text-slate-300">
@@ -287,6 +282,10 @@ export function ProfilePage() {
             Nitrox certified
           </label>
         </section>
+
+        {user && (
+          <CertCardSection userId={user.id} />
+        )}
 
         <section className="bg-slate-800 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Medical Notes</h2>
@@ -374,6 +373,113 @@ export function NotificationsToggle() {
         at 3 / 2 / 1 weeks and 3 / 1 days before. iOS requires installing the
         app to your Home Screen.
       </p>
+      {error && <p className="text-red-400 text-xs">{error}</p>}
+    </section>
+  )
+}
+
+export function CertCardSection({ userId }: { userId: string }) {
+  const [path, setPath] = useState<string | null>(null)
+  const [signedUrl, setSignedUrl] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Load current path from the profile + refresh signed URL when it changes.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('cert_card_path')
+        .eq('id', userId)
+        .maybeSingle()
+      if (cancelled) return
+      const p = data?.cert_card_path ?? null
+      setPath(p)
+      setSignedUrl(p ? await getCertCardSignedUrl(p) : null)
+    })()
+    return () => { cancelled = true }
+  }, [userId])
+
+  async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-picking the same file
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose an image file.')
+      return
+    }
+    setError(null)
+    setBusy(true)
+    try {
+      const newPath = await uploadCertCard(userId, file)
+      if (path && path !== newPath) {
+        // Best-effort cleanup of the previous version.
+        try { await deleteCertCard(path) } catch { /* ignore */ }
+      }
+      await supabase.from('profiles').update({ cert_card_path: newPath }).eq('id', userId)
+      setPath(newPath)
+      setSignedUrl(await getCertCardSignedUrl(newPath))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onRemove() {
+    if (!path) return
+    setBusy(true)
+    setError(null)
+    try {
+      await deleteCertCard(path)
+      await supabase.from('profiles').update({ cert_card_path: null }).eq('id', userId)
+      setPath(null)
+      setSignedUrl(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Remove failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="bg-slate-800 rounded-xl p-4 space-y-3" aria-label="Certification Card">
+      <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Cert card photo</h2>
+      <p className="text-xs text-slate-400">
+        Photo of your certification card. Images are compressed before upload
+        so they take up minimal space while keeping the key details readable.
+      </p>
+      {signedUrl && (
+        <img
+          src={signedUrl}
+          alt="Your certification card"
+          className="w-full rounded-lg border border-slate-700"
+        />
+      )}
+      <div className="flex gap-2">
+        <label className="flex-1 cursor-pointer bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-white text-sm font-semibold py-2 rounded-lg text-center transition-colors">
+          <input
+            type="file"
+            accept="image/*"
+            aria-label="Upload certification card"
+            className="hidden"
+            disabled={busy}
+            onChange={onPickFile}
+          />
+          {busy ? 'Working…' : path ? 'Replace photo' : 'Upload photo'}
+        </label>
+        {path && (
+          <button
+            type="button"
+            onClick={onRemove}
+            disabled={busy}
+            className="bg-slate-700 hover:bg-red-900 disabled:opacity-40 text-slate-200 text-sm font-semibold py-2 px-3 rounded-lg transition-colors"
+          >
+            Remove
+          </button>
+        )}
+      </div>
       {error && <p className="text-red-400 text-xs">{error}</p>}
     </section>
   )
