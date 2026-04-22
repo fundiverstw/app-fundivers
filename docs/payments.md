@@ -1,0 +1,88 @@
+# Payments
+
+## Core model
+
+Money flows are tracked by two things:
+
+1. **Snapshot on the booking** — when the diver submits
+   `RegisterForm`, the final `total` and the `deposit` amount are
+   written into `bookings.details`. These values **do not change**
+   after booking, so later price tweaks don't retroactively alter what
+   was owed.
+
+2. **Ledger of payments** — `public.payments` rows are
+   **staff-inserted** records of actual money received. A booking can
+   have many payment rows (typically: one deposit payment, then one
+   balance payment closer to the event).
+
+Derived quantities used by the UI:
+
+```
+paid        = Σ payments.amount where status = 'paid'
+depositDue  = max(0, booking.details.deposit − paid)
+balanceDue  = max(0, booking.details.total   − paid)
+```
+
+All computation lives client-side in
+`src/pages/PaymentsPage.tsx` (`refetch()` → `paymentsByBooking`).
+
+## Payment row semantics
+
+`payments.status` is one of:
+
+| Status | Meaning |
+| --- | --- |
+| `pending` | Recorded intent / bank transfer not yet confirmed. Does **not** count toward `paid`. |
+| `paid` | Money received. Counts toward `paid`. |
+| `refunded` | Reversed. Does **not** count toward `paid`. |
+
+`payments.booking_id` is nullable (ON DELETE SET NULL) because the
+ledger should survive a booking being cancelled.
+
+## Deposit vs balance messaging
+
+Both the PWA and the push cron use the same rule for which message to
+surface, driven by the diver's current paid amount:
+
+- `depositDue > 0` → this is a **deposit** reminder.
+- `depositDue == 0 && balanceDue > 0` → this is a **balance**
+  reminder.
+- `balanceDue == 0` → no reminder.
+
+The push cron encodes this in `selectReminders()` in
+`src/lib/push-reminders.ts`. The UI encodes it in
+`PaymentsPage.tsx` / `BookingsPage.tsx`.
+
+## Refund flow
+
+1. Diver presses **Request refund** on a booking (either page).
+2. App sets `bookings.refund_requested_at = now()`.
+3. Admin sees the flag in the event-detail registrant card and either:
+   - **Approves** → sets `bookings.status = 'cancelled'` and
+     (out-of-band) wires the money back via bank transfer, then records
+     a `payments` row with `status = 'refunded'`.
+   - **Declines** → clears `refund_requested_at` back to null (there's
+     currently no UI for this — clear it manually via Supabase Studio
+     if needed).
+
+The app **does not move money itself** — Stripe is not wired up.
+Payments are bank transfers and cash, tracked by hand in the ledger.
+
+## Summary cards
+
+`PaymentsPage` shows three summary cards at the top:
+
+- **Deposits due** — Σ `depositDue` across non-cancelled bookings
+- **Balance due** — Σ `balanceDue` across non-cancelled bookings
+- **Total paid** — Σ `paid` across non-cancelled bookings
+
+Note that *balance-due already includes the unpaid deposit*. That's
+intentional: the balance is "what still needs to be received for this
+event in total." Don't sum deposits + balance to get "total owed" —
+you'd double-count.
+
+## Related reminders
+
+See [push-notifications.md](./push-notifications.md). The cron fires
+payment reminders on a 21/14/7/3/1-day cadence, skipping bookings where
+`balanceDue == 0`.

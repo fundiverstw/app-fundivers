@@ -1,0 +1,21 @@
+{
+  "name": "fundivers-push-worker",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev --test-scheduled",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.103.2",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260401.0",
+    "@types/web-push": "^3.6.4",
+    "typescript": "~6.0.2",
+    "wrangler": "^4.83.0"
+  }
+}
