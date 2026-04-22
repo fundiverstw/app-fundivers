@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth,
   addMonths, subMonths, startOfWeek, endOfWeek,
@@ -23,6 +23,20 @@ const TYPE_LABELS: Record<AppEvent['type'], string> = {
   course: 'Course',
 }
 
+// Short chip labels for the course-category filter popover. Falls back to the
+// raw category string if a new course type shows up in the data.
+const COURSE_SHORT: Record<string, string> = {
+  'Open Water Course': 'OW',
+  'Advanced Open Water': 'AOW',
+  'PADI Rescue Course': 'Rescue',
+  'EFR Course': 'EFR',
+  'Equipment Course': 'Equipment',
+  'Deep Specialty': 'Deep',
+}
+function courseShortLabel(category: string): string {
+  return COURSE_SHORT[category] ?? category
+}
+
 const TRACK_HEIGHT = 18 // px per bar
 const TRACK_GAP = 2     // px between bars
 
@@ -45,6 +59,12 @@ export function CalendarPage() {
   const [registering, setRegistering] = useState<AppEvent | null>(null)
   const [bookingLoading, setBookingLoading] = useState(false)
 
+  // Filter state: Dive is a simple on/off; Courses is per-category. We track
+  // hidden categories (not shown ones) so brand-new course types appearing in
+  // the data are visible by default.
+  const [diveShown, setDiveShown] = useState(true)
+  const [hiddenCourses, setHiddenCourses] = useState<Set<string>>(new Set())
+
   const days = eachDayOfInterval({ start: startOfMonth(month), end: endOfMonth(month) })
 
   useEffect(() => {
@@ -64,7 +84,20 @@ export function CalendarPage() {
       .then(({ data }) => setBookings(data ?? []))
   }, [user])
 
-  const ranges: EventRange[] = useMemo(() => assignTracks(events), [events])
+  // Distinct course categories appearing in the fetched range. Drives the
+  // Courses popover; sorted for stable ordering.
+  const courseCategories = useMemo(() => {
+    const seen = new Set<string>()
+    for (const e of events) if (e.type === 'course') seen.add(e.title)
+    return Array.from(seen).sort()
+  }, [events])
+
+  const filteredEvents = useMemo(() => events.filter(e => {
+    if (e.type === 'dive') return diveShown
+    return !hiddenCourses.has(e.title)
+  }), [events, diveShown, hiddenCourses])
+
+  const ranges: EventRange[] = useMemo(() => assignTracks(filteredEvents), [filteredEvents])
 
   // Max track used within *visible cells* determines cell height
   const cellTrackRows = useMemo(() => {
@@ -79,9 +112,17 @@ export function CalendarPage() {
   }, [ranges, month])
 
   const inMonthEvents = useMemo(
-    () => events.filter(e => isSameMonth(new Date(e.start_time), month) || (e.end_time && isSameMonth(new Date(e.end_time), month))),
-    [events, month]
+    () => filteredEvents.filter(e => isSameMonth(new Date(e.start_time), month) || (e.end_time && isSameMonth(new Date(e.end_time), month))),
+    [filteredEvents, month]
   )
+
+  function toggleCourseCategory(cat: string) {
+    setHiddenCourses(prev => {
+      const next = new Set(prev)
+      if (next.has(cat)) next.delete(cat); else next.add(cat)
+      return next
+    })
+  }
 
   function isBooked(ev: AppEvent) {
     return bookings.some(b => bookingMatches(b, ev) && b.status !== 'cancelled')
@@ -115,18 +156,18 @@ export function CalendarPage() {
 
   return (
     <div className="max-w-lg mx-auto space-y-4">
+      <FilterLegend
+        diveShown={diveShown}
+        onToggleDive={() => setDiveShown(v => !v)}
+        courseCategories={courseCategories}
+        hiddenCourses={hiddenCourses}
+        onToggleCategory={toggleCourseCategory}
+      />
+
       <div className="flex items-center justify-between">
         <button onClick={() => setMonth(m => subMonths(m, 1))} className="p-2 text-slate-400 hover:text-slate-100">‹</button>
         <h1 className="text-lg font-bold text-slate-100">{format(month, 'MMMM yyyy')}</h1>
         <button onClick={() => setMonth(m => addMonths(m, 1))} className="p-2 text-slate-400 hover:text-slate-100">›</button>
-      </div>
-
-      <div className="flex gap-3 text-xs text-slate-400">
-        {(Object.keys(TYPE_DOT) as AppEvent['type'][]).map(t => (
-          <span key={t} className="flex items-center gap-1">
-            <span className={`w-2 h-2 rounded-full ${TYPE_DOT[t]}`} />{TYPE_LABELS[t]}
-          </span>
-        ))}
       </div>
 
       <MonthGrid
@@ -347,5 +388,104 @@ function EventBar({ seg, track, onClick }: { seg: CellSegment; track: number; on
         <>&nbsp;</>
       )}
     </button>
+  )
+}
+
+interface FilterLegendProps {
+  diveShown: boolean
+  onToggleDive: () => void
+  courseCategories: string[]
+  hiddenCourses: Set<string>
+  onToggleCategory: (cat: string) => void
+}
+
+function FilterLegend({
+  diveShown, onToggleDive,
+  courseCategories, hiddenCourses, onToggleCategory,
+}: FilterLegendProps) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onDocClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [open])
+
+  const visibleCourses = courseCategories.length - hiddenCourses.size
+  const allCoursesHidden = courseCategories.length > 0 && visibleCourses === 0
+
+  return (
+    <div className="flex items-center gap-2 text-xs" ref={ref}>
+      <button
+        type="button"
+        onClick={onToggleDive}
+        aria-pressed={diveShown}
+        aria-label="Toggle dives"
+        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors ${
+          diveShown
+            ? 'bg-slate-800 border-slate-600 text-slate-200'
+            : 'bg-slate-900 border-slate-700 text-slate-500 line-through'
+        }`}
+      >
+        <span className={`w-2 h-2 rounded-full ${TYPE_DOT.dive}`} />
+        {TYPE_LABELS.dive}
+      </button>
+
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen(v => !v)}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          aria-label="Filter courses"
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors ${
+            allCoursesHidden
+              ? 'bg-slate-900 border-slate-700 text-slate-500 line-through'
+              : 'bg-slate-800 border-slate-600 text-slate-200'
+          }`}
+        >
+          <span className={`w-2 h-2 rounded-full ${TYPE_DOT.course}`} />
+          Courses
+          {hiddenCourses.size > 0 && !allCoursesHidden && (
+            <span className="ml-0.5 text-[10px] text-slate-400">({visibleCourses}/{courseCategories.length})</span>
+          )}
+          <span aria-hidden="true">▾</span>
+        </button>
+
+        {open && (
+          <div
+            role="menu"
+            className="absolute left-0 top-full mt-1 z-20 min-w-[180px] bg-slate-900 border border-slate-700 rounded-lg shadow-lg p-2 space-y-1"
+          >
+            {courseCategories.length === 0 && (
+              <p className="text-slate-500 text-xs px-2 py-1">No courses in this range.</p>
+            )}
+            {courseCategories.map(cat => {
+              const shown = !hiddenCourses.has(cat)
+              const short = courseShortLabel(cat)
+              return (
+                <label
+                  key={cat}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-800 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={shown}
+                    onChange={() => onToggleCategory(cat)}
+                    className="accent-emerald-500"
+                  />
+                  <span className="text-slate-200 text-xs font-semibold">{short}</span>
+                  {short !== cat && <span className="text-slate-500 text-[11px]">{cat}</span>}
+                </label>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
