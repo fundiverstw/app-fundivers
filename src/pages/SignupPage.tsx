@@ -9,7 +9,7 @@ const schema = z.object({
   email: z.string().email('Invalid email'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   confirm: z.string(),
-  agreedToTerms: z.literal(true, { errorMap: () => ({ message: 'Please agree to continue' }) }),
+  agreedToTerms: z.literal(true, { message: 'Please agree to continue' }),
 }).refine(d => d.password === d.confirm, { message: 'Passwords do not match', path: ['confirm'] })
 type FormData = z.infer<typeof schema>
 

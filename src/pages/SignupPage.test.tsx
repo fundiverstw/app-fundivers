@@ -59,9 +59,7 @@ describe('SignupPage', () => {
     await user.type(byName('confirm'), 'secret1234')
     await user.click(screen.getByRole('button', { name: /create account/i }))
 
-    // Zod's default error text for an unsatisfied z.literal(true) — exact
-    // wording varies across zod versions, but always contains "expected true".
-    expect(await screen.findByText(/expected true/i)).toBeInTheDocument()
+    expect(await screen.findByText(/please agree to continue/i)).toBeInTheDocument()
     expect(signUp).not.toHaveBeenCalled()
   })
 
