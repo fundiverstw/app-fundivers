@@ -31,6 +31,76 @@ function placeFood(occupied: Cell[]): Cell {
   }
 }
 
+interface Point { x: number; y: number }
+
+// Draw the eel as a tapered serpentine stroke through `pts` (head first).
+// A wider head pass, a narrower body pass, and a highlight pass give the
+// impression of a cylindrical body with light glancing off the top — reads
+// as an eel instead of a string of beads.
+function drawEel(ctx: CanvasRenderingContext2D, pts: Point[], cell: number) {
+  if (pts.length === 0) return
+  if (pts.length === 1) {
+    ctx.fillStyle = '#16a34a'
+    ctx.beginPath(); ctx.arc(pts[0].x, pts[0].y, cell * 0.42, 0, Math.PI * 2); ctx.fill()
+    return
+  }
+
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+
+  // Two passes: dark outline first (width +2), then body on top. Cheap depth.
+  for (const pass of ['outline', 'body', 'highlight'] as const) {
+    for (let i = 0; i < pts.length - 1; i++) {
+      // Taper along the body: head is widest, tail thinnest.
+      const frac = i / Math.max(1, pts.length - 1)
+      const baseWidth = cell * (0.85 - frac * 0.55) // 0.85 → 0.30
+      if (pass === 'outline') {
+        ctx.strokeStyle = 'rgba(2, 44, 34, 0.9)'
+        ctx.lineWidth = baseWidth + 2
+      } else if (pass === 'body') {
+        const shade = Math.round(160 - frac * 60) // 160..100 green
+        ctx.strokeStyle = `rgb(14, ${shade}, 70)`
+        ctx.lineWidth = baseWidth
+      } else {
+        // Highlight: thin bright line riding the top of the body.
+        ctx.strokeStyle = `rgba(134, 239, 172, ${0.45 - frac * 0.4})` // fades toward tail
+        ctx.lineWidth = Math.max(1, baseWidth * 0.25)
+      }
+      ctx.beginPath()
+      ctx.moveTo(pts[i].x, pts[i].y)
+      ctx.lineTo(pts[i + 1].x, pts[i + 1].y)
+      ctx.stroke()
+    }
+  }
+
+  // Head cap — slightly bulbous, with eye + pupil offset in the direction
+  // of travel so the eel looks like it's "looking" forward.
+  const head = pts[0]
+  const next = pts[1] ?? head
+  const dx = head.x - next.x
+  const dy = head.y - next.y
+  const len = Math.hypot(dx, dy) || 1
+  const nx = dx / len
+  const ny = dy / len
+  // Perpendicular (for eye placement, slightly off-centerline)
+  const px = -ny
+  const py = nx
+
+  ctx.fillStyle = 'rgb(14, 170, 70)'
+  ctx.beginPath(); ctx.arc(head.x, head.y, cell * 0.43, 0, Math.PI * 2); ctx.fill()
+  ctx.strokeStyle = 'rgba(2, 44, 34, 0.9)'
+  ctx.lineWidth = 1.5
+  ctx.stroke()
+
+  // Eye
+  const eyeX = head.x + nx * cell * 0.18 + px * cell * 0.18
+  const eyeY = head.y + ny * cell * 0.18 + py * cell * 0.18
+  ctx.fillStyle = '#fef3c7'  // amber-100 sclera
+  ctx.beginPath(); ctx.arc(eyeX, eyeY, cell * 0.12, 0, Math.PI * 2); ctx.fill()
+  ctx.fillStyle = '#020617'  // pupil
+  ctx.beginPath(); ctx.arc(eyeX + nx * cell * 0.03, eyeY + ny * cell * 0.03, cell * 0.06, 0, Math.PI * 2); ctx.fill()
+}
+
 export function EelSnakePage() {
   const { profile } = useAuth()
   const backTo = profile?.role === 'admin' ? '/admin' : '/dashboard'
@@ -41,27 +111,36 @@ export function EelSnakePage() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const cellPxRef = useRef(20)
+  // `prev` snapshots each segment's position *before* the current tick; `draw`
+  // interpolates between prev → segments based on wall-clock progress through
+  // the tick interval, so rendering stays smooth between discrete moves.
   const gameRef = useRef<{
     segments: Cell[]
+    prev: Cell[]
     dir: Dir
     pending: Dir
     food: Cell
     tickMs: number
     score: number
+    lastTickAt: number
   }>({
     segments: [{ x: 10, y: 10 }],
+    prev: [{ x: 10, y: 10 }],
     dir: 'right',
     pending: 'right',
     food: { x: 5, y: 5 },
     tickMs: TICK_MS_START,
     score: 0,
+    lastTickAt: 0,
   })
+  const rafRef = useRef(0)
 
   const sizeCanvas = useCallback(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    // Fit within viewport minus chrome; snap to whole cells so rendering is crisp.
-    const maxPx = Math.min(window.innerWidth - 24, window.innerHeight - 200, 480)
+    // Fit within viewport minus chrome (header + title + D-pad + paddings);
+    // snap to whole cells so rendering is crisp.
+    const maxPx = Math.min(window.innerWidth - 24, window.innerHeight - 340, 480)
     const cell = Math.max(12, Math.floor(maxPx / GRID_SIZE))
     cellPxRef.current = cell
     const dpr = window.devicePixelRatio || 1
@@ -94,27 +173,27 @@ export function EelSnakePage() {
       ctx.beginPath(); ctx.moveTo(0, i * cell); ctx.lineTo(cell * GRID_SIZE, i * cell); ctx.stroke()
     }
 
-    // Food (fish). Emoji ≫ sprite effort for a single-week minigame.
+    // Food (fish).
     ctx.font = `${Math.floor(cell * 0.85)}px serif`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText('🐠', g.food.x * cell + cell / 2, g.food.y * cell + cell / 2)
 
-    // Eel — gradient of greens along the body, darker head with a cyan eye dot.
-    g.segments.forEach((seg, i) => {
-      const t = g.segments.length === 1 ? 1 : 1 - i / (g.segments.length)
-      const shade = Math.round(120 + t * 80) // 120..200 green
-      ctx.fillStyle = `rgb(16, ${shade}, 90)`
-      ctx.beginPath()
-      ctx.arc(seg.x * cell + cell / 2, seg.y * cell + cell / 2, cell * 0.45, 0, Math.PI * 2)
-      ctx.fill()
+    // Interpolate each segment between its prev and current grid cell.
+    // When not playing (idle / gameover) interp is 0 so the eel rests exactly on the grid.
+    const t = phase === 'playing' && g.lastTickAt
+      ? Math.min(1, (performance.now() - g.lastTickAt) / g.tickMs)
+      : 0
+    const pts = g.segments.map((cur, i) => {
+      const prev = g.prev[i] ?? cur
+      return {
+        x: (prev.x + (cur.x - prev.x) * t) * cell + cell / 2,
+        y: (prev.y + (cur.y - prev.y) * t) * cell + cell / 2,
+      }
     })
-    const head = g.segments[0]
-    ctx.fillStyle = '#06b6d4'
-    ctx.beginPath()
-    ctx.arc(head.x * cell + cell * 0.6, head.y * cell + cell * 0.4, Math.max(2, cell * 0.08), 0, Math.PI * 2)
-    ctx.fill()
-  }, [])
+
+    drawEel(ctx, pts, cell)
+  }, [phase])
 
   const changeDir = useCallback((d: Dir) => {
     const g = gameRef.current
@@ -129,22 +208,27 @@ export function EelSnakePage() {
     ]
     gameRef.current = {
       segments: initial,
+      prev: initial.map(c => ({ ...c })),
       dir: 'right',
       pending: 'right',
       food: placeFood(initial),
       tickMs: TICK_MS_START,
       score: 0,
+      lastTickAt: performance.now(),
     }
     setScore(0)
     setPhase('playing')
   }, [])
 
-  // Game loop (interval rather than rAF — discrete grid ticks).
+  // Game loop: discrete grid ticks drive logic; a separate rAF loop drives
+  // rendering and interpolates between prev ↔ current cell positions so the
+  // eel slides smoothly instead of teleporting one cell at a time.
   useEffect(() => {
     if (phase !== 'playing') return
     let stopped = false
+    let tickTimeout: number | undefined
 
-    function step() {
+    function logicTick() {
       if (stopped) return
       const g = gameRef.current
       g.dir = g.pending
@@ -161,14 +245,16 @@ export function EelSnakePage() {
       if (hitWall || hitSelf) {
         stopped = true
         setPhase('gameover')
-        setHigh(prev => {
-          const best = Math.max(prev, g.score)
+        setHigh(prevHigh => {
+          const best = Math.max(prevHigh, g.score)
           localStorage.setItem('eel-snake-high', String(best))
           return best
         })
         return
       }
 
+      // Snapshot current → prev, then mutate current forward by one cell.
+      g.prev = g.segments.map(c => ({ ...c }))
       g.segments.unshift(next)
       if (next.x === g.food.x && next.y === g.food.y) {
         g.score++
@@ -177,16 +263,31 @@ export function EelSnakePage() {
         if (g.score % SPEEDUP_EVERY_FISH === 0) {
           g.tickMs = Math.max(TICK_MS_MIN, g.tickMs - SPEEDUP_STEP_MS)
         }
+        // Fresh tail grows from where it used to end — give prev an extra
+        // entry so the new tail segment doesn't pop out of nowhere.
+        g.prev.push(g.prev[g.prev.length - 1])
       } else {
         g.segments.pop()
       }
+      g.lastTickAt = performance.now()
 
-      draw()
-      setTimeout(step, g.tickMs)
+      tickTimeout = window.setTimeout(logicTick, g.tickMs)
     }
 
-    step()
-    return () => { stopped = true }
+    function renderLoop() {
+      if (stopped) return
+      draw()
+      rafRef.current = requestAnimationFrame(renderLoop)
+    }
+
+    tickTimeout = window.setTimeout(logicTick, gameRef.current.tickMs)
+    rafRef.current = requestAnimationFrame(renderLoop)
+
+    return () => {
+      stopped = true
+      if (tickTimeout) clearTimeout(tickTimeout)
+      cancelAnimationFrame(rafRef.current)
+    }
   }, [phase, draw])
 
   // Canvas sizing — run on mount and window resize.
@@ -214,28 +315,9 @@ export function EelSnakePage() {
     return () => window.removeEventListener('keydown', onKey)
   }, [changeDir])
 
-  // Swipe — single-axis dominant, with a small threshold so taps don't count.
-  useEffect(() => {
-    let startX = 0, startY = 0
-    function onStart(e: TouchEvent) {
-      const t = e.changedTouches[0]
-      startX = t.clientX; startY = t.clientY
-    }
-    function onEnd(e: TouchEvent) {
-      const t = e.changedTouches[0]
-      const dx = t.clientX - startX
-      const dy = t.clientY - startY
-      if (Math.abs(dx) + Math.abs(dy) < 30) return
-      if (Math.abs(dx) > Math.abs(dy)) changeDir(dx > 0 ? 'right' : 'left')
-      else                              changeDir(dy > 0 ? 'down'  : 'up')
-    }
-    window.addEventListener('touchstart', onStart, { passive: true })
-    window.addEventListener('touchend',   onEnd,   { passive: true })
-    return () => {
-      window.removeEventListener('touchstart', onStart)
-      window.removeEventListener('touchend',   onEnd)
-    }
-  }, [changeDir])
+  // Touch input goes through the on-screen D-pad below the canvas (swipe
+  // turned out to be finicky — small deltas were misread as direction
+  // changes, and the game board competes with scroll gestures).
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center p-4">
@@ -268,11 +350,37 @@ export function EelSnakePage() {
               {phase === 'idle' ? 'Start' : 'Play again'}
             </button>
             <p className="text-xs text-slate-500 mt-2 text-center px-6">
-              Arrow keys or swipe to steer.<br />Don't hit walls or yourself.
+              Arrow keys or tap the D-pad to steer.<br />Don't hit walls or yourself.
             </p>
           </div>
         )}
       </div>
+
+      <DPad onDir={changeDir} />
+    </div>
+  )
+}
+
+function DPad({ onDir }: { onDir: (d: Dir) => void }) {
+  // onPointerDown fires on first contact — feels more responsive than onClick,
+  // which waits for pointerup and can be swallowed by 300ms tap-delay heuristics
+  // on some mobile browsers. touch-action: manipulation prevents the long-press
+  // context menu and double-tap zoom interference.
+  const btn = 'w-16 h-16 bg-slate-800 active:bg-sky-700 text-sky-200 text-2xl rounded-xl border border-slate-700 flex items-center justify-center select-none'
+  return (
+    <div
+      className="mt-8 grid grid-cols-3 grid-rows-3 gap-2 touch-manipulation"
+      style={{ WebkitUserSelect: 'none' }}
+    >
+      <div />
+      <button aria-label="Up"    className={btn} onPointerDown={() => onDir('up')}>▲</button>
+      <div />
+      <button aria-label="Left"  className={btn} onPointerDown={() => onDir('left')}>◀</button>
+      <div />
+      <button aria-label="Right" className={btn} onPointerDown={() => onDir('right')}>▶</button>
+      <div />
+      <button aria-label="Down"  className={btn} onPointerDown={() => onDir('down')}>▼</button>
+      <div />
     </div>
   )
 }
