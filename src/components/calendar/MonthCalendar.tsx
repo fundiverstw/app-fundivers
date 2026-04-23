@@ -257,23 +257,35 @@ function DayCell({
 
 function EventBar({ seg, track, onClick }: { seg: CellSegment; track: number; onClick: () => void }) {
   const baseClass = TYPE_BAR[seg.event.type]
-  const featuredRing = seg.event.featured ? 'ring-1 ring-amber-300' : ''
   const leftInset = seg.isStart ? 2 : 0
   const rightInset = seg.isEnd ? 2 : 0
   const leftRadius = seg.isStart ? 'rounded-l-sm' : ''
   const rightRadius = seg.isEnd ? 'rounded-r-sm' : ''
+  // Featured ring: gold on the outside edge only. Top + bottom always on;
+  // left/right only on the true start/end cells so the middle days of a
+  // multi-day featured event read as one continuous stripe, not a row of
+  // individually ringed boxes.
+  const featuredShadow = seg.event.featured
+    ? [
+        'inset 0 1px 0 rgb(252 211 77)',
+        'inset 0 -1px 0 rgb(252 211 77)',
+        seg.isStart ? 'inset 1px 0 0 rgb(252 211 77)' : '',
+        seg.isEnd   ? 'inset -1px 0 0 rgb(252 211 77)' : '',
+      ].filter(Boolean).join(', ')
+    : undefined
 
   return (
     <button
       type="button"
       onClick={onClick}
       title={seg.event.title}
-      className={`absolute text-[10px] font-semibold truncate text-left px-1 ${baseClass} ${leftRadius} ${rightRadius} ${featuredRing}`}
+      className={`absolute text-[10px] font-semibold truncate text-left px-1 ${baseClass} ${leftRadius} ${rightRadius}`}
       style={{
         top: track * (TRACK_HEIGHT + TRACK_GAP),
         height: TRACK_HEIGHT,
         left: leftInset,
         right: rightInset,
+        boxShadow: featuredShadow,
       }}
     >
       {seg.showTitle ? (
