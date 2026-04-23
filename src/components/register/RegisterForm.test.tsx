@@ -5,9 +5,10 @@ import { RegisterForm } from './RegisterForm'
 import { mockQueryBuilder } from '../../../tests/test-utils'
 import type { AppEvent, EOAddon, EORoom, Profile } from '../../types/database'
 
-const { from, insert } = vi.hoisted(() => ({
+const { from, insert, update } = vi.hoisted(() => ({
   from: vi.fn(),
   insert: vi.fn(),
+  update: vi.fn(),
 }))
 
 vi.mock('../../lib/supabase', () => ({
@@ -56,29 +57,43 @@ const sampleAddons: EOAddon[] = [
   { _id: 'addon-a', title: 'SMB 1 Day', display_name: null, price: 100, currency: 'NTD' },
 ]
 
-function setupFrom(inserted: unknown = { id: 'b-new' }) {
+function setupFrom(inserted: unknown = { id: 'b-new' }, updated: unknown = { id: 'b-existing' }) {
   from.mockImplementation((table: string) => {
     if (table === 'EO_rooms')     return mockQueryBuilder({ data: sampleRooms })
     if (table === 'Other_Addons') return mockQueryBuilder({ data: sampleAddons })
-    // bookings
-    return {
-      ...mockQueryBuilder(),
-      insert: (...a: unknown[]) => {
-        insert(...a)
-        return {
-          select: () => ({
-            single: () => Promise.resolve({ data: inserted, error: null }),
-          }),
-        }
-      },
+    if (table === 'bookings') {
+      return {
+        ...mockQueryBuilder(),
+        insert: (...a: unknown[]) => {
+          insert(...a)
+          return {
+            select: () => ({
+              single: () => Promise.resolve({ data: inserted, error: null }),
+            }),
+          }
+        },
+        update: (...a: unknown[]) => {
+          update(...a)
+          return {
+            eq: () => ({
+              select: () => ({
+                single: () => Promise.resolve({ data: updated, error: null }),
+              }),
+            }),
+          }
+        },
+      }
     }
+    // profiles + anything else → generic thenable builder that resolves to
+    // { data: null, error: null } so `.update(...).eq(...)` awaits cleanly.
+    return mockQueryBuilder()
   })
 }
 
-beforeEach(() => { from.mockReset(); insert.mockReset() })
+beforeEach(() => { from.mockReset(); insert.mockReset(); update.mockReset() })
 
 describe('RegisterForm', () => {
-  it('walks through 3 steps and submits a minimal booking with empty details structure', async () => {
+  it('walks through 4 steps and submits a minimal booking with empty details structure', async () => {
     setupFrom()
     const onBooked = vi.fn()
     const user = userEvent.setup()
@@ -87,11 +102,13 @@ describe('RegisterForm', () => {
         onClose={() => {}} onBooked={onBooked} />
     )
 
-    // Step 1 → 2
+    // Step 1 (event) → 2 (about you)
     await user.click(screen.getByRole('button', { name: /next/i }))
-    // Step 2 → 3
+    // Step 2 → 3 (extras) — sampleProfile has full_name so step-2 Next isn't gated
     await user.click(screen.getByRole('button', { name: /next/i }))
-    // Step 3: confirm
+    // Step 3 → 4 (payment)
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    // Step 4: confirm
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
 
     await waitFor(() => expect(insert).toHaveBeenCalledOnce())
@@ -124,12 +141,14 @@ describe('RegisterForm', () => {
       <RegisterForm event={sampleEvent} profile={profileOwnsAll} userId="u1"
         onClose={() => {}} onBooked={onBooked} />
     )
+    // Step 1 → 2 (about you) → 3 (extras)
+    await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
-    // Wait for async room/addon fetch to populate the step-2 form
+    // Wait for async room/addon fetch to populate the extras step
     await screen.findByLabelText(/SMB 1 Day/i)
 
-    // Step 2: turn on gear, pick à-la-carte + Wetsuit
+    // Step 3: turn on gear, pick à-la-carte + Wetsuit
     await user.click(screen.getByLabelText(/rent gear/i))
     const gearSelect = await screen.findByDisplayValue(/full set/i)
     await user.selectOptions(gearSelect, 'a-la-carte')
@@ -140,6 +159,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByLabelText(/add nitrox course/i))
     await user.click(screen.getByLabelText(/SMB 1 Day/i))
 
+    // Step 3 → 4 → confirm
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
 
@@ -169,9 +189,11 @@ describe('RegisterForm', () => {
       <RegisterForm event={noExtrasEvent} profile={sampleProfile} userId="u1"
         onClose={() => {}} onBooked={() => {}} />
     )
+    // Step 1 → 2 (about you) → 3 (extras)
+    await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
-    // Step 2 should show "no extras" copy and hide all optional sections
+    // Step 3 should show "no extras" copy and hide all optional sections
     expect(await screen.findByText(/no extras/i)).toBeInTheDocument()
     expect(screen.queryByLabelText(/rent gear/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/^room$/i)).not.toBeInTheDocument()
@@ -193,6 +215,8 @@ describe('RegisterForm', () => {
         onBooked={() => {}}
       />
     )
+    // Step 1 → 2 (about you) → 3 (extras)
+    await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
     await user.click(screen.getByLabelText(/rent gear/i))
@@ -221,6 +245,8 @@ describe('RegisterForm', () => {
       <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
         onClose={() => {}} onBooked={() => {}} />
     )
+    // Step 1 → 2 (about you) → 3 (extras) → 4 (payment)
+    await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/credit card/i))
@@ -230,5 +256,76 @@ describe('RegisterForm', () => {
     const details = (insert.mock.calls[0][0] as Record<string, unknown>).details as { total: number; payment_method: string }
     expect(details.payment_method).toBe('credit_card')
     expect(details.total).toBe(Math.round(2800 * 1.05))
+  })
+
+  it('step 2 Next is gated on full-name being set (enforces the one required field)', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    const blankProfile: Profile = { ...sampleProfile, full_name: null }
+    render(
+      <RegisterForm event={sampleEvent} profile={blankProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    // Step 1 → 2: no name pre-filled, Next should be disabled
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    const next = screen.getByRole('button', { name: /next/i })
+    expect(next).toBeDisabled()
+    await user.type(screen.getByLabelText(/full name/i), 'Grace Hopper')
+    expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
+  })
+
+  it('in edit mode, pre-populates state from the existing booking and UPDATEs on submit', async () => {
+    setupFrom()
+    const onBooked = vi.fn()
+    const user = userEvent.setup()
+
+    const existing = {
+      id: 'b-existing',
+      user_id: 'u1',
+      status: 'pending',
+      notes: 'allergic to shellfish',
+      details: {
+        gear: { rent: true, mode: 'a-la-carte', items: ['Fins', 'Mask'] },
+        add_ons: [],
+        transportation: true,
+        payment_method: 'cash',
+        total: 3000,
+      },
+    } as unknown as Parameters<typeof RegisterForm>[0]['existingBooking']
+
+    render(
+      <RegisterForm
+        event={sampleEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={onBooked}
+        existingBooking={existing}
+      />
+    )
+
+    // Step 1 (event) → 2 (about you) → 3 (extras): the gear picker should reflect
+    // the existing booking.
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await waitFor(() => {
+      expect((screen.getByLabelText(/rent gear/i) as HTMLInputElement).checked).toBe(true)
+      expect((screen.getByDisplayValue(/à-la-carte/i) as HTMLSelectElement).value).toBe('a-la-carte')
+    })
+    // Items checked to match the existing booking's a-la-carte list, not the
+    // profile's gear_owned (which would otherwise seed a different set).
+    expect((screen.getByLabelText(/Fins/i) as HTMLInputElement).checked).toBe(true)
+    expect((screen.getByLabelText(/Mask/i) as HTMLInputElement).checked).toBe(true)
+    expect((screen.getByLabelText(/BCD/i) as HTMLInputElement).checked).toBe(false)
+
+    // Step 3 → 4 (payment): submit button says "Save changes", not "Confirm booking".
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    // The `update` spy is wired to bookings only (profiles routes to the
+    // generic thenable builder), so exactly one call expected.
+    await waitFor(() => expect(update).toHaveBeenCalledOnce())
+    expect(insert).not.toHaveBeenCalled()
+    const payload = update.mock.calls[0][0] as Record<string, unknown>
+    expect(payload).toHaveProperty('details')
+    expect(payload).toHaveProperty('notes', 'allergic to shellfish')
+    expect(onBooked).toHaveBeenCalled()
   })
 })
