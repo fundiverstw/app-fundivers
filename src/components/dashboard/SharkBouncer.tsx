@@ -8,7 +8,8 @@ import { useNavigate } from 'react-router-dom'
 // State lives in a ref and drives `style.transform` directly — avoiding
 // per-frame React re-renders keeps the animation smooth on low-end phones.
 
-const SHARK_SIZE = 96             // px square
+const SHARK_SIZE = 96             // visible image (px square)
+const HIT_PADDING = 28            // invisible tap expansion around the img
 const BOUNCES_BEFORE_DISAPPEAR = 6
 const MIN_DELAY_MS = 25_000
 const MAX_DELAY_MS = 45_000
@@ -103,25 +104,35 @@ export function SharkBouncer() {
     }
   }, [])
 
+  // The button is visibly SHARK_SIZE but receives taps within a larger box
+  // (SHARK_SIZE + 2*HIT_PADDING). The transparent padding is pointer-events
+  // active; the image sits centered. Easier to hit on a phone without
+  // making the sprite itself huge.
   return (
     <button
       ref={btnRef}
       type="button"
       aria-label="Play the weekly minigame"
       onClick={() => navigate('/minigame/eel-snake')}
-      className="fixed top-0 left-0 z-40 transition-opacity duration-300 cursor-pointer drop-shadow-[0_0_12px_rgba(56,189,248,0.4)] rounded-full overflow-hidden"
+      className="fixed top-0 left-0 z-40 transition-opacity duration-300 cursor-pointer flex items-center justify-center"
       style={{
-        width: SHARK_SIZE,
-        height: SHARK_SIZE,
+        width: SHARK_SIZE + HIT_PADDING * 2,
+        height: SHARK_SIZE + HIT_PADDING * 2,
+        padding: HIT_PADDING,
         opacity: 0,
         pointerEvents: 'none',
         willChange: 'transform',
+        // Shark position is applied via translate() on the button itself, so
+        // offset the anchor by -HIT_PADDING in both axes so the visible shark
+        // lines up with state.current.x/y.
+        marginLeft: -HIT_PADDING,
+        marginTop: -HIT_PADDING,
       }}
     >
       <img
         src="/imgs/sexy-shark.jpg"
         alt=""
-        className="w-full h-full object-cover rounded-full"
+        className="w-full h-full object-cover rounded-full drop-shadow-[0_0_12px_rgba(56,189,248,0.4)]"
         draggable={false}
       />
     </button>
