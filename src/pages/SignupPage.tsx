@@ -9,6 +9,7 @@ const schema = z.object({
   email: z.string().email('Invalid email'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   confirm: z.string(),
+  agreedToTerms: z.literal(true, { errorMap: () => ({ message: 'Please agree to continue' }) }),
 }).refine(d => d.password === d.confirm, { message: 'Passwords do not match', path: ['confirm'] })
 type FormData = z.infer<typeof schema>
 
@@ -21,7 +22,14 @@ export function SignupPage() {
 
   async function onSubmit(data: FormData) {
     setServerError('')
-    const { error } = await supabase.auth.signUp({ email: data.email, password: data.password })
+    // Stash the agreement timestamp on auth.users.raw_user_meta_data; the
+    // handle_new_user trigger copies it into profiles.agreed_to_terms_at
+    // when the account row is created.
+    const { error } = await supabase.auth.signUp({
+      email: data.email,
+      password: data.password,
+      options: { data: { agreed_to_terms_at: new Date().toISOString() } },
+    })
     if (error) { setServerError(error.message); return }
     setDone(true)
   }
@@ -74,6 +82,15 @@ export function SignupPage() {
             />
             {errors.confirm && <p className="text-red-400 text-xs mt-1">{errors.confirm.message}</p>}
           </div>
+
+          <label className="flex items-start gap-2 text-xs text-slate-300">
+            <input {...register('agreedToTerms')} type="checkbox" className="accent-sky-500 mt-0.5" />
+            <span>
+              I agree to the{' '}
+              <Link to="/terms" target="_blank" className="text-sky-400 hover:underline">Terms of Use & Privacy</Link>.
+            </span>
+          </label>
+          {errors.agreedToTerms && <p className="text-red-400 text-xs">{errors.agreedToTerms.message}</p>}
 
           {serverError && <p className="text-red-400 text-sm">{serverError}</p>}
 

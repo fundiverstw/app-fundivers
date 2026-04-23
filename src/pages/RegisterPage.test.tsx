@@ -130,6 +130,8 @@ describe('RegisterPage', () => {
     await user.click(screen.getByRole('button', { name: 'Create account' }))
     await user.type(screen.getByLabelText(/email/i), 'new@diver.test')
     await user.type(screen.getByLabelText(/password/i), 'abcdefgh')
+    // ToS checkbox is required for the signup path — find it by the visible text.
+    await user.click(screen.getByLabelText(/I agree to the/i))
     await user.click(screen.getByRole('button', { name: /create account and continue/i }))
 
     await waitFor(() => expect(signUp).toHaveBeenCalledOnce())
@@ -140,5 +142,6 @@ describe('RegisterPage', () => {
     // only assert that emailRedirectTo was supplied — the real value in
     // production is window.location.href of the register page.
     expect(typeof arg.options?.emailRedirectTo).toBe('string')
+    expect(typeof arg.options?.data?.agreed_to_terms_at).toBe('string')
   })
 })
