@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { fetchEventsForBookings } from '../../lib/events'
 import { AdminNotes } from '../../components/admin/AdminNotes'
 import { EventStaffSection } from '../../components/admin/EventStaffSection'
+import { RegisterForm } from '../../components/register/RegisterForm'
 import { shoeAsJp } from '../../lib/shoe-size'
 import type { AppEvent, Booking, BookingDetails, Payment, Profile } from '../../types/database'
 
@@ -24,6 +25,7 @@ export function AdminEventDetailPage() {
   const [addonNames, setAddonNames] = useState<AddonNameMap>(new Map())
   const [roomNames, setRoomNames] = useState<RoomNameMap>(new Map())
   const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState<Registrant | null>(null)
 
   useEffect(() => {
     if (!type || !id) return
@@ -171,9 +173,27 @@ export function AdminEventDetailPage() {
               roomNames={roomNames}
               onStatusChange={updateStatus}
               onApproveRefund={approveRefund}
+              onEdit={() => setEditing(r)}
             />
           ))}
         </section>
+      )}
+
+      {editing && event && (
+        <RegisterForm
+          event={event}
+          profile={editing.profile}
+          userId={editing.booking.user_id}
+          existingBooking={editing.booking}
+          onClose={() => setEditing(null)}
+          onBooked={updated => {
+            const b = updated as Booking
+            setRegistrants(prev => prev.map(r =>
+              r.booking.id === b.id ? { ...r, booking: b } : r
+            ))
+            setEditing(null)
+          }}
+        />
       )}
     </div>
   )
@@ -181,12 +201,13 @@ export function AdminEventDetailPage() {
 
 const BOOKING_STATUSES: Booking['status'][] = ['pending', 'confirmed', 'waitlisted', 'cancelled']
 
-function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRefund }: {
+function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRefund, onEdit }: {
   r: Registrant
   addonNames: AddonNameMap
   roomNames: RoomNameMap
   onStatusChange: (id: string, s: Booking['status']) => void
   onApproveRefund: (id: string) => void
+  onEdit: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
 
@@ -291,6 +312,15 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
           {r.booking.notes && (
             <p className="text-xs text-slate-300 bg-slate-900/40 rounded p-2">📝 {r.booking.notes}</p>
           )}
+
+          <div className="flex justify-end pt-1">
+            <button
+              onClick={onEdit}
+              className="text-xs bg-slate-700 hover:bg-sky-700 text-slate-200 font-semibold px-3 py-1 rounded"
+            >
+              Edit registration
+            </button>
+          </div>
         </>
       )}
     </div>
