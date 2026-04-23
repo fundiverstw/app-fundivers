@@ -1,3 +1,8 @@
+// Pin TZ for deterministic date-picker default values. These tests assert
+// specific YYYY-MM-DD strings; without pinning, they'd fail whenever the
+// machine's local TZ pushes the UTC timestamps across midnight.
+process.env.TZ = 'UTC'
+
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -86,6 +91,39 @@ describe('EventStaffSection date range', () => {
       end_date:   '2030-02-12',
       eo_course_id: 'course-x',
     })
+  })
+
+  it('defaults to the local-time date, not the UTC date (regression: Taipei-midnight events drifted back a day)', async () => {
+    // Temporarily pretend we're in Taipei (UTC+8). An event whose ISO says
+    // "2026-04-24T16:00:00Z" represents midnight Taipei on April 25 — the
+    // calendar displays it as April 25, so the picker must too.
+    const originalTZ = process.env.TZ
+    process.env.TZ = 'Asia/Taipei'
+    try {
+      from.mockImplementation((table: string) => {
+        if (table === 'duties')   return mockQueryBuilder({ data: [] })
+        if (table === 'profiles') return mockQueryBuilder({ data: [
+          { id: 'admin-1', role: 'admin', display_name: 'Ada', full_name: 'Ada Lovelace' },
+        ] })
+        return mockQueryBuilder({ data: [] })
+      })
+
+      render(
+        <EventStaffSection
+          eventType="dive"
+          eventId="dive-z"
+          eventStartDate="2026-04-24T16:00:00.000Z"  // 00:00 Apr 25 Taipei
+          eventEndDate={null}
+          nonAdminDiverCount={0}
+        />
+      )
+
+      // The default should be the local (Taipei) date, not the UTC date.
+      await screen.findByDisplayValue('2026-04-25')
+      expect(screen.queryByDisplayValue('2026-04-24')).not.toBeInTheDocument()
+    } finally {
+      process.env.TZ = originalTZ
+    }
   })
 
   it('accepts a blank end date for single-day assignments', async () => {

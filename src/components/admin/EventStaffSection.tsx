@@ -19,8 +19,11 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
   const [admins, setAdmins] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
 
-  const eventStart = eventStartDate.slice(0, 10)
-  const eventEnd = eventEndDate ? eventEndDate.slice(0, 10) : null
+  // IMPORTANT: format in the user's local timezone, not by slicing the UTC ISO
+  // string. An event at midnight Taipei maps to the previous day in UTC, so
+  // slice(0,10) would show the picker a day earlier than the calendar bar.
+  const eventStart = format(parseISO(eventStartDate), 'yyyy-MM-dd')
+  const eventEnd = eventEndDate ? format(parseISO(eventEndDate), 'yyyy-MM-dd') : null
   const isMultiDay = !!eventEnd && eventEnd !== eventStart
 
   // Form state for the "assign" row. Date range defaults to the event's
@@ -146,6 +149,8 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
           <input
             type="date"
             value={startDate}
+            min={eventStart}
+            max={eventEnd ?? eventStart}
             onChange={e => setStartDate(e.target.value)}
             className="flex-1 min-w-0 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-slate-100"
           />
@@ -154,9 +159,11 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
             type="date"
             value={endDate}
             min={startDate}
+            max={eventEnd ?? eventStart}
             onChange={e => setEndDate(e.target.value)}
             placeholder={isMultiDay ? 'end' : '(single day)'}
-            className="flex-1 min-w-0 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-slate-100"
+            disabled={!isMultiDay}
+            className="flex-1 min-w-0 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-slate-100 disabled:text-slate-500 disabled:bg-slate-800"
           />
           <button
             onClick={assign}
