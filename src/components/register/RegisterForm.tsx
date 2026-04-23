@@ -4,12 +4,35 @@ import { supabase } from '../../lib/supabase'
 import { GEAR_ITEMS } from '../../lib/gear'
 import type { AppEvent, BookingDetails, EOAddon, EORoom, Profile } from '../../types/database'
 
+// RegisterForm = modal wrapper around RegisterFormBody.
+// RegisterFormBody = the actual 3-step form, reusable from a standalone page
+// or the admin edit modal.
+
 interface Props {
   event: AppEvent
   profile: Profile | null
   userId: string
   onClose: () => void
   onBooked: (booking: unknown) => void
+}
+
+export function RegisterForm({ event, profile, userId, onClose, onBooked }: Props) {
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-50" onClick={onClose}>
+      <div
+        className="bg-slate-800 rounded-t-2xl w-full max-w-lg p-5 space-y-4 max-h-[90vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        <RegisterFormBody
+          event={event}
+          profile={profile}
+          userId={userId}
+          onSubmitSuccess={onBooked}
+          onCancel={onClose}
+        />
+      </div>
+    </div>
+  )
 }
 
 const GEAR_ALACARTE_PRICES: Record<string, number> = {
@@ -21,7 +44,23 @@ const TRANSPORT_FEE = 1300
 
 type Step = 1 | 2 | 3
 
-export function RegisterForm({ event, profile, userId, onClose, onBooked }: Props) {
+export interface RegisterFormBodyProps {
+  event: AppEvent
+  profile: Profile | null
+  userId: string
+  onSubmitSuccess: (booking: unknown) => void
+  /** Optional cancel handler — renders a close button in the header when provided. */
+  onCancel?: () => void
+  /**
+   * Optional handler for the `‹ Back` button when the user is on step 1.
+   * Without this, step-1 Back is disabled (the modal flow has nowhere to go
+   * back to). The standalone /register page wires this to navigate back to
+   * the event picker so users can change their mind mid-form.
+   */
+  onBackBeforeStepOne?: () => void
+}
+
+export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCancel, onBackBeforeStepOne }: RegisterFormBodyProps) {
   // Gating derived from the event
   const diveDays = Math.max(1, event.dive_days ?? 1)
   const showGear = event.type === 'dive'
@@ -152,177 +191,184 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked }: Prop
 
     setSaving(false)
     if (error) { setErr(error.message); return }
-    if (data) onBooked(data)
+    if (data) onSubmitSuccess(data)
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-50" onClick={onClose}>
-      <div className="bg-slate-800 rounded-t-2xl w-full max-w-lg p-5 space-y-4 max-h-[90vh] overflow-y-auto"
-           onClick={e => e.stopPropagation()}>
-        <header className="flex items-center justify-between">
-          <span className="text-xs text-slate-400">Step {step} of 3</span>
-          <button onClick={onClose} className="text-slate-400 text-xl leading-none">×</button>
-        </header>
-
-        {step === 1 && (
-          <section className="space-y-3">
-            <h2 className="text-lg font-bold text-slate-100">{event.title}</h2>
-            <p className="text-sm text-slate-400">
-              {format(new Date(event.start_time), 'EEEE, MMMM d · HH:mm')}
-              {event.end_time && ` → ${format(new Date(event.end_time), 'MMMM d')}`}
-            </p>
-            {event.price != null && (
-              <p className="text-sm text-slate-300">From {event.currency} {event.price.toLocaleString()}</p>
-            )}
-            <div className="text-sm text-slate-300 bg-slate-900/50 rounded-lg p-3 space-y-1">
-              <p><strong>{profile?.full_name ?? '—'}</strong></p>
-              {profile?.cert_agency && profile.cert_level && (
-                <p className="text-xs">{profile.cert_agency} {profile.cert_level} · {profile.logged_dives ?? 0} dives{profile.nitrox_certified && ' · Nitrox'}</p>
-              )}
-              {(!profile?.full_name || !profile?.cert_level) && (
-                <p className="text-xs text-amber-400">Complete your profile for a faster check-in.</p>
-              )}
-            </div>
-          </section>
+    <>
+      <header className="flex items-center justify-between">
+        <span className="text-xs text-slate-400">Step {step} of 3</span>
+        {onCancel && (
+          <button onClick={onCancel} className="text-slate-400 text-xl leading-none">×</button>
         )}
+      </header>
 
-        {step === 2 && (
-          <section className="space-y-4">
-            <h2 className="text-lg font-bold text-slate-100">Extras</h2>
-
-            {!showGear && !showRooms && !showAddons && !showNitroxAddon && (
-              <p className="text-slate-400 text-sm">No extras for this event.</p>
-            )}
-
-            {showGear && (
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm text-slate-300">
-                  <input type="checkbox" checked={rentGear} onChange={e => setRentGear(e.target.checked)} className="accent-sky-500" />
-                  Rent gear
-                </label>
-                {event.gear_rental_info && (
-                  <p className="text-xs text-slate-500 pl-6">{event.gear_rental_info}</p>
-                )}
-                {rentGear && (
-                  <div className="pl-6 space-y-2">
-                    <select
-                      value={gearMode}
-                      onChange={e => setGearMode(e.target.value as typeof gearMode)}
-                      className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-100"
-                    >
-                      <option value="full">Full set ({GEAR_FULLSET_DAILY.toLocaleString()}/day)</option>
-                      <option value="a-la-carte">À-la-carte</option>
-                      <option value="provided">Provided by shop</option>
-                    </select>
-                    {gearMode === 'a-la-carte' && (
-                      <div className="grid grid-cols-2 gap-1">
-                        {GEAR_ITEMS.map(item => (
-                          <label key={item} className="flex items-center gap-1 text-xs text-slate-300">
-                            <input type="checkbox" checked={gearItems.includes(item)} onChange={() => toggleItem(item)} className="accent-sky-500" />
-                            {item} ({GEAR_ALACARTE_PRICES[item]})
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {showRooms && rooms.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm text-slate-300 font-semibold">Room</p>
-                <select value={roomId} onChange={e => setRoomId(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-100">
-                  <option value="">— none —</option>
-                  {rooms.map(r => (
-                    <option key={r._id} value={r._id}>
-                      {r.display_name ?? r.title} {r.added_price != null && `(+${r.added_price.toLocaleString()})`}
-                    </option>
-                  ))}
-                </select>
-                {roomId && (
-                  <input value={roomNotes} onChange={e => setRoomNotes(e.target.value)} placeholder="Room notes" className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-100" />
-                )}
-              </div>
-            )}
-
-            {showAddons && addons.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm text-slate-300 font-semibold">Add-ons</p>
-                <div className="max-h-40 overflow-y-auto grid grid-cols-1 gap-1 pr-1">
-                  {addons.map(a => (
-                    <label key={a._id} className="flex items-center gap-2 text-xs text-slate-300">
-                      <input type="checkbox" checked={addonIds.has(a._id)} onChange={() => toggleAddon(a._id)} className="accent-sky-500" />
-                      <span className="flex-1">{a.display_name ?? a.title}</span>
-                      {a.price != null && <span className="text-slate-400">+{a.price.toLocaleString()}</span>}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <label className="flex items-center gap-2 text-sm text-slate-300">
-              <input type="checkbox" checked={needsTransport} onChange={e => setNeedsTransport(e.target.checked)} className="accent-sky-500" />
-              Need transportation (+{TRANSPORT_FEE.toLocaleString()})
-            </label>
-
-            {showNitroxAddon && (
-              <label className="flex items-center gap-2 text-sm text-slate-300">
-                <input type="checkbox" checked={addNitroxCourse} onChange={e => setAddNitroxCourse(e.target.checked)} className="accent-sky-500" />
-                Add Nitrox course (+{NITROX_COURSE_FEE.toLocaleString()})
-              </label>
-            )}
-
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Notes (optional)"
-              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-100" />
-          </section>
-        )}
-
-        {step === 3 && (
-          <section className="space-y-3">
-            <h2 className="text-lg font-bold text-slate-100">Payment</h2>
-            <div className="space-y-1">
-              {(['bank_transfer', 'credit_card', 'cash'] as const).map(method => (
-                <label key={method} className="flex items-center gap-2 text-sm text-slate-300">
-                  <input type="radio" name="payment" checked={payment === method} onChange={() => setPayment(method)} className="accent-sky-500" />
-                  {method === 'bank_transfer' && 'Bank transfer'}
-                  {method === 'credit_card' && 'Credit card (+5%)'}
-                  {method === 'cash' && 'Cash on the day'}
-                </label>
-              ))}
-            </div>
-
-            <div className="text-sm text-slate-300 bg-slate-900/50 rounded-lg p-3 space-y-1">
-              <Row label="Base"                value={base} currency={event.currency} />
-              {gearCost > 0         && <Row label="Gear"           value={gearCost}     currency={event.currency} />}
-              {roomCost > 0         && <Row label="Room"           value={roomCost}     currency={event.currency} />}
-              {addonsCost > 0       && <Row label="Add-ons"        value={addonsCost}   currency={event.currency} />}
-              {needsTransport       && <Row label="Transport"      value={TRANSPORT_FEE} currency={event.currency} />}
-              {(showNitroxAddon && addNitroxCourse) && <Row label="Nitrox course" value={NITROX_COURSE_FEE} currency={event.currency} />}
-              {paymentSurcharge > 0 && <Row label="Credit surcharge (5%)" value={total - subTotal} currency={event.currency} />}
-              <div className="border-t border-slate-700 pt-1 mt-1">
-                <Row label="Total" value={total} currency={event.currency} bold />
-              </div>
-            </div>
-            {err && <p className="text-rose-400 text-sm">{err}</p>}
-          </section>
-        )}
-
-        <footer className="flex items-center justify-between gap-2 pt-2">
-          <button onClick={() => step > 1 && setStep((step - 1) as Step)} disabled={step === 1}
-            className="text-sm text-slate-400 hover:text-slate-100 disabled:opacity-40">‹ Back</button>
-          {step < 3 ? (
-            <button onClick={() => setStep((step + 1) as Step)}
-              className="bg-sky-500 hover:bg-sky-600 text-white text-sm font-semibold py-2 px-4 rounded-lg">Next ›</button>
-          ) : (
-            <button onClick={submit} disabled={saving}
-              className="bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg">
-              {saving ? 'Booking…' : 'Confirm booking'}
-            </button>
+      {step === 1 && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-bold text-slate-100">{event.title}</h2>
+          <p className="text-sm text-slate-400">
+            {format(new Date(event.start_time), 'EEEE, MMMM d · HH:mm')}
+            {event.end_time && ` → ${format(new Date(event.end_time), 'MMMM d')}`}
+          </p>
+          {event.price != null && (
+            <p className="text-sm text-slate-300">From {event.currency} {event.price.toLocaleString()}</p>
           )}
-        </footer>
-      </div>
-    </div>
+          <div className="text-sm text-slate-300 bg-slate-900/50 rounded-lg p-3 space-y-1">
+            <p><strong>{profile?.full_name ?? '—'}</strong></p>
+            {profile?.cert_agency && profile.cert_level && (
+              <p className="text-xs">{profile.cert_agency} {profile.cert_level} · {profile.logged_dives ?? 0} dives{profile.nitrox_certified && ' · Nitrox'}</p>
+            )}
+            {(!profile?.full_name || !profile?.cert_level) && (
+              <p className="text-xs text-amber-400">Complete your profile for a faster check-in.</p>
+            )}
+          </div>
+        </section>
+      )}
+
+      {step === 2 && (
+        <section className="space-y-4">
+          <h2 className="text-lg font-bold text-slate-100">Extras</h2>
+
+          {!showGear && !showRooms && !showAddons && !showNitroxAddon && (
+            <p className="text-slate-400 text-sm">No extras for this event.</p>
+          )}
+
+          {showGear && (
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm text-slate-300">
+                <input type="checkbox" checked={rentGear} onChange={e => setRentGear(e.target.checked)} className="accent-sky-500" />
+                Rent gear
+              </label>
+              {event.gear_rental_info && (
+                <p className="text-xs text-slate-500 pl-6">{event.gear_rental_info}</p>
+              )}
+              {rentGear && (
+                <div className="pl-6 space-y-2">
+                  <select
+                    value={gearMode}
+                    onChange={e => setGearMode(e.target.value as typeof gearMode)}
+                    className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-100"
+                  >
+                    <option value="full">Full set ({GEAR_FULLSET_DAILY.toLocaleString()}/day)</option>
+                    <option value="a-la-carte">À-la-carte</option>
+                    <option value="provided">Provided by shop</option>
+                  </select>
+                  {gearMode === 'a-la-carte' && (
+                    <div className="grid grid-cols-2 gap-1">
+                      {GEAR_ITEMS.map(item => (
+                        <label key={item} className="flex items-center gap-1 text-xs text-slate-300">
+                          <input type="checkbox" checked={gearItems.includes(item)} onChange={() => toggleItem(item)} className="accent-sky-500" />
+                          {item} ({GEAR_ALACARTE_PRICES[item]})
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {showRooms && rooms.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm text-slate-300 font-semibold">Room</p>
+              <select value={roomId} onChange={e => setRoomId(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-100">
+                <option value="">— none —</option>
+                {rooms.map(r => (
+                  <option key={r._id} value={r._id}>
+                    {r.display_name ?? r.title} {r.added_price != null && `(+${r.added_price.toLocaleString()})`}
+                  </option>
+                ))}
+              </select>
+              {roomId && (
+                <input value={roomNotes} onChange={e => setRoomNotes(e.target.value)} placeholder="Room notes" className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-100" />
+              )}
+            </div>
+          )}
+
+          {showAddons && addons.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm text-slate-300 font-semibold">Add-ons</p>
+              <div className="max-h-40 overflow-y-auto grid grid-cols-1 gap-1 pr-1">
+                {addons.map(a => (
+                  <label key={a._id} className="flex items-center gap-2 text-xs text-slate-300">
+                    <input type="checkbox" checked={addonIds.has(a._id)} onChange={() => toggleAddon(a._id)} className="accent-sky-500" />
+                    <span className="flex-1">{a.display_name ?? a.title}</span>
+                    {a.price != null && <span className="text-slate-400">+{a.price.toLocaleString()}</span>}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <label className="flex items-center gap-2 text-sm text-slate-300">
+            <input type="checkbox" checked={needsTransport} onChange={e => setNeedsTransport(e.target.checked)} className="accent-sky-500" />
+            Need transportation (+{TRANSPORT_FEE.toLocaleString()})
+          </label>
+
+          {showNitroxAddon && (
+            <label className="flex items-center gap-2 text-sm text-slate-300">
+              <input type="checkbox" checked={addNitroxCourse} onChange={e => setAddNitroxCourse(e.target.checked)} className="accent-sky-500" />
+              Add Nitrox course (+{NITROX_COURSE_FEE.toLocaleString()})
+            </label>
+          )}
+
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Notes (optional)"
+            className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-100" />
+        </section>
+      )}
+
+      {step === 3 && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-bold text-slate-100">Payment</h2>
+          <div className="space-y-1">
+            {(['bank_transfer', 'credit_card', 'cash'] as const).map(method => (
+              <label key={method} className="flex items-center gap-2 text-sm text-slate-300">
+                <input type="radio" name="payment" checked={payment === method} onChange={() => setPayment(method)} className="accent-sky-500" />
+                {method === 'bank_transfer' && 'Bank transfer'}
+                {method === 'credit_card' && 'Credit card (+5%)'}
+                {method === 'cash' && 'Cash on the day'}
+              </label>
+            ))}
+          </div>
+
+          <div className="text-sm text-slate-300 bg-slate-900/50 rounded-lg p-3 space-y-1">
+            <Row label="Base"                value={base} currency={event.currency} />
+            {gearCost > 0         && <Row label="Gear"           value={gearCost}     currency={event.currency} />}
+            {roomCost > 0         && <Row label="Room"           value={roomCost}     currency={event.currency} />}
+            {addonsCost > 0       && <Row label="Add-ons"        value={addonsCost}   currency={event.currency} />}
+            {needsTransport       && <Row label="Transport"      value={TRANSPORT_FEE} currency={event.currency} />}
+            {(showNitroxAddon && addNitroxCourse) && <Row label="Nitrox course" value={NITROX_COURSE_FEE} currency={event.currency} />}
+            {paymentSurcharge > 0 && <Row label="Credit surcharge (5%)" value={total - subTotal} currency={event.currency} />}
+            <div className="border-t border-slate-700 pt-1 mt-1">
+              <Row label="Total" value={total} currency={event.currency} bold />
+            </div>
+          </div>
+          {err && <p className="text-rose-400 text-sm">{err}</p>}
+        </section>
+      )}
+
+      <footer className="flex items-center justify-between gap-2 pt-2">
+        <button
+          onClick={() => {
+            if (step === 1) onBackBeforeStepOne?.()
+            else setStep((step - 1) as Step)
+          }}
+          disabled={step === 1 && !onBackBeforeStepOne}
+          className="text-sm text-slate-400 hover:text-slate-100 disabled:opacity-40"
+        >
+          ‹ Back
+        </button>
+        {step < 3 ? (
+          <button onClick={() => setStep((step + 1) as Step)}
+            className="bg-sky-500 hover:bg-sky-600 text-white text-sm font-semibold py-2 px-4 rounded-lg">Next ›</button>
+        ) : (
+          <button onClick={submit} disabled={saving}
+            className="bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg">
+            {saving ? 'Booking…' : 'Confirm booking'}
+          </button>
+        )}
+      </footer>
+    </>
   )
 }
 
