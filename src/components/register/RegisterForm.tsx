@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { GEAR_ITEMS } from '../../lib/gear'
-import type { AppEvent, BookingDetails, EOAddon, EORoom, Profile } from '../../types/database'
+import type { AppEvent, Booking, BookingDetails, EOAddon, EORoom, Profile } from '../../types/database'
 
 // RegisterForm = modal wrapper around RegisterFormBody.
 // RegisterFormBody = the actual 3-step form, reusable from a standalone page
@@ -14,9 +14,12 @@ interface Props {
   userId: string
   onClose: () => void
   onBooked: (booking: unknown) => void
+  /** If provided, the form opens in edit mode: pre-populated from this row
+   *  and submit UPDATEs instead of INSERTing. Used by the admin edit modal. */
+  existingBooking?: Booking
 }
 
-export function RegisterForm({ event, profile, userId, onClose, onBooked }: Props) {
+export function RegisterForm({ event, profile, userId, onClose, onBooked, existingBooking }: Props) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-50" onClick={onClose}>
       <div
@@ -29,6 +32,7 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked }: Prop
           userId={userId}
           onSubmitSuccess={onBooked}
           onCancel={onClose}
+          existingBooking={existingBooking}
         />
       </div>
     </div>
@@ -42,7 +46,8 @@ const GEAR_FULLSET_DAILY = 1500
 const NITROX_COURSE_FEE = 6000
 const TRANSPORT_FEE = 1300
 
-type Step = 1 | 2 | 3
+type Step = 1 | 2 | 3 | 4
+type ContactMethod = 'whatsapp' | 'line' | 'phone' | 'email'
 
 export interface RegisterFormBodyProps {
   event: AppEvent
@@ -58,9 +63,13 @@ export interface RegisterFormBodyProps {
    * the event picker so users can change their mind mid-form.
    */
   onBackBeforeStepOne?: () => void
+  /** Edit mode: pre-populate from this row and UPDATE on submit. */
+  existingBooking?: Booking
 }
 
-export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCancel, onBackBeforeStepOne }: RegisterFormBodyProps) {
+export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCancel, onBackBeforeStepOne, existingBooking }: RegisterFormBodyProps) {
+  const isEdit = !!existingBooking
+  const initialDetails = existingBooking?.details as BookingDetails | undefined
   // Gating derived from the event
   const diveDays = Math.max(1, event.dive_days ?? 1)
   const showGear = event.type === 'dive'
@@ -76,21 +85,44 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
-  // Form state
-  const [rentGear, setRentGear] = useState(false)
-  const [gearMode, setGearMode] = useState<'full' | 'a-la-carte' | 'provided'>('full')
-  const [gearItems, setGearItems] = useState<string[]>([])
-  // Auto-prefill the a-la-carte rental list with items the diver does NOT
-  // already own, the first time they enter that mode. Once they touch the
-  // list we back off so their explicit choice wins.
-  const [gearEdited, setGearEdited] = useState(false)
-  const [roomId, setRoomId] = useState<string>('')
-  const [roomNotes, setRoomNotes] = useState('')
-  const [addonIds, setAddonIds] = useState<Set<string>>(new Set())
-  const [needsTransport, setNeedsTransport] = useState(false)
-  const [addNitroxCourse, setAddNitroxCourse] = useState(false)
-  const [payment, setPayment] = useState<'bank_transfer' | 'credit_card' | 'cash'>('bank_transfer')
-  const [notes, setNotes] = useState('')
+  // Form state — pre-populated from existingBooking when editing. The `gearEdited`
+  // flag is set true in edit mode so we don't stomp the saved a-la-carte list
+  // with the profile's gear_owned fallback.
+  const [rentGear, setRentGear] = useState(initialDetails?.gear?.rent ?? false)
+  const [gearMode, setGearMode] = useState<'full' | 'a-la-carte' | 'provided'>(
+    initialDetails?.gear?.rent ? (initialDetails.gear.mode ?? 'full') : 'full'
+  )
+  const [gearItems, setGearItems] = useState<string[]>(
+    (initialDetails?.gear?.rent && initialDetails.gear.items) ? initialDetails.gear.items : []
+  )
+  const [gearEdited, setGearEdited] = useState(isEdit)
+  const [roomId, setRoomId] = useState<string>(initialDetails?.room?.option_id ?? '')
+  const [roomNotes, setRoomNotes] = useState(initialDetails?.room?.notes ?? '')
+  const [addonIds, setAddonIds] = useState<Set<string>>(new Set(initialDetails?.add_ons ?? []))
+  const [needsTransport, setNeedsTransport] = useState(initialDetails?.transportation ?? false)
+  const [addNitroxCourse, setAddNitroxCourse] = useState(initialDetails?.nitrox_course_addon ?? false)
+  const [payment, setPayment] = useState<'bank_transfer' | 'credit_card' | 'cash'>(
+    initialDetails?.payment_method ?? 'bank_transfer'
+  )
+  const [notes, setNotes] = useState(existingBooking?.notes ?? '')
+
+  // Profile fields — pre-filled from the diver's profile (empty strings for
+  // missing values so the inputs are controlled). On submit we UPSERT any
+  // changes back to profiles so a Wix visitor who fills these in the first
+  // time has them pre-filled for every future registration.
+  const [fullName, setFullName]  = useState(profile?.full_name  ?? '')
+  const [dob, setDob]            = useState(profile?.date_of_birth ?? '')
+  const [nationality, setNationality] = useState(profile?.nationality ?? '')
+  const [idNumber, setIdNumber]  = useState(profile?.id_number  ?? '')
+  const [phone, setPhone]        = useState(profile?.phone      ?? '')
+  const [contactMethod, setContactMethod] = useState<ContactMethod | ''>(profile?.contact_method ?? '')
+  const [contactId, setContactId] = useState(profile?.contact_id ?? '')
+  const [certAgency, setCertAgency] = useState(profile?.cert_agency ?? '')
+  const [certLevel, setCertLevel] = useState(profile?.cert_level ?? '')
+  const [loggedDives, setLoggedDives] = useState(profile?.logged_dives ?? 0)
+  const [nitroxCertified, setNitroxCertified] = useState(profile?.nitrox_certified ?? false)
+  const [emergencyName, setEmergencyName]   = useState(profile?.emergency_contact_name  ?? '')
+  const [emergencyPhone, setEmergencyPhone] = useState(profile?.emergency_contact_phone ?? '')
 
   useEffect(() => {
     if (gearMode === 'a-la-carte' && !gearEdited) {
@@ -152,6 +184,31 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
 
   async function submit() {
     setSaving(true); setErr('')
+
+    // Persist any edits to the diver's profile first. Only columns that have
+    // a value get sent; empty strings become NULL so we don't overwrite
+    // existing data with blanks when a field was left untouched. A Wix
+    // visitor filling these in for the first time ends up with a complete
+    // profile for next time.
+    const nullish = (v: string) => v.trim() === '' ? null : v.trim()
+    const profilePatch = {
+      full_name:               nullish(fullName),
+      date_of_birth:           nullish(dob),
+      nationality:             nullish(nationality),
+      id_number:               nullish(idNumber),
+      phone:                   nullish(phone),
+      contact_method:          (contactMethod || null) as ContactMethod | null,
+      contact_id:              nullish(contactId),
+      cert_agency:             nullish(certAgency),
+      cert_level:              nullish(certLevel),
+      logged_dives:            Number.isFinite(loggedDives) ? loggedDives : 0,
+      nitrox_certified:        nitroxCertified,
+      emergency_contact_name:  nullish(emergencyName),
+      emergency_contact_phone: nullish(emergencyPhone),
+    }
+    const { error: profErr } = await supabase.from('profiles').update(profilePatch).eq('id', userId)
+    if (profErr) { setSaving(false); setErr(profErr.message); return }
+
     const details: BookingDetails = {
       gear: showGear && rentGear
         ? {
@@ -172,6 +229,19 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
       nitrox_course_addon: showNitroxAddon && addNitroxCourse,
       total,
       deposit: event.deposit_amount ?? undefined,
+    }
+
+    if (existingBooking) {
+      // Admin edit path — update in place, don't touch user_id / FK / status.
+      const { data, error } = await supabase
+        .from('bookings')
+        .update({ notes: notes || null, details })
+        .eq('id', existingBooking.id)
+        .select().single()
+      setSaving(false)
+      if (error) { setErr(error.message); return }
+      if (data) onSubmitSuccess(data)
+      return
     }
 
     const fk = event.type === 'dive'
@@ -197,7 +267,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   return (
     <>
       <header className="flex items-center justify-between">
-        <span className="text-xs text-slate-400">Step {step} of 3</span>
+        <span className="text-xs text-slate-400">Step {step} of 4</span>
         {onCancel && (
           <button onClick={onCancel} className="text-slate-400 text-xl leading-none">×</button>
         )}
@@ -213,19 +283,76 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
           {event.price != null && (
             <p className="text-sm text-slate-300">From {event.currency} {event.price.toLocaleString()}</p>
           )}
-          <div className="text-sm text-slate-300 bg-slate-900/50 rounded-lg p-3 space-y-1">
-            <p><strong>{profile?.full_name ?? '—'}</strong></p>
-            {profile?.cert_agency && profile.cert_level && (
-              <p className="text-xs">{profile.cert_agency} {profile.cert_level} · {profile.logged_dives ?? 0} dives{profile.nitrox_certified && ' · Nitrox'}</p>
-            )}
-            {(!profile?.full_name || !profile?.cert_level) && (
-              <p className="text-xs text-amber-400">Complete your profile for a faster check-in.</p>
-            )}
-          </div>
         </section>
       )}
 
       {step === 2 && (
+        <section className="space-y-4">
+          <h2 className="text-lg font-bold text-slate-100">About you</h2>
+          <p className="text-xs text-slate-400">
+            Pre-filled if you've registered before. Edits are saved to your profile.
+          </p>
+
+          <div className="space-y-3">
+            <TextField label="Full name *"      value={fullName}      onChange={setFullName} required />
+            <div className="grid grid-cols-2 gap-3">
+              <TextField label="Date of birth" type="date" value={dob} onChange={setDob} />
+              <TextField label="Nationality" value={nationality} onChange={setNationality} />
+            </div>
+            <TextField label="Passport / ID number" value={idNumber} onChange={setIdNumber} />
+
+            <div className="grid grid-cols-2 gap-3">
+              <TextField label="Phone" type="tel" value={phone} onChange={setPhone} />
+              <label className="block">
+                <span className="block text-xs text-slate-400 mb-1">Preferred contact</span>
+                <select
+                  value={contactMethod}
+                  onChange={e => setContactMethod(e.target.value as ContactMethod | '')}
+                  className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-2 text-sm text-slate-100"
+                >
+                  <option value="">—</option>
+                  <option value="line">LINE</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="phone">Phone</option>
+                  <option value="email">Email</option>
+                </select>
+              </label>
+            </div>
+            {contactMethod && (
+              <TextField label={`${contactMethod === 'email' ? 'Email' : 'ID / number'}`} value={contactId} onChange={setContactId} />
+            )}
+
+            <div className="border-t border-slate-700 pt-3 space-y-3">
+              <p className="text-xs text-slate-400 uppercase tracking-wider">Diving</p>
+              <div className="grid grid-cols-2 gap-3">
+                <TextField label="Cert agency" placeholder="PADI, SSI…" value={certAgency} onChange={setCertAgency} />
+                <TextField label="Cert level" placeholder="OW, AOW…" value={certLevel} onChange={setCertLevel} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <TextField
+                  label="Logged dives" type="number" min={0}
+                  value={loggedDives === 0 ? '' : String(loggedDives)}
+                  onChange={v => setLoggedDives(Number(v) || 0)}
+                />
+                <label className="flex items-end gap-2 text-sm text-slate-300 pb-2">
+                  <input type="checkbox" checked={nitroxCertified} onChange={e => setNitroxCertified(e.target.checked)} className="accent-sky-500" />
+                  Nitrox certified
+                </label>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-700 pt-3 space-y-3">
+              <p className="text-xs text-slate-400 uppercase tracking-wider">Emergency contact</p>
+              <div className="grid grid-cols-2 gap-3">
+                <TextField label="Name" value={emergencyName} onChange={setEmergencyName} />
+                <TextField label="Phone" type="tel" value={emergencyPhone} onChange={setEmergencyPhone} />
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {step === 3 && (
         <section className="space-y-4">
           <h2 className="text-lg font-bold text-slate-100">Extras</h2>
 
@@ -254,14 +381,17 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
                     <option value="provided">Provided by shop</option>
                   </select>
                   {gearMode === 'a-la-carte' && (
-                    <div className="grid grid-cols-2 gap-1">
-                      {GEAR_ITEMS.map(item => (
-                        <label key={item} className="flex items-center gap-1 text-xs text-slate-300">
-                          <input type="checkbox" checked={gearItems.includes(item)} onChange={() => toggleItem(item)} className="accent-sky-500" />
-                          {item} ({GEAR_ALACARTE_PRICES[item]})
-                        </label>
-                      ))}
-                    </div>
+                    <>
+                      <p className="text-xs text-slate-500">Check the items you need us to prepare for you:</p>
+                      <div className="grid grid-cols-2 gap-1">
+                        {GEAR_ITEMS.map(item => (
+                          <label key={item} className="flex items-center gap-1 text-xs text-slate-300">
+                            <input type="checkbox" checked={gearItems.includes(item)} onChange={() => toggleItem(item)} className="accent-sky-500" />
+                            {item} ({GEAR_ALACARTE_PRICES[item]})
+                          </label>
+                        ))}
+                      </div>
+                    </>
                   )}
                 </div>
               )}
@@ -271,8 +401,11 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
           {showRooms && rooms.length > 0 && (
             <div className="space-y-2">
               <p className="text-sm text-slate-300 font-semibold">Room</p>
+              <p className="text-xs text-slate-500">
+                Your base price already includes a place to sleep — upgrading is optional.
+              </p>
               <select value={roomId} onChange={e => setRoomId(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-100">
-                <option value="">— none —</option>
+                <option value="">— keep included room —</option>
                 {rooms.map(r => (
                   <option key={r._id} value={r._id}>
                     {r.display_name ?? r.title} {r.added_price != null && `(+${r.added_price.toLocaleString()})`}
@@ -280,7 +413,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
                 ))}
               </select>
               {roomId && (
-                <input value={roomNotes} onChange={e => setRoomNotes(e.target.value)} placeholder="Room notes" className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-100" />
+                <input value={roomNotes} onChange={e => setRoomNotes(e.target.value)} placeholder="Roommate preferences, etc." className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-100" />
               )}
             </div>
           )}
@@ -306,9 +439,12 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
           </label>
 
           {showNitroxAddon && (
-            <label className="flex items-center gap-2 text-sm text-slate-300">
-              <input type="checkbox" checked={addNitroxCourse} onChange={e => setAddNitroxCourse(e.target.checked)} className="accent-sky-500" />
-              Add Nitrox course (+{NITROX_COURSE_FEE.toLocaleString()})
+            <label className="flex gap-2 text-sm text-slate-300 items-start">
+              <input type="checkbox" checked={addNitroxCourse} onChange={e => setAddNitroxCourse(e.target.checked)} className="accent-sky-500 mt-1" />
+              <span className="flex-1">
+                <span className="block">Add Nitrox course (+{NITROX_COURSE_FEE.toLocaleString()})</span>
+                <span className="block text-xs text-slate-500">Get your Nitrox certification during this event.</span>
+              </span>
             </label>
           )}
 
@@ -317,16 +453,25 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
         </section>
       )}
 
-      {step === 3 && (
+      {step === 4 && (
         <section className="space-y-3">
           <h2 className="text-lg font-bold text-slate-100">Payment</h2>
-          <div className="space-y-1">
+          <div className="space-y-2">
             {(['bank_transfer', 'credit_card', 'cash'] as const).map(method => (
-              <label key={method} className="flex items-center gap-2 text-sm text-slate-300">
-                <input type="radio" name="payment" checked={payment === method} onChange={() => setPayment(method)} className="accent-sky-500" />
-                {method === 'bank_transfer' && 'Bank transfer'}
-                {method === 'credit_card' && 'Credit card (+5%)'}
-                {method === 'cash' && 'Cash on the day'}
+              <label key={method} className="flex gap-2 text-sm text-slate-300 items-start">
+                <input type="radio" name="payment" checked={payment === method} onChange={() => setPayment(method)} className="accent-sky-500 mt-1" />
+                <span className="flex-1">
+                  <span className="block">
+                    {method === 'bank_transfer' && 'Bank transfer'}
+                    {method === 'credit_card' && 'Credit card / PayPal (+5%)'}
+                    {method === 'cash' && 'Cash on the day'}
+                  </span>
+                  <span className="block text-xs text-slate-500">
+                    {method === 'bank_transfer' && 'We\'ll send you the bank account details.'}
+                    {method === 'credit_card' && 'A 5% processing fee applies. We\'ll email you a PayPal invoice.'}
+                    {method === 'cash' && 'We\'ll contact you to arrange a convenient time.'}
+                  </span>
+                </span>
               </label>
             ))}
           </div>
@@ -343,6 +488,14 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
               <Row label="Total" value={total} currency={event.currency} bold />
             </div>
           </div>
+
+          {!isEdit && (
+            <p className="text-xs text-amber-300 bg-amber-950/40 border border-amber-900/60 rounded p-2">
+              Please note: your reservation is not confirmed until the deposit
+              {event.deposit_amount != null && ` (${event.currency} ${event.deposit_amount.toLocaleString()})`} has been paid.
+            </p>
+          )}
+
           {err && <p className="text-rose-400 text-sm">{err}</p>}
         </section>
       )}
@@ -358,13 +511,18 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
         >
           ‹ Back
         </button>
-        {step < 3 ? (
-          <button onClick={() => setStep((step + 1) as Step)}
-            className="bg-sky-500 hover:bg-sky-600 text-white text-sm font-semibold py-2 px-4 rounded-lg">Next ›</button>
+        {step < 4 ? (
+          <button
+            onClick={() => setStep((step + 1) as Step)}
+            disabled={step === 2 && fullName.trim() === ''}
+            className="bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
+          >
+            Next ›
+          </button>
         ) : (
           <button onClick={submit} disabled={saving}
             className="bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg">
-            {saving ? 'Booking…' : 'Confirm booking'}
+            {saving ? '…' : isEdit ? 'Save changes' : 'Confirm booking'}
           </button>
         )}
       </footer>
@@ -378,5 +536,34 @@ function Row({ label, value, currency, bold = false }: { label: string; value: n
       <span>{label}</span>
       <span>{currency} {value.toLocaleString()}</span>
     </div>
+  )
+}
+
+// Small labeled input for the About-you step. `label` wraps the input so
+// getByLabelText / screen readers find the association without needing id.
+function TextField({
+  label, value, onChange, type = 'text', required, placeholder, min,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  type?: 'text' | 'email' | 'tel' | 'number' | 'date'
+  required?: boolean
+  placeholder?: string
+  min?: number
+}) {
+  return (
+    <label className="block">
+      <span className="block text-xs text-slate-400 mb-1">{label}</span>
+      <input
+        type={type}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        required={required}
+        placeholder={placeholder}
+        min={min}
+        className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
+      />
+    </label>
   )
 }

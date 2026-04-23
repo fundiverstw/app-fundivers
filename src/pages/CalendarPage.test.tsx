@@ -124,7 +124,7 @@ describe('CalendarPage', () => {
     await user.click(screen.getAllByText(ev.title)[0])
     await user.click(screen.getByRole('button', { name: /register/i }))
 
-    expect(await screen.findByText(/step 1 of 3/i)).toBeInTheDocument()
+    expect(await screen.findByText(/step 1 of 4/i)).toBeInTheDocument()
     // The event detail modal closes; only the register form is now visible.
     expect(screen.queryByRole('button', { name: /^register$/i })).not.toBeInTheDocument()
   })
