@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
 import { ProtectedRoute } from './components/layout/ProtectedRoute'
 import { AdminRoute } from './components/layout/AdminRoute'
 import { AppShell } from './components/layout/AppShell'
@@ -17,12 +18,36 @@ import { AdminGearMapPage } from './pages/admin/AdminGearMapPage'
 import { AdminUsersPage } from './pages/admin/AdminUsersPage'
 import { AdminDutyPage } from './pages/admin/AdminDutyPage'
 
+// Public registration flow — /register (pick an event) and /register/:type/:id
+// (deep-link from Wix calendar) both render RegisterPage. Outside ProtectedRoute
+// so cold visitors don't hit an auth wall; lazy-loaded so the cold path doesn't
+// pay for the full PWA bundle.
+const RegisterPage = lazy(() =>
+  import('./pages/RegisterPage').then(m => ({ default: m.RegisterPage }))
+)
+
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
+        <Route
+          path="/register"
+          element={
+            <Suspense fallback={<RegisterLoading />}>
+              <RegisterPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/register/:type/:id"
+          element={
+            <Suspense fallback={<RegisterLoading />}>
+              <RegisterPage />
+            </Suspense>
+          }
+        />
         <Route element={<ProtectedRoute />}>
           <Route element={<AppShell />}>
             <Route path="/dashboard" element={<DashboardPage />} />
@@ -46,5 +71,13 @@ export default function App() {
         <Route path="*" element={<Navigate to="/calendar" replace />} />
       </Routes>
     </BrowserRouter>
+  )
+}
+
+function RegisterLoading() {
+  return (
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
+    </div>
   )
 }
