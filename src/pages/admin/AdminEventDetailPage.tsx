@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
-import { fetchEventsForBookings } from '../../lib/events'
+import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
 import { AdminNotes } from '../../components/admin/AdminNotes'
 import { EventStaffSection } from '../../components/admin/EventStaffSection'
 import { RegisterForm } from '../../components/register/RegisterForm'
@@ -128,8 +128,7 @@ export function AdminEventDetailPage() {
         <h1 className="text-xl font-bold text-slate-100">{event?.title ?? '(event not found)'}</h1>
         {event && (
           <p className="text-sm text-slate-400 mt-1">
-            {format(new Date(event.start_time), 'EEEE, MMMM d · HH:mm')}
-            {event.end_time && ` → ${format(new Date(event.end_time), 'MMMM d')}`}
+            {formatEventSpan(event, { style: 'long' })}
             {' · '}
             <span className="capitalize">{event.type}</span>
             {event.price != null && ` · From ${event.currency} ${event.price.toLocaleString()}`}

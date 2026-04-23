@@ -1,5 +1,37 @@
+import { format, isSameDay, parseISO } from 'date-fns'
 import { supabase } from './supabase'
 import type { AppEvent, EOCourse, EODive, EOPrice } from '../types/database'
+
+/**
+ * Render an event's date span as a human string. Policy:
+ *   - Never show times; EO_* events are date-only even when the ISO has a
+ *     midnight component for timezone-conversion reasons.
+ *   - Single-day events show one date, not a "→ same date" range.
+ *   - `style` controls formality: 'long' (Saturday, May 1), 'short' (Sat,
+ *     May 1; default), 'compact' (May 1, no weekday).
+ */
+export function formatEventSpan(
+  event: Pick<AppEvent, 'start_time' | 'end_time'>,
+  opts: { style?: 'long' | 'short' | 'compact'; withYear?: boolean } = {},
+): string {
+  const style = opts.style ?? 'short'
+  const year = opts.withYear ? ' yyyy' : ''
+  const start = parseISO(event.start_time)
+  const end = event.end_time ? parseISO(event.end_time) : null
+  const singleDay = !end || isSameDay(start, end)
+  const startFmt = ({
+    long:    'EEEE, MMMM d',
+    short:   'EEE, MMM d',
+    compact: 'MMM d',
+  }[style]) + year
+  if (singleDay) return format(start, startFmt)
+  const endFmt = ({
+    long:    'MMMM d',
+    short:   'MMM d',
+    compact: 'MMM d',
+  }[style]) + year
+  return `${format(start, startFmt)} → ${format(end!, endFmt)}`
+}
 
 /**
  * Build an ISO timestamp from EO_* text columns. start_date is 'YYYY-MM-DD';

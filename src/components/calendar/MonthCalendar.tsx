@@ -4,6 +4,7 @@ import {
   addMonths, subMonths, startOfWeek, endOfWeek,
 } from 'date-fns'
 import { assignTracks, segmentsForDay, type CellSegment, type EventRange } from '../../lib/calendar-layout'
+import { formatEventSpan } from '../../lib/events'
 import type { AppEvent } from '../../types/database'
 
 // Shared by CalendarPage (diver) and AdminEventsPage (admin). The only
@@ -147,8 +148,7 @@ export function MonthCalendar({
                   {ev.featured && <span className="text-xs text-amber-400">★</span>}
                 </div>
                 <p className="text-xs text-slate-400 mt-1">
-                  {format(new Date(ev.start_time), 'EEE, MMM d · HH:mm')}
-                  {ev.end_time && ` → ${format(new Date(ev.end_time), 'MMM d')}`}
+                  {formatEventSpan(ev)}
                 </p>
               </div>
               <div className="text-right shrink-0 space-y-0.5">

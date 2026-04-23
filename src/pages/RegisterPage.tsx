@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { format, parseISO } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { fetchEventsForBookings, fetchEventsInRange } from '../lib/events'
+import { fetchEventsForBookings, fetchEventsInRange, formatEventSpan } from '../lib/events'
 import { RegisterFormBody } from '../components/register/RegisterForm'
 import type { AppEvent, Booking } from '../types/database'
 
@@ -156,8 +155,7 @@ function EventHeader({ event }: { event: AppEvent }) {
       <p className="text-xs uppercase tracking-[0.25em] text-cyan-300/70">Register for</p>
       <h1 className="text-xl font-bold text-slate-100">{event.title}</h1>
       <p className="text-sm text-slate-400">
-        {format(parseISO(event.start_time), 'EEEE, MMMM d · HH:mm')}
-        {event.end_time && ` → ${format(parseISO(event.end_time), 'MMMM d')}`}
+        {formatEventSpan(event, { style: 'long' })}
       </p>
       {event.price != null && (
         <p className="text-sm text-slate-300">From {event.currency} {event.price.toLocaleString()}</p>
@@ -174,7 +172,7 @@ function LockedConfirmation({ event, booking, alreadyExisting = false }: { event
         {alreadyExisting ? "You're already registered" : 'Registration submitted'}
       </h1>
       <p className="text-sm text-slate-400">
-        {event.title} · {format(parseISO(event.start_time), 'MMM d')}
+        {event.title} · {formatEventSpan(event, { style: 'compact' })}
       </p>
       <div className="bg-slate-900/50 rounded-lg p-3 text-sm text-slate-300 text-left">
         <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Status</p>
@@ -250,8 +248,7 @@ function EventPickerStep() {
                       {ev.featured && <span className="text-xs text-amber-400">★</span>}
                     </div>
                     <p className="text-xs text-slate-400 mt-1">
-                      {format(parseISO(ev.start_time), 'EEE, MMM d · HH:mm')}
-                      {ev.end_time && ` → ${format(parseISO(ev.end_time), 'MMM d')}`}
+                      {formatEventSpan(ev)}
                     </p>
                   </div>
                   {ev.price != null && (
