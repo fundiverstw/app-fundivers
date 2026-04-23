@@ -29,6 +29,7 @@ import {
 export interface Env {
   SUPABASE_URL: string
   SUPABASE_SERVICE_ROLE_KEY: string
+  SUPABASE_ANON_KEY?: string
   VAPID_PUBLIC_KEY: string
   VAPID_PRIVATE_KEY: string
   VAPID_SUBJECT: string
@@ -44,16 +45,108 @@ export default {
 
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url)
-    if (url.pathname !== '/run') return new Response('not found', { status: 404 })
-
-    const auth = req.headers.get('authorization') ?? ''
-    const expected = `Bearer ${env.ADMIN_TRIGGER_SECRET ?? ''}`
-    if (!env.ADMIN_TRIGGER_SECRET || auth !== expected) {
-      return new Response('unauthorized', { status: 401 })
+    if (url.pathname === '/run') {
+      const auth = req.headers.get('authorization') ?? ''
+      const expected = `Bearer ${env.ADMIN_TRIGGER_SECRET ?? ''}`
+      if (!env.ADMIN_TRIGGER_SECRET || auth !== expected) {
+        return new Response('unauthorized', { status: 401 })
+      }
+      const result = await runDailyReminders(env)
+      return Response.json(result)
     }
-    const result = await runDailyReminders(env)
-    return Response.json(result)
+    if (url.pathname === '/notify-duty' && req.method === 'POST') {
+      return handleNotifyDuty(req, env)
+    }
+    return new Response('not found', { status: 404 })
   },
+}
+
+// Fires a push to the assignee the moment a duty row is inserted — out-of-band
+// from the daily reminder cron so the admin sees it immediately, not 24h later.
+//
+// Auth model: the caller passes their user JWT. We do an admin gate via a
+// user-scoped Supabase client (RLS on duties enforces admin-only), then use
+// the service role client to look up push subscriptions and send.
+export async function handleNotifyDuty(req: Request, env: Env): Promise<Response> {
+  const auth = req.headers.get('authorization') ?? ''
+  if (!auth.startsWith('Bearer ')) return new Response('unauthorized', { status: 401 })
+
+  let body: { duty_id?: string }
+  try { body = await req.json() } catch { return new Response('bad request', { status: 400 }) }
+  const dutyId = body.duty_id
+  if (!dutyId) return new Response('missing duty_id', { status: 400 })
+
+  const anonKey = (env as Env & { SUPABASE_ANON_KEY?: string }).SUPABASE_ANON_KEY
+  if (!anonKey) return new Response('SUPABASE_ANON_KEY not configured', { status: 500 })
+
+  // RLS on duties requires admin role; if the caller isn't admin this read
+  // returns no rows and we bail.
+  const userClient = createClient<Database>(env.SUPABASE_URL, anonKey, {
+    global: { headers: { Authorization: auth } },
+    auth: { persistSession: false },
+  })
+  const { data: duty } = await userClient
+    .from('duties')
+    .select('id, assignee_id, role, start_date, end_date, eo_dive_id, eo_course_id')
+    .eq('id', dutyId)
+    .maybeSingle()
+  if (!duty) return new Response('not found', { status: 404 })
+
+  const service = createClient<Database>(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false },
+  })
+
+  // Resolve event title (best-effort; no event = standalone duty, push still goes out).
+  let eventTitle: string | null = null
+  if (duty.eo_dive_id) {
+    const { data } = await service.from('EO_dives').select('dive_title, title').eq('_id', duty.eo_dive_id).maybeSingle()
+    eventTitle = data?.dive_title || data?.title || null
+  } else if (duty.eo_course_id) {
+    const { data } = await service.from('EO_courses').select('course_title, title').eq('_id', duty.eo_course_id).maybeSingle()
+    eventTitle = data?.course_title || data?.title || null
+  }
+
+  const { data: subs } = await service
+    .from('push_subscriptions')
+    .select('endpoint, p256dh, auth')
+    .eq('user_id', duty.assignee_id)
+  if (!subs?.length) return Response.json({ sent: 0, skipped: 1, reason: 'no-subscription' })
+
+  webpush.setVapidDetails(env.VAPID_SUBJECT, env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY)
+  const dateSpan = duty.end_date && duty.end_date !== duty.start_date
+    ? `${duty.start_date} → ${duty.end_date}`
+    : duty.start_date
+  const titlePart = eventTitle ? ` for ${eventTitle}` : ''
+  const payload = JSON.stringify({
+    title: 'New duty assigned',
+    body:  `${capitalize(duty.role)}${titlePart} · ${dateSpan}`,
+    tag:   `duty:${duty.id}`,
+    url:   '/admin/duty',
+  })
+
+  let sent = 0
+  let skipped = 0
+  for (const s of subs) {
+    try {
+      await webpush.sendNotification(
+        { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+        payload,
+        { TTL: 60 * 60 * 24 }
+      )
+      sent++
+    } catch (err: unknown) {
+      const status = (err as { statusCode?: number })?.statusCode
+      if (status === 404 || status === 410) {
+        await service.from('push_subscriptions').delete().eq('endpoint', s.endpoint)
+      }
+      skipped++
+    }
+  }
+  return Response.json({ sent, skipped })
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 export async function runDailyReminders(env: Env): Promise<{ sent: number; skipped: number }> {

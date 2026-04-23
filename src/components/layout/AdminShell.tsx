@@ -5,6 +5,7 @@ const adminNav = [
   { to: '/admin',        label: 'Dashboard', icon: '📊' },
   { to: '/admin/events', label: 'Events',    icon: '🗓️' },
   { to: '/admin/users',  label: 'Divers',    icon: '🤿' },
+  { to: '/admin/duty',   label: 'Duty',      icon: '🛟' },
 ]
 
 export function AdminShell() {
