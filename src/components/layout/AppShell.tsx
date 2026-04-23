@@ -3,8 +3,9 @@ import { useAuth } from '../../hooks/useAuth'
 import { usePWAInstall } from '../../hooks/usePWAInstall'
 
 const navItems = [
+  { to: '/dashboard', label: 'Home', icon: '🫧' },
   { to: '/calendar', label: 'Calendar', icon: '📅' },
-  { to: '/bookings', label: 'My Bookings', icon: '🤿' },
+  { to: '/bookings', label: 'Bookings', icon: '🤿' },
   { to: '/payments', label: 'Payments', icon: '💳' },
   { to: '/profile', label: 'Profile', icon: '👤' },
 ]
