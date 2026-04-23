@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
 import { AdminNotes } from '../../components/admin/AdminNotes'

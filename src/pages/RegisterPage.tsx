@@ -270,6 +270,7 @@ function AuthGate({ event }: { event: AppEvent }) {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [agreed, setAgreed] = useState(false)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const [signupSent, setSignupSent] = useState(false)
@@ -281,11 +282,17 @@ function AuthGate({ event }: { event: AppEvent }) {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) setErr(error.message)
     } else {
+      if (!agreed) { setErr('Please agree to the Terms of Use to continue.'); setBusy(false); return }
       // Land the confirmation link back on this same register URL so the user
-      // can finish booking after confirming their email in one tap.
+      // can finish booking after confirming their email in one tap. The
+      // agreement timestamp rides on raw_user_meta_data → handle_new_user
+      // trigger copies it into profiles.agreed_to_terms_at.
       const { error } = await supabase.auth.signUp({
         email, password,
-        options: { emailRedirectTo: window.location.href },
+        options: {
+          emailRedirectTo: window.location.href,
+          data: { agreed_to_terms_at: new Date().toISOString() },
+        },
       })
       if (error) setErr(error.message)
       else setSignupSent(true)
@@ -349,6 +356,15 @@ function AuthGate({ event }: { event: AppEvent }) {
               className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
             />
           </label>
+          {mode === 'signup' && (
+            <label className="flex items-start gap-2 text-xs text-slate-300">
+              <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} className="accent-sky-500 mt-0.5" />
+              <span>
+                I agree to the{' '}
+                <a href="/terms" target="_blank" rel="noreferrer" className="text-sky-400 hover:underline">Terms of Use & Privacy</a>.
+              </span>
+            </label>
+          )}
           {err && <p className="text-rose-400 text-sm">{err}</p>}
           <button
             type="submit" disabled={busy}
