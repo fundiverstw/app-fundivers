@@ -14,6 +14,7 @@ import { AdminEventsPage } from './pages/admin/AdminEventsPage'
 import { AdminEventDetailPage } from './pages/admin/AdminEventDetailPage'
 import { AdminGearMapPage } from './pages/admin/AdminGearMapPage'
 import { AdminUsersPage } from './pages/admin/AdminUsersPage'
+import { AdminDutyPage } from './pages/admin/AdminDutyPage'
 
 export default function App() {
   return (
@@ -35,6 +36,7 @@ export default function App() {
               <Route path="/admin/events/:type/:id" element={<AdminEventDetailPage />} />
               <Route path="/admin/events/:type/:id/gear-map" element={<AdminGearMapPage />} />
               <Route path="/admin/users" element={<AdminUsersPage />} />
+              <Route path="/admin/duty" element={<AdminDutyPage />} />
             </Route>
           </Route>
         </Route>

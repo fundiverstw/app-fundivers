@@ -19,10 +19,13 @@ vi.mock('../../lib/events', () => ({
 }))
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => useAuthMock() }))
 
-// The AdminNotes component does its own supabase reads; stub it out since the
-// test is only about the registrant cards.
+// The AdminNotes + EventStaffSection components do their own supabase reads;
+// stub them out since this test is only about the registrant cards.
 vi.mock('../../components/admin/AdminNotes', () => ({
   AdminNotes: () => null,
+}))
+vi.mock('../../components/admin/EventStaffSection', () => ({
+  EventStaffSection: () => null,
 }))
 
 function renderAt(path: string) {

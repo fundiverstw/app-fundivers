@@ -272,6 +272,44 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['EO_courses']['Insert']>
         Relationships: []
       }
+      duties: {
+        Row: {
+          id: string
+          created_at: string
+          created_by: string | null
+          assignee_id: string
+          role: 'instructor' | 'guide' | 'support'
+          start_date: string
+          end_date: string | null
+          eo_dive_id: string | null
+          eo_course_id: string | null
+          notes: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          created_by?: string | null
+          assignee_id: string
+          role: 'instructor' | 'guide' | 'support'
+          start_date: string
+          end_date?: string | null
+          eo_dive_id?: string | null
+          eo_course_id?: string | null
+          notes?: string | null
+        }
+        Update: {
+          id?: string
+          created_by?: string | null
+          assignee_id?: string
+          role?: 'instructor' | 'guide' | 'support'
+          start_date?: string
+          end_date?: string | null
+          eo_dive_id?: string | null
+          eo_course_id?: string | null
+          notes?: string | null
+        }
+        Relationships: []
+      }
       admin_notes: {
         Row: {
           id: string
@@ -435,6 +473,9 @@ export type EOAddon = Database['public']['Tables']['Other_Addons']['Row']
 export type AdminNote = Database['public']['Tables']['admin_notes']['Row']
 export const NOTE_TAGS = ['urgent','payment','gear','logistics','cert','medical','note','general'] as const
 export type NoteTag = typeof NOTE_TAGS[number]
+export type Duty = Database['public']['Tables']['duties']['Row']
+export const DUTY_ROLES = ['instructor', 'guide', 'support'] as const
+export type DutyRole = typeof DUTY_ROLES[number]
 
 /** Normalized event shape used across Calendar + Bookings UI. */
 export interface AppEvent {
