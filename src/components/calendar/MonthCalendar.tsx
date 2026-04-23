@@ -12,9 +12,17 @@ import type { AppEvent } from '../../types/database'
 // event, and what gets rendered in the "this month" list items — both
 // expressed as props here so the grid + filter legend stay one copy.
 
+// Base vs. hovered fills are split so we can cross-highlight every segment
+// of a multi-day event when any one is hovered (see hoveredEventId state
+// on MonthCalendar). The hover: variant is intentionally NOT on the base
+// class — per-segment self-hover would only light up one day of a bar.
 const TYPE_BAR: Record<AppEvent['type'], string> = {
-  dive:   'bg-sky-500 hover:bg-sky-400 text-white',
-  course: 'bg-emerald-500 hover:bg-emerald-400 text-white',
+  dive:   'bg-sky-500 text-white',
+  course: 'bg-emerald-500 text-white',
+}
+const TYPE_BAR_HOVER: Record<AppEvent['type'], string> = {
+  dive:   'bg-sky-400 text-white',
+  course: 'bg-emerald-400 text-white',
 }
 const TYPE_DOT: Record<AppEvent['type'], string> = {
   dive:   'bg-sky-500',
@@ -59,6 +67,10 @@ export function MonthCalendar({
 }: MonthCalendarProps) {
   const [diveShown, setDiveShown] = useState(true)
   const [hiddenCourses, setHiddenCourses] = useState<Set<string>>(new Set())
+  // When any segment of a multi-day event is hovered, the parent tracks the
+  // event id so every segment of that event can cross-highlight. Cleared on
+  // mouse leave.
+  const [hoveredEventId, setHoveredEventId] = useState<string | null>(null)
 
   const days = eachDayOfInterval({ start: startOfMonth(month), end: endOfMonth(month) })
 
@@ -125,6 +137,8 @@ export function MonthCalendar({
         ranges={ranges}
         trackRows={cellTrackRows}
         onPickEvent={onPickEvent}
+        hoveredEventId={hoveredEventId}
+        onHoverEvent={setHoveredEventId}
       />
 
       <div className="space-y-2">
@@ -171,9 +185,11 @@ interface MonthGridProps {
   ranges: EventRange[]
   trackRows: number
   onPickEvent: (ev: AppEvent) => void
+  hoveredEventId: string | null
+  onHoverEvent: (id: string | null) => void
 }
 
-function MonthGrid({ month, days, ranges, trackRows, onPickEvent }: MonthGridProps) {
+function MonthGrid({ month, days, ranges, trackRows, onPickEvent, hoveredEventId, onHoverEvent }: MonthGridProps) {
   const leading = days[0].getDay()
   const cellMinHeight = 22 + Math.max(1, trackRows) * (TRACK_HEIGHT + TRACK_GAP) + 6
 
@@ -198,6 +214,8 @@ function MonthGrid({ month, days, ranges, trackRows, onPickEvent }: MonthGridPro
           trackRows={trackRows}
           minHeight={cellMinHeight}
           onPickEvent={onPickEvent}
+          hoveredEventId={hoveredEventId}
+          onHoverEvent={onHoverEvent}
         />
       ))}
     </div>
@@ -205,7 +223,7 @@ function MonthGrid({ month, days, ranges, trackRows, onPickEvent }: MonthGridPro
 }
 
 function DayCell({
-  day, ranges, month, trackRows, minHeight, onPickEvent,
+  day, ranges, month, trackRows, minHeight, onPickEvent, hoveredEventId, onHoverEvent,
 }: {
   day: Date
   ranges: EventRange[]
@@ -213,6 +231,8 @@ function DayCell({
   trackRows: number
   minHeight: number
   onPickEvent: (ev: AppEvent) => void
+  hoveredEventId: string | null
+  onHoverEvent: (id: string | null) => void
 }) {
   const weekStart = startOfWeek(day, { weekStartsOn: 0 })
   const weekEnd = endOfWeek(day, { weekStartsOn: 0 })
@@ -245,6 +265,8 @@ function DayCell({
               seg={seg}
               track={track}
               onClick={() => onPickEvent(seg.event)}
+              hovered={hoveredEventId === seg.event.id}
+              onHoverEvent={onHoverEvent}
             />
           ))}
       </div>
@@ -255,8 +277,14 @@ function DayCell({
   )
 }
 
-function EventBar({ seg, track, onClick }: { seg: CellSegment; track: number; onClick: () => void }) {
-  const baseClass = TYPE_BAR[seg.event.type]
+function EventBar({ seg, track, onClick, hovered, onHoverEvent }: {
+  seg: CellSegment
+  track: number
+  onClick: () => void
+  hovered: boolean
+  onHoverEvent: (id: string | null) => void
+}) {
+  const baseClass = hovered ? TYPE_BAR_HOVER[seg.event.type] : TYPE_BAR[seg.event.type]
   const leftInset = seg.isStart ? 2 : 0
   const rightInset = seg.isEnd ? 2 : 0
   const leftRadius = seg.isStart ? 'rounded-l-sm' : ''
@@ -278,8 +306,10 @@ function EventBar({ seg, track, onClick }: { seg: CellSegment; track: number; on
     <button
       type="button"
       onClick={onClick}
+      onMouseEnter={() => onHoverEvent(seg.event.id)}
+      onMouseLeave={() => onHoverEvent(null)}
       title={seg.event.title}
-      className={`absolute text-[10px] font-semibold truncate text-left px-1 ${baseClass} ${leftRadius} ${rightRadius}`}
+      className={`absolute text-[10px] font-semibold truncate text-left px-1 transition-colors ${baseClass} ${leftRadius} ${rightRadius}`}
       style={{
         top: track * (TRACK_HEIGHT + TRACK_GAP),
         height: TRACK_HEIGHT,
