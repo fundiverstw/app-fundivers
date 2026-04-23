@@ -4,6 +4,7 @@ import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { fetchEventsForBookings } from '../../lib/events'
 import { AdminNotes } from '../../components/admin/AdminNotes'
+import { EventStaffSection } from '../../components/admin/EventStaffSection'
 import { shoeAsJp } from '../../lib/shoe-size'
 import type { AppEvent, Booking, BookingDetails, Payment, Profile } from '../../types/database'
 
@@ -145,6 +146,14 @@ export function AdminEventDetailPage() {
               Gear map →
             </Link>
           </div>
+          {event && (
+            <EventStaffSection
+              eventType={type}
+              eventId={id}
+              eventStartDate={event.start_time}
+              nonAdminDiverCount={registrants.length}
+            />
+          )}
           <AdminNotes target={{ kind: type, id }} title="Memos" />
         </>
       )}

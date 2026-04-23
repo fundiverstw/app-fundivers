@@ -1,0 +1,174 @@
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { format, parseISO } from 'date-fns'
+import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../hooks/useAuth'
+import { fetchEventsInRange } from '../../lib/events'
+import type { AppEvent, Duty, Profile } from '../../types/database'
+
+type AdminMap = Map<string, Profile>
+
+interface Enriched {
+  duty: Duty
+  assignee: Profile | null
+  event: AppEvent | null
+}
+
+// The Duty tab answers three questions at a glance:
+//   1. What am I on duty for?
+//   2. Which events have nobody assigned yet?
+//   3. What's on the roster overall?
+export function AdminDutyPage() {
+  const { user } = useAuth()
+  const [duties, setDuties] = useState<Enriched[]>([])
+  const [unstaffed, setUnstaffed] = useState<AppEvent[]>([])
+  const [admins, setAdmins] = useState<AdminMap>(new Map())
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      // Load duties, admins, and the visible slice of events in parallel.
+      // Range: 1 month back (to show recently-ended duties in "all") through
+      // 3 months ahead (enough for course batches).
+      const today = new Date()
+      const start = new Date(today); start.setMonth(start.getMonth() - 1)
+      const end = new Date(today); end.setMonth(end.getMonth() + 3)
+      const isoDate = (d: Date) => d.toISOString().slice(0, 10)
+
+      const [dutiesRes, adminsRes, events] = await Promise.all([
+        supabase.from('duties').select('*').order('start_date', { ascending: true }),
+        supabase.from('profiles').select('*').eq('role', 'admin'),
+        fetchEventsInRange(isoDate(start), isoDate(end)),
+      ])
+      if (cancelled) return
+
+      const adminMap = new Map((adminsRes.data ?? []).map(p => [p.id, p]))
+      setAdmins(adminMap)
+
+      const eventIndex = new Map(events.map(e => [e.id, e]))
+      const enriched: Enriched[] = (dutiesRes.data ?? []).map(d => ({
+        duty: d,
+        assignee: adminMap.get(d.assignee_id) ?? null,
+        event: (d.eo_dive_id && eventIndex.get(d.eo_dive_id))
+          || (d.eo_course_id && eventIndex.get(d.eo_course_id))
+          || null,
+      }))
+      setDuties(enriched)
+
+      // Unstaffed = events in range with no duty pointing at them.
+      const coveredEventIds = new Set(
+        (dutiesRes.data ?? []).flatMap(d => [d.eo_dive_id, d.eo_course_id].filter((x): x is string => !!x))
+      )
+      setUnstaffed(events.filter(e => !coveredEventIds.has(e.id)))
+
+      setLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  if (loading) {
+    return <div className="flex justify-center pt-12"><div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" /></div>
+  }
+
+  const today = format(new Date(), 'yyyy-MM-dd')
+  const upcoming = duties.filter(e => (e.duty.end_date ?? e.duty.start_date) >= today)
+  const mine = user ? upcoming.filter(e => e.duty.assignee_id === user.id) : []
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      <header className="space-y-1">
+        <h1 className="text-xl font-bold text-slate-100">Duty roster</h1>
+        <p className="text-xs text-slate-400">
+          {admins.size} admin{admins.size === 1 ? '' : 's'} · {upcoming.length} upcoming
+          {mine.length > 0 && <span className="text-amber-400"> · {mine.length} for you</span>}
+        </p>
+      </header>
+
+      {mine.length > 0 && (
+        <Section title="Your upcoming duties" subtitle="You are on duty for these.">
+          {mine.map(e => <DutyRow key={e.duty.id} enriched={e} highlight />)}
+        </Section>
+      )}
+
+      {unstaffed.length > 0 && (
+        <Section
+          title="Unstaffed events"
+          subtitle="Every event should have at least one admin assigned. Click an event to assign staff."
+        >
+          {unstaffed.map(ev => (
+            <Link
+              key={ev.id}
+              to={`/admin/events/${ev.type}/${ev.id}`}
+              className="block bg-slate-800 hover:bg-slate-700/50 rounded-xl p-3 border border-rose-900/40 transition-colors"
+            >
+              <p className="text-sm font-medium text-slate-100">{ev.title}</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {format(parseISO(ev.start_time), 'EEE, MMM d · HH:mm')}
+                {' · '}
+                <span className="capitalize">{ev.type}</span>
+              </p>
+            </Link>
+          ))}
+        </Section>
+      )}
+
+      <Section title="All upcoming duties" subtitle="Across the whole team.">
+        {upcoming.length === 0
+          ? <p className="text-slate-500 text-sm">No duties assigned.</p>
+          : upcoming.map(e => <DutyRow key={e.duty.id} enriched={e} />)
+        }
+      </Section>
+    </div>
+  )
+}
+
+function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-2">
+      <div>
+        <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">{title}</h2>
+        {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
+      </div>
+      <div className="space-y-2">{children}</div>
+    </section>
+  )
+}
+
+const ROLE_STYLES: Record<string, string> = {
+  instructor: 'bg-sky-900/60 text-sky-200',
+  guide:      'bg-emerald-900/60 text-emerald-200',
+  support:    'bg-slate-700 text-slate-200',
+}
+
+function DutyRow({ enriched, highlight }: { enriched: Enriched; highlight?: boolean }) {
+  const { duty, assignee, event } = enriched
+  const dateSpan = duty.end_date && duty.end_date !== duty.start_date
+    ? `${format(parseISO(duty.start_date), 'MMM d')} → ${format(parseISO(duty.end_date), 'MMM d')}`
+    : format(parseISO(duty.start_date), 'EEE, MMM d')
+
+  return (
+    <div className={`bg-slate-800 rounded-xl p-3 space-y-1 ${highlight ? 'border border-amber-700/60' : ''}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-slate-100 truncate">
+            {assignee?.display_name || assignee?.full_name || '(unknown admin)'}
+          </p>
+          <p className="text-xs text-slate-400">{dateSpan}</p>
+        </div>
+        <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize shrink-0 ${ROLE_STYLES[duty.role] ?? ROLE_STYLES.support}`}>
+          {duty.role}
+        </span>
+      </div>
+      {event
+        ? <Link to={`/admin/events/${event.type}/${event.id}`} className="block text-xs text-sky-300 hover:text-sky-100 truncate">
+            {event.title}
+          </Link>
+        : (duty.eo_dive_id || duty.eo_course_id)
+          ? <p className="text-xs text-slate-500">(event outside visible range)</p>
+          : <p className="text-xs text-slate-500">Standalone duty</p>
+      }
+      {duty.notes && <p className="text-xs text-slate-400 bg-slate-900/40 rounded p-2 mt-1">📝 {duty.notes}</p>}
+    </div>
+  )
+}
