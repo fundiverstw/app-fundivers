@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { fetchEventsForBookings } from '../lib/events'
+import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
 import type { AppEvent, Booking, Payment } from '../types/database'
 
 type Row = Booking & {
@@ -184,7 +184,7 @@ function Card({
           </p>
           {row.event && (
             <p className="text-xs text-slate-400 mt-0.5">
-              {format(new Date(row.event.start_time), 'EEE, MMM d yyyy · HH:mm')}
+              {formatEventSpan(row.event, { withYear: true })}
               {' · '}
               {row.event.type === 'dive' ? 'Dive' : 'Course'}
             </p>

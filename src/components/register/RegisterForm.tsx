@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
+import { formatEventSpan } from '../../lib/events'
 import { GEAR_ITEMS } from '../../lib/gear'
 import type { AppEvent, Booking, BookingDetails, EOAddon, EORoom, Profile } from '../../types/database'
 
@@ -277,8 +277,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
         <section className="space-y-3">
           <h2 className="text-lg font-bold text-slate-100">{event.title}</h2>
           <p className="text-sm text-slate-400">
-            {format(new Date(event.start_time), 'EEEE, MMMM d · HH:mm')}
-            {event.end_time && ` → ${format(new Date(event.end_time), 'MMMM d')}`}
+            {formatEventSpan(event, { style: 'long' })}
           </p>
           {event.price != null && (
             <p className="text-sm text-slate-300">From {event.currency} {event.price.toLocaleString()}</p>

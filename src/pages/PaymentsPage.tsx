@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { fetchEventsForBookings } from '../lib/events'
+import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
 import type { AppEvent, Booking, Payment } from '../types/database'
 
 interface BookingLine {
@@ -172,7 +172,7 @@ function LineCard({
         <div className="flex-1 min-w-0">
           <p className="font-medium text-slate-100 text-sm">{label}</p>
           {event && (
-            <p className="text-xs text-slate-400 mt-0.5">{format(new Date(event.start_time), 'EEE, MMM d yyyy · HH:mm')}</p>
+            <p className="text-xs text-slate-400 mt-0.5">{formatEventSpan(event, { withYear: true })}</p>
           )}
           <p className={`text-xs capitalize mt-0.5 font-medium ${STATUS_STYLES[booking.status]}`}>{booking.status}</p>
           {refundRequested && (

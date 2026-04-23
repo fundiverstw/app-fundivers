@@ -23,10 +23,14 @@ vi.mock('../lib/supabase', () => ({
     },
   },
 }))
-vi.mock('../lib/events', () => ({
-  fetchEventsForBookings: (...a: unknown[]) => fetchEventsForBookings(...a),
-  fetchEventsInRange: (...a: unknown[]) => fetchEventsInRange(...a),
-}))
+vi.mock('../lib/events', async () => {
+  const actual = await vi.importActual<typeof import('../lib/events')>('../lib/events')
+  return {
+    ...actual,
+    fetchEventsForBookings: (...a: unknown[]) => fetchEventsForBookings(...a),
+    fetchEventsInRange: (...a: unknown[]) => fetchEventsInRange(...a),
+  }
+})
 vi.mock('../hooks/useAuth', () => ({ useAuth: () => useAuthMock() }))
 // Register form body is covered by its own tests; stub it here so this test
 // stays focused on the page-level phase transitions (event / auth / locked).

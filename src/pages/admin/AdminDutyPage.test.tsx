@@ -13,9 +13,13 @@ const { from, useAuthMock, fetchEventsInRange } = vi.hoisted(() => ({
 vi.mock('../../lib/supabase', () => ({
   supabase: { from: (...a: unknown[]) => from(...a) },
 }))
-vi.mock('../../lib/events', () => ({
-  fetchEventsInRange: (...a: unknown[]) => fetchEventsInRange(...a),
-}))
+vi.mock('../../lib/events', async () => {
+  const actual = await vi.importActual<typeof import('../../lib/events')>('../../lib/events')
+  return {
+    ...actual,
+    fetchEventsInRange: (...a: unknown[]) => fetchEventsInRange(...a),
+  }
+})
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => useAuthMock() }))
 
 beforeEach(() => {
