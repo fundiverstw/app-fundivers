@@ -56,11 +56,14 @@ export function AdminDutyPage() {
       }))
       setDuties(enriched)
 
-      // Unstaffed = events in range with no duty pointing at them.
+      // Unstaffed = upcoming events (today or later) with no duty pointing at them.
       const coveredEventIds = new Set(
         (dutiesRes.data ?? []).flatMap(d => [d.eo_dive_id, d.eo_course_id].filter((x): x is string => !!x))
       )
-      setUnstaffed(events.filter(e => !coveredEventIds.has(e.id)))
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+      setUnstaffed(events.filter(e =>
+        !coveredEventIds.has(e.id) && new Date(e.start_time) >= todayStart
+      ))
 
       setLoading(false)
     })()

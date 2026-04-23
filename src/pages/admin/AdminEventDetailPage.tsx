@@ -151,6 +151,7 @@ export function AdminEventDetailPage() {
               eventType={type}
               eventId={id}
               eventStartDate={event.start_time}
+              eventEndDate={event.end_time}
               nonAdminDiverCount={registrants.length}
             />
           )}
