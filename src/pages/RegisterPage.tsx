@@ -1,0 +1,368 @@
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { format, parseISO } from 'date-fns'
+import { supabase } from '../lib/supabase'
+import { useAuth } from '../hooks/useAuth'
+import { fetchEventsForBookings, fetchEventsInRange } from '../lib/events'
+import { RegisterFormBody } from '../components/register/RegisterForm'
+import type { AppEvent, Booking } from '../types/database'
+
+// Public standalone registration page. Two entry paths:
+//   /register                 → event picker (Wix home link, direct URL)
+//   /register/:type/:id       → form pre-filled with that event (Wix calendar
+//                                deep-link, in-app event click)
+//
+// Both render this component. When no event is in the URL we show the picker
+// framed as step 1 of the form; clicking an event navigates to the pre-filled
+// variant rather than setting local state, so the URL stays bookmarkable.
+//
+// No AppShell chrome — feels like a marketing-funnel landing page for divers
+// arriving from fundiverstw.com, not an app screen.
+
+type Phase = 'loading' | 'event-picker' | 'event-missing' | 'auth-gate' | 'form' | 'already-booked' | 'just-booked'
+
+export function RegisterPage() {
+  const { type, id } = useParams<{ type: 'dive' | 'course'; id: string }>()
+  const navigate = useNavigate()
+  const { user, profile, loading: authLoading } = useAuth()
+
+  const [event, setEvent] = useState<AppEvent | null>(null)
+  const [existing, setExisting] = useState<Booking | null>(null)
+  const [justBooked, setJustBooked] = useState<Booking | null>(null)
+  const [dataLoading, setDataLoading] = useState(true)
+
+  // Only fetch the specific event when :type/:id are in the URL. For the bare
+  // /register path we don't fetch one event; the picker fetches a list.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setDataLoading(true)
+
+      if (!type || !id) {
+        setEvent(null)
+        setExisting(null)
+        setDataLoading(false)
+        return
+      }
+
+      const eventMap = await fetchEventsForBookings(
+        type === 'dive'   ? [id] : [],
+        type === 'course' ? [id] : [],
+      )
+      if (cancelled) return
+      setEvent(eventMap.get(id) ?? null)
+
+      if (user) {
+        const col = type === 'dive' ? 'eo_dive_id' : 'eo_course_id'
+        const { data } = await supabase
+          .from('bookings')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq(col, id)
+          .neq('status', 'cancelled')
+          .maybeSingle()
+        if (!cancelled) setExisting(data)
+      } else {
+        setExisting(null)
+      }
+
+      setDataLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [type, id, user])
+
+  const phase: Phase =
+    authLoading || dataLoading        ? 'loading'
+    : !type || !id                    ? 'event-picker'
+    : !event                          ? 'event-missing'
+    : justBooked                      ? 'just-booked'
+    : existing                        ? 'already-booked'
+    : !user                           ? 'auth-gate'
+    :                                   'form'
+
+  return (
+    <div className="min-h-screen bg-slate-900 text-slate-100">
+      <header className="border-b border-slate-800 px-4 py-3">
+        <a href="https://fundiverstw.com" className="text-sky-400 font-bold text-lg">FunDivers TW</a>
+      </header>
+
+      <main className="max-w-lg mx-auto p-4 space-y-5">
+        {phase === 'loading' && <Spinner />}
+
+        {phase === 'event-picker' && <EventPickerStep />}
+
+        {phase === 'event-missing' && (
+          <EmptyState
+            title="Event not found"
+            body="That event isn't available anymore. Pick another from the list."
+            action={{ label: 'Back to events', href: '/register' }}
+          />
+        )}
+
+        {phase === 'just-booked' && event && justBooked && (
+          <LockedConfirmation event={event} booking={justBooked} />
+        )}
+
+        {phase === 'already-booked' && event && existing && (
+          <LockedConfirmation event={event} booking={existing} alreadyExisting />
+        )}
+
+        {phase === 'auth-gate' && event && <AuthGate event={event} />}
+
+        {phase === 'form' && event && user && (
+          <>
+            <EventHeader event={event} />
+            <div className="bg-slate-800 rounded-xl p-5">
+              <RegisterFormBody
+                event={event}
+                profile={profile}
+                userId={user.id}
+                onSubmitSuccess={b => setJustBooked(b as Booking)}
+                onBackBeforeStepOne={() => navigate('/register')}
+              />
+            </div>
+          </>
+        )}
+      </main>
+    </div>
+  )
+}
+
+function Spinner() {
+  return (
+    <div className="flex justify-center pt-12">
+      <div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+}
+
+function EmptyState({ title, body, action }: { title: string; body: string; action?: { label: string; href: string } }) {
+  return (
+    <div className="text-center pt-12 space-y-4">
+      <h1 className="text-2xl font-bold text-slate-100">{title}</h1>
+      <p className="text-slate-400 text-sm">{body}</p>
+      {action && (
+        <a href={action.href} className="inline-block bg-sky-500 hover:bg-sky-600 text-white font-semibold px-5 py-2 rounded-lg">
+          {action.label}
+        </a>
+      )}
+    </div>
+  )
+}
+
+function EventHeader({ event }: { event: AppEvent }) {
+  return (
+    <div className="bg-slate-800 rounded-xl p-5 space-y-1">
+      <p className="text-xs uppercase tracking-[0.25em] text-cyan-300/70">Register for</p>
+      <h1 className="text-xl font-bold text-slate-100">{event.title}</h1>
+      <p className="text-sm text-slate-400">
+        {format(parseISO(event.start_time), 'EEEE, MMMM d · HH:mm')}
+        {event.end_time && ` → ${format(parseISO(event.end_time), 'MMMM d')}`}
+      </p>
+      {event.price != null && (
+        <p className="text-sm text-slate-300">From {event.currency} {event.price.toLocaleString()}</p>
+      )}
+    </div>
+  )
+}
+
+function LockedConfirmation({ event, booking, alreadyExisting = false }: { event: AppEvent; booking: Booking; alreadyExisting?: boolean }) {
+  return (
+    <div className="bg-slate-800 rounded-xl p-6 space-y-4 text-center">
+      <div className="text-5xl">{alreadyExisting ? '📋' : '✅'}</div>
+      <h1 className="text-xl font-bold text-slate-100">
+        {alreadyExisting ? "You're already registered" : 'Registration submitted'}
+      </h1>
+      <p className="text-sm text-slate-400">
+        {event.title} · {format(parseISO(event.start_time), 'MMM d')}
+      </p>
+      <div className="bg-slate-900/50 rounded-lg p-3 text-sm text-slate-300 text-left">
+        <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Status</p>
+        <p className="capitalize">{booking.status}</p>
+      </div>
+      <p className="text-xs text-slate-500">
+        Details are locked once submitted. Need a change? Contact FunDivers staff and they'll adjust it for you.
+      </p>
+      <Link to="/bookings" className="inline-block bg-sky-500 hover:bg-sky-600 text-white font-semibold px-5 py-2 rounded-lg">
+        View my bookings
+      </Link>
+    </div>
+  )
+}
+
+// Event-picker phase — shown when /register is opened without a specific
+// event in the URL. Framed as "step 1 of the form" so a visitor sees
+// continuous progress rather than feeling handed off between screens.
+function EventPickerStep() {
+  const navigate = useNavigate()
+  const [events, setEvents] = useState<AppEvent[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const today = new Date()
+      const end = new Date(today); end.setMonth(end.getMonth() + 3)
+      const iso = (d: Date) => d.toISOString().slice(0, 10)
+      const evs = await fetchEventsInRange(iso(today), iso(end))
+      if (cancelled) return
+      const upcoming = evs.filter(e => new Date(e.start_time) >= today && !e.fully_booked)
+      setEvents(upcoming)
+      setLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  return (
+    <div className="bg-slate-800 rounded-xl p-5 space-y-4">
+      <header className="flex items-center justify-between">
+        <span className="text-xs text-slate-400">Step 1 of 3</span>
+      </header>
+      <section className="space-y-2">
+        <h2 className="text-lg font-bold text-slate-100">Which event?</h2>
+        <p className="text-sm text-slate-400">
+          Pick the dive or course you'd like to register for.
+        </p>
+      </section>
+
+      {loading ? (
+        <div className="flex justify-center py-8">
+          <div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : events.length === 0 ? (
+        <p className="text-slate-500 text-sm">No upcoming events available right now.</p>
+      ) : (
+        <ul className="space-y-2 max-h-[60vh] overflow-y-auto">
+          {events.map(ev => (
+            <li key={`${ev.type}_${ev.id}`}>
+              <button
+                type="button"
+                onClick={() => navigate(`/register/${ev.type}/${ev.id}`)}
+                className="w-full text-left bg-slate-900/50 hover:bg-slate-700 rounded-lg p-3 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full text-white ${ev.type === 'dive' ? 'bg-sky-500' : 'bg-emerald-500'}`}>
+                        {ev.type === 'dive' ? 'Dive' : 'Course'}
+                      </span>
+                      <span className="font-medium text-slate-100 text-sm truncate">{ev.title}</span>
+                      {ev.featured && <span className="text-xs text-amber-400">★</span>}
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">
+                      {format(parseISO(ev.start_time), 'EEE, MMM d · HH:mm')}
+                      {ev.end_time && ` → ${format(parseISO(ev.end_time), 'MMM d')}`}
+                    </p>
+                  </div>
+                  {ev.price != null && (
+                    <div className="text-right shrink-0 text-xs text-slate-300">
+                      From {ev.currency} {ev.price.toLocaleString()}
+                    </div>
+                  )}
+                </div>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function AuthGate({ event }: { event: AppEvent }) {
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [signupSent, setSignupSent] = useState(false)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setErr(''); setBusy(true)
+    if (mode === 'signin') {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) setErr(error.message)
+    } else {
+      // Land the confirmation link back on this same register URL so the user
+      // can finish booking after confirming their email in one tap.
+      const { error } = await supabase.auth.signUp({
+        email, password,
+        options: { emailRedirectTo: window.location.href },
+      })
+      if (error) setErr(error.message)
+      else setSignupSent(true)
+    }
+    setBusy(false)
+  }
+
+  if (signupSent) {
+    return (
+      <div className="bg-slate-800 rounded-xl p-6 space-y-3 text-center">
+        <div className="text-5xl">📧</div>
+        <h2 className="text-xl font-bold text-slate-100">Check your email</h2>
+        <p className="text-sm text-slate-400">
+          We sent a confirmation link to <strong>{email}</strong>. Click it to finish signing up — you'll come back here automatically to complete your registration for {event.title}.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <EventHeader event={event} />
+      <div className="bg-slate-800 rounded-xl p-5 space-y-4">
+        <div className="flex gap-2 text-sm">
+          <button
+            onClick={() => setMode('signin')}
+            className={`flex-1 py-2 rounded-lg font-semibold transition-colors ${
+              mode === 'signin' ? 'bg-sky-500 text-white' : 'bg-slate-700 text-slate-300'
+            }`}
+          >
+            Sign in
+          </button>
+          <button
+            onClick={() => setMode('signup')}
+            className={`flex-1 py-2 rounded-lg font-semibold transition-colors ${
+              mode === 'signup' ? 'bg-sky-500 text-white' : 'bg-slate-700 text-slate-300'
+            }`}
+          >
+            Create account
+          </button>
+        </div>
+        <p className="text-xs text-slate-400 text-center">
+          {mode === 'signin'
+            ? 'Returning diver? Sign in and we\'ll pull in what we already know about you.'
+            : 'New diver? Create an account — we\'ll build your profile as you go.'}
+        </p>
+
+        <form onSubmit={submit} className="space-y-3">
+          <label className="block">
+            <span className="block text-xs text-slate-400 mb-1">Email</span>
+            <input
+              type="email" required value={email} onChange={e => setEmail(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
+            />
+          </label>
+          <label className="block">
+            <span className="block text-xs text-slate-400 mb-1">Password</span>
+            <input
+              type="password" required value={password} onChange={e => setPassword(e.target.value)}
+              minLength={mode === 'signup' ? 8 : undefined}
+              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
+            />
+          </label>
+          {err && <p className="text-rose-400 text-sm">{err}</p>}
+          <button
+            type="submit" disabled={busy}
+            className="w-full bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg"
+          >
+            {busy
+              ? '…'
+              : mode === 'signin' ? 'Sign in and continue' : 'Create account and continue'}
+          </button>
+        </form>
+      </div>
+    </>
+  )
+}
