@@ -8,19 +8,28 @@ import { DUTY_ROLES, type Duty, type DutyRole, type Profile } from '../../types/
 interface Props {
   eventType: 'dive' | 'course'
   eventId: string
-  eventStartDate: string     // ISO timestamp — we use the date portion as the duty default
-  nonAdminDiverCount: number // for the 1-per-5 instructor hint (courses only)
+  eventStartDate: string          // ISO timestamp
+  eventEndDate?: string | null    // ISO timestamp; null for single-day events
+  nonAdminDiverCount: number      // 1-per-5 instructor hint (courses only)
 }
 
-export function EventStaffSection({ eventType, eventId, eventStartDate, nonAdminDiverCount }: Props) {
+export function EventStaffSection({ eventType, eventId, eventStartDate, eventEndDate, nonAdminDiverCount }: Props) {
   const { user } = useAuth()
   const [duties, setDuties] = useState<Duty[]>([])
   const [admins, setAdmins] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Form state for the "assign" row.
+  const eventStart = eventStartDate.slice(0, 10)
+  const eventEnd = eventEndDate ? eventEndDate.slice(0, 10) : null
+  const isMultiDay = !!eventEnd && eventEnd !== eventStart
+
+  // Form state for the "assign" row. Date range defaults to the event's
+  // full span; admins can narrow to specific days for multi-day events
+  // (e.g. an instructor covering only day 2 of a 3-day course).
   const [assigneeId, setAssigneeId] = useState('')
   const [role, setRole] = useState<DutyRole>(eventType === 'course' ? 'instructor' : 'guide')
+  const [startDate, setStartDate] = useState(eventStart)
+  const [endDate, setEndDate] = useState(eventEnd ?? '')
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
@@ -42,21 +51,25 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, nonAdmin
   }, [eventId, fkColumn])
 
   const adminMap = useMemo(() => new Map(admins.map(a => [a.id, a])), [admins])
-  const startDate = eventStartDate.slice(0, 10)
 
   async function assign() {
-    if (!user || !assigneeId) return
+    if (!user || !assigneeId || !startDate) return
+    if (endDate && endDate < startDate) { setErr('End date must be on or after start date'); return }
     setSubmitting(true); setErr(null)
     const { duty, error } = await createDutyWithNotify({
       assignee_id: assigneeId,
       role,
       start_date: startDate,
+      end_date: endDate || null,
       [fkColumn]: eventId,
     } as Parameters<typeof createDutyWithNotify>[0], user.id)
     setSubmitting(false)
     if (error || !duty) { setErr(error?.message ?? 'Failed to assign'); return }
     setDuties(prev => [...prev, duty])
     setAssigneeId('')
+    // Reset date range to event defaults for the next assignment.
+    setStartDate(eventStart)
+    setEndDate(eventEnd ?? '')
   }
 
   async function remove(id: string) {
@@ -127,10 +140,28 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, nonAdmin
           >
             {DUTY_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
+        </div>
+        <div className="flex gap-2 items-center text-xs">
+          <label className="text-slate-400 shrink-0">From</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={e => setStartDate(e.target.value)}
+            className="flex-1 min-w-0 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-slate-100"
+          />
+          <label className="text-slate-400 shrink-0">to</label>
+          <input
+            type="date"
+            value={endDate}
+            min={startDate}
+            onChange={e => setEndDate(e.target.value)}
+            placeholder={isMultiDay ? 'end' : '(single day)'}
+            className="flex-1 min-w-0 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-slate-100"
+          />
           <button
             onClick={assign}
-            disabled={!assigneeId || submitting}
-            className="shrink-0 bg-sky-700 hover:bg-sky-600 disabled:bg-slate-700 disabled:text-slate-500 text-white text-xs font-semibold px-3 py-1 rounded"
+            disabled={!assigneeId || !startDate || submitting}
+            className="shrink-0 bg-sky-700 hover:bg-sky-600 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold px-3 py-1 rounded"
           >
             Assign
           </button>
