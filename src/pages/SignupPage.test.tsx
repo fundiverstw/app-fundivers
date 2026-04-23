@@ -42,9 +42,26 @@ describe('SignupPage', () => {
     await user.type(byName('email'), 'a@b.com')
     await user.type(byName('password'), 'goodpassword')
     await user.type(byName('confirm'), 'different1234')
+    // Terms box has to be checked for zod to even reach the .refine() check
+    // that compares password vs confirm.
+    await user.click(byName('agreedToTerms'))
     await user.click(screen.getByRole('button', { name: /create account/i }))
 
     expect(await screen.findByText(/passwords do not match/i)).toBeInTheDocument()
+    expect(signUp).not.toHaveBeenCalled()
+  })
+
+  it('rejects submit without the terms-of-use checkbox', async () => {
+    const user = userEvent.setup()
+    renderWithRouter(<SignupPage />)
+    await user.type(byName('email'), 'ada@example.com')
+    await user.type(byName('password'), 'secret1234')
+    await user.type(byName('confirm'), 'secret1234')
+    await user.click(screen.getByRole('button', { name: /create account/i }))
+
+    // Zod's default error text for an unsatisfied z.literal(true) — exact
+    // wording varies across zod versions, but always contains "expected true".
+    expect(await screen.findByText(/expected true/i)).toBeInTheDocument()
     expect(signUp).not.toHaveBeenCalled()
   })
 
@@ -55,14 +72,14 @@ describe('SignupPage', () => {
     await user.type(byName('email'), 'ada@example.com')
     await user.type(byName('password'), 'secret1234')
     await user.type(byName('confirm'), 'secret1234')
+    await user.click(byName('agreedToTerms'))
     await user.click(screen.getByRole('button', { name: /create account/i }))
 
-    await waitFor(() =>
-      expect(signUp).toHaveBeenCalledWith({
-        email: 'ada@example.com',
-        password: 'secret1234',
-      })
-    )
+    await waitFor(() => expect(signUp).toHaveBeenCalledOnce())
+    const [arg] = signUp.mock.calls[0]
+    expect(arg.email).toBe('ada@example.com')
+    expect(arg.password).toBe('secret1234')
+    expect(typeof arg.options?.data?.agreed_to_terms_at).toBe('string')
     expect(await screen.findByText(/check your email/i)).toBeInTheDocument()
   })
 
@@ -73,6 +90,7 @@ describe('SignupPage', () => {
     await user.type(byName('email'), 'taken@example.com')
     await user.type(byName('password'), 'secret1234')
     await user.type(byName('confirm'), 'secret1234')
+    await user.click(byName('agreedToTerms'))
     await user.click(screen.getByRole('button', { name: /create account/i }))
 
     expect(await screen.findByText(/already registered/i)).toBeInTheDocument()

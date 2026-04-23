@@ -70,6 +70,7 @@ export interface Database {
           logged_dives: number
           last_dive_date: string | null
           gear_owned: string[]
+          agreed_to_terms_at: string | null
         }
         Insert: {
           id: string
