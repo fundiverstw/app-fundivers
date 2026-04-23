@@ -107,11 +107,12 @@ describe('AppShell', () => {
     expect(screen.queryByRole('link', { name: /view as admin/i })).not.toBeInTheDocument()
   })
 
-  it('renders all four bottom nav links', () => {
+  it('renders all five bottom nav links', () => {
     useAuthMock.mockReturnValue({ profile: null, signOut })
     routedRender()
+    expect(screen.getByRole('link', { name: /home/i })).toHaveAttribute('href', '/dashboard')
     expect(screen.getByRole('link', { name: /calendar/i })).toHaveAttribute('href', '/calendar')
-    expect(screen.getByRole('link', { name: /my bookings/i })).toHaveAttribute('href', '/bookings')
+    expect(screen.getByRole('link', { name: /bookings/i })).toHaveAttribute('href', '/bookings')
     expect(screen.getByRole('link', { name: /payments/i })).toHaveAttribute('href', '/payments')
     expect(screen.getByRole('link', { name: /profile/i })).toHaveAttribute('href', '/profile')
   })
