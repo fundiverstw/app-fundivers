@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
-import { fetchEventsInRange } from '../../lib/events'
+import { fetchEventsInRange, formatEventSpan } from '../../lib/events'
 import type { AppEvent, Duty, Profile } from '../../types/database'
 
 type AdminMap = Map<string, Profile>
@@ -107,7 +107,7 @@ export function AdminDutyPage() {
             >
               <p className="text-sm font-medium text-slate-100">{ev.title}</p>
               <p className="text-xs text-slate-400 mt-0.5">
-                {format(parseISO(ev.start_time), 'EEE, MMM d · HH:mm')}
+                {formatEventSpan(ev)}
                 {' · '}
                 <span className="capitalize">{ev.type}</span>
               </p>

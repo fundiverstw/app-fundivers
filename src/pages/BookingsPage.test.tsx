@@ -15,9 +15,13 @@ vi.mock('../lib/supabase', () => ({
   supabase: { from: (...a: unknown[]) => from(...a) },
 }))
 
-vi.mock('../lib/events', () => ({
-  fetchEventsForBookings: (...a: unknown[]) => fetchEventsForBookings(...a),
-}))
+vi.mock('../lib/events', async () => {
+  const actual = await vi.importActual<typeof import('../lib/events')>('../lib/events')
+  return {
+    ...actual,
+    fetchEventsForBookings: (...a: unknown[]) => fetchEventsForBookings(...a),
+  }
+})
 
 vi.mock('../hooks/useAuth', () => ({
   useAuth: () => useAuthMock(),

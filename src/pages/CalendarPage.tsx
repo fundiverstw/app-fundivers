@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { format, startOfMonth, endOfMonth } from 'date-fns'
+import { startOfMonth, endOfMonth } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { fetchEventsInRange } from '../lib/events'
+import { fetchEventsInRange, formatEventSpan } from '../lib/events'
 import { MonthCalendar } from '../components/calendar/MonthCalendar'
 import { RegisterForm } from '../components/register/RegisterForm'
 import type { AppEvent, Booking } from '../types/database'
@@ -105,10 +105,7 @@ export function CalendarPage() {
             </div>
             <h2 className="text-xl font-bold text-slate-100">{selected.title}</h2>
             <div className="text-sm text-slate-400 space-y-1">
-              <p>{format(new Date(selected.start_time), 'EEEE, MMMM d · HH:mm')}</p>
-              {selected.end_time && (
-                <p>Ends {format(new Date(selected.end_time), 'EEEE, MMMM d')}</p>
-              )}
+              <p>{formatEventSpan(selected, { style: 'long' })}</p>
               {selected.price != null && (
                 <p>💰 From {selected.currency} {selected.price.toLocaleString()}</p>
               )}

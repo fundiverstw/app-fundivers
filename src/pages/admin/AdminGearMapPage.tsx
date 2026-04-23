@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
-import { fetchEventsForBookings } from '../../lib/events'
+import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
 import { AdminNotes } from '../../components/admin/AdminNotes'
 import { GEAR_ITEMS } from '../../lib/gear'
 import { shoeAsJp } from '../../lib/shoe-size'
@@ -81,8 +81,7 @@ export function AdminGearMapPage() {
         <h1 className="text-xl font-bold text-slate-100">Gear map</h1>
         {event && (
           <p className="text-sm text-slate-400 mt-1">
-            {event.title} · {format(new Date(event.start_time), 'MMM d')}
-            {event.end_time && ` → ${format(new Date(event.end_time), 'MMM d')}`}
+            {event.title} · {formatEventSpan(event, { style: 'compact' })}
           </p>
         )}
         <p className="text-sm text-amber-400 mt-2">
