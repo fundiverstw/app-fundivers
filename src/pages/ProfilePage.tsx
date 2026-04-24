@@ -59,20 +59,20 @@ function strOrNull(v: unknown): string | null {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wide">{label}</label>
+      <label className="block text-xs text-blue-900 font-medium mb-1 uppercase tracking-wide">{label}</label>
       {children}
     </div>
   )
 }
 
-const inputClass = 'w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-sky-500'
+const inputClass = 'w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-blue-900 text-sm focus:outline-none focus:border-blue-900'
 
 export function ProfilePage() {
   const { user, profile } = useAuth()
 
   return (
     <div className="max-w-lg mx-auto space-y-6">
-      <h1 className="text-xl font-bold text-slate-100">My Profile</h1>
+      <h1 className="text-xl font-bold text-white">My Profile</h1>
       <NotificationsToggle />
       {user && profile && (
         // Keying on profile.id remounts the form whenever a different
@@ -171,11 +171,11 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <section className="bg-slate-800 rounded-xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Personal Info</h2>
+        <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
+          <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Personal Info</h2>
           <Field label="Full name">
             <input {...register('full_name')} className={inputClass} />
-            {errors.full_name && <p className="text-red-400 text-xs mt-1">{errors.full_name.message}</p>}
+            {errors.full_name && <p className="text-red-600 text-xs mt-1">{errors.full_name.message}</p>}
           </Field>
           <Field label="Display name"><input {...register('display_name')} className={inputClass} /></Field>
           <Field label="Phone"><input {...register('phone')} type="tel" className={inputClass} /></Field>
@@ -193,8 +193,8 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
           </Field>
         </section>
 
-        <section className="bg-slate-800 rounded-xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Preferred contact</h2>
+        <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
+          <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Preferred contact</h2>
           <Field label="Method">
             <select {...register('contact_method')} className={inputClass}>
               <option value="">—</option>
@@ -209,18 +209,18 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
           </Field>
         </section>
 
-        <section className="bg-slate-800 rounded-xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Sizing</h2>
+        <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
+          <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Sizing</h2>
           <Field label="Height (cm)"><input {...register('height_cm')} type="number" step="0.1" className={inputClass} /></Field>
           <Field label="Weight (kg)"><input {...register('weight_kg')} type="number" step="0.1" className={inputClass} /></Field>
           <div>
-            <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wide">Shoe size</label>
+            <label className="block text-xs text-blue-900 font-medium mb-1 uppercase tracking-wide">Shoe size</label>
             <div className="flex gap-1.5">
               <select
                 aria-label="Shoe size unit"
                 value={shoeUnit}
                 onChange={e => handleUnitChange(e.target.value as ShoeUnit)}
-                className="shrink-0 w-16 bg-slate-800 border border-slate-600 rounded-lg px-1.5 py-2 text-slate-100 text-sm focus:outline-none focus:border-sky-500"
+                className="shrink-0 w-16 bg-white border border-sky-300 rounded-lg px-1.5 py-2 text-blue-900 text-sm focus:outline-none focus:border-blue-900"
               >
                 {SHOE_UNITS.map(u => <option key={u} value={u}>{u.toUpperCase()}</option>)}
               </select>
@@ -228,7 +228,7 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
                 aria-label="Shoe size gender"
                 value={shoeGender}
                 onChange={e => handleGenderChange(e.target.value as ShoeGender)}
-                className="shrink-0 w-14 bg-slate-800 border border-slate-600 rounded-lg px-1.5 py-2 text-slate-100 text-sm focus:outline-none focus:border-sky-500"
+                className="shrink-0 w-14 bg-white border border-sky-300 rounded-lg px-1.5 py-2 text-blue-900 text-sm focus:outline-none focus:border-blue-900"
               >
                 {SHOE_GENDERS.map(g => <option key={g} value={g}>{g.toUpperCase()}</option>)}
               </select>
@@ -242,23 +242,23 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
                 {shoeOptions.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
-            {jpHint && <p className="text-xs text-sky-400 mt-1">{jpHint}</p>}
+            {jpHint && <p className="text-xs text-red-600 mt-1">{jpHint}</p>}
           </div>
         </section>
 
-        <section className="bg-slate-800 rounded-xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Gear I own</h2>
-          <p className="text-xs text-slate-400">
+        <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
+          <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Gear I own</h2>
+          <p className="text-xs text-blue-900 font-medium">
             Checked items will be skipped when you choose à-la-carte rental at registration.
           </p>
           <div className="grid grid-cols-2 gap-2">
             {GEAR_ITEMS.map(item => (
-              <label key={item} className="flex items-center gap-2 text-sm text-slate-300">
+              <label key={item} className="flex items-center gap-2 text-sm text-blue-900">
                 <input
                   type="checkbox"
                   checked={gearOwned.includes(item)}
                   onChange={() => toggleGearOwned(item)}
-                  className="accent-sky-500"
+                  className="accent-blue-900"
                 />
                 {item}
               </label>
@@ -266,20 +266,20 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
           </div>
         </section>
 
-        <section className="bg-slate-800 rounded-xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Emergency Contact</h2>
+        <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
+          <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Emergency Contact</h2>
           <Field label="Name"><input {...register('emergency_contact_name')} className={inputClass} /></Field>
           <Field label="Phone"><input {...register('emergency_contact_phone')} type="tel" className={inputClass} /></Field>
         </section>
 
-        <section className="bg-slate-800 rounded-xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Certification</h2>
+        <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
+          <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Certification</h2>
           <Field label="Agency (e.g. PADI, SSI)"><input {...register('cert_agency')} className={inputClass} /></Field>
           <Field label="Level (e.g. Open Water)"><input {...register('cert_level')} className={inputClass} /></Field>
           <Field label="Logged dives"><input {...register('logged_dives')} type="number" min="0" className={inputClass} /></Field>
           <Field label="Last dive"><input {...register('last_dive_date')} type="date" className={inputClass} /></Field>
-          <label className="flex items-center gap-2 text-sm text-slate-300">
-            <input type="checkbox" {...register('nitrox_certified')} className="accent-sky-500" />
+          <label className="flex items-center gap-2 text-sm text-blue-900">
+            <input type="checkbox" {...register('nitrox_certified')} className="accent-blue-900" />
             Nitrox certified
           </label>
         </section>
@@ -288,8 +288,8 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
           <CertCardSection userId={user.id} />
         )}
 
-        <section className="bg-slate-800 rounded-xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Medical Notes</h2>
+        <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
+          <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Medical Notes</h2>
           <textarea
             {...register('medical_notes')}
             rows={3}
@@ -301,7 +301,7 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
         <button
           type="submit"
           disabled={isSubmitting || (!isDirty && !dirtyExtras)}
-          className="w-full bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-white font-semibold py-2 rounded-lg transition-colors"
+          className="w-full bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white font-semibold py-2 rounded-lg transition-colors"
         >
           {isSubmitting ? 'Saving…' : 'Save changes'}
         </button>
@@ -343,9 +343,9 @@ export function NotificationsToggle() {
 
   if (state === 'unsupported') {
     return (
-      <section className="bg-slate-800 rounded-xl p-4 space-y-2" aria-label="Push Notifications">
-        <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Push Notifications</h2>
-        <p className="text-sm text-slate-400">
+      <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-2" aria-label="Push Notifications">
+        <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Push Notifications</h2>
+        <p className="text-sm text-blue-900 font-medium">
           Your device doesn't support push notifications in this browser.
           On iPhone/iPad, install FunDivers to your Home Screen
           (Share → Add to Home Screen), open the app from there, and the toggle will appear.
@@ -355,25 +355,25 @@ export function NotificationsToggle() {
   }
 
   return (
-    <section className="bg-slate-800 rounded-xl p-4 space-y-3" aria-label="Push Notifications">
-      <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Push Notifications</h2>
+    <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3" aria-label="Push Notifications">
+      <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Push Notifications</h2>
       <label className="flex items-center justify-between gap-3">
-        <span className="text-sm text-slate-200">Event &amp; payment reminders</span>
+        <span className="text-sm text-blue-900">Event &amp; payment reminders</span>
         <input
           type="checkbox"
           aria-label="Enable push notifications"
-          className="accent-sky-500 scale-125"
+          className="accent-blue-900 scale-125"
           disabled={busy}
           checked={state === 'on'}
           onChange={(e) => toggle(e.target.checked)}
         />
       </label>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-blue-950 font-medium">
         Reminders fire 1 week and 1 day before each event, plus payment nudges
         at 3 / 2 / 1 weeks and 3 / 1 days before. iOS requires installing the
         app to your Home Screen.
       </p>
-      {error && <p className="text-red-400 text-xs">{error}</p>}
+      {error && <p className="text-red-600 text-xs">{error}</p>}
     </section>
   )
 }
@@ -444,9 +444,9 @@ export function CertCardSection({ userId }: { userId: string }) {
   }
 
   return (
-    <section className="bg-slate-800 rounded-xl p-4 space-y-3" aria-label="Certification Card">
-      <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Cert card photo</h2>
-      <p className="text-xs text-slate-400">
+    <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3" aria-label="Certification Card">
+      <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Cert card photo</h2>
+      <p className="text-xs text-blue-900 font-medium">
         Photo of your certification card. Images are compressed before upload
         so they take up minimal space while keeping the key details readable.
       </p>
@@ -454,11 +454,11 @@ export function CertCardSection({ userId }: { userId: string }) {
         <img
           src={signedUrl}
           alt="Your certification card"
-          className="w-full rounded-lg border border-slate-700"
+          className="w-full rounded-lg border border-sky-300"
         />
       )}
       <div className="flex gap-2">
-        <label className="flex-1 cursor-pointer bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-white text-sm font-semibold py-2 rounded-lg text-center transition-colors">
+        <label className="flex-1 cursor-pointer bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 rounded-lg text-center transition-colors">
           <input
             type="file"
             accept="image/*"
@@ -474,13 +474,13 @@ export function CertCardSection({ userId }: { userId: string }) {
             type="button"
             onClick={onRemove}
             disabled={busy}
-            className="bg-slate-700 hover:bg-red-900 disabled:opacity-40 text-slate-200 text-sm font-semibold py-2 px-3 rounded-lg transition-colors"
+            className="bg-sky-100 hover:bg-red-100 disabled:opacity-40 text-red-700 border border-red-500 text-sm font-semibold py-2 px-3 rounded-lg transition-colors"
           >
             Remove
           </button>
         )}
       </div>
-      {error && <p className="text-red-400 text-xs">{error}</p>}
+      {error && <p className="text-red-600 text-xs">{error}</p>}
     </section>
   )
 }

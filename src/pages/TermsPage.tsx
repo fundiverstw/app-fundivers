@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { Logo } from '../components/Logo'
 
 // Terms of Use + retention policy shown to divers at signup. Intentionally
 // plain: a small shop + a small user base deserves a summary a normal person
@@ -7,16 +8,16 @@ import { Link } from 'react-router-dom'
 
 export function TermsPage() {
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100">
-      <header className="border-b border-slate-800 px-4 py-3">
-        <Link to="/" className="text-sky-400 font-bold text-lg">FunDivers TW</Link>
+    <div className="min-h-screen bg-sky-50 text-blue-900">
+      <header className="bg-blue-950 border-b border-red-500 px-4 py-3">
+        <Link to="/" aria-label="FunDivers Taiwan home"><Logo size="sm" /></Link>
       </header>
 
       <main className="max-w-2xl mx-auto p-6 space-y-6 text-sm leading-relaxed">
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.25em] text-cyan-300/70">Terms of Use & Privacy</p>
-          <h1 className="text-2xl font-bold text-slate-100">The short version</h1>
-          <p className="text-slate-400">
+          <p className="text-xs uppercase tracking-[0.25em] text-red-600">Terms of Use & Privacy</p>
+          <h1 className="text-2xl font-bold text-blue-900">The short version</h1>
+          <p className="text-blue-900 font-medium">
             We ask for the information we need to plan your dives safely and to
             handle permits, insurance, and emergency contact. Nothing we collect
             is sold or shared beyond what's required to run the trip you signed
@@ -69,7 +70,7 @@ export function TermsPage() {
 
         <Section title="Deletion and access">
           <p>
-            Email <a className="text-sky-400 hover:underline" href="mailto:fundiverstw@gmail.com">fundiverstw@gmail.com</a> to
+            Email <a className="text-blue-700 hover:underline" href="mailto:fundiverstw@gmail.com">fundiverstw@gmail.com</a> to
             request a full export or deletion of your account. We'll honor it
             within a reasonable turnaround.
           </p>
@@ -95,7 +96,7 @@ export function TermsPage() {
         </Section>
 
         <div className="text-center pt-6">
-          <Link to="/" className="text-sm text-slate-400 hover:text-slate-100">‹ back</Link>
+          <Link to="/" className="text-sm text-blue-700 hover:underline">‹ back</Link>
         </div>
       </main>
     </div>
@@ -105,8 +106,8 @@ export function TermsPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-2">
-      <h2 className="text-lg font-bold text-slate-100">{title}</h2>
-      <div className="text-slate-300 space-y-2">{children}</div>
+      <h2 className="text-lg font-bold text-blue-900">{title}</h2>
+      <div className="text-blue-950 font-medium space-y-2">{children}</div>
     </section>
   )
 }

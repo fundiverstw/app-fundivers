@@ -4,6 +4,9 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
 import type { AppEvent, Booking, Payment } from '../types/database'
+import {
+  CARD, BTN_GHOST, BTN_DANGER, TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR,
+} from '../styles/tokens'
 
 type Row = Booking & {
   event: AppEvent | null
@@ -14,10 +17,10 @@ type Row = Booking & {
 type AddonNameMap = Map<string, string>
 
 const STATUS_STYLES: Record<Booking['status'], string> = {
-  pending: 'text-amber-400',
-  confirmed: 'text-emerald-400',
-  cancelled: 'text-slate-500 line-through',
-  waitlisted: 'text-violet-400',
+  pending: 'text-red-600',
+  confirmed: 'text-blue-900 font-semibold',
+  cancelled: 'text-blue-900/40 line-through',
+  waitlisted: 'text-sky-600',
 }
 
 export function BookingsPage() {
@@ -106,17 +109,17 @@ export function BookingsPage() {
   )
 
   if (loading) {
-    return <div className="flex justify-center pt-12"><div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" /></div>
+    return <div className="flex justify-center pt-12"><div className="w-6 h-6 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" /></div>
   }
 
   return (
     <div className="max-w-lg mx-auto space-y-6">
-      <h1 className="text-xl font-bold text-slate-100">My Bookings</h1>
+      <h1 className="text-xl font-bold text-white">My Bookings</h1>
 
       <section>
-        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-2">Upcoming</h2>
+        <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-2">Upcoming</h2>
         {upcoming.length === 0
-          ? <p className="text-slate-500 text-sm">No upcoming bookings. Check the calendar!</p>
+          ? <p className="text-blue-950 font-medium text-sm">No upcoming bookings. Check the calendar!</p>
           : <div className="space-y-2">
               {upcoming.map(r => (
                 <Card
@@ -135,7 +138,7 @@ export function BookingsPage() {
 
       {past.length > 0 && (
         <section>
-          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-2">Past / Cancelled</h2>
+          <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-2">Past / Cancelled</h2>
           <div className="space-y-2">
             {past.map(r => (
               <Card
@@ -172,79 +175,73 @@ function Card({
   const canRefund = row.paidSum > 0 && row.status !== 'cancelled' && !row.refund_requested_at
 
   return (
-    <div className="bg-slate-800 rounded-xl">
+    <div className={CARD}>
       <button
         type="button"
         onClick={onToggle}
-        className="w-full text-left p-4 flex items-start justify-between hover:bg-slate-700/50 rounded-xl transition-colors"
+        className="w-full text-left p-4 flex items-start justify-between hover:bg-sky-50 rounded-xl transition-colors"
       >
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-slate-100 text-sm">
+          <p className={`font-medium ${TEXT_HEADING} text-sm`}>
             {row.event?.title ?? '(event unavailable)'}
           </p>
           {row.event && (
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className={`text-xs ${TEXT_MUTED} mt-0.5`}>
               {formatEventSpan(row.event, { withYear: true })}
               {' · '}
               {row.event.type === 'dive' ? 'Dive' : 'Course'}
             </p>
           )}
           {row.refund_requested_at && (
-            <p className="text-xs text-amber-300 mt-0.5">🔄 Refund requested {format(new Date(row.refund_requested_at), 'MMM d')}</p>
+            <p className={`text-xs ${TEXT_ERROR} mt-0.5`}>🔄 Refund requested {format(new Date(row.refund_requested_at), 'MMM d')}</p>
           )}
         </div>
         <div className="text-right shrink-0 ml-3">
           <span className={`text-xs font-medium capitalize ${STATUS_STYLES[row.status]}`}>{row.status}</span>
-          <p className="text-xs text-slate-500 mt-0.5">{open ? '▲' : '▼'}</p>
+          <p className={`text-xs ${TEXT_SUBTLE} mt-0.5`}>{open ? '▲' : '▼'}</p>
         </div>
       </button>
 
       {open && (
-        <div className="px-4 pb-4 border-t border-slate-700 pt-3 space-y-3 text-sm">
+        <div className="px-4 pb-4 border-t border-sky-200 pt-3 space-y-3 text-sm">
           {total > 0 && (
-            <div className="flex justify-between text-slate-300">
+            <div className={`flex justify-between ${TEXT_BODY}`}>
               <span>Total</span>
               <span className="font-semibold">{row.event?.currency ?? 'TWD'} {total.toLocaleString()}</span>
             </div>
           )}
           {deposit > 0 && (
-            <div className="flex justify-between text-slate-300">
+            <div className={`flex justify-between ${TEXT_BODY}`}>
               <span>Deposit</span>
-              <span className={row.paidSum >= deposit ? 'text-emerald-400' : 'text-amber-400'}>
+              <span className={row.paidSum >= deposit ? 'text-blue-900 font-semibold' : TEXT_ERROR}>
                 {row.event?.currency ?? 'TWD'} {deposit.toLocaleString()} {row.paidSum >= deposit ? '✓' : 'due'}
               </span>
             </div>
           )}
           {row.paidSum > 0 && (
-            <div className="flex justify-between text-slate-300">
+            <div className={`flex justify-between ${TEXT_BODY}`}>
               <span>Paid so far</span>
-              <span className="text-emerald-400">{row.event?.currency ?? 'TWD'} {row.paidSum.toLocaleString()}</span>
+              <span className="text-blue-900 font-semibold">{row.event?.currency ?? 'TWD'} {row.paidSum.toLocaleString()}</span>
             </div>
           )}
 
           <Breakdown details={details} addonNames={addonNames} />
 
           {row.notes && (
-            <p className="text-xs text-slate-400 bg-slate-900/40 rounded p-2">📝 {row.notes}</p>
+            <p className={`text-xs ${TEXT_MUTED} bg-sky-50 rounded p-2`}>📝 {row.notes}</p>
           )}
-          <p className="text-xs text-slate-500">
+          <p className={`text-xs ${TEXT_SUBTLE}`}>
             Booked {format(new Date(row.created_at), 'MMM d, yyyy')}
           </p>
 
           <div className="flex gap-2 pt-1">
             {canCancel && (
-              <button
-                onClick={() => onCancel(row.id)}
-                className="flex-1 bg-slate-700 hover:bg-rose-900 text-slate-200 text-xs font-semibold py-2 px-3 rounded-lg transition-colors"
-              >
+              <button onClick={() => onCancel(row.id)} className={`flex-1 ${BTN_DANGER} text-xs py-2 px-3`}>
                 Cancel booking
               </button>
             )}
             {canRefund && (
-              <button
-                onClick={() => onRefund(row.id)}
-                className="flex-1 bg-amber-700 hover:bg-amber-600 text-white text-xs font-semibold py-2 px-3 rounded-lg transition-colors"
-              >
+              <button onClick={() => onRefund(row.id)} className={`flex-1 ${BTN_GHOST} text-xs py-2 px-3`}>
                 Request refund
               </button>
             )}
@@ -273,9 +270,9 @@ function Breakdown({ details, addonNames }: { details: Booking['details'] | unde
 
   if (items.length === 0) return null
   return (
-    <div className="text-xs text-slate-400 space-y-0.5">
+    <div className={`text-xs ${TEXT_MUTED} space-y-0.5`}>
       {items.map(([label, extra]) => (
-        <p key={label}>{label}{extra && <span className="text-slate-500"> — {extra}</span>}</p>
+        <p key={label}>{label}{extra && <span className={TEXT_SUBTLE}> — {extra}</span>}</p>
       ))}
     </div>
   )

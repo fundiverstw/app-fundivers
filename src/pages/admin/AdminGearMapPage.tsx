@@ -72,29 +72,29 @@ export function AdminGearMapPage() {
   }, [type, id])
 
   if (loading) {
-    return <div className="flex justify-center pt-12"><div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" /></div>
+    return <div className="flex justify-center pt-12"><div className="w-6 h-6 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" /></div>
   }
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
-      <Link to={`/admin/events/${type}/${id}`} className="text-sm text-slate-400 hover:text-slate-100">
+      <Link to={`/admin/events/${type}/${id}`} className="text-sm text-white/70 hover:text-white">
         ‹ back to event
       </Link>
 
-      <header className="bg-slate-800 rounded-xl p-4">
-        <h1 className="text-xl font-bold text-slate-100">Gear map</h1>
+      <header className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4">
+        <h1 className="text-xl font-bold text-blue-900">Gear map</h1>
         {event && (
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-sm text-blue-900 font-medium mt-1">
             {event.title} · {formatEventSpan(event, { style: 'compact' })}
           </p>
         )}
-        <p className="text-sm text-amber-400 mt-2">
+        <p className="text-sm text-red-600 mt-2">
           {rows.length} diver{rows.length === 1 ? '' : 's'} · {rows.filter(r => packList(r.booking).items.length > 0).length} to pack
         </p>
       </header>
 
       {rows.length === 0 ? (
-        <p className="text-slate-500 text-sm">No registrants yet.</p>
+        <p className="text-blue-950 font-medium text-sm">No registrants yet.</p>
       ) : (
         <section className="space-y-3">
           {rows.map(r => <DiverGearCard key={r.booking.id} row={r} />)}
@@ -116,16 +116,16 @@ function DiverGearCard({ row }: { row: Row }) {
   ].filter(Boolean).join(' · ')
 
   return (
-    <article className="bg-slate-800 rounded-xl p-4 space-y-3">
+    <article className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-slate-100">
+          <h2 className="text-base font-semibold text-blue-900">
             {profile?.display_name || profile?.full_name || '(unknown)'}
           </h2>
-          {sizing && <p className="text-xs text-slate-400">{sizing}</p>}
+          {sizing && <p className="text-xs text-blue-900 font-medium">{sizing}</p>}
         </div>
         <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
-          pack.items.length > 0 ? 'bg-amber-700 text-amber-100' : 'bg-slate-700 text-slate-300'
+          pack.items.length > 0 ? 'bg-red-100 text-red-700 border border-red-500' : 'bg-sky-100 text-blue-950 font-medium'
         }`}>
           {pack.summary}
         </span>
@@ -138,8 +138,8 @@ function DiverGearCard({ row }: { row: Row }) {
               key={item}
               className={`text-xs px-2 py-0.5 rounded-full border ${
                 owned.has(item)
-                  ? 'border-emerald-700 text-emerald-300 line-through'
-                  : 'border-sky-700 text-sky-200'
+                  ? 'border-blue-900/40 text-blue-950 font-medium line-through'
+                  : 'border-blue-900 text-blue-900'
               }`}
               title={owned.has(item) ? 'Diver owns this item' : 'Needs packing'}
             >
