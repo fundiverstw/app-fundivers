@@ -114,19 +114,25 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
-  // Form state — pre-populated from existingBooking when editing. The `gearEdited`
-  // flag is set true in edit mode so we don't stomp the saved a-la-carte list
-  // with the profile's gear_owned fallback.
+  // Form state — pre-populated from existingBooking when editing.
   const [rentGear, setRentGear] = useState(initialDetails?.gear?.rent ?? false)
   const [gearMode, setGearMode] = useState<'full' | 'a-la-carte'>(
     // Legacy bookings may carry mode: 'provided' from the old dropdown;
     // treat that as "no rental" rather than crashing the dropdown.
     initialDetails?.gear?.rent && initialDetails.gear.mode === 'a-la-carte' ? 'a-la-carte' : 'full'
   )
-  const [gearItems, setGearItems] = useState<string[]>(
-    (initialDetails?.gear?.rent && initialDetails.gear.items) ? initialDetails.gear.items : []
+  // À-la-carte selection: explicitly chosen items (or null = use the
+  // "everything the diver doesn't already own" default derived from
+  // profile.gear_owned). Splitting this two-step keeps the default
+  // computed at render — no setState-in-effect dance.
+  const [editedGearItems, setEditedGearItems] = useState<string[] | null>(
+    (initialDetails?.gear?.rent && initialDetails.gear.items) ? initialDetails.gear.items : null
   )
-  const [gearEdited, setGearEdited] = useState(isEdit)
+  const defaultGearItems = useMemo(() => {
+    const owned = new Set(profile?.gear_owned ?? [])
+    return (GEAR_ITEMS as readonly string[]).filter(item => !owned.has(item))
+  }, [profile])
+  const gearItems = editedGearItems ?? defaultGearItems
   const [roomId, setRoomId] = useState<string>(initialDetails?.room?.option_id ?? '')
   const [roomNotes, setRoomNotes] = useState(initialDetails?.room?.notes ?? '')
   const [addonIds, setAddonIds] = useState<Set<string>>(new Set(initialDetails?.add_ons ?? []))
@@ -160,13 +166,6 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   const [guestEmail, setGuestEmail] = useState('')
   const [guestPassword, setGuestPassword] = useState('')
   const [guestAgreedTerms, setGuestAgreedTerms] = useState(false)
-
-  useEffect(() => {
-    if (gearMode === 'a-la-carte' && !gearEdited) {
-      const owned = new Set(profile?.gear_owned ?? [])
-      setGearItems((GEAR_ITEMS as readonly string[]).filter(item => !owned.has(item)))
-    }
-  }, [gearMode, gearEdited, profile])
 
   useEffect(() => {
     let cancelled = false
@@ -207,8 +206,10 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   const total = Math.round(subTotal * (1 + paymentSurcharge))
 
   function toggleItem(item: string) {
-    setGearEdited(true)
-    setGearItems(prev => prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item])
+    // First toggle promotes the rendered default (or existing list) into
+    // an explicit edited list; subsequent toggles update it.
+    const current = editedGearItems ?? gearItems
+    setEditedGearItems(current.includes(item) ? current.filter(i => i !== item) : [...current, item])
   }
   function toggleAddon(id: string) {
     setAddonIds(prev => {

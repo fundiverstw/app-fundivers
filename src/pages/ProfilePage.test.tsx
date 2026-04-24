@@ -202,17 +202,12 @@ describe('ProfilePage', () => {
     await waitFor(() => expect(deleteCertCard).toHaveBeenCalledWith('u1/existing.jpg'))
   })
 
-  it('no-ops submit when there is no authenticated user', async () => {
+  it('does not render the form (and thus cannot submit) when there is no authenticated user', () => {
     useAuthMock.mockReturnValue({ user: null, profile: null })
-    from.mockReturnValue({
-      ...mockQueryBuilder(),
-      upsert: (...a: unknown[]) => { upsert(...a); return mockQueryBuilder() },
-    })
-    const user = userEvent.setup()
     renderWithRouter(<ProfilePage />)
-    // Trigger dirty state then submit
-    await user.type(input('full_name'), 'Ada')
-    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    // The page header still renders; the form is gated on user + profile.
+    expect(screen.getByText(/my profile/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /save changes/i })).not.toBeInTheDocument()
     expect(upsert).not.toHaveBeenCalled()
   })
 })
