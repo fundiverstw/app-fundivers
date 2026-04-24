@@ -34,9 +34,13 @@ vi.mock('../lib/events', async () => {
 vi.mock('../hooks/useAuth', () => ({ useAuth: () => useAuthMock() }))
 // Register form body is covered by its own tests; stub it here so this test
 // stays focused on the page-level phase transitions (event / auth / locked).
-vi.mock('../components/register/RegisterForm', () => ({
-  RegisterFormBody: ({ event }: { event: { title: string } }) => <div data-testid="form-body">{event.title}</div>,
-}))
+vi.mock('../components/register/RegisterForm', async () => {
+  const actual = await vi.importActual<typeof import('../components/register/RegisterForm')>('../components/register/RegisterForm')
+  return {
+    ...actual,
+    RegisterFormBody: ({ event }: { event: { title: string } }) => <div data-testid="form-body">{event.title}</div>,
+  }
+})
 
 const testEvent = {
   id: 'dive-a', type: 'dive', title: 'Kenting Dive',
@@ -82,15 +86,15 @@ describe('RegisterPage', () => {
     expect(screen.getByText('OW Batch')).toBeInTheDocument()
   })
 
-  it('shows the sign-in / sign-up gate when the visitor is not authed', async () => {
+  it('unauthed visitors see the form directly with a Sign-in affordance for returning divers', async () => {
     useAuthMock.mockReturnValue({ user: null, profile: null, loading: false })
     fetchEventsForBookings.mockResolvedValue(new Map([['dive-a', testEvent]]))
 
     renderAt('/register/dive/dive-a')
-    await screen.findByText('Kenting Dive')
-    // Two buttons include "Sign in" text — the tab and the submit — so match exactly.
-    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Create account' })).toBeInTheDocument()
+    // The form body (stubbed) renders in place of the old gate — no auth wall.
+    await screen.findByTestId('form-body')
+    // Returning divers can collapse-expand a sign-in form from the banner.
+    expect(screen.getByRole('button', { name: /^sign in$/i })).toBeInTheDocument()
   })
 
   it('shows the locked confirmation screen when the user already has a booking for this event', async () => {
@@ -118,30 +122,35 @@ describe('RegisterPage', () => {
     expect(screen.getByTestId('form-body')).toHaveTextContent('Kenting Dive')
   })
 
-  it('passes the current page URL as emailRedirectTo on signup so the confirmation link bounces back', async () => {
-    useAuthMock.mockReturnValue({ user: null, profile: null, loading: false })
+  it('auto-submits a pending booking draft when a freshly-authed user returns via the email confirmation link', async () => {
+    // Draft was stashed while the user was unauthed; they're back now with a
+    // session (emailRedirectTo bounced them here). The page should apply the
+    // profile patch, insert the booking, and clear the localStorage key.
+    const draft = {
+      profilePatch: { full_name: 'Grace Hopper' },
+      details: { payment_method: 'bank_transfer', total: 3000 },
+      notes: null,
+    }
+    localStorage.setItem('pending-booking:dive:dive-a', JSON.stringify(draft))
+
+    useAuthMock.mockReturnValue({ user: { id: 'u-new' }, profile: null, loading: false })
     fetchEventsForBookings.mockResolvedValue(new Map([['dive-a', testEvent]]))
-    signUp.mockResolvedValue({ error: null })
 
-    const user = userEvent.setup()
+    const profileUpdate = vi.fn().mockReturnValue({ eq: () => Promise.resolve({ error: null }) })
+    const bookingInsert = vi.fn().mockReturnValue({
+      select: () => ({ single: () => Promise.resolve({ data: { id: 'b-just-booked', status: 'pending' }, error: null }) }),
+    })
+    from.mockImplementation((table: string) => {
+      if (table === 'profiles') return { update: profileUpdate }
+      if (table === 'bookings') return { ...mockQueryBuilder({ data: null }), insert: bookingInsert }
+      return mockQueryBuilder({ data: null })
+    })
+
     renderAt('/register/dive/dive-a')
-    await screen.findByText('Kenting Dive')
-
-    await user.click(screen.getByRole('button', { name: 'Create account' }))
-    await user.type(screen.getByLabelText(/email/i), 'new@diver.test')
-    await user.type(screen.getByLabelText(/password/i), 'abcdefgh')
-    // ToS checkbox is required for the signup path — find it by the visible text.
-    await user.click(screen.getByLabelText(/I agree to the/i))
-    await user.click(screen.getByRole('button', { name: /create account and continue/i }))
-
-    await waitFor(() => expect(signUp).toHaveBeenCalledOnce())
-    const [arg] = signUp.mock.calls[0]
-    expect(arg.email).toBe('new@diver.test')
-    expect(arg.password).toBe('abcdefgh')
-    // jsdom/happy-dom uses its own base URL (not the MemoryRouter's), so we
-    // only assert that emailRedirectTo was supplied — the real value in
-    // production is window.location.href of the register page.
-    expect(typeof arg.options?.emailRedirectTo).toBe('string')
-    expect(typeof arg.options?.data?.agreed_to_terms_at).toBe('string')
+    await waitFor(() => expect(bookingInsert).toHaveBeenCalled())
+    const [payload] = bookingInsert.mock.calls[0]
+    expect(payload).toMatchObject({ user_id: 'u-new', eo_dive_id: 'dive-a', eo_course_id: null, status: 'pending' })
+    expect(localStorage.getItem('pending-booking:dive:dive-a')).toBeNull()
+    await screen.findByText(/registration submitted/i)
   })
 })

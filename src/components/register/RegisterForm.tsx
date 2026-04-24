@@ -19,6 +19,20 @@ interface Props {
   existingBooking?: Booking
 }
 
+// Draft of a guest submission that couldn't complete because email
+// confirmation was required at signup. Stashed to localStorage keyed by
+// event, then consumed by RegisterPage once the user returns authed via
+// the confirmation link and we can finally insert the booking.
+export interface PendingBookingDraft {
+  profilePatch: Partial<Profile>
+  details: BookingDetails
+  notes: string | null
+}
+
+export function pendingBookingKey(event: Pick<AppEvent, 'type' | 'id'>) {
+  return `pending-booking:${event.type}:${event.id}`
+}
+
 export function RegisterForm({ event, profile, userId, onClose, onBooked, existingBooking }: Props) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-50" onClick={onClose}>
@@ -52,7 +66,10 @@ type ContactMethod = 'whatsapp' | 'line' | 'phone' | 'email'
 export interface RegisterFormBodyProps {
   event: AppEvent
   profile: Profile | null
-  userId: string
+  /** Authed user id. When omitted, the form runs in guest mode: step 2
+   *  collects email/password/ToS and the final submit signs the user up
+   *  before inserting the booking. */
+  userId?: string
   onSubmitSuccess: (booking: unknown) => void
   /** Optional cancel handler — renders a close button in the header when provided. */
   onCancel?: () => void
@@ -65,9 +82,15 @@ export interface RegisterFormBodyProps {
   onBackBeforeStepOne?: () => void
   /** Edit mode: pre-populate from this row and UPDATE on submit. */
   existingBooking?: Booking
+  /** Guest mode: called when signUp succeeds but no session is returned
+   *  (cloud has email-confirmation on). The parent should show a "check
+   *  your email" screen; the draft has already been stashed to localStorage
+   *  under `pendingBookingKey(event)`. */
+  onPendingEmailConfirmation?: (email: string) => void
 }
 
-export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCancel, onBackBeforeStepOne, existingBooking }: RegisterFormBodyProps) {
+export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCancel, onBackBeforeStepOne, existingBooking, onPendingEmailConfirmation }: RegisterFormBodyProps) {
+  const isGuest = !userId
   const isEdit = !!existingBooking
   const initialDetails = existingBooking?.details as BookingDetails | undefined
   // Gating derived from the event
@@ -123,6 +146,12 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   const [nitroxCertified, setNitroxCertified] = useState(profile?.nitrox_certified ?? false)
   const [emergencyName, setEmergencyName]   = useState(profile?.emergency_contact_name  ?? '')
   const [emergencyPhone, setEmergencyPhone] = useState(profile?.emergency_contact_phone ?? '')
+
+  // Guest-mode credentials — only collected when the visitor isn't signed in.
+  // At submit, we signUp with these before inserting the booking.
+  const [guestEmail, setGuestEmail] = useState('')
+  const [guestPassword, setGuestPassword] = useState('')
+  const [guestAgreedTerms, setGuestAgreedTerms] = useState(false)
 
   useEffect(() => {
     if (gearMode === 'a-la-carte' && !gearEdited) {
@@ -185,12 +214,11 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   async function submit() {
     setSaving(true); setErr('')
 
-    // Persist any edits to the diver's profile first. Only columns that have
-    // a value get sent; empty strings become NULL so we don't overwrite
-    // existing data with blanks when a field was left untouched. A Wix
-    // visitor filling these in for the first time ends up with a complete
-    // profile for next time.
     const nullish = (v: string) => v.trim() === '' ? null : v.trim()
+    // Profile changes collected from step 2. In authed mode we UPDATE this
+    // against profiles; in guest mode we stash it in a draft if email
+    // confirmation blocks us, or apply it after the signUp gives us a
+    // session.
     const profilePatch = {
       full_name:               nullish(fullName),
       date_of_birth:           nullish(dob),
@@ -206,8 +234,6 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
       emergency_contact_name:  nullish(emergencyName),
       emergency_contact_phone: nullish(emergencyPhone),
     }
-    const { error: profErr } = await supabase.from('profiles').update(profilePatch).eq('id', userId)
-    if (profErr) { setSaving(false); setErr(profErr.message); return }
 
     const details: BookingDetails = {
       gear: showGear && rentGear
@@ -231,6 +257,41 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
       deposit: event.deposit_amount ?? undefined,
     }
 
+    // Guest path: signUp first. Either we get a session back (email
+    // confirmations off) and proceed, or we don't (confirmations on) and
+    // we stash a draft for RegisterPage to consume when the user returns
+    // via the confirmation link.
+    let effectiveUserId = userId
+    if (isGuest) {
+      const { data, error } = await supabase.auth.signUp({
+        email: guestEmail.trim(),
+        password: guestPassword,
+        options: {
+          emailRedirectTo: window.location.href,
+          data: { agreed_to_terms_at: new Date().toISOString() },
+        },
+      })
+      if (error) { setSaving(false); setErr(error.message); return }
+      const newUserId = data.user?.id
+      if (!newUserId) { setSaving(false); setErr('Sign up failed — please try again.'); return }
+
+      if (!data.session) {
+        const draft: PendingBookingDraft = {
+          profilePatch,
+          details,
+          notes: notes || null,
+        }
+        try { localStorage.setItem(pendingBookingKey(event), JSON.stringify(draft)) } catch { /* storage disabled — user will just refill on return */ }
+        setSaving(false)
+        onPendingEmailConfirmation?.(guestEmail.trim())
+        return
+      }
+      effectiveUserId = newUserId
+    }
+
+    const { error: profErr } = await supabase.from('profiles').update(profilePatch).eq('id', effectiveUserId!)
+    if (profErr) { setSaving(false); setErr(profErr.message); return }
+
     if (existingBooking) {
       // Admin edit path — update in place, don't touch user_id / FK / status.
       const { data, error } = await supabase
@@ -251,7 +312,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
     const { data, error } = await supabase
       .from('bookings')
       .insert({
-        user_id: userId,
+        user_id: effectiveUserId!,
         status: 'pending',
         notes: notes || null,
         details,
@@ -291,6 +352,26 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
           <p className="text-xs text-slate-400">
             Pre-filled if you've registered before. Edits are saved to your profile.
           </p>
+
+          {isGuest && (
+            <div className="border border-slate-700 rounded-lg p-3 space-y-3 bg-slate-900/40">
+              <div>
+                <p className="text-sm font-semibold text-slate-100">Account</p>
+                <p className="text-xs text-slate-400">
+                  We'll create a FunDivers account for you so you can check your booking status and sign up for future events faster.
+                </p>
+              </div>
+              <TextField label="Email *" type="email" value={guestEmail} onChange={setGuestEmail} required />
+              <TextField label="Password * (min 8 characters)" type="password" value={guestPassword} onChange={setGuestPassword} required />
+              <label className="flex items-start gap-2 text-xs text-slate-300">
+                <input type="checkbox" checked={guestAgreedTerms} onChange={e => setGuestAgreedTerms(e.target.checked)} className="accent-sky-500 mt-0.5" />
+                <span>
+                  I agree to the{' '}
+                  <a href="/terms" target="_blank" rel="noreferrer" className="text-sky-400 hover:underline">Terms of Use & Privacy</a>.
+                </span>
+              </label>
+            </div>
+          )}
 
           <div className="space-y-3">
             <TextField label="Full name *"      value={fullName}      onChange={setFullName} required />
@@ -513,7 +594,10 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
         {step < 4 ? (
           <button
             onClick={() => setStep((step + 1) as Step)}
-            disabled={step === 2 && fullName.trim() === ''}
+            disabled={step === 2 && (
+              fullName.trim() === '' ||
+              (isGuest && (guestEmail.trim() === '' || guestPassword.length < 8 || !guestAgreedTerms))
+            )}
             className="bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
           >
             Next ›
@@ -546,7 +630,7 @@ function TextField({
   label: string
   value: string
   onChange: (v: string) => void
-  type?: 'text' | 'email' | 'tel' | 'number' | 'date'
+  type?: 'text' | 'email' | 'tel' | 'number' | 'date' | 'password'
   required?: boolean
   placeholder?: string
   min?: number
