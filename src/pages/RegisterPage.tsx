@@ -3,8 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { fetchEventsForBookings, fetchEventsInRange, formatEventSpan } from '../lib/events'
-import { RegisterFormBody } from '../components/register/RegisterForm'
-import type { AppEvent, Booking } from '../types/database'
+import { RegisterFormBody, pendingBookingKey, type PendingBookingDraft } from '../components/register/RegisterForm'
+import type { AppEvent, Booking, BookingDetails } from '../types/database'
 
 // Public standalone registration page. Two entry paths:
 //   /register                 → event picker (Wix home link, direct URL)
@@ -18,7 +18,7 @@ import type { AppEvent, Booking } from '../types/database'
 // No AppShell chrome — feels like a marketing-funnel landing page for divers
 // arriving from fundiverstw.com, not an app screen.
 
-type Phase = 'loading' | 'event-picker' | 'event-missing' | 'auth-gate' | 'form' | 'already-booked' | 'just-booked'
+type Phase = 'loading' | 'event-picker' | 'event-missing' | 'form' | 'already-booked' | 'just-booked' | 'pending-email'
 
 export function RegisterPage() {
   const { type, id } = useParams<{ type: 'dive' | 'course'; id: string }>()
@@ -29,6 +29,7 @@ export function RegisterPage() {
   const [existing, setExisting] = useState<Booking | null>(null)
   const [justBooked, setJustBooked] = useState<Booking | null>(null)
   const [dataLoading, setDataLoading] = useState(true)
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null)
 
   // Only fetch the specific event when :type/:id are in the URL. For the bare
   // /register path we don't fetch one event; the picker fetches a list.
@@ -76,8 +77,39 @@ export function RegisterPage() {
     : !event                          ? 'event-missing'
     : justBooked                      ? 'just-booked'
     : existing                        ? 'already-booked'
-    : !user                           ? 'auth-gate'
+    : pendingEmail                    ? 'pending-email'
     :                                   'form'
+
+  // If the user returned via an email-confirmation link (now authed) and we
+  // stashed a pending booking draft before they left, submit it for them so
+  // the confirmation click completes both the account and the booking in
+  // one step. Guarded on `existing` so we don't duplicate an already-made
+  // booking.
+  useEffect(() => {
+    if (!user || !event || !type || existing || justBooked || dataLoading) return
+    const key = pendingBookingKey(event)
+    const raw = (() => { try { return localStorage.getItem(key) } catch { return null } })()
+    if (!raw) return
+    // Remove synchronously before the await so StrictMode's double-mount
+    // in dev can't fire a second insert from the same draft.
+    try { localStorage.removeItem(key) } catch { /* ignore */ }
+    let draft: PendingBookingDraft
+    try { draft = JSON.parse(raw) } catch { return }
+    ;(async () => {
+      await supabase.from('profiles').update(draft.profilePatch).eq('id', user.id)
+      const fk = type === 'dive'
+        ? { eo_dive_id: event.id, eo_course_id: null }
+        : { eo_dive_id: null, eo_course_id: event.id }
+      const { data } = await supabase.from('bookings').insert({
+        user_id: user.id,
+        status: 'pending',
+        notes: draft.notes,
+        details: draft.details as BookingDetails,
+        ...fk,
+      }).select().single()
+      if (data) setJustBooked(data as Booking)
+    })()
+  }, [user, event, type, existing, justBooked, dataLoading])
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100">
@@ -106,18 +138,22 @@ export function RegisterPage() {
           <LockedConfirmation event={event} booking={existing} alreadyExisting />
         )}
 
-        {phase === 'auth-gate' && event && <AuthGate event={event} />}
+        {phase === 'pending-email' && pendingEmail && event && (
+          <PendingEmailScreen email={pendingEmail} event={event} />
+        )}
 
-        {phase === 'form' && event && user && (
+        {phase === 'form' && event && (
           <>
+            {!user && <SignInBanner />}
             <EventHeader event={event} />
             <div className="bg-slate-800 rounded-xl p-5">
               <RegisterFormBody
                 event={event}
                 profile={profile}
-                userId={user.id}
+                userId={user?.id}
                 onSubmitSuccess={b => setJustBooked(b as Booking)}
                 onBackBeforeStepOne={() => navigate('/register')}
+                onPendingEmailConfirmation={email => setPendingEmail(email)}
               />
             </div>
           </>
@@ -266,116 +302,80 @@ function EventPickerStep() {
   )
 }
 
-function AuthGate({ event }: { event: AppEvent }) {
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
+// Collapsible banner shown at the top of the form for unauthed visitors.
+// Most guests will just fill in the form; returning divers without a
+// session on this device expand it and sign in to pre-fill the form.
+function SignInBanner() {
+  const [open, setOpen] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [agreed, setAgreed] = useState(false)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
-  const [signupSent, setSignupSent] = useState(false)
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setErr(''); setBusy(true)
-    if (mode === 'signin') {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) setErr(error.message)
-    } else {
-      if (!agreed) { setErr('Please agree to the Terms of Use to continue.'); setBusy(false); return }
-      // Land the confirmation link back on this same register URL so the user
-      // can finish booking after confirming their email in one tap. The
-      // agreement timestamp rides on raw_user_meta_data → handle_new_user
-      // trigger copies it into profiles.agreed_to_terms_at.
-      const { error } = await supabase.auth.signUp({
-        email, password,
-        options: {
-          emailRedirectTo: window.location.href,
-          data: { agreed_to_terms_at: new Date().toISOString() },
-        },
-      })
-      if (error) setErr(error.message)
-      else setSignupSent(true)
-    }
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
     setBusy(false)
-  }
-
-  if (signupSent) {
-    return (
-      <div className="bg-slate-800 rounded-xl p-6 space-y-3 text-center">
-        <div className="text-5xl">📧</div>
-        <h2 className="text-xl font-bold text-slate-100">Check your email</h2>
-        <p className="text-sm text-slate-400">
-          We sent a confirmation link to <strong>{email}</strong>. Click it to finish signing up — you'll come back here automatically to complete your registration for {event.title}.
-        </p>
-      </div>
-    )
+    if (error) setErr(error.message)
+    // On success the useAuth subscription will flip the page into authed
+    // mode and the form re-renders with pre-filled profile values.
   }
 
   return (
-    <>
-      <EventHeader event={event} />
-      <div className="bg-slate-800 rounded-xl p-5 space-y-4">
-        <div className="flex gap-2 text-sm">
+    <div className="bg-slate-800/70 border border-slate-700 rounded-xl p-3 text-sm">
+      {!open ? (
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-slate-300">Already have a FunDivers account?</span>
           <button
-            onClick={() => setMode('signin')}
-            className={`flex-1 py-2 rounded-lg font-semibold transition-colors ${
-              mode === 'signin' ? 'bg-sky-500 text-white' : 'bg-slate-700 text-slate-300'
-            }`}
+            onClick={() => setOpen(true)}
+            className="text-sky-400 font-semibold hover:underline"
           >
             Sign in
           </button>
-          <button
-            onClick={() => setMode('signup')}
-            className={`flex-1 py-2 rounded-lg font-semibold transition-colors ${
-              mode === 'signup' ? 'bg-sky-500 text-white' : 'bg-slate-700 text-slate-300'
-            }`}
-          >
-            Create account
-          </button>
         </div>
-        <p className="text-xs text-slate-400 text-center">
-          {mode === 'signin'
-            ? 'Returning diver? Sign in and we\'ll pull in what we already know about you.'
-            : 'New diver? Create an account — we\'ll build your profile as you go.'}
-        </p>
-
+      ) : (
         <form onSubmit={submit} className="space-y-3">
-          <label className="block">
-            <span className="block text-xs text-slate-400 mb-1">Email</span>
-            <input
-              type="email" required value={email} onChange={e => setEmail(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
-            />
-          </label>
-          <label className="block">
-            <span className="block text-xs text-slate-400 mb-1">Password</span>
-            <input
-              type="password" required value={password} onChange={e => setPassword(e.target.value)}
-              minLength={mode === 'signup' ? 8 : undefined}
-              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
-            />
-          </label>
-          {mode === 'signup' && (
-            <label className="flex items-start gap-2 text-xs text-slate-300">
-              <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} className="accent-sky-500 mt-0.5" />
-              <span>
-                I agree to the{' '}
-                <a href="/terms" target="_blank" rel="noreferrer" className="text-sky-400 hover:underline">Terms of Use & Privacy</a>.
-              </span>
-            </label>
-          )}
-          {err && <p className="text-rose-400 text-sm">{err}</p>}
-          <button
-            type="submit" disabled={busy}
-            className="w-full bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg"
-          >
-            {busy
-              ? '…'
-              : mode === 'signin' ? 'Sign in and continue' : 'Create account and continue'}
+          <div className="flex items-center justify-between">
+            <span className="text-slate-200 font-semibold">Sign in</span>
+            <button type="button" onClick={() => setOpen(false)} className="text-slate-400 text-xs hover:text-slate-200">
+              Cancel
+            </button>
+          </div>
+          <input
+            type="email" required placeholder="Email" value={email}
+            onChange={e => setEmail(e.target.value)}
+            className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
+          />
+          <input
+            type="password" required placeholder="Password" value={password}
+            onChange={e => setPassword(e.target.value)}
+            className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
+          />
+          {err && <p className="text-rose-400 text-xs">{err}</p>}
+          <button type="submit" disabled={busy} className="w-full bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg">
+            {busy ? '…' : 'Sign in'}
           </button>
         </form>
-      </div>
-    </>
+      )}
+    </div>
+  )
+}
+
+// Shown after a guest submits the whole form but cloud returned no
+// session (email confirmation required). The draft has been stashed to
+// localStorage; on their return via the confirmation link, the effect
+// in RegisterPage will auto-insert the booking.
+function PendingEmailScreen({ email, event }: { email: string; event: AppEvent }) {
+  return (
+    <div className="bg-slate-800 rounded-xl p-6 space-y-3 text-center">
+      <div className="text-5xl">📧</div>
+      <h2 className="text-xl font-bold text-slate-100">Confirm your email to finish</h2>
+      <p className="text-sm text-slate-400">
+        We sent a confirmation link to <strong>{email}</strong>. Click it to confirm your
+        account — your registration for <strong>{event.title}</strong> will be submitted
+        automatically when you come back.
+      </p>
+    </div>
   )
 }
