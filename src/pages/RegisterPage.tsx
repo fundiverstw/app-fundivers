@@ -3,9 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { fetchEventsForBookings, fetchEventsInRange, formatEventSpan } from '../lib/events'
-import { RegisterFormBody, pendingBookingKey, type PendingBookingDraft } from '../components/register/RegisterForm'
-import { sendRegistrationPdfEmail } from '../lib/registration-email'
-import type { AppEvent, Booking, BookingDetails } from '../types/database'
+import { RegisterFormBody } from '../components/register/RegisterForm'
+import type { AppEvent, Booking } from '../types/database'
 
 // Public standalone registration page. Two entry paths:
 //   /register                 → event picker (Wix home link, direct URL)
@@ -19,7 +18,7 @@ import type { AppEvent, Booking, BookingDetails } from '../types/database'
 // No AppShell chrome — feels like a marketing-funnel landing page for divers
 // arriving from fundiverstw.com, not an app screen.
 
-type Phase = 'loading' | 'event-picker' | 'event-missing' | 'form' | 'already-booked' | 'just-booked' | 'pending-email'
+type Phase = 'loading' | 'event-picker' | 'event-missing' | 'form' | 'already-booked' | 'just-booked'
 
 export function RegisterPage() {
   const { type, id } = useParams<{ type: 'dive' | 'course'; id: string }>()
@@ -30,7 +29,6 @@ export function RegisterPage() {
   const [existing, setExisting] = useState<Booking | null>(null)
   const [justBooked, setJustBooked] = useState<Booking | null>(null)
   const [dataLoading, setDataLoading] = useState(true)
-  const [pendingEmail, setPendingEmail] = useState<string | null>(null)
 
   // Only fetch the specific event when :type/:id are in the URL. For the bare
   // /register path we don't fetch one event; the picker fetches a list.
@@ -78,65 +76,7 @@ export function RegisterPage() {
     : !event                          ? 'event-missing'
     : justBooked                      ? 'just-booked'
     : existing                        ? 'already-booked'
-    : pendingEmail                    ? 'pending-email'
     :                                   'form'
-
-  // If the user returned via an email-confirmation link (now authed) and
-  // we stashed a pending booking draft before they left, submit it so
-  // the click completes both the account and the booking. Guarded on
-  // `existing` so a duplicate draft can't double-insert.
-  //
-  // Source order: user.user_metadata.pending_booking (set via signUp's
-  // options.data; survives a different device confirming the email),
-  // then localStorage (in-flight drafts from before user_metadata was
-  // adopted; fallback can be removed once nobody old is mid-flow).
-  useEffect(() => {
-    if (!user || !event || !type || existing || justBooked || dataLoading) return
-
-    const meta = (user.user_metadata ?? {}) as { pending_booking?: PendingBookingDraft }
-    const fromMeta = meta.pending_booking
-    const matchesEvent = fromMeta && fromMeta.event_type === type && fromMeta.event_id === event.id
-
-    let draft: PendingBookingDraft | null = null
-    let consumedFromMeta = false
-    if (matchesEvent) {
-      draft = fromMeta!
-      consumedFromMeta = true
-    } else {
-      const key = pendingBookingKey(event)
-      const raw = (() => { try { return localStorage.getItem(key) } catch { return null } })()
-      if (!raw) return
-      // Remove synchronously before the await so StrictMode's double
-      // mount in dev can't fire a second insert from the same draft.
-      try { localStorage.removeItem(key) } catch { /* ignore */ }
-      try { draft = JSON.parse(raw) as PendingBookingDraft } catch { return }
-    }
-    if (!draft) return
-    const settledDraft = draft
-
-    ;(async () => {
-      await supabase.from('profiles').update(settledDraft.profilePatch).eq('id', user.id)
-      const fk = type === 'dive'
-        ? { eo_dive_id: event.id, eo_course_id: null }
-        : { eo_dive_id: null, eo_course_id: event.id }
-      const { data } = await supabase.from('bookings').insert({
-        user_id: user.id,
-        status: 'pending',
-        notes: settledDraft.notes,
-        details: settledDraft.details as BookingDetails,
-        ...fk,
-      }).select().single()
-      if (data) {
-        if (consumedFromMeta) {
-          // Clear the metadata draft so AppShell's pending-booking
-          // banner doesn't keep prompting after the booking landed.
-          supabase.auth.updateUser({ data: { pending_booking: null } }).catch(() => { /* non-fatal */ })
-        }
-        sendRegistrationPdfEmail((data as { id: string }).id)
-        setJustBooked(data as Booking)
-      }
-    })()
-  }, [user, event, type, existing, justBooked, dataLoading])
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100">
@@ -165,10 +105,6 @@ export function RegisterPage() {
           <LockedConfirmation event={event} booking={existing} alreadyExisting />
         )}
 
-        {phase === 'pending-email' && pendingEmail && event && (
-          <PendingEmailScreen email={pendingEmail} event={event} />
-        )}
-
         {phase === 'form' && event && (
           <>
             {!user && <SignInBanner />}
@@ -180,7 +116,6 @@ export function RegisterPage() {
                 userId={user?.id}
                 onSubmitSuccess={b => setJustBooked(b as Booking)}
                 onBackBeforeStepOne={() => navigate('/register')}
-                onPendingEmailConfirmation={email => setPendingEmail(email)}
               />
             </div>
           </>
@@ -389,20 +324,3 @@ function SignInBanner() {
   )
 }
 
-// Shown after a guest submits the whole form but cloud returned no
-// session (email confirmation required). The draft has been stashed to
-// localStorage; on their return via the confirmation link, the effect
-// in RegisterPage will auto-insert the booking.
-function PendingEmailScreen({ email, event }: { email: string; event: AppEvent }) {
-  return (
-    <div className="bg-slate-800 rounded-xl p-6 space-y-3 text-center">
-      <div className="text-5xl">📧</div>
-      <h2 className="text-xl font-bold text-slate-100">Confirm your email to finish</h2>
-      <p className="text-sm text-slate-400">
-        We sent a confirmation link to <strong>{email}</strong>. Click it to confirm your
-        account — your registration for <strong>{event.title}</strong> will be submitted
-        automatically when you come back.
-      </p>
-    </div>
-  )
-}

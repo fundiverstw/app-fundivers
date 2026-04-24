@@ -77,16 +77,24 @@ target installs deps on first run. Secrets are set separately via
 ## Supabase Edge Functions
 
 Each directory under `supabase/functions/` is one deployable function
-(Deno 2 runtime). `make deploy-functions` runs `supabase functions
-deploy send-registration-pdf` against the linked project.
+(Deno 2 runtime). Shared code lives under `supabase/functions/_shared/`
+and is imported relatively. `make deploy-functions` runs `supabase
+functions deploy` (no name → ships every function in the directory)
+against the linked project.
 
-### `send-registration-pdf`
+### `create-registration`
 
-Called from `src/lib/registration-email.ts` right after a booking is
-inserted. Fetches the booking under the caller's JWT (RLS applies),
-pulls the event / profile / rooms / addons via the service role, builds
-a PDF with `npm:jspdf` (matching the old Wix layout), and emails it via
-Gmail SMTP to both `fundiverstw@gmail.com` and the diver's auth email.
+Single atomic endpoint behind the registration form (`RegisterFormBody`).
+Either the body has `email` + `password` (guest flow → creates the
+account with `email_confirm: true`, bypassing the click-to-confirm
+gate) or the caller's Bearer JWT identifies an authed user. Either
+way, the function then UPDATEs the profile, INSERTs the booking,
+builds a PDF (via `_shared/pdf.ts`, layout ported from the Wix
+backend), and emails it via Gmail SMTP to both `fundiverstw@gmail.com`
+and the diver. Returns `{ booking_id, session }`; `session` is
+populated only on the guest path so the client can `setSession`
+immediately. If the booking insert fails on the guest path the
+just-created auth user is deleted to keep retries clean.
 
 Required secrets (`supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" …`):
 
@@ -101,7 +109,7 @@ auto-injected by the edge runtime.
 Deploy:
 
 ```sh
-make deploy-functions      # ships the function
+make deploy-functions      # ships every function under supabase/functions/
 supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" \
   GMAIL_USER=fundiverstw@gmail.com \
   GMAIL_APP_PASSWORD=<app-password>
@@ -110,8 +118,8 @@ supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" \
 Local testing:
 
 ```sh
-supabase functions serve send-registration-pdf --env-file .env.local
-# ...then in another shell, curl with a valid JWT and an existing booking_id.
+supabase functions serve create-registration --env-file .env.local
+# ...then in another shell, curl with a registration body.
 ```
 
 ## Supabase schema workflow

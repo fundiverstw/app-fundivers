@@ -6,19 +6,18 @@ import { RegisterForm, RegisterFormBody } from './RegisterForm'
 import { mockQueryBuilder } from '../../../tests/test-utils'
 import type { AppEvent, EOAddon, EORoom, Profile } from '../../types/database'
 
-const { from, insert, update, invoke, signUp } = vi.hoisted(() => ({
+const { from, update, invoke, setSession } = vi.hoisted(() => ({
   from: vi.fn(),
-  insert: vi.fn(),
   update: vi.fn(),
   invoke: vi.fn(),
-  signUp: vi.fn(),
+  setSession: vi.fn(),
 }))
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: (...a: unknown[]) => from(...a),
     functions: { invoke: (...a: unknown[]) => invoke(...a) },
-    auth: { signUp: (...a: unknown[]) => signUp(...a) },
+    auth: { setSession: (...a: unknown[]) => setSession(...a) },
   },
 }))
 
@@ -64,21 +63,15 @@ const sampleAddons: EOAddon[] = [
   { _id: 'addon-a', title: 'SMB 1 Day', display_name: null, price: 100, currency: 'NTD' },
 ]
 
-function setupFrom(inserted: unknown = { id: 'b-new' }, updated: unknown = { id: 'b-existing' }) {
+function setupFrom(updated: unknown = { id: 'b-existing' }) {
   from.mockImplementation((table: string) => {
     if (table === 'EO_rooms')     return mockQueryBuilder({ data: sampleRooms })
     if (table === 'Other_Addons') return mockQueryBuilder({ data: sampleAddons })
     if (table === 'bookings') {
+      // New bookings now go through the create-registration edge function;
+      // only the admin-edit path still hits bookings.update directly.
       return {
         ...mockQueryBuilder(),
-        insert: (...a: unknown[]) => {
-          insert(...a)
-          return {
-            select: () => ({
-              single: () => Promise.resolve({ data: inserted, error: null }),
-            }),
-          }
-        },
         update: (...a: unknown[]) => {
           update(...a)
           return {
@@ -91,16 +84,15 @@ function setupFrom(inserted: unknown = { id: 'b-new' }, updated: unknown = { id:
         },
       }
     }
-    // profiles + anything else → generic thenable builder that resolves to
-    // { data: null, error: null } so `.update(...).eq(...)` awaits cleanly.
     return mockQueryBuilder()
   })
 }
 
 beforeEach(() => {
-  from.mockReset(); insert.mockReset(); update.mockReset()
-  invoke.mockReset(); signUp.mockReset()
-  invoke.mockResolvedValue({ data: { ok: true }, error: null })
+  from.mockReset(); update.mockReset()
+  invoke.mockReset(); setSession.mockReset()
+  invoke.mockResolvedValue({ data: { booking_id: 'b-new', session: null }, error: null })
+  setSession.mockResolvedValue({ data: null, error: null })
 })
 
 describe('RegisterForm', () => {
@@ -122,23 +114,23 @@ describe('RegisterForm', () => {
     // Step 4: confirm
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
 
-    await waitFor(() => expect(insert).toHaveBeenCalledOnce())
-    const payload = insert.mock.calls[0][0] as Record<string, unknown>
-    expect(payload).toMatchObject({
-      user_id: 'u1',
-      eo_dive_id: 'dive_abc',
-      eo_course_id: null,
-      status: 'pending',
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+    const [fnName, opts] = invoke.mock.calls[0] as [string, { body: Record<string, unknown> }]
+    expect(fnName).toBe('create-registration')
+    expect(opts.body).toMatchObject({
+      event_type: 'dive',
+      event_id: 'dive_abc',
     })
-    const details = payload.details as { gear: { rent: boolean }; transportation: boolean; payment_method: string }
+    // Authed path: no email/password ride-along on the body.
+    expect(opts.body).not.toHaveProperty('email')
+    expect(opts.body).not.toHaveProperty('password')
+    const details = opts.body.details as { gear: { rent: boolean }; transportation: boolean; payment_method: string }
     expect(details.gear.rent).toBe(false)
     expect(details.transportation).toBe(false)
     expect(details.payment_method).toBe('bank_transfer')
 
     await waitFor(() => expect(onBooked).toHaveBeenCalledOnce())
-
-    // PDF-email edge function invoked with the new booking id.
-    expect(invoke).toHaveBeenCalledWith('send-registration-pdf', { body: { booking_id: 'b-new' } })
+    expect(onBooked.mock.calls[0][0]).toEqual({ id: 'b-new' })
   })
 
   it('includes gear items and add-ons in the details payload', async () => {
@@ -177,9 +169,9 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
 
-    await waitFor(() => expect(insert).toHaveBeenCalledOnce())
-    const payload = insert.mock.calls[0][0] as Record<string, unknown>
-    const details = payload.details as {
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+    const opts = invoke.mock.calls[0][1] as { body: Record<string, unknown> }
+    const details = opts.body.details as {
       gear: { rent: boolean; mode: string; items: string[] }
       add_ons: string[]
       transportation: boolean
@@ -266,8 +258,8 @@ describe('RegisterForm', () => {
     await user.click(screen.getByLabelText(/credit card/i))
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
 
-    await waitFor(() => expect(insert).toHaveBeenCalledOnce())
-    const details = (insert.mock.calls[0][0] as Record<string, unknown>).details as { total: number; payment_method: string }
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+    const details = (invoke.mock.calls[0][1] as { body: Record<string, unknown> }).body.details as { total: number; payment_method: string }
     expect(details.payment_method).toBe('credit_card')
     expect(details.total).toBe(Math.round(2800 * 1.05))
   })
@@ -288,23 +280,24 @@ describe('RegisterForm', () => {
     expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
   })
 
-  it('guest path: submits signUp with the booking draft on options.data and bails to onPendingEmailConfirmation when no session is returned', async () => {
+  it('guest path: invokes create-registration with email/password + payload, then setSession on the returned token', async () => {
     setupFrom()
-    // Email-confirmation-on case: signUp returns a user but no session.
-    signUp.mockResolvedValue({ data: { user: { id: 'u-new' }, session: null }, error: null })
-    const onPending = vi.fn()
+    invoke.mockResolvedValueOnce({
+      data: {
+        booking_id: 'b-guest-new',
+        session: { access_token: 'ACCESS', refresh_token: 'REFRESH' },
+      },
+      error: null,
+    })
+    const onBooked = vi.fn()
     const user = userEvent.setup()
     render(
       <MemoryRouter>
-        <RegisterFormBody
-          event={sampleEvent} profile={null}
-          onSubmitSuccess={() => {}}
-          onPendingEmailConfirmation={onPending}
-        />
+        <RegisterFormBody event={sampleEvent} profile={null} onSubmitSuccess={onBooked} />
       </MemoryRouter>
     )
 
-    // Step 1 → 2 (about you, with the new account section because !userId)
+    // Step 1 → 2 (about you with the new-account section, because !userId).
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.type(screen.getByLabelText(/email \*/i), 'new@diver.test')
     await user.type(screen.getByLabelText(/password/i), 'abcdefgh')
@@ -315,24 +308,22 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
 
-    await waitFor(() => expect(signUp).toHaveBeenCalledOnce())
-    const [arg] = signUp.mock.calls[0]
-    expect(arg.email).toBe('new@diver.test')
-    expect(arg.password).toBe('abcdefgh')
-    // The pending booking ride-along — what RegisterPage and AppShell read
-    // back from user_metadata after email confirmation.
-    expect(arg.options.data.pending_booking).toMatchObject({
-      event_type:  'dive',
-      event_id:    'dive_abc',
-      event_title: 'Kenting 2-dive',
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+    const [fnName, opts] = invoke.mock.calls[0] as [string, { body: Record<string, unknown> }]
+    expect(fnName).toBe('create-registration')
+    expect(opts.body).toMatchObject({
+      email:      'new@diver.test',
+      password:   'abcdefgh',
+      event_type: 'dive',
+      event_id:   'dive_abc',
     })
-    expect(arg.options.data.pending_booking.profilePatch).toMatchObject({ full_name: 'Grace Hopper' })
-    expect(typeof arg.options.data.agreed_to_terms_at).toBe('string')
+    expect(typeof opts.body.agreed_to_terms_at).toBe('string')
+    expect(opts.body.profile_patch).toMatchObject({ full_name: 'Grace Hopper' })
 
-    // No booking insert in this branch; consume happens in RegisterPage's
-    // auto-resume after the email link returns the user authed.
-    expect(insert).not.toHaveBeenCalled()
-    expect(onPending).toHaveBeenCalledWith('new@diver.test')
+    // Session token from the function gets handed to setSession so the
+    // diver lands authed without a second round-trip.
+    await waitFor(() => expect(setSession).toHaveBeenCalledWith({ access_token: 'ACCESS', refresh_token: 'REFRESH' }))
+    await waitFor(() => expect(onBooked).toHaveBeenCalledWith({ id: 'b-guest-new' }))
   })
 
   it('in edit mode, pre-populates state from the existing booking and UPDATEs on submit', async () => {
@@ -383,12 +374,11 @@ describe('RegisterForm', () => {
     // The `update` spy is wired to bookings only (profiles routes to the
     // generic thenable builder), so exactly one call expected.
     await waitFor(() => expect(update).toHaveBeenCalledOnce())
-    expect(insert).not.toHaveBeenCalled()
     const payload = update.mock.calls[0][0] as Record<string, unknown>
     expect(payload).toHaveProperty('details')
     expect(payload).toHaveProperty('notes', 'allergic to shellfish')
     expect(onBooked).toHaveBeenCalled()
-    // Admin edits shouldn't re-trigger the PDF-email flow.
+    // Admin edits stay direct — no edge function, no fresh PDF email.
     expect(invoke).not.toHaveBeenCalled()
   })
 })
