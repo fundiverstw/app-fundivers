@@ -7,6 +7,7 @@ import { useAuth } from '../hooks/useAuth'
 import { pushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
 import { GEAR_ITEMS } from '../lib/gear'
 import { uploadCertCard, getCertCardSignedUrl, deleteCertCard } from '../lib/cert-card'
+import type { Profile } from '../types/database'
 import {
   SHOE_UNITS,
   SHOE_GENDERS,
@@ -68,30 +69,35 @@ const inputClass = 'w-full bg-slate-800 border border-slate-600 rounded-lg px-3 
 
 export function ProfilePage() {
   const { user, profile } = useAuth()
+
+  return (
+    <div className="max-w-lg mx-auto space-y-6">
+      <h1 className="text-xl font-bold text-slate-100">My Profile</h1>
+      <NotificationsToggle />
+      {user && profile && (
+        // Keying on profile.id remounts the form whenever a different
+        // profile loads, so all initial state is computed lazily from
+        // props at mount — no sync-state-from-prop effect needed.
+        <ProfileForm key={profile.id} user={user} profile={profile} />
+      )}
+    </div>
+  )
+}
+
+function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile }) {
   const { register, handleSubmit, reset, formState: { errors, isSubmitting, isDirty } } = useForm<FormData>({
     resolver: zodResolver(schema),
+    defaultValues: profile as unknown as FormData,
   })
 
-  const [gearOwned, setGearOwned] = useState<string[]>([])
-  const [shoeUnit, setShoeUnit] = useState<ShoeUnit>('eu')
-  const [shoeGender, setShoeGender] = useState<ShoeGender>('m')
-  const [shoeValue, setShoeValue] = useState<string>('') // select value as a string
+  const [gearOwned, setGearOwned] = useState<string[]>(
+    () => Array.isArray(profile.gear_owned) ? [...profile.gear_owned] : []
+  )
+  const initialShoe = useMemo(() => parseShoeSize(profile.shoe_size), [profile.shoe_size])
+  const [shoeUnit, setShoeUnit] = useState<ShoeUnit>(() => initialShoe?.unit ?? 'eu')
+  const [shoeGender, setShoeGender] = useState<ShoeGender>(() => initialShoe?.gender ?? 'm')
+  const [shoeValue, setShoeValue] = useState<string>(() => initialShoe ? String(initialShoe.value) : '')
   const [dirtyExtras, setDirtyExtras] = useState(false)
-
-  useEffect(() => {
-    if (!profile) return
-    reset(profile as unknown as FormData)
-    setGearOwned(Array.isArray(profile.gear_owned) ? [...profile.gear_owned] : [])
-    const parsed = parseShoeSize(profile.shoe_size)
-    if (parsed) {
-      setShoeUnit(parsed.unit)
-      setShoeGender(parsed.gender)
-      setShoeValue(String(parsed.value))
-    } else {
-      setShoeUnit('eu'); setShoeGender('m'); setShoeValue('')
-    }
-    setDirtyExtras(false)
-  }, [profile, reset])
 
   const shoeOptions = useMemo(() => shoeSizesFor(shoeUnit, shoeGender), [shoeUnit, shoeGender])
   const jpHint = useMemo(() => {
@@ -164,12 +170,7 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto space-y-6">
-      <h1 className="text-xl font-bold text-slate-100">My Profile</h1>
-
-      <NotificationsToggle />
-
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <section className="bg-slate-800 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-sky-400 uppercase tracking-wider">Personal Info</h2>
           <Field label="Full name">
@@ -304,8 +305,7 @@ export function ProfilePage() {
         >
           {isSubmitting ? 'Saving…' : 'Save changes'}
         </button>
-      </form>
-    </div>
+    </form>
   )
 }
 
