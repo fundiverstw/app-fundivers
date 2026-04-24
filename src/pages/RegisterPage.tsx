@@ -167,7 +167,7 @@ function LockedConfirmation({ event, booking, alreadyExisting = false }: { event
     <div className="bg-slate-800 rounded-xl p-6 space-y-4 text-center">
       <div className="text-5xl">{alreadyExisting ? '📋' : '✅'}</div>
       <h1 className="text-xl font-bold text-slate-100">
-        {alreadyExisting ? "You're already registered" : 'Registration submitted'}
+        {alreadyExisting ? "You're already registered" : 'Your registration has been submitted'}
       </h1>
       <p className="text-sm text-slate-400">
         {event.title} · {formatEventSpan(event, { style: 'compact' })}
@@ -177,7 +177,7 @@ function LockedConfirmation({ event, booking, alreadyExisting = false }: { event
         <p className="capitalize">{booking.status}</p>
       </div>
       <p className="text-xs text-slate-500">
-        Details are locked once submitted. Need a change? Contact FunDivers staff and they'll adjust it for you.
+        Sign in any time at <a href="https://app.fundiverstw.com" className="text-sky-400 hover:underline">app.fundiverstw.com</a> to track your booking and payment status.
       </p>
       <Link to="/bookings" className="inline-block bg-sky-500 hover:bg-sky-600 text-white font-semibold px-5 py-2 rounded-lg">
         View my bookings
@@ -318,6 +318,9 @@ function SignInBanner() {
           <button type="submit" disabled={busy} className="w-full bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg">
             {busy ? '…' : 'Sign in'}
           </button>
+          <p className="text-center text-xs">
+            <Link to="/forgot-password" className="text-sky-400 hover:underline">Forgot password?</Link>
+          </p>
         </form>
       )}
     </div>

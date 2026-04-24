@@ -99,9 +99,11 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   const initialDetails = existingBooking?.details as BookingDetails | undefined
   // Gating derived from the event
   const diveDays = Math.max(1, event.dive_days ?? 1)
-  const showGear = event.type === 'dive'
-    ? !!event.gear_rental_info
-    : (event.dive_days ?? 0) > 0
+  // Courses with dive days bundle gear in — we record the fact in the
+  // booking but don't prompt. Dives expose the rent toggle when the
+  // admin filled in gear_rental_info on EO_dives.
+  const gearIncluded = event.type === 'course' && (event.dive_days ?? 0) > 0
+  const showGearRentChoice = event.type === 'dive' && !!event.gear_rental_info
   const showRooms = event.has_rooms && event.room_type_ids.length > 0
   const showAddons = event.has_addons && event.addon_ids.length > 0
   const showNitroxAddon = event.nitrox_required && !(profile?.nitrox_certified ?? false)
@@ -116,8 +118,10 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   // flag is set true in edit mode so we don't stomp the saved a-la-carte list
   // with the profile's gear_owned fallback.
   const [rentGear, setRentGear] = useState(initialDetails?.gear?.rent ?? false)
-  const [gearMode, setGearMode] = useState<'full' | 'a-la-carte' | 'provided'>(
-    initialDetails?.gear?.rent ? (initialDetails.gear.mode ?? 'full') : 'full'
+  const [gearMode, setGearMode] = useState<'full' | 'a-la-carte'>(
+    // Legacy bookings may carry mode: 'provided' from the old dropdown;
+    // treat that as "no rental" rather than crashing the dropdown.
+    initialDetails?.gear?.rent && initialDetails.gear.mode === 'a-la-carte' ? 'a-la-carte' : 'full'
   )
   const [gearItems, setGearItems] = useState<string[]>(
     (initialDetails?.gear?.rent && initialDetails.gear.items) ? initialDetails.gear.items : []
@@ -186,11 +190,10 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   }, [event.id, showRooms, showAddons, event.room_type_ids, event.addon_ids])
 
   const gearCost = useMemo(() => {
-    if (!showGear || !rentGear) return 0
+    if (!showGearRentChoice || !rentGear) return 0
     if (gearMode === 'full') return GEAR_FULLSET_DAILY * diveDays
-    if (gearMode === 'a-la-carte') return gearItems.reduce((s, item) => s + (GEAR_ALACARTE_PRICES[item] ?? 0) * diveDays, 0)
-    return 0
-  }, [showGear, rentGear, gearMode, gearItems, diveDays])
+    return gearItems.reduce((s, item) => s + (GEAR_ALACARTE_PRICES[item] ?? 0) * diveDays, 0)
+  }, [showGearRentChoice, rentGear, gearMode, gearItems, diveDays])
 
   const roomCost = useMemo(() => rooms.find(r => r._id === roomId)?.added_price ?? 0, [rooms, roomId])
   const addonsCost = useMemo(() => {
@@ -236,18 +239,20 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
     }
 
     const details: BookingDetails = {
-      gear: showGear && rentGear
-        ? {
-            rent: true,
-            mode: gearMode,
-            items: gearMode === 'a-la-carte' ? gearItems : undefined,
-            size_overrides: {
-              height_cm: profile?.height_cm ?? null,
-              weight_kg: profile?.weight_kg ?? null,
-              shoe_size: profile?.shoe_size ?? null,
-            },
-          }
-        : { rent: false },
+      gear: gearIncluded
+        ? { rent: false, included: true }
+        : (showGearRentChoice && rentGear
+          ? {
+              rent: true,
+              mode: gearMode,
+              items: gearMode === 'a-la-carte' ? gearItems : undefined,
+              size_overrides: {
+                height_cm: profile?.height_cm ?? null,
+                weight_kg: profile?.weight_kg ?? null,
+                shoe_size: profile?.shoe_size ?? null,
+              },
+            }
+          : { rent: false }),
       room: (showRooms && roomId) ? { option_id: roomId, notes: roomNotes || null } : undefined,
       add_ons: showAddons ? [...addonIds] : [],
       transportation: needsTransport,
@@ -416,11 +421,17 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
         <section className="space-y-4">
           <h2 className="text-lg font-bold text-slate-100">Extras</h2>
 
-          {!showGear && !showRooms && !showAddons && !showNitroxAddon && (
+          {!gearIncluded && !showGearRentChoice && !showRooms && !showAddons && !showNitroxAddon && (
             <p className="text-slate-400 text-sm">No extras for this event.</p>
           )}
 
-          {showGear && (
+          {gearIncluded && (
+            <p className="text-sm text-slate-300">
+              Gear is included with this course — no need to rent.
+            </p>
+          )}
+
+          {showGearRentChoice && (
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-sm text-slate-300">
                 <input type="checkbox" checked={rentGear} onChange={e => setRentGear(e.target.checked)} className="accent-sky-500" />
@@ -438,7 +449,6 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
                   >
                     <option value="full">Full set ({GEAR_FULLSET_DAILY.toLocaleString()}/day)</option>
                     <option value="a-la-carte">À-la-carte</option>
-                    <option value="provided">Provided by shop</option>
                   </select>
                   {gearMode === 'a-la-carte' && (
                     <>
