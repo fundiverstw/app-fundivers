@@ -1,11 +1,14 @@
 # Deployment
 
-Two things get deployed:
+Three things get deployed:
 
 1. **The SPA** — Cloudflare Worker hosting the built `dist/` assets.
 2. **The push cron** — separate Cloudflare Worker in `workers/push/`
    running the daily reminder job. See
    [push-notifications.md](./push-notifications.md) for that one.
+3. **Supabase Edge Functions** under `supabase/functions/` — on-demand
+   server code (PDF emailer, etc.), deployed via `supabase functions
+   deploy`.
 
 Database changes deploy via `supabase db push` — a separate workflow
 described below.
@@ -70,6 +73,46 @@ deploy you may need `wrangler login` to authenticate.
 target installs deps on first run. Secrets are set separately via
 `wrangler secret put` — see
 [push-notifications.md § Configure the worker](./push-notifications.md#4-configure-the-worker).
+
+## Supabase Edge Functions
+
+Each directory under `supabase/functions/` is one deployable function
+(Deno 2 runtime). `make deploy-functions` runs `supabase functions
+deploy send-registration-pdf` against the linked project.
+
+### `send-registration-pdf`
+
+Called from `src/lib/registration-email.ts` right after a booking is
+inserted. Fetches the booking under the caller's JWT (RLS applies),
+pulls the event / profile / rooms / addons via the service role, builds
+a PDF with `npm:jspdf` (matching the old Wix layout), and emails it via
+Gmail SMTP to both `fundiverstw@gmail.com` and the diver's auth email.
+
+Required secrets (`supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" …`):
+
+| Secret | What it is |
+| --- | --- |
+| `GMAIL_USER`          | Gmail account that sends the mail |
+| `GMAIL_APP_PASSWORD`  | Gmail [app password](https://support.google.com/accounts/answer/185833) — not the normal password |
+
+`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_ANON_KEY` are
+auto-injected by the edge runtime.
+
+Deploy:
+
+```sh
+make deploy-functions      # ships the function
+supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" \
+  GMAIL_USER=fundiverstw@gmail.com \
+  GMAIL_APP_PASSWORD=<app-password>
+```
+
+Local testing:
+
+```sh
+supabase functions serve send-registration-pdf --env-file .env.local
+# ...then in another shell, curl with a valid JWT and an existing booking_id.
+```
 
 ## Supabase schema workflow
 

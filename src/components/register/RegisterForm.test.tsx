@@ -5,14 +5,18 @@ import { RegisterForm } from './RegisterForm'
 import { mockQueryBuilder } from '../../../tests/test-utils'
 import type { AppEvent, EOAddon, EORoom, Profile } from '../../types/database'
 
-const { from, insert, update } = vi.hoisted(() => ({
+const { from, insert, update, invoke } = vi.hoisted(() => ({
   from: vi.fn(),
   insert: vi.fn(),
   update: vi.fn(),
+  invoke: vi.fn(),
 }))
 
 vi.mock('../../lib/supabase', () => ({
-  supabase: { from: (...a: unknown[]) => from(...a) },
+  supabase: {
+    from: (...a: unknown[]) => from(...a),
+    functions: { invoke: (...a: unknown[]) => invoke(...a) },
+  },
 }))
 
 const sampleEvent: AppEvent = {
@@ -90,7 +94,11 @@ function setupFrom(inserted: unknown = { id: 'b-new' }, updated: unknown = { id:
   })
 }
 
-beforeEach(() => { from.mockReset(); insert.mockReset(); update.mockReset() })
+beforeEach(() => {
+  from.mockReset(); insert.mockReset(); update.mockReset()
+  invoke.mockReset()
+  invoke.mockResolvedValue({ data: { ok: true }, error: null })
+})
 
 describe('RegisterForm', () => {
   it('walks through 4 steps and submits a minimal booking with empty details structure', async () => {
@@ -125,6 +133,9 @@ describe('RegisterForm', () => {
     expect(details.payment_method).toBe('bank_transfer')
 
     await waitFor(() => expect(onBooked).toHaveBeenCalledOnce())
+
+    // PDF-email edge function invoked with the new booking id.
+    expect(invoke).toHaveBeenCalledWith('send-registration-pdf', { body: { booking_id: 'b-new' } })
   })
 
   it('includes gear items and add-ons in the details payload', async () => {
@@ -327,5 +338,7 @@ describe('RegisterForm', () => {
     expect(payload).toHaveProperty('details')
     expect(payload).toHaveProperty('notes', 'allergic to shellfish')
     expect(onBooked).toHaveBeenCalled()
+    // Admin edits shouldn't re-trigger the PDF-email flow.
+    expect(invoke).not.toHaveBeenCalled()
   })
 })

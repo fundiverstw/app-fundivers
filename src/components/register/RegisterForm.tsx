@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { formatEventSpan } from '../../lib/events'
 import { GEAR_ITEMS } from '../../lib/gear'
+import { sendRegistrationPdfEmail } from '../../lib/registration-email'
 import type { AppEvent, Booking, BookingDetails, Database, EOAddon, EORoom, Profile } from '../../types/database'
 
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
@@ -324,7 +325,10 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
 
     setSaving(false)
     if (error) { setErr(error.message); return }
-    if (data) onSubmitSuccess(data)
+    if (data) {
+      sendRegistrationPdfEmail((data as { id: string }).id)
+      onSubmitSuccess(data)
+    }
   }
 
   return (
