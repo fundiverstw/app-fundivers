@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { CalendarPage } from './CalendarPage'
@@ -28,6 +28,14 @@ vi.mock('../lib/events', async () => {
 vi.mock('../hooks/useAuth', () => ({
   useAuth: () => useAuthMock(),
 }))
+
+// Pin the clock to a stable mid-month date. The calendar grid renders
+// only the current month's days, so `future(7)` has to land within the
+// same month — without pinning, tests break whenever the real clock is
+// within a week of month-end (Apr 24+ pushed future events into May and
+// off the April grid).
+beforeAll(() => { vi.useFakeTimers({ shouldAdvanceTime: true }); vi.setSystemTime(new Date('2026-06-15T00:00:00Z')) })
+afterAll(() => { vi.useRealTimers() })
 
 beforeEach(() => {
   from.mockReset()
