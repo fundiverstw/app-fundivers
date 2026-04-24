@@ -195,7 +195,7 @@ describe('profiles constraints', () => {
   it('contact_method CHECK rejects values outside the enum', async () => {
     const { error } = await admin
       .from('profiles')
-      // @ts-expect-error
+      // @ts-expect-error: invalid enum value is the point of the test
       .update({ contact_method: 'carrier-pigeon' })
       .eq('id', user.id)
     expect(error).toBeTruthy()
@@ -248,7 +248,7 @@ describe('payments constraints', () => {
       .insert({
         user_id: user.id,
         amount: 100,
-        // @ts-expect-error
+        // @ts-expect-error: invalid enum value is the point of the test
         status: 'wild-west',
       })
     expect(error).toBeTruthy()
