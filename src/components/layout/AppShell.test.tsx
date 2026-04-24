@@ -107,36 +107,6 @@ describe('AppShell', () => {
     expect(screen.queryByRole('link', { name: /view as admin/i })).not.toBeInTheDocument()
   })
 
-  it('shows a "finish your registration" banner when user_metadata.pending_booking is set', () => {
-    useAuthMock.mockReturnValue({
-      user: { user_metadata: { pending_booking: { event_type: 'dive', event_id: 'dive_abc', event_title: 'Kenting Dive' } } },
-      profile: null,
-      signOut,
-    })
-    routedRender('/calendar')
-    expect(screen.getByText(/finish your registration/i)).toBeInTheDocument()
-    expect(screen.getByText('Kenting Dive')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /finish/i })).toHaveAttribute('href', '/register/dive/dive_abc')
-  })
-
-  it('hides the pending-booking banner when already on the matching /register route', () => {
-    useAuthMock.mockReturnValue({
-      user: { user_metadata: { pending_booking: { event_type: 'dive', event_id: 'dive_abc', event_title: 'Kenting Dive' } } },
-      profile: null,
-      signOut,
-    })
-    render(
-      <MemoryRouter initialEntries={['/register/dive/dive_abc']}>
-        <Routes>
-          <Route element={<AppShell />}>
-            <Route path="/register/:type/:id" element={<div>REG</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>
-    )
-    expect(screen.queryByText(/finish your registration/i)).not.toBeInTheDocument()
-  })
-
   it('renders all five bottom nav links', () => {
     useAuthMock.mockReturnValue({ profile: null, signOut })
     routedRender()

@@ -2,13 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { formatEventSpan } from '../../lib/events'
 import { GEAR_ITEMS } from '../../lib/gear'
-import { sendRegistrationPdfEmail } from '../../lib/registration-email'
 import type { AppEvent, Booking, BookingDetails, Database, EOAddon, EORoom, Profile } from '../../types/database'
 
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
 
 // RegisterForm = modal wrapper around RegisterFormBody.
-// RegisterFormBody = the actual 3-step form, reusable from a standalone page
+// RegisterFormBody = the actual 4-step form, reusable from a standalone page
 // or the admin edit modal.
 
 interface Props {
@@ -20,30 +19,6 @@ interface Props {
   /** If provided, the form opens in edit mode: pre-populated from this row
    *  and submit UPDATEs instead of INSERTing. Used by the admin edit modal. */
   existingBooking?: Booking
-}
-
-// Draft of a guest submission that couldn't complete because email
-// confirmation was required at signup. Travels with the account on
-// auth.users.raw_user_meta_data (via signUp's options.data → readable
-// as user.user_metadata after confirm), so the cross-device case
-// (signed up on laptop, confirmed on phone) still picks up where the
-// diver left off. Includes the event identity so RegisterPage can
-// validate the URL match before inserting.
-export interface PendingBookingDraft {
-  event_type: AppEvent['type']
-  event_id: string
-  event_title: string
-  profilePatch: ProfileUpdate
-  details: BookingDetails
-  notes: string | null
-}
-
-// LocalStorage key kept for in-flight drafts from the previous deploy
-// (which stashed there). New drafts go straight to user_metadata; this
-// fallback can be removed once everyone old has either confirmed or
-// abandoned.
-export function pendingBookingKey(event: Pick<AppEvent, 'type' | 'id'>) {
-  return `pending-booking:${event.type}:${event.id}`
 }
 
 export function RegisterForm({ event, profile, userId, onClose, onBooked, existingBooking }: Props) {
@@ -80,8 +55,9 @@ export interface RegisterFormBodyProps {
   event: AppEvent
   profile: Profile | null
   /** Authed user id. When omitted, the form runs in guest mode: step 2
-   *  collects email/password/ToS and the final submit signs the user up
-   *  before inserting the booking. */
+   *  collects email/password/ToS and the final submit creates the
+   *  account, profile, and booking atomically via the
+   *  create-registration edge function. */
   userId?: string
   onSubmitSuccess: (booking: unknown) => void
   /** Optional cancel handler — renders a close button in the header when provided. */
@@ -95,14 +71,9 @@ export interface RegisterFormBodyProps {
   onBackBeforeStepOne?: () => void
   /** Edit mode: pre-populate from this row and UPDATE on submit. */
   existingBooking?: Booking
-  /** Guest mode: called when signUp succeeds but no session is returned
-   *  (cloud has email-confirmation on). The parent should show a "check
-   *  your email" screen; the draft has already been stashed to localStorage
-   *  under `pendingBookingKey(event)`. */
-  onPendingEmailConfirmation?: (email: string) => void
 }
 
-export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCancel, onBackBeforeStepOne, existingBooking, onPendingEmailConfirmation }: RegisterFormBodyProps) {
+export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCancel, onBackBeforeStepOne, existingBooking }: RegisterFormBodyProps) {
   const isGuest = !userId
   const isEdit = !!existingBooking
   const initialDetails = existingBooking?.details as BookingDetails | undefined
@@ -228,11 +199,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
     setSaving(true); setErr('')
 
     const nullish = (v: string) => v.trim() === '' ? null : v.trim()
-    // Profile changes collected from step 2. In authed mode we UPDATE this
-    // against profiles; in guest mode we stash it in a draft if email
-    // confirmation blocks us, or apply it after the signUp gives us a
-    // session.
-    const profilePatch = {
+    const profilePatch: ProfileUpdate = {
       full_name:               nullish(fullName),
       date_of_birth:           nullish(dob),
       nationality:             nullish(nationality),
@@ -270,52 +237,9 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
       deposit: event.deposit_amount ?? undefined,
     }
 
-    // Guest path: signUp first. Either we get a session back (email
-    // confirmations off) and proceed, or we don't (confirmations on) and
-    // we stash a draft for RegisterPage to consume when the user returns
-    // via the confirmation link.
-    let effectiveUserId = userId
-    if (isGuest) {
-      const draft: PendingBookingDraft = {
-        event_type: event.type,
-        event_id: event.id,
-        event_title: event.title,
-        profilePatch,
-        details,
-        notes: notes || null,
-      }
-      const { data, error } = await supabase.auth.signUp({
-        email: guestEmail.trim(),
-        password: guestPassword,
-        options: {
-          emailRedirectTo: window.location.href,
-          // Stash the draft on auth.users.raw_user_meta_data so it
-          // survives a different device clicking the confirmation link.
-          // RegisterPage's auto-resume reads it back from user_metadata
-          // and clears it via updateUser after the booking is inserted.
-          data: {
-            agreed_to_terms_at: new Date().toISOString(),
-            pending_booking: draft,
-          },
-        },
-      })
-      if (error) { setSaving(false); setErr(error.message); return }
-      const newUserId = data.user?.id
-      if (!newUserId) { setSaving(false); setErr('Sign up failed — please try again.'); return }
-
-      if (!data.session) {
-        setSaving(false)
-        onPendingEmailConfirmation?.(guestEmail.trim())
-        return
-      }
-      effectiveUserId = newUserId
-    }
-
-    const { error: profErr } = await supabase.from('profiles').update(profilePatch).eq('id', effectiveUserId!)
-    if (profErr) { setSaving(false); setErr(profErr.message); return }
-
     if (existingBooking) {
-      // Admin edit path — update in place, don't touch user_id / FK / status.
+      // Admin edit path stays direct — admin already has the row, no
+      // account creation, no email. Don't touch user_id / FK / status.
       const { data, error } = await supabase
         .from('bookings')
         .update({ notes: notes || null, details })
@@ -327,27 +251,38 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
       return
     }
 
-    const fk = event.type === 'dive'
-      ? { eo_dive_id: event.id, eo_course_id: null }
-      : { eo_dive_id: null, eo_course_id: event.id }
-
-    const { data, error } = await supabase
-      .from('bookings')
-      .insert({
-        user_id: effectiveUserId!,
-        status: 'pending',
-        notes: notes || null,
-        details,
-        ...fk,
-      })
-      .select().single()
-
+    // New booking — both guest and authed routes go through the
+    // create-registration edge function so account/profile/booking/email
+    // happen atomically server-side. The function handles the guest case
+    // (creates the account with email_confirm: true) when email/password
+    // are provided; authed callers' Bearer JWT identifies the user.
+    const { data, error } = await supabase.functions.invoke<{ booking_id: string; session: { access_token: string; refresh_token: string } | null }>(
+      'create-registration',
+      {
+        body: {
+          ...(isGuest ? {
+            email:    guestEmail.trim(),
+            password: guestPassword,
+            agreed_to_terms_at: new Date().toISOString(),
+          } : {}),
+          event_type:    event.type,
+          event_id:      event.id,
+          profile_patch: profilePatch,
+          details,
+          notes:         notes || null,
+        },
+      },
+    )
     setSaving(false)
     if (error) { setErr(error.message); return }
-    if (data) {
-      sendRegistrationPdfEmail((data as { id: string }).id)
-      onSubmitSuccess(data)
+    if (!data?.booking_id) { setErr('Registration failed — please try again.'); return }
+
+    // Guest path returns the session so we can sign the diver in
+    // immediately; authed callers already have a session.
+    if (data.session) {
+      await supabase.auth.setSession(data.session)
     }
+    onSubmitSuccess({ id: data.booking_id })
   }
 
   return (
