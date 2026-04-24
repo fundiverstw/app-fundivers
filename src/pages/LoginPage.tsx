@@ -99,6 +99,10 @@ export function LoginPage() {
           </button>
         </form>
 
+        <p className="text-center text-sm text-slate-400 mt-3">
+          <Link to="/forgot-password" className="text-sky-400 hover:underline">Forgot password?</Link>
+        </p>
+
         <p className="text-center text-sm text-slate-400 mt-6">
           No account?{' '}
           <Link to="/signup" className="text-sky-400 hover:underline">Sign up</Link>

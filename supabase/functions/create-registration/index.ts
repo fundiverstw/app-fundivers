@@ -177,7 +177,7 @@ Deno.serve(async (req) => {
   const details = body.details as Record<string, unknown>
   const roomDetail = details.room as { option_id?: string; notes?: string } | undefined
   const addOnIds   = Array.isArray(details.add_ons) ? details.add_ons as string[] : []
-  const gearDetail = details.gear as { rent?: boolean; mode?: string; items?: string[] } | undefined
+  const gearDetail = details.gear as { rent?: boolean; included?: boolean; mode?: string; items?: string[] } | undefined
 
   let roomBoard: string | null = null
   if (roomDetail?.option_id) {
@@ -225,6 +225,7 @@ Deno.serve(async (req) => {
     roomNotes:       roomDetail?.notes ?? null,
     otherAddons,
     rentGear:        !!gearDetail?.rent,
+    gearIncluded:    !!gearDetail?.included,
     gearMode:        (gearDetail?.mode ?? "") as RegistrationPdfPayload["gearMode"],
     gearItems:       gearDetail?.items ?? [],
     diveDays:        (event?.dive_days as number | null) ?? 1,

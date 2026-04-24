@@ -9,7 +9,11 @@ export type Json = string | number | boolean | null | { [key: string]: Json } | 
 export interface BookingDetails {
   gear?: {
     rent: boolean
-    mode?: 'full' | 'a-la-carte' | 'provided'
+    /** Set when the event itself includes gear (e.g. OW course). The form
+     *  doesn't prompt the diver in this case; we just record the fact so
+     *  the PDF can say "Included with course" instead of "No". */
+    included?: boolean
+    mode?: 'full' | 'a-la-carte'
     items?: string[]
     size_overrides?: {
       height_cm?: number | null
