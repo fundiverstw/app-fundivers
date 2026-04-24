@@ -37,17 +37,37 @@ function renderPage() {
 }
 
 describe('DashboardPage', () => {
-  it('labels as admin console for admin users', () => {
-    useAuthMock.mockReturnValue({ profile: { role: 'admin' } })
+  it('renders the bubbles canvas', () => {
+    useAuthMock.mockReturnValue({ user: null, profile: null })
     renderPage()
-    expect(screen.getByText(/FUNDIVERS · TW/)).toBeInTheDocument()
-    expect(screen.getByText('admin console')).toBeInTheDocument()
     expect(document.querySelector('canvas')).not.toBeNull()
   })
 
-  it('labels as diver console for non-admin users', () => {
-    useAuthMock.mockReturnValue({ profile: { role: 'diver' } })
+  it('shows the WelcomeBanner for a user welcomed within the last 24h', () => {
+    useAuthMock.mockReturnValue({
+      user: { user_metadata: { welcomed_at: new Date().toISOString() } },
+      profile: null,
+    })
     renderPage()
-    expect(screen.getByText('diver console')).toBeInTheDocument()
+    expect(screen.getByText(/welcome to fundivers/i)).toBeInTheDocument()
+  })
+
+  it('hides the WelcomeBanner once 24h have passed since welcomed_at', () => {
+    const longAgo = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString()
+    useAuthMock.mockReturnValue({
+      user: { user_metadata: { welcomed_at: longAgo } },
+      profile: null,
+    })
+    renderPage()
+    expect(screen.queryByText(/welcome to fundivers/i)).not.toBeInTheDocument()
+  })
+
+  it('hides the WelcomeBanner for a user who has never been welcomed', () => {
+    useAuthMock.mockReturnValue({
+      user: { user_metadata: {} },
+      profile: null,
+    })
+    renderPage()
+    expect(screen.queryByText(/welcome to fundivers/i)).not.toBeInTheDocument()
   })
 })

@@ -17,16 +17,16 @@ import type { AppEvent } from '../../types/database'
 // on MonthCalendar). The hover: variant is intentionally NOT on the base
 // class — per-segment self-hover would only light up one day of a bar.
 const TYPE_BAR: Record<AppEvent['type'], string> = {
-  dive:   'bg-sky-500 text-white',
-  course: 'bg-emerald-500 text-white',
+  dive:   'bg-emerald-600 text-white',
+  course: 'bg-sky-500 text-white',
 }
 const TYPE_BAR_HOVER: Record<AppEvent['type'], string> = {
-  dive:   'bg-sky-400 text-white',
-  course: 'bg-emerald-400 text-white',
+  dive:   'bg-emerald-500 text-white',
+  course: 'bg-sky-400 text-white',
 }
 const TYPE_DOT: Record<AppEvent['type'], string> = {
-  dive:   'bg-sky-500',
-  course: 'bg-emerald-500',
+  dive:   'bg-emerald-600',
+  course: 'bg-sky-500',
 }
 const TYPE_LABELS: Record<AppEvent['type'], string> = {
   dive:   'Dive',
@@ -126,9 +126,9 @@ export function MonthCalendar({
       />
 
       <div className="flex items-center justify-between">
-        <button onClick={() => onMonthChange(subMonths(month, 1))} className="p-2 text-slate-400 hover:text-slate-100">‹</button>
-        <h1 className="text-lg font-bold text-slate-100">{format(month, 'MMMM yyyy')}</h1>
-        <button onClick={() => onMonthChange(addMonths(month, 1))} className="p-2 text-slate-400 hover:text-slate-100">›</button>
+        <button onClick={() => onMonthChange(subMonths(month, 1))} className="p-2 text-blue-900 font-medium hover:text-blue-900">‹</button>
+        <h1 className="text-lg font-bold text-white">{format(month, 'MMMM yyyy')}</h1>
+        <button onClick={() => onMonthChange(addMonths(month, 1))} className="p-2 text-blue-900 font-medium hover:text-blue-900">›</button>
       </div>
 
       <MonthGrid
@@ -142,15 +142,15 @@ export function MonthCalendar({
       />
 
       <div className="space-y-2">
-        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">{listTitle}</h2>
+        <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider">{listTitle}</h2>
         {inMonthEvents.length === 0 && (
-          <p className="text-slate-500 text-sm">No events scheduled.</p>
+          <p className="text-blue-950 font-medium text-sm">No events scheduled.</p>
         )}
         {inMonthEvents.map(ev => (
           <button
             key={ev.id}
             onClick={() => onPickEvent(ev)}
-            className="w-full text-left bg-slate-800 rounded-xl p-3 hover:bg-slate-700 transition-colors"
+            className="w-full text-left bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-3 hover:border-red-500 transition-colors"
           >
             <div className="flex items-start justify-between">
               <div>
@@ -158,17 +158,17 @@ export function MonthCalendar({
                   <span className={`text-xs px-1.5 py-0.5 rounded-full text-white ${TYPE_DOT[ev.type]}`}>
                     {TYPE_LABELS[ev.type]}
                   </span>
-                  <span className="font-medium text-slate-100 text-sm">{ev.title}</span>
-                  {ev.featured && <span className="text-xs text-amber-400">★</span>}
+                  <span className="font-medium text-blue-900 text-sm">{ev.title}</span>
+                  {ev.featured && <span className="text-xs text-red-600">★</span>}
                 </div>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-blue-900 font-medium mt-1">
                   {formatEventSpan(ev)}
                 </p>
               </div>
               <div className="text-right shrink-0 space-y-0.5">
                 {renderListBadge?.(ev)}
                 {ev.fully_booked && (
-                  <p className="text-xs text-rose-400 font-medium">Fully booked</p>
+                  <p className="text-xs text-red-600 font-semibold">Fully booked</p>
                 )}
               </div>
             </div>
@@ -194,14 +194,14 @@ function MonthGrid({ month, days, ranges, trackRows, onPickEvent, hoveredEventId
   const cellMinHeight = 22 + Math.max(1, trackRows) * (TRACK_HEIGHT + TRACK_GAP) + 6
 
   return (
-    <div className="grid grid-cols-7 bg-slate-800 rounded-xl overflow-hidden text-sm">
+    <div className="grid grid-cols-7 bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl overflow-hidden text-sm">
       {['S','M','T','W','T','F','S'].map((d, i) => (
-        <div key={i} className="bg-slate-900/40 text-center text-xs text-slate-500 py-1 border-b border-slate-700">{d}</div>
+        <div key={i} className="bg-sky-100 text-center text-xs text-blue-900 font-semibold py-1 border-b border-sky-200">{d}</div>
       ))}
       {Array.from({ length: leading }).map((_, i) => (
         <div
           key={`empty-${i}`}
-          className="bg-slate-800 border-b border-slate-700/60"
+          className="bg-sky-50/50 border-b border-sky-200/60"
           style={{ minHeight: cellMinHeight }}
         />
       ))}
@@ -246,13 +246,13 @@ function DayCell({
 
   return (
     <div
-      className={`relative pt-1 border-b border-slate-700/60 ${
-        isToday ? 'bg-rose-900/30' : 'bg-slate-800'
+      className={`relative pt-1 border-b border-sky-200/60 ${
+        isToday ? 'bg-red-50' : ''
       } ${!inMonth ? 'opacity-40' : ''}`}
       style={{ minHeight }}
     >
       <span className={`text-[10px] block text-center w-5 h-5 flex items-center justify-center mx-auto ${
-        isToday ? 'text-rose-200 font-bold' : 'text-slate-300'
+        isToday ? 'text-red-700 font-bold' : 'text-blue-900'
       }`}>
         {format(day, 'd')}
       </span>
@@ -271,7 +271,7 @@ function DayCell({
           ))}
       </div>
       {overflow > 0 && (
-        <div className="text-[9px] text-slate-400 text-center -mt-0.5">+{overflow} more</div>
+        <div className="text-[9px] text-blue-900 font-medium text-center -mt-0.5">+{overflow} more</div>
       )}
     </div>
   )
@@ -366,8 +366,8 @@ function FilterLegend({
         aria-label="Toggle dives"
         className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors ${
           diveShown
-            ? 'bg-slate-800 border-slate-600 text-slate-200'
-            : 'bg-slate-900 border-slate-700 text-slate-500 line-through'
+            ? 'bg-white border-blue-900 text-blue-900'
+            : 'bg-sky-100 border-sky-200 text-blue-950 font-medium line-through'
         }`}
       >
         <span className={`w-2 h-2 rounded-full ${TYPE_DOT.dive}`} />
@@ -383,14 +383,14 @@ function FilterLegend({
           aria-label="Filter courses"
           className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors ${
             allCoursesHidden
-              ? 'bg-slate-900 border-slate-700 text-slate-500 line-through'
-              : 'bg-slate-800 border-slate-600 text-slate-200'
+              ? 'bg-sky-100 border-sky-200 text-blue-950 font-medium line-through'
+              : 'bg-white border-blue-900 text-blue-900'
           }`}
         >
           <span className={`w-2 h-2 rounded-full ${TYPE_DOT.course}`} />
           Courses
           {hiddenCourses.size > 0 && !allCoursesHidden && (
-            <span className="ml-0.5 text-[10px] text-slate-400">({visibleCourses}/{courseCategories.length})</span>
+            <span className="ml-0.5 text-[10px] text-blue-900 font-medium">({visibleCourses}/{courseCategories.length})</span>
           )}
           <span aria-hidden="true">▾</span>
         </button>
@@ -398,10 +398,10 @@ function FilterLegend({
         {open && (
           <div
             role="menu"
-            className="absolute left-0 top-full mt-1 z-20 min-w-[180px] bg-slate-900 border border-slate-700 rounded-lg shadow-lg p-2 space-y-1"
+            className="absolute left-0 top-full mt-1 z-20 min-w-[180px] bg-white border border-red-500 rounded-lg shadow-lg p-2 space-y-1"
           >
             {courseCategories.length === 0 && (
-              <p className="text-slate-500 text-xs px-2 py-1">No courses in this range.</p>
+              <p className="text-blue-900 font-medium text-xs px-2 py-1">No courses in this range.</p>
             )}
             {courseCategories.map(cat => {
               const shown = !hiddenCourses.has(cat)
@@ -409,16 +409,16 @@ function FilterLegend({
               return (
                 <label
                   key={cat}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-800 cursor-pointer"
+                  className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-sky-50 cursor-pointer"
                 >
                   <input
                     type="checkbox"
                     checked={shown}
                     onChange={() => onToggleCategory(cat)}
-                    className="accent-emerald-500"
+                    className="accent-blue-900"
                   />
-                  <span className="text-slate-200 text-xs font-semibold">{short}</span>
-                  {short !== cat && <span className="text-slate-500 text-[11px]">{cat}</span>}
+                  <span className="text-blue-900 text-xs font-semibold">{short}</span>
+                  {short !== cat && <span className="text-blue-900 font-medium text-[11px]">{cat}</span>}
                 </label>
               )
             })}

@@ -8,8 +8,8 @@ import { RegisterForm } from '../components/register/RegisterForm'
 import type { AppEvent, Booking } from '../types/database'
 
 const TYPE_DOT: Record<AppEvent['type'], string> = {
-  dive:   'bg-sky-500',
-  course: 'bg-emerald-500',
+  dive:   'bg-emerald-600',
+  course: 'bg-sky-500',
 }
 const TYPE_LABELS: Record<AppEvent['type'], string> = {
   dive:   'Dive',
@@ -89,35 +89,35 @@ export function CalendarPage() {
         events={events}
         onPickEvent={setSelected}
         renderListBadge={ev => isBooked(ev)
-          ? <span className="text-xs text-emerald-400 font-medium">Booked</span>
+          ? <span className="text-xs text-red-600 font-semibold">Booked</span>
           : null
         }
       />
 
       {selected && (
-        <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-50" onClick={() => setSelected(null)}>
-          <div className="bg-slate-800 rounded-t-2xl w-full max-w-lg p-6 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-blue-900/60 backdrop-blur-sm flex items-end justify-center z-50" onClick={() => setSelected(null)}>
+          <div className="bg-white/75 backdrop-blur-md border-t border-red-500 rounded-t-2xl w-full max-w-lg p-6 space-y-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <span className={`text-xs px-2 py-1 rounded-full text-white ${TYPE_DOT[selected.type]}`}>
                 {TYPE_LABELS[selected.type]}
               </span>
-              <button onClick={() => setSelected(null)} className="text-slate-400 text-xl leading-none">×</button>
+              <button onClick={() => setSelected(null)} className="text-blue-900 font-medium hover:text-blue-900 text-xl leading-none">×</button>
             </div>
-            <h2 className="text-xl font-bold text-slate-100">{selected.title}</h2>
-            <div className="text-sm text-slate-400 space-y-1">
+            <h2 className="text-xl font-bold text-blue-900">{selected.title}</h2>
+            <div className="text-sm text-blue-900 font-medium space-y-1">
               <p>{formatEventSpan(selected, { style: 'long' })}</p>
               {selected.price != null && (
                 <p>💰 From {selected.currency} {selected.price.toLocaleString()}</p>
               )}
-              {selected.fully_booked && <p className="text-rose-400">Fully booked</p>}
+              {selected.fully_booked && <p className="text-red-600 font-semibold">Fully booked</p>}
             </div>
             <button
               onClick={isBooked(selected) ? cancelBooking : startRegister}
               disabled={bookingLoading || (!isBooked(selected) && selected.fully_booked)}
               className={`w-full py-3 rounded-xl font-semibold transition-colors disabled:opacity-50 ${
                 isBooked(selected)
-                  ? 'bg-slate-600 hover:bg-red-900 text-slate-200'
-                  : 'bg-sky-500 hover:bg-sky-600 text-white'
+                  ? 'bg-sky-100 hover:bg-red-100 text-red-700 border border-red-500'
+                  : 'bg-blue-900 hover:bg-blue-950 text-white'
               }`}
             >
               {bookingLoading ? '…' : isBooked(selected) ? 'Cancel booking' : 'Register'}

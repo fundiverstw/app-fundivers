@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { Logo } from '../components/Logo'
+import { CARD_ELEVATED, INPUT, INPUT_LABEL, BTN_PRIMARY, TEXT_ERROR, TEXT_LINK, TEXT_MUTED, TEXT_HEADING } from '../styles/tokens'
 
 // Public landing page for the reset-password email link.
 // Supabase's recovery URL drops the diver here with a recovery-scoped
@@ -42,49 +44,46 @@ export function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
-        <h1 className="text-3xl font-bold text-sky-400 text-center mb-2">FunDivers TW</h1>
-        <p className="text-slate-400 text-center mb-8 text-sm">Choose a new password</p>
+    <div className="min-h-screen bg-blue-900 flex items-center justify-center p-4">
+      <div className={`w-full max-w-sm ${CARD_ELEVATED} p-6`}>
+        <div className="flex justify-center mb-3"><Logo size="lg" /></div>
+        <p className={`${TEXT_MUTED} text-center mb-8 text-sm`}>Choose a new password</p>
 
         {done ? (
-          <div className="bg-slate-800 rounded-xl p-6 text-center space-y-3">
+          <div className="text-center space-y-3">
             <div className="text-5xl">✅</div>
-            <h2 className="text-lg font-semibold text-slate-100">Password updated</h2>
-            <p className="text-sm text-slate-400">Signing you in…</p>
+            <h2 className={`text-lg font-semibold ${TEXT_HEADING}`}>Password updated</h2>
+            <p className={`text-sm ${TEXT_MUTED}`}>Signing you in…</p>
           </div>
         ) : !ready ? (
-          <div className="text-center text-slate-400 text-sm">Verifying reset link…</div>
+          <div className={`text-center ${TEXT_MUTED} text-sm`}>Verifying reset link…</div>
         ) : (
           <form onSubmit={submit} className="space-y-4">
             <div>
-              <label className="block text-sm text-slate-300 mb-1">New password</label>
+              <label className={INPUT_LABEL}>New password</label>
               <input
                 type="password" required minLength={8}
                 value={password} onChange={e => setPassword(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
+                className={INPUT}
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-300 mb-1">Confirm password</label>
+              <label className={INPUT_LABEL}>Confirm password</label>
               <input
                 type="password" required minLength={8}
                 value={confirm} onChange={e => setConfirm(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
+                className={INPUT}
               />
             </div>
-            {err && <p className="text-red-400 text-sm">{err}</p>}
-            <button
-              type="submit" disabled={busy}
-              className="w-full bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg transition-colors"
-            >
+            {err && <p className={`${TEXT_ERROR} text-sm`}>{err}</p>}
+            <button type="submit" disabled={busy} className={`w-full ${BTN_PRIMARY}`}>
               {busy ? 'Saving…' : 'Set new password'}
             </button>
           </form>
         )}
 
-        <p className="text-center text-sm text-slate-400 mt-6">
-          <Link to="/login" className="text-sky-400 hover:underline">Back to sign in</Link>
+        <p className={`text-center text-sm ${TEXT_MUTED} mt-6`}>
+          <Link to="/login" className={TEXT_LINK}>Back to sign in</Link>
         </p>
       </div>
     </div>

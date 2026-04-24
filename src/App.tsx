@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import { ProtectedRoute } from './components/layout/ProtectedRoute'
 import { AdminRoute } from './components/layout/AdminRoute'
+import { Logo } from './components/Logo'
 import { AppShell } from './components/layout/AppShell'
 import { AdminShell } from './components/layout/AdminShell'
 import { LoginPage } from './pages/LoginPage'
@@ -82,7 +83,8 @@ export default function App() {
 
 function RegisterLoading() {
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-4">
+      <Logo size="lg" />
       <div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
     </div>
   )

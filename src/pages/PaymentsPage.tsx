@@ -4,6 +4,9 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
 import type { AppEvent, Booking, Payment } from '../types/database'
+import {
+  CARD, BTN_GHOST, TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR,
+} from '../styles/tokens'
 
 interface BookingLine {
   booking: Booking
@@ -17,16 +20,16 @@ interface BookingLine {
 }
 
 const PAYMENT_STATUS_STYLES: Record<Payment['status'], string> = {
-  pending: 'text-amber-400',
-  paid: 'text-emerald-400',
-  refunded: 'text-slate-400',
+  pending: 'text-red-600',
+  paid: 'text-blue-900 font-semibold',
+  refunded: 'text-blue-950 font-medium',
 }
 
 const STATUS_STYLES: Record<Booking['status'], string> = {
-  pending: 'text-amber-400',
-  confirmed: 'text-emerald-400',
-  cancelled: 'text-slate-500',
-  waitlisted: 'text-violet-400',
+  pending: 'text-red-600',
+  confirmed: 'text-blue-900 font-semibold',
+  cancelled: 'text-blue-900/40 line-through',
+  waitlisted: 'text-sky-600',
 }
 
 export function PaymentsPage() {
@@ -99,23 +102,23 @@ export function PaymentsPage() {
   const currency = lines.find(l => l.event)?.event?.currency ?? 'TWD'
 
   if (loading) {
-    return <div className="flex justify-center pt-12"><div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" /></div>
+    return <div className="flex justify-center pt-12"><div className="w-6 h-6 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" /></div>
   }
 
   return (
     <div className="max-w-lg mx-auto space-y-6">
-      <h1 className="text-xl font-bold text-slate-100">Payments</h1>
+      <h1 className="text-xl font-bold text-white">Payments</h1>
 
       <div className="grid grid-cols-3 gap-2">
-        <Summary label="Deposits due" value={totalDepositDue} currency={currency} accent="text-rose-400" />
-        <Summary label="Balance due"  value={totalOwed}       currency={currency} accent="text-amber-400" />
-        <Summary label="Total paid"   value={totalPaid}       currency={currency} accent="text-emerald-400" />
+        <Summary label="Deposits due" value={totalDepositDue} currency={currency} accent="text-red-600" />
+        <Summary label="Balance due"  value={totalOwed}       currency={currency} accent="text-red-600" />
+        <Summary label="Total paid"   value={totalPaid}       currency={currency} accent="text-blue-900" />
       </div>
 
       <section>
-        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-2">Per booking</h2>
+        <h2 className={`text-sm font-semibold ${TEXT_MUTED} uppercase tracking-wider mb-2`}>Per booking</h2>
         {active.length === 0 ? (
-          <p className="text-slate-500 text-sm">No active bookings yet. Check the calendar!</p>
+          <p className={`${TEXT_SUBTLE} text-sm`}>No active bookings yet. Check the calendar!</p>
         ) : (
           <div className="space-y-2">
             {active.map(l => (
@@ -132,7 +135,7 @@ export function PaymentsPage() {
         )}
       </section>
 
-      <p className="text-xs text-slate-500 text-center">
+      <p className={`text-xs ${TEXT_SUBTLE} text-center`}>
         Deposit is due up-front to confirm your spot. Balance is settled closer to the event.
       </p>
     </div>
@@ -141,8 +144,8 @@ export function PaymentsPage() {
 
 function Summary({ label, value, currency, accent }: { label: string; value: number; currency: string; accent: string }) {
   return (
-    <div className="bg-slate-800 rounded-xl p-3 text-center">
-      <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+    <div className={`${CARD} p-3 text-center`}>
+      <p className={`text-xs ${TEXT_MUTED} uppercase tracking-wider mb-1`}>{label}</p>
       <p className={`text-lg font-bold ${accent}`}>{currency} {value.toLocaleString()}</p>
     </div>
   )
@@ -163,41 +166,41 @@ function LineCard({
   const canRefundDeposit = paid > 0 && !refundRequested
 
   return (
-    <div className="bg-slate-800 rounded-xl">
+    <div className={CARD}>
       <button
         type="button"
         onClick={onToggle}
-        className="w-full text-left p-4 flex items-start justify-between hover:bg-slate-700/50 rounded-xl transition-colors"
+        className="w-full text-left p-4 flex items-start justify-between hover:bg-sky-50 rounded-xl transition-colors"
       >
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-slate-100 text-sm">{label}</p>
+          <p className={`font-medium ${TEXT_HEADING} text-sm`}>{label}</p>
           {event && (
-            <p className="text-xs text-slate-400 mt-0.5">{formatEventSpan(event, { withYear: true })}</p>
+            <p className={`text-xs ${TEXT_MUTED} mt-0.5`}>{formatEventSpan(event, { withYear: true })}</p>
           )}
           <p className={`text-xs capitalize mt-0.5 font-medium ${STATUS_STYLES[booking.status]}`}>{booking.status}</p>
           {refundRequested && (
-            <p className="text-xs text-amber-300 mt-0.5">🔄 Refund requested</p>
+            <p className={`text-xs ${TEXT_ERROR} mt-0.5`}>🔄 Refund requested</p>
           )}
         </div>
         <div className="text-right shrink-0 ml-3">
           {total > 0 ? (
             <>
-              <p className="text-sm font-semibold text-slate-100">{currency} {total.toLocaleString()}</p>
+              <p className={`text-sm font-semibold ${TEXT_HEADING}`}>{currency} {total.toLocaleString()}</p>
               {due > 0
-                ? <p className="text-xs text-amber-400">{currency} {due.toLocaleString()} due</p>
-                : <p className="text-xs text-emerald-400">Paid in full</p>}
+                ? <p className={`text-xs ${TEXT_ERROR}`}>{currency} {due.toLocaleString()} due</p>
+                : <p className="text-xs text-blue-900 font-semibold">Paid in full</p>}
             </>
-          ) : <p className="text-xs text-slate-500">—</p>}
-          <p className="text-xs text-slate-500 mt-0.5">{open ? '▲' : '▼'}</p>
+          ) : <p className={`text-xs ${TEXT_SUBTLE}`}>—</p>}
+          <p className={`text-xs ${TEXT_SUBTLE} mt-0.5`}>{open ? '▲' : '▼'}</p>
         </div>
       </button>
 
       {open && (
-        <div className="px-4 pb-4 border-t border-slate-700 pt-3 space-y-3 text-sm">
+        <div className="px-4 pb-4 border-t border-sky-200 pt-3 space-y-3 text-sm">
           {deposit > 0 && (
             <div className="flex justify-between">
-              <span className="text-slate-300">Deposit</span>
-              <span className={depositDue > 0 ? 'text-amber-400 font-medium' : 'text-emerald-400 font-medium'}>
+              <span className={TEXT_BODY}>Deposit</span>
+              <span className={depositDue > 0 ? `${TEXT_ERROR} font-medium` : 'text-blue-900 font-semibold'}>
                 {depositDue > 0
                   ? `${currency} ${depositDue.toLocaleString()} due`
                   : `${currency} ${deposit.toLocaleString()} paid ✓`}
@@ -205,28 +208,28 @@ function LineCard({
             </div>
           )}
           {total > 0 && (
-            <div className="flex justify-between text-slate-300">
+            <div className={`flex justify-between ${TEXT_BODY}`}>
               <span>Total</span>
               <span>{currency} {total.toLocaleString()}</span>
             </div>
           )}
           {paid > 0 && (
-            <div className="flex justify-between text-slate-300">
+            <div className={`flex justify-between ${TEXT_BODY}`}>
               <span>Paid</span>
-              <span className="text-emerald-400">{currency} {paid.toLocaleString()}</span>
+              <span className="text-blue-900 font-semibold">{currency} {paid.toLocaleString()}</span>
             </div>
           )}
 
-          <div className="text-xs text-slate-500 pt-2 border-t border-slate-700">
+          <div className={`text-xs ${TEXT_SUBTLE} pt-2 border-t border-sky-200`}>
             Booked {format(new Date(booking.created_at), 'MMM d, yyyy')}
           </div>
 
           {payments.length > 0 && (
             <div className="space-y-1">
-              <p className="text-xs text-slate-400 uppercase tracking-wider">Payment history</p>
+              <p className={`text-xs ${TEXT_MUTED} uppercase tracking-wider`}>Payment history</p>
               {payments.map(p => (
                 <div key={p.id} className="flex justify-between text-xs">
-                  <span className="text-slate-400">
+                  <span className={TEXT_MUTED}>
                     {format(new Date(p.created_at), 'MMM d')}{p.method && ` · ${p.method}`}
                   </span>
                   <span className={`${PAYMENT_STATUS_STYLES[p.status]} capitalize`}>
@@ -238,10 +241,7 @@ function LineCard({
           )}
 
           {canRefundDeposit && (
-            <button
-              onClick={() => onRefund(booking.id)}
-              className="w-full bg-amber-700 hover:bg-amber-600 text-white text-xs font-semibold py-2 rounded-lg transition-colors"
-            >
+            <button onClick={() => onRefund(booking.id)} className={`w-full ${BTN_GHOST} text-xs py-2`}>
               Request deposit refund
             </button>
           )}

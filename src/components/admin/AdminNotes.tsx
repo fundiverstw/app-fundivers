@@ -11,8 +11,8 @@ const TAG_STYLES: Record<NoteTag, string> = {
   logistics: 'bg-violet-700 text-violet-100',
   cert:      'bg-emerald-700 text-emerald-100',
   medical:   'bg-fuchsia-700 text-fuchsia-100',
-  note:      'bg-slate-700 text-slate-200',
-  general:   'bg-slate-700 text-slate-200',
+  note:      'bg-sky-100 text-blue-900',
+  general:   'bg-sky-100 text-blue-900',
 }
 
 type NoteWithAuthors = AdminNote & {
@@ -131,13 +131,13 @@ export function AdminNotes({ target, tagFilter, title = 'Notes' }: Props) {
   const resolved = notes.filter(m => m.resolved)
 
   return (
-    <section className="bg-slate-800 rounded-xl p-4 space-y-3">
+    <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-amber-400 uppercase tracking-wider">{title}</h2>
+        <h2 className="text-sm font-semibold text-red-600 uppercase tracking-wider">{title}</h2>
         {resolved.length > 0 && (
           <button
             onClick={() => setShowResolved(v => !v)}
-            className="text-xs text-slate-400 hover:text-slate-100"
+            className="text-xs text-blue-900 font-medium hover:text-blue-900"
           >
             {showResolved ? 'Hide resolved' : `Show resolved (${resolved.length})`}
           </button>
@@ -146,7 +146,7 @@ export function AdminNotes({ target, tagFilter, title = 'Notes' }: Props) {
 
       <div className="space-y-2">
         {open.length === 0 && (
-          <p className="text-xs text-slate-500">No open notes.</p>
+          <p className="text-xs text-blue-950 font-medium">No open notes.</p>
         )}
         {open.map(m => (
           <NoteCard key={m.id} note={m} onResolve={() => resolve(m.id)} />
@@ -156,13 +156,13 @@ export function AdminNotes({ target, tagFilter, title = 'Notes' }: Props) {
         ))}
       </div>
 
-      <div className="pt-2 border-t border-slate-700 space-y-2">
+      <div className="pt-2 border-t border-sky-200 space-y-2">
         <div className="flex gap-2">
           {!tagFilter && (
             <select
               value={tag}
               onChange={e => setTag(e.target.value as NoteTag)}
-              className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-xs text-slate-100"
+              className="bg-white border border-sky-300 rounded-lg px-2 py-1 text-xs text-blue-900"
             >
               {NOTE_TAGS.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
@@ -172,13 +172,13 @@ export function AdminNotes({ target, tagFilter, title = 'Notes' }: Props) {
             value={content}
             onChange={e => setContent(e.target.value)}
             placeholder="New note…"
-            className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-1 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
+            className="flex-1 bg-white border border-sky-300 rounded-lg px-3 py-1 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
             onKeyDown={e => { if (e.key === 'Enter') addNote() }}
           />
           <button
             onClick={addNote}
             disabled={saving || !content.trim()}
-            className="bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-white text-xs px-3 rounded-lg"
+            className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-xs px-3 rounded-lg"
           >
             Add
           </button>
@@ -195,20 +195,20 @@ function NoteCard({ note, onResolve, onUnresolve }: {
 }) {
   const author = note.author?.display_name ?? note.author?.full_name ?? 'unknown'
   return (
-    <div className={`bg-slate-900/50 rounded-lg p-3 text-sm ${note.resolved ? 'opacity-60' : ''}`}>
+    <div className={`bg-sky-50 rounded-lg p-3 text-sm ${note.resolved ? 'opacity-60' : ''}`}>
       <div className="flex items-start gap-2">
         <span className={`text-xs font-semibold uppercase px-2 py-0.5 rounded-full shrink-0 ${TAG_STYLES[note.tag]}`}>
           {note.tag}
         </span>
-        <p className={`flex-1 text-slate-100 ${note.resolved ? 'line-through' : ''}`}>{note.content}</p>
+        <p className={`flex-1 text-blue-900 ${note.resolved ? 'line-through' : ''}`}>{note.content}</p>
         {onResolve && (
-          <button onClick={onResolve} className="text-xs text-slate-400 hover:text-emerald-400 shrink-0">✓ resolve</button>
+          <button onClick={onResolve} className="text-xs text-blue-900 font-medium hover:text-blue-900 font-semibold shrink-0">✓ resolve</button>
         )}
         {onUnresolve && (
-          <button onClick={onUnresolve} className="text-xs text-slate-400 hover:text-sky-400 shrink-0">↺ reopen</button>
+          <button onClick={onUnresolve} className="text-xs text-blue-900 font-medium hover:text-blue-700 shrink-0">↺ reopen</button>
         )}
       </div>
-      <p className="text-xs text-slate-500 mt-1">
+      <p className="text-xs text-blue-950 font-medium mt-1">
         {author} · {format(new Date(note.created_at), 'MMM d · HH:mm')}
         {note.resolved && note.resolved_at && (
           <> · resolved by {note.resolver?.display_name ?? note.resolver?.full_name ?? 'unknown'} {format(new Date(note.resolved_at), 'MMM d')}</>
