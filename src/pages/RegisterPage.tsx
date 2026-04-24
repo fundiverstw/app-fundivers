@@ -81,34 +81,57 @@ export function RegisterPage() {
     : pendingEmail                    ? 'pending-email'
     :                                   'form'
 
-  // If the user returned via an email-confirmation link (now authed) and we
-  // stashed a pending booking draft before they left, submit it for them so
-  // the confirmation click completes both the account and the booking in
-  // one step. Guarded on `existing` so we don't duplicate an already-made
-  // booking.
+  // If the user returned via an email-confirmation link (now authed) and
+  // we stashed a pending booking draft before they left, submit it so
+  // the click completes both the account and the booking. Guarded on
+  // `existing` so a duplicate draft can't double-insert.
+  //
+  // Source order: user.user_metadata.pending_booking (set via signUp's
+  // options.data; survives a different device confirming the email),
+  // then localStorage (in-flight drafts from before user_metadata was
+  // adopted; fallback can be removed once nobody old is mid-flow).
   useEffect(() => {
     if (!user || !event || !type || existing || justBooked || dataLoading) return
-    const key = pendingBookingKey(event)
-    const raw = (() => { try { return localStorage.getItem(key) } catch { return null } })()
-    if (!raw) return
-    // Remove synchronously before the await so StrictMode's double-mount
-    // in dev can't fire a second insert from the same draft.
-    try { localStorage.removeItem(key) } catch { /* ignore */ }
-    let draft: PendingBookingDraft
-    try { draft = JSON.parse(raw) } catch { return }
+
+    const meta = (user.user_metadata ?? {}) as { pending_booking?: PendingBookingDraft }
+    const fromMeta = meta.pending_booking
+    const matchesEvent = fromMeta && fromMeta.event_type === type && fromMeta.event_id === event.id
+
+    let draft: PendingBookingDraft | null = null
+    let consumedFromMeta = false
+    if (matchesEvent) {
+      draft = fromMeta!
+      consumedFromMeta = true
+    } else {
+      const key = pendingBookingKey(event)
+      const raw = (() => { try { return localStorage.getItem(key) } catch { return null } })()
+      if (!raw) return
+      // Remove synchronously before the await so StrictMode's double
+      // mount in dev can't fire a second insert from the same draft.
+      try { localStorage.removeItem(key) } catch { /* ignore */ }
+      try { draft = JSON.parse(raw) as PendingBookingDraft } catch { return }
+    }
+    if (!draft) return
+    const settledDraft = draft
+
     ;(async () => {
-      await supabase.from('profiles').update(draft.profilePatch).eq('id', user.id)
+      await supabase.from('profiles').update(settledDraft.profilePatch).eq('id', user.id)
       const fk = type === 'dive'
         ? { eo_dive_id: event.id, eo_course_id: null }
         : { eo_dive_id: null, eo_course_id: event.id }
       const { data } = await supabase.from('bookings').insert({
         user_id: user.id,
         status: 'pending',
-        notes: draft.notes,
-        details: draft.details as BookingDetails,
+        notes: settledDraft.notes,
+        details: settledDraft.details as BookingDetails,
         ...fk,
       }).select().single()
       if (data) {
+        if (consumedFromMeta) {
+          // Clear the metadata draft so AppShell's pending-booking
+          // banner doesn't keep prompting after the booking landed.
+          supabase.auth.updateUser({ data: { pending_booking: null } }).catch(() => { /* non-fatal */ })
+        }
         sendRegistrationPdfEmail((data as { id: string }).id)
         setJustBooked(data as Booking)
       }

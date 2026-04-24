@@ -1,6 +1,7 @@
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { usePWAInstall } from '../../hooks/usePWAInstall'
+import type { PendingBookingDraft } from '../register/RegisterForm'
 
 const navItems = [
   { to: '/dashboard', label: 'Home', icon: '🫧' },
@@ -11,9 +12,19 @@ const navItems = [
 ]
 
 export function AppShell() {
-  const { profile, signOut } = useAuth()
+  const { user, profile, signOut } = useAuth()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const { canInstall, install } = usePWAInstall()
+
+  // Diver returned via the email-confirmation link but landed somewhere
+  // other than /register/<type>/<id> (e.g. site root, because the URL
+  // allowlist redirected to Site URL instead of emailRedirectTo). The
+  // pending_booking draft is on user_metadata; nudge them back to the
+  // register URL where the auto-resume effect picks it up and inserts.
+  const meta = (user?.user_metadata ?? {}) as { pending_booking?: PendingBookingDraft }
+  const pending = meta.pending_booking
+  const onRegisterRoute = pathname.startsWith('/register/')
 
   async function handleSignOut() {
     await signOut()
@@ -51,6 +62,22 @@ export function AppShell() {
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto p-4 pb-24">
+        {pending && !onRegisterRoute && (
+          <div className="mb-4 bg-amber-950/40 border border-amber-700/60 rounded-xl p-3 flex items-center justify-between gap-3">
+            <div className="text-sm text-amber-200">
+              <p className="font-semibold">Finish your registration</p>
+              <p className="text-xs text-amber-300/80 mt-0.5">
+                You started signing up for <strong>{pending.event_title}</strong>. Tap below to complete it.
+              </p>
+            </div>
+            <Link
+              to={`/register/${pending.event_type}/${pending.event_id}`}
+              className="shrink-0 bg-amber-500 hover:bg-amber-400 text-slate-900 text-xs font-semibold px-3 py-2 rounded-lg"
+            >
+              Finish
+            </Link>
+          </div>
+        )}
         <Outlet />
       </main>
 

@@ -23,15 +23,25 @@ interface Props {
 }
 
 // Draft of a guest submission that couldn't complete because email
-// confirmation was required at signup. Stashed to localStorage keyed by
-// event, then consumed by RegisterPage once the user returns authed via
-// the confirmation link and we can finally insert the booking.
+// confirmation was required at signup. Travels with the account on
+// auth.users.raw_user_meta_data (via signUp's options.data → readable
+// as user.user_metadata after confirm), so the cross-device case
+// (signed up on laptop, confirmed on phone) still picks up where the
+// diver left off. Includes the event identity so RegisterPage can
+// validate the URL match before inserting.
 export interface PendingBookingDraft {
+  event_type: AppEvent['type']
+  event_id: string
+  event_title: string
   profilePatch: ProfileUpdate
   details: BookingDetails
   notes: string | null
 }
 
+// LocalStorage key kept for in-flight drafts from the previous deploy
+// (which stashed there). New drafts go straight to user_metadata; this
+// fallback can be removed once everyone old has either confirmed or
+// abandoned.
 export function pendingBookingKey(event: Pick<AppEvent, 'type' | 'id'>) {
   return `pending-booking:${event.type}:${event.id}`
 }
@@ -266,12 +276,27 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
     // via the confirmation link.
     let effectiveUserId = userId
     if (isGuest) {
+      const draft: PendingBookingDraft = {
+        event_type: event.type,
+        event_id: event.id,
+        event_title: event.title,
+        profilePatch,
+        details,
+        notes: notes || null,
+      }
       const { data, error } = await supabase.auth.signUp({
         email: guestEmail.trim(),
         password: guestPassword,
         options: {
           emailRedirectTo: window.location.href,
-          data: { agreed_to_terms_at: new Date().toISOString() },
+          // Stash the draft on auth.users.raw_user_meta_data so it
+          // survives a different device clicking the confirmation link.
+          // RegisterPage's auto-resume reads it back from user_metadata
+          // and clears it via updateUser after the booking is inserted.
+          data: {
+            agreed_to_terms_at: new Date().toISOString(),
+            pending_booking: draft,
+          },
         },
       })
       if (error) { setSaving(false); setErr(error.message); return }
@@ -279,12 +304,6 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
       if (!newUserId) { setSaving(false); setErr('Sign up failed — please try again.'); return }
 
       if (!data.session) {
-        const draft: PendingBookingDraft = {
-          profilePatch,
-          details,
-          notes: notes || null,
-        }
-        try { localStorage.setItem(pendingBookingKey(event), JSON.stringify(draft)) } catch { /* storage disabled — user will just refill on return */ }
         setSaving(false)
         onPendingEmailConfirmation?.(guestEmail.trim())
         return

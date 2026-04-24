@@ -1,21 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { RegisterForm } from './RegisterForm'
+import { MemoryRouter } from 'react-router-dom'
+import { RegisterForm, RegisterFormBody } from './RegisterForm'
 import { mockQueryBuilder } from '../../../tests/test-utils'
 import type { AppEvent, EOAddon, EORoom, Profile } from '../../types/database'
 
-const { from, insert, update, invoke } = vi.hoisted(() => ({
+const { from, insert, update, invoke, signUp } = vi.hoisted(() => ({
   from: vi.fn(),
   insert: vi.fn(),
   update: vi.fn(),
   invoke: vi.fn(),
+  signUp: vi.fn(),
 }))
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: (...a: unknown[]) => from(...a),
     functions: { invoke: (...a: unknown[]) => invoke(...a) },
+    auth: { signUp: (...a: unknown[]) => signUp(...a) },
   },
 }))
 
@@ -96,7 +99,7 @@ function setupFrom(inserted: unknown = { id: 'b-new' }, updated: unknown = { id:
 
 beforeEach(() => {
   from.mockReset(); insert.mockReset(); update.mockReset()
-  invoke.mockReset()
+  invoke.mockReset(); signUp.mockReset()
   invoke.mockResolvedValue({ data: { ok: true }, error: null })
 })
 
@@ -283,6 +286,53 @@ describe('RegisterForm', () => {
     expect(next).toBeDisabled()
     await user.type(screen.getByLabelText(/full name/i), 'Grace Hopper')
     expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
+  })
+
+  it('guest path: submits signUp with the booking draft on options.data and bails to onPendingEmailConfirmation when no session is returned', async () => {
+    setupFrom()
+    // Email-confirmation-on case: signUp returns a user but no session.
+    signUp.mockResolvedValue({ data: { user: { id: 'u-new' }, session: null }, error: null })
+    const onPending = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter>
+        <RegisterFormBody
+          event={sampleEvent} profile={null}
+          onSubmitSuccess={() => {}}
+          onPendingEmailConfirmation={onPending}
+        />
+      </MemoryRouter>
+    )
+
+    // Step 1 → 2 (about you, with the new account section because !userId)
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.type(screen.getByLabelText(/email \*/i), 'new@diver.test')
+    await user.type(screen.getByLabelText(/password/i), 'abcdefgh')
+    await user.click(screen.getByLabelText(/I agree to the/i))
+    await user.type(screen.getByLabelText(/full name/i), 'Grace Hopper')
+    // Step 2 → 3 → 4 → confirm
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+    await waitFor(() => expect(signUp).toHaveBeenCalledOnce())
+    const [arg] = signUp.mock.calls[0]
+    expect(arg.email).toBe('new@diver.test')
+    expect(arg.password).toBe('abcdefgh')
+    // The pending booking ride-along — what RegisterPage and AppShell read
+    // back from user_metadata after email confirmation.
+    expect(arg.options.data.pending_booking).toMatchObject({
+      event_type:  'dive',
+      event_id:    'dive_abc',
+      event_title: 'Kenting 2-dive',
+    })
+    expect(arg.options.data.pending_booking.profilePatch).toMatchObject({ full_name: 'Grace Hopper' })
+    expect(typeof arg.options.data.agreed_to_terms_at).toBe('string')
+
+    // No booking insert in this branch; consume happens in RegisterPage's
+    // auto-resume after the email link returns the user authed.
+    expect(insert).not.toHaveBeenCalled()
+    expect(onPending).toHaveBeenCalledWith('new@diver.test')
   })
 
   it('in edit mode, pre-populates state from the existing booking and UPDATEs on submit', async () => {
