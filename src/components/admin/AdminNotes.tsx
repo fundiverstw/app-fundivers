@@ -88,6 +88,11 @@ export function AdminNotes({ target, tagFilter, title = 'Notes' }: Props) {
     })))
   }, [target, tagFilter])
 
+  // Loading data on mount + dep change is the canonical "subscribe to
+  // external state" pattern; the rule flags it because refetch calls
+  // setNotes transitively. Killing it cleanly would mean dragging in
+  // TanStack Query / SWR for one call site — not worth it.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { refetch() }, [refetch])
 
   async function addNote() {
