@@ -18,7 +18,8 @@
     "db:link": "dotenv -e .env.local -- sh -c 'supabase link --project-ref \"$SUPABASE_PROJECT_REF\" --password \"$SUPABASE_DB_PASSWORD\"'",
     "db:pull": "dotenv -e .env.local -- sh -c 'supabase db pull --password \"$SUPABASE_DB_PASSWORD\"'",
     "db:push": "dotenv -e .env.local -- sh -c 'supabase db push --password \"$SUPABASE_DB_PASSWORD\"'",
-    "db:dump-data": "dotenv -e .env.local -- sh -c 'supabase db dump --data-only --schema auth,public --password \"$SUPABASE_DB_PASSWORD\" -f supabase/seed.sql'"
+    "db:dump-data": "dotenv -e .env.local -- sh -c 'supabase db dump --data-only --schema auth,public --password \"$SUPABASE_DB_PASSWORD\" -f supabase/seed.sql'",
+    "functions:deploy": "dotenv -e .env.local -- sh -c 'supabase functions deploy send-registration-pdf --project-ref \"$SUPABASE_PROJECT_REF\"'"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

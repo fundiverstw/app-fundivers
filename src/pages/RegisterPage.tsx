@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { fetchEventsForBookings, fetchEventsInRange, formatEventSpan } from '../lib/events'
 import { RegisterFormBody, pendingBookingKey, type PendingBookingDraft } from '../components/register/RegisterForm'
+import { sendRegistrationPdfEmail } from '../lib/registration-email'
 import type { AppEvent, Booking, BookingDetails } from '../types/database'
 
 // Public standalone registration page. Two entry paths:
@@ -107,7 +108,10 @@ export function RegisterPage() {
         details: draft.details as BookingDetails,
         ...fk,
       }).select().single()
-      if (data) setJustBooked(data as Booking)
+      if (data) {
+        sendRegistrationPdfEmail((data as { id: string }).id)
+        setJustBooked(data as Booking)
+      }
     })()
   }, [user, event, type, existing, justBooked, dataLoading])
 

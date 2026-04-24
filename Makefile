@@ -1,4 +1,4 @@
-.PHONY: help dev studio mail start stop status reset diff link pull push dump-data verify test deploy deploy-app deploy-push
+.PHONY: help dev studio mail start stop status reset diff link pull push dump-data verify test deploy deploy-app deploy-push deploy-functions
 
 help:
 	@echo "Local dev:"
@@ -22,9 +22,10 @@ help:
 	@echo "  make test        — run every local test (unit + component + integration)"
 	@echo ""
 	@echo "Deploy:"
-	@echo "  make deploy      — deploy both workers (SPA + push cron)"
-	@echo "  make deploy-app  — deploy just the SPA (app-fundiverstw)"
-	@echo "  make deploy-push — deploy just the push cron (fundivers-push)"
+	@echo "  make deploy            — deploy both workers (SPA + push cron)"
+	@echo "  make deploy-app        — deploy just the SPA (app-fundiverstw)"
+	@echo "  make deploy-push       — deploy just the push cron (fundivers-push)"
+	@echo "  make deploy-functions  — deploy supabase edge functions (send-registration-pdf, …)"
 
 start:      ; @npm run db:start
 stop:       ; @npm run db:stop
@@ -48,6 +49,8 @@ deploy-push:
 	  cd workers/push && npm install; \
 	fi
 	@cd workers/push && npm run deploy
+
+deploy-functions: ; @npm run functions:deploy
 
 dev:
 	@if ! docker ps --format '{{.Names}}' | grep -q supabase_db_app-fundivers; then \
