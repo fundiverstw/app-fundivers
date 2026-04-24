@@ -4,6 +4,8 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { supabase } from '../lib/supabase'
+import { Logo } from '../components/Logo'
+import { CARD_ELEVATED, INPUT, INPUT_LABEL, BTN_PRIMARY, TEXT_ERROR, TEXT_LINK, TEXT_MUTED } from '../styles/tokens'
 
 const schema = z.object({
   email: z.string().email('Invalid email'),
@@ -47,10 +49,10 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
-        <h1 className="text-3xl font-bold text-sky-400 text-center mb-2">FunDivers TW</h1>
-        <p className="text-slate-400 text-center mb-8 text-sm">Sign in to your account</p>
+    <div className="min-h-screen bg-blue-900 flex items-center justify-center p-4">
+      <div className={`w-full max-w-sm ${CARD_ELEVATED} p-6`}>
+        <div className="flex justify-center mb-3"><Logo size="lg" /></div>
+        <p className={`${TEXT_MUTED} text-center mb-8 text-sm`}>Sign in to your account</p>
 
         {import.meta.env.DEV && (
           <div className="grid grid-cols-2 gap-2 mb-4">
@@ -59,7 +61,7 @@ export function LoginPage() {
                 key={acc.email}
                 type="button"
                 onClick={() => fill(acc)}
-                className="border border-dashed border-slate-600 text-slate-400 text-xs py-1.5 rounded-lg hover:border-slate-400 hover:text-slate-200 transition-colors"
+                className={`border border-dashed border-blue-900/40 ${TEXT_MUTED} text-xs py-1.5 rounded-lg hover:border-blue-900 hover:text-blue-900 transition-colors`}
               >
                 {acc.label}
               </button>
@@ -69,43 +71,31 @@ export function LoginPage() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label className="block text-sm text-slate-300 mb-1">Email</label>
-            <input
-              {...register('email')}
-              type="email"
-              className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
-            />
-            {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email.message}</p>}
+            <label className={INPUT_LABEL}>Email</label>
+            <input {...register('email')} type="email" className={INPUT} />
+            {errors.email && <p className={`${TEXT_ERROR} text-xs mt-1`}>{errors.email.message}</p>}
           </div>
 
           <div>
-            <label className="block text-sm text-slate-300 mb-1">Password</label>
-            <input
-              {...register('password')}
-              type="password"
-              className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
-            />
-            {errors.password && <p className="text-red-400 text-xs mt-1">{errors.password.message}</p>}
+            <label className={INPUT_LABEL}>Password</label>
+            <input {...register('password')} type="password" className={INPUT} />
+            {errors.password && <p className={`${TEXT_ERROR} text-xs mt-1`}>{errors.password.message}</p>}
           </div>
 
-          {serverError && <p className="text-red-400 text-sm">{serverError}</p>}
+          {serverError && <p className={`${TEXT_ERROR} text-sm`}>{serverError}</p>}
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg transition-colors"
-          >
+          <button type="submit" disabled={isSubmitting} className={`w-full ${BTN_PRIMARY}`}>
             {isSubmitting ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
 
-        <p className="text-center text-sm text-slate-400 mt-3">
-          <Link to="/forgot-password" className="text-sky-400 hover:underline">Forgot password?</Link>
+        <p className={`text-center text-sm ${TEXT_MUTED} mt-3`}>
+          <Link to="/forgot-password" className={TEXT_LINK}>Forgot password?</Link>
         </p>
 
-        <p className="text-center text-sm text-slate-400 mt-6">
+        <p className={`text-center text-sm ${TEXT_MUTED} mt-6`}>
           No account?{' '}
-          <Link to="/signup" className="text-sky-400 hover:underline">Sign up</Link>
+          <Link to="/signup" className={TEXT_LINK}>Sign up</Link>
         </p>
       </div>
     </div>

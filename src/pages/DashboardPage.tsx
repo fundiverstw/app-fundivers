@@ -1,22 +1,34 @@
 import { useEffect, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { SharkBouncer } from '../components/dashboard/SharkBouncer'
+import { WelcomeBanner } from '../components/welcome/WelcomeBanner'
 
 // Ocean-themed rising bubbles, shared by admin and diver landings. Replaces
 // the old stats cards (which nobody looked at — actionable data lives on the
 // tabs). Pure canvas, no per-frame React updates; cleans up on unmount.
 //
-// Drawing circles (not glyphs) keeps each bubble a fixed size, which avoids
-// the per-frame jitter you get when fillText re-rasterizes a different random
-// unicode char every tick.
+// Each bubble is an independent particle (random x, varied radius and rise
+// speed, slight horizontal sine wobble) so they don't form visible columns
+// the way a fixed-grid would. Drawn as a translucent fill plus a brighter
+// stroke so they read as bubbles rather than solid balls.
 
-const COLUMN_WIDTH = 18          // horizontal spacing between bubble trails (px)
-const RISE_PX_PER_SEC = 130
-const TRAIL_FADE_ALPHA = 0.08    // smaller = longer trails, larger = snappier reset
-const HEAD_RADIUS = 3
+const BUBBLES_PER_KILOPIX = 0.12  // bubble count = ceil(area_px * this / 1000)
+const RISE_PX_PER_SEC_BASE = 50
+const MIN_RADIUS = 3
+const MAX_RADIUS = 14
+
+interface Bubble {
+  x: number              // horizontal anchor
+  y: number              // current vertical (px from top)
+  r: number              // radius (px)
+  speed: number          // multiplier on RISE_PX_PER_SEC_BASE
+  wobbleAmp: number      // peak horizontal drift (px)
+  wobblePhase: number    // 0..2π — desyncs each bubble's wobble
+  wobbleHz: number       // wobble cycles per second (slow)
+}
 
 export function DashboardPage() {
-  const { profile } = useAuth()
+  const { user } = useAuth()
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
 
@@ -29,12 +41,27 @@ export function DashboardPage() {
 
     let width = 0
     let height = 0
-    // Each column tracks its rising head-y (in px), a speed factor so bubbles
-    // don't rise in lockstep, and a radius for size variation.
-    let columns: Array<{ y: number; speed: number; radius: number }> = []
+    let bubbles: Bubble[] = []
     let raf = 0
     let lastTs = 0
     let running = true
+
+    function newBubble(spawnAtRandomY: boolean): Bubble {
+      const r = MIN_RADIUS + Math.random() * (MAX_RADIUS - MIN_RADIUS)
+      return {
+        x: Math.random() * width,
+        // Initial population spreads through the visible area so the first
+        // frame isn't empty; respawns enter from below the bottom edge.
+        y: spawnAtRandomY ? Math.random() * height : height + r + Math.random() * 40,
+        r,
+        // Smaller bubbles drift up slower (matches real fluid behaviour
+        // and reads as depth — bigger = closer to the surface).
+        speed: 0.6 + Math.random() * 0.9 + (r / MAX_RADIUS) * 0.4,
+        wobbleAmp: 8 + Math.random() * 24,
+        wobblePhase: Math.random() * Math.PI * 2,
+        wobbleHz: 0.15 + Math.random() * 0.35,
+      }
+    }
 
     function setupGrid() {
       if (!canvas || !container || !ctx) return
@@ -47,45 +74,38 @@ export function DashboardPage() {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       width = rect.width
       height = rect.height
-      const colCount = Math.ceil(width / COLUMN_WIDTH)
-      // Spread columns through the full height so the first frame isn't an
-      // empty screen waiting for bubbles to enter from the bottom.
-      columns = Array.from({ length: colCount }, () => ({
-        y: Math.random() * height * 1.5,
-        speed: 0.6 + Math.random() * 0.8,
-        radius: HEAD_RADIUS * (0.7 + Math.random() * 0.6),
-      }))
-      ctx.fillStyle = '#020617' // slate-950 — prime so the first frame isn't black-flashed
-      ctx.fillRect(0, 0, width, height)
+      const target = Math.ceil((width * height / 1000) * BUBBLES_PER_KILOPIX)
+      bubbles = Array.from({ length: target }, () => newBubble(true))
     }
 
     function draw(ts: number) {
       if (!ctx) return
       const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.1) : 0
       lastTs = ts
+      const tSec = ts / 1000
 
-      // Translucent wash → fading trails.
-      ctx.fillStyle = `rgba(2, 6, 23, ${TRAIL_FADE_ALPHA})`
+      // Hard navy fill each frame — no trail wash, otherwise the random
+      // x positions blur into a uniform haze instead of distinct bubbles.
+      ctx.fillStyle = '#1e3a8a' // blue-900
       ctx.fillRect(0, 0, width, height)
 
-      for (let i = 0; i < columns.length; i++) {
-        const col = columns[i]
-        const x = i * COLUMN_WIDTH + COLUMN_WIDTH / 2
+      for (const b of bubbles) {
+        const x = b.x + Math.sin(tSec * b.wobbleHz * Math.PI * 2 + b.wobblePhase) * b.wobbleAmp
 
         ctx.beginPath()
-        ctx.arc(x, col.y, col.radius, 0, Math.PI * 2)
-        ctx.fillStyle = 'rgba(224, 242, 254, 0.9)' // sky-100 head
+        ctx.arc(x, b.y, b.r, 0, Math.PI * 2)
+        ctx.fillStyle   = 'rgba(255, 255, 255, 0.18)' // semi-transparent fill
         ctx.fill()
+        ctx.lineWidth   = Math.max(1, b.r * 0.12)
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)' // brighter rim
+        ctx.stroke()
 
-        col.y -= RISE_PX_PER_SEC * col.speed * dt
+        b.y -= RISE_PX_PER_SEC_BASE * b.speed * dt
 
-        // Once the bubble clears the top, respawn below the bottom with small
-        // probability so columns stagger rather than all reseeding at once.
-        if (col.y < -col.radius && Math.random() > 0.96) {
-          col.y = height + Math.random() * height * 0.5
-          col.speed = 0.6 + Math.random() * 0.8
-          col.radius = HEAD_RADIUS * (0.7 + Math.random() * 0.6)
-        }
+        // Once a bubble clears the top, respawn at a fresh random x below
+        // the bottom edge with new attributes — keeps the pattern non-
+        // periodic.
+        if (b.y < -b.r) Object.assign(b, newBubble(false))
       }
 
       if (running) raf = requestAnimationFrame(draw)
@@ -119,15 +139,14 @@ export function DashboardPage() {
   return (
     <div
       ref={containerRef}
-      className="relative -m-4 -mb-24 h-[calc(100vh-3rem)] bg-slate-950 overflow-hidden"
+      className="relative -m-4 -mb-24 h-[calc(100vh-3rem)] bg-blue-900 overflow-hidden"
     >
       <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0" />
-      <div className="absolute top-4 left-4 text-cyan-200/60 font-mono text-xs pointer-events-none select-none">
-        <p className="font-bold tracking-[0.25em]">FUNDIVERS · TW</p>
-        <p className="text-cyan-300/40">
-          {profile?.role === 'admin' ? 'admin console' : 'diver console'}
-        </p>
-      </div>
+      {user && (
+        <div className="absolute top-4 right-4 left-auto max-w-sm">
+          <WelcomeBanner user={user} />
+        </div>
+      )}
       <SharkBouncer />
     </div>
   )

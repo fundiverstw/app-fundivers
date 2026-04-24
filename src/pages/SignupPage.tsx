@@ -4,6 +4,8 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { supabase } from '../lib/supabase'
+import { Logo } from '../components/Logo'
+import { CARD_ELEVATED, INPUT, INPUT_LABEL, BTN_PRIMARY, TEXT_ERROR, TEXT_LINK, TEXT_MUTED } from '../styles/tokens'
 
 const schema = z.object({
   email: z.string().email('Invalid email'),
@@ -36,76 +38,60 @@ export function SignupPage() {
 
   if (done) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="text-center">
+      <div className="min-h-screen bg-blue-900 flex items-center justify-center p-4">
+        <div className={`w-full max-w-sm ${CARD_ELEVATED} p-6 text-center`}>
           <div className="text-5xl mb-4">📧</div>
-          <h2 className="text-xl font-semibold text-slate-100 mb-2">Check your email</h2>
-          <p className="text-slate-400 text-sm">We sent a confirmation link to your email address.</p>
+          <h2 className="text-xl font-semibold text-blue-950 mb-2">Check your email</h2>
+          <p className={`${TEXT_MUTED} text-sm`}>We sent a confirmation link to your email address.</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
-        <h1 className="text-3xl font-bold text-sky-400 text-center mb-2">FunDivers TW</h1>
-        <p className="text-slate-400 text-center mb-8 text-sm">Create your account</p>
+    <div className="min-h-screen bg-blue-900 flex items-center justify-center p-4">
+      <div className={`w-full max-w-sm ${CARD_ELEVATED} p-6`}>
+        <div className="flex justify-center mb-3"><Logo size="lg" /></div>
+        <p className={`${TEXT_MUTED} text-center mb-8 text-sm`}>Create your account</p>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label className="block text-sm text-slate-300 mb-1">Email</label>
-            <input
-              {...register('email')}
-              type="email"
-              className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
-            />
-            {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email.message}</p>}
+            <label className={INPUT_LABEL}>Email</label>
+            <input {...register('email')} type="email" className={INPUT} />
+            {errors.email && <p className={`${TEXT_ERROR} text-xs mt-1`}>{errors.email.message}</p>}
           </div>
 
           <div>
-            <label className="block text-sm text-slate-300 mb-1">Password</label>
-            <input
-              {...register('password')}
-              type="password"
-              className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
-            />
-            {errors.password && <p className="text-red-400 text-xs mt-1">{errors.password.message}</p>}
+            <label className={INPUT_LABEL}>Password</label>
+            <input {...register('password')} type="password" className={INPUT} />
+            {errors.password && <p className={`${TEXT_ERROR} text-xs mt-1`}>{errors.password.message}</p>}
           </div>
 
           <div>
-            <label className="block text-sm text-slate-300 mb-1">Confirm password</label>
-            <input
-              {...register('confirm')}
-              type="password"
-              className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
-            />
-            {errors.confirm && <p className="text-red-400 text-xs mt-1">{errors.confirm.message}</p>}
+            <label className={INPUT_LABEL}>Confirm password</label>
+            <input {...register('confirm')} type="password" className={INPUT} />
+            {errors.confirm && <p className={`${TEXT_ERROR} text-xs mt-1`}>{errors.confirm.message}</p>}
           </div>
 
-          <label className="flex items-start gap-2 text-xs text-slate-300">
-            <input {...register('agreedToTerms')} type="checkbox" className="accent-sky-500 mt-0.5" />
+          <label className="flex items-start gap-2 text-xs text-blue-900">
+            <input {...register('agreedToTerms')} type="checkbox" className="accent-blue-900 mt-0.5" />
             <span>
               I agree to the{' '}
-              <Link to="/terms" target="_blank" className="text-sky-400 hover:underline">Terms of Use & Privacy</Link>.
+              <Link to="/terms" target="_blank" className={TEXT_LINK}>Terms of Use & Privacy</Link>.
             </span>
           </label>
-          {errors.agreedToTerms && <p className="text-red-400 text-xs">{errors.agreedToTerms.message}</p>}
+          {errors.agreedToTerms && <p className={`${TEXT_ERROR} text-xs`}>{errors.agreedToTerms.message}</p>}
 
-          {serverError && <p className="text-red-400 text-sm">{serverError}</p>}
+          {serverError && <p className={`${TEXT_ERROR} text-sm`}>{serverError}</p>}
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg transition-colors"
-          >
+          <button type="submit" disabled={isSubmitting} className={`w-full ${BTN_PRIMARY}`}>
             {isSubmitting ? 'Creating account…' : 'Create account'}
           </button>
         </form>
 
-        <p className="text-center text-sm text-slate-400 mt-6">
+        <p className={`text-center text-sm ${TEXT_MUTED} mt-6`}>
           Already have an account?{' '}
-          <Link to="/login" className="text-sky-400 hover:underline">Sign in</Link>
+          <Link to="/login" className={TEXT_LINK}>Sign in</Link>
         </p>
       </div>
     </div>

@@ -117,24 +117,24 @@ export function AdminEventDetailPage() {
   }
 
   if (loading) {
-    return <div className="flex justify-center pt-12"><div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" /></div>
+    return <div className="flex justify-center pt-12"><div className="w-6 h-6 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" /></div>
   }
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
-      <Link to="/admin/events" className="text-sm text-slate-400 hover:text-slate-100">‹ back to events</Link>
+      <Link to="/admin/events" className="text-sm text-white/70 hover:text-white">‹ back to events</Link>
 
-      <header className="bg-slate-800 rounded-xl p-4">
-        <h1 className="text-xl font-bold text-slate-100">{event?.title ?? '(event not found)'}</h1>
+      <header className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4">
+        <h1 className="text-xl font-bold text-blue-900">{event?.title ?? '(event not found)'}</h1>
         {event && (
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-sm text-blue-900 font-medium mt-1">
             {formatEventSpan(event, { style: 'long' })}
             {' · '}
             <span className="capitalize">{event.type}</span>
             {event.price != null && ` · From ${event.currency} ${event.price.toLocaleString()}`}
           </p>
         )}
-        <p className="text-sm text-amber-400 mt-2">{registrants.length} registrant{registrants.length === 1 ? '' : 's'}</p>
+        <p className="text-sm text-red-600 mt-2">{registrants.length} registrant{registrants.length === 1 ? '' : 's'}</p>
       </header>
 
       {type && id && (
@@ -161,7 +161,7 @@ export function AdminEventDetailPage() {
       )}
 
       {registrants.length === 0 ? (
-        <p className="text-slate-500 text-sm">No one has registered for this event yet.</p>
+        <p className="text-blue-950 font-medium text-sm">No one has registered for this event yet.</p>
       ) : (
         <section className="space-y-2">
           {registrants.map(r => (
@@ -217,19 +217,19 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
     : totalDue > 0 ? 'partial' : 'paid'
 
   const statusStyles: Record<string, string> = {
-    confirmed:  'text-emerald-400',
-    pending:    'text-amber-400',
-    cancelled:  'text-slate-500 line-through',
+    confirmed:  'text-blue-900 font-semibold',
+    pending:    'text-red-600',
+    cancelled:  'text-blue-950 font-medium line-through',
     waitlisted: 'text-violet-400',
   }
   const payStyles: Record<string, string> = {
-    paid:    'text-emerald-400',
-    partial: 'text-amber-400',
-    none:    'text-slate-500',
+    paid:    'text-blue-900 font-semibold',
+    partial: 'text-red-600',
+    none:    'text-blue-950 font-medium',
   }
 
   return (
-    <div className="bg-slate-800 rounded-xl p-4 space-y-2">
+    <div className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-2">
       <button
         type="button"
         onClick={() => setExpanded(v => !v)}
@@ -237,13 +237,13 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
         className="w-full text-left flex items-start justify-between gap-3 focus:outline-none"
       >
         <div>
-          <p className="font-medium text-slate-100 text-sm">
-            <span aria-hidden="true" className="text-slate-500 mr-1.5">{expanded ? '▾' : '▸'}</span>
+          <p className="font-medium text-blue-900 text-sm">
+            <span aria-hidden="true" className="text-blue-950 font-medium mr-1.5">{expanded ? '▾' : '▸'}</span>
             {r.profile?.full_name ?? '(no profile)'}
-            {r.profile?.display_name && <span className="text-slate-400"> “{r.profile.display_name}”</span>}
+            {r.profile?.display_name && <span className="text-blue-900 font-medium"> “{r.profile.display_name}”</span>}
           </p>
           {r.profile && (
-            <p className="text-xs text-slate-400 pl-4">
+            <p className="text-xs text-blue-900 font-medium pl-4">
               {r.profile.cert_agency && r.profile.cert_level && `${r.profile.cert_agency} ${r.profile.cert_level}`}
               {r.profile.nitrox_certified && ' · Nitrox'}
             </p>
@@ -255,7 +255,7 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
             <select
               value={r.booking.status}
               onChange={e => onStatusChange(r.booking.id, e.target.value as Booking['status'])}
-              className={`bg-slate-900 border border-slate-600 rounded px-1.5 py-0.5 text-xs font-medium capitalize ${statusStyles[r.booking.status]}`}
+              className={`bg-white border border-sky-300 rounded px-1.5 py-0.5 text-xs font-medium capitalize ${statusStyles[r.booking.status]}`}
             >
               {BOOKING_STATUSES.map(s => (
                 <option key={s} value={s}>{s}</option>
@@ -273,7 +273,7 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
       {expanded && (
         <>
           {r.profile && (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-400 pt-1 border-t border-slate-700">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-blue-900 font-medium pt-1 border-t border-sky-200">
               {r.profile.phone       && <span>📞 {r.profile.phone}</span>}
               {r.profile.contact_method && r.profile.contact_id && (
                 <span>{methodEmoji(r.profile.contact_method)} {r.profile.contact_id}</span>
@@ -289,19 +289,19 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
           )}
 
           {renderDetails(r.booking.details, { addonNames, roomNames }) && (
-            <div className="text-xs text-slate-300 bg-slate-900/40 rounded p-2 space-y-1">
+            <div className="text-xs text-blue-950 font-medium bg-sky-50 rounded p-2 space-y-1">
               {renderDetails(r.booking.details, { addonNames, roomNames })}
             </div>
           )}
 
           {r.booking.refund_requested_at && r.booking.status !== 'cancelled' && (
-            <div className="flex items-center justify-between text-xs bg-amber-950/50 border border-amber-900 rounded p-2">
-              <span className="text-amber-300">
+            <div className="flex items-center justify-between text-xs bg-red-50 border border-red-500 rounded p-2">
+              <span className="text-red-600">
                 🔄 Refund requested {format(new Date(r.booking.refund_requested_at), 'MMM d, HH:mm')}
               </span>
               <button
                 onClick={() => onApproveRefund(r.booking.id)}
-                className="bg-amber-700 hover:bg-amber-600 text-white text-xs font-semibold px-2 py-1 rounded"
+                className="bg-blue-900 hover:bg-blue-950 text-white text-xs font-semibold px-2 py-1 rounded"
               >
                 Approve refund
               </button>
@@ -309,13 +309,13 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
           )}
 
           {r.booking.notes && (
-            <p className="text-xs text-slate-300 bg-slate-900/40 rounded p-2">📝 {r.booking.notes}</p>
+            <p className="text-xs text-blue-950 font-medium bg-sky-50 rounded p-2">📝 {r.booking.notes}</p>
           )}
 
           <div className="flex justify-end pt-1">
             <button
               onClick={onEdit}
-              className="text-xs bg-slate-700 hover:bg-sky-700 text-slate-200 font-semibold px-3 py-1 rounded"
+              className="text-xs bg-sky-100 hover:bg-sky-700 text-blue-900 font-semibold px-3 py-1 rounded"
             >
               Edit registration
             </button>

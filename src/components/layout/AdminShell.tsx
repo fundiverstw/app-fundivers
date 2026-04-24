@@ -1,5 +1,10 @@
 import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
+import { Logo } from '../Logo'
+import {
+  PAGE, NAV_BAR, NAV_BOTTOM,
+  ON_DEEP_MUTED, ON_DEEP_SUBTLE, ON_DEEP_BODY,
+} from '../../styles/tokens'
 
 const adminNav = [
   { to: '/admin',        label: 'Home',      icon: '🫧' },
@@ -18,18 +23,16 @@ export function AdminShell() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col">
-      <header className="bg-slate-800 border-b border-slate-700 px-4 py-3 flex items-center justify-between">
-        <span className="font-bold text-sky-400 text-lg">
-          FunDivers TW <span className="text-xs text-amber-400 font-normal align-middle">admin</span>
-        </span>
+    <div className={`min-h-screen ${PAGE} flex flex-col`}>
+      <header className={NAV_BAR}>
+        <div className="flex items-center gap-2">
+          <Logo size="sm" />
+          <span className="text-xs text-red-300 font-medium uppercase tracking-wider">admin</span>
+        </div>
         <div className="flex items-center gap-3">
-          <Link to="/calendar" className="text-xs text-slate-400 hover:text-slate-100">View as diver</Link>
-          <span className="text-sm text-slate-400">{profile?.display_name ?? profile?.full_name}</span>
-          <button
-            onClick={handleSignOut}
-            className="text-xs text-slate-400 hover:text-slate-200 transition-colors"
-          >
+          <Link to="/calendar" className={`text-xs ${ON_DEEP_MUTED} hover:text-white`}>View as diver</Link>
+          <span className={`text-sm ${ON_DEEP_BODY}`}>{profile?.display_name ?? profile?.full_name}</span>
+          <button onClick={handleSignOut} className={`text-xs ${ON_DEEP_MUTED} hover:text-white`}>
             Sign out
           </button>
         </div>
@@ -39,7 +42,7 @@ export function AdminShell() {
         <Outlet />
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-slate-800 border-t border-slate-700 flex justify-around py-2">
+      <nav className={NAV_BOTTOM}>
         {adminNav.map(({ to, label, icon }) => (
           <NavLink
             key={to}
@@ -47,7 +50,7 @@ export function AdminShell() {
             end={to === '/admin'}
             className={({ isActive }) =>
               `flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg text-xs transition-colors ${
-                isActive ? 'text-amber-400' : 'text-slate-400 hover:text-slate-200'
+                isActive ? 'text-white font-semibold' : `${ON_DEEP_SUBTLE} hover:text-white`
               }`
             }
           >

@@ -23,9 +23,9 @@ interface Props {
 
 export function RegisterForm({ event, profile, userId, onClose, onBooked, existingBooking }: Props) {
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-50" onClick={onClose}>
+    <div className="fixed inset-0 bg-blue-900/60 backdrop-blur-sm flex items-end justify-center z-50" onClick={onClose}>
       <div
-        className="bg-slate-800 rounded-t-2xl w-full max-w-lg p-5 space-y-4 max-h-[90vh] overflow-y-auto"
+        className="bg-white/80 backdrop-blur-md border-t border-red-500 rounded-t-2xl w-full max-w-lg p-5 space-y-4 max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <RegisterFormBody
@@ -314,46 +314,46 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   return (
     <>
       <header className="flex items-center justify-between">
-        <span className="text-xs text-slate-400">Step {step} of 4</span>
+        <span className="text-xs text-blue-900 font-medium">Step {step} of 4</span>
         {onCancel && (
-          <button onClick={onCancel} className="text-slate-400 text-xl leading-none">×</button>
+          <button onClick={onCancel} className="text-blue-900 font-medium text-xl leading-none">×</button>
         )}
       </header>
 
       {step === 1 && (
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-100">{event.title}</h2>
-          <p className="text-sm text-slate-400">
+          <h2 className="text-lg font-bold text-blue-900">{event.title}</h2>
+          <p className="text-sm text-blue-900 font-medium">
             {formatEventSpan(event, { style: 'long' })}
           </p>
           {event.price != null && (
-            <p className="text-sm text-slate-300">From {event.currency} {event.price.toLocaleString()}</p>
+            <p className="text-sm text-blue-950 font-medium">From {event.currency} {event.price.toLocaleString()}</p>
           )}
         </section>
       )}
 
       {step === 2 && (
         <section className="space-y-4">
-          <h2 className="text-lg font-bold text-slate-100">About you</h2>
-          <p className="text-xs text-slate-400">
+          <h2 className="text-lg font-bold text-blue-900">About you</h2>
+          <p className="text-xs text-blue-900 font-medium">
             Pre-filled if you've registered before. Edits are saved to your profile.
           </p>
 
           {isGuest && (
-            <div className="border border-slate-700 rounded-lg p-3 space-y-3 bg-slate-900/40">
+            <div className="border border-sky-200 rounded-lg p-3 space-y-3 bg-sky-50">
               <div>
-                <p className="text-sm font-semibold text-slate-100">Account</p>
-                <p className="text-xs text-slate-400">
+                <p className="text-sm font-semibold text-blue-900">Account</p>
+                <p className="text-xs text-blue-900 font-medium">
                   We'll create a FunDivers account for you so you can check your booking status and sign up for future events faster.
                 </p>
               </div>
               <TextField label="Email *" type="email" value={guestEmail} onChange={setGuestEmail} required />
               <TextField label="Password * (min 8 characters)" type="password" value={guestPassword} onChange={setGuestPassword} required />
-              <label className="flex items-start gap-2 text-xs text-slate-300">
-                <input type="checkbox" checked={guestAgreedTerms} onChange={e => setGuestAgreedTerms(e.target.checked)} className="accent-sky-500 mt-0.5" />
+              <label className="flex items-start gap-2 text-xs text-blue-950 font-medium">
+                <input type="checkbox" checked={guestAgreedTerms} onChange={e => setGuestAgreedTerms(e.target.checked)} className="accent-blue-900 mt-0.5" />
                 <span>
                   I agree to the{' '}
-                  <a href="/terms" target="_blank" rel="noreferrer" className="text-sky-400 hover:underline">Terms of Use & Privacy</a>.
+                  <a href="/terms" target="_blank" rel="noreferrer" className="text-blue-700 hover:underline">Terms of Use & Privacy</a>.
                 </span>
               </label>
             </div>
@@ -370,11 +370,11 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
             <div className="grid grid-cols-2 gap-3">
               <TextField label="Phone" type="tel" value={phone} onChange={setPhone} />
               <label className="block">
-                <span className="block text-xs text-slate-400 mb-1">Preferred contact</span>
+                <span className="block text-xs text-blue-900 font-medium mb-1">Preferred contact</span>
                 <select
                   value={contactMethod}
                   onChange={e => setContactMethod(e.target.value as ContactMethod | '')}
-                  className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-2 text-sm text-slate-100"
+                  className="w-full bg-white border border-sky-300 rounded-lg px-2 py-2 text-sm text-blue-900"
                 >
                   <option value="">—</option>
                   <option value="line">LINE</option>
@@ -388,8 +388,8 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
               <TextField label={`${contactMethod === 'email' ? 'Email' : 'ID / number'}`} value={contactId} onChange={setContactId} />
             )}
 
-            <div className="border-t border-slate-700 pt-3 space-y-3">
-              <p className="text-xs text-slate-400 uppercase tracking-wider">Diving</p>
+            <div className="border-t border-sky-200 pt-3 space-y-3">
+              <p className="text-xs text-blue-900 font-medium uppercase tracking-wider">Diving</p>
               <div className="grid grid-cols-2 gap-3">
                 <TextField label="Cert agency" placeholder="PADI, SSI…" value={certAgency} onChange={setCertAgency} />
                 <TextField label="Cert level" placeholder="OW, AOW…" value={certLevel} onChange={setCertLevel} />
@@ -400,15 +400,15 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
                   value={loggedDives === 0 ? '' : String(loggedDives)}
                   onChange={v => setLoggedDives(Number(v) || 0)}
                 />
-                <label className="flex items-end gap-2 text-sm text-slate-300 pb-2">
-                  <input type="checkbox" checked={nitroxCertified} onChange={e => setNitroxCertified(e.target.checked)} className="accent-sky-500" />
+                <label className="flex items-end gap-2 text-sm text-blue-950 font-medium pb-2">
+                  <input type="checkbox" checked={nitroxCertified} onChange={e => setNitroxCertified(e.target.checked)} className="accent-blue-900" />
                   Nitrox certified
                 </label>
               </div>
             </div>
 
-            <div className="border-t border-slate-700 pt-3 space-y-3">
-              <p className="text-xs text-slate-400 uppercase tracking-wider">Emergency contact</p>
+            <div className="border-t border-sky-200 pt-3 space-y-3">
+              <p className="text-xs text-blue-900 font-medium uppercase tracking-wider">Emergency contact</p>
               <div className="grid grid-cols-2 gap-3">
                 <TextField label="Name" value={emergencyName} onChange={setEmergencyName} />
                 <TextField label="Phone" type="tel" value={emergencyPhone} onChange={setEmergencyPhone} />
@@ -420,44 +420,44 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
 
       {step === 3 && (
         <section className="space-y-4">
-          <h2 className="text-lg font-bold text-slate-100">Extras</h2>
+          <h2 className="text-lg font-bold text-blue-900">Extras</h2>
 
           {!gearIncluded && !showGearRentChoice && !showRooms && !showAddons && !showNitroxAddon && (
-            <p className="text-slate-400 text-sm">No extras for this event.</p>
+            <p className="text-blue-900 font-medium text-sm">No extras for this event.</p>
           )}
 
           {gearIncluded && (
-            <p className="text-sm text-slate-300">
+            <p className="text-sm text-blue-950 font-medium">
               Gear is included with this course — no need to rent.
             </p>
           )}
 
           {showGearRentChoice && (
             <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm text-slate-300">
-                <input type="checkbox" checked={rentGear} onChange={e => setRentGear(e.target.checked)} className="accent-sky-500" />
+              <label className="flex items-center gap-2 text-sm text-blue-950 font-medium">
+                <input type="checkbox" checked={rentGear} onChange={e => setRentGear(e.target.checked)} className="accent-blue-900" />
                 Rent gear
               </label>
               {event.gear_rental_info && (
-                <p className="text-xs text-slate-500 pl-6">{event.gear_rental_info}</p>
+                <p className="text-xs text-blue-950 font-medium pl-6">{event.gear_rental_info}</p>
               )}
               {rentGear && (
                 <div className="pl-6 space-y-2">
                   <select
                     value={gearMode}
                     onChange={e => setGearMode(e.target.value as typeof gearMode)}
-                    className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-100"
+                    className="bg-white border border-sky-300 rounded-lg px-2 py-1 text-sm text-blue-900"
                   >
                     <option value="full">Full set ({GEAR_FULLSET_DAILY.toLocaleString()}/day)</option>
                     <option value="a-la-carte">À-la-carte</option>
                   </select>
                   {gearMode === 'a-la-carte' && (
                     <>
-                      <p className="text-xs text-slate-500">Check the items you need us to prepare for you:</p>
+                      <p className="text-xs text-blue-950 font-medium">Check the items you need us to prepare for you:</p>
                       <div className="grid grid-cols-2 gap-1">
                         {GEAR_ITEMS.map(item => (
-                          <label key={item} className="flex items-center gap-1 text-xs text-slate-300">
-                            <input type="checkbox" checked={gearItems.includes(item)} onChange={() => toggleItem(item)} className="accent-sky-500" />
+                          <label key={item} className="flex items-center gap-1 text-xs text-blue-950 font-medium">
+                            <input type="checkbox" checked={gearItems.includes(item)} onChange={() => toggleItem(item)} className="accent-blue-900" />
                             {item} ({GEAR_ALACARTE_PRICES[item]})
                           </label>
                         ))}
@@ -471,11 +471,11 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
 
           {showRooms && rooms.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm text-slate-300 font-semibold">Room</p>
-              <p className="text-xs text-slate-500">
+              <p className="text-sm text-blue-950 font-medium font-semibold">Room</p>
+              <p className="text-xs text-blue-950 font-medium">
                 Your base price already includes a place to sleep — upgrading is optional.
               </p>
-              <select value={roomId} onChange={e => setRoomId(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-100">
+              <select value={roomId} onChange={e => setRoomId(e.target.value)} className="w-full bg-white border border-sky-300 rounded-lg px-2 py-1 text-sm text-blue-900">
                 <option value="">— keep included room —</option>
                 {rooms.map(r => (
                   <option key={r._id} value={r._id}>
@@ -484,60 +484,60 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
                 ))}
               </select>
               {roomId && (
-                <input value={roomNotes} onChange={e => setRoomNotes(e.target.value)} placeholder="Roommate preferences, etc." className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-100" />
+                <input value={roomNotes} onChange={e => setRoomNotes(e.target.value)} placeholder="Roommate preferences, etc." className="w-full bg-white border border-sky-300 rounded-lg px-2 py-1 text-sm text-blue-900" />
               )}
             </div>
           )}
 
           {showAddons && addons.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm text-slate-300 font-semibold">Add-ons</p>
+              <p className="text-sm text-blue-950 font-medium font-semibold">Add-ons</p>
               <div className="max-h-40 overflow-y-auto grid grid-cols-1 gap-1 pr-1">
                 {addons.map(a => (
-                  <label key={a._id} className="flex items-center gap-2 text-xs text-slate-300">
-                    <input type="checkbox" checked={addonIds.has(a._id)} onChange={() => toggleAddon(a._id)} className="accent-sky-500" />
+                  <label key={a._id} className="flex items-center gap-2 text-xs text-blue-950 font-medium">
+                    <input type="checkbox" checked={addonIds.has(a._id)} onChange={() => toggleAddon(a._id)} className="accent-blue-900" />
                     <span className="flex-1">{a.display_name ?? a.title}</span>
-                    {a.price != null && <span className="text-slate-400">+{a.price.toLocaleString()}</span>}
+                    {a.price != null && <span className="text-blue-900 font-medium">+{a.price.toLocaleString()}</span>}
                   </label>
                 ))}
               </div>
             </div>
           )}
 
-          <label className="flex items-center gap-2 text-sm text-slate-300">
-            <input type="checkbox" checked={needsTransport} onChange={e => setNeedsTransport(e.target.checked)} className="accent-sky-500" />
+          <label className="flex items-center gap-2 text-sm text-blue-950 font-medium">
+            <input type="checkbox" checked={needsTransport} onChange={e => setNeedsTransport(e.target.checked)} className="accent-blue-900" />
             Need transportation (+{TRANSPORT_FEE.toLocaleString()})
           </label>
 
           {showNitroxAddon && (
-            <label className="flex gap-2 text-sm text-slate-300 items-start">
-              <input type="checkbox" checked={addNitroxCourse} onChange={e => setAddNitroxCourse(e.target.checked)} className="accent-sky-500 mt-1" />
+            <label className="flex gap-2 text-sm text-blue-950 font-medium items-start">
+              <input type="checkbox" checked={addNitroxCourse} onChange={e => setAddNitroxCourse(e.target.checked)} className="accent-blue-900 mt-1" />
               <span className="flex-1">
                 <span className="block">Add Nitrox course (+{NITROX_COURSE_FEE.toLocaleString()})</span>
-                <span className="block text-xs text-slate-500">Get your Nitrox certification during this event.</span>
+                <span className="block text-xs text-blue-950 font-medium">Get your Nitrox certification during this event.</span>
               </span>
             </label>
           )}
 
           <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Notes (optional)"
-            className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-100" />
+            className="w-full bg-white border border-sky-300 rounded-lg px-2 py-1 text-sm text-blue-900" />
         </section>
       )}
 
       {step === 4 && (
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-100">Payment</h2>
+          <h2 className="text-lg font-bold text-blue-900">Payment</h2>
           <div className="space-y-2">
             {(['bank_transfer', 'credit_card', 'cash'] as const).map(method => (
-              <label key={method} className="flex gap-2 text-sm text-slate-300 items-start">
-                <input type="radio" name="payment" checked={payment === method} onChange={() => setPayment(method)} className="accent-sky-500 mt-1" />
+              <label key={method} className="flex gap-2 text-sm text-blue-950 font-medium items-start">
+                <input type="radio" name="payment" checked={payment === method} onChange={() => setPayment(method)} className="accent-blue-900 mt-1" />
                 <span className="flex-1">
                   <span className="block">
                     {method === 'bank_transfer' && 'Bank transfer'}
                     {method === 'credit_card' && 'Credit card / PayPal (+5%)'}
                     {method === 'cash' && 'Cash on the day'}
                   </span>
-                  <span className="block text-xs text-slate-500">
+                  <span className="block text-xs text-blue-950 font-medium">
                     {method === 'bank_transfer' && 'We\'ll send you the bank account details.'}
                     {method === 'credit_card' && 'A 5% processing fee applies. We\'ll email you a PayPal invoice.'}
                     {method === 'cash' && 'We\'ll contact you to arrange a convenient time.'}
@@ -547,7 +547,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
             ))}
           </div>
 
-          <div className="text-sm text-slate-300 bg-slate-900/50 rounded-lg p-3 space-y-1">
+          <div className="text-sm text-blue-950 font-medium bg-sky-50 rounded-lg p-3 space-y-1">
             <Row label="Base"                value={base} currency={event.currency} />
             {gearCost > 0         && <Row label="Gear"           value={gearCost}     currency={event.currency} />}
             {roomCost > 0         && <Row label="Room"           value={roomCost}     currency={event.currency} />}
@@ -555,19 +555,19 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
             {needsTransport       && <Row label="Transport"      value={TRANSPORT_FEE} currency={event.currency} />}
             {(showNitroxAddon && addNitroxCourse) && <Row label="Nitrox course" value={NITROX_COURSE_FEE} currency={event.currency} />}
             {paymentSurcharge > 0 && <Row label="Credit surcharge (5%)" value={total - subTotal} currency={event.currency} />}
-            <div className="border-t border-slate-700 pt-1 mt-1">
+            <div className="border-t border-sky-200 pt-1 mt-1">
               <Row label="Total" value={total} currency={event.currency} bold />
             </div>
           </div>
 
           {!isEdit && (
-            <p className="text-xs text-amber-300 bg-amber-950/40 border border-amber-900/60 rounded p-2">
+            <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded p-2">
               Please note: your reservation is not confirmed until the deposit
               {event.deposit_amount != null && ` (${event.currency} ${event.deposit_amount.toLocaleString()})`} has been paid.
             </p>
           )}
 
-          {err && <p className="text-rose-400 text-sm">{err}</p>}
+          {err && <p className="text-red-600 text-sm">{err}</p>}
         </section>
       )}
 
@@ -578,7 +578,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
             else setStep((step - 1) as Step)
           }}
           disabled={step === 1 && !onBackBeforeStepOne}
-          className="text-sm text-slate-400 hover:text-slate-100 disabled:opacity-40"
+          className="text-sm text-blue-900 font-medium hover:text-blue-900 disabled:opacity-40"
         >
           ‹ Back
         </button>
@@ -589,13 +589,13 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
               fullName.trim() === '' ||
               (isGuest && (guestEmail.trim() === '' || guestPassword.length < 8 || !guestAgreedTerms))
             )}
-            className="bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
+            className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
           >
             Next ›
           </button>
         ) : (
           <button onClick={submit} disabled={saving}
-            className="bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg">
+            className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg">
             {saving ? '…' : isEdit ? 'Save changes' : 'Confirm booking'}
           </button>
         )}
@@ -606,7 +606,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
 
 function Row({ label, value, currency, bold = false }: { label: string; value: number; currency: string; bold?: boolean }) {
   return (
-    <div className={`flex justify-between ${bold ? 'font-bold text-slate-100' : ''}`}>
+    <div className={`flex justify-between ${bold ? 'font-bold text-blue-900' : ''}`}>
       <span>{label}</span>
       <span>{currency} {value.toLocaleString()}</span>
     </div>
@@ -628,7 +628,7 @@ function TextField({
 }) {
   return (
     <label className="block">
-      <span className="block text-xs text-slate-400 mb-1">{label}</span>
+      <span className="block text-xs text-blue-900 font-medium mb-1">{label}</span>
       <input
         type={type}
         value={value}
@@ -636,7 +636,7 @@ function TextField({
         required={required}
         placeholder={placeholder}
         min={min}
-        className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
+        className="w-full bg-white border border-sky-300 rounded-lg px-2 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
       />
     </label>
   )
