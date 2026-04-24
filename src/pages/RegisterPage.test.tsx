@@ -5,13 +5,14 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { RegisterPage } from './RegisterPage'
 import { mockQueryBuilder } from '../../tests/test-utils'
 
-const { from, useAuthMock, fetchEventsForBookings, fetchEventsInRange, signInWithPassword, signUp } = vi.hoisted(() => ({
+const { from, useAuthMock, fetchEventsForBookings, fetchEventsInRange, signInWithPassword, signUp, invoke } = vi.hoisted(() => ({
   from: vi.fn(),
   useAuthMock: vi.fn(),
   fetchEventsForBookings: vi.fn(),
   fetchEventsInRange: vi.fn(),
   signInWithPassword: vi.fn(),
   signUp: vi.fn(),
+  invoke: vi.fn(),
 }))
 
 vi.mock('../lib/supabase', () => ({
@@ -21,6 +22,7 @@ vi.mock('../lib/supabase', () => ({
       signInWithPassword: (...a: unknown[]) => signInWithPassword(...a),
       signUp: (...a: unknown[]) => signUp(...a),
     },
+    functions: { invoke: (...a: unknown[]) => invoke(...a) },
   },
 }))
 vi.mock('../lib/events', async () => {
@@ -58,6 +60,8 @@ beforeEach(() => {
   fetchEventsInRange.mockReset()
   signInWithPassword.mockReset()
   signUp.mockReset()
+  invoke.mockReset()
+  invoke.mockResolvedValue({ data: { ok: true }, error: null })
 })
 
 function renderAt(path: string) {
@@ -152,5 +156,7 @@ describe('RegisterPage', () => {
     expect(payload).toMatchObject({ user_id: 'u-new', eo_dive_id: 'dive-a', eo_course_id: null, status: 'pending' })
     expect(localStorage.getItem('pending-booking:dive:dive-a')).toBeNull()
     await screen.findByText(/registration submitted/i)
+    // PDF-email edge function fires for the auto-resume path too.
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('send-registration-pdf', { body: { booking_id: 'b-just-booked' } }))
   })
 })
