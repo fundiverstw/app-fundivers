@@ -13,8 +13,13 @@ import type { AppEvent, Booking, Profile } from '../../types/database'
 // source of truth for what to physically pack.
 function packList(booking: Booking): { summary: string; items: string[] } {
   const g = booking.details?.gear
-  if (!g || !g.rent) return { summary: 'Own gear', items: [] }
-  if (g.mode === 'provided') return { summary: 'Provided by shop', items: [] }
+  if (!g) return { summary: 'Own gear', items: [] }
+  // Course-bundled gear (g.included) is functionally a full set the shop
+  // packs — same item list, just labeled differently so the gear map
+  // distinguishes "diver paid to rent" from "shop provides as part of
+  // the course".
+  if (g.included) return { summary: 'Included with course', items: [...GEAR_ITEMS] }
+  if (!g.rent) return { summary: 'Own gear', items: [] }
   if (g.mode === 'full') return { summary: 'Full set', items: [...GEAR_ITEMS] }
   if (g.mode === 'a-la-carte') return {
     summary: g.items?.length ? `À-la-carte (${g.items.length})` : 'À-la-carte (none)',

@@ -1,4 +1,4 @@
-.PHONY: help dev studio mail start stop status reset diff link pull push dump-data verify test deploy deploy-app deploy-push deploy-functions
+.PHONY: help dev studio mail start stop status reset diff link pull push dump-data verify test lint lint-fix typecheck check deploy deploy-app deploy-push deploy-functions
 
 help:
 	@echo "Local dev:"
@@ -20,6 +20,10 @@ help:
 	@echo ""
 	@echo "Testing:"
 	@echo "  make test        — run every local test (unit + component + integration)"
+	@echo "  make lint        — run eslint over the SPA + tests"
+	@echo "  make lint-fix    — run eslint with --fix to auto-correct what it can"
+	@echo "  make typecheck   — run tsc --noEmit (no build, just type validation)"
+	@echo "  make check       — typecheck + lint + test, in that order; pre-deploy gate"
 	@echo ""
 	@echo "Deploy:"
 	@echo "  make deploy            — deploy both workers (SPA + push cron)"
@@ -38,6 +42,10 @@ push:       ; @npm run db:push
 dump-data:  ; @npm run db:dump-data
 verify:     ; @bash scripts/verify-sync.sh
 test:       ; @npm run test:all
+lint:       ; @npm run lint
+lint-fix:   ; @npm run lint:fix
+typecheck:  ; @npx tsc --noEmit
+check:      typecheck lint test
 
 deploy: deploy-app deploy-push
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -55,7 +55,11 @@ export function AdminNotes({ target, tagFilter, title = 'Notes' }: Props) {
   const [content, setContent] = useState('')
   const [saving, setSaving] = useState(false)
 
-  async function refetch() {
+  // useCallback so the refetch identity is stable across renders that
+  // don't change target/tagFilter, satisfying react-hooks/exhaustive-deps
+  // and avoiding the set-state-in-effect warning that fires when an
+  // anonymous arrow inside useEffect transitively calls setState.
+  const refetch = useCallback(async () => {
     let q = supabase
       .from('admin_notes')
       .select('*')
@@ -82,9 +86,9 @@ export function AdminNotes({ target, tagFilter, title = 'Notes' }: Props) {
       author: profMap.get(r.created_by) ?? null,
       resolver: r.resolved_by ? (profMap.get(r.resolved_by) ?? null) : null,
     })))
-  }
+  }, [target, tagFilter])
 
-  useEffect(() => { refetch() }, [target.kind, target.id, tagFilter])
+  useEffect(() => { refetch() }, [refetch])
 
   async function addNote() {
     if (!user || !content.trim()) return
