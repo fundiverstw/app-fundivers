@@ -25,7 +25,7 @@ help:
 	@echo "  make deploy            — deploy both workers (SPA + push cron)"
 	@echo "  make deploy-app        — deploy just the SPA (app-fundiverstw)"
 	@echo "  make deploy-push       — deploy just the push cron (fundivers-push)"
-	@echo "  make deploy-functions  — deploy supabase edge functions (send-registration-pdf, …)"
+	@echo "  make deploy-functions  — deploy all supabase edge functions in supabase/functions/"
 
 start:      ; @npm run db:start
 stop:       ; @npm run db:stop
