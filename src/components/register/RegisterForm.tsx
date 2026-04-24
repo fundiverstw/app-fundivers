@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { formatEventSpan } from '../../lib/events'
 import { GEAR_ITEMS } from '../../lib/gear'
-import type { AppEvent, Booking, BookingDetails, EOAddon, EORoom, Profile } from '../../types/database'
+import type { AppEvent, Booking, BookingDetails, Database, EOAddon, EORoom, Profile } from '../../types/database'
+
+type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
 
 // RegisterForm = modal wrapper around RegisterFormBody.
 // RegisterFormBody = the actual 3-step form, reusable from a standalone page
@@ -24,7 +26,7 @@ interface Props {
 // event, then consumed by RegisterPage once the user returns authed via
 // the confirmation link and we can finally insert the booking.
 export interface PendingBookingDraft {
-  profilePatch: Partial<Profile>
+  profilePatch: ProfileUpdate
   details: BookingDetails
   notes: string | null
 }
