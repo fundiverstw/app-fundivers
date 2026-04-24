@@ -326,6 +326,37 @@ describe('RegisterForm', () => {
     await waitFor(() => expect(onBooked).toHaveBeenCalledWith({ id: 'b-guest-new' }))
   })
 
+  it('guest path: surfaces the server\'s error body and softens "already registered" with a sign-in hint', async () => {
+    setupFrom()
+    // FunctionsHttpError shape: .context is a Response, .message is the
+    // generic wrapper. The form should pull the body out and then
+    // detect the "already registered" case to point users at sign-in.
+    const responseBody = { error: 'A user with this email address has already been registered' }
+    const ctx = new Response(JSON.stringify(responseBody), { status: 400, headers: { 'content-type': 'application/json' } })
+    invoke.mockResolvedValueOnce({
+      data: null,
+      error: Object.assign(new Error('Edge Function returned a non-2xx status code'), { context: ctx }),
+    })
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter>
+        <RegisterFormBody event={sampleEvent} profile={null} onSubmitSuccess={() => {}} />
+      </MemoryRouter>
+    )
+
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.type(screen.getByLabelText(/email \*/i), 'taken@diver.test')
+    await user.type(screen.getByLabelText(/password/i), 'abcdefgh')
+    await user.click(screen.getByLabelText(/I agree to the/i))
+    await user.type(screen.getByLabelText(/full name/i), 'Grace Hopper')
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+    expect(await screen.findByText(/account with that email already exists/i)).toBeInTheDocument()
+    expect(screen.getByText(/sign in/i)).toBeInTheDocument()
+  })
+
   it('in edit mode, pre-populates state from the existing booking and UPDATEs on submit', async () => {
     setupFrom()
     const onBooked = vi.fn()

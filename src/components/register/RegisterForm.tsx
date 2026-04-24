@@ -48,6 +48,26 @@ const GEAR_FULLSET_DAILY = 1500
 const NITROX_COURSE_FEE = 6000
 const TRANSPORT_FEE = 1300
 
+// supabase-js wraps every non-2xx as `FunctionsHttpError` whose .message
+// is just "Edge Function returned a non-2xx status code"; the actual
+// server message is buried in .context (a Response). Pull it out, then
+// soften the most common case (email already taken) with a recovery
+// hint pointing at the inline sign-in banner.
+async function readFunctionsError(error: { message: string; context?: unknown }, isGuest: boolean): Promise<string> {
+  let msg = error.message
+  const ctx = error.context
+  if (ctx && typeof (ctx as Response).json === 'function') {
+    try {
+      const body = await (ctx as Response).json() as { error?: string }
+      if (body?.error) msg = body.error
+    } catch { /* fall back to wrapper text */ }
+  }
+  if (isGuest && /already.*registered|already.*exists/i.test(msg)) {
+    return 'An account with that email already exists. Use "Sign in" at the top of the page to continue with this email.'
+  }
+  return msg
+}
+
 type Step = 1 | 2 | 3 | 4
 type ContactMethod = 'whatsapp' | 'line' | 'phone' | 'email'
 
@@ -274,7 +294,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
       },
     )
     setSaving(false)
-    if (error) { setErr(error.message); return }
+    if (error) { setErr(await readFunctionsError(error, isGuest)); return }
     if (!data?.booking_id) { setErr('Registration failed — please try again.'); return }
 
     // Guest path returns the session so we can sign the diver in
