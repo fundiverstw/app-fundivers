@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { RegisterPage } from './RegisterPage'
 import { mockQueryBuilder } from '../../tests/test-utils'
 
-const { from, useAuthMock, fetchEventsForBookings, fetchEventsInRange, signInWithPassword, signUp, invoke } = vi.hoisted(() => ({
+const { from, useAuthMock, fetchEventsForBookings, fetchEventsInRange, signInWithPassword, signUp, invoke, updateUser } = vi.hoisted(() => ({
   from: vi.fn(),
   useAuthMock: vi.fn(),
   fetchEventsForBookings: vi.fn(),
@@ -13,6 +13,7 @@ const { from, useAuthMock, fetchEventsForBookings, fetchEventsInRange, signInWit
   signInWithPassword: vi.fn(),
   signUp: vi.fn(),
   invoke: vi.fn(),
+  updateUser: vi.fn(),
 }))
 
 vi.mock('../lib/supabase', () => ({
@@ -21,6 +22,7 @@ vi.mock('../lib/supabase', () => ({
     auth: {
       signInWithPassword: (...a: unknown[]) => signInWithPassword(...a),
       signUp: (...a: unknown[]) => signUp(...a),
+      updateUser: (...a: unknown[]) => updateUser(...a),
     },
     functions: { invoke: (...a: unknown[]) => invoke(...a) },
   },
@@ -62,6 +64,8 @@ beforeEach(() => {
   signUp.mockReset()
   invoke.mockReset()
   invoke.mockResolvedValue({ data: { ok: true }, error: null })
+  updateUser.mockReset()
+  updateUser.mockResolvedValue({ data: null, error: null })
 })
 
 function renderAt(path: string) {
@@ -158,5 +162,43 @@ describe('RegisterPage', () => {
     await screen.findByText(/registration submitted/i)
     // PDF-email edge function fires for the auto-resume path too.
     await waitFor(() => expect(invoke).toHaveBeenCalledWith('send-registration-pdf', { body: { booking_id: 'b-just-booked' } }))
+  })
+
+  it('auto-submits a pending booking draft from user_metadata (cross-device confirm path)', async () => {
+    // Email confirmation clicked on a different device — no localStorage on
+    // this browser, but the draft rides along on auth.users.raw_user_meta_data
+    // and is now visible as user.user_metadata.pending_booking.
+    const draft = {
+      event_type: 'dive',
+      event_id: 'dive-a',
+      event_title: 'Kenting Dive',
+      profilePatch: { full_name: 'Grace Hopper' },
+      details: { payment_method: 'bank_transfer', total: 3000 },
+      notes: null,
+    }
+
+    useAuthMock.mockReturnValue({
+      user: { id: 'u-new', user_metadata: { pending_booking: draft } },
+      profile: null,
+      loading: false,
+    })
+    fetchEventsForBookings.mockResolvedValue(new Map([['dive-a', testEvent]]))
+
+    const profileUpdate = vi.fn().mockReturnValue({ eq: () => Promise.resolve({ error: null }) })
+    const bookingInsert = vi.fn().mockReturnValue({
+      select: () => ({ single: () => Promise.resolve({ data: { id: 'b-from-meta', status: 'pending' }, error: null }) }),
+    })
+    from.mockImplementation((table: string) => {
+      if (table === 'profiles') return { update: profileUpdate }
+      if (table === 'bookings') return { ...mockQueryBuilder({ data: null }), insert: bookingInsert }
+      return mockQueryBuilder({ data: null })
+    })
+
+    renderAt('/register/dive/dive-a')
+    await waitFor(() => expect(bookingInsert).toHaveBeenCalled())
+    const [payload] = bookingInsert.mock.calls[0]
+    expect(payload).toMatchObject({ user_id: 'u-new', eo_dive_id: 'dive-a', eo_course_id: null, status: 'pending' })
+    await screen.findByText(/registration submitted/i)
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('send-registration-pdf', { body: { booking_id: 'b-from-meta' } }))
   })
 })
