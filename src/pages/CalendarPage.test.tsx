@@ -233,7 +233,7 @@ describe('CalendarPage', () => {
     renderWithRouter(<CalendarPage />)
     const heading = await screen.findByRole('heading', { level: 1 })
     const initial = heading.textContent
-    await user.click(screen.getByRole('button', { name: '›' }))
+    await user.click(screen.getByRole('button', { name: /next month/i }))
     await waitFor(() => expect(heading.textContent).not.toBe(initial))
   })
 })

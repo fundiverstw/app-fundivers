@@ -7,7 +7,7 @@ import { Logo } from '../Logo'
 import { CalendarIcon } from '../icons/CalendarIcon'
 import {
   PAGE, NAV_BAR, NAV_BOTTOM, BTN_LIGHT,
-  ON_DEEP_MUTED, ON_DEEP_SUBTLE, ON_DEEP_BODY, ON_DEEP_LINK,
+  ON_DEEP_MUTED, ON_DEEP_SUBTLE, ON_DEEP_BODY,
 } from '../../styles/tokens'
 
 function DiveLogIcon() {
@@ -101,12 +101,13 @@ export function AppShell() {
               Install app
             </button>
           )}
-          {profile?.role === 'admin' && (
-            <Link to="/admin" className={`text-xs ${ON_DEEP_LINK}`}>
-              View as admin
+          {profile?.role === 'admin' ? (
+            <Link to="/admin" className={`text-sm ${ON_DEEP_BODY} hover:text-white`}>
+              {profile.display_name ?? profile.full_name}
             </Link>
+          ) : (
+            <span className={`text-sm ${ON_DEEP_BODY}`}>{profile?.display_name ?? profile?.full_name}</span>
           )}
-          <span className={`text-sm ${ON_DEEP_BODY}`}>{profile?.display_name ?? profile?.full_name}</span>
           <button onClick={handleSignOut} className={`text-xs ${ON_DEEP_MUTED} hover:text-white`}>
             Sign out
           </button>

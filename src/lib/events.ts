@@ -4,14 +4,15 @@ import type { AppEvent, EOCourse, EODive, EOPrice } from '../types/database'
 
 /**
  * Render an event's date span as a human string. Policy:
- *   - Never show times; EO_* events are date-only even when the ISO has a
- *     midnight component for timezone-conversion reasons.
+ *   - When `start_time_hhmm` is set, append ` · HH:mm` (24h) so the start
+ *     time is visible everywhere events are listed. Existing rows without a
+ *     time set keep the date-only output.
  *   - Single-day events show one date, not a "→ same date" range.
  *   - `style` controls formality: 'long' (Saturday, May 1), 'short' (Sat,
  *     May 1; default), 'compact' (May 1, no weekday).
  */
 export function formatEventSpan(
-  event: Pick<AppEvent, 'start_time' | 'end_time'>,
+  event: Pick<AppEvent, 'start_time' | 'end_time' | 'start_time_hhmm'>,
   opts: { style?: 'long' | 'short' | 'compact'; withYear?: boolean } = {},
 ): string {
   const style = opts.style ?? 'short'
@@ -24,13 +25,14 @@ export function formatEventSpan(
     short:   'EEE, MMM d',
     compact: 'MMM d',
   }[style]) + year
-  if (singleDay) return format(start, startFmt)
+  const timeSuffix = event.start_time_hhmm ? ` · ${event.start_time_hhmm}` : ''
+  if (singleDay) return format(start, startFmt) + timeSuffix
   const endFmt = ({
     long:    'MMMM d',
     short:   'MMM d',
     compact: 'MMM d',
   }[style]) + year
-  return `${format(start, startFmt)} → ${format(end!, endFmt)}`
+  return `${format(start, startFmt)}${timeSuffix} → ${format(end!, endFmt)}`
 }
 
 /**
@@ -41,6 +43,18 @@ function toIso(date: string | null | undefined, time: string | null | undefined)
   if (!date) return null
   const t = time && time.trim() ? time.trim() : '00:00:00'
   return new Date(`${date}T${t}`).toISOString()
+}
+
+/**
+ * Normalize a Bubble time field ('HH:MM:SS.SSS' / 'HH:MM:SS' / 'HH:MM' or
+ * empty) to 'HH:mm' for display. Returns null when no time was set so
+ * surfaces can fall back to date-only.
+ */
+function toHhmm(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  const m = /^(\d{1,2}):(\d{2})/.exec(raw.trim())
+  if (!m) return null
+  return `${m[1].padStart(2, '0')}:${m[2]}`
 }
 
 /** `"id1,id2"` → `['id1','id2']`. Handles null/whitespace. */
@@ -60,6 +74,7 @@ function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: stri
     title: d.dive_title || d.title || 'Dive',
     start_time: start,
     end_time: toIso(d.end_date, d.time),
+    start_time_hhmm: toHhmm(d.time),
     featured: d.featured ?? false,
     fully_booked: d.fully_booked ?? false,
     price: p?.starting_at ?? null,
@@ -108,6 +123,7 @@ function courseToEvents(c: EOCourse, priceIndex: Map<string, EOPrice>, addonIds:
     id: c._id,
     type: 'course' as const,
     title: c.course_title || c.title || 'Course',
+    start_time_hhmm: toHhmm(c.start_time),
     featured: false,
     fully_booked: false,
     price: p?.starting_at ?? null,
