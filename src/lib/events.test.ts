@@ -120,4 +120,52 @@ describe('courseToEvents — Wix special_date branches', () => {
     })
     expect(new Set(events.map(e => e.id))).toEqual(new Set(['c1']))
   })
+
+  it('carries start_time_hhmm from the course start_time column', async () => {
+    const events = await fetchAndGet({
+      ...baseCourse, start_time: '14:30:00.000', start_date: '2026-05-10', end_date: '2026-05-10', special_date: null,
+    })
+    expect(events).toHaveLength(1)
+    expect(events[0].start_time_hhmm).toBe('14:30')
+  })
+
+  it('emits start_time_hhmm = null when course has no start_time set', async () => {
+    const events = await fetchAndGet({
+      ...baseCourse, start_time: '', start_date: '2026-05-10', end_date: '2026-05-10', special_date: null,
+    })
+    expect(events).toHaveLength(1)
+    expect(events[0].start_time_hhmm).toBeNull()
+  })
+})
+
+describe('formatEventSpan — start_time_hhmm rendering', () => {
+  it('appends · HH:mm when start_time_hhmm is set (single-day)', async () => {
+    const { formatEventSpan } = await import('./events')
+    const out = formatEventSpan({
+      start_time: '2026-05-10T01:00:00.000Z',
+      end_time: null,
+      start_time_hhmm: '09:00',
+    })
+    expect(out).toMatch(/· 09:00$/)
+  })
+
+  it('omits time suffix when start_time_hhmm is null', async () => {
+    const { formatEventSpan } = await import('./events')
+    const out = formatEventSpan({
+      start_time: '2026-05-10T01:00:00.000Z',
+      end_time: null,
+      start_time_hhmm: null,
+    })
+    expect(out).not.toMatch(/·/)
+  })
+
+  it('places time on the start side of a multi-day range', async () => {
+    const { formatEventSpan } = await import('./events')
+    const out = formatEventSpan({
+      start_time: '2026-05-10T01:00:00.000Z',
+      end_time: '2026-05-12T01:00:00.000Z',
+      start_time_hhmm: '09:00',
+    })
+    expect(out).toMatch(/· 09:00 → /)
+  })
 })

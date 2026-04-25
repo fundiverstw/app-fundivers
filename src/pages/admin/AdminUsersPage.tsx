@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
-import { fetchEventsForBookings } from '../../lib/events'
+import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
 import { getCertCardSignedUrl } from '../../lib/cert-card'
 import { shoeAsJp } from '../../lib/shoe-size'
 import type { AppEvent, Booking, Payment, Profile } from '../../types/database'
@@ -214,7 +214,7 @@ function ExtrasBlock({ extras }: { extras: UserExtras }) {
                 <div className="min-w-0">
                   <p className="text-blue-900 truncate">{b.event?.title ?? '(event)'}</p>
                   {b.event && (
-                    <p className="text-blue-950 font-medium">{format(new Date(b.event.start_time), 'MMM d yyyy')}</p>
+                    <p className="text-blue-950 font-medium">{formatEventSpan(b.event, { style: 'compact', withYear: true })}</p>
                   )}
                 </div>
                 <span className={`capitalize shrink-0 ml-2 ${statusColor(b.status)}`}>{b.status}</span>

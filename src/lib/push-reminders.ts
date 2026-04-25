@@ -39,17 +39,19 @@ export function daysBetween(fromYmd: string, toYmd: string): number {
 }
 
 export interface ReminderInput {
-  userId:          string
-  eventId:         string
-  eventType:       'dive' | 'course'
-  eventTitle:      string
-  eventStartDate:  string   // YYYY-MM-DD, Taipei local
-  bookingStatus:   string
-  totalAmount:     number
-  depositAmount:   number
-  paidAmount:      number
-  currency:        string
-  alreadySent:     ReadonlySet<ReminderKind>
+  userId:              string
+  eventId:             string
+  eventType:           'dive' | 'course'
+  eventTitle:          string
+  eventStartDate:      string   // YYYY-MM-DD, Taipei local
+  /** 'HH:mm' (24h) or null when source row has no start time set. */
+  eventStartTimeHhmm:  string | null
+  bookingStatus:       string
+  totalAmount:         number
+  depositAmount:       number
+  paidAmount:          number
+  currency:            string
+  alreadySent:         ReadonlySet<ReminderKind>
 }
 
 export interface ReminderOutput {
@@ -74,12 +76,14 @@ export function selectReminders(today: string, inputs: ReminderInput[]): Reminde
     const days = daysBetween(today, r.eventStartDate)
     if (days < 0) continue
 
+    const timeSuffix = r.eventStartTimeHhmm ? ` · ${r.eventStartTimeHhmm}` : ''
+
     const evKind = eventKindForDays(days)
     if (evKind && !r.alreadySent.has(evKind)) {
       out.push({
         userId: r.userId, eventId: r.eventId, eventType: r.eventType, kind: evKind,
         title: days === 1 ? 'Dive tomorrow' : `Dive in ${days} days`,
-        body:  r.eventTitle,
+        body:  r.eventTitle + timeSuffix,
         url:   '/bookings',
       })
     }
@@ -95,7 +99,7 @@ export function selectReminders(today: string, inputs: ReminderInput[]): Reminde
         out.push({
           userId: r.userId, eventId: r.eventId, eventType: r.eventType, kind: payKind,
           title: `${label} due — ${r.eventTitle}`,
-          body:  `${r.currency} ${amount.toLocaleString()} · event ${whenLabel(days)}`,
+          body:  `${r.currency} ${amount.toLocaleString()} · event ${whenLabel(days)}${timeSuffix}`,
           url:   '/payments',
         })
       }

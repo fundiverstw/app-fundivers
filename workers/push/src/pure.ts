@@ -12,8 +12,8 @@ export type Booking = {
   eo_course_id: string | null
   details: { total?: number; deposit?: number } | null
 }
-export type DiveRow   = { _id: string; dive_title?: string | null;  title?: string | null; start_date: string | null }
-export type CourseRow = { _id: string; course_title?: string | null; title?: string | null; start_date: string | null }
+export type DiveRow   = { _id: string; dive_title?: string | null;  title?: string | null; start_date: string | null; time?: string | null }
+export type CourseRow = { _id: string; course_title?: string | null; title?: string | null; start_date: string | null; start_time?: string | null }
 
 function titleOf(ev: DiveRow | CourseRow, isDive: boolean): string {
   if (isDive) {
@@ -22,6 +22,14 @@ function titleOf(ev: DiveRow | CourseRow, isDive: boolean): string {
   }
   const c = ev as CourseRow
   return c.course_title || c.title || 'Course'
+}
+
+/** 'HH:MM:SS.SSS' / 'HH:MM:SS' / 'HH:MM' / empty → 'HH:mm' or null. */
+export function toHhmm(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  const m = /^(\d{1,2}):(\d{2})/.exec(raw.trim())
+  if (!m) return null
+  return `${m[1].padStart(2, '0')}:${m[2]}`
 }
 
 /**
@@ -48,18 +56,20 @@ export function buildReminderInputs(args: {
     if (!ev || !ev.start_date) continue
 
     const details = b.details ?? {}
+    const rawTime = isDive ? (ev as DiveRow).time : (ev as CourseRow).start_time
     inputs.push({
-      userId:         b.user_id,
+      userId:             b.user_id,
       eventId,
-      eventType:      isDive ? 'dive' : 'course',
-      eventTitle:     titleOf(ev, isDive),
-      eventStartDate: ev.start_date,
-      bookingStatus:  b.status,
-      totalAmount:    Number(details.total   ?? 0),
-      depositAmount:  Number(details.deposit ?? 0),
-      paidAmount:     paidByBooking.get(b.id) ?? 0,
-      currency:       'TWD',
-      alreadySent:    sentMap.get(`${b.user_id}:${eventId}`) ?? new Set<ReminderKind>(),
+      eventType:          isDive ? 'dive' : 'course',
+      eventTitle:         titleOf(ev, isDive),
+      eventStartDate:     ev.start_date,
+      eventStartTimeHhmm: toHhmm(rawTime),
+      bookingStatus:      b.status,
+      totalAmount:        Number(details.total   ?? 0),
+      depositAmount:      Number(details.deposit ?? 0),
+      paidAmount:         paidByBooking.get(b.id) ?? 0,
+      currency:           'TWD',
+      alreadySent:        sentMap.get(`${b.user_id}:${eventId}`) ?? new Set<ReminderKind>(),
     })
   }
   return inputs
