@@ -75,7 +75,7 @@ const navItems: Array<{ to: string; label: string; icon: React.ReactNode }> = [
   { to: '/calendar', label: 'Calendar', icon: <CalendarIcon /> },
   { to: '/bookings', label: 'Bookings', icon: <DiveLogIcon /> },
   { to: '/payments', label: 'Payments', icon: <DollarIcon /> },
-  { to: '/profile', label: 'Profile', icon: '👤' },
+  { to: '/profile', label: 'Profile', icon: '🤿' },
 ]
 
 export function AppShell() {
@@ -95,10 +95,28 @@ export function AppShell() {
   return (
     <div className={`min-h-screen ${PAGE} flex flex-col`}>
       <header className={NAV_BAR}>
-        <Link to="/dashboard" aria-label="Home">
+        <div className="flex-1 flex items-center justify-start gap-4">
+          <a
+            href="https://radio.fundiverstw.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="FunDivers Radio"
+          >
+            <img src="/imgs/broadcast.png" alt="" className="h-8 w-auto" />
+          </a>
+          <a
+            href="https://www.fundiverstw.com/weeklyspecial"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Weekly special"
+          >
+            <img src="/imgs/tanks.png" alt="" className="h-8 w-auto" />
+          </a>
+        </div>
+        <Link to="/dashboard" aria-label="Home" className="shrink-0">
           <Logo size="sm" />
         </Link>
-        <div className="flex items-center gap-3">
+        <div className="flex-1 flex items-center justify-end gap-3">
           {canInstall && (
             <button onClick={install} className={`text-xs px-2 py-1 rounded-md ${BTN_LIGHT}`}>
               Install app
