@@ -4,6 +4,7 @@ import {
   buildReminderInputs,
   todayInTaipei,
   addDays,
+  toHhmm,
   type Booking,
   type DiveRow,
   type CourseRow,
@@ -123,5 +124,53 @@ describe('buildReminderInputs', () => {
     })
     expect(input.totalAmount).toBe(0)
     expect(input.depositAmount).toBe(0)
+  })
+
+  it('carries dive time through as eventStartTimeHhmm when set', () => {
+    const [input] = buildReminderInputs({
+      dives: [{ ...dive('d1', '2026-05-08'), time: '09:00:00.000' }],
+      courses: [],
+      bookings: [booking()],
+      paidByBooking: new Map(),
+      sentMap: new Map(),
+    })
+    expect(input.eventStartTimeHhmm).toBe('09:00')
+  })
+
+  it('carries course start_time through as eventStartTimeHhmm when set', () => {
+    const [input] = buildReminderInputs({
+      dives: [],
+      courses: [{ ...course('c1', '2026-06-01'), start_time: '14:30:00' }],
+      bookings: [booking({ eo_dive_id: null, eo_course_id: 'c1' })],
+      paidByBooking: new Map(),
+      sentMap: new Map(),
+    })
+    expect(input.eventStartTimeHhmm).toBe('14:30')
+  })
+
+  it('emits null eventStartTimeHhmm when source row has no time', () => {
+    const [input] = buildReminderInputs({
+      dives: [dive('d1', '2026-05-08')],
+      courses: [],
+      bookings: [booking()],
+      paidByBooking: new Map(),
+      sentMap: new Map(),
+    })
+    expect(input.eventStartTimeHhmm).toBeNull()
+  })
+})
+
+describe('toHhmm', () => {
+  it('normalizes Bubble time formats to HH:mm', () => {
+    expect(toHhmm('09:00:00.000')).toBe('09:00')
+    expect(toHhmm('14:30:00')).toBe('14:30')
+    expect(toHhmm('14:30')).toBe('14:30')
+    expect(toHhmm('9:00:00')).toBe('09:00')
+  })
+  it('returns null for empty / null / unparseable input', () => {
+    expect(toHhmm('')).toBeNull()
+    expect(toHhmm(null)).toBeNull()
+    expect(toHhmm(undefined)).toBeNull()
+    expect(toHhmm('garbage')).toBeNull()
   })
 })

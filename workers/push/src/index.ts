@@ -23,6 +23,7 @@ import {
   buildReminderInputs,
   todayInTaipei,
   addDays,
+  toHhmm,
   type Booking,
 } from './pure'
 
@@ -98,12 +99,15 @@ export async function handleNotifyDuty(req: Request, env: Env): Promise<Response
 
   // Resolve event title (best-effort; no event = standalone duty, push still goes out).
   let eventTitle: string | null = null
+  let eventTimeHhmm: string | null = null
   if (duty.eo_dive_id) {
-    const { data } = await service.from('EO_dives').select('dive_title, title').eq('_id', duty.eo_dive_id).maybeSingle()
+    const { data } = await service.from('EO_dives').select('dive_title, title, time').eq('_id', duty.eo_dive_id).maybeSingle()
     eventTitle = data?.dive_title || data?.title || null
+    eventTimeHhmm = toHhmm(data?.time)
   } else if (duty.eo_course_id) {
-    const { data } = await service.from('EO_courses').select('course_title, title').eq('_id', duty.eo_course_id).maybeSingle()
+    const { data } = await service.from('EO_courses').select('course_title, title, start_time').eq('_id', duty.eo_course_id).maybeSingle()
     eventTitle = data?.course_title || data?.title || null
+    eventTimeHhmm = toHhmm(data?.start_time)
   }
 
   const { data: subs } = await service
@@ -117,9 +121,10 @@ export async function handleNotifyDuty(req: Request, env: Env): Promise<Response
     ? `${duty.start_date} → ${duty.end_date}`
     : duty.start_date
   const titlePart = eventTitle ? ` for ${eventTitle}` : ''
+  const timePart = eventTimeHhmm ? ` · ${eventTimeHhmm}` : ''
   const payload = JSON.stringify({
     title: 'New duty assigned',
-    body:  `${capitalize(duty.role)}${titlePart} · ${dateSpan}`,
+    body:  `${capitalize(duty.role)}${titlePart} · ${dateSpan}${timePart}`,
     tag:   `duty:${duty.id}`,
     url:   '/admin/duty',
   })
@@ -161,8 +166,8 @@ export async function runDailyReminders(env: Env): Promise<{ sent: number; skipp
   const targetDates = WINDOWS.map((d) => addDays(today, d))
 
   const [divesResp, coursesResp] = await Promise.all([
-    sb.from('EO_dives').select('_id, dive_title, title, start_date').in('start_date', targetDates),
-    sb.from('EO_courses').select('_id, course_title, title, start_date').in('start_date', targetDates),
+    sb.from('EO_dives').select('_id, dive_title, title, start_date, time').in('start_date', targetDates),
+    sb.from('EO_courses').select('_id, course_title, title, start_date, start_time').in('start_date', targetDates),
   ])
   const dives   = divesResp.data   ?? []
   const courses = coursesResp.data ?? []

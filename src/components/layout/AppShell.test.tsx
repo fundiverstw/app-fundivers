@@ -87,24 +87,24 @@ describe('AppShell', () => {
     expect(screen.queryByRole('button', { name: /install app/i })).not.toBeInTheDocument()
   })
 
-  it('shows "View as admin" link when the user is an admin', () => {
+  it("renders the admin's name as a link to /admin (the view-toggle affordance)", () => {
     useAuthMock.mockReturnValue({
       profile: { display_name: 'Admin', full_name: 'Eric', role: 'admin' },
       signOut,
     })
     routedRender()
-    const link = screen.getByRole('link', { name: /view as admin/i })
-    expect(link).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: 'Admin' })
     expect(link).toHaveAttribute('href', '/admin')
   })
 
-  it('hides "View as admin" for divers', () => {
+  it("renders a diver's name as plain text, not a link", () => {
     useAuthMock.mockReturnValue({
       profile: { display_name: 'Alice', full_name: 'Alice', role: 'diver' },
       signOut,
     })
     routedRender()
-    expect(screen.queryByRole('link', { name: /view as admin/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Alice' })).not.toBeInTheDocument()
+    expect(screen.getByText('Alice')).toBeInTheDocument()
   })
 
   it('renders bottom nav links and the logo home link', () => {

@@ -489,6 +489,12 @@ export interface AppEvent {
   title: string
   start_time: string // ISO timestamp
   end_time: string | null
+  /**
+   * Raw 24h start time as 'HH:mm', or null when the source row has no time
+   * set. Carried separately from start_time because round-tripping through
+   * Date+toISOString shifts to UTC and loses the "unset vs midnight" signal.
+   */
+  start_time_hhmm: string | null
   featured: boolean
   fully_booked: boolean
   price: number | null

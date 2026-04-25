@@ -6,7 +6,7 @@ import { CrosshairIcon } from '../icons/CrosshairIcon'
 import { PeopleIcon } from '../icons/PeopleIcon'
 import {
   PAGE, NAV_BAR, NAV_BOTTOM,
-  ON_DEEP_MUTED, ON_DEEP_SUBTLE, ON_DEEP_BODY,
+  ON_DEEP_MUTED, ON_DEEP_SUBTLE,
 } from '../../styles/tokens'
 
 const adminNav: Array<{ to: string; label: string; icon: React.ReactNode }> = [
@@ -45,13 +45,13 @@ export function AdminShell() {
             <img src="/imgs/tanks.png" alt="" className="h-8 w-auto" />
           </a>
         </div>
-        <Link to="/admin" aria-label="Admin home" className="shrink-0 flex items-center gap-2">
+        <Link to="/admin" aria-label="Admin home" className="shrink-0">
           <Logo size="sm" />
-          <span className="text-xs text-red-300 font-medium uppercase tracking-wider">admin</span>
         </Link>
         <div className="flex-1 flex items-center justify-end gap-3">
-          <Link to="/calendar" className={`text-xs ${ON_DEEP_MUTED} hover:text-white`}>View as diver</Link>
-          <span className={`text-sm ${ON_DEEP_BODY}`}>{profile?.display_name ?? profile?.full_name}</span>
+          <Link to="/calendar" className="text-sm font-semibold text-amber-300 hover:text-amber-200">
+            {profile?.display_name ?? profile?.full_name}
+          </Link>
           <button onClick={handleSignOut} className={`text-xs ${ON_DEEP_MUTED} hover:text-white`}>
             Sign out
           </button>
