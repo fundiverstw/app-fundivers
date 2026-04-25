@@ -107,7 +107,7 @@ describe('AppShell', () => {
     expect(screen.queryByRole('link', { name: /view as admin/i })).not.toBeInTheDocument()
   })
 
-  it('renders all five bottom nav links', () => {
+  it('renders bottom nav links and the logo home link', () => {
     useAuthMock.mockReturnValue({ profile: null, signOut })
     routedRender()
     expect(screen.getByRole('link', { name: /home/i })).toHaveAttribute('href', '/dashboard')
