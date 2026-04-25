@@ -4,6 +4,7 @@ import { Logo } from '../Logo'
 import { CalendarIcon } from '../icons/CalendarIcon'
 import { CrosshairIcon } from '../icons/CrosshairIcon'
 import { PeopleIcon } from '../icons/PeopleIcon'
+import { PlusCircleIcon } from '../icons/PlusCircleIcon'
 import {
   PAGE, NAV_BAR, NAV_BOTTOM,
   ON_DEEP_MUTED, ON_DEEP_SUBTLE,
@@ -13,6 +14,7 @@ const adminNav: Array<{ to: string; label: string; icon: React.ReactNode }> = [
   { to: '/admin/events', label: 'Calendar', icon: <CalendarIcon /> },
   { to: '/admin/users',  label: 'Divers',   icon: <PeopleIcon /> },
   { to: '/admin/duty',   label: 'Duty',     icon: <CrosshairIcon /> },
+  { to: '/admin/new',    label: 'New',      icon: <PlusCircleIcon /> },
 ]
 
 export function AdminShell() {

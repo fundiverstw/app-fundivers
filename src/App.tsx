@@ -21,6 +21,7 @@ import { AdminEventDetailPage } from './pages/admin/AdminEventDetailPage'
 import { AdminGearMapPage } from './pages/admin/AdminGearMapPage'
 import { AdminUsersPage } from './pages/admin/AdminUsersPage'
 import { AdminDutyPage } from './pages/admin/AdminDutyPage'
+import { AdminNewEventPage } from './pages/admin/AdminNewEventPage'
 
 // Public registration flow — /register (pick an event) and /register/:type/:id
 // (deep-link from Wix calendar) both render RegisterPage. Outside ProtectedRoute
@@ -67,6 +68,7 @@ export default function App() {
           <Route element={<AdminRoute />}>
             <Route element={<AdminShell />}>
               <Route path="/admin" element={<DashboardPage />} />
+              <Route path="/admin/new" element={<AdminNewEventPage />} />
               <Route path="/admin/events" element={<AdminEventsPage />} />
               <Route path="/admin/events/:type/:id" element={<AdminEventDetailPage />} />
               <Route path="/admin/events/:type/:id/gear-map" element={<AdminGearMapPage />} />
