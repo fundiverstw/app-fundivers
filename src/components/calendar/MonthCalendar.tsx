@@ -125,10 +125,22 @@ export function MonthCalendar({
         onToggleCategory={toggleCourseCategory}
       />
 
-      <div className="flex items-center justify-between">
-        <button onClick={() => onMonthChange(subMonths(month, 1))} className="p-2 text-blue-900 font-medium hover:text-blue-900">‹</button>
-        <h1 className="text-lg font-bold text-white">{format(month, 'MMMM yyyy')}</h1>
-        <button onClick={() => onMonthChange(addMonths(month, 1))} className="p-2 text-blue-900 font-medium hover:text-blue-900">›</button>
+      <div className="flex items-center justify-between gap-2">
+        <button
+          onClick={() => onMonthChange(subMonths(month, 1))}
+          aria-label="Previous month"
+          className="flex-1 flex items-center justify-center px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/30 text-white text-2xl leading-none transition-colors"
+        >
+          ‹
+        </button>
+        <h1 className="text-lg font-bold text-white shrink-0">{format(month, 'MMMM yyyy')}</h1>
+        <button
+          onClick={() => onMonthChange(addMonths(month, 1))}
+          aria-label="Next month"
+          className="flex-1 flex items-center justify-center px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/30 text-white text-2xl leading-none transition-colors"
+        >
+          ›
+        </button>
       </div>
 
       <MonthGrid

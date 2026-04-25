@@ -9,11 +9,72 @@ import {
   ON_DEEP_MUTED, ON_DEEP_SUBTLE, ON_DEEP_BODY, ON_DEEP_LINK,
 } from '../../styles/tokens'
 
-const navItems = [
-  { to: '/dashboard', label: 'Home', icon: '🫧' },
-  { to: '/calendar', label: 'Calendar', icon: '📅' },
-  { to: '/bookings', label: 'Bookings', icon: '🤿' },
-  { to: '/payments', label: 'Payments', icon: '💳' },
+function CalendarIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="24"
+      height="24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="3.5" y="5.5" width="17" height="15" rx="2.5" />
+      <line x1="3.5" y1="10" x2="20.5" y2="10" />
+      <line x1="8" y1="3.5" x2="8" y2="7" />
+      <line x1="16" y1="3.5" x2="16" y2="7" />
+      <rect x="7" y="13" width="3" height="3" rx="0.5" fill="currentColor" />
+    </svg>
+  )
+}
+
+function DiveLogIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="24"
+      height="24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="3.5" y="4" width="17" height="16.5" rx="1.5" />
+      <line x1="8.5" y1="4" x2="8.5" y2="20.5" />
+      <path d="M11 11 q 1.5 -2 3 0 t 3 0" />
+      <path d="M11 16 q 1.5 -2 3 0 t 3 0" />
+    </svg>
+  )
+}
+
+function DollarIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="24"
+      height="24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <line x1="12" y1="2.5" x2="12" y2="21.5" />
+      <path d="M17 6.5H10a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6H6.5" />
+    </svg>
+  )
+}
+
+const navItems: Array<{ to: string; label: string; icon: React.ReactNode }> = [
+  { to: '/calendar', label: 'Calendar', icon: <CalendarIcon /> },
+  { to: '/bookings', label: 'Bookings', icon: <DiveLogIcon /> },
+  { to: '/payments', label: 'Payments', icon: <DollarIcon /> },
   { to: '/profile', label: 'Profile', icon: '👤' },
 ]
 
@@ -34,7 +95,9 @@ export function AppShell() {
   return (
     <div className={`min-h-screen ${PAGE} flex flex-col`}>
       <header className={NAV_BAR}>
-        <Logo size="sm" />
+        <Link to="/dashboard" aria-label="Home">
+          <Logo size="sm" />
+        </Link>
         <div className="flex items-center gap-3">
           {canInstall && (
             <button onClick={install} className={`text-xs px-2 py-1 rounded-md ${BTN_LIGHT}`}>
