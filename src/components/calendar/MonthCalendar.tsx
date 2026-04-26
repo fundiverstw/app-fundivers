@@ -87,6 +87,9 @@ export function MonthCalendar({
 
   const ranges: EventRange[] = useMemo(() => assignTracks(filteredEvents), [filteredEvents])
 
+  // Cells grow to fit every track in use that month — no overflow / "+N more"
+  // truncation. Days are capped at a couple of events in practice, so a
+  // hard limit isn't earning its keep.
   const cellTrackRows = useMemo(() => {
     let max = 0
     for (const r of ranges) {
@@ -95,7 +98,7 @@ export function MonthCalendar({
       if (r.end < monthStart || r.start > monthEnd) continue
       if (r.track + 1 > max) max = r.track + 1
     }
-    return Math.min(max, 3)
+    return max
   }, [ranges, month])
 
   const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }, [])
@@ -252,9 +255,7 @@ function DayCell({
   const isToday = isSameDay(day, new Date())
   const inMonth = isSameMonth(day, month)
 
-  const totalOnDay = segMap.size
-  const visibleTracks = Math.max(1, trackRows)
-  const overflow = Math.max(0, totalOnDay - visibleTracks)
+  const trackRowCount = Math.max(1, trackRows)
 
   return (
     <div
@@ -268,23 +269,18 @@ function DayCell({
       }`}>
         {format(day, 'd')}
       </span>
-      <div className="mt-1 relative" style={{ height: visibleTracks * (TRACK_HEIGHT + TRACK_GAP) }}>
-        {Array.from(segMap.entries())
-          .filter(([track]) => track < visibleTracks)
-          .map(([track, seg]) => (
-            <EventBar
-              key={`${seg.event.id}_${seg.event.start_time}`}
-              seg={seg}
-              track={track}
-              onClick={() => onPickEvent(seg.event)}
-              hovered={hoveredEventId === seg.event.id}
-              onHoverEvent={onHoverEvent}
-            />
-          ))}
+      <div className="mt-1 relative" style={{ height: trackRowCount * (TRACK_HEIGHT + TRACK_GAP) }}>
+        {Array.from(segMap.entries()).map(([track, seg]) => (
+          <EventBar
+            key={`${seg.event.id}_${seg.event.start_time}`}
+            seg={seg}
+            track={track}
+            onClick={() => onPickEvent(seg.event)}
+            hovered={hoveredEventId === seg.event.id}
+            onHoverEvent={onHoverEvent}
+          />
+        ))}
       </div>
-      {overflow > 0 && (
-        <div className="text-[9px] text-blue-900 font-medium text-center -mt-0.5">+{overflow} more</div>
-      )}
     </div>
   )
 }
