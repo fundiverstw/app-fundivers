@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import type { EOAddon, EOPrice, EORoom } from '../../types/database'
+import type { EOAddon, EOCourse, EODive, EOPrice, EORoom } from '../../types/database'
 
 // Admin-facing form for creating a new EO_dive or EO_course. Exposes every
 // editable column on the chosen table (system fields like _id / Created Date
@@ -71,6 +71,49 @@ const EMPTY_FORM: FormState = {
   included: '', schedule: '', starting_at: '',
 }
 
+// Discriminated union so the picker can drive both the type pill and the
+// row → form mapping from a single selection.
+type PastEvent =
+  | { kind: 'dive';   id: string; startDate: string; title: string; row: EODive }
+  | { kind: 'course'; id: string; startDate: string; title: string; row: EOCourse }
+
+function toHhmm(raw: string | null | undefined): string {
+  if (!raw) return ''
+  const m = /^(\d{1,2}):(\d{2})/.exec(raw.trim())
+  return m ? `${m[1].padStart(2, '0')}:${m[2]}` : ''
+}
+
+// other_addons can be a JSON array string, a CSV string, or empty (Bubble
+// legacy). Try JSON first, fall back to CSV — same shape as the DB-side
+// parse_addon_ids() function.
+function parseAddonIds(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  const trimmed = raw.trim()
+  if (!trimmed) return []
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed)
+      if (Array.isArray(parsed)) return parsed.map(String).map(s => s.trim()).filter(Boolean)
+    } catch { /* fall through to CSV */ }
+  }
+  return trimmed.split(',').map(s => s.trim()).filter(Boolean)
+}
+
+function parseCsvIds(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  return raw.split(',').map(s => s.trim()).filter(Boolean)
+}
+
+// "Standard (total: 5000 NTD / deposit: 1500 NTD)" — drops parts that
+// aren't set so a tier with only one of the two prices doesn't render an
+// awkward placeholder.
+function priceOptionLabel(p: EOPrice): string {
+  const parts: string[] = []
+  if (p.starting_at != null)    parts.push(`total: ${p.starting_at} NTD`)
+  if (p.deposit_amount != null) parts.push(`deposit: ${p.deposit_amount} NTD`)
+  return parts.length ? `${p.title} (${parts.join(' / ')})` : p.title
+}
+
 // Sub-form state for creating a brand-new EO_prices row inline (so admins
 // don't have to leave /admin/new just to define a price tier).
 interface PriceFormState {
@@ -94,6 +137,9 @@ export function AdminNewEventPage() {
   const [addons, setAddons] = useState<EOAddon[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Past events for the preload picker, sorted most-recent-first.
+  const [pastEvents, setPastEvents] = useState<PastEvent[]>([])
+  const [preloadId, setPreloadId] = useState<string>('')
   // Price-tier sub-form lives collapsed by default.
   const [showNewPrice, setShowNewPrice] = useState(false)
   const [priceForm, setPriceForm] = useState<PriceFormState>(EMPTY_PRICE_FORM)
@@ -103,18 +149,113 @@ export function AdminNewEventPage() {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const [pricesRes, roomsRes, addonsRes] = await Promise.all([
+      // Past-event cutoff is local "today"; the date columns are text
+      // YYYY-MM-DD so a string compare matches the calendar's view of
+      // "today" without timezone drift.
+      const today = new Date()
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
+      const settled = await Promise.allSettled([
         supabase.from('EO_prices').select('*').order('title'),
         supabase.from('EO_rooms').select('*').order('display_name'),
         supabase.from('Other_Addons').select('*').order('display_name'),
+        supabase.from('EO_dives').select('*').lt('start_date', todayStr).order('start_date', { ascending: false }).limit(50),
+        supabase.from('EO_courses').select('*').lt('start_date', todayStr).order('start_date', { ascending: false }).limit(50),
       ])
       if (cancelled) return
-      setPrices((pricesRes.data ?? []) as EOPrice[])
-      setRooms((roomsRes.data ?? []) as EORoom[])
-      setAddons((addonsRes.data ?? []) as EOAddon[])
+      const dataOf = <T,>(i: number): T[] => {
+        const r = settled[i]
+        if (r.status !== 'fulfilled') return []
+        const d = (r.value as { data?: T[] | null }).data
+        return (d ?? []) as T[]
+      }
+      setPrices(dataOf<EOPrice>(0))
+      setRooms(dataOf<EORoom>(1))
+      setAddons(dataOf<EOAddon>(2))
+
+      const pastDives = dataOf<EODive>(3).map<PastEvent>(d => ({
+        kind: 'dive', id: d._id, startDate: d.start_date ?? '', title: d.dive_title ?? '(untitled dive)', row: d,
+      }))
+      const pastCourses = dataOf<EOCourse>(4).map<PastEvent>(c => ({
+        kind: 'course', id: c._id, startDate: c.start_date ?? '', title: c.course_title ?? '(untitled course)', row: c,
+      }))
+      const merged = [...pastDives, ...pastCourses].sort((a, b) => b.startDate.localeCompare(a.startDate))
+      setPastEvents(merged)
     })()
     return () => { cancelled = true }
   }, [])
+
+  const filteredPastEvents = pastEvents.filter(p => p.kind === form.type)
+
+  function applyPreload(p: PastEvent) {
+    if (p.kind === 'dive') {
+      const d = p.row
+      setForm({
+        type: 'dive',
+        title: d.dive_title ?? '',
+        subtitle: d.title ?? '',
+        start_date: d.start_date ?? '',
+        start_time: toHhmm(d.time),
+        end_date: d.end_date ?? '',
+        price: d.price ?? '',
+        featured_image: d.featured_image ?? '',
+        prereqs: d.prereqs ?? '',
+        req_dives: d.req_dives != null ? String(d.req_dives) : '',
+        dive_days: d.dive_days != null ? String(d.dive_days) : '',
+        addonIds: parseAddonIds(d.other_addons),
+        notes: d.notes ?? '',
+        featured: !!d.featured,
+        fully_booked: !!d.fully_booked,
+        has_rooms: !!d.has_rooms,
+        roomIds: parseCsvIds(d.room_types),
+        nitrox_required: d.nitrox_required === 'true',
+        gear_rental: d.gear_rental ?? '',
+        cancel_date: d.cancel_date ?? '',
+        cancel_policy: d.cancel_policy ?? '',
+        destination_reference: d.destination_reference ?? '',
+        second_image: d.second_image ?? '',
+        divetravel_reference: d.DiveTravel_reference ?? '',
+        // course-only fields cleared
+        special_date: '', url: '', course_name: '',
+        included: '', schedule: '', starting_at: '',
+      })
+    } else {
+      const c = p.row
+      setForm({
+        type: 'course',
+        title: c.course_title ?? '',
+        subtitle: c.title ?? '',
+        course_name: c.course_name ?? '',
+        start_date: c.start_date ?? '',
+        start_time: toHhmm(c.start_time),
+        end_date: c.end_date ?? '',
+        special_date: c.special_date ?? '',
+        price: c.price ?? '',
+        featured_image: c.featured_image ?? '',
+        url: c.URL ?? '',
+        prereqs: c.prereqs ?? '',
+        req_dives: c.req_dives ?? '',
+        dive_days: c.dive_days != null ? String(c.dive_days) : '',
+        included: c.included ?? '',
+        schedule: c.schedule ?? '',
+        starting_at: c.starting_at != null ? String(c.starting_at) : '',
+        addonIds: parseAddonIds(c.other_addons),
+        // dive-only fields cleared
+        notes: '', featured: false, fully_booked: false,
+        has_rooms: false, roomIds: [],
+        nitrox_required: false, gear_rental: '',
+        cancel_date: '', cancel_policy: '',
+        destination_reference: '', second_image: '', divetravel_reference: '',
+      })
+    }
+  }
+
+  function handlePreload(id: string) {
+    setPreloadId(id)
+    if (!id) return
+    const found = pastEvents.find(p => p.id === id)
+    if (found) applyPreload(found)
+  }
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm(f => ({ ...f, [key]: value }))
@@ -264,9 +405,31 @@ export function AdminNewEventPage() {
       <h1 className="text-2xl font-bold text-white mb-4">New event</h1>
 
       <div className="flex gap-2 mb-4">
-        <TypePill active={form.type === 'dive'}   onClick={() => set('type', 'dive')}>Dive</TypePill>
-        <TypePill active={form.type === 'course'} onClick={() => set('type', 'course')}>Course</TypePill>
+        <TypePill active={form.type === 'dive'}   onClick={() => { set('type', 'dive');   setPreloadId('') }}>Dive</TypePill>
+        <TypePill active={form.type === 'course'} onClick={() => { set('type', 'course'); setPreloadId('') }}>Course</TypePill>
       </div>
+
+      {filteredPastEvents.length > 0 && (
+        <div className="mb-4">
+          <label className="block space-y-1">
+            <span className="text-xs font-medium text-white/80">
+              Preload from past {form.type === 'dive' ? 'dive' : 'course'} (optional)
+            </span>
+            <select
+              value={preloadId}
+              onChange={e => handlePreload(e.target.value)}
+              className={INPUT_CLASS}
+            >
+              <option value="">— Start fresh —</option>
+              {filteredPastEvents.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.startDate || '????-??-??'} — {p.title}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
 
       <form onSubmit={submit} className="space-y-6">
         <Section title="Basics">
@@ -291,7 +454,7 @@ export function AdminNewEventPage() {
             <Select value={form.price} onChange={v => set('price', v)}>
               <option value="">— None —</option>
               {prices.map(p => (
-                <option key={p._id} value={p._id}>{p.title}{p.starting_at ? ` (${p.starting_at})` : ''}</option>
+                <option key={p._id} value={p._id}>{priceOptionLabel(p)}</option>
               ))}
             </Select>
           </Field>

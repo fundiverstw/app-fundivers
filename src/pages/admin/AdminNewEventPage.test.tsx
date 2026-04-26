@@ -70,6 +70,43 @@ describe('AdminNewEventPage', () => {
     expect(screen.getByRole('heading', { name: /new event/i })).toBeInTheDocument()
   })
 
+  it('preloads form fields when a past dive is picked', async () => {
+    const pastDive = {
+      _id: 'past-1',
+      dive_title: 'Green Island Day Trip',
+      title: 'GI',
+      start_date: '2026-01-15',
+      time: '09:00:00',
+      end_date: '2026-01-15',
+      notes: 'Bring fins',
+      featured: true,
+      fully_booked: false,
+      nitrox_required: 'true',
+      has_rooms: false,
+      room_types: '',
+      other_addons: '',
+      price: 'price-1',
+    }
+    from.mockImplementation((table: string) => {
+      if (table === 'EO_prices')    return mockQueryBuilder({ data: [{ _id: 'price-1', title: 'Standard' }] })
+      if (table === 'EO_rooms')     return mockQueryBuilder({ data: [] })
+      if (table === 'Other_Addons') return mockQueryBuilder({ data: [] })
+      if (table === 'EO_dives')     return mockQueryBuilder({ data: [pastDive] })
+      if (table === 'EO_courses')   return mockQueryBuilder({ data: [] })
+      return mockQueryBuilder({ data: [] })
+    })
+    const user = userEvent.setup()
+    renderPage()
+    const select = await screen.findByLabelText(/preload from past dive/i) as HTMLSelectElement
+    await user.selectOptions(select, 'past-1')
+    expect((screen.getByLabelText(/dive title/i) as HTMLInputElement).value).toBe('Green Island Day Trip')
+    expect((screen.getByLabelText(/start date/i) as HTMLInputElement).value).toBe('2026-01-15')
+    expect((screen.getByLabelText(/start time/i) as HTMLInputElement).value).toBe('09:00')
+    expect((screen.getByLabelText(/notes/i) as HTMLTextAreaElement).value).toBe('Bring fins')
+    expect((screen.getByLabelText(/^featured$/i) as HTMLInputElement).checked).toBe(true)
+    expect((screen.getByLabelText(/nitrox required/i) as HTMLInputElement).checked).toBe(true)
+  })
+
   it('inserts a new price tier from the sub-form and auto-selects it', async () => {
     const priceInsert = vi.fn().mockReturnValue({
       then: (cb: (r: { error: null }) => void) => Promise.resolve({ error: null }).then(cb),
@@ -109,7 +146,13 @@ describe('AdminNewEventPage', () => {
       if (table === 'EO_prices')    return mockQueryBuilder({ data: [] })
       if (table === 'EO_rooms')     return mockQueryBuilder({ data: [] })
       if (table === 'Other_Addons') return mockQueryBuilder({ data: [] })
-      if (table === 'EO_dives')     return { insert }
+      if (table === 'EO_dives') {
+        // Hybrid: select() chain (past-event fetch) returns empty,
+        // insert() routes through the spy so we can assert payload.
+        const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
+        b.insert = insert
+        return b
+      }
       return mockQueryBuilder({ data: [] })
     })
     const user = userEvent.setup()
