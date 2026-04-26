@@ -140,7 +140,8 @@ describe('bookings constraints', () => {
   it('rejects a non-existent eo_dive_id (FK)', async () => {
     const { error } = await admin
       .from('bookings')
-      .insert({ user_id: user.id, eo_dive_id: 'does_not_exist', status: 'pending' })
+      // Valid uuid format, but no row with this id exists.
+      .insert({ user_id: user.id, eo_dive_id: '00000000-0000-0000-0000-000000000001', status: 'pending' })
     expect(error).toBeTruthy()
     expect(String(error?.message ?? '')).toMatch(/foreign|violat/i)
   })
@@ -148,7 +149,7 @@ describe('bookings constraints', () => {
   it('rejects a non-existent eo_course_id (FK)', async () => {
     const { error } = await admin
       .from('bookings')
-      .insert({ user_id: user.id, eo_course_id: 'does_not_exist', status: 'pending' })
+      .insert({ user_id: user.id, eo_course_id: '00000000-0000-0000-0000-000000000002', status: 'pending' })
     expect(error).toBeTruthy()
   })
 

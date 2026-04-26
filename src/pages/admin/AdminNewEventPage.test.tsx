@@ -70,6 +70,39 @@ describe('AdminNewEventPage', () => {
     expect(screen.getByRole('heading', { name: /new event/i })).toBeInTheDocument()
   })
 
+  it('inserts a new price tier from the sub-form and auto-selects it', async () => {
+    const priceInsert = vi.fn().mockReturnValue({
+      then: (cb: (r: { error: null }) => void) => Promise.resolve({ error: null }).then(cb),
+    })
+    from.mockImplementation((table: string) => {
+      if (table === 'EO_prices') {
+        const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
+        b.insert = priceInsert
+        return b
+      }
+      if (table === 'EO_rooms')     return mockQueryBuilder({ data: [{ _id: 'room-1', display_name: 'Twin', title: 'Twin' }] })
+      if (table === 'Other_Addons') return mockQueryBuilder({ data: [] })
+      return mockQueryBuilder({ data: [] })
+    })
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByLabelText(/dive title/i)
+    await user.click(screen.getByRole('button', { name: /new price tier/i }))
+    await user.type(screen.getByLabelText('Title (required)'), 'Premium')
+    await user.type(screen.getByLabelText('Starting at'), '15000')
+    await user.click(screen.getByRole('button', { name: /save price tier/i }))
+    await waitFor(() => expect(priceInsert).toHaveBeenCalled())
+    const payload = (priceInsert.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
+    expect(payload.title).toBe('Premium')
+    expect(payload.starting_at).toBe(15000)
+    // Newly created tier becomes the selected option in the price dropdown.
+    await waitFor(() => {
+      const select = screen.getByLabelText(/price tier/i) as HTMLSelectElement
+      expect(select.value).toBe(payload._id as string)
+      expect(select.options[select.selectedIndex].textContent).toMatch(/Premium/)
+    })
+  })
+
   it('inserts a dive with minimum required fields and navigates to its detail page', async () => {
     const insert = vi.fn().mockReturnValue({ then: (cb: (r: { error: null }) => void) => Promise.resolve({ error: null }).then(cb) })
     from.mockImplementation((table: string) => {
