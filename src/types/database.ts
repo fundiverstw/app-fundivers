@@ -226,6 +226,16 @@ export interface Database {
           gear_rental: string | null
           nitrox_required: string | null
           dive_days: number | null
+          // Read by /admin/new's preload-from-past picker.
+          featured_image: string | null
+          second_image: string | null
+          prereqs: string | null
+          req_dives: number | null
+          notes: string | null
+          cancel_date: string | null
+          cancel_policy: string | null
+          destination_reference: string | null
+          DiveTravel_reference: string | null
         }
         Insert: {
           _id: string
@@ -261,6 +271,15 @@ export interface Database {
           other_addons: string | null
           dive_days: number | null
           special_date: string | null
+          // Read by /admin/new's preload-from-past picker.
+          course_name: string | null
+          featured_image: string | null
+          URL: string | null
+          prereqs: string | null
+          req_dives: string | null
+          included: string | null
+          schedule: string | null
+          starting_at: number | null
         }
         Insert: {
           _id: string
