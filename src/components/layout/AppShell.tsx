@@ -5,6 +5,7 @@ import { usePWAInstall } from '../../hooks/usePWAInstall'
 import { WelcomeModal } from '../welcome/WelcomeModal'
 import { Logo } from '../Logo'
 import { CalendarIcon } from '../icons/CalendarIcon'
+import { MapIcon } from '../icons/MapIcon'
 import {
   PAGE, NAV_BAR, NAV_BOTTOM, BTN_LIGHT,
   ON_DEEP_MUTED, ON_DEEP_SUBTLE, ON_DEEP_BODY,
@@ -91,6 +92,13 @@ export function AppShell() {
           >
             <img src="/imgs/tanks.png" alt="" className="h-8 w-auto" />
           </a>
+          <Link
+            to="/map"
+            aria-label="Dive site map"
+            className="text-red-500 hover:text-red-400 transition-colors"
+          >
+            <MapIcon />
+          </Link>
         </div>
         <Link to="/dashboard" aria-label="Home" className="shrink-0">
           <Logo size="sm" />
