@@ -31,7 +31,7 @@ afterAll(async () => {
 describe('EO_dives admin writes', () => {
   it('admin can insert', async () => {
     const sb = await userClient(adminUser.email, adminUser.password)
-    const id = `test_admin_dive_${Date.now()}`
+    const id = crypto.randomUUID()
     createdDiveIds.push(id)
     const { error } = await sb.from('EO_dives' as never).insert({
       _id: id, dive_title: 'Admin-created dive', notes: '', start_date: '2026-06-01',
@@ -41,7 +41,7 @@ describe('EO_dives admin writes', () => {
 
   it('admin can update', async () => {
     const sb = await userClient(adminUser.email, adminUser.password)
-    const id = `test_admin_dive_update_${Date.now()}`
+    const id = crypto.randomUUID()
     createdDiveIds.push(id)
     await admin.from('EO_dives' as never).insert({ _id: id, dive_title: 'pre', notes: '', start_date: '2026-06-01' } as never)
     const { error } = await sb.from('EO_dives' as never).update({ dive_title: 'post' } as never).eq('_id', id)
@@ -52,7 +52,7 @@ describe('EO_dives admin writes', () => {
 
   it('admin can delete', async () => {
     const sb = await userClient(adminUser.email, adminUser.password)
-    const id = `test_admin_dive_delete_${Date.now()}`
+    const id = crypto.randomUUID()
     await admin.from('EO_dives' as never).insert({ _id: id, dive_title: 'doomed', notes: '', start_date: '2026-06-01' } as never)
     const { error } = await sb.from('EO_dives' as never).delete().eq('_id', id)
     expect(error).toBeNull()
@@ -62,7 +62,7 @@ describe('EO_dives admin writes', () => {
 
   it('diver cannot insert', async () => {
     const sb = await userClient(diver.email, diver.password)
-    const id = `test_diver_dive_${Date.now()}`
+    const id = crypto.randomUUID()
     const { error } = await sb.from('EO_dives' as never).insert({
       _id: id, dive_title: 'diver tried', notes: '', start_date: '2026-06-01',
     } as never)
@@ -73,7 +73,7 @@ describe('EO_dives admin writes', () => {
 
   it('diver cannot update', async () => {
     const sb = await userClient(diver.email, diver.password)
-    const id = `test_admin_dive_diver_update_${Date.now()}`
+    const id = crypto.randomUUID()
     createdDiveIds.push(id)
     await admin.from('EO_dives' as never).insert({ _id: id, dive_title: 'before', notes: '', start_date: '2026-06-01' } as never)
     const { error, count } = await sb
@@ -89,7 +89,7 @@ describe('EO_dives admin writes', () => {
 
   it('diver cannot delete', async () => {
     const sb = await userClient(diver.email, diver.password)
-    const id = `test_admin_dive_diver_delete_${Date.now()}`
+    const id = crypto.randomUUID()
     createdDiveIds.push(id)
     await admin.from('EO_dives' as never).insert({ _id: id, dive_title: 'survives', notes: '', start_date: '2026-06-01' } as never)
     const { error, count } = await sb.from('EO_dives' as never).delete({ count: 'exact' }).eq('_id', id)
@@ -102,7 +102,7 @@ describe('EO_dives admin writes', () => {
 describe('EO_courses admin writes', () => {
   it('admin can insert', async () => {
     const sb = await userClient(adminUser.email, adminUser.password)
-    const id = `test_admin_course_${Date.now()}`
+    const id = crypto.randomUUID()
     createdCourseIds.push(id)
     const { error } = await sb.from('EO_courses' as never).insert({
       _id: id, course_title: 'Admin-created course', start_date: '2026-06-01',
@@ -112,7 +112,7 @@ describe('EO_courses admin writes', () => {
 
   it('admin can update', async () => {
     const sb = await userClient(adminUser.email, adminUser.password)
-    const id = `test_admin_course_update_${Date.now()}`
+    const id = crypto.randomUUID()
     createdCourseIds.push(id)
     await admin.from('EO_courses' as never).insert({ _id: id, course_title: 'pre', start_date: '2026-06-01' } as never)
     const { error } = await sb.from('EO_courses' as never).update({ course_title: 'post' } as never).eq('_id', id)
@@ -123,7 +123,7 @@ describe('EO_courses admin writes', () => {
 
   it('admin can delete', async () => {
     const sb = await userClient(adminUser.email, adminUser.password)
-    const id = `test_admin_course_delete_${Date.now()}`
+    const id = crypto.randomUUID()
     await admin.from('EO_courses' as never).insert({ _id: id, course_title: 'doomed', start_date: '2026-06-01' } as never)
     const { error } = await sb.from('EO_courses' as never).delete().eq('_id', id)
     expect(error).toBeNull()
@@ -133,7 +133,7 @@ describe('EO_courses admin writes', () => {
 
   it('diver cannot insert', async () => {
     const sb = await userClient(diver.email, diver.password)
-    const id = `test_diver_course_${Date.now()}`
+    const id = crypto.randomUUID()
     const { error } = await sb.from('EO_courses' as never).insert({
       _id: id, course_title: 'diver tried', start_date: '2026-06-01',
     } as never)
@@ -144,7 +144,7 @@ describe('EO_courses admin writes', () => {
 
   it('diver cannot update', async () => {
     const sb = await userClient(diver.email, diver.password)
-    const id = `test_admin_course_diver_update_${Date.now()}`
+    const id = crypto.randomUUID()
     createdCourseIds.push(id)
     await admin.from('EO_courses' as never).insert({ _id: id, course_title: 'before', start_date: '2026-06-01' } as never)
     const { error, count } = await sb
@@ -158,7 +158,7 @@ describe('EO_courses admin writes', () => {
 
   it('diver cannot delete', async () => {
     const sb = await userClient(diver.email, diver.password)
-    const id = `test_admin_course_diver_delete_${Date.now()}`
+    const id = crypto.randomUUID()
     createdCourseIds.push(id)
     await admin.from('EO_courses' as never).insert({ _id: id, course_title: 'survives', start_date: '2026-06-01' } as never)
     const { error, count } = await sb.from('EO_courses' as never).delete({ count: 'exact' }).eq('_id', id)

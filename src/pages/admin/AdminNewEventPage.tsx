@@ -71,6 +71,21 @@ const EMPTY_FORM: FormState = {
   included: '', schedule: '', starting_at: '',
 }
 
+// Sub-form state for creating a brand-new EO_prices row inline (so admins
+// don't have to leave /admin/new just to define a price tier).
+interface PriceFormState {
+  title: string
+  price: string             // human label, e.g. "NT$10,000"
+  starting_at: string       // bigint or empty
+  deposit_amount: string    // bigint or empty
+  roomIds: string[]         // → EO_prices.room_options (JSON array of EO_rooms._id)
+  transport: string
+}
+
+const EMPTY_PRICE_FORM: PriceFormState = {
+  title: '', price: '', starting_at: '', deposit_amount: '', roomIds: [], transport: '',
+}
+
 export function AdminNewEventPage() {
   const navigate = useNavigate()
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
@@ -79,6 +94,11 @@ export function AdminNewEventPage() {
   const [addons, setAddons] = useState<EOAddon[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Price-tier sub-form lives collapsed by default.
+  const [showNewPrice, setShowNewPrice] = useState(false)
+  const [priceForm, setPriceForm] = useState<PriceFormState>(EMPTY_PRICE_FORM)
+  const [priceSubmitting, setPriceSubmitting] = useState(false)
+  const [priceError, setPriceError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -106,6 +126,54 @@ export function AdminNewEventPage() {
       const next = list.includes(id) ? list.filter(x => x !== id) : [...list, id]
       return { ...f, [key]: next }
     })
+  }
+
+  function togglePriceRoom(id: string) {
+    setPriceForm(f => {
+      const next = f.roomIds.includes(id) ? f.roomIds.filter(x => x !== id) : [...f.roomIds, id]
+      return { ...f, roomIds: next }
+    })
+  }
+
+  async function submitNewPrice() {
+    setPriceError(null)
+    if (!priceForm.title.trim()) {
+      setPriceError('Title is required.')
+      return
+    }
+    setPriceSubmitting(true)
+    try {
+      const id = crypto.randomUUID()
+      // room_options stores a JSON array of EO_rooms._id values, matching the
+      // legacy Bubble shape so the existing `EO_rooms.added_price` lookup
+      // continues to feed per-room pricing for booking flows.
+      const roomOptions = priceForm.roomIds.length ? JSON.stringify(priceForm.roomIds) : null
+      const payload = {
+        _id: id,
+        title: priceForm.title.trim(),
+        price: priceForm.price || null,
+        starting_at: priceForm.starting_at ? Number(priceForm.starting_at) : null,
+        deposit_amount: priceForm.deposit_amount ? Number(priceForm.deposit_amount) : null,
+        room_options: roomOptions,
+        transport: priceForm.transport || null,
+      }
+      const { error: insErr } = await supabase.from('EO_prices').insert(payload as never)
+      if (insErr) throw insErr
+      // Optimistically inject so the user can pick the new tier immediately.
+      const newRow = {
+        ...payload,
+        starting_at: payload.starting_at ?? null,
+        deposit_amount: payload.deposit_amount ?? null,
+      } as unknown as EOPrice
+      setPrices(p => [...p, newRow].sort((a, b) => (a.title ?? '').localeCompare(b.title ?? '')))
+      set('price', id)
+      setPriceForm(EMPTY_PRICE_FORM)
+      setShowNewPrice(false)
+    } catch (err) {
+      setPriceError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setPriceSubmitting(false)
+    }
   }
 
   async function submit(e: React.FormEvent) {
@@ -227,6 +295,72 @@ export function AdminNewEventPage() {
               ))}
             </Select>
           </Field>
+          <button
+            type="button"
+            onClick={() => setShowNewPrice(s => !s)}
+            className="-mt-2 self-start text-xs font-medium text-amber-300 hover:text-amber-200"
+          >
+            {showNewPrice ? '− Cancel new tier' : '+ New price tier'}
+          </button>
+          {showNewPrice && (
+            <div className="space-y-3 rounded-lg border border-amber-300/40 bg-white/5 p-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-200">New price tier</h3>
+              <Field label="Title (required)">
+                <Input value={priceForm.title} onChange={v => setPriceForm(f => ({ ...f, title: v }))} />
+              </Field>
+              <div className="grid grid-cols-3 gap-3">
+                <Field label="Price label">
+                  <Input value={priceForm.price} onChange={v => setPriceForm(f => ({ ...f, price: v }))} />
+                </Field>
+                <Field label="Starting at">
+                  <Input type="number" value={priceForm.starting_at} onChange={v => setPriceForm(f => ({ ...f, starting_at: v }))} />
+                </Field>
+                <Field label="Deposit amount">
+                  <Input type="number" value={priceForm.deposit_amount} onChange={v => setPriceForm(f => ({ ...f, deposit_amount: v }))} />
+                </Field>
+              </div>
+              <Field label="Transport">
+                <Input value={priceForm.transport} onChange={v => setPriceForm(f => ({ ...f, transport: v }))} />
+              </Field>
+              <div className="space-y-1">
+                <span className="text-xs font-medium text-white/80">Room options</span>
+                {rooms.length === 0 ? (
+                  <p className="text-xs text-white/60">No rooms defined.</p>
+                ) : (
+                  <div className="space-y-1 max-h-40 overflow-y-auto bg-white/70 backdrop-blur-md border border-sky-200 rounded-md p-2">
+                    {rooms.map(r => (
+                      <Checkbox
+                        key={r._id}
+                        checked={priceForm.roomIds.includes(r._id)}
+                        onChange={() => togglePriceRoom(r._id)}
+                        label={r.display_name || r.title || r._id}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+              {priceError && (
+                <p className="text-xs text-red-200 bg-red-900/50 border border-red-500 rounded-md p-2">{priceError}</p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={submitNewPrice}
+                  disabled={priceSubmitting}
+                  className="flex-1 py-2 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 transition-colors"
+                >
+                  {priceSubmitting ? 'Saving…' : 'Save price tier'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowNewPrice(false); setPriceForm(EMPTY_PRICE_FORM); setPriceError(null) }}
+                  className="px-3 py-2 rounded-lg text-sm font-medium text-white/80 hover:text-white border border-white/30"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Required dives">
               <Input value={form.req_dives} onChange={v => set('req_dives', v)} />

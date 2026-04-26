@@ -24,13 +24,18 @@ afterEach(async () => {
   createdPriceIds.length = 0
 })
 
-function rid(prefix: string) {
-  return `${prefix}_${Math.random().toString(36).slice(2, 10)}`
+// _id columns are uuid; tests need valid-format ids regardless of which
+// table they target.
+function rid() {
+  return crypto.randomUUID()
 }
+
+// Valid uuid format that no row will ever match — used for orphan-FK tests.
+const NONEXISTENT_PRICE_ID = '00000000-0000-0000-0000-000000000099'
 
 describe('EO_* catalog table constraints', () => {
   it('EO_prices._id is a primary key (duplicate inserts are rejected)', async () => {
-    const id = rid('price')
+    const id = rid()
     const first = await admin.from('EO_prices' as never).insert({ _id: id, title: 'First' } as never)
     expect(first.error).toBeNull()
     createdPriceIds.push(id)
@@ -42,9 +47,9 @@ describe('EO_* catalog table constraints', () => {
 
   it('EO_courses.price → EO_prices._id FK rejects orphan references', async () => {
     const { error } = await admin.from('EO_courses' as never).insert({
-      _id: rid('course'),
+      _id: rid(),
       title: 'Orphan Course',
-      price: 'nonexistent-price-id',
+      price: NONEXISTENT_PRICE_ID,
     } as never)
     expect(error).toBeTruthy()
     expect(String(error?.message ?? '')).toMatch(/foreign|violat/i)
@@ -52,20 +57,20 @@ describe('EO_* catalog table constraints', () => {
 
   it('EO_dives.price → EO_prices._id FK rejects orphan references', async () => {
     const { error } = await admin.from('EO_dives' as never).insert({
-      _id: rid('dive'),
+      _id: rid(),
       dive_title: 'Orphan Dive',
       notes: '',
-      price: 'nonexistent-price-id',
+      price: NONEXISTENT_PRICE_ID,
     } as never)
     expect(error).toBeTruthy()
   })
 
   it('EO_dives.price has ON DELETE SET NULL: deleting the price nulls the reference', async () => {
-    const priceId = rid('price')
+    const priceId = rid()
     await admin.from('EO_prices' as never).insert({ _id: priceId, title: 'P' } as never)
     createdPriceIds.push(priceId)
 
-    const diveId = rid('dive')
+    const diveId = rid()
     await admin.from('EO_dives' as never).insert({
       _id: diveId, dive_title: 'D', notes: '', price: priceId,
     } as never)
@@ -81,11 +86,11 @@ describe('EO_* catalog table constraints', () => {
   })
 
   it('EO_courses.price is a plain FK (no cascade): deleting referenced price fails', async () => {
-    const priceId = rid('price')
+    const priceId = rid()
     await admin.from('EO_prices' as never).insert({ _id: priceId, title: 'P' } as never)
     createdPriceIds.push(priceId)
 
-    const courseId = rid('course')
+    const courseId = rid()
     await admin.from('EO_courses' as never).insert({
       _id: courseId, title: 'C', price: priceId,
     } as never)
@@ -97,7 +102,7 @@ describe('EO_* catalog table constraints', () => {
   })
 
   it('EO_rooms and Other_Addons have _id primary keys (round-trips cleanly)', async () => {
-    const roomId = rid('room')
+    const roomId = rid()
     const ins = await admin.from('EO_rooms' as never).insert({
       _id: roomId, title: 'Test Room',
     } as never)
@@ -108,7 +113,7 @@ describe('EO_* catalog table constraints', () => {
 
     await admin.from('EO_rooms' as never).delete().eq('_id', roomId)
 
-    const addonId = rid('addon')
+    const addonId = rid()
     const ins2 = await admin.from('Other_Addons' as never).insert({
       _id: addonId, title: 'Test Addon',
     } as never)

@@ -67,10 +67,10 @@ export async function deleteTestUser(admin: DB, userId: string) {
 
 /**
  * Insert an EO_dive row for tests that need something bookable. Returns the _id.
- * EO_dives uses text _id (not uuid) and text date/time columns.
+ * _id is uuid; date/time columns are still text (Bubble legacy).
  */
 export async function createTestDive(admin: DB = adminClient()): Promise<string> {
-  const id = `test_dive_${Math.random().toString(36).slice(2, 10)}`
+  const id = crypto.randomUUID()
   const startDate = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10)
   const { error } = await admin.from('EO_dives' as never).insert({
     _id: id,
@@ -85,7 +85,7 @@ export async function createTestDive(admin: DB = adminClient()): Promise<string>
 }
 
 export async function createTestCourse(admin: DB = adminClient()): Promise<string> {
-  const id = `test_course_${Math.random().toString(36).slice(2, 10)}`
+  const id = crypto.randomUUID()
   const startDate = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10)
   const { error } = await admin.from('EO_courses' as never).insert({
     _id: id,

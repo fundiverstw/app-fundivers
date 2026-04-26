@@ -9,7 +9,7 @@ let diveId: string
 let courseId: string
 
 async function createTestAddon(displayName: string): Promise<string> {
-  const id = `test_addon_${Math.random().toString(36).slice(2, 10)}`
+  const id = crypto.randomUUID()
   const { error } = await admin.from('Other_Addons' as never).insert({
     _id: id, display_name: displayName, title: displayName, price: 0, currency: 'TWD',
   } as never)
