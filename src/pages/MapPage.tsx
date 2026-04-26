@@ -39,17 +39,20 @@ interface RegionInfo {
 const REGIONS: Record<Region, RegionInfo> = {
   keelung: {
     name: 'Keelung / Badouzi',
-    center: [121.79, 25.16],
-    bbox: [121.745, 25.120, 121.840, 25.210],
+    center: [121.81, 25.15],
+    // Tightened to fit the actual Keelung sites with a small margin so the
+    // natural scale lifts to ~50; the maxZoom cap then lets us approach it.
+    bbox: [121.785, 25.122, 121.836, 25.195],
     description: 'Northern port-area diving — Badouzi Bay reefs and shipwrecks, with Keelung Islet just offshore.',
-    maxZoom: 26,
+    maxZoom: 40,
   },
   longdong: {
     name: 'Long Dong Bay',
-    center: [121.92, 25.10],
-    bbox: [121.890, 25.080, 121.945, 25.150],
+    center: [121.91, 25.118],
+    // Tightened to the bay proper (Long Dong Bay + Canyons + 82.5 cluster).
+    bbox: [121.895, 25.108, 121.927, 25.130],
     description: 'The classic northeast wall and reef dives — sheer basalt cliffs, deep gullies, dramatic rock formations.',
-    maxZoom: 26,
+    maxZoom: 40,
   },
   yilan: {
     name: 'Yilan / Turtle Island',
@@ -189,6 +192,10 @@ function strokeWidthForZoom(r: Region | null): number {
 export function MapPage() {
   const [selected, setSelected] = useState<Region | null>(null)
   const [sites, setSites] = useState<DiveSite[]>([])
+  // Independent toggles, both on by default. Sites with NULL dive_type
+  // (uncategorized) always show — they're not opted out of either filter.
+  const [showShore, setShowShore] = useState(true)
+  const [showBoat, setShowBoat] = useState(true)
 
   useEffect(() => {
     let cancelled = false
@@ -206,15 +213,21 @@ export function MapPage() {
     return () => { cancelled = true }
   }, [])
 
+  const filteredSites = useMemo(() => sites.filter(s => {
+    if (s.dive_type === 'shore') return showShore
+    if (s.dive_type === 'boat')  return showBoat
+    return true // unspecified type stays visible regardless of toggle.
+  }), [sites, showShore, showBoat])
+
   const sitesByRegion = useMemo(() => {
     const m = new Map<Region, DiveSite[]>()
     REGION_ORDER.forEach(r => m.set(r, []))
-    for (const s of sites) {
+    for (const s of filteredSites) {
       const r = s.region as Region
       if (m.has(r)) m.get(r)!.push(s)
     }
     return m
-  }, [sites])
+  }, [filteredSites])
 
   function pick(r: Region) {
     setSelected(prev => (prev === r ? null : r))
@@ -230,7 +243,10 @@ export function MapPage() {
   }
 
   const stroke = strokeWidthForZoom(selected)
-  const visibleSites = selected ? sitesByRegion.get(selected) ?? [] : []
+  const visibleSites = useMemo(
+    () => (selected ? sitesByRegion.get(selected) ?? [] : []),
+    [selected, sitesByRegion],
+  )
 
   // Project each site to SVG coords through the active zoom, then defer to
   // the radial placement helper for layout. Re-attach the original DiveSite
@@ -268,6 +284,37 @@ export function MapPage() {
             ← Back to overview
           </button>
         )}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setShowShore(v => !v)}
+          aria-pressed={showShore}
+          aria-label="Toggle shore dives"
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs transition-colors ${
+            showShore
+              ? 'bg-white border-blue-900 text-blue-900'
+              : 'bg-sky-100 border-sky-200 text-blue-950 line-through'
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-amber-400" />
+          Shore
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowBoat(v => !v)}
+          aria-pressed={showBoat}
+          aria-label="Toggle boat dives"
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs transition-colors ${
+            showBoat
+              ? 'bg-white border-blue-900 text-blue-900'
+              : 'bg-sky-100 border-sky-200 text-blue-950 line-through'
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-sky-500" />
+          Boat
+        </button>
       </div>
       {!selected && (
         <p className="text-sm text-white/80">Tap a marker or a region below to zoom in.</p>
