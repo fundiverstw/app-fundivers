@@ -30,10 +30,10 @@ function listButton(name: RegExp | string) {
 }
 
 const SAMPLE_SITES = [
-  { id: 's1', name: 'Long Dong Bay', tagline: 'Walk-in ramp.', latitude: 25.1133, longitude: 121.9201, region: 'longdong', created_at: '', updated_at: '' },
-  { id: 's2', name: 'Canyons',       tagline: 'Slopes and walls.', latitude: 25.1226, longitude: 121.9041, region: 'longdong', created_at: '', updated_at: '' },
-  { id: 's3', name: 'Iron House 2',  tagline: 'Metal frame structures.', latitude: 25.1430, longitude: 121.8130, region: 'keelung', created_at: '', updated_at: '' },
-  { id: 's4', name: 'Bat Cave',      tagline: 'For all levels.', latitude: 25.1263, longitude: 121.8321, region: 'keelung', created_at: '', updated_at: '' },
+  { id: 's1', name: 'Long Dong Bay', tagline: 'Walk-in ramp.',          latitude: 25.1133, longitude: 121.9201, region: 'longdong', dive_type: 'shore', created_at: '', updated_at: '' },
+  { id: 's2', name: 'Canyons',       tagline: 'Slopes and walls.',      latitude: 25.1226, longitude: 121.9041, region: 'longdong', dive_type: 'shore', created_at: '', updated_at: '' },
+  { id: 's3', name: 'Iron House 2',  tagline: 'Metal frame structures.', latitude: 25.1460, longitude: 121.8160, region: 'keelung',  dive_type: 'boat',  created_at: '', updated_at: '' },
+  { id: 's4', name: 'Bat Cave',      tagline: 'For all levels.',         latitude: 25.1263, longitude: 121.8321, region: 'keelung',  dive_type: 'shore', created_at: '', updated_at: '' },
 ]
 
 function fakeSites(rows = SAMPLE_SITES) {
@@ -112,6 +112,24 @@ describe('MapPage', () => {
       expect(screen.getAllByText(/Iron House 2/).length).toBeGreaterThanOrEqual(2)
       expect(screen.getAllByText(/Bat Cave/).length).toBeGreaterThanOrEqual(2)
     })
+  })
+
+  it('hides shore-only sites when the Shore toggle is off', async () => {
+    fakeSites()
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(listButton(/keelung/i))
+    // Both Iron House 2 (boat) and Bat Cave (shore) appear before toggling.
+    await waitFor(() => {
+      expect(screen.getAllByText(/Iron House 2/).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Bat Cave/).length).toBeGreaterThan(0)
+    })
+    await user.click(screen.getByRole('button', { name: /toggle shore dives/i }))
+    // Bat Cave (shore) disappears; Iron House 2 (boat) remains.
+    await waitFor(() => {
+      expect(screen.queryByText(/Bat Cave/)).not.toBeInTheDocument()
+    })
+    expect(screen.getAllByText(/Iron House 2/).length).toBeGreaterThan(0)
   })
 
   it('falls back to an empty site list if the fetch errors', async () => {

@@ -304,6 +304,7 @@ export interface Database {
           latitude: number
           longitude: number
           region: 'keelung' | 'longdong' | 'yilan' | 'greenisland' | 'lanyu' | 'xiaoliuqiu' | 'kenting' | 'penghu'
+          dive_type: 'shore' | 'boat' | null
           created_at: string
           updated_at: string
         }
@@ -314,6 +315,7 @@ export interface Database {
           latitude: number
           longitude: number
           region: 'keelung' | 'longdong' | 'yilan' | 'greenisland' | 'lanyu' | 'xiaoliuqiu' | 'kenting' | 'penghu'
+          dive_type?: 'shore' | 'boat' | null
           created_at?: string
           updated_at?: string
         }
