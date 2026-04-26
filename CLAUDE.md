@@ -38,6 +38,14 @@ conventions and non-obvious mechanics the code doesn't spell out.
    source. Constraints / triggers / RLS policies get integration
    tests. See `docs/testing.md`.
 
+8. **Commit messages stay on one line.** A single concise subject —
+   no body, no bullet list, no expanded prose. The diff is the detail.
+
+9. **No Claude attribution in commits or PRs.** Don't append
+   `Co-Authored-By: Claude` trailers, don't sign commits as Claude,
+   and don't mention "Generated with Claude Code" in commit messages
+   or PR bodies.
+
 ## Verifying from memory
 
 If a memory or prior conversation claims a file, function, or flag
