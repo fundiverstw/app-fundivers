@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import taiwanGeo from '../assets/taiwan.geo.json'
 import { supabase } from '../lib/supabase'
 import type { DiveSite } from '../types/database'
+import { placeLabels } from '../lib/map-layout'
 
 // High-detail Taiwan map. Coastline data is GADM 4.1 country-level boundaries
 // (1,800+ vertices on the main island, 30+ separate Penghu islets, plus
@@ -30,6 +31,9 @@ interface RegionInfo {
   /** [minLon, minLat, maxLon, maxLat] — the camera frames this on zoom. */
   bbox: [number, number, number, number]
   description: string
+  /** Optional override for MAX_ZOOM when this region is selected. Bumped
+   *  for Keelung / Long Dong where divers want maximum site separation. */
+  maxZoom?: number
 }
 
 const REGIONS: Record<Region, RegionInfo> = {
@@ -38,12 +42,14 @@ const REGIONS: Record<Region, RegionInfo> = {
     center: [121.79, 25.16],
     bbox: [121.745, 25.120, 121.840, 25.210],
     description: 'Northern port-area diving — Badouzi Bay reefs and shipwrecks, with Keelung Islet just offshore.',
+    maxZoom: 26,
   },
   longdong: {
     name: 'Long Dong Bay',
     center: [121.92, 25.10],
     bbox: [121.890, 25.080, 121.945, 25.150],
     description: 'The classic northeast wall and reef dives — sheer basalt cliffs, deep gullies, dramatic rock formations.',
+    maxZoom: 26,
   },
   yilan: {
     name: 'Yilan / Turtle Island',
@@ -125,11 +131,15 @@ function bboxToSvgRect(bbox: [number, number, number, number]) {
 const REGION_BBOX_SVG: Record<Region, { x: number; y: number; w: number; h: number }> =
   Object.fromEntries(REGION_ORDER.map(r => [r, bboxToSvgRect(REGIONS[r].bbox)])) as never
 
-const MAX_ZOOM = 12
+// Cap chosen to give Keelung / Long Dong / Penghu's small bays enough zoom
+// for divers to see individual sites separated, without taking the smallest
+// islands (Lanyu, Green Island) past the GADM coastline density.
+const MAX_ZOOM = 18
 
 function scaleForRegion(r: Region): number {
   const b = REGION_BBOX_SVG[r]
-  return Math.min(VIEW_W / b.w, VIEW_H / b.h, MAX_ZOOM)
+  const cap = REGIONS[r].maxZoom ?? MAX_ZOOM
+  return Math.min(VIEW_W / b.w, VIEW_H / b.h, cap)
 }
 
 function transformForRegion(r: Region | null): string {
@@ -222,15 +232,28 @@ export function MapPage() {
   const stroke = strokeWidthForZoom(selected)
   const visibleSites = selected ? sitesByRegion.get(selected) ?? [] : []
 
-  // Stack labels for sites at identical coords so they don't overplot each
-  // other (Badouzi has three sites at one bay).
-  const labelStack = new Map<string, number>()
-  const visibleSiteLayout = visibleSites.map(s => {
-    const key = `${s.latitude},${s.longitude}`
-    const idx = labelStack.get(key) ?? 0
-    labelStack.set(key, idx + 1)
-    return { site: s, labelIdx: idx }
-  })
+  // Project each site to SVG coords through the active zoom, then defer to
+  // the radial placement helper for layout. Re-attach the original DiveSite
+  // reference for rendering after placement returns.
+  const visibleSiteLayout = useMemo(() => {
+    if (!selected) return []
+    const projected = visibleSites.map(s => {
+      const [vx, vy] = siteToViewBoxXY(s.longitude, s.latitude, selected)
+      return { name: s.name, vx, vy }
+    })
+    const placed = placeLabels(projected, { bounds: { width: VIEW_W, height: VIEW_H } })
+    return placed.map(p => ({
+      site: visibleSites[p.index],
+      vx: p.vx,
+      vy: p.vy,
+      labelX: p.labelX,
+      labelY: p.labelY,
+      anchor: p.anchor,
+      rect: p.rect,
+      leaderStart: p.leaderStart,
+      leaderEnd: p.leaderEnd,
+    }))
+  }, [selected, visibleSites])
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
@@ -257,6 +280,23 @@ export function MapPage() {
           role="img"
           aria-label="Map of Taiwan with selectable diving regions"
         >
+          <defs>
+            {/* Arrowhead at the end of leader lines, pointing at the site
+                marker. Long, narrow triangle (3:1 aspect) for a sharp,
+                needle-like point. orient="auto" rotates with the line. */}
+            <marker
+              id="site-arrow"
+              viewBox="0 0 12 4"
+              refX="11"
+              refY="2"
+              markerWidth="3.5"
+              markerHeight="2.5"
+              orient="auto"
+            >
+              <path d="M 0 0 L 12 2 L 0 4 Z" fill="#dc2626" />
+            </marker>
+          </defs>
+
           {/* Zoomable group — only the coastline scales; markers and labels
               live outside this group so they keep a fixed visual size. */}
           <g
@@ -303,28 +343,31 @@ export function MapPage() {
               region's transform so they land at the right geographic spot
               while keeping a fixed visual size. paint-order=stroke gives
               labels a white halo so they stay legible over coastline. */}
-          {selected && visibleSiteLayout.map(({ site, labelIdx }) => {
-            const [vx, vy] = siteToViewBoxXY(site.longitude, site.latitude, selected)
-            const labelY = vy + 1.4 + labelIdx * 6
-            return (
-              <g key={site.id} className="pointer-events-none">
-                <circle cx={vx} cy={vy} r="2" fill="#dc2626" stroke="white" strokeWidth="0.7" />
-                <text
-                  x={vx + 3.5}
-                  y={labelY}
-                  fontSize="5"
-                  fontWeight="700"
-                  fill="#1e3a8a"
-                  stroke="white"
-                  strokeWidth="1.6"
-                  paintOrder="stroke fill"
-                  strokeLinejoin="round"
-                >
-                  {site.name}
-                </text>
-              </g>
-            )
-          })}
+          {selected && visibleSiteLayout.map(({ site, vx, vy, labelX, labelY, anchor, leaderStart, leaderEnd }) => (
+            <g key={site.id} className="pointer-events-none">
+              <line
+                x1={leaderStart[0]} y1={leaderStart[1]}
+                x2={leaderEnd[0]}   y2={leaderEnd[1]}
+                stroke="#dc2626" strokeWidth="1.4" strokeOpacity="0.8"
+                markerEnd="url(#site-arrow)"
+              />
+              <circle cx={vx} cy={vy} r="3" fill="#dc2626" stroke="white" strokeWidth="1.2" />
+              <text
+                x={labelX}
+                y={labelY}
+                textAnchor={anchor}
+                fontSize="10"
+                fontWeight="700"
+                fill="#1e3a8a"
+                stroke="white"
+                strokeWidth="3.2"
+                paintOrder="stroke fill"
+                strokeLinejoin="round"
+              >
+                {site.name}
+              </text>
+            </g>
+          ))}
         </svg>
       </div>
 
