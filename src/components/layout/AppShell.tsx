@@ -81,9 +81,21 @@ export function AppShell() {
             target="_blank"
             rel="noopener noreferrer"
             aria-label="FunDivers Radio"
-          >
-            <img src="/imgs/broadcast.png" alt="" className="h-8 w-auto" />
-          </a>
+            // CSS mask makes the PNG act as a stencil for an exact red fill
+            // — `filter: hue-rotate` couldn't pin a specific shade and
+            // multi-color PNGs end up muddy. The PNG is square so h == w.
+            className="block h-6 w-6 bg-red-500 hover:bg-red-400 transition-colors"
+            style={{
+              WebkitMaskImage: 'url(/imgs/broadcast.png)',
+              maskImage: 'url(/imgs/broadcast.png)',
+              WebkitMaskSize: 'contain',
+              maskSize: 'contain',
+              WebkitMaskRepeat: 'no-repeat',
+              maskRepeat: 'no-repeat',
+              WebkitMaskPosition: 'center',
+              maskPosition: 'center',
+            }}
+          />
           <a
             href="https://www.fundiverstw.com/weeklyspecial"
             target="_blank"
