@@ -236,6 +236,7 @@ export interface Database {
           cancel_policy: string | null
           destination_reference: string | null
           DiveTravel_reference: string | null
+          prereq_cert_id: string | null
         }
         Insert: {
           _id: string
@@ -280,6 +281,7 @@ export interface Database {
           included: string | null
           schedule: string | null
           starting_at: number | null
+          prereq_cert_id: string | null
         }
         Insert: {
           _id: string
@@ -320,6 +322,28 @@ export interface Database {
           updated_at?: string
         }
         Update: Partial<Database['public']['Tables']['dive_sites']['Insert']>
+        Relationships: []
+      }
+      cert_levels: {
+        Row: {
+          id: string
+          code: string
+          name: string
+          name_zh: string | null
+          rank: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          code: string
+          name: string
+          name_zh?: string | null
+          rank: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['cert_levels']['Insert']>
         Relationships: []
       }
       duties: {
@@ -521,6 +545,7 @@ export type EOPrice = Database['public']['Tables']['EO_prices']['Row']
 export type EORoom = Database['public']['Tables']['EO_rooms']['Row']
 export type EOAddon = Database['public']['Tables']['Other_Addons']['Row']
 export type DiveSite = Database['public']['Tables']['dive_sites']['Row']
+export type CertLevel = Database['public']['Tables']['cert_levels']['Row']
 export type AdminNote = Database['public']['Tables']['admin_notes']['Row']
 export const NOTE_TAGS = ['urgent','payment','gear','logistics','cert','medical','note','general'] as const
 export type NoteTag = typeof NOTE_TAGS[number]
