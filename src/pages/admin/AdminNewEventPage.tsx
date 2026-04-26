@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import type { EOAddon, EOCourse, EODive, EOPrice, EORoom } from '../../types/database'
+import type { CertLevel, EOAddon, EOCourse, EODive, EOPrice, EORoom } from '../../types/database'
 
 // Admin-facing form for creating a new EO_dive or EO_course. Exposes every
 // editable column on the chosen table (system fields like _id / Created Date
@@ -29,7 +29,8 @@ interface FormState {
   end_date: string
   price: string          // FK → EO_prices._id; empty = no price linked
   featured_image: string
-  prereqs: string
+  prereq_cert_id: string // FK → cert_levels.id; empty = no cert required
+  prereqs: string        // free-form notes (e.g. "20+ logged dives")
   req_dives: string      // dives store bigint, courses store text — keep as string here
   dive_days: string      // bigint or empty
   addonIds: string[]     // FK multi → Other_Addons
@@ -59,7 +60,8 @@ const EMPTY_FORM: FormState = {
   type: 'dive',
   title: '', subtitle: '',
   start_date: '', start_time: '', end_date: '',
-  price: '', featured_image: '', prereqs: '',
+  price: '', featured_image: '',
+  prereq_cert_id: '', prereqs: '',
   req_dives: '', dive_days: '',
   addonIds: [],
   notes: '', featured: false, fully_booked: false,
@@ -135,6 +137,7 @@ export function AdminNewEventPage() {
   const [prices, setPrices] = useState<EOPrice[]>([])
   const [rooms, setRooms] = useState<EORoom[]>([])
   const [addons, setAddons] = useState<EOAddon[]>([])
+  const [certLevels, setCertLevels] = useState<CertLevel[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Past events for the preload picker, sorted most-recent-first.
@@ -161,6 +164,7 @@ export function AdminNewEventPage() {
         supabase.from('Other_Addons').select('*').order('display_name'),
         supabase.from('EO_dives').select('*').lt('start_date', todayStr).order('start_date', { ascending: false }).limit(50),
         supabase.from('EO_courses').select('*').lt('start_date', todayStr).order('start_date', { ascending: false }).limit(50),
+        supabase.from('cert_levels').select('*').order('rank'),
       ])
       if (cancelled) return
       const dataOf = <T,>(i: number): T[] => {
@@ -172,6 +176,7 @@ export function AdminNewEventPage() {
       setPrices(dataOf<EOPrice>(0))
       setRooms(dataOf<EORoom>(1))
       setAddons(dataOf<EOAddon>(2))
+      setCertLevels(dataOf<CertLevel>(5))
 
       const pastDives = dataOf<EODive>(3).map<PastEvent>(d => ({
         kind: 'dive', id: d._id, startDate: d.start_date ?? '', title: d.dive_title ?? '(untitled dive)', row: d,
@@ -199,6 +204,7 @@ export function AdminNewEventPage() {
         end_date: d.end_date ?? '',
         price: d.price ?? '',
         featured_image: d.featured_image ?? '',
+        prereq_cert_id: d.prereq_cert_id ?? '',
         prereqs: d.prereqs ?? '',
         req_dives: d.req_dives != null ? String(d.req_dives) : '',
         dive_days: d.dive_days != null ? String(d.dive_days) : '',
@@ -233,6 +239,7 @@ export function AdminNewEventPage() {
         price: c.price ?? '',
         featured_image: c.featured_image ?? '',
         url: c.URL ?? '',
+        prereq_cert_id: c.prereq_cert_id ?? '',
         prereqs: c.prereqs ?? '',
         req_dives: c.req_dives ?? '',
         dive_days: c.dive_days != null ? String(c.dive_days) : '',
@@ -352,6 +359,7 @@ export function AdminNewEventPage() {
           notes: form.notes,                   // NOT NULL — empty string OK
           featured: form.featured,
           fully_booked: form.fully_booked,
+          prereq_cert_id: form.prereq_cert_id || null,
           prereqs: form.prereqs || null,
           req_dives: form.req_dives ? Number(form.req_dives) : null,
           dive_days: form.dive_days ? Number(form.dive_days) : null,
@@ -382,6 +390,7 @@ export function AdminNewEventPage() {
           price: form.price || null,
           featured_image: form.featured_image || null,
           URL: form.url || null,
+          prereq_cert_id: form.prereq_cert_id || null,
           prereqs: form.prereqs || null,
           req_dives: form.req_dives || null,    // text on courses
           dive_days: form.dive_days ? Number(form.dive_days) : null,
@@ -532,6 +541,14 @@ export function AdminNewEventPage() {
               <Input type="number" value={form.dive_days} onChange={v => set('dive_days', v)} />
             </Field>
           </div>
+          <Field label="Required certification">
+            <Select value={form.prereq_cert_id} onChange={v => set('prereq_cert_id', v)}>
+              <option value="">— None —</option>
+              {certLevels.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </Select>
+          </Field>
           <Field label="Prereqs (free text)">
             <Input value={form.prereqs} onChange={v => set('prereqs', v)} />
           </Field>
