@@ -14,14 +14,18 @@
 
 begin;
 
+-- ~330 m offsets along the bay's NE/SW axis so the three Badouzi markers
+-- read as three distinct points at the page's deepest zoom (~scale 40).
+-- Tighter offsets visually stack on the same dot regardless of zoom; these
+-- are still placeholders, swap in real GPS when known.
 update public.dive_sites
-   set latitude  = 25.1432625,
-       longitude = 121.8132844
+   set latitude  = 25.1459625,
+       longitude = 121.8159844
  where name = 'Iron House 2';
 
 update public.dive_sites
-   set latitude  = 25.1426625,
-       longitude = 121.8126844
+   set latitude  = 25.1399625,
+       longitude = 121.8099844
  where name = 'Shipwrecks';
 
 alter table public.dive_sites
