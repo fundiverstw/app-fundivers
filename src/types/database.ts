@@ -296,6 +296,30 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['EO_courses']['Insert']>
         Relationships: []
       }
+      dive_sites: {
+        Row: {
+          id: string
+          name: string
+          tagline: string | null
+          latitude: number
+          longitude: number
+          region: 'keelung' | 'longdong' | 'yilan' | 'greenisland' | 'lanyu' | 'xiaoliuqiu' | 'kenting' | 'penghu'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          tagline?: string | null
+          latitude: number
+          longitude: number
+          region: 'keelung' | 'longdong' | 'yilan' | 'greenisland' | 'lanyu' | 'xiaoliuqiu' | 'kenting' | 'penghu'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['dive_sites']['Insert']>
+        Relationships: []
+      }
       duties: {
         Row: {
           id: string
@@ -494,6 +518,7 @@ export type EOCourse = Database['public']['Tables']['EO_courses']['Row']
 export type EOPrice = Database['public']['Tables']['EO_prices']['Row']
 export type EORoom = Database['public']['Tables']['EO_rooms']['Row']
 export type EOAddon = Database['public']['Tables']['Other_Addons']['Row']
+export type DiveSite = Database['public']['Tables']['dive_sites']['Row']
 export type AdminNote = Database['public']['Tables']['admin_notes']['Row']
 export const NOTE_TAGS = ['urgent','payment','gear','logistics','cert','medical','note','general'] as const
 export type NoteTag = typeof NOTE_TAGS[number]

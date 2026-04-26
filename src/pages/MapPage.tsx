@@ -1,29 +1,27 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import taiwanGeo from '../assets/taiwan.geo.json'
+import { supabase } from '../lib/supabase'
+import type { DiveSite } from '../types/database'
 
 // High-detail Taiwan map. Coastline data is GADM 4.1 country-level boundaries
 // (1,800+ vertices on the main island, 30+ separate Penghu islets, plus
 // Keelung Island, Turtle Island, Lanyu, Green Island, Xiao Liuqiu) bundled
-// here so the PWA renders offline. Coordinates are projected with an
-// equirectangular formula scaled by cos(latitude) so the island reads at
-// honest aspect ratio.
+// here so the PWA renders offline.
 //
-// Interaction model:
-//   - Overview state shows every island plus emerald markers at each
-//     dive-region center. Tapping a marker (or its row in the list below
-//     the map) flies the camera to that region's bbox.
-//   - When zoomed in, the markers hide so they don't blow up under the
-//     transform; the user navigates back via the × on the panel or the
-//     "Back to overview" button.
+// Region metadata (name / center / bbox / description) is hardcoded in this
+// file — there are eight fixed regions and the constants are tightly tied
+// to the SVG geometry. Dive *sites* live in public.dive_sites and are
+// fetched on mount so admins can add/edit them without redeploying the SPA.
 
 type Region =
-  | 'penghu'
   | 'keelung'
   | 'longdong'
   | 'yilan'
-  | 'south'
-  | 'lanyu'
   | 'greenisland'
+  | 'lanyu'
+  | 'xiaoliuqiu'
+  | 'kenting'
+  | 'penghu'
 
 interface RegionInfo {
   name: string
@@ -32,77 +30,74 @@ interface RegionInfo {
   /** [minLon, minLat, maxLon, maxLat] — the camera frames this on zoom. */
   bbox: [number, number, number, number]
   description: string
-  sites: string[]
 }
 
 const REGIONS: Record<Region, RegionInfo> = {
   keelung: {
     name: 'Keelung / Badouzi',
     center: [121.79, 25.16],
-    bbox: [121.69, 25.05, 121.92, 25.27],
-    description:
-      'Northern port-area diving — Badouzi reefs, Wanghaixiang Bay, with Keelung Islet (基隆嶼) just offshore. ' +
-      'Year-round, visibility 10–20 m, 18–26°C.',
-    sites: ['Badouzi (八斗子)', 'Wanghaixiang Bay', 'Keelung Islet (基隆嶼)', 'Heping Island'],
+    bbox: [121.745, 25.120, 121.840, 25.210],
+    description: 'Northern port-area diving — Badouzi Bay reefs and shipwrecks, with Keelung Islet just offshore.',
   },
   longdong: {
     name: 'Long Dong Bay',
     center: [121.92, 25.10],
-    bbox: [121.85, 25.03, 121.99, 25.16],
-    description:
-      'The classic northeast wall dive — sheer basalt cliffs, dramatic rock formations, deep gullies. ' +
-      'Best summer–fall, visibility 15–25 m. Easy shore entry.',
-    sites: ['Long Dong Bay (龍洞灣)', 'First Cave', 'Second Cave', 'Bitou Cape'],
+    bbox: [121.890, 25.080, 121.945, 25.150],
+    description: 'The classic northeast wall and reef dives — sheer basalt cliffs, deep gullies, dramatic rock formations.',
   },
   yilan: {
     name: 'Yilan / Turtle Island',
-    center: [121.95, 24.85],
-    bbox: [121.78, 24.45, 122.10, 25.05],
+    center: [121.95, 24.95],
+    bbox: [121.810, 24.800, 121.990, 25.050],
     description:
-      "East-coast diving — Wushibi reefs, Toucheng, Wai'ao, with Turtle Island (Guishan Dao) offshore. " +
-      'Volcanic seabed and underwater hot vents. Summer-only (April–October), visibility 15–25 m.',
-    sites: ['Wushibi Reef (烏石鼻)', "Wai'ao", 'Turtle Island (龜山島)'],
-  },
-  south: {
-    name: 'Kenting / Xiao Liuqiu',
-    center: [120.55, 22.10],
-    bbox: [120.05, 21.85, 120.95, 22.55],
-    description:
-      "Warm water year-round, healthy coral gardens, frequent macro encounters. Xiao Liuqiu — Taiwan's only coral " +
-      "island — has resident green turtles. Kenting peninsula carries Taiwan's most popular dive sites. Visibility 15–30 m.",
-    sites: ['South Bay (南灣)', 'Houbihu (後壁湖)', 'Wanlitong', 'Sail Rock (船帆石)', 'Xiao Liuqiu (小琉球)'],
-  },
-  lanyu: {
-    name: 'Lanyu (Orchid Island)',
-    center: [121.55, 22.05],
-    bbox: [121.43, 21.95, 121.67, 22.15],
-    description:
-      'Volcanic island off SE Taiwan, home to the Tao indigenous people. Drift dives along basalt walls, big pelagic ' +
-      'encounters. Summer-only access. Visibility 25–40 m, 24–28°C.',
-    sites: ['Eight Generations Bay', 'Lanyu Lighthouse', 'Yuren coast'],
+      "East-coast diving — Toucheng / Wai'ao reefs, the Cathedral and Cauliflower Garden walls, the Wan An Jian wreck, " +
+      'and Turtle Island offshore (Guishan Dao).',
   },
   greenisland: {
     name: 'Green Island (Lyudao)',
-    center: [121.50, 22.66],
-    bbox: [121.42, 22.58, 121.58, 22.74],
+    center: [121.4901443, 22.6620886],
+    bbox: [121.460, 22.625, 121.530, 22.700],
     description:
-      'Coral reefs, hot springs, year-round diving with reliable conditions. Drift on the east side, mooring sites on ' +
-      'the west. Visibility 20–35 m, 22–28°C.',
-    sites: ['Shilang (石朗)', 'Big Mushroom (大香菇)', 'Sleeping Beauty Rock', 'Chaikou'],
+      'Green Island is located off the coast of Taitung, on the southeast coast of Taiwan. It is a favorite dive ' +
+      'destination for many locals. Renowned for its impressive visibility, which can reach up to 30–40 m, it is ideal ' +
+      'for photography enthusiasts.',
+  },
+  lanyu: {
+    name: 'Lanyu (Orchid Island)',
+    center: [121.548418, 22.0435616],
+    bbox: [121.470, 21.985, 121.605, 22.115],
+    description:
+      'Orchid Island is best known for the Badai Wreck, a Korean lumber-carrying vessel that starts at 26 m and ' +
+      'descends to 40 m deep.',
+  },
+  xiaoliuqiu: {
+    name: 'Xiao Liuqiu (Lambai Island)',
+    center: [120.3715149, 22.3404158],
+    bbox: [120.350, 22.315, 120.405, 22.365],
+    description:
+      'Xiao Liuqiu / Lambai is a large coral island. Due to its nesting beach, it is home to hundreds of green sea ' +
+      'turtles that both snorkelers and divers can enjoy.',
+  },
+  kenting: {
+    name: 'Kenting',
+    center: [120.7797516, 21.9483307],
+    bbox: [120.685, 21.925, 120.845, 22.020],
+    description:
+      'Kenting has been a top dive destination in Taiwan for decades. It is best known for its myriad of corals that ' +
+      'are plastered atop the reef.',
   },
   penghu: {
     name: 'Penghu Islands',
-    center: [119.50, 23.50],
-    bbox: [119.18, 23.00, 119.78, 23.80],
+    center: [119.5793157, 23.5711899],
+    bbox: [119.290, 23.090, 119.760, 23.700],
     description:
-      'Volcanic basalt formations across 90+ islands. Summer-only diving (April–October), occasional drift ' +
-      'conditions. Visibility 20–35 m. Reached by ferry or short flight.',
-    sites: ['Magong (馬公)', "Wang'an", 'Cimei', 'Niao Yu (鳥嶼)'],
+      'Of all the dive locations in Taiwan, Penghu has the most fish in numbers, size, and diversity! If you have the ' +
+      "experience and time, it's a definite must-see!",
   },
 }
 
 const REGION_ORDER: Region[] = [
-  'keelung', 'longdong', 'yilan', 'greenisland', 'lanyu', 'south', 'penghu',
+  'keelung', 'longdong', 'yilan', 'greenisland', 'lanyu', 'xiaoliuqiu', 'kenting', 'penghu',
 ]
 
 // --- Projection ----------------------------------------------------------
@@ -118,32 +113,48 @@ const MARGIN = 10
 const projectX = (lon: number) => (lon - LON_MIN) * LON_PX_PER_DEG + MARGIN
 const projectY = (lat: number) => (LAT_MAX - lat) * LAT_PX_PER_DEG + MARGIN
 
-// Convert a geographic bbox [minLon, minLat, maxLon, maxLat] to the
-// rectangular SVG region the camera will fly to.
 function bboxToSvgRect(bbox: [number, number, number, number]) {
   const [lon0, lat0, lon1, lat1] = bbox
   const x = projectX(lon0)
-  const y = projectY(lat1) // top of svg = highest latitude
+  const y = projectY(lat1)
   const w = projectX(lon1) - x
   const h = projectY(lat0) - y
   return { x, y, w, h }
 }
 
-// Pre-compute camera transforms for each region.
 const REGION_BBOX_SVG: Record<Region, { x: number; y: number; w: number; h: number }> =
   Object.fromEntries(REGION_ORDER.map(r => [r, bboxToSvgRect(REGIONS[r].bbox)])) as never
+
+const MAX_ZOOM = 12
+
+function scaleForRegion(r: Region): number {
+  const b = REGION_BBOX_SVG[r]
+  return Math.min(VIEW_W / b.w, VIEW_H / b.h, MAX_ZOOM)
+}
 
 function transformForRegion(r: Region | null): string {
   if (!r) return 'translate(0px, 0px) scale(1)'
   const b = REGION_BBOX_SVG[r]
-  // Tight zooms shouldn't exceed 8× — past that, vertex density runs out
-  // and the coastline starts to look polygonal even at GADM resolution.
-  const scale = Math.min(VIEW_W / b.w, VIEW_H / b.h, 8)
+  const scale = scaleForRegion(r)
   const cx = b.x + b.w / 2
   const cy = b.y + b.h / 2
   const tx = VIEW_W / 2 - scale * cx
   const ty = VIEW_H / 2 - scale * cy
   return `translate(${tx}px, ${ty}px) scale(${scale})`
+}
+
+// Project a [lon, lat] coord through the active zoom transform so site
+// markers can sit OUTSIDE the scaled coastline group at fixed visual size.
+function siteToViewBoxXY(lon: number, lat: number, region: Region): [number, number] {
+  const px = projectX(lon)
+  const py = projectY(lat)
+  const b = REGION_BBOX_SVG[region]
+  const scale = scaleForRegion(region)
+  const cx = b.x + b.w / 2
+  const cy = b.y + b.h / 2
+  const tx = VIEW_W / 2 - scale * cx
+  const ty = VIEW_H / 2 - scale * cy
+  return [scale * px + tx, scale * py + ty]
 }
 
 // --- Path construction ---------------------------------------------------
@@ -157,23 +168,43 @@ function ringToPath(ring: Ring): string {
 }
 
 const features = (taiwanGeo as { features: Feature[] }).features
-// All polygon paths, one per island feature. The base map renders all of
-// them in the same fill — region selection is handled via marker clicks,
-// not feature clicks.
 const allPaths = features.map(f => ringToPath((f.geometry.coordinates as Ring[])[0]))
 
-// Width of stroke around each island. Inversely scales with zoom so the
-// outline doesn't fatten visually as the camera flies in.
 function strokeWidthForZoom(r: Region | null): number {
   if (!r) return 0.5
-  const b = REGION_BBOX_SVG[r]
-  const scale = Math.min(VIEW_W / b.w, VIEW_H / b.h, 8)
-  return 0.5 / scale
+  return 0.5 / scaleForRegion(r)
 }
 
 // --- Component -----------------------------------------------------------
 export function MapPage() {
   const [selected, setSelected] = useState<Region | null>(null)
+  const [sites, setSites] = useState<DiveSite[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data, error } = await supabase
+        .from('dive_sites')
+        .select('*')
+        .order('name')
+      if (cancelled) return
+      // Silent fall-back: an empty site list still lets the map render with
+      // just region pins, which is better than a broken page.
+      if (error) return
+      setSites((data ?? []) as DiveSite[])
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  const sitesByRegion = useMemo(() => {
+    const m = new Map<Region, DiveSite[]>()
+    REGION_ORDER.forEach(r => m.set(r, []))
+    for (const s of sites) {
+      const r = s.region as Region
+      if (m.has(r)) m.get(r)!.push(s)
+    }
+    return m
+  }, [sites])
 
   function pick(r: Region) {
     setSelected(prev => (prev === r ? null : r))
@@ -189,6 +220,17 @@ export function MapPage() {
   }
 
   const stroke = strokeWidthForZoom(selected)
+  const visibleSites = selected ? sitesByRegion.get(selected) ?? [] : []
+
+  // Stack labels for sites at identical coords so they don't overplot each
+  // other (Badouzi has three sites at one bay).
+  const labelStack = new Map<string, number>()
+  const visibleSiteLayout = visibleSites.map(s => {
+    const key = `${s.latitude},${s.longitude}`
+    const idx = labelStack.get(key) ?? 0
+    labelStack.set(key, idx + 1)
+    return { site: s, labelIdx: idx }
+  })
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
@@ -216,7 +258,7 @@ export function MapPage() {
           aria-label="Map of Taiwan with selectable diving regions"
         >
           {/* Zoomable group — only the coastline scales; markers and labels
-              live outside this group so they keep a fixed size. */}
+              live outside this group so they keep a fixed visual size. */}
           <g
             style={{
               transform: transformForRegion(selected),
@@ -236,9 +278,7 @@ export function MapPage() {
             ))}
           </g>
 
-          {/* Region markers — pinned, fixed-size. Each is a transparent
-              hit target plus a visible dot, so touch tap zones stay easy
-              to hit without inflating the rendered marker. */}
+          {/* Region pins — only on overview, fixed visual size. */}
           {!selected && REGION_ORDER.map(id => {
             const r = REGIONS[id]
             const cx = projectX(r.center[0])
@@ -255,6 +295,33 @@ export function MapPage() {
               >
                 <circle cx={cx} cy={cy} r="11" fill="transparent" />
                 <circle cx={cx} cy={cy} r="4.5" fill="currentColor" stroke="white" strokeWidth="1.5" />
+              </g>
+            )
+          })}
+
+          {/* Site markers — only when zoomed in, projected through the
+              region's transform so they land at the right geographic spot
+              while keeping a fixed visual size. paint-order=stroke gives
+              labels a white halo so they stay legible over coastline. */}
+          {selected && visibleSiteLayout.map(({ site, labelIdx }) => {
+            const [vx, vy] = siteToViewBoxXY(site.longitude, site.latitude, selected)
+            const labelY = vy + 1.4 + labelIdx * 6
+            return (
+              <g key={site.id} className="pointer-events-none">
+                <circle cx={vx} cy={vy} r="2" fill="#dc2626" stroke="white" strokeWidth="0.7" />
+                <text
+                  x={vx + 3.5}
+                  y={labelY}
+                  fontSize="5"
+                  fontWeight="700"
+                  fill="#1e3a8a"
+                  stroke="white"
+                  strokeWidth="1.6"
+                  paintOrder="stroke fill"
+                  strokeLinejoin="round"
+                >
+                  {site.name}
+                </text>
               </g>
             )
           })}
@@ -297,14 +364,23 @@ export function MapPage() {
             </button>
           </div>
           <p className="text-sm text-blue-900 mb-3">{REGIONS[selected].description}</p>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-blue-900/70 mb-1">
-            Dive sites
-          </h3>
-          <ul className="text-sm text-blue-900 space-y-0.5">
-            {REGIONS[selected].sites.map(s => (
-              <li key={s}>• {s}</li>
-            ))}
-          </ul>
+          {visibleSites.length > 0 && (
+            <>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-blue-900/70 mb-1">
+                Dive sites
+              </h3>
+              <ul className="text-sm text-blue-900 space-y-2">
+                {visibleSites.map(s => (
+                  <li key={s.id}>
+                    <strong className="font-semibold">{s.name}</strong>
+                    {s.tagline && (
+                      <p className="text-xs text-blue-900/80 mt-0.5">{s.tagline}</p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </div>
       )}
     </div>
