@@ -31,7 +31,7 @@ interface CourseRow {
 
 function setup(courses: CourseRow[]) {
   const builder: Record<string, unknown> = {}
-  const chain = ['select', 'eq', 'gte', 'lte', 'order', 'in']
+  const chain = ['select', 'eq', 'gte', 'lte', 'order', 'in', 'is']
   for (const m of chain) builder[m] = () => builder
   builder.then = (cb?: (r: unknown) => unknown) =>
     Promise.resolve({ data: courses, error: null }).then(cb)

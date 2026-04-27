@@ -87,6 +87,7 @@ function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: stri
     gear_rental_info: gearText,
     nitrox_required: (d.nitrox_required ?? '').toLowerCase() === 'true',
     dive_days: d.dive_days ?? null,
+    cancelled_at: d.cancelled_at ?? null,
   }
 }
 
@@ -136,6 +137,7 @@ function courseToEvents(c: EOCourse, priceIndex: Map<string, EOPrice>, addonIds:
     gear_rental_info: null,
     nitrox_required: false,
     dive_days: c.dive_days ?? null,
+    cancelled_at: c.cancelled_at ?? null,
   }
 
   const makeSegment = (fromKey: string, toKey: string): AppEvent | null => {
@@ -221,14 +223,20 @@ async function attachPrices(dives: EODive[], courses: EOCourse[]): Promise<Map<s
   return new Map((data ?? []).map(p => [p._id, p as EOPrice]))
 }
 
-const DIVE_COLS = '_id, dive_title, title, start_date, time, end_date, featured, fully_booked, price, has_rooms, room_types, hasotheraddons, other_addons, gear_rental, nitrox_required, dive_days'
-const COURSE_COLS = '_id, course_title, title, start_date, start_time, end_date, price, other_addons, dive_days, special_date'
+const DIVE_COLS = '_id, dive_title, title, start_date, time, end_date, featured, fully_booked, price, has_rooms, room_types, hasotheraddons, other_addons, gear_rental, nitrox_required, dive_days, cancelled_at'
+const COURSE_COLS = '_id, course_title, title, start_date, start_time, end_date, price, other_addons, dive_days, special_date, cancelled_at'
 
-/** Fetch dives + courses whose start_date falls within [fromDate, toDate] (inclusive, 'YYYY-MM-DD'). */
+/**
+ * Fetch dives + courses whose start_date falls within [fromDate, toDate]
+ * (inclusive, 'YYYY-MM-DD'). Events with `cancelled_at` set are hidden —
+ * admin soft-cancellations vanish from the calendar / listing surfaces.
+ * Use `fetchEventsForBookings` when bookings against cancelled events
+ * still need to resolve their event details.
+ */
 export async function fetchEventsInRange(fromDate: string, toDate: string): Promise<AppEvent[]> {
   const [divesResp, coursesResp] = await Promise.all([
-    supabase.from('EO_dives').select(DIVE_COLS).gte('start_date', fromDate).lte('start_date', toDate).order('start_date'),
-    supabase.from('EO_courses').select(COURSE_COLS).gte('start_date', fromDate).lte('start_date', toDate).order('start_date'),
+    supabase.from('EO_dives').select(DIVE_COLS).is('cancelled_at', null).gte('start_date', fromDate).lte('start_date', toDate).order('start_date'),
+    supabase.from('EO_courses').select(COURSE_COLS).is('cancelled_at', null).gte('start_date', fromDate).lte('start_date', toDate).order('start_date'),
   ])
 
   const dives = (divesResp.data ?? []) as EODive[]
