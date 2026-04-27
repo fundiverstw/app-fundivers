@@ -142,8 +142,10 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
     const shoeSizeCanonical = shoeValue
       ? formatShoeSize(parseFloat(shoeValue), shoeUnit, shoeGender)
       : null
-    await supabase.from('profiles').upsert({
-      id: user.id,
+    // Update, not upsert: the row is created by handle_new_user at signup,
+    // and there is no INSERT policy on profiles — upsert hits the INSERT
+    // RLS check and 403s even when only updating an existing row.
+    await supabase.from('profiles').update({
       full_name: data.full_name,
       display_name: strOrNull(data.display_name),
       phone: strOrNull(data.phone),
@@ -166,7 +168,7 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
       last_dive_date: strOrNull(data.last_dive_date),
       gear_owned: gearOwned,
       updated_at: new Date().toISOString(),
-    })
+    }).eq('id', user.id)
     reset(data)
     setDirtyExtras(false)
   }

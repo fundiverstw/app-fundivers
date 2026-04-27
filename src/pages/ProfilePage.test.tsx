@@ -4,8 +4,8 @@ import userEvent from '@testing-library/user-event'
 import { ProfilePage } from './ProfilePage'
 import { renderWithRouter, mockQueryBuilder } from '../../tests/test-utils'
 
-const { upsert, from, useAuthMock, uploadCertCard, getCertCardSignedUrl, deleteCertCard } = vi.hoisted(() => ({
-  upsert: vi.fn(),
+const { update, from, useAuthMock, uploadCertCard, getCertCardSignedUrl, deleteCertCard } = vi.hoisted(() => ({
+  update: vi.fn(),
   from: vi.fn(),
   useAuthMock: vi.fn(),
   uploadCertCard: vi.fn(),
@@ -34,7 +34,7 @@ function input(name: string): HTMLInputElement | HTMLTextAreaElement {
 }
 
 beforeEach(() => {
-  upsert.mockReset()
+  update.mockReset()
   from.mockReset()
   useAuthMock.mockReset()
   uploadCertCard.mockReset()
@@ -50,7 +50,7 @@ describe('ProfilePage', () => {
     })
     from.mockReturnValue({
       ...mockQueryBuilder(),
-      upsert: (...a: unknown[]) => { upsert(...a); return mockQueryBuilder() },
+      update: (...a: unknown[]) => { update(...a); return mockQueryBuilder() },
     })
     const user = userEvent.setup()
     renderWithRouter(<ProfilePage />)
@@ -61,7 +61,7 @@ describe('ProfilePage', () => {
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
     expect((await screen.findAllByText(/required/i)).length).toBeGreaterThan(0)
-    expect(upsert).not.toHaveBeenCalled()
+    expect(update).not.toHaveBeenCalled()
   })
 
   it('submit is disabled when the form is clean', async () => {
@@ -75,7 +75,7 @@ describe('ProfilePage', () => {
     await waitFor(() => expect(btn).toBeDisabled())
   })
 
-  it('upserts with user.id, form values and updated_at on submit', async () => {
+  it('updates own profile row with form values and updated_at on submit', async () => {
     useAuthMock.mockReturnValue({
       user: { id: 'u1' },
       profile: {
@@ -89,9 +89,16 @@ describe('ProfilePage', () => {
         logged_dives: 0,
       },
     })
+    const eqSpy = vi.fn()
     from.mockImplementation(() => ({
       ...mockQueryBuilder(),
-      upsert: (...a: unknown[]) => { upsert(...a); return mockQueryBuilder() },
+      update: (...a: unknown[]) => {
+        update(...a)
+        return {
+          ...mockQueryBuilder(),
+          eq: (...e: unknown[]) => { eqSpy(...e); return mockQueryBuilder() },
+        }
+      },
     }))
 
     const user = userEvent.setup()
@@ -103,17 +110,18 @@ describe('ProfilePage', () => {
     await user.type(input('phone'), '+886-900-123')
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
-    await waitFor(() => expect(upsert).toHaveBeenCalledOnce())
-    const payload = upsert.mock.calls[0][0] as Record<string, unknown>
-    expect(payload.id).toBe('u1')
+    await waitFor(() => expect(update).toHaveBeenCalledOnce())
+    const payload = update.mock.calls[0][0] as Record<string, unknown>
+    expect(payload.id).toBeUndefined() // id is in the .eq filter, not the payload
     expect(payload.full_name).toBe('Ada L.')
     expect(payload.phone).toBe('+886-900-123')
     expect(typeof payload.updated_at).toBe('string')
     expect(new Date(payload.updated_at as string).toString()).not.toBe('Invalid Date')
     expect(from).toHaveBeenCalledWith('profiles')
+    expect(eqSpy).toHaveBeenCalledWith('id', 'u1')
   })
 
-  it('toggles gear owned and includes it in the upsert payload', async () => {
+  it('toggles gear owned and includes it in the update payload', async () => {
     useAuthMock.mockReturnValue({
       user: { id: 'u1' },
       profile: {
@@ -130,7 +138,7 @@ describe('ProfilePage', () => {
     })
     from.mockImplementation(() => ({
       ...mockQueryBuilder(),
-      upsert: (...a: unknown[]) => { upsert(...a); return mockQueryBuilder() },
+      update: (...a: unknown[]) => { update(...a); return mockQueryBuilder() },
     }))
 
     const user = userEvent.setup()
@@ -141,8 +149,8 @@ describe('ProfilePage', () => {
     await user.click(screen.getByLabelText('Fins'))
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
-    await waitFor(() => expect(upsert).toHaveBeenCalledOnce())
-    const payload = upsert.mock.calls[0][0] as Record<string, unknown>
+    await waitFor(() => expect(update).toHaveBeenCalledOnce())
+    const payload = update.mock.calls[0][0] as Record<string, unknown>
     expect(payload.gear_owned).toEqual(['BCD', 'Fins'])
   })
 
@@ -164,7 +172,7 @@ describe('ProfilePage', () => {
     })
     from.mockImplementation(() => ({
       ...mockQueryBuilder(),
-      upsert: (...a: unknown[]) => { upsert(...a); return mockQueryBuilder() },
+      update: (...a: unknown[]) => { update(...a); return mockQueryBuilder() },
     }))
 
     const user = userEvent.setup()
@@ -188,8 +196,8 @@ describe('ProfilePage', () => {
     // Change size, save, confirm canonical format flows through
     await user.selectOptions(sizeSel, '42')
     await user.click(screen.getByRole('button', { name: /save changes/i }))
-    await waitFor(() => expect(upsert).toHaveBeenCalledOnce())
-    const payload = upsert.mock.calls[0][0] as Record<string, unknown>
+    await waitFor(() => expect(update).toHaveBeenCalledOnce())
+    const payload = update.mock.calls[0][0] as Record<string, unknown>
     expect(payload.shoe_size).toBe('EU 42 M')
     expect(payload.gear_owned).toEqual(['BCD', 'Fins'])
   })
@@ -238,6 +246,6 @@ describe('ProfilePage', () => {
     // The page header still renders; the form is gated on user + profile.
     expect(screen.getByText(/my profile/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /save changes/i })).not.toBeInTheDocument()
-    expect(upsert).not.toHaveBeenCalled()
+    expect(update).not.toHaveBeenCalled()
   })
 })
