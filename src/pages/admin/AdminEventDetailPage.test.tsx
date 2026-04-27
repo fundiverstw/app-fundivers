@@ -103,4 +103,77 @@ describe('AdminEventDetailPage', () => {
     // Shoe size displayed as JP for admins.
     expect(screen.getByText(/JP 26/)).toBeInTheDocument()
   })
+
+  it('cancels an event via the confirmation modal and updates EO_dives.cancelled_at', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', {
+        id: 'dive_x', type: 'dive', title: 'Kenting',
+        start_time: new Date().toISOString(), end_time: null, currency: 'TWD',
+        cancelled_at: null,
+      }],
+    ]))
+
+    const updateSpy = vi.fn().mockReturnValue({
+      eq: () => Promise.resolve({ error: null }),
+    })
+    from.mockImplementation((table: string) => {
+      if (table === 'EO_dives') {
+        const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
+        b.update = updateSpy
+        return b
+      }
+      // No registrants — keep the rest of the page light.
+      return mockQueryBuilder({ data: [] })
+    })
+
+    const user = userEvent.setup()
+    renderAt('/admin/events/dive/dive_x')
+
+    await screen.findByRole('heading', { name: /kenting/i })
+    await user.click(screen.getByRole('button', { name: /cancel event/i }))
+
+    // Modal up; confirm.
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    await user.click(screen.getAllByRole('button', { name: /cancel event/i })[1])
+
+    await waitFor(() => expect(updateSpy).toHaveBeenCalled())
+    const payload = (updateSpy.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
+    expect(typeof payload.cancelled_at).toBe('string')
+    // After confirm the modal closes and the banner appears.
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByText(/^Cancelled /)).toBeInTheDocument()
+  })
+
+  it('restores a cancelled event by clearing cancelled_at', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', {
+        id: 'dive_x', type: 'dive', title: 'Kenting',
+        start_time: new Date().toISOString(), end_time: null, currency: 'TWD',
+        cancelled_at: '2026-04-25T10:00:00.000Z',
+      }],
+    ]))
+
+    const updateSpy = vi.fn().mockReturnValue({
+      eq: () => Promise.resolve({ error: null }),
+    })
+    from.mockImplementation((table: string) => {
+      if (table === 'EO_dives') {
+        const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
+        b.update = updateSpy
+        return b
+      }
+      return mockQueryBuilder({ data: [] })
+    })
+
+    const user = userEvent.setup()
+    renderAt('/admin/events/dive/dive_x')
+
+    await screen.findByRole('heading', { name: /kenting/i })
+    await user.click(screen.getByRole('button', { name: /restore event/i }))
+    await user.click(screen.getAllByRole('button', { name: /restore event/i })[1])
+
+    await waitFor(() => expect(updateSpy).toHaveBeenCalled())
+    const payload = (updateSpy.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
+    expect(payload.cancelled_at).toBeNull()
+  })
 })

@@ -26,6 +26,11 @@ export function AdminEventDetailPage() {
   const [roomNames, setRoomNames] = useState<RoomNameMap>(new Map())
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<Registrant | null>(null)
+  // Cancel-event flow state. The modal opens on click; the actual update
+  // runs only after the admin confirms in the modal.
+  const [cancelModalOpen, setCancelModalOpen] = useState(false)
+  const [cancelInFlight, setCancelInFlight] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!type || !id) return
@@ -116,6 +121,26 @@ export function AdminEventDetailPage() {
     ))
   }
 
+  async function setCancelledAt(value: string | null) {
+    if (!type || !id) return
+    setCancelInFlight(true)
+    setCancelError(null)
+    try {
+      const table = type === 'dive' ? 'EO_dives' : 'EO_courses'
+      const { error } = await supabase
+        .from(table)
+        .update({ cancelled_at: value } as never)
+        .eq('_id', id)
+      if (error) throw error
+      setEvent(prev => (prev ? { ...prev, cancelled_at: value } : prev))
+      setCancelModalOpen(false)
+    } catch (err) {
+      setCancelError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setCancelInFlight(false)
+    }
+  }
+
   if (loading) {
     return <div className="flex justify-center pt-12"><div className="w-6 h-6 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" /></div>
   }
@@ -135,11 +160,29 @@ export function AdminEventDetailPage() {
           </p>
         )}
         <p className="text-sm text-red-600 mt-2">{registrants.length} registrant{registrants.length === 1 ? '' : 's'}</p>
+        {event?.cancelled_at && (
+          <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-red-700 bg-red-50 border border-red-500 rounded px-2 py-1 inline-block">
+            Cancelled {format(new Date(event.cancelled_at), 'MMM d, yyyy')}
+          </p>
+        )}
       </header>
 
       {type && id && (
         <>
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-end gap-2">
+            <Link
+              to={`/admin/events/${type}/${id}/edit`}
+              className="text-xs bg-blue-900/60 hover:bg-blue-900 text-white px-3 py-1 rounded-lg"
+            >
+              Edit
+            </Link>
+            <button
+              type="button"
+              onClick={() => { setCancelError(null); setCancelModalOpen(true) }}
+              className="text-xs bg-red-900/60 hover:bg-red-900 text-white px-3 py-1 rounded-lg"
+            >
+              {event?.cancelled_at ? 'Restore event' : 'Cancel event'}
+            </button>
             <Link
               to={`/admin/events/${type}/${id}/gear-map`}
               className="text-xs bg-sky-900/50 hover:bg-sky-900 text-sky-200 px-3 py-1 rounded-lg"
@@ -194,6 +237,89 @@ export function AdminEventDetailPage() {
           }}
         />
       )}
+
+      {cancelModalOpen && (
+        <CancelEventModal
+          alreadyCancelled={!!event?.cancelled_at}
+          activeBookingCount={registrants.filter(r => r.booking.status !== 'cancelled').length}
+          inFlight={cancelInFlight}
+          error={cancelError}
+          onClose={() => setCancelModalOpen(false)}
+          onConfirm={() => setCancelledAt(event?.cancelled_at ? null : new Date().toISOString())}
+        />
+      )}
+    </div>
+  )
+}
+
+function CancelEventModal({
+  alreadyCancelled, activeBookingCount, inFlight, error, onClose, onConfirm,
+}: {
+  alreadyCancelled: boolean
+  activeBookingCount: number
+  inFlight: boolean
+  error: string | null
+  onClose: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="cancel-event-title"
+    >
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3">
+        <h2 id="cancel-event-title" className="text-lg font-bold text-blue-900">
+          {alreadyCancelled ? 'Restore event?' : 'Cancel event?'}
+        </h2>
+        {alreadyCancelled ? (
+          <p className="text-sm text-blue-900">
+            This will make the event visible on the calendar again. Existing
+            bookings remain attached.
+          </p>
+        ) : (
+          <>
+            <p className="text-sm text-blue-900">
+              The event will be hidden from the calendar and listing pages.
+              Existing bookings stay attached so refund records remain
+              traceable.
+            </p>
+            {activeBookingCount > 0 && (
+              <p className="text-sm font-semibold text-red-700 bg-red-50 border border-red-500 rounded px-3 py-2">
+                {activeBookingCount} active booking{activeBookingCount === 1 ? '' : 's'} on this event will need refunds. Issue them in Stripe separately.
+              </p>
+            )}
+          </>
+        )}
+        {error && (
+          <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded px-2 py-1">{error}</p>
+        )}
+        <div className="flex gap-2 pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={inFlight}
+            className="flex-1 py-2 rounded-lg text-sm font-medium text-blue-900 border border-sky-300 hover:bg-sky-50 disabled:opacity-50"
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={inFlight}
+            className={`flex-1 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50 ${
+              alreadyCancelled
+                ? 'bg-blue-900 hover:bg-blue-950'
+                : 'bg-red-700 hover:bg-red-800'
+            }`}
+          >
+            {inFlight
+              ? (alreadyCancelled ? 'Restoring…' : 'Cancelling…')
+              : (alreadyCancelled ? 'Restore event' : 'Cancel event')}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

@@ -29,7 +29,7 @@ type QueryResult<T> = { data?: T; error?: unknown }
 export function mockQueryBuilder<T = unknown>(result: QueryResult<T> = { data: null, error: null }) {
   const resolved = { data: result.data ?? null, error: result.error ?? null }
   const builder: Record<string, unknown> = {}
-  const chainable = ['select', 'eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in', 'order', 'limit', 'filter', 'match']
+  const chainable = ['select', 'eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in', 'is', 'order', 'limit', 'filter', 'match']
   const mutating = ['insert', 'update', 'upsert', 'delete']
   for (const m of [...chainable, ...mutating]) {
     builder[m] = () => builder

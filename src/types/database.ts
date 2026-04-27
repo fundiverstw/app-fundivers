@@ -237,6 +237,7 @@ export interface Database {
           destination_reference: string | null
           DiveTravel_reference: string | null
           prereq_cert_id: string | null
+          cancelled_at: string | null
         }
         Insert: {
           _id: string
@@ -256,6 +257,7 @@ export interface Database {
           gear_rental?: string | null
           nitrox_required?: string | null
           dive_days?: number | null
+          cancelled_at?: string | null
         }
         Update: Partial<Database['public']['Tables']['EO_dives']['Insert']>
         Relationships: []
@@ -282,6 +284,7 @@ export interface Database {
           schedule: string | null
           starting_at: number | null
           prereq_cert_id: string | null
+          cancelled_at: string | null
         }
         Insert: {
           _id: string
@@ -294,6 +297,7 @@ export interface Database {
           other_addons?: string | null
           dive_days?: number | null
           special_date?: string | null
+          cancelled_at?: string | null
         }
         Update: Partial<Database['public']['Tables']['EO_courses']['Insert']>
         Relationships: []
@@ -582,4 +586,6 @@ export interface AppEvent {
   nitrox_required: boolean
   /** Number of in-water days. Used to gate the gear section on courses. */
   dive_days: number | null
+  /** ISO timestamp of when the event was cancelled by an admin; null = active. */
+  cancelled_at: string | null
 }
