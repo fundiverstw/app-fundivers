@@ -24,6 +24,10 @@ import { AdminUsersPage } from './pages/admin/AdminUsersPage'
 import { AdminDutyPage } from './pages/admin/AdminDutyPage'
 import { AdminNewEventPage } from './pages/admin/AdminNewEventPage'
 import { AdminEditEventPage } from './pages/admin/AdminEditEventPage'
+import { AdminManagePage } from './pages/admin/AdminManagePage'
+import { AdminRoomsPage } from './pages/admin/AdminRoomsPage'
+import { AdminAddonsPage } from './pages/admin/AdminAddonsPage'
+import { AdminTravelPage } from './pages/admin/AdminTravelPage'
 
 // Public registration flow — /register (pick an event) and /register/:type/:id
 // (deep-link from Wix calendar) both render RegisterPage. Outside ProtectedRoute
@@ -71,7 +75,11 @@ export default function App() {
           <Route element={<AdminRoute />}>
             <Route element={<AdminShell />}>
               <Route path="/admin" element={<DashboardPage />} />
-              <Route path="/admin/new" element={<AdminNewEventPage />} />
+              <Route path="/admin/new" element={<AdminManagePage />} />
+              <Route path="/admin/new/event" element={<AdminNewEventPage />} />
+              <Route path="/admin/rooms" element={<AdminRoomsPage />} />
+              <Route path="/admin/addons" element={<AdminAddonsPage />} />
+              <Route path="/admin/travel" element={<AdminTravelPage />} />
               <Route path="/admin/events" element={<AdminEventsPage />} />
               <Route path="/admin/events/:type/:id" element={<AdminEventDetailPage />} />
               <Route path="/admin/events/:type/:id/edit" element={<AdminEditEventPage />} />
