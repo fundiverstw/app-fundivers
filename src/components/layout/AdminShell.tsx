@@ -14,7 +14,7 @@ const adminNav: Array<{ to: string; label: string; icon: React.ReactNode }> = [
   { to: '/admin/events', label: 'Calendar', icon: <CalendarIcon /> },
   { to: '/admin/users',  label: 'Divers',   icon: <PeopleIcon /> },
   { to: '/admin/duty',   label: 'Duty',     icon: <CrosshairIcon /> },
-  { to: '/admin/new',    label: 'New',      icon: <PlusCircleIcon /> },
+  { to: '/admin/new',    label: 'Manage',   icon: <PlusCircleIcon /> },
 ]
 
 export function AdminShell() {
