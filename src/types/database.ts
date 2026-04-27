@@ -481,6 +481,24 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['Other_Addons']['Insert']>
         Relationships: []
       }
+      DiveTravel: {
+        Row: {
+          _id: string
+          title: string | null
+          included: string | null
+          not_included: string | null
+          transportation: string | null
+        }
+        Insert: {
+          _id: string
+          title?: string | null
+          included?: string | null
+          not_included?: string | null
+          transportation?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['DiveTravel']['Insert']>
+        Relationships: []
+      }
       eo_dive_addons: {
         Row: { eo_dive_id: string; addon_id: string }
         Insert: { eo_dive_id: string; addon_id: string }
@@ -548,6 +566,7 @@ export type EOCourse = Database['public']['Tables']['EO_courses']['Row']
 export type EOPrice = Database['public']['Tables']['EO_prices']['Row']
 export type EORoom = Database['public']['Tables']['EO_rooms']['Row']
 export type EOAddon = Database['public']['Tables']['Other_Addons']['Row']
+export type DiveTravelEntry = Database['public']['Tables']['DiveTravel']['Row']
 export type DiveSite = Database['public']['Tables']['dive_sites']['Row']
 export type CertLevel = Database['public']['Tables']['cert_levels']['Row']
 export type AdminNote = Database['public']['Tables']['admin_notes']['Row']
