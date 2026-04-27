@@ -60,7 +60,7 @@ describe('ProfilePage', () => {
     await user.clear(input('full_name'))
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
-    expect(await screen.findByText(/required/i)).toBeInTheDocument()
+    expect((await screen.findAllByText(/required/i)).length).toBeGreaterThan(0)
     expect(upsert).not.toHaveBeenCalled()
   })
 
@@ -78,7 +78,16 @@ describe('ProfilePage', () => {
   it('upserts with user.id, form values and updated_at on submit', async () => {
     useAuthMock.mockReturnValue({
       user: { id: 'u1' },
-      profile: { id: 'u1', full_name: 'Ada' },
+      profile: {
+        id: 'u1',
+        full_name: 'Ada',
+        display_name: 'Ada',
+        date_of_birth: '1815-12-10',
+        contact_method: 'email',
+        contact_id: 'ada@example.com',
+        cert_level: 'Open Water',
+        logged_dives: 0,
+      },
     })
     from.mockImplementation(() => ({
       ...mockQueryBuilder(),
@@ -107,7 +116,17 @@ describe('ProfilePage', () => {
   it('toggles gear owned and includes it in the upsert payload', async () => {
     useAuthMock.mockReturnValue({
       user: { id: 'u1' },
-      profile: { id: 'u1', full_name: 'Ada', gear_owned: [] },
+      profile: {
+        id: 'u1',
+        full_name: 'Ada',
+        display_name: 'Ada',
+        date_of_birth: '1815-12-10',
+        contact_method: 'email',
+        contact_id: 'ada@example.com',
+        cert_level: 'Open Water',
+        logged_dives: 0,
+        gear_owned: [],
+      },
     })
     from.mockImplementation(() => ({
       ...mockQueryBuilder(),
@@ -130,7 +149,18 @@ describe('ProfilePage', () => {
   it('prefills existing gear_owned and canonicalizes shoe_size on save', async () => {
     useAuthMock.mockReturnValue({
       user: { id: 'u1' },
-      profile: { id: 'u1', full_name: 'Ada', gear_owned: ['BCD', 'Fins'], shoe_size: 'EU 41 M' },
+      profile: {
+        id: 'u1',
+        full_name: 'Ada',
+        display_name: 'Ada',
+        date_of_birth: '1815-12-10',
+        contact_method: 'email',
+        contact_id: 'ada@example.com',
+        cert_level: 'Open Water',
+        logged_dives: 0,
+        gear_owned: ['BCD', 'Fins'],
+        shoe_size: 'EU 41 M',
+      },
     })
     from.mockImplementation(() => ({
       ...mockQueryBuilder(),
