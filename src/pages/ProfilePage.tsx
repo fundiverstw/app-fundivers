@@ -25,23 +25,25 @@ import {
 // keeps react-hook-form happy.
 const schema = z.object({
   full_name: z.string().min(1, 'Required'),
-  display_name: z.string().optional(),
+  display_name: z.string().min(1, 'Required'),
   phone: z.string().optional(),
-  date_of_birth: z.string().optional(),
+  date_of_birth: z.string().min(1, 'Required'),
   nationality: z.string().optional(),
   id_number: z.string().optional(),
   emergency_contact_name: z.string().optional(),
   emergency_contact_phone: z.string().optional(),
   cert_agency: z.string().optional(),
-  cert_level: z.string().optional(),
+  cert_level: z.string().min(1, 'Required'),
   medical_notes: z.string().optional(),
   height_cm: z.union([z.string(), z.number()]).optional(),
   weight_kg: z.union([z.string(), z.number()]).optional(),
   gender: z.string().optional(),
-  contact_method: z.string().optional(),
-  contact_id: z.string().optional(),
+  contact_method: z.string().min(1, 'Required'),
+  contact_id: z.string().min(1, 'Required'),
   nitrox_certified: z.boolean().optional(),
-  logged_dives: z.union([z.string(), z.number()]).optional(),
+  logged_dives: z
+    .union([z.string(), z.number()])
+    .refine(v => typeof v === 'number' || v.length > 0, { message: 'Required' }),
   last_dive_date: z.string().optional(),
 })
 type FormData = z.infer<typeof schema>
@@ -177,9 +179,15 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
             <input {...register('full_name')} className={inputClass} />
             {errors.full_name && <p className="text-red-600 text-xs mt-1">{errors.full_name.message}</p>}
           </Field>
-          <Field label="Display name"><input {...register('display_name')} className={inputClass} /></Field>
+          <Field label="Display name">
+            <input {...register('display_name')} className={inputClass} />
+            {errors.display_name && <p className="text-red-600 text-xs mt-1">{errors.display_name.message}</p>}
+          </Field>
           <Field label="Phone"><input {...register('phone')} type="tel" className={inputClass} /></Field>
-          <Field label="Date of birth"><input {...register('date_of_birth')} type="date" className={inputClass} /></Field>
+          <Field label="Date of birth">
+            <input {...register('date_of_birth')} type="date" className={inputClass} />
+            {errors.date_of_birth && <p className="text-red-600 text-xs mt-1">{errors.date_of_birth.message}</p>}
+          </Field>
           <Field label="Nationality"><input {...register('nationality')} className={inputClass} /></Field>
           <Field label="ID / Passport number"><input {...register('id_number')} className={inputClass} /></Field>
           <Field label="Gender">
@@ -196,16 +204,25 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
         <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Preferred contact</h2>
           <Field label="Method">
-            <select {...register('contact_method')} className={inputClass}>
+            <select
+              {...register('contact_method', { onChange: () => setDirtyExtras(true) })}
+              className={inputClass}
+            >
               <option value="">—</option>
               <option value="whatsapp">WhatsApp</option>
               <option value="line">Line</option>
               <option value="phone">Phone</option>
               <option value="email">Email</option>
             </select>
+            {errors.contact_method && <p className="text-red-600 text-xs mt-1">{errors.contact_method.message}</p>}
           </Field>
           <Field label="Handle / number">
-            <input {...register('contact_id')} className={inputClass} placeholder="e.g. +886-900… or a Line ID" />
+            <input
+              {...register('contact_id', { onChange: () => setDirtyExtras(true) })}
+              className={inputClass}
+              placeholder="e.g. +886-900… or a Line ID"
+            />
+            {errors.contact_id && <p className="text-red-600 text-xs mt-1">{errors.contact_id.message}</p>}
           </Field>
         </section>
 
@@ -275,8 +292,14 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
         <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Certification</h2>
           <Field label="Agency (e.g. PADI, SSI)"><input {...register('cert_agency')} className={inputClass} /></Field>
-          <Field label="Level (e.g. Open Water)"><input {...register('cert_level')} className={inputClass} /></Field>
-          <Field label="Logged dives"><input {...register('logged_dives')} type="number" min="0" className={inputClass} /></Field>
+          <Field label="Level (e.g. Open Water)">
+            <input {...register('cert_level')} className={inputClass} />
+            {errors.cert_level && <p className="text-red-600 text-xs mt-1">{errors.cert_level.message}</p>}
+          </Field>
+          <Field label="Logged dives">
+            <input {...register('logged_dives')} type="number" min="0" className={inputClass} />
+            {errors.logged_dives && <p className="text-red-600 text-xs mt-1">{errors.logged_dives.message}</p>}
+          </Field>
           <Field label="Last dive"><input {...register('last_dive_date')} type="date" className={inputClass} /></Field>
           <label className="flex items-center gap-2 text-sm text-blue-900">
             <input type="checkbox" {...register('nitrox_certified')} className="accent-blue-900" />
