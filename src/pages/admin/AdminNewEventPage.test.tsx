@@ -81,7 +81,7 @@ describe('AdminNewEventPage', () => {
       notes: 'Bring fins',
       featured: true,
       fully_booked: false,
-      nitrox_required: 'true',
+      nitrox_required: true,
       has_rooms: false,
       room_types: '',
       other_addons: '',

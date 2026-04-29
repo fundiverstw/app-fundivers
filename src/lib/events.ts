@@ -85,7 +85,7 @@ function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: stri
     has_addons: addonIds.length > 0,
     addon_ids: addonIds,
     gear_rental_info: gearText,
-    nitrox_required: (d.nitrox_required ?? '').toLowerCase() === 'true',
+    nitrox_required: d.nitrox_required ?? false,
     dive_days: d.dive_days ?? null,
     cancelled_at: d.cancelled_at ?? null,
   }
