@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import { ProtectedRoute } from './components/layout/ProtectedRoute'
 import { AdminRoute } from './components/layout/AdminRoute'
+import { StaffOrAdminRoute } from './components/layout/StaffOrAdminRoute'
 import { Logo } from './components/Logo'
 import { AppShell } from './components/layout/AppShell'
 import { AdminShell } from './components/layout/AdminShell'
@@ -16,6 +17,7 @@ import { BookingsPage } from './pages/BookingsPage'
 import { PaymentsPage } from './pages/PaymentsPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { DashboardPage } from './pages/DashboardPage'
+import { DutiesPage } from './pages/DutiesPage'
 import { EelSnakePage } from './pages/EelSnakePage'
 import { AdminEventsPage } from './pages/admin/AdminEventsPage'
 import { AdminEventDetailPage } from './pages/admin/AdminEventDetailPage'
@@ -70,20 +72,27 @@ export default function App() {
             <Route path="/bookings" element={<BookingsPage />} />
             <Route path="/payments" element={<PaymentsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/duties" element={<DutiesPage />} />
           </Route>
           <Route path="/minigame/eel-snake" element={<EelSnakePage />} />
-          <Route element={<AdminRoute />}>
+          {/* Read-only event surfaces — accessible to staff + admin */}
+          <Route element={<StaffOrAdminRoute />}>
             <Route element={<AdminShell />}>
               <Route path="/admin" element={<DashboardPage />} />
+              <Route path="/admin/events" element={<AdminEventsPage />} />
+              <Route path="/admin/events/:type/:id" element={<AdminEventDetailPage />} />
+              <Route path="/admin/events/:type/:id/gear-map" element={<AdminGearMapPage />} />
+            </Route>
+          </Route>
+          {/* Write/manage routes — admin only */}
+          <Route element={<AdminRoute />}>
+            <Route element={<AdminShell />}>
               <Route path="/admin/new" element={<AdminManagePage />} />
               <Route path="/admin/new/event" element={<AdminNewEventPage />} />
               <Route path="/admin/rooms" element={<AdminRoomsPage />} />
               <Route path="/admin/addons" element={<AdminAddonsPage />} />
               <Route path="/admin/travel" element={<AdminTravelPage />} />
-              <Route path="/admin/events" element={<AdminEventsPage />} />
-              <Route path="/admin/events/:type/:id" element={<AdminEventDetailPage />} />
               <Route path="/admin/events/:type/:id/edit" element={<AdminEditEventPage />} />
-              <Route path="/admin/events/:type/:id/gear-map" element={<AdminGearMapPage />} />
               <Route path="/admin/users" element={<AdminUsersPage />} />
               <Route path="/admin/duty" element={<AdminDutyPage />} />
             </Route>

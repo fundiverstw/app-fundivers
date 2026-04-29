@@ -48,7 +48,8 @@ function fkPayload(target: NoteTarget) {
 }
 
 export function AdminNotes({ target, tagFilter, title = 'Notes' }: Props) {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
+  const isAdmin = profile?.role === 'admin'
   const [notes, setNotes] = useState<NoteWithAuthors[]>([])
   const [showResolved, setShowResolved] = useState(false)
   const [tag, setTag] = useState<NoteTag>(tagFilter ?? 'note')
@@ -149,10 +150,10 @@ export function AdminNotes({ target, tagFilter, title = 'Notes' }: Props) {
           <p className="text-xs text-blue-950 font-medium">No open notes.</p>
         )}
         {open.map(m => (
-          <NoteCard key={m.id} note={m} onResolve={() => resolve(m.id)} />
+          <NoteCard key={m.id} note={m} onResolve={isAdmin ? () => resolve(m.id) : undefined} />
         ))}
         {showResolved && resolved.map(m => (
-          <NoteCard key={m.id} note={m} onUnresolve={() => unresolve(m.id)} />
+          <NoteCard key={m.id} note={m} onUnresolve={isAdmin ? () => unresolve(m.id) : undefined} />
         ))}
       </div>
 
