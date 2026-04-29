@@ -30,17 +30,18 @@ export function LoginPage() {
     const { data: signIn, error } = await supabase.auth.signInWithPassword(data)
     if (error) { setServerError(error.message); return }
 
-    // Fetch role so admins land on /admin, divers on /calendar.
-    let role: 'diver' | 'admin' = 'diver'
+    // Fetch role so admins land on /admin and staff on /admin/events;
+    // divers go to /calendar.
+    let role: 'diver' | 'admin' | 'staff' = 'diver'
     if (signIn?.user) {
       const { data: profile } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', signIn.user.id)
         .single()
-      if (profile?.role === 'admin') role = 'admin'
+      if (profile?.role === 'admin' || profile?.role === 'staff') role = profile.role
     }
-    navigate(role === 'admin' ? '/admin' : '/calendar')
+    navigate(role === 'admin' ? '/admin' : role === 'staff' ? '/admin/events' : '/calendar')
   }
 
   function fill(account: typeof DEV_ACCOUNTS[number]) {

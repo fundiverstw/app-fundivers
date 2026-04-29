@@ -164,8 +164,8 @@ describe('bookings constraints', () => {
 })
 
 describe('profiles constraints', () => {
-  it('role CHECK rejects anything outside (diver, admin)', async () => {
-    for (const bad of ['customer', 'staff', 'hacker', '']) {
+  it('role CHECK rejects anything outside (diver, admin, staff)', async () => {
+    for (const bad of ['customer', 'hacker', '']) {
       const { error } = await admin
         .from('profiles')
         // @ts-expect-error — intentionally bad role
@@ -175,8 +175,8 @@ describe('profiles constraints', () => {
     }
   })
 
-  it('accepts role=diver and role=admin', async () => {
-    for (const good of ['diver', 'admin'] as const) {
+  it('accepts role=diver, role=admin, and role=staff', async () => {
+    for (const good of ['diver', 'admin', 'staff'] as const) {
       const { error } = await admin
         .from('profiles')
         .update({ role: good })

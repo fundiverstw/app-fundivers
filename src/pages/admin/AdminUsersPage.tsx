@@ -132,7 +132,9 @@ function UserCard({
         </div>
         <div className="flex items-center gap-2 shrink-0 ml-3">
           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-            user.role === 'admin' ? 'bg-red-500 text-white' : 'bg-blue-900 text-white'
+            user.role === 'admin' ? 'bg-red-500 text-white'
+            : user.role === 'staff' ? 'bg-amber-500 text-white'
+            : 'bg-blue-900 text-white'
           }`}>
             {user.role}
           </span>

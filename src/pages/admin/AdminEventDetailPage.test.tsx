@@ -46,7 +46,7 @@ beforeEach(() => {
   from.mockReset()
   useAuthMock.mockReset()
   fetchEventsForBookings.mockReset()
-  useAuthMock.mockReturnValue({ user: { id: 'admin-1' } })
+  useAuthMock.mockReturnValue({ user: { id: 'admin-1' }, profile: { id: 'admin-1', role: 'admin' } })
 })
 
 describe('AdminEventDetailPage', () => {
@@ -175,5 +175,51 @@ describe('AdminEventDetailPage', () => {
     await waitFor(() => expect(updateSpy).toHaveBeenCalled())
     const payload = (updateSpy.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
     expect(payload.cancelled_at).toBeNull()
+  })
+
+  it('hides write controls when the viewer is staff (read-only)', async () => {
+    useAuthMock.mockReturnValue({
+      user: { id: 'staff-1' },
+      profile: { id: 'staff-1', role: 'staff' },
+    })
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', {
+        id: 'dive_x', type: 'dive', title: 'Kenting',
+        start_time: new Date().toISOString(), end_time: null, currency: 'TWD',
+        cancelled_at: null,
+      }],
+    ]))
+
+    const bookings = [{
+      id: 'b1', user_id: 'u1', status: 'pending', created_at: '2026-04-20',
+      eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null,
+      details: {},
+    }]
+    const profiles = [{
+      id: 'u1', full_name: 'Ada Lovelace', display_name: 'Ada',
+      cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false,
+      logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null,
+      phone: null, contact_method: null, contact_id: null,
+    }]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: bookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    renderAt('/admin/events/dive/dive_x')
+
+    // Header still loads, gear-map link still there.
+    await screen.findByRole('heading', { name: /kenting/i })
+    expect(screen.getByRole('link', { name: /gear map/i })).toBeInTheDocument()
+
+    // Admin-only controls are gone.
+    expect(screen.queryByRole('link', { name: /^edit$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /cancel event/i })).not.toBeInTheDocument()
+
+    // Per-registrant: status is shown as a label, not a select; Edit registration is gone.
+    await screen.findByText('Ada Lovelace')
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /edit registration/i })).not.toBeInTheDocument()
   })
 })
