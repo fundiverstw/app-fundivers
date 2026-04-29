@@ -42,7 +42,7 @@ describe('AdminEditEventPage', () => {
       hasotheraddons: false,
       other_addons: '',
       gear_rental: null,
-      nitrox_required: 'false',
+      nitrox_required: false,
       dive_days: 1,
       featured_image: null,
       second_image: null,
