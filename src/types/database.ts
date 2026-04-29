@@ -224,7 +224,7 @@ export interface Database {
           hasotheraddons: boolean | null
           other_addons: string | null
           gear_rental: string | null
-          nitrox_required: string | null
+          nitrox_required: boolean | null
           dive_days: number | null
           // Read by /admin/new's preload-from-past picker.
           featured_image: string | null
@@ -255,7 +255,7 @@ export interface Database {
           hasotheraddons?: boolean | null
           other_addons?: string | null
           gear_rental?: string | null
-          nitrox_required?: string | null
+          nitrox_required?: boolean | null
           dive_days?: number | null
           cancelled_at?: string | null
         }

@@ -16,8 +16,16 @@
 --
 -- Fix: mirror the EO_dives admin-write pattern, and add a public
 -- select policy so addon resolution actually returns rows.
+--
+-- Also explicitly `enable row level security` on both tables so local
+-- and cloud match. In cloud the rls_auto_enable event trigger turned
+-- it on at CREATE TABLE; locally that trigger doesn't fire during
+-- migration replay, leaving RLS off and the policies unenforced.
 
 begin;
+
+alter table public.eo_dive_addons   enable row level security;
+alter table public.eo_course_addons enable row level security;
 
 drop policy if exists "eo_dive_addons: public read"   on public.eo_dive_addons;
 drop policy if exists "eo_dive_addons: admin insert"  on public.eo_dive_addons;

@@ -56,8 +56,6 @@ edit specific columns.
 - `EO_dives.room_types` is a **CSV text** of `EO_rooms._id` values.
 - `EO_dives.other_addons` / `EO_courses.other_addons` is a **JSON
   string array** of `Other_Addons._id` values.
-- `EO_dives.nitrox_required` is a text column storing `'true'` /
-  `'false'` — compare with `.toLowerCase() === 'true'`.
 - All dates are interpreted as **Asia/Taipei local** (no DST).
 
 Normalization into the uniform `AppEvent` shape lives in
