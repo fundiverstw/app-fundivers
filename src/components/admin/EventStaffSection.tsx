@@ -11,9 +11,10 @@ interface Props {
   eventStartDate: string          // ISO timestamp
   eventEndDate?: string | null    // ISO timestamp; null for single-day events
   nonAdminDiverCount: number      // 1-per-5 instructor hint (courses only)
+  readOnly?: boolean              // staff: see assignments, but no assign/remove
 }
 
-export function EventStaffSection({ eventType, eventId, eventStartDate, eventEndDate, nonAdminDiverCount }: Props) {
+export function EventStaffSection({ eventType, eventId, eventStartDate, eventEndDate, nonAdminDiverCount, readOnly }: Props) {
   const { user } = useAuth()
   const [duties, setDuties] = useState<Duty[]>([])
   const [admins, setAdmins] = useState<Profile[]>([])
@@ -43,7 +44,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
     ;(async () => {
       const [dutiesRes, adminsRes] = await Promise.all([
         supabase.from('duties').select('*').eq(fkColumn, eventId).order('role'),
-        supabase.from('profiles').select('*').eq('role', 'admin').order('display_name'),
+        supabase.from('profiles').select('*').in('role', ['admin', 'staff']).order('display_name'),
       ])
       if (cancelled) return
       setDuties(dutiesRes.data ?? [])
@@ -111,19 +112,22 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
                   <span className="font-medium text-blue-900">{p?.display_name || p?.full_name || '(unknown)'}</span>
                   <span className="text-blue-900 font-medium"> · <span className="capitalize">{d.role}</span> · {span}</span>
                 </span>
-                <button
-                  onClick={() => remove(d.id)}
-                  className="text-blue-950 font-medium hover:text-red-600 ml-2"
-                  aria-label={`Remove duty for ${p?.display_name || p?.full_name || 'admin'}`}
-                >
-                  ✕
-                </button>
+                {!readOnly && (
+                  <button
+                    onClick={() => remove(d.id)}
+                    className="text-blue-950 font-medium hover:text-red-600 ml-2"
+                    aria-label={`Remove duty for ${p?.display_name || p?.full_name || 'admin'}`}
+                  >
+                    ✕
+                  </button>
+                )}
               </li>
             )
           })}
         </ul>
       )}
 
+      {!readOnly && (
       <div className="border-t border-sky-200 pt-3 space-y-2">
         <div className="flex gap-2">
           <select
@@ -131,7 +135,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
             onChange={e => setAssigneeId(e.target.value)}
             className="flex-1 min-w-0 bg-white border border-sky-300 rounded px-2 py-1 text-xs text-blue-900"
           >
-            <option value="">Pick admin…</option>
+            <option value="">Pick admin/staff…</option>
             {admins.map(a => (
               <option key={a.id} value={a.id}>{a.display_name || a.full_name || a.id}</option>
             ))}
@@ -175,6 +179,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
         </div>
         {err && <p className="text-xs text-red-600">{err}</p>}
       </div>
+      )}
     </section>
   )
 }

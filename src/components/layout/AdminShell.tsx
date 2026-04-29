@@ -10,11 +10,12 @@ import {
   ON_DEEP_MUTED, ON_DEEP_SUBTLE,
 } from '../../styles/tokens'
 
-const adminNav: Array<{ to: string; label: string; icon: React.ReactNode }> = [
+type NavItem = { to: string; label: string; icon: React.ReactNode; adminOnly?: boolean }
+const adminNav: NavItem[] = [
   { to: '/admin/events', label: 'Calendar', icon: <CalendarIcon /> },
-  { to: '/admin/users',  label: 'Divers',   icon: <PeopleIcon /> },
-  { to: '/admin/duty',   label: 'Duty',     icon: <CrosshairIcon /> },
-  { to: '/admin/new',    label: 'Manage',   icon: <PlusCircleIcon /> },
+  { to: '/admin/users',  label: 'Divers',   icon: <PeopleIcon />,    adminOnly: true },
+  { to: '/admin/duty',   label: 'Duty',     icon: <CrosshairIcon />, adminOnly: true },
+  { to: '/admin/new',    label: 'Manage',   icon: <PlusCircleIcon />, adminOnly: true },
 ]
 
 export function AdminShell() {
@@ -65,7 +66,7 @@ export function AdminShell() {
       </main>
 
       <nav className={NAV_BOTTOM}>
-        {adminNav.map(({ to, label, icon }) => (
+        {adminNav.filter(i => !i.adminOnly || profile?.role === 'admin').map(({ to, label, icon }) => (
           <NavLink
             key={to}
             to={to}

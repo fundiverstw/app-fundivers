@@ -103,7 +103,9 @@ function drawEel(ctx: CanvasRenderingContext2D, pts: Point[], cell: number) {
 
 export function EelSnakePage() {
   const { profile } = useAuth()
-  const backTo = profile?.role === 'admin' ? '/admin' : '/dashboard'
+  const backTo = profile?.role === 'admin' ? '/admin'
+    : profile?.role === 'staff' ? '/admin/events'
+    : '/dashboard'
 
   const [phase, setPhase] = useState<Phase>('idle')
   const [score, setScore] = useState(0)

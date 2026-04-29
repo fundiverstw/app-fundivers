@@ -37,7 +37,7 @@ export interface TestUser {
  */
 export async function createTestUser(
   admin: DB = adminClient(),
-  overrides: { role?: 'diver' | 'admin' } = {}
+  overrides: { role?: 'diver' | 'admin' | 'staff' } = {}
 ): Promise<TestUser> {
   const rand = Math.random().toString(36).slice(2, 10)
   const email = `test_${rand}@example.test`

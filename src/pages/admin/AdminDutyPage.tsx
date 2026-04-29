@@ -38,7 +38,7 @@ export function AdminDutyPage() {
 
       const [dutiesRes, adminsRes, events] = await Promise.all([
         supabase.from('duties').select('*').order('start_date', { ascending: true }),
-        supabase.from('profiles').select('*').eq('role', 'admin'),
+        supabase.from('profiles').select('*').in('role', ['admin', 'staff']),
         fetchEventsInRange(isoDate(start), isoDate(end)),
       ])
       if (cancelled) return
@@ -83,7 +83,7 @@ export function AdminDutyPage() {
       <header className="space-y-1">
         <h1 className="text-xl font-bold text-white">Duty roster</h1>
         <p className="text-xs text-white/70">
-          {admins.size} admin{admins.size === 1 ? '' : 's'} · {upcoming.length} upcoming
+          {admins.size} assignable · {upcoming.length} upcoming
           {mine.length > 0 && <span className="text-red-300"> · {mine.length} for you</span>}
         </p>
       </header>

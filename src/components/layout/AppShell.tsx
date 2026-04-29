@@ -5,6 +5,7 @@ import { usePWAInstall } from '../../hooks/usePWAInstall'
 import { WelcomeModal } from '../welcome/WelcomeModal'
 import { Logo } from '../Logo'
 import { CalendarIcon } from '../icons/CalendarIcon'
+import { CrosshairIcon } from '../icons/CrosshairIcon'
 import { MapIcon } from '../icons/MapIcon'
 import {
   PAGE, NAV_BAR, NAV_BOTTOM, BTN_LIGHT,
@@ -51,12 +52,16 @@ function DollarIcon() {
   )
 }
 
-const navItems: Array<{ to: string; label: string; icon: React.ReactNode }> = [
+const baseNavItems: Array<{ to: string; label: string; icon: React.ReactNode }> = [
   { to: '/calendar', label: 'Calendar', icon: <CalendarIcon /> },
   { to: '/bookings', label: 'Bookings', icon: <DiveLogIcon /> },
   { to: '/payments', label: 'Payments', icon: <DollarIcon /> },
   { to: '/profile', label: 'Profile', icon: '🤿' },
 ]
+
+// "Duty" appears for staff/admin only — divers never have rows in
+// duties (the assignee trigger blocks them).
+const dutyNavItem = { to: '/duties', label: 'Duty', icon: <CrosshairIcon /> }
 
 export function AppShell() {
   const { user, profile, signOut } = useAuth()
@@ -121,8 +126,8 @@ export function AppShell() {
               Install app
             </button>
           )}
-          {profile?.role === 'admin' ? (
-            <Link to="/admin" className={`text-sm ${ON_DEEP_BODY} hover:text-white`}>
+          {profile?.role === 'admin' || profile?.role === 'staff' ? (
+            <Link to={profile.role === 'admin' ? '/admin' : '/admin/events'} className={`text-sm ${ON_DEEP_BODY} hover:text-white`}>
               {profile.display_name ?? profile.full_name}
             </Link>
           ) : (
@@ -141,7 +146,10 @@ export function AppShell() {
       {showWelcome && user && <WelcomeModal user={user} onDismiss={() => setWelcomedLocally(true)} />}
 
       <nav className={NAV_BOTTOM}>
-        {navItems.map(({ to, label, icon }) => (
+        {(profile?.role === 'admin' || profile?.role === 'staff'
+          ? [...baseNavItems, dutyNavItem]
+          : baseNavItems
+        ).map(({ to, label, icon }) => (
           <NavLink
             key={to}
             to={to}

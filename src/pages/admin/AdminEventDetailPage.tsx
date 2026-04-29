@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../hooks/useAuth'
 import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
 import { AdminNotes } from '../../components/admin/AdminNotes'
 import { EventStaffSection } from '../../components/admin/EventStaffSection'
@@ -20,6 +21,8 @@ type RoomNameMap = Map<string, string>
 
 export function AdminEventDetailPage() {
   const { type, id } = useParams<{ type: 'dive' | 'course'; id: string }>()
+  const { profile } = useAuth()
+  const isAdmin = profile?.role === 'admin'
   const [event, setEvent] = useState<AppEvent | null>(null)
   const [registrants, setRegistrants] = useState<Registrant[]>([])
   const [addonNames, setAddonNames] = useState<AddonNameMap>(new Map())
@@ -170,19 +173,23 @@ export function AdminEventDetailPage() {
       {type && id && (
         <>
           <div className="flex items-center justify-end gap-2">
-            <Link
-              to={`/admin/events/${type}/${id}/edit`}
-              className="text-xs bg-blue-900/60 hover:bg-blue-900 text-white px-3 py-1 rounded-lg"
-            >
-              Edit
-            </Link>
-            <button
-              type="button"
-              onClick={() => { setCancelError(null); setCancelModalOpen(true) }}
-              className="text-xs bg-red-900/60 hover:bg-red-900 text-white px-3 py-1 rounded-lg"
-            >
-              {event?.cancelled_at ? 'Restore event' : 'Cancel event'}
-            </button>
+            {isAdmin && (
+              <>
+                <Link
+                  to={`/admin/events/${type}/${id}/edit`}
+                  className="text-xs bg-blue-900/60 hover:bg-blue-900 text-white px-3 py-1 rounded-lg"
+                >
+                  Edit
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => { setCancelError(null); setCancelModalOpen(true) }}
+                  className="text-xs bg-red-900/60 hover:bg-red-900 text-white px-3 py-1 rounded-lg"
+                >
+                  {event?.cancelled_at ? 'Restore event' : 'Cancel event'}
+                </button>
+              </>
+            )}
             <Link
               to={`/admin/events/${type}/${id}/gear-map`}
               className="text-xs bg-sky-900/50 hover:bg-sky-900 text-sky-200 px-3 py-1 rounded-lg"
@@ -197,6 +204,7 @@ export function AdminEventDetailPage() {
               eventStartDate={event.start_time}
               eventEndDate={event.end_time}
               nonAdminDiverCount={registrants.length}
+              readOnly={!isAdmin}
             />
           )}
           <AdminNotes target={{ kind: type, id }} title="Memos" />
@@ -216,6 +224,7 @@ export function AdminEventDetailPage() {
               onStatusChange={updateStatus}
               onApproveRefund={approveRefund}
               onEdit={() => setEditing(r)}
+              readOnly={!isAdmin}
             />
           ))}
         </section>
@@ -326,13 +335,14 @@ function CancelEventModal({
 
 const BOOKING_STATUSES: Booking['status'][] = ['pending', 'confirmed', 'waitlisted', 'cancelled']
 
-function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRefund, onEdit }: {
+function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRefund, onEdit, readOnly }: {
   r: Registrant
   addonNames: AddonNameMap
   roomNames: RoomNameMap
   onStatusChange: (id: string, s: Booking['status']) => void
   onApproveRefund: (id: string) => void
   onEdit: () => void
+  readOnly?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
 
@@ -377,17 +387,23 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
         </div>
         <div className="text-right text-xs shrink-0 space-y-1">
           {/* Wrapped in a click-stopper so opening the select doesn't collapse/expand the card. */}
-          <span onClick={e => e.stopPropagation()}>
-            <select
-              value={r.booking.status}
-              onChange={e => onStatusChange(r.booking.id, e.target.value as Booking['status'])}
-              className={`bg-white border border-sky-300 rounded px-1.5 py-0.5 text-xs font-medium capitalize ${statusStyles[r.booking.status]}`}
-            >
-              {BOOKING_STATUSES.map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </span>
+          {readOnly ? (
+            <span className={`bg-white border border-sky-300 rounded px-1.5 py-0.5 text-xs font-medium capitalize inline-block ${statusStyles[r.booking.status]}`}>
+              {r.booking.status}
+            </span>
+          ) : (
+            <span onClick={e => e.stopPropagation()}>
+              <select
+                value={r.booking.status}
+                onChange={e => onStatusChange(r.booking.id, e.target.value as Booking['status'])}
+                className={`bg-white border border-sky-300 rounded px-1.5 py-0.5 text-xs font-medium capitalize ${statusStyles[r.booking.status]}`}
+              >
+                {BOOKING_STATUSES.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </span>
+          )}
           <p className={`${payStyles[paymentStatus]} capitalize`}>
             {paymentStatus === 'paid'    && `Paid ${totalPaid.toLocaleString()}`}
             {paymentStatus === 'partial' && `${totalPaid.toLocaleString()} paid · ${totalDue.toLocaleString()} due`}
@@ -425,12 +441,14 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
               <span className="text-red-600">
                 🔄 Refund requested {format(new Date(r.booking.refund_requested_at), 'MMM d, HH:mm')}
               </span>
-              <button
-                onClick={() => onApproveRefund(r.booking.id)}
-                className="bg-blue-900 hover:bg-blue-950 text-white text-xs font-semibold px-2 py-1 rounded"
-              >
-                Approve refund
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={() => onApproveRefund(r.booking.id)}
+                  className="bg-blue-900 hover:bg-blue-950 text-white text-xs font-semibold px-2 py-1 rounded"
+                >
+                  Approve refund
+                </button>
+              )}
             </div>
           )}
 
@@ -438,14 +456,16 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
             <p className="text-xs text-blue-950 font-medium bg-sky-50 rounded p-2">📝 {r.booking.notes}</p>
           )}
 
-          <div className="flex justify-end pt-1">
-            <button
-              onClick={onEdit}
-              className="text-xs bg-sky-100 hover:bg-sky-700 text-blue-900 font-semibold px-3 py-1 rounded"
-            >
-              Edit registration
-            </button>
-          </div>
+          {!readOnly && (
+            <div className="flex justify-end pt-1">
+              <button
+                onClick={onEdit}
+                className="text-xs bg-sky-100 hover:bg-sky-700 text-blue-900 font-semibold px-3 py-1 rounded"
+              >
+                Edit registration
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>
