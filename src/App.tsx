@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/layout/ProtectedRoute'
 import { AdminRoute } from './components/layout/AdminRoute'
 import { StaffOrAdminRoute } from './components/layout/StaffOrAdminRoute'
 import { Logo } from './components/Logo'
+import { ToastProvider } from './components/Toast'
 import { AppShell } from './components/layout/AppShell'
 import { AdminShell } from './components/layout/AdminShell'
 import { LoginPage } from './pages/LoginPage'
@@ -42,6 +43,7 @@ const RegisterPage = lazy(() =>
 export default function App() {
   return (
     <BrowserRouter>
+      <ToastProvider>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
@@ -100,6 +102,7 @@ export default function App() {
         </Route>
         <Route path="*" element={<Navigate to="/calendar" replace />} />
       </Routes>
+      </ToastProvider>
     </BrowserRouter>
   )
 }

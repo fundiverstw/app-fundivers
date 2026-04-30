@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { useToast } from '../hooks/useToast'
 import { pushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
 import { GEAR_ITEMS } from '../lib/gear'
 import { uploadCertCard, getCertCardSignedUrl, deleteCertCard } from '../lib/cert-card'
@@ -90,6 +91,7 @@ export function ProfilePage() {
 }
 
 function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile }) {
+  const toast = useToast()
   const { register, handleSubmit, reset, formState: { errors, isSubmitting, isDirty } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: profile as unknown as FormData,
@@ -148,7 +150,7 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
     // Update, not upsert: the row is created by handle_new_user at signup,
     // and there is no INSERT policy on profiles — upsert hits the INSERT
     // RLS check and 403s even when only updating an existing row.
-    await supabase.from('profiles').update({
+    const { error } = await supabase.from('profiles').update({
       full_name: data.full_name,
       display_name: strOrNull(data.display_name),
       phone: strOrNull(data.phone),
@@ -175,8 +177,13 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
       gear_owned: gearOwned,
       updated_at: new Date().toISOString(),
     }).eq('id', user.id)
+    if (error) {
+      toast.error(`Could not save profile: ${error.message}`)
+      return
+    }
     reset(data)
     setDirtyExtras(false)
+    toast.success('Profile saved')
   }
 
   return (

@@ -10,6 +10,7 @@ import {
   type FormState,
 } from '../../components/admin/event-form-state'
 import type { EOCourse, EODive } from '../../types/database'
+import { useToast } from '../../hooks/useToast'
 
 // Edit page — load the existing dive/course row, hand the prefilled
 // FormState to the shared EventForm, and on submit call .update().eq()
@@ -18,6 +19,7 @@ import type { EOCourse, EODive } from '../../types/database'
 export function AdminEditEventPage() {
   const { type, id } = useParams<{ type: 'dive' | 'course'; id: string }>()
   const navigate = useNavigate()
+  const toast = useToast()
   const [initial, setInitial] = useState<FormState | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -62,6 +64,7 @@ export function AdminEditEventPage() {
         .update(divePayloadFromForm(form) as never)
         .eq('_id', id)
       if (error) throw error
+      toast.success('Dive updated')
       navigate(`/admin/events/dive/${id}`)
     } else {
       const { error } = await supabase
@@ -69,6 +72,7 @@ export function AdminEditEventPage() {
         .update(coursePayloadFromForm(form) as never)
         .eq('_id', id)
       if (error) throw error
+      toast.success('Course updated')
       navigate(`/admin/events/course/${id}`)
     }
   }
