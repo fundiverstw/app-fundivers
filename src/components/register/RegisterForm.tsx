@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
+import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { formatEventSpan } from '../../lib/events'
+import { computeEffectiveDeadlines } from '../../lib/payment-deadlines'
+import { paymentInstructionsFor } from '../../lib/payment-instructions'
 import { GEAR_ITEMS } from '../../lib/gear'
 import type { AppEvent, Booking, BookingDetails, Database, EOAddon, EORoom, Profile } from '../../types/database'
 
@@ -141,7 +144,13 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   const [payment, setPayment] = useState<'bank_transfer' | 'credit_card' | 'cash'>(
     initialDetails?.payment_method ?? 'bank_transfer'
   )
+  // Default to full payment per product spec. Only meaningful when the event
+  // has a deposit_amount — otherwise the radio is hidden entirely.
+  const [payDepositOnly, setPayDepositOnly] = useState<boolean>(initialDetails?.pay_deposit_only ?? false)
   const [notes, setNotes] = useState(existingBooking?.notes ?? '')
+
+  const hasDeposit = (event.deposit_amount ?? 0) > 0
+  const deadlines = useMemo(() => computeEffectiveDeadlines(event), [event])
 
   // Profile fields — pre-filled from the diver's profile (empty strings for
   // missing values so the inputs are controlled). On submit we UPSERT any
@@ -258,6 +267,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
       add_ons: showAddons ? [...addonIds] : [],
       transportation: needsTransport,
       payment_method: payment,
+      pay_deposit_only: hasDeposit ? payDepositOnly : false,
       nitrox_course_addon: showNitroxAddon && addNitroxCourse,
       total,
       deposit: event.deposit_amount ?? undefined,
@@ -534,18 +544,15 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
                 <span className="flex-1">
                   <span className="block">
                     {method === 'bank_transfer' && 'Bank transfer'}
-                    {method === 'credit_card' && 'Credit card / PayPal (+5%)'}
-                    {method === 'cash' && 'Cash on the day'}
-                  </span>
-                  <span className="block text-xs text-blue-950 font-medium">
-                    {method === 'bank_transfer' && 'We\'ll send you the bank account details.'}
-                    {method === 'credit_card' && 'A 5% processing fee applies. We\'ll email you a PayPal invoice.'}
-                    {method === 'cash' && 'We\'ll contact you to arrange a convenient time.'}
+                    {method === 'credit_card' && 'Credit card via PayPal (+5%)'}
+                    {method === 'cash' && 'Cash (in person at the shop)'}
                   </span>
                 </span>
               </label>
             ))}
           </div>
+
+          <PaymentInstructionsBlock method={payment} />
 
           <div className="text-sm text-blue-950 font-medium bg-sky-50 rounded-lg p-3 space-y-1">
             <Row label="Base"                value={base} currency={event.currency} />
@@ -558,6 +565,49 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
             <div className="border-t border-sky-200 pt-1 mt-1">
               <Row label="Total" value={total} currency={event.currency} bold />
             </div>
+          </div>
+
+          {hasDeposit && (
+            <div className="space-y-2">
+              <p className="text-sm text-blue-950 font-medium font-semibold">How much to pay now</p>
+              <label className="flex gap-2 text-sm text-blue-950 font-medium items-start">
+                <input type="radio" name="pay-amount" checked={!payDepositOnly} onChange={() => setPayDepositOnly(false)} className="accent-blue-900 mt-1" />
+                <span className="flex-1">
+                  <span className="block">Pay full amount now</span>
+                  <span className="block text-xs text-blue-950 font-medium">
+                    {event.currency} {total.toLocaleString()} — settles your booking in one go.
+                  </span>
+                </span>
+              </label>
+              <label className="flex gap-2 text-sm text-blue-950 font-medium items-start">
+                <input type="radio" name="pay-amount" checked={payDepositOnly} onChange={() => setPayDepositOnly(true)} className="accent-blue-900 mt-1" />
+                <span className="flex-1">
+                  <span className="block">Pay deposit only</span>
+                  <span className="block text-xs text-blue-950 font-medium">
+                    {event.currency} {(event.deposit_amount ?? 0).toLocaleString()} now, remainder due before the trip.
+                  </span>
+                </span>
+              </label>
+            </div>
+          )}
+
+          <div className="text-xs text-blue-950 font-medium bg-sky-50 border border-sky-200 rounded-lg p-3 space-y-1">
+            <p>
+              Pay by <strong>{formatDeadline(deadlines.deposit_deadline)}</strong> to hold your spot.
+              Pay the full amount by <strong>{formatDeadline(deadlines.full_payment_deadline)}</strong> to complete your registration.
+            </p>
+            {hasDeposit && payDepositOnly && (
+              <div className="border-t border-sky-200 pt-1 mt-1 space-y-0.5">
+                <p>
+                  Pay deposit by {formatDeadline(deadlines.deposit_deadline)}:{' '}
+                  <strong>{event.currency} {(event.deposit_amount ?? 0).toLocaleString()}</strong>
+                </p>
+                <p>
+                  Pay remaining amount by {formatDeadline(deadlines.full_payment_deadline)}:{' '}
+                  <strong>{event.currency} {Math.max(0, total - (event.deposit_amount ?? 0)).toLocaleString()}</strong>
+                </p>
+              </div>
+            )}
           </div>
 
           {!isEdit && (
@@ -609,6 +659,21 @@ function Row({ label, value, currency, bold = false }: { label: string; value: n
     <div className={`flex justify-between ${bold ? 'font-bold text-blue-900' : ''}`}>
       <span>{label}</span>
       <span>{currency} {value.toLocaleString()}</span>
+    </div>
+  )
+}
+
+// 'YYYY-MM-DD' → 'EEE, MMM d' (e.g. 'Sat, May 1'). Matches the calendar copy.
+function formatDeadline(yyyyMmDd: string): string {
+  return format(parseISO(yyyyMmDd + 'T00:00:00'), 'EEE, MMM d')
+}
+
+function PaymentInstructionsBlock({ method }: { method: 'bank_transfer' | 'credit_card' | 'cash' }) {
+  const instr = paymentInstructionsFor(method)
+  return (
+    <div className="text-xs text-blue-950 font-medium bg-white/70 border border-sky-200 rounded-lg p-3 space-y-1">
+      <p className="font-semibold text-blue-900">{instr.title}</p>
+      {instr.lines.map((line, i) => <p key={i}>{line}</p>)}
     </div>
   )
 }

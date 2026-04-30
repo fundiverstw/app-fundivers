@@ -23,23 +23,30 @@ vi.mock('../../lib/supabase', () => ({
 
 const sampleEvent: AppEvent = {
   id: 'dive_abc', type: 'dive', title: 'Kenting 2-dive',
-  start_time: new Date(Date.now() + 86_400_000).toISOString(),
-  end_time: null, featured: false, fully_booked: false,
-  price: 2800, currency: 'TWD',
+  start_time: '2027-05-15T00:00:00.000Z',
+  end_time: null, start_time_hhmm: null,
+  featured: false, fully_booked: false,
+  price: 2800, deposit_amount: 1000, currency: 'TWD',
   has_rooms: true, room_type_ids: ['room-a'],
   has_addons: true, addon_ids: ['addon-a'],
   gear_rental_info: 'Full set 1500/day',
   nitrox_required: true, dive_days: 1,
+  cancelled_at: null,
+  deposit_deadline: '2027-04-01',
+  full_payment_deadline: '2027-05-08',
 }
 
 const noExtrasEvent: AppEvent = {
   id: 'course_xyz', type: 'course', title: 'EFR Course',
-  start_time: new Date(Date.now() + 86_400_000).toISOString(),
-  end_time: null, featured: false, fully_booked: false,
-  price: 4900, currency: 'TWD',
+  start_time: '2027-05-15T00:00:00.000Z',
+  end_time: null, start_time_hhmm: null,
+  featured: false, fully_booked: false,
+  price: 4900, deposit_amount: null, currency: 'TWD',
   has_rooms: false, room_type_ids: [],
   has_addons: false, addon_ids: [],
   gear_rental_info: null, nitrox_required: false, dive_days: 0,
+  cancelled_at: null,
+  deposit_deadline: null, full_payment_deadline: null,
 }
 
 const sampleProfile: Profile = {
@@ -355,6 +362,97 @@ describe('RegisterForm', () => {
 
     expect(await screen.findByText(/account with that email already exists/i)).toBeInTheDocument()
     expect(screen.getByText(/sign in/i)).toBeInTheDocument()
+  })
+
+  it('step 4 renders a per-method "How to pay" block that updates with the selected method', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    // Default = bank_transfer → bank-details block.
+    expect(screen.getByText(/how to pay — bank transfer/i)).toBeInTheDocument()
+    expect(screen.getByText(/account number/i)).toBeInTheDocument()
+
+    // Switch to credit card → PayPal-email copy.
+    await user.click(screen.getByLabelText(/credit card via paypal/i))
+    expect(screen.getByText(/how to pay — credit card \(via paypal\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/paypal payment link/i)).toBeInTheDocument()
+
+    // Switch to cash → shop address.
+    await user.click(screen.getByLabelText(/^cash/i))
+    expect(screen.getByText(/how to pay — cash/i)).toBeInTheDocument()
+    expect(screen.getByText(/heping st/i)).toBeInTheDocument()
+    expect(screen.getByText(/909-083-683/)).toBeInTheDocument()
+  })
+
+  it('shows the admin-set deadline summary on step 4 and hides the deposit-only block when paying full', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    // The summary line is always present and uses the admin-set dates.
+    expect(screen.getByText(/Pay by/i)).toBeInTheDocument()
+    expect(screen.getByText(/Apr 1/)).toBeInTheDocument()      // deposit_deadline
+    expect(screen.getByText(/May 8/)).toBeInTheDocument()      // full_payment_deadline
+    expect(screen.getByText(/hold your spot/i)).toBeInTheDocument()
+
+    // Default is "Pay full amount now" → no per-amount breakdown.
+    expect(screen.getByLabelText(/pay full amount now/i)).toBeChecked()
+    expect(screen.queryByText(/pay deposit by/i)).not.toBeInTheDocument()
+  })
+
+  it('selecting "deposit only" persists the flag and renders the two-amount breakdown', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    await user.click(screen.getByLabelText(/pay deposit only/i))
+
+    // Two extra lines appear under the summary, with deposit and remaining amounts.
+    expect(screen.getByText(/pay deposit by/i)).toBeInTheDocument()
+    expect(screen.getByText(/pay remaining amount by/i)).toBeInTheDocument()
+    // total 2800, deposit 1000 → remaining 1800
+    expect(screen.getByText(/1,800/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+    const details = (invoke.mock.calls[0][1] as { body: { details: { pay_deposit_only: boolean } } }).body.details
+    expect(details.pay_deposit_only).toBe(true)
+  })
+
+  it('hides the deposit-only choice entirely when the event has no deposit_amount', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={noExtrasEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    expect(screen.queryByLabelText(/pay deposit only/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/pay full amount now/i)).not.toBeInTheDocument()
+    // Summary still renders (with the 7-day fallback since both deadlines are null).
+    expect(screen.getByText(/hold your spot/i)).toBeInTheDocument()
   })
 
   it('in edit mode, pre-populates state from the existing booking and UPDATEs on submit', async () => {

@@ -28,6 +28,9 @@ export interface BookingDetails {
   add_ons?: string[]
   transportation?: boolean
   payment_method?: 'bank_transfer' | 'credit_card' | 'cash'
+  /** True when the diver chose deposit-only at registration; full balance is
+   *  due by full_payment_deadline. False / undefined = paying full upfront. */
+  pay_deposit_only?: boolean
   nitrox_course_addon?: boolean
   total?: number
   deposit?: number
@@ -238,6 +241,8 @@ export interface Database {
           DiveTravel_reference: string | null
           prereq_cert_id: string | null
           cancelled_at: string | null
+          deposit_deadline: string | null
+          full_payment_deadline: string | null
         }
         Insert: {
           _id: string
@@ -258,6 +263,8 @@ export interface Database {
           nitrox_required?: boolean | null
           dive_days?: number | null
           cancelled_at?: string | null
+          deposit_deadline?: string | null
+          full_payment_deadline?: string | null
         }
         Update: Partial<Database['public']['Tables']['EO_dives']['Insert']>
         Relationships: []
@@ -285,6 +292,8 @@ export interface Database {
           starting_at: number | null
           prereq_cert_id: string | null
           cancelled_at: string | null
+          deposit_deadline: string | null
+          full_payment_deadline: string | null
         }
         Insert: {
           _id: string
@@ -298,6 +307,8 @@ export interface Database {
           dive_days?: number | null
           special_date?: string | null
           cancelled_at?: string | null
+          deposit_deadline?: string | null
+          full_payment_deadline?: string | null
         }
         Update: Partial<Database['public']['Tables']['EO_courses']['Insert']>
         Relationships: []
@@ -607,4 +618,11 @@ export interface AppEvent {
   dive_days: number | null
   /** ISO timestamp of when the event was cancelled by an admin; null = active. */
   cancelled_at: string | null
+  /**
+   * Admin-set payment deadlines (YYYY-MM-DD). When null the registration
+   * form falls back to "7 days before start_date" — see
+   * computeEffectiveDeadlines in src/lib/payment-deadlines.ts.
+   */
+  deposit_deadline: string | null
+  full_payment_deadline: string | null
 }
