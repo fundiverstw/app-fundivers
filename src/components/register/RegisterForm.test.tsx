@@ -26,7 +26,7 @@ const sampleEvent: AppEvent = {
   start_time: '2027-05-15T00:00:00.000Z',
   end_time: null, start_time_hhmm: null,
   featured: false, fully_booked: false,
-  price: 2800, deposit_amount: 1000, currency: 'TWD',
+  price: 2800, deposit_amount: 1000, transport_price: 1300, currency: 'TWD',
   has_rooms: true, room_type_ids: ['room-a'],
   has_addons: true, addon_ids: ['addon-a'],
   gear_rental_info: 'Full set 1500/day',
@@ -43,7 +43,9 @@ const noExtrasEvent: AppEvent = {
   start_time: '2027-05-15T00:00:00.000Z',
   end_time: null, start_time_hhmm: null,
   featured: false, fully_booked: false,
-  price: 4900, deposit_amount: null, currency: 'TWD',
+  // `noExtrasEvent` has no transport surcharge — the form should show the
+  // "included in base price" copy and skip the checkbox.
+  price: 4900, deposit_amount: null, transport_price: null, currency: 'TWD',
   has_rooms: false, room_type_ids: [],
   has_addons: false, addon_ids: [],
   gear_rental_info: null, nitrox_required: false, dive_days: 0,
@@ -215,8 +217,10 @@ describe('RegisterForm', () => {
     expect(screen.queryByText(/^room$/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/^add-ons$/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/add nitrox course/i)).not.toBeInTheDocument()
-    // Transportation is always available
-    expect(screen.getByLabelText(/need transportation/i)).toBeInTheDocument()
+    // Transport is included in base price for this event (transport_price = null)
+    // → no opt-in checkbox; instead the "included" copy is shown.
+    expect(screen.queryByLabelText(/need transportation/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/transportation included in base price/i)).toBeInTheDocument()
   })
 
   it('prefills a-la-carte rental list with items the diver does NOT already own', async () => {
@@ -365,6 +369,55 @@ describe('RegisterForm', () => {
 
     expect(await screen.findByText(/account with that email already exists/i)).toBeInTheDocument()
     expect(screen.getByText(/sign in/i)).toBeInTheDocument()
+  })
+
+  it('uses event.transport_price for the surcharge — when null/0, hides the checkbox and renders "included" copy', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    // Same as sampleEvent but with transport bundled into the base price.
+    const eventInclTransport: AppEvent = { ...sampleEvent, transport_price: null }
+    render(
+      <RegisterForm event={eventInclTransport} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    expect(screen.queryByLabelText(/need transportation/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/transportation included in base price/i)).toBeInTheDocument()
+
+    // Confirm submit and assert the cost row excludes a transport line.
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+    const details = (invoke.mock.calls[0][1] as { body: { details: { transportation: boolean; total: number } } }).body.details
+    expect(details.transportation).toBe(false)
+    // base 2800 only — no transport surcharge added.
+    expect(details.total).toBe(2800)
+  })
+
+  it('uses the per-tier transport price when surcharge applies', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    // event.transport_price = 1300 (from sampleEvent fixture)
+    render(
+      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    // Checkbox visible with the per-tier price (1300).
+    const checkbox = screen.getByLabelText(/need transportation/i)
+    expect(checkbox).toBeInTheDocument()
+    await user.click(checkbox)
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+    const details = (invoke.mock.calls[0][1] as { body: { details: { transportation: boolean; total: number } } }).body.details
+    expect(details.transportation).toBe(true)
+    // base 2800 + transport 1300 = 4100
+    expect(details.total).toBe(4100)
   })
 
   it('renders the cancellation policy + ack checkbox when the event has one, and gates submit on the checkbox', async () => {
