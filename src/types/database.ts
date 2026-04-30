@@ -34,6 +34,10 @@ export interface BookingDetails {
   nitrox_course_addon?: boolean
   total?: number
   deposit?: number
+  /** ISO timestamp of when the diver checked the "I have read the cancellation
+   *  policy" box on the registration form. Required when the event has a
+   *  cancel_policy set — gates the form's submit button. */
+  cancellation_policy_acked_at?: string
 }
 
 /**
@@ -294,6 +298,8 @@ export interface Database {
           cancelled_at: string | null
           deposit_deadline: string | null
           full_payment_deadline: string | null
+          cancel_date: string | null
+          cancel_policy: string | null
         }
         Insert: {
           _id: string
@@ -309,6 +315,8 @@ export interface Database {
           cancelled_at?: string | null
           deposit_deadline?: string | null
           full_payment_deadline?: string | null
+          cancel_date?: string | null
+          cancel_policy?: string | null
         }
         Update: Partial<Database['public']['Tables']['EO_courses']['Insert']>
         Relationships: []
@@ -510,6 +518,21 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['DiveTravel']['Insert']>
         Relationships: []
       }
+      cancellation_policies: {
+        // 'cancelation_policy' (single l) preserved from the Wix CSV import.
+        Row: {
+          _id: string
+          title: string | null
+          cancelation_policy: string | null
+        }
+        Insert: {
+          _id: string
+          title?: string | null
+          cancelation_policy?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['cancellation_policies']['Insert']>
+        Relationships: []
+      }
       eo_dive_addons: {
         Row: { eo_dive_id: string; addon_id: string }
         Insert: { eo_dive_id: string; addon_id: string }
@@ -578,6 +601,7 @@ export type EOPrice = Database['public']['Tables']['EO_prices']['Row']
 export type EORoom = Database['public']['Tables']['EO_rooms']['Row']
 export type EOAddon = Database['public']['Tables']['Other_Addons']['Row']
 export type DiveTravelEntry = Database['public']['Tables']['DiveTravel']['Row']
+export type CancellationPolicy = Database['public']['Tables']['cancellation_policies']['Row']
 export type DiveSite = Database['public']['Tables']['dive_sites']['Row']
 export type CertLevel = Database['public']['Tables']['cert_levels']['Row']
 export type AdminNote = Database['public']['Tables']['admin_notes']['Row']
@@ -625,4 +649,8 @@ export interface AppEvent {
    */
   deposit_deadline: string | null
   full_payment_deadline: string | null
+  /** FK → cancellation_policies._id; null = no policy attached. */
+  cancel_policy: string | null
+  /** YYYY-MM-DD — the cancel-by date the policy text references. */
+  cancel_date: string | null
 }

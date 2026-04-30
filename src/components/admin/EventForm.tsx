@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../../lib/supabase'
-import type { CertLevel, EOAddon, EOCourse, EODive, EOPrice, EORoom } from '../../types/database'
+import type { CancellationPolicy, CertLevel, EOAddon, EOCourse, EODive, EOPrice, EORoom } from '../../types/database'
 import {
   EMPTY_FORM,
   formStateFromCourse,
@@ -63,6 +63,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
   const [rooms, setRooms] = useState<EORoom[]>([])
   const [addons, setAddons] = useState<EOAddon[]>([])
   const [certLevels, setCertLevels] = useState<CertLevel[]>([])
+  const [cancelPolicies, setCancelPolicies] = useState<CancellationPolicy[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Past events for the preload picker, sorted most-recent-first.
@@ -96,6 +97,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
           ? supabase.from('EO_courses').select('*').lt('start_date', todayStr).order('start_date', { ascending: false }).limit(50)
           : Promise.resolve({ data: [] as EOCourse[] }),
         supabase.from('cert_levels').select('*').order('rank'),
+        supabase.from('cancellation_policies').select('*').order('title'),
       ])
       if (cancelled) return
       const dataOf = <T,>(i: number): T[] => {
@@ -108,6 +110,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
       setRooms(dataOf<EORoom>(1))
       setAddons(dataOf<EOAddon>(2))
       setCertLevels(dataOf<CertLevel>(5))
+      setCancelPolicies(dataOf<CancellationPolicy>(6))
 
       const pastDives = dataOf<EODive>(3).map<PastEvent>(d => ({
         kind: 'dive', id: d._id, startDate: d.start_date ?? '', title: d.dive_title ?? '(untitled dive)', row: d,
@@ -415,16 +418,6 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
             )}
           </Section>
 
-          <Section title="Cancellation">
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Cancel-by date">
-                <Input type="date" value={form.cancel_date} onChange={v => set('cancel_date', v)} />
-              </Field>
-            </div>
-            <Field label="Cancel policy">
-              <Textarea value={form.cancel_policy} onChange={v => set('cancel_policy', v)} />
-            </Field>
-          </Section>
         </>
       )}
 
@@ -452,6 +445,22 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
           </Field>
         </Section>
       )}
+
+      <Section title="Cancellation">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Cancel-by date">
+            <Input type="date" value={form.cancel_date} onChange={v => set('cancel_date', v)} />
+          </Field>
+          <Field label="Cancel policy">
+            <Select value={form.cancel_policy} onChange={v => set('cancel_policy', v)}>
+              <option value="">— None —</option>
+              {cancelPolicies.map(p => (
+                <option key={p._id} value={p._id}>{p.title ?? p._id}</option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+      </Section>
 
       <Section title="Payment deadlines">
         <p className="text-xs text-blue-950 font-medium">

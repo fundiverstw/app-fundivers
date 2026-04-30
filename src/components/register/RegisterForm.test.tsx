@@ -34,6 +34,8 @@ const sampleEvent: AppEvent = {
   cancelled_at: null,
   deposit_deadline: '2027-04-01',
   full_payment_deadline: '2027-05-08',
+  cancel_policy: null,
+  cancel_date: null,
 }
 
 const noExtrasEvent: AppEvent = {
@@ -47,6 +49,7 @@ const noExtrasEvent: AppEvent = {
   gear_rental_info: null, nitrox_required: false, dive_days: 0,
   cancelled_at: null,
   deposit_deadline: null, full_payment_deadline: null,
+  cancel_policy: null, cancel_date: null,
 }
 
 const sampleProfile: Profile = {
@@ -362,6 +365,56 @@ describe('RegisterForm', () => {
 
     expect(await screen.findByText(/account with that email already exists/i)).toBeInTheDocument()
     expect(screen.getByText(/sign in/i)).toBeInTheDocument()
+  })
+
+  it('renders the cancellation policy + ack checkbox when the event has one, and gates submit on the checkbox', async () => {
+    // Route cancellation_policies through the mock so the form's lookup resolves.
+    const policyRow = {
+      _id: 'pol-1',
+      title: 'Local Multi-day Trip',
+      cancelation_policy: 'Deposit non-refundable. 14 days notice for partial refund.',
+    }
+    from.mockImplementation((table: string) => {
+      if (table === 'EO_rooms')              return mockQueryBuilder({ data: sampleRooms })
+      if (table === 'Other_Addons')          return mockQueryBuilder({ data: sampleAddons })
+      if (table === 'cancellation_policies') return mockQueryBuilder({ data: policyRow })
+      return mockQueryBuilder()
+    })
+
+    const eventWithPolicy: AppEvent = {
+      ...sampleEvent,
+      cancel_policy: 'pol-1',
+      cancel_date: '2027-04-15',
+    }
+
+    const onBooked = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={eventWithPolicy} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={onBooked} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    // Policy heading + body + cancel-by date + checkbox all visible.
+    expect(await screen.findByText(/cancellation policy — local multi-day trip/i)).toBeInTheDocument()
+    expect(screen.getByText(/deposit non-refundable/i)).toBeInTheDocument()
+    expect(screen.getByText(/cancel-by date/i)).toBeInTheDocument()
+    const checkbox = screen.getByLabelText(/i have read and agree to the cancellation policy/i)
+    expect(checkbox).not.toBeChecked()
+
+    // Confirm-booking is gated until ack.
+    const confirm = screen.getByRole('button', { name: /confirm booking/i })
+    expect(confirm).toBeDisabled()
+    await user.click(checkbox)
+    expect(confirm).toBeEnabled()
+
+    await user.click(confirm)
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+    const details = (invoke.mock.calls[0][1] as { body: { details: { cancellation_policy_acked_at?: string } } }).body.details
+    expect(typeof details.cancellation_policy_acked_at).toBe('string')
+    expect(details.cancellation_policy_acked_at).toMatch(/^\d{4}-\d{2}-\d{2}T/)
   })
 
   it('step 4 renders a per-method "How to pay" block that updates with the selected method', async () => {
