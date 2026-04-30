@@ -47,7 +47,20 @@ export interface BookingDetails {
  */
 export interface Database {
   public: {
-    Functions: Record<string, never>
+    Functions: {
+      // Staff/admin-only narrow write path for diver gear sizes. Defined in
+      // 20260430020000_profile_gear_sizes.sql; gated server-side on
+      // is_staff_or_admin(). Empty / whitespace strings are normalized to NULL.
+      update_diver_gear_sizes: {
+        Args: {
+          diver_id:     string
+          fin_size:     string | null
+          bcd_size:     string | null
+          wetsuit_size: string | null
+        }
+        Returns: void
+      }
+    }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
     Views: Record<string, never>
