@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../../lib/supabase'
-import type { CancellationPolicy, CertLevel, EOAddon, EOCourse, EODive, EOPrice, EORoom } from '../../types/database'
+import type { CancellationPolicy, CertLevel, DiveTravelEntry, EOAddon, EOCourse, EODive, EOPrice, EORoom } from '../../types/database'
 import {
   EMPTY_FORM,
   formStateFromCourse,
@@ -47,6 +47,16 @@ const EMPTY_PRICE_FORM: PriceFormState = {
   title: '', price: '', starting_at: '', deposit_amount: '', transport: '',
 }
 
+// Sub-form state for inline EO_rooms / Other_Addons / DiveTravel inserts.
+// Only the most-used fields — admins can edit the rest from the Manage page.
+interface RoomFormState   { title: string; display_name: string; added_price: string }
+interface AddonFormState  { title: string; display_name: string; price: string }
+interface TravelFormState { title: string; included: string; not_included: string; transportation: string }
+
+const EMPTY_ROOM_FORM:   RoomFormState   = { title: '', display_name: '', added_price: '' }
+const EMPTY_ADDON_FORM:  AddonFormState  = { title: '', display_name: '', price: '' }
+const EMPTY_TRAVEL_FORM: TravelFormState = { title: '', included: '', not_included: '', transportation: '' }
+
 export interface EventFormProps {
   mode: 'create' | 'edit'
   /** Required in edit mode; ignored in create mode. */
@@ -66,16 +76,35 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
   const [addons, setAddons] = useState<EOAddon[]>([])
   const [certLevels, setCertLevels] = useState<CertLevel[]>([])
   const [cancelPolicies, setCancelPolicies] = useState<CancellationPolicy[]>([])
+  const [diveTravels, setDiveTravels] = useState<DiveTravelEntry[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Past events for the preload picker, sorted most-recent-first.
   const [pastEvents, setPastEvents] = useState<PastEvent[]>([])
   const [preloadId, setPreloadId] = useState<string>('')
-  // Price-tier sub-form lives collapsed by default.
+  // Inline-create sub-forms — all collapsed by default. Each can be opened
+  // independently so admins can spin up new lookup rows without leaving
+  // the event form. Optimistically prepend on success so the new row is
+  // immediately pickable.
   const [showNewPrice, setShowNewPrice] = useState(false)
   const [priceForm, setPriceForm] = useState<PriceFormState>(EMPTY_PRICE_FORM)
   const [priceSubmitting, setPriceSubmitting] = useState(false)
   const [priceError, setPriceError] = useState<string | null>(null)
+
+  const [showNewRoom, setShowNewRoom] = useState(false)
+  const [roomForm, setRoomForm] = useState<RoomFormState>(EMPTY_ROOM_FORM)
+  const [roomSubmitting, setRoomSubmitting] = useState(false)
+  const [roomError, setRoomError] = useState<string | null>(null)
+
+  const [showNewAddon, setShowNewAddon] = useState(false)
+  const [addonForm, setAddonForm] = useState<AddonFormState>(EMPTY_ADDON_FORM)
+  const [addonSubmitting, setAddonSubmitting] = useState(false)
+  const [addonError, setAddonError] = useState<string | null>(null)
+
+  const [showNewTravel, setShowNewTravel] = useState(false)
+  const [travelForm, setTravelForm] = useState<TravelFormState>(EMPTY_TRAVEL_FORM)
+  const [travelSubmitting, setTravelSubmitting] = useState(false)
+  const [travelError, setTravelError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -100,6 +129,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
           : Promise.resolve({ data: [] as EOCourse[] }),
         supabase.from('cert_levels').select('*').order('rank'),
         supabase.from('cancellation_policies').select('*').order('title'),
+        supabase.from('DiveTravel').select('*').order('title'),
       ])
       if (cancelled) return
       const dataOf = <T,>(i: number): T[] => {
@@ -113,6 +143,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
       setAddons(dataOf<EOAddon>(2))
       setCertLevels(dataOf<CertLevel>(5))
       setCancelPolicies(dataOf<CancellationPolicy>(6))
+      setDiveTravels(dataOf<DiveTravelEntry>(7))
 
       const pastDives = dataOf<EODive>(3).map<PastEvent>(d => ({
         kind: 'dive', id: d._id, startDate: d.start_date ?? '', title: d.dive_title ?? '(untitled dive)', row: d,
@@ -188,6 +219,89 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
       setPriceError(err instanceof Error ? err.message : String(err))
     } finally {
       setPriceSubmitting(false)
+    }
+  }
+
+  async function submitNewRoom() {
+    setRoomError(null)
+    if (!roomForm.title.trim()) { setRoomError('Title is required.'); return }
+    setRoomSubmitting(true)
+    try {
+      const id = crypto.randomUUID()
+      const payload = {
+        _id: id,
+        title: roomForm.title.trim(),
+        display_name: roomForm.display_name.trim() || null,
+        added_price: roomForm.added_price ? Number(roomForm.added_price) : null,
+      }
+      const { error: insErr } = await supabase.from('EO_rooms').insert(payload as never)
+      if (insErr) throw insErr
+      setRooms(rs => [...rs, payload as unknown as EORoom].sort(
+        (a, b) => (a.display_name ?? a.title ?? '').localeCompare(b.display_name ?? b.title ?? '')
+      ))
+      // Auto-tick the new room so admins don't have to scroll back.
+      setForm(f => ({ ...f, has_rooms: true, roomIds: [...f.roomIds, id] }))
+      setRoomForm(EMPTY_ROOM_FORM)
+      setShowNewRoom(false)
+    } catch (err) {
+      setRoomError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setRoomSubmitting(false)
+    }
+  }
+
+  async function submitNewAddon() {
+    setAddonError(null)
+    if (!addonForm.title.trim()) { setAddonError('Title is required.'); return }
+    setAddonSubmitting(true)
+    try {
+      const id = crypto.randomUUID()
+      const payload = {
+        _id: id,
+        title: addonForm.title.trim(),
+        display_name: addonForm.display_name.trim() || null,
+        price: addonForm.price ? Number(addonForm.price) : null,
+      }
+      const { error: insErr } = await supabase.from('Other_Addons').insert(payload as never)
+      if (insErr) throw insErr
+      setAddons(as => [...as, payload as unknown as EOAddon].sort(
+        (a, b) => (a.display_name ?? a.title ?? '').localeCompare(b.display_name ?? b.title ?? '')
+      ))
+      setForm(f => ({ ...f, addonIds: [...f.addonIds, id] }))
+      setAddonForm(EMPTY_ADDON_FORM)
+      setShowNewAddon(false)
+    } catch (err) {
+      setAddonError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setAddonSubmitting(false)
+    }
+  }
+
+  async function submitNewTravel() {
+    setTravelError(null)
+    if (!travelForm.title.trim()) { setTravelError('Title is required.'); return }
+    setTravelSubmitting(true)
+    try {
+      const id = crypto.randomUUID()
+      const payload = {
+        _id: id,
+        title: travelForm.title.trim(),
+        included: travelForm.included || null,
+        not_included: travelForm.not_included || null,
+        transportation: travelForm.transportation || null,
+      }
+      const { error: insErr } = await supabase.from('DiveTravel').insert(payload as never)
+      if (insErr) throw insErr
+      setDiveTravels(ts => [...ts, payload as unknown as DiveTravelEntry].sort(
+        (a, b) => (a.title ?? '').localeCompare(b.title ?? '')
+      ))
+      set('divetravel_reference', id)
+      setTravelForm(EMPTY_TRAVEL_FORM)
+      setShowNewTravel(false)
+    } catch (err) {
+      setTravelError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setTravelSubmitting(false)
     }
   }
 
@@ -368,8 +482,57 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
               <Input value={form.destination_reference} onChange={v => set('destination_reference', v)} />
             </Field>
             <Field label="DiveTravel reference">
-              <Input value={form.divetravel_reference} onChange={v => set('divetravel_reference', v)} />
+              <Select value={form.divetravel_reference} onChange={v => set('divetravel_reference', v)}>
+                <option value="">— None —</option>
+                {diveTravels.map(t => (
+                  <option key={t._id} value={t._id}>{t.title ?? t._id}</option>
+                ))}
+              </Select>
             </Field>
+            <button
+              type="button"
+              onClick={() => setShowNewTravel(s => !s)}
+              className="-mt-2 self-start text-xs font-medium text-amber-300 hover:text-amber-200"
+            >
+              {showNewTravel ? '− Cancel new entry' : '+ New DiveTravel entry'}
+            </button>
+            {showNewTravel && (
+              <div className="space-y-3 rounded-lg border border-amber-300/40 bg-white/5 p-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-200">New DiveTravel entry</h3>
+                <Field label="Title (required)">
+                  <Input value={travelForm.title} onChange={v => setTravelForm(f => ({ ...f, title: v }))} />
+                </Field>
+                <Field label="Included">
+                  <Textarea value={travelForm.included} onChange={v => setTravelForm(f => ({ ...f, included: v }))} />
+                </Field>
+                <Field label="Not included">
+                  <Textarea value={travelForm.not_included} onChange={v => setTravelForm(f => ({ ...f, not_included: v }))} />
+                </Field>
+                <Field label="Transportation">
+                  <Textarea value={travelForm.transportation} onChange={v => setTravelForm(f => ({ ...f, transportation: v }))} />
+                </Field>
+                {travelError && (
+                  <p className="text-xs text-red-200 bg-red-900/50 border border-red-500 rounded-md p-2">{travelError}</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={submitNewTravel}
+                    disabled={travelSubmitting}
+                    className="flex-1 py-2 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 transition-colors"
+                  >
+                    {travelSubmitting ? 'Saving…' : 'Save DiveTravel entry'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowNewTravel(false); setTravelForm(EMPTY_TRAVEL_FORM); setTravelError(null) }}
+                    className="px-3 py-2 rounded-lg text-sm font-medium text-white/80 hover:text-white border border-white/30"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
             <Field label="Second image URL">
               <Input value={form.second_image} onChange={v => set('second_image', v)} />
             </Field>
@@ -387,6 +550,47 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
                     label={r.display_name || r.title || r._id}
                   />
                 ))}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowNewRoom(s => !s)}
+              className="self-start text-xs font-medium text-amber-300 hover:text-amber-200"
+            >
+              {showNewRoom ? '− Cancel new room' : '+ New room option'}
+            </button>
+            {showNewRoom && (
+              <div className="space-y-3 rounded-lg border border-amber-300/40 bg-white/5 p-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-200">New room option</h3>
+                <Field label="Title (required)">
+                  <Input value={roomForm.title} onChange={v => setRoomForm(f => ({ ...f, title: v }))} />
+                </Field>
+                <Field label="Display name">
+                  <Input value={roomForm.display_name} onChange={v => setRoomForm(f => ({ ...f, display_name: v }))} />
+                </Field>
+                <Field label="Added price (NTD)">
+                  <Input type="number" value={roomForm.added_price} onChange={v => setRoomForm(f => ({ ...f, added_price: v }))} />
+                </Field>
+                {roomError && (
+                  <p className="text-xs text-red-200 bg-red-900/50 border border-red-500 rounded-md p-2">{roomError}</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={submitNewRoom}
+                    disabled={roomSubmitting}
+                    className="flex-1 py-2 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 transition-colors"
+                  >
+                    {roomSubmitting ? 'Saving…' : 'Save room option'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowNewRoom(false); setRoomForm(EMPTY_ROOM_FORM); setRoomError(null) }}
+                    className="px-3 py-2 rounded-lg text-sm font-medium text-white/80 hover:text-white border border-white/30"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             )}
           </Section>
@@ -463,6 +667,47 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
                 label={a.display_name || a.title || a._id}
               />
             ))}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setShowNewAddon(s => !s)}
+          className="self-start text-xs font-medium text-amber-300 hover:text-amber-200"
+        >
+          {showNewAddon ? '− Cancel new add-on' : '+ New add-on'}
+        </button>
+        {showNewAddon && (
+          <div className="space-y-3 rounded-lg border border-amber-300/40 bg-white/5 p-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-200">New add-on</h3>
+            <Field label="Title (required)">
+              <Input value={addonForm.title} onChange={v => setAddonForm(f => ({ ...f, title: v }))} />
+            </Field>
+            <Field label="Display name">
+              <Input value={addonForm.display_name} onChange={v => setAddonForm(f => ({ ...f, display_name: v }))} />
+            </Field>
+            <Field label="Price (NTD)">
+              <Input type="number" value={addonForm.price} onChange={v => setAddonForm(f => ({ ...f, price: v }))} />
+            </Field>
+            {addonError && (
+              <p className="text-xs text-red-200 bg-red-900/50 border border-red-500 rounded-md p-2">{addonError}</p>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={submitNewAddon}
+                disabled={addonSubmitting}
+                className="flex-1 py-2 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 transition-colors"
+              >
+                {addonSubmitting ? 'Saving…' : 'Save add-on'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowNewAddon(false); setAddonForm(EMPTY_ADDON_FORM); setAddonError(null) }}
+                className="px-3 py-2 rounded-lg text-sm font-medium text-white/80 hover:text-white border border-white/30"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         )}
       </Section>
