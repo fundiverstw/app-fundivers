@@ -49,7 +49,9 @@ const GEAR_ALACARTE_PRICES: Record<string, number> = {
 }
 const GEAR_FULLSET_DAILY = 1500
 const NITROX_COURSE_FEE = 6000
-const TRANSPORT_FEE = 1300
+// Per-event transport surcharge now lives on the linked EO_prices row
+// (see event.transport_price). NULL or 0 = transportation bundled into
+// the base price.
 
 // supabase-js wraps every non-2xx as `FunctionsHttpError` whose .message
 // is just "Edge Function returned a non-2xx status code"; the actual
@@ -223,7 +225,13 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   }, [addons, addonIds])
   const paymentSurcharge = payment === 'credit_card' ? 0.05 : 0
   const base = event.price ?? 0
-  const subTotal = base + gearCost + roomCost + addonsCost + (needsTransport ? TRANSPORT_FEE : 0) + ((showNitroxAddon && addNitroxCourse) ? NITROX_COURSE_FEE : 0)
+  // Transport pricing comes from the linked EO_prices row. NULL or 0 means
+  // it's bundled into the base price — the form hides the opt-in checkbox
+  // and the cost calc skips the surcharge entirely.
+  const transportSurcharge = event.transport_price ?? 0
+  const transportIncluded = transportSurcharge <= 0
+  const transportCost = !transportIncluded && needsTransport ? transportSurcharge : 0
+  const subTotal = base + gearCost + roomCost + addonsCost + transportCost + ((showNitroxAddon && addNitroxCourse) ? NITROX_COURSE_FEE : 0)
   const total = Math.round(subTotal * (1 + paymentSurcharge))
 
   function toggleItem(item: string) {
@@ -531,10 +539,16 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
             </div>
           )}
 
-          <label className="flex items-center gap-2 text-sm text-blue-950 font-medium">
-            <input type="checkbox" checked={needsTransport} onChange={e => setNeedsTransport(e.target.checked)} className="accent-blue-900" />
-            Need transportation (+{TRANSPORT_FEE.toLocaleString()})
-          </label>
+          {transportIncluded ? (
+            <p className="text-sm text-blue-950 font-medium">
+              🚐 Transportation included in base price.
+            </p>
+          ) : (
+            <label className="flex items-center gap-2 text-sm text-blue-950 font-medium">
+              <input type="checkbox" checked={needsTransport} onChange={e => setNeedsTransport(e.target.checked)} className="accent-blue-900" />
+              Need transportation (+{transportSurcharge.toLocaleString()})
+            </label>
+          )}
 
           {showNitroxAddon && (
             <label className="flex gap-2 text-sm text-blue-950 font-medium items-start">
@@ -576,7 +590,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
             {gearCost > 0         && <Row label="Gear"           value={gearCost}     currency={event.currency} />}
             {roomCost > 0         && <Row label="Room"           value={roomCost}     currency={event.currency} />}
             {addonsCost > 0       && <Row label="Add-ons"        value={addonsCost}   currency={event.currency} />}
-            {needsTransport       && <Row label="Transport"      value={TRANSPORT_FEE} currency={event.currency} />}
+            {transportCost > 0    && <Row label="Transport"      value={transportCost} currency={event.currency} />}
             {(showNitroxAddon && addNitroxCourse) && <Row label="Nitrox course" value={NITROX_COURSE_FEE} currency={event.currency} />}
             {paymentSurcharge > 0 && <Row label="Credit surcharge (5%)" value={total - subTotal} currency={event.currency} />}
             <div className="border-t border-sky-200 pt-1 mt-1">

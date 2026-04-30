@@ -79,6 +79,7 @@ function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: stri
     fully_booked: d.fully_booked ?? false,
     price: p?.starting_at ?? null,
     deposit_amount: p?.deposit_amount ?? null,
+    transport_price: p?.transport ?? null,
     currency: 'TWD',
     has_rooms: Boolean(d.has_rooms),
     room_type_ids: parseCsvIds(d.room_types),
@@ -133,6 +134,7 @@ function courseToEvents(c: EOCourse, priceIndex: Map<string, EOPrice>, addonIds:
     fully_booked: false,
     price: p?.starting_at ?? null,
     deposit_amount: p?.deposit_amount ?? null,
+    transport_price: p?.transport ?? null,
     currency: 'TWD',
     has_rooms: false,
     room_type_ids: [] as string[],
@@ -225,7 +227,7 @@ async function attachPrices(dives: EODive[], courses: EOCourse[]): Promise<Map<s
 
   const { data } = await supabase
     .from('EO_prices')
-    .select('_id, title, starting_at, deposit_amount')
+    .select('_id, title, starting_at, deposit_amount, transport')
     .in('_id', [...new Set(priceIds)])
 
   return new Map((data ?? []).map(p => [p._id, p as EOPrice]))

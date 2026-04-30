@@ -237,6 +237,24 @@ Deno.serve(async (req) => {
   const cancelDate = (event?.cancel_date as string | null) ?? null
   const cancellationPolicyAckedAt = (details.cancellation_policy_acked_at as string | null) ?? null
 
+  // Transport status — read the linked EO_prices row's transport surcharge.
+  // NULL or 0 means transportation is bundled into the base price; the PDF
+  // renders "Included with base price" instead of yes/no in that case.
+  let transportIncluded = false
+  const priceId = event?.price as string | null | undefined
+  if (priceId) {
+    const { data: pr } = await admin
+      .from("EO_prices")
+      .select("transport")
+      .eq("_id", priceId)
+      .maybeSingle()
+    const transport = pr?.transport as number | null | undefined
+    transportIncluded = transport == null || transport <= 0
+  } else {
+    // No price tier linked — treat as included (no surcharge to charge).
+    transportIncluded = true
+  }
+
   const payload: RegistrationPdfPayload = {
     eventTitle: (event?.dive_title ?? event?.course_title ?? event?.title ?? "Event") as string,
     startDate,
@@ -266,6 +284,7 @@ Deno.serve(async (req) => {
     weight:          profile?.weight_kg ?? null,
     shoeSize:        profile?.shoe_size ?? null,
     needsRide:       !!details.transportation,
+    transportIncluded,
     notes:           booking.notes ?? null,
     paymentMethod:   paymentWireLabel(details.payment_method as string | null | undefined),
     deposit:         (details.deposit as number | null) ?? null,

@@ -21,6 +21,7 @@ const CARDS: ManageCard[] = [
   { to: '/admin/rooms',     title: 'Room options',  blurb: 'Add, rename, reprice or delete room types offered with multi-day dives.' },
   { to: '/admin/addons',    title: 'Add-ons',       blurb: 'Add, rename, reprice or delete optional items (gear, courses, transport).' },
   { to: '/admin/travel',    title: 'DiveTravel',    blurb: 'Add or edit "what’s included" and transportation copy used by EO_dives.' },
+  { to: '/admin/prices',    title: 'Price tiers',   blurb: 'Total / deposit / transport for each event price tier.' },
 ]
 
 export function AdminManagePage() {
