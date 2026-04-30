@@ -57,6 +57,9 @@ export interface RegistrationPdfPayload {
   weight: number | string | null
   shoeSize: string | null
   needsRide: boolean
+  /** True when the linked EO_prices tier had no transport surcharge — the PDF
+   *  renders "Included with base price" instead of yes/no. */
+  transportIncluded: boolean
   notes: string | null
   paymentMethod: 'bank' | 'paypal' | 'cash' | string
   deposit: number | string | null
@@ -229,7 +232,9 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   if (p.rentGear && (p.height || p.weight || p.shoeSize)) {
     y = row(doc, y, "Sizing", "H: " + (p.height || "") + "  W: " + (p.weight || "") + "  Shoe: " + (p.shoeSize || ""), altState)
   }
-  y = row(doc, y, "Transportation", p.needsRide ? "Yes" : "No", altState)
+  y = row(doc, y, "Transportation",
+    p.transportIncluded ? "Included with base price" : (p.needsRide ? "Yes" : "No"),
+    altState)
   if (p.notes) y = row(doc, y, "Note", p.notes, altState)
   y += 4
 

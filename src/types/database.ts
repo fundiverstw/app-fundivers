@@ -477,12 +477,16 @@ export interface Database {
           title: string
           starting_at: number | null
           deposit_amount: number | null
+          /** Per-tier transportation surcharge in NTD. NULL or 0 means
+           *  transportation is bundled into the base price. */
+          transport: number | null
         }
         Insert: {
           _id: string
           title: string
           starting_at?: number | null
           deposit_amount?: number | null
+          transport?: number | null
         }
         Update: Partial<Database['public']['Tables']['EO_prices']['Insert']>
         Relationships: []
@@ -651,6 +655,10 @@ export interface AppEvent {
   fully_booked: boolean
   price: number | null
   deposit_amount: number | null
+  /** Per-tier transport surcharge from EO_prices.transport (NTD). NULL or
+   *  0 means transportation is bundled into the base price; the registration
+   *  form hides the opt-in checkbox in that case. */
+  transport_price: number | null
   currency: string
   /** Source table gating flags — parsed from EO_dives/EO_courses columns. */
   has_rooms: boolean
