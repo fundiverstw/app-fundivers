@@ -66,6 +66,13 @@ export interface RegistrationPdfPayload {
   /** YYYY-MM-DD; resolved upstream so the PDF always has concrete dates. */
   depositDeadline: string | null
   fullPaymentDeadline: string | null
+  /** Cancellation policy resolved from EO_*.cancel_policy → cancellation_policies. */
+  cancellationPolicyTitle: string | null
+  cancellationPolicyText:  string | null
+  /** YYYY-MM-DD — the cancel-by date the policy text references. */
+  cancelDate: string | null
+  /** ISO timestamp of when the diver checked the "I have read the policy" box. */
+  cancellationPolicyAckedAt: string | null
 }
 
 function formatGeneratedDate(): string {
@@ -293,6 +300,42 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
       doc.text(`Pay remaining amount by ${formatDeadlineLong(p.fullPaymentDeadline)}: ${remaining} NTD`, ML + 2, y)
       y += 4.5
       doc.setFont("helvetica", "normal")
+    }
+  }
+
+  // Cancellation policy — full text plus the cancel-by date and the diver's
+  // acknowledgement timestamp from the registration form.
+  if (p.cancellationPolicyText) {
+    y += 6
+    const heading = p.cancellationPolicyTitle
+      ? `Cancellation policy — ${p.cancellationPolicyTitle}`
+      : "Cancellation policy"
+    y = section(doc, y, heading)
+    doc.setFontSize(8.5)
+    doc.setFont("helvetica", "normal")
+    doc.setTextColor(...C.dark)
+    if (p.cancelDate) {
+      doc.setFont("helvetica", "bold")
+      doc.text(`Cancel-by date: ${formatDeadlineLong(p.cancelDate)}`, ML + 2, y)
+      doc.setFont("helvetica", "normal")
+      y += 5
+    }
+    const wrappedPol = doc.splitTextToSize(p.cancellationPolicyText, MR - ML - 2)
+    for (const line of wrappedPol) {
+      y = ensureY(doc, y, 6)
+      doc.text(line, ML + 2, y)
+      y += 4.5
+    }
+    if (p.cancellationPolicyAckedAt) {
+      y += 2
+      y = ensureY(doc, y, 6)
+      doc.setTextColor(...C.gray)
+      doc.text(
+        `Acknowledged by diver: ${new Date(p.cancellationPolicyAckedAt).toUTCString()}`,
+        ML + 2, y,
+      )
+      doc.setTextColor(...C.dark)
+      y += 4.5
     }
   }
 

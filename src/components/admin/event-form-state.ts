@@ -151,10 +151,11 @@ export function formStateFromCourse(c: EOCourse): FormState {
     addonIds: parseAddonIds(c.other_addons),
     deposit_deadline: c.deposit_deadline ?? '',
     full_payment_deadline: c.full_payment_deadline ?? '',
+    cancel_date: c.cancel_date ?? '',
+    cancel_policy: c.cancel_policy ?? '',
     notes: '', featured: false, fully_booked: false,
     has_rooms: false, roomIds: [],
     nitrox_required: false, gear_rental: '',
-    cancel_date: '', cancel_policy: '',
     destination_reference: '', second_image: '', divetravel_reference: '',
   }
 }
@@ -225,5 +226,7 @@ export function coursePayloadFromForm(form: FormState): Record<string, unknown> 
     other_addons: addonsJson,
     deposit_deadline: form.deposit_deadline || null,
     full_payment_deadline: form.full_payment_deadline || null,
+    cancel_date: form.cancel_date || null,
+    cancel_policy: form.cancel_policy || null,
   }
 }

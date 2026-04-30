@@ -5,7 +5,7 @@ import { formatEventSpan } from '../../lib/events'
 import { computeEffectiveDeadlines } from '../../lib/payment-deadlines'
 import { paymentInstructionsFor } from '../../lib/payment-instructions'
 import { GEAR_ITEMS } from '../../lib/gear'
-import type { AppEvent, Booking, BookingDetails, Database, EOAddon, EORoom, Profile } from '../../types/database'
+import type { AppEvent, Booking, BookingDetails, CancellationPolicy, Database, EOAddon, EORoom, Profile } from '../../types/database'
 
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
 
@@ -114,6 +114,10 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   const [step, setStep] = useState<Step>(1)
   const [rooms, setRooms] = useState<EORoom[]>([])
   const [addons, setAddons] = useState<EOAddon[]>([])
+  const [cancelPolicy, setCancelPolicy] = useState<CancellationPolicy | null>(null)
+  // Pre-checked when editing an existing booking that already carries an
+  // ack timestamp — admins shouldn't have to re-tick to save unrelated edits.
+  const [policyAcked, setPolicyAcked] = useState<boolean>(!!initialDetails?.cancellation_policy_acked_at)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
@@ -193,9 +197,17 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
           .in('_id', event.addon_ids)
         if (!cancelled) setAddons((data ?? []) as EOAddon[])
       }
+      if (event.cancel_policy) {
+        const { data } = await supabase
+          .from('cancellation_policies' as never)
+          .select('_id, title, cancelation_policy')
+          .eq('_id', event.cancel_policy)
+          .maybeSingle()
+        if (!cancelled) setCancelPolicy((data ?? null) as CancellationPolicy | null)
+      }
     })()
     return () => { cancelled = true }
-  }, [event.id, showRooms, showAddons, event.room_type_ids, event.addon_ids])
+  }, [event.id, showRooms, showAddons, event.room_type_ids, event.addon_ids, event.cancel_policy])
 
   const gearCost = useMemo(() => {
     if (!showGearRentChoice || !rentGear) return 0
@@ -271,6 +283,11 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
       nitrox_course_addon: showNitroxAddon && addNitroxCourse,
       total,
       deposit: event.deposit_amount ?? undefined,
+      // Stamp the ack only when there's a policy and the diver ticked the
+      // box — preserving any prior ack on the existing booking otherwise.
+      cancellation_policy_acked_at: cancelPolicy && policyAcked
+        ? (initialDetails?.cancellation_policy_acked_at ?? new Date().toISOString())
+        : initialDetails?.cancellation_policy_acked_at,
     }
 
     if (existingBooking) {
@@ -610,6 +627,29 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
             )}
           </div>
 
+          {cancelPolicy && cancelPolicy.cancelation_policy && (
+            <div className="text-xs text-blue-950 font-medium bg-white/70 border border-sky-300 rounded-lg p-3 space-y-2">
+              <p className="font-semibold text-blue-900">
+                Cancellation policy{cancelPolicy.title ? ` — ${cancelPolicy.title}` : ''}
+              </p>
+              {event.cancel_date && (
+                <p>Cancel-by date: <strong>{formatDeadline(event.cancel_date)}</strong></p>
+              )}
+              <p className="whitespace-pre-line max-h-40 overflow-y-auto pr-1">
+                {cancelPolicy.cancelation_policy}
+              </p>
+              <label className="flex items-start gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  checked={policyAcked}
+                  onChange={e => setPolicyAcked(e.target.checked)}
+                  className="accent-blue-900 mt-0.5"
+                />
+                <span>I have read and agree to the cancellation policy.</span>
+              </label>
+            </div>
+          )}
+
           {!isEdit && (
             <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded p-2">
               Please note: your reservation is not confirmed until the deposit
@@ -644,7 +684,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
             Next ›
           </button>
         ) : (
-          <button onClick={submit} disabled={saving}
+          <button onClick={submit} disabled={saving || (!!cancelPolicy && !policyAcked)}
             className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg">
             {saving ? '…' : isEdit ? 'Save changes' : 'Confirm booking'}
           </button>
