@@ -47,36 +47,36 @@ async function readSizes(diverId: string) {
 describe('update_diver_gear_sizes RPC', () => {
   it('admin can write gear sizes on any diver', async () => {
     const sb = await userClient(adminUser.email, adminUser.password)
-    const { error } = await sb.rpc('update_diver_gear_sizes' as never, {
+    const { error } = await sb.rpc('update_diver_gear_sizes', {
       diver_id:     diverA.id,
       fin_size:     'M',
       bcd_size:     'L',
       wetsuit_size: 'XL',
-    } as never)
+    })
     expect(error).toBeNull()
     expect(await readSizes(diverA.id)).toEqual({ fin_size: 'M', bcd_size: 'L', wetsuit_size: 'XL' })
   })
 
   it('staff can write gear sizes on any diver', async () => {
     const sb = await userClient(staffUser.email, staffUser.password)
-    const { error } = await sb.rpc('update_diver_gear_sizes' as never, {
+    const { error } = await sb.rpc('update_diver_gear_sizes', {
       diver_id:     diverB.id,
       fin_size:     'L',
       bcd_size:     'L',
       wetsuit_size: '7mm M',
-    } as never)
+    })
     expect(error).toBeNull()
     expect(await readSizes(diverB.id)).toEqual({ fin_size: 'L', bcd_size: 'L', wetsuit_size: '7mm M' })
   })
 
   it('diver cannot call the RPC, even on themselves', async () => {
     const sb = await userClient(diverA.email, diverA.password)
-    const { error } = await sb.rpc('update_diver_gear_sizes' as never, {
+    const { error } = await sb.rpc('update_diver_gear_sizes', {
       diver_id:     diverA.id,
       fin_size:     'XS',
       bcd_size:     'XS',
       wetsuit_size: 'XS',
-    } as never)
+    })
     expect(error).not.toBeNull()
     // Pre-existing sizes from the admin test still in place — RPC was rejected.
     expect(await readSizes(diverA.id)).toEqual({ fin_size: 'M', bcd_size: 'L', wetsuit_size: 'XL' })
@@ -84,12 +84,12 @@ describe('update_diver_gear_sizes RPC', () => {
 
   it('empty strings are stored as NULL (cleared)', async () => {
     const sb = await userClient(adminUser.email, adminUser.password)
-    const { error } = await sb.rpc('update_diver_gear_sizes' as never, {
+    const { error } = await sb.rpc('update_diver_gear_sizes', {
       diver_id:     diverA.id,
       fin_size:     '   ',  // whitespace also normalizes to null
       bcd_size:     '',
       wetsuit_size: '',
-    } as never)
+    })
     expect(error).toBeNull()
     expect(await readSizes(diverA.id)).toEqual({ fin_size: null, bcd_size: null, wetsuit_size: null })
   })
