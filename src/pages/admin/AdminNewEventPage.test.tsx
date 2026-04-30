@@ -140,6 +140,117 @@ describe('AdminNewEventPage', () => {
     })
   })
 
+  it('inserts a new room option from the sub-form, auto-ticks it, and enables has_rooms', async () => {
+    const roomInsert = vi.fn().mockReturnValue({
+      then: (cb: (r: { error: null }) => void) => Promise.resolve({ error: null }).then(cb),
+    })
+    from.mockImplementation((table: string) => {
+      if (table === 'EO_rooms') {
+        const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
+        b.insert = roomInsert
+        return b
+      }
+      if (table === 'EO_prices')    return mockQueryBuilder({ data: [] })
+      if (table === 'Other_Addons') return mockQueryBuilder({ data: [] })
+      return mockQueryBuilder({ data: [] })
+    })
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByLabelText(/dive title/i)
+    // has_rooms starts false; the sub-form should flip it on save.
+    expect((screen.getByLabelText(/^offers rooms$/i) as HTMLInputElement).checked).toBe(false)
+
+    await user.click(screen.getByRole('button', { name: /new room option/i }))
+    await user.type(screen.getByLabelText('Title (required)'), 'Premium Room')
+    await user.type(screen.getByLabelText(/display name/i), 'Premium Suite')
+    await user.type(screen.getByLabelText(/added price/i), '2000')
+    await user.click(screen.getByRole('button', { name: /save room option/i }))
+
+    await waitFor(() => expect(roomInsert).toHaveBeenCalled())
+    const payload = (roomInsert.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
+    expect(payload.title).toBe('Premium Room')
+    expect(payload.display_name).toBe('Premium Suite')
+    expect(payload.added_price).toBe(2000)
+
+    // has_rooms toggle flipped on, and the new room is checked in the list.
+    await waitFor(() => {
+      expect((screen.getByLabelText(/^offers rooms$/i) as HTMLInputElement).checked).toBe(true)
+      expect((screen.getByLabelText(/Premium Suite/) as HTMLInputElement).checked).toBe(true)
+    })
+  })
+
+  it('inserts a new add-on from the sub-form and auto-ticks it', async () => {
+    const addonInsert = vi.fn().mockReturnValue({
+      then: (cb: (r: { error: null }) => void) => Promise.resolve({ error: null }).then(cb),
+    })
+    from.mockImplementation((table: string) => {
+      if (table === 'Other_Addons') {
+        const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
+        b.insert = addonInsert
+        return b
+      }
+      if (table === 'EO_prices') return mockQueryBuilder({ data: [] })
+      if (table === 'EO_rooms')  return mockQueryBuilder({ data: [] })
+      return mockQueryBuilder({ data: [] })
+    })
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByLabelText(/dive title/i)
+
+    await user.click(screen.getByRole('button', { name: /new add-on/i }))
+    await user.type(screen.getByLabelText('Title (required)'), 'SMB')
+    await user.type(screen.getByLabelText(/display name/i), 'Surface Marker Buoy')
+    await user.type(screen.getByLabelText(/price \(NTD\)/i), '100')
+    await user.click(screen.getByRole('button', { name: /save add-on/i }))
+
+    await waitFor(() => expect(addonInsert).toHaveBeenCalled())
+    const payload = (addonInsert.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
+    expect(payload.title).toBe('SMB')
+    expect(payload.display_name).toBe('Surface Marker Buoy')
+    expect(payload.price).toBe(100)
+
+    await waitFor(() =>
+      expect((screen.getByLabelText(/Surface Marker Buoy/) as HTMLInputElement).checked).toBe(true)
+    )
+  })
+
+  it('inserts a new DiveTravel entry from the sub-form and selects it as the reference', async () => {
+    const travelInsert = vi.fn().mockReturnValue({
+      then: (cb: (r: { error: null }) => void) => Promise.resolve({ error: null }).then(cb),
+    })
+    from.mockImplementation((table: string) => {
+      if (table === 'DiveTravel') {
+        const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
+        b.insert = travelInsert
+        return b
+      }
+      if (table === 'EO_prices')    return mockQueryBuilder({ data: [] })
+      if (table === 'EO_rooms')     return mockQueryBuilder({ data: [] })
+      if (table === 'Other_Addons') return mockQueryBuilder({ data: [] })
+      return mockQueryBuilder({ data: [] })
+    })
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByLabelText(/dive title/i)
+
+    await user.click(screen.getByRole('button', { name: /new DiveTravel entry/i }))
+    await user.type(screen.getByLabelText('Title (required)'), 'Green Island')
+    await user.type(screen.getByLabelText(/^Included$/i), 'Tanks, weights, transport')
+    await user.click(screen.getByRole('button', { name: /save DiveTravel entry/i }))
+
+    await waitFor(() => expect(travelInsert).toHaveBeenCalled())
+    const payload = (travelInsert.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
+    expect(payload.title).toBe('Green Island')
+    expect(payload.included).toBe('Tanks, weights, transport')
+
+    // Newly created entry becomes the selected option in the DiveTravel dropdown.
+    await waitFor(() => {
+      const select = screen.getByLabelText(/DiveTravel reference/i) as HTMLSelectElement
+      expect(select.value).toBe(payload._id as string)
+      expect(select.options[select.selectedIndex].textContent).toMatch(/Green Island/)
+    })
+  })
+
   it('inserts a dive with minimum required fields and navigates to its detail page', async () => {
     const insert = vi.fn().mockReturnValue({ then: (cb: (r: { error: null }) => void) => Promise.resolve({ error: null }).then(cb) })
     from.mockImplementation((table: string) => {
