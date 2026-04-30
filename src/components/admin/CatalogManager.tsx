@@ -1,5 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useToast } from '../../hooks/useToast'
+
+function capitalize(s: string) {
+  return s.length === 0 ? s : s[0].toUpperCase() + s.slice(1)
+}
 
 // Generic list+create+edit+delete UI for the simple catalog tables backing
 // /admin/rooms, /admin/addons, /admin/travel. Each row's _id is an
@@ -72,6 +77,7 @@ function formToPayload<Row>(form: FormValues, fields: CatalogField<Row>[]): Reco
 export function CatalogManager<Row extends { _id: string }>({
   title, table, fields, orderBy, rowLabel, rowDetail, noun,
 }: CatalogManagerProps<Row>) {
+  const toast = useToast()
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -143,16 +149,20 @@ export function CatalogManager<Row extends { _id: string }>({
           .eq('_id', editing._id)
         if (error) throw error
         setRows(prev => prev.map(r => r._id === editing._id ? { ...r, ...payload } as Row : r))
+        toast.success(`${capitalize(noun)} updated`)
       } else {
         const id = crypto.randomUUID()
         const insertPayload = { _id: id, ...payload }
         const { error } = await supabase.from(table).insert(insertPayload as never)
         if (error) throw error
         setRows(prev => [...prev, insertPayload as unknown as Row])
+        toast.success(`${capitalize(noun)} created`)
       }
       closeForm()
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : String(err))
+      const msg = err instanceof Error ? err.message : String(err)
+      setSubmitError(msg)
+      toast.error(`Could not save ${noun}: ${msg}`)
     } finally {
       setSubmitting(false)
     }
@@ -166,12 +176,16 @@ export function CatalogManager<Row extends { _id: string }>({
       if (error) throw error
       setRows(prev => prev.filter(r => r._id !== row._id))
       setConfirmDelete(null)
+      toast.success(`${capitalize(noun)} deleted`)
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : String(err))
+      const msg = err instanceof Error ? err.message : String(err)
+      setDeleteError(msg)
+      toast.error(`Could not delete ${noun}: ${msg}`)
     } finally {
       setDeleteInFlight(false)
     }
   }
+
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
