@@ -26,9 +26,9 @@ interface Props {
 
 export function RegisterForm({ event, profile, userId, onClose, onBooked, existingBooking }: Props) {
   return (
-    <div className="fixed inset-0 bg-blue-900/60 backdrop-blur-sm flex items-end justify-center z-50" onClick={onClose}>
+    <div className="fixed inset-0 bg-blue-900/60 backdrop-blur-sm flex items-start justify-center z-50 px-4 pt-8 pb-4 overflow-y-auto" onClick={onClose}>
       <div
-        className="bg-white/80 backdrop-blur-md border-t border-red-500 rounded-t-2xl w-full max-w-lg p-5 space-y-4 max-h-[90vh] overflow-y-auto"
+        className="bg-white/80 backdrop-blur-md border border-red-500 rounded-2xl w-full max-w-lg p-5 space-y-4 max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <RegisterFormBody

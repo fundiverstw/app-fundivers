@@ -19,7 +19,7 @@
     "db:link": "dotenv -e .env.local -- sh -c 'supabase link --project-ref \"$SUPABASE_PROJECT_REF\" --password \"$SUPABASE_DB_PASSWORD\"'",
     "db:pull": "dotenv -e .env.local -- sh -c 'supabase db pull --password \"$SUPABASE_DB_PASSWORD\"'",
     "db:push": "dotenv -e .env.local -- sh -c 'supabase db push --password \"$SUPABASE_DB_PASSWORD\"'",
-    "db:dump-data": "dotenv -e .env.local -- sh -c 'supabase db dump --data-only --schema auth,public --exclude public.DiveTravel --exclude public.cancellation_policies --exclude public.cert_levels --exclude public.dive_sites --exclude public.eo_dive_addons --exclude public.eo_course_addons --exclude public.eo_dive_rooms --password \"$SUPABASE_DB_PASSWORD\" -f supabase/seed.sql'",
+    "db:dump-data": "dotenv -e .env.local -- sh -c 'supabase db dump --data-only --schema auth,public --exclude public.DiveTravel --exclude public.cancellation_policies --exclude public.cert_levels --exclude public.dive_sites --password \"$SUPABASE_DB_PASSWORD\" -f supabase/seed.sql'",
     "functions:deploy": "dotenv -e .env.local -- sh -c 'supabase functions deploy --project-ref \"$SUPABASE_PROJECT_REF\"'"
   },
   "dependencies": {
