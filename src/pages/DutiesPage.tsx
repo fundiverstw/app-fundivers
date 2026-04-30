@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { fetchEventsInRange, formatEventSpan } from '../lib/events'
 import type { AppEvent, Duty } from '../types/database'
+import { PAGE_BODY } from '../styles/tokens'
 
 interface Enriched {
   duty: Duty
@@ -75,7 +76,7 @@ export function DutiesPage() {
 
       <Section title="Upcoming">
         {upcoming.length === 0
-          ? <p className="text-blue-950 font-medium text-sm">Nothing scheduled.</p>
+          ? <p className={`${PAGE_BODY} text-sm`}>Nothing scheduled.</p>
           : upcoming.map(e => <Row key={e.duty.id} e={e} eventLinkBase={eventLinkBase} />)
         }
       </Section>
