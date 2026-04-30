@@ -307,7 +307,9 @@ Deno.serve(async (req) => {
       host: "smtp.gmail.com", port: 465, secure: true,
       auth: { user: GMAIL_USER, pass: GMAIL_PASS },
     })
-    const subject = `Registration - ${payload.eventTitle} | FunDivers TW`
+    // Subject format makes Gmail filtering / threading by event + diver
+    // straightforward: registration--[event name]--[diver name]
+    const subject = `registration--${payload.eventTitle}--${payload.name}`
     const mailOpts = {
       from: { name: "FunDivers TW", address: GMAIL_USER },
       subject,
