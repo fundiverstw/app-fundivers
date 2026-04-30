@@ -218,6 +218,25 @@ Deno.serve(async (req) => {
   const depositDeadline      = (event?.deposit_deadline      as string | null) ?? fallbackDeadline
   const fullPaymentDeadline  = (event?.full_payment_deadline as string | null) ?? fallbackDeadline
 
+  // Cancellation policy — resolve the FK so the PDF can render the full
+  // text. Null when the event has no policy attached (legacy rows).
+  let cancellationPolicyTitle: string | null = null
+  let cancellationPolicyText:  string | null = null
+  const policyId = event?.cancel_policy as string | null | undefined
+  if (policyId) {
+    const { data: pol } = await admin
+      .from("cancellation_policies")
+      .select("title, cancelation_policy")
+      .eq("_id", policyId)
+      .maybeSingle()
+    if (pol) {
+      cancellationPolicyTitle = (pol.title ?? null) as string | null
+      cancellationPolicyText  = (pol.cancelation_policy ?? null) as string | null
+    }
+  }
+  const cancelDate = (event?.cancel_date as string | null) ?? null
+  const cancellationPolicyAckedAt = (details.cancellation_policy_acked_at as string | null) ?? null
+
   const payload: RegistrationPdfPayload = {
     eventTitle: (event?.dive_title ?? event?.course_title ?? event?.title ?? "Event") as string,
     startDate,
@@ -254,6 +273,10 @@ Deno.serve(async (req) => {
     payDepositOnly:  !!details.pay_deposit_only,
     depositDeadline,
     fullPaymentDeadline,
+    cancellationPolicyTitle,
+    cancellationPolicyText,
+    cancelDate,
+    cancellationPolicyAckedAt,
   }
 
   // 4. Send PDF. Failure here is logged but not fatal — the booking is
