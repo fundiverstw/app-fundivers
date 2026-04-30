@@ -7,6 +7,7 @@
 
 import { jsPDF } from "npm:jspdf@2.5.1"
 import { Buffer } from "node:buffer"
+import { paymentInstructionsFor } from "./payment-instructions.ts"
 
 const LOGO_URL =
   "https://static.wixstatic.com/media/b37fef_ade8b006d798481a89453869bbc7aee6~mv2.png/v1/fill/w_400,h_240,al_c,q_85,enc_auto/b37fef_ade8b006d798481a89453869bbc7aee6~mv2.png"
@@ -60,6 +61,11 @@ export interface RegistrationPdfPayload {
   paymentMethod: 'bank' | 'paypal' | 'cash' | string
   deposit: number | string | null
   total: number | null
+  /** True when the diver chose deposit-only at registration. */
+  payDepositOnly: boolean
+  /** YYYY-MM-DD; resolved upstream so the PDF always has concrete dates. */
+  depositDeadline: string | null
+  fullPaymentDeadline: string | null
 }
 
 function formatGeneratedDate(): string {
@@ -242,7 +248,66 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   doc.text("Total (NTD)", ML + 2, y + 1)
   doc.setFontSize(13)
   doc.text(p.total != null ? String(p.total) : "-", COL, y + 1)
+  y += 8
+
+  // How to pay — per-method instructions (shop address for cash, bank
+  // details for bank transfer, "await PayPal email" for credit card).
+  const instr = paymentInstructionsFor(p.paymentMethod)
+  if (instr) {
+    y += 6
+    y = section(doc, y, instr.title)
+    doc.setFontSize(8.5)
+    doc.setFont("helvetica", "normal")
+    doc.setTextColor(...C.dark)
+    for (const line of instr.lines) {
+      const wrapped = doc.splitTextToSize(line, MR - ML - 2)
+      for (const w of wrapped) {
+        y = ensureY(doc, y, 6)
+        doc.text(w, ML + 2, y)
+        y += 4.5
+      }
+    }
+  }
+
+  // Deadlines — always render the summary line. When the diver opted to pay
+  // the deposit only we also break out the two amount/date pairs so they
+  // know exactly what to send and when.
+  if (p.depositDeadline || p.fullPaymentDeadline) {
+    y += 4
+    y = ensureY(doc, y, 16)
+    doc.setFontSize(8.5)
+    doc.setFont("helvetica", "normal")
+    doc.setTextColor(...C.dark)
+    const summary =
+      `Pay by ${formatDeadlineLong(p.depositDeadline)} to hold your spot. ` +
+      `Pay full amount by ${formatDeadlineLong(p.fullPaymentDeadline)} to complete your registration.`
+    const wrapped = doc.splitTextToSize(summary, MR - ML - 2)
+    for (const line of wrapped) { doc.text(line, ML + 2, y); y += 4.5 }
+
+    if (p.payDepositOnly && typeof p.deposit === "number" && typeof p.total === "number") {
+      y += 2
+      const remaining = Math.max(0, p.total - p.deposit)
+      doc.setFont("helvetica", "bold")
+      doc.text(`Pay deposit by ${formatDeadlineLong(p.depositDeadline)}: ${p.deposit} NTD`, ML + 2, y)
+      y += 4.5
+      doc.text(`Pay remaining amount by ${formatDeadlineLong(p.fullPaymentDeadline)}: ${remaining} NTD`, ML + 2, y)
+      y += 4.5
+      doc.setFont("helvetica", "normal")
+    }
+  }
 
   const dataUri = doc.output("datauristring")
   return dataUri.split(",")[1]
+}
+
+// Render a YYYY-MM-DD string as 'EEE, MMM d' (e.g. 'Sat, May 1') without
+// pulling in date-fns on the edge runtime. Falls back to the raw string
+// when input is null/empty.
+function formatDeadlineLong(yyyyMmDd: string | null): string {
+  if (!yyyyMmDd) return "TBD"
+  const d = new Date(yyyyMmDd + "T00:00:00Z")
+  if (Number.isNaN(d.getTime())) return yyyyMmDd
+  const wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getUTCDay()]
+  const mo = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getUTCMonth()]
+  return `${wd}, ${mo} ${d.getUTCDate()}`
 }

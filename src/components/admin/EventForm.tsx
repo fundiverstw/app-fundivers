@@ -453,6 +453,21 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
         </Section>
       )}
 
+      <Section title="Payment deadlines">
+        <p className="text-xs text-blue-950 font-medium">
+          Shown to divers on the registration form and in the emailed PDF.
+          Leave blank to fall back to "7 days before start date".
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Deposit deadline">
+            <Input type="date" value={form.deposit_deadline} onChange={v => set('deposit_deadline', v)} />
+          </Field>
+          <Field label="Full payment deadline">
+            <Input type="date" value={form.full_payment_deadline} onChange={v => set('full_payment_deadline', v)} />
+          </Field>
+        </div>
+      </Section>
+
       <Section title="Add-ons">
         {addons.length === 0 ? (
           <p className="text-sm text-blue-950 font-medium">No add-ons defined.</p>
