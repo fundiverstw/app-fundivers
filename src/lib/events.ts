@@ -57,13 +57,7 @@ function toHhmm(raw: string | null | undefined): string | null {
   return `${m[1].padStart(2, '0')}:${m[2]}`
 }
 
-/** `"id1,id2"` → `['id1','id2']`. Handles null/whitespace. */
-function parseCsvIds(raw: string | null | undefined): string[] {
-  if (!raw) return []
-  return raw.split(',').map(s => s.trim()).filter(Boolean)
-}
-
-function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: string[]): AppEvent | null {
+function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: string[], roomIds: string[]): AppEvent | null {
   const start = toIso(d.start_date, d.time)
   if (!start) return null
   const p = d.price ? priceIndex.get(d.price) : undefined
@@ -82,7 +76,7 @@ function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: stri
     transport_price: p?.transport ?? null,
     currency: 'TWD',
     has_rooms: Boolean(d.has_rooms),
-    room_type_ids: parseCsvIds(d.room_types),
+    room_type_ids: roomIds,
     has_addons: addonIds.length > 0,
     addon_ids: addonIds,
     gear_rental_info: gearText,
@@ -190,6 +184,26 @@ function courseToEvents(c: EOCourse, priceIndex: Map<string, EOPrice>, addonIds:
  * (replacing the legacy JSON-array-of-IDs parse on `other_addons`).
  * Returns a map keyed by dive/course `_id` → ordered list of addon IDs.
  */
+/**
+ * Same shape as attachAddonIds but for the `eo_dive_rooms` junction table
+ * (kept in sync from EO_dives.room_types CSV by the sync_eo_dive_rooms
+ * trigger). Courses don't carry rooms, so this is dive-only.
+ */
+async function attachRoomIds(diveIds: string[]): Promise<Map<string, string[]>> {
+  const out = new Map<string, string[]>()
+  if (!diveIds.length) return out
+  const { data } = await supabase
+    .from('eo_dive_rooms')
+    .select('eo_dive_id, room_id')
+    .in('eo_dive_id', diveIds)
+  for (const row of data ?? []) {
+    const arr = out.get(row.eo_dive_id) ?? []
+    arr.push(row.room_id)
+    out.set(row.eo_dive_id, arr)
+  }
+  return out
+}
+
 async function attachAddonIds(diveIds: string[], courseIds: string[]): Promise<Map<string, string[]>> {
   const out = new Map<string, string[]>()
   if (diveIds.length) {
@@ -251,13 +265,14 @@ export async function fetchEventsInRange(fromDate: string, toDate: string): Prom
 
   const dives = (divesResp.data ?? []) as EODive[]
   const courses = (coursesResp.data ?? []) as EOCourse[]
-  const [prices, addons] = await Promise.all([
+  const [prices, addons, rooms] = await Promise.all([
     attachPrices(dives, courses),
     attachAddonIds(dives.map(d => d._id), courses.map(c => c._id)),
+    attachRoomIds(dives.map(d => d._id)),
   ])
 
   return [
-    ...dives.map(d => diveToEvent(d, prices, addons.get(d._id) ?? [])).filter((x): x is AppEvent => !!x),
+    ...dives.map(d => diveToEvent(d, prices, addons.get(d._id) ?? [], rooms.get(d._id) ?? [])).filter((x): x is AppEvent => !!x),
     ...courses.flatMap(c => courseToEvents(c, prices, addons.get(c._id) ?? [])),
   ].sort((a, b) => a.start_time.localeCompare(b.start_time))
 }
@@ -278,14 +293,15 @@ export async function fetchEventsForBookings(
 
   const dives = (divesResp.data ?? []) as EODive[]
   const courses = (coursesResp.data ?? []) as EOCourse[]
-  const [prices, addons] = await Promise.all([
+  const [prices, addons, rooms] = await Promise.all([
     attachPrices(dives, courses),
     attachAddonIds(dives.map(d => d._id), courses.map(c => c._id)),
+    attachRoomIds(dives.map(d => d._id)),
   ])
 
   const out = new Map<string, AppEvent>()
   for (const d of dives) {
-    const ev = diveToEvent(d, prices, addons.get(d._id) ?? [])
+    const ev = diveToEvent(d, prices, addons.get(d._id) ?? [], rooms.get(d._id) ?? [])
     if (ev) out.set(ev.id, ev)
   }
   for (const c of courses) {

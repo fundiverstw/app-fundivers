@@ -37,12 +37,14 @@ interface PriceFormState {
   price: string             // human label, e.g. "NT$10,000"
   starting_at: string       // bigint or empty
   deposit_amount: string    // bigint or empty
-  roomIds: string[]         // → EO_prices.room_options (JSON array of EO_rooms._id)
+  // Per-event room options now live solely on EO_dives.room_types — see
+  // 20260430040000_eo_dive_rooms_junction.sql. EO_prices no longer carries
+  // a room_options column.
   transport: string
 }
 
 const EMPTY_PRICE_FORM: PriceFormState = {
-  title: '', price: '', starting_at: '', deposit_amount: '', roomIds: [], transport: '',
+  title: '', price: '', starting_at: '', deposit_amount: '', transport: '',
 }
 
 export interface EventFormProps {
@@ -153,13 +155,6 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
     })
   }
 
-  function togglePriceRoom(id: string) {
-    setPriceForm(f => {
-      const next = f.roomIds.includes(id) ? f.roomIds.filter(x => x !== id) : [...f.roomIds, id]
-      return { ...f, roomIds: next }
-    })
-  }
-
   async function submitNewPrice() {
     setPriceError(null)
     if (!priceForm.title.trim()) {
@@ -169,18 +164,13 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
     setPriceSubmitting(true)
     try {
       const id = crypto.randomUUID()
-      // room_options stores a JSON array of EO_rooms._id values, matching the
-      // legacy Bubble shape so the existing `EO_rooms.added_price` lookup
-      // continues to feed per-room pricing for booking flows.
-      const roomOptions = priceForm.roomIds.length ? JSON.stringify(priceForm.roomIds) : null
       const payload = {
         _id: id,
         title: priceForm.title.trim(),
         price: priceForm.price || null,
         starting_at: priceForm.starting_at ? Number(priceForm.starting_at) : null,
         deposit_amount: priceForm.deposit_amount ? Number(priceForm.deposit_amount) : null,
-        room_options: roomOptions,
-        transport: priceForm.transport || null,
+        transport: priceForm.transport ? Number(priceForm.transport) : null,
       }
       const { error: insErr } = await supabase.from('EO_prices').insert(payload as never)
       if (insErr) throw insErr
@@ -311,26 +301,9 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
                 <Input type="number" value={priceForm.deposit_amount} onChange={v => setPriceForm(f => ({ ...f, deposit_amount: v }))} />
               </Field>
             </div>
-            <Field label="Transport">
-              <Input value={priceForm.transport} onChange={v => setPriceForm(f => ({ ...f, transport: v }))} />
+            <Field label="Transport (NTD per booking; blank or 0 = included in base)">
+              <Input type="number" value={priceForm.transport} onChange={v => setPriceForm(f => ({ ...f, transport: v }))} />
             </Field>
-            <div className="space-y-1">
-              <span className="text-xs font-medium text-white/80">Room options</span>
-              {rooms.length === 0 ? (
-                <p className="text-xs text-white/60">No rooms defined.</p>
-              ) : (
-                <div className="space-y-1 max-h-40 overflow-y-auto bg-white/70 backdrop-blur-md border border-sky-200 rounded-md p-2">
-                  {rooms.map(r => (
-                    <Checkbox
-                      key={r._id}
-                      checked={priceForm.roomIds.includes(r._id)}
-                      onChange={() => togglePriceRoom(r._id)}
-                      label={r.display_name || r.title || r._id}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
             {priceError && (
               <p className="text-xs text-red-200 bg-red-900/50 border border-red-500 rounded-md p-2">{priceError}</p>
             )}
