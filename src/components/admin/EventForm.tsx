@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../../lib/supabase'
+import { errorMessage } from '../../lib/errors'
 import type { CancellationPolicy, CertLevel, DiveTravelEntry, EOAddon, EOCourse, EODive, EOPrice, EORoom } from '../../types/database'
 import {
   EMPTY_FORM,
@@ -216,7 +217,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
       setPriceForm(EMPTY_PRICE_FORM)
       setShowNewPrice(false)
     } catch (err) {
-      setPriceError(err instanceof Error ? err.message : String(err))
+      setPriceError(errorMessage(err))
     } finally {
       setPriceSubmitting(false)
     }
@@ -244,7 +245,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
       setRoomForm(EMPTY_ROOM_FORM)
       setShowNewRoom(false)
     } catch (err) {
-      setRoomError(err instanceof Error ? err.message : String(err))
+      setRoomError(errorMessage(err))
     } finally {
       setRoomSubmitting(false)
     }
@@ -271,7 +272,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
       setAddonForm(EMPTY_ADDON_FORM)
       setShowNewAddon(false)
     } catch (err) {
-      setAddonError(err instanceof Error ? err.message : String(err))
+      setAddonError(errorMessage(err))
     } finally {
       setAddonSubmitting(false)
     }
@@ -299,7 +300,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
       setTravelForm(EMPTY_TRAVEL_FORM)
       setShowNewTravel(false)
     } catch (err) {
-      setTravelError(err instanceof Error ? err.message : String(err))
+      setTravelError(errorMessage(err))
     } finally {
       setTravelSubmitting(false)
     }
@@ -323,7 +324,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
     try {
       await onSubmit(form)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(errorMessage(err))
       setSubmitting(false)
     }
   }

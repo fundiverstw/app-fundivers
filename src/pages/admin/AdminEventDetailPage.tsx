@@ -4,6 +4,7 @@ import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
+import { errorMessage } from '../../lib/errors'
 import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
 import { AdminNotes } from '../../components/admin/AdminNotes'
 import { EventStaffSection } from '../../components/admin/EventStaffSection'
@@ -141,7 +142,7 @@ export function AdminEventDetailPage() {
       setCancelModalOpen(false)
       toast.success(value ? 'Event cancelled' : 'Event restored')
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
+      const msg = errorMessage(err)
       setCancelError(msg)
       toast.error(`Could not ${value ? 'cancel' : 'restore'} event: ${msg}`)
     } finally {
