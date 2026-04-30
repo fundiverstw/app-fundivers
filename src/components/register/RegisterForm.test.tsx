@@ -151,7 +151,7 @@ describe('RegisterForm', () => {
     // clicking Wetsuit adds only Wetsuit (keeps the original test intent).
     const profileOwnsAll: Profile = {
       ...sampleProfile,
-      gear_owned: ['BCD', 'Regulator', 'Wetsuit', 'Fins', 'Mask', 'Boots'],
+      gear_owned: ['BCD', 'Regulator', 'Wetsuit', 'Fins', 'Mask', 'Boots', 'Dive computer'],
     }
     render(
       <RegisterForm event={sampleEvent} profile={profileOwnsAll} userId="u1"
