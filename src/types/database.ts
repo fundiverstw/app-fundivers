@@ -566,6 +566,12 @@ export interface Database {
         Update: Partial<{ eo_dive_id: string; addon_id: string }>
         Relationships: []
       }
+      eo_dive_rooms: {
+        Row: { eo_dive_id: string; room_id: string }
+        Insert: { eo_dive_id: string; room_id: string }
+        Update: Partial<{ eo_dive_id: string; room_id: string }>
+        Relationships: []
+      }
       eo_course_addons: {
         Row: { eo_course_id: string; addon_id: string }
         Insert: { eo_course_id: string; addon_id: string }
