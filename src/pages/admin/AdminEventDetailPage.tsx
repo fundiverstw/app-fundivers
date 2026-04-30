@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
+import { useToast } from '../../hooks/useToast'
 import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
 import { AdminNotes } from '../../components/admin/AdminNotes'
 import { EventStaffSection } from '../../components/admin/EventStaffSection'
@@ -22,6 +23,7 @@ type RoomNameMap = Map<string, string>
 export function AdminEventDetailPage() {
   const { type, id } = useParams<{ type: 'dive' | 'course'; id: string }>()
   const { profile } = useAuth()
+  const toast = useToast()
   const isAdmin = profile?.role === 'admin'
   const [event, setEvent] = useState<AppEvent | null>(null)
   const [registrants, setRegistrants] = useState<Registrant[]>([])
@@ -137,8 +139,11 @@ export function AdminEventDetailPage() {
       if (error) throw error
       setEvent(prev => (prev ? { ...prev, cancelled_at: value } : prev))
       setCancelModalOpen(false)
+      toast.success(value ? 'Event cancelled' : 'Event restored')
     } catch (err) {
-      setCancelError(err instanceof Error ? err.message : String(err))
+      const msg = err instanceof Error ? err.message : String(err)
+      setCancelError(msg)
+      toast.error(`Could not ${value ? 'cancel' : 'restore'} event: ${msg}`)
     } finally {
       setCancelInFlight(false)
     }

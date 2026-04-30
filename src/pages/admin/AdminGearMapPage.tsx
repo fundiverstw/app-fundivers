@@ -5,6 +5,7 @@ import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
 import { AdminNotes } from '../../components/admin/AdminNotes'
 import { GEAR_ITEMS } from '../../lib/gear'
 import { shoeAsJp } from '../../lib/shoe-size'
+import { useToast } from '../../hooks/useToast'
 import type { AppEvent, Booking, Profile } from '../../types/database'
 
 // What items the shop actually needs to pack for this diver. Derived from
@@ -118,6 +119,7 @@ export function AdminGearMapPage() {
 function DiverGearCard({ row, onProfilePatched }: { row: Row; onProfilePatched: (diverId: string, patch: Partial<Profile>) => void }) {
   const { profile, booking } = row
   const pack = packList(booking)
+  const toast = useToast()
   const owned = new Set(profile?.gear_owned ?? [])
   const shoeLabel = profile?.shoe_size ? (shoeAsJp(profile.shoe_size) ?? profile.shoe_size) : null
   const sizing = [
@@ -151,12 +153,17 @@ function DiverGearCard({ row, onProfilePatched }: { row: Row; onProfilePatched: 
       wetsuit_size: wetsuitSize || null,
     })
     setSavingSizes(false)
-    if (error) { setSizeError(error.message); return }
+    if (error) {
+      setSizeError(error.message)
+      toast.error(`Could not save sizes: ${error.message}`)
+      return
+    }
     onProfilePatched(profile.id, {
       fin_size:     finSize     || null,
       bcd_size:     bcdSize     || null,
       wetsuit_size: wetsuitSize || null,
     })
+    toast.success(`Saved sizes for ${profile.display_name || profile.full_name || 'diver'}`)
   }
 
   return (
