@@ -204,9 +204,23 @@ Deno.serve(async (req) => {
       .filter((s: string) => s.length > 0)
   }
 
+  // Resolve effective payment deadlines — admin-set values take precedence;
+  // when null fall back to "7 days before start_date" (matches the SPA's
+  // computeEffectiveDeadlines helper). Done here so the PDF and the form
+  // always agree.
+  const startDate = (event?.start_date ?? null) as string | null
+  function shiftDays(yyyyMmDd: string, deltaDays: number): string {
+    const d = new Date(yyyyMmDd + "T00:00:00Z")
+    d.setUTCDate(d.getUTCDate() + deltaDays)
+    return d.toISOString().slice(0, 10)
+  }
+  const fallbackDeadline = startDate ? shiftDays(startDate, -7) : null
+  const depositDeadline      = (event?.deposit_deadline      as string | null) ?? fallbackDeadline
+  const fullPaymentDeadline  = (event?.full_payment_deadline as string | null) ?? fallbackDeadline
+
   const payload: RegistrationPdfPayload = {
     eventTitle: (event?.dive_title ?? event?.course_title ?? event?.title ?? "Event") as string,
-    startDate:  (event?.start_date ?? null) as string | null,
+    startDate,
     endDate:    (event?.end_date ?? null) as string | null,
     name:            profile?.full_name ?? "",
     email:           registrantEmail,
@@ -237,6 +251,9 @@ Deno.serve(async (req) => {
     paymentMethod:   paymentWireLabel(details.payment_method as string | null | undefined),
     deposit:         (details.deposit as number | null) ?? null,
     total:           (details.total as number | null) ?? null,
+    payDepositOnly:  !!details.pay_deposit_only,
+    depositDeadline,
+    fullPaymentDeadline,
   }
 
   // 4. Send PDF. Failure here is logged but not fatal — the booking is

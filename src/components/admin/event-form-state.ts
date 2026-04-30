@@ -34,6 +34,10 @@ export interface FormState {
   destination_reference: string
   second_image: string
   divetravel_reference: string
+  // payment deadlines (both event types) — empty string = unset, falls back
+  // client-side to "7 days before start_date".
+  deposit_deadline: string
+  full_payment_deadline: string
   // course
   special_date: string
   url: string
@@ -56,6 +60,7 @@ export const EMPTY_FORM: FormState = {
   nitrox_required: false, gear_rental: '',
   cancel_date: '', cancel_policy: '',
   destination_reference: '', second_image: '', divetravel_reference: '',
+  deposit_deadline: '', full_payment_deadline: '',
   special_date: '', url: '', course_name: '',
   included: '', schedule: '', starting_at: '',
 }
@@ -115,6 +120,8 @@ export function formStateFromDive(d: EODive): FormState {
     destination_reference: d.destination_reference ?? '',
     second_image: d.second_image ?? '',
     divetravel_reference: d.DiveTravel_reference ?? '',
+    deposit_deadline: d.deposit_deadline ?? '',
+    full_payment_deadline: d.full_payment_deadline ?? '',
     special_date: '', url: '', course_name: '',
     included: '', schedule: '', starting_at: '',
   }
@@ -142,6 +149,8 @@ export function formStateFromCourse(c: EOCourse): FormState {
     schedule: c.schedule ?? '',
     starting_at: c.starting_at != null ? String(c.starting_at) : '',
     addonIds: parseAddonIds(c.other_addons),
+    deposit_deadline: c.deposit_deadline ?? '',
+    full_payment_deadline: c.full_payment_deadline ?? '',
     notes: '', featured: false, fully_booked: false,
     has_rooms: false, roomIds: [],
     nitrox_required: false, gear_rental: '',
@@ -184,6 +193,8 @@ export function divePayloadFromForm(form: FormState): Record<string, unknown> {
     cancel_policy: form.cancel_policy || null,
     destination_reference: form.destination_reference || null,
     DiveTravel_reference: form.divetravel_reference || null,
+    deposit_deadline: form.deposit_deadline || null,
+    full_payment_deadline: form.full_payment_deadline || null,
   }
 }
 
@@ -212,5 +223,7 @@ export function coursePayloadFromForm(form: FormState): Record<string, unknown> 
     schedule: form.schedule || null,
     starting_at: form.starting_at ? Number(form.starting_at) : null,
     other_addons: addonsJson,
+    deposit_deadline: form.deposit_deadline || null,
+    full_payment_deadline: form.full_payment_deadline || null,
   }
 }

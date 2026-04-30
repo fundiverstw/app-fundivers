@@ -88,6 +88,8 @@ function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: stri
     nitrox_required: d.nitrox_required ?? false,
     dive_days: d.dive_days ?? null,
     cancelled_at: d.cancelled_at ?? null,
+    deposit_deadline: d.deposit_deadline ?? null,
+    full_payment_deadline: d.full_payment_deadline ?? null,
   }
 }
 
@@ -138,6 +140,8 @@ function courseToEvents(c: EOCourse, priceIndex: Map<string, EOPrice>, addonIds:
     nitrox_required: false,
     dive_days: c.dive_days ?? null,
     cancelled_at: c.cancelled_at ?? null,
+    deposit_deadline: c.deposit_deadline ?? null,
+    full_payment_deadline: c.full_payment_deadline ?? null,
   }
 
   const makeSegment = (fromKey: string, toKey: string): AppEvent | null => {
@@ -223,8 +227,8 @@ async function attachPrices(dives: EODive[], courses: EOCourse[]): Promise<Map<s
   return new Map((data ?? []).map(p => [p._id, p as EOPrice]))
 }
 
-const DIVE_COLS = '_id, dive_title, title, start_date, time, end_date, featured, fully_booked, price, has_rooms, room_types, hasotheraddons, other_addons, gear_rental, nitrox_required, dive_days, cancelled_at'
-const COURSE_COLS = '_id, course_title, title, start_date, start_time, end_date, price, other_addons, dive_days, special_date, cancelled_at'
+const DIVE_COLS = '_id, dive_title, title, start_date, time, end_date, featured, fully_booked, price, has_rooms, room_types, hasotheraddons, other_addons, gear_rental, nitrox_required, dive_days, cancelled_at, deposit_deadline, full_payment_deadline'
+const COURSE_COLS = '_id, course_title, title, start_date, start_time, end_date, price, other_addons, dive_days, special_date, cancelled_at, deposit_deadline, full_payment_deadline'
 
 /**
  * Fetch dives + courses whose start_date falls within [fromDate, toDate]
