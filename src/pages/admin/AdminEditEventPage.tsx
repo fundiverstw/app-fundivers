@@ -11,6 +11,7 @@ import {
 } from '../../components/admin/event-form-state'
 import type { EOCourse, EODive } from '../../types/database'
 import { useToast } from '../../hooks/useToast'
+import { errorMessage } from '../../lib/errors'
 
 // Edit page — load the existing dive/course row, hand the prefilled
 // FormState to the shared EventForm, and on submit call .update().eq()
@@ -50,7 +51,7 @@ export function AdminEditEventPage() {
           throw new Error(`Unknown event type: ${type}`)
         }
       } catch (err) {
-        if (!cancelled) setLoadError(err instanceof Error ? err.message : String(err))
+        if (!cancelled) setLoadError(errorMessage(err))
       }
     })()
     return () => { cancelled = true }

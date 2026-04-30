@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useToast } from '../../hooks/useToast'
+import { errorMessage } from '../../lib/errors'
 
 function capitalize(s: string) {
   return s.length === 0 ? s : s[0].toUpperCase() + s.slice(1)
@@ -160,7 +161,7 @@ export function CatalogManager<Row extends { _id: string }>({
       }
       closeForm()
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
+      const msg = errorMessage(err)
       setSubmitError(msg)
       toast.error(`Could not save ${noun}: ${msg}`)
     } finally {
@@ -178,7 +179,7 @@ export function CatalogManager<Row extends { _id: string }>({
       setConfirmDelete(null)
       toast.success(`${capitalize(noun)} deleted`)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
+      const msg = errorMessage(err)
       setDeleteError(msg)
       toast.error(`Could not delete ${noun}: ${msg}`)
     } finally {
