@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
 import type { AppEvent, Booking, Payment } from '../types/database'
 import {
-  CARD, BTN_GHOST, BTN_DANGER, TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR,
+  CARD, BTN_GHOST, BTN_DANGER, TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR, PAGE_BODY,
 } from '../styles/tokens'
 
 type Row = Booking & {
@@ -119,7 +119,7 @@ export function BookingsPage() {
       <section>
         <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-2">Upcoming</h2>
         {upcoming.length === 0
-          ? <p className="text-blue-950 font-medium text-sm">No upcoming bookings. Check the calendar!</p>
+          ? <p className={`${PAGE_BODY} text-sm`}>No upcoming bookings. Check the calendar!</p>
           : <div className="space-y-2">
               {upcoming.map(r => (
                 <Card

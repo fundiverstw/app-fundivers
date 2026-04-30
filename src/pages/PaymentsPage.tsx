@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
 import type { AppEvent, Booking, Payment } from '../types/database'
 import {
-  CARD, BTN_GHOST, TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR,
+  CARD, BTN_GHOST, TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR, PAGE_BODY,
 } from '../styles/tokens'
 
 interface BookingLine {
@@ -118,7 +118,7 @@ export function PaymentsPage() {
       <section>
         <h2 className={`text-sm font-semibold ${TEXT_MUTED} uppercase tracking-wider mb-2`}>Per booking</h2>
         {active.length === 0 ? (
-          <p className={`${TEXT_SUBTLE} text-sm`}>No active bookings yet. Check the calendar!</p>
+          <p className={`${PAGE_BODY} text-sm`}>No active bookings yet. Check the calendar!</p>
         ) : (
           <div className="space-y-2">
             {active.map(l => (
