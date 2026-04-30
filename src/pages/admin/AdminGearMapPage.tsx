@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
@@ -71,6 +71,17 @@ export function AdminGearMapPage() {
     return () => { cancelled = true }
   }, [type, id])
 
+  // Patch one diver's profile in the rows list — used after a successful
+  // gear-size save so the card's displayed values stay in sync without
+  // a refetch round-trip.
+  function patchProfile(diverId: string, patch: Partial<Profile>) {
+    setRows(prev => prev.map(r =>
+      r.profile && r.profile.id === diverId
+        ? { ...r, profile: { ...r.profile, ...patch } as Profile }
+        : r
+    ))
+  }
+
   if (loading) {
     return <div className="flex justify-center pt-12"><div className="w-6 h-6 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" /></div>
   }
@@ -97,14 +108,14 @@ export function AdminGearMapPage() {
         <p className="text-blue-950 font-medium text-sm">No registrants yet.</p>
       ) : (
         <section className="space-y-3">
-          {rows.map(r => <DiverGearCard key={r.booking.id} row={r} />)}
+          {rows.map(r => <DiverGearCard key={r.booking.id} row={r} onProfilePatched={patchProfile} />)}
         </section>
       )}
     </div>
   )
 }
 
-function DiverGearCard({ row }: { row: Row }) {
+function DiverGearCard({ row, onProfilePatched }: { row: Row; onProfilePatched: (diverId: string, patch: Partial<Profile>) => void }) {
   const { profile, booking } = row
   const pack = packList(booking)
   const owned = new Set(profile?.gear_owned ?? [])
@@ -114,6 +125,39 @@ function DiverGearCard({ row }: { row: Row }) {
     profile?.weight_kg && `${profile.weight_kg}kg`,
     shoeLabel,
   ].filter(Boolean).join(' · ')
+
+  // Inline gear-size editor — staff/admin only (the page itself is gated
+  // by StaffOrAdminRoute, and the RPC server-side rechecks the role). The
+  // three inputs always reflect the saved profile values; when any field
+  // is dirty the Save button activates and a single RPC call persists
+  // the new values for the diver.
+  const [finSize,     setFinSize]     = useState(profile?.fin_size     ?? '')
+  const [bcdSize,     setBcdSize]     = useState(profile?.bcd_size     ?? '')
+  const [wetsuitSize, setWetsuitSize] = useState(profile?.wetsuit_size ?? '')
+  const [savingSizes, setSavingSizes] = useState(false)
+  const [sizeError,   setSizeError]   = useState<string | null>(null)
+  const sizesDirty =
+    (profile?.fin_size     ?? '') !== finSize ||
+    (profile?.bcd_size     ?? '') !== bcdSize ||
+    (profile?.wetsuit_size ?? '') !== wetsuitSize
+
+  async function saveSizes() {
+    if (!profile) return
+    setSavingSizes(true); setSizeError(null)
+    const { error } = await supabase.rpc('update_diver_gear_sizes', {
+      diver_id:     profile.id,
+      fin_size:     finSize     || null,
+      bcd_size:     bcdSize     || null,
+      wetsuit_size: wetsuitSize || null,
+    })
+    setSavingSizes(false)
+    if (error) { setSizeError(error.message); return }
+    onProfilePatched(profile.id, {
+      fin_size:     finSize     || null,
+      bcd_size:     bcdSize     || null,
+      wetsuit_size: wetsuitSize || null,
+    })
+  }
 
   return (
     <article className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
@@ -149,7 +193,43 @@ function DiverGearCard({ row }: { row: Row }) {
         </div>
       )}
 
+      {profile && (
+        <div className="border-t border-sky-200 pt-3 space-y-2">
+          <p className="text-xs font-semibold text-blue-900 uppercase tracking-wider">Sizes</p>
+          <div className="grid grid-cols-3 gap-2">
+            <SizeField label="Fin"     value={finSize}     onChange={setFinSize} />
+            <SizeField label="BCD"     value={bcdSize}     onChange={setBcdSize} />
+            <SizeField label="Wetsuit" value={wetsuitSize} onChange={setWetsuitSize} />
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={saveSizes}
+              disabled={!sizesDirty || savingSizes}
+              className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-xs font-semibold py-1.5 px-3 rounded-md"
+            >
+              {savingSizes ? 'Saving…' : 'Save sizes'}
+            </button>
+            {sizeError && <span className="text-xs text-red-600">{sizeError}</span>}
+          </div>
+        </div>
+      )}
+
       <AdminNotes target={{ kind: 'booking', id: booking.id }} tagFilter="gear" title="Gear flags" />
     </article>
+  )
+}
+
+function SizeField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }): ReactNode {
+  return (
+    <label className="block">
+      <span className="block text-[10px] text-blue-900 font-medium mb-0.5 uppercase tracking-wide">{label}</span>
+      <input
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="w-full bg-white border border-sky-300 rounded-md px-2 py-1 text-blue-900 text-xs focus:outline-none focus:border-blue-900"
+        placeholder="—"
+      />
+    </label>
   )
 }

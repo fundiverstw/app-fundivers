@@ -74,6 +74,10 @@ export interface Database {
           height_cm: number | null
           weight_kg: number | null
           shoe_size: string | null
+          /** Diving gear sizes — free text so any sizing convention works. */
+          fin_size: string | null
+          bcd_size: string | null
+          wetsuit_size: string | null
           gender: string | null
           contact_method: 'whatsapp' | 'line' | 'phone' | 'email' | null
           contact_id: string | null
@@ -104,6 +108,9 @@ export interface Database {
           height_cm?: number | null
           weight_kg?: number | null
           shoe_size?: string | null
+          fin_size?: string | null
+          bcd_size?: string | null
+          wetsuit_size?: string | null
           gender?: string | null
           contact_method?: 'whatsapp' | 'line' | 'phone' | 'email' | null
           contact_id?: string | null
@@ -132,6 +139,9 @@ export interface Database {
           height_cm?: number | null
           weight_kg?: number | null
           shoe_size?: string | null
+          fin_size?: string | null
+          bcd_size?: string | null
+          wetsuit_size?: string | null
           gender?: string | null
           contact_method?: 'whatsapp' | 'line' | 'phone' | 'email' | null
           contact_id?: string | null
