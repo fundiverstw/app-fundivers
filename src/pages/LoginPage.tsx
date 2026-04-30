@@ -13,9 +13,12 @@ const schema = z.object({
 })
 type FormData = z.infer<typeof schema>
 
+// Seeded by supabase/seed-local-test-users.sql on every `make reset`. Keep
+// the credentials here in sync with that file's password values.
 const DEV_ACCOUNTS = [
   { label: 'diver@diver.diver', email: 'diver@diver.diver', password: 'diverdiver' },
   { label: 'admin@admin.admin', email: 'admin@admin.admin', password: 'adminadmin' },
+  { label: 'staff@staff.staff', email: 'staff@staff.staff', password: 'staffstaff' },
 ] as const
 
 export function LoginPage() {

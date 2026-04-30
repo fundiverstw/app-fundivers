@@ -95,8 +95,8 @@ export function CalendarPage() {
       />
 
       {selected && (
-        <div className="fixed inset-0 bg-blue-900/60 backdrop-blur-sm flex items-end justify-center z-50" onClick={() => setSelected(null)}>
-          <div className="bg-white/75 backdrop-blur-md border-t border-red-500 rounded-t-2xl w-full max-w-lg p-6 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-blue-900/60 backdrop-blur-sm flex items-start justify-center z-50 px-4 pt-8 pb-4 overflow-y-auto" onClick={() => setSelected(null)}>
+          <div className="bg-white/75 backdrop-blur-md border border-red-500 rounded-2xl w-full max-w-lg p-6 space-y-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <span className={`text-xs px-2 py-1 rounded-full text-white ${TYPE_DOT[selected.type]}`}>
                 {TYPE_LABELS[selected.type]}
