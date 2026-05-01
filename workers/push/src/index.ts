@@ -201,6 +201,7 @@ function capitalize(s: string): string {
 export async function handleAdminBroadcast(req: Request, env: Env): Promise<Response> {
   const auth = req.headers.get('authorization') ?? ''
   if (!auth.startsWith('Bearer ')) return new Response('unauthorized', { status: 401 })
+  const token = auth.slice('Bearer '.length)
 
   let body: { title?: string; body?: string; url?: string }
   try { body = await req.json() } catch { return new Response('bad request', { status: 400 }) }
@@ -219,9 +220,15 @@ export async function handleAdminBroadcast(req: Request, env: Env): Promise<Resp
     global: { headers: { Authorization: auth } },
     auth: { persistSession: false },
   })
-  const { data: userRes } = await userClient.auth.getUser()
+  // Pass the JWT explicitly — getUser() with no arg returns null in worker
+  // contexts where no session is persisted, even when global.headers carries
+  // the Authorization. Explicit form hits /auth/v1/user with the token directly.
+  const { data: userRes, error: userErr } = await userClient.auth.getUser(token)
   const userId = userRes?.user?.id
-  if (!userId) return new Response('unauthorized', { status: 401 })
+  if (!userId) {
+    console.error('admin-broadcast: getUser failed', userErr?.message ?? 'no user')
+    return new Response('unauthorized', { status: 401 })
+  }
   const { data: prof } = await userClient
     .from('profiles')
     .select('role')
