@@ -12,9 +12,15 @@ into source.
 | [events-and-bookings.md](./events-and-bookings.md)     | Calendar rendering, register-form wizard, `bookings.details` JSONB shape |
 | [payments.md](./payments.md)                           | Deposit vs balance semantics, payments ledger, refund flow |
 | [admin.md](./admin.md)                                 | Admin routes, event memos, user search, role-view toggle |
-| [push-notifications.md](./push-notifications.md)       | Web Push: VAPID, service worker, Cloudflare cron sender |
+| [push-notifications.md](./push-notifications.md)       | Web Push: VAPID, service worker, Cloudflare cron sender, `/admin-broadcast`, `/notify-duty`, CORS |
 | [testing.md](./testing.md)                             | Unit vs integration conventions, `mockQueryBuilder`, Makefile surface |
-| [deployment.md](./deployment.md)                       | Env vars, Cloudflare deploy, Supabase link / push / pull / verify |
+| [deployment.md](./deployment.md)                       | Env vars, Cloudflare deploy, Supabase link / push / pull / verify, edge functions |
+
+In-flight proposals (live until shipped, then folded into the topic doc):
+
+| Doc | Status |
+| --- | --- |
+| [plan-manual-verification.md](./plan-manual-verification.md) | Proposal — admin-approval gate before new accounts can write to Supabase. Awaiting decision between two implementation options. |
 
 ## Conventions called out across docs
 

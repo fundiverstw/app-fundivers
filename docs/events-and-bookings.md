@@ -88,33 +88,57 @@ Clicking an event in the calendar opens `RegisterForm`
 
 ```
 total = base_price
-      + gear_cost       (0 / daily × days if full-set / per-item × days if à-la-carte)
+      + gear_cost       (0 if included; full_daily × days for full-set;
+                         ∑ per-item × days for à-la-carte)
       + room_cost       (selected EO_rooms.added_price)
       + addons_cost     (∑ Other_Addons.price for selected ids)
-      + transport_fee   (1,300 TWD if ticked)
+      + transport_cost  (event.transport_price if surcharge>0 and ticked;
+                         else 0 — surcharge=0 means transport is bundled
+                         and we render "Included with base price")
       + nitrox_course   (6,000 TWD if required-and-not-certified and ticked)
 total *= 1.05           (if payment_method === 'credit_card')
 ```
 
-All constants live at the top of `RegisterForm.tsx`:
-`GEAR_FULLSET_DAILY`, `GEAR_ALACARTE_PRICES`, `TRANSPORT_FEE`,
-`NITROX_COURSE_FEE`. Change them there, not in a config table.
+The static constants `GEAR_FULLSET_DAILY`, `GEAR_ALACARTE_PRICES`,
+and `NITROX_COURSE_FEE` live at the top of `RegisterForm.tsx` —
+change them there. **Transport** moved out of the constants in
+migration `20260430030000_eo_prices_transport_int.sql`: it's now a
+per-event integer on the linked `EO_prices.transport` row, surfaced
+on `AppEvent` as `transport_price`.
 
 ### What gets written
 
-One row into `public.bookings`:
+The form does **not** write to `bookings` directly. It invokes the
+`create-registration` Supabase Edge Function
+(`supabase/functions/create-registration/index.ts`) which atomically:
 
-- `user_id`, `status: 'pending'`
-- `eo_dive_id` XOR `eo_course_id` set from the event type
-- `notes` — free-text field from the form
-- `details` JSONB — see
-  [data-model.md § BookingDetails](./data-model.md#bookingdetails-jsonb-shape)
-  - `total` snapshot (final charged amount)
-  - `deposit` snapshot (copied from `event.deposit_amount`)
+1. (Guest path only) Creates the auth user with `email_confirm: true`
+   so a typo'd address is rejected loudly instead of silently dropped.
+2. Updates `profiles` from `profile_patch`.
+3. Inserts one row into `public.bookings` (under service-role, so RLS
+   doesn't apply at this stage):
+   - `user_id`, `status: 'pending'`
+   - `eo_dive_id` XOR `eo_course_id` set from the event type
+   - `notes` — free-text field from the form
+   - `details` JSONB — see
+     [data-model.md § BookingDetails](./data-model.md#bookingdetails-jsonb-shape)
+     (`total` and `deposit` are snapshots).
+4. Builds a registration PDF (`supabase/functions/_shared/pdf.ts`) and
+   sends it via Gmail SMTP to `fundiverstw@gmail.com` and the diver.
+5. Returns `{ booking_id, session? }` — `session` populated on the
+   guest path so the SPA can `setSession()` without a second
+   round-trip.
 
-The unique index `bookings_user_dive_uniq` / `bookings_user_course_uniq`
-prevents a diver from double-booking the same event — if they try,
-Supabase returns a conflict and the form shows an error.
+If the booking insert fails on the guest path the function rolls back
+the just-created auth user so the diver can retry cleanly.
+
+The **admin edit path** (`existingBooking` set) skips the edge
+function and updates `bookings.notes` / `bookings.details` directly
+under the admin's RLS — no PDF, no account creation.
+
+The unique indexes `bookings_user_dive_uniq` /
+`bookings_user_course_uniq` prevent a diver from double-booking the
+same event — Supabase returns a conflict and the form shows an error.
 
 ## BookingsPage — the diver's view
 
