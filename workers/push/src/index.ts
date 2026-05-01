@@ -49,23 +49,54 @@ export default {
 
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url)
+    if (req.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: corsHeaders(req) })
+    }
     if (url.pathname === '/run') {
       const auth = req.headers.get('authorization') ?? ''
       const expected = `Bearer ${env.ADMIN_TRIGGER_SECRET ?? ''}`
       if (!env.ADMIN_TRIGGER_SECRET || auth !== expected) {
-        return new Response('unauthorized', { status: 401 })
+        return withCors(new Response('unauthorized', { status: 401 }), req)
       }
       const result = await runDailyReminders(env)
-      return Response.json(result)
+      return withCors(Response.json(result), req)
     }
     if (url.pathname === '/notify-duty' && req.method === 'POST') {
-      return handleNotifyDuty(req, env)
+      return withCors(await handleNotifyDuty(req, env), req)
     }
     if (url.pathname === '/admin-broadcast' && req.method === 'POST') {
-      return handleAdminBroadcast(req, env)
+      return withCors(await handleAdminBroadcast(req, env), req)
     }
-    return new Response('not found', { status: 404 })
+    return withCors(new Response('not found', { status: 404 }), req)
   },
+}
+
+// Browser callers (the SPA) hit this worker cross-origin and send an
+// Authorization header, which forces a CORS preflight. Only the SPA origins
+// are allowlisted; other origins get no Access-Control-Allow-Origin and are
+// blocked by the browser. CORS is browser-side only — auth is still enforced
+// per-handler via the Bearer JWT, so this list is about UX, not security.
+const ALLOWED_ORIGINS = new Set([
+  'https://app.fundiverstw.com',
+  'http://localhost:5173',
+])
+
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('origin') ?? ''
+  if (!ALLOWED_ORIGINS.has(origin)) return {}
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, content-type',
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin',
+  }
+}
+
+function withCors(res: Response, req: Request): Response {
+  const headers = new Headers(res.headers)
+  for (const [k, v] of Object.entries(corsHeaders(req))) headers.set(k, v)
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
 }
 
 // Fires a push to the assignee the moment a duty row is inserted — out-of-band
