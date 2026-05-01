@@ -35,6 +35,9 @@ export interface Env {
   VAPID_PRIVATE_KEY: string
   VAPID_SUBJECT: string
   ADMIN_TRIGGER_SECRET?: string
+  // Optional: when set, /admin-broadcast also POSTs `{title, body}` JSON to
+  // this URL (e.g. a LINE Messaging API relay or a third-party automation).
+  BROADCAST_WEBHOOK_URL?: string
 }
 
 type SubscriptionRow = { user_id: string; endpoint: string; p256dh: string; auth: string }
@@ -57,6 +60,9 @@ export default {
     }
     if (url.pathname === '/notify-duty' && req.method === 'POST') {
       return handleNotifyDuty(req, env)
+    }
+    if (url.pathname === '/admin-broadcast' && req.method === 'POST') {
+      return handleAdminBroadcast(req, env)
     }
     return new Response('not found', { status: 404 })
   },
@@ -152,6 +158,93 @@ export async function handleNotifyDuty(req: Request, env: Env): Promise<Response
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+// Admin one-off broadcast: send a custom title+body to every device that
+// has opted in via push_subscriptions. Used for ad-hoc announcements and
+// for debugging the push pipeline end-to-end (the original motivation —
+// it's hard to tell whether a quiet day means "no reminders due today"
+// or "the worker is broken"). Optionally relays the same title+body to
+// BROADCAST_WEBHOOK_URL so a LINE / Slack / etc. integration can receive
+// the same payload.
+export async function handleAdminBroadcast(req: Request, env: Env): Promise<Response> {
+  const auth = req.headers.get('authorization') ?? ''
+  if (!auth.startsWith('Bearer ')) return new Response('unauthorized', { status: 401 })
+
+  let body: { title?: string; body?: string; url?: string }
+  try { body = await req.json() } catch { return new Response('bad request', { status: 400 }) }
+  const title = (body.title ?? '').trim()
+  const text  = (body.body  ?? '').trim()
+  const url   = (body.url   ?? '').trim() || '/'
+  if (!title || !text) return new Response('title and body are required', { status: 400 })
+
+  const anonKey = env.SUPABASE_ANON_KEY
+  if (!anonKey) return new Response('SUPABASE_ANON_KEY not configured', { status: 500 })
+
+  // Admin gate: profiles RLS lets users read their own row, so we read
+  // the caller's profile via their JWT and reject anyone whose role isn't
+  // 'admin'. profiles.role is the source of truth elsewhere in the app.
+  const userClient = createClient<Database>(env.SUPABASE_URL, anonKey, {
+    global: { headers: { Authorization: auth } },
+    auth: { persistSession: false },
+  })
+  const { data: userRes } = await userClient.auth.getUser()
+  const userId = userRes?.user?.id
+  if (!userId) return new Response('unauthorized', { status: 401 })
+  const { data: prof } = await userClient
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .maybeSingle()
+  if (prof?.role !== 'admin') return new Response('forbidden', { status: 403 })
+
+  const service = createClient<Database>(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false },
+  })
+  const { data: subs } = await service
+    .from('push_subscriptions')
+    .select('endpoint, p256dh, auth')
+
+  webpush.setVapidDetails(env.VAPID_SUBJECT, env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY)
+  const payload = JSON.stringify({ title, body: text, tag: `broadcast:${Date.now()}`, url })
+
+  let sent = 0
+  let skipped = 0
+  for (const s of subs ?? []) {
+    try {
+      await webpush.sendNotification(
+        { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+        payload,
+        { TTL: 60 * 60 * 24 }
+      )
+      sent++
+    } catch (err: unknown) {
+      const status = (err as { statusCode?: number })?.statusCode
+      if (status === 404 || status === 410) {
+        await service.from('push_subscriptions').delete().eq('endpoint', s.endpoint)
+      }
+      skipped++
+    }
+  }
+
+  // Fire-and-forget webhook relay. Failure here does not fail the request —
+  // the push fan-out is the primary channel and we don't want a flaky
+  // third-party endpoint to mask a successful broadcast.
+  let webhookOk: boolean | null = null
+  if (env.BROADCAST_WEBHOOK_URL) {
+    try {
+      const res = await fetch(env.BROADCAST_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title, body: text }),
+      })
+      webhookOk = res.ok
+    } catch {
+      webhookOk = false
+    }
+  }
+
+  return Response.json({ sent, skipped, webhook: webhookOk })
 }
 
 export async function runDailyReminders(env: Env): Promise<{ sent: number; skipped: number }> {

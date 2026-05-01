@@ -5,3 +5,9 @@ VAPID_PUBLIC_KEY=BKd0N2Xg...
 VAPID_PRIVATE_KEY=...
 VAPID_SUBJECT=mailto:fundiverstw@gmail.com
 ADMIN_TRIGGER_SECRET=pick-something-random
+# Optional. /admin-broadcast also needs the anon key so it can verify the
+# caller's role via their JWT.
+SUPABASE_ANON_KEY=eyJhbGciOi...
+# Optional. When set, /admin-broadcast POSTs `{title, body}` JSON here too
+# (e.g. a LINE Messaging API relay or a third-party automation endpoint).
+BROADCAST_WEBHOOK_URL=

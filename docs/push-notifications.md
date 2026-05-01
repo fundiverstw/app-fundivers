@@ -95,6 +95,32 @@ curl -H "Authorization: Bearer $ADMIN_TRIGGER_SECRET" \
 # → {"sent":3,"skipped":0}
 ```
 
+## Admin one-off broadcast
+
+The `/admin-broadcast` endpoint sends an immediate push (custom title +
+body) to **every** opted-in device. Surfaced in-app at
+`/admin/notifications` (Manage → "One-off notification") for admins; the
+worker also gates by reading `profiles.role` via the caller's JWT.
+
+```
+POST /admin-broadcast
+Authorization: Bearer <admin user's session JWT>
+{ "title": "Trip cancelled", "body": "Typhoon — see calendar.", "url": "/" }
+→ { "sent": N, "skipped": M, "webhook": true | false | null }
+```
+
+Set `SUPABASE_ANON_KEY` (worker secret) so the admin gate can run. Set
+`BROADCAST_WEBHOOK_URL` if you also want the same `{title, body}` payload
+relayed to a webhook (LINE Messaging API relay, n8n / Make.com flow,
+etc.) — leaving it unset just skips the relay and `webhook` returns
+`null` in the response.
+
+```sh
+cd workers/push
+npx wrangler secret put SUPABASE_ANON_KEY
+npx wrangler secret put BROADCAST_WEBHOOK_URL   # optional
+```
+
 ## iOS caveat
 
 On iPhone/iPad, Web Push only works when the PWA is **installed to the
