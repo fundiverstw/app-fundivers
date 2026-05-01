@@ -22,6 +22,7 @@ const CARDS: ManageCard[] = [
   { to: '/admin/addons',    title: 'Add-ons',       blurb: 'Add, rename, reprice or delete optional items (gear, courses, transport).' },
   { to: '/admin/travel',    title: 'DiveTravel',    blurb: 'Add or edit "what’s included" and transportation copy used by EO_dives.' },
   { to: '/admin/prices',    title: 'Price tiers',   blurb: 'Total / deposit / transport for each event price tier.' },
+  { to: '/admin/notifications', title: 'One-off notification', blurb: 'Send an immediate push (and optional LINE relay) to every opted-in device.' },
 ]
 
 export function AdminManagePage() {
