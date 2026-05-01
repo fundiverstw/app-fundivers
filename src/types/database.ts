@@ -99,6 +99,9 @@ export interface Database {
           last_dive_date: string | null
           gear_owned: string[]
           agreed_to_terms_at: string | null
+          /** Manual-verification gate. Diver-side INSERTs into bookings /
+           *  push_subscriptions are blocked unless status='active'. */
+          status: 'pending' | 'active' | 'rejected'
         }
         Insert: {
           id: string
@@ -131,6 +134,7 @@ export interface Database {
           logged_dives?: number
           last_dive_date?: string | null
           gear_owned?: string[]
+          status?: 'pending' | 'active' | 'rejected'
         }
         Update: {
           id?: string
@@ -162,6 +166,7 @@ export interface Database {
           logged_dives?: number
           last_dive_date?: string | null
           gear_owned?: string[]
+          status?: 'pending' | 'active' | 'rejected'
         }
         Relationships: []
       }
