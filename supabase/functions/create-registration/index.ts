@@ -136,10 +136,17 @@ Deno.serve(async (req) => {
     return json({ error: reason }, 500)
   }
 
-  // 1. Profile update
+  // 1. Profile update.
+  // status is the manual-verification gate — never trust the client to set
+  // its own. Strip it from the patch unconditionally; the column default
+  // ('pending') already covers guest signups, but we re-state it explicitly
+  // here so a future change to the default doesn't silently relax the gate.
+  const safePatch: Record<string, unknown> = { ...body.profile_patch }
+  delete safePatch.status
+  if (createdGuest) safePatch.status = "pending"
   const { error: profErr } = await admin
     .from("profiles")
-    .update(body.profile_patch as never)
+    .update(safePatch as never)
     .eq("id", userId)
   if (profErr) return rollback(profErr.message)
 

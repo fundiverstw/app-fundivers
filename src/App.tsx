@@ -3,6 +3,8 @@ import { lazy, Suspense } from 'react'
 import { ProtectedRoute } from './components/layout/ProtectedRoute'
 import { AdminRoute } from './components/layout/AdminRoute'
 import { StaffOrAdminRoute } from './components/layout/StaffOrAdminRoute'
+import { RequireActive } from './components/layout/RequireActive'
+import { PendingPage } from './pages/PendingPage'
 import { Logo } from './components/Logo'
 import { ToastProvider } from './components/Toast'
 import { AppShell } from './components/layout/AppShell'
@@ -24,6 +26,7 @@ import { AdminEventsPage } from './pages/admin/AdminEventsPage'
 import { AdminEventDetailPage } from './pages/admin/AdminEventDetailPage'
 import { AdminGearMapPage } from './pages/admin/AdminGearMapPage'
 import { AdminUsersPage } from './pages/admin/AdminUsersPage'
+import { AdminApplicationsPage } from './pages/admin/AdminApplicationsPage'
 import { AdminDutyPage } from './pages/admin/AdminDutyPage'
 import { AdminNewEventPage } from './pages/admin/AdminNewEventPage'
 import { AdminEditEventPage } from './pages/admin/AdminEditEventPage'
@@ -69,38 +72,44 @@ export default function App() {
           }
         />
         <Route element={<ProtectedRoute />}>
-          <Route element={<AppShell />}>
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/calendar" element={<CalendarPage />} />
-            <Route path="/map" element={<MapPage />} />
-            <Route path="/bookings" element={<BookingsPage />} />
-            <Route path="/payments" element={<PaymentsPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/duties" element={<DutiesPage />} />
-          </Route>
-          <Route path="/minigame/eel-snake" element={<EelSnakePage />} />
-          {/* Read-only event surfaces — accessible to staff + admin */}
-          <Route element={<StaffOrAdminRoute />}>
-            <Route element={<AdminShell />}>
-              <Route path="/admin" element={<DashboardPage />} />
-              <Route path="/admin/events" element={<AdminEventsPage />} />
-              <Route path="/admin/events/:type/:id" element={<AdminEventDetailPage />} />
-              <Route path="/admin/events/:type/:id/gear-map" element={<AdminGearMapPage />} />
+          {/* /pending is reachable to authenticated-but-not-active users.
+              Outside RequireActive so it's where pending divers actually land. */}
+          <Route path="/pending" element={<PendingPage />} />
+          <Route element={<RequireActive />}>
+            <Route element={<AppShell />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/calendar" element={<CalendarPage />} />
+              <Route path="/map" element={<MapPage />} />
+              <Route path="/bookings" element={<BookingsPage />} />
+              <Route path="/payments" element={<PaymentsPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/duties" element={<DutiesPage />} />
             </Route>
-          </Route>
-          {/* Write/manage routes — admin only */}
-          <Route element={<AdminRoute />}>
-            <Route element={<AdminShell />}>
-              <Route path="/admin/new" element={<AdminManagePage />} />
-              <Route path="/admin/new/event" element={<AdminNewEventPage />} />
-              <Route path="/admin/rooms" element={<AdminRoomsPage />} />
-              <Route path="/admin/addons" element={<AdminAddonsPage />} />
-              <Route path="/admin/travel" element={<AdminTravelPage />} />
-              <Route path="/admin/prices" element={<AdminPricesPage />} />
-              <Route path="/admin/events/:type/:id/edit" element={<AdminEditEventPage />} />
-              <Route path="/admin/users" element={<AdminUsersPage />} />
-              <Route path="/admin/duty" element={<AdminDutyPage />} />
-              <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
+            <Route path="/minigame/eel-snake" element={<EelSnakePage />} />
+            {/* Read-only event surfaces — accessible to staff + admin */}
+            <Route element={<StaffOrAdminRoute />}>
+              <Route element={<AdminShell />}>
+                <Route path="/admin" element={<DashboardPage />} />
+                <Route path="/admin/events" element={<AdminEventsPage />} />
+                <Route path="/admin/events/:type/:id" element={<AdminEventDetailPage />} />
+                <Route path="/admin/events/:type/:id/gear-map" element={<AdminGearMapPage />} />
+              </Route>
+            </Route>
+            {/* Write/manage routes — admin only */}
+            <Route element={<AdminRoute />}>
+              <Route element={<AdminShell />}>
+                <Route path="/admin/new" element={<AdminManagePage />} />
+                <Route path="/admin/new/event" element={<AdminNewEventPage />} />
+                <Route path="/admin/rooms" element={<AdminRoomsPage />} />
+                <Route path="/admin/addons" element={<AdminAddonsPage />} />
+                <Route path="/admin/travel" element={<AdminTravelPage />} />
+                <Route path="/admin/prices" element={<AdminPricesPage />} />
+                <Route path="/admin/events/:type/:id/edit" element={<AdminEditEventPage />} />
+                <Route path="/admin/users" element={<AdminUsersPage />} />
+                <Route path="/admin/applications" element={<AdminApplicationsPage />} />
+                <Route path="/admin/duty" element={<AdminDutyPage />} />
+                <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
+              </Route>
             </Route>
           </Route>
         </Route>
