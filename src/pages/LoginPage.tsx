@@ -33,18 +33,23 @@ export function LoginPage() {
     const { data: signIn, error } = await supabase.auth.signInWithPassword(data)
     if (error) { setServerError(error.message); return }
 
-    // Fetch role so admins land on /admin and staff on /admin/events;
-    // divers go to /calendar.
-    let role: 'diver' | 'admin' | 'staff' = 'diver'
+    // Fetch role + status. Admins land on /admin; staff on /admin/events;
+    // pending / rejected divers on /pending; everyone else on /calendar.
+    // Staff and admin bypass the status gate so a non-active staff/admin
+    // (data-fix gone wrong) can still operate.
+    let role:   'diver' | 'admin' | 'staff' = 'diver'
+    let status: 'pending' | 'active' | 'rejected' = 'active'
     if (signIn?.user) {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, status')
         .eq('id', signIn.user.id)
         .single()
       if (profile?.role === 'admin' || profile?.role === 'staff') role = profile.role
+      if (profile?.status) status = profile.status
     }
-    navigate(role === 'admin' ? '/admin' : role === 'staff' ? '/admin/events' : '/calendar')
+    if (role === 'diver' && status !== 'active') navigate('/pending')
+    else navigate(role === 'admin' ? '/admin' : role === 'staff' ? '/admin/events' : '/calendar')
   }
 
   function fill(account: typeof DEV_ACCOUNTS[number]) {
