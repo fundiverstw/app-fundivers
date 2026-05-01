@@ -32,6 +32,7 @@ import { AdminRoomsPage } from './pages/admin/AdminRoomsPage'
 import { AdminAddonsPage } from './pages/admin/AdminAddonsPage'
 import { AdminTravelPage } from './pages/admin/AdminTravelPage'
 import { AdminPricesPage } from './pages/admin/AdminPricesPage'
+import { AdminNotificationsPage } from './pages/admin/AdminNotificationsPage'
 
 // Public registration flow — /register (pick an event) and /register/:type/:id
 // (deep-link from Wix calendar) both render RegisterPage. Outside ProtectedRoute
@@ -99,6 +100,7 @@ export default function App() {
               <Route path="/admin/events/:type/:id/edit" element={<AdminEditEventPage />} />
               <Route path="/admin/users" element={<AdminUsersPage />} />
               <Route path="/admin/duty" element={<AdminDutyPage />} />
+              <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
             </Route>
           </Route>
         </Route>
