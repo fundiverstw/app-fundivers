@@ -28,12 +28,16 @@ beforeEach(() => {
   from.mockReset()
 })
 
-function okSignIn(role: 'diver' | 'admin' = 'diver', userId = 'u1') {
+function okSignIn(
+  role: 'diver' | 'admin' | 'staff' = 'diver',
+  userId = 'u1',
+  status: 'pending' | 'active' | 'rejected' = 'active',
+) {
   signInWithPassword.mockResolvedValue({
     data: { user: { id: userId } },
     error: null,
   })
-  from.mockReturnValue(mockQueryBuilder({ data: { role } }))
+  from.mockReturnValue(mockQueryBuilder({ data: { role, status } }))
 }
 
 describe('LoginPage', () => {
@@ -80,6 +84,50 @@ describe('LoginPage', () => {
     renderWithRouter(<LoginPage />)
     await user.type(byName('email'), 'admin@admin.admin')
     await user.type(byName('password'), 'adminadmin')
+    await user.click(screen.getByRole('button', { name: /sign in/i }))
+
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/admin'))
+  })
+
+  it('navigates a staff member to /admin/events after sign-in', async () => {
+    okSignIn('staff')
+    const user = userEvent.setup()
+    renderWithRouter(<LoginPage />)
+    await user.type(byName('email'), 'staff@staff.staff')
+    await user.type(byName('password'), 'staffstaff')
+    await user.click(screen.getByRole('button', { name: /sign in/i }))
+
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/admin/events'))
+  })
+
+  it('routes a pending diver to /pending', async () => {
+    okSignIn('diver', 'u1', 'pending')
+    const user = userEvent.setup()
+    renderWithRouter(<LoginPage />)
+    await user.type(byName('email'), 'new@example.com')
+    await user.type(byName('password'), 'secret123')
+    await user.click(screen.getByRole('button', { name: /sign in/i }))
+
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/pending'))
+  })
+
+  it('routes a rejected diver to /pending', async () => {
+    okSignIn('diver', 'u1', 'rejected')
+    const user = userEvent.setup()
+    renderWithRouter(<LoginPage />)
+    await user.type(byName('email'), 'rejected@example.com')
+    await user.type(byName('password'), 'secret123')
+    await user.click(screen.getByRole('button', { name: /sign in/i }))
+
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/pending'))
+  })
+
+  it('lets a pending admin still hit /admin (status gate is diver-only)', async () => {
+    okSignIn('admin', 'u1', 'pending')
+    const user = userEvent.setup()
+    renderWithRouter(<LoginPage />)
+    await user.type(byName('email'), 'admin@example.com')
+    await user.type(byName('password'), 'secret123')
     await user.click(screen.getByRole('button', { name: /sign in/i }))
 
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/admin'))

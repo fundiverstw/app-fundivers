@@ -1,5 +1,7 @@
-import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { NavLink, Outlet, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
+import { supabase } from '../../lib/supabase'
 import { Logo } from '../Logo'
 import { CalendarIcon } from '../icons/CalendarIcon'
 import { CrosshairIcon } from '../icons/CrosshairIcon'
@@ -21,6 +23,23 @@ const adminNav: NavItem[] = [
 export function AdminShell() {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const [pendingCount, setPendingCount] = useState<number | null>(null)
+
+  // Refetch pending-applications count on every admin route change so the
+  // badge reflects reality after approve/reject without needing a global
+  // event bus. Only admins can read pending profiles via RLS, so staff
+  // sessions get null (badge stays hidden).
+  useEffect(() => {
+    if (profile?.role !== 'admin') { setPendingCount(null); return }
+    let cancelled = false
+    supabase
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .then(({ count }) => { if (!cancelled) setPendingCount(count ?? 0) })
+    return () => { cancelled = true }
+  }, [profile?.role, location.pathname])
 
   async function handleSignOut() {
     await signOut()
@@ -52,6 +71,15 @@ export function AdminShell() {
           <Logo size="sm" />
         </Link>
         <div className="flex-1 flex items-center justify-end gap-3">
+          {pendingCount != null && pendingCount > 0 && (
+            <Link
+              to="/admin/applications"
+              className="text-xs font-semibold bg-red-500 text-white px-2 py-0.5 rounded-full hover:bg-red-400"
+              aria-label={`${pendingCount} pending applications`}
+            >
+              {pendingCount} pending
+            </Link>
+          )}
           <Link to="/calendar" className="text-sm font-semibold text-amber-300 hover:text-amber-200">
             {profile?.display_name ?? profile?.full_name}
           </Link>
