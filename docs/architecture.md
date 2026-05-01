@@ -10,11 +10,18 @@
   + notificationclick).
 - **Backend / DB:** Supabase (Postgres 15, Auth, RLS). No custom
   server for the main app — the frontend talks to PostgREST directly.
-- **Hosting:** Cloudflare Workers, assets-only. See
+- **Hosting:** Cloudflare Workers, assets-only. The SPA worker is the
+  root `wrangler.toml` (`name = "app-fundiverstw"`). See
   [deployment.md](./deployment.md).
-- **Scheduled jobs:** One Cloudflare Worker in `workers/push/` runs a
-  daily cron for reminders. See
+- **Scheduled jobs + admin endpoints:** One Cloudflare Worker in
+  `workers/push/` runs a daily reminder cron and serves
+  `/admin-broadcast`, `/notify-duty`, and `/run` for the SPA. See
   [push-notifications.md](./push-notifications.md).
+- **Server-side registration:** A Supabase Edge Function in
+  `supabase/functions/create-registration/` handles the atomic
+  signUp + profile-update + booking insert + PDF email pipeline for
+  the public registration form. Email goes out via Gmail SMTP
+  (`nodemailer`).
 
 ## Directory layout
 
@@ -31,30 +38,45 @@ src/
     push-reminders.ts     Pure reminder-selection logic (shared with worker)
   hooks/useAuth.ts        Session + profile subscription
   pages/
+    DashboardPage.tsx     Shared dashboard (rendered at /dashboard for
+                          divers and /admin for admins)
     CalendarPage.tsx      Diver calendar + register flow entry
+    MapPage.tsx           Dive sites map
     BookingsPage.tsx      Diver's own bookings (upcoming / past)
     PaymentsPage.tsx      Diver's own payment status
     ProfilePage.tsx       Editable profile + push-notification toggle
-    LoginPage.tsx / SignupPage.tsx
+    DutiesPage.tsx        Staff/admin own-duty list
+    RegisterPage.tsx      Public, no-auth registration funnel
+    EelSnakePage.tsx      Easter-egg minigame
+    LoginPage.tsx / SignupPage.tsx / ForgotPasswordPage.tsx /
+    ResetPasswordPage.tsx / TermsPage.tsx
     admin/
-      AdminDashboard.tsx
-      AdminEventsPage.tsx
-      AdminEventDetailPage.tsx
-      AdminUsersPage.tsx
+      AdminEventsPage.tsx / AdminEventDetailPage.tsx /
+      AdminEditEventPage.tsx / AdminNewEventPage.tsx /
+      AdminGearMapPage.tsx / AdminUsersPage.tsx /
+      AdminDutyPage.tsx / AdminNotificationsPage.tsx /
+      AdminManagePage.tsx (catalog landing) +
+      AdminRoomsPage / AdminAddonsPage / AdminTravelPage /
+      AdminPricesPage  (catalog editors)
   components/
     layout/
-      AppShell.tsx        Diver shell (top bar + bottom nav)
-      AdminShell.tsx      Admin shell (separate nav, "view as diver" toggle)
-      ProtectedRoute.tsx  Gates on session
-      AdminRoute.tsx      Gates on profile.role === 'admin'
+      AppShell.tsx           Diver shell (top bar + bottom nav)
+      AdminShell.tsx         Admin shell (separate nav, "view as diver" toggle)
+      ProtectedRoute.tsx     Gates on session
+      AdminRoute.tsx         Gates on profile.role === 'admin'
+      StaffOrAdminRoute.tsx  Gates on profile.role IN ('admin','staff')
     register/
-      RegisterForm.tsx    3-step booking wizard
+      RegisterForm.tsx       3-step booking wizard (used by RegisterPage)
     admin/
-      EventMemos.tsx      Staff-visible flags per event
-  types/database.ts       Hand-maintained Supabase Database type
+      EventMemos.tsx         Staff-visible flags per event
+  types/database.ts          Hand-maintained Supabase Database type
 
-supabase/migrations/      Forward-only SQL migrations
-workers/push/             Cloudflare Worker cron sender
+supabase/migrations/         Forward-only SQL migrations
+supabase/functions/          Supabase Edge Functions (Deno)
+  create-registration/       Atomic registration: account + profile +
+                             booking + PDF + Gmail SMTP
+  _shared/pdf.ts             Registration PDF builder (server-side)
+workers/push/                Cloudflare Worker: cron + admin endpoints
 tests/
   setup.unit.ts           Stubs VITE_* env for unit tests
   setup.integration.ts    Loads local stack's SERVICE_ROLE / API_URL
@@ -69,25 +91,34 @@ scripts/
 ```
 ┌───────────── Browser (PWA) ─────────────┐
 │ React SPA  ←→  Service Worker (sw.js)   │
-└───────┬─────────────────┬───────────────┘
-        │ supabase-js     │ Web Push endpoint (push service)
-        ↓                 ↑
-┌───────────── Supabase ─────────────┐    ┌────── Cloudflare Worker ───────┐
-│ Postgres + PostgREST + Auth + RLS  │←───│ workers/push (daily cron)      │
-└────────────────────────────────────┘    │ service_role_key → DB queries  │
-                                          │ VAPID priv key → web-push send │
-                                          └────────────────────────────────┘
+└───┬───────────┬────────────────┬────────┘
+    │supabase-js│ fetch (admin)  │ Web Push endpoint
+    ↓           ↓                ↑
+┌──────────────────────┐ ┌──────────────────────────────────┐
+│ Supabase             │ │ workers/push (Cloudflare)        │
+│ Postgres + PostgREST │←│ daily cron + /admin-broadcast +  │
+│ Auth + RLS + Edge Fns│ │ /notify-duty + /run              │
+│  • create-registration│ │ service_role_key → DB queries    │
+└──────────────────────┘ │ VAPID priv key → web-push send   │
+                         └──────────────────────────────────┘
 ```
 
-**Three places code runs:**
+**Four places code runs:**
 
 1. **Browser (SPA + SW).** All diver-facing features. Auth via the
    user's access token; PostgREST + RLS enforce row access.
 2. **Cloudflare Worker** (`app-fundiverstw`). Static asset server for
-   the SPA. No custom fetch handler today.
-3. **Cloudflare Worker** (`fundivers-push`). Scheduled cron. Uses the
-   Supabase service-role key (bypasses RLS) because it needs to read
-   every user's pending reminders and write the ledger.
+   the SPA. No custom fetch handler — `[assets]` only.
+3. **Cloudflare Worker** (`fundivers-push`). Scheduled cron + admin
+   endpoints (`/admin-broadcast`, `/notify-duty`, `/run`). Uses the
+   Supabase service-role key (bypasses RLS) for reminder fan-out and
+   to look up subscriptions; admin endpoints additionally verify the
+   caller's user JWT against `profiles.role`.
+4. **Supabase Edge Function** (`create-registration`). Public POST
+   endpoint that the registration form invokes. Uses service role to
+   create the auth user (guest path), update profile, insert booking,
+   and send the PDF over Gmail SMTP. CORS is `*` here — auth is by
+   the call shape (guest = email/password in body, authed = Bearer).
 
 ## Why this shape
 

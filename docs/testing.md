@@ -84,14 +84,25 @@ a clear error.
 
 ### What integration tests cover
 
-| File | Focus |
+The `tests/integration/` folder is the source of truth — `ls` it for
+the full list. Representative slices:
+
+| Pattern | Focus |
 | --- | --- |
-| `auth-smoke.test.ts`       | Signup trigger creates a profile; login returns a session |
-| `profile-trigger.test.ts`  | `handle_new_user` edge cases (missing metadata, etc.) |
-| `constraints.test.ts`      | Booking XOR / unique / RLS policy enforcement |
-| `eo-constraints.test.ts`   | `EO_*` catalog defaults + FKs |
-| `memos.test.ts`            | `event_memos` XOR + resolved-trio CHECK |
-| `seed-integrity.test.ts`   | `supabase/seed.sql` still loads cleanly |
+| `auth-smoke.test.ts` / `profile-trigger.test.ts`           | Signup trigger creates a profile; login returns a session; `handle_new_user` edge cases |
+| `constraints.test.ts` / `core-rls.test.ts`                 | Booking XOR / unique / immutability triggers / core RLS |
+| `staff-role.test.ts`                                       | The staff role's read scope and write denial |
+| `eo-*-admin-writes.test.ts` / `eo-public-read.test.ts`     | RLS on the EO_\* catalog tables (admin can write, anon/diver read what's public) |
+| `eo-events-*.test.ts`                                      | Event-level constraints (cancellation, payment deadlines) |
+| `event-addons.test.ts` / `event-rooms.test.ts`             | Junction tables (`eo_dive_addons`, `eo_dive_rooms`) |
+| `memos.test.ts`                                            | `event_memos` XOR + resolved-trio CHECK |
+| `duties.test.ts`                                           | Duty assignee trigger (must be staff or admin) |
+| `dive-sites-rls.test.ts` / `cert-levels-rls.test.ts`       | Reference data: read-open, write-admin |
+| `admin-audit-log.test.ts`                                  | Admin mutations land in the audit log |
+| `pii-retention.test.ts`                                    | TOS-acceptance + retention behaviours |
+| `seed-integrity.test.ts`                                   | `supabase/seed.sql` still loads cleanly |
+| `cert-cards-storage.test.ts`                               | Storage bucket policies for cert-card uploads |
+| `profile-gear-sizes-rpc.test.ts`                           | RPC for atomic gear-size update |
 
 ### When to write an integration test
 

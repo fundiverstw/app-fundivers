@@ -109,17 +109,49 @@ Authorization: Bearer <admin user's session JWT>
 → { "sent": N, "skipped": M, "webhook": true | false | null }
 ```
 
-Set `SUPABASE_ANON_KEY` (worker secret) so the admin gate can run. Set
-`BROADCAST_WEBHOOK_URL` if you also want the same `{title, body}` payload
-relayed to a webhook (LINE Messaging API relay, n8n / Make.com flow,
-etc.) — leaving it unset just skips the relay and `webhook` returns
-`null` in the response.
+Set `SUPABASE_ANON_KEY` (worker secret) so the admin gate can run.
+Use the **legacy JWT-format anon key** (the `eyJ…` value of
+`VITE_SUPABASE_ANON_KEY`) — Supabase's auth API rejects the
+publishable-format `sb_publishable_…` keys here as "Invalid API key."
+Set `BROADCAST_WEBHOOK_URL` if you also want the same `{title, body}`
+payload relayed to a webhook (LINE Messaging API relay, n8n /
+Make.com flow, etc.) — leaving it unset just skips the relay and
+`webhook` returns `null` in the response.
 
 ```sh
 cd workers/push
 npx wrangler secret put SUPABASE_ANON_KEY
 npx wrangler secret put BROADCAST_WEBHOOK_URL   # optional
 ```
+
+## Duty-assigned push (`/notify-duty`)
+
+When an admin assigns a duty (`/admin/duty`), the SPA fires a
+fire-and-forget POST so the assignee's device beeps immediately
+rather than waiting for the next daily cron tick.
+
+```
+POST /notify-duty
+Authorization: Bearer <admin user's session JWT>
+{ "duty_id": "<uuid>" }
+→ { sent: N, skipped: M }
+```
+
+The worker re-reads the duty under the caller's JWT (RLS gates on
+admin), then uses the service-role key to look up the assignee's
+push subscriptions and send. Errors are deliberately swallowed on
+the SPA side — the duty row is the source of truth, the push is
+just acceleration. See `src/lib/duties.ts → notifyDutyAssigned`.
+
+## CORS
+
+The worker is on a different origin from the SPA, so browser POSTs
+to `/admin-broadcast` and `/notify-duty` trigger a preflight. The
+worker allowlists exactly `https://app.fundiverstw.com` and
+`http://localhost:5173`; other origins get no
+`Access-Control-Allow-Origin` and the browser blocks them. CORS is
+browser-side only — auth is still enforced per-handler via the
+Bearer JWT, so the allowlist is for UX, not security.
 
 ## iOS caveat
 
