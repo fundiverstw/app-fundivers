@@ -34,10 +34,18 @@ export interface TestUser {
 /**
  * Create a throwaway auth user with email pre-confirmed. The profile row is
  * created automatically by the `handle_new_user` trigger.
+ *
+ * The trigger leaves new profiles with status='pending' (the default). Tests
+ * default to flipping status to 'active' so existing RLS contracts that
+ * predate the manual-verification gate keep passing. Pass `status: 'pending'`
+ * explicitly when you're testing the gate itself.
  */
 export async function createTestUser(
   admin: DB = adminClient(),
-  overrides: { role?: 'diver' | 'admin' | 'staff' } = {}
+  overrides: {
+    role?: 'diver' | 'admin' | 'staff'
+    status?: 'pending' | 'active' | 'rejected'
+  } = {}
 ): Promise<TestUser> {
   const rand = Math.random().toString(36).slice(2, 10)
   const email = `test_${rand}@example.test`
@@ -50,13 +58,13 @@ export async function createTestUser(
   })
   if (error || !data.user) throw new Error(`createUser failed: ${error?.message}`)
 
-  if (overrides.role && overrides.role !== 'diver') {
-    const { error: rerr } = await admin
-      .from('profiles')
-      .update({ role: overrides.role })
-      .eq('id', data.user.id)
-    if (rerr) throw new Error(`role update failed: ${rerr.message}`)
-  }
+  const patch: Record<string, string> = { status: overrides.status ?? 'active' }
+  if (overrides.role && overrides.role !== 'diver') patch.role = overrides.role
+  const { error: rerr } = await admin
+    .from('profiles')
+    .update(patch as never)
+    .eq('id', data.user.id)
+  if (rerr) throw new Error(`profile update failed: ${rerr.message}`)
 
   return { id: data.user.id, email, password, user: data.user }
 }

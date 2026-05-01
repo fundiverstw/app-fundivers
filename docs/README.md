@@ -16,12 +16,6 @@ into source.
 | [testing.md](./testing.md)                             | Unit vs integration conventions, `mockQueryBuilder`, Makefile surface |
 | [deployment.md](./deployment.md)                       | Env vars, Cloudflare deploy, Supabase link / push / pull / verify, edge functions |
 
-In-flight proposals (live until shipped, then folded into the topic doc):
-
-| Doc | Status |
-| --- | --- |
-| [plan-manual-verification.md](./plan-manual-verification.md) | Proposal — admin-approval gate before new accounts can write to Supabase. Awaiting decision between two implementation options. |
-
 ## Conventions called out across docs
 
 - **Migrations are immutable once pushed.** Add a forward migration; never
