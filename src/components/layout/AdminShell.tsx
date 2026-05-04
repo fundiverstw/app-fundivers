@@ -28,10 +28,10 @@ export function AdminShell() {
 
   // Refetch pending-applications count on every admin route change so the
   // badge reflects reality after approve/reject without needing a global
-  // event bus. Only admins can read pending profiles via RLS, so staff
-  // sessions get null (badge stays hidden).
+  // event bus. Only admins can read pending profiles via RLS, so we gate
+  // the fetch (and the rendered badge below) on role.
   useEffect(() => {
-    if (profile?.role !== 'admin') { setPendingCount(null); return }
+    if (profile?.role !== 'admin') return
     let cancelled = false
     supabase
       .from('profiles')
@@ -40,6 +40,7 @@ export function AdminShell() {
       .then(({ count }) => { if (!cancelled) setPendingCount(count ?? 0) })
     return () => { cancelled = true }
   }, [profile?.role, location.pathname])
+  const displayPendingCount = profile?.role === 'admin' ? pendingCount : null
 
   async function handleSignOut() {
     await signOut()
@@ -71,13 +72,13 @@ export function AdminShell() {
           <Logo size="sm" />
         </Link>
         <div className="flex-1 flex items-center justify-end gap-3">
-          {pendingCount != null && pendingCount > 0 && (
+          {displayPendingCount != null && displayPendingCount > 0 && (
             <Link
               to="/admin/applications"
               className="text-xs font-semibold bg-red-500 text-white px-2 py-0.5 rounded-full hover:bg-red-400"
-              aria-label={`${pendingCount} pending applications`}
+              aria-label={`${displayPendingCount} pending applications`}
             >
-              {pendingCount} pending
+              {displayPendingCount} pending
             </Link>
           )}
           <Link to="/calendar" className="text-sm font-semibold text-amber-300 hover:text-amber-200">

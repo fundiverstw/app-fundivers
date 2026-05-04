@@ -19,7 +19,7 @@ beforeEach(() => {
   useAuthMock.mockReset()
   signOut.mockReset()
   usePWAInstallMock.mockReset()
-  usePWAInstallMock.mockReturnValue({ canInstall: false, install: vi.fn() })
+  usePWAInstallMock.mockReturnValue({ canInstall: false, install: vi.fn(), isIOSInstallable: false })
 })
 
 function routedRender(start = '/calendar') {
@@ -74,17 +74,48 @@ describe('AppShell', () => {
     expect(await screen.findByText('LOGIN')).toBeInTheDocument()
   })
 
-  it('shows Install app button only when canInstall is true', () => {
+  it('shows Install app button when canInstall is true', () => {
     useAuthMock.mockReturnValue({ profile: null, signOut })
-    usePWAInstallMock.mockReturnValue({ canInstall: true, install: vi.fn() })
+    usePWAInstallMock.mockReturnValue({ canInstall: true, install: vi.fn(), isIOSInstallable: false })
     routedRender()
     expect(screen.getByRole('button', { name: /install app/i })).toBeInTheDocument()
   })
 
-  it('hides Install app button when canInstall is false', () => {
+  it('shows Install app button on iOS Safari (no native prompt available)', () => {
+    useAuthMock.mockReturnValue({ profile: null, signOut })
+    usePWAInstallMock.mockReturnValue({ canInstall: false, install: vi.fn(), isIOSInstallable: true })
+    routedRender()
+    expect(screen.getByRole('button', { name: /install app/i })).toBeInTheDocument()
+  })
+
+  it('hides Install app button when neither canInstall nor isIOSInstallable', () => {
     useAuthMock.mockReturnValue({ profile: null, signOut })
     routedRender()
     expect(screen.queryByRole('button', { name: /install app/i })).not.toBeInTheDocument()
+  })
+
+  it('Install button on iOS opens the instructions modal instead of calling install()', async () => {
+    useAuthMock.mockReturnValue({ profile: null, signOut })
+    const install = vi.fn()
+    usePWAInstallMock.mockReturnValue({ canInstall: false, install, isIOSInstallable: true })
+    const user = userEvent.setup()
+    routedRender()
+    await user.click(screen.getByRole('button', { name: /install app/i }))
+    expect(install).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: /install fundivers on iphone/i })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /got it/i }))
+    expect(screen.queryByRole('dialog', { name: /install fundivers on iphone/i })).not.toBeInTheDocument()
+  })
+
+  it('Install button calls install() directly when a native prompt is available', async () => {
+    useAuthMock.mockReturnValue({ profile: null, signOut })
+    const install = vi.fn()
+    usePWAInstallMock.mockReturnValue({ canInstall: true, install, isIOSInstallable: false })
+    const user = userEvent.setup()
+    routedRender()
+    await user.click(screen.getByRole('button', { name: /install app/i }))
+    expect(install).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('dialog', { name: /install fundivers on iphone/i })).not.toBeInTheDocument()
   })
 
   it("renders the admin's name as a link to /admin (the view-toggle affordance)", () => {

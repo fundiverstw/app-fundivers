@@ -1,0 +1,67 @@
+# Manual Cloudflare deploy. Trigger from the GitHub Actions UI:
+#   Actions → "Deploy to Cloudflare" → Run workflow → pick a target.
+#
+# Required repository secrets:
+#   CLOUDFLARE_API_TOKEN     — token with "Edit Cloudflare Workers" permission
+#   CLOUDFLARE_ACCOUNT_ID    — visible in the Cloudflare dashboard sidebar
+#   VITE_SUPABASE_URL        — baked into the SPA bundle at build time
+#   VITE_SUPABASE_ANON_KEY   — baked into the SPA bundle at build time
+#   VITE_VAPID_PUBLIC_KEY    — optional; push UI hides itself if absent
+name: Deploy to Cloudflare
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Which worker to deploy
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - spa
+          - push
+
+jobs:
+  deploy-spa:
+    if: ${{ inputs.target == 'spa' || inputs.target == 'both' }}
+    name: Deploy SPA (app-fundiverstw)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_VAPID_PUBLIC_KEY: ${{ secrets.VITE_VAPID_PUBLIC_KEY }}
+      - name: Deploy with Wrangler
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  deploy-push:
+    if: ${{ inputs.target == 'push' || inputs.target == 'both' }}
+    name: Deploy push cron (fundivers-push)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: workers/push/package-lock.json
+      - run: npm ci
+        working-directory: workers/push
+      - name: Deploy with Wrangler
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/push
