@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { usePWAInstall } from '../../hooks/usePWAInstall'
+import { IOSInstallModal } from '../install/IOSInstallModal'
 import { WelcomeModal } from '../welcome/WelcomeModal'
 import { Logo } from '../Logo'
 import { CalendarIcon } from '../icons/CalendarIcon'
@@ -66,11 +67,18 @@ const dutyNavItem = { to: '/duties', label: 'Duty', icon: <CrosshairIcon /> }
 export function AppShell() {
   const { user, profile, signOut } = useAuth()
   const navigate = useNavigate()
-  const { canInstall, install } = usePWAInstall()
+  const { canInstall, install, isIOSInstallable } = usePWAInstall()
+  const [showIOSInstall, setShowIOSInstall] = useState(false)
   // Local override so the modal hides immediately on dismiss; the
   // server-side welcomed_at update propagates a moment later.
   const [welcomedLocally, setWelcomedLocally] = useState(false)
   const showWelcome = !!user && !welcomedLocally && !user.user_metadata?.welcomed_at
+  const showInstallButton = canInstall || isIOSInstallable
+
+  function handleInstallClick() {
+    if (canInstall) install()
+    else if (isIOSInstallable) setShowIOSInstall(true)
+  }
 
   async function handleSignOut() {
     await signOut()
@@ -121,8 +129,8 @@ export function AppShell() {
           <Logo size="sm" />
         </Link>
         <div className="flex-1 flex items-center justify-end gap-3">
-          {canInstall && (
-            <button onClick={install} className={`text-xs px-2 py-1 rounded-md ${BTN_LIGHT}`}>
+          {showInstallButton && (
+            <button onClick={handleInstallClick} className={`text-xs px-2 py-1 rounded-md ${BTN_LIGHT}`}>
               Install app
             </button>
           )}
@@ -144,6 +152,7 @@ export function AppShell() {
       </main>
 
       {showWelcome && user && <WelcomeModal user={user} onDismiss={() => setWelcomedLocally(true)} />}
+      {showIOSInstall && <IOSInstallModal onDismiss={() => setShowIOSInstall(false)} />}
 
       <nav className={NAV_BOTTOM}>
         {(profile?.role === 'admin' || profile?.role === 'staff'

@@ -14,7 +14,7 @@ into source.
 | [admin.md](./admin.md)                                 | Admin routes, event memos, user search, role-view toggle |
 | [push-notifications.md](./push-notifications.md)       | Web Push: VAPID, service worker, Cloudflare cron sender, `/admin-broadcast`, `/notify-duty`, CORS |
 | [testing.md](./testing.md)                             | Unit vs integration conventions, `mockQueryBuilder`, Makefile surface |
-| [deployment.md](./deployment.md)                       | Env vars, Cloudflare deploy, Supabase link / push / pull / verify, edge functions |
+| [deployment.md](./deployment.md)                       | Env vars (which secret lives where), Cloudflare deploy (CLI + GitHub Actions), Supabase link / push / pull / verify, edge functions |
 
 ## Conventions called out across docs
 

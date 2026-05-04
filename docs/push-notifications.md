@@ -31,9 +31,17 @@ workers/push/                                               Cloudflare Worker cr
 npx web-push generate-vapid-keys
 ```
 
-You get a public + private key. The **public** key ships with the client
-(`VITE_VAPID_PUBLIC_KEY`); the **private** key stays in the worker
-(`VAPID_PRIVATE_KEY`).
+You get a public + private key. The **public** key ships with the
+client and is *also* set on the worker — it appears under two names:
+
+- `VITE_VAPID_PUBLIC_KEY` — in `.env.local`, `.env.production`, and the
+  GitHub Actions secret of the same name. The `VITE_` prefix is what
+  exposes it to the browser bundle.
+- `VAPID_PUBLIC_KEY` — same value, set on the push worker via
+  `wrangler secret put` (and kept in `.env.push` as a paste-buffer).
+
+The **private** key (`VAPID_PRIVATE_KEY`) lives only on the push worker
+— never in the SPA, never in GitHub.
 
 ### 2. Apply the migration
 
