@@ -42,6 +42,11 @@ interface RegistrationBody {
   password?: string  // guest path only
   agreed_to_terms_at?: string
 
+  // Admin-on-behalf path: caller must be an admin (verified by JWT).
+  // When set, the booking lands on this user instead of the JWT subject,
+  // and the confirmation email goes to that user's address.
+  target_user_id?: string
+
   event_type:  'dive' | 'course'
   event_id:    string
   profile_patch: Record<string, unknown>
@@ -90,7 +95,28 @@ Deno.serve(async (req) => {
   let createdGuest = false
 
   const auth = req.headers.get("Authorization") ?? ""
-  if (auth.startsWith("Bearer ") && !body.email) {
+  if (auth.startsWith("Bearer ") && body.target_user_id) {
+    // Admin-on-behalf: caller must be an admin and the booking lands on
+    // body.target_user_id. We still use the JWT to identify the caller,
+    // then check role via the service-role client (RLS would otherwise
+    // hide other rows).
+    const caller = createClient(SUPABASE_URL, ANON_KEY, {
+      global: { headers: { Authorization: auth } },
+      auth:   { persistSession: false },
+    })
+    const { data: c, error: cErr } = await caller.auth.getUser()
+    if (cErr || !c.user) return json({ error: "invalid bearer" }, 401)
+
+    const { data: callerProfile } = await admin
+      .from("profiles").select("role").eq("id", c.user.id).single()
+    if (callerProfile?.role !== "admin") return json({ error: "admin only" }, 403)
+
+    const { data: target, error: tErr } = await admin.auth.admin.getUserById(body.target_user_id)
+    if (tErr || !target.user) return json({ error: "target user not found" }, 404)
+    userId = target.user.id
+    registrantEmail = target.user.email ?? ""
+    if (!registrantEmail) return json({ error: "target has no email" }, 400)
+  } else if (auth.startsWith("Bearer ") && !body.email) {
     const caller = createClient(SUPABASE_URL, ANON_KEY, {
       global: { headers: { Authorization: auth } },
       auth:   { persistSession: false },
@@ -150,7 +176,22 @@ Deno.serve(async (req) => {
     .eq("id", userId)
   if (profErr) return rollback(profErr.message)
 
-  // 2. Booking insert
+  // 2. Booking insert. Pre-check for an active booking on the same
+  //    event so we can surface a friendly message; the partial unique
+  //    index (bookings_one_active_*_per_user_idx) is the safety net for
+  //    races. Cancelled rows don't count — the user can re-register.
+  const fkColumn = body.event_type === "dive" ? "eo_dive_id" : "eo_course_id"
+  const { data: existing } = await admin
+    .from("bookings")
+    .select("id, status")
+    .eq("user_id", userId)
+    .eq(fkColumn, body.event_id)
+    .neq("status", "cancelled")
+    .maybeSingle()
+  if (existing) {
+    return rollback(`This diver already has an active booking for this event (status: ${existing.status}).`)
+  }
+
   const fk = body.event_type === "dive"
     ? { eo_dive_id: body.event_id, eo_course_id: null }
     : { eo_dive_id: null, eo_course_id: body.event_id }
