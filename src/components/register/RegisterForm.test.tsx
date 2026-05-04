@@ -616,4 +616,39 @@ describe('RegisterForm', () => {
     // Admin edits stay direct — no edge function, no fresh PDF email.
     expect(invoke).not.toHaveBeenCalled()
   })
+
+  it('admin "register on behalf of": submits target_user_id and runs as authed (no email/password)', async () => {
+    setupFrom()
+    const onBooked = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter>
+        <RegisterFormBody
+          event={sampleEvent}
+          profile={sampleProfile}
+          userId="diver-99"
+          actingOnBehalfOf="diver-99"
+          onSubmitSuccess={onBooked}
+        />
+      </MemoryRouter>
+    )
+
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+    const opts = invoke.mock.calls[0][1] as { body: Record<string, unknown> }
+    expect(opts.body).toMatchObject({
+      target_user_id: 'diver-99',
+      event_type:     'dive',
+      event_id:       'dive_abc',
+    })
+    // Admin path is authed via JWT, not guest — no signup ride-along.
+    expect(opts.body).not.toHaveProperty('email')
+    expect(opts.body).not.toHaveProperty('password')
+    expect(setSession).not.toHaveBeenCalled()
+    expect(onBooked).toHaveBeenCalledWith({ id: 'b-new' })
+  })
 })

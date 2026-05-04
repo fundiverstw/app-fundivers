@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useToast } from '../../hooks/useToast'
@@ -29,16 +29,18 @@ export function AdminApplicationsPage() {
   const [acting, setActing] = useState<string | null>(null)
   const [rejectReasons, setRejectReasons] = useState<Map<string, string>>(new Map())
 
-  const refetch = useCallback(async () => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false })
-    setUsers((data ?? []) as Profile[])
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+      if (!cancelled) setUsers((data ?? []) as Profile[])
+    })()
+    return () => { cancelled = true }
   }, [])
-
-  useEffect(() => { refetch() }, [refetch])
 
   async function expand(userId: string) {
     if (expandedId === userId) { setExpanded(null); return }

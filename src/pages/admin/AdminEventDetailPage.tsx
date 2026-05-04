@@ -7,6 +7,7 @@ import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
 import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
 import { AdminNotes } from '../../components/admin/AdminNotes'
+import { AdminAddDiverModal } from '../../components/admin/AdminAddDiverModal'
 import { EventStaffSection } from '../../components/admin/EventStaffSection'
 import { RegisterForm } from '../../components/register/RegisterForm'
 import { shoeAsJp } from '../../lib/shoe-size'
@@ -32,6 +33,8 @@ export function AdminEventDetailPage() {
   const [roomNames, setRoomNames] = useState<RoomNameMap>(new Map())
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<Registrant | null>(null)
+  const [addDiverOpen, setAddDiverOpen] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
   // Cancel-event flow state. The modal opens on click; the actual update
   // runs only after the admin confirms in the modal.
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
@@ -109,7 +112,7 @@ export function AdminEventDetailPage() {
     })()
 
     return () => { cancelled = true }
-  }, [type, id])
+  }, [type, id, refreshKey])
 
   async function updateStatus(bookingId: string, newStatus: Booking['status']) {
     await supabase.from('bookings').update({ status: newStatus }).eq('id', bookingId)
@@ -181,6 +184,13 @@ export function AdminEventDetailPage() {
           <div className="flex items-center justify-end gap-2">
             {isAdmin && (
               <>
+                <button
+                  type="button"
+                  onClick={() => setAddDiverOpen(true)}
+                  className="text-xs bg-emerald-900/60 hover:bg-emerald-900 text-white px-3 py-1 rounded-lg"
+                >
+                  Add diver
+                </button>
                 <Link
                   to={`/admin/events/${type}/${id}/edit`}
                   className="text-xs bg-blue-900/60 hover:bg-blue-900 text-white px-3 py-1 rounded-lg"
@@ -249,6 +259,17 @@ export function AdminEventDetailPage() {
               r.booking.id === b.id ? { ...r, booking: b } : r
             ))
             setEditing(null)
+          }}
+        />
+      )}
+
+      {addDiverOpen && event && (
+        <AdminAddDiverModal
+          event={event}
+          onClose={() => setAddDiverOpen(false)}
+          onAdded={() => {
+            toast.success('Diver registered for this event')
+            setRefreshKey(k => k + 1)
           }}
         />
       )}
