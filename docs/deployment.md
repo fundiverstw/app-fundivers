@@ -15,25 +15,89 @@ described below.
 
 ## Environment variables
 
-### Frontend build (`.env.local`, read by Vite)
+Secrets live in five distinct places. Putting one in the wrong place is
+the most common deploy footgun, so the table below maps each value to
+its destination(s).
+
+| Value | Local dev (`.env.local`) | Local build (`.env.production`) | Push worker stash (`.env.push`) | Cloudflare Worker secret (`wrangler secret put`) | GitHub Actions repo secret |
+| --- | :-: | :-: | :-: | :-: | :-: |
+| `VITE_SUPABASE_URL`         | yes | yes |     |     | yes |
+| `VITE_SUPABASE_ANON_KEY`    | yes | yes |     |     | yes |
+| `VITE_VAPID_PUBLIC_KEY`     | yes | yes |     |     | yes |
+| `SUPABASE_PROJECT_REF`      | yes |     |     |     |     |
+| `SUPABASE_DB_PASSWORD`      | yes |     |     |     |     |
+| `SUPABASE_POOLER_HOST`      | yes |     |     |     |     |
+| `VAPID_PUBLIC_KEY` *(push worker — same value as `VITE_VAPID_PUBLIC_KEY`, just a different name)*  |     |     | yes | yes (push worker) |     |
+| `VAPID_PRIVATE_KEY`         |     |     | yes | yes (push worker) |     |
+| `VAPID_SUBJECT`             |     |     | yes | set in `workers/push/wrangler.toml [vars]` |     |
+| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_ANON_KEY` *(push worker)* |     |     |     | yes (push worker) |     |
+| `ADMIN_TRIGGER_SECRET` / `BROADCAST_WEBHOOK_URL` |     |     |     | yes (push worker) |     |
+| `GMAIL_USER` / `GMAIL_APP_PASSWORD` |     |     |     | `supabase secrets set` (edge function) |     |
+| `CLOUDFLARE_API_TOKEN`      |     |     |     |     | yes |
+| `CLOUDFLARE_ACCOUNT_ID`     |     |     |     |     | yes |
+
+### `.env.local` — local dev
+
+Read by Vite (`npm run dev`) and by `make` targets that talk to the
+linked Supabase project.
 
 | Var | Where used | Notes |
 | --- | --- | --- |
-| `VITE_SUPABASE_URL`            | `src/lib/supabase.ts` | Cloud project URL; local is `http://127.0.0.1:64321` |
-| `VITE_SUPABASE_ANON_KEY`       | `src/lib/supabase.ts` | Public; ships to the browser |
-| `VITE_VAPID_PUBLIC_KEY`        | `src/lib/push.ts`     | Optional — push toggle is hidden if unset |
+| `VITE_SUPABASE_URL`      | `src/lib/supabase.ts` | Cloud project URL; local is `http://127.0.0.1:64321` |
+| `VITE_SUPABASE_ANON_KEY` | `src/lib/supabase.ts` | Public; ships to the browser |
+| `VITE_VAPID_PUBLIC_KEY`  | `src/lib/push.ts`     | Push toggle is hidden if unset |
+| `SUPABASE_PROJECT_REF`   | `make link`, `make push`     | e.g. `abcdefghij` |
+| `SUPABASE_DB_PASSWORD`   | `make push`, `make pull`     | DB password for migrations |
+| `SUPABASE_POOLER_HOST`   | `make verify` (`scripts/verify-sync.sh`) | e.g. `aws-0-ap-east-1.pooler.supabase.com` |
 
-### Supabase CLI (`.env.local`, read by `make` targets)
+### `.env.production` — local `make deploy` build
 
-| Var | Notes |
+Vite auto-loads this file when `vite build` runs in production mode.
+The same `VITE_*` values from `.env.local` go here so a hand-run
+`make deploy` produces a bundle that points at the cloud Supabase
+project. Not used by the GitHub Actions deploy (Actions sources its
+values from repo secrets instead).
+
+### `.env.push` — push worker secret stash
+
+A personal scratchpad — nothing reads it. It exists so that when you
+run `wrangler secret put` for the push worker you have the values to
+paste. The actual secrets live on Cloudflare. Note that
+`VAPID_PUBLIC_KEY` here is the **same value** as `VITE_VAPID_PUBLIC_KEY`
+in `.env.local` / `.env.production`; the worker just doesn't use the
+`VITE_` prefix because it isn't a Vite project.
+
+### Cloudflare Worker secrets
+
+Set via `wrangler secret put` from inside the worker's directory; they
+never appear in env files at deploy time. See
+[push-notifications.md § Configure the worker](./push-notifications.md#4-configure-the-worker)
+for the push worker's full list. The SPA Worker (`app-fundiverstw`)
+has no Worker-level secrets — all of its config is baked into the
+bundle at build time via `VITE_*`.
+
+### Supabase Edge Function secrets
+
+Set via `supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" …`.
+Currently only `create-registration` uses these (`GMAIL_USER`,
+`GMAIL_APP_PASSWORD`). See [§ Supabase Edge Functions](#supabase-edge-functions).
+
+### GitHub Actions repo secrets
+
+Used by `.github/workflows/deploy.yml` for browser-triggered deploys.
+Set under **Settings → Secrets and variables → Actions**.
+
+| Secret | Purpose |
 | --- | --- |
-| `SUPABASE_PROJECT_REF`   | e.g. `abcdefghij` — used by `make link` and `make push` |
-| `SUPABASE_DB_PASSWORD`   | DB password for migrations |
-| `SUPABASE_POOLER_HOST`   | e.g. `aws-0-ap-east-1.pooler.supabase.com` — used by `make verify` |
+| `CLOUDFLARE_API_TOKEN`     | Token with the "Edit Cloudflare Workers" template permission |
+| `CLOUDFLARE_ACCOUNT_ID`    | Visible in the Cloudflare dashboard sidebar |
+| `VITE_SUPABASE_URL`        | Same value as `.env.production`; baked into the SPA bundle at build |
+| `VITE_SUPABASE_ANON_KEY`   | Same value as `.env.production`; baked into the SPA bundle at build |
+| `VITE_VAPID_PUBLIC_KEY`    | Same public key as `VAPID_PUBLIC_KEY` in `.env.push` — only the public half goes here |
 
-### Push worker (Cloudflare secrets, not env files)
-
-See [push-notifications.md § Configure the worker](./push-notifications.md#4-configure-the-worker).
+Do **not** put `VAPID_PRIVATE_KEY`, service-role keys, or any push
+worker secret in GitHub. Those stay on Cloudflare via `wrangler secret
+put`; the workflow only deploys code, it doesn't rotate worker secrets.
 
 ## Workers
 
@@ -44,7 +108,9 @@ Two Cloudflare Workers are deployed separately:
 | `app-fundiverstw`  | `./wrangler.toml`              | `make deploy-app` |
 | `fundivers-push`   | `./workers/push/wrangler.toml` | `make deploy-push` |
 
-`make deploy` runs both in sequence.
+`make deploy` runs both in sequence. The same two workers can also be
+deployed from the GitHub Actions UI — see [§ Browser-triggered deploy
+(GitHub Actions)](#browser-triggered-deploy-github-actions).
 
 ### `app-fundiverstw` (SPA)
 
@@ -73,6 +139,18 @@ deploy you may need `wrangler login` to authenticate.
 target installs deps on first run. Secrets are set separately via
 `wrangler secret put` — see
 [push-notifications.md § Configure the worker](./push-notifications.md#4-configure-the-worker).
+
+### Browser-triggered deploy (GitHub Actions)
+
+`.github/workflows/deploy.yml` exposes the same two deploys to the
+GitHub Actions UI. **Actions → Deploy to Cloudflare → Run workflow**,
+pick a target (`spa`, `push`, or `both`), and the chosen jobs run in
+parallel.
+
+The workflow needs the repo secrets listed in
+[§ GitHub Actions repo secrets](#github-actions-repo-secrets). It does
+not push migrations, deploy edge functions, or rotate worker secrets —
+treat it as a remote `make deploy`, nothing more.
 
 ## Supabase Edge Functions
 
