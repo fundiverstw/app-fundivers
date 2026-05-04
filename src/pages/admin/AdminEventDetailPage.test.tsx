@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { AdminEventDetailPage } from './AdminEventDetailPage'
@@ -216,10 +216,63 @@ describe('AdminEventDetailPage', () => {
     // Admin-only controls are gone.
     expect(screen.queryByRole('link', { name: /^edit$/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /cancel event/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /add diver/i })).not.toBeInTheDocument()
 
     // Per-registrant: status is shown as a label, not a select; Edit registration is gone.
     await screen.findByText('Ada Lovelace')
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /edit registration/i })).not.toBeInTheDocument()
+  })
+
+  it('opens the Add diver modal, searches profiles, and advances to the registration form on pick', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', {
+        id: 'dive_x', type: 'dive', title: 'Kenting',
+        start_time: new Date().toISOString(), end_time: null, currency: 'TWD',
+        cancelled_at: null,
+        // RegisterFormBody reads these to gate room/addon/gear sections.
+        has_rooms: false, room_type_ids: [], has_addons: false, addon_ids: [],
+        nitrox_required: false, gear_rental_info: null,
+        price: 2800, deposit_amount: 0, transport_price: 0, dive_days: 1,
+      }],
+    ]))
+
+    const profiles = [
+      { id: 'u-ada',  full_name: 'Ada Lovelace',     display_name: 'Ada',
+        cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false,
+        logged_dives: 0, phone: null, contact_method: null, contact_id: null,
+        height_cm: null, weight_kg: null, shoe_size: null, status: 'active' },
+      { id: 'u-bob',  full_name: 'Bob Roberts',      display_name: null,
+        cert_agency: 'PADI', cert_level: 'OW', nitrox_certified: false,
+        logged_dives: 0, phone: null, contact_method: null, contact_id: null,
+        height_cm: null, weight_kg: null, shoe_size: null, status: 'active' },
+    ]
+
+    from.mockImplementation((table: string) => {
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      // No registrants on this event yet; everything else stays empty.
+      return mockQueryBuilder({ data: [] })
+    })
+
+    const user = userEvent.setup()
+    renderAt('/admin/events/dive/dive_x')
+
+    await screen.findByRole('heading', { name: /kenting/i })
+    await user.click(screen.getByRole('button', { name: /add diver/i }))
+
+    // Step A: search box + both divers visible.
+    const dialog = await screen.findByRole('dialog', { name: /add diver to event/i })
+    expect(within(dialog).getByText('Ada Lovelace')).toBeInTheDocument()
+    expect(within(dialog).getByText('Bob Roberts')).toBeInTheDocument()
+
+    // Filter narrows to Ada.
+    await user.type(within(dialog).getByPlaceholderText(/search by name/i), 'Ada')
+    expect(within(dialog).getByText('Ada Lovelace')).toBeInTheDocument()
+    expect(within(dialog).queryByText('Bob Roberts')).not.toBeInTheDocument()
+
+    // Pick Ada → step B reuses RegisterFormBody (Step 1 of 4 visible).
+    await user.click(within(dialog).getByRole('button', { name: /Ada Lovelace/ }))
+    await screen.findByText(/Step 1 of 4/i)
+    expect(screen.getByRole('heading', { name: /Register Ada/i })).toBeInTheDocument()
   })
 })

@@ -96,10 +96,16 @@ export interface RegisterFormBodyProps {
   onBackBeforeStepOne?: () => void
   /** Edit mode: pre-populate from this row and UPDATE on submit. */
   existingBooking?: Booking
+  /** Admin "register on behalf of" path. When set, the form is
+   *  authenticated as the admin (their session calls the edge
+   *  function) but the booking lands on this target user_id and the
+   *  confirmation email goes to that user's address. Profile / userId
+   *  must be the *target* diver — not the admin. */
+  actingOnBehalfOf?: string
 }
 
-export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCancel, onBackBeforeStepOne, existingBooking }: RegisterFormBodyProps) {
-  const isGuest = !userId
+export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCancel, onBackBeforeStepOne, existingBooking, actingOnBehalfOf }: RegisterFormBodyProps) {
+  const isGuest = !userId && !actingOnBehalfOf
   const isEdit = !!existingBooking
   const initialDetails = existingBooking?.details as BookingDetails | undefined
   // Gating derived from the event
@@ -317,6 +323,8 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
     // happen atomically server-side. The function handles the guest case
     // (creates the account with email_confirm: true) when email/password
     // are provided; authed callers' Bearer JWT identifies the user.
+    // When actingOnBehalfOf is set, the caller (admin) JWT is used to
+    // authorise, but the booking lands on target_user_id.
     const { data, error } = await supabase.functions.invoke<{ booking_id: string; session: { access_token: string; refresh_token: string } | null }>(
       'create-registration',
       {
@@ -326,6 +334,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
             password: guestPassword,
             agreed_to_terms_at: new Date().toISOString(),
           } : {}),
+          ...(actingOnBehalfOf ? { target_user_id: actingOnBehalfOf } : {}),
           event_type:    event.type,
           event_id:      event.id,
           profile_patch: profilePatch,
