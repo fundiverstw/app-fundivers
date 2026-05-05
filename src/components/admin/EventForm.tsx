@@ -314,8 +314,8 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
     setError(null)
 
     // Validate the per-type required fields up front.
-    if (form.type === 'dive' && !form.title.trim()) {
-      setError('Dive title is required.')
+    if (form.type === 'dive' && !form.admin_title.trim()) {
+      setError('Admin title is required.')
       return
     }
     if (!form.start_date) {
@@ -370,11 +370,14 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
       )}
 
       <Section title="Basics">
-        <Field label={form.type === 'dive' ? 'Dive title (required)' : 'Course title'}>
-          <Input value={form.title} onChange={v => set('title', v)} required={form.type === 'dive'} />
+        <Field label={form.type === 'dive' ? 'Admin title (required, internal)' : 'Admin title (internal)'}>
+          <Input value={form.admin_title} onChange={v => set('admin_title', v)} required={form.type === 'dive'} />
         </Field>
-        <Field label="Subtitle (optional)">
-          <Input value={form.subtitle} onChange={v => set('subtitle', v)} />
+        <Field label="Display title (diver-facing)">
+          <Input value={form.display_title} onChange={v => set('display_title', v)} />
+        </Field>
+        <Field label="Calendar title (calendar widget; short)">
+          <Input value={form.calendar_title} onChange={v => set('calendar_title', v)} />
         </Field>
         <div className="grid grid-cols-3 gap-3">
           <Field label="Start date">

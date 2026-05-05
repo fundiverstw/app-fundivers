@@ -9,8 +9,9 @@ export type EventType = 'dive' | 'course'
 export interface FormState {
   // common
   type: EventType
-  title: string          // → admin_title for dives, display_title for courses (required for dives)
-  subtitle: string       // → display_title for dives, calendar_title for courses
+  admin_title: string    // internal label admins see (NOT NULL on EO_dives, nullable on EO_courses)
+  display_title: string  // diver-facing title; falls back to admin_title on public surfaces
+  calendar_title: string // short label for the calendar widget; optional
   start_date: string
   start_time: string     // 'HH:mm' or empty
   end_date: string
@@ -49,7 +50,7 @@ export interface FormState {
 
 export const EMPTY_FORM: FormState = {
   type: 'dive',
-  title: '', subtitle: '',
+  admin_title: '', display_title: '', calendar_title: '',
   start_date: '', start_time: '', end_date: '',
   price: '', featured_image: '',
   prereq_cert_id: '', prereqs: '',
@@ -96,8 +97,9 @@ export function parseCsvIds(raw: string | null | undefined): string[] {
 export function formStateFromDive(d: EODive): FormState {
   return {
     type: 'dive',
-    title: d.admin_title ?? '',
-    subtitle: d.display_title ?? '',
+    admin_title: d.admin_title ?? '',
+    display_title: d.display_title ?? '',
+    calendar_title: d.calendar_title ?? '',
     start_date: d.start_date ?? '',
     start_time: toHhmm(d.time),
     end_date: d.end_date ?? '',
@@ -131,8 +133,9 @@ export function formStateFromDive(d: EODive): FormState {
 export function formStateFromCourse(c: EOCourse): FormState {
   return {
     type: 'course',
-    title: c.display_title ?? '',
-    subtitle: c.calendar_title ?? '',
+    admin_title: c.admin_title ?? '',
+    display_title: c.display_title ?? '',
+    calendar_title: c.calendar_title ?? '',
     course_name: c.course_name ?? '',
     start_date: c.start_date ?? '',
     start_time: toHhmm(c.start_time),
@@ -169,8 +172,9 @@ export function divePayloadFromForm(form: FormState): Record<string, unknown> {
   const timeText = form.start_time ? `${form.start_time}:00` : ''
   const addonsJson = form.addonIds.length ? JSON.stringify(form.addonIds) : ''
   return {
-    admin_title: form.title.trim(),
-    display_title: form.subtitle || null,
+    admin_title: form.admin_title.trim(),
+    display_title: form.display_title || null,
+    calendar_title: form.calendar_title || null,
     start_date: form.start_date || null,
     time: timeText || null,
     end_date: form.end_date || null,
@@ -206,8 +210,9 @@ export function coursePayloadFromForm(form: FormState): Record<string, unknown> 
   const timeText = form.start_time ? `${form.start_time}:00` : ''
   const addonsJson = form.addonIds.length ? JSON.stringify(form.addonIds) : ''
   return {
-    display_title: form.title.trim() || null,
-    calendar_title: form.subtitle || null,
+    admin_title: form.admin_title || null,
+    display_title: form.display_title.trim() || null,
+    calendar_title: form.calendar_title || null,
     course_name: form.course_name || null,
     start_date: form.start_date || null,
     start_time: timeText || null,
