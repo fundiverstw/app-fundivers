@@ -1,21 +1,26 @@
 import { useAuth } from '../hooks/useAuth'
 import { Logo } from '../components/Logo'
+import { ProfileForm } from './ProfilePage'
 import { CARD_ELEVATED, BTN_PRIMARY, TEXT_MUTED } from '../styles/tokens'
 
 // Holding screen for pending / rejected divers. RequireActive routes
 // every non-active diver here; the only way out is admin approval (then
 // the next login takes them to /calendar) or signing out.
+//
+// Pending divers see the profile form so they can submit the data the
+// admin needs to approve them — the static "you're under review" copy
+// alone left admins with empty applications to review.
 export function PendingPage() {
-  const { profile, signOut } = useAuth()
+  const { user, profile, signOut } = useAuth()
   const rejected = profile?.status === 'rejected'
 
   return (
-    <div className="min-h-screen bg-blue-900 flex items-center justify-center p-4">
-      <div className={`w-full max-w-sm ${CARD_ELEVATED} p-6 text-center`}>
-        <div className="flex justify-center mb-4"><Logo size="lg" /></div>
+    <div className="min-h-screen bg-blue-900 p-4">
+      <div className="w-full max-w-lg mx-auto space-y-4">
+        <div className="flex justify-center"><Logo size="lg" /></div>
 
         {rejected ? (
-          <>
+          <div className={`${CARD_ELEVATED} p-6 text-center`}>
             <h1 className="text-xl font-semibold text-blue-950 mb-2">
               Application not approved
             </h1>
@@ -26,22 +31,32 @@ export function PendingPage() {
                 fundiverstw@gmail.com
               </a>.
             </p>
-          </>
+            <button onClick={signOut} className={`w-full ${BTN_PRIMARY}`}>
+              Sign out
+            </button>
+          </div>
         ) : (
           <>
-            <h1 className="text-xl font-semibold text-blue-950 mb-2">
-              Application under review
-            </h1>
-            <p className={`${TEXT_MUTED} text-sm mb-5`}>
-              Thanks for registering. An admin will review your application
-              shortly — you'll receive an email once your account is approved.
-            </p>
+            <div className={`${CARD_ELEVATED} p-4 text-center`}>
+              <h1 className="text-lg font-semibold text-blue-950 mb-1">
+                Application under review
+              </h1>
+              <p className={`${TEXT_MUTED} text-xs`}>
+                Fill in the required fields below and save — an admin will
+                review your application and you'll receive an email once
+                you're approved.
+              </p>
+            </div>
+
+            {user && profile?.id && (
+              <ProfileForm key={profile.id} user={user} profile={profile} />
+            )}
+
+            <button onClick={signOut} className={`w-full ${BTN_PRIMARY}`}>
+              Sign out
+            </button>
           </>
         )}
-
-        <button onClick={signOut} className={`w-full ${BTN_PRIMARY}`}>
-          Sign out
-        </button>
       </div>
     </div>
   )
