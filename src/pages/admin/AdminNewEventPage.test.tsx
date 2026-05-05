@@ -175,7 +175,7 @@ describe('AdminNewEventPage', () => {
     // has_rooms toggle flipped on, and the new room is checked in the list.
     await waitFor(() => {
       expect((screen.getByLabelText(/^offers rooms$/i) as HTMLInputElement).checked).toBe(true)
-      expect((screen.getByLabelText(/Premium Suite/) as HTMLInputElement).checked).toBe(true)
+      expect((screen.getByLabelText(/Premium Room/) as HTMLInputElement).checked).toBe(true)
     })
   })
 
@@ -210,7 +210,7 @@ describe('AdminNewEventPage', () => {
     expect(payload.price).toBe(100)
 
     await waitFor(() =>
-      expect((screen.getByLabelText(/Surface Marker Buoy/) as HTMLInputElement).checked).toBe(true)
+      expect((screen.getByLabelText(/^SMB$/) as HTMLInputElement).checked).toBe(true)
     )
   })
 
