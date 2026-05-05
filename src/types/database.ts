@@ -671,6 +671,32 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['push_notifications_sent']['Insert']>
         Relationships: []
       }
+      notifications: {
+        Row: {
+          id: string
+          user_id: string
+          title: string
+          body: string | null
+          url: string | null
+          kind: string
+          event_id: string | null
+          created_at: string
+          read_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          title: string
+          body?: string | null
+          url?: string | null
+          kind: string
+          event_id?: string | null
+          created_at?: string
+          read_at?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['notifications']['Insert']>
+        Relationships: []
+      }
     }
   }
 }
@@ -693,6 +719,9 @@ export type AdminNote = Database['public']['Tables']['admin_notes']['Row']
 export const NOTE_TAGS = ['urgent','payment','gear','logistics','cert','medical','note','general'] as const
 export type NoteTag = typeof NOTE_TAGS[number]
 export type Duty = Database['public']['Tables']['duties']['Row']
+export type Notification = Database['public']['Tables']['notifications']['Row']
+export const NOTIFICATION_KINDS = ['reminder', 'broadcast', 'duty'] as const
+export type NotificationKind = typeof NOTIFICATION_KINDS[number]
 export const DUTY_ROLES = ['instructor', 'guide', 'support'] as const
 export type DutyRole = typeof DUTY_ROLES[number]
 

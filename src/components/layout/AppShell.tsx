@@ -8,6 +8,7 @@ import { Logo } from '../Logo'
 import { CalendarIcon } from '../icons/CalendarIcon'
 import { CrosshairIcon } from '../icons/CrosshairIcon'
 import { MapIcon } from '../icons/MapIcon'
+import { NotificationBell } from '../NotificationBell'
 import {
   PAGE, NAV_BAR, NAV_BOTTOM, BTN_LIGHT,
   ON_DEEP_MUTED, ON_DEEP_SUBTLE, ON_DEEP_BODY,
@@ -134,6 +135,7 @@ export function AppShell() {
               Install app
             </button>
           )}
+          <NotificationBell />
           {profile?.role === 'admin' || profile?.role === 'staff' ? (
             <Link to={profile.role === 'admin' ? '/admin' : '/admin/events'} className={`text-sm ${ON_DEEP_BODY} hover:text-white`}>
               {profile.display_name ?? profile.full_name}
