@@ -270,9 +270,6 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
             </div>
             {jpHint && <p className="text-xs text-red-600 mt-1">{jpHint}</p>}
           </div>
-          <p className="text-xs text-blue-900 font-medium">
-            BCD, fin, and wetsuit sizes are filled in by an instructor at your first dive.
-          </p>
         </section>
 
         <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
