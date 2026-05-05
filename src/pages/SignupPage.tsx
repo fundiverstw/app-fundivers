@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -16,7 +16,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 export function SignupPage() {
-  const [done, setDone] = useState(false)
+  const navigate = useNavigate()
   const [serverError, setServerError] = useState('')
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -33,21 +33,11 @@ export function SignupPage() {
       options: { data: { agreed_to_terms_at: new Date().toISOString() } },
     })
     if (error) { setServerError(error.message); return }
-    setDone(true)
-  }
-
-  if (done) {
-    return (
-      <div className="min-h-screen bg-blue-900 flex items-center justify-center p-4">
-        <div className={`w-full max-w-sm ${CARD_ELEVATED} p-6 text-center`}>
-          <h2 className="text-xl font-semibold text-blue-950 mb-2">Account created</h2>
-          <p className={`${TEXT_MUTED} text-sm`}>
-            Fill in your profile so an admin can review your application —
-            you'll be taken there in a moment.
-          </p>
-        </div>
-      </div>
-    )
+    // With email confirmation off, signUp returns a session immediately —
+    // the diver is authenticated and can land straight on /pending where
+    // they'll fill in the profile form for admin review. `replace: true`
+    // so the back button doesn't bring them to a stale /signup form.
+    navigate('/pending', { replace: true })
   }
 
   return (

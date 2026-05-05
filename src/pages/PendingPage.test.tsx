@@ -46,4 +46,22 @@ describe('PendingPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /sign out/i }))
     expect(signOut).toHaveBeenCalled()
   })
+
+  it('shows the "application submitted" screen when the diver already filled in the required fields', () => {
+    useAuthMock.mockReturnValue({
+      user: { id: 'u1' },
+      profile: {
+        id: 'u1', status: 'pending',
+        full_name: 'Ada', display_name: 'Ada',
+        date_of_birth: '1990-01-01',
+        cert_level: 'Open Water',
+        contact_method: 'email', contact_id: 'ada@example.com',
+      },
+      signOut,
+    })
+    renderPage()
+    expect(screen.getByRole('heading', { name: /application submitted/i })).toBeInTheDocument()
+    // Form is hidden in this state.
+    expect(screen.queryByRole('button', { name: /save changes/i })).not.toBeInTheDocument()
+  })
 })
