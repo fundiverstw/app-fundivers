@@ -22,6 +22,7 @@ export default defineConfig({
           name: 'integration',
           globals: true,
           environment: 'node',
+          globalSetup: ['./tests/global-setup.integration.ts'],
           setupFiles: ['./tests/setup.integration.ts'],
           include: ['tests/integration/**/*.test.ts'],
           testTimeout: 30_000,
