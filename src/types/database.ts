@@ -700,7 +700,15 @@ export type DutyRole = typeof DUTY_ROLES[number]
 export interface AppEvent {
   id: string
   type: 'dive' | 'course'
+  /** Diver-facing title — display_title with admin_title fallback. Used on
+   *  every diver-facing surface (event detail, bookings, register form,
+   *  notifications) EXCEPT the calendar grid pills, which use calendar_title
+   *  when set so admins can give long-named events a short label that fits
+   *  in a day square. */
   title: string
+  /** Short label for the calendar grid pill — falls back to `title` at the
+   *  call site when blank. Null when the source row has no calendar_title set. */
+  calendar_title: string | null
   start_time: string // ISO timestamp
   end_time: string | null
   /**

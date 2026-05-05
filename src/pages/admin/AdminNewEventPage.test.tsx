@@ -42,7 +42,7 @@ describe('AdminNewEventPage', () => {
     fakeCatalog()
     renderPage()
     expect(await screen.findByRole('heading', { name: /new event/i })).toBeInTheDocument()
-    expect(screen.getByLabelText(/dive title/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/admin title \(required, internal\)/i)).toBeInTheDocument()
     expect(screen.getByText(/dive details/i)).toBeInTheDocument()
     // Course-only sections should be absent
     expect(screen.queryByText(/course details/i)).not.toBeInTheDocument()
@@ -53,7 +53,7 @@ describe('AdminNewEventPage', () => {
     const user = userEvent.setup()
     renderPage()
     await user.click(screen.getByRole('button', { name: 'Course' }))
-    expect(screen.getByLabelText(/course title/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/admin title \(internal\)/i)).toBeInTheDocument()
     expect(screen.getByText(/course details/i)).toBeInTheDocument()
     expect(screen.queryByText(/dive details/i)).not.toBeInTheDocument()
   })
@@ -64,7 +64,7 @@ describe('AdminNewEventPage', () => {
     renderPage()
     // Browser form validation kicks in before our handler — fill start_date so
     // the admin_title required attribute is the only thing left.
-    await screen.findByLabelText(/dive title/i)
+    await screen.findByLabelText(/admin title \(required, internal\)/i)
     await user.click(screen.getByRole('button', { name: /create dive/i }))
     // We never navigated, so the new-event heading is still visible.
     expect(screen.getByRole('heading', { name: /new event/i })).toBeInTheDocument()
@@ -99,7 +99,7 @@ describe('AdminNewEventPage', () => {
     renderPage()
     const select = await screen.findByLabelText(/preload from past dive/i) as HTMLSelectElement
     await user.selectOptions(select, 'past-1')
-    expect((screen.getByLabelText(/dive title/i) as HTMLInputElement).value).toBe('Green Island Day Trip')
+    expect((screen.getByLabelText(/admin title \(required, internal\)/i) as HTMLInputElement).value).toBe('Green Island Day Trip')
     expect((screen.getByLabelText(/start date/i) as HTMLInputElement).value).toBe('2026-01-15')
     expect((screen.getByLabelText(/start time/i) as HTMLInputElement).value).toBe('09:00')
     expect((screen.getByLabelText(/notes/i) as HTMLTextAreaElement).value).toBe('Bring fins')
@@ -123,7 +123,7 @@ describe('AdminNewEventPage', () => {
     })
     const user = userEvent.setup()
     renderPage()
-    await screen.findByLabelText(/dive title/i)
+    await screen.findByLabelText(/admin title \(required, internal\)/i)
     await user.click(screen.getByRole('button', { name: /new price tier/i }))
     await user.type(screen.getByLabelText('Title (required)'), 'Premium')
     await user.type(screen.getByLabelText('Starting at'), '15000')
@@ -156,7 +156,7 @@ describe('AdminNewEventPage', () => {
     })
     const user = userEvent.setup()
     renderPage()
-    await screen.findByLabelText(/dive title/i)
+    await screen.findByLabelText(/admin title \(required, internal\)/i)
     // has_rooms starts false; the sub-form should flip it on save.
     expect((screen.getByLabelText(/^offers rooms$/i) as HTMLInputElement).checked).toBe(false)
 
@@ -195,7 +195,7 @@ describe('AdminNewEventPage', () => {
     })
     const user = userEvent.setup()
     renderPage()
-    await screen.findByLabelText(/dive title/i)
+    await screen.findByLabelText(/admin title \(required, internal\)/i)
 
     await user.click(screen.getByRole('button', { name: /new add-on/i }))
     await user.type(screen.getByLabelText('Title (required)'), 'SMB')
@@ -231,7 +231,7 @@ describe('AdminNewEventPage', () => {
     })
     const user = userEvent.setup()
     renderPage()
-    await screen.findByLabelText(/dive title/i)
+    await screen.findByLabelText(/admin title \(required, internal\)/i)
 
     await user.click(screen.getByRole('button', { name: /new DiveTravel entry/i }))
     await user.type(screen.getByLabelText('Title (required)'), 'Green Island')
@@ -267,8 +267,8 @@ describe('AdminNewEventPage', () => {
     })
     const user = userEvent.setup()
     renderPage()
-    await screen.findByLabelText(/dive title/i)
-    await user.type(screen.getByLabelText(/dive title/i), 'Multi-destination trip')
+    await screen.findByLabelText(/admin title \(required, internal\)/i)
+    await user.type(screen.getByLabelText(/admin title \(required, internal\)/i), 'Multi-destination trip')
     await user.type(screen.getByLabelText(/start date/i),  '2026-06-01')
 
     await user.click(screen.getByLabelText(/Green Island — Taiwan/))
@@ -298,8 +298,8 @@ describe('AdminNewEventPage', () => {
     })
     const user = userEvent.setup()
     renderPage()
-    await screen.findByLabelText(/dive title/i)
-    await user.type(screen.getByLabelText(/dive title/i), 'Green Island Day Trip')
+    await screen.findByLabelText(/admin title \(required, internal\)/i)
+    await user.type(screen.getByLabelText(/admin title \(required, internal\)/i), 'Green Island Day Trip')
     await user.type(screen.getByLabelText(/start date/i),  '2026-06-01')
     await user.click(screen.getByRole('button', { name: /create dive/i }))
     await waitFor(() => expect(insert).toHaveBeenCalled())

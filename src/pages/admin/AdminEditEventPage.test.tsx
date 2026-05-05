@@ -77,7 +77,7 @@ describe('AdminEditEventPage', () => {
     renderAt('/admin/events/dive/dive_x/edit')
 
     // Form prefills the existing dive title.
-    const titleInput = await screen.findByLabelText(/dive title/i) as HTMLInputElement
+    const titleInput = await screen.findByLabelText(/admin title \(required, internal\)/i) as HTMLInputElement
     await waitFor(() => expect(titleInput.value).toBe('Kenting Day Trip'))
     expect((screen.getByLabelText(/start date/i) as HTMLInputElement).value).toBe('2026-06-01')
     expect((screen.getByLabelText(/notes/i) as HTMLTextAreaElement).value).toBe('Bring fins')
@@ -104,6 +104,6 @@ describe('AdminEditEventPage', () => {
 
     renderAt('/admin/events/dive/missing/edit')
     expect(await screen.findByText(/dive not found/i)).toBeInTheDocument()
-    expect(screen.queryByLabelText(/dive title/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/admin title \(required, internal\)/i)).not.toBeInTheDocument()
   })
 })
