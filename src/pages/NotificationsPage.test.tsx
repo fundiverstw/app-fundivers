@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { NotificationsPage } from './NotificationsPage'
 import { mockQueryBuilder } from '../../tests/test-utils'
 
@@ -39,6 +39,19 @@ function renderPage() {
   return render(<MemoryRouter><NotificationsPage /></MemoryRouter>)
 }
 
+// Lets us observe navigation when the user taps "Open event" inside an
+// expanded row.
+function renderPageWithRoutes() {
+  return render(
+    <MemoryRouter initialEntries={['/notifications']}>
+      <Routes>
+        <Route path="/notifications" element={<NotificationsPage />} />
+        <Route path="/bookings" element={<div>BOOKINGS_PAGE</div>} />
+      </Routes>
+    </MemoryRouter>
+  )
+}
+
 describe('NotificationsPage', () => {
   it('renders the inbox most-recent first with an unread visual', async () => {
     setup()
@@ -49,18 +62,54 @@ describe('NotificationsPage', () => {
     expect(screen.getByRole('button', { name: /mark all read/i })).toBeInTheDocument()
   })
 
-  it('clicking an unread row marks it read and navigates to its url', async () => {
+  it('tapping an unread row expands it (showing the body) and marks it read', async () => {
+    const updateSpy = vi.fn()
+    setup(sample, updateSpy)
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Trip in 3 days')
+    // Body is hidden in the collapsed state.
+    expect(screen.queryByText('Pay deposit')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /Trip in 3 days/i }))
+
+    // Body now visible.
+    expect(await screen.findByText('Pay deposit')).toBeInTheDocument()
+    // Mark-as-read fired with a timestamp.
+    await waitFor(() => expect(updateSpy).toHaveBeenCalled())
+    const payload = updateSpy.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(typeof payload.read_at).toBe('string')
+  })
+
+  it('tapping the expanded row again collapses it (no double-mark-read)', async () => {
     const updateSpy = vi.fn()
     setup(sample, updateSpy)
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Trip in 3 days')
 
-    await user.click(screen.getByRole('button', { name: /Trip in 3 days/i }))
+    const row = screen.getByRole('button', { name: /Trip in 3 days/i })
+    await user.click(row)
+    expect(await screen.findByText('Pay deposit')).toBeInTheDocument()
+    await user.click(row)
+    expect(screen.queryByText('Pay deposit')).not.toBeInTheDocument()
+    // Mark-as-read fires once on the first expand, not on the collapse.
+    expect(updateSpy).toHaveBeenCalledTimes(1)
+  })
 
-    await waitFor(() => expect(updateSpy).toHaveBeenCalled())
-    const payload = updateSpy.mock.calls[0]?.[0] as Record<string, unknown>
-    expect(typeof payload.read_at).toBe('string')
+  it('navigates only when the explicit "Open event" button is tapped', async () => {
+    setup(sample)
+    const user = userEvent.setup()
+    renderPageWithRoutes()
+    await screen.findByText('Trip in 3 days')
+
+    // Expanding the row should NOT navigate.
+    await user.click(screen.getByRole('button', { name: /Trip in 3 days/i }))
+    expect(screen.queryByText('BOOKINGS_PAGE')).not.toBeInTheDocument()
+
+    // The action button does navigate.
+    await user.click(screen.getByRole('button', { name: /open event/i }))
+    expect(await screen.findByText('BOOKINGS_PAGE')).toBeInTheDocument()
   })
 
   it('shows the empty state when there are no notifications', async () => {
