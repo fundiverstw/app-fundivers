@@ -24,28 +24,34 @@ import {
 // number inputs, booleans for checkboxes). Numeric/enum coercion happens in
 // onSubmit so the input and output types of this schema are identical, which
 // keeps react-hook-form happy.
+// Optional text fields use `.nullish()` (string | null | undefined) so
+// that pre-existing NULLs from a freshly-created profile don't fail
+// validation — react-hook-form passes them through as `null`, and the
+// previous `.optional()` (string | undefined) rejected null silently,
+// which surfaced as a save that only worked once the user typed into
+// every empty field.
 const schema = z.object({
   full_name: z.string().min(1, 'Required'),
   display_name: z.string().min(1, 'Required'),
-  phone: z.string().optional(),
+  phone: z.string().nullish(),
   date_of_birth: z.string().min(1, 'Required'),
-  nationality: z.string().optional(),
-  id_number: z.string().optional(),
-  emergency_contact_name: z.string().optional(),
-  emergency_contact_phone: z.string().optional(),
-  cert_agency: z.string().optional(),
+  nationality: z.string().nullish(),
+  id_number: z.string().nullish(),
+  emergency_contact_name: z.string().nullish(),
+  emergency_contact_phone: z.string().nullish(),
+  cert_agency: z.string().nullish(),
   cert_level: z.string().min(1, 'Required'),
-  medical_notes: z.string().optional(),
-  height_cm: z.union([z.string(), z.number()]).optional(),
-  weight_kg: z.union([z.string(), z.number()]).optional(),
-  gender: z.string().optional(),
+  medical_notes: z.string().nullish(),
+  height_cm: z.union([z.string(), z.number()]).nullish(),
+  weight_kg: z.union([z.string(), z.number()]).nullish(),
+  gender: z.string().nullish(),
   contact_method: z.string().min(1, 'Required'),
   contact_id: z.string().min(1, 'Required'),
-  nitrox_certified: z.boolean().optional(),
+  nitrox_certified: z.boolean().nullish(),
   logged_dives: z
     .union([z.string(), z.number()])
     .refine(v => typeof v === 'number' || v.length > 0, { message: 'Required' }),
-  last_dive_date: z.string().optional(),
+  last_dive_date: z.string().nullish(),
 })
 type FormData = z.infer<typeof schema>
 
