@@ -458,7 +458,10 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
         <Field label="Required certification">
           <Select value={form.prereq_cert_id} onChange={v => set('prereq_cert_id', v)}>
             <option value="">— None —</option>
-            {certLevels.map(c => (
+            {/* Prereqs are encoded as PADI ranks; agency-specific levels carry
+                 a padi_equivalent_id so a CMAS 2-Star diver still satisfies a
+                 PADI Rescue prereq when that comparison gets wired up. */}
+            {certLevels.filter(c => c.organization === 'PADI').map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </Select>
