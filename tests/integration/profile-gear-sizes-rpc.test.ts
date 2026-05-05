@@ -82,6 +82,31 @@ describe('update_diver_gear_sizes RPC', () => {
     expect(await readSizes(diverA.id)).toEqual({ fin_size: 'M', bcd_size: 'L', wetsuit_size: 'XL' })
   })
 
+  it('diver cannot self-edit gear sizes via direct profiles UPDATE', async () => {
+    // Pre-seed via admin RPC so we have a known starting state.
+    const adminSb = await userClient(adminUser.email, adminUser.password)
+    await adminSb.rpc('update_diver_gear_sizes', {
+      diver_id: diverB.id, fin_size: 'L', bcd_size: 'L', wetsuit_size: 'M',
+    })
+
+    // Diver's own update attempt — RLS lets them update their profile, but
+    // the BEFORE UPDATE trigger rejects the row when these three columns
+    // change.
+    const sb = await userClient(diverB.email, diverB.password)
+    const { error } = await sb.from('profiles').update({ fin_size: 'XS' }).eq('id', diverB.id)
+    expect(error).not.toBeNull()
+    expect(String(error?.message ?? '')).toMatch(/staff|admin|gear/i)
+
+    // The other gear-size columns are still admin-set values.
+    expect(await readSizes(diverB.id)).toEqual({ fin_size: 'L', bcd_size: 'L', wetsuit_size: 'M' })
+  })
+
+  it('diver can still update non-gear profile fields without tripping the gear trigger', async () => {
+    const sb = await userClient(diverB.email, diverB.password)
+    const { error } = await sb.from('profiles').update({ display_name: 'New Name' }).eq('id', diverB.id)
+    expect(error).toBeNull()
+  })
+
   it('empty strings are stored as NULL (cleared)', async () => {
     const sb = await userClient(adminUser.email, adminUser.password)
     const { error } = await sb.rpc('update_diver_gear_sizes', {

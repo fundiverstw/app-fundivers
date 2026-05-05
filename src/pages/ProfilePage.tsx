@@ -38,9 +38,6 @@ const schema = z.object({
   medical_notes: z.string().optional(),
   height_cm: z.union([z.string(), z.number()]).optional(),
   weight_kg: z.union([z.string(), z.number()]).optional(),
-  fin_size: z.string().optional(),
-  bcd_size: z.string().optional(),
-  wetsuit_size: z.string().optional(),
   gender: z.string().optional(),
   contact_method: z.string().min(1, 'Required'),
   contact_id: z.string().min(1, 'Required'),
@@ -165,9 +162,6 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
       height_cm: numOrNull(data.height_cm),
       weight_kg: numOrNull(data.weight_kg),
       shoe_size: shoeSizeCanonical,
-      fin_size: strOrNull(data.fin_size),
-      bcd_size: strOrNull(data.bcd_size),
-      wetsuit_size: strOrNull(data.wetsuit_size),
       gender: strOrNull(data.gender),
       contact_method: (method === 'whatsapp' || method === 'line' || method === 'phone' || method === 'email') ? method : null,
       contact_id: strOrNull(data.contact_id),
@@ -276,17 +270,9 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
             </div>
             {jpHint && <p className="text-xs text-red-600 mt-1">{jpHint}</p>}
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <Field label="Fin size">
-              <input {...register('fin_size')} className={inputClass} placeholder="M / 8-9" />
-            </Field>
-            <Field label="BCD size">
-              <input {...register('bcd_size')} className={inputClass} placeholder="M" />
-            </Field>
-            <Field label="Wetsuit size">
-              <input {...register('wetsuit_size')} className={inputClass} placeholder="L" />
-            </Field>
-          </div>
+          <p className="text-xs text-blue-900 font-medium">
+            BCD, fin, and wetsuit sizes are filled in by an instructor at your first dive.
+          </p>
         </section>
 
         <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
