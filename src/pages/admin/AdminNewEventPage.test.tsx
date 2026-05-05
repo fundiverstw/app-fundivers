@@ -251,6 +251,36 @@ describe('AdminNewEventPage', () => {
     })
   })
 
+  it('encodes selected TravelDestinations into destination_reference as a JSON array', async () => {
+    const insert = vi.fn().mockReturnValue({ then: (cb: (r: { error: null }) => void) => Promise.resolve({ error: null }).then(cb) })
+    from.mockImplementation((table: string) => {
+      if (table === 'TravelDestinations') return mockQueryBuilder({ data: [
+        { _id: 'dest-1', title: 'Green Island',  country: 'Taiwan',          sort_order: 1 },
+        { _id: 'dest-2', title: 'Puerto Galera', country: 'The Philippines', sort_order: 2 },
+      ] })
+      if (table === 'EO_dives') {
+        const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
+        b.insert = insert
+        return b
+      }
+      return mockQueryBuilder({ data: [] })
+    })
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByLabelText(/dive title/i)
+    await user.type(screen.getByLabelText(/dive title/i), 'Multi-destination trip')
+    await user.type(screen.getByLabelText(/start date/i),  '2026-06-01')
+
+    await user.click(screen.getByLabelText(/Green Island — Taiwan/))
+    await user.click(screen.getByLabelText(/Puerto Galera — The Philippines/))
+
+    await user.click(screen.getByRole('button', { name: /create dive/i }))
+
+    await waitFor(() => expect(insert).toHaveBeenCalled())
+    const payload = (insert.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
+    expect(payload.destination_reference).toBe(JSON.stringify(['dest-1', 'dest-2']))
+  })
+
   it('inserts a dive with minimum required fields and navigates to its detail page', async () => {
     const insert = vi.fn().mockReturnValue({ then: (cb: (r: { error: null }) => void) => Promise.resolve({ error: null }).then(cb) })
     from.mockImplementation((table: string) => {
