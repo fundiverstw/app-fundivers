@@ -565,10 +565,52 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['cancellation_policies']['Insert']>
         Relationships: []
       }
+      TravelDestinations: {
+        Row: {
+          _id: string
+          title: string | null
+          slug: string | null
+          tagline: string | null
+          country: string | null
+          divetype: string | null
+          sort_order: number | null
+          latitude: number | null
+          longitude: number | null
+          international: boolean | null
+          northeast_diving: boolean | null
+          location_picture: string | null
+          background_picture: string | null
+          diver_requirements: string | null
+        }
+        Insert: {
+          _id: string
+          title?: string | null
+          slug?: string | null
+          tagline?: string | null
+          country?: string | null
+          divetype?: string | null
+          sort_order?: number | null
+          latitude?: number | null
+          longitude?: number | null
+          international?: boolean | null
+          northeast_diving?: boolean | null
+          location_picture?: string | null
+          background_picture?: string | null
+          diver_requirements?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['TravelDestinations']['Insert']>
+        Relationships: []
+      }
       eo_dive_addons: {
         Row: { eo_dive_id: string; addon_id: string }
         Insert: { eo_dive_id: string; addon_id: string }
         Update: Partial<{ eo_dive_id: string; addon_id: string }>
+        Relationships: []
+      }
+      eo_dive_destinations: {
+        Row: { eo_dive_id: string; destination_id: string }
+        Insert: { eo_dive_id: string; destination_id: string }
+        Update: Partial<{ eo_dive_id: string; destination_id: string }>
         Relationships: []
       }
       eo_dive_rooms: {
@@ -639,6 +681,7 @@ export type EOPrice = Database['public']['Tables']['EO_prices']['Row']
 export type EORoom = Database['public']['Tables']['EO_rooms']['Row']
 export type EOAddon = Database['public']['Tables']['Other_Addons']['Row']
 export type DiveTravelEntry = Database['public']['Tables']['DiveTravel']['Row']
+export type TravelDestination = Database['public']['Tables']['TravelDestinations']['Row']
 export type CancellationPolicy = Database['public']['Tables']['cancellation_policies']['Row']
 export type DiveSite = Database['public']['Tables']['dive_sites']['Row']
 export type CertLevel = Database['public']['Tables']['cert_levels']['Row']

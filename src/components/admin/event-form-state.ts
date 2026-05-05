@@ -31,7 +31,7 @@ export interface FormState {
   gear_rental: string
   cancel_date: string
   cancel_policy: string
-  destination_reference: string
+  destinationIds: string[]   // FK multi → TravelDestinations (JSON-encoded into destination_reference)
   second_image: string
   divetravel_reference: string
   // payment deadlines (both event types) — empty string = unset, falls back
@@ -59,7 +59,7 @@ export const EMPTY_FORM: FormState = {
   has_rooms: false, roomIds: [],
   nitrox_required: false, gear_rental: '',
   cancel_date: '', cancel_policy: '',
-  destination_reference: '', second_image: '', divetravel_reference: '',
+  destinationIds: [], second_image: '', divetravel_reference: '',
   deposit_deadline: '', full_payment_deadline: '',
   special_date: '', url: '', course_name: '',
   included: '', schedule: '', starting_at: '',
@@ -117,7 +117,7 @@ export function formStateFromDive(d: EODive): FormState {
     gear_rental: d.gear_rental ?? '',
     cancel_date: d.cancel_date ?? '',
     cancel_policy: d.cancel_policy ?? '',
-    destination_reference: d.destination_reference ?? '',
+    destinationIds: parseAddonIds(d.destination_reference),
     second_image: d.second_image ?? '',
     divetravel_reference: d.DiveTravel_reference ?? '',
     deposit_deadline: d.deposit_deadline ?? '',
@@ -156,7 +156,7 @@ export function formStateFromCourse(c: EOCourse): FormState {
     notes: '', featured: false, fully_booked: false,
     has_rooms: false, roomIds: [],
     nitrox_required: false, gear_rental: '',
-    destination_reference: '', second_image: '', divetravel_reference: '',
+    destinationIds: [], second_image: '', divetravel_reference: '',
   }
 }
 
@@ -192,7 +192,7 @@ export function divePayloadFromForm(form: FormState): Record<string, unknown> {
     other_addons: addonsJson,
     cancel_date: form.cancel_date || null,
     cancel_policy: form.cancel_policy || null,
-    destination_reference: form.destination_reference || null,
+    destination_reference: form.destinationIds.length ? JSON.stringify(form.destinationIds) : null,
     DiveTravel_reference: form.divetravel_reference || null,
     deposit_deadline: form.deposit_deadline || null,
     full_payment_deadline: form.full_payment_deadline || null,

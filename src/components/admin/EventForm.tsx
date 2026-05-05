@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
-import type { CancellationPolicy, CertLevel, DiveTravelEntry, EOAddon, EOCourse, EODive, EOPrice, EORoom } from '../../types/database'
+import type { CancellationPolicy, CertLevel, DiveTravelEntry, EOAddon, EOCourse, EODive, EOPrice, EORoom, TravelDestination } from '../../types/database'
 import {
   EMPTY_FORM,
   formStateFromCourse,
@@ -78,6 +78,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
   const [certLevels, setCertLevels] = useState<CertLevel[]>([])
   const [cancelPolicies, setCancelPolicies] = useState<CancellationPolicy[]>([])
   const [diveTravels, setDiveTravels] = useState<DiveTravelEntry[]>([])
+  const [destinations, setDestinations] = useState<TravelDestination[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Past events for the preload picker, sorted most-recent-first.
@@ -131,6 +132,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
         supabase.from('cert_levels').select('*').order('rank'),
         supabase.from('cancellation_policies').select('*').order('title'),
         supabase.from('DiveTravel').select('*').order('title'),
+        supabase.from('TravelDestinations').select('*').order('sort_order', { nullsFirst: false }),
       ])
       if (cancelled) return
       const dataOf = <T,>(i: number): T[] => {
@@ -145,6 +147,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
       setCertLevels(dataOf<CertLevel>(5))
       setCancelPolicies(dataOf<CancellationPolicy>(6))
       setDiveTravels(dataOf<DiveTravelEntry>(7))
+      setDestinations(dataOf<TravelDestination>(8))
 
       const pastDives = dataOf<EODive>(3).map<PastEvent>(d => ({
         kind: 'dive', id: d._id, startDate: d.start_date ?? '', title: d.dive_title ?? '(untitled dive)', row: d,
@@ -179,7 +182,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
     setForm(f => ({ ...f, [key]: value }))
   }
 
-  function toggleId(key: 'addonIds' | 'roomIds', id: string) {
+  function toggleId(key: 'addonIds' | 'roomIds' | 'destinationIds', id: string) {
     setForm(f => {
       const list = f[key]
       const next = list.includes(id) ? list.filter(x => x !== id) : [...list, id]
@@ -479,9 +482,23 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
             <Field label="Gear rental info">
               <Input value={form.gear_rental} onChange={v => set('gear_rental', v)} />
             </Field>
-            <Field label="Destination reference">
-              <Input value={form.destination_reference} onChange={v => set('destination_reference', v)} />
-            </Field>
+            <div className="space-y-1">
+              <span className="text-xs font-medium text-white/80">Destinations</span>
+              {destinations.length === 0 ? (
+                <p className="text-sm text-blue-950 font-medium">No destinations defined.</p>
+              ) : (
+                <div className="space-y-1 max-h-56 overflow-y-auto bg-white/70 backdrop-blur-md border border-sky-200 rounded-md p-2">
+                  {destinations.map(d => (
+                    <Checkbox
+                      key={d._id}
+                      checked={form.destinationIds.includes(d._id)}
+                      onChange={() => toggleId('destinationIds', d._id)}
+                      label={d.country ? `${d.title ?? d._id} — ${d.country}` : (d.title ?? d._id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
             <Field label="DiveTravel reference">
               <Select value={form.divetravel_reference} onChange={v => set('divetravel_reference', v)}>
                 <option value="">— None —</option>
