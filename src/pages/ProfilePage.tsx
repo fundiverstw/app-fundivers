@@ -59,10 +59,13 @@ function strOrNull(v: unknown): string | null {
   return String(v)
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs text-blue-900 font-medium mb-1 uppercase tracking-wide">{label}</label>
+      <label className="block text-xs text-blue-900 font-medium mb-1 uppercase tracking-wide">
+        {label}
+        {required && <span className="text-red-600 ml-0.5" aria-label="required">*</span>}
+      </label>
       {children}
     </div>
   )
@@ -87,7 +90,7 @@ export function ProfilePage() {
   )
 }
 
-function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile }) {
+export function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile }) {
   const toast = useToast()
   const { register, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting, isDirty } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -231,16 +234,16 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Personal Info</h2>
-          <Field label="Full name">
+          <Field label="Full name" required>
             <input {...register('full_name')} className={inputClass} />
             {errors.full_name && <p className="text-red-600 text-xs mt-1">{errors.full_name.message}</p>}
           </Field>
-          <Field label="Display name">
+          <Field label="Display name" required>
             <input {...register('display_name')} className={inputClass} />
             {errors.display_name && <p className="text-red-600 text-xs mt-1">{errors.display_name.message}</p>}
           </Field>
           <Field label="Phone"><input {...register('phone')} type="tel" className={inputClass} /></Field>
-          <Field label="Date of birth">
+          <Field label="Date of birth" required>
             <input {...register('date_of_birth')} type="date" className={inputClass} />
             {errors.date_of_birth && <p className="text-red-600 text-xs mt-1">{errors.date_of_birth.message}</p>}
           </Field>
@@ -259,7 +262,7 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
 
         <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Preferred contact</h2>
-          <Field label="Method">
+          <Field label="Method" required>
             <select
               {...register('contact_method', { onChange: () => setDirtyExtras(true) })}
               className={inputClass}
@@ -272,7 +275,7 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
             </select>
             {errors.contact_method && <p className="text-red-600 text-xs mt-1">{errors.contact_method.message}</p>}
           </Field>
-          <Field label="Handle / number">
+          <Field label="Handle / number" required>
             <input
               {...register('contact_id', { onChange: () => setDirtyExtras(true) })}
               className={inputClass}
@@ -360,7 +363,7 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
               ))}
             </select>
           </Field>
-          <Field label="Level">
+          <Field label="Level" required>
             <select {...register('cert_level')} className={inputClass} disabled={!selectedAgency}>
               <option value="">{selectedAgency ? '— select level —' : '— pick agency first —'}</option>
               {/* Preserve a legacy free-text level if the current selection
@@ -375,7 +378,7 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
             </select>
             {errors.cert_level && <p className="text-red-600 text-xs mt-1">{errors.cert_level.message}</p>}
           </Field>
-          <Field label="Logged dives">
+          <Field label="Logged dives" required>
             <input {...register('logged_dives')} type="number" min="0" className={inputClass} />
             {errors.logged_dives && <p className="text-red-600 text-xs mt-1">{errors.logged_dives.message}</p>}
           </Field>
