@@ -90,7 +90,14 @@ export function ProfilePage() {
   )
 }
 
-export function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile }) {
+export function ProfileForm({ user, profile, onSaved }: {
+  user: { id: string }
+  profile: Profile
+  /** Fires after a successful save. PendingPage uses it to flip to a
+   *  "waiting for approval" screen once the diver has submitted their
+   *  required info. Optional — the regular /profile page ignores it. */
+  onSaved?: () => void
+}) {
   const toast = useToast()
   const { register, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting, isDirty } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -228,6 +235,7 @@ export function ProfileForm({ user, profile }: { user: { id: string }; profile: 
     reset(data)
     setDirtyExtras(false)
     toast.success('Profile saved')
+    onSaved?.()
   }
 
   return (

@@ -8,6 +8,9 @@ export function NotificationsPage() {
   const [items, setItems] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Tap a row to expand; tap again to collapse. Only one row open at a
+  // time so the list stays scannable.
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -22,13 +25,15 @@ export function NotificationsPage() {
 
   const unreadCount = items.filter(n => n.read_at === null).length
 
-  async function handleClick(n: Notification) {
-    if (n.read_at === null) {
-      // Optimistic local update; server confirms via markRead.
+  async function handleToggle(n: Notification) {
+    const willExpand = expandedId !== n.id
+    setExpandedId(willExpand ? n.id : null)
+    // Mark-as-read fires on first expand of an unread row. Optimistic
+    // local update so the dot disappears instantly.
+    if (willExpand && n.read_at === null) {
       setItems(prev => prev.map(x => x.id === n.id ? { ...x, read_at: new Date().toISOString() } : x))
       try { await markRead(n.id) } catch { /* tolerate — next reload will resync */ }
     }
-    if (n.url) navigate(n.url)
   }
 
   async function handleMarkAll() {
@@ -66,29 +71,64 @@ export function NotificationsPage() {
       <ul className="space-y-2">
         {items.map(n => {
           const unread = n.read_at === null
+          const expanded = expandedId === n.id
           return (
             <li key={n.id}>
-              <button
-                onClick={() => handleClick(n)}
-                className={`w-full text-left rounded-xl p-3 border transition-colors ${
+              <div
+                className={`rounded-xl border transition-colors overflow-hidden ${
                   unread
-                    ? 'bg-white/85 border-sky-300 hover:bg-white'
-                    : 'bg-white/55 border-sky-200/60 hover:bg-white/70'
+                    ? 'bg-white/85 border-sky-300'
+                    : 'bg-white/55 border-sky-200/60'
                 }`}
               >
-                <div className="flex items-baseline gap-2">
-                  {unread && <span aria-hidden className="w-2 h-2 rounded-full bg-red-500 shrink-0 translate-y-1" />}
-                  <p className={`flex-1 text-sm ${unread ? 'font-semibold' : 'font-medium'} text-blue-900`}>{n.title}</p>
-                  <span className="text-[11px] text-blue-900/60 shrink-0">{relativeTime(n.created_at)}</span>
-                </div>
-                {n.body && <p className={`text-xs ${ON_DEEP_BODY} mt-1 ml-${unread ? '4' : '0'} text-blue-900/85`}>{n.body}</p>}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => handleToggle(n)}
+                  aria-expanded={expanded}
+                  className={`w-full text-left p-3 ${unread ? 'hover:bg-white' : 'hover:bg-white/70'} transition-colors`}
+                >
+                  <div className="flex items-baseline gap-2">
+                    {unread && <span aria-hidden className="w-2 h-2 rounded-full bg-red-500 shrink-0 translate-y-1" />}
+                    <p className={`flex-1 text-sm ${unread ? 'font-semibold' : 'font-medium'} text-blue-900`}>{n.title}</p>
+                    <span className="text-[11px] text-blue-900/60 shrink-0">{relativeTime(n.created_at)}</span>
+                  </div>
+                </button>
+
+                {expanded && (
+                  <div className="border-t border-sky-200/60 px-3 pb-3 pt-2 space-y-2">
+                    {n.body
+                      ? <p className={`text-sm ${ON_DEEP_BODY} text-blue-900/90 whitespace-pre-wrap`}>{n.body}</p>
+                      : <p className={`text-xs italic text-blue-900/60`}>No additional details.</p>}
+                    {n.url && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(n.url!)}
+                        className="text-xs px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
+                      >
+                        {actionLabelForKind(n.kind)}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             </li>
           )
         })}
       </ul>
     </div>
   )
+}
+
+// Action button label inside the expanded view. Tied to the `kind` so the
+// CTA reads naturally — a reminder takes you to the event, a duty assignment
+// to the duty page, etc.
+function actionLabelForKind(kind: string): string {
+  switch (kind) {
+    case 'reminder':  return 'Open event'
+    case 'duty':      return 'Go to duty'
+    case 'broadcast': return 'Open link'
+    default:          return 'Open'
+  }
 }
 
 function relativeTime(iso: string): string {

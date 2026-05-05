@@ -1,8 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { SignupPage } from './SignupPage'
 import { renderWithRouter, byName } from '../../tests/test-utils'
+
+// Renders SignupPage with a sibling /pending route so navigation after a
+// successful signup is observable (the actual PendingPage isn't pulled in
+// to keep this unit-scoped).
+function renderWithPending() {
+  return render(
+    <MemoryRouter initialEntries={['/signup']}>
+      <Routes>
+        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/pending" element={<div>PENDING_PAGE</div>} />
+      </Routes>
+    </MemoryRouter>
+  )
+}
 
 const { signUp } = vi.hoisted(() => ({ signUp: vi.fn() }))
 
@@ -63,10 +78,10 @@ describe('SignupPage', () => {
     expect(signUp).not.toHaveBeenCalled()
   })
 
-  it('calls signUp and shows the success card on success', async () => {
+  it('calls signUp and navigates straight to /pending on success', async () => {
     signUp.mockResolvedValue({ error: null })
     const user = userEvent.setup()
-    renderWithRouter(<SignupPage />)
+    renderWithPending()
     await user.type(byName('email'), 'ada@example.com')
     await user.type(byName('password'), 'secret1234')
     await user.type(byName('confirm'), 'secret1234')
@@ -78,7 +93,7 @@ describe('SignupPage', () => {
     expect(arg.email).toBe('ada@example.com')
     expect(arg.password).toBe('secret1234')
     expect(typeof arg.options?.data?.agreed_to_terms_at).toBe('string')
-    expect(await screen.findByText(/account created/i)).toBeInTheDocument()
+    expect(await screen.findByText('PENDING_PAGE')).toBeInTheDocument()
   })
 
   it('shows a server error without advancing to the success screen', async () => {
@@ -92,7 +107,8 @@ describe('SignupPage', () => {
     await user.click(screen.getByRole('button', { name: /create account/i }))
 
     expect(await screen.findByText(/already registered/i)).toBeInTheDocument()
-    expect(screen.queryByText(/account created/i)).not.toBeInTheDocument()
+    // Still on signup — no navigation happened.
+    expect(screen.getByRole('button', { name: /create account/i })).toBeInTheDocument()
   })
 
   it('links to the login page', () => {
