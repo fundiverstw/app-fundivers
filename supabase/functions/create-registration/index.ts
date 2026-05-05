@@ -231,11 +231,11 @@ Deno.serve(async (req) => {
   if (roomDetail?.option_id) {
     const { data: r } = await admin
       .from("EO_rooms")
-      .select("title, display_name, added_price")
+      .select("admin_title, display_title, added_price")
       .eq("_id", roomDetail.option_id)
       .maybeSingle()
     if (r) {
-      const label = (r.display_name ?? r.title ?? "Room") as string
+      const label = (r.display_title ?? r.admin_title ?? "Room") as string
       roomBoard = r.added_price != null ? `${label} (+${r.added_price})` : label
     }
   }
@@ -244,11 +244,11 @@ Deno.serve(async (req) => {
   if (addOnIds.length) {
     const { data: as } = await admin
       .from("Other_Addons")
-      .select("_id, title, display_name")
+      .select("_id, admin_title, display_title")
       .in("_id", addOnIds)
     otherAddons = (as ?? [])
-      .map((a: { title?: string | null; display_name?: string | null }) =>
-        (a.display_name ?? a.title ?? "") as string)
+      .map((a: { admin_title?: string | null; display_title?: string | null }) =>
+        (a.display_title ?? a.admin_title ?? "") as string)
       .filter((s: string) => s.length > 0)
   }
 
@@ -304,7 +304,7 @@ Deno.serve(async (req) => {
   }
 
   const payload: RegistrationPdfPayload = {
-    eventTitle: (event?.dive_title ?? event?.course_title ?? event?.title ?? "Event") as string,
+    eventTitle: (event?.display_title ?? event?.admin_title ?? "Event") as string,
     startDate,
     endDate:    (event?.end_date ?? null) as string | null,
     name:            profile?.full_name ?? "",

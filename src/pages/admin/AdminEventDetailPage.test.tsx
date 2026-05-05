@@ -50,7 +50,7 @@ beforeEach(() => {
 })
 
 describe('AdminEventDetailPage', () => {
-  it('renders compact diver cards and expands to show add-ons by display_name', async () => {
+  it('renders compact diver cards and expands to show add-ons by display_title', async () => {
     fetchEventsForBookings.mockResolvedValue(new Map([
       ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
     ]))
@@ -68,8 +68,8 @@ describe('AdminEventDetailPage', () => {
     }]
     const payments: unknown[] = []
     const addons = [
-      { _id: 'addon-a', display_name: 'SMB Rental', title: 'SMB' },
-      { _id: 'addon-b', display_name: 'Camera Rental (1 Dive)', title: 'Cam' },
+      { _id: 'addon-a', display_title: 'SMB Rental', admin_title: 'SMB' },
+      { _id: 'addon-b', display_title: 'Camera Rental (1 Dive)', admin_title: 'Cam' },
     ]
 
     from.mockImplementation((table: string) => {
@@ -93,7 +93,7 @@ describe('AdminEventDetailPage', () => {
     // Expand the card by clicking it.
     await user.click(screen.getByRole('button', { expanded: false, name: /Ada Lovelace/ }))
 
-    // Add-ons now visible, rendered as display_name, not raw _id.
+    // Add-ons now visible, rendered as display_title, not raw _id.
     await waitFor(() => {
       expect(screen.getByText(/SMB Rental/)).toBeInTheDocument()
     })

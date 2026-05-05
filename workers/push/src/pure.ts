@@ -12,16 +12,11 @@ export type Booking = {
   eo_course_id: string | null
   details: { total?: number; deposit?: number } | null
 }
-export type DiveRow   = { _id: string; dive_title?: string | null;  title?: string | null; start_date: string | null; time?: string | null }
-export type CourseRow = { _id: string; course_title?: string | null; title?: string | null; start_date: string | null; start_time?: string | null }
+export type DiveRow   = { _id: string; admin_title?: string | null; display_title?: string | null; start_date: string | null; time?: string | null }
+export type CourseRow = { _id: string; admin_title?: string | null; display_title?: string | null; start_date: string | null; start_time?: string | null }
 
 function titleOf(ev: DiveRow | CourseRow, isDive: boolean): string {
-  if (isDive) {
-    const d = ev as DiveRow
-    return d.dive_title || d.title || 'Dive'
-  }
-  const c = ev as CourseRow
-  return c.course_title || c.title || 'Course'
+  return ev.display_title || ev.admin_title || (isDive ? 'Dive' : 'Course')
 }
 
 /** 'HH:MM:SS.SSS' / 'HH:MM:SS' / 'HH:MM' / empty → 'HH:mm' or null. */

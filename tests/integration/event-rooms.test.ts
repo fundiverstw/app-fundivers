@@ -13,7 +13,7 @@ let diveId: string
 async function createTestRoom(displayName: string): Promise<string> {
   const id = crypto.randomUUID()
   const { error } = await admin.from('EO_rooms' as never).insert({
-    _id: id, display_name: displayName, title: displayName, added_price: 0, currency: 'TWD',
+    _id: id, display_title: displayName, admin_title: displayName, added_price: 0, currency: 'TWD',
   } as never)
   if (error) throw error
   roomIds.push(id)

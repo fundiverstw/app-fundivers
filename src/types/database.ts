@@ -246,8 +246,9 @@ export interface Database {
       EO_dives: {
         Row: {
           _id: string
-          dive_title: string | null
-          title: string | null
+          admin_title: string | null
+          display_title: string | null
+          calendar_title: string | null
           start_date: string | null
           time: string | null
           end_date: string | null
@@ -278,8 +279,9 @@ export interface Database {
         }
         Insert: {
           _id: string
-          dive_title?: string | null
-          title?: string | null
+          admin_title?: string | null
+          display_title?: string | null
+          calendar_title?: string | null
           start_date?: string | null
           time?: string | null
           end_date?: string | null
@@ -304,8 +306,9 @@ export interface Database {
       EO_courses: {
         Row: {
           _id: string
-          course_title: string | null
-          title: string | null
+          admin_title: string | null
+          display_title: string | null
+          calendar_title: string | null
           start_date: string | null
           start_time: string | null
           end_date: string | null
@@ -331,8 +334,9 @@ export interface Database {
         }
         Insert: {
           _id: string
-          course_title?: string | null
-          title?: string | null
+          admin_title?: string | null
+          display_title?: string | null
+          calendar_title?: string | null
           start_date?: string | null
           start_time?: string | null
           end_date?: string | null
@@ -479,7 +483,7 @@ export interface Database {
       EO_prices: {
         Row: {
           _id: string
-          title: string
+          admin_title: string
           starting_at: number | null
           deposit_amount: number | null
           /** Per-tier transportation surcharge in NTD. NULL or 0 means
@@ -488,7 +492,7 @@ export interface Database {
         }
         Insert: {
           _id: string
-          title: string
+          admin_title: string
           starting_at?: number | null
           deposit_amount?: number | null
           transport?: number | null
@@ -499,15 +503,15 @@ export interface Database {
       EO_rooms: {
         Row: {
           _id: string
-          title: string | null
-          display_name: string | null
+          admin_title: string | null
+          display_title: string | null
           added_price: number | null
           currency: string | null
         }
         Insert: {
           _id: string
-          title?: string | null
-          display_name?: string | null
+          admin_title?: string | null
+          display_title?: string | null
           added_price?: number | null
           currency?: string | null
         }
@@ -517,15 +521,15 @@ export interface Database {
       Other_Addons: {
         Row: {
           _id: string
-          title: string | null
-          display_name: string | null
+          admin_title: string | null
+          display_title: string | null
           price: number | null
           currency: string | null
         }
         Insert: {
           _id: string
-          title?: string | null
-          display_name?: string | null
+          admin_title?: string | null
+          display_title?: string | null
           price?: number | null
           currency?: string | null
         }
@@ -535,14 +539,14 @@ export interface Database {
       DiveTravel: {
         Row: {
           _id: string
-          title: string | null
+          admin_title: string | null
           included: string | null
           not_included: string | null
           transportation: string | null
         }
         Insert: {
           _id: string
-          title?: string | null
+          admin_title?: string | null
           included?: string | null
           not_included?: string | null
           transportation?: string | null
@@ -568,7 +572,7 @@ export interface Database {
       TravelDestinations: {
         Row: {
           _id: string
-          title: string | null
+          admin_title: string | null
           slug: string | null
           tagline: string | null
           country: string | null
@@ -584,7 +588,7 @@ export interface Database {
         }
         Insert: {
           _id: string
-          title?: string | null
+          admin_title?: string | null
           slug?: string | null
           tagline?: string | null
           country?: string | null

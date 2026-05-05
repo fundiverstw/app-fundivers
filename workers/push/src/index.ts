@@ -138,12 +138,12 @@ export async function handleNotifyDuty(req: Request, env: Env): Promise<Response
   let eventTitle: string | null = null
   let eventTimeHhmm: string | null = null
   if (duty.eo_dive_id) {
-    const { data } = await service.from('EO_dives').select('dive_title, title, time').eq('_id', duty.eo_dive_id).maybeSingle()
-    eventTitle = data?.dive_title || data?.title || null
+    const { data } = await service.from('EO_dives').select('admin_title, display_title, time').eq('_id', duty.eo_dive_id).maybeSingle()
+    eventTitle = data?.display_title || data?.admin_title || null
     eventTimeHhmm = toHhmm(data?.time)
   } else if (duty.eo_course_id) {
-    const { data } = await service.from('EO_courses').select('course_title, title, start_time').eq('_id', duty.eo_course_id).maybeSingle()
-    eventTitle = data?.course_title || data?.title || null
+    const { data } = await service.from('EO_courses').select('display_title, admin_title, start_time').eq('_id', duty.eo_course_id).maybeSingle()
+    eventTitle = data?.display_title || data?.admin_title || null
     eventTimeHhmm = toHhmm(data?.start_time)
   }
 
@@ -297,8 +297,8 @@ export async function runDailyReminders(env: Env): Promise<{ sent: number; skipp
   const targetDates = WINDOWS.map((d) => addDays(today, d))
 
   const [divesResp, coursesResp] = await Promise.all([
-    sb.from('EO_dives').select('_id, dive_title, title, start_date, time').in('start_date', targetDates),
-    sb.from('EO_courses').select('_id, course_title, title, start_date, start_time').in('start_date', targetDates),
+    sb.from('EO_dives').select('_id, admin_title, display_title, start_date, time').in('start_date', targetDates),
+    sb.from('EO_courses').select('_id, admin_title, display_title, start_date, start_time').in('start_date', targetDates),
   ])
   const dives   = divesResp.data   ?? []
   const courses = coursesResp.data ?? []

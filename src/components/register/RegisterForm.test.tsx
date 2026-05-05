@@ -69,10 +69,10 @@ const sampleProfile: Profile = {
 }
 
 const sampleRooms: EORoom[] = [
-  { _id: 'room-a', title: 'kenting_double', display_name: 'Kenting Double', added_price: 1700, currency: 'NTD' },
+  { _id: 'room-a', admin_title: 'kenting_double', display_title: 'Kenting Double', added_price: 1700, currency: 'NTD' },
 ]
 const sampleAddons: EOAddon[] = [
-  { _id: 'addon-a', title: 'SMB 1 Day', display_name: null, price: 100, currency: 'NTD' },
+  { _id: 'addon-a', admin_title: 'SMB 1 Day', display_title: null, price: 100, currency: 'NTD' },
 ]
 
 function setupFrom(updated: unknown = { id: 'b-existing' }) {
