@@ -121,8 +121,8 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
       // different past event would clobber the row being edited.
       const settled = await Promise.allSettled([
         supabase.from('EO_prices').select('*').order('admin_title'),
-        supabase.from('EO_rooms').select('*').order('display_title'),
-        supabase.from('Other_Addons').select('*').order('display_title'),
+        supabase.from('EO_rooms').select('*').order('admin_title'),
+        supabase.from('Other_Addons').select('*').order('admin_title'),
         mode === 'create'
           ? supabase.from('EO_dives').select('*').lt('start_date', todayStr).order('start_date', { ascending: false }).limit(50)
           : Promise.resolve({ data: [] as EODive[] }),
@@ -241,7 +241,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
       const { error: insErr } = await supabase.from('EO_rooms').insert(payload as never)
       if (insErr) throw insErr
       setRooms(rs => [...rs, payload as unknown as EORoom].sort(
-        (a, b) => (a.display_title ?? a.admin_title ?? '').localeCompare(b.display_title ?? b.admin_title ?? '')
+        (a, b) => (a.admin_title ?? a.display_title ?? '').localeCompare(b.admin_title ?? b.display_title ?? '')
       ))
       // Auto-tick the new room so admins don't have to scroll back.
       setForm(f => ({ ...f, has_rooms: true, roomIds: [...f.roomIds, id] }))
@@ -269,7 +269,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
       const { error: insErr } = await supabase.from('Other_Addons').insert(payload as never)
       if (insErr) throw insErr
       setAddons(as => [...as, payload as unknown as EOAddon].sort(
-        (a, b) => (a.display_title ?? a.admin_title ?? '').localeCompare(b.display_title ?? b.admin_title ?? '')
+        (a, b) => (a.admin_title ?? a.display_title ?? '').localeCompare(b.admin_title ?? b.display_title ?? '')
       ))
       setForm(f => ({ ...f, addonIds: [...f.addonIds, id] }))
       setAddonForm(EMPTY_ADDON_FORM)
@@ -565,7 +565,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
                     key={r._id}
                     checked={form.roomIds.includes(r._id)}
                     onChange={() => toggleId('roomIds', r._id)}
-                    label={r.display_title || r.admin_title || r._id}
+                    label={r.admin_title || r.display_title || r._id}
                   />
                 ))}
               </div>
@@ -682,7 +682,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
                 key={a._id}
                 checked={form.addonIds.includes(a._id)}
                 onChange={() => toggleId('addonIds', a._id)}
-                label={a.display_title || a.admin_title || a._id}
+                label={a.admin_title || a.display_title || a._id}
               />
             ))}
           </div>
