@@ -8,7 +8,7 @@ import { useToast } from '../hooks/useToast'
 import { pushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
 import { GEAR_ITEMS } from '../lib/gear'
 import { uploadCertCard, getCertCardSignedUrl, deleteCertCard } from '../lib/cert-card'
-import type { Profile } from '../types/database'
+import type { Profile, CertLevel } from '../types/database'
 import {
   SHOE_UNITS,
   SHOE_GENDERS,
@@ -89,7 +89,7 @@ export function ProfilePage() {
 
 function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile }) {
   const toast = useToast()
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting, isDirty } } = useForm<FormData>({
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting, isDirty } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: profile as unknown as FormData,
   })
@@ -97,6 +97,53 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
   const [gearOwned, setGearOwned] = useState<string[]>(
     () => Array.isArray(profile.gear_owned) ? [...profile.gear_owned] : []
   )
+  // Agency + cert level dropdowns both pull from public.cert_levels (RLS
+  // public-read). Each row carries an `organization` ('PADI' | 'BSAC' | …)
+  // so we can derive the agency list and filter the level list by the
+  // currently-selected agency. Fetched once on mount.
+  const [certLevels, setCertLevels] = useState<CertLevel[]>([])
+  useEffect(() => {
+    let cancelled = false
+    supabase
+      .from('cert_levels')
+      .select('*')
+      .order('rank')
+      .then(({ data }) => {
+        if (cancelled) return
+        // Defensive: tests mock supabase.from with a single shared builder that
+        // can return shapes other than an array. Narrow before using map().
+        setCertLevels(Array.isArray(data) ? (data as CertLevel[]) : [])
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  const selectedAgency = watch('cert_agency') ?? ''
+  // Distinct orgs in the order returned by the rank-sorted query (PADI rows
+  // come first because they're the seed; agency rows follow).
+  const orgs = useMemo(() => {
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const c of certLevels) {
+      if (!seen.has(c.organization)) { seen.add(c.organization); out.push(c.organization) }
+    }
+    return out
+  }, [certLevels])
+  const filteredLevels = useMemo(
+    () => certLevels.filter(c => c.organization === selectedAgency),
+    [certLevels, selectedAgency],
+  )
+
+  // When the user changes agency, clear cert_level so they don't end up with
+  // a level from the wrong org. Subscribed via watch so we only react to
+  // user-initiated edits, not the initial defaultValues hydration.
+  useEffect(() => {
+    const sub = watch((_values, info) => {
+      if (info.name === 'cert_agency' && info.type === 'change') {
+        setValue('cert_level', '', { shouldDirty: true })
+      }
+    })
+    return () => sub.unsubscribe()
+  }, [watch, setValue])
   const initialShoe = useMemo(() => parseShoeSize(profile.shoe_size), [profile.shoe_size])
   const [shoeUnit, setShoeUnit] = useState<ShoeUnit>(() => initialShoe?.unit ?? 'eu')
   const [shoeGender, setShoeGender] = useState<ShoeGender>(() => initialShoe?.gender ?? 'm')
@@ -300,9 +347,32 @@ function ProfileForm({ user, profile }: { user: { id: string }; profile: Profile
 
         <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Certification</h2>
-          <Field label="Agency (e.g. PADI, SSI)"><input {...register('cert_agency')} className={inputClass} /></Field>
-          <Field label="Level (e.g. Open Water)">
-            <input {...register('cert_level')} className={inputClass} />
+          <Field label="Agency">
+            <select {...register('cert_agency')} className={inputClass}>
+              <option value="">— select agency —</option>
+              {/* Preserve any legacy free-text agency on the existing profile
+                   so opening the form doesn't silently drop it. */}
+              {profile.cert_agency
+                && !orgs.includes(profile.cert_agency)
+                && <option value={profile.cert_agency}>{profile.cert_agency}</option>}
+              {orgs.map(o => (
+                <option key={o} value={o}>{o}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Level">
+            <select {...register('cert_level')} className={inputClass} disabled={!selectedAgency}>
+              <option value="">{selectedAgency ? '— select level —' : '— pick agency first —'}</option>
+              {/* Preserve a legacy free-text level if the current selection
+                   isn't in the filtered list — only when the agency matches. */}
+              {profile.cert_level
+                && profile.cert_agency === selectedAgency
+                && !filteredLevels.some(c => c.name === profile.cert_level)
+                && <option value={profile.cert_level}>{profile.cert_level}</option>}
+              {filteredLevels.map(c => (
+                <option key={c.id} value={c.name}>{c.name}</option>
+              ))}
+            </select>
             {errors.cert_level && <p className="text-red-600 text-xs mt-1">{errors.cert_level.message}</p>}
           </Field>
           <Field label="Logged dives">
