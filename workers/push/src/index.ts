@@ -159,11 +159,26 @@ export async function handleNotifyDuty(req: Request, env: Env): Promise<Response
     : duty.start_date
   const titlePart = eventTitle ? ` for ${eventTitle}` : ''
   const timePart = eventTimeHhmm ? ` · ${eventTimeHhmm}` : ''
+  const dutyTitle = 'New duty assigned'
+  const dutyBody  = `${capitalize(duty.role)}${titlePart} · ${dateSpan}${timePart}`
+  const dutyUrl   = '/admin/duty'
   const payload = JSON.stringify({
-    title: 'New duty assigned',
-    body:  `${capitalize(duty.role)}${titlePart} · ${dateSpan}${timePart}`,
+    title: dutyTitle,
+    body:  dutyBody,
     tag:   `duty:${duty.id}`,
-    url:   '/admin/duty',
+    url:   dutyUrl,
+  })
+
+  // Inbox row for the assignee — same content as the push payload. Goes
+  // out before the push fan-out so even if every endpoint 410s the row
+  // is still in the inbox.
+  await service.from('notifications').insert({
+    user_id:  duty.assignee_id,
+    title:    dutyTitle,
+    body:     dutyBody,
+    url:      dutyUrl,
+    kind:     'duty',
+    event_id: duty.eo_dive_id ?? duty.eo_course_id ?? null,
   })
 
   let sent = 0
@@ -263,6 +278,26 @@ export async function handleAdminBroadcast(req: Request, env: Env): Promise<Resp
       }
       skipped++
     }
+  }
+
+  // Inbox fan-out — one row per active diver, regardless of whether they
+  // have a push subscription. This is the only delivery mechanism for
+  // iOS users who haven't installed the PWA, and it keeps a scrollable
+  // history of past broadcasts for everyone else.
+  const { data: recipients } = await service
+    .from('profiles')
+    .select('id')
+    .eq('status', 'active')
+  if (recipients?.length) {
+    const rows = recipients.map((p) => ({
+      user_id: p.id,
+      title,
+      body: text,
+      url,
+      kind: 'broadcast' as const,
+      event_id: null,
+    }))
+    await service.from('notifications').insert(rows)
   }
 
   // Fire-and-forget webhook relay. Failure here does not fail the request —
@@ -371,28 +406,39 @@ export async function runDailyReminders(env: Env): Promise<{ sent: number; skipp
   let skipped = 0
   for (const r of reminders) {
     const userSubs = subsByUser.get(r.userId) ?? []
-    if (!userSubs.length) { skipped++; continue }
-
-    const payload = JSON.stringify({
-      title: r.title,
-      body:  r.body,
-      tag:   `${r.eventId}:${r.kind}`,
-      url:   r.url,
-    })
-
-    const deliveries = await Promise.allSettled(
-      userSubs.map((s) => deliver(sb, s, payload))
-    )
-    const anyOk = deliveries.some((d) => d.status === 'fulfilled')
-    if (anyOk) {
-      sent++
-      await sb.from('push_notifications_sent').upsert(
-        { user_id: r.userId, event_id: r.eventId, event_type: r.eventType, kind: r.kind },
-        { onConflict: 'user_id,event_id,kind' }
+    let anyOk = false
+    if (userSubs.length) {
+      const payload = JSON.stringify({
+        title: r.title,
+        body:  r.body,
+        tag:   `${r.eventId}:${r.kind}`,
+        url:   r.url,
+      })
+      const deliveries = await Promise.allSettled(
+        userSubs.map((s) => deliver(sb, s, payload))
       )
-    } else {
-      skipped++
+      anyOk = deliveries.some((d) => d.status === 'fulfilled')
     }
+
+    // Persist the in-app inbox row regardless of push outcome — covers
+    // recipients with no push subscriptions (iOS not added to Home Screen)
+    // and lets us record history we can scroll through later. The
+    // push_notifications_sent upsert below dedupes against future cron
+    // runs, so we don't insert duplicates.
+    await sb.from('notifications').insert({
+      user_id:  r.userId,
+      title:    r.title,
+      body:     r.body,
+      url:      r.url,
+      kind:     'reminder',
+      event_id: r.eventId,
+    })
+    await sb.from('push_notifications_sent').upsert(
+      { user_id: r.userId, event_id: r.eventId, event_type: r.eventType, kind: r.kind },
+      { onConflict: 'user_id,event_id,kind' }
+    )
+    if (anyOk) sent++
+    else skipped++
   }
 
   return { sent, skipped }

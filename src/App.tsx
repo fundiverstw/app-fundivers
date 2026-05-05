@@ -19,6 +19,7 @@ import { MapPage } from './pages/MapPage'
 import { BookingsPage } from './pages/BookingsPage'
 import { PaymentsPage } from './pages/PaymentsPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { NotificationsPage } from './pages/NotificationsPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { DutiesPage } from './pages/DutiesPage'
 import { EelSnakePage } from './pages/EelSnakePage'
@@ -83,6 +84,7 @@ export default function App() {
               <Route path="/bookings" element={<BookingsPage />} />
               <Route path="/payments" element={<PaymentsPage />} />
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/duties" element={<DutiesPage />} />
             </Route>
             <Route path="/minigame/eel-snake" element={<EelSnakePage />} />
