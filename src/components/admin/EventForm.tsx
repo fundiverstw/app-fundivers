@@ -650,7 +650,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
             <Select value={form.cancel_policy} onChange={v => set('cancel_policy', v)}>
               <option value="">— None —</option>
               {cancelPolicies.map(p => (
-                <option key={p._id} value={p._id}>{p.admin_title ?? p._id}</option>
+                <option key={p._id} value={p._id}>{p.title ?? p._id}</option>
               ))}
             </Select>
           </Field>
