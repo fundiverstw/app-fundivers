@@ -32,11 +32,17 @@ export function AdminApplicationsPage() {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
+      // Filter to applications the diver has actually submitted — the
+      // BEFORE UPDATE trigger on profiles stamps `application_submitted_at`
+      // the first time all required fields are populated. Without this
+      // filter, admins see a row the instant a diver hits "Sign up",
+      // before they've typed a single field.
       const { data } = await supabase
         .from('profiles')
         .select('*')
         .eq('status', 'pending')
-        .order('created_at', { ascending: false })
+        .not('application_submitted_at', 'is', null)
+        .order('application_submitted_at', { ascending: false })
       if (!cancelled) setUsers((data ?? []) as Profile[])
     })()
     return () => { cancelled = true }
