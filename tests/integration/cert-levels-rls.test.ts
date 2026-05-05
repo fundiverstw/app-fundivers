@@ -48,7 +48,7 @@ describe('cert_levels admin writes', () => {
     const sb = await userClient(adminUser.email, adminUser.password)
     const { data, error } = await sb
       .from('cert_levels')
-      .insert({ code: uniqCode(), name: 'Test cert', rank: 99 })
+      .insert({ code: uniqCode(), name: 'Test cert', rank: 99, organization: 'TEST' })
       .select('id').single<{ id: string }>()
     expect(error).toBeNull()
     if (data) createdIds.push(data.id)
@@ -58,7 +58,7 @@ describe('cert_levels admin writes', () => {
     const sb = await userClient(adminUser.email, adminUser.password)
     const { data: ins } = await admin
       .from('cert_levels')
-      .insert({ code: uniqCode(), name: 'pre', rank: 100 })
+      .insert({ code: uniqCode(), name: 'pre', rank: 100, organization: 'TEST' })
       .select('id').single<{ id: string }>()
     const id = ins!.id
     createdIds.push(id)
@@ -73,7 +73,7 @@ describe('cert_levels admin writes', () => {
     const sb = await userClient(adminUser.email, adminUser.password)
     const { data: ins } = await admin
       .from('cert_levels')
-      .insert({ code: uniqCode(), name: 'doomed', rank: 101 })
+      .insert({ code: uniqCode(), name: 'doomed', rank: 101, organization: 'TEST' })
       .select('id').single<{ id: string }>()
     const id = ins!.id
     const { error } = await sb.from('cert_levels').delete().eq('id', id)
@@ -86,7 +86,7 @@ describe('cert_levels admin writes', () => {
     const sb = await userClient(diver.email, diver.password)
     const { error } = await sb
       .from('cert_levels')
-      .insert({ code: uniqCode(), name: 'diver tried', rank: 102 })
+      .insert({ code: uniqCode(), name: 'diver tried', rank: 102, organization: 'TEST' })
     expect(error).not.toBeNull()
   })
 
@@ -94,7 +94,7 @@ describe('cert_levels admin writes', () => {
     const sb = await userClient(diver.email, diver.password)
     const { data: ins } = await admin
       .from('cert_levels')
-      .insert({ code: uniqCode(), name: 'before', rank: 103 })
+      .insert({ code: uniqCode(), name: 'before', rank: 103, organization: 'TEST' })
       .select('id').single<{ id: string }>()
     const id = ins!.id
     createdIds.push(id)
@@ -112,7 +112,7 @@ describe('cert_levels admin writes', () => {
     const sb = await userClient(diver.email, diver.password)
     const { data: ins } = await admin
       .from('cert_levels')
-      .insert({ code: uniqCode(), name: 'survives', rank: 104 })
+      .insert({ code: uniqCode(), name: 'survives', rank: 104, organization: 'TEST' })
       .select('id').single<{ id: string }>()
     const id = ins!.id
     createdIds.push(id)
@@ -126,12 +126,12 @@ describe('cert_levels admin writes', () => {
     const code1 = uniqCode()
     const { data: a } = await admin
       .from('cert_levels')
-      .insert({ code: code1, name: 'first', rank: 200 })
+      .insert({ code: code1, name: 'first', rank: 200, organization: 'TEST' })
       .select('id').single<{ id: string }>()
     if (a) createdIds.push(a.id)
     const { error } = await admin
       .from('cert_levels')
-      .insert({ code: uniqCode(), name: 'second', rank: 200 })
+      .insert({ code: uniqCode(), name: 'second', rank: 200, organization: 'TEST' })
     expect(error).toBeTruthy()
     expect(String(error?.message ?? '')).toMatch(/duplicate|unique/i)
   })
@@ -139,7 +139,7 @@ describe('cert_levels admin writes', () => {
   it('rejects non-positive rank', async () => {
     const { error } = await admin
       .from('cert_levels')
-      .insert({ code: uniqCode(), name: 'zero', rank: 0 })
+      .insert({ code: uniqCode(), name: 'zero', rank: 0, organization: 'TEST' })
     expect(error).toBeTruthy()
     expect(String(error?.message ?? '')).toMatch(/check|constraint/i)
   })
