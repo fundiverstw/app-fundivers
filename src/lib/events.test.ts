@@ -18,7 +18,7 @@ beforeEach(() => { from.mockReset() })
 
 interface CourseRow {
   _id: string
-  course_title: string
+  display_title: string
   start_date: string
   start_time: string | null
   end_date: string | null
@@ -26,7 +26,8 @@ interface CourseRow {
   price: string | null
   other_addons: string | null
   dive_days: number | null
-  title?: string | null
+  admin_title?: string | null
+  calendar_title?: string | null
 }
 
 function setup(courses: CourseRow[]) {
@@ -57,12 +58,13 @@ async function fetchAndGet(courseRow: CourseRow) {
 describe('courseToEvents — Wix special_date branches', () => {
   const baseCourse: Omit<CourseRow, 'start_date' | 'end_date' | 'special_date'> = {
     _id: 'c1',
-    course_title: 'AOW',
+    display_title: 'AOW',
     start_time: '09:00:00',
     price: null,
     other_addons: null,
     dive_days: null,
-    title: null,
+    admin_title: null,
+    calendar_title: null,
   }
 
   it('A: no special_date — one segment spanning start..end', async () => {

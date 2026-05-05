@@ -93,15 +93,15 @@ export function AdminEventDetailPage() {
       }
       const [addonRes, roomRes] = await Promise.all([
         addonIds.size
-          ? supabase.from('Other_Addons').select('_id, display_name, title').in('_id', [...addonIds])
-          : Promise.resolve({ data: [] as { _id: string; display_name: string | null; title: string | null }[] }),
+          ? supabase.from('Other_Addons').select('_id, display_title, admin_title').in('_id', [...addonIds])
+          : Promise.resolve({ data: [] as { _id: string; display_title: string | null; admin_title: string | null }[] }),
         roomIds.size
-          ? supabase.from('EO_rooms').select('_id, display_name, title').in('_id', [...roomIds])
-          : Promise.resolve({ data: [] as { _id: string; display_name: string | null; title: string | null }[] }),
+          ? supabase.from('EO_rooms').select('_id, display_title, admin_title').in('_id', [...roomIds])
+          : Promise.resolve({ data: [] as { _id: string; display_title: string | null; admin_title: string | null }[] }),
       ])
       if (cancelled) return
-      setAddonNames(new Map((addonRes.data ?? []).map(a => [a._id, a.display_name || a.title || a._id])))
-      setRoomNames(new Map((roomRes.data ?? []).map(r => [r._id, r.display_name || r.title || r._id])))
+      setAddonNames(new Map((addonRes.data ?? []).map(a => [a._id, a.display_title || a.admin_title || a._id])))
+      setRoomNames(new Map((roomRes.data ?? []).map(r => [r._id, r.display_title || r.admin_title || r._id])))
 
       setRegistrants(bookings.map(b => ({
         booking: b,

@@ -82,7 +82,7 @@ export async function createTestDive(admin: DB = adminClient()): Promise<string>
   const startDate = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10)
   const { error } = await admin.from('EO_dives' as never).insert({
     _id: id,
-    dive_title: 'Test Dive',
+    admin_title: 'Test Dive',
     notes: '',
     start_date: startDate,
     time: '09:00:00',
@@ -97,7 +97,7 @@ export async function createTestCourse(admin: DB = adminClient()): Promise<strin
   const startDate = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10)
   const { error } = await admin.from('EO_courses' as never).insert({
     _id: id,
-    course_title: 'Test Course',
+    display_title: 'Test Course',
     start_date: startDate,
     start_time: '09:00:00',
     end_date: startDate,

@@ -19,8 +19,8 @@ function fakeCatalog() {
   // Hand each lookup a tiny fixture so the FK pickers actually render rows.
   from.mockImplementation((table: string) => {
     if (table === 'EO_prices') return mockQueryBuilder({ data: [{ _id: 'price-1', title: 'Standard',  starting_at: 5000 }] })
-    if (table === 'EO_rooms')  return mockQueryBuilder({ data: [{ _id: 'room-1',  display_name: 'Twin', title: 'Twin' }] })
-    if (table === 'Other_Addons') return mockQueryBuilder({ data: [{ _id: 'addon-1', display_name: 'Nitrox', title: 'Nitrox' }] })
+    if (table === 'EO_rooms')  return mockQueryBuilder({ data: [{ _id: 'room-1',  display_title: 'Twin', admin_title: 'Twin' }] })
+    if (table === 'Other_Addons') return mockQueryBuilder({ data: [{ _id: 'addon-1', display_title: 'Nitrox', admin_title: 'Nitrox' }] })
     return mockQueryBuilder({ data: [] })
   })
 }
@@ -63,7 +63,7 @@ describe('AdminNewEventPage', () => {
     const user = userEvent.setup()
     renderPage()
     // Browser form validation kicks in before our handler — fill start_date so
-    // the dive_title required attribute is the only thing left.
+    // the admin_title required attribute is the only thing left.
     await screen.findByLabelText(/dive title/i)
     await user.click(screen.getByRole('button', { name: /create dive/i }))
     // We never navigated, so the new-event heading is still visible.
@@ -73,7 +73,7 @@ describe('AdminNewEventPage', () => {
   it('preloads form fields when a past dive is picked', async () => {
     const pastDive = {
       _id: 'past-1',
-      dive_title: 'Green Island Day Trip',
+      admin_title: 'Green Island Day Trip',
       title: 'GI',
       start_date: '2026-01-15',
       time: '09:00:00',
@@ -117,7 +117,7 @@ describe('AdminNewEventPage', () => {
         b.insert = priceInsert
         return b
       }
-      if (table === 'EO_rooms')     return mockQueryBuilder({ data: [{ _id: 'room-1', display_name: 'Twin', title: 'Twin' }] })
+      if (table === 'EO_rooms')     return mockQueryBuilder({ data: [{ _id: 'room-1', display_title: 'Twin', admin_title: 'Twin' }] })
       if (table === 'Other_Addons') return mockQueryBuilder({ data: [] })
       return mockQueryBuilder({ data: [] })
     })
@@ -130,7 +130,7 @@ describe('AdminNewEventPage', () => {
     await user.click(screen.getByRole('button', { name: /save price tier/i }))
     await waitFor(() => expect(priceInsert).toHaveBeenCalled())
     const payload = (priceInsert.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
-    expect(payload.title).toBe('Premium')
+    expect(payload.admin_title).toBe('Premium')
     expect(payload.starting_at).toBe(15000)
     // Newly created tier becomes the selected option in the price dropdown.
     await waitFor(() => {
@@ -168,8 +168,8 @@ describe('AdminNewEventPage', () => {
 
     await waitFor(() => expect(roomInsert).toHaveBeenCalled())
     const payload = (roomInsert.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
-    expect(payload.title).toBe('Premium Room')
-    expect(payload.display_name).toBe('Premium Suite')
+    expect(payload.admin_title).toBe('Premium Room')
+    expect(payload.display_title).toBe('Premium Suite')
     expect(payload.added_price).toBe(2000)
 
     // has_rooms toggle flipped on, and the new room is checked in the list.
@@ -205,8 +205,8 @@ describe('AdminNewEventPage', () => {
 
     await waitFor(() => expect(addonInsert).toHaveBeenCalled())
     const payload = (addonInsert.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
-    expect(payload.title).toBe('SMB')
-    expect(payload.display_name).toBe('Surface Marker Buoy')
+    expect(payload.admin_title).toBe('SMB')
+    expect(payload.display_title).toBe('Surface Marker Buoy')
     expect(payload.price).toBe(100)
 
     await waitFor(() =>
@@ -240,7 +240,7 @@ describe('AdminNewEventPage', () => {
 
     await waitFor(() => expect(travelInsert).toHaveBeenCalled())
     const payload = (travelInsert.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
-    expect(payload.title).toBe('Green Island')
+    expect(payload.admin_title).toBe('Green Island')
     expect(payload.included).toBe('Tanks, weights, transport')
 
     // Newly created entry becomes the selected option in the DiveTravel dropdown.
@@ -255,8 +255,8 @@ describe('AdminNewEventPage', () => {
     const insert = vi.fn().mockReturnValue({ then: (cb: (r: { error: null }) => void) => Promise.resolve({ error: null }).then(cb) })
     from.mockImplementation((table: string) => {
       if (table === 'TravelDestinations') return mockQueryBuilder({ data: [
-        { _id: 'dest-1', title: 'Green Island',  country: 'Taiwan',          sort_order: 1 },
-        { _id: 'dest-2', title: 'Puerto Galera', country: 'The Philippines', sort_order: 2 },
+        { _id: 'dest-1', admin_title: 'Green Island',  country: 'Taiwan',          sort_order: 1 },
+        { _id: 'dest-2', admin_title: 'Puerto Galera', country: 'The Philippines', sort_order: 2 },
       ] })
       if (table === 'EO_dives') {
         const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
@@ -304,7 +304,7 @@ describe('AdminNewEventPage', () => {
     await user.click(screen.getByRole('button', { name: /create dive/i }))
     await waitFor(() => expect(insert).toHaveBeenCalled())
     const payload = (insert.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
-    expect(payload.dive_title).toBe('Green Island Day Trip')
+    expect(payload.admin_title).toBe('Green Island Day Trip')
     expect(payload.start_date).toBe('2026-06-01')
     expect(typeof payload._id).toBe('string')
     expect(await screen.findByText('DIVE_DETAIL')).toBeInTheDocument()

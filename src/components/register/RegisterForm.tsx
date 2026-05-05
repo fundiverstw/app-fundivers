@@ -194,14 +194,14 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
       if (showRooms && event.room_type_ids.length > 0) {
         const { data } = await supabase
           .from('EO_rooms' as never)
-          .select('_id, title, display_name, added_price, currency')
+          .select('_id, admin_title, display_title, added_price, currency')
           .in('_id', event.room_type_ids)
         if (!cancelled) setRooms((data ?? []) as EORoom[])
       }
       if (showAddons && event.addon_ids.length > 0) {
         const { data } = await supabase
           .from('Other_Addons' as never)
-          .select('_id, title, display_name, price, currency')
+          .select('_id, admin_title, display_title, price, currency')
           .in('_id', event.addon_ids)
         if (!cancelled) setAddons((data ?? []) as EOAddon[])
       }
@@ -523,7 +523,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
                 <option value="">— keep included room —</option>
                 {rooms.map(r => (
                   <option key={r._id} value={r._id}>
-                    {r.display_name ?? r.title} {r.added_price != null && `(+${r.added_price.toLocaleString()})`}
+                    {r.display_title ?? r.admin_title} {r.added_price != null && `(+${r.added_price.toLocaleString()})`}
                   </option>
                 ))}
               </select>
@@ -540,7 +540,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
                 {addons.map(a => (
                   <label key={a._id} className="flex items-center gap-2 text-xs text-blue-950 font-medium">
                     <input type="checkbox" checked={addonIds.has(a._id)} onChange={() => toggleAddon(a._id)} className="accent-blue-900" />
-                    <span className="flex-1">{a.display_name ?? a.title}</span>
+                    <span className="flex-1">{a.display_title ?? a.admin_title}</span>
                     {a.price != null && <span className="text-blue-900 font-medium">+{a.price.toLocaleString()}</span>}
                   </label>
                 ))}

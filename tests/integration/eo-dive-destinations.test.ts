@@ -8,7 +8,7 @@ let diveId: string
 async function createTestDestination(title: string): Promise<string> {
   const id = crypto.randomUUID()
   const { error } = await admin.from('TravelDestinations' as never).insert({
-    _id: id, title, slug: `/test/${id}`, country: 'Testland',
+    _id: id, admin_title: title, slug: `/test/${id}`, country: 'Testland',
   } as never)
   if (error) throw error
   destIds.push(id)

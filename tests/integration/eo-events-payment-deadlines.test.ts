@@ -36,7 +36,7 @@ describe('EO_dives.deposit_deadline / full_payment_deadline', () => {
     const id = crypto.randomUUID()
     createdDiveIds.push(id)
     await admin.from('EO_dives' as never).insert({
-      _id: id, dive_title: 'No deadlines yet', notes: '', start_date: '2027-06-01',
+      _id: id, admin_title: 'No deadlines yet', notes: '', start_date: '2027-06-01',
     } as never)
     const { data } = await admin.from('EO_dives' as never)
       .select('deposit_deadline, full_payment_deadline').eq('_id', id)
@@ -50,7 +50,7 @@ describe('EO_dives.deposit_deadline / full_payment_deadline', () => {
     const id = crypto.randomUUID()
     createdDiveIds.push(id)
     await admin.from('EO_dives' as never).insert({
-      _id: id, dive_title: 'Has deadlines', notes: '', start_date: '2027-06-15',
+      _id: id, admin_title: 'Has deadlines', notes: '', start_date: '2027-06-15',
     } as never)
     const { error } = await sb.from('EO_dives' as never).update({
       deposit_deadline: '2027-05-01',
@@ -71,7 +71,7 @@ describe('EO_dives.deposit_deadline / full_payment_deadline', () => {
     // Seed in two steps so the insert matches the shape used by other
     // tests in this suite — the deadline column is exercised via update.
     await admin.from('EO_dives' as never).insert({
-      _id: id, dive_title: 'Locked', notes: '', start_date: '2027-06-15',
+      _id: id, admin_title: 'Locked', notes: '', start_date: '2027-06-15',
     } as never)
     await admin.from('EO_dives' as never)
       .update({ deposit_deadline: '2027-05-01' } as never).eq('_id', id)
@@ -94,7 +94,7 @@ describe('EO_courses.deposit_deadline / full_payment_deadline', () => {
     const id = crypto.randomUUID()
     createdCourseIds.push(id)
     await admin.from('EO_courses' as never).insert({
-      _id: id, course_title: 'OW course', start_date: '2027-07-10',
+      _id: id, display_title: 'OW course', start_date: '2027-07-10',
     } as never)
     const { error } = await sb.from('EO_courses' as never).update({
       deposit_deadline: '2027-06-01',

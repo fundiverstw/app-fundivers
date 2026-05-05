@@ -29,7 +29,7 @@ describe('cancelled events are filtered from listing reads', () => {
     const start = '2027-09-15'
     await admin.from('EO_dives' as never).insert({
       _id: id,
-      dive_title: 'Cancellation test dive',
+      admin_title: 'Cancellation test dive',
       notes: '',
       start_date: start,
       end_date: start,
@@ -58,7 +58,7 @@ describe('cancelled events are filtered from listing reads', () => {
     const start = '2027-09-15'
     await admin.from('EO_courses' as never).insert({
       _id: id,
-      course_title: 'Cancellation test course',
+      display_title: 'Cancellation test course',
       start_date: start,
       end_date: start,
     } as never)

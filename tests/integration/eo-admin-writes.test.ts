@@ -34,7 +34,7 @@ describe('EO_dives admin writes', () => {
     const id = crypto.randomUUID()
     createdDiveIds.push(id)
     const { error } = await sb.from('EO_dives' as never).insert({
-      _id: id, dive_title: 'Admin-created dive', notes: '', start_date: '2026-06-01',
+      _id: id, admin_title: 'Admin-created dive', notes: '', start_date: '2026-06-01',
     } as never)
     expect(error).toBeNull()
   })
@@ -43,17 +43,17 @@ describe('EO_dives admin writes', () => {
     const sb = await userClient(adminUser.email, adminUser.password)
     const id = crypto.randomUUID()
     createdDiveIds.push(id)
-    await admin.from('EO_dives' as never).insert({ _id: id, dive_title: 'pre', notes: '', start_date: '2026-06-01' } as never)
-    const { error } = await sb.from('EO_dives' as never).update({ dive_title: 'post' } as never).eq('_id', id)
+    await admin.from('EO_dives' as never).insert({ _id: id, admin_title: 'pre', notes: '', start_date: '2026-06-01' } as never)
+    const { error } = await sb.from('EO_dives' as never).update({ admin_title: 'post' } as never).eq('_id', id)
     expect(error).toBeNull()
-    const { data } = await admin.from('EO_dives' as never).select('dive_title').eq('_id', id).single<{ dive_title: string }>()
-    expect(data?.dive_title).toBe('post')
+    const { data } = await admin.from('EO_dives' as never).select('admin_title').eq('_id', id).single<{ admin_title: string }>()
+    expect(data?.admin_title).toBe('post')
   })
 
   it('admin can delete', async () => {
     const sb = await userClient(adminUser.email, adminUser.password)
     const id = crypto.randomUUID()
-    await admin.from('EO_dives' as never).insert({ _id: id, dive_title: 'doomed', notes: '', start_date: '2026-06-01' } as never)
+    await admin.from('EO_dives' as never).insert({ _id: id, admin_title: 'doomed', notes: '', start_date: '2026-06-01' } as never)
     const { error } = await sb.from('EO_dives' as never).delete().eq('_id', id)
     expect(error).toBeNull()
     const { data } = await admin.from('EO_dives' as never).select('_id').eq('_id', id).maybeSingle()
@@ -64,7 +64,7 @@ describe('EO_dives admin writes', () => {
     const sb = await userClient(diver.email, diver.password)
     const id = crypto.randomUUID()
     const { error } = await sb.from('EO_dives' as never).insert({
-      _id: id, dive_title: 'diver tried', notes: '', start_date: '2026-06-01',
+      _id: id, admin_title: 'diver tried', notes: '', start_date: '2026-06-01',
     } as never)
     expect(error).not.toBeNull()
     const { data } = await admin.from('EO_dives' as never).select('_id').eq('_id', id).maybeSingle()
@@ -75,23 +75,23 @@ describe('EO_dives admin writes', () => {
     const sb = await userClient(diver.email, diver.password)
     const id = crypto.randomUUID()
     createdDiveIds.push(id)
-    await admin.from('EO_dives' as never).insert({ _id: id, dive_title: 'before', notes: '', start_date: '2026-06-01' } as never)
+    await admin.from('EO_dives' as never).insert({ _id: id, admin_title: 'before', notes: '', start_date: '2026-06-01' } as never)
     const { error, count } = await sb
       .from('EO_dives' as never)
-      .update({ dive_title: 'after' } as never, { count: 'exact' })
+      .update({ admin_title: 'after' } as never, { count: 'exact' })
       .eq('_id', id)
     // RLS may silently filter (count=0) or raise; either is acceptable as
     // long as the row is unchanged.
     expect(error !== null || count === 0).toBe(true)
-    const { data } = await admin.from('EO_dives' as never).select('dive_title').eq('_id', id).single<{ dive_title: string }>()
-    expect(data?.dive_title).toBe('before')
+    const { data } = await admin.from('EO_dives' as never).select('admin_title').eq('_id', id).single<{ admin_title: string }>()
+    expect(data?.admin_title).toBe('before')
   })
 
   it('diver cannot delete', async () => {
     const sb = await userClient(diver.email, diver.password)
     const id = crypto.randomUUID()
     createdDiveIds.push(id)
-    await admin.from('EO_dives' as never).insert({ _id: id, dive_title: 'survives', notes: '', start_date: '2026-06-01' } as never)
+    await admin.from('EO_dives' as never).insert({ _id: id, admin_title: 'survives', notes: '', start_date: '2026-06-01' } as never)
     const { error, count } = await sb.from('EO_dives' as never).delete({ count: 'exact' }).eq('_id', id)
     expect(error !== null || count === 0).toBe(true)
     const { data } = await admin.from('EO_dives' as never).select('_id').eq('_id', id).maybeSingle()
@@ -105,7 +105,7 @@ describe('EO_courses admin writes', () => {
     const id = crypto.randomUUID()
     createdCourseIds.push(id)
     const { error } = await sb.from('EO_courses' as never).insert({
-      _id: id, course_title: 'Admin-created course', start_date: '2026-06-01',
+      _id: id, display_title: 'Admin-created course', start_date: '2026-06-01',
     } as never)
     expect(error).toBeNull()
   })
@@ -114,17 +114,17 @@ describe('EO_courses admin writes', () => {
     const sb = await userClient(adminUser.email, adminUser.password)
     const id = crypto.randomUUID()
     createdCourseIds.push(id)
-    await admin.from('EO_courses' as never).insert({ _id: id, course_title: 'pre', start_date: '2026-06-01' } as never)
-    const { error } = await sb.from('EO_courses' as never).update({ course_title: 'post' } as never).eq('_id', id)
+    await admin.from('EO_courses' as never).insert({ _id: id, display_title: 'pre', start_date: '2026-06-01' } as never)
+    const { error } = await sb.from('EO_courses' as never).update({ display_title: 'post' } as never).eq('_id', id)
     expect(error).toBeNull()
-    const { data } = await admin.from('EO_courses' as never).select('course_title').eq('_id', id).single<{ course_title: string }>()
-    expect(data?.course_title).toBe('post')
+    const { data } = await admin.from('EO_courses' as never).select('display_title').eq('_id', id).single<{ display_title: string }>()
+    expect(data?.display_title).toBe('post')
   })
 
   it('admin can delete', async () => {
     const sb = await userClient(adminUser.email, adminUser.password)
     const id = crypto.randomUUID()
-    await admin.from('EO_courses' as never).insert({ _id: id, course_title: 'doomed', start_date: '2026-06-01' } as never)
+    await admin.from('EO_courses' as never).insert({ _id: id, display_title: 'doomed', start_date: '2026-06-01' } as never)
     const { error } = await sb.from('EO_courses' as never).delete().eq('_id', id)
     expect(error).toBeNull()
     const { data } = await admin.from('EO_courses' as never).select('_id').eq('_id', id).maybeSingle()
@@ -135,7 +135,7 @@ describe('EO_courses admin writes', () => {
     const sb = await userClient(diver.email, diver.password)
     const id = crypto.randomUUID()
     const { error } = await sb.from('EO_courses' as never).insert({
-      _id: id, course_title: 'diver tried', start_date: '2026-06-01',
+      _id: id, display_title: 'diver tried', start_date: '2026-06-01',
     } as never)
     expect(error).not.toBeNull()
     const { data } = await admin.from('EO_courses' as never).select('_id').eq('_id', id).maybeSingle()
@@ -146,21 +146,21 @@ describe('EO_courses admin writes', () => {
     const sb = await userClient(diver.email, diver.password)
     const id = crypto.randomUUID()
     createdCourseIds.push(id)
-    await admin.from('EO_courses' as never).insert({ _id: id, course_title: 'before', start_date: '2026-06-01' } as never)
+    await admin.from('EO_courses' as never).insert({ _id: id, display_title: 'before', start_date: '2026-06-01' } as never)
     const { error, count } = await sb
       .from('EO_courses' as never)
-      .update({ course_title: 'after' } as never, { count: 'exact' })
+      .update({ display_title: 'after' } as never, { count: 'exact' })
       .eq('_id', id)
     expect(error !== null || count === 0).toBe(true)
-    const { data } = await admin.from('EO_courses' as never).select('course_title').eq('_id', id).single<{ course_title: string }>()
-    expect(data?.course_title).toBe('before')
+    const { data } = await admin.from('EO_courses' as never).select('display_title').eq('_id', id).single<{ display_title: string }>()
+    expect(data?.display_title).toBe('before')
   })
 
   it('diver cannot delete', async () => {
     const sb = await userClient(diver.email, diver.password)
     const id = crypto.randomUUID()
     createdCourseIds.push(id)
-    await admin.from('EO_courses' as never).insert({ _id: id, course_title: 'survives', start_date: '2026-06-01' } as never)
+    await admin.from('EO_courses' as never).insert({ _id: id, display_title: 'survives', start_date: '2026-06-01' } as never)
     const { error, count } = await sb.from('EO_courses' as never).delete({ count: 'exact' }).eq('_id', id)
     expect(error !== null || count === 0).toBe(true)
     const { data } = await admin.from('EO_courses' as never).select('_id').eq('_id', id).maybeSingle()

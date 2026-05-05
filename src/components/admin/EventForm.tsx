@@ -28,13 +28,13 @@ function priceOptionLabel(p: EOPrice): string {
   const parts: string[] = []
   if (p.starting_at != null)    parts.push(`total: ${p.starting_at} NTD`)
   if (p.deposit_amount != null) parts.push(`deposit: ${p.deposit_amount} NTD`)
-  return parts.length ? `${p.title} (${parts.join(' / ')})` : p.title
+  return parts.length ? `${p.admin_title} (${parts.join(' / ')})` : p.admin_title
 }
 
 // Sub-form state for creating a brand-new EO_prices row inline (so admins
 // don't have to leave the form just to define a price tier).
 interface PriceFormState {
-  title: string
+  admin_title: string
   price: string             // human label, e.g. "NT$10,000"
   starting_at: string       // bigint or empty
   deposit_amount: string    // bigint or empty
@@ -45,18 +45,18 @@ interface PriceFormState {
 }
 
 const EMPTY_PRICE_FORM: PriceFormState = {
-  title: '', price: '', starting_at: '', deposit_amount: '', transport: '',
+  admin_title: '', price: '', starting_at: '', deposit_amount: '', transport: '',
 }
 
 // Sub-form state for inline EO_rooms / Other_Addons / DiveTravel inserts.
 // Only the most-used fields — admins can edit the rest from the Manage page.
-interface RoomFormState   { title: string; display_name: string; added_price: string }
-interface AddonFormState  { title: string; display_name: string; price: string }
-interface TravelFormState { title: string; included: string; not_included: string; transportation: string }
+interface RoomFormState   { admin_title: string; display_title: string; added_price: string }
+interface AddonFormState  { admin_title: string; display_title: string; price: string }
+interface TravelFormState { admin_title: string; included: string; not_included: string; transportation: string }
 
-const EMPTY_ROOM_FORM:   RoomFormState   = { title: '', display_name: '', added_price: '' }
-const EMPTY_ADDON_FORM:  AddonFormState  = { title: '', display_name: '', price: '' }
-const EMPTY_TRAVEL_FORM: TravelFormState = { title: '', included: '', not_included: '', transportation: '' }
+const EMPTY_ROOM_FORM:   RoomFormState   = { admin_title: '', display_title: '', added_price: '' }
+const EMPTY_ADDON_FORM:  AddonFormState  = { admin_title: '', display_title: '', price: '' }
+const EMPTY_TRAVEL_FORM: TravelFormState = { admin_title: '', included: '', not_included: '', transportation: '' }
 
 export interface EventFormProps {
   mode: 'create' | 'edit'
@@ -120,9 +120,9 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
       // Skip the past-event lookup in edit mode — preloading from a
       // different past event would clobber the row being edited.
       const settled = await Promise.allSettled([
-        supabase.from('EO_prices').select('*').order('title'),
-        supabase.from('EO_rooms').select('*').order('display_name'),
-        supabase.from('Other_Addons').select('*').order('display_name'),
+        supabase.from('EO_prices').select('*').order('admin_title'),
+        supabase.from('EO_rooms').select('*').order('display_title'),
+        supabase.from('Other_Addons').select('*').order('display_title'),
         mode === 'create'
           ? supabase.from('EO_dives').select('*').lt('start_date', todayStr).order('start_date', { ascending: false }).limit(50)
           : Promise.resolve({ data: [] as EODive[] }),
@@ -131,7 +131,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
           : Promise.resolve({ data: [] as EOCourse[] }),
         supabase.from('cert_levels').select('*').order('rank'),
         supabase.from('cancellation_policies').select('*').order('title'),
-        supabase.from('DiveTravel').select('*').order('title'),
+        supabase.from('DiveTravel').select('*').order('admin_title'),
         supabase.from('TravelDestinations').select('*').order('sort_order', { nullsFirst: false }),
       ])
       if (cancelled) return
@@ -150,10 +150,10 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
       setDestinations(dataOf<TravelDestination>(8))
 
       const pastDives = dataOf<EODive>(3).map<PastEvent>(d => ({
-        kind: 'dive', id: d._id, startDate: d.start_date ?? '', title: d.dive_title ?? '(untitled dive)', row: d,
+        kind: 'dive', id: d._id, startDate: d.start_date ?? '', title: d.display_title ?? d.admin_title ?? '(untitled dive)', row: d,
       }))
       const pastCourses = dataOf<EOCourse>(4).map<PastEvent>(c => ({
-        kind: 'course', id: c._id, startDate: c.start_date ?? '', title: c.course_title ?? '(untitled course)', row: c,
+        kind: 'course', id: c._id, startDate: c.start_date ?? '', title: c.display_title ?? c.admin_title ?? '(untitled course)', row: c,
       }))
       const merged = [...pastDives, ...pastCourses].sort((a, b) => b.startDate.localeCompare(a.startDate))
       setPastEvents(merged)
@@ -192,7 +192,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
 
   async function submitNewPrice() {
     setPriceError(null)
-    if (!priceForm.title.trim()) {
+    if (!priceForm.admin_title.trim()) {
       setPriceError('Title is required.')
       return
     }
@@ -201,7 +201,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
       const id = crypto.randomUUID()
       const payload = {
         _id: id,
-        title: priceForm.title.trim(),
+        admin_title: priceForm.admin_title.trim(),
         price: priceForm.price || null,
         starting_at: priceForm.starting_at ? Number(priceForm.starting_at) : null,
         deposit_amount: priceForm.deposit_amount ? Number(priceForm.deposit_amount) : null,
@@ -215,7 +215,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
         starting_at: payload.starting_at ?? null,
         deposit_amount: payload.deposit_amount ?? null,
       } as unknown as EOPrice
-      setPrices(p => [...p, newRow].sort((a, b) => (a.title ?? '').localeCompare(b.title ?? '')))
+      setPrices(p => [...p, newRow].sort((a, b) => (a.admin_title ?? '').localeCompare(b.admin_title ?? '')))
       set('price', id)
       setPriceForm(EMPTY_PRICE_FORM)
       setShowNewPrice(false)
@@ -228,20 +228,20 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
 
   async function submitNewRoom() {
     setRoomError(null)
-    if (!roomForm.title.trim()) { setRoomError('Title is required.'); return }
+    if (!roomForm.admin_title.trim()) { setRoomError('Title is required.'); return }
     setRoomSubmitting(true)
     try {
       const id = crypto.randomUUID()
       const payload = {
         _id: id,
-        title: roomForm.title.trim(),
-        display_name: roomForm.display_name.trim() || null,
+        admin_title: roomForm.admin_title.trim(),
+        display_title: roomForm.display_title.trim() || null,
         added_price: roomForm.added_price ? Number(roomForm.added_price) : null,
       }
       const { error: insErr } = await supabase.from('EO_rooms').insert(payload as never)
       if (insErr) throw insErr
       setRooms(rs => [...rs, payload as unknown as EORoom].sort(
-        (a, b) => (a.display_name ?? a.title ?? '').localeCompare(b.display_name ?? b.title ?? '')
+        (a, b) => (a.display_title ?? a.admin_title ?? '').localeCompare(b.display_title ?? b.admin_title ?? '')
       ))
       // Auto-tick the new room so admins don't have to scroll back.
       setForm(f => ({ ...f, has_rooms: true, roomIds: [...f.roomIds, id] }))
@@ -256,20 +256,20 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
 
   async function submitNewAddon() {
     setAddonError(null)
-    if (!addonForm.title.trim()) { setAddonError('Title is required.'); return }
+    if (!addonForm.admin_title.trim()) { setAddonError('Title is required.'); return }
     setAddonSubmitting(true)
     try {
       const id = crypto.randomUUID()
       const payload = {
         _id: id,
-        title: addonForm.title.trim(),
-        display_name: addonForm.display_name.trim() || null,
+        admin_title: addonForm.admin_title.trim(),
+        display_title: addonForm.display_title.trim() || null,
         price: addonForm.price ? Number(addonForm.price) : null,
       }
       const { error: insErr } = await supabase.from('Other_Addons').insert(payload as never)
       if (insErr) throw insErr
       setAddons(as => [...as, payload as unknown as EOAddon].sort(
-        (a, b) => (a.display_name ?? a.title ?? '').localeCompare(b.display_name ?? b.title ?? '')
+        (a, b) => (a.display_title ?? a.admin_title ?? '').localeCompare(b.display_title ?? b.admin_title ?? '')
       ))
       setForm(f => ({ ...f, addonIds: [...f.addonIds, id] }))
       setAddonForm(EMPTY_ADDON_FORM)
@@ -283,13 +283,13 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
 
   async function submitNewTravel() {
     setTravelError(null)
-    if (!travelForm.title.trim()) { setTravelError('Title is required.'); return }
+    if (!travelForm.admin_title.trim()) { setTravelError('Title is required.'); return }
     setTravelSubmitting(true)
     try {
       const id = crypto.randomUUID()
       const payload = {
         _id: id,
-        title: travelForm.title.trim(),
+        admin_title: travelForm.admin_title.trim(),
         included: travelForm.included || null,
         not_included: travelForm.not_included || null,
         transportation: travelForm.transportation || null,
@@ -297,7 +297,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
       const { error: insErr } = await supabase.from('DiveTravel').insert(payload as never)
       if (insErr) throw insErr
       setDiveTravels(ts => [...ts, payload as unknown as DiveTravelEntry].sort(
-        (a, b) => (a.title ?? '').localeCompare(b.title ?? '')
+        (a, b) => (a.admin_title ?? '').localeCompare(b.admin_title ?? '')
       ))
       set('divetravel_reference', id)
       setTravelForm(EMPTY_TRAVEL_FORM)
@@ -406,7 +406,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
           <div className="space-y-3 rounded-lg border border-amber-300/40 bg-white/5 p-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-200">New price tier</h3>
             <Field label="Title (required)">
-              <Input value={priceForm.title} onChange={v => setPriceForm(f => ({ ...f, title: v }))} />
+              <Input value={priceForm.admin_title} onChange={v => setPriceForm(f => ({ ...f, admin_title: v }))} />
             </Field>
             <div className="grid grid-cols-3 gap-3">
               <Field label="Price label">
@@ -493,7 +493,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
                       key={d._id}
                       checked={form.destinationIds.includes(d._id)}
                       onChange={() => toggleId('destinationIds', d._id)}
-                      label={d.country ? `${d.title ?? d._id} — ${d.country}` : (d.title ?? d._id)}
+                      label={d.country ? `${d.admin_title ?? d._id} — ${d.country}` : (d.admin_title ?? d._id)}
                     />
                   ))}
                 </div>
@@ -503,7 +503,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
               <Select value={form.divetravel_reference} onChange={v => set('divetravel_reference', v)}>
                 <option value="">— None —</option>
                 {diveTravels.map(t => (
-                  <option key={t._id} value={t._id}>{t.title ?? t._id}</option>
+                  <option key={t._id} value={t._id}>{t.admin_title ?? t._id}</option>
                 ))}
               </Select>
             </Field>
@@ -518,7 +518,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
               <div className="space-y-3 rounded-lg border border-amber-300/40 bg-white/5 p-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-200">New DiveTravel entry</h3>
                 <Field label="Title (required)">
-                  <Input value={travelForm.title} onChange={v => setTravelForm(f => ({ ...f, title: v }))} />
+                  <Input value={travelForm.admin_title} onChange={v => setTravelForm(f => ({ ...f, admin_title: v }))} />
                 </Field>
                 <Field label="Included">
                   <Textarea value={travelForm.included} onChange={v => setTravelForm(f => ({ ...f, included: v }))} />
@@ -565,7 +565,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
                     key={r._id}
                     checked={form.roomIds.includes(r._id)}
                     onChange={() => toggleId('roomIds', r._id)}
-                    label={r.display_name || r.title || r._id}
+                    label={r.display_title || r.admin_title || r._id}
                   />
                 ))}
               </div>
@@ -581,10 +581,10 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
               <div className="space-y-3 rounded-lg border border-amber-300/40 bg-white/5 p-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-200">New room option</h3>
                 <Field label="Title (required)">
-                  <Input value={roomForm.title} onChange={v => setRoomForm(f => ({ ...f, title: v }))} />
+                  <Input value={roomForm.admin_title} onChange={v => setRoomForm(f => ({ ...f, admin_title: v }))} />
                 </Field>
                 <Field label="Display name">
-                  <Input value={roomForm.display_name} onChange={v => setRoomForm(f => ({ ...f, display_name: v }))} />
+                  <Input value={roomForm.display_title} onChange={v => setRoomForm(f => ({ ...f, display_title: v }))} />
                 </Field>
                 <Field label="Added price (NTD)">
                   <Input type="number" value={roomForm.added_price} onChange={v => setRoomForm(f => ({ ...f, added_price: v }))} />
@@ -650,7 +650,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
             <Select value={form.cancel_policy} onChange={v => set('cancel_policy', v)}>
               <option value="">— None —</option>
               {cancelPolicies.map(p => (
-                <option key={p._id} value={p._id}>{p.title ?? p._id}</option>
+                <option key={p._id} value={p._id}>{p.admin_title ?? p._id}</option>
               ))}
             </Select>
           </Field>
@@ -682,7 +682,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
                 key={a._id}
                 checked={form.addonIds.includes(a._id)}
                 onChange={() => toggleId('addonIds', a._id)}
-                label={a.display_name || a.title || a._id}
+                label={a.display_title || a.admin_title || a._id}
               />
             ))}
           </div>
@@ -698,10 +698,10 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
           <div className="space-y-3 rounded-lg border border-amber-300/40 bg-white/5 p-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-200">New add-on</h3>
             <Field label="Title (required)">
-              <Input value={addonForm.title} onChange={v => setAddonForm(f => ({ ...f, title: v }))} />
+              <Input value={addonForm.admin_title} onChange={v => setAddonForm(f => ({ ...f, admin_title: v }))} />
             </Field>
             <Field label="Display name">
-              <Input value={addonForm.display_name} onChange={v => setAddonForm(f => ({ ...f, display_name: v }))} />
+              <Input value={addonForm.display_title} onChange={v => setAddonForm(f => ({ ...f, display_title: v }))} />
             </Field>
             <Field label="Price (NTD)">
               <Input type="number" value={addonForm.price} onChange={v => setAddonForm(f => ({ ...f, price: v }))} />

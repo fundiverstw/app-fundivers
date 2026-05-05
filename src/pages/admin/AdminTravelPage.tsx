@@ -2,7 +2,7 @@ import { CatalogManager, type CatalogField } from '../../components/admin/Catalo
 import type { DiveTravelEntry } from '../../types/database'
 
 const fields: CatalogField<DiveTravelEntry>[] = [
-  { key: 'title',          label: 'Title', type: 'text', required: true, placeholder: 'e.g. Green Island' },
+  { key: 'admin_title',    label: 'Admin title', type: 'text', required: true, placeholder: 'e.g. Green Island' },
   { key: 'included',       label: 'Included', type: 'textarea', placeholder: 'What the price includes…' },
   { key: 'not_included',   label: 'Not included', type: 'textarea', placeholder: 'What the price does NOT include…' },
   { key: 'transportation', label: 'Transportation', type: 'textarea', placeholder: 'How divers reach the site…' },
@@ -14,9 +14,9 @@ export function AdminTravelPage() {
       title="DiveTravel"
       table="DiveTravel"
       noun="DiveTravel entry"
-      orderBy="title"
+      orderBy="admin_title"
       fields={fields}
-      rowLabel={r => r.title || r._id}
+      rowLabel={r => r.admin_title || r._id}
     />
   )
 }
