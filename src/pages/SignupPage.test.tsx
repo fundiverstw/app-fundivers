@@ -63,7 +63,7 @@ describe('SignupPage', () => {
     expect(signUp).not.toHaveBeenCalled()
   })
 
-  it('calls signUp and shows the confirmation screen on success', async () => {
+  it('calls signUp and shows the success card on success', async () => {
     signUp.mockResolvedValue({ error: null })
     const user = userEvent.setup()
     renderWithRouter(<SignupPage />)
@@ -78,7 +78,7 @@ describe('SignupPage', () => {
     expect(arg.email).toBe('ada@example.com')
     expect(arg.password).toBe('secret1234')
     expect(typeof arg.options?.data?.agreed_to_terms_at).toBe('string')
-    expect(await screen.findByText(/check your email/i)).toBeInTheDocument()
+    expect(await screen.findByText(/account created/i)).toBeInTheDocument()
   })
 
   it('shows a server error without advancing to the success screen', async () => {
@@ -92,7 +92,7 @@ describe('SignupPage', () => {
     await user.click(screen.getByRole('button', { name: /create account/i }))
 
     expect(await screen.findByText(/already registered/i)).toBeInTheDocument()
-    expect(screen.queryByText(/check your email/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/account created/i)).not.toBeInTheDocument()
   })
 
   it('links to the login page', () => {
