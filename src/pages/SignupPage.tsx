@@ -40,9 +40,11 @@ export function SignupPage() {
     return (
       <div className="min-h-screen bg-blue-900 flex items-center justify-center p-4">
         <div className={`w-full max-w-sm ${CARD_ELEVATED} p-6 text-center`}>
-          <div className="text-5xl mb-4">📧</div>
-          <h2 className="text-xl font-semibold text-blue-950 mb-2">Check your email</h2>
-          <p className={`${TEXT_MUTED} text-sm`}>We sent a confirmation link to your email address.</p>
+          <h2 className="text-xl font-semibold text-blue-950 mb-2">Account created</h2>
+          <p className={`${TEXT_MUTED} text-sm`}>
+            Fill in your profile so an admin can review your application —
+            you'll be taken there in a moment.
+          </p>
         </div>
       </div>
     )
