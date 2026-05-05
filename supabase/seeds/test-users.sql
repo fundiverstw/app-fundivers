@@ -1,7 +1,8 @@
 -- Local-only test users. Runs after seed.sql on every `make reset`
 -- (configured in supabase/config.toml's [db.seed] sql_paths). NEVER
 -- pushed to cloud — `make push` only ships migrations from
--- supabase/migrations/, not seed files.
+-- supabase/migrations/, not seed files. Lives under supabase/seeds/
+-- alongside any other test-only fixtures we add later.
 --
 -- Credentials match the DEV_ACCOUNTS list on src/pages/LoginPage.tsx
 -- so the dev "easy login" buttons work after every reset:
