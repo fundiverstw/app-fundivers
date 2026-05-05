@@ -29,8 +29,8 @@ describe('AdminEditEventPage', () => {
   it('prefills the form from EO_dives and submits an update on save', async () => {
     const existing = {
       _id: 'dive_x',
-      dive_title: 'Kenting Day Trip',
-      title: 'Subtitle',
+      admin_title: 'Kenting Day Trip',
+      display_title: 'Subtitle',
       start_date: '2026-06-01',
       time: '08:00:00',
       end_date: '2026-06-01',
@@ -89,7 +89,7 @@ describe('AdminEditEventPage', () => {
 
     await waitFor(() => expect(updateSpy).toHaveBeenCalled())
     const payload = (updateSpy.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
-    expect(payload.dive_title).toBe('Kenting Day Trip (revised)')
+    expect(payload.admin_title).toBe('Kenting Day Trip (revised)')
     // Update payload should not carry _id (that's in the .eq filter).
     expect(payload._id).toBeUndefined()
     // Navigated to the detail page after save.

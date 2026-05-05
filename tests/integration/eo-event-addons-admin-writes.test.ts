@@ -30,7 +30,7 @@ let courseId: string
 async function createTestAddon(displayName: string): Promise<string> {
   const id = crypto.randomUUID()
   const { error } = await admin.from('Other_Addons' as never).insert({
-    _id: id, display_name: displayName, title: displayName, price: 0, currency: 'TWD',
+    _id: id, display_title: displayName, admin_title: displayName, price: 0, currency: 'TWD',
   } as never)
   if (error) throw error
   createdAddonIds.push(id)
@@ -63,7 +63,7 @@ describe('EO_dives admin INSERT with other_addons (junction sync under RLS)', ()
     const startDate = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10)
     const { error } = await sb.from('EO_dives' as never).insert({
       _id: id,
-      dive_title: 'Dive with addons',
+      admin_title: 'Dive with addons',
       notes: '',
       start_date: startDate,
       time: '09:00:00',
@@ -86,7 +86,7 @@ describe('EO_dives admin INSERT with other_addons (junction sync under RLS)', ()
     createdDiveIds.push(id)
     const startDate = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10)
     await admin.from('EO_dives' as never).insert({
-      _id: id, dive_title: 'pre', notes: '', start_date: startDate, time: '09:00:00', end_date: startDate,
+      _id: id, admin_title: 'pre', notes: '', start_date: startDate, time: '09:00:00', end_date: startDate,
       other_addons: JSON.stringify([a1]),
     } as never)
 
@@ -110,7 +110,7 @@ describe('eo_dive_addons / eo_course_addons direct write policies', () => {
     createdDiveIds.push(dive)
     const startDate = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10)
     await admin.from('EO_dives' as never).insert({
-      _id: dive, dive_title: 'd', notes: '', start_date: startDate, time: '09:00:00', end_date: startDate,
+      _id: dive, admin_title: 'd', notes: '', start_date: startDate, time: '09:00:00', end_date: startDate,
     } as never)
 
     const sb = await userClient(diver.email, diver.password)
@@ -135,7 +135,7 @@ describe('eo_dive_addons / eo_course_addons public read', () => {
     createdDiveIds.push(dive)
     const startDate = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10)
     await admin.from('EO_dives' as never).insert({
-      _id: dive, dive_title: 'r', notes: '', start_date: startDate, time: '09:00:00', end_date: startDate,
+      _id: dive, admin_title: 'r', notes: '', start_date: startDate, time: '09:00:00', end_date: startDate,
       other_addons: JSON.stringify([a]),
     } as never)
 

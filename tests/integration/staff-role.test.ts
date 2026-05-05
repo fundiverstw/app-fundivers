@@ -85,7 +85,7 @@ describe('staff role: blocked writes on catalog tables', () => {
     const sb = await userClient(staff.email, staff.password)
     const id = crypto.randomUUID()
     const { error } = await sb.from('EO_dives' as never).insert({
-      _id: id, dive_title: 'staff-attempted', notes: '', start_date: '2026-12-01', time: '09:00:00', end_date: '2026-12-01',
+      _id: id, admin_title: 'staff-attempted', notes: '', start_date: '2026-12-01', time: '09:00:00', end_date: '2026-12-01',
     } as never)
     expect(error).not.toBeNull()
     const { data } = await admin.from('EO_dives' as never).select('_id').eq('_id', id).maybeSingle()
@@ -95,7 +95,7 @@ describe('staff role: blocked writes on catalog tables', () => {
   it('cannot UPDATE an EO_dive', async () => {
     const sb = await userClient(staff.email, staff.password)
     const { count } = await sb.from('EO_dives' as never)
-      .update({ dive_title: 'staff-overwrote' } as never, { count: 'exact' })
+      .update({ admin_title: 'staff-overwrote' } as never, { count: 'exact' })
       .eq('_id', diveId)
     expect(count).toBe(0)
   })
@@ -112,7 +112,7 @@ describe('staff role: blocked writes on catalog tables', () => {
     const sb = await userClient(staff.email, staff.password)
     const id = crypto.randomUUID()
     const { error } = await sb.from('Other_Addons' as never).insert({
-      _id: id, display_name: 'staff-tried', title: 'x',
+      _id: id, display_title: 'staff-tried', admin_title: 'x',
     } as never)
     expect(error).not.toBeNull()
   })
@@ -120,7 +120,7 @@ describe('staff role: blocked writes on catalog tables', () => {
   it('cannot INSERT into EO_rooms', async () => {
     const sb = await userClient(staff.email, staff.password)
     const id = crypto.randomUUID()
-    const { error } = await sb.from('EO_rooms' as never).insert({ _id: id, display_name: 'no' } as never)
+    const { error } = await sb.from('EO_rooms' as never).insert({ _id: id, display_title: 'no' } as never)
     expect(error).not.toBeNull()
   })
 

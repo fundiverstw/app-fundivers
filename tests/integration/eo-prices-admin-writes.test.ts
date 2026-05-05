@@ -32,7 +32,7 @@ describe('EO_prices admin writes', () => {
     const id = crypto.randomUUID()
     createdPriceIds.push(id)
     const { error } = await sb.from('EO_prices' as never).insert({
-      _id: id, title: 'Admin tier', starting_at: 5000,
+      _id: id, admin_title: 'Admin tier', starting_at: 5000,
     } as never)
     expect(error).toBeNull()
   })
@@ -41,18 +41,18 @@ describe('EO_prices admin writes', () => {
     const sb = await userClient(adminUser.email, adminUser.password)
     const id = crypto.randomUUID()
     createdPriceIds.push(id)
-    await admin.from('EO_prices' as never).insert({ _id: id, title: 'pre' } as never)
-    const { error } = await sb.from('EO_prices' as never).update({ title: 'post' } as never).eq('_id', id)
+    await admin.from('EO_prices' as never).insert({ _id: id, admin_title: 'pre' } as never)
+    const { error } = await sb.from('EO_prices' as never).update({ admin_title: 'post' } as never).eq('_id', id)
     expect(error).toBeNull()
     const { data } = await admin
-      .from('EO_prices' as never).select('title').eq('_id', id).single<{ title: string }>()
-    expect(data?.title).toBe('post')
+      .from('EO_prices' as never).select("admin_title").eq('_id', id).single<{ admin_title: string }>()
+    expect(data?.admin_title).toBe('post')
   })
 
   it('admin can delete', async () => {
     const sb = await userClient(adminUser.email, adminUser.password)
     const id = crypto.randomUUID()
-    await admin.from('EO_prices' as never).insert({ _id: id, title: 'doomed' } as never)
+    await admin.from('EO_prices' as never).insert({ _id: id, admin_title: 'doomed' } as never)
     const { error } = await sb.from('EO_prices' as never).delete().eq('_id', id)
     expect(error).toBeNull()
     const { data } = await admin.from('EO_prices' as never).select('_id').eq('_id', id).maybeSingle()
@@ -63,7 +63,7 @@ describe('EO_prices admin writes', () => {
     const sb = await userClient(diver.email, diver.password)
     const id = crypto.randomUUID()
     const { error } = await sb.from('EO_prices' as never).insert({
-      _id: id, title: 'diver tried',
+      _id: id, admin_title: 'diver tried',
     } as never)
     expect(error).not.toBeNull()
     const { data } = await admin.from('EO_prices' as never).select('_id').eq('_id', id).maybeSingle()
@@ -74,22 +74,22 @@ describe('EO_prices admin writes', () => {
     const sb = await userClient(diver.email, diver.password)
     const id = crypto.randomUUID()
     createdPriceIds.push(id)
-    await admin.from('EO_prices' as never).insert({ _id: id, title: 'before' } as never)
+    await admin.from('EO_prices' as never).insert({ _id: id, admin_title: 'before' } as never)
     const { error, count } = await sb
       .from('EO_prices' as never)
-      .update({ title: 'after' } as never, { count: 'exact' })
+      .update({ admin_title: 'after' } as never, { count: 'exact' })
       .eq('_id', id)
     expect(error !== null || count === 0).toBe(true)
     const { data } = await admin
-      .from('EO_prices' as never).select('title').eq('_id', id).single<{ title: string }>()
-    expect(data?.title).toBe('before')
+      .from('EO_prices' as never).select("admin_title").eq('_id', id).single<{ admin_title: string }>()
+    expect(data?.admin_title).toBe('before')
   })
 
   it('diver cannot delete', async () => {
     const sb = await userClient(diver.email, diver.password)
     const id = crypto.randomUUID()
     createdPriceIds.push(id)
-    await admin.from('EO_prices' as never).insert({ _id: id, title: 'survives' } as never)
+    await admin.from('EO_prices' as never).insert({ _id: id, admin_title: 'survives' } as never)
     const { error, count } = await sb.from('EO_prices' as never).delete({ count: 'exact' }).eq('_id', id)
     expect(error !== null || count === 0).toBe(true)
     const { data } = await admin.from('EO_prices' as never).select('_id').eq('_id', id).maybeSingle()

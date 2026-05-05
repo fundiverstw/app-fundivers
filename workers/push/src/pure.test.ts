@@ -33,10 +33,10 @@ describe('addDays', () => {
 })
 
 function dive(id: string, start: string, title = 'Green Island'): DiveRow {
-  return { _id: id, dive_title: title, title: null, start_date: start }
+  return { _id: id, admin_title: title, display_title: null, start_date: start }
 }
 function course(id: string, start: string, title = 'Open Water'): CourseRow {
-  return { _id: id, course_title: title, title: null, start_date: start }
+  return { _id: id, display_title: title, admin_title: null, start_date: start }
 }
 function booking(overrides: Partial<Booking> = {}): Booking {
   return {

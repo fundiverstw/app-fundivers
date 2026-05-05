@@ -65,7 +65,7 @@ function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: stri
   return {
     id: d._id,
     type: 'dive',
-    title: d.dive_title || d.title || 'Dive',
+    title: d.display_title || d.admin_title || 'Dive',
     start_time: start,
     end_time: toIso(d.end_date, d.time),
     start_time_hhmm: toHhmm(d.time),
@@ -122,7 +122,7 @@ function courseToEvents(c: EOCourse, priceIndex: Map<string, EOPrice>, addonIds:
   const shared = {
     id: c._id,
     type: 'course' as const,
-    title: c.course_title || c.title || 'Course',
+    title: c.display_title || c.admin_title || 'Course',
     start_time_hhmm: toHhmm(c.start_time),
     featured: false,
     fully_booked: false,
@@ -241,14 +241,14 @@ async function attachPrices(dives: EODive[], courses: EOCourse[]): Promise<Map<s
 
   const { data } = await supabase
     .from('EO_prices')
-    .select('_id, title, starting_at, deposit_amount, transport')
+    .select('_id, admin_title, starting_at, deposit_amount, transport')
     .in('_id', [...new Set(priceIds)])
 
   return new Map((data ?? []).map(p => [p._id, p as EOPrice]))
 }
 
-const DIVE_COLS = '_id, dive_title, title, start_date, time, end_date, featured, fully_booked, price, has_rooms, room_types, hasotheraddons, other_addons, gear_rental, nitrox_required, dive_days, cancelled_at, deposit_deadline, full_payment_deadline, cancel_policy, cancel_date'
-const COURSE_COLS = '_id, course_title, title, start_date, start_time, end_date, price, other_addons, dive_days, special_date, cancelled_at, deposit_deadline, full_payment_deadline, cancel_policy, cancel_date'
+const DIVE_COLS = '_id, admin_title, display_title, calendar_title, start_date, time, end_date, featured, fully_booked, price, has_rooms, room_types, hasotheraddons, other_addons, gear_rental, nitrox_required, dive_days, cancelled_at, deposit_deadline, full_payment_deadline, cancel_policy, cancel_date'
+const COURSE_COLS = '_id, admin_title, display_title, calendar_title, start_date, start_time, end_date, price, other_addons, dive_days, special_date, cancelled_at, deposit_deadline, full_payment_deadline, cancel_policy, cancel_date'
 
 /**
  * Fetch dives + courses whose start_date falls within [fromDate, toDate]
