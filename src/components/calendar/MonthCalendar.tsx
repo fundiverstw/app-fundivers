@@ -329,7 +329,7 @@ function EventBar({ seg, track, onClick, hovered, onHoverEvent }: {
       {seg.showTitle ? (
         <>
           {seg.event.featured && '★ '}
-          {seg.event.title}
+          {seg.event.calendar_title || seg.event.title}
         </>
       ) : (
         <>&nbsp;</>
