@@ -239,7 +239,18 @@ export async function handleAdminBroadcast(req: Request, env: Env): Promise<Resp
   try { body = await req.json() } catch { return new Response('bad request', { status: 400 }) }
   const title = (body.title ?? '').trim()
   const text  = (body.body  ?? '').trim()
-  const url   = (body.url   ?? '').trim() || '/'
+  // Two URLs derived from one optional admin input:
+  //   • pushUrl     — where tapping the OS notification opens the app.
+  //                    Falls back to /notifications (the inbox) so the
+  //                    diver can re-read the body on tap; landing on a
+  //                    catch-all redirect to /calendar made the message
+  //                    feel "lost" the moment the system tray dismissed it.
+  //   • inboxUrl    — what the inbox row stores. NULL when the admin
+  //                    didn't set a link, so the row doesn't render an
+  //                    "Open link" CTA pointing at the inbox itself.
+  const adminLink = (body.url ?? '').trim()
+  const pushUrl   = adminLink || '/notifications'
+  const inboxUrl  = adminLink || null
   if (!title || !text) return new Response('title and body are required', { status: 400 })
 
   const anonKey = env.SUPABASE_ANON_KEY
@@ -276,7 +287,7 @@ export async function handleAdminBroadcast(req: Request, env: Env): Promise<Resp
     .select('endpoint, p256dh, auth')
 
   webpush.setVapidDetails(env.VAPID_SUBJECT, env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY)
-  const payload = JSON.stringify({ title, body: text, tag: `broadcast:${Date.now()}`, url })
+  const payload = JSON.stringify({ title, body: text, tag: `broadcast:${Date.now()}`, url: pushUrl })
 
   let sent = 0
   let skipped = 0
@@ -310,7 +321,7 @@ export async function handleAdminBroadcast(req: Request, env: Env): Promise<Resp
       user_id: p.id,
       title,
       body: text,
-      url,
+      url: inboxUrl,
       kind: 'broadcast' as const,
       event_id: null,
     }))
