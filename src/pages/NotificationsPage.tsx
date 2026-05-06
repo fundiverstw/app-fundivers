@@ -94,18 +94,39 @@ export function NotificationsPage() {
                 </button>
 
                 {expanded && (
-                  <div className="border-t border-sky-200/60 bg-sky-50 px-3 pb-3 pt-2 space-y-2">
+                  // containerType lets the ASCII-art branch reference the
+                  // wrapper's inline size with `cqi` units, so the font
+                  // shrinks to fit the card width without measuring it
+                  // in JS. No-op for the non-ascii branch.
+                  <div
+                    className="border-t border-sky-200/60 bg-sky-50 px-3 pb-3 pt-2 space-y-2"
+                    style={{ containerType: 'inline-size' }}
+                  >
                     {n.body
-                      // <pre> defaults to monospace + whitespace:pre, which
-                      // is exactly what we need for pasted ASCII art (columns
-                      // align, exact spacing). overflow-x-auto so a long line
-                      // scrolls horizontally instead of breaking the layout.
-                      // Solid bg-sky-50 (above) keeps contrast crisp regardless
-                      // of whether the parent card is in its washed-out
-                      // already-read state.
-                      ? <pre className="text-sm text-blue-950 font-mono whitespace-pre overflow-x-auto m-0">
-                          {n.body}
-                        </pre>
+                      ? n.is_ascii_art
+                        // ASCII-art branch: clamp(...) auto-sizes so 80
+                        // monospace cols fit exactly inside the card. 2cqi
+                        // = 2% of container width; for 80ch we need
+                        // 80 * 0.6em (monospace ratio) ≈ 100cqi, so
+                        // ~2cqi per em-unit is the math. Floor at 5px so
+                        // it stays minimally legible on tiny screens;
+                        // ceiling at 14px so desktop doesn't render it
+                        // ridiculously large.
+                        ? <pre
+                            data-ascii-art="true"
+                            className="text-blue-950 font-mono whitespace-pre m-0"
+                            style={{
+                              fontSize:   'clamp(5px, 2cqi, 14px)',
+                              lineHeight: 1,
+                            }}
+                          >
+                            {n.body}
+                          </pre>
+                        // Default branch: normal-size body that horizontally
+                        // scrolls if a line happens to be wider than the card.
+                        : <pre className="text-sm text-blue-950 font-mono whitespace-pre overflow-x-auto m-0">
+                            {n.body}
+                          </pre>
                       : <p className="text-xs italic text-blue-900/70">No additional details.</p>}
                     {n.url && (
                       <button
