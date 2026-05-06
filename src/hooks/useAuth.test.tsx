@@ -103,7 +103,11 @@ describe('useAuth', () => {
     expect(result.current.user).toBe(null)
   })
 
-  it('calls supabase.auth.signOut when signOut() is invoked', async () => {
+  it('calls supabase.auth.signOut with scope:local so other devices stay signed in', async () => {
+    // The default global scope revokes the user's refresh tokens, which
+    // kicks them out on every other device. Sessions should be
+    // per-environment — signing out on desktop must not log out the
+    // Android PWA.
     getSession.mockResolvedValue({ data: { session: null } })
     const useAuth = await importHook()
     const { result } = renderHook(() => useAuth())
@@ -111,6 +115,7 @@ describe('useAuth', () => {
 
     await act(async () => { await result.current.signOut() })
     expect(signOut).toHaveBeenCalledOnce()
+    expect(signOut).toHaveBeenCalledWith({ scope: 'local' })
   })
 
   it('unsubscribes on unmount', async () => {
