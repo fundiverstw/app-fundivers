@@ -16,7 +16,9 @@ import {
   ON_DEEP_MUTED, ON_DEEP_SUBTLE, ON_DEEP_BODY,
 } from '../../styles/tokens'
 
-function DiveLogIcon() {
+function RecordsIcon() {
+  // Logbook glyph — a bound book with a few pages — represents the consolidated
+  // Records tab (bookings + payments + dive logs).
   return (
     <svg
       viewBox="0 0 24 24"
@@ -37,30 +39,10 @@ function DiveLogIcon() {
   )
 }
 
-function DollarIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="24"
-      height="24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <line x1="12" y1="2.5" x2="12" y2="21.5" />
-      <path d="M17 6.5H10a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6H6.5" />
-    </svg>
-  )
-}
-
 const baseNavItems: Array<{ to: string; label: string; icon: React.ReactNode }> = [
   { to: '/calendar', label: 'Calendar', icon: <CalendarIcon /> },
-  { to: '/bookings', label: 'Bookings', icon: <DiveLogIcon /> },
-  { to: '/payments', label: 'Payments', icon: <DollarIcon /> },
-  { to: '/profile', label: 'Profile', icon: '🤿' },
+  { to: '/records',  label: 'Records',  icon: <RecordsIcon /> },
+  { to: '/profile',  label: 'Profile',  icon: '🤿' },
 ]
 
 // "Duty" appears for staff/admin only — divers never have rows in

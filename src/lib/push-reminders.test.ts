@@ -35,7 +35,7 @@ describe('selectReminders', () => {
     const pay = out.find(r => r.kind === 'payment_1d')!
     expect(pay.title).toContain('Deposit due')
     expect(pay.body).toContain('1,000')
-    expect(pay.url).toBe('/payments')
+    expect(pay.url).toBe('/records/payments')
   })
 
   it('fires only event reminder when fully paid', () => {
@@ -82,9 +82,9 @@ describe('selectReminders', () => {
     expect(out.map(r => r.kind)).toEqual(['payment_14d'])
   })
 
-  it('deep-links event reminders to /bookings, payment to /payments', () => {
+  it('deep-links event reminders to the Records bookings tab and payment reminders to the Records payments tab', () => {
     const out = selectReminders(TODAY, [mk()])
-    expect(out.find(r => r.kind === 'event_1d')!.url).toBe('/bookings')
-    expect(out.find(r => r.kind === 'payment_1d')!.url).toBe('/payments')
+    expect(out.find(r => r.kind === 'event_1d')!.url).toBe('/records/bookings')
+    expect(out.find(r => r.kind === 'payment_1d')!.url).toBe('/records/payments')
   })
 })
