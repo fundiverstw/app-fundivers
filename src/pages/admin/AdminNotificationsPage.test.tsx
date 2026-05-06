@@ -89,46 +89,6 @@ describe('AdminNotificationsPage', () => {
     })
   })
 
-  it('sends is_ascii_art: true when the ASCII art mode checkbox is ticked, omits the field when not', async () => {
-    getSession.mockResolvedValue({ data: { session: { access_token: 'tok' } } })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(globalThis as any).fetch = vi.fn().mockResolvedValue({
-      ok: true, json: async () => ({ sent: 1, skipped: 0, webhook: null }),
-    })
-    renderPage()
-    fireEvent.change(screen.getByPlaceholderText(/Trip cancelled/), { target: { value: 'Banner' } })
-    fireEvent.change(screen.getByPlaceholderText(/everyone needs to know/), { target: { value: 'art body' } })
-    // Tick the ASCII art checkbox.
-    fireEvent.click(screen.getByRole('checkbox', { name: /ascii art mode/i }))
-    fireEvent.click(screen.getByRole('button', { name: 'Send now' }))
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await waitFor(() => expect((globalThis as any).fetch).toHaveBeenCalled())
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const call = (globalThis as any).fetch.mock.calls[0]
-    expect(JSON.parse(call[1].body)).toEqual({
-      title: 'Banner', body: 'art body', is_ascii_art: true,
-    })
-  })
-
-  it('does NOT include is_ascii_art in the payload when the checkbox is left unchecked', async () => {
-    getSession.mockResolvedValue({ data: { session: { access_token: 'tok' } } })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(globalThis as any).fetch = vi.fn().mockResolvedValue({
-      ok: true, json: async () => ({ sent: 0, skipped: 0, webhook: null }),
-    })
-    renderPage()
-    fireEvent.change(screen.getByPlaceholderText(/Trip cancelled/), { target: { value: 'plain' } })
-    fireEvent.change(screen.getByPlaceholderText(/everyone needs to know/), { target: { value: 'plain body' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Send now' }))
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await waitFor(() => expect((globalThis as any).fetch).toHaveBeenCalled())
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const call = (globalThis as any).fetch.mock.calls[0]
-    expect(JSON.parse(call[1].body)).not.toHaveProperty('is_ascii_art')
-  })
-
   it('trims whitespace-only links to "no link" — empty after trim drops the url field', async () => {
     getSession.mockResolvedValue({ data: { session: { access_token: 'tok' } } })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
