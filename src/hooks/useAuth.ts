@@ -38,7 +38,12 @@ export function useAuth() {
   }, [])
 
   async function signOut() {
-    await supabase.auth.signOut()
+    // scope:'local' invalidates only the current device's session.
+    // The default ('global') revokes the user's refresh tokens
+    // server-side, which kicks them off every other device they're
+    // logged in on too — not what users expect when they sign out
+    // of one browser. Sessions are per-environment.
+    await supabase.auth.signOut({ scope: 'local' })
   }
 
   return { session, user, profile, loading, signOut }
