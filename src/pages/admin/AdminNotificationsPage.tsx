@@ -108,13 +108,15 @@ export function AdminNotificationsPage() {
             value={body}
             onChange={e => setBody(e.target.value)}
             placeholder="What everyone needs to know."
-            rows={6}
-            maxLength={1000}
-            // Monospace + spellcheck off so pasted ASCII art stays
-            // column-aligned in the input the same way it'll render in
-            // the inbox. The diver-side body view also renders monospace.
+            // Sized for 80×30 ASCII-art banners. maxLength = 80*30 (chars)
+            // + 30 (newlines) + buffer = 2500. wrap="off" preserves long
+            // lines instead of soft-wrapping them visually, so what the
+            // admin pastes is what the diver-side <pre> renders.
+            rows={30}
+            maxLength={2500}
+            wrap="off"
             spellCheck={false}
-            className={`${inputClass} font-mono resize-y whitespace-pre`}
+            className={`${inputClass} font-mono resize-y whitespace-pre overflow-auto`}
           />
         </label>
         <label className="block space-y-1">
