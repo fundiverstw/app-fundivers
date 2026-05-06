@@ -709,7 +709,6 @@ export interface Database {
           event_id: string | null
           created_at: string
           read_at: string | null
-          is_ascii_art: boolean
         }
         Insert: {
           id?: string
@@ -721,7 +720,6 @@ export interface Database {
           event_id?: string | null
           created_at?: string
           read_at?: string | null
-          is_ascii_art?: boolean
         }
         Update: Partial<Database['public']['Tables']['notifications']['Insert']>
         Relationships: []
