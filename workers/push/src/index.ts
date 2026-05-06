@@ -235,7 +235,7 @@ export async function handleAdminBroadcast(req: Request, env: Env): Promise<Resp
   if (!auth.startsWith('Bearer ')) return new Response('unauthorized', { status: 401 })
   const token = auth.slice('Bearer '.length)
 
-  let body: { title?: string; body?: string; url?: string }
+  let body: { title?: string; body?: string; url?: string; is_ascii_art?: boolean }
   try { body = await req.json() } catch { return new Response('bad request', { status: 400 }) }
   const title = (body.title ?? '').trim()
   const text  = (body.body  ?? '').trim()
@@ -248,9 +248,10 @@ export async function handleAdminBroadcast(req: Request, env: Env): Promise<Resp
   //   • inboxUrl    — what the inbox row stores. NULL when the admin
   //                    didn't set a link, so the row doesn't render an
   //                    "Open link" CTA pointing at the inbox itself.
-  const adminLink = (body.url ?? '').trim()
-  const pushUrl   = adminLink || '/notifications'
-  const inboxUrl  = adminLink || null
+  const adminLink   = (body.url ?? '').trim()
+  const pushUrl     = adminLink || '/notifications'
+  const inboxUrl    = adminLink || null
+  const isAsciiArt  = body.is_ascii_art === true
   if (!title || !text) return new Response('title and body are required', { status: 400 })
 
   const anonKey = env.SUPABASE_ANON_KEY
@@ -324,6 +325,7 @@ export async function handleAdminBroadcast(req: Request, env: Env): Promise<Resp
       url: inboxUrl,
       kind: 'broadcast' as const,
       event_id: null,
+      is_ascii_art: isAsciiArt,
     }))
     await service.from('notifications').insert(rows)
   }

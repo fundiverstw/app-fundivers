@@ -21,6 +21,7 @@ export function AdminNotificationsPage() {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [link, setLink] = useState('')
+  const [isAsciiArt, setIsAsciiArt] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
@@ -55,6 +56,7 @@ export function AdminNotificationsPage() {
           title: title.trim(),
           body:  body.trim(),
           ...(trimmedLink ? { url: trimmedLink } : {}),
+          ...(isAsciiArt   ? { is_ascii_art: true } : {}),
         }),
       })
       if (!res.ok) {
@@ -71,6 +73,7 @@ export function AdminNotificationsPage() {
       setTitle('')
       setBody('')
       setLink('')
+      setIsAsciiArt(false)
     } catch (err) {
       setSubmitError(errorMessage(err))
     } finally {
@@ -101,6 +104,17 @@ export function AdminNotificationsPage() {
             maxLength={80}
             className={inputClass}
           />
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={isAsciiArt}
+            onChange={e => setIsAsciiArt(e.target.checked)}
+            className="w-4 h-4 accent-blue-900"
+          />
+          <span className="text-xs font-medium text-blue-900">
+            ASCII art mode — shrink the body so an 80×30 banner fits without horizontal scroll on phone screens.
+          </span>
         </label>
         <label className="block space-y-1">
           <span className="text-xs font-medium text-blue-900">Body *</span>
