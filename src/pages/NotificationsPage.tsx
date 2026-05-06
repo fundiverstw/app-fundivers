@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fetchNotifications, markRead, markAllRead } from '../lib/notifications'
 import type { Notification } from '../types/database'
@@ -94,39 +94,13 @@ export function NotificationsPage() {
                 </button>
 
                 {expanded && (
-                  // containerType lets the ASCII-art branch reference the
-                  // wrapper's inline size with `cqi` units, so the font
-                  // shrinks to fit the card width without measuring it
-                  // in JS. No-op for the non-ascii branch.
-                  <div
-                    className="border-t border-sky-200/60 bg-sky-50 px-3 pb-3 pt-2 space-y-2"
-                    style={{ containerType: 'inline-size' }}
-                  >
+                  <div className="border-t border-sky-200/60 bg-sky-50 px-3 pb-3 pt-2 space-y-2">
                     {n.body
                       ? n.is_ascii_art
-                        // ASCII-art branch: clamp(...) auto-sizes so 80
-                        // monospace cols fit exactly inside the card. 2cqi
-                        // = 2% of container width; for 80ch we need
-                        // 80 * 0.6em (monospace ratio) ≈ 100cqi, so
-                        // ~2cqi per em-unit is the math. Floor at 5px so
-                        // it stays minimally legible on tiny screens;
-                        // ceiling at 14px so desktop doesn't render it
-                        // ridiculously large.
-                        ? <pre
-                            data-ascii-art="true"
-                            className="text-blue-950 font-mono whitespace-pre m-0"
-                            style={{
-                              fontSize:   'clamp(5px, 2cqi, 14px)',
-                              lineHeight: 1,
-                            }}
-                          >
-                            {n.body}
-                          </pre>
+                        ? <AsciiArtBody body={n.body} />
                         // Default branch: normal-size body that horizontally
                         // scrolls if a line happens to be wider than the card.
-                        : <pre className="text-sm text-blue-950 font-mono whitespace-pre overflow-x-auto m-0">
-                            {n.body}
-                          </pre>
+                        : <pre className="text-sm text-blue-950 font-mono whitespace-pre overflow-x-auto m-0">{n.body}</pre>
                       : <p className="text-xs italic text-blue-900/70">No additional details.</p>}
                     {n.url && (
                       <button
@@ -144,6 +118,81 @@ export function NotificationsPage() {
           )
         })}
       </ul>
+    </div>
+  )
+}
+
+// ASCII-art rendering: scale the font so an 80-char line fits the visible
+// container width exactly, regardless of the user's monospace font and OS.
+//
+// Approach: measure a hidden 80-char ruler rendered at a known font-size
+// (100px), divide the container's width by the ruler's width, multiply
+// the known font-size by that ratio. No assumed monospace char-ratio —
+// the browser's actual rendered width is what we scale against, which is
+// why this works the same on Chrome/Safari (~0.6em chars) and Firefox or
+// older Android (~0.65–0.7em chars). A ResizeObserver re-runs the math
+// when the card width changes (window resize, expand/collapse).
+//
+// The 80 in RULER_LENGTH matches the admin form's documented 80×30 cap.
+const RULER_LENGTH = 80
+const RULER_FONT_PX = 100
+const FONT_PX_FLOOR = 4
+const FONT_PX_CEILING = 24
+
+function AsciiArtBody({ body }: { body: string }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const measureRef   = useRef<HTMLSpanElement>(null)
+  // Initial 8px is a safe mobile-ish default that makes the brief
+  // pre-measurement render legible without overflowing typical screens.
+  // useLayoutEffect overwrites it before paint on real browsers.
+  const [fontPx, setFontPx] = useState<number>(8)
+
+  useLayoutEffect(() => {
+    const container = containerRef.current
+    const measure   = measureRef.current
+    if (!container || !measure) return
+
+    function recompute() {
+      const containerW = container!.clientWidth
+      const measureW   = measure!.getBoundingClientRect().width
+      if (containerW <= 0 || measureW <= 0) return
+      // measure span renders RULER_LENGTH chars at RULER_FONT_PX. Solve
+      // linearly for the font-size at which RULER_LENGTH chars equal
+      // containerW: target = RULER_FONT_PX × (containerW / measureW).
+      const target = (containerW * RULER_FONT_PX) / measureW
+      setFontPx(Math.max(FONT_PX_FLOOR, Math.min(target, FONT_PX_CEILING)))
+    }
+
+    recompute()
+    const ro = new ResizeObserver(recompute)
+    ro.observe(container)
+    return () => ro.disconnect()
+  }, [])
+
+  return (
+    <div ref={containerRef} className="overflow-hidden">
+      {/* Hidden measurement ruler — rendered at a fixed large font for
+          high-precision width measurement, then positioned off-screen
+          so it doesn't affect layout or get read by assistive tech. */}
+      <span
+        ref={measureRef}
+        aria-hidden="true"
+        className="font-mono"
+        style={{
+          position: 'absolute',
+          left: '-9999px',
+          top: '-9999px',
+          fontSize: `${RULER_FONT_PX}px`,
+          whiteSpace: 'pre',
+        }}
+      >
+        {'0'.repeat(RULER_LENGTH)}
+      </span>
+      <pre
+        data-ascii-art="true"
+        className="text-blue-950 font-mono whitespace-pre m-0 p-0"
+        style={{ fontSize: `${fontPx}px`, lineHeight: 1 }}
+      >{body}</pre>
     </div>
   )
 }
