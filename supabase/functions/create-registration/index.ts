@@ -195,6 +195,10 @@ Deno.serve(async (req) => {
   const fk = body.event_type === "dive"
     ? { eo_dive_id: body.event_id, eo_course_id: null }
     : { eo_dive_id: null, eo_course_id: body.event_id }
+  // We send status: 'pending' explicitly. The set_waitlisted_when_event_full
+  // BEFORE INSERT trigger may flip it to 'waitlisted' if the linked event is
+  // marked fully_booked — we read booking.status back below to decide which
+  // confirmation email path to take.
   const { data: booking, error: bErr } = await admin
     .from("bookings")
     .insert({
@@ -207,6 +211,7 @@ Deno.serve(async (req) => {
     .select()
     .single()
   if (bErr || !booking) return rollback(bErr?.message ?? "booking insert failed")
+  const isWaitlisted = booking.status === "waitlisted"
 
   // 3. Build the PDF payload from data we already have or can fetch.
   //    Profile is read after the update so the PDF reflects what the
@@ -346,34 +351,60 @@ Deno.serve(async (req) => {
     cancellationPolicyAckedAt,
   }
 
-  // 4. Send PDF. Failure here is logged but not fatal — the booking is
-  //    real, the diver can be contacted out-of-band.
+  // 4. Send confirmation email.
+  //
+  // Two paths, picked on `isWaitlisted`:
+  //   - Pending: build the registration PDF and email it (to the diver
+  //     and BCC the company) with payment instructions. Same as before.
+  //   - Waitlisted: short text-only email saying "you're on the waitlist
+  //     for X" — no PDF (no payment owed yet), and no "we'll reach out
+  //     to confirm payment details" copy.
+  //
+  // Failure here is logged but not fatal — the booking is real, the
+  // diver can be contacted out-of-band.
   try {
-    const base64 = await buildPdfBase64(payload)
-    const buf    = Buffer.from(base64, "base64")
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com", port: 465, secure: true,
       auth: { user: GMAIL_USER, pass: GMAIL_PASS },
     })
-    // Subject format makes Gmail filtering / threading by event + diver
-    // straightforward: registration--[event name]--[diver name]
-    const subject = `registration--${payload.eventTitle}--${payload.name}`
-    const mailOpts = {
-      from: { name: "FunDivers TW", address: GMAIL_USER },
-      subject,
-      attachments: [{ filename: "registration.pdf", content: buf, contentType: "application/pdf" }],
-    }
-    await transporter.sendMail({ ...mailOpts, to: COMPANY_EMAIL, text: "Registration summary attached." })
-    if (registrantEmail.toLowerCase().trim() !== COMPANY_EMAIL) {
-      await transporter.sendMail({
-        ...mailOpts,
-        to: registrantEmail,
-        text: "Thanks for registering — your registration summary is attached. We'll reach out shortly to confirm payment details.",
-      })
+    if (isWaitlisted) {
+      const subject = `waitlist--${payload.eventTitle}--${payload.name}`
+      const mailOpts = {
+        from: { name: "FunDivers TW", address: GMAIL_USER },
+        subject,
+      }
+      const companyText =
+        `${payload.name} has been added to the waitlist for ${payload.eventTitle}.`
+      const diverText =
+        `Thanks for signing up — ${payload.eventTitle} is currently full, so we've added you to the waitlist. ` +
+        `If a spot opens up, you'll receive a notification with 24 hours to claim it. No payment is needed unless and until that happens.\n\n— FunDivers TW`
+      await transporter.sendMail({ ...mailOpts, to: COMPANY_EMAIL, text: companyText })
+      if (registrantEmail.toLowerCase().trim() !== COMPANY_EMAIL) {
+        await transporter.sendMail({ ...mailOpts, to: registrantEmail, text: diverText })
+      }
+    } else {
+      const base64 = await buildPdfBase64(payload)
+      const buf    = Buffer.from(base64, "base64")
+      // Subject format makes Gmail filtering / threading by event + diver
+      // straightforward: registration--[event name]--[diver name]
+      const subject = `registration--${payload.eventTitle}--${payload.name}`
+      const mailOpts = {
+        from: { name: "FunDivers TW", address: GMAIL_USER },
+        subject,
+        attachments: [{ filename: "registration.pdf", content: buf, contentType: "application/pdf" }],
+      }
+      await transporter.sendMail({ ...mailOpts, to: COMPANY_EMAIL, text: "Registration summary attached." })
+      if (registrantEmail.toLowerCase().trim() !== COMPANY_EMAIL) {
+        await transporter.sendMail({
+          ...mailOpts,
+          to: registrantEmail,
+          text: "Thanks for registering — your registration summary is attached. We'll reach out shortly to confirm payment details.",
+        })
+      }
     }
   } catch (e) {
-    console.error("PDF email failed:", (e as Error).message)
+    console.error("registration email failed:", (e as Error).message)
   }
 
-  return json({ booking_id: booking.id, session })
+  return json({ booking_id: booking.id, status: booking.status, session })
 })

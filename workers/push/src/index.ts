@@ -43,8 +43,16 @@ export interface Env {
 type SubscriptionRow = { user_id: string; endpoint: string; p256dh: string; auth: string }
 
 export default {
-  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(runDailyReminders(env))
+  async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext) {
+    // Waitlist processing runs on every cron tick — it's idempotent
+    // (notified_at gates double-sends, status='pending' gates double-expires)
+    // so re-running is a no-op once the per-tick set has been processed.
+    ctx.waitUntil(processWaitlistOffers(env))
+    // The daily reminder fan-out is heavy and time-sensitive — only on the
+    // 02:00 UTC = 10:00 Asia/Taipei tick.
+    if (event.cron === '0 2 * * *') {
+      ctx.waitUntil(runDailyReminders(env))
+    }
   },
 
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -59,6 +67,15 @@ export default {
         return withCors(new Response('unauthorized', { status: 401 }), req)
       }
       const result = await runDailyReminders(env)
+      return withCors(Response.json(result), req)
+    }
+    if (url.pathname === '/process-waitlist-offers') {
+      const auth = req.headers.get('authorization') ?? ''
+      const expected = `Bearer ${env.ADMIN_TRIGGER_SECRET ?? ''}`
+      if (!env.ADMIN_TRIGGER_SECRET || auth !== expected) {
+        return withCors(new Response('unauthorized', { status: 401 }), req)
+      }
+      const result = await processWaitlistOffers(env)
       return withCors(Response.json(result), req)
     }
     if (url.pathname === '/notify-duty' && req.method === 'POST') {
@@ -467,4 +484,132 @@ async function deliver(
 
 function unique<T>(arr: T[]): T[] {
   return [...new Set(arr)]
+}
+
+
+// Waitlist-offer processing pass — runs every 15 min via the second cron
+// declared in wrangler.toml.
+//
+// Two passes per tick:
+//   1. Newly-created offers (notified_at IS NULL): send the push and the
+//      email, write the inbox row, then stamp notified_at so the next
+//      tick doesn't duplicate.
+//   2. Stale offers (expires_at < now): mark expired, then call the SQL
+//      helper to issue a fresh offer for the next waitlister on that
+//      same event. Chains organically tick-by-tick — if the next person
+//      also lets it expire, the tick after rolls again.
+//
+// Email sending is delegated to the `notify-waitlist-offer` edge function
+// (Cloudflare Workers can't talk SMTP). Push is sent directly here since
+// the worker already owns webpush + the VAPID keys.
+export async function processWaitlistOffers(env: Env): Promise<{ sent: number; expired: number }> {
+  webpush.setVapidDetails(env.VAPID_SUBJECT, env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY)
+
+  const sb = createClient<Database>(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false },
+  })
+
+  const { data: offers } = await sb
+    .from('waitlist_offers')
+    .select('id, booking_id, expires_at, notified_at, status')
+    .eq('status', 'pending')
+
+  if (!offers?.length) return { sent: 0, expired: 0 }
+
+  const nowIso = new Date().toISOString()
+  let sent = 0
+  let expired = 0
+
+  for (const offer of offers) {
+    if (new Date(offer.expires_at) < new Date(nowIso)) {
+      await sb.from('waitlist_offers').update({ status: 'expired' }).eq('id', offer.id)
+
+      const { data: b } = await sb
+        .from('bookings')
+        .select('eo_dive_id, eo_course_id')
+        .eq('id', offer.booking_id)
+        .maybeSingle()
+      if (b) {
+        const eventId = b.eo_dive_id ?? b.eo_course_id
+        const eventType = b.eo_dive_id ? 'dive' : 'course'
+        if (eventId) {
+          // Fire-and-forget; failure here just means no chain — the next
+          // upstream cancellation will offer the spot anew.
+          await sb.rpc('offer_next_waitlist_spot', { p_event_id: eventId, p_event_type: eventType })
+        }
+      }
+      expired++
+      continue
+    }
+
+    if (offer.notified_at) continue
+
+    const { data: booking } = await sb
+      .from('bookings')
+      .select('user_id, eo_dive_id, eo_course_id')
+      .eq('id', offer.booking_id)
+      .maybeSingle()
+    if (!booking) continue
+
+    let eventTitle = 'Event'
+    const eventId = booking.eo_dive_id ?? booking.eo_course_id
+    if (booking.eo_dive_id) {
+      const { data } = await sb.from('EO_dives')
+        .select('display_title, admin_title').eq('_id', booking.eo_dive_id).maybeSingle()
+      eventTitle = (data?.display_title ?? data?.admin_title ?? eventTitle) as string
+    } else if (booking.eo_course_id) {
+      const { data } = await sb.from('EO_courses')
+        .select('display_title, admin_title').eq('_id', booking.eo_course_id).maybeSingle()
+      eventTitle = (data?.display_title ?? data?.admin_title ?? eventTitle) as string
+    }
+
+    const expiresLabel = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Taipei',
+      day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+    }).format(new Date(offer.expires_at))
+
+    const title = 'Spot opened on the waitlist'
+    const body  = `${eventTitle} — accept by ${expiresLabel} (Asia/Taipei) before it rolls to the next person.`
+    const url   = '/records/bookings'
+
+    // Inbox first — the only delivery path for iOS / no-push users.
+    await sb.from('notifications').insert({
+      user_id:  booking.user_id,
+      title, body, url,
+      kind:     'waitlist_offer',
+      event_id: eventId ?? null,
+    })
+
+    // Push fan-out across every endpoint the recipient has.
+    const { data: subs } = await sb
+      .from('push_subscriptions')
+      .select('endpoint, p256dh, auth')
+      .eq('user_id', booking.user_id)
+    if (subs?.length) {
+      const payload = JSON.stringify({ title, body, tag: `waitlist:${offer.id}`, url })
+      for (const s of subs) {
+        try {
+          await webpush.sendNotification(
+            { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+            payload,
+            { TTL: 60 * 60 * 24 }
+          )
+        } catch (err: unknown) {
+          const status = (err as { statusCode?: number })?.statusCode
+          if (status === 404 || status === 410) {
+            await sb.from('push_subscriptions').delete().eq('endpoint', s.endpoint)
+          }
+        }
+      }
+    }
+
+    // Email via the edge function. The function checks the bearer matches
+    // SERVICE_ROLE_KEY before sending, so only the worker can call it.
+    await sb.functions.invoke('notify-waitlist-offer', { body: { offer_id: offer.id } })
+
+    await sb.from('waitlist_offers').update({ notified_at: nowIso }).eq('id', offer.id)
+    sent++
+  }
+
+  return { sent, expired }
 }

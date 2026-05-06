@@ -197,3 +197,66 @@ describe('BookingsPage', () => {
     expect(await screen.findByText(/event unavailable/i)).toBeInTheDocument()
   })
 })
+
+describe('BookingsPage waitlist offers', () => {
+  const future24h = () => new Date(Date.now() + 23 * 3_600_000).toISOString()
+
+  function setupWithOffer(offerExpiresAt: string | null = future24h()) {
+    useAuthMock.mockReturnValue({ user: { id: 'u1' } })
+    const booking = {
+      id: 'b-wait', user_id: 'u1', eo_dive_id: 'd1', eo_course_id: null,
+      status: 'waitlisted', notes: null, created_at: new Date().toISOString(),
+      details: {}, refund_requested_at: null,
+    }
+    const offer = offerExpiresAt
+      ? [{ id: 'offer-1', booking_id: 'b-wait', status: 'pending', expires_at: offerExpiresAt, offered_at: new Date().toISOString(), notified_at: new Date().toISOString() }]
+      : []
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings')        return mockQueryBuilder({ data: [booking] })
+      if (table === 'waitlist_offers') return mockQueryBuilder({ data: offer })
+      return mockQueryBuilder({ data: [] })
+    })
+    fetchEventsForBookings.mockResolvedValue(new Map<string, AppEvent>([
+      ['d1', ev({ id: 'd1', type: 'dive', title: 'Green Island', start_time: future() })],
+    ]))
+  }
+
+  it('renders the "Spot opened" banner with an Accept button on a waitlisted booking that has a live offer', async () => {
+    setupWithOffer()
+    renderWithRouter(<BookingsPage />)
+    await screen.findByText('Green Island')
+    expect(screen.getByText(/a spot just opened up/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^accept$/i })).toBeInTheDocument()
+  })
+
+  it('does NOT render the banner on a waitlisted booking with no live offer (still on the list, no spot opened yet)', async () => {
+    setupWithOffer(null)
+    renderWithRouter(<BookingsPage />)
+    await screen.findByText('Green Island')
+    expect(screen.queryByText(/a spot just opened up/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^accept$/i })).not.toBeInTheDocument()
+  })
+
+  it('shows a remaining-time label computed at fetch time (no Date.now() during render)', async () => {
+    // Offer expires in ~22 hours; the label is computed once during refetch
+    // and threaded through as a prop, so the banner can render purely.
+    setupWithOffer(new Date(Date.now() + 22 * 3_600_000 + 30 * 60_000).toISOString())
+    renderWithRouter(<BookingsPage />)
+    expect(await screen.findByText(/22h \d+m left/)).toBeInTheDocument()
+  })
+
+  it('clicking Accept calls accept_waitlist_offer RPC with the offer id', async () => {
+    setupWithOffer()
+    const rpc = vi.fn().mockResolvedValue({ error: null })
+    // Patch supabase.rpc onto the existing mock — the test's vi.mock above
+    // only stubs supabase.from, so we extend it here.
+    const supabaseModule = await import('../lib/supabase')
+    ;(supabaseModule.supabase as { rpc?: unknown }).rpc = rpc
+
+    const user = userEvent.setup()
+    renderWithRouter(<BookingsPage />)
+    await user.click(await screen.findByRole('button', { name: /^accept$/i }))
+
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('accept_waitlist_offer', { p_offer_id: 'offer-1' }))
+  })
+})

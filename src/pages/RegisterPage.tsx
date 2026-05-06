@@ -164,12 +164,15 @@ function EventHeader({ event }: { event: AppEvent }) {
 }
 
 function LockedConfirmation({ event, booking, alreadyExisting = false }: { event: AppEvent; booking: Booking; alreadyExisting?: boolean }) {
+  const isWaitlisted = booking.status === 'waitlisted'
+  const heading = alreadyExisting
+    ? "You're already registered"
+    : isWaitlisted
+      ? "You've been added to the waitlist"
+      : 'Your registration has been submitted'
   return (
     <div className="bg-white border border-red-500 rounded-xl p-6 space-y-4 text-center shadow-lg">
-      <div className="text-5xl">{alreadyExisting ? '📋' : '✅'}</div>
-      <h1 className="text-xl font-bold text-blue-900">
-        {alreadyExisting ? "You're already registered" : 'Your registration has been submitted'}
-      </h1>
+      <h1 className="text-xl font-bold text-blue-900">{heading}</h1>
       <p className="text-sm text-blue-900 font-medium">
         {event.title} · {formatEventSpan(event, { style: 'compact' })}
       </p>
@@ -177,10 +180,16 @@ function LockedConfirmation({ event, booking, alreadyExisting = false }: { event
         <p className="text-xs text-blue-950 font-medium uppercase tracking-wider mb-1">Status</p>
         <p className="capitalize">{booking.status}</p>
       </div>
-      <p className="text-xs text-blue-950 font-medium">
-        Sign in any time at <a href="https://app.fundiverstw.com" className="text-blue-700 hover:underline">app.fundiverstw.com</a> to track your booking and payment status.
-      </p>
-      <Link to="/bookings" className="inline-block bg-blue-900 hover:bg-blue-950 text-white font-semibold px-5 py-2 rounded-lg">
+      {isWaitlisted ? (
+        <p className="text-xs text-blue-950 font-medium">
+          We'll send you a push notification and an email if a spot opens up. You'll have 24 hours to accept before the offer rolls to the next person on the list.
+        </p>
+      ) : (
+        <p className="text-xs text-blue-950 font-medium">
+          Sign in any time at <a href="https://app.fundiverstw.com" className="text-blue-700 hover:underline">app.fundiverstw.com</a> to track your booking and payment status.
+        </p>
+      )}
+      <Link to="/records/bookings" className="inline-block bg-blue-900 hover:bg-blue-950 text-white font-semibold px-5 py-2 rounded-lg">
         View my bookings
       </Link>
     </div>

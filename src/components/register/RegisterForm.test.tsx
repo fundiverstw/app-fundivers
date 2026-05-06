@@ -142,7 +142,7 @@ describe('RegisterForm', () => {
     expect(details.payment_method).toBe('bank_transfer')
 
     await waitFor(() => expect(onBooked).toHaveBeenCalledOnce())
-    expect(onBooked.mock.calls[0][0]).toEqual({ id: 'b-new' })
+    expect(onBooked.mock.calls[0][0]).toEqual({ id: 'b-new', status: 'pending' })
   })
 
   it('includes gear items and add-ons in the details payload', async () => {
@@ -337,7 +337,7 @@ describe('RegisterForm', () => {
     // Session token from the function gets handed to setSession so the
     // diver lands authed without a second round-trip.
     await waitFor(() => expect(setSession).toHaveBeenCalledWith({ access_token: 'ACCESS', refresh_token: 'REFRESH' }))
-    await waitFor(() => expect(onBooked).toHaveBeenCalledWith({ id: 'b-guest-new' }))
+    await waitFor(() => expect(onBooked).toHaveBeenCalledWith({ id: 'b-guest-new', status: 'pending' }))
   })
 
   it('guest path: surfaces the server\'s error body and softens "already registered" with a sign-in hint', async () => {
@@ -649,6 +649,6 @@ describe('RegisterForm', () => {
     expect(opts.body).not.toHaveProperty('email')
     expect(opts.body).not.toHaveProperty('password')
     expect(setSession).not.toHaveBeenCalled()
-    expect(onBooked).toHaveBeenCalledWith({ id: 'b-new' })
+    expect(onBooked).toHaveBeenCalledWith({ id: 'b-new', status: 'pending' })
   })
 })

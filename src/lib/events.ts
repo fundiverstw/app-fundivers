@@ -127,7 +127,7 @@ function courseToEvents(c: EOCourse, priceIndex: Map<string, EOPrice>, addonIds:
     calendar_title: c.calendar_title ?? null,
     start_time_hhmm: toHhmm(c.start_time),
     featured: false,
-    fully_booked: false,
+    fully_booked: c.fully_booked ?? false,
     price: p?.starting_at ?? null,
     deposit_amount: p?.deposit_amount ?? null,
     transport_price: p?.transport ?? null,
@@ -250,7 +250,7 @@ async function attachPrices(dives: EODive[], courses: EOCourse[]): Promise<Map<s
 }
 
 const DIVE_COLS = '_id, admin_title, display_title, calendar_title, start_date, time, end_date, featured, fully_booked, price, has_rooms, room_types, hasotheraddons, other_addons, gear_rental, nitrox_required, dive_days, cancelled_at, deposit_deadline, full_payment_deadline, cancel_policy, cancel_date'
-const COURSE_COLS = '_id, admin_title, display_title, calendar_title, start_date, start_time, end_date, price, other_addons, dive_days, special_date, cancelled_at, deposit_deadline, full_payment_deadline, cancel_policy, cancel_date'
+const COURSE_COLS = '_id, admin_title, display_title, calendar_title, start_date, start_time, end_date, price, other_addons, dive_days, special_date, cancelled_at, deposit_deadline, full_payment_deadline, cancel_policy, cancel_date, fully_booked'
 
 /**
  * Fetch dives + courses whose start_date falls within [fromDate, toDate]
