@@ -20,6 +20,7 @@ export function AdminNotificationsPage() {
   const toast = useToast()
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
+  const [link, setLink] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
@@ -39,13 +40,22 @@ export function AdminNotificationsPage() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) throw new Error('Not signed in.')
+      // Send url only when the admin filled it in. The worker reads
+      // an empty/absent url as "no link" — push tap opens the inbox so
+      // the diver can re-read the body, and the inbox row doesn't
+      // render an "Open link" button.
+      const trimmedLink = link.trim()
       const res = await fetch(`${workerUrl}/admin-broadcast`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
           authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ title: title.trim(), body: body.trim() }),
+        body: JSON.stringify({
+          title: title.trim(),
+          body:  body.trim(),
+          ...(trimmedLink ? { url: trimmedLink } : {}),
+        }),
       })
       if (!res.ok) {
         const text = await res.text().catch(() => '')
@@ -60,6 +70,7 @@ export function AdminNotificationsPage() {
       toast.success(`Sent to ${sent} device${sent === 1 ? '' : 's'}` + (skipped ? `, ${skipped} skipped` : '') + webhookPart)
       setTitle('')
       setBody('')
+      setLink('')
     } catch (err) {
       setSubmitError(errorMessage(err))
     } finally {
@@ -97,10 +108,28 @@ export function AdminNotificationsPage() {
             value={body}
             onChange={e => setBody(e.target.value)}
             placeholder="What everyone needs to know."
-            rows={4}
-            maxLength={300}
-            className={`${inputClass} resize-none`}
+            rows={6}
+            maxLength={1000}
+            // Monospace + spellcheck off so pasted ASCII art stays
+            // column-aligned in the input the same way it'll render in
+            // the inbox. The diver-side body view also renders monospace.
+            spellCheck={false}
+            className={`${inputClass} font-mono resize-y whitespace-pre`}
           />
+        </label>
+        <label className="block space-y-1">
+          <span className="text-xs font-medium text-blue-900">Link (optional)</span>
+          <input
+            type="text"
+            value={link}
+            onChange={e => setLink(e.target.value)}
+            placeholder="/records/bookings  or  https://example.com"
+            className={inputClass}
+          />
+          <span className="block text-[11px] text-blue-900/70">
+            When set, tapping the push opens this URL. When empty, tapping opens the
+            in-app inbox so the diver can re-read the message.
+          </span>
         </label>
         {submitError && (
           <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded px-2 py-1">{submitError}</p>
