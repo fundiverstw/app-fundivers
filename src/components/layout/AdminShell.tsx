@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
+import { usePWAUpdate } from '../../hooks/usePWAUpdate'
 import { supabase } from '../../lib/supabase'
 import { Logo } from '../Logo'
+import { UpdateAvailableBanner } from '../install/UpdateAvailableBanner'
 import { CalendarIcon } from '../icons/CalendarIcon'
 import { CrosshairIcon } from '../icons/CrosshairIcon'
 import { PeopleIcon } from '../icons/PeopleIcon'
@@ -25,6 +27,7 @@ export function AdminShell() {
   const navigate = useNavigate()
   const location = useLocation()
   const [pendingCount, setPendingCount] = useState<number | null>(null)
+  const { needRefresh, update } = usePWAUpdate()
 
   // Refetch pending-applications count on every admin route change so the
   // badge reflects reality after approve/reject without needing a global
@@ -89,6 +92,8 @@ export function AdminShell() {
           </button>
         </div>
       </header>
+
+      {needRefresh && <UpdateAvailableBanner onUpdate={update} />}
 
       <main className="flex-1 overflow-y-auto p-4 pb-24">
         <Outlet />

@@ -14,7 +14,12 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.ts',
-      registerType: 'autoUpdate',
+      // 'prompt' (not 'autoUpdate') so a freshly-installed SW sits in the
+      // `waiting` state until the user clicks the in-app update banner. With
+      // autoUpdate the page would hard-reload itself the moment a deploy
+      // landed; with prompt we surface needRefresh and let the user reload
+      // when it's safe (form not half-filled, etc.).
+      registerType: 'prompt',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'icons/*.png'],
       manifest: {
         name: 'FunDivers TW',

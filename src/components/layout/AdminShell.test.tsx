@@ -16,6 +16,12 @@ vi.mock('../../lib/supabase', () => ({
   supabase: { from: (...a: unknown[]) => from(...a) },
 }))
 
+// usePWAUpdate pulls in `virtual:pwa-register/react`, a build-time virtual
+// module that has no resolution under vitest. Stub it so AdminShell mounts.
+vi.mock('../../hooks/usePWAUpdate', () => ({
+  usePWAUpdate: () => ({ needRefresh: false, update: vi.fn() }),
+}))
+
 beforeEach(() => {
   useAuthMock.mockReset()
   from.mockReset()
