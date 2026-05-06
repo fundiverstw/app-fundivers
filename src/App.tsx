@@ -18,6 +18,8 @@ import { CalendarPage } from './pages/CalendarPage'
 import { MapPage } from './pages/MapPage'
 import { BookingsPage } from './pages/BookingsPage'
 import { PaymentsPage } from './pages/PaymentsPage'
+import { RecordsPage } from './pages/RecordsPage'
+import { DiveLogsPage } from './pages/DiveLogsPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { DashboardPage } from './pages/DashboardPage'
@@ -81,8 +83,12 @@ export default function App() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/map" element={<MapPage />} />
-              <Route path="/bookings" element={<BookingsPage />} />
-              <Route path="/payments" element={<PaymentsPage />} />
+              <Route path="/records" element={<RecordsPage />}>
+                <Route index element={<Navigate to="bookings" replace />} />
+                <Route path="bookings" element={<BookingsPage />} />
+                <Route path="payments" element={<PaymentsPage />} />
+                <Route path="dive-logs" element={<DiveLogsPage />} />
+              </Route>
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/duties" element={<DutiesPage />} />

@@ -84,7 +84,7 @@ export function selectReminders(today: string, inputs: ReminderInput[]): Reminde
         userId: r.userId, eventId: r.eventId, eventType: r.eventType, kind: evKind,
         title: days === 1 ? 'Dive tomorrow' : `Dive in ${days} days`,
         body:  r.eventTitle + timeSuffix,
-        url:   '/bookings',
+        url:   '/records/bookings',
       })
     }
 
@@ -100,7 +100,7 @@ export function selectReminders(today: string, inputs: ReminderInput[]): Reminde
           userId: r.userId, eventId: r.eventId, eventType: r.eventType, kind: payKind,
           title: `${label} due — ${r.eventTitle}`,
           body:  `${r.currency} ${amount.toLocaleString()} · event ${whenLabel(days)}${timeSuffix}`,
-          url:   '/payments',
+          url:   '/records/payments',
         })
       }
     }

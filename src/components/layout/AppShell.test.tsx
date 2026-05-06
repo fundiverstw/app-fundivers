@@ -36,8 +36,7 @@ function routedRender(start = '/calendar') {
         <Route path="/login" element={<div>LOGIN</div>} />
         <Route element={<AppShell />}>
           <Route path="/calendar" element={<div>CAL</div>} />
-          <Route path="/bookings" element={<div>BOOK</div>} />
-          <Route path="/payments" element={<div>PAY</div>} />
+          <Route path="/records" element={<div>REC</div>} />
           <Route path="/profile" element={<div>PROF</div>} />
         </Route>
       </Routes>
@@ -67,8 +66,8 @@ describe('AppShell', () => {
 
   it('renders outlet content for current route', () => {
     useAuthMock.mockReturnValue({ profile: null, signOut })
-    routedRender('/bookings')
-    expect(screen.getByText('BOOK')).toBeInTheDocument()
+    routedRender('/records')
+    expect(screen.getByText('REC')).toBeInTheDocument()
   })
 
   it('clicking Sign out calls signOut and navigates to /login', async () => {
@@ -173,8 +172,11 @@ describe('AppShell', () => {
     routedRender()
     expect(screen.getByRole('link', { name: /home/i })).toHaveAttribute('href', '/dashboard')
     expect(screen.getByRole('link', { name: /calendar/i })).toHaveAttribute('href', '/calendar')
-    expect(screen.getByRole('link', { name: /bookings/i })).toHaveAttribute('href', '/bookings')
-    expect(screen.getByRole('link', { name: /payments/i })).toHaveAttribute('href', '/payments')
+    expect(screen.getByRole('link', { name: /records/i })).toHaveAttribute('href', '/records')
     expect(screen.getByRole('link', { name: /profile/i })).toHaveAttribute('href', '/profile')
+    // Bookings and Payments are no longer top-level bottom-nav items — they
+    // live as sub-tabs inside Records now.
+    expect(screen.queryByRole('link', { name: /^bookings$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^payments$/i })).not.toBeInTheDocument()
   })
 })

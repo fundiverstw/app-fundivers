@@ -704,6 +704,77 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['notifications']['Insert']>
         Relationships: []
       }
+      dive_logs: {
+        Row: {
+          id: string
+          user_id: string
+          dive_number: number
+          dived_on: string
+          site: string
+          dive_type: DiveType | null
+          max_depth_m: number | null
+          dive_time_min: number | null
+          visibility_m: number | null
+          water_temp_c: number | null
+          air_temp_c: number | null
+          weather: string | null
+          wave_height_m: number | null
+          weight_kg: number | null
+          gear_used: string[]
+          gas_mix: GasMix | null
+          tank_size_l: number | null
+          start_pressure_bar: number | null
+          end_pressure_bar: number | null
+          buddy_name: string | null
+          instructor_name: string | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          // Optional on insert — the trigger fills it in when omitted.
+          dive_number?: number
+          dived_on: string
+          site: string
+          dive_type?: DiveType | null
+          max_depth_m?: number | null
+          dive_time_min?: number | null
+          visibility_m?: number | null
+          water_temp_c?: number | null
+          air_temp_c?: number | null
+          weather?: string | null
+          wave_height_m?: number | null
+          weight_kg?: number | null
+          gear_used?: string[]
+          gas_mix?: GasMix | null
+          tank_size_l?: number | null
+          start_pressure_bar?: number | null
+          end_pressure_bar?: number | null
+          buddy_name?: string | null
+          instructor_name?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['dive_logs']['Insert']>
+        Relationships: []
+      }
+      dive_log_export_requests: {
+        Row: {
+          id: string
+          user_id: string
+          requested_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          requested_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['dive_log_export_requests']['Insert']>
+        Relationships: []
+      }
     }
   }
 }
@@ -727,6 +798,16 @@ export const NOTE_TAGS = ['urgent','payment','gear','logistics','cert','medical'
 export type NoteTag = typeof NOTE_TAGS[number]
 export type Duty = Database['public']['Tables']['duties']['Row']
 export type Notification = Database['public']['Tables']['notifications']['Row']
+
+export const DIVE_TYPES = ['shore','boat','training','drift','night','wreck','other'] as const
+export type DiveType = typeof DIVE_TYPES[number]
+
+export const GAS_MIXES = ['air','EAN32','EAN36','other'] as const
+export type GasMix = typeof GAS_MIXES[number]
+
+export type DiveLog = Database['public']['Tables']['dive_logs']['Row']
+export type DiveLogInsert = Database['public']['Tables']['dive_logs']['Insert']
+export type DiveLogExportRequest = Database['public']['Tables']['dive_log_export_requests']['Row']
 export const NOTIFICATION_KINDS = ['reminder', 'broadcast', 'duty'] as const
 export type NotificationKind = typeof NOTIFICATION_KINDS[number]
 export const DUTY_ROLES = ['instructor', 'guide', 'support'] as const
