@@ -325,7 +325,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
     // are provided; authed callers' Bearer JWT identifies the user.
     // When actingOnBehalfOf is set, the caller (admin) JWT is used to
     // authorise, but the booking lands on target_user_id.
-    const { data, error } = await supabase.functions.invoke<{ booking_id: string; session: { access_token: string; refresh_token: string } | null }>(
+    const { data, error } = await supabase.functions.invoke<{ booking_id: string; status?: string; session: { access_token: string; refresh_token: string } | null }>(
       'create-registration',
       {
         body: {
@@ -352,7 +352,9 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
     if (data.session) {
       await supabase.auth.setSession(data.session)
     }
-    onSubmitSuccess({ id: data.booking_id })
+    // Pass status through so the parent can render a different success
+    // toast when the booking landed as 'waitlisted' rather than 'pending'.
+    onSubmitSuccess({ id: data.booking_id, status: data.status ?? 'pending' })
   }
 
   return (
@@ -372,6 +374,19 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
           </p>
           {event.price != null && (
             <p className="text-sm text-blue-950 font-medium">From {event.currency} {event.price.toLocaleString()}</p>
+          )}
+          {event.fully_booked && (
+            // Surface waitlist-on-register up front. The booking still goes
+            // through end-to-end so the diver doesn't have to come back —
+            // they just land in 'waitlisted' status. Payment is owed only
+            // if a spot opens and they accept the offer.
+            <div
+              role="alert"
+              className="bg-red-50 border border-red-500 rounded-lg px-3 py-2 text-xs text-red-700"
+            >
+              <p className="font-semibold">This event is full.</p>
+              <p>You'll be added to the waitlist. If a spot opens we'll send a push and email — you'll have 24 hours to claim it.</p>
+            </div>
           )}
         </section>
       )}

@@ -5,10 +5,14 @@ compatibility_date = "2026-04-01"
 # nodejs_compat flag. No polyfills needed.
 compatibility_flags = ["nodejs_compat"]
 
-# 02:00 UTC = 10:00 Asia/Taipei — sensible time to land a daily reminder in
-# the app. Change to taste; Cloudflare cron triggers are always UTC.
+# Two crons:
+#   - "0 2 * * *"    — daily reminder fan-out (02:00 UTC = 10:00 Asia/Taipei).
+#   - "*/15 * * * *" — waitlist-offer processing (every 15 min): send pushes
+#                      and emails for new offers, expire stale ones, chain
+#                      expired offers to the next waitlister.
+# Cloudflare cron triggers are always UTC.
 [triggers]
-crons = ["0 2 * * *"]
+crons = ["0 2 * * *", "*/15 * * * *"]
 
 # Non-secret env can live here; secrets go via `wrangler secret put …`.
 # See docs/push-notifications.md for the deploy runbook.
