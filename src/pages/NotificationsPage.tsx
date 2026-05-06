@@ -15,7 +15,6 @@ export function NotificationsPage() {
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
     fetchNotifications()
       .then(rows => { if (!cancelled) { setItems(rows); setError(null) } })
       .catch(err => { if (!cancelled) setError((err as Error).message) })

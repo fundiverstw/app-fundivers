@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { supabase } from '../lib/supabase'
@@ -105,7 +105,7 @@ export function ProfileForm({ user, profile, onSaved }: {
   onSaved?: () => void
 }) {
   const toast = useToast()
-  const { register, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting, isDirty } } = useForm<FormData>({
+  const { register, handleSubmit, reset, control, setValue, formState: { errors, isSubmitting, isDirty } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: profile as unknown as FormData,
   })
@@ -133,7 +133,9 @@ export function ProfileForm({ user, profile, onSaved }: {
     return () => { cancelled = true }
   }, [])
 
-  const selectedAgency = watch('cert_agency') ?? ''
+  // useWatch (not the watch() function from useForm) — useWatch is the
+  // React-Compiler-safe API for reading a live form value.
+  const selectedAgency = useWatch({ control, name: 'cert_agency' }) ?? ''
   // Distinct orgs in the order returned by the rank-sorted query (PADI rows
   // come first because they're the seed; agency rows follow).
   const orgs = useMemo(() => {
@@ -149,17 +151,6 @@ export function ProfileForm({ user, profile, onSaved }: {
     [certLevels, selectedAgency],
   )
 
-  // When the user changes agency, clear cert_level so they don't end up with
-  // a level from the wrong org. Subscribed via watch so we only react to
-  // user-initiated edits, not the initial defaultValues hydration.
-  useEffect(() => {
-    const sub = watch((_values, info) => {
-      if (info.name === 'cert_agency' && info.type === 'change') {
-        setValue('cert_level', '', { shouldDirty: true })
-      }
-    })
-    return () => sub.unsubscribe()
-  }, [watch, setValue])
   const initialShoe = useMemo(() => parseShoeSize(profile.shoe_size), [profile.shoe_size])
   const [shoeUnit, setShoeUnit] = useState<ShoeUnit>(() => initialShoe?.unit ?? 'eu')
   const [shoeGender, setShoeGender] = useState<ShoeGender>(() => initialShoe?.gender ?? 'm')
@@ -365,7 +356,17 @@ export function ProfileForm({ user, profile, onSaved }: {
         <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Certification</h2>
           <Field label="Agency">
-            <select {...register('cert_agency')} className={inputClass}>
+            <select
+              // Clearing cert_level on agency change keeps the user from
+              // saving a cert level that belongs to a different org. We do
+              // it here on the register-level onChange (not via watch())
+              // so it only fires for user-initiated edits — not for the
+              // initial defaultValues hydration.
+              {...register('cert_agency', {
+                onChange: () => setValue('cert_level', '', { shouldDirty: true }),
+              })}
+              className={inputClass}
+            >
               <option value="">— select agency —</option>
               {/* Preserve any legacy free-text agency on the existing profile
                    so opening the form doesn't silently drop it. */}
