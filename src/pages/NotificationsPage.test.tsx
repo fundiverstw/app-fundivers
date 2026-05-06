@@ -119,4 +119,50 @@ describe('NotificationsPage', () => {
     // Mark-all-read hidden when there are no unread rows.
     expect(screen.queryByRole('button', { name: /mark all read/i })).not.toBeInTheDocument()
   })
+
+  it('renders the body in a monospace <pre> with preserved whitespace so pasted ASCII art keeps its columns', async () => {
+    const ascii =
+      '   _____\n' +
+      '  /     \\\n' +
+      ' |  o o  |\n' +
+      '  \\__-__/\n'
+    setup([{
+      id: 'n-art', user_id: 'u',
+      title: 'ASCII fish', body: ascii,
+      url: null, kind: 'broadcast',
+      event_id: null,
+      created_at: '2026-05-05T00:00:00.000Z',
+      read_at: null,
+    }])
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: /ascii fish/i }))
+
+    // <pre> is what makes whitespace and column alignment survive — both
+    // via element semantics and via our explicit whitespace-pre class.
+    // querySelector keeps the assertion robust to minor copy changes.
+    const pre = document.querySelector('pre')
+    expect(pre).not.toBeNull()
+    expect(pre!.tagName).toBe('PRE')
+    expect(pre!.textContent).toBe(ascii)
+    expect(pre!.className).toMatch(/font-mono/)
+    expect(pre!.className).toMatch(/whitespace-pre\b/)
+  })
+
+  it('omits the action button entirely when the notification has no url (admin sent broadcast with no link)', async () => {
+    setup([{
+      id: 'n-no-link', user_id: 'u',
+      title: 'No link broadcast', body: 'Body only',
+      url: null, kind: 'broadcast',
+      event_id: null,
+      created_at: '2026-05-05T00:00:00.000Z',
+      read_at: null,
+    }])
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: /no link broadcast/i }))
+    // Body shows; CTA button is suppressed.
+    expect(screen.getByText('Body only')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /open link/i })).not.toBeInTheDocument()
+  })
 })

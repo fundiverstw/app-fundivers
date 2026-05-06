@@ -41,7 +41,7 @@ describe('AdminNotificationsPage', () => {
     expect((globalThis as any).fetch).not.toHaveBeenCalled()
   })
 
-  it('sends payload to /admin-broadcast and toasts on success', async () => {
+  it('sends payload to /admin-broadcast and toasts on success — omits url when the link field is empty', async () => {
     getSession.mockResolvedValue({ data: { session: { access_token: 'tok' } } })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(globalThis as any).fetch = vi.fn().mockResolvedValue({
@@ -62,7 +62,50 @@ describe('AdminNotificationsPage', () => {
     const call = (globalThis as any).fetch.mock.calls[0]
     expect(call[0]).toBe('https://push.test/admin-broadcast')
     expect(call[1].headers.authorization).toBe('Bearer tok')
+    // url is intentionally omitted (not even set to '') when the optional
+    // Link field is left blank, so the worker treats it as "no link".
     expect(JSON.parse(call[1].body)).toEqual({ title: 'Heads up', body: 'Body text' })
+  })
+
+  it('passes through the optional Link field as `url` when filled in', async () => {
+    getSession.mockResolvedValue({ data: { session: { access_token: 'tok' } } })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(globalThis as any).fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ sent: 1, skipped: 0, webhook: null }),
+    })
+    renderPage()
+    fireEvent.change(screen.getByPlaceholderText(/Trip cancelled/), { target: { value: 'Read this' } })
+    fireEvent.change(screen.getByPlaceholderText(/everyone needs to know/), { target: { value: 'Important' } })
+    fireEvent.change(screen.getByPlaceholderText(/records\/bookings/), { target: { value: '/records/dive-logs' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send now' }))
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await waitFor(() => expect((globalThis as any).fetch).toHaveBeenCalled())
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const call = (globalThis as any).fetch.mock.calls[0]
+    expect(JSON.parse(call[1].body)).toEqual({
+      title: 'Read this', body: 'Important', url: '/records/dive-logs',
+    })
+  })
+
+  it('trims whitespace-only links to "no link" — empty after trim drops the url field', async () => {
+    getSession.mockResolvedValue({ data: { session: { access_token: 'tok' } } })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(globalThis as any).fetch = vi.fn().mockResolvedValue({
+      ok: true, json: async () => ({ sent: 0, skipped: 0, webhook: null }),
+    })
+    renderPage()
+    fireEvent.change(screen.getByPlaceholderText(/Trip cancelled/), { target: { value: 't' } })
+    fireEvent.change(screen.getByPlaceholderText(/everyone needs to know/), { target: { value: 'b' } })
+    fireEvent.change(screen.getByPlaceholderText(/records\/bookings/), { target: { value: '   ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send now' }))
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await waitFor(() => expect((globalThis as any).fetch).toHaveBeenCalled())
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const call = (globalThis as any).fetch.mock.calls[0]
+    expect(JSON.parse(call[1].body)).not.toHaveProperty('url')
   })
 
   it('surfaces an error when the worker returns non-ok', async () => {

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fetchNotifications, markRead, markAllRead } from '../lib/notifications'
 import type { Notification } from '../types/database'
-import { ON_DEEP_BODY, ON_DEEP_MUTED } from '../styles/tokens'
+import { ON_DEEP_MUTED } from '../styles/tokens'
 
 export function NotificationsPage() {
   const [items, setItems] = useState<Notification[]>([])
@@ -94,15 +94,24 @@ export function NotificationsPage() {
                 </button>
 
                 {expanded && (
-                  <div className="border-t border-sky-200/60 px-3 pb-3 pt-2 space-y-2">
+                  <div className="border-t border-sky-200/60 bg-sky-50 px-3 pb-3 pt-2 space-y-2">
                     {n.body
-                      ? <p className={`text-sm ${ON_DEEP_BODY} text-blue-900/90 whitespace-pre-wrap`}>{n.body}</p>
-                      : <p className={`text-xs italic text-blue-900/60`}>No additional details.</p>}
+                      // <pre> defaults to monospace + whitespace:pre, which
+                      // is exactly what we need for pasted ASCII art (columns
+                      // align, exact spacing). overflow-x-auto so a long line
+                      // scrolls horizontally instead of breaking the layout.
+                      // Solid bg-sky-50 (above) keeps contrast crisp regardless
+                      // of whether the parent card is in its washed-out
+                      // already-read state.
+                      ? <pre className="text-sm text-blue-950 font-mono whitespace-pre overflow-x-auto m-0">
+                          {n.body}
+                        </pre>
+                      : <p className="text-xs italic text-blue-900/70">No additional details.</p>}
                     {n.url && (
                       <button
                         type="button"
                         onClick={() => navigate(n.url!)}
-                        className="text-xs px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
+                        className="text-xs px-3 py-1.5 rounded-md bg-blue-900 hover:bg-blue-950 text-white font-semibold transition-colors"
                       >
                         {actionLabelForKind(n.kind)}
                       </button>
