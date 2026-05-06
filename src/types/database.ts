@@ -60,6 +60,24 @@ export interface Database {
         }
         Returns: void
       }
+      // Defined in 20260507000000_waitlist_offers.sql; service-role only
+      // (used by the push-cron worker to chain the next waitlister when
+      // an offer expires). Returns the new offer's uuid, or null when
+      // there's no eligible waitlister.
+      offer_next_waitlist_spot: {
+        Args: {
+          p_event_id:   string
+          p_event_type: 'dive' | 'course'
+        }
+        Returns: string | null
+      }
+      // Defined in 20260507000000_waitlist_offers.sql; security-definer.
+      // Atomically flips waitlist_offers.status -> 'accepted' and
+      // bookings.status -> 'pending'. auth.uid() must own the booking.
+      accept_waitlist_offer: {
+        Args: { p_offer_id: string }
+        Returns: void
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
@@ -331,6 +349,7 @@ export interface Database {
           full_payment_deadline: string | null
           cancel_date: string | null
           cancel_policy: string | null
+          fully_booked: boolean | null
         }
         Insert: {
           _id: string
@@ -349,6 +368,7 @@ export interface Database {
           full_payment_deadline?: string | null
           cancel_date?: string | null
           cancel_policy?: string | null
+          fully_booked?: boolean | null
         }
         Update: Partial<Database['public']['Tables']['EO_courses']['Insert']>
         Relationships: []
@@ -775,6 +795,26 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['dive_log_export_requests']['Insert']>
         Relationships: []
       }
+      waitlist_offers: {
+        Row: {
+          id: string
+          booking_id: string
+          offered_at: string
+          expires_at: string
+          notified_at: string | null
+          status: WaitlistOfferStatus
+        }
+        Insert: {
+          id?: string
+          booking_id: string
+          offered_at?: string
+          expires_at?: string
+          notified_at?: string | null
+          status?: WaitlistOfferStatus
+        }
+        Update: Partial<Database['public']['Tables']['waitlist_offers']['Insert']>
+        Relationships: []
+      }
     }
   }
 }
@@ -808,7 +848,11 @@ export type GasMix = typeof GAS_MIXES[number]
 export type DiveLog = Database['public']['Tables']['dive_logs']['Row']
 export type DiveLogInsert = Database['public']['Tables']['dive_logs']['Insert']
 export type DiveLogExportRequest = Database['public']['Tables']['dive_log_export_requests']['Row']
-export const NOTIFICATION_KINDS = ['reminder', 'broadcast', 'duty'] as const
+
+export const WAITLIST_OFFER_STATUSES = ['pending', 'accepted', 'expired'] as const
+export type WaitlistOfferStatus = typeof WAITLIST_OFFER_STATUSES[number]
+export type WaitlistOffer = Database['public']['Tables']['waitlist_offers']['Row']
+export const NOTIFICATION_KINDS = ['reminder', 'broadcast', 'duty', 'waitlist_offer'] as const
 export type NotificationKind = typeof NOTIFICATION_KINDS[number]
 export const DUTY_ROLES = ['instructor', 'guide', 'support'] as const
 export type DutyRole = typeof DUTY_ROLES[number]

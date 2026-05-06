@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { useToast } from '../hooks/useToast'
 import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
-import type { AppEvent, Booking, Payment } from '../types/database'
+import type { AppEvent, Booking, Payment, WaitlistOffer } from '../types/database'
 import {
   CARD, BTN_GHOST, BTN_DANGER, TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR, PAGE_BODY,
 } from '../styles/tokens'
@@ -12,6 +13,23 @@ type Row = Booking & {
   event: AppEvent | null
   payments: Payment[]
   paidSum: number
+  /** Live (status='pending', not expired) waitlist offer on this booking,
+   *  if any. Drives the "Spot opened — Accept this spot" banner. */
+  offer: WaitlistOffer | null
+  /** Snapshot label like "23h 14m left", computed at fetch time so the
+   *  banner doesn't have to call Date.now() during render. Refreshed
+   *  on every refetch — the staleness is visible to anyone who reloads. */
+  offerRemainingLabel: string | null
+}
+
+function formatRemaining(expiresAt: string, nowMs: number): string {
+  const ms = new Date(expiresAt).getTime() - nowMs
+  if (ms <= 0) return 'expiring now'
+  const hours = Math.floor(ms / 3_600_000)
+  const mins  = Math.floor((ms % 3_600_000) / 60_000)
+  if (hours > 0) return `${hours}h ${mins}m left`
+  if (mins  > 0) return `${mins}m left`
+  return 'expiring now'
 }
 
 type AddonNameMap = Map<string, string>
@@ -25,10 +43,12 @@ const STATUS_STYLES: Record<Booking['status'], string> = {
 
 export function BookingsPage() {
   const { user } = useAuth()
+  const toast = useToast()
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [addonNames, setAddonNames] = useState<AddonNameMap>(new Map())
+  const [acceptingOfferId, setAcceptingOfferId] = useState<string | null>(null)
 
   async function refetch(uid: string) {
     const [bookingsRes, paymentsRes] = await Promise.all([
@@ -37,6 +57,22 @@ export function BookingsPage() {
     ])
     const bookings = bookingsRes.data ?? []
     const payments = (paymentsRes.data ?? []) as Payment[]
+
+    // Live waitlist offers (status='pending', not expired). RLS scopes to
+    // the diver's own offers. We do this in the same refetch so the
+    // "Accept this spot" banner appears as soon as the page loads — no
+    // separate request, no flicker.
+    const waitlistedIds = bookings.filter(b => b.status === 'waitlisted').map(b => b.id)
+    let offersByBooking = new Map<string, WaitlistOffer>()
+    if (waitlistedIds.length) {
+      const { data: offers } = await supabase
+        .from('waitlist_offers')
+        .select('*')
+        .in('booking_id', waitlistedIds)
+        .eq('status', 'pending')
+        .gt('expires_at', new Date().toISOString())
+      offersByBooking = new Map((offers ?? []).map(o => [o.booking_id, o as WaitlistOffer]))
+    }
 
     const diveIds = bookings.map(b => b.eo_dive_id).filter((x): x is string => !!x)
     const courseIds = bookings.map(b => b.eo_course_id).filter((x): x is string => !!x)
@@ -52,14 +88,18 @@ export function BookingsPage() {
       paymentsByBooking.set(p.booking_id, arr)
     }
 
+    const nowMs = Date.now()
     setRows(bookings.map(b => {
       const bookingPayments = paymentsByBooking.get(b.id) ?? []
       const paidSum = bookingPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
+      const offer = offersByBooking.get(b.id) ?? null
       return {
         ...b,
         event: eventMap.get((b.eo_dive_id ?? b.eo_course_id)!) ?? null,
         payments: bookingPayments,
         paidSum,
+        offer,
+        offerRemainingLabel: offer ? formatRemaining(offer.expires_at, nowMs) : null,
       }
     }))
 
@@ -101,6 +141,24 @@ export function BookingsPage() {
     if (user) await refetch(user.id)
   }
 
+  async function acceptWaitlistOffer(offerId: string) {
+    setAcceptingOfferId(offerId)
+    try {
+      // accept_waitlist_offer is a SECURITY DEFINER RPC — flips
+      // waitlist_offers.status -> 'accepted' and bookings.status ->
+      // 'pending' atomically. The function raises if the offer is
+      // already accepted/expired or not owned by the caller.
+      const { error } = await supabase.rpc('accept_waitlist_offer', { p_offer_id: offerId })
+      if (error) throw error
+      toast.success('Spot accepted! We will be in touch about payment.')
+      if (user) await refetch(user.id)
+    } catch (err) {
+      toast.error((err as Error).message)
+    } finally {
+      setAcceptingOfferId(null)
+    }
+  }
+
   const upcoming = rows.filter(r =>
     r.status !== 'cancelled' && r.event && new Date(r.event.start_time) >= new Date()
   )
@@ -130,6 +188,8 @@ export function BookingsPage() {
                   onToggle={() => setExpanded(expanded === r.id ? null : r.id)}
                   onCancel={cancelBooking}
                   onRefund={requestRefund}
+                  onAcceptOffer={acceptWaitlistOffer}
+                  acceptingOfferId={acceptingOfferId}
                 />
               ))}
             </div>
@@ -149,6 +209,8 @@ export function BookingsPage() {
                 onToggle={() => setExpanded(expanded === r.id ? null : r.id)}
                 onCancel={cancelBooking}
                 onRefund={requestRefund}
+                onAcceptOffer={acceptWaitlistOffer}
+                acceptingOfferId={acceptingOfferId}
               />
             ))}
           </div>
@@ -159,7 +221,7 @@ export function BookingsPage() {
 }
 
 function Card({
-  row, addonNames, open, onToggle, onCancel, onRefund,
+  row, addonNames, open, onToggle, onCancel, onRefund, onAcceptOffer, acceptingOfferId,
 }: {
   row: Row
   addonNames: AddonNameMap
@@ -167,6 +229,8 @@ function Card({
   onToggle: () => void
   onCancel: (id: string) => void
   onRefund: (id: string) => void
+  onAcceptOffer: (offerId: string) => void
+  acceptingOfferId: string | null
 }) {
   const details = (row.details ?? {}) as Booking['details']
   const total = Number((details as { total?: number } | undefined)?.total ?? 0)
@@ -176,6 +240,11 @@ function Card({
 
   return (
     <div className={CARD}>
+      {row.offer && <WaitlistOfferBanner
+        remainingLabel={row.offerRemainingLabel ?? ''}
+        onAccept={() => onAcceptOffer(row.offer!.id)}
+        accepting={acceptingOfferId === row.offer.id}
+      />}
       <button
         type="button"
         onClick={onToggle}
@@ -248,6 +317,31 @@ function Card({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function WaitlistOfferBanner({
+  remainingLabel, onAccept, accepting,
+}: {
+  remainingLabel: string
+  onAccept: () => void
+  accepting: boolean
+}) {
+  return (
+    <div className="bg-red-500 text-white px-4 py-3 rounded-t-xl flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <p className="font-semibold text-sm">A spot just opened up.</p>
+        <p className="text-xs text-white/90">{remainingLabel} — accept before it rolls to the next person.</p>
+      </div>
+      <button
+        type="button"
+        onClick={onAccept}
+        disabled={accepting}
+        className="bg-white text-red-700 font-semibold text-xs rounded-lg px-3 py-1.5 hover:bg-sky-100 transition-colors disabled:opacity-50 shrink-0"
+      >
+        {accepting ? 'Accepting…' : 'Accept'}
+      </button>
     </div>
   )
 }
