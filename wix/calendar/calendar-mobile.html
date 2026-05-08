@@ -242,15 +242,6 @@ let visibleTypes = { course: true, dive: true };
 const monthNames=["January","February","March","April","May","June","July","August","September","October","November","December"];
 const dayNamesShort=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const dayNames=["S","M","T","W","T","F","S"];
-const siteBaseUrl = "https://www.fundiverstw.com";
-
-// Mirrors calendar.html: the Wix detail pages are static (their SEO URL
-// config doesn't accept path parameters), so the event id rides as ?id=.
-function getEventDetailsUrl(ev) {
-  const slug = ev.type === 'dive' ? 'upcoming-dives' : 'upcoming-courses';
-  return siteBaseUrl + "/" + slug + "?id=" + encodeURIComponent(ev.id);
-}
-
 window.addEventListener("message", e=>{
   if (e.data && e.data.type === 'viewportCenter') {
     return;
@@ -482,7 +473,7 @@ function buildMonth(container, monthDate){
             textSpan.textContent = ev.title;
             evDiv.appendChild(textSpan);
             evDiv.title = ev.title;
-            evDiv.addEventListener("click", () => window.open(getEventDetailsUrl(ev), "_blank"));
+            evDiv.addEventListener("click", () => window.parent.postMessage({ type: 'details_event', eventId: ev.id, eventType: ev.type }, '*'));
             dayEvents.appendChild(evDiv);
           }
         } else {
@@ -562,7 +553,7 @@ function buildMonth(container, monthDate){
         span.appendChild(titleEl);
         span.addEventListener("click", (e) => {
           e.stopPropagation();
-          window.open(getEventDetailsUrl(ev), "_blank");
+          window.parent.postMessage({ type: 'details_event', eventId: ev.id, eventType: ev.type }, '*');
         });
         layer.appendChild(span);
       });

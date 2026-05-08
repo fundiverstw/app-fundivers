@@ -17,12 +17,16 @@ $w.onReady(async function () {
     if (comp && typeof comp.onMessage === 'function') {
       comp.onMessage(function (event) {
         const d = event.data;
-        if (d && d.type === 'book_event' && d.eventId && d.eventType) {
+        if (!d || !d.eventId || !d.eventType) return;
+        if (d.type === 'book_event') {
           wixLocation.to(
             'https://app.fundiverstw.com/register/' +
               encodeURIComponent(d.eventType) + '/' +
               encodeURIComponent(d.eventId)
           );
+        } else if (d.type === 'details_event') {
+          const slug = d.eventType === 'dive' ? 'upcoming-dives' : 'upcoming-courses';
+          wixLocation.to('/' + slug + '?id=' + encodeURIComponent(d.eventId));
         }
       });
     }
