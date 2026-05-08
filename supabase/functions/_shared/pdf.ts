@@ -9,8 +9,8 @@ import { jsPDF } from "npm:jspdf@2.5.1"
 import { Buffer } from "node:buffer"
 import { paymentInstructionsFor } from "./payment-instructions.ts"
 
-const LOGO_URL =
-  "https://static.wixstatic.com/media/b37fef_ade8b006d798481a89453869bbc7aee6~mv2.png/v1/fill/w_400,h_240,al_c,q_85,enc_auto/b37fef_ade8b006d798481a89453869bbc7aee6~mv2.png"
+// Bundled alongside this file in the edge function deploy.
+const LOGO_PATH = new URL("./fd_logo.png", import.meta.url)
 
 // Brand colours (matching the LaTeX registration form).
 const C = {
@@ -120,17 +120,13 @@ function row(doc: jsPDF, y: number, label: string, value: unknown, altState: { a
   return y + blockH
 }
 
-async function fetchLogoDataUrl(): Promise<{ dataUrl: string; format: "PNG" | "JPEG" } | null> {
+async function loadLogoDataUrl(): Promise<{ dataUrl: string; format: "PNG" } | null> {
   try {
-    const res = await fetch(LOGO_URL)
-    if (!res.ok) return null
-    const buf = await res.arrayBuffer()
-    const ct = res.headers.get("content-type") ?? ""
-    const b64 = Buffer.from(buf).toString("base64")
-    if (ct.includes("jpeg") || ct.includes("jpg")) {
-      return { dataUrl: "data:image/jpeg;base64," + b64, format: "JPEG" }
+    const bytes = await Deno.readFile(LOGO_PATH)
+    return {
+      dataUrl: "data:image/png;base64," + Buffer.from(bytes).toString("base64"),
+      format:  "PNG",
     }
-    return { dataUrl: "data:image/png;base64," + b64, format: "PNG" }
   } catch {
     return null
   }
@@ -141,7 +137,7 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   const altState = { alt: false }
 
   // ── Header ────────────────────────────────────────────
-  const logo = await fetchLogoDataUrl()
+  const logo = await loadLogoDataUrl()
   let y = 8
 
   doc.setFontSize(7.5)
@@ -152,7 +148,13 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
 
   if (logo) {
     try {
-      const logoW = 38, logoH = 23
+      // Compute render dims from the source's natural aspect ratio so we
+      // don't squish wide logos into a narrow box.
+      const props = doc.getImageProperties(logo.dataUrl)
+      const maxW = 50, maxH = 24
+      const ratio = props.width / props.height
+      let logoW = maxW, logoH = maxW / ratio
+      if (logoH > maxH) { logoH = maxH; logoW = maxH * ratio }
       doc.addImage(logo.dataUrl, logo.format, (210 - logoW) / 2, y, logoW, logoH)
       y += logoH + 3
     } catch { y += 4 }
