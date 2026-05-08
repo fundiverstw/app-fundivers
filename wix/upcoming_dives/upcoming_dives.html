@@ -331,7 +331,7 @@
     panel.innerHTML = '';
     for (const r of (rooms || [])) {
       if (!r) continue;
-      const name = (r.display_name || r.title || '').trim();
+      const name = (r.display_title || r.admin_title || '').trim();
       const price = formatRoomAddedPrice(r);
       if (!name && !price) continue;
       panel.appendChild(makeSubfield(name, price, false));

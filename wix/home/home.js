@@ -23,7 +23,7 @@ $w.onReady(async function () {
 
   // Upcoming dives
   $w('#upcomingDives').onItemReady(($item, itemData) => {
-    $item('#diveTitle').text = itemData.title ?? '';
+    $item('#diveTitle').text = itemData.display_title ?? itemData.admin_title ?? '';
     $item('#diveBackground').src = itemData.featured_image ?? '';
     $item('#divePrice').text = itemData.starting_at != null ? `Starting at: ${parseInt(itemData.starting_at)}` : '';
     $item('#diveDay').text = itemData.start_date ?? '';
@@ -41,7 +41,7 @@ $w.onReady(async function () {
 
   // Upcoming courses
   $w('#upcomingCourses').onItemReady(($item, itemData) => {
-    $item('#courseTitle').text = itemData.course_title ?? '';
+    $item('#courseTitle').text = itemData.display_title ?? itemData.calendar_title ?? '';
     $item('#courseBackground').src = itemData.featured_image ?? '';
     $item('#coursePrice').text = itemData.starting_at != null ? `Starting at: ${parseInt(itemData.starting_at)}` : '';
     $item('#courseDate').text = itemData.start_date ?? '';

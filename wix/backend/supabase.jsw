@@ -83,10 +83,6 @@ export async function getUpcomingCourses(limit = 4) {
   }));
 }
 
-// Slug helpers — used by the legacy /dives/{slug} + /courses/{slug}
-// dynamic-page Velo code so old URLs still resolve to the right event
-// after the Wix datasets were retired. Slugs are derived the same way
-// the calendar used to build them: lowercase, non-alphanumeric → dash.
 function slugify(s) {
   return String(s || '')
     .toLowerCase()
@@ -94,39 +90,26 @@ function slugify(s) {
     .replace(/^-|-$/g, '');
 }
 
-/**
- * Find an EO_dive whose dive_title (or title) slugifies to the given slug.
- * Returns the row or null. Used by the legacy slug-based redirects.
- */
 export async function findDiveByTitleSlug(slug) {
   const target = slugify(slug);
   if (!target) return null;
   const key = await getKey();
   const dives = await fetchTable(key, 'EO_dives');
   return dives.find(d =>
-    slugify(d.dive_title) === target || slugify(d.title) === target
+    slugify(d.admin_title) === target || slugify(d.display_title) === target
   ) || null;
 }
 
-/**
- * Find an EO_course whose course_title (or title) slugifies to the given
- * slug. Returns the row or null.
- */
 export async function findCourseByTitleSlug(slug) {
   const target = slugify(slug);
   if (!target) return null;
   const key = await getKey();
   const courses = await fetchTable(key, 'EO_courses');
   return courses.find(c =>
-    slugify(c.course_title) === target || slugify(c.title) === target
+    slugify(c.display_title) === target || slugify(c.calendar_title) === target
   ) || null;
 }
 
-// Convert a wix:image://v1/<id>/<filename>#metadata identifier to a
-// public CDN URL (https://static.wixstatic.com/media/<id>). The actual
-// image bits still live in Wix Media — only the URL form changes.
-// Pass-through for anything that doesn't start with wix:image://, so
-// regular https:// URLs from Supabase / elsewhere work too.
 function wixImageToUrl(raw) {
   if (!raw) return '';
   const s = String(raw);
@@ -138,8 +121,6 @@ function wixImageToUrl(raw) {
     .join('/');
 }
 
-// Pulls the cert_levels rows once and indexes by id, so getDiveById /
-// getCourseById can resolve the prereq_cert_id FK to a display name.
 async function fetchCertMap(key) {
   const rows = await fetchTable(key, 'cert_levels');
   const map = {};
@@ -147,10 +128,6 @@ async function fetchCertMap(key) {
   return map;
 }
 
-// DiveTravel (included / not_included / transportation) and
-// cancellation_policies (cancelation_policy text) are joined onto each
-// EO_dives row via the EO_dives.DiveTravel_reference and
-// EO_dives.cancel_policy reference fields. Same pattern as fetchPriceMap.
 async function fetchTravelMap(key) {
   const rows = await fetchTable(key, 'DiveTravel');
   const map = {};
@@ -165,9 +142,6 @@ async function fetchCancellationMap(key) {
   return map;
 }
 
-// EO_rooms holds optional room upgrades (display_name, added_price,
-// added_price_display, currency). EO_prices.room_options points to the
-// rooms available for that price tier.
 async function fetchRoomMap(key) {
   const rows = await fetchTable(key, 'EO_rooms');
   const map = {};
@@ -175,41 +149,16 @@ async function fetchRoomMap(key) {
   return map;
 }
 
-// Resolves the EO_prices row backing a given EO_dives row. Mirrors the
-// flexible reference handling in resolveStartingAt — accepts a string
-// uuid, a JSON-encoded array/object, or a populated object.
-function resolvePriceRow(item, priceMap) {
-  if (item.EO_price_reference && priceMap[item.EO_price_reference]) {
-    return priceMap[item.EO_price_reference];
-  }
-  let price = item.price;
-  if (typeof price === 'string') {
-    try { price = JSON.parse(price); } catch (_) { /* plain id */ }
-  }
-  const ref = Array.isArray(price) ? price[0] : price;
-  if (!ref) return null;
-  if (typeof ref === 'object') return priceMap[ref._id || ref.id] || ref;
-  return priceMap[ref] || null;
+function resolveRoomOptions(item, roomMap) {
+  const raw = item.room_types;
+  if (!raw || typeof raw !== 'string') return [];
+  return raw.split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(id => roomMap[id])
+    .filter(Boolean);
 }
 
-// Given an EO_dives row, returns its available room upgrades —
-// [{ _id, display_name, added_price, added_price_display, currency }]
-// — by following price → room_options → EO_rooms. Empty array when the
-// dive has no price tier or no room upgrades configured.
-function resolveRoomOptions(item, priceMap, roomMap) {
-  const priceRow = resolvePriceRow(item, priceMap);
-  if (!priceRow) return [];
-  let ids = priceRow.room_options;
-  if (typeof ids === 'string') {
-    try { ids = JSON.parse(ids); } catch (_) { ids = []; }
-  }
-  if (!Array.isArray(ids)) return [];
-  return ids.map(id => roomMap[id]).filter(Boolean);
-}
-
-// Reference fields on Supabase rows can show up as a uuid string, a
-// JSON-encoded array/object (legacy Wix multi-ref shape), or a plain
-// object with _id/id. Normalize all of them down to the target row id.
 function resolveRefId(raw) {
   if (raw == null || raw === '') return null;
   let v = raw;
@@ -227,14 +176,6 @@ function resolveRefId(raw) {
   return v._id || v.id || null;
 }
 
-// Combines the structured cert level with the legacy free-text prereqs
-// note. Returns the display string the Wix iframe should show in the
-// Prerequisites subfield. Either, both, or neither are acceptable inputs.
-//
-// Legacy compat: some rows still have a cert UUID in the free-text
-// `prereqs` column (admins typed it there before the structured FK
-// existed). If we can resolve `prereqs` to a known cert id, treat it
-// as one — same fallback the backfill migration applied DB-side.
 function buildPrereqsText(item, certMap) {
   let cert = item.prereq_cert_id ? certMap[item.prereq_cert_id] : null;
   let note = (item.prereqs || '').trim();
@@ -247,12 +188,6 @@ function buildPrereqsText(item, certMap) {
   return certName || note || '';
 }
 
-/**
- * Fetch a single EO_dive by _id with starting_at joined from EO_prices
- * and the prereq_cert_id resolved to a display name. Used by the
- * /upcoming-dives?id=<uuid> detail page so the iframe gets every field
- * it needs in one round-trip.
- */
 export async function getDiveById(id) {
   if (!id) return null;
   const key = await getKey();
@@ -278,23 +213,15 @@ export async function getDiveById(id) {
     not_included: travel?.not_included || '',
     transportation: travel?.transportation || '',
     cancellation_policy: cancellation?.cancelation_policy || '',
-    // Long-form copy from the DiveTravel row. tagline_text and itinerary
-    // are plain text already; description and details are Wix HTML and
-    // get stripped to plain text on the Velo page (closer to the data,
-    // keeps the iframe simple).
     tagline_text: travel?.tagline_text || '',
     description: travel?.description || '',
     itinerary: travel?.itinerary || '',
     details: travel?.details || '',
-    // Trip-level picture (separate from the dive's own featured_image)
-    // — converted from wix:image:// to the public CDN URL.
     picture: wixImageToUrl(travel?.picture),
-    // Optional room upgrades for the dive's price tier.
-    room_options: resolveRoomOptions(dive, priceMap, roomMap),
+    room_options: resolveRoomOptions(dive, roomMap),
   };
 }
 
-/** Course equivalent of getDiveById. */
 export async function getCourseById(id) {
   if (!id) return null;
   const key = await getKey();
@@ -330,7 +257,7 @@ export async function getCalendarEvents() {
     if (!item.start_date) return [];
     const base = {
       id: item._id || item.id,
-      title: item.title || item.course_type || 'Course',
+      title: item.calendar_title || '',
       type: 'course',
       featured: item.featured || false,
       starting_at: resolveStartingAt(item, priceMap),
@@ -378,7 +305,7 @@ export async function getCalendarEvents() {
       id: item._id || item.id,
       start_date: start.toISOString().split('T')[0],
       end_date:   end.toISOString().split('T')[0],
-      title:      item.title || item.dive_site || 'Dive',
+      title:      item.calendar_title || '',
       type:       'dive',
       url:        item['link-eo-dives-dive_title'] || '',
       featured:   item.featured || false,
