@@ -223,6 +223,26 @@ export interface Database {
         }
         Relationships: []
       }
+      booking_amendments: {
+        Row: {
+          id: string
+          booking_id: string
+          amount: number
+          note: string
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          booking_id: string
+          amount: number
+          note: string
+          created_by: string
+          created_at?: string
+        }
+        Update: never
+        Relationships: []
+      }
       payments: {
         Row: {
           id: string
@@ -823,6 +843,8 @@ export interface Database {
 export type Profile = Database['public']['Tables']['profiles']['Row']
 export type Booking = Database['public']['Tables']['bookings']['Row']
 export type Payment = Database['public']['Tables']['payments']['Row']
+export type BookingAmendment = Database['public']['Tables']['booking_amendments']['Row']
+export type BookingAmendmentInsert = Database['public']['Tables']['booking_amendments']['Insert']
 export type EODive = Database['public']['Tables']['EO_dives']['Row']
 export type EOCourse = Database['public']['Tables']['EO_courses']['Row']
 export type EOPrice = Database['public']['Tables']['EO_prices']['Row']
