@@ -297,7 +297,6 @@ let visibleTypes = { course: true, dive: true };
 
 const monthNames=["January","February","March","April","May","June","July","August","September","October","November","December"];
 const dayNames=["S","M","T","W","T","F","S"];
-const siteBaseUrl = "https://www.fundiverstw.com";
 
 window.addEventListener("message", e=>{
   allEvents = e.data || [];
@@ -642,9 +641,7 @@ function showEventDetail(ev){
     : NaN;
   detailPrice.textContent = isNaN(priceValue) ? 'Contact for pricing' : `Starting at ${priceValue} NTD`;
 
-  const detailsSlug = ev.type === 'dive' ? 'upcoming-dives' : 'upcoming-courses';
-  const detailsUrl = siteBaseUrl + "/" + detailsSlug + "?id=" + encodeURIComponent(ev.id);
-  detailLink.onclick = () => window.open(detailsUrl, "_blank");
+  detailLink.onclick = () => window.parent.postMessage({ type: 'details_event', eventId: ev.id, eventType: ev.type }, '*');
   detailLink.classList.remove("hidden");
 
   bookLink.onclick = () => window.parent.postMessage({ type: 'book_event', eventId: ev.id, eventType: ev.type }, '*');
