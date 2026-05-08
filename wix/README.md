@@ -55,7 +55,7 @@ does **nothing** — Wix is still serving the previously pasted copy.
 - `backend/` — Velo backend modules
   - `supabase.jsw` — every Supabase REST read used by the Wix site,
     plus the reference-flattening helpers (`resolveStartingAt`,
-    `resolvePriceRow`, `wixImageToUrl`, etc.)
+    `resolveRefId`, `resolveRoomOptions`, `wixImageToUrl`, etc.)
   - `sendRegistrationPdf.web.js` — emails the registration PDF on
     submit (jspdf + nodemailer; needs Wix secrets `GMAIL_USER` and
     `GMAIL_APP_PASSWORD`)
@@ -95,8 +95,8 @@ are off-limits, so each iframe communicates with its host page via
 `docs/data-model.md`). Foreign keys are sometimes uuid strings,
 sometimes JSON-encoded arrays, sometimes populated objects.
 `backend/supabase.jsw` already handles all three shapes via
-`resolveRefId` and `resolvePriceRow` — keep using those helpers when
-adding new joins rather than re-implementing the parsing.
+`resolveRefId` — keep using that helper when adding new joins rather
+than re-implementing the parsing.
 
 `featured_image` and `picture` columns hold either `wix:image://v1/...`
 identifiers (legacy, written by Wix when the row originated there) or
