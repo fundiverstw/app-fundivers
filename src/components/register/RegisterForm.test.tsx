@@ -173,7 +173,7 @@ describe('RegisterForm', () => {
     await user.click(await screen.findByLabelText(/wetsuit/i))
 
     // Transport, Nitrox course, one add-on
-    await user.click(screen.getByLabelText(/need transportation/i))
+    await user.click(screen.getByLabelText(/ride with the shop/i))
     await user.click(screen.getByLabelText(/add nitrox course/i))
     await user.click(screen.getByLabelText(/SMB 1 Day/i))
 
@@ -218,9 +218,9 @@ describe('RegisterForm', () => {
     expect(screen.queryByText(/^add-ons$/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/add nitrox course/i)).not.toBeInTheDocument()
     // Transport is included in base price for this event (transport_price = null)
-    // → no opt-in checkbox; instead the "included" copy is shown.
-    expect(screen.queryByLabelText(/need transportation/i)).not.toBeInTheDocument()
-    expect(screen.getByText(/transportation included in base price/i)).toBeInTheDocument()
+    // → the "Ride with the shop" radio shows an "Included in base price" sub-label.
+    expect(screen.getByLabelText(/ride with the shop/i)).toBeInTheDocument()
+    expect(screen.getByText(/included in base price/i)).toBeInTheDocument()
   })
 
   it('prefills a-la-carte rental list with items the diver does NOT already own', async () => {
@@ -383,8 +383,8 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
-    expect(screen.queryByLabelText(/need transportation/i)).not.toBeInTheDocument()
-    expect(screen.getByText(/transportation included in base price/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/ride with the shop/i)).toBeInTheDocument()
+    expect(screen.getByText(/included in base price/i)).toBeInTheDocument()
 
     // Confirm submit and assert the cost row excludes a transport line.
     await user.click(screen.getByRole('button', { name: /next/i }))
@@ -407,10 +407,10 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
-    // Checkbox visible with the per-tier price (1300).
-    const checkbox = screen.getByLabelText(/need transportation/i)
-    expect(checkbox).toBeInTheDocument()
-    await user.click(checkbox)
+    // "Ride with the shop" radio visible with the per-tier price (1300).
+    const rideRadio = screen.getByLabelText(/ride with the shop/i)
+    expect(rideRadio).toBeInTheDocument()
+    await user.click(rideRadio)
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
     await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
@@ -481,9 +481,10 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
-    // Default = bank_transfer → bank-details block.
-    expect(screen.getByText(/how to pay — bank transfer/i)).toBeInTheDocument()
-    expect(screen.getByText(/account number/i)).toBeInTheDocument()
+    // Default = bank_transfer → local bank-details block.
+    expect(screen.getByText(/how to pay — local bank transfer/i)).toBeInTheDocument()
+    expect(screen.getByText(/code:/i)).toBeInTheDocument()
+    expect(screen.getByText(/branch:/i)).toBeInTheDocument()
 
     // Switch to credit card → PayPal-email copy.
     await user.click(screen.getByLabelText(/credit card via paypal/i))
@@ -508,15 +509,15 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
-    // The summary line is always present and uses the admin-set dates.
-    expect(screen.getByText(/Pay by/i)).toBeInTheDocument()
-    expect(screen.getByText(/Apr 1/)).toBeInTheDocument()      // deposit_deadline
+    // Deposit is always due ASAP; only the balance carries the admin date.
+    expect(screen.getByText((_, el) =>
+      el?.tagName === 'P' && /pay deposit\s+ASAP\s+to hold your spot/i.test(el.textContent ?? '')
+    )).toBeInTheDocument()
     expect(screen.getByText(/May 8/)).toBeInTheDocument()      // full_payment_deadline
-    expect(screen.getByText(/hold your spot/i)).toBeInTheDocument()
 
     // Default is "Pay full amount now" → no per-amount breakdown.
     expect(screen.getByLabelText(/pay full amount now/i)).toBeChecked()
-    expect(screen.queryByText(/pay deposit by/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/pay remaining balance by/i)).not.toBeInTheDocument()
   })
 
   it('selecting "deposit only" persists the flag and renders the two-amount breakdown', async () => {
@@ -532,9 +533,13 @@ describe('RegisterForm', () => {
 
     await user.click(screen.getByLabelText(/pay deposit only/i))
 
-    // Two extra lines appear under the summary, with deposit and remaining amounts.
-    expect(screen.getByText(/pay deposit by/i)).toBeInTheDocument()
-    expect(screen.getByText(/pay remaining amount by/i)).toBeInTheDocument()
+    // Two extra lines appear under the summary: deposit ASAP and balance with date.
+    expect(screen.getByText((_, el) =>
+      el?.tagName === 'P' && /pay deposit\s+ASAP\s*:/i.test(el.textContent ?? '')
+    )).toBeInTheDocument()
+    expect(screen.getByText((_, el) =>
+      el?.tagName === 'P' && /pay remaining balance by/i.test(el.textContent ?? '')
+    )).toBeInTheDocument()
     // total 2800, deposit 1000 → remaining 1800
     expect(screen.getByText(/1,800/)).toBeInTheDocument()
 

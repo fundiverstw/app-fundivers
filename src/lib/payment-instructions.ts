@@ -7,10 +7,10 @@
 export const SHOP_PHONE   = '+886 909-083-683'
 export const SHOP_ADDRESS = 'No. 8, Heping St, Yonghe District, New Taipei City, 23446'
 
-// Placeholders — replace with real values when the shop confirms them.
-export const BANK_ACCOUNT_NAME   = '[Account name — TBD]'
-export const BANK_NAME           = '[Bank name — TBD]'
-export const BANK_ACCOUNT_NUMBER = '[Account number — TBD]'
+export const BANK_CODE           = '822'
+export const BANK_ACCOUNT_NUMBER = '1305 4100 1904'
+export const BANK_ACCOUNT_NAME   = 'Wong, Dennis'
+export const BANK_BRANCH         = 'Shuang He'
 
 export type PaymentMethod = 'bank_transfer' | 'credit_card' | 'cash'
 
@@ -32,12 +32,12 @@ export function paymentInstructionsFor(method: PaymentMethod): PaymentInstructio
       }
     case 'bank_transfer':
       return {
-        title: 'How to pay — Bank transfer',
+        title: 'How to pay — Local bank transfer',
         lines: [
-          'Transfer to the shop\'s bank account:',
-          `Account name: ${BANK_ACCOUNT_NAME}`,
-          `Bank: ${BANK_NAME}`,
-          `Account number: ${BANK_ACCOUNT_NUMBER}`,
+          `Code: ${BANK_CODE}`,
+          `Account: ${BANK_ACCOUNT_NUMBER}`,
+          `Name: ${BANK_ACCOUNT_NAME}`,
+          `Branch: ${BANK_BRANCH}`,
         ],
       }
     case 'credit_card':
