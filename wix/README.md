@@ -56,9 +56,6 @@ does **nothing** — Wix is still serving the previously pasted copy.
   - `supabase.jsw` — every Supabase REST read used by the Wix site,
     plus the reference-flattening helpers (`resolveStartingAt`,
     `resolveRefId`, `resolveRoomOptions`, `wixImageToUrl`, etc.)
-  - `sendRegistrationPdf.web.js` — emails the registration PDF on
-    submit (jspdf + nodemailer; needs Wix secrets `GMAIL_USER` and
-    `GMAIL_APP_PASSWORD`)
   - `sendRequest.web.js` — try-dive / course-info request emails
 - `calendar/` — desktop and mobile calendar HTML elements + the Velo
   page script that wires them up. Receives events from
