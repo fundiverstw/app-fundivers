@@ -1,0 +1,616 @@
+<!-- calendar -->
+<div style="display:flex; flex-direction:column; align-items:center; gap:0.35rem; width:100%; max-width:100%; overflow-x:hidden; box-sizing:border-box; padding:0 12px;">
+
+  <div id="calendarNav" style="display:flex; align-items:center; justify-content:center; gap:1.25rem; margin-bottom:4px; flex-wrap:wrap; padding:10px; overflow:visible;">
+    <button id="prevMonth" class="nav-arrow" type="button" aria-label="Previous month">◀</button>
+    <div id="colorLegend" style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+      <div class="legend-item" data-type="course" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+        <div class="legend-color course"></div>
+        <span>Courses</span>
+      </div>
+      <div class="legend-item" data-type="dive" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+        <div class="legend-color dive"></div>
+        <span>Dives</span>
+      </div>
+    </div>
+    <button id="nextMonth" class="nav-arrow" type="button" aria-label="Next month">▶</button>
+  </div>
+
+  <div id="calendarContainer" style="width:100%; max-width:1200px;"></div>
+</div>
+
+<div id="eventDetailModal">
+  <button id="closeDetail" class="close-btn">×</button>
+  <h3 id="detailTitle"></h3>
+  <div class="modal-content">
+    <div class="modal-item date-item">
+      <span id="detailDate"></span>
+    </div>
+    <div class="modal-item price-item">
+      <span id="detailPrice"></span>
+    </div>
+    <div class="modal-item">
+      <button id="detailLink" class="modal-btn details-btn">DETAILS</button>
+    </div>
+    <div class="modal-item">
+      <button id="bookLink" class="modal-btn book-btn">BOOK NOW</button>
+    </div>
+  </div>
+</div>
+
+<style>
+body { font-family:"Segoe UI",sans-serif; margin:0; padding:1rem; background:transparent; color:#333; overflow-x:hidden; }
+#calendarContainer { display:flex; flex-wrap:wrap; gap:1rem; justify-content:center; max-width:100%; box-sizing:border-box; }
+.month { border:1px solid rgba(0,0,0,0.2); border-radius:10px; background:rgba(255,255,255,0.2); backdrop-filter:blur(8px); padding:8px; overflow:visible; min-width:250px; flex:1; max-width:100%; box-sizing:border-box; }
+.month-name { text-align:center; font-weight:bold; font-size:1.1rem; margin-bottom:6px; color:#333; }
+.days { display:grid; grid-template-columns:repeat(7,1fr); gap:1px; position:relative; overflow:visible; background:rgba(0,0,0,0.08); }
+.day { border:none; position:relative; font-size:11px; cursor:pointer; background:rgba(255,255,255,0.25); overflow:visible; display:flex; flex-direction:column; height:140px; z-index:1; }
+.day.has-multi-day { z-index:2; }
+.day-header { background:rgba(255,255,255,0.35); font-weight:bold; display:flex; align-items:center; justify-content:center; height:32px; color:#333; }
+.date { position:absolute; top:2px; left:2px; font-size:0.75rem; color:#333; font-weight:bold; z-index:20; }
+.event { position:absolute; left:0; right:0; height:28px; margin:2px 0; border-radius:4px; font-size:0.85rem; color:#fff; padding:0; cursor:pointer; z-index:15; overflow:visible; }
+.event > span { position:absolute; left:0; right:0; top:0; bottom:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; color:#fff; font-size:0.85rem; cursor:pointer; line-height:28px; padding-left:8px; padding-right:4px; box-sizing:border-box; }
+.event.course { background:#4a90e2; }
+.event.dive { background:#2ecc71; }
+.event.featured { 
+  background: linear-gradient(135deg, #ffd700 0%, #f0c000 100%);
+  border: 2px solid #c0c0c0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.3) inset;
+}
+.event.featured.course { 
+  background: linear-gradient(135deg, #ffd700 0%, #f0c000 100%);
+  border: 2px solid #c0c0c0;
+}
+.event.featured.dive { 
+  background: linear-gradient(135deg, #ffd700 0%, #f0c000 100%);
+  border: 2px solid #c0c0c0;
+}
+.event.featured > span {
+  color: #b22222 !important;
+  font-weight: 700;
+  text-shadow: 0 0 1px rgba(139,0,0,0.4), 0 1px 2px rgba(0,0,0,0.15);
+  letter-spacing: 0.02em;
+}
+
+.nav-arrow {
+  width:40px; height:40px;
+  border-radius:50%;
+  border:2px solid rgba(0,0,0,0.25);
+  background:rgba(255,255,255,0.6);
+  color:#333;
+  font-size:1rem;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:background 0.2s, border-color 0.2s, transform 0.15s;
+}
+.nav-arrow:hover {
+  background:rgba(255,255,255,0.9);
+  border-color:rgba(0,0,0,0.4);
+  transform:scale(1.08);
+}
+.nav-arrow:active { transform:scale(0.96); }
+
+.legend-item { transition:opacity 0.2s; color:#333; }
+.legend-item:hover { opacity:0.8; }
+.legend-item.disabled { opacity:0.4; }
+.legend-item.disabled .legend-color { opacity:0.5; }
+.legend-color { width:20px; height:20px; border-radius:4px; transition:opacity 0.2s; }
+.legend-color.course { background:#4a90e2; }
+.legend-color.dive { background:#2ecc71; }
+.event.hidden { display:none; }
+.event.multi-day.start { border-top-left-radius:4px; border-bottom-left-radius:4px; border-top-right-radius:0; border-bottom-right-radius:0; right:-1px; }
+.event.multi-day.middle { border-radius:0; left:-1px; right:-1px; }
+.event.multi-day.end { border-top-right-radius:4px; border-bottom-right-radius:4px; border-top-left-radius:0; border-bottom-left-radius:0; left:-1px; }
+.event.featured.multi-day.start { border-right:none; box-shadow:none; background:#ffd700; }
+.event.featured.multi-day.middle { border-left:none; border-right:none; box-shadow:none; background:#ffd700; }
+.event.featured.multi-day.end { border-left:none; box-shadow:none; background:#ffd700; }
+
+#eventDetailModal { 
+  display:none; 
+  position:fixed; 
+  top:50%; 
+  left:50%; 
+  transform:translate(-50%,-50%); 
+  width:85%; 
+  max-width:450px; 
+  background:linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%);
+  border-radius:16px; 
+  padding:2rem; 
+  z-index:9999; 
+  box-shadow:0 10px 40px rgba(0,0,0,0.2), 0 0 0 1px rgba(0,0,0,0.05);
+}
+#eventDetailModal .close-btn {
+  position:absolute;
+  top:12px;
+  right:12px;
+  background:rgba(0,0,0,0.05);
+  border:none;
+  font-size:24px;
+  line-height:1;
+  color:#666;
+  cursor:pointer;
+  padding:0;
+  width:32px;
+  height:32px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:50%;
+  transition:all 0.2s ease;
+  font-weight:300;
+}
+#eventDetailModal .close-btn:hover {
+  background:rgba(0,0,0,0.1);
+  color:#333;
+  transform:rotate(90deg);
+}
+#eventDetailModal h3 {
+  margin:0 0 0.75rem 0;
+  font-size:1.75rem;
+  font-weight:700;
+  color:#1a1a1a;
+  padding-right:40px;
+  line-height:1.3;
+}
+#eventDetailModal .modal-content {
+  display:flex;
+  flex-direction:column;
+  gap:1.25rem;
+}
+#eventDetailModal .modal-item {
+  display:flex;
+  flex-direction:column;
+}
+#eventDetailModal .modal-item.date-item {
+  padding:0;
+  background:none;
+  border-radius:0;
+}
+#eventDetailModal #detailDate {
+  color:#000000;
+  font-size:0.9rem;
+  font-weight:400;
+  text-align:left;
+  letter-spacing:0;
+}
+#eventDetailModal .modal-item.price-item {
+  padding:0;
+  background:none;
+  border-radius:0;
+}
+#eventDetailModal #detailPrice {
+  color:#000000;
+  font-size:0.9rem;
+  font-weight:400;
+  text-align:left;
+  letter-spacing:0;
+}
+#eventDetailModal .modal-btn {
+  width:100%;
+  padding:14px 24px;
+  border:none;
+  border-radius:10px;
+  font-size:1rem;
+  font-weight:700;
+  cursor:pointer;
+  transition:all 0.3s ease;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  box-shadow:0 4px 15px rgba(0,0,0,0.2);
+  position:relative;
+  overflow:hidden;
+}
+#eventDetailModal .modal-btn::before {
+  content:'';
+  position:absolute;
+  top:50%;
+  left:50%;
+  width:0;
+  height:0;
+  border-radius:50%;
+  background:rgba(255,255,255,0.3);
+  transform:translate(-50%,-50%);
+  transition:width 0.6s, height 0.6s;
+}
+#eventDetailModal .modal-btn:hover::before {
+  width:300px;
+  height:300px;
+}
+#eventDetailModal .modal-btn:hover {
+  transform:translateY(-2px);
+  box-shadow:0 6px 20px rgba(0,0,0,0.3);
+}
+#eventDetailModal .modal-btn:active {
+  transform:translateY(0);
+  box-shadow:0 2px 10px rgba(0,0,0,0.2);
+}
+#eventDetailModal .details-btn {
+  background:linear-gradient(135deg, #20b2aa 0%, #17a2b8 100%);
+  color:#ffffff;
+}
+#eventDetailModal .details-btn:hover {
+  background:linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+}
+#eventDetailModal .book-btn {
+  background:linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+  color:#ffffff;
+}
+#eventDetailModal .book-btn:hover {
+  background:linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+}
+#eventDetailModal #detailLink.hidden,
+#eventDetailModal #bookLink.hidden {
+  display:none;
+}
+</style>
+
+<script>
+let allEvents = [];
+let currentMonth = new Date().getMonth();
+let currentYear = new Date().getFullYear();
+let visibleTypes = { course: true, dive: true };
+
+const monthNames=["January","February","March","April","May","June","July","August","September","October","November","December"];
+const dayNames=["S","M","T","W","T","F","S"];
+const siteBaseUrl = "https://www.fundiverstw.com";
+
+window.addEventListener("message", e=>{
+  allEvents = e.data || [];
+  buildCalendar();
+});
+
+function init() {
+  buildCalendar();
+  setupLegendToggles();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+
+function setupLegendToggles() {
+  document.querySelectorAll('.legend-item').forEach(item => {
+    item.addEventListener('click', function() {
+      const type = this.getAttribute('data-type');
+      visibleTypes[type] = !visibleTypes[type];
+      this.classList.toggle('disabled', !visibleTypes[type]);
+      document.querySelectorAll(`.event.${type}`).forEach(event => {
+        event.classList.toggle('hidden', !visibleTypes[type]);
+      });
+    });
+  });
+}
+
+document.getElementById("prevMonth").addEventListener("click", ()=>{
+  currentMonth--;
+  if(currentMonth<0){ currentMonth=11; currentYear--; }
+  buildCalendar();
+});
+document.getElementById("nextMonth").addEventListener("click", ()=>{
+  currentMonth++;
+  if(currentMonth>11){ currentMonth=0; currentYear++; }
+  buildCalendar();
+});
+
+function buildCalendar(){
+  const container = document.getElementById("calendarContainer");
+  container.innerHTML="";
+  buildMonth(container, currentMonth, currentYear);
+  setTimeout(adjustMultiDayTextWidths, 100);
+}
+
+function adjustMultiDayTextWidths() {
+  const GAP = 1;
+  const PADDING = 4;
+  const TEXT_STYLES = {
+    position: 'absolute',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    color: '#fff',
+    fontSize: '0.85rem',
+    zIndex: '20',
+    cursor: 'pointer',
+    pointerEvents: 'auto',
+    height: '28px',
+    lineHeight: '28px',
+    minWidth: '0',
+    paddingLeft: '8px',
+    paddingRight: '4px',
+    boxSizing: 'border-box'
+  };
+  
+  document.querySelectorAll('.event > span').forEach(span => {
+    const eventDiv = span.parentElement;
+    const dayDiv = eventDiv.parentElement;
+    const daysGrid = dayDiv?.closest('.days');
+    if (!daysGrid || !dayDiv?.classList.contains('day')) return;
+    
+    const dayCount = parseInt(eventDiv.getAttribute('data-day-count')) || 1;
+    const dayRect = dayDiv.getBoundingClientRect();
+    const gridRect = daysGrid.getBoundingClientRect();
+    const eventRect = eventDiv.getBoundingClientRect();
+
+    const dayWidth = dayRect.width;
+    if (!dayWidth) return;
+
+    const colIndex = Math.round((dayRect.left - gridRect.left) / dayWidth);
+    const daysLeftInRow = 7 - (colIndex % 7);
+    const effectiveDayCount = Math.min(dayCount, daysLeftInRow);
+
+    const totalWidth = effectiveDayCount > 1
+      ? (dayWidth * effectiveDayCount) + (GAP * (effectiveDayCount - 1)) + 4
+      : dayWidth;
+    
+    const isFeatured = eventDiv.classList.contains('featured');
+    const textStyles = { ...TEXT_STYLES };
+    if (isFeatured) {
+      textStyles.color = '#b22222';
+      textStyles.fontWeight = '700';
+    }
+    
+    Object.assign(span.style, textStyles, {
+      left: `${dayRect.left - gridRect.left + 2}px`,
+      top: `${eventRect.top - gridRect.top}px`,
+      width: `${totalWidth - PADDING}px`,
+      maxWidth: `${totalWidth - PADDING}px`
+    });
+    
+    span.addEventListener('click', (e) => {
+      e.stopPropagation();
+      eventDiv.click();
+    });
+    
+    eventDiv.removeChild(span);
+    daysGrid.appendChild(span);
+  });
+}
+
+function buildMonth(container, monthIndex, year){
+  const monthDiv = document.createElement("div");
+  monthDiv.className="month";
+
+  const title = document.createElement("div");
+  title.className="month-name";
+  title.textContent = `${monthNames[monthIndex]} ${year}`;
+  monthDiv.appendChild(title);
+
+  const daysDiv = document.createElement("div");
+  daysDiv.className="days";
+
+  dayNames.forEach(dn=>{
+    const dh = document.createElement("div");
+    dh.className="day day-header";
+    dh.textContent = dn;
+    daysDiv.appendChild(dh);
+  });
+
+  const firstDay = new Date(year, monthIndex, 1).getDay();
+  const daysInMonth = new Date(year, monthIndex+1, 0).getDate();
+  const dayCells = [];
+
+  for(let i=0;i<firstDay;i++){
+    const blank = document.createElement("div");
+    blank.className="day";
+    daysDiv.appendChild(blank);
+    dayCells.push(blank);
+  }
+
+  for(let d=1; d<=daysInMonth; d++){
+    const dayDiv = document.createElement("div");
+    dayDiv.className="day";
+    const dateDiv = document.createElement("div");
+    dateDiv.className="date";
+    dateDiv.textContent=d;
+    dayDiv.appendChild(dateDiv);
+    daysDiv.appendChild(dayDiv);
+    dayCells.push(dayDiv);
+  }
+
+  const eventsInMonth = [];
+  allEvents.forEach(ev=>{
+    const evStart = parseDateStr(ev.start_date);
+    const evEnd = parseDateStr(ev.end_date) || parseDateStr(ev.start_date);
+
+    if(evEnd < new Date(year, monthIndex, 1) || evStart > new Date(year, monthIndex, daysInMonth)) return;
+
+    const startDay = Math.max(1, evStart.getDate());
+    const endDay = Math.min(daysInMonth, evEnd.getDate());
+
+    eventsInMonth.push({
+      event: ev,
+      startDay: startDay,
+      endDay: endDay,
+      track: -1
+    });
+  });
+
+  function darkenColor(hex, amount) {
+    hex = hex.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    const newR = Math.max(0, Math.floor(r * (1 - amount)));
+    const newG = Math.max(0, Math.floor(g * (1 - amount)));
+    const newB = Math.max(0, Math.floor(b * (1 - amount)));
+    return '#' + [newR, newG, newB].map(x => {
+      const hex = x.toString(16);
+      return hex.length === 1 ? '0' + hex : hex;
+    }).join('');
+  }
+
+  eventsInMonth.forEach(eventData => {
+    const { startDay, endDay } = eventData;
+    let track = 0;
+    
+    while (true) {
+      let conflict = false;
+      for (const other of eventsInMonth) {
+        if (other.track === track && other !== eventData) {
+          if (!(endDay < other.startDay || startDay > other.endDay)) {
+            conflict = true;
+            break;
+          }
+        }
+      }
+      if (!conflict) {
+        eventData.track = track;
+        break;
+      }
+      track++;
+    }
+  });
+
+  eventsInMonth.forEach(eventData => {
+    const { event: ev, startDay, endDay, track } = eventData;
+    
+    const overlappingSameType = eventsInMonth.filter(other => {
+      return other.event.type === ev.type && 
+             other !== eventData &&
+             !(endDay < other.startDay || startDay > other.endDay);
+    });
+    
+    const allOverlapping = [eventData, ...overlappingSameType].sort((a, b) => a.track - b.track);
+    const shadeIndex = allOverlapping.findIndex(ed => ed === eventData);
+    
+    eventData.shadeIndex = shadeIndex;
+  });
+
+  eventsInMonth.forEach(eventData => {
+    const { event: ev, startDay, endDay, track } = eventData;
+    
+    const isMultiDay = startDay !== endDay;
+    
+    if(isMultiDay) {
+      for(let d=startDay; d<=endDay; d++){
+        const dayDiv = dayCells[firstDay + d -1];
+        if(dayDiv) dayDiv.classList.add("has-multi-day");
+      }
+    }
+    
+    for(let d=startDay; d<=endDay; d++){
+      const dayDiv = dayCells[firstDay + d -1];
+      if(!dayDiv) continue;
+
+      const evDiv = document.createElement("div");
+      evDiv.className = `event ${ev.type}${ev.featured ? ' featured' : ''}`;
+      
+      const shadeIndex = eventData.shadeIndex || 0;
+      
+      const baseColors = {
+        course: '#4a90e2',
+        dive: '#2ecc71'
+      };
+      
+      if (baseColors[ev.type] && !ev.featured) {
+        const darkenAmount = Math.min(shadeIndex * 0.12, 0.6);
+        const darkerColor = darkenColor(baseColors[ev.type], darkenAmount);
+        evDiv.style.backgroundColor = darkerColor;
+      }
+      
+      if(isMultiDay) {
+        if(d === startDay) {
+          evDiv.classList.add("multi-day", "start");
+        } else if(d === endDay) {
+          evDiv.classList.add("multi-day", "end");
+        } else {
+          evDiv.classList.add("multi-day", "middle");
+        }
+      }
+      
+      if(d === startDay || !isMultiDay) {
+        const textSpan = document.createElement("span");
+        textSpan.textContent = ev.title;
+        if (ev.featured) {
+          textSpan.style.color = '#b22222';
+          textSpan.style.fontWeight = '700';
+        }
+        evDiv.appendChild(textSpan);
+        evDiv.title = ev.title;
+        if(isMultiDay && d === startDay) {
+          evDiv.setAttribute('data-day-count', endDay - startDay + 1);
+        }
+      } else {
+        evDiv.title = ev.title;
+      }
+
+      const topOffset = 20 + track * 30;
+      evDiv.style.top = `${topOffset}px`;
+
+      evDiv.addEventListener("click", ()=>showEventDetail(ev));
+      dayDiv.appendChild(evDiv);
+    }
+  });
+
+  monthDiv.appendChild(daysDiv);
+  container.appendChild(monthDiv);
+}
+
+const eventDetailModal = document.getElementById("eventDetailModal");
+const detailTitle = document.getElementById("detailTitle");
+const detailDate = document.getElementById("detailDate");
+const detailPrice = document.getElementById("detailPrice");
+const detailLink = document.getElementById("detailLink");
+const bookLink = document.getElementById("bookLink");
+document.getElementById("closeDetail").addEventListener("click", ()=>eventDetailModal.style.display="none");
+
+eventDetailModal.addEventListener("click", (e)=>{
+  if(e.target === eventDetailModal){
+    eventDetailModal.style.display="none";
+  }
+});
+
+function parseDateStr(str) {
+  if (!str) return null;
+  const [y, m, d] = str.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function formatDate(dateString) {
+  if (!dateString) return "";
+  const date = parseDateStr(dateString);
+  const options = { year: 'numeric', month: 'long', day: 'numeric' };
+  return date.toLocaleDateString('en-US', options);
+}
+
+function showEventDetail(ev){
+  detailTitle.textContent = ev.title;
+  
+  let dateText = formatDate(ev.start_date);
+  if(ev.end_date && ev.end_date !== ev.start_date) {
+    dateText += " → " + formatDate(ev.end_date);
+  }
+  detailDate.textContent = dateText;
+  
+  if(ev.starting_at) {
+    const priceValue = typeof ev.starting_at === 'number' ? ev.starting_at : parseInt(ev.starting_at);
+    if (!isNaN(priceValue)) {
+      detailPrice.textContent = `Starting at ${priceValue} NTD`;
+      detailPrice.style.display = 'block';
+    } else {
+      detailPrice.textContent = 'Contact for pricing';
+      detailPrice.style.display = 'block';
+    }
+  } else {
+    detailPrice.textContent = 'Contact for pricing';
+    detailPrice.style.display = 'block';
+  }
+  
+  // Details opens the Wix detail page in a new tab. The page is static
+  // (Wix SEO URL config only accepts letters/numbers/dashes — no path
+  // parameters), so the event id rides as a ?id= query string.
+  const detailsSlug = ev.type === 'dive' ? 'upcoming-dives' : 'upcoming-courses';
+  const detailsUrl = siteBaseUrl + "/" + detailsSlug + "?id=" + encodeURIComponent(ev.id);
+  detailLink.onclick = () => window.open(detailsUrl, "_blank");
+  detailLink.classList.remove("hidden");
+  
+  bookLink.onclick = () => window.parent.postMessage({ type: 'book_event', eventId: ev.id, eventType: ev.type }, '*');
+  bookLink.classList.remove("hidden");
+
+  eventDetailModal.style.display="block";
+}
+</script>

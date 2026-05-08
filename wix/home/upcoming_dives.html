@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: transparent; padding: 8px; margin: 0; width: 100%; overflow: hidden; box-sizing: border-box; }
+
+  .section-header {
+    text-align: center;
+    color: #fff;
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    margin: 4px 0 14px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 8px;
+    width: 100%;
+  }
+
+  .card {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 5 / 6;
+    border-radius: 28%;
+    border: 1px solid #cc0000;
+    overflow: hidden;
+    box-shadow: none;
+    transition: transform 0.2s, box-shadow 0.2s;
+    background: #0a2a4a;
+  }
+
+  .card-bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
+  }
+
+  .card-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.15) 60%, transparent 100%);
+    z-index: 1;
+  }
+
+  .card-info {
+    position: absolute;
+    bottom: 22%;
+    left: 12%;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-width: 75%;
+  }
+
+  .card-title { font-size: 1.2rem; font-weight: 700; color: #fff; line-height: 1.2; }
+  .card-date { font-size: 0.9rem; color: #2ecc71; font-weight: 600; }
+  .card-notes { font-size: 0.85rem; color: rgba(255,255,255,0.8); }
+  .card-price { font-size: 0.95rem; font-weight: 700; color: #ffd700; }
+
+  .card-actions {
+    position: absolute;
+    bottom: 10%;
+    left: 12%;
+    z-index: 2;
+    display: flex;
+    gap: 5px;
+  }
+
+  .btn {
+    padding: 6px 12px;
+    min-width: 90px;
+    background: transparent;
+    border: 1px solid #2ecc71;
+    color: #fff;
+    border-radius: 99px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+  }
+  .btn:hover { background: #2ecc71; border-color: #2ecc71; color: #fff; }
+
+  .badge {
+    display: inline-block;
+    background: #ffd700;
+    color: #b22222;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 99px;
+    width: fit-content;
+  }
+</style>
+</head>
+<body>
+  <h2 class="section-header">Upcoming Dives</h2>
+  <div class="grid" id="grid"></div>
+  <script>
+    // Handlers attach via addEventListener (matches calendar.html). Wix HTML
+    // components can apply a CSP that blocks inline onclick="..." attributes,
+    // so the buttons are wired programmatically after insertion.
+    // Both buttons self-navigate from the iframe via window.open(..., '_top').
+    // Tried routing through window.parent.postMessage + home.js, but the parent
+    // handler never fires (likely Wix element-ID mismatch / CSP). Direct nav
+    // is what calendar.html uses for Details and works reliably here too.
+    function details(id)  { window.open('https://www.fundiverstw.com/upcoming-dives?id=' + encodeURIComponent(id), '_top'); }
+    function book(id)     { window.open('https://app.fundiverstw.com/register/dive/' + encodeURIComponent(id), '_top'); }
+
+    window.addEventListener('message', (e) => {
+      const dives = e.data;
+      if (!Array.isArray(dives)) return;
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+      dives.forEach(d => {
+        const imgSrc = (d.featured_image || '').replace(/^wix:image:\/\/v1\//, 'https://static.wixstatic.com/media/').split('#')[0].split('/').slice(0,-1).join('/') || '';
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          ${imgSrc ? `<img class="card-bg" src="${imgSrc}" onerror="this.style.display='none'">` : ''}
+          <div class="card-overlay"></div>
+          <div class="card-info">
+            ${d.featured ? '<span class="badge">FEATURED</span>' : ''}
+            <div class="card-title">${d.title || ''}</div>
+            <div class="card-date">${d.start_date || ''}${d.end_date && d.end_date !== d.start_date ? ' → ' + d.end_date : ''}</div>
+            ${d.notes ? `<div class="card-notes">${d.notes}</div>` : ''}
+            ${d.starting_at != null ? `<div class="card-price">From ${parseInt(d.starting_at)} NTD</div>` : ''}
+          </div>
+          <div class="card-actions">
+            <button class="btn btn-details" data-action="details">Details</button>
+            <button class="btn btn-book"    data-action="book">Book Now</button>
+          </div>
+        `;
+        card.querySelector('[data-action="details"]').addEventListener('click', () => details(d._id));
+        card.querySelector('[data-action="book"]').addEventListener('click', () => book(d._id));
+        grid.appendChild(card);
+      });
+    });
+  </script>
+</body>
+</html>
