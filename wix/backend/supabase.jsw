@@ -258,6 +258,7 @@ export async function getCalendarEvents() {
     const base = {
       id: item._id || item.id,
       title: item.calendar_title || '',
+      display_title: item.display_title || '',
       type: 'course',
       featured: item.featured || false,
       starting_at: resolveStartingAt(item, priceMap),
@@ -306,6 +307,7 @@ export async function getCalendarEvents() {
       start_date: start.toISOString().split('T')[0],
       end_date:   end.toISOString().split('T')[0],
       title:      item.calendar_title || '',
+      display_title: item.display_title || '',
       type:       'dive',
       url:        item['link-eo-dives-dive_title'] || '',
       featured:   item.featured || false,
