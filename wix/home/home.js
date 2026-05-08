@@ -9,11 +9,9 @@ function registerUrl(eventType, eventId) {
   return REGISTER_ORIGIN + '/register/' + encodeURIComponent(eventType) + '/' + encodeURIComponent(eventId);
 }
 
-// Wix detail pages are static (Wix SEO URL config doesn't allow path
-// parameters), so the event id rides as a ?id= query string.
 function detailsPath(eventType, eventId) {
-  const slug = eventType === 'dive' ? 'upcoming-dives' : 'upcoming-courses';
-  return '/' + slug + '?id=' + encodeURIComponent(eventId);
+  const slug = eventType === 'dive' ? 'dives' : 'course';
+  return '/' + slug + '/' + encodeURIComponent(eventId);
 }
 
 $w.onReady(async function () {
@@ -21,51 +19,11 @@ $w.onReady(async function () {
   $w('#Section1ListItem1Title1').onClick(() => wixLocation.to("/travel-destinations?mode=dom"));
   $w('#Section1ListItem2Title1').onClick(() => wixLocation.to("/travel-destinations?mode=int"));
 
-  // Upcoming dives
-  $w('#upcomingDives').onItemReady(($item, itemData) => {
-    $item('#diveTitle').text = itemData.display_title ?? itemData.admin_title ?? '';
-    $item('#diveBackground').src = itemData.featured_image ?? '';
-    $item('#divePrice').text = itemData.starting_at != null ? `Starting at: ${parseInt(itemData.starting_at)}` : '';
-    $item('#diveDay').text = itemData.start_date ?? '';
-    $item('#diveDate').text = itemData.start_date ?? '';
-    $item('#diveNotes').text = itemData.notes ?? '';
-    $item('#diveBookNow').label = 'Book Now';
-    $item('#diveBookNow').onClick(() => {
-      wixLocation.to(registerUrl('dive', itemData._id));
-    });
-    $item('#diveButton').label = 'Details';
-    $item('#diveButton').onClick(() => {
-      wixLocation.to(detailsPath('dive', itemData._id));
-    });
-  });
-
-  // Upcoming courses
-  $w('#upcomingCourses').onItemReady(($item, itemData) => {
-    $item('#courseTitle').text = itemData.display_title ?? itemData.calendar_title ?? '';
-    $item('#courseBackground').src = itemData.featured_image ?? '';
-    $item('#coursePrice').text = itemData.starting_at != null ? `Starting at: ${parseInt(itemData.starting_at)}` : '';
-    $item('#courseDate').text = itemData.start_date ?? '';
-    $item('#courseDay').text = itemData.start_date ?? '';
-    $item('#courseSchedule').text = itemData.schedule ?? '';
-    $item('#courseBookNow').label = 'Book Now';
-    $item('#courseBookNow').onClick(() => {
-      wixLocation.to(registerUrl('course', itemData._id));
-    });
-    $item('#courseButton').label = 'Details';
-    $item('#courseButton').onClick(() => {
-      wixLocation.to(detailsPath('course', itemData._id));
-    });
-  });
-
   const [dives, courses] = await Promise.all([
     getUpcomingDives(3),
     getUpcomingCourses(3),
   ]);
 
-  $w('#upcomingDives').data = dives;
-  $w('#upcomingCourses').data = courses;
-
-  // HTML card elements
   $w('#divesHtml').postMessage(dives);
   $w('#coursesHtml').postMessage(courses);
 

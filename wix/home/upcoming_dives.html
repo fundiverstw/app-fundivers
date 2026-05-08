@@ -105,14 +105,7 @@
   <h2 class="section-header">Upcoming Dives</h2>
   <div class="grid" id="grid"></div>
   <script>
-    // Handlers attach via addEventListener (matches calendar.html). Wix HTML
-    // components can apply a CSP that blocks inline onclick="..." attributes,
-    // so the buttons are wired programmatically after insertion.
-    // Both buttons self-navigate from the iframe via window.open(..., '_top').
-    // Tried routing through window.parent.postMessage + home.js, but the parent
-    // handler never fires (likely Wix element-ID mismatch / CSP). Direct nav
-    // is what calendar.html uses for Details and works reliably here too.
-    function details(id)  { window.open('https://www.fundiverstw.com/upcoming-dives?id=' + encodeURIComponent(id), '_top'); }
+    function details(id)  { window.open('https://www.fundiverstw.com/dives/' + encodeURIComponent(id), '_top'); }
     function book(id)     { window.open('https://app.fundiverstw.com/register/dive/' + encodeURIComponent(id), '_top'); }
 
     window.addEventListener('message', (e) => {
@@ -129,7 +122,7 @@
           <div class="card-overlay"></div>
           <div class="card-info">
             ${d.featured ? '<span class="badge">FEATURED</span>' : ''}
-            <div class="card-title">${d.display_title || d.admin_title || ''}</div>
+            <div class="card-title">${d.display_title || ''}</div>
             <div class="card-date">${d.start_date || ''}${d.end_date && d.end_date !== d.start_date ? ' → ' + d.end_date : ''}</div>
             ${d.notes ? `<div class="card-notes">${d.notes}</div>` : ''}
             ${d.starting_at != null ? `<div class="card-price">From ${parseInt(d.starting_at)} NTD</div>` : ''}
