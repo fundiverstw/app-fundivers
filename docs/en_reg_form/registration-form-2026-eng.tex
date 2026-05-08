@@ -1,0 +1,188 @@
+\documentclass[a4paper,10pt]{article}
+\usepackage[margin=1.2cm,top=1.2cm,bottom=1.2cm]{geometry}
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{colortbl}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{eso-pic}
+\usepackage{enumitem}
+\usepackage{tabularx}
+\usepackage{needspace}
+\usepackage{tgadventor}
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+
+% Brand colours
+\definecolor{ocean}{HTML}{0B5394}
+\definecolor{oceanlight}{HTML}{D6E9F8}
+\definecolor{oceanbg}{HTML}{EEF5FB}
+\definecolor{sand}{HTML}{F9F5EC}
+\definecolor{darktext}{HTML}{1A1A1A}
+
+\hypersetup{colorlinks=true,urlcolor=ocean}
+
+% Watermark background
+\AddToShipoutPictureFG{%
+  \AtPageCenter{%
+    \begin{tikzpicture}[remember picture,overlay]
+      \node[opacity=0.05,yshift=-0.3cm] {\includegraphics[width=0.55\paperwidth,keepaspectratio]{fundivers-logo.png}};
+    \end{tikzpicture}%
+  }%
+}
+
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\color{darktext}
+
+% Section header command — keeps header with following content
+\newcommand{\formheader}[1]{%
+  \needspace{5\baselineskip}%
+  \vspace{8pt}%
+  \begingroup\renewcommand{\arraystretch}{1.0}%
+  \noindent\begin{tabularx}{\textwidth}{@{}X@{}}
+  \rowcolor{ocean}
+  \rule{0pt}{12pt}\color{white}\bfseries\sffamily\small\hspace{4pt}#1 \\[-3pt]
+  \end{tabularx}%
+  \endgroup
+  \vspace{6pt}%
+  \nopagebreak[4]%
+}
+
+% Underline field command
+\newcommand{\field}[1]{%
+  {\small\sffamily #1}\enspace\hrulefill%
+}
+
+\newcolumntype{R}{>{\raggedleft\arraybackslash}p{2.3cm}}
+
+\begin{document}
+\vfill
+
+% ── Header ──────────────────────────────────────────────
+\begin{center}
+  \includegraphics[width=4.5cm]{../../imgs/fd_logo.png}\\[4pt]
+  {\color{ocean}\sffamily\itshape\small Breathe the Adventure! Explore with Confidence!}\\[6pt]
+  {\color{ocean}\sffamily\Large\bfseries Registration Form}
+\end{center}
+
+\vspace{2pt}
+
+% ── Personal Details ────────────────────────────────────
+
+\renewcommand{\arraystretch}{1.5}
+\begin{tabularx}{\textwidth}{@{}XX@{}}
+\field{Name on Passport} & \field{LINE / Instagram} \\
+\field{ARC / ID No.} & \field{Height} \\
+\field{Citizenship} & \field{Weight} \\
+\field{Date of Birth {\scriptsize(DD/MM/YYYY)}} & \field{Shoe Size} \\
+\end{tabularx}
+
+\vspace{2pt}
+\begin{tabularx}{\textwidth}{@{}X@{}}
+\field{Email Address} \\
+\end{tabularx}
+
+\vspace{2pt}
+\begin{tabularx}{\textwidth}{@{}X@{}}
+\field{How did you discover Fun Divers?} \\
+\end{tabularx}
+
+\vspace{2pt}
+\begin{tabularx}{\textwidth}{@{}XXX@{}}
+\field{Current Cert} & \field{No.\ of Dives} & \field{Last Dive} \\
+\end{tabularx}
+
+\vspace{2pt}
+\begin{tabularx}{\textwidth}{@{}XX@{}}
+\field{Emergency Contact Details} & \field{Occupation} \\
+\end{tabularx}
+
+% ── Courses ─────────────────────────────────────────────
+\formheader{COURSES}
+
+\renewcommand{\arraystretch}{1.25}
+\small
+\rowcolors{2}{oceanbg}{white}
+\begin{tabularx}{\textwidth}{@{}XRRR@{}}
+\rowcolor{oceanlight}
+ & \textbf{\sffamily 1 Diver} & \textbf{\sffamily 2 Divers} & \textbf{\sffamily 3+ Divers} \\
+Refresher Course {\footnotesize(review, 2 shore dives)} & \$2,800 & & \\
+Try Dive {\footnotesize(1 shore dive, +\$1,000 for 2nd dive)} & \$2,700 & \$2,500 & \\
+Open Water {\footnotesize(class, pool, 4 shore dives)} & \$15,400 & \$14,400 & \$13,500 \\
+Advanced {\footnotesize(5 shore dives, SMB/spool included)} & \$12,500 & \$11,600 & \$11,000 \\
+Enhanced Training 1 or 2 {\footnotesize(4 shore dives each)} & \$6,500 & \$6,000 & \$5,800 \\
+Specialties {\footnotesize(2-4 shore dives, extras may apply)} & \$6,800 & \$6,000 & \$5,800 \\
+Equipment Specialist Course {\footnotesize(+\$2,000 with cert)} & \$3,000 & \$2,800 & \\
+Rescue {\footnotesize(pool, 2 shore dives)} & \$10,500 & \$9,600 & \$9,200 \\
+Emergency First Aid {\footnotesize(theory/practical)} & \$4,900 & \$4,500 & \\
+Divemaster {\footnotesize(2-3 months)} & \$34,000 & \$32,000 & \\
+\end{tabularx}
+\rowcolors{0}{}{}
+
+\vspace{4pt}
+
+% ── Fun Diving ──────────────────────────────────────────
+
+\rowcolors{2}{oceanbg}{white}
+\begin{tabularx}{\textwidth}{@{}XRRR@{}}
+\rowcolor{oceanlight}
+\textbf{\sffamily Ask about upcoming boat dive adventures} & \textbf{\sffamily Bat Cave} & \textbf{\sffamily Secret Garden} & \textbf{\sffamily Long Dong Bay} \\
+Fun Diving Weekends {\footnotesize(2 shore dives)} & \$1,500 & \$1,600 & \$1,800 \\
+Fun Diving Weekdays {\footnotesize(2 shore dives)} & \$2,000 & \$2,100 & \$2,300 \\
+\end{tabularx}
+\rowcolors{0}{}{}
+
+% ── Important Notes ─────────────────────────────────────
+\formheader{IMPORTANT NOTES}
+
+\small
+\begin{enumerate}[leftmargin=1.4em,itemsep=1pt,topsep=2pt,label={\color{ocean}\bfseries\arabic*.}]
+  \item Gear rental is included for the Try Dive \& PADI Open Water Courses only.
+  \item Gear rental for all other courses: Standard \$1,200/day, Full \$1,600/day.
+  \item Major courses do \textbf{NOT} include mask and snorkel.
+  \item Return transport and weights are included for all trips to the northeast coast.
+  \item Local scuba diving insurance is included for all diving excursions with Fun Divers Taiwan.
+  \item Food and beverages are \textbf{NOT} included in the price.
+\end{enumerate}
+
+% ── Payment Options ────────────────────────────────────
+\formheader{PAYMENT OPTIONS}
+
+\small
+\noindent
+\begin{minipage}[t]{0.55\textwidth}
+  \textbf{Local Bank Transfer:}\\[2pt]
+  \renewcommand{\arraystretch}{1.4}
+  \begin{tabular}{@{}ll@{}}
+  \textbf{Code:} & 822 \\
+  \textbf{Account:} & 1305\enspace4100\enspace1904 \\
+  \textbf{Name:} & Wong, Dennis \\
+  \textbf{Branch:} & Shuang He \\
+  \end{tabular}
+\end{minipage}%
+\hfill
+\begin{minipage}[t]{0.4\textwidth}
+  \textbf{PayPal:}\\[2pt]
+  5\% service fee applies
+\end{minipage}
+
+\vspace{6pt}
+
+% ── Declaration & Signature ─────────────────────────────
+\noindent\fbox{\parbox{\dimexpr\textwidth-2\fboxsep-2\fboxrule}{%
+  \vspace{4pt}
+  \small I have read and understood the \textbf{IMPORTANT NOTES} stated above.
+  \vspace{10pt}
+
+  \renewcommand{\arraystretch}{2.0}
+  \begin{tabularx}{\dimexpr\textwidth-2\fboxsep-2\fboxrule}{@{}p{0.45\dimexpr\textwidth-2\fboxsep-2\fboxrule}X@{}}
+  \field{Signature} & \field{Date {\scriptsize(DD/MM/YYYY)}} \\
+  \end{tabularx}
+  \vspace{2pt}
+}}
+\vfill
+
+\end{document}

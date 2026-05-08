@@ -1,0 +1,265 @@
+/* Landscape poster – Fundivers advertisement (aquatic theme) */
+
+.poster {
+  width: 297mm;
+  height: 210mm;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 72mm 1fr 72mm;
+  grid-template-rows: 50mm 1fr 50mm 10mm;
+  grid-template-areas:
+    "qr-tl   top    qr-tr"
+    "side-l  main   side-r"
+    "qr-bl   foot   qr-br"
+    "footer  footer footer";
+  gap: 6mm;
+  box-sizing: border-box;
+  overflow: hidden;
+  position: relative;
+}
+
+.poster__bg {
+  grid-column: 1 / -1;
+  grid-row: 1 / 4;
+  z-index: 0;
+  background:
+    linear-gradient(180deg, rgba(0, 40, 80, 0.5) 0%, rgba(0, 60, 100, 0.4) 100%),
+    url("../../imgs/ocean_bg.jpg") center / cover no-repeat;
+  background-color: #062d47;
+}
+
+.poster__bubble {
+  border: 2px solid #c0392b;
+  border-radius: 10mm;
+  box-sizing: border-box;
+  background: rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+}
+
+.poster__hero {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6mm;
+  padding: 6mm 8mm;
+  margin: 0;
+  min-width: 0;
+  max-width: 100%;
+  z-index: 2;
+}
+
+.poster__hero-boat {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  order: 1;
+}
+
+.poster__hero-logo {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  order: 2;
+}
+
+.poster__boat {
+  max-width: 95mm;
+  height: 42mm;
+  width: auto;
+  object-fit: contain;
+  display: block;
+  border-radius: 6mm;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.35));
+}
+
+.poster__logo {
+  width: 58mm;
+  height: 58mm;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4)) drop-shadow(0 0 20px rgba(77, 208, 225, 0.15));
+}
+
+.poster__slogan-wrap {
+  margin: 4mm 0 0;
+  padding: 4mm 8mm;
+  z-index: 2;
+  flex: 0 0 auto;
+}
+
+.poster__slogan {
+  margin: 0;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 6.5mm;
+  font-weight: 700;
+  color: #fff;
+  text-align: center;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.6), 0 0 20px rgba(0,0,0,0.3);
+}
+
+.poster__copy-wrap {
+  margin: 3mm 0 0;
+  padding: 4mm 8mm;
+  max-width: 100%;
+  z-index: 2;
+  flex: 0 0 auto;
+}
+
+.poster__copy {
+  margin: 0;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 4.2mm;
+  font-weight: 500;
+  color: #fff;
+  text-align: center;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6), 0 1px 2px rgba(0,0,0,0.4);
+}
+
+.poster__copy-accent {
+  color: #7dd8f0;
+  font-weight: 700;
+}
+
+.poster__copy-extra {
+  margin: 3mm 0 0;
+  padding: 3mm 8mm;
+  max-width: 100%;
+  z-index: 2;
+  flex: 0 0 auto;
+}
+
+.poster__copy-extra .poster__copy {
+  font-size: 3.8mm;
+  font-weight: 500;
+}
+
+.poster__main {
+  grid-area: main;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  padding: 2mm 0;
+  gap: 0;
+}
+
+.poster__main .poster__hero {
+  flex: 0 1 auto;
+}
+
+.poster__side-copy {
+  padding: 5mm 6mm;
+  z-index: 1;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 3.2mm;
+  font-weight: 500;
+  color: #fff;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6), 0 1px 2px rgba(0,0,0,0.4);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+
+.poster__side-copy--left { grid-area: side-l; text-align: left; }
+.poster__side-copy--right { grid-area: side-r; text-align: right; }
+
+.poster__side-text { margin: 0 0 2.5mm; }
+.poster__side-text:last-child { margin-bottom: 0; }
+
+.poster__footer {
+  grid-area: footer;
+  padding: 2mm 8mm;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.35);
+  border: none;
+  border-radius: 0;
+}
+
+.poster__footer-text {
+  margin: 0;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 2.8mm;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  text-align: center;
+  letter-spacing: 0.03em;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6), 0 1px 2px rgba(0,0,0,0.4);
+}
+
+.poster__qr-wrap {
+  padding: 4mm;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+}
+
+.poster__qr-wrap.poster__qr--top-left   { grid-area: qr-tl; }
+.poster__qr-wrap.poster__qr--top-right  { grid-area: qr-tr; }
+.poster__qr-wrap.poster__qr--bottom-left  { grid-area: qr-bl; }
+.poster__qr-wrap.poster__qr--bottom-right { grid-area: qr-br; }
+
+.poster__qr {
+  position: relative;
+  width: 26mm;
+  height: 26mm;
+  background: linear-gradient(165deg, #fff 0%, #e0f7fa 100%);
+  padding: 3mm;
+  border-radius: 8mm;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 3px 12px rgba(0,0,0,0.25);
+  z-index: 0;
+}
+
+.poster__qr img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  border-radius: 4mm;
+}
+
+.poster__qr-label {
+  position: absolute;
+  bottom: -5mm;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 2.8mm;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  background: rgba(192, 57, 43, 0.95);
+  padding: 1.2mm 3.5mm;
+  border-radius: 3mm;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+@media print {
+  body { margin: 0; background: #062d47; }
+  .poster { margin: 0; box-shadow: none; }
+}
