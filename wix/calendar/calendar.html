@@ -19,21 +19,25 @@
   <div id="calendarContainer" style="width:100%; max-width:1200px;"></div>
 </div>
 
-<div id="eventDetailModal">
-  <button id="closeDetail" class="close-btn">×</button>
+<div id="eventDetailModal" role="dialog" aria-modal="true">
+  <button id="closeDetail" class="close-btn" aria-label="Close">×</button>
+  <div class="modal-tags">
+    <span id="detailType" class="type-chip"></span>
+    <span id="detailFeatured" class="featured-chip">★ Featured</span>
+  </div>
   <h3 id="detailTitle"></h3>
   <div class="modal-content">
-    <div class="modal-item date-item">
+    <div class="modal-row">
+      <span class="row-label">When</span>
       <span id="detailDate"></span>
     </div>
-    <div class="modal-item price-item">
+    <div class="modal-row">
+      <span class="row-label">Price</span>
       <span id="detailPrice"></span>
     </div>
-    <div class="modal-item">
-      <button id="detailLink" class="modal-btn details-btn">DETAILS</button>
-    </div>
-    <div class="modal-item">
-      <button id="bookLink" class="modal-btn book-btn">BOOK NOW</button>
+    <div class="modal-actions">
+      <button id="detailLink" class="modal-btn details-btn">Details</button>
+      <button id="bookLink" class="modal-btn book-btn">Book Now</button>
     </div>
   </div>
 </div>
@@ -107,138 +111,167 @@ body { font-family:"Segoe UI",sans-serif; margin:0; padding:1rem; background:tra
 .event.featured.multi-day.middle { border-left:none; border-right:none; box-shadow:none; background:#ffd700; }
 .event.featured.multi-day.end { border-left:none; box-shadow:none; background:#ffd700; }
 
-#eventDetailModal { 
-  display:none; 
-  position:fixed; 
-  top:50%; 
-  left:50%; 
-  transform:translate(-50%,-50%); 
-  width:85%; 
-  max-width:450px; 
-  background:linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%);
-  border-radius:16px; 
-  padding:2rem; 
-  z-index:9999; 
-  box-shadow:0 10px 40px rgba(0,0,0,0.2), 0 0 0 1px rgba(0,0,0,0.05);
+#eventDetailModal {
+  display:none;
+  position:fixed;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  width:90%;
+  max-width:420px;
+  background:rgba(255,255,255,0.92);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  border:1px solid rgba(0,0,0,0.12);
+  border-radius:14px;
+  padding:1.5rem 1.5rem 1.25rem;
+  z-index:9999;
+  box-shadow:0 16px 48px rgba(0,0,0,0.18);
+  font-family:"Segoe UI",sans-serif;
+  color:#1a1a1a;
 }
 #eventDetailModal .close-btn {
   position:absolute;
-  top:12px;
-  right:12px;
+  top:10px;
+  right:10px;
   background:rgba(0,0,0,0.05);
   border:none;
-  font-size:24px;
+  font-size:20px;
   line-height:1;
   color:#666;
   cursor:pointer;
   padding:0;
-  width:32px;
-  height:32px;
+  width:30px;
+  height:30px;
   display:flex;
   align-items:center;
   justify-content:center;
   border-radius:50%;
-  transition:all 0.2s ease;
+  transition:background 0.2s, color 0.2s, transform 0.2s;
   font-weight:300;
 }
 #eventDetailModal .close-btn:hover {
   background:rgba(0,0,0,0.1);
-  color:#333;
+  color:#222;
   transform:rotate(90deg);
 }
+#eventDetailModal .modal-tags {
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+  margin-bottom:0.5rem;
+  padding-right:32px;
+}
+#eventDetailModal .type-chip {
+  display:inline-block;
+  font-size:0.7rem;
+  font-weight:700;
+  letter-spacing:0.06em;
+  text-transform:uppercase;
+  padding:3px 10px;
+  border-radius:999px;
+}
+#eventDetailModal .type-chip.course {
+  background:rgba(74,144,226,0.15);
+  color:#2c5d99;
+}
+#eventDetailModal .type-chip.dive {
+  background:rgba(46,204,113,0.15);
+  color:#1e7a44;
+}
+#eventDetailModal .featured-chip {
+  display:none;
+  font-size:0.7rem;
+  font-weight:700;
+  letter-spacing:0.06em;
+  padding:3px 10px;
+  border-radius:999px;
+  background:linear-gradient(135deg,#ffd700 0%,#f0c000 100%);
+  color:#7a4c00;
+  border:1px solid rgba(192,192,192,0.6);
+}
+#eventDetailModal.featured .featured-chip {
+  display:inline-block;
+}
 #eventDetailModal h3 {
-  margin:0 0 0.75rem 0;
-  font-size:1.75rem;
+  margin:0 0 1rem 0;
+  font-size:1.4rem;
   font-weight:700;
   color:#1a1a1a;
-  padding-right:40px;
+  padding-right:32px;
   line-height:1.3;
+  word-break:break-word;
 }
 #eventDetailModal .modal-content {
   display:flex;
   flex-direction:column;
-  gap:1.25rem;
 }
-#eventDetailModal .modal-item {
+#eventDetailModal .modal-row {
   display:flex;
-  flex-direction:column;
+  align-items:baseline;
+  gap:10px;
+  padding:10px 0;
+  border-top:1px solid rgba(0,0,0,0.06);
+  font-size:0.95rem;
+  color:#222;
 }
-#eventDetailModal .modal-item.date-item {
-  padding:0;
-  background:none;
-  border-radius:0;
+#eventDetailModal .modal-row:first-child {
+  border-top:none;
 }
-#eventDetailModal #detailDate {
-  color:#000000;
-  font-size:0.9rem;
-  font-weight:400;
-  text-align:left;
-  letter-spacing:0;
+#eventDetailModal .row-label {
+  font-size:0.7rem;
+  font-weight:700;
+  letter-spacing:0.08em;
+  text-transform:uppercase;
+  color:#888;
+  min-width:50px;
 }
-#eventDetailModal .modal-item.price-item {
-  padding:0;
-  background:none;
-  border-radius:0;
-}
-#eventDetailModal #detailPrice {
-  color:#000000;
-  font-size:0.9rem;
-  font-weight:400;
-  text-align:left;
-  letter-spacing:0;
+#eventDetailModal .modal-actions {
+  display:flex;
+  gap:10px;
+  margin-top:1rem;
 }
 #eventDetailModal .modal-btn {
-  width:100%;
-  padding:14px 24px;
+  flex:1;
+  padding:11px 16px;
   border:none;
-  border-radius:10px;
-  font-size:1rem;
+  border-radius:8px;
+  font-size:0.85rem;
   font-weight:700;
-  cursor:pointer;
-  transition:all 0.3s ease;
+  letter-spacing:0.06em;
   text-transform:uppercase;
-  letter-spacing:1px;
-  box-shadow:0 4px 15px rgba(0,0,0,0.2);
-  position:relative;
-  overflow:hidden;
-}
-#eventDetailModal .modal-btn::before {
-  content:'';
-  position:absolute;
-  top:50%;
-  left:50%;
-  width:0;
-  height:0;
-  border-radius:50%;
-  background:rgba(255,255,255,0.3);
-  transform:translate(-50%,-50%);
-  transition:width 0.6s, height 0.6s;
-}
-#eventDetailModal .modal-btn:hover::before {
-  width:300px;
-  height:300px;
+  cursor:pointer;
+  transition:transform 0.15s, box-shadow 0.2s, background 0.2s, border-color 0.2s;
+  font-family:inherit;
 }
 #eventDetailModal .modal-btn:hover {
-  transform:translateY(-2px);
-  box-shadow:0 6px 20px rgba(0,0,0,0.3);
+  transform:translateY(-1px);
+  box-shadow:0 4px 12px rgba(0,0,0,0.15);
 }
 #eventDetailModal .modal-btn:active {
   transform:translateY(0);
-  box-shadow:0 2px 10px rgba(0,0,0,0.2);
+  box-shadow:none;
 }
 #eventDetailModal .details-btn {
-  background:linear-gradient(135deg, #20b2aa 0%, #17a2b8 100%);
-  color:#ffffff;
+  background:rgba(255,255,255,0.55);
+  border:1.5px solid rgba(0,0,0,0.18);
+  color:#333;
 }
 #eventDetailModal .details-btn:hover {
-  background:linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+  background:rgba(255,255,255,0.9);
+  border-color:rgba(0,0,0,0.28);
 }
 #eventDetailModal .book-btn {
-  background:linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
-  color:#ffffff;
+  background:#4a90e2;
+  color:#fff;
 }
-#eventDetailModal .book-btn:hover {
-  background:linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+#eventDetailModal.dive .book-btn {
+  background:#2ecc71;
+}
+#eventDetailModal.featured .book-btn {
+  background:linear-gradient(135deg,#ffd700 0%,#f0c000 100%);
+  color:#7a4c00;
+  border:1px solid rgba(192,192,192,0.6);
 }
 #eventDetailModal #detailLink.hidden,
 #eventDetailModal #bookLink.hidden {
@@ -551,6 +584,7 @@ function buildMonth(container, monthIndex, year){
 }
 
 const eventDetailModal = document.getElementById("eventDetailModal");
+const detailType = document.getElementById("detailType");
 const detailTitle = document.getElementById("detailTitle");
 const detailDate = document.getElementById("detailDate");
 const detailPrice = document.getElementById("detailPrice");
@@ -578,36 +612,31 @@ function formatDate(dateString) {
 }
 
 function showEventDetail(ev){
-  detailTitle.textContent = ev.title;
-  
+  eventDetailModal.classList.toggle('course', ev.type === 'course');
+  eventDetailModal.classList.toggle('dive',   ev.type === 'dive');
+  eventDetailModal.classList.toggle('featured', !!ev.featured);
+
+  detailType.className = 'type-chip ' + ev.type;
+  detailType.textContent = ev.type === 'dive' ? 'Dive' : 'Course';
+
+  detailTitle.textContent = ev.display_title || '';
+
   let dateText = formatDate(ev.start_date);
   if(ev.end_date && ev.end_date !== ev.start_date) {
     dateText += " → " + formatDate(ev.end_date);
   }
   detailDate.textContent = dateText;
-  
-  if(ev.starting_at) {
-    const priceValue = typeof ev.starting_at === 'number' ? ev.starting_at : parseInt(ev.starting_at);
-    if (!isNaN(priceValue)) {
-      detailPrice.textContent = `Starting at ${priceValue} NTD`;
-      detailPrice.style.display = 'block';
-    } else {
-      detailPrice.textContent = 'Contact for pricing';
-      detailPrice.style.display = 'block';
-    }
-  } else {
-    detailPrice.textContent = 'Contact for pricing';
-    detailPrice.style.display = 'block';
-  }
-  
-  // Details opens the Wix detail page in a new tab. The page is static
-  // (Wix SEO URL config only accepts letters/numbers/dashes — no path
-  // parameters), so the event id rides as a ?id= query string.
+
+  const priceValue = ev.starting_at != null
+    ? (typeof ev.starting_at === 'number' ? ev.starting_at : parseInt(ev.starting_at))
+    : NaN;
+  detailPrice.textContent = isNaN(priceValue) ? 'Contact for pricing' : `Starting at ${priceValue} NTD`;
+
   const detailsSlug = ev.type === 'dive' ? 'upcoming-dives' : 'upcoming-courses';
   const detailsUrl = siteBaseUrl + "/" + detailsSlug + "?id=" + encodeURIComponent(ev.id);
   detailLink.onclick = () => window.open(detailsUrl, "_blank");
   detailLink.classList.remove("hidden");
-  
+
   bookLink.onclick = () => window.parent.postMessage({ type: 'book_event', eventId: ev.id, eventType: ev.type }, '*');
   bookLink.classList.remove("hidden");
 
