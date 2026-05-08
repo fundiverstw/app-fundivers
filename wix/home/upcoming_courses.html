@@ -117,7 +117,7 @@
           ${imgSrc ? `<img class="card-bg" src="${imgSrc}" onerror="this.style.display='none'">` : ''}
           <div class="card-overlay"></div>
           <div class="card-info">
-            <div class="card-title">${c.course_title || c.title || ''}</div>
+            <div class="card-title">${c.display_title || c.calendar_title || ''}</div>
             <div class="card-date">${c.start_date || ''}${c.end_date && c.end_date !== c.start_date ? ' → ' + c.end_date : ''}</div>
             ${c.schedule ? `<div class="card-schedule">${c.schedule}</div>` : ''}
             ${c.starting_at != null ? `<div class="card-price">From ${parseInt(c.starting_at)} NTD</div>` : ''}

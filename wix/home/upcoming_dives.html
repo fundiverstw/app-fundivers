@@ -129,7 +129,7 @@
           <div class="card-overlay"></div>
           <div class="card-info">
             ${d.featured ? '<span class="badge">FEATURED</span>' : ''}
-            <div class="card-title">${d.title || ''}</div>
+            <div class="card-title">${d.display_title || d.admin_title || ''}</div>
             <div class="card-date">${d.start_date || ''}${d.end_date && d.end_date !== d.start_date ? ' → ' + d.end_date : ''}</div>
             ${d.notes ? `<div class="card-notes">${d.notes}</div>` : ''}
             ${d.starting_at != null ? `<div class="card-price">From ${parseInt(d.starting_at)} NTD</div>` : ''}
