@@ -26,7 +26,7 @@ $w.onReady(async () => {
 
   const payload = {
     id: course._id,
-    title: course.display_title || course.calendar_title || 'Untitled course',
+    title: course.display_title || '',
     image: course.featured_image || '',
     schedule: courseSchedule(course),
     price: course.starting_at,

@@ -26,7 +26,7 @@ $w.onReady(async () => {
 
   const payload = {
     id: dive._id,
-    title: dive.display_title || dive.admin_title || 'Untitled dive',
+    title: dive.display_title || '',
     image: dive.featured_image || '',
     schedule: buildSchedule(dive.start_date, dive.end_date, dive.time),
     price: dive.starting_at,
