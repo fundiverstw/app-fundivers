@@ -4,7 +4,8 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
 import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
-import type { AppEvent, Booking, Payment, WaitlistOffer } from '../types/database'
+import { fetchAmendmentsForBookings, amendmentsDelta } from '../lib/booking-amendments'
+import type { AppEvent, Booking, BookingAmendment, Payment, WaitlistOffer } from '../types/database'
 import {
   CARD, BTN_GHOST, BTN_DANGER, TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR, PAGE_BODY,
 } from '../styles/tokens'
@@ -13,6 +14,7 @@ type Row = Booking & {
   event: AppEvent | null
   payments: Payment[]
   paidSum: number
+  amendments: BookingAmendment[]
   /** Live (status='pending', not expired) waitlist offer on this booking,
    *  if any. Drives the "Spot opened — Accept this spot" banner. */
   offer: WaitlistOffer | null
@@ -88,6 +90,8 @@ export function BookingsPage() {
       paymentsByBooking.set(p.booking_id, arr)
     }
 
+    const amendmentsByBooking = await fetchAmendmentsForBookings(bookings.map(b => b.id))
+
     const nowMs = Date.now()
     setRows(bookings.map(b => {
       const bookingPayments = paymentsByBooking.get(b.id) ?? []
@@ -98,6 +102,7 @@ export function BookingsPage() {
         event: eventMap.get((b.eo_dive_id ?? b.eo_course_id)!) ?? null,
         payments: bookingPayments,
         paidSum,
+        amendments: amendmentsByBooking.get(b.id) ?? [],
         offer,
         offerRemainingLabel: offer ? formatRemaining(offer.expires_at, nowMs) : null,
       }
@@ -287,6 +292,28 @@ function Card({
               </span>
             </div>
           )}
+          {row.amendments.length > 0 && (
+            <div className={`text-xs ${TEXT_BODY} bg-sky-50 rounded p-2 space-y-1`}>
+              <p className={`font-semibold ${TEXT_HEADING}`}>Amendments</p>
+              <ul className="space-y-0.5">
+                {row.amendments.map(a => (
+                  <li key={a.id} className="flex items-baseline justify-between gap-2">
+                    <span className="flex-1">{a.note}</span>
+                    <span className={`shrink-0 font-semibold ${a.amount >= 0 ? 'text-red-600' : 'text-blue-900'}`}>
+                      {a.amount >= 0 ? '+' : '−'}{Math.abs(a.amount).toLocaleString()}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className={`pt-1 border-t border-sky-200 flex items-baseline justify-between ${TEXT_HEADING}`}>
+                <span>Adjusted total</span>
+                <span className="font-semibold">
+                  {row.event?.currency ?? 'TWD'} {(total + amendmentsDelta(row.amendments)).toLocaleString()}
+                </span>
+              </p>
+            </div>
+          )}
+
           {row.paidSum > 0 && (
             <div className={`flex justify-between ${TEXT_BODY}`}>
               <span>Paid so far</span>

@@ -11,12 +11,14 @@ import { AdminAddDiverModal } from '../../components/admin/AdminAddDiverModal'
 import { EventStaffSection } from '../../components/admin/EventStaffSection'
 import { RegisterForm } from '../../components/register/RegisterForm'
 import { shoeAsJp } from '../../lib/shoe-size'
-import type { AppEvent, Booking, BookingDetails, Payment, Profile } from '../../types/database'
+import { fetchAmendmentsForBookings, addAmendment, formAmount, amendmentsDelta } from '../../lib/booking-amendments'
+import type { AppEvent, Booking, BookingAmendment, BookingDetails, Payment, Profile } from '../../types/database'
 
 interface Registrant {
   booking: Booking
   profile: Profile | null
   payments: Payment[]
+  amendments: BookingAmendment[]
 }
 
 type AddonNameMap = Map<string, string>
@@ -67,9 +69,10 @@ export function AdminEventDetailPage() {
       const userIds = [...new Set(bookings.map(b => b.user_id))]
       const bookingIds = bookings.map(b => b.id)
 
-      const [profilesRes, paymentsRes] = await Promise.all([
+      const [profilesRes, paymentsRes, amendmentsByBooking] = await Promise.all([
         supabase.from('profiles').select('*').in('id', userIds),
         supabase.from('payments').select('*').in('booking_id', bookingIds),
+        fetchAmendmentsForBookings(bookingIds),
       ])
       if (cancelled) return
 
@@ -107,6 +110,7 @@ export function AdminEventDetailPage() {
         booking: b,
         profile: profileMap.get(b.user_id) ?? null,
         payments: paymentsByBooking.get(b.id) ?? [],
+        amendments: amendmentsByBooking.get(b.id) ?? [],
       })))
       setLoading(false)
     })()
@@ -128,6 +132,24 @@ export function AdminEventDetailPage() {
     setRegistrants(prev => prev.map(r =>
       r.booking.id === bookingId ? { ...r, booking: { ...r.booking, status: 'cancelled' } } : r
     ))
+  }
+
+  async function submitAmendment(bookingId: string, sign: '+' | '-', amount: number, note: string) {
+    if (!profile?.id) return
+    try {
+      const row = await addAmendment({
+        bookingId,
+        signedAmount: formAmount(sign, amount),
+        note,
+        createdBy: profile.id,
+      })
+      setRegistrants(prev => prev.map(r =>
+        r.booking.id === bookingId ? { ...r, amendments: [...r.amendments, row] } : r
+      ))
+      toast.success('Amendment added.')
+    } catch (err) {
+      toast.error(errorMessage(err))
+    }
   }
 
   async function setCancelledAt(value: string | null) {
@@ -240,6 +262,7 @@ export function AdminEventDetailPage() {
               onStatusChange={updateStatus}
               onApproveRefund={approveRefund}
               onEdit={() => setEditing(r)}
+              onAddAmendment={submitAmendment}
               readOnly={!isAdmin}
             />
           ))}
@@ -362,13 +385,14 @@ function CancelEventModal({
 
 const BOOKING_STATUSES: Booking['status'][] = ['pending', 'confirmed', 'waitlisted', 'cancelled']
 
-function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRefund, onEdit, readOnly }: {
+function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRefund, onEdit, onAddAmendment, readOnly }: {
   r: Registrant
   addonNames: AddonNameMap
   roomNames: RoomNameMap
   onStatusChange: (id: string, s: Booking['status']) => void
   onApproveRefund: (id: string) => void
   onEdit: () => void
+  onAddAmendment: (id: string, sign: '+' | '-', amount: number, note: string) => Promise<void>
   readOnly?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
@@ -378,6 +402,8 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
   const paymentStatus = r.payments.length === 0
     ? 'none'
     : totalDue > 0 ? 'partial' : 'paid'
+  const baseTotal = Number((r.booking.details as { total?: number } | undefined)?.total ?? 0)
+  const adjusted = baseTotal + amendmentsDelta(r.amendments)
 
   const statusStyles: Record<string, string> = {
     confirmed:  'text-blue-900 font-semibold',
@@ -483,6 +509,14 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
             <p className="text-xs text-blue-950 font-medium bg-sky-50 rounded p-2">📝 {r.booking.notes}</p>
           )}
 
+          <AmendmentsSection
+            amendments={r.amendments}
+            baseTotal={baseTotal}
+            adjusted={adjusted}
+            readOnly={!!readOnly}
+            onAdd={(sign, amount, note) => onAddAmendment(r.booking.id, sign, amount, note)}
+          />
+
           {!readOnly && (
             <div className="flex justify-end pt-1">
               <button
@@ -494,6 +528,114 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
             </div>
           )}
         </>
+      )}
+    </div>
+  )
+}
+
+function AmendmentsSection({ amendments, baseTotal, adjusted, readOnly, onAdd }: {
+  amendments: BookingAmendment[]
+  baseTotal: number
+  adjusted: number
+  readOnly: boolean
+  onAdd: (sign: '+' | '-', amount: number, note: string) => Promise<void>
+}) {
+  const [sign, setSign] = useState<'+' | '-'>('+')
+  const [amountStr, setAmountStr] = useState('')
+  const [note, setNote] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    const amount = parseInt(amountStr, 10)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError('Amount must be a positive integer.')
+      return
+    }
+    if (!note.trim()) {
+      setError('A note is required.')
+      return
+    }
+    setSubmitting(true)
+    try {
+      await onAdd(sign, amount, note.trim())
+      setAmountStr('')
+      setNote('')
+      setSign('+')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (amendments.length === 0 && readOnly) return null
+
+  return (
+    <div className="text-xs bg-sky-50 rounded p-2 space-y-2">
+      <p className="font-semibold text-blue-900">Balance amendments</p>
+      {amendments.length === 0 ? (
+        <p className="text-blue-900 font-medium italic">No amendments yet.</p>
+      ) : (
+        <ul className="space-y-1">
+          {amendments.map(a => (
+            <li key={a.id} className="flex items-baseline justify-between gap-2">
+              <span className="text-blue-950 font-medium flex-1">{a.note}</span>
+              <span className={`shrink-0 font-semibold ${a.amount >= 0 ? 'text-red-600' : 'text-blue-900'}`}>
+                {a.amount >= 0 ? '+' : '−'}{Math.abs(a.amount).toLocaleString()}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {amendments.length > 0 && baseTotal > 0 && (
+        <p className="text-blue-900 font-medium pt-1 border-t border-sky-200 flex items-baseline justify-between">
+          <span>Adjusted total</span>
+          <span className="font-semibold">{adjusted.toLocaleString()}</span>
+        </p>
+      )}
+
+      {!readOnly && (
+        <form onSubmit={handleSubmit} className="space-y-1.5 pt-1 border-t border-sky-200">
+          <div className="flex items-center gap-2">
+            <select
+              value={sign}
+              onChange={e => setSign(e.target.value as '+' | '-')}
+              className="bg-white border border-sky-300 rounded px-1.5 py-0.5 text-xs font-semibold text-blue-900"
+            >
+              <option value="+">+ owes more</option>
+              <option value="-">− owes less</option>
+            </select>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
+              value={amountStr}
+              onChange={e => setAmountStr(e.target.value)}
+              placeholder="Amount"
+              className="flex-1 bg-white border border-sky-300 rounded px-2 py-0.5 text-xs text-blue-900"
+            />
+          </div>
+          <input
+            type="text"
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            placeholder="Reason (required)"
+            maxLength={1000}
+            className="w-full bg-white border border-sky-300 rounded px-2 py-0.5 text-xs text-blue-900"
+          />
+          {error && <p className="text-red-600">{error}</p>}
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="text-xs bg-blue-900 hover:bg-blue-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded"
+            >
+              {submitting ? 'Adding…' : 'Add amendment'}
+            </button>
+          </div>
+        </form>
       )}
     </div>
   )
