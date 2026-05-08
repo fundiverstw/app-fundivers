@@ -25,8 +25,8 @@ $w.onReady(async function () {
               encodeURIComponent(d.eventId)
           );
         } else if (d.type === 'details_event') {
-          const slug = d.eventType === 'dive' ? 'upcoming-dives' : 'upcoming-courses';
-          wixLocation.to('/' + slug + '?id=' + encodeURIComponent(d.eventId));
+          const slug = d.eventType === 'dive' ? 'dives' : 'course';
+          wixLocation.to('/' + slug + '/' + encodeURIComponent(d.eventId));
         }
       });
     }
