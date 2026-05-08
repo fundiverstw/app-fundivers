@@ -359,19 +359,19 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
 
   return (
     <>
-      <header className="flex items-center justify-between">
-        <span className="text-xs text-blue-900 font-medium">Step {step} of 4</span>
-        {onCancel && (
-          <button onClick={onCancel} className="text-blue-900 font-medium text-xl leading-none">×</button>
-        )}
+      <header className="space-y-1">
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="text-xl font-bold text-blue-900 leading-tight">{event.title}</h1>
+          {onCancel && (
+            <button onClick={onCancel} className="text-blue-900 font-medium text-xl leading-none shrink-0">×</button>
+          )}
+        </div>
+        <p className="text-xs text-blue-900 font-medium">{formatEventSpan(event, { style: 'long' })}</p>
+        <p className="text-xs text-blue-900 font-medium">Step {step} of 4</p>
       </header>
 
       {step === 1 && (
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-blue-900">{event.title}</h2>
-          <p className="text-sm text-blue-900 font-medium">
-            {formatEventSpan(event, { style: 'long' })}
-          </p>
           {event.price != null && (
             <p className="text-sm text-blue-950 font-medium">From {event.currency} {event.price.toLocaleString()}</p>
           )}
@@ -563,16 +563,28 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
             </div>
           )}
 
-          {transportIncluded ? (
-            <p className="text-sm text-blue-950 font-medium">
-              🚐 Transportation included in base price.
-            </p>
-          ) : (
-            <label className="flex items-center gap-2 text-sm text-blue-950 font-medium">
-              <input type="checkbox" checked={needsTransport} onChange={e => setNeedsTransport(e.target.checked)} className="accent-blue-900" />
-              Need transportation (+{transportSurcharge.toLocaleString()})
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-semibold text-blue-900">Transportation</legend>
+            <label className="flex gap-2 text-sm text-blue-950 font-medium items-start">
+              <input type="radio" name="transport" checked={needsTransport} onChange={() => setNeedsTransport(true)} className="accent-blue-900 mt-1" />
+              <span className="flex-1">
+                <span className="block">Ride with the shop from the dive shop to the site</span>
+                {!transportIncluded && transportSurcharge > 0 && (
+                  <span className="block text-xs text-blue-950 font-medium">+{transportSurcharge.toLocaleString()} {event.currency}</span>
+                )}
+                {transportIncluded && (
+                  <span className="block text-xs text-blue-950 font-medium">Included in base price</span>
+                )}
+              </span>
             </label>
-          )}
+            <label className="flex gap-2 text-sm text-blue-950 font-medium items-start">
+              <input type="radio" name="transport" checked={!needsTransport} onChange={() => setNeedsTransport(false)} className="accent-blue-900 mt-1" />
+              <span className="flex-1">
+                <span className="block">Drive myself / handle my own transportation</span>
+                <span className="block text-xs text-blue-950 font-medium">Meet us at the dive site.</span>
+              </span>
+            </label>
+          </fieldset>
 
           {showNitroxAddon && (
             <label className="flex gap-2 text-sm text-blue-950 font-medium items-start">
@@ -648,17 +660,17 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
 
           <div className="text-xs text-blue-950 font-medium bg-sky-50 border border-sky-200 rounded-lg p-3 space-y-1">
             <p>
-              Pay by <strong>{formatDeadline(deadlines.deposit_deadline)}</strong> to hold your spot.
-              Pay the full amount by <strong>{formatDeadline(deadlines.full_payment_deadline)}</strong> to complete your registration.
+              Pay deposit <strong>ASAP</strong> to hold your spot.
+              Pay the remaining balance by <strong>{formatDeadline(deadlines.full_payment_deadline)}</strong> to complete your registration.
             </p>
             {hasDeposit && payDepositOnly && (
               <div className="border-t border-sky-200 pt-1 mt-1 space-y-0.5">
                 <p>
-                  Pay deposit by {formatDeadline(deadlines.deposit_deadline)}:{' '}
+                  Pay deposit <strong>ASAP</strong>:{' '}
                   <strong>{event.currency} {(event.deposit_amount ?? 0).toLocaleString()}</strong>
                 </p>
                 <p>
-                  Pay remaining amount by {formatDeadline(deadlines.full_payment_deadline)}:{' '}
+                  Pay remaining balance by {formatDeadline(deadlines.full_payment_deadline)}:{' '}
                   <strong>{event.currency} {Math.max(0, total - (event.deposit_amount ?? 0)).toLocaleString()}</strong>
                 </p>
               </div>

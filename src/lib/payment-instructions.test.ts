@@ -10,13 +10,14 @@ describe('paymentInstructionsFor', () => {
     expect(i.lines.join(' ').toLowerCase()).toContain('in person')
   })
 
-  it('bank_transfer → bank account placeholders', () => {
+  it('bank_transfer → local bank details (code, account, name, branch)', () => {
     const i = paymentInstructionsFor('bank_transfer')
     expect(i.title).toMatch(/bank transfer/i)
     const body = i.lines.join(' ')
-    expect(body).toMatch(/account name/i)
-    expect(body).toMatch(/bank/i)
-    expect(body).toMatch(/account number/i)
+    expect(body).toMatch(/code/i)
+    expect(body).toMatch(/account/i)
+    expect(body).toMatch(/name/i)
+    expect(body).toMatch(/branch/i)
   })
 
   it('credit_card → routes through PayPal email link', () => {

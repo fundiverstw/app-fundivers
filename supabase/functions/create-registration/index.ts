@@ -268,7 +268,6 @@ Deno.serve(async (req) => {
     return d.toISOString().slice(0, 10)
   }
   const fallbackDeadline = startDate ? shiftDays(startDate, -7) : null
-  const depositDeadline      = (event?.deposit_deadline      as string | null) ?? fallbackDeadline
   const fullPaymentDeadline  = (event?.full_payment_deadline as string | null) ?? fallbackDeadline
 
   // Cancellation policy — resolve the FK so the PDF can render the full
@@ -343,7 +342,6 @@ Deno.serve(async (req) => {
     deposit:         (details.deposit as number | null) ?? null,
     total:           (details.total as number | null) ?? null,
     payDepositOnly:  !!details.pay_deposit_only,
-    depositDeadline,
     fullPaymentDeadline,
     cancellationPolicyTitle,
     cancellationPolicyText,

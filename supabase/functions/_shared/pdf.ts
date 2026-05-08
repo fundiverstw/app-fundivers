@@ -66,8 +66,7 @@ export interface RegistrationPdfPayload {
   total: number | null
   /** True when the diver chose deposit-only at registration. */
   payDepositOnly: boolean
-  /** YYYY-MM-DD; resolved upstream so the PDF always has concrete dates. */
-  depositDeadline: string | null
+  /** YYYY-MM-DD; deposit is always due ASAP, so only the balance carries a date. */
   fullPaymentDeadline: string | null
   /** Cancellation policy resolved from EO_*.cancel_policy → cancellation_policies. */
   cancellationPolicyTitle: string | null
@@ -233,7 +232,7 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
     y = row(doc, y, "Sizing", "H: " + (p.height || "") + "  W: " + (p.weight || "") + "  Shoe: " + (p.shoeSize || ""), altState)
   }
   y = row(doc, y, "Transportation",
-    p.transportIncluded ? "Included with base price" : (p.needsRide ? "Yes" : "No"),
+    p.needsRide ? "Riding with the shop" : "Driving themselves",
     altState)
   if (p.notes) y = row(doc, y, "Note", p.notes, altState)
   y += 4
@@ -281,31 +280,32 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
     }
   }
 
-  // Deadlines — always render the summary line. When the diver opted to pay
-  // the deposit only we also break out the two amount/date pairs so they
-  // know exactly what to send and when.
-  if (p.depositDeadline || p.fullPaymentDeadline) {
-    y += 4
-    y = ensureY(doc, y, 16)
-    doc.setFontSize(8.5)
-    doc.setFont("helvetica", "normal")
-    doc.setTextColor(...C.dark)
-    const summary =
-      `Pay by ${formatDeadlineLong(p.depositDeadline)} to hold your spot. ` +
-      `Pay full amount by ${formatDeadlineLong(p.fullPaymentDeadline)} to complete your registration.`
-    const wrapped = doc.splitTextToSize(summary, MR - ML - 2)
-    for (const line of wrapped) { doc.text(line, ML + 2, y); y += 4.5 }
+  // Deposit is always due ASAP; the configurable deadline only governs the
+  // remaining balance. When the diver opted to pay the deposit only we also
+  // break out the two amount/date pairs so they know exactly what to send.
+  y += 4
+  y = ensureY(doc, y, 16)
+  doc.setFontSize(8.5)
+  doc.setFont("helvetica", "normal")
+  doc.setTextColor(...C.dark)
+  const summary = p.fullPaymentDeadline
+    ? `Pay deposit ASAP to hold your spot. Pay the remaining balance by ${formatDeadlineLong(p.fullPaymentDeadline)} to complete your registration.`
+    : `Pay deposit ASAP to hold your spot. Pay the remaining balance to complete your registration.`
+  const wrapped = doc.splitTextToSize(summary, MR - ML - 2)
+  for (const line of wrapped) { doc.text(line, ML + 2, y); y += 4.5 }
 
-    if (p.payDepositOnly && typeof p.deposit === "number" && typeof p.total === "number") {
-      y += 2
-      const remaining = Math.max(0, p.total - p.deposit)
-      doc.setFont("helvetica", "bold")
-      doc.text(`Pay deposit by ${formatDeadlineLong(p.depositDeadline)}: ${p.deposit} NTD`, ML + 2, y)
-      y += 4.5
-      doc.text(`Pay remaining amount by ${formatDeadlineLong(p.fullPaymentDeadline)}: ${remaining} NTD`, ML + 2, y)
-      y += 4.5
-      doc.setFont("helvetica", "normal")
-    }
+  if (p.payDepositOnly && typeof p.deposit === "number" && typeof p.total === "number") {
+    y += 2
+    const remaining = Math.max(0, p.total - p.deposit)
+    doc.setFont("helvetica", "bold")
+    doc.text(`Pay deposit ASAP: ${p.deposit} NTD`, ML + 2, y)
+    y += 4.5
+    const balanceLine = p.fullPaymentDeadline
+      ? `Pay remaining balance by ${formatDeadlineLong(p.fullPaymentDeadline)}: ${remaining} NTD`
+      : `Pay remaining balance: ${remaining} NTD`
+    doc.text(balanceLine, ML + 2, y)
+    y += 4.5
+    doc.setFont("helvetica", "normal")
   }
 
   // Cancellation policy — full text plus the cancel-by date and the diver's
