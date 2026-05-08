@@ -1,0 +1,390 @@
+import wixSecretsBackend from 'wix-secrets-backend';
+import { fetch } from 'wix-fetch';
+
+const SUPABASE_URL = 'https://pcauozfljgmelxnguqiz.supabase.co';
+
+async function getKey() {
+  return wixSecretsBackend.getSecret('SUPABASE_KEY');
+}
+
+function headers(key) {
+  return {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+    'Content-Type': 'application/json',
+  };
+}
+
+async function fetchTable(key, table, params = '') {
+  const url = `${SUPABASE_URL}/rest/v1/${table}${params ? '?' + params : ''}`;
+  const res = await fetch(url, { method: 'GET', headers: headers(key) });
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+
+async function fetchPriceMap(key) {
+  const prices = await fetchTable(key, 'EO_prices');
+  const map = {};
+  prices.forEach(p => { map[p._id || p.id] = p; });
+  return map;
+}
+
+function resolveStartingAt(item, priceMap) {
+  if (item.starting_at != null) return item.starting_at;
+  let price = item.price;
+  if (typeof price === 'string') {
+    try {
+      price = JSON.parse(price);
+    } catch (_) {
+      // Not JSON — leave the raw string so the lookup-by-id branch below picks it up.
+    }
+  }
+  const ref = Array.isArray(price) ? price[0] : price;
+  if (!ref) return null;
+  if (typeof ref === 'object') return ref.starting_at ?? null;
+  const priceId = typeof ref === 'string' ? ref : (ref._id || ref.id);
+  if (!priceId) return null;
+  return priceMap[priceId]?.starting_at ?? null;
+}
+
+export async function queryTable(table, filters = {}) {
+  const key = await getKey();
+  const params = new URLSearchParams(filters).toString();
+  return fetchTable(key, table, params);
+}
+
+export async function getUpcomingDives(limit = 4) {
+  const key = await getKey();
+  const todayStr = new Date().toISOString().split('T')[0];
+  const params = `start_date=gte.${todayStr}&order=start_date.asc&limit=${limit}`;
+  const [dives, priceMap] = await Promise.all([
+    fetchTable(key, 'EO_dives', params),
+    fetchPriceMap(key),
+  ]);
+  return dives.map((item, i) => ({
+    ...item,
+    _id: String(item._id || item.id || i),
+    starting_at: resolveStartingAt(item, priceMap),
+  }));
+}
+
+export async function getUpcomingCourses(limit = 4) {
+  const key = await getKey();
+  const todayStr = new Date().toISOString().split('T')[0];
+  const params = `start_date=gte.${todayStr}&order=start_date.asc&limit=${limit}`;
+  const [courses, priceMap] = await Promise.all([
+    fetchTable(key, 'EO_courses', params),
+    fetchPriceMap(key),
+  ]);
+  return courses.map((item, i) => ({
+    ...item,
+    _id: String(item._id || item.id || i),
+    starting_at: resolveStartingAt(item, priceMap),
+  }));
+}
+
+// Slug helpers — used by the legacy /dives/{slug} + /courses/{slug}
+// dynamic-page Velo code so old URLs still resolve to the right event
+// after the Wix datasets were retired. Slugs are derived the same way
+// the calendar used to build them: lowercase, non-alphanumeric → dash.
+function slugify(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/**
+ * Find an EO_dive whose dive_title (or title) slugifies to the given slug.
+ * Returns the row or null. Used by the legacy slug-based redirects.
+ */
+export async function findDiveByTitleSlug(slug) {
+  const target = slugify(slug);
+  if (!target) return null;
+  const key = await getKey();
+  const dives = await fetchTable(key, 'EO_dives');
+  return dives.find(d =>
+    slugify(d.dive_title) === target || slugify(d.title) === target
+  ) || null;
+}
+
+/**
+ * Find an EO_course whose course_title (or title) slugifies to the given
+ * slug. Returns the row or null.
+ */
+export async function findCourseByTitleSlug(slug) {
+  const target = slugify(slug);
+  if (!target) return null;
+  const key = await getKey();
+  const courses = await fetchTable(key, 'EO_courses');
+  return courses.find(c =>
+    slugify(c.course_title) === target || slugify(c.title) === target
+  ) || null;
+}
+
+// Convert a wix:image://v1/<id>/<filename>#metadata identifier to a
+// public CDN URL (https://static.wixstatic.com/media/<id>). The actual
+// image bits still live in Wix Media — only the URL form changes.
+// Pass-through for anything that doesn't start with wix:image://, so
+// regular https:// URLs from Supabase / elsewhere work too.
+function wixImageToUrl(raw) {
+  if (!raw) return '';
+  const s = String(raw);
+  if (!s.startsWith('wix:image://')) return s;
+  return s
+    .replace(/^wix:image:\/\/v1\//, 'https://static.wixstatic.com/media/')
+    .split('#')[0]
+    .split('/').slice(0, -1)
+    .join('/');
+}
+
+// Pulls the cert_levels rows once and indexes by id, so getDiveById /
+// getCourseById can resolve the prereq_cert_id FK to a display name.
+async function fetchCertMap(key) {
+  const rows = await fetchTable(key, 'cert_levels');
+  const map = {};
+  rows.forEach(r => { if (r.id) map[r.id] = r; });
+  return map;
+}
+
+// DiveTravel (included / not_included / transportation) and
+// cancellation_policies (cancelation_policy text) are joined onto each
+// EO_dives row via the EO_dives.DiveTravel_reference and
+// EO_dives.cancel_policy reference fields. Same pattern as fetchPriceMap.
+async function fetchTravelMap(key) {
+  const rows = await fetchTable(key, 'DiveTravel');
+  const map = {};
+  rows.forEach(r => { const k = r._id || r.id; if (k) map[k] = r; });
+  return map;
+}
+
+async function fetchCancellationMap(key) {
+  const rows = await fetchTable(key, 'cancellation_policies');
+  const map = {};
+  rows.forEach(r => { const k = r._id || r.id; if (k) map[k] = r; });
+  return map;
+}
+
+// EO_rooms holds optional room upgrades (display_name, added_price,
+// added_price_display, currency). EO_prices.room_options points to the
+// rooms available for that price tier.
+async function fetchRoomMap(key) {
+  const rows = await fetchTable(key, 'EO_rooms');
+  const map = {};
+  rows.forEach(r => { const k = r._id || r.id; if (k) map[k] = r; });
+  return map;
+}
+
+// Resolves the EO_prices row backing a given EO_dives row. Mirrors the
+// flexible reference handling in resolveStartingAt — accepts a string
+// uuid, a JSON-encoded array/object, or a populated object.
+function resolvePriceRow(item, priceMap) {
+  if (item.EO_price_reference && priceMap[item.EO_price_reference]) {
+    return priceMap[item.EO_price_reference];
+  }
+  let price = item.price;
+  if (typeof price === 'string') {
+    try { price = JSON.parse(price); } catch (_) { /* plain id */ }
+  }
+  const ref = Array.isArray(price) ? price[0] : price;
+  if (!ref) return null;
+  if (typeof ref === 'object') return priceMap[ref._id || ref.id] || ref;
+  return priceMap[ref] || null;
+}
+
+// Given an EO_dives row, returns its available room upgrades —
+// [{ _id, display_name, added_price, added_price_display, currency }]
+// — by following price → room_options → EO_rooms. Empty array when the
+// dive has no price tier or no room upgrades configured.
+function resolveRoomOptions(item, priceMap, roomMap) {
+  const priceRow = resolvePriceRow(item, priceMap);
+  if (!priceRow) return [];
+  let ids = priceRow.room_options;
+  if (typeof ids === 'string') {
+    try { ids = JSON.parse(ids); } catch (_) { ids = []; }
+  }
+  if (!Array.isArray(ids)) return [];
+  return ids.map(id => roomMap[id]).filter(Boolean);
+}
+
+// Reference fields on Supabase rows can show up as a uuid string, a
+// JSON-encoded array/object (legacy Wix multi-ref shape), or a plain
+// object with _id/id. Normalize all of them down to the target row id.
+function resolveRefId(raw) {
+  if (raw == null || raw === '') return null;
+  let v = raw;
+  if (typeof v === 'string') {
+    const trimmed = v.trim();
+    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+      try { v = JSON.parse(trimmed); } catch (_) { return trimmed; }
+    } else {
+      return trimmed;
+    }
+  }
+  if (Array.isArray(v)) v = v[0];
+  if (!v) return null;
+  if (typeof v === 'string') return v;
+  return v._id || v.id || null;
+}
+
+// Combines the structured cert level with the legacy free-text prereqs
+// note. Returns the display string the Wix iframe should show in the
+// Prerequisites subfield. Either, both, or neither are acceptable inputs.
+//
+// Legacy compat: some rows still have a cert UUID in the free-text
+// `prereqs` column (admins typed it there before the structured FK
+// existed). If we can resolve `prereqs` to a known cert id, treat it
+// as one — same fallback the backfill migration applied DB-side.
+function buildPrereqsText(item, certMap) {
+  let cert = item.prereq_cert_id ? certMap[item.prereq_cert_id] : null;
+  let note = (item.prereqs || '').trim();
+  if (!cert && note && certMap[note]) {
+    cert = certMap[note];
+    note = '';
+  }
+  const certName = cert ? cert.name : '';
+  if (certName && note) return `${certName} · ${note}`;
+  return certName || note || '';
+}
+
+/**
+ * Fetch a single EO_dive by _id with starting_at joined from EO_prices
+ * and the prereq_cert_id resolved to a display name. Used by the
+ * /upcoming-dives?id=<uuid> detail page so the iframe gets every field
+ * it needs in one round-trip.
+ */
+export async function getDiveById(id) {
+  if (!id) return null;
+  const key = await getKey();
+  const params = `_id=eq.${encodeURIComponent(id)}`;
+  const [rows, priceMap, certMap, travelMap, cancellationMap, roomMap] = await Promise.all([
+    fetchTable(key, 'EO_dives', params),
+    fetchPriceMap(key),
+    fetchCertMap(key),
+    fetchTravelMap(key),
+    fetchCancellationMap(key),
+    fetchRoomMap(key),
+  ]);
+  const dive = rows[0];
+  if (!dive) return null;
+  const travel = travelMap[resolveRefId(dive.DiveTravel_reference)] || null;
+  const cancellation = cancellationMap[resolveRefId(dive.cancel_policy)] || null;
+  return {
+    ...dive,
+    starting_at: resolveStartingAt(dive, priceMap),
+    prereqs: buildPrereqsText(dive, certMap),
+    featured_image: wixImageToUrl(dive.featured_image),
+    included: travel?.included || '',
+    not_included: travel?.not_included || '',
+    transportation: travel?.transportation || '',
+    cancellation_policy: cancellation?.cancelation_policy || '',
+    // Long-form copy from the DiveTravel row. tagline_text and itinerary
+    // are plain text already; description and details are Wix HTML and
+    // get stripped to plain text on the Velo page (closer to the data,
+    // keeps the iframe simple).
+    tagline_text: travel?.tagline_text || '',
+    description: travel?.description || '',
+    itinerary: travel?.itinerary || '',
+    details: travel?.details || '',
+    // Trip-level picture (separate from the dive's own featured_image)
+    // — converted from wix:image:// to the public CDN URL.
+    picture: wixImageToUrl(travel?.picture),
+    // Optional room upgrades for the dive's price tier.
+    room_options: resolveRoomOptions(dive, priceMap, roomMap),
+  };
+}
+
+/** Course equivalent of getDiveById. */
+export async function getCourseById(id) {
+  if (!id) return null;
+  const key = await getKey();
+  const params = `_id=eq.${encodeURIComponent(id)}`;
+  const [rows, priceMap, certMap] = await Promise.all([
+    fetchTable(key, 'EO_courses', params),
+    fetchPriceMap(key),
+    fetchCertMap(key),
+  ]);
+  const course = rows[0];
+  if (!course) return null;
+  return {
+    ...course,
+    starting_at: resolveStartingAt(course, priceMap),
+    prereqs: buildPrereqsText(course, certMap),
+    featured_image: wixImageToUrl(course.featured_image),
+  };
+}
+
+export async function getCalendarEvents() {
+  const key = await getKey();
+
+  const [courses, dives, priceMap] = await Promise.all([
+    fetchTable(key, 'EO_courses'),
+    fetchTable(key, 'EO_dives'),
+    fetchPriceMap(key),
+  ]);
+
+  const toStr = (val) => val ? new Date(val).toISOString().split('T')[0] : null;
+  const dayDiff = (a, b) => Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000);
+
+  const courseEvents = courses.flatMap((item) => {
+    if (!item.start_date) return [];
+    const base = {
+      id: item._id || item.id,
+      title: item.title || item.course_type || 'Course',
+      type: 'course',
+      featured: item.featured || false,
+      starting_at: resolveStartingAt(item, priceMap),
+      url: (item.url && String(item.url).trim()) || item['link-eo-courses-course_title'] || '',
+    };
+
+    const startStr   = toStr(item.start_date);
+    const endStr     = toStr(item.end_date) || startStr;
+    const specialStr = toStr(item.special_date);
+
+    if (!specialStr) return [{ ...base, start_date: startStr, end_date: endStr }];
+
+    if (specialStr === endStr) return [
+      { ...base, start_date: startStr, end_date: startStr },
+      { ...base, start_date: endStr,   end_date: endStr   },
+    ];
+
+    if (Math.abs(dayDiff(startStr, specialStr)) === 1) {
+      const [rangeStart, rangeEnd] = startStr < specialStr ? [startStr, specialStr] : [specialStr, startStr];
+      return [
+        { ...base, start_date: rangeStart, end_date: rangeEnd },
+        { ...base, start_date: endStr,     end_date: endStr   },
+      ];
+    }
+
+    if (Math.abs(dayDiff(endStr, specialStr)) === 1) {
+      const [rangeStart, rangeEnd] = endStr < specialStr ? [endStr, specialStr] : [specialStr, endStr];
+      return [
+        { ...base, start_date: startStr,  end_date: startStr },
+        { ...base, start_date: rangeStart, end_date: rangeEnd },
+      ];
+    }
+
+    return [
+      { ...base, start_date: startStr,   end_date: endStr     },
+      { ...base, start_date: specialStr, end_date: specialStr },
+    ];
+  });
+
+  const diveEvents = dives.flatMap((item) => {
+    if (!item.start_date) return [];
+    const start = new Date(item.start_date);
+    const end = item.end_date ? new Date(item.end_date) : start;
+    return [{
+      id: item._id || item.id,
+      start_date: start.toISOString().split('T')[0],
+      end_date:   end.toISOString().split('T')[0],
+      title:      item.title || item.dive_site || 'Dive',
+      type:       'dive',
+      url:        item['link-eo-dives-dive_title'] || '',
+      featured:   item.featured || false,
+      starting_at: resolveStartingAt(item, priceMap),
+    }];
+  });
+
+  return [...courseEvents, ...diveEvents];
+}
