@@ -466,12 +466,6 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
             ))}
           </Select>
         </Field>
-        <Field label="Prereqs (free text)">
-          <Input value={form.prereqs} onChange={v => set('prereqs', v)} />
-        </Field>
-        <Field label="Featured image URL">
-          <Input value={form.featured_image} onChange={v => set('featured_image', v)} />
-        </Field>
       </Section>
 
       {form.type === 'dive' && (
@@ -557,9 +551,6 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
                 </div>
               </div>
             )}
-            <Field label="Second image URL">
-              <Input value={form.second_image} onChange={v => set('second_image', v)} />
-            </Field>
           </Section>
 
           <Section title="Rooms">

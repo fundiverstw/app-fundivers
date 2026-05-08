@@ -16,9 +16,7 @@ export interface FormState {
   start_time: string     // 'HH:mm' or empty
   end_date: string
   price: string          // FK → EO_prices._id; empty = no price linked
-  featured_image: string
   prereq_cert_id: string // FK → cert_levels.id; empty = no cert required
-  prereqs: string        // free-form notes (e.g. "20+ logged dives")
   req_dives: string      // dives store bigint, courses store text — keep as string here
   dive_days: string      // bigint or empty
   addonIds: string[]     // FK multi → Other_Addons
@@ -33,7 +31,6 @@ export interface FormState {
   cancel_date: string
   cancel_policy: string
   destinationIds: string[]   // FK multi → TravelDestinations (JSON-encoded into destination_reference)
-  second_image: string
   divetravel_reference: string
   // payment deadlines (both event types) — empty string = unset, falls back
   // client-side to "7 days before start_date".
@@ -52,15 +49,15 @@ export const EMPTY_FORM: FormState = {
   type: 'dive',
   admin_title: '', display_title: '', calendar_title: '',
   start_date: '', start_time: '', end_date: '',
-  price: '', featured_image: '',
-  prereq_cert_id: '', prereqs: '',
+  price: '',
+  prereq_cert_id: '',
   req_dives: '', dive_days: '',
   addonIds: [],
   notes: '', featured: false, fully_booked: false,
   has_rooms: false, roomIds: [],
   nitrox_required: false, gear_rental: '',
   cancel_date: '', cancel_policy: '',
-  destinationIds: [], second_image: '', divetravel_reference: '',
+  destinationIds: [], divetravel_reference: '',
   deposit_deadline: '', full_payment_deadline: '',
   special_date: '', url: '', course_name: '',
   included: '', schedule: '', starting_at: '',
@@ -104,9 +101,7 @@ export function formStateFromDive(d: EODive): FormState {
     start_time: toHhmm(d.time),
     end_date: d.end_date ?? '',
     price: d.price ?? '',
-    featured_image: d.featured_image ?? '',
     prereq_cert_id: d.prereq_cert_id ?? '',
-    prereqs: d.prereqs ?? '',
     req_dives: d.req_dives != null ? String(d.req_dives) : '',
     dive_days: d.dive_days != null ? String(d.dive_days) : '',
     addonIds: parseAddonIds(d.other_addons),
@@ -120,7 +115,6 @@ export function formStateFromDive(d: EODive): FormState {
     cancel_date: d.cancel_date ?? '',
     cancel_policy: d.cancel_policy ?? '',
     destinationIds: parseAddonIds(d.destination_reference),
-    second_image: d.second_image ?? '',
     divetravel_reference: d.DiveTravel_reference ?? '',
     deposit_deadline: d.deposit_deadline ?? '',
     full_payment_deadline: d.full_payment_deadline ?? '',
@@ -142,10 +136,8 @@ export function formStateFromCourse(c: EOCourse): FormState {
     end_date: c.end_date ?? '',
     special_date: c.special_date ?? '',
     price: c.price ?? '',
-    featured_image: c.featured_image ?? '',
     url: c.URL ?? '',
     prereq_cert_id: c.prereq_cert_id ?? '',
-    prereqs: c.prereqs ?? '',
     req_dives: c.req_dives ?? '',
     dive_days: c.dive_days != null ? String(c.dive_days) : '',
     included: c.included ?? '',
@@ -159,7 +151,7 @@ export function formStateFromCourse(c: EOCourse): FormState {
     notes: '', featured: false, fully_booked: false,
     has_rooms: false, roomIds: [],
     nitrox_required: false, gear_rental: '',
-    destinationIds: [], second_image: '', divetravel_reference: '',
+    destinationIds: [], divetravel_reference: '',
   }
 }
 
@@ -179,13 +171,10 @@ export function divePayloadFromForm(form: FormState): Record<string, unknown> {
     time: timeText || null,
     end_date: form.end_date || null,
     price: form.price || null,
-    featured_image: form.featured_image || null,
-    second_image: form.second_image || null,
     notes: form.notes,                   // NOT NULL — empty string OK
     featured: form.featured,
     fully_booked: form.fully_booked,
     prereq_cert_id: form.prereq_cert_id || null,
-    prereqs: form.prereqs || null,
     req_dives: form.req_dives ? Number(form.req_dives) : null,
     dive_days: form.dive_days ? Number(form.dive_days) : null,
     gear_rental: form.gear_rental || null,
@@ -219,10 +208,8 @@ export function coursePayloadFromForm(form: FormState): Record<string, unknown> 
     end_date: form.end_date || null,
     special_date: form.special_date || null,
     price: form.price || null,
-    featured_image: form.featured_image || null,
     URL: form.url || null,
     prereq_cert_id: form.prereq_cert_id || null,
-    prereqs: form.prereqs || null,
     req_dives: form.req_dives || null,    // text on courses
     dive_days: form.dive_days ? Number(form.dive_days) : null,
     included: form.included || null,
