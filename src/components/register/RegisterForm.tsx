@@ -169,6 +169,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   // changes back to profiles so a Wix visitor who fills these in the first
   // time has them pre-filled for every future registration.
   const [fullName, setFullName]  = useState(profile?.full_name  ?? '')
+  const [nameAlt, setNameAlt]    = useState(profile?.name_alt   ?? '')
   const [dob, setDob]            = useState(profile?.date_of_birth ?? '')
   const [nationality, setNationality] = useState(profile?.nationality ?? '')
   const [idNumber, setIdNumber]  = useState(profile?.id_number  ?? '')
@@ -260,6 +261,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
     const nullish = (v: string) => v.trim() === '' ? null : v.trim()
     const profilePatch: ProfileUpdate = {
       full_name:               nullish(fullName),
+      name_alt:                nullish(nameAlt),
       date_of_birth:           nullish(dob),
       nationality:             nullish(nationality),
       id_number:               nullish(idNumber),
@@ -420,6 +422,12 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
 
           <div className="space-y-3">
             <TextField label="Full name *"      value={fullName}      onChange={setFullName} required />
+            <TextField
+              label="Name in another script (optional)"
+              value={nameAlt}
+              onChange={setNameAlt}
+              placeholder="e.g. 陳大文 / 山田太郎 / 김민수"
+            />
             <div className="grid grid-cols-2 gap-3">
               <TextField label="Date of birth" type="date" value={dob} onChange={setDob} />
               <TextField label="Nationality" value={nationality} onChange={setNationality} />

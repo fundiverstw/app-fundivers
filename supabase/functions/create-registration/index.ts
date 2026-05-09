@@ -312,6 +312,7 @@ Deno.serve(async (req) => {
     startDate,
     endDate:    (event?.end_date ?? null) as string | null,
     name:            profile?.full_name ?? "",
+    nameAlt:         profile?.name_alt ?? null,
     email:           registrantEmail,
     dob:             profile?.date_of_birth ?? null,
     nationality:     profile?.nationality ?? null,
@@ -365,8 +366,11 @@ Deno.serve(async (req) => {
       host: "smtp.gmail.com", port: 465, secure: true,
       auth: { user: GMAIL_USER, pass: GMAIL_PASS },
     })
+    const subjectName = payload.nameAlt
+      ? `${payload.name} ${payload.nameAlt}`
+      : payload.name
     if (isWaitlisted) {
-      const subject = `waitlist--${payload.eventTitle}--${payload.name}`
+      const subject = `waitlist--${payload.eventTitle}--${subjectName}`
       const mailOpts = {
         from: { name: "FunDivers TW", address: GMAIL_USER },
         subject,
@@ -385,7 +389,7 @@ Deno.serve(async (req) => {
       const buf    = Buffer.from(base64, "base64")
       // Subject format makes Gmail filtering / threading by event + diver
       // straightforward: registration--[event name]--[diver name]
-      const subject = `registration--${payload.eventTitle}--${payload.name}`
+      const subject = `registration--${payload.eventTitle}--${subjectName}`
       const mailOpts = {
         from: { name: "FunDivers TW", address: GMAIL_USER },
         subject,

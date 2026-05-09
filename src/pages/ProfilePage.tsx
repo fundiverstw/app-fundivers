@@ -33,6 +33,7 @@ import {
 const schema = z.object({
   full_name: z.string().min(1, 'Required'),
   display_name: z.string().min(1, 'Required'),
+  name_alt: z.string().nullish(),
   phone: z.string().nullish(),
   date_of_birth: z.string().min(1, 'Required'),
   nationality: z.string().nullish(),
@@ -204,6 +205,7 @@ export function ProfileForm({ user, profile, onSaved }: {
     const { error } = await supabase.from('profiles').update({
       full_name: data.full_name,
       display_name: strOrNull(data.display_name),
+      name_alt: strOrNull(data.name_alt),
       phone: strOrNull(data.phone),
       date_of_birth: strOrNull(data.date_of_birth),
       nationality: strOrNull(data.nationality),
@@ -246,6 +248,13 @@ export function ProfileForm({ user, profile, onSaved }: {
           <Field label="Display name" required>
             <input {...register('display_name')} className={inputClass} />
             {errors.display_name && <p className="text-red-600 text-xs mt-1">{errors.display_name.message}</p>}
+          </Field>
+          <Field label="Name in another script (optional)">
+            <input
+              {...register('name_alt')}
+              className={inputClass}
+              placeholder="e.g. 陳大文 / 山田太郎 / 김민수"
+            />
           </Field>
           <Field label="Phone"><input {...register('phone')} type="tel" className={inputClass} /></Field>
           <Field label="Date of birth" required>

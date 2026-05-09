@@ -67,7 +67,7 @@ export function AdminUsersPage() {
 
   const visible = users.filter(u => {
     if (!filter) return true
-    const haystack = [u.full_name, u.display_name, u.contact_id, u.phone]
+    const haystack = [u.full_name, u.display_name, u.name_alt, u.contact_id, u.phone]
       .filter(Boolean).join(' ').toLowerCase()
     return haystack.includes(filter.toLowerCase())
   })
@@ -123,6 +123,7 @@ function UserCard({
           <p className="font-medium text-blue-900 text-sm">
             {user.full_name ?? '(unnamed)'}
             {user.display_name && <span className="text-blue-900 font-medium"> “{user.display_name}”</span>}
+            {user.name_alt && <span className="text-blue-900 font-medium"> ({user.name_alt})</span>}
           </p>
           <p className="text-xs text-blue-900 font-medium">
             {user.cert_agency && user.cert_level ? `${user.cert_agency} ${user.cert_level}` : 'Uncertified'}

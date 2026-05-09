@@ -31,6 +31,8 @@ export interface RegistrationPdfPayload {
   startDate: string | null
   endDate: string | null
   name: string
+  /** Optional name in a non-Latin script. Rendered as its own row. */
+  nameAlt: string | null
   email: string
   dob: string | null
   nationality: string | null
@@ -191,6 +193,7 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   altState.alt = false
   y = section(doc, y, "Personal details")
   y = row(doc, y, "Name", p.name, altState)
+  y = row(doc, y, "Name (other script)", p.nameAlt, altState)
   y = row(doc, y, "Email", p.email, altState)
   y = row(doc, y, "Date of birth", p.dob, altState)
   y = row(doc, y, "Nationality", p.nationality, altState)
