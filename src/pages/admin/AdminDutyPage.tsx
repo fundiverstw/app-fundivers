@@ -164,7 +164,7 @@ function DutyRow({ enriched, highlight }: { enriched: Enriched; highlight?: bool
         </span>
       </div>
       {event
-        ? <Link to={`/admin/events/${event.type}/${event.id}`} className="block text-xs text-sky-300 hover:text-sky-100 truncate">
+        ? <Link to={`/admin/events/${event.type}/${event.id}`} className="block text-xs font-medium text-blue-900 hover:text-blue-700 underline truncate">
             {event.title}
           </Link>
         : (duty.eo_dive_id || duty.eo_course_id)

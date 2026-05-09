@@ -655,7 +655,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
       </Section>
 
       <Section title="Payment deadlines">
-        <p className="text-xs text-blue-950 font-medium">
+        <p className="text-xs text-white/70">
           Shown to divers on the registration form and in the emailed PDF.
           Leave blank to fall back to "7 days before start date".
         </p>
