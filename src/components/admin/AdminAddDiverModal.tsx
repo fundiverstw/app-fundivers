@@ -42,7 +42,7 @@ export function AdminAddDiverModal({
 
   const visible = profiles.filter(p => {
     if (!filter) return true
-    const haystack = [p.full_name, p.display_name, p.contact_id, p.phone]
+    const haystack = [p.full_name, p.display_name, p.name_alt, p.contact_id, p.phone]
       .filter(Boolean).join(' ').toLowerCase()
     return haystack.includes(filter.toLowerCase())
   })
@@ -109,6 +109,7 @@ export function AdminAddDiverModal({
                     <p className="text-sm font-medium text-blue-900">
                       {p.full_name ?? '(no name)'}
                       {p.display_name && <span className="text-blue-900/80"> “{p.display_name}”</span>}
+                      {p.name_alt && <span className="text-blue-900/80"> ({p.name_alt})</span>}
                     </p>
                     <p className="text-xs text-blue-900/70">
                       {p.cert_agency && p.cert_level && `${p.cert_agency} ${p.cert_level}`}

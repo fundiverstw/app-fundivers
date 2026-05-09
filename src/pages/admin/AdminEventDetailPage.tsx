@@ -430,6 +430,7 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
             <span aria-hidden="true" className="text-blue-950 font-medium mr-1.5">{expanded ? '▾' : '▸'}</span>
             {r.profile?.full_name ?? '(no profile)'}
             {r.profile?.display_name && <span className="text-blue-900 font-medium"> “{r.profile.display_name}”</span>}
+            {r.profile?.name_alt && <span className="text-blue-900 font-medium"> ({r.profile.name_alt})</span>}
           </p>
           {r.profile && (
             <p className="text-xs text-blue-900 font-medium pl-4">
