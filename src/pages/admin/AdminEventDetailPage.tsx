@@ -42,6 +42,7 @@ export function AdminEventDetailPage() {
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [cancelInFlight, setCancelInFlight] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
+  const [notifyModalOpen, setNotifyModalOpen] = useState(false)
 
   useEffect(() => {
     if (!type || !id) return
@@ -226,6 +227,13 @@ export function AdminEventDetailPage() {
                 >
                   {event?.cancelled_at ? 'Restore event' : 'Cancel event'}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setNotifyModalOpen(true)}
+                  className="text-xs bg-amber-700/80 hover:bg-amber-700 text-white px-3 py-1 rounded-lg"
+                >
+                  Notify divers
+                </button>
               </>
             )}
             <Link
@@ -307,6 +315,20 @@ export function AdminEventDetailPage() {
           onConfirm={() => setCancelledAt(event?.cancelled_at ? null : new Date().toISOString())}
         />
       )}
+
+      {notifyModalOpen && type && id && event && (
+        <NotifyDiversModal
+          eventTitle={event.title}
+          eventId={id}
+          eventType={type}
+          confirmedCount={registrants.filter(r => r.booking.status === 'confirmed').length}
+          onClose={() => setNotifyModalOpen(false)}
+          onSent={summary => {
+            toast.success(summary)
+            setNotifyModalOpen(false)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -378,6 +400,161 @@ function CancelEventModal({
               : (alreadyCancelled ? 'Restore event' : 'Cancel event')}
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function NotifyDiversModal({
+  eventTitle, eventId, eventType, confirmedCount, onClose, onSent,
+}: {
+  eventTitle: string
+  eventId: string
+  eventType: 'dive' | 'course'
+  confirmedCount: number
+  onClose: () => void
+  onSent: (summary: string) => void
+}) {
+  const [status, setStatus] = useState<'on' | 'cancelled'>('on')
+  const [body, setBody] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const headerPreview = status === 'on'
+    ? `Event ${eventTitle} is ON AS SCHEDULED!`
+    : `Event ${eventTitle} is CANCELLED :(`
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    if (!body.trim()) {
+      setError('Body is required.')
+      return
+    }
+    const workerUrl = ((import.meta.env.VITE_PUSH_WORKER_URL as string | undefined) ?? '').replace(/\/$/, '')
+    if (!workerUrl) {
+      setError('VITE_PUSH_WORKER_URL is not configured for this environment.')
+      return
+    }
+    setSubmitting(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Not signed in.')
+      const res = await fetch(`${workerUrl}/admin-event-broadcast`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          event_id:   eventId,
+          event_type: eventType,
+          status,
+          body:       body.trim(),
+        }),
+      })
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        throw new Error(text || `Notify failed (HTTP ${res.status}).`)
+      }
+      const result = await res.json() as { sent?: number; skipped?: number; recipients?: number }
+      const sent = result.sent ?? 0
+      const recipients = result.recipients ?? 0
+      onSent(`Notified ${recipients} diver${recipients === 1 ? '' : 's'} (${sent} push device${sent === 1 ? '' : 's'})`)
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/50 flex items-start justify-center p-4 pt-8 overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="notify-divers-title"
+      onClick={onClose}
+    >
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3" onClick={e => e.stopPropagation()}>
+        <h2 id="notify-divers-title" className="text-lg font-bold text-blue-900">
+          Notify confirmed divers
+        </h2>
+        <p className="text-sm text-blue-900">
+          Sends a push to {confirmedCount} confirmed diver{confirmedCount === 1 ? '' : 's'} on this event,
+          and lands in their in-app inbox.
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="space-y-1">
+            <span className="text-xs font-medium text-blue-900">Status</span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setStatus('on')}
+                className={`flex-1 text-xs font-semibold px-3 py-2 rounded-lg border ${
+                  status === 'on'
+                    ? 'bg-blue-900 text-white border-blue-900'
+                    : 'bg-white text-blue-900 border-sky-300 hover:bg-sky-50'
+                }`}
+              >
+                ON AS SCHEDULED
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatus('cancelled')}
+                className={`flex-1 text-xs font-semibold px-3 py-2 rounded-lg border ${
+                  status === 'cancelled'
+                    ? 'bg-red-700 text-white border-red-700'
+                    : 'bg-white text-blue-900 border-sky-300 hover:bg-sky-50'
+                }`}
+              >
+                CANCELLED
+              </button>
+            </div>
+            <p className="text-[11px] text-blue-900/70 pt-1">
+              Push title: <span className="font-medium">{headerPreview}</span>
+            </p>
+          </div>
+
+          <label className="block space-y-1">
+            <span className="text-xs font-medium text-blue-900">Note *</span>
+            <textarea
+              value={body}
+              onChange={e => setBody(e.target.value)}
+              placeholder="Details for the divers (e.g. weather, meeting point, refund info)."
+              rows={5}
+              maxLength={1000}
+              className="w-full bg-white border border-sky-300 rounded-md px-3 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900 resize-none"
+            />
+          </label>
+
+          {error && (
+            <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded px-2 py-1">{error}</p>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="flex-1 py-2 rounded-lg text-sm font-medium text-blue-900 border border-sky-300 hover:bg-sky-50 disabled:opacity-50"
+            >
+              Back
+            </button>
+            <button
+              type="submit"
+              disabled={submitting || confirmedCount === 0}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50 ${
+                status === 'cancelled'
+                  ? 'bg-red-700 hover:bg-red-800'
+                  : 'bg-blue-900 hover:bg-blue-950'
+              }`}
+            >
+              {submitting ? 'Sending…' : `Send to ${confirmedCount}`}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   )
