@@ -84,6 +84,9 @@ export default {
     if (url.pathname === '/admin-broadcast' && req.method === 'POST') {
       return withCors(await handleAdminBroadcast(req, env), req)
     }
+    if (url.pathname === '/admin-event-broadcast' && req.method === 'POST') {
+      return withCors(await handleAdminEventBroadcast(req, env), req)
+    }
     return withCors(new Response('not found', { status: 404 }), req)
   },
 }
@@ -346,6 +349,124 @@ export async function handleAdminBroadcast(req: Request, env: Env): Promise<Resp
   }
 
   return Response.json({ sent, skipped, webhook: webhookOk })
+}
+
+// Admin-triggered status push for a single event ("ON AS SCHEDULED" /
+// "CANCELLED"). Goes only to confirmed bookings on the event so we don't
+// alarm cancelled/waitlisted divers. Title is built from the toggle and
+// the event's display_title; the admin-supplied note becomes the body.
+//
+// Tap target is /notifications (the inbox) — tapping a system push that
+// vanishes from the tray is the worst time to lose the message body, and
+// the inbox row keeps the full text scrollable.
+export async function handleAdminEventBroadcast(req: Request, env: Env): Promise<Response> {
+  const auth = req.headers.get('authorization') ?? ''
+  if (!auth.startsWith('Bearer ')) return new Response('unauthorized', { status: 401 })
+  const token = auth.slice('Bearer '.length)
+
+  let body: { event_id?: string; event_type?: 'dive' | 'course'; status?: 'on' | 'cancelled'; body?: string }
+  try { body = await req.json() } catch { return new Response('bad request', { status: 400 }) }
+  const eventId   = (body.event_id ?? '').trim()
+  const eventType = body.event_type
+  const status    = body.status
+  const text      = (body.body ?? '').trim()
+  if (!eventId)                                  return new Response('event_id is required', { status: 400 })
+  if (eventType !== 'dive' && eventType !== 'course') return new Response('event_type must be dive or course', { status: 400 })
+  if (status !== 'on' && status !== 'cancelled')      return new Response('status must be on or cancelled', { status: 400 })
+  if (!text)                                          return new Response('body is required', { status: 400 })
+
+  const anonKey = env.SUPABASE_ANON_KEY
+  if (!anonKey) return new Response('SUPABASE_ANON_KEY not configured', { status: 500 })
+
+  // Admin gate via the caller's JWT — same pattern as handleAdminBroadcast.
+  const userClient = createClient<Database>(env.SUPABASE_URL, anonKey, {
+    global: { headers: { Authorization: auth } },
+    auth: { persistSession: false },
+  })
+  const { data: userRes } = await userClient.auth.getUser(token)
+  const userId = userRes?.user?.id
+  if (!userId) return new Response('unauthorized', { status: 401 })
+  const { data: prof } = await userClient
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .maybeSingle()
+  if (prof?.role !== 'admin') return new Response('forbidden', { status: 403 })
+
+  const service = createClient<Database>(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false },
+  })
+
+  // Resolve event title.
+  let eventTitle = 'Event'
+  if (eventType === 'dive') {
+    const { data } = await service.from('EO_dives').select('display_title, admin_title').eq('_id', eventId).maybeSingle()
+    eventTitle = data?.display_title || data?.admin_title || eventTitle
+  } else {
+    const { data } = await service.from('EO_courses').select('display_title, admin_title').eq('_id', eventId).maybeSingle()
+    eventTitle = data?.display_title || data?.admin_title || eventTitle
+  }
+
+  const title = status === 'on'
+    ? `Event ${eventTitle} is ON AS SCHEDULED!`
+    : `Event ${eventTitle} is CANCELLED :(`
+
+  // Confirmed bookings only — pending/waitlisted/cancelled divers don't
+  // get the message.
+  const column = eventType === 'dive' ? 'eo_dive_id' : 'eo_course_id'
+  const { data: bookings } = await service
+    .from('bookings')
+    .select('user_id')
+    .eq(column, eventId)
+    .eq('status', 'confirmed')
+  const recipientIds = unique((bookings ?? []).map(b => b.user_id))
+  if (!recipientIds.length) return Response.json({ sent: 0, skipped: 0, recipients: 0 })
+
+  webpush.setVapidDetails(env.VAPID_SUBJECT, env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY)
+
+  // Inbox row per recipient first — sole delivery path for users without
+  // push subscriptions.
+  const inboxRows = recipientIds.map(uid => ({
+    user_id:  uid,
+    title,
+    body:     text,
+    url:      '/notifications',
+    kind:     'event_status' as const,
+    event_id: eventId,
+  }))
+  await service.from('notifications').insert(inboxRows)
+
+  const { data: subs } = await service
+    .from('push_subscriptions')
+    .select('user_id, endpoint, p256dh, auth')
+    .in('user_id', recipientIds)
+
+  const payload = JSON.stringify({
+    title,
+    body: text,
+    tag:  `event-status:${eventId}:${Date.now()}`,
+    url:  '/notifications',
+  })
+
+  let sent = 0
+  let skipped = 0
+  for (const s of subs ?? []) {
+    try {
+      await webpush.sendNotification(
+        { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+        payload,
+        { TTL: 60 * 60 * 24 }
+      )
+      sent++
+    } catch (err: unknown) {
+      const sc = (err as { statusCode?: number })?.statusCode
+      if (sc === 404 || sc === 410) {
+        await service.from('push_subscriptions').delete().eq('endpoint', s.endpoint)
+      }
+      skipped++
+    }
+  }
+  return Response.json({ sent, skipped, recipients: recipientIds.length })
 }
 
 export async function runDailyReminders(env: Env): Promise<{ sent: number; skipped: number }> {

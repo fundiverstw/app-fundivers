@@ -132,6 +132,33 @@ npx wrangler secret put SUPABASE_ANON_KEY
 npx wrangler secret put BROADCAST_WEBHOOK_URL   # optional
 ```
 
+## Per-event status push (`/admin-event-broadcast`)
+
+Lets an admin notify only the **confirmed** divers on a specific event with
+a status update — typically just before an event when conditions change.
+Surfaced in-app at `/admin/events/:type/:id` ("Notify divers" button) and
+gated by `profiles.role` in the worker.
+
+```
+POST /admin-event-broadcast
+Authorization: Bearer <admin user's session JWT>
+{ "event_id": "<EO_dives._id | EO_courses._id>",
+  "event_type": "dive" | "course",
+  "status": "on" | "cancelled",
+  "body": "Free-form note that becomes the push body." }
+→ { "sent": N, "skipped": M, "recipients": K }
+```
+
+Title is auto-built: `Event {display_title} is ON AS SCHEDULED!` or
+`Event {display_title} is CANCELLED :(`. Tap target is `/notifications`
+(the inbox), so the diver can re-read the body after the system tray
+dismisses the push. Inbox rows are written `kind = 'event_status'`.
+
+This endpoint is decoupled from `EO_*.cancelled_at` — sending a CANCELLED
+notification does **not** flip the column. Use the existing "Cancel event"
+flow for that; the two are intentionally independent so admins can also
+broadcast "back on" updates without restoring the row.
+
 ## Duty-assigned push (`/notify-duty`)
 
 When an admin assigns a duty (`/admin/duty`), the SPA fires a
