@@ -5,10 +5,16 @@ import { DashboardPage } from './DashboardPage'
 
 const { useAuthMock } = vi.hoisted(() => ({ useAuthMock: vi.fn() }))
 vi.mock('../hooks/useAuth', () => ({ useAuth: () => useAuthMock() }))
-// SharkBouncer does its own timers/pointer math; stub it here since this
+// Bouncers do their own timers/pointer math; stub them here since this
 // test is only about the bubble console overlay and role label.
 vi.mock('../components/dashboard/SharkBouncer', () => ({
   SharkBouncer: () => null,
+}))
+vi.mock('../components/dashboard/TurtleBouncer', () => ({
+  TurtleBouncer: () => null,
+}))
+vi.mock('../components/dashboard/NudibranchBouncer', () => ({
+  NudibranchBouncer: () => null,
 }))
 
 // happy-dom provides a Canvas stub but getContext returns null by default.

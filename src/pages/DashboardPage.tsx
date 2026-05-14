@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { SharkBouncer } from '../components/dashboard/SharkBouncer'
+import { TurtleBouncer } from '../components/dashboard/TurtleBouncer'
+import { NudibranchBouncer } from '../components/dashboard/NudibranchBouncer'
 import { WelcomeBanner } from '../components/welcome/WelcomeBanner'
 
 // Ocean-themed rising bubbles, shared by admin and diver landings. Replaces
@@ -148,6 +150,8 @@ export function DashboardPage() {
         </div>
       )}
       <SharkBouncer />
+      <TurtleBouncer />
+      <NudibranchBouncer />
     </div>
   )
 }
