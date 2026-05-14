@@ -44,7 +44,6 @@ export interface FormState {
   course_name: string
   included: string
   schedule: string
-  starting_at: string    // integer or empty
 }
 
 export const EMPTY_FORM: FormState = {
@@ -63,7 +62,7 @@ export const EMPTY_FORM: FormState = {
   destinationIds: [], divetravel_reference: '',
   deposit_deadline: '', full_payment_deadline: '',
   special_date: '', url: '', course_name: '',
-  included: '', schedule: '', starting_at: '',
+  included: '', schedule: '',
 }
 
 function toHhmm(raw: string | null | undefined): string {
@@ -135,7 +134,7 @@ export function formStateFromDive(d: EODive): FormState {
     deposit_deadline: d.deposit_deadline ?? '',
     full_payment_deadline: d.full_payment_deadline ?? '',
     special_date: '', url: '', course_name: '',
-    included: '', schedule: '', starting_at: '',
+    included: '', schedule: '',
   }
 }
 
@@ -159,7 +158,6 @@ export function formStateFromCourse(c: EOCourse): FormState {
     dive_days: c.dive_days != null ? String(c.dive_days) : '',
     included: c.included ?? '',
     schedule: c.schedule ?? '',
-    starting_at: c.starting_at != null ? String(c.starting_at) : '',
     addonIds: parseAddonIds(c.other_addons),
     deposit_deadline: c.deposit_deadline ?? '',
     full_payment_deadline: c.full_payment_deadline ?? '',
@@ -233,7 +231,6 @@ export function coursePayloadFromForm(form: FormState): Record<string, unknown> 
     dive_days: form.dive_days ? Number(form.dive_days) : null,
     included: form.included || null,
     schedule: form.schedule || null,
-    starting_at: form.starting_at ? Number(form.starting_at) : null,
     other_addons: addonsJson,
     deposit_deadline: form.deposit_deadline || null,
     full_payment_deadline: form.full_payment_deadline || null,

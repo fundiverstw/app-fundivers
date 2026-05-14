@@ -621,14 +621,9 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
           <Field label="Course name">
             <Input value={form.course_name} onChange={v => set('course_name', v)} />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Special date (extra session)">
-              <Input type="date" value={form.special_date} onChange={v => set('special_date', v)} />
-            </Field>
-            <Field label="Starting at (price)">
-              <Input type="number" value={form.starting_at} onChange={v => set('starting_at', v)} />
-            </Field>
-          </div>
+          <Field label="Special date (extra session)">
+            <Input type="date" value={form.special_date} onChange={v => set('special_date', v)} />
+          </Field>
           <Field label="URL">
             <Input value={form.url} onChange={v => set('url', v)} />
           </Field>
