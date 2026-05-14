@@ -5,14 +5,24 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { AdminEventDetailPage } from './AdminEventDetailPage'
 import { mockQueryBuilder } from '../../../tests/test-utils'
 
-const { from, useAuthMock, fetchEventsForBookings } = vi.hoisted(() => ({
+const { from, invoke, useAuthMock, fetchEventsForBookings } = vi.hoisted(() => ({
   from: vi.fn(),
+  invoke: vi.fn(),
   useAuthMock: vi.fn(),
   fetchEventsForBookings: vi.fn(),
 }))
 
 vi.mock('../../lib/supabase', () => ({
-  supabase: { from: (...a: unknown[]) => from(...a) },
+  supabase: {
+    from: (...a: unknown[]) => from(...a),
+    functions: { invoke: (...a: unknown[]) => invoke(...a) },
+  },
+}))
+
+const toastSuccess = vi.fn()
+const toastError = vi.fn()
+vi.mock('../../hooks/useToast', () => ({
+  useToast: () => ({ success: toastSuccess, error: toastError, info: vi.fn() }),
 }))
 vi.mock('../../lib/events', async () => {
   const actual = await vi.importActual<typeof import('../../lib/events')>('../../lib/events')
@@ -44,8 +54,11 @@ function renderAt(path: string) {
 
 beforeEach(() => {
   from.mockReset()
+  invoke.mockReset()
   useAuthMock.mockReset()
   fetchEventsForBookings.mockReset()
+  toastSuccess.mockReset()
+  toastError.mockReset()
   useAuthMock.mockReturnValue({ user: { id: 'admin-1' }, profile: { id: 'admin-1', role: 'admin' } })
 })
 
@@ -409,5 +422,75 @@ describe('AdminEventDetailPage', () => {
 
     // Booking is already confirmed; no status update should fire.
     expect(bookingUpdate).not.toHaveBeenCalled()
+  })
+
+  it('creates a new diver account from the Add diver modal and advances to the register step', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', {
+        id: 'dive_x', type: 'dive', title: 'Kenting',
+        start_time: new Date().toISOString(), end_time: null, currency: 'TWD',
+        cancelled_at: null,
+        has_rooms: false, room_type_ids: [], has_addons: false, addon_ids: [],
+        nitrox_required: false, gear_rental_info: null,
+        price: 2800, deposit_amount: 0, transport_price: 0, dive_days: 1,
+      }],
+    ]))
+
+    const newProfile = {
+      id: 'u-new', full_name: 'Eve Tester', display_name: 'Eve', name_alt: null,
+      cert_agency: null, cert_level: null, nitrox_certified: false,
+      logged_dives: 0, phone: null, contact_method: null, contact_id: null,
+      height_cm: null, weight_kg: null, shoe_size: null, status: 'active',
+    }
+
+    // First profiles call (modal list) returns no existing divers. Second
+    // profiles call (after create) returns the new profile by id.
+    let profilesCallCount = 0
+    from.mockImplementation((table: string) => {
+      if (table === 'profiles') {
+        profilesCallCount += 1
+        if (profilesCallCount === 1) return mockQueryBuilder({ data: [] })
+        return mockQueryBuilder({ data: newProfile })
+      }
+      return mockQueryBuilder({ data: [] })
+    })
+
+    invoke.mockResolvedValue({
+      data: { ok: true, user_id: 'u-new', email_sent: true },
+      error: null,
+    })
+
+    const user = userEvent.setup()
+    renderAt('/admin/events/dive/dive_x')
+
+    await screen.findByRole('heading', { name: /kenting/i })
+    await user.click(screen.getByRole('button', { name: /add diver/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: /add diver to event/i })
+    await user.click(within(dialog).getByRole('button', { name: /create new diver account/i }))
+
+    // Form fields visible.
+    const form = await screen.findByRole('heading', { name: /create new diver account/i })
+    expect(form).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText(/^email \*$/i), 'eve@example.com')
+    await user.type(screen.getByLabelText(/^full name \*$/i), 'Eve Tester')
+    await user.type(screen.getByLabelText(/^display name$/i), 'Eve')
+
+    await user.click(screen.getByRole('button', { name: /create account/i }))
+
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('admin-create-diver', expect.anything()))
+    const invokeArgs = invoke.mock.calls[0]?.[1] as { body: Record<string, unknown> }
+    expect(invokeArgs.body).toMatchObject({
+      email: 'eve@example.com',
+      full_name: 'Eve Tester',
+      display_name: 'Eve',
+    })
+    expect(invokeArgs.body.redirect_to).toMatch(/\/reset-password$/)
+
+    // Modal jumps to step C — RegisterFormBody Step 1 of 4 for the new diver.
+    await screen.findByText(/Step 1 of 4/i)
+    expect(screen.getByRole('heading', { name: /Register Eve/i })).toBeInTheDocument()
+    expect(toastSuccess).toHaveBeenCalled()
   })
 })
