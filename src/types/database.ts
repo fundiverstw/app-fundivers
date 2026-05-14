@@ -27,7 +27,12 @@ export interface BookingDetails {
   }
   add_ons?: string[]
   transportation?: boolean
-  payment_method?: 'bank_transfer' | 'credit_card' | 'cash'
+  payment_method?: 'bank_transfer' | 'credit_card' | 'paypal' | 'cash'
+  /** Optional billing email when the diver picks credit_card — they receive
+   *  the invoice with the card-payment link at this address. Empty / undefined
+   *  means fall back to the registered account email. Only set when
+   *  payment_method === 'credit_card'. */
+  credit_card_invoice_email?: string
   /** True when the diver chose deposit-only at registration; full balance is
    *  due by full_payment_deadline. False / undefined = paying full upfront. */
   pay_deposit_only?: boolean

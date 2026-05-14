@@ -153,8 +153,11 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   const [addonIds, setAddonIds] = useState<Set<string>>(new Set(initialDetails?.add_ons ?? []))
   const [needsTransport, setNeedsTransport] = useState(initialDetails?.transportation ?? false)
   const [addNitroxCourse, setAddNitroxCourse] = useState(initialDetails?.nitrox_course_addon ?? false)
-  const [payment, setPayment] = useState<'bank_transfer' | 'credit_card' | 'cash'>(
+  const [payment, setPayment] = useState<'bank_transfer' | 'credit_card' | 'paypal' | 'cash'>(
     initialDetails?.payment_method ?? 'bank_transfer'
+  )
+  const [creditCardInvoiceEmail, setCreditCardInvoiceEmail] = useState<string>(
+    initialDetails?.credit_card_invoice_email ?? ''
   )
   // Default to full payment per product spec. Only meaningful when the event
   // has a deposit_amount — otherwise the radio is hidden entirely.
@@ -295,6 +298,9 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
       add_ons: showAddons ? [...addonIds] : [],
       transportation: needsTransport,
       payment_method: payment,
+      credit_card_invoice_email: payment === 'credit_card' && creditCardInvoiceEmail.trim()
+        ? creditCardInvoiceEmail.trim()
+        : undefined,
       pay_deposit_only: hasDeposit ? payDepositOnly : false,
       nitrox_course_addon: showNitroxAddon && addNitroxCourse,
       total,
@@ -613,13 +619,14 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
         <section className="space-y-3">
           <h2 className="text-lg font-bold text-blue-900">Payment</h2>
           <div className="space-y-2">
-            {(['bank_transfer', 'credit_card', 'cash'] as const).map(method => (
+            {(['bank_transfer', 'paypal', 'credit_card', 'cash'] as const).map(method => (
               <label key={method} className="flex gap-2 text-sm text-blue-950 font-medium items-start">
                 <input type="radio" name="payment" checked={payment === method} onChange={() => setPayment(method)} className="accent-blue-900 mt-1" />
                 <span className="flex-1">
                   <span className="block">
                     {method === 'bank_transfer' && 'Bank transfer'}
-                    {method === 'credit_card' && 'Credit card via PayPal (+5%)'}
+                    {method === 'paypal' && 'PayPal'}
+                    {method === 'credit_card' && 'Credit card (+5%)'}
                     {method === 'cash' && 'Cash (in person at the shop)'}
                   </span>
                 </span>
@@ -627,7 +634,25 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
             ))}
           </div>
 
-          <PaymentInstructionsBlock method={payment} />
+          {payment === 'credit_card' && (
+            <label className="block">
+              <span className="block text-xs text-blue-900 font-medium mb-1">
+                Invoice email (optional)
+              </span>
+              <input
+                type="email"
+                value={creditCardInvoiceEmail}
+                onChange={e => setCreditCardInvoiceEmail(e.target.value)}
+                placeholder="Defaults to your registered email"
+                className="w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-sm text-blue-900"
+              />
+            </label>
+          )}
+
+          <PaymentInstructionsBlock
+            method={payment}
+            invoiceEmail={payment === 'credit_card' ? creditCardInvoiceEmail.trim() || null : null}
+          />
 
           <div className="text-sm text-blue-950 font-medium bg-sky-50 rounded-lg p-3 space-y-1">
             <Row label="Base"                value={base} currency={event.currency} />
@@ -766,13 +791,43 @@ function formatDeadline(yyyyMmDd: string): string {
   return format(parseISO(yyyyMmDd + 'T00:00:00'), 'EEE, MMM d')
 }
 
-function PaymentInstructionsBlock({ method }: { method: 'bank_transfer' | 'credit_card' | 'cash' }) {
-  const instr = paymentInstructionsFor(method)
+function PaymentInstructionsBlock({
+  method, invoiceEmail,
+}: {
+  method: 'bank_transfer' | 'credit_card' | 'paypal' | 'cash'
+  invoiceEmail?: string | null
+}) {
+  const instr = paymentInstructionsFor(method, { invoiceEmail })
   return (
     <div className="text-xs text-blue-950 font-medium bg-white/70 border border-sky-200 rounded-lg p-3 space-y-1">
       <p className="font-semibold text-blue-900">{instr.title}</p>
-      {instr.lines.map((line, i) => <p key={i}>{line}</p>)}
+      {instr.lines.map((line, i) => <PaymentInstructionLine key={i} line={line} />)}
     </div>
+  )
+}
+
+// Render a single instruction line, turning bare https URLs into clickable
+// anchors so tapping the paypal.me / Google Maps link Just Works on mobile.
+// The PDF version stays plain text — jsPDF doesn't carry hyperlinks well.
+function PaymentInstructionLine({ line }: { line: string }) {
+  const urlMatch = line.match(/(https?:\/\/\S+)/)
+  if (!urlMatch) return <p>{line}</p>
+  const url = urlMatch[1]
+  const before = line.slice(0, urlMatch.index)
+  const after = line.slice((urlMatch.index ?? 0) + url.length)
+  return (
+    <p>
+      {before}
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-700 underline break-all"
+      >
+        {url}
+      </a>
+      {after}
+    </p>
   )
 }
 
