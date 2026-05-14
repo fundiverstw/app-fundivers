@@ -2,20 +2,19 @@
 //
 // Flow:
 //   1. Verify caller via Bearer JWT, confirm profiles.role = 'admin'.
-//   2. createUser with a one-shot random password and email_confirm = true,
-//      so the new diver does not need to click a confirmation link before
-//      they can log in.
+//   2. createUser with a one-shot random password and email_confirm = true.
+//      The diver never sees this password; if they later want to log in
+//      they reach out and we issue temporary credentials by hand.
 //   3. UPDATE the auto-created profile row (handle_new_user trigger fires
 //      on the auth insert) with the admin-supplied name fields and
 //      status = 'active'. The admin is vouching for the diver — we skip
 //      the normal pending → review flow.
-//   4. generateLink(type='recovery') against the new email to mint a
-//      one-time link that lands the diver on /reset-password with a
-//      recovery-scoped session. We send the link via Gmail SMTP so we
-//      bypass Supabase's built-in email rate limits and stay consistent
-//      with notify-application-decision.
+//   4. Send a courtesy "we made an account for you on your behalf" email
+//      via Gmail SMTP. No login link in the email — the diver can ignore
+//      it entirely if they don't want app access. If they do, they reply
+//      and an admin issues credentials manually.
 //
-// Body: { email, full_name, display_name?, name_alt?, redirect_to }
+// Body: { email, full_name, display_name?, name_alt?, event_title? }
 // Returns: { ok: true, user_id, email_sent }
 
 import { createClient } from "jsr:@supabase/supabase-js@2"
@@ -41,12 +40,12 @@ interface Body {
   full_name:     string
   display_name?: string
   name_alt?:     string
-  redirect_to:   string
+  event_title?:  string
 }
 
-// 32 chars of crypto-random base64 — admin never sees this. The diver gets
-// in via the recovery link, sets their own password, and this throwaway
-// password is overwritten.
+// Throwaway password — admin never sees this. The auth.users row needs a
+// password column to be set; the diver gets credentials issued manually if
+// they later want app access.
 function randomTempPassword(): string {
   const bytes = new Uint8Array(24)
   crypto.getRandomValues(bytes)
@@ -65,10 +64,9 @@ Deno.serve(async (req) => {
   try { body = await req.json() as Body } catch { return json({ error: "invalid json" }, 400) }
   const email = body.email?.trim().toLowerCase()
   const fullName = body.full_name?.trim()
-  const redirectTo = body.redirect_to?.trim()
-  if (!email)       return json({ error: "email required" }, 400)
-  if (!fullName)    return json({ error: "full_name required" }, 400)
-  if (!redirectTo)  return json({ error: "redirect_to required" }, 400)
+  const eventTitle = body.event_title?.trim() || null
+  if (!email)    return json({ error: "email required" }, 400)
+  if (!fullName) return json({ error: "full_name required" }, 400)
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
   const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -118,26 +116,8 @@ Deno.serve(async (req) => {
     return json({ error: profErr.message }, 500)
   }
 
-  // Mint the password-set link. type='recovery' against the just-created
-  // user gives them a one-time link that the existing /reset-password page
-  // already handles (PASSWORD_RECOVERY auth event → updateUser({password})).
-  const { data: link, error: linkErr } = await admin.auth.admin.generateLink({
-    type:    "recovery",
-    email,
-    options: { redirectTo },
-  })
-  const actionLink = link?.properties?.action_link ?? null
-  if (linkErr || !actionLink) {
-    return json({
-      ok:        true,
-      user_id:   newUserId,
-      email_sent: false,
-      warning:   "Account created but recovery link could not be generated. Diver can use 'Forgot password' on the login page.",
-    })
-  }
-
-  // Email the link via Gmail SMTP. Best-effort: the account exists already,
-  // so admin can re-trigger via Forgot Password if SMTP is misconfigured.
+  // Courtesy email — no login link. The diver only needs to act if they
+  // want app access; otherwise their event registration stands on its own.
   let emailSent = false
   if (GMAIL_USER && GMAIL_PASS) {
     try {
@@ -145,21 +125,27 @@ Deno.serve(async (req) => {
         host: "smtp.gmail.com", port: 465, secure: true,
         auth: { user: GMAIL_USER, pass: GMAIL_PASS },
       })
+      const eventClause = eventTitle
+        ? `your registration for ${eventTitle}`
+        : `your event registration`
       await transporter.sendMail({
         from: { name: "FunDivers TW", address: GMAIL_USER },
         to:      email,
         bcc:     COMPANY_EMAIL,
-        subject: "FunDivers TW — set your password",
+        subject: "FunDivers TW — account created for you",
         text:
           `Hi ${fullName},\n\n` +
-          `An account has been created for you at FunDivers TW. To finish setting up, click the link below to choose your password:\n\n` +
-          `${actionLink}\n\n` +
-          `Once you've set a password you can sign in at https://app.fundiverstw.com any time.\n\n` +
+          `We have created a FunDivers TW app diver account on your behalf.\n\n` +
+          `If you would like to access this account for all the great features on the app ` +
+          `(dive logs, easy event registration, push notifications, fun games, etc.) please ` +
+          `reply to this email or message us, and we'll issue you a temporary username and ` +
+          `password to log in with.\n\n` +
+          `Otherwise no further action is required for ${eventClause}.\n\n` +
           `— FunDivers TW`,
       })
       emailSent = true
     } catch (e) {
-      console.error("invite email failed:", (e as Error).message)
+      console.error("courtesy email failed:", (e as Error).message)
     }
   }
 

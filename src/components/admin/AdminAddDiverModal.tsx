@@ -95,6 +95,7 @@ export function AdminAddDiverModal({
           </>
         ) : creatingNew ? (
           <CreateNewDiverForm
+            eventTitle={event.title}
             onCancel={() => setCreatingNew(false)}
             onCreated={profile => {
               setProfiles(prev => [profile, ...prev])
@@ -161,9 +162,11 @@ export function AdminAddDiverModal({
 function CreateNewDiverForm({
   onCancel,
   onCreated,
+  eventTitle,
 }: {
   onCancel: () => void
   onCreated: (profile: Profile) => void
+  eventTitle: string
 }) {
   const toast = useToast()
   const [email, setEmail] = useState('')
@@ -188,14 +191,13 @@ function CreateNewDiverForm({
         ok: boolean
         user_id: string
         email_sent: boolean
-        warning?: string
       }>('admin-create-diver', {
         body: {
           email:        trimmedEmail,
           full_name:    trimmedName,
           display_name: displayName.trim() || undefined,
           name_alt:     nameAlt.trim() || undefined,
-          redirect_to:  `${window.location.origin}/reset-password`,
+          event_title:  eventTitle,
         },
       })
       if (invokeErr) throw new Error(invokeErr.message)
@@ -207,11 +209,7 @@ function CreateNewDiverForm({
         .from('profiles').select('*').eq('id', data.user_id).single()
       if (profErr || !profile) throw new Error(profErr?.message ?? 'profile not found after creation')
 
-      const tail = data.email_sent
-        ? ' · invite emailed'
-        : data.warning
-          ? ' · email not sent — diver can use Forgot Password'
-          : ' · email skipped'
+      const tail = data.email_sent ? ' · courtesy email sent' : ' · email skipped'
       toast.success(`Account created${tail}`)
       onCreated(profile as Profile)
     } catch (err) {
@@ -231,9 +229,9 @@ function CreateNewDiverForm({
         ‹ back to diver list
       </button>
       <p className={`text-sm ${TEXT_BODY}`}>
-        The diver will receive an email with a one-time link to set their password. The account
-        is created as <span className="font-semibold">active</span> — no manual approval
-        needed. You'll be taken to the registration form after the account is created.
+        We'll send a courtesy email letting the diver know an account was made on their behalf.
+        It doesn't include a login link — if they later want app access they reply and you
+        issue credentials manually. You'll be taken to the registration form right after.
       </p>
 
       <label className="block">

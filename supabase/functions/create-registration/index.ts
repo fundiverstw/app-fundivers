@@ -307,8 +307,18 @@ Deno.serve(async (req) => {
     transportIncluded = true
   }
 
+  // Title fallback chain matches src/lib/events.ts: prefer the diver-facing
+  // display_title, then the admin label, then calendar_title (so events with
+  // only the calendar slot filled still render meaningfully). `||` (not `??`)
+  // so empty strings fall through to the next candidate too.
+  const titleFallback =
+    (event?.display_title as string | null | undefined) ||
+    (event?.admin_title as string | null | undefined) ||
+    (event?.calendar_title as string | null | undefined) ||
+    "Event"
+
   const payload: RegistrationPdfPayload = {
-    eventTitle: (event?.display_title ?? event?.admin_title ?? "Event") as string,
+    eventTitle: titleFallback,
     startDate,
     endDate:    (event?.end_date ?? null) as string | null,
     name:            profile?.full_name ?? "",
