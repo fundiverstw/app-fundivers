@@ -1,19 +1,29 @@
 import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../hooks/useAuth'
+import { useToast } from '../../hooks/useToast'
+import { errorMessage } from '../../lib/errors'
 import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
+import { fetchAmendmentsForBookings, amendmentsDelta } from '../../lib/booking-amendments'
+import { recordPayment } from '../../lib/booking-payments'
+import { BookingPaymentsBlock } from '../../components/admin/BookingPaymentsBlock'
 import { getCertCardSignedUrl } from '../../lib/cert-card'
 import { shoeAsJp } from '../../lib/shoe-size'
-import type { AppEvent, Booking, Payment, Profile } from '../../types/database'
+import type { AppEvent, Booking, BookingAmendment, Payment, Profile } from '../../types/database'
 
 interface UserExtras {
   bookings: Array<Booking & { event: AppEvent | null }>
   payments: Payment[]
+  amendments: Map<string, BookingAmendment[]>
   paidSum: number
   pendingSum: number
 }
 
 export function AdminUsersPage() {
+  const { profile } = useAuth()
+  const toast = useToast()
+  const isAdmin = profile?.role === 'admin'
   const [users, setUsers] = useState<Profile[]>([])
   const [filter, setFilter] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -46,9 +56,12 @@ export function AdminUsersPage() {
 
     const diveIds = bookings.map(b => b.eo_dive_id).filter((x): x is string => !!x)
     const courseIds = bookings.map(b => b.eo_course_id).filter((x): x is string => !!x)
-    const eventMap = (diveIds.length || courseIds.length)
-      ? await fetchEventsForBookings(diveIds, courseIds)
-      : new Map<string, AppEvent>()
+    const [eventMap, amendments] = await Promise.all([
+      diveIds.length || courseIds.length
+        ? fetchEventsForBookings(diveIds, courseIds)
+        : Promise.resolve(new Map<string, AppEvent>()),
+      fetchAmendmentsForBookings(bookings.map(b => b.id)),
+    ])
 
     const hydrated = bookings.map(b => ({
       ...b,
@@ -59,10 +72,50 @@ export function AdminUsersPage() {
 
     setExtrasCache(prev => {
       const next = new Map(prev)
-      next.set(userId, { bookings: hydrated, payments, paidSum, pendingSum })
+      next.set(userId, { bookings: hydrated, payments, amendments, paidSum, pendingSum })
       return next
     })
     setExtrasLoading(null)
+  }
+
+  async function handleRecordPayment(userId: string, bookingId: string, amount: number, note: string) {
+    if (!profile?.id) return
+    const extras = extrasCache.get(userId)
+    if (!extras) return
+    const booking = extras.bookings.find(b => b.id === bookingId)
+    if (!booking) return
+
+    const existingForBooking = extras.payments.filter(p => p.booking_id === bookingId)
+    try {
+      const { payment, newStatus } = await recordPayment({
+        booking,
+        existingPayments: existingForBooking,
+        amount, note,
+        recordedBy: profile.id,
+      })
+      const promoted = newStatus !== booking.status
+      setExtrasCache(prev => {
+        const next = new Map(prev)
+        const cur = next.get(userId)
+        if (!cur) return prev
+        const updatedBookings = cur.bookings.map(b =>
+          b.id === bookingId ? { ...b, status: newStatus } : b
+        )
+        const updatedPayments = [payment, ...cur.payments]
+        next.set(userId, {
+          ...cur,
+          bookings: updatedBookings,
+          payments: updatedPayments,
+          paidSum: updatedPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0),
+          pendingSum: updatedPayments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0),
+        })
+        return next
+      })
+      toast.success(promoted ? 'Payment recorded · status set to confirmed' : 'Payment recorded')
+    } catch (err) {
+      toast.error(`Could not record payment: ${errorMessage(err)}`)
+      throw err
+    }
   }
 
   const visible = users.filter(u => {
@@ -93,6 +146,8 @@ export function AdminUsersPage() {
             extras={extrasCache.get(u.id) ?? null}
             loading={extrasLoading === u.id}
             onToggle={() => toggle(u.id)}
+            onRecordPayment={(bookingId, amount, note) => handleRecordPayment(u.id, bookingId, amount, note)}
+            isAdmin={isAdmin}
           />
         ))}
         {visible.length === 0 && (
@@ -104,13 +159,15 @@ export function AdminUsersPage() {
 }
 
 function UserCard({
-  user, open, extras, loading, onToggle,
+  user, open, extras, loading, onToggle, onRecordPayment, isAdmin,
 }: {
   user: Profile
   open: boolean
   extras: UserExtras | null
   loading: boolean
   onToggle: () => void
+  onRecordPayment: (bookingId: string, amount: number, note: string) => Promise<void>
+  isAdmin: boolean
 }) {
   return (
     <div className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl">
@@ -149,7 +206,13 @@ function UserCard({
           {loading && (
             <div className="flex justify-center py-2"><div className="w-5 h-5 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" /></div>
           )}
-          {extras && <ExtrasBlock extras={extras} />}
+          {extras && (
+            <ExtrasBlock
+              extras={extras}
+              onRecordPayment={onRecordPayment}
+              isAdmin={isAdmin}
+            />
+          )}
         </div>
       )}
     </div>
@@ -203,7 +266,11 @@ function ProfileDetails({ user }: { user: Profile }) {
   )
 }
 
-function ExtrasBlock({ extras }: { extras: UserExtras }) {
+function ExtrasBlock({ extras, onRecordPayment, isAdmin }: {
+  extras: UserExtras
+  onRecordPayment: (bookingId: string, amount: number, note: string) => Promise<void>
+  isAdmin: boolean
+}) {
   const activeBookings = extras.bookings.filter(b => b.status !== 'cancelled')
   return (
     <div className="space-y-3 pt-2 border-t border-sky-200">
@@ -211,23 +278,44 @@ function ExtrasBlock({ extras }: { extras: UserExtras }) {
         {activeBookings.length === 0 ? (
           <p className="text-blue-950 font-medium text-xs">None active.</p>
         ) : (
-          <div className="space-y-1">
-            {activeBookings.map(b => (
-              <div key={b.id} className="flex items-start justify-between text-xs">
-                <div className="min-w-0">
-                  <p className="text-blue-900 truncate">{b.event?.title ?? '(event)'}</p>
-                  {b.event && (
-                    <p className="text-blue-950 font-medium">{formatEventSpan(b.event, { style: 'compact', withYear: true })}</p>
-                  )}
+          <div className="space-y-3">
+            {activeBookings.map(b => {
+              const bookingPayments = extras.payments.filter(p => p.booking_id === b.id)
+              const baseTotal = Number((b.details as { total?: number } | undefined)?.total ?? 0)
+              const deposit = Number((b.details as { deposit?: number } | undefined)?.deposit ?? 0)
+              const owed = baseTotal + amendmentsDelta(extras.amendments.get(b.id) ?? [])
+              const paid = bookingPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
+              const outstanding = Math.max(0, owed - paid)
+              const depositDue = Math.max(0, deposit - paid)
+              return (
+                <div key={b.id} className="space-y-1">
+                  <div className="flex items-start justify-between text-xs">
+                    <div className="min-w-0">
+                      <p className="text-blue-900 truncate">{b.event?.title ?? '(event)'}</p>
+                      {b.event && (
+                        <p className="text-blue-950 font-medium">{formatEventSpan(b.event, { style: 'compact', withYear: true })}</p>
+                      )}
+                    </div>
+                    <span className={`capitalize shrink-0 ml-2 ${statusColor(b.status)}`}>{b.status}</span>
+                  </div>
+                  <BookingPaymentsBlock
+                    payments={bookingPayments}
+                    owed={owed}
+                    paid={paid}
+                    outstanding={outstanding}
+                    depositDue={depositDue}
+                    cancelled={false}
+                    readOnly={!isAdmin}
+                    onRecord={(amount, note) => onRecordPayment(b.id, amount, note)}
+                  />
                 </div>
-                <span className={`capitalize shrink-0 ml-2 ${statusColor(b.status)}`}>{b.status}</span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </Section>
 
-      <Section title="Payments">
+      <Section title="Totals across all bookings">
         <div className="flex justify-between text-xs">
           <span className="text-blue-900 font-medium">Paid</span>
           <span className="text-blue-900 font-semibold">{extras.paidSum.toLocaleString()}</span>

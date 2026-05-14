@@ -275,4 +275,139 @@ describe('AdminEventDetailPage', () => {
     await screen.findByText(/Step 1 of 4/i)
     expect(screen.getByRole('heading', { name: /Register Ada/i })).toBeInTheDocument()
   })
+
+  it('records a deposit payment and auto-promotes a pending booking to confirmed', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
+    ]))
+
+    const bookings = [{
+      id: 'b1', user_id: 'u1', status: 'pending', created_at: '2026-04-20',
+      eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null,
+      details: { total: 4900, deposit: 4900, payment_method: 'cash' },
+    }]
+    const profiles = [{
+      id: 'u1', full_name: 'Ada Lovelace', display_name: 'Ada',
+      cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false,
+      logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null,
+      phone: null, contact_method: null, contact_id: null,
+    }]
+
+    const paymentInsert = vi.fn().mockReturnValue({
+      select: () => ({
+        single: () => Promise.resolve({
+          data: {
+            id: 'pay-1', created_at: '2026-05-14T10:00:00Z', amount: 4900,
+            status: 'paid', method: 'cash', note: 'Deposit',
+            user_id: 'u1', booking_id: 'b1', currency: 'TWD', recorded_by: 'admin-1',
+          },
+          error: null,
+        }),
+      }),
+    })
+    const bookingUpdate = vi.fn().mockReturnValue({ eq: () => Promise.resolve({ error: null }) })
+
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') {
+        const b = mockQueryBuilder({ data: bookings }) as Record<string, unknown>
+        b.update = bookingUpdate
+        return b
+      }
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      if (table === 'payments') {
+        const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
+        b.insert = paymentInsert
+        return b
+      }
+      return mockQueryBuilder({ data: [] })
+    })
+
+    const user = userEvent.setup()
+    renderAt('/admin/events/dive/dive_x')
+
+    await user.click(await screen.findByRole('button', { expanded: false, name: /Ada Lovelace/ }))
+    await user.click(await screen.findByRole('button', { name: /mark deposit paid \(4,900\)/i }))
+
+    await waitFor(() => expect(paymentInsert).toHaveBeenCalled())
+    const insertedPayment = paymentInsert.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(insertedPayment).toMatchObject({
+      user_id: 'u1', booking_id: 'b1', amount: 4900, status: 'paid', method: 'cash', note: 'Deposit',
+    })
+
+    await waitFor(() => expect(bookingUpdate).toHaveBeenCalledWith({ status: 'confirmed' }))
+  })
+
+  it('records a custom partial balance payment without promoting status', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
+    ]))
+
+    // confirmed booking with deposit already paid; admin records partial balance.
+    const bookings = [{
+      id: 'b1', user_id: 'u1', status: 'confirmed', created_at: '2026-04-20',
+      eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null,
+      details: { total: 12000, deposit: 2000, payment_method: 'bank_transfer' },
+    }]
+    const profiles = [{
+      id: 'u1', full_name: 'Ada Lovelace', display_name: 'Ada',
+      cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false,
+      logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null,
+      phone: null, contact_method: null, contact_id: null,
+    }]
+    const existingPayments = [{
+      id: 'pay-0', created_at: '2026-05-01T10:00:00Z', amount: 2000,
+      status: 'paid', method: 'bank_transfer', note: 'Deposit',
+      user_id: 'u1', booking_id: 'b1', currency: 'TWD', recorded_by: 'admin-1',
+    }]
+
+    const paymentInsert = vi.fn().mockReturnValue({
+      select: () => ({
+        single: () => Promise.resolve({
+          data: {
+            id: 'pay-1', created_at: '2026-05-14T10:00:00Z', amount: 3000,
+            status: 'paid', method: 'bank_transfer', note: 'Partial #1',
+            user_id: 'u1', booking_id: 'b1', currency: 'TWD', recorded_by: 'admin-1',
+          },
+          error: null,
+        }),
+      }),
+    })
+    const bookingUpdate = vi.fn().mockReturnValue({ eq: () => Promise.resolve({ error: null }) })
+
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') {
+        const b = mockQueryBuilder({ data: bookings }) as Record<string, unknown>
+        b.update = bookingUpdate
+        return b
+      }
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      if (table === 'payments') {
+        const b = mockQueryBuilder({ data: existingPayments }) as Record<string, unknown>
+        b.insert = paymentInsert
+        return b
+      }
+      return mockQueryBuilder({ data: [] })
+    })
+
+    const user = userEvent.setup()
+    renderAt('/admin/events/dive/dive_x')
+
+    await user.click(await screen.findByRole('button', { expanded: false, name: /Ada Lovelace/ }))
+
+    // Deposit is fully paid → "Mark deposit paid" should be hidden.
+    expect(screen.queryByRole('button', { name: /mark deposit paid/i })).not.toBeInTheDocument()
+
+    await user.type(screen.getByPlaceholderText(/paid amount/i), '3000')
+    await user.type(screen.getByPlaceholderText(/note \(optional/i), 'Partial #1')
+    await user.click(screen.getByRole('button', { name: /^record payment$/i }))
+
+    await waitFor(() => expect(paymentInsert).toHaveBeenCalled())
+    const insertedPayment = paymentInsert.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(insertedPayment).toMatchObject({
+      user_id: 'u1', booking_id: 'b1', amount: 3000, status: 'paid', note: 'Partial #1',
+    })
+
+    // Booking is already confirmed; no status update should fire.
+    expect(bookingUpdate).not.toHaveBeenCalled()
+  })
 })
