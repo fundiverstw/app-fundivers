@@ -171,3 +171,34 @@ describe('formatEventSpan — start_time_hhmm rendering', () => {
     expect(out).toMatch(/· 09:00 → /)
   })
 })
+
+describe('eventSpotsRemaining + eventIsFull', () => {
+  it('returns null when capacity is unset (uncapped event)', async () => {
+    const { eventSpotsRemaining, eventIsFull } = await import('./events')
+    expect(eventSpotsRemaining({ capacity: null, confirmed_count: 0 })).toBeNull()
+    expect(eventIsFull({ fully_booked: false, capacity: null, confirmed_count: 99 })).toBe(false)
+  })
+
+  it('returns null when confirmed_count has not been loaded', async () => {
+    const { eventSpotsRemaining } = await import('./events')
+    expect(eventSpotsRemaining({ capacity: 10, confirmed_count: null })).toBeNull()
+  })
+
+  it('computes remaining = capacity - confirmed_count', async () => {
+    const { eventSpotsRemaining, eventIsFull } = await import('./events')
+    expect(eventSpotsRemaining({ capacity: 10, confirmed_count: 7 })).toBe(3)
+    expect(eventIsFull({ fully_booked: false, capacity: 10, confirmed_count: 7 })).toBe(false)
+  })
+
+  it('clamps remaining at 0 when confirmed exceeds capacity', async () => {
+    const { eventSpotsRemaining, eventIsFull } = await import('./events')
+    expect(eventSpotsRemaining({ capacity: 5, confirmed_count: 7 })).toBe(0)
+    expect(eventIsFull({ fully_booked: false, capacity: 5, confirmed_count: 7 })).toBe(true)
+  })
+
+  it('eventIsFull respects manual fully_booked flag even without capacity', async () => {
+    const { eventIsFull } = await import('./events')
+    expect(eventIsFull({ fully_booked: true, capacity: null, confirmed_count: 0 })).toBe(true)
+    expect(eventIsFull({ fully_booked: true, capacity: 10, confirmed_count: 0 })).toBe(true)
+  })
+})

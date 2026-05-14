@@ -4,7 +4,7 @@ import {
   addMonths, subMonths, startOfWeek, endOfWeek,
 } from 'date-fns'
 import { assignTracks, segmentsForDay, type CellSegment, type EventRange } from '../../lib/calendar-layout'
-import { formatEventSpan } from '../../lib/events'
+import { formatEventSpan, eventIsFull, eventSpotsRemaining } from '../../lib/events'
 import type { AppEvent } from '../../types/database'
 
 // Shared by CalendarPage (diver) and AdminEventsPage (admin). The only
@@ -182,9 +182,19 @@ export function MonthCalendar({
               </div>
               <div className="text-right shrink-0 space-y-0.5">
                 {renderListBadge?.(ev)}
-                {ev.fully_booked && (
-                  <p className="text-xs text-red-600 font-semibold">Fully booked</p>
-                )}
+                {/* Capacity-aware status: full → waitlist nudge; 1-2 left →
+                    "only X remaining"; otherwise quiet. Manual fully_booked
+                    is folded into eventIsFull. */}
+                {(() => {
+                  if (eventIsFull(ev)) {
+                    return <p className="text-xs text-red-600 font-semibold">Fully booked — register for waitlist</p>
+                  }
+                  const remaining = eventSpotsRemaining(ev)
+                  if (remaining !== null && remaining > 0 && remaining <= 2) {
+                    return <p className="text-xs text-red-600 font-semibold">Only {remaining} spot{remaining === 1 ? '' : 's'} remaining</p>
+                  }
+                  return null
+                })()}
               </div>
             </div>
           </button>
