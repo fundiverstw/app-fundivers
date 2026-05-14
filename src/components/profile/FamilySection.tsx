@@ -1,0 +1,212 @@
+import { useEffect, useState } from 'react'
+import { supabase } from '../../lib/supabase'
+import { useToast } from '../../hooks/useToast'
+import { errorMessage } from '../../lib/errors'
+import type { Profile } from '../../types/database'
+
+// Diver-facing "Family" panel on /profile. Lets a top-level diver (one
+// whose own parent_account is null) see + create child accounts they
+// manage. The child accounts are real diver profiles — a child can also
+// log in directly if they ever want to. Parent rights flow through the
+// parent_account FK + the matching RLS policies in
+// 20260514030000_parent_child_accounts.sql.
+export function FamilySection({ parent }: { parent: Profile }) {
+  // Only top-level divers (parent_account === null) can themselves be
+  // parents — the one-level family-tree rule. Children see no panel.
+  if (parent.parent_account) return null
+  if (parent.status !== 'active') return null
+
+  return <FamilyPanel parent={parent} />
+}
+
+function FamilyPanel({ parent }: { parent: Profile }) {
+  const [children, setChildren] = useState<Profile[]>([])
+  const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
+  // Bumped after a successful create so the effect refires. Keeps the
+  // fetch inline (no separate refresh() helper) which sidesteps the
+  // react-hooks/set-state-in-effect lint rule.
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    supabase
+      .from('profiles')
+      .select('*')
+      .eq('parent_account', parent.id)
+      .order('full_name', { ascending: true })
+      .then(({ data }) => {
+        if (cancelled) return
+        setChildren((data ?? []) as Profile[])
+        setLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [parent.id, refreshKey])
+
+  return (
+    <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3" aria-label="Family">
+      <header className="flex items-center justify-between">
+        <h2 className="text-lg font-bold text-blue-900">Family</h2>
+      </header>
+      <p className="text-xs text-blue-900 font-medium">
+        Manage diver accounts you've added on behalf of family members or guests. You can
+        register them for events together with you in a single booking.
+      </p>
+
+      {loading ? (
+        <div className="flex justify-center py-2">
+          <div className="w-5 h-5 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : children.length === 0 ? (
+        <p className="text-sm text-blue-950 font-medium italic">No child accounts yet.</p>
+      ) : (
+        <ul className="space-y-1">
+          {children.map(c => (
+            <li key={c.id} className="bg-sky-50 border border-sky-200 rounded-lg px-3 py-2">
+              <p className="text-sm font-medium text-blue-900">
+                {c.full_name ?? '(no name)'}
+                {c.display_name && <span className="text-blue-900/80"> “{c.display_name}”</span>}
+              </p>
+              <p className="text-xs text-blue-900/70">
+                {c.cert_agency && c.cert_level ? `${c.cert_agency} ${c.cert_level}` : 'Uncertified'}
+                {c.status && c.status !== 'active' && (
+                  <span className="ml-2 uppercase tracking-wider text-red-700">{c.status}</span>
+                )}
+              </p>
+              {/* Per-child management UI ships in Phase B. */}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {creating ? (
+        <CreateChildForm
+          onCancel={() => setCreating(false)}
+          onCreated={() => { setCreating(false); setRefreshKey(k => k + 1) }}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setCreating(true)}
+          className="w-full text-sm bg-emerald-900/80 hover:bg-emerald-900 text-white font-semibold px-3 py-2 rounded-lg"
+        >
+          + Create new diver account
+        </button>
+      )}
+    </section>
+  )
+}
+
+function CreateChildForm({
+  onCancel, onCreated,
+}: {
+  onCancel: () => void
+  onCreated: () => void
+}) {
+  const toast = useToast()
+  const [email, setEmail] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [nameAlt, setNameAlt] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    const trimmedEmail = email.trim().toLowerCase()
+    const trimmedName  = fullName.trim()
+    if (!trimmedEmail || !trimmedName) {
+      setError('Email and full name are required.')
+      return
+    }
+    setSubmitting(true)
+    try {
+      const { data, error: invokeErr } = await supabase.functions.invoke<{
+        ok: boolean
+        user_id: string
+        email_sent: boolean
+      }>('create-child-account', {
+        body: {
+          email:        trimmedEmail,
+          full_name:    trimmedName,
+          display_name: displayName.trim() || undefined,
+          name_alt:     nameAlt.trim() || undefined,
+        },
+      })
+      if (invokeErr) throw new Error(invokeErr.message)
+      if (!data?.ok || !data.user_id) throw new Error('child account creation failed')
+
+      const tail = data.email_sent ? ' · courtesy email sent' : ' · email skipped'
+      toast.success(`Child account created${tail}`)
+      onCreated()
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-2 border-t border-sky-200 pt-3">
+      <p className="text-xs text-blue-900 font-medium">
+        We'll create an account for them and send a courtesy email letting them know — no
+        login link, no password. If they ever want app access they can reach out.
+      </p>
+      <label className="block">
+        <span className="text-xs font-medium text-blue-900">Email *</span>
+        <input
+          type="email" required autoFocus
+          value={email} onChange={e => setEmail(e.target.value)}
+          className="w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-blue-900 text-sm focus:outline-none focus:border-blue-900"
+        />
+      </label>
+      <label className="block">
+        <span className="text-xs font-medium text-blue-900">Full name *</span>
+        <input
+          type="text" required
+          value={fullName} onChange={e => setFullName(e.target.value)}
+          className="w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-blue-900 text-sm focus:outline-none focus:border-blue-900"
+        />
+      </label>
+      <label className="block">
+        <span className="text-xs font-medium text-blue-900">Display name</span>
+        <input
+          type="text"
+          value={displayName} onChange={e => setDisplayName(e.target.value)}
+          placeholder="What you call them day-to-day (optional)"
+          className="w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-blue-900 text-sm focus:outline-none focus:border-blue-900"
+        />
+      </label>
+      <label className="block">
+        <span className="text-xs font-medium text-blue-900">Alternate name</span>
+        <input
+          type="text"
+          value={nameAlt} onChange={e => setNameAlt(e.target.value)}
+          placeholder="Chinese name or alias (optional)"
+          className="w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-blue-900 text-sm focus:outline-none focus:border-blue-900"
+        />
+      </label>
+
+      {error && <p className="text-sm text-red-700 bg-red-50 border border-red-500 rounded px-2 py-1">{error}</p>}
+
+      <div className="flex gap-2 pt-1">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={submitting}
+          className="flex-1 py-2 rounded-lg text-sm font-medium text-blue-900 border border-sky-300 hover:bg-sky-50 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={submitting}
+          className="flex-1 py-2 rounded-lg text-sm font-semibold bg-blue-900 hover:bg-blue-950 text-white disabled:opacity-50"
+        >
+          {submitting ? 'Creating…' : 'Create account'}
+        </button>
+      </div>
+    </form>
+  )
+}
