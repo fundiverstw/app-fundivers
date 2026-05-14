@@ -36,8 +36,9 @@ export function formatEventSpan(
 }
 
 /**
- * Build an ISO timestamp from EO_* text columns. start_date is 'YYYY-MM-DD';
- * time/start_time is 'HH:MM:SS.SSS' or empty. Defaults midnight when missing.
+ * Build an ISO timestamp from an EO_* date column ('YYYY-MM-DD') and a
+ * time column ('HH:MM:SS'). PostgREST serializes both as strings.
+ * Defaults to midnight when the time is null or empty.
  */
 function toIso(date: string | null | undefined, time: string | null | undefined): string | null {
   if (!date) return null
@@ -46,9 +47,10 @@ function toIso(date: string | null | undefined, time: string | null | undefined)
 }
 
 /**
- * Normalize a Bubble time field ('HH:MM:SS.SSS' / 'HH:MM:SS' / 'HH:MM' or
- * empty) to 'HH:mm' for display. Returns null when no time was set so
- * surfaces can fall back to date-only.
+ * Normalize a PostgREST time string ('HH:MM:SS' / 'HH:MM' or empty —
+ * legacy Bubble values were 'HH:MM:SS.SSS', still tolerated) to 'HH:mm'
+ * for display. Returns null when no time was set so surfaces can fall
+ * back to date-only.
  */
 function toHhmm(raw: string | null | undefined): string | null {
   if (!raw) return null

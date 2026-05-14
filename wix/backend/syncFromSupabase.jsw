@@ -1,0 +1,188 @@
+import wixData from 'wix-data';
+import wixSecretsBackend from 'wix-secrets-backend';
+import { fetch } from 'wix-fetch';
+
+const SUPABASE_URL = 'https://pcauozfljgmelxnguqiz.supabase.co';
+const PAGE_SIZE = 1000;
+const BULK_BATCH = 50;
+
+// Tables that mirror 1:1 from Supabase to Wix CMS collections of the
+// same ID. Add a name here, create the matching Wix collection + a
+// Supabase Database Webhook → /_functions/supabaseWebhook, and the
+// rest is automatic (webhook + manual /_functions/syncSupabase).
+export const SYNC_TABLES = [
+  'EO_dives',
+  'EO_courses',
+  'EO_rooms',
+  'EO_prices',
+  'cert_levels',
+  'DiveTravel',
+  'Other_Addons',
+  'cancellation_policies',
+];
+const SYNC_TABLE_SET = new Set(SYNC_TABLES);
+export function isSyncTable(name) { return SYNC_TABLE_SET.has(name); }
+
+// Wix manages these — sending them in bulkSave is rejected or ignored.
+const RESERVED = new Set([
+  'Created Date', 'Updated Date', 'Owner',
+  '_createdDate', '_updatedDate', '_owner',
+]);
+
+// Collection → list of multi-reference field keys. Wix CMS silently
+// ignores multi-reference fields passed to wixData.save()/bulkSave():
+// the only API that writes them is wixData.replaceReferences(). Fields
+// listed here are stripped from the save payload and reapplied via
+// replaceReferences() once the row is in place. Values arrive as
+// JSON-encoded id-array strings (e.g. '["id1","id2"]'), legacy Bubble
+// shape, and parseIdList unwraps them.
+const MULTI_REF_FIELDS = {
+  EO_dives: ['destination_reference'],
+};
+
+function multiRefsFor(collection) {
+  return MULTI_REF_FIELDS[collection] || [];
+}
+
+function parseIdList(raw) {
+  if (raw == null || raw === '') return [];
+  if (Array.isArray(raw)) return raw.filter(Boolean).map(String);
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(Boolean).map(String) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function stripMultiRefs(item, collection) {
+  const refs = multiRefsFor(collection);
+  if (refs.length === 0) return item;
+  const out = { ...item };
+  for (const f of refs) delete out[f];
+  return out;
+}
+
+async function applyMultiRefs(collection, itemId, source) {
+  for (const field of multiRefsFor(collection)) {
+    const ids = parseIdList(source[field]);
+    await wixData.replaceReferences(collection, field, itemId, ids, {
+      suppressAuth: true,
+      suppressHooks: true,
+    });
+  }
+}
+
+async function getKey() {
+  return wixSecretsBackend.getSecret('SUPABASE_KEY');
+}
+
+async function fetchPage(table, key, from) {
+  const url = `${SUPABASE_URL}/rest/v1/${table}?select=*`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      'Range-Unit': 'items',
+      Range: `${from}-${from + PAGE_SIZE - 1}`,
+    },
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Supabase ${table} fetch failed: ${res.status} ${body}`);
+  }
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+
+async function fetchAll(table, key) {
+  const out = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const batch = await fetchPage(table, key, from);
+    if (batch.length === 0) break;
+    out.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
+  }
+  return out;
+}
+
+function toWixItem(row) {
+  const out = {};
+  for (const [k, v] of Object.entries(row)) {
+    if (RESERVED.has(k)) continue;
+    out[k] = v;
+  }
+  const id = row._id ?? row.id;
+  out._id = id == null ? undefined : String(id);
+  return out;
+}
+
+async function bulkSaveChunked(collection, items) {
+  let inserted = 0, updated = 0, skipped = 0;
+  const errors = [];
+  for (let i = 0; i < items.length; i += BULK_BATCH) {
+    const chunk = items.slice(i, i + BULK_BATCH);
+    const savePayload = chunk.map((it) => stripMultiRefs(it, collection));
+    const result = await wixData.bulkSave(collection, savePayload, {
+      suppressAuth: true,
+      suppressHooks: true,
+    });
+    inserted += result.inserted || 0;
+    updated  += result.updated  || 0;
+    skipped  += result.skipped  || 0;
+    if (result.errors && result.errors.length) errors.push(...result.errors);
+    for (const it of chunk) {
+      await applyMultiRefs(collection, it._id, it);
+    }
+  }
+  return { inserted, updated, skipped, errors };
+}
+
+async function syncTable(collection) {
+  const key = await getKey();
+  const rows = await fetchAll(collection, key);
+  const items = rows
+    .map(toWixItem)
+    .filter((it) => it._id);
+
+  if (items.length === 0) {
+    return { collection, total: 0, inserted: 0, updated: 0, skipped: 0, errors: [] };
+  }
+  const result = await bulkSaveChunked(collection, items);
+  return { collection, total: items.length, ...result };
+}
+
+export async function syncOne(collection) {
+  if (!isSyncTable(collection)) {
+    throw new Error(`syncOne: unknown collection ${collection}`);
+  }
+  return syncTable(collection);
+}
+
+export async function syncFromSupabase() {
+  const out = {};
+  // Sequential, not Promise.all — keeps memory and Wix bulkSave concurrency low.
+  for (const t of SYNC_TABLES) {
+    out[t] = await syncTable(t);
+  }
+  return out;
+}
+
+// Single-row sync, called from the Supabase webhook handler.
+export async function upsertOne(collection, row) {
+  const item = toWixItem(row);
+  if (!item._id) throw new Error(`upsertOne(${collection}): row missing _id/id`);
+  const saved = await wixData.save(
+    collection,
+    stripMultiRefs(item, collection),
+    { suppressAuth: true, suppressHooks: true },
+  );
+  await applyMultiRefs(collection, saved._id, item);
+  return saved;
+}
+
+export async function deleteOne(collection, id) {
+  if (id == null) throw new Error(`deleteOne(${collection}): missing id`);
+  return wixData.remove(collection, String(id), { suppressAuth: true, suppressHooks: true });
+}
