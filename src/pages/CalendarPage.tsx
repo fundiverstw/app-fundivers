@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { startOfMonth, endOfMonth } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { fetchEventsInRange, formatEventSpan, eventIsFull, eventSpotsRemaining } from '../lib/events'
+import { fetchEventsInRange, formatEventSpan, eventIsFull } from '../lib/events'
 import { MonthCalendar } from '../components/calendar/MonthCalendar'
 import { RegisterForm } from '../components/register/RegisterForm'
 import type { AppEvent, Booking } from '../types/database'
@@ -109,16 +109,8 @@ export function CalendarPage() {
               {selected.price != null && (
                 <p>💰 From {selected.currency} {selected.price.toLocaleString()}</p>
               )}
-              {(() => {
-                if (eventIsFull(selected)) {
-                  return <p className="text-red-600 font-semibold">Fully booked — register for waitlist</p>
-                }
-                const remaining = eventSpotsRemaining(selected)
-                if (remaining !== null && remaining > 0 && remaining <= 2) {
-                  return <p className="text-red-600 font-semibold">Only {remaining} spot{remaining === 1 ? '' : 's'} remaining</p>
-                }
-                return null
-              })()}
+              {/* Capacity status is part of selected.title (set by the
+                  display_title trigger). No separate badge needed. */}
             </div>
             <button
               onClick={isBooked(selected) ? cancelBooking : startRegister}
