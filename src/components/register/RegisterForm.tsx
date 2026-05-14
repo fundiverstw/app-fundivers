@@ -233,7 +233,10 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
     for (const a of addons) if (addonIds.has(a._id)) total += a.price ?? 0
     return total
   }, [addons, addonIds])
-  const paymentSurcharge = payment === 'credit_card' ? 0.05 : 0
+  // Both PayPal and credit card incur a 5% surcharge (PayPal absorbs ~3% on
+  // paypal.me transfers; the card processor's fee is similar). Cash and
+  // local bank transfer pass through at face value.
+  const paymentSurcharge = payment === 'credit_card' || payment === 'paypal' ? 0.05 : 0
   const base = event.price ?? 0
   // Transport pricing comes from the linked EO_prices row. NULL or 0 means
   // it's bundled into the base price — the form hides the opt-in checkbox
@@ -625,7 +628,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
                 <span className="flex-1">
                   <span className="block">
                     {method === 'bank_transfer' && 'Bank transfer'}
-                    {method === 'paypal' && 'PayPal'}
+                    {method === 'paypal' && 'PayPal (+5%)'}
                     {method === 'credit_card' && 'Credit card (+5%)'}
                     {method === 'cash' && 'Cash (in person at the shop)'}
                   </span>

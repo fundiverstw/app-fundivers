@@ -54,7 +54,7 @@ export function paymentInstructionsFor(
       }
     case 'paypal':
       return {
-        title: 'How to pay — PayPal',
+        title: 'How to pay — PayPal (+5%)',
         lines: [
           'Send your payment via PayPal:',
           PAYPAL_LINK,

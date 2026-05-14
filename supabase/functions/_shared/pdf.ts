@@ -251,8 +251,8 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   y = section(doc, y, "Payment")
   const methodLabel =
     p.paymentMethod === "bank_transfer" ? "Bank transfer"
-    : p.paymentMethod === "paypal"      ? "PayPal"
-    : p.paymentMethod === "credit_card" ? "Credit card"
+    : p.paymentMethod === "paypal"      ? "PayPal (+5%)"
+    : p.paymentMethod === "credit_card" ? "Credit card (+5%)"
     : p.paymentMethod === "cash"        ? "Cash"
     : (p.paymentMethod || "")
   y = row(doc, y, "Method", methodLabel, altState)
