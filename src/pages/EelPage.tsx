@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 
 // Snake, but the snake is an eel. Week-one minigame. Playable by admin or
-// diver — route is /minigame/eel-snake, rendered fullscreen (outside the
+// diver — route is /minigame/eel, rendered fullscreen (outside the
 // regular shells) so the canvas isn't squeezed by the bottom nav.
 //
 // Controls: arrow keys (desktop), swipe (mobile). Wall or self collision
@@ -101,7 +101,7 @@ function drawEel(ctx: CanvasRenderingContext2D, pts: Point[], cell: number) {
   ctx.beginPath(); ctx.arc(eyeX + nx * cell * 0.03, eyeY + ny * cell * 0.03, cell * 0.06, 0, Math.PI * 2); ctx.fill()
 }
 
-export function EelSnakePage() {
+export function EelPage() {
   const { profile } = useAuth()
   const backTo = profile?.role === 'admin' ? '/admin'
     : profile?.role === 'staff' ? '/admin/events'
@@ -109,7 +109,7 @@ export function EelSnakePage() {
 
   const [phase, setPhase] = useState<Phase>('idle')
   const [score, setScore] = useState(0)
-  const [high, setHigh] = useState<number>(() => Number(localStorage.getItem('eel-snake-high') ?? 0))
+  const [high, setHigh] = useState<number>(() => Number(localStorage.getItem('eel-high') ?? 0))
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const cellPxRef = useRef(20)
@@ -249,7 +249,7 @@ export function EelSnakePage() {
         setPhase('gameover')
         setHigh(prevHigh => {
           const best = Math.max(prevHigh, g.score)
-          localStorage.setItem('eel-snake-high', String(best))
+          localStorage.setItem('eel-high', String(best))
           return best
         })
         return
@@ -332,7 +332,7 @@ export function EelSnakePage() {
       </header>
 
       <h1 className="text-sm uppercase tracking-[0.3em] text-cyan-200/70 mb-3 font-semibold">
-        🪱 eel snake
+        🪱 eel
       </h1>
 
       <div className="relative">
