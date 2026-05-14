@@ -12,6 +12,8 @@ import { EventStaffSection } from '../../components/admin/EventStaffSection'
 import { RegisterForm } from '../../components/register/RegisterForm'
 import { shoeAsJp } from '../../lib/shoe-size'
 import { fetchAmendmentsForBookings, addAmendment, formAmount, amendmentsDelta } from '../../lib/booking-amendments'
+import { recordPayment as recordPaymentRow } from '../../lib/booking-payments'
+import { BookingPaymentsBlock } from '../../components/admin/BookingPaymentsBlock'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Payment, Profile } from '../../types/database'
 
 interface Registrant {
@@ -153,6 +155,27 @@ export function AdminEventDetailPage() {
     }
   }
 
+  async function recordPayment(r: Registrant, amount: number, note: string) {
+    if (!profile?.id) return
+    try {
+      const { payment, newStatus } = await recordPaymentRow({
+        booking: r.booking,
+        existingPayments: r.payments,
+        amount, note,
+        recordedBy: profile.id,
+      })
+      const promoted = newStatus !== r.booking.status
+      setRegistrants(prev => prev.map(x =>
+        x.booking.id === r.booking.id
+          ? { ...x, payments: [...x.payments, payment], booking: { ...x.booking, status: newStatus } }
+          : x
+      ))
+      toast.success(promoted ? 'Payment recorded · status set to confirmed' : 'Payment recorded')
+    } catch (err) {
+      toast.error(`Could not record payment: ${errorMessage(err)}`)
+    }
+  }
+
   async function setCancelledAt(value: string | null) {
     if (!type || !id) return
     setCancelInFlight(true)
@@ -271,6 +294,7 @@ export function AdminEventDetailPage() {
               onApproveRefund={approveRefund}
               onEdit={() => setEditing(r)}
               onAddAmendment={submitAmendment}
+              onRecordPayment={(amount, note) => recordPayment(r, amount, note)}
               readOnly={!isAdmin}
             />
           ))}
@@ -562,7 +586,7 @@ function NotifyDiversModal({
 
 const BOOKING_STATUSES: Booking['status'][] = ['pending', 'confirmed', 'waitlisted', 'cancelled']
 
-function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRefund, onEdit, onAddAmendment, readOnly }: {
+function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRefund, onEdit, onAddAmendment, onRecordPayment, readOnly }: {
   r: Registrant
   addonNames: AddonNameMap
   roomNames: RoomNameMap
@@ -570,17 +594,20 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
   onApproveRefund: (id: string) => void
   onEdit: () => void
   onAddAmendment: (id: string, sign: '+' | '-', amount: number, note: string) => Promise<void>
+  onRecordPayment: (amount: number, note: string) => Promise<void>
   readOnly?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
 
-  const totalPaid = r.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
-  const totalDue = r.payments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0)
-  const paymentStatus = r.payments.length === 0
-    ? 'none'
-    : totalDue > 0 ? 'partial' : 'paid'
   const baseTotal = Number((r.booking.details as { total?: number } | undefined)?.total ?? 0)
+  const deposit = Number((r.booking.details as { deposit?: number } | undefined)?.deposit ?? 0)
   const adjusted = baseTotal + amendmentsDelta(r.amendments)
+  const totalPaid = r.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
+  const outstanding = Math.max(0, adjusted - totalPaid)
+  const depositDue = Math.max(0, deposit - totalPaid)
+  const paymentStatus = totalPaid === 0
+    ? 'none'
+    : outstanding > 0 ? 'partial' : 'paid'
 
   const statusStyles: Record<string, string> = {
     confirmed:  'text-blue-900 font-semibold',
@@ -637,7 +664,7 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
           )}
           <p className={`${payStyles[paymentStatus]} capitalize`}>
             {paymentStatus === 'paid'    && `Paid ${totalPaid.toLocaleString()}`}
-            {paymentStatus === 'partial' && `${totalPaid.toLocaleString()} paid · ${totalDue.toLocaleString()} due`}
+            {paymentStatus === 'partial' && `${totalPaid.toLocaleString()} paid · ${outstanding.toLocaleString()} due`}
             {paymentStatus === 'none'    && 'No payment'}
           </p>
         </div>
@@ -686,6 +713,17 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
           {r.booking.notes && (
             <p className="text-xs text-blue-950 font-medium bg-sky-50 rounded p-2">📝 {r.booking.notes}</p>
           )}
+
+          <BookingPaymentsBlock
+            payments={r.payments}
+            owed={adjusted}
+            paid={totalPaid}
+            outstanding={outstanding}
+            depositDue={depositDue}
+            cancelled={r.booking.status === 'cancelled'}
+            readOnly={!!readOnly}
+            onRecord={onRecordPayment}
+          />
 
           <AmendmentsSection
             amendments={r.amendments}
@@ -836,7 +874,6 @@ function renderDetails(d: BookingDetails, names: { addonNames: AddonNameMap; roo
   if (d.transportation) bits.push(<p key="transport">🚐 Needs ride</p>)
   if (d.nitrox_course_addon) bits.push(<p key="nitrox">🟢 Nitrox course add-on</p>)
   if (d.payment_method) bits.push(<p key="pay">💳 {d.payment_method.replace('_', ' ')}</p>)
-  if (d.total != null) bits.push(<p key="total">Total: {d.total.toLocaleString()}{d.deposit != null && ` · Deposit ${d.deposit.toLocaleString()}`}</p>)
   return bits.length ? bits : null
 }
 
