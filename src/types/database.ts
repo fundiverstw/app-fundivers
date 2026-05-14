@@ -132,6 +132,11 @@ export interface Database {
           /** Manual-verification gate. Diver-side INSERTs into bookings /
            *  push_subscriptions are blocked unless status='active'. */
           status: 'pending' | 'active' | 'rejected'
+          /** Self-FK pointer to the parent profile when this diver is
+           *  managed by another (a child account). Null = standalone.
+           *  One-level only — enforced by the trg_profiles_one_level_family
+           *  trigger (20260514030000_parent_child_accounts.sql). */
+          parent_account: string | null
         }
         Insert: {
           id: string
@@ -166,6 +171,7 @@ export interface Database {
           last_dive_date?: string | null
           gear_owned?: string[]
           status?: 'pending' | 'active' | 'rejected'
+          parent_account?: string | null
         }
         Update: {
           id?: string
@@ -199,6 +205,7 @@ export interface Database {
           last_dive_date?: string | null
           gear_owned?: string[]
           status?: 'pending' | 'active' | 'rejected'
+          parent_account?: string | null
         }
         Relationships: []
       }
@@ -213,6 +220,11 @@ export interface Database {
           notes: string | null
           details: BookingDetails
           refund_requested_at: string | null
+          /** Shared id linking all bookings submitted together by a parent
+           *  as a group registration. Null on solo registrations. Added in
+           *  20260514030000_parent_child_accounts.sql; populated by the
+           *  group-booking submission flow in Phase B. */
+          group_id: string | null
         }
         Insert: {
           id?: string
@@ -224,6 +236,7 @@ export interface Database {
           notes?: string | null
           details?: BookingDetails
           refund_requested_at?: string | null
+          group_id?: string | null
         }
         Update: {
           id?: string
@@ -234,6 +247,7 @@ export interface Database {
           notes?: string | null
           details?: BookingDetails
           refund_requested_at?: string | null
+          group_id?: string | null
         }
         Relationships: []
       }

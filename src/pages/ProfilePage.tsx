@@ -8,6 +8,7 @@ import { useToast } from '../hooks/useToast'
 import { pushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
 import { GEAR_ITEMS } from '../lib/gear'
 import { uploadCertCard, getCertCardSignedUrl, deleteCertCard } from '../lib/cert-card'
+import { FamilySection } from '../components/profile/FamilySection'
 import type { Profile, CertLevel } from '../types/database'
 import {
   SHOE_UNITS,
@@ -91,7 +92,10 @@ export function ProfilePage() {
         // Keying on profile.id remounts the form whenever a different
         // profile loads, so all initial state is computed lazily from
         // props at mount — no sync-state-from-prop effect needed.
-        <ProfileForm key={profile.id} user={user} profile={profile} />
+        <>
+          <ProfileForm key={profile.id} user={user} profile={profile} />
+          <FamilySection parent={profile} />
+        </>
       )}
     </div>
   )
