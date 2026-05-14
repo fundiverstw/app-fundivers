@@ -493,4 +493,38 @@ describe('AdminEventDetailPage', () => {
     expect(screen.getByRole('heading', { name: /Register Eve/i })).toBeInTheDocument()
     expect(toastSuccess).toHaveBeenCalled()
   })
+
+  it('exports diver info via the export-event-divers edge function', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
+    ]))
+    from.mockImplementation(() => mockQueryBuilder({ data: [] }))
+    invoke.mockResolvedValue({ data: { ok: true, diver_count: 7 }, error: null })
+
+    const user = userEvent.setup()
+    renderAt('/admin/events/dive/dive_x')
+
+    await user.click(await screen.findByRole('button', { name: /export diver info/i }))
+
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith(
+      'export-event-divers',
+      { body: { event_type: 'dive', event_id: 'dive_x' } },
+    ))
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith(expect.stringMatching(/7 divers/)))
+  })
+
+  it('surfaces the export error from the edge function', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
+    ]))
+    from.mockImplementation(() => mockQueryBuilder({ data: [] }))
+    invoke.mockResolvedValue({ data: null, error: { message: 'email failed: smtp down' } })
+
+    const user = userEvent.setup()
+    renderAt('/admin/events/dive/dive_x')
+
+    await user.click(await screen.findByRole('button', { name: /export diver info/i }))
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith(expect.stringMatching(/Export failed.*smtp down/)))
+  })
 })

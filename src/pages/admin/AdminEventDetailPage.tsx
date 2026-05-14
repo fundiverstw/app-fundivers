@@ -13,6 +13,7 @@ import { RegisterForm } from '../../components/register/RegisterForm'
 import { shoeAsJp } from '../../lib/shoe-size'
 import { fetchAmendmentsForBookings, addAmendment, formAmount, amendmentsDelta } from '../../lib/booking-amendments'
 import { recordPayment as recordPaymentRow } from '../../lib/booking-payments'
+import { requestEventDiverExport } from '../../lib/admin-event-export'
 import { BookingPaymentsBlock } from '../../components/admin/BookingPaymentsBlock'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Payment, Profile } from '../../types/database'
 
@@ -45,6 +46,7 @@ export function AdminEventDetailPage() {
   const [cancelInFlight, setCancelInFlight] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
   const [notifyModalOpen, setNotifyModalOpen] = useState(false)
+  const [exportingDivers, setExportingDivers] = useState(false)
 
   useEffect(() => {
     if (!type || !id) return
@@ -256,6 +258,25 @@ export function AdminEventDetailPage() {
                   className="text-xs bg-amber-700/80 hover:bg-amber-700 text-white px-3 py-1 rounded-lg"
                 >
                   Notify divers
+                </button>
+                <button
+                  type="button"
+                  disabled={exportingDivers}
+                  onClick={async () => {
+                    if (!type || !id) return
+                    setExportingDivers(true)
+                    try {
+                      const res = await requestEventDiverExport(type, id)
+                      toast.success(`Manifest emailed — ${res.diver_count} diver${res.diver_count === 1 ? '' : 's'}.`)
+                    } catch (err) {
+                      toast.error(`Export failed: ${errorMessage(err)}`)
+                    } finally {
+                      setExportingDivers(false)
+                    }
+                  }}
+                  className="text-xs bg-sky-700/80 hover:bg-sky-700 disabled:opacity-50 text-white px-3 py-1 rounded-lg"
+                >
+                  {exportingDivers ? 'Exporting…' : 'Export diver info'}
                 </button>
               </>
             )}
