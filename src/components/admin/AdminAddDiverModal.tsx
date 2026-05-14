@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useToast } from '../../hooks/useToast'
+import { errorMessage } from '../../lib/errors'
 import { RegisterFormBody } from '../register/RegisterForm'
 import type { AppEvent, Profile } from '../../types/database'
-import { MODAL_BACKDROP, TEXT_HEADING, TEXT_BODY, INPUT } from '../../styles/tokens'
+import { MODAL_BACKDROP, TEXT_HEADING, TEXT_BODY, INPUT, INPUT_LABEL, BTN_PRIMARY } from '../../styles/tokens'
 
-// Two-step "register a diver on behalf" modal:
-//   1. pick which diver — search profiles by name / display name / contact
-//   2. fill out the same RegisterFormBody the diver would see, but with
-//      `actingOnBehalfOf` set so the booking lands on that user instead
-//      of the admin's own id.
+// Three-step "register a diver on behalf" modal:
+//   1. pick which diver — search profiles by name / display name / contact,
+//      or click "Create new diver account" to mint a fresh profile.
+//   2. (optional) create-new-account form — admin fills minimal identity,
+//      edge function provisions the auth user + emails a one-time link
+//      the diver uses to pick their own password.
+//   3. fill out the same RegisterFormBody the diver would see, with
+//      `actingOnBehalfOf` set so the booking lands on the diver's id.
 //
-// Step 2 reuses the diver-side form unchanged (the modal lives at the
-// admin level and just selects a target). The form invokes the
+// Step 3 reuses the diver-side form unchanged. The form invokes the
 // create-registration edge function exactly as the diver would, so
 // the same PDF + confirmation email is sent.
 export function AdminAddDiverModal({
@@ -26,6 +30,7 @@ export function AdminAddDiverModal({
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [filter, setFilter] = useState('')
   const [target, setTarget] = useState<Profile | null>(null)
+  const [creatingNew, setCreatingNew] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -47,6 +52,12 @@ export function AdminAddDiverModal({
     return haystack.includes(filter.toLowerCase())
   })
 
+  const title = target
+    ? `Register ${target.display_name ?? target.full_name}`
+    : creatingNew
+      ? 'Create new diver account'
+      : 'Add diver to event'
+
   return (
     <div
       className={`${MODAL_BACKDROP} flex items-start justify-center p-4 pt-8 overflow-y-auto`}
@@ -60,9 +71,7 @@ export function AdminAddDiverModal({
         onClick={e => e.stopPropagation()}
       >
         <header className="flex items-center justify-between">
-          <h2 id="add-diver-title" className={`text-lg ${TEXT_HEADING}`}>
-            {target ? `Register ${target.display_name ?? target.full_name}` : 'Add diver to event'}
-          </h2>
+          <h2 id="add-diver-title" className={`text-lg ${TEXT_HEADING}`}>{title}</h2>
           <button onClick={onClose} className="text-blue-900 font-medium text-xl leading-none" aria-label="Close">×</button>
         </header>
 
@@ -84,12 +93,28 @@ export function AdminAddDiverModal({
               onCancel={onClose}
             />
           </>
+        ) : creatingNew ? (
+          <CreateNewDiverForm
+            onCancel={() => setCreatingNew(false)}
+            onCreated={profile => {
+              setProfiles(prev => [profile, ...prev])
+              setTarget(profile)
+              setCreatingNew(false)
+            }}
+          />
         ) : (
           <>
             <p className={`text-sm ${TEXT_BODY}`}>
               Pick a diver to register for <span className="font-semibold">{event.title}</span>. The same
               confirmation PDF and email the diver gets when they self-register will be sent to them.
             </p>
+            <button
+              type="button"
+              onClick={() => setCreatingNew(true)}
+              className="w-full text-sm bg-emerald-900/80 hover:bg-emerald-900 text-white font-semibold px-3 py-2 rounded-lg"
+            >
+              + Create new diver account
+            </button>
             <input
               type="text"
               autoFocus
@@ -130,5 +155,141 @@ export function AdminAddDiverModal({
         )}
       </div>
     </div>
+  )
+}
+
+function CreateNewDiverForm({
+  onCancel,
+  onCreated,
+}: {
+  onCancel: () => void
+  onCreated: (profile: Profile) => void
+}) {
+  const toast = useToast()
+  const [email, setEmail] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [nameAlt, setNameAlt] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    const trimmedEmail = email.trim().toLowerCase()
+    const trimmedName = fullName.trim()
+    if (!trimmedEmail || !trimmedName) {
+      setError('Email and full name are required.')
+      return
+    }
+    setSubmitting(true)
+    try {
+      const { data, error: invokeErr } = await supabase.functions.invoke<{
+        ok: boolean
+        user_id: string
+        email_sent: boolean
+        warning?: string
+      }>('admin-create-diver', {
+        body: {
+          email:        trimmedEmail,
+          full_name:    trimmedName,
+          display_name: displayName.trim() || undefined,
+          name_alt:     nameAlt.trim() || undefined,
+          redirect_to:  `${window.location.origin}/reset-password`,
+        },
+      })
+      if (invokeErr) throw new Error(invokeErr.message)
+      if (!data?.ok || !data.user_id) throw new Error('account creation failed')
+
+      // Fetch the newly created (and admin-updated) profile so step 3 has a
+      // real Profile to register against.
+      const { data: profile, error: profErr } = await supabase
+        .from('profiles').select('*').eq('id', data.user_id).single()
+      if (profErr || !profile) throw new Error(profErr?.message ?? 'profile not found after creation')
+
+      const tail = data.email_sent
+        ? ' · invite emailed'
+        : data.warning
+          ? ' · email not sent — diver can use Forgot Password'
+          : ' · email skipped'
+      toast.success(`Account created${tail}`)
+      onCreated(profile as Profile)
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <button
+        type="button"
+        onClick={onCancel}
+        className="text-xs text-blue-900 hover:underline"
+      >
+        ‹ back to diver list
+      </button>
+      <p className={`text-sm ${TEXT_BODY}`}>
+        The diver will receive an email with a one-time link to set their password. The account
+        is created as <span className="font-semibold">active</span> — no manual approval
+        needed. You'll be taken to the registration form after the account is created.
+      </p>
+
+      <label className="block">
+        <span className={INPUT_LABEL}>Email *</span>
+        <input
+          type="email" required autoFocus
+          value={email} onChange={e => setEmail(e.target.value)}
+          className={`${INPUT} text-sm`}
+        />
+      </label>
+      <label className="block">
+        <span className={INPUT_LABEL}>Full name *</span>
+        <input
+          type="text" required
+          value={fullName} onChange={e => setFullName(e.target.value)}
+          className={`${INPUT} text-sm`}
+        />
+      </label>
+      <label className="block">
+        <span className={INPUT_LABEL}>Display name</span>
+        <input
+          type="text"
+          value={displayName} onChange={e => setDisplayName(e.target.value)}
+          placeholder="What we call them day-to-day (optional)"
+          className={`${INPUT} text-sm`}
+        />
+      </label>
+      <label className="block">
+        <span className={INPUT_LABEL}>Alternate name</span>
+        <input
+          type="text"
+          value={nameAlt} onChange={e => setNameAlt(e.target.value)}
+          placeholder="Chinese name or alias (optional)"
+          className={`${INPUT} text-sm`}
+        />
+      </label>
+
+      {error && <p className="text-sm text-red-700 bg-red-50 border border-red-500 rounded px-2 py-1">{error}</p>}
+
+      <div className="flex gap-2 pt-1">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={submitting}
+          className="flex-1 py-2 rounded-lg text-sm font-medium text-blue-900 border border-sky-300 hover:bg-sky-50 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={submitting}
+          className={`flex-1 ${BTN_PRIMARY}`}
+        >
+          {submitting ? 'Creating…' : 'Create account'}
+        </button>
+      </div>
+    </form>
   )
 }
