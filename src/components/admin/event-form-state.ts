@@ -72,6 +72,18 @@ function toHhmm(raw: string | null | undefined): string {
   return m ? `${m[1].padStart(2, '0')}:${m[2]}` : ''
 }
 
+/**
+ * Strip the capacity suffix the DB trigger appends to display_title (see
+ * migration 20260514020000) so admins editing an event see the clean base
+ * title in the form. On save the trigger re-appends the live suffix.
+ *
+ * Mirrors strip_capacity_suffix() in plpgsql — keep the regexes aligned.
+ */
+function stripCapacitySuffix(raw: string | null | undefined): string {
+  if (!raw) return ''
+  return raw.replace(/\s*\((?:\d+\s*spots?\s*open|fully booked\s*[-–—]+\s*register for waitlist)\)\s*$/i, '')
+}
+
 // other_addons can be a JSON array string, a CSV string, or empty (Bubble
 // legacy). Try JSON first, fall back to CSV — same shape as the DB-side
 // parse_addon_ids() function.
@@ -98,7 +110,7 @@ export function formStateFromDive(d: EODive): FormState {
   return {
     type: 'dive',
     admin_title: d.admin_title ?? '',
-    display_title: d.display_title ?? '',
+    display_title: stripCapacitySuffix(d.display_title),
     calendar_title: d.calendar_title ?? '',
     start_date: d.start_date ?? '',
     start_time: toHhmm(d.time),
@@ -132,7 +144,7 @@ export function formStateFromCourse(c: EOCourse): FormState {
   return {
     type: 'course',
     admin_title: c.admin_title ?? '',
-    display_title: c.display_title ?? '',
+    display_title: stripCapacitySuffix(c.display_title),
     calendar_title: c.calendar_title ?? '',
     course_name: c.course_name ?? '',
     start_date: c.start_date ?? '',
