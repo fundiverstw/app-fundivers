@@ -1,13 +1,15 @@
 import { describe, it, expect } from 'vitest'
-import { paymentInstructionsFor, SHOP_ADDRESS, SHOP_PHONE } from './payment-instructions'
+import { paymentInstructionsFor, SHOP_ADDRESS, SHOP_PHONE, SHOP_MAPS_URL, PAYPAL_LINK } from './payment-instructions'
 
 describe('paymentInstructionsFor', () => {
-  it('cash → in-person at the shop, including address + phone', () => {
+  it('cash → in-person at the shop, including address + phone + map link', () => {
     const i = paymentInstructionsFor('cash')
     expect(i.title).toMatch(/cash/i)
-    expect(i.lines.join(' ')).toContain(SHOP_PHONE)
-    expect(i.lines.join(' ')).toContain(SHOP_ADDRESS)
-    expect(i.lines.join(' ').toLowerCase()).toContain('in person')
+    const body = i.lines.join(' ')
+    expect(body).toContain(SHOP_PHONE)
+    expect(body).toContain(SHOP_ADDRESS)
+    expect(body).toContain(SHOP_MAPS_URL)
+    expect(body.toLowerCase()).toContain('in person')
   })
 
   it('bank_transfer → local bank details (code, account, name, branch)', () => {
@@ -20,10 +22,31 @@ describe('paymentInstructionsFor', () => {
     expect(body).toMatch(/branch/i)
   })
 
-  it('credit_card → routes through PayPal email link', () => {
-    const i = paymentInstructionsFor('credit_card')
+  it('paypal → paypal.me link + name-in-note instruction', () => {
+    const i = paymentInstructionsFor('paypal')
     expect(i.title).toMatch(/paypal/i)
-    expect(i.lines.join(' ').toLowerCase()).toContain('paypal payment link')
-    expect(i.lines.join(' ').toLowerCase()).toContain('email')
+    const body = i.lines.join(' ')
+    expect(body).toContain(PAYPAL_LINK)
+    expect(body.toLowerCase()).toContain('full name')
+  })
+
+  it('credit_card with no invoice email → falls back to "your registered email"', () => {
+    const i = paymentInstructionsFor('credit_card')
+    expect(i.title).toMatch(/credit card/i)
+    const body = i.lines.join(' ')
+    expect(body.toLowerCase()).toContain('invoice')
+    expect(body.toLowerCase()).toContain('registered email')
+  })
+
+  it('credit_card with invoice email → shows that address verbatim', () => {
+    const i = paymentInstructionsFor('credit_card', { invoiceEmail: 'invoices@example.com' })
+    const body = i.lines.join(' ')
+    expect(body).toContain('invoices@example.com')
+    expect(body.toLowerCase()).not.toContain('registered email')
+  })
+
+  it('credit_card whitespace-only invoice email → falls back to registered email', () => {
+    const i = paymentInstructionsFor('credit_card', { invoiceEmail: '   ' })
+    expect(i.lines.join(' ').toLowerCase()).toContain('registered email')
   })
 })
