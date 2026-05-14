@@ -54,11 +54,11 @@ interface RegistrationBody {
   notes?:        string | null
 }
 
-// Schema enum is bank_transfer/credit_card/cash; the PDF builder
-// expects bank/paypal/cash. Map between.
+// Pass the payment_method through verbatim — the PDF builder now accepts
+// the SPA's enum directly (bank_transfer / credit_card / paypal / cash).
+// Earlier rev remapped credit_card → paypal because the two were one
+// option; they're separate now (20260514 payment-instructions split).
 function paymentWireLabel(m: string | null | undefined): string {
-  if (m === "bank_transfer") return "bank"
-  if (m === "credit_card")   return "paypal"
   return m ?? ""
 }
 
@@ -350,6 +350,7 @@ Deno.serve(async (req) => {
     transportIncluded,
     notes:           booking.notes ?? null,
     paymentMethod:   paymentWireLabel(details.payment_method as string | null | undefined),
+    creditCardInvoiceEmail: (details.credit_card_invoice_email as string | null | undefined) ?? null,
     deposit:         (details.deposit as number | null) ?? null,
     total:           (details.total as number | null) ?? null,
     payDepositOnly:  !!details.pay_deposit_only,

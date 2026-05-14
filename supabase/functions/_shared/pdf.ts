@@ -63,7 +63,11 @@ export interface RegistrationPdfPayload {
    *  renders "Included with base price" instead of yes/no. */
   transportIncluded: boolean
   notes: string | null
-  paymentMethod: 'bank' | 'paypal' | 'cash' | string
+  paymentMethod: 'bank_transfer' | 'credit_card' | 'paypal' | 'cash' | string
+  /** Where to send the credit-card invoice. Only meaningful when
+   *  paymentMethod === 'credit_card'. Null falls back to "your registered
+   *  email" copy in the instructions block. */
+  creditCardInvoiceEmail: string | null
   deposit: number | string | null
   total: number | null
   /** True when the diver chose deposit-only at registration. */
@@ -246,9 +250,10 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   altState.alt = false
   y = section(doc, y, "Payment")
   const methodLabel =
-    p.paymentMethod === "bank"   ? "Bank transfer"
-    : p.paymentMethod === "paypal" ? "Credit card / PayPal"
-    : p.paymentMethod === "cash"   ? "Cash"
+    p.paymentMethod === "bank_transfer" ? "Bank transfer"
+    : p.paymentMethod === "paypal"      ? "PayPal"
+    : p.paymentMethod === "credit_card" ? "Credit card"
+    : p.paymentMethod === "cash"        ? "Cash"
     : (p.paymentMethod || "")
   y = row(doc, y, "Method", methodLabel, altState)
   y = row(doc, y, "Deposit due (NTD)", p.deposit, altState)
@@ -266,9 +271,12 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   doc.text(p.total != null ? String(p.total) : "-", COL, y + 1)
   y += 8
 
-  // How to pay — per-method instructions (shop address for cash, bank
-  // details for bank transfer, "await PayPal email" for credit card).
-  const instr = paymentInstructionsFor(p.paymentMethod)
+  // How to pay — per-method instructions (shop address + map for cash,
+  // bank details for transfer, paypal.me link for PayPal, invoice email
+  // for credit card).
+  const instr = paymentInstructionsFor(p.paymentMethod, {
+    invoiceEmail: p.creditCardInvoiceEmail ?? p.email,
+  })
   if (instr) {
     y += 6
     y = section(doc, y, instr.title)

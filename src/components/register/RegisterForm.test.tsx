@@ -486,10 +486,16 @@ describe('RegisterForm', () => {
     expect(screen.getByText(/code:/i)).toBeInTheDocument()
     expect(screen.getByText(/branch:/i)).toBeInTheDocument()
 
-    // Switch to credit card → PayPal-email copy.
-    await user.click(screen.getByLabelText(/credit card via paypal/i))
-    expect(screen.getByText(/how to pay — credit card \(via paypal\)/i)).toBeInTheDocument()
-    expect(screen.getByText(/paypal payment link/i)).toBeInTheDocument()
+    // Switch to PayPal → paypal.me link block.
+    await user.click(screen.getByLabelText(/^paypal/i))
+    expect(screen.getByText(/how to pay — paypal/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /paypal\.me\/fundiverstw/i })).toBeInTheDocument()
+
+    // Switch to credit card → invoice-email block, defaults to registered email copy.
+    await user.click(screen.getByLabelText(/credit card/i))
+    expect(screen.getByText(/how to pay — credit card/i)).toBeInTheDocument()
+    expect(screen.getByText(/invoice will be sent to/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/invoice email/i)).toBeInTheDocument()
 
     // Switch to cash → shop address.
     await user.click(screen.getByLabelText(/^cash/i))
