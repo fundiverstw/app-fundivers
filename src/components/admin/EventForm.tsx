@@ -447,12 +447,15 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
             </div>
           </div>
         )}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <Field label="Required dives">
             <Input value={form.req_dives} onChange={v => set('req_dives', v)} />
           </Field>
           <Field label="Dive days">
             <Input type="number" value={form.dive_days} onChange={v => set('dive_days', v)} />
+          </Field>
+          <Field label="Capacity (max confirmed; blank = no cap)">
+            <Input type="number" value={form.capacity} onChange={v => set('capacity', v)} />
           </Field>
         </div>
         <Field label="Required certification">

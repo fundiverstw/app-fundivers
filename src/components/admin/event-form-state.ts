@@ -15,6 +15,8 @@ export interface FormState {
   start_date: string
   start_time: string     // 'HH:mm' or empty
   end_date: string
+  /** Max confirmed bookings before the trigger forces waitlist. Empty = uncapped. */
+  capacity: string
   price: string          // FK → EO_prices._id; empty = no price linked
   prereq_cert_id: string // FK → cert_levels.id; empty = no cert required
   req_dives: string      // dives store bigint, courses store text — keep as string here
@@ -49,6 +51,7 @@ export const EMPTY_FORM: FormState = {
   type: 'dive',
   admin_title: '', display_title: '', calendar_title: '',
   start_date: '', start_time: '', end_date: '',
+  capacity: '',
   price: '',
   prereq_cert_id: '',
   req_dives: '', dive_days: '',
@@ -100,6 +103,7 @@ export function formStateFromDive(d: EODive): FormState {
     start_date: d.start_date ?? '',
     start_time: toHhmm(d.time),
     end_date: d.end_date ?? '',
+    capacity: d.capacity != null ? String(d.capacity) : '',
     price: d.price ?? '',
     prereq_cert_id: d.prereq_cert_id ?? '',
     req_dives: d.req_dives != null ? String(d.req_dives) : '',
@@ -134,6 +138,7 @@ export function formStateFromCourse(c: EOCourse): FormState {
     start_date: c.start_date ?? '',
     start_time: toHhmm(c.start_time),
     end_date: c.end_date ?? '',
+    capacity: c.capacity != null ? String(c.capacity) : '',
     special_date: c.special_date ?? '',
     price: c.price ?? '',
     url: c.URL ?? '',
@@ -170,6 +175,7 @@ export function divePayloadFromForm(form: FormState): Record<string, unknown> {
     start_date: form.start_date || null,
     time: timeText || null,
     end_date: form.end_date || null,
+    capacity: form.capacity ? Number(form.capacity) : null,
     price: form.price || null,
     notes: form.notes,                   // NOT NULL — empty string OK
     featured: form.featured,
@@ -206,6 +212,7 @@ export function coursePayloadFromForm(form: FormState): Record<string, unknown> 
     start_date: form.start_date || null,
     start_time: timeText || null,
     end_date: form.end_date || null,
+    capacity: form.capacity ? Number(form.capacity) : null,
     special_date: form.special_date || null,
     price: form.price || null,
     URL: form.url || null,

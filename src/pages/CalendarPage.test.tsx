@@ -166,7 +166,9 @@ describe('CalendarPage', () => {
     await screen.findAllByText(ev.title)
     // The title now appears twice (calendar bar + list row); click the first.
     await user.click(screen.getAllByText(ev.title)[0])
-    const btn = await screen.findByRole('button', { name: /register/i })
+    // The list row's accessible name now contains "register for waitlist",
+    // so match on exact "Register" to grab the action button instead.
+    const btn = await screen.findByRole('button', { name: 'Register' })
     expect(btn).toBeDisabled()
   })
 
