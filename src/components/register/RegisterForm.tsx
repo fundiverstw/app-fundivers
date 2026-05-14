@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
-import { formatEventSpan } from '../../lib/events'
+import { formatEventSpan, eventIsFull, eventSpotsRemaining } from '../../lib/events'
 import { computeEffectiveDeadlines } from '../../lib/payment-deadlines'
 import { paymentInstructionsFor } from '../../lib/payment-instructions'
 import { GEAR_ITEMS } from '../../lib/gear'
@@ -377,19 +377,32 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
           {event.price != null && (
             <p className="text-sm text-blue-950 font-medium">From {event.currency} {event.price.toLocaleString()}</p>
           )}
-          {event.fully_booked && (
-            // Surface waitlist-on-register up front. The booking still goes
-            // through end-to-end so the diver doesn't have to come back —
-            // they just land in 'waitlisted' status. Payment is owed only
-            // if a spot opens and they accept the offer.
+          {/* Capacity-aware banner. Full → waitlist nudge; 1-2 left →
+              urgency nudge. The booking still goes through end-to-end so
+              the diver doesn't have to come back — they just land in
+              'waitlisted' if the trigger flags them as full. */}
+          {eventIsFull(event) ? (
             <div
               role="alert"
               className="bg-red-50 border border-red-500 rounded-lg px-3 py-2 text-xs text-red-700"
             >
-              <p className="font-semibold">This event is full.</p>
-              <p>You'll be added to the waitlist. If a spot opens we'll send a push and email — you'll have 24 hours to claim it.</p>
+              <p className="font-semibold">This event is full — register for the waitlist.</p>
+              <p>If a spot opens we'll send a push and email — you'll have 24 hours to claim it.</p>
             </div>
-          )}
+          ) : (() => {
+            const remaining = eventSpotsRemaining(event)
+            if (remaining !== null && remaining > 0 && remaining <= 2) {
+              return (
+                <div
+                  role="status"
+                  className="bg-red-50 border border-red-500 rounded-lg px-3 py-2 text-xs text-red-700"
+                >
+                  <p className="font-semibold">Only {remaining} spot{remaining === 1 ? '' : 's'} remaining.</p>
+                </div>
+              )
+            }
+            return null
+          })()}
         </section>
       )}
 

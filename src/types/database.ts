@@ -78,6 +78,16 @@ export interface Database {
         Args: { p_offer_id: string }
         Returns: void
       }
+      // Defined in 20260514010000_event_capacity.sql; security-definer.
+      // Returns one row per event with at least one confirmed booking.
+      // Lets divers see real aggregate capacity numbers past their RLS.
+      event_confirmed_counts: {
+        Args: {
+          p_dive_ids:   string[]
+          p_course_ids: string[]
+        }
+        Returns: Array<{ event_id: string; event_type: 'dive' | 'course'; n: number }>
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
@@ -318,6 +328,7 @@ export interface Database {
           cancelled_at: string | null
           deposit_deadline: string | null
           full_payment_deadline: string | null
+          capacity: number | null
         }
         Insert: {
           _id: string
@@ -341,6 +352,7 @@ export interface Database {
           cancelled_at?: string | null
           deposit_deadline?: string | null
           full_payment_deadline?: string | null
+          capacity?: number | null
         }
         Update: Partial<Database['public']['Tables']['EO_dives']['Insert']>
         Relationships: []
@@ -374,6 +386,7 @@ export interface Database {
           cancel_date: string | null
           cancel_policy: string | null
           fully_booked: boolean | null
+          capacity: number | null
         }
         Insert: {
           _id: string
@@ -393,6 +406,7 @@ export interface Database {
           cancel_date?: string | null
           cancel_policy?: string | null
           fully_booked?: boolean | null
+          capacity?: number | null
         }
         Update: Partial<Database['public']['Tables']['EO_courses']['Insert']>
         Relationships: []
@@ -905,7 +919,16 @@ export interface AppEvent {
    */
   start_time_hhmm: string | null
   featured: boolean
+  /** Admin-set manual "no more registrations" flag. Independent of capacity:
+   *  set it to force an event onto the waitlist regardless of capacity. */
   fully_booked: boolean
+  /** Maximum number of confirmed bookings the event accepts. NULL = no cap.
+   *  Pending bookings don't count toward this — only status='confirmed' does. */
+  capacity: number | null
+  /** Live count of confirmed bookings (NULL if not loaded — most call sites
+   *  populate it via fetchEventsInRange / fetchEventsForBookings). Combined
+   *  with `capacity` to derive "X spots remaining" / fully-booked state. */
+  confirmed_count: number | null
   price: number | null
   deposit_amount: number | null
   /** Per-tier transport surcharge from EO_prices.transport (NTD). NULL or

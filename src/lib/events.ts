@@ -72,6 +72,8 @@ function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: stri
     start_time_hhmm: toHhmm(d.time),
     featured: d.featured ?? false,
     fully_booked: d.fully_booked ?? false,
+    capacity: d.capacity ?? null,
+    confirmed_count: null,
     price: p?.starting_at ?? null,
     deposit_amount: p?.deposit_amount ?? null,
     transport_price: p?.transport ?? null,
@@ -128,6 +130,8 @@ function courseToEvents(c: EOCourse, priceIndex: Map<string, EOPrice>, addonIds:
     start_time_hhmm: toHhmm(c.start_time),
     featured: false,
     fully_booked: c.fully_booked ?? false,
+    capacity: c.capacity ?? null,
+    confirmed_count: null,
     price: p?.starting_at ?? null,
     deposit_amount: p?.deposit_amount ?? null,
     transport_price: p?.transport ?? null,
@@ -249,8 +253,8 @@ async function attachPrices(dives: EODive[], courses: EOCourse[]): Promise<Map<s
   return new Map((data ?? []).map(p => [p._id, p as EOPrice]))
 }
 
-const DIVE_COLS = '_id, admin_title, display_title, calendar_title, start_date, time, end_date, featured, fully_booked, price, has_rooms, room_types, hasotheraddons, other_addons, gear_rental, nitrox_required, dive_days, cancelled_at, deposit_deadline, full_payment_deadline, cancel_policy, cancel_date'
-const COURSE_COLS = '_id, admin_title, display_title, calendar_title, start_date, start_time, end_date, price, other_addons, dive_days, special_date, cancelled_at, deposit_deadline, full_payment_deadline, cancel_policy, cancel_date, fully_booked'
+const DIVE_COLS = '_id, admin_title, display_title, calendar_title, start_date, time, end_date, featured, fully_booked, capacity, price, has_rooms, room_types, hasotheraddons, other_addons, gear_rental, nitrox_required, dive_days, cancelled_at, deposit_deadline, full_payment_deadline, cancel_policy, cancel_date'
+const COURSE_COLS = '_id, admin_title, display_title, calendar_title, start_date, start_time, end_date, price, other_addons, dive_days, special_date, cancelled_at, deposit_deadline, full_payment_deadline, cancel_policy, cancel_date, fully_booked, capacity'
 
 /**
  * Fetch dives + courses whose start_date falls within [fromDate, toDate]
@@ -273,10 +277,12 @@ export async function fetchEventsInRange(fromDate: string, toDate: string): Prom
     attachRoomIds(dives.map(d => d._id)),
   ])
 
-  return [
+  const events = [
     ...dives.map(d => diveToEvent(d, prices, addons.get(d._id) ?? [], rooms.get(d._id) ?? [])).filter((x): x is AppEvent => !!x),
     ...courses.flatMap(c => courseToEvents(c, prices, addons.get(c._id) ?? [])),
   ].sort((a, b) => a.start_time.localeCompare(b.start_time))
+  await attachConfirmedCounts(events)
+  return events
 }
 
 /** Fetch the events referenced by a batch of bookings. */
@@ -312,5 +318,73 @@ export async function fetchEventsForBookings(
     const segs = courseToEvents(c, prices, addons.get(c._id) ?? [])
     if (segs.length > 0) out.set(segs[0].id, segs[0])
   }
+  await attachConfirmedCounts([...out.values()])
   return out
+}
+
+/**
+ * Populate `event.confirmed_count` in place via the event_confirmed_counts
+ * RPC (SECURITY DEFINER, so divers see real aggregates past RLS).
+ *
+ * Only events with `capacity != null` need a count — uncapped events ignore
+ * the field. Events with no confirmed bookings get 0. Mutates the array.
+ */
+async function attachConfirmedCounts(events: AppEvent[]): Promise<void> {
+  if (events.length === 0) return
+  // Group by id with type, so duplicate course segments share one count.
+  const diveIds:   string[] = []
+  const courseIds: string[] = []
+  for (const ev of events) {
+    if (ev.type === 'dive')   diveIds.push(ev.id)
+    else                       courseIds.push(ev.id)
+  }
+  const dedupDive   = [...new Set(diveIds)]
+  const dedupCourse = [...new Set(courseIds)]
+  if (dedupDive.length === 0 && dedupCourse.length === 0) return
+
+  // Non-fatal: any failure (RPC not deployed yet, network blip, test mock
+  // without rpc) leaves confirmed_count null so the UI falls back to "no
+  // badge" instead of breaking the whole event fetch.
+  type Row = { event_id: string; event_type: string; n: number }
+  let rows: Row[] = []
+  try {
+    const res = await supabase.rpc('event_confirmed_counts', {
+      p_dive_ids:   dedupDive,
+      p_course_ids: dedupCourse,
+    })
+    if (res.error) return
+    rows = (res.data ?? []) as Row[]
+  } catch {
+    return
+  }
+
+  const counts = new Map<string, number>()
+  for (const row of rows) {
+    counts.set(`${row.event_type}:${row.event_id}`, Number(row.n))
+  }
+  for (const ev of events) {
+    ev.confirmed_count = counts.get(`${ev.type}:${ev.id}`) ?? 0
+  }
+}
+
+/**
+ * Spots-remaining for diver-facing UI. Returns null when the event has no
+ * capacity set (uncapped) or no count has been loaded yet — callers should
+ * render no badge in that case. Otherwise returns max(0, capacity - confirmed).
+ */
+export function eventSpotsRemaining(event: Pick<AppEvent, 'capacity' | 'confirmed_count'>): number | null {
+  if (event.capacity == null) return null
+  if (event.confirmed_count == null) return null
+  return Math.max(0, event.capacity - event.confirmed_count)
+}
+
+/**
+ * True when divers should be steered to the waitlist — either the admin
+ * manually flipped fully_booked, or capacity is set and exhausted. Mirrors
+ * what set_waitlisted_when_event_full() decides server-side.
+ */
+export function eventIsFull(event: Pick<AppEvent, 'fully_booked' | 'capacity' | 'confirmed_count'>): boolean {
+  if (event.fully_booked) return true
+  const remaining = eventSpotsRemaining(event)
+  return remaining !== null && remaining === 0
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { startOfMonth, endOfMonth } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { fetchEventsInRange, formatEventSpan } from '../lib/events'
+import { fetchEventsInRange, formatEventSpan, eventIsFull, eventSpotsRemaining } from '../lib/events'
 import { MonthCalendar } from '../components/calendar/MonthCalendar'
 import { RegisterForm } from '../components/register/RegisterForm'
 import type { AppEvent, Booking } from '../types/database'
@@ -109,11 +109,20 @@ export function CalendarPage() {
               {selected.price != null && (
                 <p>💰 From {selected.currency} {selected.price.toLocaleString()}</p>
               )}
-              {selected.fully_booked && <p className="text-red-600 font-semibold">Fully booked</p>}
+              {(() => {
+                if (eventIsFull(selected)) {
+                  return <p className="text-red-600 font-semibold">Fully booked — register for waitlist</p>
+                }
+                const remaining = eventSpotsRemaining(selected)
+                if (remaining !== null && remaining > 0 && remaining <= 2) {
+                  return <p className="text-red-600 font-semibold">Only {remaining} spot{remaining === 1 ? '' : 's'} remaining</p>
+                }
+                return null
+              })()}
             </div>
             <button
               onClick={isBooked(selected) ? cancelBooking : startRegister}
-              disabled={bookingLoading || (!isBooked(selected) && selected.fully_booked)}
+              disabled={bookingLoading || (!isBooked(selected) && eventIsFull(selected))}
               className={`w-full py-3 rounded-xl font-semibold transition-colors disabled:opacity-50 ${
                 isBooked(selected)
                   ? 'bg-sky-100 hover:bg-red-100 text-red-700 border border-red-500'
