@@ -278,6 +278,25 @@ describe('RegisterForm', () => {
     expect(details.total).toBe(Math.round(2800 * 1.05))
   })
 
+  it('applies a 5% surcharge for PayPal payment on the total', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/^paypal/i))
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+    const details = (invoke.mock.calls[0][1] as { body: Record<string, unknown> }).body.details as { total: number; payment_method: string }
+    expect(details.payment_method).toBe('paypal')
+    expect(details.total).toBe(Math.round(2800 * 1.05))
+  })
+
   it('step 2 Next is gated on full-name being set (enforces the one required field)', async () => {
     setupFrom()
     const user = userEvent.setup()
