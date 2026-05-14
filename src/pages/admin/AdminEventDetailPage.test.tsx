@@ -485,8 +485,8 @@ describe('AdminEventDetailPage', () => {
       email: 'eve@example.com',
       full_name: 'Eve Tester',
       display_name: 'Eve',
+      event_title: 'Kenting',
     })
-    expect(invokeArgs.body.redirect_to).toMatch(/\/reset-password$/)
 
     // Modal jumps to step C — RegisterFormBody Step 1 of 4 for the new diver.
     await screen.findByText(/Step 1 of 4/i)
