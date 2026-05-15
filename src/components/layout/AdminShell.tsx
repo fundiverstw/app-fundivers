@@ -40,6 +40,7 @@ export function AdminShell() {
       .from('profiles')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'pending')
+      .not('application_submitted_at', 'is', null)
       .then(({ count }) => { if (!cancelled) setPendingCount(count ?? 0) })
     return () => { cancelled = true }
   }, [profile?.role, location.pathname])
