@@ -627,6 +627,8 @@ export interface Database {
           included: string | null
           not_included: string | null
           transportation: string | null
+          itinerary: string | null
+          prerequisites: string | null
         }
         Insert: {
           _id: string
@@ -634,6 +636,8 @@ export interface Database {
           included?: string | null
           not_included?: string | null
           transportation?: string | null
+          itinerary?: string | null
+          prerequisites?: string | null
         }
         Update: Partial<Database['public']['Tables']['DiveTravel']['Insert']>
         Relationships: []
