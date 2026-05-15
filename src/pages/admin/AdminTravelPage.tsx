@@ -6,6 +6,8 @@ const fields: CatalogField<DiveTravelEntry>[] = [
   { key: 'included',       label: 'Included', type: 'textarea', placeholder: 'What the price includes…' },
   { key: 'not_included',   label: 'Not included', type: 'textarea', placeholder: 'What the price does NOT include…' },
   { key: 'transportation', label: 'Transportation', type: 'textarea', placeholder: 'How divers reach the site…' },
+  { key: 'itinerary',      label: 'Itinerary', type: 'textarea', placeholder: 'Day-by-day plan…' },
+  { key: 'prerequisites',  label: 'Prerequisites', type: 'textarea', placeholder: 'Certification level, experience…' },
 ]
 
 export function AdminTravelPage() {
