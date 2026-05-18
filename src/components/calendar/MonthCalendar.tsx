@@ -3,9 +3,12 @@ import {
   format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth,
   addMonths, subMonths, startOfWeek, endOfWeek,
 } from 'date-fns'
-import { assignTracks, segmentsForDay, type CellSegment, type EventRange } from '../../lib/calendar-layout'
+import {
+  assignTracks, segmentsForDay,
+  type CellSegment, type EventRange, type LayoutEvent,
+} from '../../lib/calendar-layout'
 import { formatEventSpan } from '../../lib/events'
-import type { AppEvent } from '../../types/database'
+import type { AppEvent, StaffBusyEntry } from '../../types/database'
 
 // Shared by CalendarPage (diver) and AdminEventsPage (admin). The only
 // differences between those two surfaces are what happens when you pick an
@@ -33,6 +36,21 @@ const TYPE_LABELS: Record<AppEvent['type'], string> = {
   course: 'Course',
 }
 
+// Busy bars are intentionally muted so they read as "not an event" next
+// to the dive/course palette. Own vs. other gets two distinct fills so
+// admins can tell at a glance which periods are theirs vs. someone
+// else's — amber-on-someone-else stays the attention-grabbing signal
+// for duty planning, and slate-on-own reads as a neutral "your own
+// calendar overlay".
+// Own = warm yellow-orange (you're the focal point of your own
+// calendar); other staff = neutral gray so they read as "background
+// constraints to plan around" rather than competing for attention.
+const OWN_BUSY_BAR         = 'bg-amber-600 text-white'
+const OWN_BUSY_BAR_HOVER   = 'bg-amber-500 text-white'
+const OTHER_BUSY_BAR       = 'bg-slate-500 text-white'
+const OTHER_BUSY_BAR_HOVER = 'bg-slate-400 text-white'
+const BUSY_DOT             = 'bg-amber-600'
+
 // Short chip labels for the course-category filter popover.
 const COURSE_SHORT: Record<string, string> = {
   'Open Water Course':   'OW',
@@ -49,6 +67,34 @@ function courseShortLabel(category: string): string {
 const TRACK_HEIGHT = 18
 const TRACK_GAP = 2
 
+// Project a staff_busy view row into the LayoutEvent shape so it can
+// share the track allocator. end_date is inclusive (busy through end of
+// day), so we anchor end_time at the end of that day rather than midnight
+// (which would round down to the previous day on toLocaleDateString diffs).
+interface BusyLayoutEvent extends LayoutEvent {
+  busy: StaffBusyEntry
+  /** Whether this row belongs to the current viewer. Own rows show their
+   *  real title; other rows show only the owner's display name (title is
+   *  null in that case because the view masks it). */
+  isOwn: boolean
+}
+function toBusyLayoutEvent(b: StaffBusyEntry, currentUserId: string | null): BusyLayoutEvent {
+  return {
+    id: b.id,
+    // 'YYYY-MM-DDTHH:MM:SS' parses as local time, which is what we want —
+    // start_date/start_time/end_date are stored as naive calendar values.
+    start_time: `${b.start_date}T${b.start_time}`,
+    end_time:   `${b.end_date}T23:59:59`,
+    busy: b,
+    isOwn: !!currentUserId && b.user_id === currentUserId,
+  }
+}
+
+function busyDisplayLabel(entry: StaffBusyEntry, isOwn: boolean): string {
+  if (isOwn) return entry.title ?? entry.owner_display_name ?? 'Busy'
+  return entry.owner_display_name ?? 'Busy'
+}
+
 export interface MonthCalendarProps {
   month: Date
   onMonthChange: (d: Date) => void
@@ -60,10 +106,28 @@ export interface MonthCalendarProps {
   hidePastInList?: boolean
   /** Optional heading for the list below the grid. */
   listTitle?: string
+
+  // ── Staff availability overlay (optional) ────────────────────────────
+  /** Staff_busy rows touching the visible range. When omitted the overlay is fully off. */
+  busyEntries?: StaffBusyEntry[]
+  /** Controlled state of the Busy toggle. The parent owns this so the
+   *  default can wait for async profile data (initializing here would
+   *  freeze the value at first render, before useAuth resolves). */
+  busyShown?: boolean
+  /** Toggle handler — paired with busyShown. The pill renders only when
+   *  busyEntries AND onToggleBusy are both provided. */
+  onToggleBusy?: () => void
+  /** Current viewer's user id — used to mark "own" rows for tap routing. */
+  currentUserId?: string | null
+  /** Click handler for tapping an empty cell. Triggers a "mark busy" flow. */
+  onCreateBusy?: (day: Date) => void
+  /** Click handler for tapping an existing busy bar. */
+  onPickBusy?: (b: StaffBusyEntry) => void
 }
 
 export function MonthCalendar({
   month, onMonthChange, events, onPickEvent, renderListBadge, hidePastInList, listTitle = 'This month',
+  busyEntries, busyShown, onToggleBusy, currentUserId, onCreateBusy, onPickBusy,
 }: MonthCalendarProps) {
   const [diveShown, setDiveShown] = useState(true)
   const [hiddenCourses, setHiddenCourses] = useState<Set<string>>(new Set())
@@ -85,11 +149,22 @@ export function MonthCalendar({
     return !hiddenCourses.has(e.title)
   }), [events, diveShown, hiddenCourses])
 
-  const ranges: EventRange[] = useMemo(() => assignTracks(filteredEvents), [filteredEvents])
+  const ranges: EventRange<AppEvent>[] = useMemo(() => assignTracks(filteredEvents), [filteredEvents])
+
+  const busyOverlayEnabled = busyEntries !== undefined && onToggleBusy !== undefined
+  const busyLayoutEvents = useMemo<BusyLayoutEvent[]>(() => {
+    if (!busyOverlayEnabled || !busyShown) return []
+    return (busyEntries ?? []).map(b => toBusyLayoutEvent(b, currentUserId ?? null))
+  }, [busyEntries, busyOverlayEnabled, busyShown, currentUserId])
+  const busyRanges: EventRange<BusyLayoutEvent>[] = useMemo(
+    () => assignTracks(busyLayoutEvents),
+    [busyLayoutEvents],
+  )
 
   // Cells grow to fit every track in use that month — no overflow / "+N more"
   // truncation. Days are capped at a couple of events in practice, so a
-  // hard limit isn't earning its keep.
+  // hard limit isn't earning its keep. Event + busy tracks are stacked
+  // (events first, busy below) so the cell height is the sum.
   const cellTrackRows = useMemo(() => {
     let max = 0
     for (const r of ranges) {
@@ -100,6 +175,16 @@ export function MonthCalendar({
     }
     return max
   }, [ranges, month])
+  const cellBusyTrackRows = useMemo(() => {
+    let max = 0
+    for (const r of busyRanges) {
+      const monthStart = startOfMonth(month)
+      const monthEnd = endOfMonth(month)
+      if (r.end < monthStart || r.start > monthEnd) continue
+      if (r.track + 1 > max) max = r.track + 1
+    }
+    return max
+  }, [busyRanges, month])
 
   const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }, [])
   const inMonthEvents = useMemo(
@@ -126,6 +211,7 @@ export function MonthCalendar({
         courseCategories={courseCategories}
         hiddenCourses={hiddenCourses}
         onToggleCategory={toggleCourseCategory}
+        busyToggle={busyOverlayEnabled ? { shown: !!busyShown, onToggle: onToggleBusy! } : undefined}
       />
 
       <div className="flex items-center justify-between gap-2">
@@ -150,8 +236,12 @@ export function MonthCalendar({
         month={month}
         days={days}
         ranges={ranges}
+        busyRanges={busyRanges}
         trackRows={cellTrackRows}
+        busyTrackRows={cellBusyTrackRows}
         onPickEvent={onPickEvent}
+        onPickBusy={onPickBusy}
+        onCreateBusy={onCreateBusy}
         hoveredEventId={hoveredEventId}
         onHoverEvent={setHoveredEventId}
       />
@@ -197,16 +287,24 @@ export function MonthCalendar({
 interface MonthGridProps {
   month: Date
   days: Date[]
-  ranges: EventRange[]
+  ranges: EventRange<AppEvent>[]
+  busyRanges: EventRange<BusyLayoutEvent>[]
   trackRows: number
+  busyTrackRows: number
   onPickEvent: (ev: AppEvent) => void
+  onPickBusy?: (b: StaffBusyEntry) => void
+  onCreateBusy?: (day: Date) => void
   hoveredEventId: string | null
   onHoverEvent: (id: string | null) => void
 }
 
-function MonthGrid({ month, days, ranges, trackRows, onPickEvent, hoveredEventId, onHoverEvent }: MonthGridProps) {
+function MonthGrid({
+  month, days, ranges, busyRanges, trackRows, busyTrackRows,
+  onPickEvent, onPickBusy, onCreateBusy, hoveredEventId, onHoverEvent,
+}: MonthGridProps) {
   const leading = days[0].getDay()
-  const cellMinHeight = 22 + Math.max(1, trackRows) * (TRACK_HEIGHT + TRACK_GAP) + 6
+  const totalRows = Math.max(1, trackRows) + busyTrackRows
+  const cellMinHeight = 22 + totalRows * (TRACK_HEIGHT + TRACK_GAP) + 6
 
   return (
     <div className="grid grid-cols-7 bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl overflow-hidden text-sm">
@@ -225,10 +323,14 @@ function MonthGrid({ month, days, ranges, trackRows, onPickEvent, hoveredEventId
           key={day.toISOString()}
           day={day}
           ranges={ranges}
+          busyRanges={busyRanges}
           month={month}
           trackRows={trackRows}
+          busyTrackRows={busyTrackRows}
           minHeight={cellMinHeight}
           onPickEvent={onPickEvent}
+          onPickBusy={onPickBusy}
+          onCreateBusy={onCreateBusy}
           hoveredEventId={hoveredEventId}
           onHoverEvent={onHoverEvent}
         />
@@ -238,30 +340,44 @@ function MonthGrid({ month, days, ranges, trackRows, onPickEvent, hoveredEventId
 }
 
 function DayCell({
-  day, ranges, month, trackRows, minHeight, onPickEvent, hoveredEventId, onHoverEvent,
+  day, ranges, busyRanges, month, trackRows, busyTrackRows, minHeight,
+  onPickEvent, onPickBusy, onCreateBusy, hoveredEventId, onHoverEvent,
 }: {
   day: Date
-  ranges: EventRange[]
+  ranges: EventRange<AppEvent>[]
+  busyRanges: EventRange<BusyLayoutEvent>[]
   month: Date
   trackRows: number
+  busyTrackRows: number
   minHeight: number
   onPickEvent: (ev: AppEvent) => void
+  onPickBusy?: (b: StaffBusyEntry) => void
+  onCreateBusy?: (day: Date) => void
   hoveredEventId: string | null
   onHoverEvent: (id: string | null) => void
 }) {
   const weekStart = startOfWeek(day, { weekStartsOn: 0 })
   const weekEnd = endOfWeek(day, { weekStartsOn: 0 })
   const segMap = segmentsForDay(day, ranges, weekStart, weekEnd)
+  const busySegMap = segmentsForDay(day, busyRanges, weekStart, weekEnd)
   const isToday = isSameDay(day, new Date())
   const inMonth = isSameMonth(day, month)
 
   const trackRowCount = Math.max(1, trackRows)
+  const eventStripHeight = trackRowCount * (TRACK_HEIGHT + TRACK_GAP)
+  const busyStripHeight = busyTrackRows * (TRACK_HEIGHT + TRACK_GAP)
+
+  // The whole cell is a click target for "mark busy" when onCreateBusy is
+  // wired; event/busy bars stopPropagation so they keep their own intent.
+  const cellClickable = !!onCreateBusy
+  const handleCellClick = cellClickable ? () => onCreateBusy!(day) : undefined
 
   return (
     <div
+      onClick={handleCellClick}
       className={`relative pt-1 border-b border-sky-200/60 ${
         isToday ? 'bg-red-50' : ''
-      } ${!inMonth ? 'opacity-40' : ''}`}
+      } ${!inMonth ? 'opacity-40' : ''} ${cellClickable ? 'cursor-pointer hover:bg-amber-50/60' : ''}`}
       style={{ minHeight }}
     >
       <span className={`text-[10px] block text-center w-5 h-5 flex items-center justify-center mx-auto ${
@@ -269,7 +385,7 @@ function DayCell({
       }`}>
         {format(day, 'd')}
       </span>
-      <div className="mt-1 relative" style={{ height: trackRowCount * (TRACK_HEIGHT + TRACK_GAP) }}>
+      <div className="mt-1 relative" style={{ height: eventStripHeight }}>
         {Array.from(segMap.entries()).map(([track, seg]) => (
           <EventBar
             key={`${seg.event.id}_${seg.event.start_time}`}
@@ -281,12 +397,26 @@ function DayCell({
           />
         ))}
       </div>
+      {busyTrackRows > 0 && (
+        <div className="relative" style={{ height: busyStripHeight }}>
+          {Array.from(busySegMap.entries()).map(([track, seg]) => (
+            <BusyBar
+              key={`busy_${seg.event.id}_${seg.event.start_time}`}
+              seg={seg}
+              track={track}
+              onClick={onPickBusy ? () => onPickBusy(seg.event.busy) : undefined}
+              hovered={hoveredEventId === seg.event.id}
+              onHoverEvent={onHoverEvent}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
 function EventBar({ seg, track, onClick, hovered, onHoverEvent }: {
-  seg: CellSegment
+  seg: CellSegment<AppEvent>
   track: number
   onClick: () => void
   hovered: boolean
@@ -313,7 +443,7 @@ function EventBar({ seg, track, onClick, hovered, onHoverEvent }: {
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={e => { e.stopPropagation(); onClick() }}
       onMouseEnter={() => onHoverEvent(seg.event.id)}
       onMouseLeave={() => onHoverEvent(null)}
       title={seg.event.title}
@@ -338,17 +468,57 @@ function EventBar({ seg, track, onClick, hovered, onHoverEvent }: {
   )
 }
 
+function BusyBar({ seg, track, onClick, hovered, onHoverEvent }: {
+  seg: CellSegment<BusyLayoutEvent>
+  track: number
+  onClick?: () => void
+  hovered: boolean
+  onHoverEvent: (id: string | null) => void
+}) {
+  const baseClass = seg.event.isOwn
+    ? (hovered ? OWN_BUSY_BAR_HOVER   : OWN_BUSY_BAR)
+    : (hovered ? OTHER_BUSY_BAR_HOVER : OTHER_BUSY_BAR)
+  const leftInset = seg.isStart ? 2 : 0
+  const rightInset = seg.isEnd ? 2 : 0
+  const leftRadius = seg.isStart ? 'rounded-l-sm' : ''
+  const rightRadius = seg.isEnd ? 'rounded-r-sm' : ''
+  const isClickable = !!onClick
+  const label = busyDisplayLabel(seg.event.busy, seg.event.isOwn)
+
+  return (
+    <button
+      type="button"
+      disabled={!isClickable}
+      onClick={onClick ? e => { e.stopPropagation(); onClick() } : undefined}
+      onMouseEnter={() => onHoverEvent(seg.event.id)}
+      onMouseLeave={() => onHoverEvent(null)}
+      title={label}
+      className={`absolute text-[10px] font-semibold truncate text-left px-1 transition-colors ${baseClass} ${leftRadius} ${rightRadius} ${isClickable ? '' : 'cursor-default'}`}
+      style={{
+        top: track * (TRACK_HEIGHT + TRACK_GAP),
+        height: TRACK_HEIGHT,
+        left: leftInset,
+        right: rightInset,
+      }}
+    >
+      {seg.showTitle ? label : <>&nbsp;</>}
+    </button>
+  )
+}
+
 interface FilterLegendProps {
   diveShown: boolean
   onToggleDive: () => void
   courseCategories: string[]
   hiddenCourses: Set<string>
   onToggleCategory: (cat: string) => void
+  busyToggle?: { shown: boolean; onToggle: () => void }
 }
 
 function FilterLegend({
   diveShown, onToggleDive,
   courseCategories, hiddenCourses, onToggleCategory,
+  busyToggle,
 }: FilterLegendProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement | null>(null)
@@ -433,6 +603,23 @@ function FilterLegend({
           </div>
         )}
       </div>
+
+      {busyToggle && (
+        <button
+          type="button"
+          onClick={busyToggle.onToggle}
+          aria-pressed={busyToggle.shown}
+          aria-label="Toggle staff availability"
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors ${
+            busyToggle.shown
+              ? 'bg-white border-blue-900 text-blue-900'
+              : 'bg-sky-100 border-sky-200 text-blue-950 font-medium line-through'
+          }`}
+        >
+          <span className={`w-2 h-2 rounded-full ${BUSY_DOT}`} />
+          Busy
+        </button>
+      )}
     </div>
   )
 }

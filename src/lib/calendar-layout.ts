@@ -1,16 +1,25 @@
 import { differenceInCalendarDays, isAfter, isSameDay, isSameMonth, startOfDay } from 'date-fns'
 import type { AppEvent } from '../types/database'
 
-export interface EventRange {
-  event: AppEvent
+// Minimum shape the layout helpers need from anything that wants to be
+// stacked into tracks. AppEvent satisfies it; so does the synthetic
+// "staff_busy" projection MonthCalendar builds for its overlay lane.
+export interface LayoutEvent {
+  id: string
+  start_time: string
+  end_time: string | null
+}
+
+export interface EventRange<T extends LayoutEvent = AppEvent> {
+  event: T
   start: Date
   end: Date
   /** 0-based vertical track the bar occupies within each day cell. */
   track: number
 }
 
-export interface CellSegment {
-  event: AppEvent
+export interface CellSegment<T extends LayoutEvent = AppEvent> {
+  event: T
   track: number
   /** This cell is the left edge of the bar (either the event start, or the first day of its week). */
   isStart: boolean
@@ -25,8 +34,8 @@ export interface CellSegment {
  * Events are sorted ascending by start date (with ties broken by longer duration
  * first so the longer bar gets the lower track).
  */
-export function assignTracks(events: AppEvent[]): EventRange[] {
-  const ranges: EventRange[] = events.map(event => ({
+export function assignTracks<T extends LayoutEvent>(events: T[]): EventRange<T>[] {
+  const ranges: EventRange<T>[] = events.map(event => ({
     event,
     start: startOfDay(new Date(event.start_time)),
     end: startOfDay(new Date(event.end_time ?? event.start_time)),
@@ -55,13 +64,13 @@ export function assignTracks(events: AppEvent[]): EventRange[] {
  * decide when the bar should "reset" (rounded edge + title re-shown on the
  * first cell of each new week it spans).
  */
-export function segmentsForDay(
+export function segmentsForDay<T extends LayoutEvent>(
   day: Date,
-  ranges: EventRange[],
+  ranges: EventRange<T>[],
   weekStart: Date,
   weekEnd: Date
-): Map<number, CellSegment> {
-  const out = new Map<number, CellSegment>()
+): Map<number, CellSegment<T>> {
+  const out = new Map<number, CellSegment<T>>()
   const d = startOfDay(day)
   for (const r of ranges) {
     if (d < r.start || d > r.end) continue
@@ -81,7 +90,9 @@ export function segmentsForDay(
 }
 
 /** Number of vertical tracks needed for the given month (upper bound across cells). */
-export function maxTracksInRange(ranges: EventRange[], monthStart: Date, monthEnd: Date): number {
+export function maxTracksInRange<T extends LayoutEvent>(
+  ranges: EventRange<T>[], monthStart: Date, monthEnd: Date,
+): number {
   let max = 0
   for (const r of ranges) {
     if (r.end < monthStart || r.start > monthEnd) continue
@@ -91,7 +102,9 @@ export function maxTracksInRange(ranges: EventRange[], monthStart: Date, monthEn
 }
 
 /** Keep only ranges that touch the given month (so we don't waste tracks on out-of-scope events). */
-export function rangesIntersectingMonth(ranges: EventRange[], month: Date): EventRange[] {
+export function rangesIntersectingMonth<T extends LayoutEvent>(
+  ranges: EventRange<T>[], month: Date,
+): EventRange<T>[] {
   return ranges.filter(r => isSameMonth(r.start, month) || isSameMonth(r.end, month)
     || (r.start < month && r.end > month))
 }

@@ -70,15 +70,17 @@ end$$;
 
 -- Patch the auto-created profiles. The handle_new_user trigger gave
 -- everyone role='diver' by default; lift two so role-gating in the SPA
--- can be exercised.
+-- can be exercised. display_name is a person-style nickname (not the
+-- role label) so surfaces that show "another user's display name" —
+-- e.g. the staff_availability overlay — read as a real name in dev.
 update public.profiles
-set role = 'admin', full_name = 'Test Admin', display_name = 'Admin'
+set role = 'admin', full_name = 'Test Admin', display_name = 'Ada'
 where id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 
 update public.profiles
-set role = 'staff', full_name = 'Test Staff', display_name = 'Staff'
+set role = 'staff', full_name = 'Test Staff', display_name = 'Sam'
 where id = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 
 update public.profiles
-set full_name = 'Test Diver', display_name = 'Diver'
+set full_name = 'Test Diver', display_name = 'Dee'
 where id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
