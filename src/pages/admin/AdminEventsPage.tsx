@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { startOfMonth, endOfMonth, format } from 'date-fns'
 import { fetchEventsInRange } from '../../lib/events'
-import { fetchMyDutyEventIds } from '../../lib/duties'
+import { fetchMyDutyDays } from '../../lib/duties'
 import { fetchStaffAvailabilityInRange } from '../../lib/staff-availability'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -17,7 +17,7 @@ export function AdminEventsPage() {
   const [events, setEvents] = useState<AppEvent[]>([])
   const [counts, setCounts] = useState<Map<string, number>>(new Map())
   const [busyEntries, setBusyEntries] = useState<StaffBusyEntry[]>([])
-  const [myDutyEventIds, setMyDutyEventIds] = useState<Set<string>>(new Set())
+  const [myDutyDays, setMyDutyDays] = useState<Map<string, Set<string>>>(new Map())
   const [createBusyDate, setCreateBusyDate] = useState<string | null>(null)
   const [editBusy, setEditBusy] = useState<StaffBusyEntry | null>(null)
   // null = no manual toggle yet, fall back to the role default. Once the
@@ -35,15 +35,15 @@ export function AdminEventsPage() {
 
     let cancelled = false
     ;(async () => {
-      const [evs, busy, dutyIds] = await Promise.all([
+      const [evs, busy, dutyDays] = await Promise.all([
         fetchEventsInRange(from, to),
         fetchStaffAvailabilityInRange(from, to),
-        user ? fetchMyDutyEventIds(user.id, from, to) : Promise.resolve(new Set<string>()),
+        user ? fetchMyDutyDays(user.id, from, to) : Promise.resolve(new Map<string, Set<string>>()),
       ])
       if (cancelled) return
       setEvents(evs)
       setBusyEntries(busy)
-      setMyDutyEventIds(dutyIds)
+      setMyDutyDays(dutyDays)
 
       const diveIds = evs.filter(e => e.type === 'dive').map(e => e.id)
       const courseIds = evs.filter(e => e.type === 'course').map(e => e.id)
@@ -99,7 +99,7 @@ export function AdminEventsPage() {
         busyShown={busyShown}
         onToggleBusy={isStaffOrAdmin ? () => setBusyShownOverride(!busyShown) : undefined}
         currentUserId={user?.id ?? null}
-        ownDutyEventIds={myDutyEventIds}
+        ownDutyDays={myDutyDays}
         onCreateBusy={isStaffOrAdmin
           ? day => setCreateBusyDate(format(day, 'yyyy-MM-dd'))
           : undefined}
