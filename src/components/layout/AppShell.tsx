@@ -8,8 +8,10 @@ import { UpdateAvailableBanner } from '../install/UpdateAvailableBanner'
 import { WelcomeModal } from '../welcome/WelcomeModal'
 import { Logo } from '../Logo'
 import { CalendarIcon } from '../icons/CalendarIcon'
+import { ChatIcon } from '../icons/ChatIcon'
 import { CrosshairIcon } from '../icons/CrosshairIcon'
 import { MapIcon } from '../icons/MapIcon'
+import { PersonIcon } from '../icons/PersonIcon'
 import { NotificationBell } from '../NotificationBell'
 import {
   PAGE, NAV_BAR, NAV_BOTTOM, BTN_LIGHT,
@@ -42,7 +44,8 @@ function RecordsIcon() {
 const baseNavItems: Array<{ to: string; label: string; icon: React.ReactNode }> = [
   { to: '/calendar', label: 'Calendar', icon: <CalendarIcon /> },
   { to: '/records',  label: 'Records',  icon: <RecordsIcon /> },
-  { to: '/profile',  label: 'Profile',  icon: '🤿' },
+  { to: '/profile',  label: 'Profile',  icon: <PersonIcon /> },
+  { to: '/contact',  label: 'Contact',  icon: <ChatIcon /> },
 ]
 
 // "Duty" appears for staff/admin only — divers never have rows in

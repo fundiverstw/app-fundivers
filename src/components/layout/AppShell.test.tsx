@@ -38,6 +38,7 @@ function routedRender(start = '/calendar') {
           <Route path="/calendar" element={<div>CAL</div>} />
           <Route path="/records" element={<div>REC</div>} />
           <Route path="/profile" element={<div>PROF</div>} />
+          <Route path="/contact" element={<div>CON</div>} />
         </Route>
       </Routes>
     </MemoryRouter>
@@ -174,6 +175,7 @@ describe('AppShell', () => {
     expect(screen.getByRole('link', { name: /calendar/i })).toHaveAttribute('href', '/calendar')
     expect(screen.getByRole('link', { name: /records/i })).toHaveAttribute('href', '/records')
     expect(screen.getByRole('link', { name: /profile/i })).toHaveAttribute('href', '/profile')
+    expect(screen.getByRole('link', { name: /contact/i })).toHaveAttribute('href', '/contact')
     // Bookings and Payments are no longer top-level bottom-nav items — they
     // live as sub-tabs inside Records now.
     expect(screen.queryByRole('link', { name: /^bookings$/i })).not.toBeInTheDocument()

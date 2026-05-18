@@ -31,6 +31,7 @@ function buildPendingCountQuery(count: number) {
   return {
     select: vi.fn().mockReturnThis(),
     eq:     vi.fn().mockReturnThis(),
+    not:    vi.fn().mockReturnThis(),
     then:   (resolve: (r: { count: number }) => void) => resolve({ count }),
   }
 }
