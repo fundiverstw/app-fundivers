@@ -2,6 +2,13 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
+import type { Database } from '../../types/database'
+
+// Tables CatalogManager can drive. Constraining to the real Database
+// keys (rather than `string`) is what lets supabase-js's from() overload
+// resolution land on the right builder type instead of complaining that
+// a bare string isn't assignable to the literal union of table names.
+type CatalogTableName = keyof Database['public']['Tables'] & string
 
 function capitalize(s: string) {
   return s.length === 0 ? s : s[0].toUpperCase() + s.slice(1)
@@ -32,7 +39,7 @@ export interface CatalogManagerProps<Row extends { _id: string }> {
   /** Page heading. */
   title: string
   /** Supabase table name (case-sensitive — the "EO_*" tables are quoted). */
-  table: string
+  table: CatalogTableName
   /** Editable fields. _id is auto-generated and never appears here. */
   fields: CatalogField<Row>[]
   /** Column to sort by when listing (defaults to the first field's key). */
@@ -103,7 +110,10 @@ export function CatalogManager<Row extends { _id: string }>({
       if (error) {
         setLoadError(error.message)
       } else {
-        setRows((data ?? []) as Row[])
+        // data is typed as a union of every catalog table's row (the
+        // `table` prop is the discriminator the compiler can't follow);
+        // narrow via unknown to the caller's Row.
+        setRows((data ?? []) as unknown as Row[])
       }
       setLoading(false)
     })()
@@ -147,7 +157,10 @@ export function CatalogManager<Row extends { _id: string }>({
         const { error } = await supabase
           .from(table)
           .update(payload as never)
-          .eq('_id', editing._id)
+          // Column name cast for the same reason `payload as never` is
+          // needed: from(table) returns the union of all catalog table
+          // builders, so .eq's column-key parameter narrows to `never`.
+          .eq('_id' as never, editing._id)
         if (error) throw error
         setRows(prev => prev.map(r => r._id === editing._id ? { ...r, ...payload } as Row : r))
         toast.success(`${capitalize(noun)} updated`)
@@ -173,7 +186,7 @@ export function CatalogManager<Row extends { _id: string }>({
     setDeleteInFlight(true)
     setDeleteError(null)
     try {
-      const { error } = await supabase.from(table).delete().eq('_id', row._id)
+      const { error } = await supabase.from(table).delete().eq('_id' as never, row._id)
       if (error) throw error
       setRows(prev => prev.filter(r => r._id !== row._id))
       setConfirmDelete(null)

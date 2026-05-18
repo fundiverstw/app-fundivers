@@ -44,7 +44,7 @@ verify:     ; @bash scripts/verify-sync.sh
 test:       ; @npm run test:all
 lint:       ; @npm run lint
 lint-fix:   ; @npm run lint:fix
-typecheck:  ; @npx tsc --noEmit
+typecheck:  ; @npx tsc -b
 check:      typecheck lint test
 
 deploy: deploy-app deploy-push
