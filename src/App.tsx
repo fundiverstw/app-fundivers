@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/layout/ProtectedRoute'
 import { AdminRoute } from './components/layout/AdminRoute'
 import { StaffOrAdminRoute } from './components/layout/StaffOrAdminRoute'
 import { RequireActive } from './components/layout/RequireActive'
+import { HomeRedirect } from './components/layout/HomeRedirect'
 import { PendingPage } from './pages/PendingPage'
 import { Logo } from './components/Logo'
 import { ToastProvider } from './components/Toast'
@@ -127,7 +128,7 @@ export default function App() {
             </Route>
           </Route>
         </Route>
-        <Route path="*" element={<Navigate to="/calendar" replace />} />
+        <Route path="*" element={<HomeRedirect />} />
       </Routes>
       </ToastProvider>
     </BrowserRouter>
