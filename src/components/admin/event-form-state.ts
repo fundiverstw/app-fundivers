@@ -40,7 +40,6 @@ export interface FormState {
   full_payment_deadline: string
   // course
   special_date: string
-  url: string
   course_name: string
   included: string
   schedule: string
@@ -61,7 +60,7 @@ export const EMPTY_FORM: FormState = {
   cancel_date: '', cancel_policy: '',
   destinationIds: [], divetravel_reference: '',
   deposit_deadline: '', full_payment_deadline: '',
-  special_date: '', url: '', course_name: '',
+  special_date: '', course_name: '',
   included: '', schedule: '',
 }
 
@@ -133,7 +132,7 @@ export function formStateFromDive(d: EODive): FormState {
     divetravel_reference: d.DiveTravel_reference ?? '',
     deposit_deadline: d.deposit_deadline ?? '',
     full_payment_deadline: d.full_payment_deadline ?? '',
-    special_date: '', url: '', course_name: '',
+    special_date: '', course_name: '',
     included: '', schedule: '',
   }
 }
@@ -152,7 +151,6 @@ export function formStateFromCourse(c: EOCourse): FormState {
     capacity: c.capacity != null ? String(c.capacity) : '',
     special_date: c.special_date ?? '',
     price: c.price ?? '',
-    url: c.URL ?? '',
     prereq_cert_id: c.prereq_cert_id ?? '',
     req_dives: c.req_dives ?? '',
     dive_days: c.dive_days != null ? String(c.dive_days) : '',
@@ -225,7 +223,6 @@ export function coursePayloadFromForm(form: FormState): Record<string, unknown> 
     capacity: form.capacity ? Number(form.capacity) : null,
     special_date: form.special_date || null,
     price: form.price || null,
-    URL: form.url || null,
     prereq_cert_id: form.prereq_cert_id || null,
     req_dives: form.req_dives || null,    // text on courses
     dive_days: form.dive_days ? Number(form.dive_days) : null,

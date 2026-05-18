@@ -415,7 +415,6 @@ export interface Database {
           // Read by /admin/new's preload-from-past picker.
           course_name: string | null
           featured_image: string | null
-          URL: string | null
           prereqs: string | null
           req_dives: string | null
           included: string | null
