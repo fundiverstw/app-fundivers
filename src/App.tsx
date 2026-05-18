@@ -21,6 +21,7 @@ import { PaymentsPage } from './pages/PaymentsPage'
 import { RecordsPage } from './pages/RecordsPage'
 import { DiveLogsPage } from './pages/DiveLogsPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { ContactPage } from './pages/ContactPage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { DutiesPage } from './pages/DutiesPage'
@@ -92,6 +93,7 @@ export default function App() {
                 <Route path="dive-logs" element={<DiveLogsPage />} />
               </Route>
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/contact" element={<ContactPage />} />
               <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/duties" element={<DutiesPage />} />
             </Route>
