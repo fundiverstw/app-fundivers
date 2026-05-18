@@ -1,3 +1,4 @@
+import { eachDayOfInterval, format } from 'date-fns'
 import { supabase } from './supabase'
 import type { Duty, DutyRole } from '../types/database'
 
@@ -48,30 +49,49 @@ export async function notifyDutyAssigned(dutyId: string): Promise<void> {
   })
 }
 
-// Return the set of EO_dives._id / EO_courses._id values the current user
-// has been assigned a duty for, within the given inclusive date window.
-// Used by the admin calendar to tint "events I'm working" so staff/admins
-// recognise their own assignments at a glance.
+// Map of EO_dives._id / EO_courses._id → set of YYYY-MM-DD day-strings the
+// current user is on duty for within the given inclusive date window. The
+// admin calendar uses this to stripe the specific days the viewer is
+// working — multi-day events get stripes only on the days they're on duty.
 //
-// The window filter is intentionally generous (single-day duties before
-// `from` may slip in): the IDs it returns are only ever intersected with
-// visible event ids, so any stragglers harmlessly miss every event.
-export async function fetchMyDutyEventIds(
+// Date ranges are inclusive on both ends; a null end_date is treated as a
+// single-day duty on start_date. Window filter is intentionally generous —
+// the returned ids are intersected with visible events, so stragglers
+// harmlessly miss everything.
+export async function fetchMyDutyDays(
   userId: string, from: string, to: string,
-): Promise<Set<string>> {
+): Promise<Map<string, Set<string>>> {
   const { data, error } = await supabase
     .from('duties')
-    .select('eo_dive_id, eo_course_id')
+    .select('eo_dive_id, eo_course_id, start_date, end_date')
     .eq('assignee_id', userId)
     .lte('start_date', to)
     .or(`end_date.gte.${from},end_date.is.null`)
   if (error) throw error
-  const out = new Set<string>()
+  const out = new Map<string, Set<string>>()
   for (const row of data ?? []) {
-    if (row.eo_dive_id)   out.add(row.eo_dive_id)
-    if (row.eo_course_id) out.add(row.eo_course_id)
+    const days = expandDateRange(row.start_date, row.end_date)
+    for (const eventId of [row.eo_dive_id, row.eo_course_id]) {
+      if (!eventId) continue
+      let bucket = out.get(eventId)
+      if (!bucket) { bucket = new Set(); out.set(eventId, bucket) }
+      for (const d of days) bucket.add(d)
+    }
   }
   return out
+}
+
+// Inclusive expansion of 'YYYY-MM-DD' .. 'YYYY-MM-DD' into a list of day
+// strings. Parses each side as a local date — `new Date('YYYY-MM-DD')`
+// would slide by timezone.
+function expandDateRange(start: string, end: string | null): string[] {
+  const parse = (s: string) => {
+    const [y, m, d] = s.split('-').map(Number)
+    return new Date(y, m - 1, d)
+  }
+  const startD = parse(start)
+  const endD = end ? parse(end) : startD
+  return eachDayOfInterval({ start: startD, end: endD }).map(d => format(d, 'yyyy-MM-dd'))
 }
 
 // Soft check surfaced in the UI: every course needs at least one instructor
