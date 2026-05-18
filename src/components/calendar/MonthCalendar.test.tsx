@@ -126,6 +126,49 @@ describe('MonthCalendar staff-busy overlay', () => {
     expect(screen.queryByTitle('Out diving')).not.toBeInTheDocument()
   })
 
+  it('tints an event amber when its id is in ownDutyEventIds', () => {
+    const ev = {
+      id: 'D1', type: 'dive' as const, title: 'Reef trip',
+      calendar_title: null,
+      start_time: '2030-06-12T09:00:00',
+      end_time:   '2030-06-12T15:00:00',
+      start_time_hhmm: '09:00',
+      featured: false, fully_booked: false,
+      capacity: null, confirmed_count: null,
+      price: null, deposit_amount: null, transport_price: null, currency: 'TWD',
+      has_rooms: false, room_type_ids: [],
+      has_addons: false, addon_ids: [],
+      gear_rental_info: null, nitrox_required: false, dive_days: null,
+      cancelled_at: null,
+    }
+    const { rerender } = render(
+      <MonthCalendar
+        month={new Date('2030-06-15')}
+        onMonthChange={() => {}}
+        events={[ev]}
+        onPickEvent={() => {}}
+      />
+    )
+    // Without ownDutyEventIds the bar uses the dive type fill (emerald).
+    const plain = screen.getByTitle('Reef trip')
+    expect(plain.className).toMatch(/bg-emerald/)
+    expect(plain.className).not.toMatch(/bg-amber-400/)
+
+    // With ownDutyEventIds containing the event id, the bar swaps to amber-400.
+    rerender(
+      <MonthCalendar
+        month={new Date('2030-06-15')}
+        onMonthChange={() => {}}
+        events={[ev]}
+        onPickEvent={() => {}}
+        ownDutyEventIds={new Set(['D1'])}
+      />
+    )
+    const tinted = screen.getByTitle('Reef trip')
+    expect(tinted.className).toMatch(/bg-amber-400/)
+    expect(tinted.className).not.toMatch(/bg-emerald/)
+  })
+
   it('clicking an empty cell fires onCreateBusy with that day', async () => {
     const onCreateBusy = vi.fn()
     const user = userEvent.setup()
