@@ -1,35 +1,43 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mockQueryBuilder } from '../../tests/test-utils'
-import { instructorsNeeded, fetchMyDutyEventIds } from './duties'
+import { instructorsNeeded, fetchMyDutyDays } from './duties'
 import { supabase } from './supabase'
 
 vi.mock('./supabase', () => ({ supabase: { from: vi.fn() } }))
 const from = supabase.from as unknown as ReturnType<typeof vi.fn>
 beforeEach(() => from.mockReset())
 
-describe('fetchMyDutyEventIds', () => {
-  it('returns a Set of distinct eo_dive_id + eo_course_id values from the rows', async () => {
+describe('fetchMyDutyDays', () => {
+  it('expands each duty into per-day entries keyed by event id', async () => {
     from.mockReturnValue(mockQueryBuilder({
       data: [
-        { eo_dive_id: 'D1', eo_course_id: null },
-        { eo_dive_id: 'D1', eo_course_id: null }, // duplicate → still one entry
-        { eo_dive_id: null, eo_course_id: 'C1' },
-        { eo_dive_id: null, eo_course_id: null }, // no event link → skipped
+        // Single-day duty (null end_date → same as start_date).
+        { eo_dive_id: 'D1', eo_course_id: null, start_date: '2030-01-05', end_date: null },
+        // Multi-day duty.
+        { eo_dive_id: 'D1', eo_course_id: null, start_date: '2030-01-10', end_date: '2030-01-12' },
+        // Course duty.
+        { eo_dive_id: null, eo_course_id: 'C1', start_date: '2030-01-08', end_date: '2030-01-08' },
+        // No event link → skipped entirely.
+        { eo_dive_id: null, eo_course_id: null, start_date: '2030-01-20', end_date: null },
       ],
     }))
-    const ids = await fetchMyDutyEventIds('u1', '2030-01-01', '2030-01-31')
-    expect(ids).toEqual(new Set(['D1', 'C1']))
+    const map = await fetchMyDutyDays('u1', '2030-01-01', '2030-01-31')
+    expect(map.get('D1')).toEqual(new Set([
+      '2030-01-05', '2030-01-10', '2030-01-11', '2030-01-12',
+    ]))
+    expect(map.get('C1')).toEqual(new Set(['2030-01-08']))
+    expect(map.size).toBe(2)
   })
 
-  it('returns an empty Set when there are no matching duties', async () => {
+  it('returns an empty map when there are no matching duties', async () => {
     from.mockReturnValue(mockQueryBuilder({ data: [] }))
-    const ids = await fetchMyDutyEventIds('u1', '2030-01-01', '2030-01-31')
-    expect(ids.size).toBe(0)
+    const map = await fetchMyDutyDays('u1', '2030-01-01', '2030-01-31')
+    expect(map.size).toBe(0)
   })
 
   it('surfaces the supabase error', async () => {
     from.mockReturnValue(mockQueryBuilder({ error: { message: 'boom' } }))
-    await expect(fetchMyDutyEventIds('u1', '2030-01-01', '2030-01-31'))
+    await expect(fetchMyDutyDays('u1', '2030-01-01', '2030-01-31'))
       .rejects.toMatchObject({ message: 'boom' })
   })
 })

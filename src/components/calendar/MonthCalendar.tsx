@@ -51,12 +51,12 @@ const OTHER_BUSY_BAR       = 'bg-slate-500 text-white'
 const OTHER_BUSY_BAR_HOVER = 'bg-slate-400 text-white'
 const BUSY_DOT             = 'bg-amber-600'
 
-// When the viewer has a duty on an event, the event bar overrides its
-// type-based color with this lighter amber. Distinct from the
-// own-busy amber-600 (a shade lighter) so duty-events and own-busy
-// don't read as the same band when they overlap visually.
-const OWN_DUTY_BAR       = 'bg-amber-400 text-amber-950'
-const OWN_DUTY_BAR_HOVER = 'bg-amber-300 text-amber-950'
+// On day-segments where the viewer is on duty, an amber-600 diagonal
+// stripe pattern overlays the event's base color (the underlying type
+// fill still shows through the gaps so the bar still reads as a
+// dive/course, just "claimed" by the viewer). amber-600 = #d97706, the
+// same shade as own-busy bars so the two duty-signals share one palette.
+const OWN_DUTY_STRIPE = 'repeating-linear-gradient(45deg, transparent 0 6px, #d97706 6px 12px)'
 
 // Short chip labels for the course-category filter popover.
 const COURSE_SHORT: Record<string, string> = {
@@ -126,10 +126,12 @@ export interface MonthCalendarProps {
   onToggleBusy?: () => void
   /** Current viewer's user id — used to mark "own" rows for tap routing. */
   currentUserId?: string | null
-  /** EO_dives._id / EO_courses._id values the viewer has been assigned a
-   *  duty for. Matching event bars tint amber so the viewer recognises
-   *  what they're working at a glance. */
-  ownDutyEventIds?: Set<string>
+  /** Per-event map of YYYY-MM-DD day-strings the viewer is on duty for.
+   *  Key = EO_dives._id / EO_courses._id; value = set of days. Each
+   *  day-segment whose date is in the set renders an amber stripe
+   *  overlay so the viewer sees which specific days are theirs to
+   *  work, not just which events touch their duty list. */
+  ownDutyDays?: Map<string, Set<string>>
   /** Click handler for tapping an empty cell. Triggers a "mark busy" flow. */
   onCreateBusy?: (day: Date) => void
   /** Click handler for tapping an existing busy bar. */
@@ -138,7 +140,7 @@ export interface MonthCalendarProps {
 
 export function MonthCalendar({
   month, onMonthChange, events, onPickEvent, renderListBadge, hidePastInList, listTitle = 'This month',
-  busyEntries, busyShown, onToggleBusy, currentUserId, ownDutyEventIds, onCreateBusy, onPickBusy,
+  busyEntries, busyShown, onToggleBusy, currentUserId, ownDutyDays, onCreateBusy, onPickBusy,
 }: MonthCalendarProps) {
   const [diveShown, setDiveShown] = useState(true)
   const [hiddenCourses, setHiddenCourses] = useState<Set<string>>(new Set())
@@ -250,7 +252,7 @@ export function MonthCalendar({
         busyRanges={busyRanges}
         trackRows={cellTrackRows}
         busyTrackRows={cellBusyTrackRows}
-        ownDutyEventIds={ownDutyEventIds}
+        ownDutyDays={ownDutyDays}
         onPickEvent={onPickEvent}
         onPickBusy={onPickBusy}
         onCreateBusy={onCreateBusy}
@@ -303,7 +305,7 @@ interface MonthGridProps {
   busyRanges: EventRange<BusyLayoutEvent>[]
   trackRows: number
   busyTrackRows: number
-  ownDutyEventIds?: Set<string>
+  ownDutyDays?: Map<string, Set<string>>
   onPickEvent: (ev: AppEvent) => void
   onPickBusy?: (b: StaffBusyEntry) => void
   onCreateBusy?: (day: Date) => void
@@ -312,7 +314,7 @@ interface MonthGridProps {
 }
 
 function MonthGrid({
-  month, days, ranges, busyRanges, trackRows, busyTrackRows, ownDutyEventIds,
+  month, days, ranges, busyRanges, trackRows, busyTrackRows, ownDutyDays,
   onPickEvent, onPickBusy, onCreateBusy, hoveredEventId, onHoverEvent,
 }: MonthGridProps) {
   const leading = days[0].getDay()
@@ -341,7 +343,7 @@ function MonthGrid({
           trackRows={trackRows}
           busyTrackRows={busyTrackRows}
           minHeight={cellMinHeight}
-          ownDutyEventIds={ownDutyEventIds}
+          ownDutyDays={ownDutyDays}
           onPickEvent={onPickEvent}
           onPickBusy={onPickBusy}
           onCreateBusy={onCreateBusy}
@@ -354,7 +356,7 @@ function MonthGrid({
 }
 
 function DayCell({
-  day, ranges, busyRanges, month, trackRows, busyTrackRows, minHeight, ownDutyEventIds,
+  day, ranges, busyRanges, month, trackRows, busyTrackRows, minHeight, ownDutyDays,
   onPickEvent, onPickBusy, onCreateBusy, hoveredEventId, onHoverEvent,
 }: {
   day: Date
@@ -364,7 +366,7 @@ function DayCell({
   trackRows: number
   busyTrackRows: number
   minHeight: number
-  ownDutyEventIds?: Set<string>
+  ownDutyDays?: Map<string, Set<string>>
   onPickEvent: (ev: AppEvent) => void
   onPickBusy?: (b: StaffBusyEntry) => void
   onCreateBusy?: (day: Date) => void
@@ -377,6 +379,7 @@ function DayCell({
   const busySegMap = segmentsForDay(day, busyRanges, weekStart, weekEnd)
   const isToday = isSameDay(day, new Date())
   const inMonth = isSameMonth(day, month)
+  const dayKey = format(day, 'yyyy-MM-dd')
 
   const trackRowCount = Math.max(1, trackRows)
   const eventStripHeight = trackRowCount * (TRACK_HEIGHT + TRACK_GAP)
@@ -406,7 +409,7 @@ function DayCell({
             key={`${seg.event.id}_${seg.event.start_time}`}
             seg={seg}
             track={track}
-            isOwnDuty={!!ownDutyEventIds?.has(seg.event.id)}
+            isOwnDuty={!!ownDutyDays?.get(seg.event.id)?.has(dayKey)}
             onClick={() => onPickEvent(seg.event)}
             hovered={hoveredEventId === seg.event.id}
             onHoverEvent={onHoverEvent}
@@ -439,9 +442,7 @@ function EventBar({ seg, track, isOwnDuty, onClick, hovered, onHoverEvent }: {
   hovered: boolean
   onHoverEvent: (id: string | null) => void
 }) {
-  const baseClass = isOwnDuty
-    ? (hovered ? OWN_DUTY_BAR_HOVER : OWN_DUTY_BAR)
-    : (hovered ? TYPE_BAR_HOVER[seg.event.type] : TYPE_BAR[seg.event.type])
+  const baseClass = hovered ? TYPE_BAR_HOVER[seg.event.type] : TYPE_BAR[seg.event.type]
   const leftInset = seg.isStart ? 2 : 0
   const rightInset = seg.isEnd ? 2 : 0
   const leftRadius = seg.isStart ? 'rounded-l-sm' : ''
@@ -472,6 +473,7 @@ function EventBar({ seg, track, isOwnDuty, onClick, hovered, onHoverEvent }: {
         height: TRACK_HEIGHT,
         left: leftInset,
         right: rightInset,
+        backgroundImage: isOwnDuty ? OWN_DUTY_STRIPE : undefined,
         boxShadow: featuredShadow,
       }}
     >
