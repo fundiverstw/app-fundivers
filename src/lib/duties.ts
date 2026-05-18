@@ -48,6 +48,32 @@ export async function notifyDutyAssigned(dutyId: string): Promise<void> {
   })
 }
 
+// Return the set of EO_dives._id / EO_courses._id values the current user
+// has been assigned a duty for, within the given inclusive date window.
+// Used by the admin calendar to tint "events I'm working" so staff/admins
+// recognise their own assignments at a glance.
+//
+// The window filter is intentionally generous (single-day duties before
+// `from` may slip in): the IDs it returns are only ever intersected with
+// visible event ids, so any stragglers harmlessly miss every event.
+export async function fetchMyDutyEventIds(
+  userId: string, from: string, to: string,
+): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from('duties')
+    .select('eo_dive_id, eo_course_id')
+    .eq('assignee_id', userId)
+    .lte('start_date', to)
+    .or(`end_date.gte.${from},end_date.is.null`)
+  if (error) throw error
+  const out = new Set<string>()
+  for (const row of data ?? []) {
+    if (row.eo_dive_id)   out.add(row.eo_dive_id)
+    if (row.eo_course_id) out.add(row.eo_course_id)
+  }
+  return out
+}
+
 // Soft check surfaced in the UI: every course needs at least one instructor
 // per 5 non-admin divers. Returns the number of additional instructors needed
 // (0 if staffed, >0 if understaffed).
