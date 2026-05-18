@@ -624,9 +624,6 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
           <Field label="Special date (extra session)">
             <Input type="date" value={form.special_date} onChange={v => set('special_date', v)} />
           </Field>
-          <Field label="URL">
-            <Input value={form.url} onChange={v => set('url', v)} />
-          </Field>
           <Field label="Included">
             <Textarea value={form.included} onChange={v => set('included', v)} />
           </Field>
