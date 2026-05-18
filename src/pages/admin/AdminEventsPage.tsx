@@ -1,16 +1,29 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { startOfMonth, endOfMonth } from 'date-fns'
+import { startOfMonth, endOfMonth, format } from 'date-fns'
 import { fetchEventsInRange } from '../../lib/events'
+import { fetchStaffAvailabilityInRange } from '../../lib/staff-availability'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../hooks/useAuth'
 import { MonthCalendar } from '../../components/calendar/MonthCalendar'
-import type { AppEvent } from '../../types/database'
+import { BusyEntryModal } from '../../components/admin/BusyEntryModal'
+import type { AppEvent, StaffBusyEntry } from '../../types/database'
 
 export function AdminEventsPage() {
   const navigate = useNavigate()
+  const { user, profile } = useAuth()
   const [month, setMonth] = useState(new Date())
   const [events, setEvents] = useState<AppEvent[]>([])
   const [counts, setCounts] = useState<Map<string, number>>(new Map())
+  const [busyEntries, setBusyEntries] = useState<StaffBusyEntry[]>([])
+  const [createBusyDate, setCreateBusyDate] = useState<string | null>(null)
+  const [editBusy, setEditBusy] = useState<StaffBusyEntry | null>(null)
+  // null = no manual toggle yet, fall back to the role default. Once the
+  // user clicks the pill, this becomes a concrete boolean and wins. The
+  // null sentinel matters because `profile` from useAuth resolves async,
+  // so a plain useState(initialDefault) would freeze at the pre-profile
+  // value (false) on first render.
+  const [busyShownOverride, setBusyShownOverride] = useState<boolean | null>(null)
 
   useEffect(() => {
     // Widen ±7 days so bars touching the month from either side render
@@ -20,9 +33,13 @@ export function AdminEventsPage() {
 
     let cancelled = false
     ;(async () => {
-      const evs = await fetchEventsInRange(from, to)
+      const [evs, busy] = await Promise.all([
+        fetchEventsInRange(from, to),
+        fetchStaffAvailabilityInRange(from, to),
+      ])
       if (cancelled) return
       setEvents(evs)
+      setBusyEntries(busy)
 
       const diveIds = evs.filter(e => e.type === 'dive').map(e => e.id)
       const courseIds = evs.filter(e => e.type === 'course').map(e => e.id)
@@ -51,6 +68,12 @@ export function AdminEventsPage() {
     return () => { cancelled = true }
   }, [month])
 
+  // Busy overlay defaults ON for both roles so unavailable periods are
+  // visible the moment staff/admin land on the calendar — they can flip
+  // it off when they want a clean view of just the events.
+  const isStaffOrAdmin = profile?.role === 'staff' || profile?.role === 'admin'
+  const busyShown = busyShownOverride ?? isStaffOrAdmin
+
   return (
     <div className="max-w-2xl mx-auto">
       <MonthCalendar
@@ -68,7 +91,50 @@ export function AdminEventsPage() {
             </span>
           )
         }}
+        busyEntries={isStaffOrAdmin ? busyEntries : undefined}
+        busyShown={busyShown}
+        onToggleBusy={isStaffOrAdmin ? () => setBusyShownOverride(!busyShown) : undefined}
+        currentUserId={user?.id ?? null}
+        onCreateBusy={isStaffOrAdmin
+          ? day => setCreateBusyDate(format(day, 'yyyy-MM-dd'))
+          : undefined}
+        onPickBusy={isStaffOrAdmin
+          // Only open the edit modal on rows the viewer owns. Non-own rows
+          // have their title/details masked (NULL) by the view, so there's
+          // nothing personal to show and editing them would fail RLS anyway.
+          ? b => { if (user && b.user_id === user.id) setEditBusy(b) }
+          : undefined}
       />
+
+      {createBusyDate && user && (
+        <BusyEntryModal
+          mode="create"
+          userId={user.id}
+          defaultDate={createBusyDate}
+          onClose={() => setCreateBusyDate(null)}
+          onSaved={row => {
+            setBusyEntries(prev => [...prev, row])
+            setCreateBusyDate(null)
+          }}
+        />
+      )}
+
+      {editBusy && (
+        <BusyEntryModal
+          mode="edit"
+          entry={editBusy}
+          canDelete={!!user && editBusy.user_id === user.id}
+          onClose={() => setEditBusy(null)}
+          onSaved={row => {
+            setBusyEntries(prev => prev.map(b => b.id === row.id ? row : b))
+            setEditBusy(null)
+          }}
+          onDeleted={id => {
+            setBusyEntries(prev => prev.filter(b => b.id !== id))
+            setEditBusy(null)
+          }}
+        />
+      )}
     </div>
   )
 }

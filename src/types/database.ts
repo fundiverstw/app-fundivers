@@ -96,7 +96,30 @@ export interface Database {
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
-    Views: Record<string, never>
+    Views: {
+      // Privacy projection over staff_availability — see migration
+      // 20260518010000. title/details are masked to NULL for any row not
+      // owned by the calling user, so a staff member's vacation note doesn't
+      // leak to the rest of the team. owner_display_name joins profiles so
+      // viewers still see whose period is blocked.
+      staff_availability_view: {
+        Row: {
+          id: string
+          user_id: string
+          start_date: string
+          start_time: string
+          end_date: string
+          title: string | null
+          details: string | null
+          owner_display_name: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+    }
     Tables: {
       profiles: {
         Row: {
@@ -876,6 +899,32 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['waitlist_offers']['Insert']>
         Relationships: []
       }
+      staff_availability: {
+        Row: {
+          id: string
+          user_id: string
+          start_date: string
+          start_time: string
+          end_date: string
+          title: string
+          details: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          start_date: string
+          start_time: string
+          end_date: string
+          title: string
+          details?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['staff_availability']['Insert']>
+        Relationships: []
+      }
     }
   }
 }
@@ -919,6 +968,14 @@ export const NOTIFICATION_KINDS = ['reminder', 'broadcast', 'duty', 'waitlist_of
 export type NotificationKind = typeof NOTIFICATION_KINDS[number]
 export const DUTY_ROLES = ['instructor', 'guide', 'support'] as const
 export type DutyRole = typeof DUTY_ROLES[number]
+
+export type StaffAvailability = Database['public']['Tables']['staff_availability']['Row']
+export type StaffAvailabilityInsert = Database['public']['Tables']['staff_availability']['Insert']
+export type StaffAvailabilityUpdate = Database['public']['Tables']['staff_availability']['Update']
+/** Privacy-projected row used by the UI. title/details are NULL for any
+ *  entry not owned by the calling user. owner_display_name comes from the
+ *  joined profiles row in staff_availability_view. */
+export type StaffBusyEntry = Database['public']['Views']['staff_availability_view']['Row']
 
 /** Normalized event shape used across Calendar + Bookings UI. */
 export interface AppEvent {

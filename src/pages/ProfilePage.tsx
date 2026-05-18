@@ -434,7 +434,7 @@ export function ProfileForm({ user, profile, onSaved }: {
         <button
           type="submit"
           disabled={isSubmitting || (!isDirty && !dirtyExtras)}
-          className="w-full bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white font-semibold py-2 rounded-lg transition-colors"
+          className="w-full bg-emerald-400 hover:bg-emerald-300 text-blue-950 font-semibold py-2 rounded-lg transition-colors disabled:opacity-50"
         >
           {isSubmitting ? 'Saving…' : 'Save changes'}
         </button>
