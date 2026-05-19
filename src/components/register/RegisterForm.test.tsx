@@ -32,7 +32,6 @@ const sampleEvent: AppEvent = {
   gear_rental_info: 'Full set 1500/day',
   nitrox_required: true, dive_days: 1,
   cancelled_at: null,
-  deposit_deadline: '2027-04-01',
   full_payment_deadline: '2027-05-08',
   cancel_policy: null,
   cancel_date: null,
@@ -50,7 +49,7 @@ const noExtrasEvent: AppEvent = {
   has_addons: false, addon_ids: [],
   gear_rental_info: null, nitrox_required: false, dive_days: 0,
   cancelled_at: null,
-  deposit_deadline: null, full_payment_deadline: null,
+  full_payment_deadline: null,
   cancel_policy: null, cancel_date: null,
 }
 
