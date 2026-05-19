@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { paymentInstructionsFor, SHOP_ADDRESS, SHOP_PHONE, SHOP_MAPS_URL, PAYPAL_LINK } from './payment-instructions'
+import {
+  paymentInstructionsFor,
+  paymentConfirmationReminder,
+  SHOP_ADDRESS,
+  SHOP_PHONE,
+  SHOP_MAPS_URL,
+  PAYPAL_LINK,
+} from './payment-instructions'
 
 describe('paymentInstructionsFor', () => {
   it('cash → in-person at the shop, including address + phone + map link', () => {
@@ -48,5 +55,18 @@ describe('paymentInstructionsFor', () => {
   it('credit_card whitespace-only invoice email → falls back to registered email', () => {
     const i = paymentInstructionsFor('credit_card', { invoiceEmail: '   ' })
     expect(i.lines.join(' ').toLowerCase()).toContain('registered email')
+  })
+})
+
+describe('paymentConfirmationReminder', () => {
+  it('names the three contact channels and points at the app for updates', () => {
+    const r = paymentConfirmationReminder()
+    expect(r.title.toLowerCase()).toContain('after you pay')
+    const body = r.lines.join(' ').toLowerCase()
+    expect(body).toContain('email')
+    expect(body).toContain('line')
+    expect(body).toContain('whatsapp')
+    expect(body).toMatch(/confirm receipt|let us know/)
+    expect(body).toContain('fundivers tw app')
   })
 })

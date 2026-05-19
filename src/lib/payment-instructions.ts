@@ -73,3 +73,19 @@ export function paymentInstructionsFor(
     }
   }
 }
+
+/**
+ * Shared "after you pay" reminder. We don't see bank/PayPal/cash payments
+ * in real time — without a heads-up from the diver we may not know to look
+ * for it, and a missed confirmation has cost real bookings. Surfaced
+ * verbatim on the form and PDF for every method.
+ */
+export function paymentConfirmationReminder(): PaymentInstructions {
+  return {
+    title: 'After you pay',
+    lines: [
+      'Once you send your payment, please contact FunDivers by email, LINE, or WhatsApp so we can confirm receipt.',
+      'Keep an eye on the FunDivers TW app for updates to your registration status, payment confirmations, and event reminders.',
+    ],
+  }
+}

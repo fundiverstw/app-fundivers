@@ -3,7 +3,7 @@ import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { formatEventSpan, eventIsFull } from '../../lib/events'
 import { computeEffectiveDeadlines } from '../../lib/payment-deadlines'
-import { paymentInstructionsFor } from '../../lib/payment-instructions'
+import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/payment-instructions'
 import { GEAR_ITEMS } from '../../lib/gear'
 import type { AppEvent, Booking, BookingDetails, CancellationPolicy, Database, EOAddon, EORoom, Profile } from '../../types/database'
 
@@ -657,6 +657,8 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
             invoiceEmail={payment === 'credit_card' ? creditCardInvoiceEmail.trim() || null : null}
           />
 
+          <PaymentConfirmationReminderBlock />
+
           <div className="text-sm text-blue-950 font-medium bg-sky-50 rounded-lg p-3 space-y-1">
             <Row label="Base"                value={base} currency={event.currency} />
             {gearCost > 0         && <Row label="Gear"           value={gearCost}     currency={event.currency} />}
@@ -805,6 +807,19 @@ function PaymentInstructionsBlock({
     <div className="text-xs text-blue-950 font-medium bg-white/70 border border-sky-200 rounded-lg p-3 space-y-1">
       <p className="font-semibold text-blue-900">{instr.title}</p>
       {instr.lines.map((line, i) => <PaymentInstructionLine key={i} line={line} />)}
+    </div>
+  )
+}
+
+// "After you pay" reminder block — same copy for every method so the diver
+// always sees how to confirm receipt with the shop and where to watch for
+// status updates.
+function PaymentConfirmationReminderBlock() {
+  const reminder = paymentConfirmationReminder()
+  return (
+    <div className="text-xs text-blue-950 font-medium bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-1">
+      <p className="font-semibold text-blue-900">{reminder.title}</p>
+      {reminder.lines.map((line, i) => <PaymentInstructionLine key={i} line={line} />)}
     </div>
   )
 }
