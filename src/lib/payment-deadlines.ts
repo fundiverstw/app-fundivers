@@ -14,22 +14,13 @@ function shiftDays(yyyyMmDd: string, deltaDays: number): string {
   return d.toISOString().slice(0, 10)
 }
 
-export interface EffectiveDeadlines {
-  full_payment_deadline: string  // YYYY-MM-DD
-  /** True when the deadline came from the fallback rather than admin input. */
-  full_payment_is_fallback: boolean
-}
-
 /**
- * Resolve the deadline a diver should see for an event. `start_time` is
- * the event's ISO timestamp — we slice off the date portion and
- * subtract FALLBACK_DAYS_BEFORE_START as the fallback.
+ * Resolve the full-payment deadline a diver should see for an event.
+ * `start_time` is the event's ISO timestamp — we slice off the date
+ * portion and subtract FALLBACK_DAYS_BEFORE_START as the fallback.
  */
-export function computeEffectiveDeadlines(event: Pick<AppEvent, 'start_time' | 'full_payment_deadline'>): EffectiveDeadlines {
+export function computeEffectiveFullPaymentDeadline(event: Pick<AppEvent, 'start_time' | 'full_payment_deadline'>): string {
+  if (event.full_payment_deadline != null) return event.full_payment_deadline
   const startDate = event.start_time.slice(0, 10)
-  const fallback = shiftDays(startDate, -FALLBACK_DAYS_BEFORE_START)
-  return {
-    full_payment_deadline:    event.full_payment_deadline ?? fallback,
-    full_payment_is_fallback: event.full_payment_deadline == null,
-  }
+  return shiftDays(startDate, -FALLBACK_DAYS_BEFORE_START)
 }
