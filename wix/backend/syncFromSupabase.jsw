@@ -46,8 +46,8 @@ const MULTI_REF_FIELDS = {
 // west of UTC. We re-anchor to UTC noon — 12h from either day
 // boundary — so every populated timezone displays the intended date.
 const DATE_FIELDS = {
-  EO_dives:   ['start_date', 'end_date', 'cancel_date', 'deposit_deadline', 'full_payment_deadline'],
-  EO_courses: ['start_date', 'end_date', 'special_date', 'cancel_date', 'deposit_deadline', 'full_payment_deadline'],
+  EO_dives:   ['start_date', 'end_date', 'cancel_date', 'full_payment_deadline'],
+  EO_courses: ['start_date', 'end_date', 'special_date', 'cancel_date', 'full_payment_deadline'],
 };
 
 function multiRefsFor(collection) {

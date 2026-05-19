@@ -368,7 +368,6 @@ export interface Database {
           DiveTravel_reference: string | null
           prereq_cert_id: string | null
           cancelled_at: string | null
-          deposit_deadline: string | null
           full_payment_deadline: string | null
           capacity: number | null
         }
@@ -392,7 +391,6 @@ export interface Database {
           nitrox_required?: boolean | null
           dive_days?: number | null
           cancelled_at?: string | null
-          deposit_deadline?: string | null
           full_payment_deadline?: string | null
           capacity?: number | null
         }
@@ -422,7 +420,6 @@ export interface Database {
           starting_at: number | null
           prereq_cert_id: string | null
           cancelled_at: string | null
-          deposit_deadline: string | null
           full_payment_deadline: string | null
           cancel_date: string | null
           cancel_policy: string | null
@@ -442,7 +439,6 @@ export interface Database {
           dive_days?: number | null
           special_date?: string | null
           cancelled_at?: string | null
-          deposit_deadline?: string | null
           full_payment_deadline?: string | null
           cancel_date?: string | null
           cancel_policy?: string | null
@@ -1029,11 +1025,11 @@ export interface AppEvent {
   /** ISO timestamp of when the event was cancelled by an admin; null = active. */
   cancelled_at: string | null
   /**
-   * Admin-set payment deadlines (YYYY-MM-DD). When null the registration
-   * form falls back to "7 days before start_date" — see
-   * computeEffectiveDeadlines in src/lib/payment-deadlines.ts.
+   * Admin-set full-payment deadline (YYYY-MM-DD). When null the
+   * registration form falls back to "7 days before start_date" — see
+   * computeEffectiveDeadlines in src/lib/payment-deadlines.ts. The
+   * deposit deadline is always "ASAP" and is not stored per-event.
    */
-  deposit_deadline: string | null
   full_payment_deadline: string | null
   /** FK → cancellation_policies._id; null = no policy attached. */
   cancel_policy: string | null

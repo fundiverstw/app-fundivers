@@ -88,7 +88,6 @@ function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: stri
     nitrox_required: d.nitrox_required ?? false,
     dive_days: d.dive_days ?? null,
     cancelled_at: d.cancelled_at ?? null,
-    deposit_deadline: d.deposit_deadline ?? null,
     full_payment_deadline: d.full_payment_deadline ?? null,
     cancel_policy: d.cancel_policy ?? null,
     cancel_date: d.cancel_date ?? null,
@@ -146,7 +145,6 @@ function courseToEvents(c: EOCourse, priceIndex: Map<string, EOPrice>, addonIds:
     nitrox_required: false,
     dive_days: c.dive_days ?? null,
     cancelled_at: c.cancelled_at ?? null,
-    deposit_deadline: c.deposit_deadline ?? null,
     full_payment_deadline: c.full_payment_deadline ?? null,
     cancel_policy: c.cancel_policy ?? null,
     cancel_date: c.cancel_date ?? null,
@@ -255,8 +253,8 @@ async function attachPrices(dives: EODive[], courses: EOCourse[]): Promise<Map<s
   return new Map((data ?? []).map(p => [p._id, p as EOPrice]))
 }
 
-const DIVE_COLS = '_id, admin_title, display_title, calendar_title, start_date, time, end_date, featured, fully_booked, capacity, price, has_rooms, room_types, hasotheraddons, other_addons, gear_rental, nitrox_required, dive_days, cancelled_at, deposit_deadline, full_payment_deadline, cancel_policy, cancel_date'
-const COURSE_COLS = '_id, admin_title, display_title, calendar_title, start_date, start_time, end_date, price, other_addons, dive_days, special_date, cancelled_at, deposit_deadline, full_payment_deadline, cancel_policy, cancel_date, fully_booked, capacity'
+const DIVE_COLS = '_id, admin_title, display_title, calendar_title, start_date, time, end_date, featured, fully_booked, capacity, price, has_rooms, room_types, hasotheraddons, other_addons, gear_rental, nitrox_required, dive_days, cancelled_at, full_payment_deadline, cancel_policy, cancel_date'
+const COURSE_COLS = '_id, admin_title, display_title, calendar_title, start_date, start_time, end_date, price, other_addons, dive_days, special_date, cancelled_at, full_payment_deadline, cancel_policy, cancel_date, fully_booked, capacity'
 
 /**
  * Fetch dives + courses whose start_date falls within [fromDate, toDate]
