@@ -83,18 +83,50 @@ be backfilled after:
 - A bulk schema change to a synced table.
 - A suspected dropped webhook delivery.
 
+### One-time setup
+
+Add the token to `.env.local`. Use the same value baked into the
+`wix_sync_*` triggers in
+`supabase/migrations/20260430153210_remote_schema.sql`:
+
+```
+WIX_SYNC_TOKEN=<paste-from-migration>
+```
+
+**Do not prefix with `VITE_`** — Vite exposes `VITE_*` vars to the
+client bundle, and this token must never end up in browser JS.
+
+### Running the re-sync
+
+`.env.local` isn't auto-exported to bare shell commands (only `make`
+reads it). Source it once per terminal, then curl:
+
 ```sh
+set -a && source .env.local && set +a
+echo "${#WIX_SYNC_TOKEN}"   # sanity check: prints token length, should be 64
+
 curl -fsSL -X POST \
   -H 'Content-Type: application/json' \
   -H "x-sync-token: $WIX_SYNC_TOKEN" \
   https://fundiverstw.com/_functions/syncSupabase
 ```
 
-`WIX_SYNC_TOKEN` is the same token configured on the Supabase webhook
-triggers (see the `wix_sync_*` triggers in
-`supabase/migrations/20260430153210_remote_schema.sql`). Export it
-from `.env.local` rather than pasting it on the command line so it
-doesn't land in shell history.
+### When it 403s
+
+Drop `-fsSL` for `-i` to see headers + body — Velo's own 403 prints a
+short error string that says which check failed:
+
+```sh
+curl -i -X POST \
+  -H 'Content-Type: application/json' \
+  -H "x-sync-token: $WIX_SYNC_TOKEN" \
+  https://fundiverstw.com/_functions/syncSupabase
+```
+
+Common causes: `$WIX_SYNC_TOKEN` unset in this shell (length 0), token
+drift between Supabase trigger config and the Wix secret read by
+`http-functions.js`, or `post_syncSupabase` checking a different
+header name than `x-sync-token`.
 
 ## Cross-origin handoff to the PWA
 
