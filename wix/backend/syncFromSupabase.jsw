@@ -40,8 +40,30 @@ const MULTI_REF_FIELDS = {
   EO_dives: ['destination_reference'],
 };
 
+// Collection → list of calendar-date field keys. Wix DateTime fields
+// can't represent a bare calendar date: passing "2026-05-31" lets JS
+// parse as UTC midnight, which renders as May 30 for every viewer
+// west of UTC. We re-anchor to UTC noon — 12h from either day
+// boundary — so every populated timezone displays the intended date.
+const DATE_FIELDS = {
+  EO_dives:   ['start_date', 'end_date', 'cancel_date', 'deposit_deadline', 'full_payment_deadline'],
+  EO_courses: ['start_date', 'end_date', 'special_date', 'cancel_date', 'deposit_deadline', 'full_payment_deadline'],
+};
+
 function multiRefsFor(collection) {
   return MULTI_REF_FIELDS[collection] || [];
+}
+
+function dateFieldsFor(collection) {
+  return DATE_FIELDS[collection] || [];
+}
+
+function toUtcNoon(raw) {
+  if (raw == null || raw === '') return null;
+  const s = raw instanceof Date ? raw.toISOString() : String(raw);
+  const match = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return raw;
+  return new Date(`${match[1]}-${match[2]}-${match[3]}T12:00:00Z`);
 }
 
 function parseIdList(raw) {
@@ -107,11 +129,12 @@ async function fetchAll(table, key) {
   return out;
 }
 
-function toWixItem(row) {
+function toWixItem(row, collection) {
+  const dateKeys = new Set(dateFieldsFor(collection));
   const out = {};
   for (const [k, v] of Object.entries(row)) {
     if (RESERVED.has(k)) continue;
-    out[k] = v;
+    out[k] = dateKeys.has(k) ? toUtcNoon(v) : v;
   }
   const id = row._id ?? row.id;
   out._id = id == null ? undefined : String(id);
@@ -143,7 +166,7 @@ async function syncTable(collection) {
   const key = await getKey();
   const rows = await fetchAll(collection, key);
   const items = rows
-    .map(toWixItem)
+    .map((r) => toWixItem(r, collection))
     .filter((it) => it._id);
 
   if (items.length === 0) {
@@ -171,7 +194,7 @@ export async function syncFromSupabase() {
 
 // Single-row sync, called from the Supabase webhook handler.
 export async function upsertOne(collection, row) {
-  const item = toWixItem(row);
+  const item = toWixItem(row, collection);
   if (!item._id) throw new Error(`upsertOne(${collection}): row missing _id/id`);
   const saved = await wixData.save(
     collection,

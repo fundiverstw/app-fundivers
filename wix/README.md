@@ -69,6 +69,33 @@ does **nothing** — Wix is still serving the previously pasted copy.
 - `upcoming_courses/` — same shape for courses, calling
   `getCourseById()`.
 
+## Manual re-sync from the CLI
+
+`backend/syncFromSupabase.jsw` exposes `syncFromSupabase()`, which
+overwrites every Wix collection in `SYNC_TABLES` with the current
+Supabase rows. It's wired to the Velo HTTP function at
+`/_functions/syncSupabase`. Hit it any time existing Wix rows need to
+be backfilled after:
+
+- Changing the sync pipeline itself (`toWixItem`, `DATE_FIELDS`, …).
+  Webhooks only correct future writes; old rows stay wrong until a
+  re-sync overwrites them.
+- A bulk schema change to a synced table.
+- A suspected dropped webhook delivery.
+
+```sh
+curl -fsSL -X POST \
+  -H 'Content-Type: application/json' \
+  -H "x-sync-token: $WIX_SYNC_TOKEN" \
+  https://fundiverstw.com/_functions/syncSupabase
+```
+
+`WIX_SYNC_TOKEN` is the same token configured on the Supabase webhook
+triggers (see the `wix_sync_*` triggers in
+`supabase/migrations/20260430153210_remote_schema.sql`). Export it
+from `.env.local` rather than pasting it on the command line so it
+doesn't land in shell history.
+
 ## Cross-origin handoff to the PWA
 
 Wix → PWA navigation uses absolute URLs to
