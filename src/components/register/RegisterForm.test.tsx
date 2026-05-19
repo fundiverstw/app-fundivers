@@ -523,6 +523,37 @@ describe('RegisterForm', () => {
     expect(screen.getByText(/909-083-683/)).toBeInTheDocument()
   })
 
+  it('step 4 always shows the "After you pay" reminder naming all three contact channels, regardless of method', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    const expectReminder = () => {
+      expect(screen.getByText(/after you pay/i)).toBeInTheDocument()
+      const reminder = screen.getByText(/contact FunDivers by email, LINE, or WhatsApp/i)
+      expect(reminder).toBeInTheDocument()
+      expect(screen.getByText(/fundivers tw app/i)).toBeInTheDocument()
+    }
+
+    // Default = bank_transfer
+    expectReminder()
+
+    await user.click(screen.getByLabelText(/^paypal/i))
+    expectReminder()
+
+    await user.click(screen.getByLabelText(/credit card/i))
+    expectReminder()
+
+    await user.click(screen.getByLabelText(/^cash/i))
+    expectReminder()
+  })
+
   it('shows the admin-set deadline summary on step 4 and hides the deposit-only block when paying full', async () => {
     setupFrom()
     const user = userEvent.setup()
