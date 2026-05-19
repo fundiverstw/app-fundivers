@@ -1027,8 +1027,8 @@ export interface AppEvent {
   /**
    * Admin-set full-payment deadline (YYYY-MM-DD). When null the
    * registration form falls back to "7 days before start_date" — see
-   * computeEffectiveDeadlines in src/lib/payment-deadlines.ts. The
-   * deposit deadline is always "ASAP" and is not stored per-event.
+   * computeEffectiveFullPaymentDeadline in src/lib/payment-deadlines.ts.
+   * The deposit deadline is always "ASAP" and is not stored per-event.
    */
   full_payment_deadline: string | null
   /** FK → cancellation_policies._id; null = no policy attached. */

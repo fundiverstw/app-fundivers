@@ -257,10 +257,10 @@ Deno.serve(async (req) => {
       .filter((s: string) => s.length > 0)
   }
 
-  // Resolve effective payment deadlines — admin-set values take precedence;
-  // when null fall back to "7 days before start_date" (matches the SPA's
-  // computeEffectiveDeadlines helper). Done here so the PDF and the form
-  // always agree.
+  // Resolve effective full-payment deadline — admin-set value takes
+  // precedence; when null fall back to "7 days before start_date"
+  // (matches the SPA's computeEffectiveFullPaymentDeadline helper).
+  // Done here so the PDF and the form always agree.
   const startDate = (event?.start_date ?? null) as string | null
   function shiftDays(yyyyMmDd: string, deltaDays: number): string {
     const d = new Date(yyyyMmDd + "T00:00:00Z")

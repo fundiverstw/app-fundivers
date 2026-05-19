@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { formatEventSpan, eventIsFull } from '../../lib/events'
-import { computeEffectiveDeadlines } from '../../lib/payment-deadlines'
+import { computeEffectiveFullPaymentDeadline } from '../../lib/payment-deadlines'
 import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/payment-instructions'
 import { GEAR_ITEMS } from '../../lib/gear'
 import type { AppEvent, Booking, BookingDetails, CancellationPolicy, Database, EOAddon, EORoom, Profile } from '../../types/database'
@@ -165,7 +165,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   const [notes, setNotes] = useState(existingBooking?.notes ?? '')
 
   const hasDeposit = (event.deposit_amount ?? 0) > 0
-  const deadlines = useMemo(() => computeEffectiveDeadlines(event), [event])
+  const fullPaymentDeadline = useMemo(() => computeEffectiveFullPaymentDeadline(event), [event])
 
   // Profile fields — pre-filled from the diver's profile (empty strings for
   // missing values so the inputs are controlled). On submit we UPSERT any
@@ -699,7 +699,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
           <div className="text-xs text-blue-950 font-medium bg-sky-50 border border-sky-200 rounded-lg p-3 space-y-1">
             <p>
               Pay deposit <strong>ASAP</strong> to hold your spot.
-              Pay the remaining balance by <strong>{formatDeadline(deadlines.full_payment_deadline)}</strong> to complete your registration.
+              Pay the remaining balance by <strong>{formatDeadline(fullPaymentDeadline)}</strong> to complete your registration.
             </p>
             {hasDeposit && payDepositOnly && (
               <div className="border-t border-sky-200 pt-1 mt-1 space-y-0.5">
@@ -708,7 +708,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
                   <strong>{event.currency} {(event.deposit_amount ?? 0).toLocaleString()}</strong>
                 </p>
                 <p>
-                  Pay remaining balance by {formatDeadline(deadlines.full_payment_deadline)}:{' '}
+                  Pay remaining balance by {formatDeadline(fullPaymentDeadline)}:{' '}
                   <strong>{event.currency} {Math.max(0, total - (event.deposit_amount ?? 0)).toLocaleString()}</strong>
                 </p>
               </div>
