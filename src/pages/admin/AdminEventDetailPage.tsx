@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -29,6 +29,7 @@ type RoomNameMap = Map<string, string>
 
 export function AdminEventDetailPage() {
   const { type, id } = useParams<{ type: 'dive' | 'course'; id: string }>()
+  const navigate = useNavigate()
   const { profile } = useAuth()
   const toast = useToast()
   const isAdmin = profile?.role === 'admin'
@@ -47,6 +48,13 @@ export function AdminEventDetailPage() {
   const [cancelError, setCancelError] = useState<string | null>(null)
   const [notifyModalOpen, setNotifyModalOpen] = useState(false)
   const [exportingDivers, setExportingDivers] = useState(false)
+  // Delete-event flow state. Only surfaced after the event is cancelled
+  // so admins can't accidentally hard-delete an active event. The actual
+  // DELETE relies on the existing ON DELETE CASCADE FKs to clean up
+  // bookings, payments, memos, amendments, duties, junctions, etc.
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [deleteInFlight, setDeleteInFlight] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!type || !id) return
@@ -201,6 +209,25 @@ export function AdminEventDetailPage() {
     }
   }
 
+  async function deleteEvent() {
+    if (!type || !id) return
+    setDeleteInFlight(true)
+    setDeleteError(null)
+    try {
+      const table = type === 'dive' ? 'EO_dives' : 'EO_courses'
+      const { error } = await supabase.from(table).delete().eq('_id', id)
+      if (error) throw error
+      toast.success('Event deleted')
+      navigate('/admin/events')
+    } catch (err) {
+      const msg = errorMessage(err)
+      setDeleteError(msg)
+      toast.error(`Could not delete event: ${msg}`)
+    } finally {
+      setDeleteInFlight(false)
+    }
+  }
+
   if (loading) {
     return <div className="flex justify-center pt-12"><div className="w-6 h-6 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" /></div>
   }
@@ -252,6 +279,15 @@ export function AdminEventDetailPage() {
                 >
                   {event?.cancelled_at ? 'Restore event' : 'Cancel event'}
                 </button>
+                {event?.cancelled_at && (
+                  <button
+                    type="button"
+                    onClick={() => { setDeleteError(null); setDeleteModalOpen(true) }}
+                    className="text-xs bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded-lg"
+                  >
+                    Delete event
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setNotifyModalOpen(true)}
@@ -361,6 +397,17 @@ export function AdminEventDetailPage() {
         />
       )}
 
+      {deleteModalOpen && event && (
+        <DeleteEventModal
+          eventTitle={event.title}
+          bookingCount={registrants.length}
+          inFlight={deleteInFlight}
+          error={deleteError}
+          onClose={() => setDeleteModalOpen(false)}
+          onConfirm={deleteEvent}
+        />
+      )}
+
       {notifyModalOpen && type && id && event && (
         <NotifyDiversModal
           eventTitle={event.title}
@@ -443,6 +490,76 @@ function CancelEventModal({
             {inFlight
               ? (alreadyCancelled ? 'Restoring…' : 'Cancelling…')
               : (alreadyCancelled ? 'Restore event' : 'Cancel event')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DeleteEventModal({
+  eventTitle, bookingCount, inFlight, error, onClose, onConfirm,
+}: {
+  eventTitle: string
+  bookingCount: number
+  inFlight: boolean
+  error: string | null
+  onClose: () => void
+  onConfirm: () => void
+}) {
+  const [typed, setTyped] = useState('')
+  const matches = typed.trim() === eventTitle.trim()
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-event-title"
+    >
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3">
+        <h2 id="delete-event-title" className="text-lg font-bold text-red-700">
+          Delete event permanently?
+        </h2>
+        <p className="text-sm text-blue-900">
+          This permanently removes the event and cascades through every related
+          row: bookings, payments, payment amendments, memos, admin notes,
+          waitlist offers, and staff duties. <strong>This cannot be undone.</strong>
+        </p>
+        {bookingCount > 0 && (
+          <p className="text-sm font-semibold text-red-700 bg-red-50 border border-red-500 rounded px-3 py-2">
+            {bookingCount} booking{bookingCount === 1 ? '' : 's'} on this event and all linked payments will be wiped. Issue any refunds before deleting.
+          </p>
+        )}
+        <label className="block text-xs text-blue-900 font-medium">
+          Type <span className="font-mono text-red-700">{eventTitle}</span> to confirm:
+          <input
+            type="text"
+            value={typed}
+            onChange={e => setTyped(e.target.value)}
+            disabled={inFlight}
+            autoFocus
+            className="mt-1 w-full bg-white border border-sky-300 rounded-lg px-2 py-2 text-sm text-blue-900 focus:outline-none focus:border-red-700"
+          />
+        </label>
+        {error && (
+          <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded px-2 py-1">{error}</p>
+        )}
+        <div className="flex gap-2 pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={inFlight}
+            className="flex-1 py-2 rounded-lg text-sm font-medium text-blue-900 border border-sky-300 hover:bg-sky-50 disabled:opacity-50"
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={inFlight || !matches}
+            className="flex-1 py-2 rounded-lg text-sm font-semibold text-white bg-red-700 hover:bg-red-800 disabled:opacity-50"
+          >
+            {inFlight ? 'Deleting…' : 'Delete forever'}
           </button>
         </div>
       </div>
