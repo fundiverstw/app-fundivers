@@ -34,9 +34,9 @@ export interface FormState {
   cancel_policy: string
   destinationIds: string[]   // FK multi → TravelDestinations (JSON-encoded into destination_reference)
   divetravel_reference: string
-  // payment deadlines (both event types) — empty string = unset, falls back
-  // client-side to "7 days before start_date".
-  deposit_deadline: string
+  // full-payment deadline (both event types) — empty string = unset, falls
+  // back client-side to "7 days before start_date". The deposit is always
+  // "ASAP" and has no per-event deadline.
   full_payment_deadline: string
   // course
   special_date: string
@@ -59,7 +59,7 @@ export const EMPTY_FORM: FormState = {
   nitrox_required: false, gear_rental: '',
   cancel_date: '', cancel_policy: '',
   destinationIds: [], divetravel_reference: '',
-  deposit_deadline: '', full_payment_deadline: '',
+  full_payment_deadline: '',
   special_date: '', course_name: '',
   included: '', schedule: '',
 }
@@ -130,7 +130,6 @@ export function formStateFromDive(d: EODive): FormState {
     cancel_policy: d.cancel_policy ?? '',
     destinationIds: parseAddonIds(d.destination_reference),
     divetravel_reference: d.DiveTravel_reference ?? '',
-    deposit_deadline: d.deposit_deadline ?? '',
     full_payment_deadline: d.full_payment_deadline ?? '',
     special_date: '', course_name: '',
     included: '', schedule: '',
@@ -157,7 +156,6 @@ export function formStateFromCourse(c: EOCourse): FormState {
     included: c.included ?? '',
     schedule: c.schedule ?? '',
     addonIds: parseAddonIds(c.other_addons),
-    deposit_deadline: c.deposit_deadline ?? '',
     full_payment_deadline: c.full_payment_deadline ?? '',
     cancel_date: c.cancel_date ?? '',
     cancel_policy: c.cancel_policy ?? '',
@@ -201,7 +199,6 @@ export function divePayloadFromForm(form: FormState): Record<string, unknown> {
     cancel_policy: form.cancel_policy || null,
     destination_reference: form.destinationIds.length ? JSON.stringify(form.destinationIds) : null,
     DiveTravel_reference: form.divetravel_reference || null,
-    deposit_deadline: form.deposit_deadline || null,
     full_payment_deadline: form.full_payment_deadline || null,
   }
 }
@@ -229,7 +226,6 @@ export function coursePayloadFromForm(form: FormState): Record<string, unknown> 
     included: form.included || null,
     schedule: form.schedule || null,
     other_addons: addonsJson,
-    deposit_deadline: form.deposit_deadline || null,
     full_payment_deadline: form.full_payment_deadline || null,
     cancel_date: form.cancel_date || null,
     cancel_policy: form.cancel_policy || null,
