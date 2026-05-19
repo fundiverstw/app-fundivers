@@ -60,8 +60,7 @@ function dateFieldsFor(collection) {
 
 function toUtcNoon(raw) {
   if (raw == null || raw === '') return null;
-  const s = raw instanceof Date ? raw.toISOString() : String(raw);
-  const match = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const match = String(raw).match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!match) return raw;
   return new Date(`${match[1]}-${match[2]}-${match[3]}T12:00:00Z`);
 }

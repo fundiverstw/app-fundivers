@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeEffectiveDeadlines } from './payment-deadlines'
+import { computeEffectiveFullPaymentDeadline } from './payment-deadlines'
 import type { AppEvent } from '../types/database'
 
 function event(overrides: Partial<AppEvent> = {}): AppEvent {
@@ -18,24 +18,19 @@ function event(overrides: Partial<AppEvent> = {}): AppEvent {
   }
 }
 
-describe('computeEffectiveDeadlines', () => {
+describe('computeEffectiveFullPaymentDeadline', () => {
   it('uses admin-set deadline verbatim when present', () => {
-    const r = computeEffectiveDeadlines(event({ full_payment_deadline: '2027-05-08' }))
-    expect(r).toEqual({
-      full_payment_deadline: '2027-05-08',
-      full_payment_is_fallback: false,
-    })
+    expect(computeEffectiveFullPaymentDeadline(event({ full_payment_deadline: '2027-05-08' })))
+      .toBe('2027-05-08')
   })
 
   it('falls back to 7 days before start_date when null', () => {
     // start_time = 2027-05-15 → fallback = 2027-05-08
-    const r = computeEffectiveDeadlines(event())
-    expect(r.full_payment_deadline).toBe('2027-05-08')
-    expect(r.full_payment_is_fallback).toBe(true)
+    expect(computeEffectiveFullPaymentDeadline(event())).toBe('2027-05-08')
   })
 
   it('fallback subtraction handles month/year boundaries', () => {
-    const r = computeEffectiveDeadlines(event({ start_time: '2027-01-03T00:00:00Z' }))
-    expect(r.full_payment_deadline).toBe('2026-12-27')
+    expect(computeEffectiveFullPaymentDeadline(event({ start_time: '2027-01-03T00:00:00Z' })))
+      .toBe('2026-12-27')
   })
 })
