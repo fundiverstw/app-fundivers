@@ -390,7 +390,8 @@ Deno.serve(async (req) => {
         `${payload.name} has been added to the waitlist for ${payload.eventTitle}.`
       const diverText =
         `Thanks for signing up — ${payload.eventTitle} is currently full, so we've added you to the waitlist. ` +
-        `If a spot opens up, you'll receive a notification with 24 hours to claim it. No payment is needed unless and until that happens.\n\n— FunDivers TW`
+        `If a spot opens up, you'll receive a notification with 24 hours to claim it. No payment is needed unless and until that happens.\n\n` +
+        `Keep an eye on the FunDivers TW app for waitlist updates and event reminders.\n\n— FunDivers TW`
       await transporter.sendMail({ ...mailOpts, to: COMPANY_EMAIL, text: companyText })
       if (registrantEmail.toLowerCase().trim() !== COMPANY_EMAIL) {
         await transporter.sendMail({ ...mailOpts, to: registrantEmail, text: diverText })
@@ -411,7 +412,10 @@ Deno.serve(async (req) => {
         await transporter.sendMail({
           ...mailOpts,
           to: registrantEmail,
-          text: "Thanks for registering — your registration summary is attached. We'll reach out shortly to confirm payment details.",
+          text:
+            "Thanks for registering — your registration summary is attached.\n\n" +
+            "Once you've sent your payment, please let us know via email, LINE, or WhatsApp so we can confirm receipt — contact details are in the attached PDF. We don't always see bank or PayPal transfers in real time, and a quick heads-up keeps your spot from falling through the cracks.\n\n" +
+            "Keep an eye on the FunDivers TW app for updates to your registration status, payment confirmations, and event reminders.\n\n— FunDivers TW",
         })
       }
     }
