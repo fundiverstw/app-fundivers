@@ -190,6 +190,69 @@ describe('AdminEventDetailPage', () => {
     expect(payload.cancelled_at).toBeNull()
   })
 
+  it('hides the Delete button until the event has been cancelled', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', {
+        id: 'dive_x', type: 'dive', title: 'Kenting',
+        start_time: new Date().toISOString(), end_time: null, currency: 'TWD',
+        cancelled_at: null,
+      }],
+    ]))
+    from.mockImplementation(() => mockQueryBuilder({ data: [] }))
+
+    renderAt('/admin/events/dive/dive_x')
+    await screen.findByRole('heading', { name: /kenting/i })
+    expect(screen.queryByRole('button', { name: /^delete event$/i })).not.toBeInTheDocument()
+  })
+
+  it('cascade-deletes a cancelled event after the admin types the title to confirm, then navigates back to /admin/events', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', {
+        id: 'dive_x', type: 'dive', title: 'Kenting',
+        start_time: new Date().toISOString(), end_time: null, currency: 'TWD',
+        cancelled_at: '2026-04-25T10:00:00.000Z',
+      }],
+    ]))
+
+    const deleteSpy = vi.fn().mockReturnValue({
+      eq: (col: string, val: string) => Promise.resolve({ error: null, data: { col, val } }),
+    })
+    from.mockImplementation((table: string) => {
+      if (table === 'EO_dives') {
+        const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
+        b.delete = deleteSpy
+        return b
+      }
+      return mockQueryBuilder({ data: [] })
+    })
+
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter initialEntries={['/admin/events/dive/dive_x']}>
+        <Routes>
+          <Route path="/admin/events/:type/:id" element={<AdminEventDetailPage />} />
+          <Route path="/admin/events" element={<div>events-index</div>} />
+        </Routes>
+      </MemoryRouter>
+    )
+
+    await screen.findByRole('heading', { name: /kenting/i })
+    await user.click(screen.getByRole('button', { name: /^delete event$/i }))
+
+    // Modal up; the confirm button is disabled until the title is typed.
+    const dialog = await screen.findByRole('dialog', { name: /delete event permanently/i })
+    const confirmBtn = within(dialog).getByRole('button', { name: /delete forever/i })
+    expect(confirmBtn).toBeDisabled()
+
+    await user.type(within(dialog).getByRole('textbox'), 'Kenting')
+    expect(confirmBtn).toBeEnabled()
+    await user.click(confirmBtn)
+
+    await waitFor(() => expect(deleteSpy).toHaveBeenCalled())
+    // After delete the user lands on the events index route.
+    expect(await screen.findByText('events-index')).toBeInTheDocument()
+  })
+
   it('hides write controls when the viewer is staff (read-only)', async () => {
     useAuthMock.mockReturnValue({
       user: { id: 'staff-1' },
