@@ -3,6 +3,7 @@ import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
+import { fetchCreditsForUser, openCreditBalance } from '../lib/credits'
 import type { AppEvent, Booking, Payment } from '../types/database'
 import {
   CARD, BTN_GHOST, TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR, PAGE_BODY,
@@ -23,6 +24,7 @@ const PAYMENT_STATUS_STYLES: Record<Payment['status'], string> = {
   pending: 'text-red-600',
   paid: 'text-blue-900 font-semibold',
   refunded: 'text-blue-950 font-medium',
+  voided: 'text-blue-950 font-medium line-through',
 }
 
 const STATUS_STYLES: Record<Booking['status'], string> = {
@@ -35,14 +37,17 @@ const STATUS_STYLES: Record<Booking['status'], string> = {
 export function PaymentsPage() {
   const { user } = useAuth()
   const [lines, setLines] = useState<BookingLine[]>([])
+  const [openCredit, setOpenCredit] = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<string | null>(null)
 
   async function refetch(uid: string) {
-    const [bookingsRes, paymentsRes] = await Promise.all([
+    const [bookingsRes, paymentsRes, credits] = await Promise.all([
       supabase.from('bookings').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('payments').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
+      fetchCreditsForUser(uid),
     ])
+    setOpenCredit(openCreditBalance(credits))
     const bookings = bookingsRes.data ?? []
     const payRows = (paymentsRes.data ?? []) as Payment[]
 
@@ -108,6 +113,19 @@ export function PaymentsPage() {
   return (
     <div className="max-w-lg mx-auto space-y-6">
       <h1 className="text-xl font-bold text-white">Payments</h1>
+
+      {openCredit > 0 && (
+        <div className="bg-emerald-50 border border-emerald-400 rounded-lg p-3 space-y-1">
+          <p className="text-sm font-semibold text-emerald-900">
+            Account credit: {currency} {openCredit.toLocaleString()}
+          </p>
+          <p className="text-xs text-emerald-900">
+            We owe you this much — usually from a cancelled event. Mention
+            it when you sign up for your next trip and we'll apply it to
+            the balance.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-2">
         <Summary label="Deposits due" value={totalDepositDue} currency={currency} accent="text-red-600" />

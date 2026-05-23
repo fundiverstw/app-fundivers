@@ -13,7 +13,7 @@ import type { Payment } from '../../types/database'
  * AdminUsersPage (one block per active booking).
  */
 export function BookingPaymentsBlock({
-  payments, owed, paid, outstanding, depositDue, cancelled, readOnly, onRecord,
+  payments, owed, paid, outstanding, depositDue, cancelled, readOnly, onRecord, onVoid,
 }: {
   payments: Payment[]
   owed: number
@@ -23,10 +23,15 @@ export function BookingPaymentsBlock({
   cancelled: boolean
   readOnly: boolean
   onRecord: (amount: number, note: string) => Promise<void>
+  /** Revert a paid payment that was recorded by mistake. Optional — when
+   *  omitted, the per-row Void button is hidden (e.g. on read-only or
+   *  diver-facing surfaces). The caller owns the supabase write. */
+  onVoid?: (paymentId: string) => Promise<void>
 }) {
   const [amountStr, setAmountStr] = useState('')
   const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [voidingId, setVoidingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   async function submit(amount: number, defaultNote: string) {
@@ -51,6 +56,20 @@ export function BookingPaymentsBlock({
       return
     }
     await submit(amount, note.trim() || 'Payment')
+  }
+
+  async function handleVoid(p: Payment) {
+    if (!onVoid) return
+    if (!window.confirm(`Void this ${p.amount.toLocaleString()} payment? It stays on record for audit but no longer counts toward paid sum.`)) return
+    setError(null)
+    setVoidingId(p.id)
+    try {
+      await onVoid(p.id)
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setVoidingId(null)
+    }
   }
 
   return (
@@ -79,18 +98,36 @@ export function BookingPaymentsBlock({
         <p className="text-blue-900 font-medium italic">No payments recorded yet.</p>
       ) : (
         <ul className="space-y-1 pt-1 border-t border-sky-200">
-          {payments.map(p => (
-            <li key={p.id} className="flex items-baseline justify-between gap-2">
-              <span className="text-blue-950 font-medium flex-1">
-                {format(new Date(p.created_at), 'MMM d')} · {p.note ?? 'Payment'}
-                {p.method && <span className="opacity-70"> ({p.method.replace('_', ' ')})</span>}
-                {p.status !== 'paid' && <span className="text-red-600"> · {p.status}</span>}
-              </span>
-              <span className={`shrink-0 font-semibold ${p.status === 'refunded' ? 'text-blue-950 line-through' : 'text-blue-900'}`}>
-                {p.amount.toLocaleString()}
-              </span>
-            </li>
-          ))}
+          {payments.map(p => {
+            // Both 'refunded' (money sent back) and 'voided' (admin mistake)
+            // get the strikethrough treatment so the running paid sum lines
+            // up visually with what the eye expects.
+            const struck = p.status === 'refunded' || p.status === 'voided'
+            return (
+              <li key={p.id} className="flex items-baseline justify-between gap-2">
+                <span className="text-blue-950 font-medium flex-1">
+                  {format(new Date(p.created_at), 'MMM d')} · {p.note ?? 'Payment'}
+                  {p.method && <span className="opacity-70"> ({p.method.replace('_', ' ')})</span>}
+                  {p.status !== 'paid' && <span className="text-red-600"> · {p.status}</span>}
+                </span>
+                {/* Void is only meaningful on rows that *are* counted as paid
+                    today. Refunded / voided / pending rows show no button. */}
+                {!readOnly && !cancelled && onVoid && p.status === 'paid' && (
+                  <button
+                    type="button"
+                    disabled={voidingId === p.id}
+                    onClick={() => handleVoid(p)}
+                    className="shrink-0 text-[10px] text-red-700 hover:text-red-900 underline disabled:opacity-50"
+                  >
+                    {voidingId === p.id ? 'Voiding…' : 'Void'}
+                  </button>
+                )}
+                <span className={`shrink-0 font-semibold ${struck ? 'text-blue-950 line-through' : 'text-blue-900'}`}>
+                  {p.amount.toLocaleString()}
+                </span>
+              </li>
+            )
+          })}
         </ul>
       )}
 

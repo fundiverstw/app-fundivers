@@ -9,6 +9,7 @@ import { pushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPus
 import { GEAR_ITEMS } from '../lib/gear'
 import { uploadCertCard, getCertCardSignedUrl, deleteCertCard } from '../lib/cert-card'
 import { uploadNitroxCard, getNitroxCardSignedUrl, deleteNitroxCard } from '../lib/nitrox-card'
+import { fetchCreditsForUser, openCreditBalance } from '../lib/credits'
 import { FamilySection } from '../components/profile/FamilySection'
 import type { Profile, CertLevel } from '../types/database'
 import {
@@ -88,6 +89,7 @@ export function ProfilePage() {
   return (
     <div className="max-w-lg mx-auto space-y-6">
       <h1 className="text-xl font-bold text-white">My Profile</h1>
+      {user && <CreditBalanceLine userId={user.id} />}
       <NotificationsToggle />
       {user && profile && (
         // Keying on profile.id remounts the form whenever a different
@@ -98,6 +100,32 @@ export function ProfilePage() {
           <FamilySection parent={profile} />
         </>
       )}
+    </div>
+  )
+}
+
+// Compact "you have a credit on file" panel. Hidden when the balance is
+// 0 so it doesn't add visual noise to the common case. The diver-facing
+// PaymentsPage shows a richer version of this; here it's a quick reminder
+// so the balance is visible from anywhere in the app.
+function CreditBalanceLine({ userId }: { userId: string }) {
+  const [balance, setBalance] = useState<number>(0)
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const credits = await fetchCreditsForUser(userId)
+        if (!cancelled) setBalance(openCreditBalance(credits))
+      } catch {
+        /* best-effort — silent on failure */
+      }
+    })()
+    return () => { cancelled = true }
+  }, [userId])
+  if (balance <= 0) return null
+  return (
+    <div className="bg-emerald-50 border border-emerald-400 rounded-lg p-3 text-sm text-emerald-900">
+      Account credit: <strong>NTD {balance.toLocaleString()}</strong> — see Payments for details.
     </div>
   )
 }
