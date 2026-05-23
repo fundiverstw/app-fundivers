@@ -11,6 +11,7 @@ import { BookingPaymentsBlock } from '../../components/admin/BookingPaymentsBloc
 import { getCertCardSignedUrl } from '../../lib/cert-card'
 import { shoeAsJp } from '../../lib/shoe-size'
 import { fetchCreditsForUser, openCreditBalance, createCredit, settleCredit, reopenCredit } from '../../lib/credits'
+import { ProfileForm } from '../ProfilePage'
 import type { AppEvent, Booking, BookingAmendment, Credit, Payment, Profile } from '../../types/database'
 
 interface UserExtras {
@@ -30,6 +31,10 @@ export function AdminUsersPage() {
   const [users, setUsers] = useState<Profile[]>([])
   const [filter, setFilter] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
+  // null = nobody editing; userId = inline ProfileForm visible for that user.
+  // Only one row can be in edit mode at a time so unsaved fields don't get
+  // visually confused across cards.
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [extrasCache, setExtrasCache] = useState<Map<string, UserExtras>>(new Map())
   const [extrasLoading, setExtrasLoading] = useState<string | null>(null)
 
@@ -182,6 +187,12 @@ export function AdminUsersPage() {
     }
   }
 
+  async function refetchUser(userId: string) {
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
+    if (!data) return
+    setUsers(prev => prev.map(u => u.id === userId ? (data as Profile) : u))
+  }
+
   async function handleReopenCredit(userId: string, creditId: string) {
     try {
       const credit = await reopenCredit(creditId)
@@ -270,7 +281,11 @@ export function AdminUsersPage() {
             open={expanded === u.id}
             extras={extrasCache.get(u.id) ?? null}
             loading={extrasLoading === u.id}
+            editing={editingId === u.id}
             onToggle={() => toggle(u.id)}
+            onEdit={() => setEditingId(u.id)}
+            onCancelEdit={() => setEditingId(null)}
+            onProfileSaved={() => { refetchUser(u.id); setEditingId(null) }}
             onRecordPayment={(bookingId, amount, note) => handleRecordPayment(u.id, bookingId, amount, note)}
             onVoidPayment={(bookingId, paymentId) => handleVoidPayment(u.id, bookingId, paymentId)}
             onCreateCredit={(amount, reason, bookingId) => handleCreateCredit(u.id, amount, reason, bookingId)}
@@ -288,13 +303,18 @@ export function AdminUsersPage() {
 }
 
 function UserCard({
-  user, open, extras, loading, onToggle, onRecordPayment, onVoidPayment, onCreateCredit, onSettleCredit, onReopenCredit, isAdmin,
+  user, open, extras, loading, editing, onToggle, onEdit, onCancelEdit, onProfileSaved,
+  onRecordPayment, onVoidPayment, onCreateCredit, onSettleCredit, onReopenCredit, isAdmin,
 }: {
   user: Profile
   open: boolean
   extras: UserExtras | null
   loading: boolean
+  editing: boolean
   onToggle: () => void
+  onEdit: () => void
+  onCancelEdit: () => void
+  onProfileSaved: () => void
   onRecordPayment: (bookingId: string, amount: number, note: string) => Promise<void>
   onVoidPayment: (bookingId: string, paymentId: string) => Promise<void>
   onCreateCredit: (amount: number, reason: string, bookingId: string | null) => Promise<void>
@@ -302,6 +322,7 @@ function UserCard({
   onReopenCredit: (creditId: string) => Promise<void>
   isAdmin: boolean
 }) {
+  const { user: authUser } = useAuth()
   return (
     <div className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl">
       <button
@@ -335,20 +356,58 @@ function UserCard({
 
       {open && (
         <div className="px-4 pb-4 border-t border-sky-200 pt-3 space-y-4 text-sm">
-          <ProfileDetails user={user} />
-          {loading && (
-            <div className="flex justify-center py-2"><div className="w-5 h-5 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" /></div>
-          )}
-          {extras && (
-            <ExtrasBlock
-              extras={extras}
-              onRecordPayment={onRecordPayment}
-              onVoidPayment={onVoidPayment}
-              onCreateCredit={onCreateCredit}
-              onSettleCredit={onSettleCredit}
-              onReopenCredit={onReopenCredit}
-              isAdmin={isAdmin}
-            />
+          {editing && authUser && isAdmin ? (
+            // Reuses the diver-facing form so field validation / save logic /
+            // gates (cert + nitrox card requirements) stay in one place. The
+            // form saves with .eq('id', profile.id), so as long as the admin
+            // RLS policy is in place, this writes through to the target row.
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Editing profile</p>
+                <button
+                  type="button"
+                  onClick={onCancelEdit}
+                  className="text-xs text-blue-700 hover:text-blue-900 underline"
+                >
+                  Done
+                </button>
+              </div>
+              <ProfileForm
+                key={user.id}
+                user={authUser}
+                profile={user}
+                onSaved={onProfileSaved}
+              />
+            </div>
+          ) : (
+            <>
+              <div className="flex justify-end">
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={onEdit}
+                    className="text-xs text-blue-700 hover:text-blue-900 underline"
+                  >
+                    Edit profile
+                  </button>
+                )}
+              </div>
+              <ProfileDetails user={user} />
+              {loading && (
+                <div className="flex justify-center py-2"><div className="w-5 h-5 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" /></div>
+              )}
+              {extras && (
+                <ExtrasBlock
+                  extras={extras}
+                  onRecordPayment={onRecordPayment}
+                  onVoidPayment={onVoidPayment}
+                  onCreateCredit={onCreateCredit}
+                  onSettleCredit={onSettleCredit}
+                  onReopenCredit={onReopenCredit}
+                  isAdmin={isAdmin}
+                />
+              )}
+            </>
           )}
         </div>
       )}
