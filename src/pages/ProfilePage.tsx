@@ -8,6 +8,7 @@ import { useToast } from '../hooks/useToast'
 import { pushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
 import { GEAR_ITEMS } from '../lib/gear'
 import { uploadCertCard, getCertCardSignedUrl, deleteCertCard } from '../lib/cert-card'
+import { uploadNitroxCard, getNitroxCardSignedUrl, deleteNitroxCard } from '../lib/nitrox-card'
 import { FamilySection } from '../components/profile/FamilySection'
 import type { Profile, CertLevel } from '../types/database'
 import {
@@ -118,6 +119,11 @@ export function ProfileForm({ user, profile, onSaved }: {
   const [gearOwned, setGearOwned] = useState<string[]>(
     () => Array.isArray(profile.gear_owned) ? [...profile.gear_owned] : []
   )
+  // Mirror of profiles.nitrox_card_path. Owned here so the Save button can
+  // gate on it (nitrox_certified=true requires a card on file); the
+  // NitroxCardSection component pushes path updates up via onPathChange
+  // whenever the user uploads / removes a photo.
+  const [nitroxCardPath, setNitroxCardPath] = useState<string | null>(profile.nitrox_card_path ?? null)
   // Agency + cert level dropdowns both pull from public.cert_levels (RLS
   // public-read). Each row carries an `organization` ('PADI' | 'BSAC' | …)
   // so we can derive the agency list and filter the level list by the
@@ -141,6 +147,8 @@ export function ProfileForm({ user, profile, onSaved }: {
   // useWatch (not the watch() function from useForm) — useWatch is the
   // React-Compiler-safe API for reading a live form value.
   const selectedAgency = useWatch({ control, name: 'cert_agency' }) ?? ''
+  const nitroxCertifiedWatched = useWatch({ control, name: 'nitrox_certified' }) ?? false
+  const nitroxCardMissing = !!nitroxCertifiedWatched && !nitroxCardPath
   // Distinct orgs in the order returned by the rank-sorted query (PADI rows
   // come first because they're the seed; agency rows follow).
   const orgs = useMemo(() => {
@@ -417,6 +425,10 @@ export function ProfileForm({ user, profile, onSaved }: {
           </label>
         </section>
 
+        {user && nitroxCertifiedWatched && (
+          <NitroxCardSection userId={user.id} onPathChange={setNitroxCardPath} />
+        )}
+
         {user && (
           <CertCardSection userId={user.id} />
         )}
@@ -431,9 +443,15 @@ export function ProfileForm({ user, profile, onSaved }: {
           />
         </section>
 
+        {nitroxCardMissing && (
+          <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded p-2">
+            Upload a photo of your nitrox certification card to save your profile.
+          </p>
+        )}
+
         <button
           type="submit"
-          disabled={isSubmitting || (!isDirty && !dirtyExtras)}
+          disabled={isSubmitting || nitroxCardMissing || (!isDirty && !dirtyExtras)}
           className="w-full bg-emerald-400 hover:bg-emerald-300 text-blue-950 font-semibold py-2 rounded-lg transition-colors disabled:opacity-50"
         >
           {isSubmitting ? 'Saving…' : 'Save changes'}
@@ -578,7 +596,7 @@ export function CertCardSection({ userId }: { userId: string }) {
 
   return (
     <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3" aria-label="Certification Card">
-      <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Cert card photo</h2>
+      <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Highest Cert Photo</h2>
       <p className="text-xs text-blue-900 font-medium">
         Photo of your certification card. Images are compressed before upload
         so they take up minimal space while keeping the key details readable.
@@ -596,6 +614,123 @@ export function CertCardSection({ userId }: { userId: string }) {
             type="file"
             accept="image/*"
             aria-label="Upload certification card"
+            className="hidden"
+            disabled={busy}
+            onChange={onPickFile}
+          />
+          {busy ? 'Working…' : path ? 'Replace photo' : 'Upload photo'}
+        </label>
+        {path && (
+          <button
+            type="button"
+            onClick={onRemove}
+            disabled={busy}
+            className="bg-sky-100 hover:bg-red-100 disabled:opacity-40 text-red-700 border border-red-500 text-sm font-semibold py-2 px-3 rounded-lg transition-colors"
+          >
+            Remove
+          </button>
+        )}
+      </div>
+      {error && <p className="text-red-600 text-xs">{error}</p>}
+    </section>
+  )
+}
+
+// Same upload pattern as CertCardSection but for the nitrox-cards bucket.
+// onPathChange lifts the current path up so ProfileForm can gate the Save
+// button on nitrox_certified ⇒ photo present.
+export function NitroxCardSection({ userId, onPathChange }: {
+  userId: string
+  onPathChange?: (path: string | null) => void
+}) {
+  const [path, setPath] = useState<string | null>(null)
+  const [signedUrl, setSignedUrl] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('nitrox_card_path')
+        .eq('id', userId)
+        .maybeSingle()
+      if (cancelled) return
+      const p = data?.nitrox_card_path ?? null
+      setPath(p)
+      onPathChange?.(p)
+      setSignedUrl(p ? await getNitroxCardSignedUrl(p) : null)
+    })()
+    return () => { cancelled = true }
+  // onPathChange intentionally excluded — parent passes a fresh setter each
+  // render; including it would re-fetch on every parent update.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId])
+
+  async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose an image file.')
+      return
+    }
+    setError(null)
+    setBusy(true)
+    try {
+      const newPath = await uploadNitroxCard(userId, file)
+      if (path && path !== newPath) {
+        try { await deleteNitroxCard(path) } catch { /* ignore */ }
+      }
+      await supabase.from('profiles').update({ nitrox_card_path: newPath }).eq('id', userId)
+      setPath(newPath)
+      onPathChange?.(newPath)
+      setSignedUrl(await getNitroxCardSignedUrl(newPath))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onRemove() {
+    if (!path) return
+    setBusy(true)
+    setError(null)
+    try {
+      await deleteNitroxCard(path)
+      await supabase.from('profiles').update({ nitrox_card_path: null }).eq('id', userId)
+      setPath(null)
+      onPathChange?.(null)
+      setSignedUrl(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Remove failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3" aria-label="Nitrox Certification Card">
+      <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Nitrox card photo</h2>
+      <p className="text-xs text-blue-900 font-medium">
+        Required because you marked yourself as nitrox certified. Same
+        compression + private-storage handling as your main cert card.
+      </p>
+      {signedUrl && (
+        <img
+          src={signedUrl}
+          alt="Your nitrox certification card"
+          className="w-full rounded-lg border border-sky-300"
+        />
+      )}
+      <div className="flex gap-2">
+        <label className="flex-1 cursor-pointer bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 rounded-lg text-center transition-colors">
+          <input
+            type="file"
+            accept="image/*"
+            aria-label="Upload nitrox certification card"
             className="hidden"
             disabled={busy}
             onChange={onPickFile}

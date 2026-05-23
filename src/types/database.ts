@@ -139,6 +139,7 @@ export interface Database {
           cert_agency: string | null
           cert_level: string | null
           cert_card_path: string | null
+          nitrox_card_path: string | null
           medical_notes: string | null
           avatar_url: string | null
           role: 'diver' | 'admin' | 'staff'
@@ -182,6 +183,7 @@ export interface Database {
           cert_agency?: string | null
           cert_level?: string | null
           cert_card_path?: string | null
+          nitrox_card_path?: string | null
           medical_notes?: string | null
           avatar_url?: string | null
           role?: 'diver' | 'admin'
@@ -216,6 +218,7 @@ export interface Database {
           cert_agency?: string | null
           cert_level?: string | null
           cert_card_path?: string | null
+          nitrox_card_path?: string | null
           medical_notes?: string | null
           avatar_url?: string | null
           role?: 'diver' | 'admin'
