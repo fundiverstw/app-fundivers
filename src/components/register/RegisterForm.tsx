@@ -5,6 +5,7 @@ import { formatEventSpan, eventIsFull } from '../../lib/events'
 import { computeEffectiveFullPaymentDeadline } from '../../lib/payment-deadlines'
 import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/payment-instructions'
 import { GEAR_ITEMS } from '../../lib/gear'
+import { uploadNitroxCard } from '../../lib/nitrox-card'
 import type { AppEvent, Booking, BookingDetails, CancellationPolicy, Database, EOAddon, EORoom, Profile } from '../../types/database'
 
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
@@ -183,6 +184,17 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   const [certLevel, setCertLevel] = useState(profile?.cert_level ?? '')
   const [loggedDives, setLoggedDives] = useState(profile?.logged_dives ?? 0)
   const [nitroxCertified, setNitroxCertified] = useState(profile?.nitrox_certified ?? false)
+  // Holds a freshly-picked nitrox card until submit, when it gets uploaded
+  // to storage. For authed users the upload happens before the
+  // create-registration call so the path lands in the profile patch; for
+  // guests it runs after setSession so the bucket RLS check (auth.uid()
+  // matches folder prefix) passes.
+  const [nitroxFile, setNitroxFile] = useState<File | null>(null)
+  const [nitroxFileErr, setNitroxFileErr] = useState<string | null>(null)
+  const hasNitroxCardOnFile = !!profile?.nitrox_card_path
+  // Hard block: nitrox=true but neither an existing card nor a freshly
+  // picked file → can't proceed past step 2.
+  const nitroxBlocked = nitroxCertified && !hasNitroxCardOnFile && !nitroxFile
   const [emergencyName, setEmergencyName]   = useState(profile?.emergency_contact_name  ?? '')
   const [emergencyPhone, setEmergencyPhone] = useState(profile?.emergency_contact_phone ?? '')
 
@@ -264,6 +276,21 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   async function submit() {
     setSaving(true); setErr('')
 
+    // Authed callers can upload to storage immediately — RLS lets them
+    // write under their own folder. The new path goes into the profile
+    // patch the edge function applies. Guests can't upload yet (no
+    // session), so we defer their upload to after setSession (below).
+    let nitroxCardPath: string | null | undefined = undefined
+    if (nitroxCertified && nitroxFile && userId) {
+      try {
+        nitroxCardPath = await uploadNitroxCard(userId, nitroxFile)
+      } catch (e) {
+        setSaving(false)
+        setErr(`Could not upload nitrox card: ${e instanceof Error ? e.message : 'unknown error'}`)
+        return
+      }
+    }
+
     const nullish = (v: string) => v.trim() === '' ? null : v.trim()
     const profilePatch: ProfileUpdate = {
       full_name:               nullish(fullName),
@@ -278,6 +305,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
       cert_level:              nullish(certLevel),
       logged_dives:            Number.isFinite(loggedDives) ? loggedDives : 0,
       nitrox_certified:        nitroxCertified,
+      ...(nitroxCardPath !== undefined ? { nitrox_card_path: nitroxCardPath } : {}),
       emergency_contact_name:  nullish(emergencyName),
       emergency_contact_phone: nullish(emergencyPhone),
     }
@@ -362,6 +390,22 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
     // immediately; authed callers already have a session.
     if (data.session) {
       await supabase.auth.setSession(data.session)
+      // Guests can finally upload now that they have a session. Best-effort:
+      // if it fails the booking still succeeded, so we surface a toast-style
+      // inline error rather than rolling back. The Profile page's gate will
+      // catch it on their next visit.
+      if (nitroxCertified && nitroxFile) {
+        const { data: u } = await supabase.auth.getUser()
+        const newUserId = u?.user?.id
+        if (newUserId) {
+          try {
+            const newPath = await uploadNitroxCard(newUserId, nitroxFile)
+            await supabase.from('profiles').update({ nitrox_card_path: newPath }).eq('id', newUserId)
+          } catch (e) {
+            console.error('nitrox card upload failed after signup:', e)
+          }
+        }
+      }
     }
     // Pass status through so the parent can render a different success
     // toast when the booking landed as 'waitlisted' rather than 'pending'.
@@ -481,6 +525,43 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
                   Nitrox certified
                 </label>
               </div>
+              {nitroxCertified && !hasNitroxCardOnFile && (
+                <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
+                  <p className="text-xs font-semibold text-blue-900">
+                    Upload a photo of your nitrox certification card *
+                  </p>
+                  <p className="text-xs text-blue-950 font-medium">
+                    Required because you marked yourself as nitrox certified. The
+                    photo is stored privately and only visible to FunDivers staff.
+                  </p>
+                  <label className="block cursor-pointer bg-blue-900 hover:bg-blue-950 text-white text-sm font-semibold py-2 px-3 rounded-lg text-center">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      aria-label="Upload nitrox certification card"
+                      className="hidden"
+                      onChange={e => {
+                        const file = e.target.files?.[0] ?? null
+                        e.target.value = ''
+                        setNitroxFileErr(null)
+                        if (file && !file.type.startsWith('image/')) {
+                          setNitroxFileErr('Please choose an image file.')
+                          return
+                        }
+                        setNitroxFile(file)
+                      }}
+                    />
+                    {nitroxFile ? `Replace photo (${nitroxFile.name})` : 'Choose photo'}
+                  </label>
+                  {nitroxFileErr && <p className="text-xs text-red-700">{nitroxFileErr}</p>}
+                </div>
+              )}
+              {nitroxCertified && hasNitroxCardOnFile && (
+                <p className="text-xs text-blue-950 font-medium">
+                  Nitrox card on file. (Update it from your profile if it's
+                  changed.)
+                </p>
+              )}
             </div>
 
             <div className="border-t border-sky-200 pt-3 space-y-3">
@@ -765,6 +846,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
             onClick={() => setStep((step + 1) as Step)}
             disabled={step === 2 && (
               fullName.trim() === '' ||
+              nitroxBlocked ||
               (isGuest && (guestEmail.trim() === '' || guestPassword.length < 8 || !guestAgreedTerms))
             )}
             className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
