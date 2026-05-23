@@ -124,6 +124,10 @@ export function ProfileForm({ user, profile, onSaved }: {
   // NitroxCardSection component pushes path updates up via onPathChange
   // whenever the user uploads / removes a photo.
   const [nitroxCardPath, setNitroxCardPath] = useState<string | null>(profile.nitrox_card_path ?? null)
+  // Same lift-pattern for the main cert card: cert_level set ⇒ a photo
+  // must be on file. Initial value comes from the profile so a diver who
+  // has already uploaded one isn't blocked the moment they open the page.
+  const [certCardPath, setCertCardPath] = useState<string | null>(profile.cert_card_path ?? null)
   // Agency + cert level dropdowns both pull from public.cert_levels (RLS
   // public-read). Each row carries an `organization` ('PADI' | 'BSAC' | …)
   // so we can derive the agency list and filter the level list by the
@@ -149,6 +153,8 @@ export function ProfileForm({ user, profile, onSaved }: {
   const selectedAgency = useWatch({ control, name: 'cert_agency' }) ?? ''
   const nitroxCertifiedWatched = useWatch({ control, name: 'nitrox_certified' }) ?? false
   const nitroxCardMissing = !!nitroxCertifiedWatched && !nitroxCardPath
+  const certLevelWatched = useWatch({ control, name: 'cert_level' }) ?? ''
+  const certCardMissing = certLevelWatched.trim() !== '' && !certCardPath
   // Distinct orgs in the order returned by the rank-sorted query (PADI rows
   // come first because they're the seed; agency rows follow).
   const orgs = useMemo(() => {
@@ -430,7 +436,7 @@ export function ProfileForm({ user, profile, onSaved }: {
         )}
 
         {user && (
-          <CertCardSection userId={user.id} />
+          <CertCardSection userId={user.id} onPathChange={setCertCardPath} />
         )}
 
         <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
@@ -443,6 +449,12 @@ export function ProfileForm({ user, profile, onSaved }: {
           />
         </section>
 
+        {certCardMissing && (
+          <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded p-2">
+            Upload a photo of your highest certification card to save your profile.
+          </p>
+        )}
+
         {nitroxCardMissing && (
           <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded p-2">
             Upload a photo of your nitrox certification card to save your profile.
@@ -451,7 +463,7 @@ export function ProfileForm({ user, profile, onSaved }: {
 
         <button
           type="submit"
-          disabled={isSubmitting || nitroxCardMissing || (!isDirty && !dirtyExtras)}
+          disabled={isSubmitting || certCardMissing || nitroxCardMissing || (!isDirty && !dirtyExtras)}
           className="w-full bg-emerald-400 hover:bg-emerald-300 text-blue-950 font-semibold py-2 rounded-lg transition-colors disabled:opacity-50"
         >
           {isSubmitting ? 'Saving…' : 'Save changes'}
@@ -529,7 +541,13 @@ export function NotificationsToggle() {
   )
 }
 
-export function CertCardSection({ userId }: { userId: string }) {
+export function CertCardSection({ userId, onPathChange }: {
+  userId: string
+  /** Optional callback that fires whenever the stored path changes
+   *  (load, upload, remove). ProfileForm uses it to gate the Save button
+   *  on cert_level ⇒ photo present. */
+  onPathChange?: (path: string | null) => void
+}) {
   const [path, setPath] = useState<string | null>(null)
   const [signedUrl, setSignedUrl] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -547,9 +565,13 @@ export function CertCardSection({ userId }: { userId: string }) {
       if (cancelled) return
       const p = data?.cert_card_path ?? null
       setPath(p)
+      onPathChange?.(p)
       setSignedUrl(p ? await getCertCardSignedUrl(p) : null)
     })()
     return () => { cancelled = true }
+  // onPathChange intentionally excluded — parent passes a fresh setter
+  // each render; including it would re-fetch on every parent update.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
 
   async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -570,6 +592,7 @@ export function CertCardSection({ userId }: { userId: string }) {
       }
       await supabase.from('profiles').update({ cert_card_path: newPath }).eq('id', userId)
       setPath(newPath)
+      onPathChange?.(newPath)
       setSignedUrl(await getCertCardSignedUrl(newPath))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed.')
@@ -586,6 +609,7 @@ export function CertCardSection({ userId }: { userId: string }) {
       await deleteCertCard(path)
       await supabase.from('profiles').update({ cert_card_path: null }).eq('id', userId)
       setPath(null)
+      onPathChange?.(null)
       setSignedUrl(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Remove failed.')

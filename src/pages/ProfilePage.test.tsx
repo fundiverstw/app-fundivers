@@ -86,12 +86,15 @@ describe('ProfilePage', () => {
         contact_method: 'email',
         contact_id: 'ada@example.com',
         cert_level: 'Open Water',
+        // cert_level=set + no cert_card_path now blocks Save (new gate).
+        // The test isn't exercising that gate, so seed a card path.
+        cert_card_path: 'u1/existing.jpg',
         logged_dives: 0,
       },
     })
     const eqSpy = vi.fn()
     from.mockImplementation(() => ({
-      ...mockQueryBuilder(),
+      ...mockQueryBuilder({ data: { cert_card_path: 'u1/existing.jpg' } }),
       update: (...a: unknown[]) => {
         update(...a)
         return {
@@ -132,12 +135,13 @@ describe('ProfilePage', () => {
         contact_method: 'email',
         contact_id: 'ada@example.com',
         cert_level: 'Open Water',
+        cert_card_path: 'u1/existing.jpg',
         logged_dives: 0,
         gear_owned: [],
       },
     })
     from.mockImplementation(() => ({
-      ...mockQueryBuilder(),
+      ...mockQueryBuilder({ data: { cert_card_path: 'u1/existing.jpg' } }),
       update: (...a: unknown[]) => { update(...a); return mockQueryBuilder() },
     }))
 
@@ -165,13 +169,14 @@ describe('ProfilePage', () => {
         contact_method: 'email',
         contact_id: 'ada@example.com',
         cert_level: 'Open Water',
+        cert_card_path: 'u1/existing.jpg',
         logged_dives: 0,
         gear_owned: ['BCD', 'Fins'],
         shoe_size: 'EU 41 M',
       },
     })
     from.mockImplementation(() => ({
-      ...mockQueryBuilder(),
+      ...mockQueryBuilder({ data: { cert_card_path: 'u1/existing.jpg' } }),
       update: (...a: unknown[]) => { update(...a); return mockQueryBuilder() },
     }))
 
@@ -238,6 +243,33 @@ describe('ProfilePage', () => {
     await user.click(removeBtn)
 
     await waitFor(() => expect(deleteCertCard).toHaveBeenCalledWith('u1/existing.jpg'))
+  })
+
+  it('disables Save when cert_level is set but no cert card is on file', async () => {
+    useAuthMock.mockReturnValue({
+      user: { id: 'u1' },
+      profile: {
+        id: 'u1',
+        full_name: 'Ada',
+        display_name: 'Ada',
+        date_of_birth: '1815-12-10',
+        contact_method: 'email',
+        contact_id: 'ada@example.com',
+        cert_level: 'Open Water',
+        cert_card_path: null,
+        logged_dives: 0,
+      },
+    })
+    // CertCardSection's load also resolves cert_card_path=null, so the
+    // missing-card banner appears and Save stays disabled until a photo
+    // is uploaded via the section.
+    from.mockReturnValue(mockQueryBuilder({ data: { cert_card_path: null } }))
+
+    renderWithRouter(<ProfilePage />)
+    await waitFor(() => {
+      expect(screen.getByText(/upload a photo of your highest certification card/i)).toBeInTheDocument()
+    })
+    expect(screen.getByRole('button', { name: /save changes/i })).toBeDisabled()
   })
 
   it('does not render the form (and thus cannot submit) when there is no authenticated user', () => {
