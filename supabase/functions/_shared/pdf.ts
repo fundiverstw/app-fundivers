@@ -7,7 +7,7 @@
 
 import { jsPDF } from "npm:jspdf@2.5.1"
 import { Buffer } from "node:buffer"
-import { paymentInstructionsFor } from "./payment-instructions.ts"
+import { paymentInstructionsFor, paymentConfirmationReminder } from "./payment-instructions.ts"
 
 // Bundled alongside this file in the edge function deploy.
 const LOGO_PATH = new URL("./fd_logo.png", import.meta.url)
@@ -290,6 +290,24 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
         doc.text(w, ML + 2, y)
         y += 4.5
       }
+    }
+  }
+
+  // "After you pay" reminder — tells the diver to ping the shop and watch
+  // the app for status updates. Same copy as the registration form so the
+  // PDF doesn't drift.
+  const reminder = paymentConfirmationReminder()
+  y += 6
+  y = section(doc, y, reminder.title)
+  doc.setFontSize(8.5)
+  doc.setFont("helvetica", "normal")
+  doc.setTextColor(...C.dark)
+  for (const line of reminder.lines) {
+    const wrapped = doc.splitTextToSize(line, MR - ML - 2)
+    for (const w of wrapped) {
+      y = ensureY(doc, y, 6)
+      doc.text(w, ML + 2, y)
+      y += 4.5
     }
   }
 
