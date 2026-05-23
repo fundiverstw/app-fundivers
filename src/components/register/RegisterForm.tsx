@@ -5,6 +5,7 @@ import { formatEventSpan, eventIsFull } from '../../lib/events'
 import { computeEffectiveFullPaymentDeadline } from '../../lib/payment-deadlines'
 import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/payment-instructions'
 import { GEAR_ITEMS } from '../../lib/gear'
+import { uploadCertCard } from '../../lib/cert-card'
 import { uploadNitroxCard } from '../../lib/nitrox-card'
 import type { AppEvent, Booking, BookingDetails, CancellationPolicy, Database, EOAddon, EORoom, Profile } from '../../types/database'
 
@@ -195,6 +196,13 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   // Hard block: nitrox=true but neither an existing card nor a freshly
   // picked file → can't proceed past step 2.
   const nitroxBlocked = nitroxCertified && !hasNitroxCardOnFile && !nitroxFile
+  // Same pattern for the main cert card: cert_level set ⇒ photo required.
+  // The card stays optional for divers who haven't picked a level (they
+  // can still register, e.g. for an entry-level course).
+  const [certFile, setCertFile] = useState<File | null>(null)
+  const [certFileErr, setCertFileErr] = useState<string | null>(null)
+  const hasCertCardOnFile = !!profile?.cert_card_path
+  const certBlocked = certLevel.trim() !== '' && !hasCertCardOnFile && !certFile
   const [emergencyName, setEmergencyName]   = useState(profile?.emergency_contact_name  ?? '')
   const [emergencyPhone, setEmergencyPhone] = useState(profile?.emergency_contact_phone ?? '')
 
@@ -290,6 +298,16 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
         return
       }
     }
+    let certCardPath: string | null | undefined = undefined
+    if (certFile && userId) {
+      try {
+        certCardPath = await uploadCertCard(userId, certFile)
+      } catch (e) {
+        setSaving(false)
+        setErr(`Could not upload certification card: ${e instanceof Error ? e.message : 'unknown error'}`)
+        return
+      }
+    }
 
     const nullish = (v: string) => v.trim() === '' ? null : v.trim()
     const profilePatch: ProfileUpdate = {
@@ -306,6 +324,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
       logged_dives:            Number.isFinite(loggedDives) ? loggedDives : 0,
       nitrox_certified:        nitroxCertified,
       ...(nitroxCardPath !== undefined ? { nitrox_card_path: nitroxCardPath } : {}),
+      ...(certCardPath !== undefined ? { cert_card_path: certCardPath } : {}),
       emergency_contact_name:  nullish(emergencyName),
       emergency_contact_phone: nullish(emergencyPhone),
     }
@@ -391,18 +410,31 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
     if (data.session) {
       await supabase.auth.setSession(data.session)
       // Guests can finally upload now that they have a session. Best-effort:
-      // if it fails the booking still succeeded, so we surface a toast-style
-      // inline error rather than rolling back. The Profile page's gate will
-      // catch it on their next visit.
-      if (nitroxCertified && nitroxFile) {
+      // if it fails the booking still succeeded, so we surface a console
+      // error rather than rolling back — the Profile page's gate catches
+      // it on their next visit. getUser() is only called when there's
+      // actually something to upload so test mocks that don't stub it
+      // aren't dragged into this branch.
+      const needGuestUpload = (nitroxCertified && nitroxFile) || certFile
+      if (needGuestUpload) {
         const { data: u } = await supabase.auth.getUser()
         const newUserId = u?.user?.id
         if (newUserId) {
-          try {
-            const newPath = await uploadNitroxCard(newUserId, nitroxFile)
-            await supabase.from('profiles').update({ nitrox_card_path: newPath }).eq('id', newUserId)
-          } catch (e) {
-            console.error('nitrox card upload failed after signup:', e)
+          if (nitroxCertified && nitroxFile) {
+            try {
+              const newPath = await uploadNitroxCard(newUserId, nitroxFile)
+              await supabase.from('profiles').update({ nitrox_card_path: newPath }).eq('id', newUserId)
+            } catch (e) {
+              console.error('nitrox card upload failed after signup:', e)
+            }
+          }
+          if (certFile) {
+            try {
+              const newPath = await uploadCertCard(newUserId, certFile)
+              await supabase.from('profiles').update({ cert_card_path: newPath }).eq('id', newUserId)
+            } catch (e) {
+              console.error('cert card upload failed after signup:', e)
+            }
           }
         }
       }
@@ -514,6 +546,43 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
                 <TextField label="Cert agency" placeholder="PADI, SSI…" value={certAgency} onChange={setCertAgency} />
                 <TextField label="Cert level" placeholder="OW, AOW…" value={certLevel} onChange={setCertLevel} />
               </div>
+              {certLevel.trim() !== '' && !hasCertCardOnFile && (
+                <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
+                  <p className="text-xs font-semibold text-blue-900">
+                    Upload a photo of your highest certification card *
+                  </p>
+                  <p className="text-xs text-blue-950 font-medium">
+                    Required because you've filled in a cert level. The photo is
+                    stored privately and only visible to FunDivers staff.
+                  </p>
+                  <label className="block cursor-pointer bg-blue-900 hover:bg-blue-950 text-white text-sm font-semibold py-2 px-3 rounded-lg text-center">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      aria-label="Upload highest certification card"
+                      className="hidden"
+                      onChange={e => {
+                        const file = e.target.files?.[0] ?? null
+                        e.target.value = ''
+                        setCertFileErr(null)
+                        if (file && !file.type.startsWith('image/')) {
+                          setCertFileErr('Please choose an image file.')
+                          return
+                        }
+                        setCertFile(file)
+                      }}
+                    />
+                    {certFile ? `Replace photo (${certFile.name})` : 'Choose photo'}
+                  </label>
+                  {certFileErr && <p className="text-xs text-red-700">{certFileErr}</p>}
+                </div>
+              )}
+              {certLevel.trim() !== '' && hasCertCardOnFile && (
+                <p className="text-xs text-blue-950 font-medium">
+                  Certification card on file. (Update it from your profile if
+                  it's changed.)
+                </p>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <TextField
                   label="Logged dives" type="number" min={0}
@@ -846,6 +915,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
             onClick={() => setStep((step + 1) as Step)}
             disabled={step === 2 && (
               fullName.trim() === '' ||
+              certBlocked ||
               nitroxBlocked ||
               (isGuest && (guestEmail.trim() === '' || guestPassword.length < 8 || !guestAgreedTerms))
             )}
