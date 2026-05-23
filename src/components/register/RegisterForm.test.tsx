@@ -59,7 +59,7 @@ const sampleProfile: Profile = {
   date_of_birth: null, nationality: null, id_number: null,
   emergency_contact_name: null, emergency_contact_phone: null,
   cert_agency: 'PADI', cert_level: 'Advanced Open Water',
-  cert_number: null, cert_date: null, medical_notes: null,
+  cert_number: null, cert_date: null, nitrox_card_path: null, medical_notes: null,
   avatar_url: null, role: 'diver',
   height_cm: 170, weight_kg: 65, shoe_size: 'EU 40',
   gender: 'female', contact_method: 'line', contact_id: 'ada-line',
@@ -309,6 +309,43 @@ describe('RegisterForm', () => {
     const next = screen.getByRole('button', { name: /next/i })
     expect(next).toBeDisabled()
     await user.type(screen.getByLabelText(/full name/i), 'Grace Hopper')
+    expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
+  })
+
+  it('step 2 Next is blocked when nitrox is checked but no card is on file and no new photo is picked', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    // Profile without a nitrox card path — represents a fresh diver who's
+    // never uploaded one.
+    const noCardProfile: Profile = { ...sampleProfile, nitrox_certified: false, nitrox_card_path: null }
+    render(
+      <RegisterForm event={sampleEvent} profile={noCardProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    // Name is pre-filled — Next would be enabled if not for the nitrox gate.
+    expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
+
+    // Tick nitrox certified → upload prompt appears, Next becomes disabled.
+    await user.click(screen.getByLabelText(/nitrox certified/i))
+    expect(screen.getByText(/upload a photo of your nitrox certification card/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+
+    // Untick → gate releases.
+    await user.click(screen.getByLabelText(/nitrox certified/i))
+    expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
+  })
+
+  it('step 2 Next is allowed when nitrox is checked AND a card is already on file', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    const withCardProfile: Profile = { ...sampleProfile, nitrox_certified: true, nitrox_card_path: 'u1/card_123.jpg' }
+    render(
+      <RegisterForm event={sampleEvent} profile={withCardProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    expect(screen.getByText(/nitrox card on file/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
   })
 
