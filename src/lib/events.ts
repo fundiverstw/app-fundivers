@@ -258,15 +258,21 @@ const COURSE_COLS = '_id, admin_title, display_title, calendar_title, start_date
 
 /**
  * Fetch dives + courses whose start_date falls within [fromDate, toDate]
- * (inclusive, 'YYYY-MM-DD'). Events with `cancelled_at` set are hidden —
- * admin soft-cancellations vanish from the calendar / listing surfaces.
- * Use `fetchEventsForBookings` when bookings against cancelled events
- * still need to resolve their event details.
+ * (inclusive, 'YYYY-MM-DD'). Courses also match when their `special_date`
+ * lands inside the window — the calendar emits a separate pill for that
+ * day, and a course with start_date outside the window but special_date
+ * inside it still needs to render so the staff-busy overlay can flag
+ * conflicts on the special day. Events with `cancelled_at` set are
+ * hidden — admin soft-cancellations vanish from the calendar / listing
+ * surfaces. Use `fetchEventsForBookings` when bookings against cancelled
+ * events still need to resolve their event details.
  */
 export async function fetchEventsInRange(fromDate: string, toDate: string): Promise<AppEvent[]> {
   const [divesResp, coursesResp] = await Promise.all([
     supabase.from('EO_dives').select(DIVE_COLS).is('cancelled_at', null).gte('start_date', fromDate).lte('start_date', toDate).order('start_date'),
-    supabase.from('EO_courses').select(COURSE_COLS).is('cancelled_at', null).gte('start_date', fromDate).lte('start_date', toDate).order('start_date'),
+    supabase.from('EO_courses').select(COURSE_COLS).is('cancelled_at', null)
+      .or(`and(start_date.gte.${fromDate},start_date.lte.${toDate}),and(special_date.gte.${fromDate},special_date.lte.${toDate})`)
+      .order('start_date'),
   ])
 
   const dives = (divesResp.data ?? []) as EODive[]

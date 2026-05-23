@@ -34,7 +34,15 @@ help:
 start:      ; @npm run db:start
 stop:       ; @npm run db:stop
 status:     ; @npm run db:status
-reset:      ; @npm run db:reset
+reset:
+	@# The CLI's post-reset "Restarting containers..." step often returns 502
+	@# while migrations + seeds did apply cleanly — Kong/PostgREST are still
+	@# pointing at the pre-reset DB. Restart them unconditionally so the
+	@# stack is usable on the next command, then propagate the CLI's exit
+	@# code so genuine migration failures still surface.
+	@npm run db:reset; status=$$?; \
+	  docker restart supabase_rest_app-fundivers supabase_kong_app-fundivers >/dev/null 2>&1 || true; \
+	  exit $$status
 diff:       ; @npm run db:diff
 link:       ; @npm run db:link
 pull:       ; @npm run db:pull
