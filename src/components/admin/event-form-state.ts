@@ -22,6 +22,12 @@ export interface FormState {
   req_dives: string      // dives store bigint, courses store text — keep as string here
   dive_days: string      // bigint or empty
   addonIds: string[]     // FK multi → Other_Addons
+  // Wix media references — paste from the Wix Media Manager (URI looks
+  // like `wix:image://v1/<id>/<filename>#originWidth=…&originHeight=…`).
+  // The Wix site reads these directly for hero / gallery rendering; the
+  // SPA only stores and round-trips the text.
+  featured_image: string // EO_dives + EO_courses
+  second_image: string   // EO_dives only — left empty for courses
   // dive
   notes: string          // dive-only NOT NULL
   featured: boolean
@@ -54,6 +60,7 @@ export const EMPTY_FORM: FormState = {
   prereq_cert_id: '',
   req_dives: '', dive_days: '',
   addonIds: [],
+  featured_image: '', second_image: '',
   notes: '', featured: false, fully_booked: false,
   has_rooms: false, roomIds: [],
   nitrox_required: false, gear_rental: '',
@@ -131,6 +138,8 @@ export function formStateFromDive(d: EODive): FormState {
     destinationIds: parseAddonIds(d.destination_reference),
     divetravel_reference: d.DiveTravel_reference ?? '',
     full_payment_deadline: d.full_payment_deadline ?? '',
+    featured_image: d.featured_image ?? '',
+    second_image: d.second_image ?? '',
     special_date: '', course_name: '',
     included: '', schedule: '',
   }
@@ -159,6 +168,8 @@ export function formStateFromCourse(c: EOCourse): FormState {
     full_payment_deadline: c.full_payment_deadline ?? '',
     cancel_date: c.cancel_date ?? '',
     cancel_policy: c.cancel_policy ?? '',
+    featured_image: c.featured_image ?? '',
+    second_image: '',
     notes: '', featured: false, fully_booked: false,
     has_rooms: false, roomIds: [],
     nitrox_required: false, gear_rental: '',
@@ -200,6 +211,8 @@ export function divePayloadFromForm(form: FormState): Record<string, unknown> {
     destination_reference: form.destinationIds.length ? JSON.stringify(form.destinationIds) : null,
     DiveTravel_reference: form.divetravel_reference || null,
     full_payment_deadline: form.full_payment_deadline || null,
+    featured_image: form.featured_image.trim() || null,
+    second_image: form.second_image.trim() || null,
   }
 }
 
@@ -229,5 +242,6 @@ export function coursePayloadFromForm(form: FormState): Record<string, unknown> 
     full_payment_deadline: form.full_payment_deadline || null,
     cancel_date: form.cancel_date || null,
     cancel_policy: form.cancel_policy || null,
+    featured_image: form.featured_image.trim() || null,
   }
 }

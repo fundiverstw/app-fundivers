@@ -485,6 +485,16 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
             <Field label="Gear rental info">
               <Input value={form.gear_rental} onChange={v => set('gear_rental', v)} />
             </Field>
+            <WixImageField
+              label="Featured image (Wix URI)"
+              value={form.featured_image}
+              onChange={v => set('featured_image', v)}
+            />
+            <WixImageField
+              label="Second image (Wix URI)"
+              value={form.second_image}
+              onChange={v => set('second_image', v)}
+            />
             <div className="space-y-1">
               <span className="text-xs font-medium text-white/80">Destinations</span>
               {destinations.length === 0 ? (
@@ -630,6 +640,11 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
           <Field label="Schedule">
             <Textarea value={form.schedule} onChange={v => set('schedule', v)} />
           </Field>
+          <WixImageField
+            label="Featured image (Wix URI)"
+            value={form.featured_image}
+            onChange={v => set('featured_image', v)}
+          />
         </Section>
       )}
 
@@ -771,6 +786,35 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
     <label className="block space-y-1">
       <span className="text-xs font-medium text-white/80">{label}</span>
       {children}
+    </label>
+  )
+}
+
+// Wix media references look like
+//   wix:image://v1/<id>/<filename>#originWidth=…&originHeight=…
+// Wix Velo reads them directly for hero / gallery rendering. We don't
+// resolve or validate beyond a soft prefix hint — admins paste in
+// whatever the Wix Media Manager hands them.
+function WixImageField({
+  label, value, onChange,
+}: { label: string; value: string; onChange: (v: string) => void }) {
+  const trimmed = value.trim()
+  const looksRight = trimmed === '' || trimmed.startsWith('wix:image://')
+  return (
+    <label className="block space-y-1">
+      <span className="text-xs font-medium text-white/80">{label}</span>
+      <input
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder="wix:image://v1/…/…jpg#originWidth=…&originHeight=…"
+        className={INPUT_CLASS}
+      />
+      {!looksRight && (
+        <span className="block text-[11px] text-amber-300">
+          Expected a Wix media URI starting with <code>wix:image://</code>. Save anyway if you've pasted a different format on purpose.
+        </span>
+      )}
     </label>
   )
 }
