@@ -6,18 +6,21 @@ import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
 import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
 import { fetchAmendmentsForBookings, amendmentsDelta } from '../../lib/booking-amendments'
-import { recordPayment } from '../../lib/booking-payments'
+import { recordPayment, voidPayment } from '../../lib/booking-payments'
 import { BookingPaymentsBlock } from '../../components/admin/BookingPaymentsBlock'
 import { getCertCardSignedUrl } from '../../lib/cert-card'
 import { shoeAsJp } from '../../lib/shoe-size'
-import type { AppEvent, Booking, BookingAmendment, Payment, Profile } from '../../types/database'
+import { fetchCreditsForUser, openCreditBalance, createCredit, settleCredit, reopenCredit } from '../../lib/credits'
+import type { AppEvent, Booking, BookingAmendment, Credit, Payment, Profile } from '../../types/database'
 
 interface UserExtras {
   bookings: Array<Booking & { event: AppEvent | null }>
   payments: Payment[]
   amendments: Map<string, BookingAmendment[]>
+  credits: Credit[]
   paidSum: number
   pendingSum: number
+  openCreditBalance: number
 }
 
 export function AdminUsersPage() {
@@ -47,9 +50,10 @@ export function AdminUsersPage() {
     if (extrasCache.has(userId)) return
 
     setExtrasLoading(userId)
-    const [bookingsRes, paymentsRes] = await Promise.all([
+    const [bookingsRes, paymentsRes, credits] = await Promise.all([
       supabase.from('bookings').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
       supabase.from('payments').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+      fetchCreditsForUser(userId),
     ])
     const bookings = bookingsRes.data ?? []
     const payments = (paymentsRes.data ?? []) as Payment[]
@@ -72,7 +76,15 @@ export function AdminUsersPage() {
 
     setExtrasCache(prev => {
       const next = new Map(prev)
-      next.set(userId, { bookings: hydrated, payments, amendments, paidSum, pendingSum })
+      next.set(userId, {
+        bookings: hydrated,
+        payments,
+        amendments,
+        credits,
+        paidSum,
+        pendingSum,
+        openCreditBalance: openCreditBalance(credits),
+      })
       return next
     })
     setExtrasLoading(null)
@@ -108,12 +120,125 @@ export function AdminUsersPage() {
           payments: updatedPayments,
           paidSum: updatedPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0),
           pendingSum: updatedPayments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0),
+          openCreditBalance: cur.openCreditBalance,
         })
         return next
       })
       toast.success(promoted ? 'Payment recorded · status set to confirmed' : 'Payment recorded')
     } catch (err) {
       toast.error(`Could not record payment: ${errorMessage(err)}`)
+      throw err
+    }
+  }
+
+  async function handleCreateCredit(userId: string, amount: number, reason: string, bookingId: string | null) {
+    if (!profile?.id) return
+    try {
+      const credit = await createCredit({
+        user_id: userId,
+        amount,
+        reason,
+        booking_id: bookingId,
+        created_by: profile.id,
+      })
+      setExtrasCache(prev => {
+        const next = new Map(prev)
+        const cur = next.get(userId)
+        if (!cur) return prev
+        const updatedCredits = [credit, ...cur.credits]
+        next.set(userId, {
+          ...cur,
+          credits: updatedCredits,
+          openCreditBalance: openCreditBalance(updatedCredits),
+        })
+        return next
+      })
+      toast.success(`Credit of ${amount.toLocaleString()} issued`)
+    } catch (err) {
+      toast.error(`Could not issue credit: ${errorMessage(err)}`)
+      throw err
+    }
+  }
+
+  async function handleSettleCredit(userId: string, creditId: string, note: string) {
+    try {
+      const credit = await settleCredit({ creditId, note })
+      setExtrasCache(prev => {
+        const next = new Map(prev)
+        const cur = next.get(userId)
+        if (!cur) return prev
+        const updatedCredits = cur.credits.map(c => c.id === credit.id ? credit : c)
+        next.set(userId, {
+          ...cur,
+          credits: updatedCredits,
+          openCreditBalance: openCreditBalance(updatedCredits),
+        })
+        return next
+      })
+      toast.success('Credit settled')
+    } catch (err) {
+      toast.error(`Could not settle credit: ${errorMessage(err)}`)
+      throw err
+    }
+  }
+
+  async function handleReopenCredit(userId: string, creditId: string) {
+    try {
+      const credit = await reopenCredit(creditId)
+      setExtrasCache(prev => {
+        const next = new Map(prev)
+        const cur = next.get(userId)
+        if (!cur) return prev
+        const updatedCredits = cur.credits.map(c => c.id === credit.id ? credit : c)
+        next.set(userId, {
+          ...cur,
+          credits: updatedCredits,
+          openCreditBalance: openCreditBalance(updatedCredits),
+        })
+        return next
+      })
+      toast.success('Credit re-opened')
+    } catch (err) {
+      toast.error(`Could not re-open credit: ${errorMessage(err)}`)
+      throw err
+    }
+  }
+
+  async function handleVoidPayment(userId: string, bookingId: string, paymentId: string) {
+    const extras = extrasCache.get(userId)
+    if (!extras) return
+    const booking = extras.bookings.find(b => b.id === bookingId)
+    if (!booking) return
+
+    const existingForBooking = extras.payments.filter(p => p.booking_id === bookingId)
+    try {
+      const { payment, newStatus } = await voidPayment({
+        booking,
+        existingPayments: existingForBooking,
+        paymentId,
+      })
+      const reverted = newStatus !== booking.status
+      setExtrasCache(prev => {
+        const next = new Map(prev)
+        const cur = next.get(userId)
+        if (!cur) return prev
+        const updatedBookings = cur.bookings.map(b =>
+          b.id === bookingId ? { ...b, status: newStatus } : b
+        )
+        const updatedPayments = cur.payments.map(p => p.id === payment.id ? payment : p)
+        next.set(userId, {
+          ...cur,
+          bookings: updatedBookings,
+          payments: updatedPayments,
+          paidSum: updatedPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0),
+          pendingSum: updatedPayments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0),
+          openCreditBalance: cur.openCreditBalance,
+        })
+        return next
+      })
+      toast.success(reverted ? 'Payment voided · status reverted to pending' : 'Payment voided')
+    } catch (err) {
+      toast.error(`Could not void payment: ${errorMessage(err)}`)
       throw err
     }
   }
@@ -147,6 +272,10 @@ export function AdminUsersPage() {
             loading={extrasLoading === u.id}
             onToggle={() => toggle(u.id)}
             onRecordPayment={(bookingId, amount, note) => handleRecordPayment(u.id, bookingId, amount, note)}
+            onVoidPayment={(bookingId, paymentId) => handleVoidPayment(u.id, bookingId, paymentId)}
+            onCreateCredit={(amount, reason, bookingId) => handleCreateCredit(u.id, amount, reason, bookingId)}
+            onSettleCredit={(creditId, note) => handleSettleCredit(u.id, creditId, note)}
+            onReopenCredit={(creditId) => handleReopenCredit(u.id, creditId)}
             isAdmin={isAdmin}
           />
         ))}
@@ -159,7 +288,7 @@ export function AdminUsersPage() {
 }
 
 function UserCard({
-  user, open, extras, loading, onToggle, onRecordPayment, isAdmin,
+  user, open, extras, loading, onToggle, onRecordPayment, onVoidPayment, onCreateCredit, onSettleCredit, onReopenCredit, isAdmin,
 }: {
   user: Profile
   open: boolean
@@ -167,6 +296,10 @@ function UserCard({
   loading: boolean
   onToggle: () => void
   onRecordPayment: (bookingId: string, amount: number, note: string) => Promise<void>
+  onVoidPayment: (bookingId: string, paymentId: string) => Promise<void>
+  onCreateCredit: (amount: number, reason: string, bookingId: string | null) => Promise<void>
+  onSettleCredit: (creditId: string, note: string) => Promise<void>
+  onReopenCredit: (creditId: string) => Promise<void>
   isAdmin: boolean
 }) {
   return (
@@ -210,6 +343,10 @@ function UserCard({
             <ExtrasBlock
               extras={extras}
               onRecordPayment={onRecordPayment}
+              onVoidPayment={onVoidPayment}
+              onCreateCredit={onCreateCredit}
+              onSettleCredit={onSettleCredit}
+              onReopenCredit={onReopenCredit}
               isAdmin={isAdmin}
             />
           )}
@@ -266,9 +403,13 @@ function ProfileDetails({ user }: { user: Profile }) {
   )
 }
 
-function ExtrasBlock({ extras, onRecordPayment, isAdmin }: {
+function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onCreateCredit, onSettleCredit, onReopenCredit, isAdmin }: {
   extras: UserExtras
   onRecordPayment: (bookingId: string, amount: number, note: string) => Promise<void>
+  onVoidPayment: (bookingId: string, paymentId: string) => Promise<void>
+  onCreateCredit: (amount: number, reason: string, bookingId: string | null) => Promise<void>
+  onSettleCredit: (creditId: string, note: string) => Promise<void>
+  onReopenCredit: (creditId: string) => Promise<void>
   isAdmin: boolean
 }) {
   const activeBookings = extras.bookings.filter(b => b.status !== 'cancelled')
@@ -307,12 +448,25 @@ function ExtrasBlock({ extras, onRecordPayment, isAdmin }: {
                     cancelled={false}
                     readOnly={!isAdmin}
                     onRecord={(amount, note) => onRecordPayment(b.id, amount, note)}
+                    onVoid={(paymentId) => onVoidPayment(b.id, paymentId)}
                   />
                 </div>
               )
             })}
           </div>
         )}
+      </Section>
+
+      <Section title="Account credits">
+        <CreditsPanel
+          credits={extras.credits}
+          openBalance={extras.openCreditBalance}
+          bookings={extras.bookings}
+          readOnly={!isAdmin}
+          onCreate={onCreateCredit}
+          onSettle={onSettleCredit}
+          onReopen={onReopenCredit}
+        />
       </Section>
 
       <Section title="Totals across all bookings">
@@ -326,7 +480,191 @@ function ExtrasBlock({ extras, onRecordPayment, isAdmin }: {
             <span className="text-red-600">{extras.pendingSum.toLocaleString()}</span>
           </div>
         )}
+        {extras.openCreditBalance > 0 && (
+          <div className="flex justify-between text-xs">
+            <span className="text-blue-900 font-medium">Open credit (owed to diver)</span>
+            <span className="text-emerald-700 font-semibold">{extras.openCreditBalance.toLocaleString()}</span>
+          </div>
+        )}
       </Section>
+    </div>
+  )
+}
+
+function CreditsPanel({ credits, openBalance, bookings, readOnly, onCreate, onSettle, onReopen }: {
+  credits: Credit[]
+  openBalance: number
+  bookings: Array<Booking & { event: AppEvent | null }>
+  readOnly: boolean
+  onCreate: (amount: number, reason: string, bookingId: string | null) => Promise<void>
+  onSettle: (creditId: string, note: string) => Promise<void>
+  onReopen: (creditId: string) => Promise<void>
+}) {
+  const [showForm, setShowForm] = useState(false)
+  const [amountStr, setAmountStr] = useState('')
+  const [reason, setReason] = useState('')
+  const [linkedBooking, setLinkedBooking] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [settlingId, setSettlingId] = useState<string | null>(null)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    const amount = parseInt(amountStr, 10)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError('Amount must be a positive integer.')
+      return
+    }
+    if (reason.trim().length < 3) {
+      setError('Reason is required.')
+      return
+    }
+    setSubmitting(true)
+    try {
+      await onCreate(amount, reason.trim(), linkedBooking || null)
+      setAmountStr(''); setReason(''); setLinkedBooking(''); setShowForm(false)
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleSettle(c: Credit) {
+    const note = window.prompt(
+      `Settle credit of ${Number(c.amount).toLocaleString()} for "${c.reason}"?\n\nNote (e.g. "Refunded via bank transfer" or "Applied to booking #abc"):`,
+      ''
+    )
+    if (note === null) return
+    setSettlingId(c.id)
+    try { await onSettle(c.id, note.trim()) } finally { setSettlingId(null) }
+  }
+
+  async function handleReopen(c: Credit) {
+    if (!window.confirm(`Re-open this settled credit (${Number(c.amount).toLocaleString()} — "${c.reason}")?`)) return
+    setSettlingId(c.id)
+    try { await onReopen(c.id) } finally { setSettlingId(null) }
+  }
+
+  return (
+    <div className="text-xs space-y-2">
+      <div className="flex justify-between">
+        <span className="text-blue-900 font-medium">Open balance</span>
+        <span className={`font-semibold ${openBalance > 0 ? 'text-emerald-700' : 'text-blue-900'}`}>
+          {openBalance.toLocaleString()}
+        </span>
+      </div>
+
+      {credits.length === 0 ? (
+        <p className="text-blue-950 font-medium italic">No credits on record.</p>
+      ) : (
+        <ul className="space-y-1 pt-1 border-t border-sky-200">
+          {credits.map(c => {
+            const linked = c.booking_id ? bookings.find(b => b.id === c.booking_id) : null
+            return (
+              <li key={c.id} className="flex items-baseline justify-between gap-2">
+                <span className="text-blue-950 font-medium flex-1">
+                  {format(new Date(c.created_at), 'MMM d')} · {c.reason}
+                  {linked?.event && <span className="opacity-70"> (re: {linked.event.title})</span>}
+                  {c.status === 'settled' && c.settled_note && (
+                    <span className="opacity-70"> · settled: {c.settled_note}</span>
+                  )}
+                  {c.status === 'settled' && !c.settled_note && (
+                    <span className="opacity-70"> · settled</span>
+                  )}
+                </span>
+                {!readOnly && c.status === 'open' && (
+                  <button
+                    type="button"
+                    disabled={settlingId === c.id}
+                    onClick={() => handleSettle(c)}
+                    className="shrink-0 text-[10px] text-blue-700 hover:text-blue-900 underline disabled:opacity-50"
+                  >
+                    {settlingId === c.id ? '…' : 'Settle'}
+                  </button>
+                )}
+                {!readOnly && c.status === 'settled' && (
+                  <button
+                    type="button"
+                    disabled={settlingId === c.id}
+                    onClick={() => handleReopen(c)}
+                    className="shrink-0 text-[10px] text-blue-700 hover:text-blue-900 underline disabled:opacity-50"
+                  >
+                    {settlingId === c.id ? '…' : 'Re-open'}
+                  </button>
+                )}
+                <span className={`shrink-0 font-semibold ${c.status === 'settled' ? 'text-blue-950 line-through' : 'text-emerald-700'}`}>
+                  {Number(c.amount).toLocaleString()}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+
+      {!readOnly && (
+        <div className="pt-1 border-t border-sky-200">
+          {!showForm ? (
+            <button
+              type="button"
+              onClick={() => setShowForm(true)}
+              className="text-xs text-blue-700 hover:text-blue-900 underline"
+            >
+              + Issue credit
+            </button>
+          ) : (
+            <form onSubmit={submit} className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <input
+                  type="number" inputMode="numeric" min={1} step={1}
+                  value={amountStr}
+                  onChange={e => setAmountStr(e.target.value)}
+                  placeholder="Amount"
+                  className="w-24 bg-white border border-sky-300 rounded px-2 py-1 text-xs text-blue-900"
+                />
+                <select
+                  value={linkedBooking}
+                  onChange={e => setLinkedBooking(e.target.value)}
+                  className="flex-1 bg-white border border-sky-300 rounded px-2 py-1 text-xs text-blue-900"
+                >
+                  <option value="">— no linked booking —</option>
+                  {bookings.map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.event?.title ?? '(event)'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <input
+                type="text"
+                value={reason}
+                onChange={e => setReason(e.target.value)}
+                placeholder="Reason (e.g. weather-cancelled Kenting May 15)"
+                maxLength={500}
+                className="w-full bg-white border border-sky-300 rounded px-2 py-1 text-xs text-blue-900"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="text-xs bg-blue-900 hover:bg-blue-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded"
+                >
+                  {submitting ? 'Issuing…' : 'Issue credit'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowForm(false); setError(null); setAmountStr(''); setReason(''); setLinkedBooking('') }}
+                  className="text-xs text-blue-700 hover:text-blue-900 underline"
+                >
+                  Cancel
+                </button>
+              </div>
+              {error && <p className="text-red-600">{error}</p>}
+            </form>
+          )}
+        </div>
+      )}
     </div>
   )
 }
