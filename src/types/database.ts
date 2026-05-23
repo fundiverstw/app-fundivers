@@ -310,7 +310,7 @@ export interface Database {
           booking_id: string | null
           amount: number
           currency: string
-          status: 'pending' | 'paid' | 'refunded'
+          status: 'pending' | 'paid' | 'refunded' | 'voided'
           method: string | null
           note: string | null
           recorded_by: string | null
@@ -322,7 +322,7 @@ export interface Database {
           booking_id?: string | null
           amount: number
           currency?: string
-          status?: 'pending' | 'paid' | 'refunded'
+          status?: 'pending' | 'paid' | 'refunded' | 'voided'
           method?: string | null
           note?: string | null
           recorded_by?: string | null
@@ -333,10 +333,51 @@ export interface Database {
           booking_id?: string | null
           amount?: number
           currency?: string
-          status?: 'pending' | 'paid' | 'refunded'
+          status?: 'pending' | 'paid' | 'refunded' | 'voided'
           method?: string | null
           note?: string | null
           recorded_by?: string | null
+        }
+        Relationships: []
+      }
+      credits: {
+        Row: {
+          id: string
+          created_at: string
+          user_id: string
+          booking_id: string | null
+          amount: number
+          currency: string
+          reason: string
+          status: 'open' | 'settled'
+          created_by: string | null
+          settled_at: string | null
+          settled_note: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          user_id: string
+          booking_id?: string | null
+          amount: number
+          currency?: string
+          reason: string
+          status?: 'open' | 'settled'
+          created_by?: string | null
+          settled_at?: string | null
+          settled_note?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          booking_id?: string | null
+          amount?: number
+          currency?: string
+          reason?: string
+          status?: 'open' | 'settled'
+          created_by?: string | null
+          settled_at?: string | null
+          settled_note?: string | null
         }
         Relationships: []
       }
@@ -932,6 +973,9 @@ export type Profile = Database['public']['Tables']['profiles']['Row']
 export type Booking = Database['public']['Tables']['bookings']['Row']
 export type Payment = Database['public']['Tables']['payments']['Row']
 export type BookingAmendment = Database['public']['Tables']['booking_amendments']['Row']
+export type Credit = Database['public']['Tables']['credits']['Row']
+export type CreditInsert = Database['public']['Tables']['credits']['Insert']
+export type CreditUpdate = Database['public']['Tables']['credits']['Update']
 export type BookingAmendmentInsert = Database['public']['Tables']['booking_amendments']['Insert']
 export type EODive = Database['public']['Tables']['EO_dives']['Row']
 export type EOCourse = Database['public']['Tables']['EO_courses']['Row']

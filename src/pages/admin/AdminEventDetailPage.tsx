@@ -12,7 +12,7 @@ import { EventStaffSection } from '../../components/admin/EventStaffSection'
 import { RegisterForm } from '../../components/register/RegisterForm'
 import { shoeAsJp } from '../../lib/shoe-size'
 import { fetchAmendmentsForBookings, addAmendment, formAmount, amendmentsDelta } from '../../lib/booking-amendments'
-import { recordPayment as recordPaymentRow } from '../../lib/booking-payments'
+import { recordPayment as recordPaymentRow, voidPayment as voidPaymentRow } from '../../lib/booking-payments'
 import { requestEventDiverExport } from '../../lib/admin-event-export'
 import { BookingPaymentsBlock } from '../../components/admin/BookingPaymentsBlock'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Payment, Profile } from '../../types/database'
@@ -186,6 +186,29 @@ export function AdminEventDetailPage() {
     }
   }
 
+  async function voidPayment(r: Registrant, paymentId: string) {
+    try {
+      const { payment, newStatus } = await voidPaymentRow({
+        booking: r.booking,
+        existingPayments: r.payments,
+        paymentId,
+      })
+      const reverted = newStatus !== r.booking.status
+      setRegistrants(prev => prev.map(x =>
+        x.booking.id === r.booking.id
+          ? {
+              ...x,
+              payments: x.payments.map(p => p.id === payment.id ? payment : p),
+              booking: { ...x.booking, status: newStatus },
+            }
+          : x
+      ))
+      toast.success(reverted ? 'Payment voided · status reverted to pending' : 'Payment voided')
+    } catch (err) {
+      toast.error(`Could not void payment: ${errorMessage(err)}`)
+    }
+  }
+
   async function setCancelledAt(value: string | null) {
     if (!type || !id) return
     setCancelInFlight(true)
@@ -352,6 +375,7 @@ export function AdminEventDetailPage() {
               onEdit={() => setEditing(r)}
               onAddAmendment={submitAmendment}
               onRecordPayment={(amount, note) => recordPayment(r, amount, note)}
+              onVoidPayment={(paymentId) => voidPayment(r, paymentId)}
               readOnly={!isAdmin}
             />
           ))}
@@ -724,7 +748,7 @@ function NotifyDiversModal({
 
 const BOOKING_STATUSES: Booking['status'][] = ['pending', 'confirmed', 'waitlisted', 'cancelled']
 
-function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRefund, onEdit, onAddAmendment, onRecordPayment, readOnly }: {
+function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRefund, onEdit, onAddAmendment, onRecordPayment, onVoidPayment, readOnly }: {
   r: Registrant
   addonNames: AddonNameMap
   roomNames: RoomNameMap
@@ -733,6 +757,7 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
   onEdit: () => void
   onAddAmendment: (id: string, sign: '+' | '-', amount: number, note: string) => Promise<void>
   onRecordPayment: (amount: number, note: string) => Promise<void>
+  onVoidPayment: (paymentId: string) => Promise<void>
   readOnly?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
@@ -861,6 +886,7 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
             cancelled={r.booking.status === 'cancelled'}
             readOnly={!!readOnly}
             onRecord={onRecordPayment}
+            onVoid={onVoidPayment}
           />
 
           <AmendmentsSection
