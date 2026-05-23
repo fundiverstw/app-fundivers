@@ -32,7 +32,7 @@ interface CourseRow {
 
 function setup(courses: CourseRow[]) {
   const builder: Record<string, unknown> = {}
-  const chain = ['select', 'eq', 'gte', 'lte', 'order', 'in', 'is']
+  const chain = ['select', 'eq', 'gte', 'lte', 'order', 'in', 'is', 'or']
   for (const m of chain) builder[m] = () => builder
   builder.then = (cb?: (r: unknown) => unknown) =>
     Promise.resolve({ data: courses, error: null }).then(cb)
@@ -137,6 +137,45 @@ describe('courseToEvents — Wix special_date branches', () => {
     })
     expect(events).toHaveLength(1)
     expect(events[0].start_time_hhmm).toBeNull()
+  })
+
+  it('fetches courses whose special_date lands in the window even when start_date is outside it', async () => {
+    // The mock builder swallows all chain calls but captures the `.or()`
+    // argument so we can assert the special_date branch is part of the
+    // filter — the staff-busy calendar relies on this to render the
+    // special pill for a course that started before the visible month.
+    const orCalls: string[] = []
+    const courseRows = [{
+      ...baseCourse,
+      start_date: '2026-04-01',
+      end_date: '2026-04-03',
+      special_date: '2026-05-15',
+    }]
+    const courseBuilder: Record<string, unknown> = {}
+    const courseChain = ['select', 'eq', 'gte', 'lte', 'order', 'in', 'is']
+    for (const m of courseChain) courseBuilder[m] = () => courseBuilder
+    courseBuilder.or = (filter: string) => { orCalls.push(filter); return courseBuilder }
+    courseBuilder.then = (cb?: (r: unknown) => unknown) =>
+      Promise.resolve({ data: courseRows, error: null }).then(cb)
+
+    from.mockImplementation((table: string) => {
+      if (table === 'EO_courses') return courseBuilder
+      const empty: Record<string, unknown> = {}
+      for (const m of [...courseChain, 'or']) empty[m] = () => empty
+      empty.then = (cb?: (r: unknown) => unknown) =>
+        Promise.resolve({ data: [], error: null }).then(cb)
+      return empty
+    })
+
+    const { fetchEventsInRange } = await import('./events')
+    const events = await fetchEventsInRange('2026-05-01', '2026-05-31')
+    expect(orCalls).toHaveLength(1)
+    expect(orCalls[0]).toContain('start_date.gte.2026-05-01')
+    expect(orCalls[0]).toContain('special_date.gte.2026-05-01')
+    expect(orCalls[0]).toContain('special_date.lte.2026-05-31')
+    // Course returned by the mock should still produce the special pill.
+    const specialPill = events.find(e => e.start_time.startsWith('2026-05-15'))
+    expect(specialPill).toBeDefined()
   })
 })
 
