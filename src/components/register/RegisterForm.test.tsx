@@ -59,7 +59,9 @@ const sampleProfile: Profile = {
   date_of_birth: null, nationality: null, id_number: null,
   emergency_contact_name: null, emergency_contact_phone: null,
   cert_agency: 'PADI', cert_level: 'Advanced Open Water',
-  cert_number: null, cert_date: null, nitrox_card_path: null, medical_notes: null,
+  cert_number: null, cert_date: null,
+  cert_card_path: 'u1/existing-card.jpg',
+  nitrox_card_path: null, medical_notes: null,
   avatar_url: null, role: 'diver',
   height_cm: 170, weight_kg: 65, shoe_size: 'EU 40',
   gender: 'female', contact_method: 'line', contact_id: 'ada-line',
@@ -309,6 +311,37 @@ describe('RegisterForm', () => {
     const next = screen.getByRole('button', { name: /next/i })
     expect(next).toBeDisabled()
     await user.type(screen.getByLabelText(/full name/i), 'Grace Hopper')
+    expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
+  })
+
+  it('step 2 Next is blocked when a cert level is filled but no cert card is on file', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    const noCardProfile: Profile = { ...sampleProfile, cert_level: 'Open Water', cert_card_path: null }
+    render(
+      <RegisterForm event={sampleEvent} profile={noCardProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    expect(screen.getByText(/upload a photo of your highest certification card/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+
+    // Clearing the cert level releases the gate (no cert ⇒ no photo required).
+    await user.clear(screen.getByLabelText(/cert level/i))
+    expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
+  })
+
+  it('step 2 Next is allowed when a cert level is filled AND a cert card is already on file', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    // sampleProfile already has cert_level + cert_card_path set, so this is
+    // the default-path assertion: gate stays open, "on file" copy shown.
+    render(
+      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    expect(screen.getByText(/certification card on file/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
   })
 
