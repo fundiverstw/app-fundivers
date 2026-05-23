@@ -56,6 +56,19 @@ describe('profiles RLS', () => {
     expect(after.data?.display_name).not.toBe('hacked')
   })
 
+  it('admin can update any diver profile (full edit control)', async () => {
+    const sb = await userClient(adminUser.email, adminUser.password)
+    const ok = await sb.from('profiles').update({
+      display_name: 'Admin-edited',
+      phone: '+886-900-555-555',
+      cert_level: 'Rescue Diver',
+    }).eq('id', diverB.id).select().single()
+    expect(ok.error).toBeNull()
+    expect(ok.data?.display_name).toBe('Admin-edited')
+    expect(ok.data?.phone).toBe('+886-900-555-555')
+    expect(ok.data?.cert_level).toBe('Rescue Diver')
+  })
+
   it('anon sees nothing', async () => {
     const { data } = await anonClient().from('profiles').select('id').limit(1)
     expect(data ?? []).toEqual([])

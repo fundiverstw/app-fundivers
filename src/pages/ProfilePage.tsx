@@ -272,7 +272,7 @@ export function ProfileForm({ user, profile, onSaved }: {
       last_dive_date: strOrNull(data.last_dive_date),
       gear_owned: gearOwned,
       updated_at: new Date().toISOString(),
-    }).eq('id', user.id)
+    }).eq('id', profile.id)
     if (error) {
       toast.error(`Could not save profile: ${error.message}`)
       return
@@ -459,13 +459,11 @@ export function ProfileForm({ user, profile, onSaved }: {
           </label>
         </section>
 
-        {user && nitroxCertifiedWatched && (
-          <NitroxCardSection userId={user.id} onPathChange={setNitroxCardPath} />
+        {nitroxCertifiedWatched && (
+          <NitroxCardSection userId={profile.id} onPathChange={setNitroxCardPath} />
         )}
 
-        {user && (
-          <CertCardSection userId={user.id} onPathChange={setCertCardPath} />
-        )}
+        <CertCardSection userId={profile.id} onPathChange={setCertCardPath} />
 
         <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Medical Notes</h2>
