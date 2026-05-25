@@ -14,6 +14,19 @@ export interface CompressOptions {
 const DEFAULT_MAX_DIM = 1600
 const DEFAULT_QUALITY = 0.82
 
+// iOS Camera defaults to HEIC, which no browser's createImageBitmap can
+// decode. We sniff for it and run heic2any (wasm) first so the canvas
+// path receives a JPEG. Sometimes iOS hands the file over with mime
+// 'application/octet-stream' or empty, so the extension fallback matters.
+const HEIC_MIMES = new Set(['image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence'])
+
+export function isHeicFile(file: { type?: string; name?: string }): boolean {
+  const type = (file.type ?? '').toLowerCase()
+  if (HEIC_MIMES.has(type)) return true
+  const name = (file.name ?? '').toLowerCase()
+  return name.endsWith('.heic') || name.endsWith('.heif')
+}
+
 /**
  * Pure helper: scale (w, h) so the longer side equals `maxDim`, preserving
  * aspect ratio. No-op if the image is already smaller. Rounded to ints so
@@ -34,14 +47,22 @@ export function computeTargetSize(
 /**
  * Compress an image File/Blob into a smaller JPEG blob. Preserves EXIF
  * orientation implicitly because `createImageBitmap` applies it on modern
- * browsers (Chromium, Firefox, Safari 17+).
+ * browsers (Chromium, Firefox, Safari 17+). iPhone HEIC inputs are
+ * transcoded to JPEG via heic2any first.
  */
 export async function compressImage(file: Blob, opts: CompressOptions = {}): Promise<Blob> {
   const maxDim = opts.maxDimension ?? DEFAULT_MAX_DIM
   const quality = opts.quality ?? DEFAULT_QUALITY
   const mime = opts.mimeType ?? 'image/jpeg'
 
-  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' as ImageOrientation })
+  let source: Blob = file
+  if (isHeicFile(file as File)) {
+    const { default: heic2any } = await import('heic2any')
+    const out = await heic2any({ blob: file, toType: 'image/jpeg', quality })
+    source = Array.isArray(out) ? out[0] : out
+  }
+
+  const bitmap = await createImageBitmap(source, { imageOrientation: 'from-image' as ImageOrientation })
   try {
     const { width, height } = computeTargetSize(bitmap.width, bitmap.height, maxDim)
     const canvas = document.createElement('canvas')

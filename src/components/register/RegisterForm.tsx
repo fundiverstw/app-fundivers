@@ -7,6 +7,7 @@ import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/p
 import { GEAR_ITEMS } from '../../lib/gear'
 import { uploadCertCard } from '../../lib/cert-card'
 import { uploadNitroxCard } from '../../lib/nitrox-card'
+import { isHeicFile } from '../../lib/image-compress'
 import type { AppEvent, Booking, BookingDetails, CancellationPolicy, Database, EOAddon, EORoom, Profile } from '../../types/database'
 
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
@@ -558,14 +559,14 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
                   <label className="block cursor-pointer bg-blue-900 hover:bg-blue-950 text-white text-sm font-semibold py-2 px-3 rounded-lg text-center">
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/*,.heic,.heif"
                       aria-label="Upload highest certification card"
                       className="hidden"
                       onChange={e => {
                         const file = e.target.files?.[0] ?? null
                         e.target.value = ''
                         setCertFileErr(null)
-                        if (file && !file.type.startsWith('image/')) {
+                        if (file && !file.type.startsWith('image/') && !isHeicFile(file)) {
                           setCertFileErr('Please choose an image file.')
                           return
                         }
@@ -606,14 +607,14 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
                   <label className="block cursor-pointer bg-blue-900 hover:bg-blue-950 text-white text-sm font-semibold py-2 px-3 rounded-lg text-center">
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/*,.heic,.heif"
                       aria-label="Upload nitrox certification card"
                       className="hidden"
                       onChange={e => {
                         const file = e.target.files?.[0] ?? null
                         e.target.value = ''
                         setNitroxFileErr(null)
-                        if (file && !file.type.startsWith('image/')) {
+                        if (file && !file.type.startsWith('image/') && !isHeicFile(file)) {
                           setNitroxFileErr('Please choose an image file.')
                           return
                         }
