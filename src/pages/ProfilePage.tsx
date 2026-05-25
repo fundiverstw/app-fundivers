@@ -9,6 +9,7 @@ import { pushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPus
 import { GEAR_ITEMS } from '../lib/gear'
 import { uploadCertCard, getCertCardSignedUrl, deleteCertCard } from '../lib/cert-card'
 import { uploadNitroxCard, getNitroxCardSignedUrl, deleteNitroxCard } from '../lib/nitrox-card'
+import { isHeicFile } from '../lib/image-compress'
 import { fetchCreditsForUser, openCreditBalance } from '../lib/credits'
 import { FamilySection } from '../components/profile/FamilySection'
 import type { Profile, CertLevel } from '../types/database'
@@ -604,7 +605,7 @@ export function CertCardSection({ userId, onPathChange }: {
     const file = e.target.files?.[0]
     e.target.value = '' // allow re-picking the same file
     if (!file) return
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith('image/') && !isHeicFile(file)) {
       setError('Please choose an image file.')
       return
     }
@@ -662,7 +663,7 @@ export function CertCardSection({ userId, onPathChange }: {
         <label className="flex-1 cursor-pointer bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 rounded-lg text-center transition-colors">
           <input
             type="file"
-            accept="image/*"
+            accept="image/*,.heic,.heif"
             aria-label="Upload certification card"
             className="hidden"
             disabled={busy}
@@ -722,7 +723,7 @@ export function NitroxCardSection({ userId, onPathChange }: {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith('image/') && !isHeicFile(file)) {
       setError('Please choose an image file.')
       return
     }
@@ -779,7 +780,7 @@ export function NitroxCardSection({ userId, onPathChange }: {
         <label className="flex-1 cursor-pointer bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 rounded-lg text-center transition-colors">
           <input
             type="file"
-            accept="image/*"
+            accept="image/*,.heic,.heif"
             aria-label="Upload nitrox certification card"
             className="hidden"
             disabled={busy}

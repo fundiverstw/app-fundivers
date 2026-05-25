@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeTargetSize } from './image-compress'
+import { computeTargetSize, isHeicFile } from './image-compress'
 
 describe('computeTargetSize', () => {
   it('leaves small images untouched', () => {
@@ -28,5 +28,33 @@ describe('computeTargetSize', () => {
     expect(computeTargetSize(0, 100, 1600)).toEqual({ width: 0, height: 0 })
     expect(computeTargetSize(100, 0, 1600)).toEqual({ width: 0, height: 0 })
     expect(computeTargetSize(-50, 100, 1600)).toEqual({ width: 0, height: 0 })
+  })
+})
+
+describe('isHeicFile', () => {
+  it('matches the HEIC/HEIF mime types', () => {
+    expect(isHeicFile({ type: 'image/heic' })).toBe(true)
+    expect(isHeicFile({ type: 'image/heif' })).toBe(true)
+    expect(isHeicFile({ type: 'image/heic-sequence' })).toBe(true)
+    expect(isHeicFile({ type: 'image/heif-sequence' })).toBe(true)
+  })
+
+  it('is case-insensitive on mime', () => {
+    expect(isHeicFile({ type: 'IMAGE/HEIC' })).toBe(true)
+  })
+
+  it('falls back to extension when iOS sends an empty or generic mime', () => {
+    expect(isHeicFile({ type: '', name: 'IMG_1234.HEIC' })).toBe(true)
+    expect(isHeicFile({ type: 'application/octet-stream', name: 'photo.heif' })).toBe(true)
+  })
+
+  it('rejects regular images', () => {
+    expect(isHeicFile({ type: 'image/jpeg', name: 'photo.jpg' })).toBe(false)
+    expect(isHeicFile({ type: 'image/png', name: 'card.png' })).toBe(false)
+    expect(isHeicFile({ type: 'image/webp', name: 'card.webp' })).toBe(false)
+  })
+
+  it('tolerates missing fields', () => {
+    expect(isHeicFile({})).toBe(false)
   })
 })
