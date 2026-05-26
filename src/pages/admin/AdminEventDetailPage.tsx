@@ -15,6 +15,7 @@ import { fetchAmendmentsForBookings, addAmendment, formAmount, amendmentsDelta }
 import { recordPayment as recordPaymentRow, voidPayment as voidPaymentRow } from '../../lib/booking-payments'
 import { requestEventDiverExport } from '../../lib/admin-event-export'
 import { BookingPaymentsBlock } from '../../components/admin/BookingPaymentsBlock'
+import { ShareEventButton } from '../../components/ShareEventButton'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Payment, Profile } from '../../types/database'
 
 interface Registrant {
@@ -345,6 +346,9 @@ export function AdminEventDetailPage() {
             >
               Gear map →
             </Link>
+            {type && id && (
+              <ShareEventButton event={{ id, type }} className="text-xs bg-sky-700/80 hover:bg-sky-700 text-white px-3 py-1 rounded-lg" />
+            )}
           </div>
           {event && (
             <EventStaffSection

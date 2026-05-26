@@ -8,6 +8,7 @@ import { HomeRedirect } from './components/layout/HomeRedirect'
 import { PendingPage } from './pages/PendingPage'
 import { Logo } from './components/Logo'
 import { ToastProvider } from './components/Toast'
+import { UpdateBannerHost } from './components/install/UpdateBannerHost'
 import { AppShell } from './components/layout/AppShell'
 import { AdminShell } from './components/layout/AdminShell'
 import { LoginPage } from './pages/LoginPage'
@@ -56,6 +57,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <ToastProvider>
+      <UpdateBannerHost />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
