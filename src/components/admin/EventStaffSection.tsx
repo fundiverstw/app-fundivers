@@ -148,31 +148,35 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
             {DUTY_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
         </div>
-        <div className="flex gap-2 items-center text-xs">
-          <label className="text-blue-900 font-medium shrink-0">From</label>
-          <input
-            type="date"
-            value={startDate}
-            min={eventStart}
-            max={eventEnd ?? eventStart}
-            onChange={e => setStartDate(e.target.value)}
-            className="flex-1 min-w-0 bg-white border border-sky-300 rounded px-2 py-1 text-blue-900"
-          />
-          <label className="text-blue-900 font-medium shrink-0">to</label>
-          <input
-            type="date"
-            value={endDate}
-            min={startDate}
-            max={eventEnd ?? eventStart}
-            onChange={e => setEndDate(e.target.value)}
-            placeholder={isMultiDay ? 'end' : '(single day)'}
-            disabled={!isMultiDay}
-            className="flex-1 min-w-0 bg-white border border-sky-300 rounded px-2 py-1 text-blue-900 disabled:text-blue-950 font-medium disabled:bg-white"
-          />
+        <div className="space-y-2 text-xs">
+          <label className="flex items-center gap-2">
+            <span className="text-blue-900 font-medium shrink-0 w-12">{isMultiDay ? 'From' : 'Date'}</span>
+            <input
+              type="date"
+              value={startDate}
+              min={eventStart}
+              max={eventEnd ?? eventStart}
+              onChange={e => setStartDate(e.target.value)}
+              className="flex-1 min-w-0 bg-white border border-sky-300 rounded px-2 py-1 text-blue-900"
+            />
+          </label>
+          {isMultiDay && (
+            <label className="flex items-center gap-2">
+              <span className="text-blue-900 font-medium shrink-0 w-12">To</span>
+              <input
+                type="date"
+                value={endDate}
+                min={startDate}
+                max={eventEnd ?? eventStart}
+                onChange={e => setEndDate(e.target.value)}
+                className="flex-1 min-w-0 bg-white border border-sky-300 rounded px-2 py-1 text-blue-900"
+              />
+            </label>
+          )}
           <button
             onClick={assign}
             disabled={!assigneeId || !startDate || submitting}
-            className="shrink-0 bg-sky-700 hover:bg-sky-600 disabled:bg-sky-100 disabled:text-blue-950 font-medium text-white font-semibold px-3 py-1 rounded"
+            className="w-full bg-sky-700 hover:bg-sky-600 disabled:bg-sky-100 disabled:text-blue-950 font-medium text-white font-semibold px-3 py-1.5 rounded"
           >
             Assign
           </button>
