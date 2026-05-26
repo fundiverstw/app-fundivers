@@ -279,7 +279,7 @@ export function AdminEventDetailPage() {
 
       {type && id && (
         <>
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {isAdmin && (
               <>
                 <button

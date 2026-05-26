@@ -514,13 +514,13 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
               onChange={setNameAlt}
               placeholder="e.g. 陳大文 / 山田太郎 / 김민수"
             />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <TextField label="Date of birth" type="date" value={dob} onChange={setDob} />
               <TextField label="Nationality" value={nationality} onChange={setNationality} />
             </div>
             <TextField label="Passport / ID number" value={idNumber} onChange={setIdNumber} />
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <TextField label="Phone" type="tel" value={phone} onChange={setPhone} />
               <label className="block">
                 <span className="block text-xs text-blue-900 font-medium mb-1">Preferred contact</span>
@@ -543,7 +543,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
 
             <div className="border-t border-sky-200 pt-3 space-y-3">
               <p className="text-xs text-blue-900 font-medium uppercase tracking-wider">Diving</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <TextField label="Cert agency" placeholder="PADI, SSI…" value={certAgency} onChange={setCertAgency} />
                 <TextField label="Cert level" placeholder="OW, AOW…" value={certLevel} onChange={setCertLevel} />
               </div>
@@ -584,13 +584,13 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
                   it's changed.)
                 </p>
               )}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <TextField
                   label="Logged dives" type="number" min={0}
                   value={loggedDives === 0 ? '' : String(loggedDives)}
                   onChange={v => setLoggedDives(Number(v) || 0)}
                 />
-                <label className="flex items-end gap-2 text-sm text-blue-950 font-medium pb-2">
+                <label className="flex items-center sm:items-end gap-2 text-sm text-blue-950 font-medium sm:pb-2">
                   <input type="checkbox" checked={nitroxCertified} onChange={e => setNitroxCertified(e.target.checked)} className="accent-blue-900" />
                   Nitrox certified
                 </label>
@@ -636,7 +636,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
 
             <div className="border-t border-sky-200 pt-3 space-y-3">
               <p className="text-xs text-blue-900 font-medium uppercase tracking-wider">Emergency contact</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <TextField label="Name" value={emergencyName} onChange={setEmergencyName} />
                 <TextField label="Phone" type="tel" value={emergencyPhone} onChange={setEmergencyPhone} />
               </div>

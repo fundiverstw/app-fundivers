@@ -120,6 +120,32 @@ scripts/
    and send the PDF over Gmail SMTP. CORS is `*` here — auth is by
    the call shape (guest = email/password in body, authed = Bearer).
 
+## Responsive layout
+
+Mobile-first, one breakpoint: Tailwind's default `sm:` (640px). Build
+the layout so it works at ~375px wide (iPhone 13/SE), then use `sm:`
+to opt into a wider arrangement on tablets and desktop. No other
+breakpoints — adding `md:`/`lg:`/`xl:` is a code smell unless you
+have a real reason.
+
+Practical rules:
+
+- **Rows with 3+ inputs/buttons need to wrap or stack.** A bare
+  `flex gap-2` with four children will overflow on iPhone. Use
+  `flex flex-wrap` for button bars and
+  `grid grid-cols-1 sm:grid-cols-3` for form-input rows.
+- **No new `@media` CSS.** `src/App.css` has a few legacy hand-written
+  media queries — don't add more. Stay in Tailwind utility classes so
+  the breakpoint stays in one place.
+- **No `useMediaQuery` hook / `window.innerWidth` reads for layout.**
+  The few `window.innerWidth` reads in the codebase are for canvas
+  sizing in minigames, not layout. Branch in CSS, not JS.
+- **Native `<input type="date">` styling varies per OS.** Calendar
+  icon on desktop Chrome, chevron on Android, nothing on iOS. That's
+  the spec — within a single device, just make sure adjacent date
+  inputs render the same as each other (same enabled state, same
+  width). Don't ship a custom date picker without a real reason.
+
 ## Why this shape
 
 - **No custom app server.** PostgREST + RLS covers all CRUD; we avoid
