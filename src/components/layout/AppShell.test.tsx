@@ -15,18 +15,11 @@ vi.mock('../../hooks/usePWAInstall', () => ({
   usePWAInstall: () => usePWAInstallMock(),
 }))
 
-const usePWAUpdateMock = vi.fn()
-vi.mock('../../hooks/usePWAUpdate', () => ({
-  usePWAUpdate: () => usePWAUpdateMock(),
-}))
-
 beforeEach(() => {
   useAuthMock.mockReset()
   signOut.mockReset()
   usePWAInstallMock.mockReset()
   usePWAInstallMock.mockReturnValue({ canInstall: false, install: vi.fn(), isIOSInstallable: false })
-  usePWAUpdateMock.mockReset()
-  usePWAUpdateMock.mockReturnValue({ needRefresh: false, update: vi.fn() })
 })
 
 function routedRender(start = '/calendar') {
@@ -145,28 +138,9 @@ describe('AppShell', () => {
     expect(screen.getByText('Alice')).toBeInTheDocument()
   })
 
-  it('does NOT render the update banner when no SW update is waiting', () => {
-    useAuthMock.mockReturnValue({ profile: null, signOut })
-    routedRender()
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-  })
-
-  it('renders the update banner when needRefresh=true (Android, iOS, desktop alike)', () => {
-    useAuthMock.mockReturnValue({ profile: null, signOut })
-    usePWAUpdateMock.mockReturnValue({ needRefresh: true, update: vi.fn() })
-    routedRender()
-    expect(screen.getByRole('alert')).toHaveTextContent(/new version is available/i)
-  })
-
-  it('clicking Update in the banner calls the update() helper (which posts SKIP_WAITING and reloads)', async () => {
-    useAuthMock.mockReturnValue({ profile: null, signOut })
-    const update = vi.fn()
-    usePWAUpdateMock.mockReturnValue({ needRefresh: true, update })
-    const user = userEvent.setup()
-    routedRender()
-    await user.click(screen.getByRole('button', { name: /^update$/i }))
-    expect(update).toHaveBeenCalledOnce()
-  })
+  // The update banner moved to UpdateBannerHost (mounted at App root so it
+  // shows on every route, not just shelled ones). Behavior is covered by
+  // UpdateBannerHost.test.tsx.
 
   it('renders bottom nav links and the logo home link', () => {
     useAuthMock.mockReturnValue({ profile: null, signOut })

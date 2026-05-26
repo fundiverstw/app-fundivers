@@ -2,9 +2,7 @@ import { useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { usePWAInstall } from '../../hooks/usePWAInstall'
-import { usePWAUpdate } from '../../hooks/usePWAUpdate'
 import { IOSInstallModal } from '../install/IOSInstallModal'
-import { UpdateAvailableBanner } from '../install/UpdateAvailableBanner'
 import { WelcomeModal } from '../welcome/WelcomeModal'
 import { Logo } from '../Logo'
 import { CalendarIcon } from '../icons/CalendarIcon'
@@ -56,7 +54,6 @@ export function AppShell() {
   const { user, profile, signOut } = useAuth()
   const navigate = useNavigate()
   const { canInstall, install, isIOSInstallable } = usePWAInstall()
-  const { needRefresh, update } = usePWAUpdate()
   const [showIOSInstall, setShowIOSInstall] = useState(false)
   // Local override so the modal hides immediately on dismiss; the
   // server-side welcomed_at update propagates a moment later.
@@ -136,8 +133,6 @@ export function AppShell() {
           </button>
         </div>
       </header>
-
-      {needRefresh && <UpdateAvailableBanner onUpdate={update} />}
 
       <main className="flex-1 overflow-y-auto p-4 pb-24">
         <Outlet />

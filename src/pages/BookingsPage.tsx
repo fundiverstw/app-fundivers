@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
 import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
 import { fetchAmendmentsForBookings, amendmentsDelta } from '../lib/booking-amendments'
+import { ShareEventButton } from '../components/ShareEventButton'
 import type { AppEvent, Booking, BookingAmendment, Payment, WaitlistOffer } from '../types/database'
 import {
   CARD, BTN_GHOST, BTN_DANGER, TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR, PAGE_BODY,
@@ -330,7 +331,7 @@ function Card({
             Booked {format(new Date(row.created_at), 'MMM d, yyyy')}
           </p>
 
-          <div className="flex gap-2 pt-1">
+          <div className="flex flex-wrap gap-2 pt-1">
             {canCancel && (
               <button onClick={() => onCancel(row.id)} className={`flex-1 ${BTN_DANGER} text-xs py-2 px-3`}>
                 Cancel booking
@@ -340,6 +341,12 @@ function Card({
               <button onClick={() => onRefund(row.id)} className={`flex-1 ${BTN_GHOST} text-xs py-2 px-3`}>
                 Request refund
               </button>
+            )}
+            {row.event && (
+              <ShareEventButton
+                event={row.event}
+                className="flex-1 text-xs py-2 px-3 rounded-lg bg-sky-700 hover:bg-sky-800 text-white font-medium"
+              />
             )}
           </div>
         </div>
