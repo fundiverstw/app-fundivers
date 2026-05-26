@@ -48,7 +48,7 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked, existi
 }
 
 const GEAR_ALACARTE_PRICES: Record<string, number> = {
-  BCD: 450, Regulator: 500, Wetsuit: 200, Fins: 100, Mask: 100, Boots: 100, 'Dive computer': 300,
+  BCD: 450, Regulator: 500, Wetsuit: 200, Fins: 150, Mask: 100, Boots: 100, 'Dive computer': 300,
 }
 const GEAR_FULLSET_DAILY = 1500
 const NITROX_COURSE_FEE = 6000

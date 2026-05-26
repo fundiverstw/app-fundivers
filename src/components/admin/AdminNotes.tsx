@@ -158,12 +158,12 @@ export function AdminNotes({ target, tagFilter, title = 'Notes' }: Props) {
       </div>
 
       <div className="pt-2 border-t border-sky-200 space-y-2">
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           {!tagFilter && (
             <select
               value={tag}
               onChange={e => setTag(e.target.value as NoteTag)}
-              className="bg-white border border-sky-300 rounded-lg px-2 py-1 text-xs text-blue-900"
+              className="sm:shrink-0 bg-white border border-sky-300 rounded-lg px-2 py-1 text-xs text-blue-900"
             >
               {NOTE_TAGS.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
@@ -173,13 +173,13 @@ export function AdminNotes({ target, tagFilter, title = 'Notes' }: Props) {
             value={content}
             onChange={e => setContent(e.target.value)}
             placeholder="New note…"
-            className="flex-1 bg-white border border-sky-300 rounded-lg px-3 py-1 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
+            className="sm:flex-1 min-w-0 bg-white border border-sky-300 rounded-lg px-3 py-1.5 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
             onKeyDown={e => { if (e.key === 'Enter') addNote() }}
           />
           <button
             onClick={addNote}
             disabled={saving || !content.trim()}
-            className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-xs px-3 rounded-lg"
+            className="sm:shrink-0 bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-xs font-semibold py-1.5 sm:py-1 px-3 rounded-lg"
           >
             Add
           </button>
