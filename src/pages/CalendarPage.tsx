@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 import { fetchEventsInRange, formatEventSpan, eventIsFull } from '../lib/events'
 import { MonthCalendar } from '../components/calendar/MonthCalendar'
 import { RegisterForm } from '../components/register/RegisterForm'
+import { ShareEventButton } from '../components/ShareEventButton'
 import type { AppEvent, Booking } from '../types/database'
 
 const TYPE_DOT: Record<AppEvent['type'], string> = {
@@ -123,6 +124,11 @@ export function CalendarPage() {
             >
               {bookingLoading ? '…' : isBooked(selected) ? 'Cancel booking' : 'Register'}
             </button>
+            <ShareEventButton
+              event={selected}
+              label="Share link with friends"
+              className="w-full py-2 rounded-xl text-sm font-semibold bg-sky-700 hover:bg-sky-800 text-white transition-colors"
+            />
           </div>
         </div>
       )}
