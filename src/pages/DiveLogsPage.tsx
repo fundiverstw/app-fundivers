@@ -331,7 +331,7 @@ function DiveLogForm({
         </button>
       </div>
 
-      <div className={`${CARD_ELEVATED} p-4 grid grid-cols-2 gap-3`}>
+      <div className={`${CARD_ELEVATED} p-4 grid grid-cols-1 sm:grid-cols-2 gap-3`}>
         <Field label="Date" required>
           <input type="date" required className={INPUT} value={form.dived_on}
             onChange={e => set('dived_on', e.target.value)} />

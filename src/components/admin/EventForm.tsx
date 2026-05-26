@@ -379,7 +379,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
         <Field label="Calendar title (calendar widget; short)">
           <Input value={form.calendar_title} onChange={v => set('calendar_title', v)} />
         </Field>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Field label="Start date">
             <Input type="date" value={form.start_date} onChange={v => set('start_date', v)} required />
           </Field>
@@ -411,7 +411,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
             <Field label="Title (required)">
               <Input value={priceForm.admin_title} onChange={v => setPriceForm(f => ({ ...f, admin_title: v }))} />
             </Field>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Field label="Price label">
                 <Input value={priceForm.price} onChange={v => setPriceForm(f => ({ ...f, price: v }))} />
               </Field>
@@ -447,7 +447,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
             </div>
           </div>
         )}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Field label="Required dives">
             <Input value={form.req_dives} onChange={v => set('req_dives', v)} />
           </Field>
