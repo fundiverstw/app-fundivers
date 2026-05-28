@@ -718,6 +718,7 @@ export interface Database {
           transportation: string | null
           itinerary: string | null
           prerequisites: string | null
+          tagline_text: string | null
         }
         Insert: {
           _id: string
@@ -727,6 +728,7 @@ export interface Database {
           transportation?: string | null
           itinerary?: string | null
           prerequisites?: string | null
+          tagline_text?: string | null
         }
         Update: Partial<Database['public']['Tables']['DiveTravel']['Insert']>
         Relationships: []
