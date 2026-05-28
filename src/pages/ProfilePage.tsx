@@ -9,6 +9,7 @@ import { pushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPus
 import { GEAR_ITEMS } from '../lib/gear'
 import { uploadCertCard, getCertCardSignedUrl, deleteCertCard } from '../lib/cert-card'
 import { uploadNitroxCard, getNitroxCardSignedUrl, deleteNitroxCard } from '../lib/nitrox-card'
+import { uploadDeepCard, getDeepCardSignedUrl, deleteDeepCard } from '../lib/deep-card'
 import { isHeicFile } from '../lib/image-compress'
 import { fetchCreditsForUser, openCreditBalance } from '../lib/credits'
 import { FamilySection } from '../components/profile/FamilySection'
@@ -53,6 +54,7 @@ const schema = z.object({
   contact_method: z.string().min(1, 'Required'),
   contact_id: z.string().min(1, 'Required'),
   nitrox_certified: z.boolean().nullish(),
+  deep_certified: z.boolean().nullish(),
   logged_dives: z
     .union([z.string(), z.number()])
     .refine(v => typeof v === 'number' || v.length > 0, { message: 'Required' }),
@@ -153,6 +155,8 @@ export function ProfileForm({ user, profile, onSaved }: {
   // NitroxCardSection component pushes path updates up via onPathChange
   // whenever the user uploads / removes a photo.
   const [nitroxCardPath, setNitroxCardPath] = useState<string | null>(profile.nitrox_card_path ?? null)
+  // Same lift-pattern for the Deep (40m) card.
+  const [deepCardPath, setDeepCardPath] = useState<string | null>(profile.deep_card_path ?? null)
   // Same lift-pattern for the main cert card: cert_level set ⇒ a photo
   // must be on file. Initial value comes from the profile so a diver who
   // has already uploaded one isn't blocked the moment they open the page.
@@ -182,6 +186,8 @@ export function ProfileForm({ user, profile, onSaved }: {
   const selectedAgency = useWatch({ control, name: 'cert_agency' }) ?? ''
   const nitroxCertifiedWatched = useWatch({ control, name: 'nitrox_certified' }) ?? false
   const nitroxCardMissing = !!nitroxCertifiedWatched && !nitroxCardPath
+  const deepCertifiedWatched = useWatch({ control, name: 'deep_certified' }) ?? false
+  const deepCardMissing = !!deepCertifiedWatched && !deepCardPath
   const certLevelWatched = useWatch({ control, name: 'cert_level' }) ?? ''
   const certCardMissing = certLevelWatched.trim() !== '' && !certCardPath
   // Distinct orgs in the order returned by the rank-sorted query (PADI rows
@@ -269,6 +275,7 @@ export function ProfileForm({ user, profile, onSaved }: {
       contact_method: (method === 'whatsapp' || method === 'line' || method === 'phone' || method === 'email') ? method : null,
       contact_id: strOrNull(data.contact_id),
       nitrox_certified: Boolean(data.nitrox_certified),
+      deep_certified: Boolean(data.deep_certified),
       logged_dives: numOrNull(data.logged_dives) ?? 0,
       last_dive_date: strOrNull(data.last_dive_date),
       gear_owned: gearOwned,
@@ -458,10 +465,18 @@ export function ProfileForm({ user, profile, onSaved }: {
             <input type="checkbox" {...register('nitrox_certified')} className="accent-blue-900" />
             Nitrox certified
           </label>
+          <label className="flex items-center gap-2 text-sm text-blue-900">
+            <input type="checkbox" {...register('deep_certified')} className="accent-blue-900" />
+            Deep certified (40m)
+          </label>
         </section>
 
         {nitroxCertifiedWatched && (
           <NitroxCardSection userId={profile.id} onPathChange={setNitroxCardPath} />
+        )}
+
+        {deepCertifiedWatched && (
+          <DeepCardSection userId={profile.id} onPathChange={setDeepCardPath} />
         )}
 
         <CertCardSection userId={profile.id} onPathChange={setCertCardPath} />
@@ -488,9 +503,15 @@ export function ProfileForm({ user, profile, onSaved }: {
           </p>
         )}
 
+        {deepCardMissing && (
+          <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded p-2">
+            Upload a photo of your Deep certification card to save your profile.
+          </p>
+        )}
+
         <button
           type="submit"
-          disabled={isSubmitting || certCardMissing || nitroxCardMissing || (!isDirty && !dirtyExtras)}
+          disabled={isSubmitting || certCardMissing || nitroxCardMissing || deepCardMissing || (!isDirty && !dirtyExtras)}
           className="w-full bg-emerald-400 hover:bg-emerald-300 text-blue-950 font-semibold py-2 rounded-lg transition-colors disabled:opacity-50"
         >
           {isSubmitting ? 'Saving…' : 'Save changes'}
@@ -782,6 +803,119 @@ export function NitroxCardSection({ userId, onPathChange }: {
             type="file"
             accept="image/*,.heic,.heif"
             aria-label="Upload nitrox certification card"
+            className="hidden"
+            disabled={busy}
+            onChange={onPickFile}
+          />
+          {busy ? 'Working…' : path ? 'Replace photo' : 'Upload photo'}
+        </label>
+        {path && (
+          <button
+            type="button"
+            onClick={onRemove}
+            disabled={busy}
+            className="bg-sky-100 hover:bg-red-100 disabled:opacity-40 text-red-700 border border-red-500 text-sm font-semibold py-2 px-3 rounded-lg transition-colors"
+          >
+            Remove
+          </button>
+        )}
+      </div>
+      {error && <p className="text-red-600 text-xs">{error}</p>}
+    </section>
+  )
+}
+
+// Same upload pattern as NitroxCardSection but for the deep-cards bucket.
+export function DeepCardSection({ userId, onPathChange }: {
+  userId: string
+  onPathChange?: (path: string | null) => void
+}) {
+  const [path, setPath] = useState<string | null>(null)
+  const [signedUrl, setSignedUrl] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('deep_card_path')
+        .eq('id', userId)
+        .maybeSingle()
+      if (cancelled) return
+      const p = data?.deep_card_path ?? null
+      setPath(p)
+      onPathChange?.(p)
+      setSignedUrl(p ? await getDeepCardSignedUrl(p) : null)
+    })()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId])
+
+  async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (!file.type.startsWith('image/') && !isHeicFile(file)) {
+      setError('Please choose an image file.')
+      return
+    }
+    setError(null)
+    setBusy(true)
+    try {
+      const newPath = await uploadDeepCard(userId, file)
+      if (path && path !== newPath) {
+        try { await deleteDeepCard(path) } catch { /* ignore */ }
+      }
+      await supabase.from('profiles').update({ deep_card_path: newPath }).eq('id', userId)
+      setPath(newPath)
+      onPathChange?.(newPath)
+      setSignedUrl(await getDeepCardSignedUrl(newPath))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onRemove() {
+    if (!path) return
+    setBusy(true)
+    setError(null)
+    try {
+      await deleteDeepCard(path)
+      await supabase.from('profiles').update({ deep_card_path: null }).eq('id', userId)
+      setPath(null)
+      onPathChange?.(null)
+      setSignedUrl(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Remove failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3" aria-label="Deep Certification Card">
+      <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Deep card photo</h2>
+      <p className="text-xs text-blue-900 font-medium">
+        Required because you marked yourself as Deep (40m) certified. Same
+        compression + private-storage handling as your main cert card.
+      </p>
+      {signedUrl && (
+        <img
+          src={signedUrl}
+          alt="Your deep certification card"
+          className="w-full rounded-lg border border-sky-300"
+        />
+      )}
+      <div className="flex gap-2">
+        <label className="flex-1 cursor-pointer bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 rounded-lg text-center transition-colors">
+          <input
+            type="file"
+            accept="image/*,.heic,.heif"
+            aria-label="Upload deep certification card"
             className="hidden"
             disabled={busy}
             onChange={onPickFile}

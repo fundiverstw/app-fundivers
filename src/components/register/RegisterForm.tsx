@@ -7,6 +7,7 @@ import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/p
 import { GEAR_ITEMS } from '../../lib/gear'
 import { uploadCertCard } from '../../lib/cert-card'
 import { uploadNitroxCard } from '../../lib/nitrox-card'
+import { uploadDeepCard } from '../../lib/deep-card'
 import { isHeicFile } from '../../lib/image-compress'
 import type { AppEvent, Booking, BookingDetails, CancellationPolicy, Database, EOAddon, EORoom, Profile } from '../../types/database'
 
@@ -204,6 +205,13 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   // Hard block: nitrox=true but neither an existing card nor a freshly
   // picked file → can't proceed past step 2.
   const nitroxBlocked = nitroxCertified && !hasNitroxCardOnFile && !nitroxFile
+  // Deep (40m) cert mirrors the nitrox pattern: boolean flag + photo
+  // required when claimed.
+  const [deepCertified, setDeepCertified] = useState(profile?.deep_certified ?? false)
+  const [deepFile, setDeepFile] = useState<File | null>(null)
+  const [deepFileErr, setDeepFileErr] = useState<string | null>(null)
+  const hasDeepCardOnFile = !!profile?.deep_card_path
+  const deepBlocked = deepCertified && !hasDeepCardOnFile && !deepFile
   // Same pattern for the main cert card: cert_level set ⇒ photo required.
   // The card stays optional for divers who haven't picked a level (they
   // can still register, e.g. for an entry-level course).
@@ -306,6 +314,16 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
         return
       }
     }
+    let deepCardPath: string | null | undefined = undefined
+    if (deepCertified && deepFile && userId) {
+      try {
+        deepCardPath = await uploadDeepCard(userId, deepFile)
+      } catch (e) {
+        setSaving(false)
+        setErr(`Could not upload deep card: ${e instanceof Error ? e.message : 'unknown error'}`)
+        return
+      }
+    }
     let certCardPath: string | null | undefined = undefined
     if (certFile && userId) {
       try {
@@ -332,6 +350,8 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
       logged_dives:            Number.isFinite(loggedDives) ? loggedDives : 0,
       nitrox_certified:        nitroxCertified,
       ...(nitroxCardPath !== undefined ? { nitrox_card_path: nitroxCardPath } : {}),
+      deep_certified:          deepCertified,
+      ...(deepCardPath !== undefined ? { deep_card_path: deepCardPath } : {}),
       ...(certCardPath !== undefined ? { cert_card_path: certCardPath } : {}),
       emergency_contact_name:  nullish(emergencyName),
       emergency_contact_phone: nullish(emergencyPhone),
@@ -423,7 +443,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
       // it on their next visit. getUser() is only called when there's
       // actually something to upload so test mocks that don't stub it
       // aren't dragged into this branch.
-      const needGuestUpload = (nitroxCertified && nitroxFile) || certFile
+      const needGuestUpload = (nitroxCertified && nitroxFile) || (deepCertified && deepFile) || certFile
       if (needGuestUpload) {
         const { data: u } = await supabase.auth.getUser()
         const newUserId = u?.user?.id
@@ -434,6 +454,14 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
               await supabase.from('profiles').update({ nitrox_card_path: newPath }).eq('id', newUserId)
             } catch (e) {
               console.error('nitrox card upload failed after signup:', e)
+            }
+          }
+          if (deepCertified && deepFile) {
+            try {
+              const newPath = await uploadDeepCard(newUserId, deepFile)
+              await supabase.from('profiles').update({ deep_card_path: newPath }).eq('id', newUserId)
+            } catch (e) {
+              console.error('deep card upload failed after signup:', e)
             }
           }
           if (certFile) {
@@ -591,7 +619,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
                   it's changed.)
                 </p>
               )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <TextField
                   label="Logged dives" type="number" min={0}
                   value={loggedDives === 0 ? '' : String(loggedDives)}
@@ -600,6 +628,10 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
                 <label className="flex items-center sm:items-end gap-2 text-sm text-blue-950 font-medium sm:pb-2">
                   <input type="checkbox" checked={nitroxCertified} onChange={e => setNitroxCertified(e.target.checked)} className="accent-blue-900" />
                   Nitrox certified
+                </label>
+                <label className="flex items-center sm:items-end gap-2 text-sm text-blue-950 font-medium sm:pb-2">
+                  <input type="checkbox" checked={deepCertified} onChange={e => setDeepCertified(e.target.checked)} className="accent-blue-900" />
+                  Deep certified (40m)
                 </label>
               </div>
               {nitroxCertified && !hasNitroxCardOnFile && (
@@ -636,6 +668,43 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
               {nitroxCertified && hasNitroxCardOnFile && (
                 <p className="text-xs text-blue-950 font-medium">
                   Nitrox card on file. (Update it from your profile if it's
+                  changed.)
+                </p>
+              )}
+              {deepCertified && !hasDeepCardOnFile && (
+                <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
+                  <p className="text-xs font-semibold text-blue-900">
+                    Upload a photo of your Deep certification card *
+                  </p>
+                  <p className="text-xs text-blue-950 font-medium">
+                    Required because you marked yourself as Deep certified. The
+                    photo is stored privately and only visible to FunDivers staff.
+                  </p>
+                  <label className="block cursor-pointer bg-blue-900 hover:bg-blue-950 text-white text-sm font-semibold py-2 px-3 rounded-lg text-center">
+                    <input
+                      type="file"
+                      accept="image/*,.heic,.heif"
+                      aria-label="Upload deep certification card"
+                      className="hidden"
+                      onChange={e => {
+                        const file = e.target.files?.[0] ?? null
+                        e.target.value = ''
+                        setDeepFileErr(null)
+                        if (file && !file.type.startsWith('image/') && !isHeicFile(file)) {
+                          setDeepFileErr('Please choose an image file.')
+                          return
+                        }
+                        setDeepFile(file)
+                      }}
+                    />
+                    {deepFile ? `Replace photo (${deepFile.name})` : 'Choose photo'}
+                  </label>
+                  {deepFileErr && <p className="text-xs text-red-700">{deepFileErr}</p>}
+                </div>
+              )}
+              {deepCertified && hasDeepCardOnFile && (
+                <p className="text-xs text-blue-950 font-medium">
+                  Deep card on file. (Update it from your profile if it's
                   changed.)
                 </p>
               )}
@@ -928,6 +997,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
                 fullName.trim() === '' ||
                 certBlocked ||
                 nitroxBlocked ||
+                deepBlocked ||
                 (isGuest && (guestEmail.trim() === '' || guestPassword.length < 8 || !guestAgreedTerms))
               )) ||
               (step === 3 && needsTransport === null)

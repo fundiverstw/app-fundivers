@@ -356,6 +356,7 @@ function UserCard({
             {user.cert_agency && user.cert_level ? `${user.cert_agency} ${user.cert_level}` : 'Uncertified'}
             {user.logged_dives > 0 && ` · ${user.logged_dives} logged`}
             {user.nitrox_certified && ' · Nitrox'}
+            {user.deep_certified && ' · Deep'}
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0 ml-3">
@@ -466,6 +467,7 @@ function ProfileDetails({ user }: { user: Profile }) {
         <Row k="Logged dives" v={String(user.logged_dives ?? 0)} />
         <Row k="Last dive" v={user.last_dive_date ? format(new Date(user.last_dive_date), 'MMM d, yyyy') : null} />
         <Row k="Nitrox" v={user.nitrox_certified ? 'certified' : 'no'} />
+        <Row k="Deep (40m)" v={user.deep_certified ? 'certified' : 'no'} />
         {user.cert_card_path && <CertCardPreview path={user.cert_card_path} />}
       </Section>
 

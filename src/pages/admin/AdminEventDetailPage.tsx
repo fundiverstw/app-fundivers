@@ -834,6 +834,7 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
             <p className="text-xs text-blue-900 font-medium pl-4">
               {r.profile.cert_agency && r.profile.cert_level && `${r.profile.cert_agency} ${r.profile.cert_level}`}
               {r.profile.nitrox_certified && ' · Nitrox'}
+              {r.profile.deep_certified && ' · Deep'}
             </p>
           )}
           {r.diverNotes.length > 0 && (

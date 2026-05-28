@@ -42,6 +42,7 @@ export interface RegistrationPdfPayload {
   certLevel: string | null
   certOrg: string | null
   diverNitrox: boolean
+  diverDeep: boolean
   addNitroxCourse: boolean
   loggedDives: number | null
   lastDiveDate: string | null
@@ -213,6 +214,7 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
     y = row(doc, y, "Level", p.certLevel, altState)
     y = row(doc, y, "Organization", p.certOrg, altState)
     y = row(doc, y, "Nitrox certified", p.diverNitrox ? "Yes" : "", altState)
+    y = row(doc, y, "Deep certified (40m)", p.diverDeep ? "Yes" : "", altState)
     y = row(doc, y, "Nitrox course add-on", p.addNitroxCourse ? "Yes" : "", altState)
     y = row(doc, y, "Logged dives", p.loggedDives, altState)
     y = row(doc, y, "Last dive", p.lastDiveDate, altState)

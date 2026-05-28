@@ -140,6 +140,7 @@ export interface Database {
           cert_level: string | null
           cert_card_path: string | null
           nitrox_card_path: string | null
+          deep_card_path: string | null
           medical_notes: string | null
           avatar_url: string | null
           role: 'diver' | 'admin' | 'staff'
@@ -154,6 +155,7 @@ export interface Database {
           contact_method: 'whatsapp' | 'line' | 'phone' | 'email' | null
           contact_id: string | null
           nitrox_certified: boolean
+          deep_certified: boolean
           logged_dives: number
           last_dive_date: string | null
           gear_owned: string[]
@@ -184,6 +186,7 @@ export interface Database {
           cert_level?: string | null
           cert_card_path?: string | null
           nitrox_card_path?: string | null
+          deep_card_path?: string | null
           medical_notes?: string | null
           avatar_url?: string | null
           role?: 'diver' | 'admin'
@@ -197,6 +200,7 @@ export interface Database {
           contact_method?: 'whatsapp' | 'line' | 'phone' | 'email' | null
           contact_id?: string | null
           nitrox_certified?: boolean
+          deep_certified?: boolean
           logged_dives?: number
           last_dive_date?: string | null
           gear_owned?: string[]
@@ -219,6 +223,7 @@ export interface Database {
           cert_level?: string | null
           cert_card_path?: string | null
           nitrox_card_path?: string | null
+          deep_card_path?: string | null
           medical_notes?: string | null
           avatar_url?: string | null
           role?: 'diver' | 'admin'
@@ -232,6 +237,7 @@ export interface Database {
           contact_method?: 'whatsapp' | 'line' | 'phone' | 'email' | null
           contact_id?: string | null
           nitrox_certified?: boolean
+          deep_certified?: boolean
           logged_dives?: number
           last_dive_date?: string | null
           gear_owned?: string[]

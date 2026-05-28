@@ -332,6 +332,7 @@ Deno.serve(async (req) => {
     certLevel:       profile?.cert_level ?? null,
     certOrg:         profile?.cert_agency ?? null,
     diverNitrox:     !!profile?.nitrox_certified,
+    diverDeep:       !!(profile as { deep_certified?: boolean })?.deep_certified,
     addNitroxCourse: !!details.nitrox_course_addon,
     loggedDives:     profile?.logged_dives ?? null,
     lastDiveDate:    profile?.last_dive_date ?? null,
