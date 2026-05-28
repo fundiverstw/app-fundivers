@@ -1,0 +1,196 @@
+import { useCallback, useEffect, useState } from 'react'
+import { format } from 'date-fns'
+import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../hooks/useAuth'
+import type { DiverNote, Profile } from '../../types/database'
+
+type NoteWithAuthor = DiverNote & {
+  author: Pick<Profile, 'id' | 'display_name' | 'full_name'> | null
+  editor: Pick<Profile, 'id' | 'display_name' | 'full_name'> | null
+}
+
+interface Props {
+  profileId: string
+  title?: string
+}
+
+export function DiverNotes({ profileId, title = 'Diver notes (staff only)' }: Props) {
+  const { user, profile } = useAuth()
+  const isAdmin = profile?.role === 'admin'
+  const [notes, setNotes] = useState<NoteWithAuthor[]>([])
+  const [content, setContent] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingContent, setEditingContent] = useState('')
+
+  const refetch = useCallback(async () => {
+    const { data: rows } = await supabase
+      .from('diver_notes')
+      .select('*')
+      .eq('profile_id', profileId)
+      .order('created_at', { ascending: false })
+
+    const ids = [
+      ...(rows ?? []).map(r => r.created_by),
+      ...(rows ?? []).map(r => r.edited_by).filter((x): x is string => !!x),
+    ]
+    let profMap = new Map<string, Pick<Profile, 'id' | 'display_name' | 'full_name'>>()
+    if (ids.length) {
+      const { data: profs } = await supabase
+        .from('profiles')
+        .select('id, display_name, full_name')
+        .in('id', [...new Set(ids)])
+      profMap = new Map((profs ?? []).map(p => [p.id, p]))
+    }
+
+    setNotes((rows ?? []).map(r => ({
+      ...r,
+      author: profMap.get(r.created_by) ?? null,
+      editor: r.edited_by ? (profMap.get(r.edited_by) ?? null) : null,
+    })))
+  }, [profileId])
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { refetch() }, [refetch])
+
+  async function addNote() {
+    if (!user || !content.trim()) return
+    setSaving(true)
+    await supabase.from('diver_notes').insert({
+      profile_id: profileId,
+      created_by: user.id,
+      content: content.trim(),
+    })
+    setContent('')
+    await refetch()
+    setSaving(false)
+  }
+
+  function startEdit(note: NoteWithAuthor) {
+    setEditingId(note.id)
+    setEditingContent(note.content)
+  }
+
+  async function saveEdit() {
+    if (!user || !editingId || !editingContent.trim()) return
+    await supabase
+      .from('diver_notes')
+      .update({
+        content: editingContent.trim(),
+        edited_by: user.id,
+        edited_at: new Date().toISOString(),
+      })
+      .eq('id', editingId)
+    setEditingId(null)
+    setEditingContent('')
+    await refetch()
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setEditingContent('')
+  }
+
+  async function deleteNote(id: string) {
+    await supabase.from('diver_notes').delete().eq('id', id)
+    await refetch()
+  }
+
+  function canMutate(note: NoteWithAuthor) {
+    return isAdmin || note.created_by === user?.id
+  }
+
+  return (
+    <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
+      <h2 className="text-sm font-semibold text-red-600 uppercase tracking-wider">{title}</h2>
+
+      <div className="space-y-2">
+        {notes.length === 0 && (
+          <p className="text-xs text-blue-950 font-medium">No diver notes yet.</p>
+        )}
+        {notes.map(n => (
+          <div key={n.id} className="bg-sky-50 rounded-lg p-3 text-sm space-y-1">
+            {editingId === n.id ? (
+              <div className="space-y-2">
+                <textarea
+                  value={editingContent}
+                  onChange={e => setEditingContent(e.target.value)}
+                  rows={2}
+                  maxLength={2000}
+                  aria-label="Edit note"
+                  className="w-full bg-white border border-sky-300 rounded-lg px-3 py-1.5 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
+                />
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={cancelEdit}
+                    className="text-xs text-blue-900 font-medium hover:text-blue-900"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveEdit}
+                    disabled={!editingContent.trim()}
+                    className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-xs font-semibold py-1 px-3 rounded-lg"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-start gap-2">
+                  <p className="flex-1 text-blue-900 whitespace-pre-wrap">{n.content}</p>
+                  {canMutate(n) && (
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        onClick={() => startEdit(n)}
+                        aria-label={`Edit note from ${n.author?.display_name ?? n.author?.full_name ?? 'unknown'}`}
+                        className="text-xs text-blue-900 font-semibold hover:text-blue-700"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => deleteNote(n.id)}
+                        aria-label={`Delete note from ${n.author?.display_name ?? n.author?.full_name ?? 'unknown'}`}
+                        className="text-xs text-red-700 font-semibold hover:text-red-800"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-blue-950 font-medium">
+                  {n.author?.display_name ?? n.author?.full_name ?? 'unknown'} · {format(new Date(n.created_at), 'MMM d, yyyy · HH:mm')}
+                  {n.edited_at && (
+                    <> · edited{n.editor && ` by ${n.editor.display_name ?? n.editor.full_name}`} {format(new Date(n.edited_at), 'MMM d')}</>
+                  )}
+                </p>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="pt-2 border-t border-sky-200 space-y-2">
+        <textarea
+          value={content}
+          onChange={e => setContent(e.target.value)}
+          placeholder="Allergies, accommodations, anything the team should know…"
+          rows={2}
+          maxLength={2000}
+          aria-label="New diver note"
+          className="w-full bg-white border border-sky-300 rounded-lg px-3 py-1.5 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
+        />
+        <div className="flex justify-end">
+          <button
+            onClick={addNote}
+            disabled={saving || !content.trim()}
+            className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-xs font-semibold py-1 px-3 rounded-lg"
+          >
+            Add note
+          </button>
+        </div>
+      </div>
+    </section>
+  )
+}

@@ -12,6 +12,7 @@ import { getCertCardSignedUrl } from '../../lib/cert-card'
 import { shoeAsJp } from '../../lib/shoe-size'
 import { fetchCreditsForUser, openCreditBalance, createCredit, settleCredit, reopenCredit } from '../../lib/credits'
 import { ProfileForm } from '../ProfilePage'
+import { DiverNotes } from '../../components/admin/DiverNotes'
 import type { AppEvent, Booking, BookingAmendment, Credit, Payment, Profile } from '../../types/database'
 
 interface UserExtras {
@@ -393,6 +394,7 @@ function UserCard({
                 )}
               </div>
               <ProfileDetails user={user} />
+              <DiverNotes profileId={user.id} />
               {loading && (
                 <div className="flex justify-center py-2"><div className="w-5 h-5 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" /></div>
               )}

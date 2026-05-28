@@ -576,6 +576,50 @@ describe('AdminEventDetailPage', () => {
     await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith(expect.stringMatching(/7 divers/)))
   })
 
+  it('flags diver notes on the registrant card and shows them inline when expanded', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
+    ]))
+
+    const bookings = [{
+      id: 'b1', user_id: 'u1', status: 'confirmed', created_at: '2026-04-20',
+      eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null,
+      details: {},
+    }]
+    const profiles = [{
+      id: 'u1', full_name: 'Ada Lovelace', display_name: 'Ada',
+      cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false,
+      logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null,
+      phone: null, contact_method: null, contact_id: null,
+    }]
+    const diverNotes = [
+      { id: 'n1', profile_id: 'u1', created_by: 'staff-1', content: 'Severe shellfish allergy',
+        created_at: '2026-04-25T10:00:00Z', edited_by: null, edited_at: null },
+      { id: 'n2', profile_id: 'u1', created_by: 'staff-1', content: 'Carries her own dive computer',
+        created_at: '2026-04-26T11:00:00Z', edited_by: null, edited_at: null },
+    ]
+
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings')    return mockQueryBuilder({ data: bookings })
+      if (table === 'profiles')    return mockQueryBuilder({ data: profiles })
+      if (table === 'diver_notes') return mockQueryBuilder({ data: diverNotes })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    const user = userEvent.setup()
+    renderAt('/admin/events/dive/dive_x')
+
+    // Collapsed view: count flag visible.
+    await screen.findByText(/2 diver notes/i)
+
+    // Expand the card → both notes visible in the rose-bordered block.
+    await user.click(screen.getByRole('button', { expanded: false, name: /Ada Lovelace/ }))
+    await waitFor(() => {
+      expect(screen.getByText('Severe shellfish allergy')).toBeInTheDocument()
+      expect(screen.getByText('Carries her own dive computer')).toBeInTheDocument()
+    })
+  })
+
   it('Transportation tab groups divers by transport choice and excludes cancelled bookings', async () => {
     fetchEventsForBookings.mockResolvedValue(new Map([
       ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
