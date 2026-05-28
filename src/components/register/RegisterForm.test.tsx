@@ -122,6 +122,8 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     // Step 2 → 3 (extras) — sampleProfile has full_name so step-2 Next isn't gated
     await user.click(screen.getByRole('button', { name: /next/i }))
+    // Transport is required; pick "no" so the Next button on step 3 is enabled.
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
     // Step 3 → 4 (payment)
     await user.click(screen.getByRole('button', { name: /next/i }))
     // Step 4: confirm
@@ -269,6 +271,7 @@ describe('RegisterForm', () => {
     // Step 1 → 2 (about you) → 3 (extras) → 4 (payment)
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/credit card/i))
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
@@ -288,6 +291,7 @@ describe('RegisterForm', () => {
     )
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/^paypal/i))
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
@@ -296,6 +300,28 @@ describe('RegisterForm', () => {
     const details = (invoke.mock.calls[0][1] as { body: Record<string, unknown> }).body.details as { total: number; payment_method: string }
     expect(details.payment_method).toBe('paypal')
     expect(details.total).toBe(Math.round(2800 * 1.05))
+  })
+
+  it('step 3 Next is blocked until the diver explicitly answers the transport question', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    // Step 1 → 2 → 3
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    // Neither radio is pre-checked.
+    expect((screen.getByLabelText(/ride with the shop/i) as HTMLInputElement).checked).toBe(false)
+    expect((screen.getByLabelText(/no, i don't need a ride/i) as HTMLInputElement).checked).toBe(false)
+
+    // Next is disabled until a choice is made.
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
   })
 
   it('step 2 Next is gated on full-name being set (enforces the one required field)', async () => {
@@ -407,6 +433,7 @@ describe('RegisterForm', () => {
     await user.type(screen.getByLabelText(/full name/i), 'Grace Hopper')
     // Step 2 → 3 → 4 → confirm
     await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
 
@@ -452,6 +479,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByLabelText(/I agree to the/i))
     await user.type(screen.getByLabelText(/full name/i), 'Grace Hopper')
     await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
 
@@ -475,6 +503,7 @@ describe('RegisterForm', () => {
     expect(screen.getByText(/included in base price/i)).toBeInTheDocument()
 
     // Confirm submit and assert the cost row excludes a transport line.
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
     await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
@@ -536,6 +565,7 @@ describe('RegisterForm', () => {
     )
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
     // Policy heading + body + cancel-by date + checkbox all visible.
@@ -567,6 +597,7 @@ describe('RegisterForm', () => {
     )
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
     // Default = bank_transfer → local bank-details block.
@@ -601,6 +632,7 @@ describe('RegisterForm', () => {
     )
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
     const expectReminder = () => {
@@ -632,6 +664,7 @@ describe('RegisterForm', () => {
     )
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
     // Deposit is always due ASAP; only the balance carries the admin date.
@@ -654,6 +687,7 @@ describe('RegisterForm', () => {
     )
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
     await user.click(screen.getByLabelText(/pay deposit only/i))
@@ -683,6 +717,7 @@ describe('RegisterForm', () => {
     )
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
     expect(screen.queryByLabelText(/pay deposit only/i)).not.toBeInTheDocument()
@@ -765,6 +800,7 @@ describe('RegisterForm', () => {
 
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
 
