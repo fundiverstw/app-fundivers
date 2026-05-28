@@ -13,6 +13,7 @@ import { shoeAsJp } from '../../lib/shoe-size'
 import { fetchCreditsForUser, openCreditBalance, createCredit, settleCredit, reopenCredit } from '../../lib/credits'
 import { ProfileForm } from '../ProfilePage'
 import { DiverNotes } from '../../components/admin/DiverNotes'
+import { AdminFamilyPanel } from '../../components/admin/AdminFamilyPanel'
 import type { AppEvent, Booking, BookingAmendment, Credit, Payment, Profile } from '../../types/database'
 
 interface UserExtras {
@@ -194,6 +195,16 @@ export function AdminUsersPage() {
     setUsers(prev => prev.map(u => u.id === userId ? (data as Profile) : u))
   }
 
+  // Full refetch — used after parent/child link mutations since they touch
+  // two rows and shift eligibility for every other diver in the picker.
+  async function refetchAllUsers() {
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('full_name', { ascending: true })
+    setUsers((data ?? []) as Profile[])
+  }
+
   async function handleReopenCredit(userId: string, creditId: string) {
     try {
       const credit = await reopenCredit(creditId)
@@ -279,6 +290,8 @@ export function AdminUsersPage() {
           <UserCard
             key={u.id}
             user={u}
+            allUsers={users}
+            onFamilyChanged={refetchAllUsers}
             open={expanded === u.id}
             extras={extrasCache.get(u.id) ?? null}
             loading={extrasLoading === u.id}
@@ -304,10 +317,12 @@ export function AdminUsersPage() {
 }
 
 function UserCard({
-  user, open, extras, loading, editing, onToggle, onEdit, onCancelEdit, onProfileSaved,
+  user, allUsers, onFamilyChanged, open, extras, loading, editing, onToggle, onEdit, onCancelEdit, onProfileSaved,
   onRecordPayment, onVoidPayment, onCreateCredit, onSettleCredit, onReopenCredit, isAdmin,
 }: {
   user: Profile
+  allUsers: Profile[]
+  onFamilyChanged: () => void
   open: boolean
   extras: UserExtras | null
   loading: boolean
@@ -395,6 +410,9 @@ function UserCard({
               </div>
               <ProfileDetails user={user} />
               <DiverNotes profileId={user.id} />
+              {isAdmin && (
+                <AdminFamilyPanel user={user} allUsers={allUsers} onChanged={onFamilyChanged} />
+              )}
               {loading && (
                 <div className="flex justify-center py-2"><div className="w-5 h-5 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" /></div>
               )}
