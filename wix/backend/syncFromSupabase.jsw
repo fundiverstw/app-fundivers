@@ -37,7 +37,8 @@ const RESERVED = new Set([
 // JSON-encoded id-array strings (e.g. '["id1","id2"]'), legacy Bubble
 // shape, and parseIdList unwraps them.
 const MULTI_REF_FIELDS = {
-  EO_dives: ['destination_reference'],
+  EO_dives:   ['destination_reference', 'other_addons'],
+  EO_courses: ['other_addons'],
 };
 
 // Collection → list of calendar-date field keys. Wix DateTime fields
