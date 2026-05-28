@@ -98,8 +98,15 @@ client bundle, and this token must never end up in browser JS.
 
 ### Running the re-sync
 
-`.env.local` isn't auto-exported to bare shell commands (only `make`
-reads it). Source it once per terminal, then curl:
+```sh
+make wix-sync
+```
+
+The Make target sources `.env.local` on demand for `WIX_SYNC_TOKEN`,
+then POSTs `/_functions/syncSupabase` and prints the JSON summary.
+
+If you'd rather run it by hand (e.g. to pipe through `jq` or capture
+the response), source the env once per terminal and curl directly:
 
 ```sh
 set -a && source .env.local && set +a

@@ -1,4 +1,4 @@
-.PHONY: help dev studio mail start stop status reset diff link pull push dump-data verify test lint lint-fix typecheck check deploy deploy-app deploy-push deploy-functions
+.PHONY: help dev studio mail start stop status reset diff link pull push dump-data verify test lint lint-fix typecheck check deploy deploy-app deploy-push deploy-functions wix-sync
 
 help:
 	@echo "Local dev:"
@@ -30,6 +30,9 @@ help:
 	@echo "  make deploy-app        — deploy just the SPA (app-fundiverstw)"
 	@echo "  make deploy-push       — deploy just the push cron (fundivers-push)"
 	@echo "  make deploy-functions  — deploy all supabase edge functions in supabase/functions/"
+	@echo ""
+	@echo "Wix CMS:"
+	@echo "  make wix-sync    — POST /_functions/syncSupabase to rebuild every Wix collection in SYNC_TABLES from current Supabase data"
 
 start:      ; @npm run db:start
 stop:       ; @npm run db:stop
@@ -67,6 +70,23 @@ deploy-push:
 	@cd workers/push && npm run deploy
 
 deploy-functions: ; @npm run functions:deploy
+
+# Trigger the manual Wix re-sync. .env.local is sourced on demand so this
+# works whether or not the caller has already exported WIX_SYNC_TOKEN.
+wix-sync:
+	@if [ -f .env.local ] && [ -z "$$WIX_SYNC_TOKEN" ]; then \
+	  set -a && . ./.env.local && set +a; \
+	fi; \
+	if [ -z "$$WIX_SYNC_TOKEN" ]; then \
+	  echo "WIX_SYNC_TOKEN is not set in your shell or .env.local. See wix/README.md."; \
+	  exit 1; \
+	fi; \
+	echo "Triggering Wix re-sync of every collection in SYNC_TABLES…"; \
+	curl -fsSL -X POST \
+	  -H 'Content-Type: application/json' \
+	  -H "x-sync-token: $$WIX_SYNC_TOKEN" \
+	  -w '\n' \
+	  https://fundiverstw.com/_functions/syncSupabase
 
 dev:
 	@if ! docker ps --format '{{.Names}}' | grep -q supabase_db_app-fundivers; then \
