@@ -395,6 +395,27 @@ describe('RegisterForm', () => {
     expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
   })
 
+  it('step 2 Next is blocked when deep is checked but no card is on file and no new photo is picked', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    const noDeepProfile: Profile = { ...sampleProfile, deep_certified: false, deep_card_path: null }
+    render(
+      <RegisterForm event={sampleEvent} profile={noDeepProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
+
+    // Tick deep certified → upload prompt appears, Next becomes disabled.
+    await user.click(screen.getByLabelText(/deep certified/i))
+    expect(screen.getByText(/upload a photo of your deep certification card/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+
+    // Untick → gate releases.
+    await user.click(screen.getByLabelText(/deep certified/i))
+    expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
+  })
+
   it('step 2 Next is allowed when nitrox is checked AND a card is already on file', async () => {
     setupFrom()
     const user = userEvent.setup()
