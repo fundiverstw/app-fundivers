@@ -626,6 +626,33 @@ export interface Database {
         }
         Relationships: []
       }
+      diver_notes: {
+        Row: {
+          id: string
+          profile_id: string
+          created_by: string
+          content: string
+          created_at: string
+          edited_by: string | null
+          edited_at: string | null
+        }
+        Insert: {
+          id?: string
+          profile_id: string
+          created_by: string
+          content: string
+          created_at?: string
+          edited_by?: string | null
+          edited_at?: string | null
+        }
+        Update: {
+          id?: string
+          content?: string
+          edited_by?: string | null
+          edited_at?: string | null
+        }
+        Relationships: []
+      }
       EO_prices: {
         Row: {
           _id: string
@@ -988,6 +1015,9 @@ export type CancellationPolicy = Database['public']['Tables']['cancellation_poli
 export type DiveSite = Database['public']['Tables']['dive_sites']['Row']
 export type CertLevel = Database['public']['Tables']['cert_levels']['Row']
 export type AdminNote = Database['public']['Tables']['admin_notes']['Row']
+export type DiverNote = Database['public']['Tables']['diver_notes']['Row']
+export type DiverNoteInsert = Database['public']['Tables']['diver_notes']['Insert']
+export type DiverNoteUpdate = Database['public']['Tables']['diver_notes']['Update']
 export const NOTE_TAGS = ['urgent','payment','gear','logistics','cert','medical','note','general'] as const
 export type NoteTag = typeof NOTE_TAGS[number]
 export type Duty = Database['public']['Tables']['duties']['Row']

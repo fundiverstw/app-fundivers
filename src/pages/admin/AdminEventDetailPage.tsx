@@ -16,13 +16,14 @@ import { recordPayment as recordPaymentRow, voidPayment as voidPaymentRow } from
 import { requestEventDiverExport } from '../../lib/admin-event-export'
 import { BookingPaymentsBlock } from '../../components/admin/BookingPaymentsBlock'
 import { ShareEventButton } from '../../components/ShareEventButton'
-import type { AppEvent, Booking, BookingAmendment, BookingDetails, Payment, Profile } from '../../types/database'
+import type { AppEvent, Booking, BookingAmendment, BookingDetails, DiverNote, Payment, Profile } from '../../types/database'
 
 interface Registrant {
   booking: Booking
   profile: Profile | null
   payments: Payment[]
   amendments: BookingAmendment[]
+  diverNotes: DiverNote[]
 }
 
 type AddonNameMap = Map<string, string>
@@ -84,14 +85,21 @@ export function AdminEventDetailPage() {
       const userIds = [...new Set(bookings.map(b => b.user_id))]
       const bookingIds = bookings.map(b => b.id)
 
-      const [profilesRes, paymentsRes, amendmentsByBooking] = await Promise.all([
+      const [profilesRes, paymentsRes, amendmentsByBooking, diverNotesRes] = await Promise.all([
         supabase.from('profiles').select('*').in('id', userIds),
         supabase.from('payments').select('*').in('booking_id', bookingIds),
         fetchAmendmentsForBookings(bookingIds),
+        supabase.from('diver_notes').select('*').in('profile_id', userIds).order('created_at', { ascending: false }),
       ])
       if (cancelled) return
 
       const profileMap = new Map((profilesRes.data ?? []).map(p => [p.id, p]))
+      const diverNotesByUser = new Map<string, DiverNote[]>()
+      for (const n of diverNotesRes.data ?? []) {
+        const arr = diverNotesByUser.get(n.profile_id) ?? []
+        arr.push(n)
+        diverNotesByUser.set(n.profile_id, arr)
+      }
       const paymentsByBooking = new Map<string, Payment[]>()
       for (const p of paymentsRes.data ?? []) {
         if (!p.booking_id) continue
@@ -126,6 +134,7 @@ export function AdminEventDetailPage() {
         profile: profileMap.get(b.user_id) ?? null,
         payments: paymentsByBooking.get(b.id) ?? [],
         amendments: amendmentsByBooking.get(b.id) ?? [],
+        diverNotes: diverNotesByUser.get(b.user_id) ?? [],
       })))
       setLoading(false)
     })()
@@ -827,6 +836,11 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
               {r.profile.nitrox_certified && ' · Nitrox'}
             </p>
           )}
+          {r.diverNotes.length > 0 && (
+            <p className="text-xs font-semibold text-red-700 pl-4 mt-0.5">
+              {r.diverNotes.length} diver note{r.diverNotes.length === 1 ? '' : 's'}
+            </p>
+          )}
         </div>
         <div className="text-right text-xs shrink-0 space-y-1">
           {/* Wrapped in a click-stopper so opening the select doesn't collapse/expand the card. */}
@@ -876,6 +890,15 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
           {renderDetails(r.booking.details, { addonNames, roomNames }) && (
             <div className="text-xs text-blue-950 font-medium bg-sky-50 rounded p-2 space-y-1">
               {renderDetails(r.booking.details, { addonNames, roomNames })}
+            </div>
+          )}
+
+          {r.diverNotes.length > 0 && (
+            <div className="text-xs bg-rose-50 border border-rose-300 rounded p-2 space-y-1">
+              <p className="font-semibold text-red-700 uppercase tracking-wider">Diver notes</p>
+              {r.diverNotes.map(n => (
+                <p key={n.id} className="text-blue-950 font-medium whitespace-pre-wrap">{n.content}</p>
+              ))}
             </div>
           )}
 
