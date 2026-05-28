@@ -56,6 +56,7 @@ export function AdminEventDetailPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [deleteInFlight, setDeleteInFlight] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [view, setView] = useState<'registrants' | 'transportation'>('registrants')
 
   useEffect(() => {
     if (!type || !id) return
@@ -367,23 +368,40 @@ export function AdminEventDetailPage() {
       {registrants.length === 0 ? (
         <p className="text-blue-950 font-medium text-sm">No one has registered for this event yet.</p>
       ) : (
-        <section className="space-y-2">
-          {registrants.map(r => (
-            <RegistrantCard
-              key={r.booking.id}
-              r={r}
-              addonNames={addonNames}
-              roomNames={roomNames}
-              onStatusChange={updateStatus}
-              onApproveRefund={approveRefund}
-              onEdit={() => setEditing(r)}
-              onAddAmendment={submitAmendment}
-              onRecordPayment={(amount, note) => recordPayment(r, amount, note)}
-              onVoidPayment={(paymentId) => voidPayment(r, paymentId)}
-              readOnly={!isAdmin}
-            />
-          ))}
-        </section>
+        <>
+          <nav role="tablist" aria-label="Event sections" className="flex gap-2">
+            <TabButton active={view === 'registrants'} onClick={() => setView('registrants')}>
+              Registrants ({registrants.length})
+            </TabButton>
+            <TabButton active={view === 'transportation'} onClick={() => setView('transportation')}>
+              Transportation
+            </TabButton>
+          </nav>
+
+          {view === 'registrants' && (
+            <section className="space-y-2">
+              {registrants.map(r => (
+                <RegistrantCard
+                  key={r.booking.id}
+                  r={r}
+                  addonNames={addonNames}
+                  roomNames={roomNames}
+                  onStatusChange={updateStatus}
+                  onApproveRefund={approveRefund}
+                  onEdit={() => setEditing(r)}
+                  onAddAmendment={submitAmendment}
+                  onRecordPayment={(amount, note) => recordPayment(r, amount, note)}
+                  onVoidPayment={(paymentId) => voidPayment(r, paymentId)}
+                  readOnly={!isAdmin}
+                />
+              ))}
+            </section>
+          )}
+
+          {view === 'transportation' && (
+            <TransportationView registrants={registrants} />
+          )}
+        </>
       )}
 
       {editing && event && (
@@ -1047,4 +1065,91 @@ function renderDetails(d: BookingDetails, names: { addonNames: AddonNameMap; roo
 
 function methodEmoji(m: NonNullable<Profile['contact_method']>) {
   return m === 'whatsapp' ? '🟢' : m === 'line' ? '🟩' : m === 'phone' ? '📞' : '✉️'
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`px-3 py-1 rounded-full text-sm transition-colors ${
+        active
+          ? 'bg-white text-blue-950 font-semibold'
+          : 'text-white/80 hover:text-white hover:bg-white/10'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+function TransportationView({ registrants }: { registrants: Registrant[] }) {
+  // Cancelled bookings aren't coming on the trip — they'd skew the count for
+  // whoever's planning the van.
+  const active = registrants.filter(r => r.booking.status !== 'cancelled')
+  const needsRide:    Registrant[] = []
+  const selfTransport: Registrant[] = []
+  const unanswered:   Registrant[] = []
+  for (const r of active) {
+    const t = (r.booking.details as BookingDetails | undefined)?.transportation
+    if (t === true)       needsRide.push(r)
+    else if (t === false) selfTransport.push(r)
+    else                  unanswered.push(r)
+  }
+
+  return (
+    <section className="space-y-3">
+      <TransportGroup title="Needs ride" rows={needsRide} emptyHint="No one has asked for a ride." />
+      <TransportGroup title="Self-transport" rows={selfTransport} emptyHint="No one has opted to drive themselves." />
+      {unanswered.length > 0 && (
+        <TransportGroup
+          title="Not specified"
+          rows={unanswered}
+          emptyHint=""
+          note="Legacy bookings from before transport was a required question."
+        />
+      )}
+      {registrants.some(r => r.booking.status === 'cancelled') && (
+        <p className="text-xs text-blue-950/70 font-medium italic">Cancelled bookings hidden.</p>
+      )}
+    </section>
+  )
+}
+
+function TransportGroup({ title, rows, emptyHint, note }: {
+  title: string
+  rows: Registrant[]
+  emptyHint: string
+  note?: string
+}) {
+  return (
+    <div role="group" aria-label={title} className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-sm font-bold text-blue-900">{title}</h2>
+        <span className="text-xs text-blue-900 font-semibold">{rows.length}</span>
+      </div>
+      {note && <p className="text-xs text-blue-950 font-medium italic">{note}</p>}
+      {rows.length === 0 ? (
+        <p className="text-xs text-blue-950/70 font-medium italic">{emptyHint}</p>
+      ) : (
+        <ul className="divide-y divide-sky-200">
+          {rows.map(r => (
+            <li key={r.booking.id} className="py-1.5 flex items-baseline justify-between gap-3">
+              <span className="text-sm text-blue-900 font-medium">
+                {r.profile?.full_name ?? '(no profile)'}
+                {r.profile?.display_name && r.profile.display_name !== r.profile.full_name && (
+                  <span className="text-blue-900 font-medium"> “{r.profile.display_name}”</span>
+                )}
+              </span>
+              {r.profile?.phone && (
+                <span className="text-xs text-blue-950 font-medium shrink-0">{r.profile.phone}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
 }

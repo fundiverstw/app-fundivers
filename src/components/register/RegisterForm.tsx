@@ -154,7 +154,14 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   const [roomId, setRoomId] = useState<string>(initialDetails?.room?.option_id ?? '')
   const [roomNotes, setRoomNotes] = useState(initialDetails?.room?.notes ?? '')
   const [addonIds, setAddonIds] = useState<Set<string>>(new Set(initialDetails?.add_ons ?? []))
-  const [needsTransport, setNeedsTransport] = useState(initialDetails?.transportation ?? false)
+  // null = diver hasn't picked yet. Step-3 Next is gated until they explicitly
+  // choose so they consciously acknowledge the self-transport responsibility
+  // when they decline a ride. Legacy bookings (created before the choice was
+  // required) carried `transportation: false` by default, so editing one
+  // pre-selects "No" rather than re-asking.
+  const [needsTransport, setNeedsTransport] = useState<boolean | null>(
+    initialDetails?.transportation ?? null
+  )
   const [addNitroxCourse, setAddNitroxCourse] = useState(initialDetails?.nitrox_course_addon ?? false)
   const [payment, setPayment] = useState<'bank_transfer' | 'credit_card' | 'paypal' | 'cash'>(
     initialDetails?.payment_method ?? 'bank_transfer'
@@ -264,7 +271,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
   // and the cost calc skips the surcharge entirely.
   const transportSurcharge = event.transport_price ?? 0
   const transportIncluded = transportSurcharge <= 0
-  const transportCost = !transportIncluded && needsTransport ? transportSurcharge : 0
+  const transportCost = !transportIncluded && needsTransport === true ? transportSurcharge : 0
   const subTotal = base + gearCost + roomCost + addonsCost + transportCost + ((showNitroxAddon && addNitroxCourse) ? NITROX_COURSE_FEE : 0)
   const total = Math.round(subTotal * (1 + paymentSurcharge))
 
@@ -347,7 +354,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
           : { rent: false }),
       room: (showRooms && roomId) ? { option_id: roomId, notes: roomNotes || null } : undefined,
       add_ons: showAddons ? [...addonIds] : [],
-      transportation: needsTransport,
+      transportation: needsTransport === true,
       payment_method: payment,
       credit_card_invoice_email: payment === 'credit_card' && creditCardInvoiceEmail.trim()
         ? creditCardInvoiceEmail.trim()
@@ -732,11 +739,11 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
           )}
 
           <fieldset className="space-y-2">
-            <legend className="text-sm font-semibold text-blue-900">Transportation</legend>
+            <legend className="text-sm font-semibold text-blue-900">Transportation *</legend>
             <label className="flex gap-2 text-sm text-blue-950 font-medium items-start">
-              <input type="radio" name="transport" checked={needsTransport} onChange={() => setNeedsTransport(true)} className="accent-blue-900 mt-1" />
+              <input type="radio" name="transport" checked={needsTransport === true} onChange={() => setNeedsTransport(true)} className="accent-blue-900 mt-1" />
               <span className="flex-1">
-                <span className="block">Ride with the shop from the dive shop to the site</span>
+                <span className="block">Yes, I'll ride with the shop from the dive shop to the site</span>
                 {!transportIncluded && transportSurcharge > 0 && (
                   <span className="block text-xs text-blue-950 font-medium">+{transportSurcharge.toLocaleString()} {event.currency}</span>
                 )}
@@ -746,10 +753,12 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
               </span>
             </label>
             <label className="flex gap-2 text-sm text-blue-950 font-medium items-start">
-              <input type="radio" name="transport" checked={!needsTransport} onChange={() => setNeedsTransport(false)} className="accent-blue-900 mt-1" />
+              <input type="radio" name="transport" checked={needsTransport === false} onChange={() => setNeedsTransport(false)} className="accent-blue-900 mt-1" />
               <span className="flex-1">
-                <span className="block">Drive myself / handle my own transportation</span>
-                <span className="block text-xs text-blue-950 font-medium">Meet us at the dive site.</span>
+                <span className="block">No, I don't need a ride</span>
+                <span className="block text-xs text-blue-950 font-medium">
+                  I am responsible for getting myself to the dive/event site on time.
+                </span>
               </span>
             </label>
           </fieldset>
@@ -914,12 +923,15 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
         {step < 4 ? (
           <button
             onClick={() => setStep((step + 1) as Step)}
-            disabled={step === 2 && (
-              fullName.trim() === '' ||
-              certBlocked ||
-              nitroxBlocked ||
-              (isGuest && (guestEmail.trim() === '' || guestPassword.length < 8 || !guestAgreedTerms))
-            )}
+            disabled={
+              (step === 2 && (
+                fullName.trim() === '' ||
+                certBlocked ||
+                nitroxBlocked ||
+                (isGuest && (guestEmail.trim() === '' || guestPassword.length < 8 || !guestAgreedTerms))
+              )) ||
+              (step === 3 && needsTransport === null)
+            }
             className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
           >
             Next ›
