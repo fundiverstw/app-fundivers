@@ -816,37 +816,36 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
   }
 
   return (
-    <div className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-2">
+    <div className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-lg overflow-hidden">
+      {/* Dense single-line row when collapsed: caret + name + status + payment.
+          Cert / sizing / contact info moved to the expanded block so the
+          scroll-length stays short on mobile. */}
       <button
         type="button"
         onClick={() => setExpanded(v => !v)}
         aria-expanded={expanded}
-        className="w-full text-left flex items-start justify-between gap-3 focus:outline-none"
+        className="w-full text-left flex items-center gap-2 px-3 py-2 focus:outline-none"
       >
-        <div>
-          <p className="font-medium text-blue-900 text-sm">
-            <span aria-hidden="true" className="text-blue-950 font-medium mr-1.5">{expanded ? '▾' : '▸'}</span>
+        <span aria-hidden="true" className="text-xs text-blue-950 font-medium shrink-0">
+          {expanded ? '▾' : '▸'}
+        </span>
+        <span className="flex-1 min-w-0 text-sm truncate">
+          <span className="text-blue-900 font-medium">
             {r.profile?.full_name ?? '(no profile)'}
-            {r.profile?.display_name && <span className="text-blue-900 font-medium"> “{r.profile.display_name}”</span>}
-            {r.profile?.name_alt && <span className="text-blue-900 font-medium"> ({r.profile.name_alt})</span>}
-          </p>
-          {r.profile && (
-            <p className="text-xs text-blue-900 font-medium pl-4">
-              {r.profile.cert_agency && r.profile.cert_level && `${r.profile.cert_agency} ${r.profile.cert_level}`}
-              {r.profile.nitrox_certified && ' · Nitrox'}
-              {r.profile.deep_certified && ' · Deep'}
-            </p>
+          </span>
+          {r.profile?.display_name && (
+            <span className="text-blue-900/80 font-medium"> “{r.profile.display_name}”</span>
           )}
           {r.diverNotes.length > 0 && (
-            <p className="text-xs font-semibold text-red-700 pl-4 mt-0.5">
+            <span className="ml-2 text-xs font-semibold text-red-700">
               {r.diverNotes.length} diver note{r.diverNotes.length === 1 ? '' : 's'}
-            </p>
+            </span>
           )}
-        </div>
-        <div className="text-right text-xs shrink-0 space-y-1">
+        </span>
+        <span className="shrink-0 flex items-center gap-1.5">
           {/* Wrapped in a click-stopper so opening the select doesn't collapse/expand the card. */}
           {readOnly ? (
-            <span className={`bg-white border border-sky-300 rounded px-1.5 py-0.5 text-xs font-medium capitalize inline-block ${statusStyles[r.booking.status]}`}>
+            <span className={`bg-white border border-sky-300 rounded px-1.5 py-0.5 text-xs font-medium capitalize ${statusStyles[r.booking.status]}`}>
               {r.booking.status}
             </span>
           ) : (
@@ -862,29 +861,40 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
               </select>
             </span>
           )}
-          <p className={`${payStyles[paymentStatus]} capitalize`}>
+          <span className={`${payStyles[paymentStatus]} text-xs font-medium whitespace-nowrap`}>
             {paymentStatus === 'paid'    && `Paid ${totalPaid.toLocaleString()}`}
-            {paymentStatus === 'partial' && `${totalPaid.toLocaleString()} paid · ${outstanding.toLocaleString()} due`}
-            {paymentStatus === 'none'    && 'No payment'}
-          </p>
-        </div>
+            {paymentStatus === 'partial' && `${outstanding.toLocaleString()} due`}
+            {paymentStatus === 'none'    && 'Unpaid'}
+          </span>
+        </span>
       </button>
 
       {expanded && (
-        <>
+        <div className="border-t border-sky-200 px-3 pb-3 pt-2 space-y-2">
           {r.profile && (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-blue-900 font-medium pt-1 border-t border-sky-200">
-              {r.profile.phone       && <span>📞 {r.profile.phone}</span>}
-              {r.profile.contact_method && r.profile.contact_id && (
-                <span>{methodEmoji(r.profile.contact_method)} {r.profile.contact_id}</span>
+            <div className="space-y-1">
+              {(r.profile.cert_agency || r.profile.cert_level || r.profile.nitrox_certified || r.profile.deep_certified || r.profile.name_alt) && (
+                <p className="text-xs text-blue-900 font-medium">
+                  {r.profile.name_alt && <span>{r.profile.name_alt}</span>}
+                  {r.profile.name_alt && r.profile.cert_agency && r.profile.cert_level && ' · '}
+                  {r.profile.cert_agency && r.profile.cert_level && `${r.profile.cert_agency} ${r.profile.cert_level}`}
+                  {r.profile.nitrox_certified && ' · Nitrox'}
+                  {r.profile.deep_certified && ' · Deep'}
+                </p>
               )}
-              {r.profile.logged_dives > 0 && <span>📖 {r.profile.logged_dives} logged</span>}
-              {r.profile.height_cm && r.profile.weight_kg && (
-                <span>📏 {r.profile.height_cm}cm / {r.profile.weight_kg}kg</span>
-              )}
-              {r.profile.shoe_size && (
-                <span>👟 {shoeAsJp(r.profile.shoe_size) ?? r.profile.shoe_size}</span>
-              )}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-blue-900 font-medium">
+                {r.profile.phone       && <span>📞 {r.profile.phone}</span>}
+                {r.profile.contact_method && r.profile.contact_id && (
+                  <span>{methodEmoji(r.profile.contact_method)} {r.profile.contact_id}</span>
+                )}
+                {r.profile.logged_dives > 0 && <span>📖 {r.profile.logged_dives} logged</span>}
+                {r.profile.height_cm && r.profile.weight_kg && (
+                  <span>📏 {r.profile.height_cm}cm / {r.profile.weight_kg}kg</span>
+                )}
+                {r.profile.shoe_size && (
+                  <span>👟 {shoeAsJp(r.profile.shoe_size) ?? r.profile.shoe_size}</span>
+                )}
+              </div>
             </div>
           )}
 
@@ -953,7 +963,7 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
               </button>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   )
