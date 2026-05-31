@@ -10,10 +10,30 @@ import { MonthCalendar } from '../../components/calendar/MonthCalendar'
 import { BusyEntryModal } from '../../components/admin/BusyEntryModal'
 import type { AppEvent, StaffBusyEntry } from '../../types/database'
 
+// Persisted in sessionStorage so clicking an event and returning via the
+// detail page's "back to events" link lands the admin on the month they
+// were viewing, not today's month.
+const MONTH_STORAGE_KEY = 'admin-events:month'
+
+function readStoredMonth(): Date {
+  try {
+    const stored = sessionStorage.getItem(MONTH_STORAGE_KEY)
+    if (stored) {
+      const d = new Date(stored)
+      if (!Number.isNaN(d.getTime())) return d
+    }
+  } catch { /* sessionStorage may be unavailable (private mode, SSR) */ }
+  return new Date()
+}
+
 export function AdminEventsPage() {
   const navigate = useNavigate()
   const { user, profile } = useAuth()
-  const [month, setMonth] = useState(new Date())
+  const [month, setMonth] = useState<Date>(readStoredMonth)
+
+  useEffect(() => {
+    try { sessionStorage.setItem(MONTH_STORAGE_KEY, month.toISOString()) } catch { /* ignore */ }
+  }, [month])
   const [events, setEvents] = useState<AppEvent[]>([])
   const [counts, setCounts] = useState<Map<string, number>>(new Map())
   const [busyEntries, setBusyEntries] = useState<StaffBusyEntry[]>([])
