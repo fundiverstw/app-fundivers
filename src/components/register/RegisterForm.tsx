@@ -111,6 +111,11 @@ export interface RegisterFormBodyProps {
 export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCancel, onBackBeforeStepOne, existingBooking, actingOnBehalfOf }: RegisterFormBodyProps) {
   const isGuest = !userId && !actingOnBehalfOf
   const isEdit = !!existingBooking
+  // Admin-on-behalf: relax the diver-facing required-field gates so an admin
+  // can register a diver whose profile is still incomplete (no cert card,
+  // missing full name, no transport choice, no policy ack). The diver can
+  // complete their profile later.
+  const isAdminBehalf = !!actingOnBehalfOf
   const initialDetails = existingBooking?.details as BookingDetails | undefined
   // Gating derived from the event
   const diveDays = Math.max(1, event.dive_days ?? 1)
@@ -994,20 +999,20 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
             onClick={() => setStep((step + 1) as Step)}
             disabled={
               (step === 2 && (
-                fullName.trim() === '' ||
-                certBlocked ||
-                nitroxBlocked ||
-                deepBlocked ||
+                (!isAdminBehalf && fullName.trim() === '') ||
+                (!isAdminBehalf && certBlocked) ||
+                (!isAdminBehalf && nitroxBlocked) ||
+                (!isAdminBehalf && deepBlocked) ||
                 (isGuest && (guestEmail.trim() === '' || guestPassword.length < 8 || !guestAgreedTerms))
               )) ||
-              (step === 3 && needsTransport === null)
+              (step === 3 && !isAdminBehalf && needsTransport === null)
             }
             className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
           >
             Next ›
           </button>
         ) : (
-          <button onClick={submit} disabled={saving || (!!cancelPolicy && !policyAcked)}
+          <button onClick={submit} disabled={saving || (!isAdminBehalf && !!cancelPolicy && !policyAcked)}
             className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg">
             {saving ? '…' : isEdit ? 'Save changes' : 'Confirm booking'}
           </button>
