@@ -93,6 +93,7 @@ export function CalendarPage() {
           ? <span className="text-xs text-red-600 font-semibold">Booked</span>
           : null
         }
+        hidePastInList
       />
 
       {selected && (
