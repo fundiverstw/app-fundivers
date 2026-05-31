@@ -5,16 +5,20 @@ import { CalendarPage } from './CalendarPage'
 import { renderWithRouter, mockQueryBuilder } from '../../tests/test-utils'
 import type { AppEvent } from '../types/database'
 
-const { from, insert, update, useAuthMock, fetchEventsInRange } = vi.hoisted(() => ({
+const { from, insert, update, invoke, useAuthMock, fetchEventsInRange } = vi.hoisted(() => ({
   from: vi.fn(),
   insert: vi.fn(),
   update: vi.fn(),
+  invoke: vi.fn(),
   useAuthMock: vi.fn(),
   fetchEventsInRange: vi.fn(),
 }))
 
 vi.mock('../lib/supabase', () => ({
-  supabase: { from: (...a: unknown[]) => from(...a) },
+  supabase: {
+    from: (...a: unknown[]) => from(...a),
+    functions: { invoke: (...a: unknown[]) => invoke(...a) },
+  },
 }))
 
 vi.mock('../lib/events', async () => {
@@ -41,6 +45,7 @@ beforeEach(() => {
   from.mockReset()
   insert.mockReset()
   update.mockReset()
+  invoke.mockReset()
   fetchEventsInRange.mockReset()
   useAuthMock.mockReset()
   useAuthMock.mockReturnValue({ user: { id: 'u1' } })
@@ -120,7 +125,7 @@ describe('CalendarPage', () => {
     await screen.findAllByText(ev.title)
     // The title now appears twice (calendar bar + list row); click the first.
     await user.click(screen.getAllByText(ev.title)[0])
-    expect(await screen.findByRole('button', { name: /register/i })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Register' })).toBeInTheDocument()
     expect(screen.getByText(/TWD\s*1,500/)).toBeInTheDocument()
   })
 
@@ -134,7 +139,7 @@ describe('CalendarPage', () => {
     await screen.findAllByText(ev.title)
     // The title now appears twice (calendar bar + list row); click the first.
     await user.click(screen.getAllByText(ev.title)[0])
-    await user.click(screen.getByRole('button', { name: /register/i }))
+    await user.click(screen.getByRole('button', { name: 'Register' }))
 
     expect(await screen.findByText(/step 1 of 4/i)).toBeInTheDocument()
     // The event detail modal closes; only the register form is now visible.
@@ -237,5 +242,57 @@ describe('CalendarPage', () => {
     const initial = heading.textContent
     await user.click(screen.getByRole('button', { name: /next month/i }))
     await waitFor(() => expect(heading.textContent).not.toBe(initial))
+  })
+
+  it('multi-event registration: cart submits one create-registration call per event with a shared group_id', async () => {
+    const evA = buildEvent({ id: 'dive_aa', type: 'dive', title: 'Green Island Dive' })
+    const evB = buildEvent({ id: 'dive_bb', type: 'dive', title: 'Long Dong Bay' })
+    fetchEventsInRange.mockResolvedValue([evA, evB])
+    setupBookings([])
+    useAuthMock.mockReturnValue({
+      user:    { id: 'u1' },
+      profile: {
+        id: 'u1', full_name: 'Ada Lovelace', phone: null, contact_method: null, contact_id: null,
+        cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false, deep_certified: false,
+        emergency_contact_name: null, emergency_contact_phone: null,
+      },
+    })
+    invoke.mockResolvedValueOnce({ data: { booking_id: 'bA', status: 'pending' }, error: null })
+    invoke.mockResolvedValueOnce({ data: { booking_id: 'bB', status: 'pending' }, error: null })
+
+    const user = userEvent.setup()
+    renderWithRouter(<CalendarPage />)
+    await screen.findAllByText('Green Island Dive')
+
+    // Enter multi mode and add both events from the "this month" list.
+    await user.click(screen.getByRole('button', { name: /register for multiple events/i }))
+    const addButtons = await screen.findAllByText('+ Add')
+    expect(addButtons.length).toBeGreaterThanOrEqual(2)
+    // Click the row, not the badge — the list item is the click target.
+    await user.click(addButtons[0].closest('li,div,button,article,a') ?? addButtons[0])
+    await user.click(addButtons[1].closest('li,div,button,article,a') ?? addButtons[1])
+
+    // Floating cart bar shows count, Continue advances to the modal.
+    expect(await screen.findByText(/2 events selected/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /continue/i }))
+
+    // Walk steps 1 → 2 → 3 → 4 and submit. Scope queries to the modal so
+    // the calendar's "Next month" button doesn't shadow the form's "Next".
+    const dialog = await screen.findByRole('dialog', { name: /multi-event registration/i })
+    await user.click(within(dialog).getByRole('button', { name: /next/i }))                    // step 1 → 2
+    await user.click(within(dialog).getByRole('button', { name: /next/i }))                    // step 2 → 3
+    const noTransportRadios = within(dialog).getAllByRole('radio', { name: /i'll get there myself/i })
+    expect(noTransportRadios.length).toBe(2)
+    for (const r of noTransportRadios) await user.click(r)
+    await user.click(within(dialog).getByRole('button', { name: /next/i }))                    // step 3 → 4
+    await user.click(within(dialog).getByRole('button', { name: /confirm 2 bookings/i }))      // submit
+
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2))
+    const firstBody  = (invoke.mock.calls[0][1] as { body: Record<string, unknown> }).body
+    const secondBody = (invoke.mock.calls[1][1] as { body: Record<string, unknown> }).body
+    // Both calls share the same group_id — that's the whole point of the cart.
+    expect(firstBody.group_id).toBeDefined()
+    expect(firstBody.group_id).toEqual(secondBody.group_id)
+    expect([firstBody.event_id, secondBody.event_id].sort()).toEqual(['dive_aa', 'dive_bb'])
   })
 })
