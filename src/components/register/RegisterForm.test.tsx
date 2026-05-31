@@ -838,4 +838,49 @@ describe('RegisterForm', () => {
     expect(setSession).not.toHaveBeenCalled()
     expect(onBooked).toHaveBeenCalledWith({ id: 'b-new', status: 'pending' })
   })
+
+  it('admin "register on behalf of": skips required-field gates when diver profile is incomplete', async () => {
+    setupFrom()
+    const onBooked = vi.fn()
+    const user = userEvent.setup()
+    // Profile is bare bones — no name, cert level set without a card,
+    // no nationality, etc. A diver couldn't get past step 2 with this,
+    // but the admin path should sail through.
+    const sparseProfile: Profile = {
+      ...sampleProfile,
+      full_name: null,
+      cert_card_path: null,
+    }
+    render(
+      <MemoryRouter>
+        <RegisterFormBody
+          event={sampleEvent}
+          profile={sparseProfile}
+          userId="diver-99"
+          actingOnBehalfOf="diver-99"
+          onSubmitSuccess={onBooked}
+        />
+      </MemoryRouter>
+    )
+
+    // Step 1 → 2.
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    // Full name left blank, cert_level pre-filled from profile with no
+    // card on file — Next should still be enabled.
+    expect((screen.getByLabelText(/full name/i) as HTMLInputElement).value).toBe('')
+    expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    // Step 3 — don't touch transport; Next should still be enabled.
+    expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    // Step 4 — Confirm enabled without any extra interaction.
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+    const opts = invoke.mock.calls[0][1] as { body: Record<string, unknown> }
+    expect(opts.body).toMatchObject({ target_user_id: 'diver-99' })
+    // needsTransport stayed null → details.transportation defaults to false.
+    expect((opts.body.details as Record<string, unknown>).transportation).toBe(false)
+    expect(onBooked).toHaveBeenCalled()
+  })
 })
