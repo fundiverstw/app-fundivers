@@ -113,6 +113,10 @@ export interface MonthCalendarProps {
   hidePastInList?: boolean
   /** Optional heading for the list below the grid. */
   listTitle?: string
+  /** Event ids to visually highlight on the grid and the list (e.g. the
+   *  current multi-event cart). Each highlighted EventBar gets an amber
+   *  ring; the corresponding list row gets a tinted background. */
+  highlightedIds?: Set<string>
 
   // ── Staff availability overlay (optional) ────────────────────────────
   /** Staff_busy rows touching the visible range. When omitted the overlay is fully off. */
@@ -140,6 +144,7 @@ export interface MonthCalendarProps {
 
 export function MonthCalendar({
   month, onMonthChange, events, onPickEvent, renderListBadge, hidePastInList, listTitle = 'This month',
+  highlightedIds,
   busyEntries, busyShown, onToggleBusy, currentUserId, ownDutyDays, onCreateBusy, onPickBusy,
 }: MonthCalendarProps) {
   const [diveShown, setDiveShown] = useState(true)
@@ -253,6 +258,7 @@ export function MonthCalendar({
         trackRows={cellTrackRows}
         busyTrackRows={cellBusyTrackRows}
         ownDutyDays={ownDutyDays}
+        highlightedIds={highlightedIds}
         onPickEvent={onPickEvent}
         onPickBusy={onPickBusy}
         onCreateBusy={onCreateBusy}
@@ -269,7 +275,11 @@ export function MonthCalendar({
           <button
             key={ev.id}
             onClick={() => onPickEvent(ev)}
-            className="w-full text-left bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-3 hover:border-red-500 transition-colors"
+            className={`w-full text-left backdrop-blur-md rounded-xl p-3 transition-colors ${
+              highlightedIds?.has(ev.id)
+                ? 'bg-amber-100 border-2 border-amber-400 hover:border-amber-500'
+                : 'bg-white/70 border border-sky-200 hover:border-red-500'
+            }`}
           >
             <div className="flex items-start justify-between">
               <div>
@@ -306,6 +316,7 @@ interface MonthGridProps {
   trackRows: number
   busyTrackRows: number
   ownDutyDays?: Map<string, Set<string>>
+  highlightedIds?: Set<string>
   onPickEvent: (ev: AppEvent) => void
   onPickBusy?: (b: StaffBusyEntry) => void
   onCreateBusy?: (day: Date) => void
@@ -314,7 +325,7 @@ interface MonthGridProps {
 }
 
 function MonthGrid({
-  month, days, ranges, busyRanges, trackRows, busyTrackRows, ownDutyDays,
+  month, days, ranges, busyRanges, trackRows, busyTrackRows, ownDutyDays, highlightedIds,
   onPickEvent, onPickBusy, onCreateBusy, hoveredEventId, onHoverEvent,
 }: MonthGridProps) {
   const leading = days[0].getDay()
@@ -344,6 +355,7 @@ function MonthGrid({
           busyTrackRows={busyTrackRows}
           minHeight={cellMinHeight}
           ownDutyDays={ownDutyDays}
+          highlightedIds={highlightedIds}
           onPickEvent={onPickEvent}
           onPickBusy={onPickBusy}
           onCreateBusy={onCreateBusy}
@@ -356,7 +368,7 @@ function MonthGrid({
 }
 
 function DayCell({
-  day, ranges, busyRanges, month, trackRows, busyTrackRows, minHeight, ownDutyDays,
+  day, ranges, busyRanges, month, trackRows, busyTrackRows, minHeight, ownDutyDays, highlightedIds,
   onPickEvent, onPickBusy, onCreateBusy, hoveredEventId, onHoverEvent,
 }: {
   day: Date
@@ -367,6 +379,7 @@ function DayCell({
   busyTrackRows: number
   minHeight: number
   ownDutyDays?: Map<string, Set<string>>
+  highlightedIds?: Set<string>
   onPickEvent: (ev: AppEvent) => void
   onPickBusy?: (b: StaffBusyEntry) => void
   onCreateBusy?: (day: Date) => void
@@ -410,6 +423,7 @@ function DayCell({
             seg={seg}
             track={track}
             isOwnDuty={!!ownDutyDays?.get(seg.event.id)?.has(dayKey)}
+            highlighted={!!highlightedIds?.has(seg.event.id)}
             onClick={() => onPickEvent(seg.event)}
             hovered={hoveredEventId === seg.event.id}
             onHoverEvent={onHoverEvent}
@@ -434,10 +448,11 @@ function DayCell({
   )
 }
 
-function EventBar({ seg, track, isOwnDuty, onClick, hovered, onHoverEvent }: {
+function EventBar({ seg, track, isOwnDuty, highlighted, onClick, hovered, onHoverEvent }: {
   seg: CellSegment<AppEvent>
   track: number
   isOwnDuty: boolean
+  highlighted: boolean
   onClick: () => void
   hovered: boolean
   onHoverEvent: (id: string | null) => void
@@ -451,12 +466,20 @@ function EventBar({ seg, track, isOwnDuty, onClick, hovered, onHoverEvent }: {
   // left/right only on the true start/end cells so the middle days of a
   // multi-day featured event read as one continuous stripe, not a row of
   // individually ringed boxes.
-  const featuredShadow = seg.event.featured
+  //
+  // Highlight ring (multi-event cart selection): a thicker amber inset on
+  // the same edges. Takes precedence over featured since the diver is
+  // actively staging this event for registration — they need to see at a
+  // glance which bars they've added.
+  const ringColor = highlighted ? 'rgb(217 119 6)' : 'rgb(252 211 77)'
+  const ringWidth = highlighted ? '2px' : '1px'
+  const showRing = highlighted || seg.event.featured
+  const featuredShadow = showRing
     ? [
-        'inset 0 1px 0 rgb(252 211 77)',
-        'inset 0 -1px 0 rgb(252 211 77)',
-        seg.isStart ? 'inset 1px 0 0 rgb(252 211 77)' : '',
-        seg.isEnd   ? 'inset -1px 0 0 rgb(252 211 77)' : '',
+        `inset 0 ${ringWidth} 0 ${ringColor}`,
+        `inset 0 -${ringWidth} 0 ${ringColor}`,
+        seg.isStart ? `inset ${ringWidth} 0 0 ${ringColor}` : '',
+        seg.isEnd   ? `inset -${ringWidth} 0 0 ${ringColor}` : '',
       ].filter(Boolean).join(', ')
     : undefined
 
