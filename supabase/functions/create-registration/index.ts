@@ -52,6 +52,12 @@ interface RegistrationBody {
   profile_patch: Record<string, unknown>
   details:       Record<string, unknown>
   notes?:        string | null
+
+  // Set on multi-event submissions so every booking from the same form
+  // submit shares a group id. The client generates the UUID and reuses it
+  // across all parallel create-registration calls. Single-event submits
+  // leave this unset and the column stays NULL.
+  group_id?:     string
 }
 
 // Pass the payment_method through verbatim — the PDF builder now accepts
@@ -202,10 +208,11 @@ Deno.serve(async (req) => {
   const { data: booking, error: bErr } = await admin
     .from("bookings")
     .insert({
-      user_id: userId,
-      status:  "pending",
-      notes:   body.notes ?? null,
-      details: body.details,
+      user_id:  userId,
+      status:   "pending",
+      notes:    body.notes ?? null,
+      details:  body.details,
+      group_id: body.group_id ?? null,
       ...fk,
     })
     .select()
