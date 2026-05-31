@@ -97,17 +97,18 @@ describe('AdminEventDetailPage', () => {
     const user = userEvent.setup()
     renderAt('/admin/events/dive/dive_x')
 
-    // Compact: name + cert/nitrox visible; add-ons (detailed) hidden.
+    // Dense row: only name is visible when collapsed. Cert + add-ons hidden.
     await screen.findByText('Ada Lovelace')
-    expect(screen.getByText(/PADI AOW · Nitrox/)).toBeInTheDocument()
+    expect(screen.queryByText(/PADI AOW · Nitrox/)).not.toBeInTheDocument()
     expect(screen.queryByText(/SMB Rental/)).not.toBeInTheDocument()
     expect(screen.queryByText(/addon-a/)).not.toBeInTheDocument()
 
     // Expand the card by clicking it.
     await user.click(screen.getByRole('button', { expanded: false, name: /Ada Lovelace/ }))
 
-    // Add-ons now visible, rendered as display_title, not raw _id.
+    // Cert info + add-ons (display_title, not raw _id) now visible.
     await waitFor(() => {
+      expect(screen.getByText(/PADI AOW · Nitrox/)).toBeInTheDocument()
       expect(screen.getByText(/SMB Rental/)).toBeInTheDocument()
     })
     expect(screen.getByText(/Camera Rental \(1 Dive\)/)).toBeInTheDocument()
