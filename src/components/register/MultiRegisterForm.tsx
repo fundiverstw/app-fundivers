@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { formatEventSpan } from '../../lib/events'
 import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/payment-instructions'
@@ -49,6 +49,36 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   // their mind. Defaults to the cart the parent handed in.
   const [cart, setCart] = useState<AppEvent[]>(events)
 
+  // Linked child accounts the signed-in user manages. Loaded once at mount.
+  // Lets a parent register different divers per cart row (e.g. "me for dive A,
+  // child for dive B"). All bookings still share one group_id.
+  const [children, setChildren] = useState<Profile[]>([])
+  // Per-event target diver id — null/missing = self.
+  const [forDiverByEvent, setForDiverByEvent] = useState<Record<string, string | null>>({})
+
+  useEffect(() => {
+    // Children only fetched for top-level divers — a profile already
+    // tagged with parent_account can't itself have children.
+    if (profile?.parent_account) return
+    let cancelled = false
+    supabase
+      .from('profiles')
+      .select('*')
+      .eq('parent_account', userId)
+      .order('full_name', { ascending: true })
+      .then(({ data }) => {
+        if (cancelled) return
+        setChildren((data ?? []) as Profile[])
+      })
+    return () => { cancelled = true }
+  }, [userId, profile])
+
+  const childById = useMemo(() => {
+    const m = new Map<string, Profile>()
+    for (const c of children) m.set(c.id, c)
+    return m
+  }, [children])
+
   // Per-event choices live in a map keyed by event id; initialized lazily.
   const [choicesById, setChoicesById] = useState<Record<string, EventChoices>>(() => {
     const init: Record<string, EventChoices> = {}
@@ -94,12 +124,16 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
         : 0
       const transportSurcharge = ev.transport_price ?? 0
       const transportCost = transportSurcharge > 0 && c.needsTransport === true ? transportSurcharge : 0
-      const showNitroxAddon = ev.nitrox_required && !(profile?.nitrox_certified ?? false)
+      const targetForDiverId = forDiverByEvent[ev.id] ?? null
+      const targetProfile = targetForDiverId
+        ? (childById.get(targetForDiverId) ?? profile)
+        : profile
+      const showNitroxAddon = ev.nitrox_required && !(targetProfile?.nitrox_certified ?? false)
       const nitroxFee = showNitroxAddon && c.addNitroxCourse ? NITROX_COURSE_FEE : 0
       const subTotal = base + gearCost + transportCost + nitroxFee
       return Math.round(subTotal * (1 + surcharge))
     })
-  }, [cart, choicesById, payment, profile])
+  }, [cart, choicesById, payment, profile, forDiverByEvent, childById])
 
   const grandTotal = eventTotals.reduce((s, n) => s + n, 0)
 
@@ -145,7 +179,14 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
     const calls = cart.map(async (ev) => {
       const c = choicesById[ev.id]
       const gearIncluded = ev.type === 'course' && (ev.dive_days ?? 0) > 0
-      const showNitroxAddon = ev.nitrox_required && !(profile?.nitrox_certified ?? false)
+      // When the booking is for a linked child, look up nitrox status on
+      // the child's profile (not the parent's) so we don't show / charge
+      // for a nitrox course they don't need.
+      const targetForDiverId = forDiverByEvent[ev.id] ?? null
+      const targetProfile = targetForDiverId
+        ? (childById.get(targetForDiverId) ?? profile)
+        : profile
+      const showNitroxAddon = ev.nitrox_required && !(targetProfile?.nitrox_certified ?? false)
 
       const details: BookingDetails = {
         gear: gearIncluded
@@ -163,16 +204,22 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
         deposit: ev.deposit_amount ?? undefined,
       }
 
+      // Self-targeted bookings update the parent's profile with whatever
+      // they typed in step 2. Child-targeted bookings leave the child's
+      // profile untouched (the parent's typed values would otherwise
+      // overwrite it).
+      const patchForCall = targetForDiverId ? {} : profilePatch
       const { data, error } = await supabase.functions.invoke<{ booking_id: string; status?: string }>(
         'create-registration',
         {
           body: {
             event_type:    ev.type,
             event_id:      ev.id,
-            profile_patch: profilePatch,
+            profile_patch: patchForCall,
             details,
             notes:         null,
             group_id:      groupId,
+            ...(targetForDiverId ? { target_user_id: targetForDiverId } : {}),
           },
         },
       )
@@ -183,6 +230,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
         status:       (data.status ?? 'pending') as Booking['status'],
         eventId:      ev.id,
         eventType:    ev.type,
+        bookingUserId: targetForDiverId ?? userId,
       }
     })
 
@@ -201,7 +249,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
         successes.push({
           id:           res.value.id,
           created_at:   new Date().toISOString(),
-          user_id:      userId,
+          user_id:      res.value.bookingUserId,
           status:       res.value.status,
           notes:        null,
           eo_dive_id:   ev.type === 'dive'   ? ev.id : null,
@@ -262,7 +310,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
             </p>
             <ul className="space-y-2">
               {cart.map(ev => (
-                <li key={ev.id} className="bg-sky-50 border border-sky-200 rounded-lg px-3 py-2">
+                <li key={ev.id} className="bg-sky-50 border border-sky-200 rounded-lg px-3 py-2 space-y-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-blue-900 truncate">{ev.title}</p>
@@ -282,6 +330,27 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                       className="text-blue-900 font-medium text-lg leading-none px-2"
                     >×</button>
                   </div>
+                  {children.length > 0 && (
+                    <label className="block">
+                      <span className="block text-xs text-blue-900 font-medium mb-1">For diver</span>
+                      <select
+                        value={forDiverByEvent[ev.id] ?? ''}
+                        onChange={e => setForDiverByEvent(prev => ({
+                          ...prev,
+                          [ev.id]: e.target.value || null,
+                        }))}
+                        aria-label={`Diver for ${ev.title}`}
+                        className="w-full bg-white border border-sky-300 rounded-lg px-2 py-1.5 text-sm text-blue-900"
+                      >
+                        <option value="">Myself ({profile?.display_name ?? profile?.full_name ?? 'me'})</option>
+                        {children.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.full_name ?? '(no name)'}{c.display_name ? ` “${c.display_name}”` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                 </li>
               ))}
               {cart.length === 0 && (
@@ -363,10 +432,22 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                 const showGearRentChoice = ev.type === 'dive' && !!ev.gear_rental_info
                 const transportSurcharge = ev.transport_price ?? 0
                 const transportIncluded = transportSurcharge <= 0
-                const showNitroxAddon = ev.nitrox_required && !(profile?.nitrox_certified ?? false)
+                const targetForDiverId = forDiverByEvent[ev.id] ?? null
+                const targetProfile = targetForDiverId
+                  ? (childById.get(targetForDiverId) ?? profile)
+                  : profile
+                const showNitroxAddon = ev.nitrox_required && !(targetProfile?.nitrox_certified ?? false)
+                const targetLabel = targetForDiverId
+                  ? (targetProfile?.display_name ?? targetProfile?.full_name ?? '(child)')
+                  : null
                 return (
                   <div key={ev.id} className="bg-sky-50 border border-sky-200 rounded-lg p-3 space-y-2">
-                    <p className="text-sm font-semibold text-blue-900">{ev.title}</p>
+                    <p className="text-sm font-semibold text-blue-900">
+                      {ev.title}
+                      {targetLabel && (
+                        <span className="ml-2 text-xs text-blue-700">· for {targetLabel}</span>
+                      )}
+                    </p>
                     {gearIncluded && (
                       <p className="text-xs text-blue-950 font-medium">Gear is included with this course.</p>
                     )}
