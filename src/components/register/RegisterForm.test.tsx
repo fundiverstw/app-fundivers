@@ -884,12 +884,17 @@ describe('RegisterForm', () => {
     expect(onBooked).toHaveBeenCalled()
   })
 
-  // Parent-on-behalf: the linked-children fetch returns rows, the picker
-  // appears, and selecting a child re-mounts the form aimed at that child.
+  // Parent diver picker: the linked-children fetch returns rows, the
+  // multi-select picker appears, and confirming the selection re-mounts
+  // the form with the right primary target and additionalTargets.
   describe('parent diver picker', () => {
     const childProfile: Profile = {
       ...sampleProfile, id: 'child-1', full_name: 'Bee Junior',
       display_name: 'Bee Jr', cert_level: null, cert_card_path: null,
+    }
+    const childTwoProfile: Profile = {
+      ...sampleProfile, id: 'child-2', full_name: 'Bee The Second',
+      display_name: 'Bee II', cert_level: null, cert_card_path: null,
     }
 
     function setupFromWithChildren(children: Profile[]) {
@@ -901,16 +906,32 @@ describe('RegisterForm', () => {
       })
     }
 
-    it('shows the diver picker when the parent has at least one linked child', async () => {
+    it('shows the picker with self pre-checked plus each child option', async () => {
       setupFromWithChildren([childProfile])
       render(
         <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
           onClose={() => {}} onBooked={() => {}} />
       )
-      // The picker swaps in once children resolve.
+      // Picker swaps in once children resolve.
       await waitFor(() => expect(screen.getByText(/who is this booking for/i)).toBeInTheDocument())
-      expect(screen.getByRole('button', { name: /myself/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /bee junior/i })).toBeInTheDocument()
+      const myself = screen.getByRole('checkbox', { name: /^myself$/i })
+      const kid    = screen.getByRole('checkbox', { name: /bee junior/i })
+      expect((myself as HTMLInputElement).checked).toBe(true)
+      expect((kid as HTMLInputElement).checked).toBe(false)
+      // Continue is enabled by default (myself pre-selected).
+      expect(screen.getByRole('button', { name: /continue/i })).not.toBeDisabled()
+    })
+
+    it('Continue is disabled when no diver is selected', async () => {
+      setupFromWithChildren([childProfile])
+      const user = userEvent.setup()
+      render(
+        <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+          onClose={() => {}} onBooked={() => {}} />
+      )
+      await waitFor(() => expect(screen.getByText(/who is this booking for/i)).toBeInTheDocument())
+      await user.click(screen.getByRole('checkbox', { name: /^myself$/i }))
+      expect(screen.getByRole('button', { name: /continue/i })).toBeDisabled()
     })
 
     it('does NOT show the picker when no children are linked', async () => {
@@ -919,12 +940,11 @@ describe('RegisterForm', () => {
         <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
           onClose={() => {}} onBooked={() => {}} />
       )
-      // Form renders immediately — step indicator visible, no picker.
       expect(screen.getByText(/step 1 of 4/i)).toBeInTheDocument()
       expect(screen.queryByText(/who is this booking for/i)).not.toBeInTheDocument()
     })
 
-    it('picking a child threads target_user_id through and skips the card upload prompt', async () => {
+    it('selecting only a child threads target_user_id and skips the card upload prompt', async () => {
       setupFromWithChildren([childProfile])
       const onBooked = vi.fn()
       const user = userEvent.setup()
@@ -932,15 +952,15 @@ describe('RegisterForm', () => {
         <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
           onClose={() => {}} onBooked={onBooked} />
       )
-      await waitFor(() => expect(screen.getByRole('button', { name: /bee junior/i })).toBeInTheDocument())
-      await user.click(screen.getByRole('button', { name: /bee junior/i }))
+      await waitFor(() => expect(screen.getByText(/who is this booking for/i)).toBeInTheDocument())
+      // Drop Myself, pick the child.
+      await user.click(screen.getByRole('checkbox', { name: /^myself$/i }))
+      await user.click(screen.getByRole('checkbox', { name: /bee junior/i }))
+      await user.click(screen.getByRole('button', { name: /continue/i }))
 
-      // Picker banner shows the chosen target.
+      // Banner shows the chosen target.
       await waitFor(() => expect(screen.getByText(/booking for: bee jr/i)).toBeInTheDocument())
 
-      // The child profile has cert_level=null, so the cert-card prompt is
-      // irrelevant. But more importantly: on-behalf-of mode hides upload
-      // prompts entirely. Walk through to confirm submit threads target_user_id.
       await user.click(screen.getByRole('button', { name: /next/i }))
       await user.click(screen.getByRole('button', { name: /next/i }))
       await user.click(screen.getByLabelText(/no, i don't need a ride/i))
@@ -950,18 +970,22 @@ describe('RegisterForm', () => {
       await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
       const opts = invoke.mock.calls[0][1] as { body: Record<string, unknown> }
       expect(opts.body).toMatchObject({ target_user_id: 'child-1', event_id: 'dive_abc' })
+      expect(opts.body).not.toHaveProperty('group_id')
       expect(onBooked).toHaveBeenCalled()
     })
 
-    it('picking "Myself" submits without target_user_id', async () => {
+    it('selecting Myself + child fans out two calls sharing one group_id', async () => {
       setupFromWithChildren([childProfile])
+      const onBooked = vi.fn()
       const user = userEvent.setup()
       render(
         <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
-          onClose={() => {}} onBooked={() => {}} />
+          onClose={() => {}} onBooked={onBooked} />
       )
-      await waitFor(() => expect(screen.getByRole('button', { name: /myself/i })).toBeInTheDocument())
-      await user.click(screen.getByRole('button', { name: /myself/i }))
+      await waitFor(() => expect(screen.getByText(/who is this booking for/i)).toBeInTheDocument())
+      // Add the child to the default Myself selection.
+      await user.click(screen.getByRole('checkbox', { name: /bee junior/i }))
+      await user.click(screen.getByRole('button', { name: /continue/i }))
 
       await user.click(screen.getByRole('button', { name: /next/i }))
       await user.click(screen.getByRole('button', { name: /next/i }))
@@ -969,9 +993,55 @@ describe('RegisterForm', () => {
       await user.click(screen.getByRole('button', { name: /next/i }))
       await user.click(screen.getByRole('button', { name: /confirm booking/i }))
 
-      await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
-      const opts = invoke.mock.calls[0][1] as { body: Record<string, unknown> }
-      expect(opts.body).not.toHaveProperty('target_user_id')
+      await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2))
+      const bodies = invoke.mock.calls.map(c => (c[1] as { body: Record<string, unknown> }).body)
+      const selfBody  = bodies.find(b => !b.target_user_id)
+      const childBody = bodies.find(b => b.target_user_id === 'child-1')
+
+      expect(selfBody).toBeTruthy()
+      expect(childBody).toBeTruthy()
+      // Both calls share the same group_id.
+      expect(selfBody?.group_id).toBeTruthy()
+      expect(selfBody?.group_id).toBe(childBody?.group_id)
+      // Child's call carries an empty patch (don't overwrite the child's profile).
+      expect(childBody?.profile_patch).toEqual({})
+      // Self's call carries the parent's typed-in name.
+      expect((selfBody?.profile_patch as Record<string, unknown>).full_name).toBe('Ada')
+
+      expect(onBooked).toHaveBeenCalled()
+    })
+
+    it('surfaces per-diver results when an additional child call fails', async () => {
+      setupFromWithChildren([childProfile, childTwoProfile])
+      const onBooked = vi.fn()
+      const user = userEvent.setup()
+      // First call (self): ok. Second call (child-1): ok. Third (child-2): fail.
+      invoke.mockReset()
+      invoke
+        .mockResolvedValueOnce({ data: { booking_id: 'b-self', session: null }, error: null })
+        .mockResolvedValueOnce({ data: { booking_id: 'b-c1', session: null }, error: null })
+        .mockResolvedValueOnce({ data: null, error: { message: 'boom', context: undefined } })
+      render(
+        <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+          onClose={() => {}} onBooked={onBooked} />
+      )
+      await waitFor(() => expect(screen.getByText(/who is this booking for/i)).toBeInTheDocument())
+      await user.click(screen.getByRole('checkbox', { name: /bee junior/i }))
+      await user.click(screen.getByRole('checkbox', { name: /bee the second/i }))
+      await user.click(screen.getByRole('button', { name: /continue/i }))
+
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+      await waitFor(() => expect(screen.getByText(/some divers could not be registered/i)).toBeInTheDocument())
+      // Per-diver block shows BOTH outcomes.
+      expect(screen.getByText(/Bee Jr.*registered/i)).toBeInTheDocument()
+      expect(screen.getByText(/Bee II.*failed/i)).toBeInTheDocument()
+      // onBooked is only fired when every call succeeded.
+      expect(onBooked).not.toHaveBeenCalled()
     })
 
     it('does NOT show the picker when an admin is already acting on behalf of someone', async () => {
@@ -987,8 +1057,6 @@ describe('RegisterForm', () => {
           />
         </MemoryRouter>
       )
-      // Picker would normally fetch children for userId='diver-99', but
-      // the admin-on-behalf path skips it entirely.
       expect(screen.getByText(/step 1 of 4/i)).toBeInTheDocument()
       expect(screen.queryByText(/who is this booking for/i)).not.toBeInTheDocument()
     })

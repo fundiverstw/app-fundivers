@@ -109,10 +109,10 @@ export interface RegisterFormBodyProps {
 }
 
 // Outer wrapper around the multi-step form. Adds an optional "Who is this
-// booking for?" picker for authed parents with linked child accounts. When
-// a child is picked we re-mount the inner form with that child's profile +
-// actingOnBehalfOf set, so the existing on-behalf wiring carries it the
-// rest of the way (edge function's parent path validates the FK).
+// booking for?" picker for authed parents with linked child accounts. The
+// picker is multi-select — a parent can register themselves and any
+// number of their children in one go (all bookings share a group_id and
+// the same extras / payment choices).
 //
 // Picker UX: the inner form renders immediately so guests / childless
 // divers see no loading state at all. We fetch the caller's linked
@@ -128,7 +128,9 @@ export function RegisterFormBody(props: RegisterFormBodyProps) {
     && !profile?.parent_account
 
   const [children, setChildren] = useState<Profile[]>([])
-  const [pickedChild, setPickedChild] = useState<Profile | null>(null)
+  // Profiles the parent has picked (may include themselves). Empty array
+  // is the implicit "self only" default for the no-children case.
+  const [selectedDivers, setSelectedDivers] = useState<Profile[]>([])
   // True once the picker has been shown and acknowledged (or there's no
   // picker to show in the first place). Starts true so the form renders
   // immediately — flips to false when the children fetch turns up at
@@ -154,38 +156,76 @@ export function RegisterFormBody(props: RegisterFormBodyProps) {
     return () => { cancelled = true }
   }, [pickerEligible, userId])
 
+  // Admin-on-behalf and edit paths don't go through the picker at all —
+  // their target is already pinned by the caller. Pass straight through.
+  if (!pickerEligible) {
+    return <RegisterFormBodyInner {...props} />
+  }
+
   if (!pickerConfirmed && profile && children.length > 0) {
     return (
       <DiverPickerStep
         parent={profile}
-        children={children}
+        childOptions={children}
         eventTitle={props.event.title}
+        initialSelection={selectedDivers.length > 0 ? selectedDivers : [profile]}
         onCancel={props.onCancel ?? props.onBackBeforeStepOne}
-        onPick={(child) => {
-          setPickedChild(child)
+        onConfirm={(selection) => {
+          setSelectedDivers(selection)
           setPickerConfirmed(true)
         }}
       />
     )
   }
 
-  const targetProfile = pickedChild ?? profile
-  const targetActingOnBehalfOf = pickedChild ? pickedChild.id : actingOnBehalfOf
+  // When the picker has been seen, selectedDivers drives the form.
+  // When it hasn't (no children), fall back to the parent as the lone
+  // target — same as before the multi-picker existed.
+  const effectiveSelection = selectedDivers.length > 0
+    ? selectedDivers
+    : (profile ? [profile] : [])
+
+  const includesSelf = !!userId && effectiveSelection.some(d => d.id === userId)
+  const childSelections = effectiveSelection.filter(d => d.id !== userId)
+  // The primary target prefills form fields + handles uploads (parent's
+  // session can only write to their own storage folder). When self is in
+  // the selection, primary = parent. Otherwise primary is the first
+  // child and uploads are skipped (on-behalf mode).
+  const primaryProfile = includesSelf ? profile : (childSelections[0] ?? profile)
+  const primaryActingOnBehalfOf = includesSelf
+    ? actingOnBehalfOf
+    : (childSelections[0]?.id ?? actingOnBehalfOf)
+  // Children NOT used as the primary still get a booking — fanned out
+  // server-side from the inner form's submit handler.
+  const additionalTargets: Profile[] = includesSelf
+    ? childSelections
+    : childSelections.slice(1)
+
+  const headerLabel = formatSelectionLabel(effectiveSelection, userId ?? null)
 
   return (
     <RegisterFormBodyInner
       {...props}
-      key={pickedChild?.id ?? userId ?? 'guest'}
-      profile={targetProfile}
-      actingOnBehalfOf={targetActingOnBehalfOf}
-      pickerHeader={children.length > 0 ? {
-        targetName: pickedChild
-          ? (pickedChild.display_name ?? pickedChild.full_name ?? '(unnamed child)')
-          : 'Myself',
-        onChange: () => { setPickerConfirmed(false); setPickedChild(null) },
+      key={`${primaryProfile?.id ?? 'guest'}::${additionalTargets.map(t => t.id).join(',')}`}
+      profile={primaryProfile}
+      actingOnBehalfOf={primaryActingOnBehalfOf}
+      additionalTargets={additionalTargets}
+      pickerHeader={children.length > 0 && headerLabel ? {
+        targetName: headerLabel,
+        onChange: () => { setPickerConfirmed(false) },
       } : null}
     />
   )
+}
+
+function formatSelectionLabel(selection: Profile[], selfId: string | null): string | null {
+  if (selection.length === 0) return null
+  const names = selection.map(p =>
+    (selfId && p.id === selfId)
+      ? 'Myself'
+      : (p.display_name ?? p.full_name ?? '(unnamed)')
+  )
+  return names.join(', ')
 }
 
 interface PickerHeaderInfo {
@@ -194,14 +234,30 @@ interface PickerHeaderInfo {
 }
 
 function DiverPickerStep({
-  parent, children, eventTitle, onPick, onCancel,
+  parent, childOptions, eventTitle, initialSelection, onConfirm, onCancel,
 }: {
   parent: Profile
-  children: Profile[]
+  childOptions: Profile[]
   eventTitle: string
-  onPick: (child: Profile | null) => void
+  initialSelection: Profile[]
+  onConfirm: (selection: Profile[]) => void
   onCancel?: () => void
 }) {
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(initialSelection.map(p => p.id))
+  )
+  const all: Profile[] = [parent, ...childOptions]
+
+  function toggle(id: string) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  const canContinue = selected.size > 0
+
   return (
     <>
       <header className="space-y-1">
@@ -211,49 +267,79 @@ function DiverPickerStep({
             <button onClick={onCancel} className="text-blue-900 font-medium text-xl leading-none shrink-0" aria-label="Close">×</button>
           )}
         </div>
-        <p className="text-xs text-blue-900 font-medium">Who is this booking for?</p>
+        <p className="text-xs text-blue-900 font-medium">Who is this booking for? (Select one or more)</p>
       </header>
       <ul className="space-y-2">
-        <li>
-          <button
-            type="button"
-            onClick={() => onPick(null)}
-            className="w-full text-left bg-white/70 hover:bg-sky-100 border border-sky-300 rounded-lg px-3 py-3"
-          >
-            <p className="text-sm font-semibold text-blue-900">Myself</p>
-            <p className="text-xs text-blue-900/80">{parent.display_name ?? parent.full_name ?? '(your account)'}</p>
-          </button>
-        </li>
-        {children.map(c => (
-          <li key={c.id}>
-            <button
-              type="button"
-              onClick={() => onPick(c)}
-              className="w-full text-left bg-white/70 hover:bg-sky-100 border border-sky-200 rounded-lg px-3 py-3"
-            >
-              <p className="text-sm font-semibold text-blue-900">
-                {c.full_name ?? '(no name)'}
-                {c.display_name && <span className="text-blue-900/80"> “{c.display_name}”</span>}
-              </p>
-              <p className="text-xs text-blue-900/70">
-                {c.cert_agency && c.cert_level ? `${c.cert_agency} ${c.cert_level}` : 'Uncertified'}
-                {c.status && c.status !== 'active' && (
-                  <span className="ml-2 uppercase tracking-wider text-red-700">{c.status}</span>
-                )}
-              </p>
-            </button>
-          </li>
-        ))}
+        {all.map(p => {
+          const isSelf = p.id === parent.id
+          const checked = selected.has(p.id)
+          return (
+            <li key={p.id}>
+              <label
+                className={`flex items-start gap-3 cursor-pointer bg-white/70 hover:bg-sky-100 border rounded-lg px-3 py-3 ${
+                  checked ? 'border-blue-700 ring-2 ring-blue-200' : 'border-sky-200'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggle(p.id)}
+                  aria-label={isSelf ? 'Myself' : (p.full_name ?? '(unnamed child)')}
+                  className="accent-blue-900 mt-1"
+                />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-blue-900">
+                    {isSelf ? 'Myself' : (
+                      <>
+                        {p.full_name ?? '(no name)'}
+                        {p.display_name && <span className="text-blue-900/80"> “{p.display_name}”</span>}
+                      </>
+                    )}
+                  </p>
+                  <p className="text-xs text-blue-900/70">
+                    {isSelf
+                      ? (p.display_name ?? p.full_name ?? '(your account)')
+                      : (p.cert_agency && p.cert_level ? `${p.cert_agency} ${p.cert_level}` : 'Uncertified')}
+                    {!isSelf && p.status && p.status !== 'active' && (
+                      <span className="ml-2 uppercase tracking-wider text-red-700">{p.status}</span>
+                    )}
+                  </p>
+                </div>
+              </label>
+            </li>
+          )
+        })}
       </ul>
+      <p className="text-xs text-blue-950 font-medium">
+        Each diver gets their own booking — extras and payment choices apply to all of them.
+      </p>
+      <footer className="flex items-center justify-end gap-2 pt-2">
+        <button
+          type="button"
+          disabled={!canContinue}
+          onClick={() => {
+            const sel = all.filter(p => selected.has(p.id))
+            onConfirm(sel)
+          }}
+          className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
+        >
+          Continue ›
+        </button>
+      </footer>
     </>
   )
 }
 
 interface RegisterFormBodyInnerProps extends RegisterFormBodyProps {
   pickerHeader?: PickerHeaderInfo | null
+  /** Additional divers to register in the same submit. Each becomes a
+   *  parallel create-registration call with target_user_id set and an
+   *  empty profile_patch (so the parent's typed values don't overwrite
+   *  the child's profile). All calls share one group_id. */
+  additionalTargets?: Profile[]
 }
 
-function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCancel, onBackBeforeStepOne, existingBooking, actingOnBehalfOf, pickerHeader }: RegisterFormBodyInnerProps) {
+function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCancel, onBackBeforeStepOne, existingBooking, actingOnBehalfOf, pickerHeader, additionalTargets = [] }: RegisterFormBodyInnerProps) {
   const isGuest = !userId && !actingOnBehalfOf
   const isEdit = !!existingBooking
   // On-behalf-of (admin or parent): relax the diver-facing required-field
@@ -287,6 +373,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const [policyAcked, setPolicyAcked] = useState<boolean>(!!initialDetails?.cancellation_policy_acked_at)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
+  // Per-additional-target results from a multi-diver fan-out. Surfaced on
+  // step 4 after submit so partial failures stay visible (e.g. parent's
+  // own booking landed but one child's failed) and can be retried.
+  const [additionalResults, setAdditionalResults] = useState<
+    Array<{ targetName: string; ok: boolean; error?: string }>
+  >([])
 
   // Form state — pre-populated from existingBooking when editing.
   const [rentGear, setRentGear] = useState(initialDetails?.gear?.rent ?? false)
@@ -562,13 +654,18 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       return
     }
 
+    // When more than one diver was picked we link the bookings with a
+    // shared group_id (matches the MultiRegisterForm pattern). Single-
+    // diver submits leave it unset so the column stays NULL.
+    const groupId = additionalTargets.length > 0 ? crypto.randomUUID() : undefined
+
     // New booking — both guest and authed routes go through the
     // create-registration edge function so account/profile/booking/email
     // happen atomically server-side. The function handles the guest case
     // (creates the account with email_confirm: true) when email/password
     // are provided; authed callers' Bearer JWT identifies the user.
-    // When actingOnBehalfOf is set, the caller (admin) JWT is used to
-    // authorise, but the booking lands on target_user_id.
+    // When actingOnBehalfOf is set, the caller (admin or parent) JWT is
+    // used to authorise, but the booking lands on target_user_id.
     const { data, error } = await supabase.functions.invoke<{ booking_id: string; status?: string; session: { access_token: string; refresh_token: string } | null }>(
       'create-registration',
       {
@@ -584,12 +681,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           profile_patch: profilePatch,
           details,
           notes:         notes || null,
+          ...(groupId ? { group_id: groupId } : {}),
         },
       },
     )
-    setSaving(false)
-    if (error) { setErr(await readFunctionsError(error, isGuest)); return }
-    if (!data?.booking_id) { setErr('Registration failed — please try again.'); return }
+    if (error) { setSaving(false); setErr(await readFunctionsError(error, isGuest)); return }
+    if (!data?.booking_id) { setSaving(false); setErr('Registration failed — please try again.'); return }
 
     // Guest path returns the session so we can sign the diver in
     // immediately; authed callers already have a session.
@@ -633,9 +730,49 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         }
       }
     }
+    // Fan out one create-registration per additional diver picked. Same
+    // group_id, same details/notes, empty profile_patch (the parent's
+    // typed-in values were already applied to themselves; child profiles
+    // stay untouched). Promise.allSettled so a single child failure
+    // doesn't blow away the others.
+    let allOk = true
+    if (additionalTargets.length > 0) {
+      const calls = additionalTargets.map(async (target) => {
+        const { data: d, error: e } = await supabase.functions.invoke<{ booking_id: string; status?: string }>(
+          'create-registration',
+          {
+            body: {
+              target_user_id: target.id,
+              event_type:     event.type,
+              event_id:       event.id,
+              profile_patch:  {},
+              details,
+              notes:          notes || null,
+              ...(groupId ? { group_id: groupId } : {}),
+            },
+          },
+        )
+        if (e) throw new Error(await readFunctionsError(e, false))
+        if (!d?.booking_id) throw new Error('Registration failed')
+        return d
+      })
+      const settled = await Promise.allSettled(calls)
+      const results = settled.map((res, i) => ({
+        targetName: additionalTargets[i].display_name ?? additionalTargets[i].full_name ?? '(diver)',
+        ok:    res.status === 'fulfilled',
+        error: res.status === 'rejected'
+          ? (res.reason instanceof Error ? res.reason.message : String(res.reason))
+          : undefined,
+      }))
+      setAdditionalResults(results)
+      allOk = results.every(r => r.ok)
+    }
+
+    setSaving(false)
     // Pass status through so the parent can render a different success
     // toast when the booking landed as 'waitlisted' rather than 'pending'.
-    onSubmitSuccess({ id: data.booking_id, status: data.status ?? 'pending' })
+    if (allOk) onSubmitSuccess({ id: data.booking_id, status: data.status ?? 'pending' })
+    else setErr('Some divers could not be registered — see details below.')
   }
 
   return (
@@ -1144,6 +1281,17 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               Please note: your reservation is not confirmed until the deposit
               {event.deposit_amount != null && ` (${event.currency} ${event.deposit_amount.toLocaleString()})`} has been paid.
             </p>
+          )}
+
+          {additionalResults.length > 0 && (
+            <div className="text-xs bg-sky-50 border border-sky-300 rounded p-2 space-y-1" aria-label="Per-diver registration results">
+              <p className="font-semibold text-blue-900">Additional divers:</p>
+              {additionalResults.map((r, i) => (
+                <p key={i} className={r.ok ? 'text-emerald-800' : 'text-red-700'}>
+                  · {r.targetName}: {r.ok ? 'registered' : `failed — ${r.error}`}
+                </p>
+              ))}
+            </div>
           )}
 
           {err && <p className="text-red-600 text-sm">{err}</p>}
