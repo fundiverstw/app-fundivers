@@ -102,10 +102,12 @@ Deno.serve(async (req) => {
 
   const auth = req.headers.get("Authorization") ?? ""
   if (auth.startsWith("Bearer ") && body.target_user_id) {
-    // Admin-on-behalf: caller must be an admin and the booking lands on
-    // body.target_user_id. We still use the JWT to identify the caller,
-    // then check role via the service-role client (RLS would otherwise
-    // hide other rows).
+    // On-behalf-of path. Two callers allowed:
+    //   - admin (any target)
+    //   - parent (target must be one of their linked children, i.e.
+    //     profiles.parent_account = caller.id)
+    // We use the JWT to identify the caller, then check role / parentage
+    // via the service-role client (RLS would otherwise hide other rows).
     const caller = createClient(SUPABASE_URL, ANON_KEY, {
       global: { headers: { Authorization: auth } },
       auth:   { persistSession: false },
@@ -115,7 +117,14 @@ Deno.serve(async (req) => {
 
     const { data: callerProfile } = await admin
       .from("profiles").select("role").eq("id", c.user.id).single()
-    if (callerProfile?.role !== "admin") return json({ error: "admin only" }, 403)
+    const isAdmin = callerProfile?.role === "admin"
+    if (!isAdmin) {
+      const { data: targetProfile } = await admin
+        .from("profiles").select("parent_account").eq("id", body.target_user_id).maybeSingle()
+      if (!targetProfile || targetProfile.parent_account !== c.user.id) {
+        return json({ error: "not authorized to register this diver" }, 403)
+      }
+    }
 
     const { data: target, error: tErr } = await admin.auth.admin.getUserById(body.target_user_id)
     if (tErr || !target.user) return json({ error: "target user not found" }, 404)

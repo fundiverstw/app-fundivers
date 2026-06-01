@@ -108,14 +108,164 @@ export interface RegisterFormBodyProps {
   actingOnBehalfOf?: string
 }
 
-export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCancel, onBackBeforeStepOne, existingBooking, actingOnBehalfOf }: RegisterFormBodyProps) {
+// Outer wrapper around the multi-step form. Adds an optional "Who is this
+// booking for?" picker for authed parents with linked child accounts. When
+// a child is picked we re-mount the inner form with that child's profile +
+// actingOnBehalfOf set, so the existing on-behalf wiring carries it the
+// rest of the way (edge function's parent path validates the FK).
+//
+// Picker UX: the inner form renders immediately so guests / childless
+// divers see no loading state at all. We fetch the caller's linked
+// children in the background; if any come back, we swap to the picker
+// before the parent's done with step 1.
+export function RegisterFormBody(props: RegisterFormBodyProps) {
+  const { profile, userId, existingBooking, actingOnBehalfOf } = props
+  // The picker is only relevant for fresh bookings made by an authed user
+  // who isn't already acting on someone else's behalf.
+  const pickerEligible = !!userId && !actingOnBehalfOf && !existingBooking
+    // A diver who already has a parent can't themselves be a parent — skip
+    // the fetch entirely.
+    && !profile?.parent_account
+
+  const [children, setChildren] = useState<Profile[]>([])
+  const [pickedChild, setPickedChild] = useState<Profile | null>(null)
+  // True once the picker has been shown and acknowledged (or there's no
+  // picker to show in the first place). Starts true so the form renders
+  // immediately — flips to false when the children fetch turns up at
+  // least one linked diver, triggering the picker.
+  const [pickerConfirmed, setPickerConfirmed] = useState(true)
+
+  useEffect(() => {
+    if (!pickerEligible || !userId) return
+    let cancelled = false
+    supabase
+      .from('profiles')
+      .select('*')
+      .eq('parent_account', userId)
+      .order('full_name', { ascending: true })
+      .then(({ data }) => {
+        if (cancelled) return
+        const rows = (data ?? []) as Profile[]
+        if (rows.length > 0) {
+          setChildren(rows)
+          setPickerConfirmed(false)
+        }
+      })
+    return () => { cancelled = true }
+  }, [pickerEligible, userId])
+
+  if (!pickerConfirmed && profile && children.length > 0) {
+    return (
+      <DiverPickerStep
+        parent={profile}
+        children={children}
+        eventTitle={props.event.title}
+        onCancel={props.onCancel ?? props.onBackBeforeStepOne}
+        onPick={(child) => {
+          setPickedChild(child)
+          setPickerConfirmed(true)
+        }}
+      />
+    )
+  }
+
+  const targetProfile = pickedChild ?? profile
+  const targetActingOnBehalfOf = pickedChild ? pickedChild.id : actingOnBehalfOf
+
+  return (
+    <RegisterFormBodyInner
+      {...props}
+      key={pickedChild?.id ?? userId ?? 'guest'}
+      profile={targetProfile}
+      actingOnBehalfOf={targetActingOnBehalfOf}
+      pickerHeader={children.length > 0 ? {
+        targetName: pickedChild
+          ? (pickedChild.display_name ?? pickedChild.full_name ?? '(unnamed child)')
+          : 'Myself',
+        onChange: () => { setPickerConfirmed(false); setPickedChild(null) },
+      } : null}
+    />
+  )
+}
+
+interface PickerHeaderInfo {
+  targetName: string
+  onChange: () => void
+}
+
+function DiverPickerStep({
+  parent, children, eventTitle, onPick, onCancel,
+}: {
+  parent: Profile
+  children: Profile[]
+  eventTitle: string
+  onPick: (child: Profile | null) => void
+  onCancel?: () => void
+}) {
+  return (
+    <>
+      <header className="space-y-1">
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="text-xl font-bold text-blue-900 leading-tight">{eventTitle}</h1>
+          {onCancel && (
+            <button onClick={onCancel} className="text-blue-900 font-medium text-xl leading-none shrink-0" aria-label="Close">×</button>
+          )}
+        </div>
+        <p className="text-xs text-blue-900 font-medium">Who is this booking for?</p>
+      </header>
+      <ul className="space-y-2">
+        <li>
+          <button
+            type="button"
+            onClick={() => onPick(null)}
+            className="w-full text-left bg-white/70 hover:bg-sky-100 border border-sky-300 rounded-lg px-3 py-3"
+          >
+            <p className="text-sm font-semibold text-blue-900">Myself</p>
+            <p className="text-xs text-blue-900/80">{parent.display_name ?? parent.full_name ?? '(your account)'}</p>
+          </button>
+        </li>
+        {children.map(c => (
+          <li key={c.id}>
+            <button
+              type="button"
+              onClick={() => onPick(c)}
+              className="w-full text-left bg-white/70 hover:bg-sky-100 border border-sky-200 rounded-lg px-3 py-3"
+            >
+              <p className="text-sm font-semibold text-blue-900">
+                {c.full_name ?? '(no name)'}
+                {c.display_name && <span className="text-blue-900/80"> “{c.display_name}”</span>}
+              </p>
+              <p className="text-xs text-blue-900/70">
+                {c.cert_agency && c.cert_level ? `${c.cert_agency} ${c.cert_level}` : 'Uncertified'}
+                {c.status && c.status !== 'active' && (
+                  <span className="ml-2 uppercase tracking-wider text-red-700">{c.status}</span>
+                )}
+              </p>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
+  )
+}
+
+interface RegisterFormBodyInnerProps extends RegisterFormBodyProps {
+  pickerHeader?: PickerHeaderInfo | null
+}
+
+function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCancel, onBackBeforeStepOne, existingBooking, actingOnBehalfOf, pickerHeader }: RegisterFormBodyInnerProps) {
   const isGuest = !userId && !actingOnBehalfOf
   const isEdit = !!existingBooking
-  // Admin-on-behalf: relax the diver-facing required-field gates so an admin
-  // can register a diver whose profile is still incomplete (no cert card,
-  // missing full name, no transport choice, no policy ack). The diver can
-  // complete their profile later.
-  const isAdminBehalf = !!actingOnBehalfOf
+  // On-behalf-of (admin or parent): relax the diver-facing required-field
+  // gates so the caller can register a diver whose profile is still
+  // incomplete (no cert card, missing full name, no transport choice, no
+  // policy ack). The target diver can complete their profile later.
+  //
+  // We also skip card-photo uploads in this mode entirely — admins upload
+  // from AdminUsersPage, parents lack the storage-RLS access to write
+  // under another user's folder, and either way the target diver can
+  // upload from /profile later.
+  const isOnBehalfOf = !!actingOnBehalfOf
   const initialDetails = existingBooking?.details as BookingDetails | undefined
   // Gating derived from the event
   const diveDays = Math.max(1, event.dive_days ?? 1)
@@ -309,8 +459,11 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
     // write under their own folder. The new path goes into the profile
     // patch the edge function applies. Guests can't upload yet (no
     // session), so we defer their upload to after setSession (below).
+    // On-behalf-of submissions skip uploads entirely — the caller may
+    // lack storage RLS access to the target's folder (parents don't have
+    // it; admins do but use AdminUsersPage). Target diver uploads later.
     let nitroxCardPath: string | null | undefined = undefined
-    if (nitroxCertified && nitroxFile && userId) {
+    if (nitroxCertified && nitroxFile && userId && !isOnBehalfOf) {
       try {
         nitroxCardPath = await uploadNitroxCard(userId, nitroxFile)
       } catch (e) {
@@ -320,7 +473,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
       }
     }
     let deepCardPath: string | null | undefined = undefined
-    if (deepCertified && deepFile && userId) {
+    if (deepCertified && deepFile && userId && !isOnBehalfOf) {
       try {
         deepCardPath = await uploadDeepCard(userId, deepFile)
       } catch (e) {
@@ -330,7 +483,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
       }
     }
     let certCardPath: string | null | undefined = undefined
-    if (certFile && userId) {
+    if (certFile && userId && !isOnBehalfOf) {
       try {
         certCardPath = await uploadCertCard(userId, certFile)
       } catch (e) {
@@ -496,6 +649,20 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
         </div>
         <p className="text-xs text-blue-900 font-medium">{formatEventSpan(event, { style: 'long' })}</p>
         <p className="text-xs text-blue-900 font-medium">Step {step} of 4</p>
+        {pickerHeader && (
+          <div className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-300 rounded-lg px-2 py-1">
+            <span className="text-xs text-blue-900 font-semibold">
+              Booking for: {pickerHeader.targetName}
+            </span>
+            <button
+              type="button"
+              onClick={pickerHeader.onChange}
+              className="text-xs text-blue-700 hover:underline font-semibold"
+            >
+              change
+            </button>
+          </div>
+        )}
       </header>
 
       {step === 1 && (
@@ -587,7 +754,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
                 <TextField label="Cert agency" placeholder="PADI, SSI…" value={certAgency} onChange={setCertAgency} />
                 <TextField label="Cert level" placeholder="OW, AOW…" value={certLevel} onChange={setCertLevel} />
               </div>
-              {certLevel.trim() !== '' && !hasCertCardOnFile && (
+              {certLevel.trim() !== '' && !hasCertCardOnFile && !isOnBehalfOf && (
                 <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
                   <p className="text-xs font-semibold text-blue-900">
                     Upload a photo of your highest certification card *
@@ -639,7 +806,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
                   Deep certified (40m)
                 </label>
               </div>
-              {nitroxCertified && !hasNitroxCardOnFile && (
+              {nitroxCertified && !hasNitroxCardOnFile && !isOnBehalfOf && (
                 <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
                   <p className="text-xs font-semibold text-blue-900">
                     Upload a photo of your nitrox certification card *
@@ -676,7 +843,7 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
                   changed.)
                 </p>
               )}
-              {deepCertified && !hasDeepCardOnFile && (
+              {deepCertified && !hasDeepCardOnFile && !isOnBehalfOf && (
                 <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
                   <p className="text-xs font-semibold text-blue-900">
                     Upload a photo of your Deep certification card *
@@ -999,20 +1166,20 @@ export function RegisterFormBody({ event, profile, userId, onSubmitSuccess, onCa
             onClick={() => setStep((step + 1) as Step)}
             disabled={
               (step === 2 && (
-                (!isAdminBehalf && fullName.trim() === '') ||
-                (!isAdminBehalf && certBlocked) ||
-                (!isAdminBehalf && nitroxBlocked) ||
-                (!isAdminBehalf && deepBlocked) ||
+                (!isOnBehalfOf && fullName.trim() === '') ||
+                (!isOnBehalfOf && certBlocked) ||
+                (!isOnBehalfOf && nitroxBlocked) ||
+                (!isOnBehalfOf && deepBlocked) ||
                 (isGuest && (guestEmail.trim() === '' || guestPassword.length < 8 || !guestAgreedTerms))
               )) ||
-              (step === 3 && !isAdminBehalf && needsTransport === null)
+              (step === 3 && !isOnBehalfOf && needsTransport === null)
             }
             className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
           >
             Next ›
           </button>
         ) : (
-          <button onClick={submit} disabled={saving || (!isAdminBehalf && !!cancelPolicy && !policyAcked)}
+          <button onClick={submit} disabled={saving || (!isOnBehalfOf && !!cancelPolicy && !policyAcked)}
             className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg">
             {saving ? '…' : isEdit ? 'Save changes' : 'Confirm booking'}
           </button>
