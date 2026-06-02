@@ -20,7 +20,28 @@ export const SERVICE_ROLE_KEY = () => env('SERVICE_ROLE_KEY')
 
 export const restUrl = (path: string) => `${API_URL()}/rest/v1${path}`
 export const authUrl = (path: string) => `${API_URL()}/auth/v1${path}`
+// Edge-function probes require `supabase functions serve` running
+// locally — the edge runtime container is not part of the default
+// `make start` set. Probes that hit fnUrl() should await
+// `requireEdgeRuntime()` first so they fail loud with a clear
+// remediation message when the runtime is down, instead of timing out
+// or returning a confusing 503.
 export const fnUrl   = (name: string) => `${API_URL()}/functions/v1/${name}`
+
+let edgeRuntimeReady: boolean | null = null
+export async function requireEdgeRuntime(): Promise<void> {
+  if (edgeRuntimeReady === true) return
+  if (edgeRuntimeReady === false) throw new Error(EDGE_RUNTIME_DOWN_MSG)
+  try {
+    const r = await fetch(`${API_URL()}/functions/v1/`, { method: 'OPTIONS' })
+    edgeRuntimeReady = r.status !== 503
+  } catch {
+    edgeRuntimeReady = false
+  }
+  if (!edgeRuntimeReady) throw new Error(EDGE_RUNTIME_DOWN_MSG)
+}
+const EDGE_RUNTIME_DOWN_MSG =
+  'edge runtime not reachable at /functions/v1 — start it with `supabase functions serve` before running edge-function probes'
 
 export interface ProbeResponse {
   status: number

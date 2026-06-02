@@ -35,7 +35,17 @@ export default defineConfig({
           globals: true,
           environment: 'happy-dom',
           setupFiles: ['./tests/setup.unit.ts'],
-          include: ['src/**/*.test.{ts,tsx}', 'workers/**/*.test.ts'],
+          // supabase/functions/ tests cover the pure-TS handler /
+          // helper modules (handler.ts, _shared/*.ts) — the Deno entry
+          // index.ts uses jsr:/npm: specifiers and is NOT
+          // vitest-importable, so tests only import the handler. See
+          // create-registration/handler.ts for the dep-injection
+          // pattern these tests rely on.
+          include: [
+            'src/**/*.test.{ts,tsx}',
+            'workers/**/*.test.ts',
+            'supabase/functions/**/*.test.ts',
+          ],
           css: false,
         },
       },
