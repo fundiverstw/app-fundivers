@@ -53,6 +53,27 @@ export default defineConfig({
           fileParallelism: false,
         },
       },
+      {
+        // Black-box "attacker" probes. Same live local stack as the
+        // integration suite, but every request goes out via native
+        // fetch() — no supabase-js abstraction, so we exercise the
+        // exact wire shape an external attacker would send (raw
+        // query operators, PostgREST PUT vs PATCH, CORS preflights,
+        // edge-function HTTP envelope, etc.). Each fix from
+        // docs/security-audit.md lands a matching probe file.
+        extends: true,
+        test: {
+          name: 'security',
+          globals: true,
+          environment: 'node',
+          globalSetup: ['./tests/global-setup.integration.ts'],
+          setupFiles: ['./tests/setup.integration.ts'],
+          include: ['tests/security/**/*.test.ts'],
+          testTimeout: 30_000,
+          hookTimeout: 30_000,
+          fileParallelism: false,
+        },
+      },
     ],
   },
 })
