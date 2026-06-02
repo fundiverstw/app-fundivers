@@ -319,10 +319,22 @@ export async function fetchEventsForBookings(
     if (ev) out.set(ev.id, ev)
   }
   for (const c of courses) {
-    // For per-booking lookups we want a single representative entry per course.
-    // Use the first (main) segment — its dates reflect the primary range.
+    // For per-booking lookups we want a single representative entry per course
+    // that covers the FULL course span [start_date..end_date], not segs[0] —
+    // which for special_date-split courses (Wix branches B/C/D) can collapse
+    // to a single in-month day. Per-booking surfaces (staff-on-duty date
+    // picker, span labels) need the full range, otherwise the picker's
+    // min/max bound out the other half of the course.
     const segs = courseToEvents(c, prices, addons.get(c._id) ?? [])
-    if (segs.length > 0) out.set(segs[0].id, segs[0])
+    if (segs.length === 0) continue
+    const startKey = toDateKey(c.start_date)
+    const endKey = toDateKey(c.end_date) || startKey
+    const fullStart = startKey ? toIso(startKey, c.start_time) : null
+    out.set(segs[0].id, {
+      ...segs[0],
+      start_time: fullStart ?? segs[0].start_time,
+      end_time: endKey ? toIso(endKey, c.start_time) : segs[0].end_time,
+    })
   }
   await attachConfirmedCounts([...out.values()])
   return out
