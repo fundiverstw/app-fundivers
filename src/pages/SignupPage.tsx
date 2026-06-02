@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { supabase } from '../lib/supabase'
+import { CURRENT_TERMS_VERSION } from '../lib/terms-version'
 import { Logo } from '../components/Logo'
 import { CARD_ELEVATED, INPUT, INPUT_LABEL, BTN_PRIMARY, TEXT_ERROR, TEXT_LINK, TEXT_MUTED } from '../styles/tokens'
 
@@ -24,13 +25,17 @@ export function SignupPage() {
 
   async function onSubmit(data: FormData) {
     setServerError('')
-    // Stash the agreement timestamp on auth.users.raw_user_meta_data; the
-    // handle_new_user trigger copies it into profiles.agreed_to_terms_at
-    // when the account row is created.
+    // Signal consent on auth.users.raw_user_meta_data. The
+    // handle_new_user trigger ignores the timestamp value (server-stamps
+    // now() instead — non-repudiation, audit L10) but reads the version
+    // verbatim so we record what was shown at signup time.
     const { error } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
-      options: { data: { agreed_to_terms_at: new Date().toISOString() } },
+      options: { data: {
+        agreed_to_terms_at:      new Date().toISOString(),
+        agreed_to_terms_version: CURRENT_TERMS_VERSION,
+      } },
     })
     if (error) { setServerError(error.message); return }
     // With email confirmation off, signUp returns a session immediately —

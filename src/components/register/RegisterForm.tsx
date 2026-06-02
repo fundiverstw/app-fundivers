@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
+import { CURRENT_TERMS_VERSION } from '../../lib/terms-version'
 import { formatEventSpan, eventIsFull } from '../../lib/events'
 import { computeEffectiveFullPaymentDeadline } from '../../lib/payment-deadlines'
 import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/payment-instructions'
@@ -673,7 +674,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           ...(isGuest ? {
             email:    guestEmail.trim(),
             password: guestPassword,
-            agreed_to_terms_at: new Date().toISOString(),
+            agreed_to_terms_at:      new Date().toISOString(),
+            agreed_to_terms_version: CURRENT_TERMS_VERSION,
           } : {}),
           ...(actingOnBehalfOf ? { target_user_id: actingOnBehalfOf } : {}),
           event_type:    event.type,
