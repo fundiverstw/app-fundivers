@@ -179,6 +179,76 @@ describe('courseToEvents — Wix special_date branches', () => {
   })
 })
 
+describe('fetchEventsForBookings — full course span', () => {
+  // For per-booking lookups (e.g. AdminEventDetailPage → EventStaffSection),
+  // the representative event for a course must cover the full
+  // [start_date..end_date] range — not a sub-segment. Otherwise the
+  // staff-on-duty date picker's min/max bounds can exclude half of a
+  // course whose special_date splits the calendar pills (Wix branches
+  // B/C/D). This regressed when a rescue course May 30 → June 3 with a
+  // gap had its duty picker stuck on May, blocking June 3 selection.
+  function setupForBookings(course: CourseRow) {
+    const courseBuilder: Record<string, unknown> = {}
+    const chain = ['select', 'eq', 'gte', 'lte', 'order', 'in', 'is', 'or']
+    for (const m of chain) courseBuilder[m] = () => courseBuilder
+    courseBuilder.then = (cb?: (r: unknown) => unknown) =>
+      Promise.resolve({ data: [course], error: null }).then(cb)
+
+    const empty: Record<string, unknown> = {}
+    for (const m of chain) empty[m] = () => empty
+    empty.then = (cb?: (r: unknown) => unknown) =>
+      Promise.resolve({ data: [], error: null }).then(cb)
+
+    from.mockImplementation((table: string) => {
+      if (table === 'EO_courses') return courseBuilder
+      return empty
+    })
+  }
+
+  it('returns one entry per course covering the full start..end range when special_date splits into two pills', async () => {
+    setupForBookings({
+      _id: 'c-split', display_title: 'Rescue', start_time: '09:00:00',
+      start_date: '2026-05-30', end_date: '2026-06-03', special_date: '2026-05-31',
+      price: null, other_addons: null, dive_days: null,
+      admin_title: null, calendar_title: null,
+    })
+    const { fetchEventsForBookings } = await import('./events')
+    const map = await fetchEventsForBookings([], ['c-split'])
+    expect(map.size).toBe(1)
+    const ev = map.get('c-split')
+    expect(ev?.start_time.slice(0, 10)).toBe('2026-05-30')
+    expect(ev?.end_time?.slice(0, 10)).toBe('2026-06-03')
+  })
+
+  it('preserves the start..end range when special_date == end_date', async () => {
+    setupForBookings({
+      _id: 'c-end-special', display_title: 'AOW', start_time: '09:00:00',
+      start_date: '2026-05-30', end_date: '2026-06-03', special_date: '2026-06-03',
+      price: null, other_addons: null, dive_days: null,
+      admin_title: null, calendar_title: null,
+    })
+    const { fetchEventsForBookings } = await import('./events')
+    const map = await fetchEventsForBookings([], ['c-end-special'])
+    const ev = map.get('c-end-special')
+    expect(ev?.start_time.slice(0, 10)).toBe('2026-05-30')
+    expect(ev?.end_time?.slice(0, 10)).toBe('2026-06-03')
+  })
+
+  it('still works for plain single-segment courses (no special_date)', async () => {
+    setupForBookings({
+      _id: 'c-plain', display_title: 'OW', start_time: '09:00:00',
+      start_date: '2026-05-10', end_date: '2026-05-12', special_date: null,
+      price: null, other_addons: null, dive_days: null,
+      admin_title: null, calendar_title: null,
+    })
+    const { fetchEventsForBookings } = await import('./events')
+    const map = await fetchEventsForBookings([], ['c-plain'])
+    const ev = map.get('c-plain')
+    expect(ev?.start_time.slice(0, 10)).toBe('2026-05-10')
+    expect(ev?.end_time?.slice(0, 10)).toBe('2026-05-12')
+  })
+})
+
 describe('formatEventSpan — start_time_hhmm rendering', () => {
   it('appends · HH:mm when start_time_hhmm is set (single-day)', async () => {
     const { formatEventSpan } = await import('./events')
