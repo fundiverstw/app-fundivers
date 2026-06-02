@@ -145,6 +145,31 @@ edge-function allowlist will still hit this trigger) and C4 below
 
 ### C2. `create-registration` edge function lets unauthenticated callers self-promote to admin
 
+**Status: FIXED 2026-06-02.**
+
+Two layers:
+1. `supabase/functions/_shared/profile-patch.ts` — allowlist
+   `sanitizeProfilePatch()`. Unit-tested in
+   `_shared/profile-patch.test.ts` (18 cases: every attack key
+   dropped, kitchen sink, SPA-shape contract pin, defensive shape
+   handling, no prototype pollution).
+2. `supabase/functions/create-registration/handler.ts` — the
+   Deno entrypoint was split into a pure handler + thin Deno wrapper
+   (`index.ts`). The handler takes injected dependencies (supabase
+   admin, anon, makeAuthedClient, transporter, buildPdfBase64, env)
+   so vitest can exercise every branch in-memory with `vi.fn`'d
+   shims. `handler.test.ts` covers 26 cases: guest path security
+   (kitchen-sink, status forcing, parent_account drop), on-behalf-of
+   gates (admin / parent / unrelated diver), authed self path,
+   rollback (booking failure deletes guest, doesn't delete existing,
+   profile-update failure also rolls back, pre-existing booking
+   rejection), email behaviour (null transporter, throwing
+   transporter, dedup to company, waitlisted text-only path), and
+   the happy path's `{booking_id, status, session}` envelope.
+
+The C1 DB trigger remains the belt; this fix is the suspenders that
+close the service-role path the trigger intentionally lets through.
+
 **Where:** `supabase/functions/create-registration/index.ts:181-192`
 
 ```ts
