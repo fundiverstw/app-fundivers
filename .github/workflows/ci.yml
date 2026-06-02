@@ -1,13 +1,20 @@
-# Lint gate. Fails the branch in GitHub on any eslint error so a
-# regression that `make lint` catches locally cannot land on main.
+# Pre-merge gate. Fails the branch in GitHub on any regression that
+# `make check` would catch locally — eslint, tsc, or the unit test
+# project.
 #
 # Runs on:
 #   - direct push to main (direct commits / fast-forwards)
 #   - PR targeting main (before merge)
 #
-# In-flight runs for the same ref are cancelled when a new commit
-# lands so a long-running queue can't shadow newer fixes.
-name: Lint
+# Integration + security probe suites are NOT in this workflow — they
+# require the local Supabase stack (Docker). When CI grows a Supabase
+# step, add an `integration` job here that depends on it.
+#
+# Three independent jobs run in parallel so a single failure shows
+# alongside the other two, not in series. In-flight runs for the same
+# ref are cancelled when a new commit lands so a long queue can't
+# shadow newer fixes.
+name: CI
 
 on:
   push:
@@ -19,7 +26,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: lint-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -34,3 +41,27 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+
+  typecheck:
+    name: tsc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsc -b
+
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run --project unit
