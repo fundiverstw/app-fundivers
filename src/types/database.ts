@@ -93,6 +93,15 @@ export interface Database {
         }
         Returns: Array<{ event_id: string; event_type: 'dive' | 'course'; n: number }>
       }
+      // Defined in 20260603000000_terms_consent_versioning.sql.
+      // Server-stamps both agreed_to_terms_at (now()) and
+      // agreed_to_terms_version (caller-supplied) on the caller's
+      // profile. Called by the re-acceptance UI on TermsPage when
+      // RequireCurrentTerms detects a stale version.
+      accept_current_terms: {
+        Args: { p_version: number }
+        Returns: void
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
@@ -160,6 +169,12 @@ export interface Database {
           last_dive_date: string | null
           gear_owned: string[]
           agreed_to_terms_at: string | null
+          /** Version of the Terms of Use the user agreed to (server-stamped
+           *  by handle_new_user / accept_current_terms). When the SPA's
+           *  CURRENT_TERMS_VERSION constant exceeds this, RequireCurrentTerms
+           *  bounces the user to /terms for re-acceptance. Null = never
+           *  consented. */
+          agreed_to_terms_version: number | null
           /** Manual-verification gate. Diver-side INSERTs into bookings /
            *  push_subscriptions are blocked unless status='active'. */
           status: 'pending' | 'active' | 'rejected'

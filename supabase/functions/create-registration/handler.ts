@@ -40,6 +40,7 @@ export interface RegistrationBody {
   email?:    string
   password?: string
   agreed_to_terms_at?: string
+  agreed_to_terms_version?: number
   target_user_id?: string
   event_type:  'dive' | 'course'
   event_id:    string
@@ -171,7 +172,10 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
       password:      body.password,
       email_confirm: true,
       user_metadata: body.agreed_to_terms_at
-        ? { agreed_to_terms_at: body.agreed_to_terms_at }
+        ? {
+            agreed_to_terms_at:      body.agreed_to_terms_at,
+            agreed_to_terms_version: body.agreed_to_terms_version,
+          }
         : undefined,
     })
     if (error || !data.user) {

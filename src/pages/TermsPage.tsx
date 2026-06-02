@@ -1,10 +1,19 @@
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Logo } from '../components/Logo'
+import { useAuth } from '../hooks/useAuth'
+import { supabase } from '../lib/supabase'
+import { CURRENT_TERMS_VERSION } from '../lib/terms-version'
 
 // Terms of Use + retention policy shown to divers at signup. Intentionally
 // plain: a small shop + a small user base deserves a summary a normal person
 // can read in 90 seconds. A proper lawyer pass is still recommended before
 // going live in anything resembling production.
+//
+// Doubles as the re-acceptance surface (legal-brief #2 / route guard
+// RequireCurrentTerms): when an authenticated user lands here with a
+// stale agreed_to_terms_version, the ReacceptBanner at the top calls
+// the accept_current_terms RPC and routes them back to /dashboard.
 
 export function TermsPage() {
   return (
@@ -14,6 +23,7 @@ export function TermsPage() {
       </header>
 
       <main className="max-w-2xl mx-auto p-6 space-y-6 text-sm leading-relaxed">
+        <ReacceptBanner />
         <div className="space-y-2">
           <p className="text-xs uppercase tracking-[0.25em] text-red-600">Terms of Use & Privacy</p>
           <h1 className="text-2xl font-bold text-blue-900">The short version</h1>
@@ -37,6 +47,16 @@ export function TermsPage() {
             <li>Physical sizing (height, weight, shoe size) — for gear fitting</li>
             <li>Medical notes you choose to share</li>
           </ul>
+          <p>
+            <strong>Don't want to upload something through the app?</strong>{' '}
+            Message us at{' '}
+            <a className="text-blue-700 hover:underline" href="mailto:fundiverstw@gmail.com">
+              fundiverstw@gmail.com
+            </a>{' '}
+            and we'll handle it offline — bring your ID, cert card, or
+            medical info to the shop on the day instead. The booking
+            still works; the app just won't hold those fields.
+          </p>
         </Section>
 
         <Section title="Why we collect it">
@@ -58,6 +78,28 @@ export function TermsPage() {
           </ul>
         </Section>
 
+        <Section title="Where your data lives">
+          <p>
+            <strong>We're a dive shop, not a tech company.</strong> We don't
+            run our own servers. The app is built on top of widely-used
+            third-party cloud services that we trust the same way most
+            small businesses trust their email provider:
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Database and login: Supabase</li>
+            <li>Website hosting: Cloudflare</li>
+            <li>Email: Gmail (Google)</li>
+            <li>Push notifications: your browser's push service (Apple, Google, Mozilla)</li>
+          </ul>
+          <p>
+            Your data sits on those providers' servers — most of it in
+            Asia-Pacific data centres. By using the app you're OK with
+            that arrangement. If you'd rather we kept your information
+            entirely off these platforms, see the offline option in
+            "What we collect" above.
+          </p>
+        </Section>
+
         <Section title="How long we keep it">
           <p>
             We automatically scrub sensitive fields <strong>12 months after your last booking</strong>:
@@ -73,6 +115,34 @@ export function TermsPage() {
             Email <a className="text-blue-700 hover:underline" href="mailto:fundiverstw@gmail.com">fundiverstw@gmail.com</a> to
             request a full export or deletion of your account. We'll honor it
             within a reasonable turnaround.
+          </p>
+        </Section>
+
+        <Section title="Security and the limits of what we can promise">
+          <p>
+            We take reasonable steps to protect your data: encrypted
+            connections, role-based access controls, regular review of
+            who can see what, and routine deletion of stale information.
+          </p>
+          <p>
+            <strong>But: we are not a tech company.</strong> Hacks,
+            cyber-attacks, and breaches of cloud platforms happen — to
+            companies far better resourced than us. If one of the
+            services listed in "Where your data lives" suffers a breach,
+            or someone successfully attacks the app itself, your data
+            could be exposed. We can't promise that won't happen and we
+            don't have the ability to undo it if it does. What we can
+            promise is an honest, ongoing effort to keep your data safe
+            and to tell you promptly if something has gone wrong.
+          </p>
+          <p>
+            <strong>What this means for you:</strong> please don't put
+            anything into this app that you would not be OK with
+            potentially becoming public. If a piece of information feels
+            too sensitive to risk, leave it out and tell us at the shop
+            instead (see "What we collect" above). The choice of what to
+            upload is yours, and so is the risk that comes with
+            uploading it.
           </p>
         </Section>
 
@@ -108,6 +178,57 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <section className="space-y-2">
       <h2 className="text-lg font-bold text-blue-900">{title}</h2>
       <div className="text-blue-950 font-medium space-y-2">{children}</div>
+    </section>
+  )
+}
+
+// Renders only when an authenticated user has a stale
+// agreed_to_terms_version — either bounced here by RequireCurrentTerms
+// or arriving via the ?reaccept=1 query param. Anonymous visitors and
+// users already at CURRENT_TERMS_VERSION see nothing.
+function ReacceptBanner() {
+  const { profile } = useAuth()
+  const [params] = useSearchParams()
+  const navigate = useNavigate()
+  const [submitting, setSubmitting] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  if (!profile) return null
+  const stale = (profile.agreed_to_terms_version ?? 0) < CURRENT_TERMS_VERSION
+  if (!stale && params.get('reaccept') !== '1') return null
+  if (!stale) return null
+
+  async function onAccept() {
+    setSubmitting(true)
+    setErr(null)
+    const { error } = await supabase.rpc('accept_current_terms', { p_version: CURRENT_TERMS_VERSION })
+    if (error) {
+      setErr(error.message)
+      setSubmitting(false)
+      return
+    }
+    navigate('/', { replace: true })
+  }
+
+  return (
+    <section
+      role="alert"
+      className="rounded-lg border-2 border-red-500 bg-red-50 p-4 space-y-3"
+    >
+      <p className="font-bold text-red-700">Our Terms of Use have been updated</p>
+      <p className="text-blue-950">
+        Please read the updated terms below. You'll need to accept them to
+        continue using the app.
+      </p>
+      <button
+        type="button"
+        onClick={onAccept}
+        disabled={submitting}
+        className="px-4 py-2 rounded bg-blue-700 hover:bg-blue-800 disabled:bg-slate-400 text-white font-semibold"
+      >
+        {submitting ? 'Saving…' : 'I agree to the updated Terms'}
+      </button>
+      {err && <p className="text-red-700 text-xs">{err}</p>}
     </section>
   )
 }

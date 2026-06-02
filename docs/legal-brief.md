@@ -341,8 +341,18 @@ enforced in code:
 | "Authorities (if required by permit)" | ✅ matches operational reality | text could name the specific authorities for clarity |
 | "12-month sensitive-field scrub" | ⚠️ partial | code does it for `id_number`, `medical_notes`, `emergency_*`, `cert_card_path` — **not** for `nitrox_card_path`, `deep_card_path`, the storage objects themselves, or any `bookings.notes` content. Operator should decide whether to broaden the scrub or narrow the text. |
 | "Email request for deletion" | ✅ no in-app button yet | |
+| "Offline option — contact admin to keep PII off the app" | ⚠️ documented, no UX hook | text invites diver to email; no in-app prompt. Operator needs an internal process for receiving the message and recording the consent state. |
+| "We're a dive shop, not a tech company" | ✅ disclosure | accurate framing; lawyer should confirm acceptable under PDPA. |
+| Sub-processor list (Supabase, Cloudflare, Gmail, Web Push) | ✅ matches §5 | |
+| "Asia-Pacific data centres" | ✅ Supabase project is `aws-0-ap-east-1` (Hong Kong) per `.env.local` | operator to confirm exact region; covers the PDPA Article 21 cross-border-transfer obligation. |
+| "Encrypted connections" | ✅ HTTPS everywhere (Cloudflare-fronted) | |
+| "Role-based access controls" | ✅ RLS + role gates | |
+| "Routine deletion of stale information" | ✅ `purge_stale_pii` covers all three card paths + bookings notes after the broaden | |
+| "We can't promise hacks won't happen" | ✅ honest disclosure | lawyer to confirm enforceability of risk-shifting language. |
+| "We will tell you promptly if something has gone wrong" | ⚠️ promise without runbook | requires the operator to have a breach-detection + notification process. Taiwan PDPA Article 12: notify affected individuals after a security incident. Operator needs a written procedure. |
+| "Choice of what to upload is yours, and so is the risk" | ✅ matches code — the SPA never requires the optional PII fields | |
 | "Liability — you confirm cert + medical disclosure" | ⚠️ informal | scuba operators in Taiwan typically require a witnessed waiver. Lawyer should advise whether the checkbox satisfies waiver requirements or if a separate signed waiver is still needed at check-in. |
-| "Changes → re-prompt on next sign-in" | ❌ not built | code does not version the terms or compare against `agreed_to_terms_at`. Either soften the promise or build the re-prompt. |
+| "Changes → re-prompt on next sign-in" | ✅ wired | `RequireCurrentTerms` route guard + `accept_current_terms` RPC, both landed 2026-06-03. Bump `CURRENT_TERMS_VERSION` in `src/lib/terms-version.ts` for the next material change. |
 
 ---
 
@@ -367,6 +377,11 @@ enforced in code:
 > - Physical sizing (height, weight, shoe size) — for gear fitting
 > - Medical notes you choose to share
 >
+> **Don't want to upload something through the app?** Message us at
+> fundiverstw@gmail.com and we'll handle it offline — bring your ID,
+> cert card, or medical info to the shop on the day instead. The
+> booking still works; the app just won't hold those fields.
+>
 > **Why we collect it**
 > - Plan the dive at a level matching your certification
 > - Generate permits and manifest paperwork for authorities
@@ -380,6 +395,22 @@ enforced in code:
 > - Nobody else. We do not sell or share your data with marketers or other third parties.
 > - Authorities (if required by permit): name, ID number, nationality, and certification.
 >
+> **Where your data lives**
+>
+> **We're a dive shop, not a tech company.** We don't run our own
+> servers. The app is built on top of widely-used third-party cloud
+> services that we trust the same way most small businesses trust
+> their email provider:
+> - Database and login: Supabase
+> - Website hosting: Cloudflare
+> - Email: Gmail (Google)
+> - Push notifications: your browser's push service (Apple, Google, Mozilla)
+>
+> Your data sits on those providers' servers — most of it in
+> Asia-Pacific data centres. By using the app you're OK with that
+> arrangement. If you'd rather we kept your information entirely off
+> these platforms, see the offline option in "What we collect" above.
+>
 > **How long we keep it**
 >
 > We automatically scrub sensitive fields 12 months after your last
@@ -392,6 +423,28 @@ enforced in code:
 >
 > Email fundiverstw@gmail.com to request a full export or deletion of
 > your account. We'll honor it within a reasonable turnaround.
+>
+> **Security and the limits of what we can promise**
+>
+> We take reasonable steps to protect your data: encrypted connections,
+> role-based access controls, regular review of who can see what, and
+> routine deletion of stale information.
+>
+> **But: we are not a tech company.** Hacks, cyber-attacks, and
+> breaches of cloud platforms happen — to companies far better
+> resourced than us. If one of the services listed in "Where your data
+> lives" suffers a breach, or someone successfully attacks the app
+> itself, your data could be exposed. We can't promise that won't
+> happen and we don't have the ability to undo it if it does. What we
+> can promise is an honest, ongoing effort to keep your data safe and
+> to tell you promptly if something has gone wrong.
+>
+> **What this means for you:** please don't put anything into this app
+> that you would not be OK with potentially becoming public. If a
+> piece of information feels too sensitive to risk, leave it out and
+> tell us at the shop instead (see "What we collect" above). The
+> choice of what to upload is yours, and so is the risk that comes
+> with uploading it.
 >
 > **Liability**
 >
@@ -464,6 +517,21 @@ Operational:
 15. **Marketing.** Operator says no marketing share today. If that
     changes, what consent uplift is required (separate checkbox?
     re-prompt?)?
+16. **Breach-notification runbook.** Terms promise "we will tell
+    you promptly if something has gone wrong." Operator needs a
+    written procedure: who decides, what counts as a notifiable
+    incident, channel (in-app banner? email? SMS?), and timing
+    (PDPA Article 12 is silent on a hard deadline but courts have
+    expected "without undue delay"). Suggest 72 hours mirroring
+    GDPR Article 33.
+17. **Sub-processor list maintenance.** The terms name specific
+    cloud providers. If we swap (e.g., move from Gmail to a
+    transactional-mail service), is bump-and-re-prompt required,
+    or notice sufficient?
+18. **Risk-shifting language enforceability.** Lawyer's view on
+    "the choice of what to upload is yours, and so is the risk."
+    Under Taiwan ROC consumer-protection law, how much of the
+    user's risk can be allocated to them by terms-of-use?
 
 Mechanics:
 
