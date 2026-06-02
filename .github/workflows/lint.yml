@@ -1,0 +1,36 @@
+# Lint gate. Fails the branch in GitHub on any eslint error so a
+# regression that `make lint` catches locally cannot land on main.
+#
+# Runs on:
+#   - direct push to main (direct commits / fast-forwards)
+#   - PR targeting main (before merge)
+#
+# In-flight runs for the same ref are cancelled when a new commit
+# lands so a long-running queue can't shadow newer fixes.
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
