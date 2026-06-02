@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/layout/ProtectedRoute'
 import { AdminRoute } from './components/layout/AdminRoute'
 import { StaffOrAdminRoute } from './components/layout/StaffOrAdminRoute'
 import { RequireActive } from './components/layout/RequireActive'
+import { RequireCurrentTerms } from './components/layout/RequireCurrentTerms'
 import { HomeRedirect } from './components/layout/HomeRedirect'
 import { PendingPage } from './pages/PendingPage'
 import { Logo } from './components/Logo'
@@ -81,6 +82,7 @@ export default function App() {
           }
         />
         <Route element={<ProtectedRoute />}>
+          <Route element={<RequireCurrentTerms />}>
           {/* /pending is reachable to authenticated-but-not-active users.
               Outside RequireActive so it's where pending divers actually land. */}
           <Route path="/pending" element={<PendingPage />} />
@@ -128,6 +130,7 @@ export default function App() {
                 <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
               </Route>
             </Route>
+          </Route>
           </Route>
         </Route>
         <Route path="*" element={<HomeRedirect />} />

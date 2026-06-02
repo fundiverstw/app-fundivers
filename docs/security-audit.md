@@ -577,6 +577,16 @@ generic strings + a correlation id logged to `console.error`.
 
 ### M5. `purge_stale_pii` doesn't write to `admin_audit_log`
 
+**Status: FIXED 2026-06-03** in
+`supabase/migrations/20260603010000_pii_purge_audit_and_broaden.sql`.
+Function now inserts one synthetic `admin_audit_log` row per run
+with `actor_id = null`, `action = 'delete'`, `target_table =
+'profiles'`, `target_id = 'pii_purge'`, and the cutoff + affected
+counts + scrubbed profile ids in the `before` jsonb. Same migration
+also broadens the scrub to include `nitrox_card_path`,
+`deep_card_path`, and `bookings.notes`. Regression coverage in
+`tests/integration/pii-purge-audit-and-broaden.test.ts`.
+
 **Where:** `supabase/migrations/20260423150000_pii_retention_and_tos.sql`
 
 The retention sweep nulls PII columns under the cron's service-role
@@ -712,10 +722,13 @@ security issue today (admin gates final confirm) but will be once
 auto-confirm is added.
 
 ### L10. `agreed_to_terms_at` from `user_metadata` (client-controlled)
-Stored in `auth.users.raw_user_meta_data` and copied via
-`handle_new_user`. A diver can later claim "I never agreed" with no
-server-stamped column to refute it. Move to a server-stamped column
-in `profiles`.
+**Status: FIXED 2026-06-03** in
+`supabase/migrations/20260603000000_terms_consent_versioning.sql`.
+`handle_new_user` now server-stamps `agreed_to_terms_at = now()` on
+signup; it only reads the *presence* of the metadata key, not the
+client's timestamp value. Re-acceptance via the
+`accept_current_terms` RPC also server-stamps. Regression coverage
+in `tests/integration/terms-consent-versioning.test.ts`.
 
 ### L11. `heic2any@0.0.4` unmaintained
 Pinned `0.0.x`, no recent release. Runs on user-supplied images
