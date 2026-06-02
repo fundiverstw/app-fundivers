@@ -234,6 +234,37 @@ describe('fetchEventsForBookings — full course span', () => {
     expect(ev?.end_time?.slice(0, 10)).toBe('2026-06-03')
   })
 
+  it('extends the range to cover special_date when it lands far from the main span (branch E)', async () => {
+    // Single-day course (May 31) with a special_date weeks later (Jun 6).
+    // The duty picker needs Jun 6 inside its min/max bounds so admins can
+    // assign staff to that day.
+    setupForBookings({
+      _id: 'c-far-special', display_title: 'Rescue', start_time: '09:00:00',
+      start_date: '2026-05-31', end_date: '2026-05-31', special_date: '2026-06-06',
+      price: null, other_addons: null, dive_days: null,
+      admin_title: null, calendar_title: null,
+    })
+    const { fetchEventsForBookings } = await import('./events')
+    const map = await fetchEventsForBookings([], ['c-far-special'])
+    const ev = map.get('c-far-special')
+    expect(ev?.start_time.slice(0, 10)).toBe('2026-05-31')
+    expect(ev?.end_time?.slice(0, 10)).toBe('2026-06-06')
+  })
+
+  it('extends backwards when special_date is before start_date', async () => {
+    setupForBookings({
+      _id: 'c-special-before', display_title: 'AOW', start_time: '09:00:00',
+      start_date: '2026-06-05', end_date: '2026-06-07', special_date: '2026-05-29',
+      price: null, other_addons: null, dive_days: null,
+      admin_title: null, calendar_title: null,
+    })
+    const { fetchEventsForBookings } = await import('./events')
+    const map = await fetchEventsForBookings([], ['c-special-before'])
+    const ev = map.get('c-special-before')
+    expect(ev?.start_time.slice(0, 10)).toBe('2026-05-29')
+    expect(ev?.end_time?.slice(0, 10)).toBe('2026-06-07')
+  })
+
   it('still works for plain single-segment courses (no special_date)', async () => {
     setupForBookings({
       _id: 'c-plain', display_title: 'OW', start_time: '09:00:00',

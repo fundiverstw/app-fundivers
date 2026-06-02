@@ -319,21 +319,27 @@ export async function fetchEventsForBookings(
     if (ev) out.set(ev.id, ev)
   }
   for (const c of courses) {
-    // For per-booking lookups we want a single representative entry per course
-    // that covers the FULL course span [start_date..end_date], not segs[0] —
-    // which for special_date-split courses (Wix branches B/C/D) can collapse
-    // to a single in-month day. Per-booking surfaces (staff-on-duty date
-    // picker, span labels) need the full range, otherwise the picker's
-    // min/max bound out the other half of the course.
+    // For per-booking lookups we want a single representative entry per
+    // course that covers the FULL span [min(start, special)..max(end,
+    // special)] — not segs[0]. segs[0] alone collapses to a sub-segment for
+    // special_date-split courses (Wix branches B/C/D), and even the full
+    // [start..end] range misses the special pill when it's far from the
+    // main span (branch E: a single-day course with a special date weeks
+    // later). Per-booking surfaces (staff-on-duty date picker, span labels)
+    // need every day the course actually exists on, otherwise the picker's
+    // min/max bound out the missing half.
     const segs = courseToEvents(c, prices, addons.get(c._id) ?? [])
     if (segs.length === 0) continue
     const startKey = toDateKey(c.start_date)
     const endKey = toDateKey(c.end_date) || startKey
-    const fullStart = startKey ? toIso(startKey, c.start_time) : null
+    const specialKey = toDateKey((c as EOCourse & { special_date?: string | null }).special_date ?? null)
+    const candidates = [startKey, endKey, specialKey].filter((k): k is string => !!k)
+    const earliest = candidates.length ? candidates.reduce((a, b) => a < b ? a : b) : null
+    const latest = candidates.length ? candidates.reduce((a, b) => a > b ? a : b) : null
     out.set(segs[0].id, {
       ...segs[0],
-      start_time: fullStart ?? segs[0].start_time,
-      end_time: endKey ? toIso(endKey, c.start_time) : segs[0].end_time,
+      start_time: earliest ? toIso(earliest, c.start_time) ?? segs[0].start_time : segs[0].start_time,
+      end_time: latest ? toIso(latest, c.start_time) : segs[0].end_time,
     })
   }
   await attachConfirmedCounts([...out.values()])
