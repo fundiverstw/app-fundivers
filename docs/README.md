@@ -16,6 +16,7 @@ into source.
 | [testing.md](./testing.md)                             | Unit vs integration conventions, `mockQueryBuilder`, Makefile surface |
 | [deployment.md](./deployment.md)                       | Env vars (which secret lives where), Cloudflare deploy (CLI + GitHub Actions), Supabase link / push / pull / verify, edge functions |
 | [security-audit.md](./security-audit.md)               | Point-in-time audit (2026-06-02): findings by severity, fix priority |
+| [legal-brief.md](./legal-brief.md)                     | Brief for the Terms-of-Use / Privacy lawyer review: data inventory, flows, code-text alignment, open questions |
 
 ## Conventions called out across docs
 
