@@ -126,7 +126,7 @@ describe('MonthCalendar staff-busy overlay', () => {
     expect(screen.queryByTitle('Out diving')).not.toBeInTheDocument()
   })
 
-  it('overlays an amber stripe on a day the viewer is on duty for, leaving the base type color underneath', () => {
+  it('overlays a violet duty stripe on a day the viewer is on duty for, leaving the base type color underneath', () => {
     const ev = {
       id: 'D1', type: 'dive' as const, title: 'Reef trip',
       calendar_title: null,
@@ -155,7 +155,9 @@ describe('MonthCalendar staff-busy overlay', () => {
     expect(plain.getAttribute('style') ?? '').not.toMatch(/repeating-linear-gradient/)
 
     // With ownDutyDays containing this day, the bar keeps its emerald
-    // base and adds an amber stripe overlay.
+    // base and adds a violet stripe overlay. Stripe color must be violet
+    // (#7c3aed), not amber — the old amber would clash with the new
+    // AOW-orange course bars.
     rerender(
       <MonthCalendar
         month={new Date('2030-06-15')}
@@ -167,7 +169,9 @@ describe('MonthCalendar staff-busy overlay', () => {
     )
     const tinted = screen.getByTitle('Reef trip')
     expect(tinted.className).toMatch(/bg-emerald/)
-    expect(tinted.getAttribute('style') ?? '').toMatch(/repeating-linear-gradient/)
+    const style = tinted.getAttribute('style') ?? ''
+    expect(style).toMatch(/repeating-linear-gradient/)
+    expect(style).toMatch(/#7c3aed/i)
   })
 
   it('only stripes the specific duty day on a multi-day event', () => {
@@ -227,5 +231,106 @@ describe('MonthCalendar staff-busy overlay', () => {
     const calledWith = onCreateBusy.mock.calls[0][0] as Date
     expect(calledWith.getDate()).toBe(1)
     expect(calledWith.getMonth()).toBe(5) // June (0-indexed)
+  })
+
+  it("uses violet (not amber) for the viewer's own-busy bars so they don't clash with AOW-orange courses", () => {
+    render(
+      <MonthCalendar
+        month={new Date('2030-06-15')}
+        onMonthChange={() => {}}
+        events={[]}
+        onPickEvent={() => {}}
+        busyEntries={[busy]}
+        busyShown
+        onToggleBusy={() => {}}
+        currentUserId="u1"
+      />
+    )
+    const bars = screen.getAllByTitle('Out diving')
+    expect(bars.length).toBeGreaterThan(0)
+    for (const b of bars) {
+      expect(b.className).toMatch(/bg-violet/)
+      expect(b.className).not.toMatch(/bg-amber/)
+    }
+  })
+})
+
+describe('MonthCalendar course color buckets', () => {
+  function makeCourse(id: string, title: string) {
+    return {
+      id, type: 'course' as const, title, calendar_title: null,
+      start_time: '2030-06-12T09:00:00',
+      end_time:   '2030-06-12T15:00:00',
+      start_time_hhmm: '09:00',
+      featured: false, fully_booked: false,
+      capacity: null, confirmed_count: null,
+      price: null, deposit_amount: null, transport_price: null, currency: 'TWD' as const,
+      has_rooms: false, room_type_ids: [] as string[],
+      has_addons: false, addon_ids: [] as string[],
+      gear_rental_info: null, nitrox_required: false, dive_days: null,
+      cancelled_at: null,
+    }
+  }
+
+  it('renders Open Water Course bars in sky-blue (OW bucket)', () => {
+    render(
+      <MonthCalendar
+        month={new Date('2030-06-15')}
+        onMonthChange={() => {}}
+        events={[makeCourse('c-ow', 'Open Water Course')]}
+        onPickEvent={() => {}}
+      />
+    )
+    const bar = screen.getByTitle('Open Water Course')
+    expect(bar.className).toMatch(/bg-sky/)
+  })
+
+  it('renders Advanced Open Water bars in orange (AOW bucket)', () => {
+    render(
+      <MonthCalendar
+        month={new Date('2030-06-15')}
+        onMonthChange={() => {}}
+        events={[makeCourse('c-aow', 'Advanced Open Water')]}
+        onPickEvent={() => {}}
+      />
+    )
+    const bar = screen.getByTitle('Advanced Open Water')
+    expect(bar.className).toMatch(/bg-orange/)
+    expect(bar.className).not.toMatch(/bg-sky/)
+  })
+
+  it('renders Rescue / EFR / Deep specialty courses in pink', () => {
+    render(
+      <MonthCalendar
+        month={new Date('2030-06-15')}
+        onMonthChange={() => {}}
+        events={[
+          makeCourse('c-rescue', 'PADI Rescue Course'),
+          makeCourse('c-efr',    'EFR Course'),
+          makeCourse('c-deep',   'Deep Specialty'),
+        ]}
+        onPickEvent={() => {}}
+      />
+    )
+    for (const t of ['PADI Rescue Course', 'EFR Course', 'Deep Specialty']) {
+      const bar = screen.getByTitle(t)
+      expect(bar.className).toMatch(/bg-pink/)
+    }
+  })
+
+  it('classifies titles correctly even with a capacity suffix appended', () => {
+    // display_title_capacity_suffix trigger appends "(2 spots open)" /
+    // "(fully booked -- register for waitlist)" — the color bucket must
+    // still resolve to AOW.
+    render(
+      <MonthCalendar
+        month={new Date('2030-06-15')}
+        onMonthChange={() => {}}
+        events={[makeCourse('c-aow-suffix', 'Advanced Open Water (2 spots open)')]}
+        onPickEvent={() => {}}
+      />
+    )
+    const bar = screen.getByTitle('Advanced Open Water (2 spots open)')
+    expect(bar.className).toMatch(/bg-orange/)
   })
 })
