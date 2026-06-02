@@ -68,6 +68,12 @@ Severity legend:
 
 ### C1. Diver can promote self to admin via direct `UPDATE profiles`
 
+**Status: FIXED 2026-06-02** in
+`supabase/migrations/20260602000000_block_self_role_status_parent_change.sql`
+(also closes H1). Regression coverage in
+`tests/integration/profiles-privileged-columns-locked.test.ts` (17
+cases pinning each blocked + allowed path).
+
 **Where:** `supabase/migrations/20260423130000_core_rls_and_booking_immutability.sql:57-60`
 
 ```sql
@@ -248,6 +254,13 @@ rewrite history.
 ## High
 
 ### H1. Parent-of-child RLS policy allows child-role promotion
+
+**Status: FIXED 2026-06-02** by the same C1 trigger
+(`20260602000000_block_self_role_status_parent_change.sql`). The
+trigger fires regardless of which RLS policy granted the row-level
+update, so the parent-update-children path is covered. Regression
+test cases at
+`tests/integration/profiles-privileged-columns-locked.test.ts:117-141`.
 
 **Where:** `supabase/migrations/20260514030000_parent_child_accounts.sql:94-98`
 

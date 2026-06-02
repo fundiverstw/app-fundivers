@@ -19,7 +19,8 @@ help:
 	@echo "  make verify      — check local is in sync with cloud (schema + row counts)"
 	@echo ""
 	@echo "Testing:"
-	@echo "  make test        — run every local test (unit + component + integration)"
+	@echo "  make test        — run every local test (unit + component + integration + security)"
+	@echo "  make security    — run only the black-box attacker probes in tests/security/"
 	@echo "  make lint        — run eslint over the SPA + tests"
 	@echo "  make lint-fix    — run eslint with --fix to auto-correct what it can"
 	@echo "  make typecheck   — run tsc --noEmit (no build, just type validation)"
@@ -53,6 +54,7 @@ push:       ; @npm run db:push
 dump-data:  ; @npm run db:dump-data
 verify:     ; @bash scripts/verify-sync.sh
 test:       ; @npm run test:all
+security:   ; @npx vitest run --project security
 lint:       ; @npm run lint
 lint-fix:   ; @npm run lint:fix
 typecheck:  ; @npx tsc -b
