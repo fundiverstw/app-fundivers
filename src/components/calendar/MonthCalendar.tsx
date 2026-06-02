@@ -19,44 +19,83 @@ import type { AppEvent, StaffBusyEntry } from '../../types/database'
 // of a multi-day event when any one is hovered (see hoveredEventId state
 // on MonthCalendar). The hover: variant is intentionally NOT on the base
 // class — per-segment self-hover would only light up one day of a bar.
-const TYPE_BAR: Record<AppEvent['type'], string> = {
-  dive:   'bg-emerald-600 text-white',
-  course: 'bg-sky-500 text-white',
+//
+// Courses split into three color buckets so the calendar reads at a glance:
+//   OW        → blue   (Open Water Course)
+//   AOW       → orange (Advanced Open Water)
+//   Specialty → pink   (Rescue, EFR, Equipment, Deep Specialty, and any
+//                        other course that isn't OW/AOW)
+// See courseColor() for the title-matching logic.
+type CourseColor = 'ow' | 'aow' | 'specialty'
+
+const DIVE_BAR       = 'bg-emerald-600 text-white'
+const DIVE_BAR_HOVER = 'bg-emerald-500 text-white'
+const DIVE_DOT       = 'bg-emerald-600'
+
+const COURSE_BAR: Record<CourseColor, string> = {
+  ow:        'bg-sky-500 text-white',
+  aow:       'bg-orange-500 text-white',
+  specialty: 'bg-pink-500 text-white',
 }
-const TYPE_BAR_HOVER: Record<AppEvent['type'], string> = {
-  dive:   'bg-emerald-500 text-white',
-  course: 'bg-sky-400 text-white',
+const COURSE_BAR_HOVER: Record<CourseColor, string> = {
+  ow:        'bg-sky-400 text-white',
+  aow:       'bg-orange-400 text-white',
+  specialty: 'bg-pink-400 text-white',
 }
-const TYPE_DOT: Record<AppEvent['type'], string> = {
-  dive:   'bg-emerald-600',
-  course: 'bg-sky-500',
+const COURSE_DOT: Record<CourseColor, string> = {
+  ow:        'bg-sky-500',
+  aow:       'bg-orange-500',
+  specialty: 'bg-pink-500',
 }
+
 const TYPE_LABELS: Record<AppEvent['type'], string> = {
   dive:   'Dive',
   course: 'Course',
 }
 
-// Busy bars are intentionally muted so they read as "not an event" next
-// to the dive/course palette. Own vs. other gets two distinct fills so
-// admins can tell at a glance which periods are theirs vs. someone
-// else's — amber-on-someone-else stays the attention-grabbing signal
-// for duty planning, and slate-on-own reads as a neutral "your own
-// calendar overlay".
-// Own = warm yellow-orange (you're the focal point of your own
-// calendar); other staff = neutral gray so they read as "background
-// constraints to plan around" rather than competing for attention.
-const OWN_BUSY_BAR         = 'bg-amber-600 text-white'
-const OWN_BUSY_BAR_HOVER   = 'bg-amber-500 text-white'
+// Course titles arrive with a capacity hint appended by the
+// display_title_capacity_suffix trigger (e.g. "Open Water Course (2 spots
+// open)"). Strip the trailing parenthetical so we match against the
+// canonical title.
+function stripTitleSuffix(title: string): string {
+  return title.replace(/\s*\([^)]*\)\s*$/, '').trim()
+}
+
+function courseColor(title: string): CourseColor {
+  const base = stripTitleSuffix(title)
+  if (base.startsWith('Advanced Open Water')) return 'aow'
+  if (base.startsWith('Open Water Course')) return 'ow'
+  return 'specialty'
+}
+
+function eventBarClass(ev: AppEvent, hovered: boolean): string {
+  if (ev.type === 'dive') return hovered ? DIVE_BAR_HOVER : DIVE_BAR
+  const key = courseColor(ev.title)
+  return hovered ? COURSE_BAR_HOVER[key] : COURSE_BAR[key]
+}
+
+function eventDotClass(ev: AppEvent): string {
+  if (ev.type === 'dive') return DIVE_DOT
+  return COURSE_DOT[courseColor(ev.title)]
+}
+
+// Busy/duty signals use violet so they don't collide with the new
+// AOW-orange / Specialty-pink course palette. Own = vivid violet (you're
+// the focal point of your own calendar); other staff = neutral gray so
+// they read as "background constraints to plan around" rather than
+// competing for attention.
+const OWN_BUSY_BAR         = 'bg-violet-600 text-white'
+const OWN_BUSY_BAR_HOVER   = 'bg-violet-500 text-white'
 const OTHER_BUSY_BAR       = 'bg-slate-500 text-white'
 const OTHER_BUSY_BAR_HOVER = 'bg-slate-400 text-white'
-const BUSY_DOT             = 'bg-amber-600'
+const BUSY_DOT             = 'bg-violet-600'
 
-// On day-segments where the viewer is on duty, an amber-600 diagonal
+// On day-segments where the viewer is on duty, a violet-600 diagonal
 // stripe pattern overlays the event's base color (the underlying type
 // fill still shows through the gaps so the bar still reads as a
-// dive/course, just "claimed" by the viewer). amber-600 = #d97706, the
+// dive/course, just "claimed" by the viewer). violet-600 = #7c3aed, the
 // same shade as own-busy bars so the two duty-signals share one palette.
-const OWN_DUTY_STRIPE = 'repeating-linear-gradient(45deg, transparent 0 6px, #d97706 6px 12px)'
+const OWN_DUTY_STRIPE = 'repeating-linear-gradient(45deg, transparent 0 6px, #7c3aed 6px 12px)'
 
 // Short chip labels for the course-category filter popover.
 const COURSE_SHORT: Record<string, string> = {
@@ -284,7 +323,7 @@ export function MonthCalendar({
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full text-white ${TYPE_DOT[ev.type]}`}>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full text-white ${eventDotClass(ev)}`}>
                     {TYPE_LABELS[ev.type]}
                   </span>
                   <span className="font-medium text-blue-900 text-sm">{ev.title}</span>
@@ -457,7 +496,7 @@ function EventBar({ seg, track, isOwnDuty, highlighted, onClick, hovered, onHove
   hovered: boolean
   onHoverEvent: (id: string | null) => void
 }) {
-  const baseClass = hovered ? TYPE_BAR_HOVER[seg.event.type] : TYPE_BAR[seg.event.type]
+  const baseClass = eventBarClass(seg.event, hovered)
   const leftInset = seg.isStart ? 2 : 0
   const rightInset = seg.isEnd ? 2 : 0
   const leftRadius = seg.isStart ? 'rounded-l-sm' : ''
@@ -592,7 +631,7 @@ function FilterLegend({
             : 'bg-sky-100 border-sky-200 text-blue-950 font-medium line-through'
         }`}
       >
-        <span className={`w-2 h-2 rounded-full ${TYPE_DOT.dive}`} />
+        <span className={`w-2 h-2 rounded-full ${DIVE_DOT}`} />
         {TYPE_LABELS.dive}
       </button>
 
@@ -609,7 +648,11 @@ function FilterLegend({
               : 'bg-white border-blue-900 text-blue-900'
           }`}
         >
-          <span className={`w-2 h-2 rounded-full ${TYPE_DOT.course}`} />
+          <span className="w-2 h-2 rounded-full overflow-hidden flex" aria-hidden="true">
+            <span className={`flex-1 ${COURSE_DOT.ow}`} />
+            <span className={`flex-1 ${COURSE_DOT.aow}`} />
+            <span className={`flex-1 ${COURSE_DOT.specialty}`} />
+          </span>
           Courses
           {hiddenCourses.size > 0 && !allCoursesHidden && (
             <span className="ml-0.5 text-[10px] text-blue-900 font-medium">({visibleCourses}/{courseCategories.length})</span>
@@ -628,6 +671,7 @@ function FilterLegend({
             {courseCategories.map(cat => {
               const shown = !hiddenCourses.has(cat)
               const short = courseShortLabel(cat)
+              const dot = COURSE_DOT[courseColor(cat)]
               return (
                 <label
                   key={cat}
@@ -639,6 +683,7 @@ function FilterLegend({
                     onChange={() => onToggleCategory(cat)}
                     className="accent-blue-900"
                   />
+                  <span className={`w-2 h-2 rounded-full ${dot}`} aria-hidden="true" />
                   <span className="text-blue-900 text-xs font-semibold">{short}</span>
                   {short !== cat && <span className="text-blue-900 font-medium text-[11px]">{cat}</span>}
                 </label>
