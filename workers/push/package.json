@@ -9,7 +9,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.103.2",
+    "@supabase/supabase-js": "^2.107.0",
     "web-push": "^3.6.7"
   },
   "devDependencies": {
