@@ -6,9 +6,16 @@ describe('errorMessage', () => {
     expect(errorMessage(new Error('boom'))).toBe('boom')
   })
 
-  it('extracts .message from PostgrestError-shaped objects', () => {
-    const pg = { message: 'duplicate key', code: '23505', details: null, hint: null }
-    expect(errorMessage(pg)).toBe('duplicate key')
+  it('maps PostgrestError SQLSTATEs to friendly strings (audit L3)', () => {
+    // Verbatim PostgREST messages leak schema details (constraint
+    // names, column names). Common SQLSTATEs are mapped to safe
+    // user-facing strings; unknown codes fall back to the fallback.
+    expect(errorMessage({ message: 'duplicate key value violates unique constraint "profiles_email_key"', code: '23505' }))
+      .toBe('That value is already in use.')
+    expect(errorMessage({ message: 'new row violates row-level security policy', code: '42501' }))
+      .toBe('You don\'t have permission to do that.')
+    expect(errorMessage({ message: 'detail', code: '22P02' }, 'Couldn\'t parse that.'))
+      .toBe('Couldn\'t parse that.')
   })
 
   it('extracts .error string from auth-style failures', () => {

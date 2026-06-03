@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
+import type { ReactNode } from 'react'
 
 type SessionLike = { user: { id: string } } | null
 
@@ -41,15 +42,21 @@ beforeEach(() => {
 })
 
 async function importHook() {
-  const mod = await import('./useAuth')
-  return mod.useAuth
+  // Both the provider and the consumer hook must be imported AFTER
+  // vi.mock above has registered, since the provider's useEffect
+  // touches supabase.auth.* at first render.
+  const provider = await import('./AuthProvider')
+  const hook     = await import('./useAuth')
+  const wrapper  = ({ children }: { children: ReactNode }) =>
+    <provider.AuthProvider>{children}</provider.AuthProvider>
+  return { useAuth: hook.useAuth, wrapper }
 }
 
 describe('useAuth', () => {
   it('starts in loading state, resolves to null session when signed out', async () => {
     getSession.mockResolvedValue({ data: { session: null } })
-    const useAuth = await importHook()
-    const { result } = renderHook(() => useAuth())
+    const { useAuth, wrapper } = await importHook()
+    const { result } = renderHook(() => useAuth(), { wrapper })
     expect(result.current.loading).toBe(true)
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.session).toBe(null)
@@ -63,8 +70,8 @@ describe('useAuth', () => {
     getSession.mockResolvedValue({ data: { session } })
     profileSingle.mockResolvedValue({ data: profile })
 
-    const useAuth = await importHook()
-    const { result } = renderHook(() => useAuth())
+    const { useAuth, wrapper } = await importHook()
+    const { result } = renderHook(() => useAuth(), { wrapper })
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     expect(result.current.user?.id).toBe('u1')
@@ -76,8 +83,8 @@ describe('useAuth', () => {
     getSession.mockResolvedValue({ data: { session: null } })
     profileSingle.mockResolvedValue({ data: { id: 'u2', role: 'staff' } })
 
-    const useAuth = await importHook()
-    const { result } = renderHook(() => useAuth())
+    const { useAuth, wrapper } = await importHook()
+    const { result } = renderHook(() => useAuth(), { wrapper })
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     act(() => {
@@ -91,8 +98,8 @@ describe('useAuth', () => {
     getSession.mockResolvedValue({ data: { session: { user: { id: 'u3' } } } })
     profileSingle.mockResolvedValue({ data: { id: 'u3' } })
 
-    const useAuth = await importHook()
-    const { result } = renderHook(() => useAuth())
+    const { useAuth, wrapper } = await importHook()
+    const { result } = renderHook(() => useAuth(), { wrapper })
     await waitFor(() => expect(result.current.profile).not.toBeNull())
 
     act(() => {
@@ -109,8 +116,8 @@ describe('useAuth', () => {
     // per-environment — signing out on desktop must not log out the
     // Android PWA.
     getSession.mockResolvedValue({ data: { session: null } })
-    const useAuth = await importHook()
-    const { result } = renderHook(() => useAuth())
+    const { useAuth, wrapper } = await importHook()
+    const { result } = renderHook(() => useAuth(), { wrapper })
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     await act(async () => { await result.current.signOut() })
@@ -131,8 +138,8 @@ describe('useAuth', () => {
       value: { controller: { postMessage } },
     })
 
-    const useAuth = await importHook()
-    const { result } = renderHook(() => useAuth())
+    const { useAuth, wrapper } = await importHook()
+    const { result } = renderHook(() => useAuth(), { wrapper })
     await waitFor(() => expect(result.current.loading).toBe(false))
     await act(async () => { await result.current.signOut() })
 
@@ -146,16 +153,16 @@ describe('useAuth', () => {
       value: { controller: null },
     })
 
-    const useAuth = await importHook()
-    const { result } = renderHook(() => useAuth())
+    const { useAuth, wrapper } = await importHook()
+    const { result } = renderHook(() => useAuth(), { wrapper })
     await waitFor(() => expect(result.current.loading).toBe(false))
     await expect(act(async () => { await result.current.signOut() })).resolves.not.toThrow()
   })
 
   it('unsubscribes on unmount', async () => {
     getSession.mockResolvedValue({ data: { session: null } })
-    const useAuth = await importHook()
-    const { unmount } = renderHook(() => useAuth())
+    const { useAuth, wrapper } = await importHook()
+    const { unmount } = renderHook(() => useAuth(), { wrapper })
     await waitFor(() => expect(onAuthStateChange).toHaveBeenCalled())
     unmount()
     expect(unsubscribe).toHaveBeenCalledOnce()

@@ -1,11 +1,13 @@
 import { supabase } from './supabase'
 import { compressImage } from './image-compress'
+import { assertUploadSize } from './upload-guard'
 
 export const DEEP_CARD_BUCKET = 'deep-cards'
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60
 
 export async function uploadDeepCard(userId: string, file: File): Promise<string> {
+  assertUploadSize(file)
   const blob = await compressImage(file)
   const path = `${userId}/card_${Date.now()}.jpg`
   const { error } = await supabase.storage

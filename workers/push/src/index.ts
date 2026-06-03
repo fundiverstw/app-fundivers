@@ -240,8 +240,15 @@ export async function handleAdminBroadcast(req: Request, env: Env): Promise<Resp
 
   let body: { title?: string; body?: string; url?: string }
   try { body = await req.json() } catch { return new Response('bad request', { status: 400 }) }
-  const title = (body.title ?? '').trim()
-  const text  = (body.body  ?? '').trim()
+  // Audit L13 — cap admin-supplied lengths before fan-out. Both the
+  // OS push surface and the BROADCAST_WEBHOOK_URL forwarder receive
+  // the same string; bounding here keeps a misclick from blowing up
+  // downstream surfaces (and keeps the push payload under the 4KB
+  // VAPID body limit).
+  const MAX_TITLE_LEN = 120
+  const MAX_BODY_LEN  = 500
+  const title = (body.title ?? '').trim().slice(0, MAX_TITLE_LEN)
+  const text  = (body.body  ?? '').trim().slice(0, MAX_BODY_LEN)
   // Two URLs derived from one optional admin input:
   //   • pushUrl     — where tapping the OS notification opens the app.
   //                    Falls back to /notifications (the inbox) so the
