@@ -96,4 +96,35 @@ describe('admin_audit_log', () => {
     const { data } = await diverSb.from('admin_audit_log').select('id').limit(1)
     expect(data ?? []).toEqual([])
   })
+
+  it('logs a profile status change performed by an admin (audit H6)', async () => {
+    // notify-application-decision flips profiles.status to active /
+    // rejected. It must go through the caller's authed client so the
+    // audit trigger sees auth.uid() and records the row. This test
+    // mimics what the edge function now does end-to-end.
+    const target = await createTestUser(admin, { role: 'diver', status: 'pending' })
+    try {
+      const adminSb = await userClient(adminUser.email, adminUser.password)
+      const { error } = await adminSb.from('profiles')
+        .update({ status: 'active' }).eq('id', target.id)
+      expect(error).toBeNull()
+
+      const { data: audit } = await admin
+        .from('admin_audit_log')
+        .select('actor_id,action,before,after')
+        .eq('target_table', 'profiles')
+        .eq('target_id', target.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      expect(audit).not.toBeNull()
+      expect(audit!.actor_id).toBe(adminUser.id)
+      expect(audit!.action).toBe('update')
+      expect((audit!.before as { status: string }).status).toBe('pending')
+      expect((audit!.after  as { status: string }).status).toBe('active')
+    } finally {
+      await deleteTestUser(admin, target.id)
+    }
+  })
 })
