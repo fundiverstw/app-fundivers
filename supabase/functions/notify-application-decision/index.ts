@@ -67,6 +67,21 @@ Deno.serve(async (req) => {
     .maybeSingle()
   if (callerProfile?.role !== "admin") return json({ error: "forbidden" }, 403)
 
+  const newStatus = body.decision === "approve" ? "active" : "rejected"
+
+  // Audit L1 — idempotency. A second click on Approve / Reject for a
+  // target already in that state previously re-ran the update (no-op
+  // by C1's column-lock trigger) and re-sent the email. Read current
+  // status first; short-circuit if there's no actual transition.
+  const { data: targetProfile } = await admin
+    .from("profiles")
+    .select("status")
+    .eq("id", body.user_id)
+    .maybeSingle()
+  if (targetProfile?.status === newStatus) {
+    return json({ ok: true, status: newStatus, email_sent: false, idempotent: true })
+  }
+
   // Audit H6 — run the status flip through the CALLER's JWT (not
   // service-role) so the profiles audit trigger sees auth.uid() =
   // the admin's id, recognises them via is_admin(), and writes a row
@@ -77,7 +92,6 @@ Deno.serve(async (req) => {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth:   { persistSession: false },
   })
-  const newStatus = body.decision === "approve" ? "active" : "rejected"
   const { error: updErr } = await callerClient
     .from("profiles")
     .update({ status: newStatus })

@@ -13,3 +13,31 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: ci
+  # L8 — keep npm deps fresh on both the SPA (root) and the push
+  # worker. Patch updates get grouped into one PR per ecosystem so the
+  # noise stays low; minor / major releases each get their own PR so
+  # the changelog gets read.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: deps
+    groups:
+      patch:
+        applies-to: version-updates
+        update-types:
+          - patch
+  - package-ecosystem: npm
+    directory: /workers/push
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: deps(push)
+    groups:
+      patch:
+        applies-to: version-updates
+        update-types:
+          - patch

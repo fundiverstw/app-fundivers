@@ -9,6 +9,7 @@ import { HomeRedirect } from './components/layout/HomeRedirect'
 import { PendingPage } from './pages/PendingPage'
 import { Logo } from './components/Logo'
 import { ToastProvider } from './components/Toast'
+import { AuthProvider } from './hooks/AuthProvider'
 import { UpdateBannerHost } from './components/install/UpdateBannerHost'
 import { AppShell } from './components/layout/AppShell'
 import { AdminShell } from './components/layout/AdminShell'
@@ -57,6 +58,7 @@ const RegisterPage = lazy(() =>
 export default function App() {
   return (
     <BrowserRouter>
+      <AuthProvider>
       <ToastProvider>
       <UpdateBannerHost />
       <Routes>
@@ -136,6 +138,7 @@ export default function App() {
         <Route path="*" element={<HomeRedirect />} />
       </Routes>
       </ToastProvider>
+      </AuthProvider>
     </BrowserRouter>
   )
 }
