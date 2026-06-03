@@ -48,19 +48,22 @@ self.addEventListener('message', (event) => {
 })
 
 // On every SW activation, wipe every cache the previous worker owned
-// (workbox precache, supabase-api, all of it) and force-reload every
-// open tab. Belt-and-suspenders against the stale-shell trap, where a
-// precached index.html points at a long-deleted bundle hash and users
-// are stuck without a path forward except manually unregistering the
-// SW. Costs a brief "no offline cache" window after each update;
-// buys a guarantee no user ever lands on a half-applied deploy.
+// (workbox precache, supabase-api, all of it) and claim every open tab.
+// Belt-and-suspenders against the stale-shell trap, where a precached
+// index.html points at a long-deleted bundle hash and users are stuck
+// without a path forward except manually unregistering the SW.
+// clients.claim() fires controllerchange in each tab, which
+// vite-plugin-pwa's updateServiceWorker(true) already listens for to
+// reload the page — so the page reloads itself onto the fresh bundle.
+// We deliberately do NOT call client.navigate() here: it races with
+// that page-side reload and locks the tab in mid-transition. Costs a
+// brief "no offline cache" window after each update; buys a guarantee
+// no user ever lands on a half-applied deploy.
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const names = await caches.keys()
     await Promise.all(names.map(n => caches.delete(n)))
     await self.clients.claim()
-    const tabs = await self.clients.matchAll({ type: 'window' })
-    await Promise.all(tabs.map(t => (t as WindowClient).navigate(t.url)))
   })())
 })
 
