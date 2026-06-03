@@ -23,6 +23,13 @@ dashboard could not be checked from the code.
 
 ## TL;DR
 
+**Update 2026-06-03:** the entire Critical + High tier is now FIXED.
+C1, C2, C3, H1–H8, plus L10 and M5 each carry a `**Status: FIXED**`
+header on their respective sections with the migration / file that
+closed them. The original findings are preserved verbatim below for
+context; read the FIXED block at the top of each section before the
+prose. Open work is now Medium tier and below.
+
 Three findings collapse the authorization model end-to-end:
 
 - **C1 — Diver self-promotion to admin via direct `UPDATE profiles`.**
@@ -236,6 +243,15 @@ callers.
 
 ### C3. Wix sync webhook token committed in plaintext, replicated across 9 triggers
 
+**Status: FIXED 2026-06-03** in
+`supabase/migrations/20260603030000_wix_sync_token_from_vault.sql`.
+Token rotated in Wix Secrets Manager; new value lives in
+`vault.secrets` under name `wix_sync_token`. The 8 triggers were
+dropped and recreated against a new `public.wix_sync_notify()`
+helper that reads the live token from `vault.decrypted_secrets` and
+fires the webhook via `net.http_post`. The historical leaked token
+in git history no longer matches anything Wix accepts.
+
 **Where:** `supabase/migrations/20260430153210_remote_schema.sql:15-29` (9 occurrences)
 
 ```sql
@@ -308,6 +324,28 @@ proposed in C1 closes this path too because it gates on
 
 ### H2. `create-registration` is internet-facing, unauthenticated, and uncontrolled
 
+**Status: FIXED 2026-06-03.** Four-part fix landed in one bundle:
+
+1. **Cloudflare Turnstile** verified server-side before `createUser`.
+   SPA renders the widget via `src/components/register/TurnstileWidget.tsx`;
+   handler refuses guest signups without a valid token.
+2. **Per-IP rate limit** via `record_signup_attempt(bytea)` RPC in
+   `20260603040000_signup_throttling_and_orphan_log.sql`. Caps each
+   IP hash at 5/min OR 50/day. SHA-256 of client IP only — raw IPs
+   not stored.
+3. **Event-existence pre-check** — guest path now confirms the
+   `event_id` exists in `EO_dives` / `EO_courses` before burning MAU
+   on `auth.admin.createUser`.
+4. **Rollback orphan logging** — when `createUser` succeeds but
+   subsequent steps fail and `deleteUser` itself errors, the orphan
+   auth user is recorded in `orphan_auth_users` via the
+   `log_orphan_auth_user` RPC instead of being silently swallowed.
+
+All gates apply only to the guest path; authed parent-on-behalf-of
+and self-auth flows skip them. 11 new unit cases in
+`supabase/functions/create-registration/handler.test.ts` pin each
+gate's behavior.
+
 **Where:** `supabase/functions/create-registration/index.ts:71-229`
 
 No CAPTCHA, no Turnstile, no IP-throttle, no per-email throttle. The
@@ -343,6 +381,16 @@ hand because the rollback path silently swallows errors
 
 ### H3. `SECURITY DEFINER` functions missing `SET search_path = public`
 
+**Status: FIXED 2026-06-03.** `handle_new_user` was patched as part of
+the L10 work in
+`supabase/migrations/20260603000000_terms_consent_versioning.sql`.
+The remaining three (`accept_waitlist_offer`,
+`handle_booking_cancellation`, `offer_next_waitlist_spot`) were
+pinned in
+`supabase/migrations/20260603050000_search_path_sweep.sql`. Existing
+waitlist integration suite (11 cases) continues to pass against the
+patched functions, so the runtime behavior is unchanged.
+
 **Where:**
 
 - `handle_new_user` —
@@ -374,6 +422,15 @@ alter function public.accept_waitlist_offer(uuid)           set search_path = pu
 ---
 
 ### H4. Service worker caches every `*.supabase.co` response, including `/auth/v1/*`
+
+**Status: FIXED 2026-06-03.** Cache route narrowed via
+`src/sw-cache-policy.ts`: GETs only, never `/auth/v1/*`, never any
+request with an `Authorization` header (all RLS-scoped reads).
+Added `CacheableResponsePlugin({ statuses: [200] })` and
+`ExpirationPlugin({ maxAgeSeconds: 60*5 })`. `useAuth.signOut` now
+posts `CLEAR_SUPABASE_CACHE` to the SW after successful sign-out so
+even the safe-cached anon reads get wiped on user switch. 7 cases
+on the predicate + 2 on the sign-out post-message.
 
 **Where:** `src/sw.ts:19-22`
 
@@ -411,6 +468,17 @@ and explicitly exclude `/auth/v1/`. Wire a `clients.postMessage` from
 
 ### H5. No CSP / X-Frame-Options / X-Content-Type-Options on the SPA
 
+**Status: FIXED 2026-06-03.** Replaced pure-assets `wrangler.toml`
+with a thin Worker wrapper (`src/worker.ts`) that calls
+`env.ASSETS.fetch(req)` and applies the headers defined in
+`src/security-headers.ts`: full CSP (`default-src 'self'`,
+`script-src 'self' challenges.cloudflare.com`,
+`frame-ancestors 'none'`, `object-src 'none'`, etc.) plus
+`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
+`Referrer-Policy: strict-origin-when-cross-origin`, and a
+`Permissions-Policy` that disables camera/geolocation/microphone.
+11 unit cases pin the policy shape so it can't be silently loosened.
+
 **Where:** root `wrangler.toml` is `[assets]`-only; `index.html` has
 no `<meta http-equiv="Content-Security-Policy">`; no `public/_headers`.
 
@@ -447,6 +515,17 @@ Test in `Content-Security-Policy-Report-Only` first, since the
 
 ### H6. `notify-application-decision` admin actions are unaudited
 
+**Status: FIXED 2026-06-03** in
+`supabase/functions/notify-application-decision/index.ts`. The status
+flip now goes through the caller's authed Supabase client (not the
+service-role client) so the existing `audit_admin_write` trigger on
+profiles sees `auth.uid()` = the admin's id, recognises them via
+`is_admin()`, and writes the audit row automatically — no extra
+explicit INSERT needed. Pinned by a new case in
+`tests/integration/admin-audit-log.test.ts` that exercises the path
+end-to-end (admin authed client → profile status UPDATE → audit row
+present with before/after snapshots and actor_id = admin).
+
 **Where:** `supabase/functions/notify-application-decision/index.ts:81-87`
 
 Any admin can flip any diver's status (`active` / `rejected`) without
@@ -463,6 +542,22 @@ no answer to "who rejected me?").
 ---
 
 ### H7. CI workflows pass deploy secrets to an unpinned build step with default-write `GITHUB_TOKEN`
+
+**Status: FIXED 2026-06-03.** All four workflows
+(`ci.yml`, `deploy.yml`, `supabase-push.yml`,
+`supabase-deploy-functions.yml`) now declare top-level
+`permissions: contents: read`. Every action is SHA-pinned with a
+trailing `# vX.Y.Z` comment for human readers — `actions/checkout`,
+`actions/setup-node`, `cloudflare/wrangler-action`,
+`supabase/setup-cli`. Deploy + migration-push + functions-deploy
+jobs declare `environment: production` so they gate on whatever
+protection rules are set in repo Settings → Environments.
+`supabase-push.yml` and `supabase-deploy-functions.yml` additionally
+gate on `github.ref == 'refs/heads/main'` so a `workflow_dispatch`
+from a PR branch no-ops instead of shipping experimental migrations
+to prod. Dependabot (`.github/dependabot.yml`) opens a weekly PR
+when any pinned action publishes a new tag so the SHA pins stay
+current without manual `git ls-remote` polling.
 
 **Where:** `.github/workflows/deploy.yml`,
 `.github/workflows/supabase-push.yml`,
@@ -493,6 +588,16 @@ from any ref against production, including a PR branch.
 ---
 
 ### H8. `EO_*` tables grant `INSERT/UPDATE/DELETE/TRUNCATE` to `anon` and `authenticated` at the DDL layer
+
+**Status: FIXED 2026-06-03** in
+`supabase/migrations/20260603060000_eo_table_write_grants_lockdown.sql`.
+Revoked `INSERT/UPDATE/DELETE/TRUNCATE` on `EO_dives`, `EO_courses`,
+`EO_prices`, `EO_rooms`, and `Other_Addons` from both `anon` and
+`authenticated`; re-granted `INSERT/UPDATE/DELETE` to `authenticated`
+only. Nobody outside `service_role` can `TRUNCATE`; `anon` retains
+`SELECT` for public reads. The admin RLS policies still gate which
+authenticated rows actually get through. 317/317 integration tests
+pass — no flow depended on the over-broad grants.
 
 **Where:** `supabase/migrations/20260421130941_remote_schema.sql:188-396`
 
