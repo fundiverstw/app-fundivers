@@ -10,7 +10,10 @@ import { uploadCertCard } from '../../lib/cert-card'
 import { uploadNitroxCard } from '../../lib/nitrox-card'
 import { uploadDeepCard } from '../../lib/deep-card'
 import { isHeicFile } from '../../lib/image-compress'
+import { TurnstileWidget } from './TurnstileWidget'
 import type { AppEvent, Booking, BookingDetails, CancellationPolicy, Database, EOAddon, EORoom, Profile } from '../../types/database'
+
+const TURNSTILE_SITE_KEY = (import.meta.env.VITE_TURNSTILE_SITE_KEY ?? '') as string
 
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
 
@@ -475,6 +478,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const [guestEmail, setGuestEmail] = useState('')
   const [guestPassword, setGuestPassword] = useState('')
   const [guestAgreedTerms, setGuestAgreedTerms] = useState(false)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -676,6 +680,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             password: guestPassword,
             agreed_to_terms_at:      new Date().toISOString(),
             agreed_to_terms_version: CURRENT_TERMS_VERSION,
+            turnstile_token:         turnstileToken ?? '',
           } : {}),
           ...(actingOnBehalfOf ? { target_user_id: actingOnBehalfOf } : {}),
           event_type:    event.type,
@@ -849,6 +854,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                   <a href="/terms" target="_blank" rel="noreferrer" className="text-blue-700 hover:underline">Terms of Use & Privacy</a>.
                 </span>
               </label>
+              {TURNSTILE_SITE_KEY && (
+                <TurnstileWidget siteKey={TURNSTILE_SITE_KEY} onToken={setTurnstileToken} />
+              )}
             </div>
           )}
 
@@ -1320,7 +1328,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 (!isOnBehalfOf && certBlocked) ||
                 (!isOnBehalfOf && nitroxBlocked) ||
                 (!isOnBehalfOf && deepBlocked) ||
-                (isGuest && (guestEmail.trim() === '' || guestPassword.length < 8 || !guestAgreedTerms))
+                (isGuest && (guestEmail.trim() === '' || guestPassword.length < 8 || !guestAgreedTerms || (!!TURNSTILE_SITE_KEY && !turnstileToken)))
               )) ||
               (step === 3 && !isOnBehalfOf && needsTransport === null)
             }
