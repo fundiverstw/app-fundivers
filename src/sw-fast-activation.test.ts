@@ -71,21 +71,12 @@ describe('PWA reload UX', () => {
       expect(scope.skipWaiting).not.toHaveBeenCalled()
     })
 
-    it('claims existing clients on activate so the next reload is served by the new SW', () => {
+    it('does NOT register an activate listener — activate is owned by sw.ts (via wipeCachesAndClaim) so wipe and claim share one waitUntil', () => {
       const { listeners, scope } = makeFakeScope()
       enableFastActivation(scope as unknown as ServiceWorkerGlobalScope)
 
-      const activateHandler = listeners.get('activate')
-      expect(activateHandler, 'activate listener registered').toBeTypeOf('function')
-
-      const waitUntil = vi.fn()
-      activateHandler!({ waitUntil } as unknown as Event)
-
-      expect(scope.clients.claim).toHaveBeenCalledOnce()
-      // waitUntil must receive the claim() promise so the SW stays in the
-      // activating phase until claim resolves.
-      expect(waitUntil).toHaveBeenCalledOnce()
-      expect(waitUntil.mock.calls[0][0]).toBeInstanceOf(Promise)
+      expect(listeners.get('activate')).toBeUndefined()
+      expect(scope.clients.claim).not.toHaveBeenCalled()
     })
   })
 
