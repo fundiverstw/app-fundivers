@@ -36,6 +36,25 @@ function paymentWireLabel(m: string | null | undefined): string {
   return m ?? ""
 }
 
+// Prefer Cloudflare's authoritative header when fronted by CF
+// (which Workers/Pages are); fall through to the next-best-effort
+// XFF / X-Real-IP chain. Returns null if nothing usable was sent.
+function clientIp(req: Request): string | null {
+  const cf = req.headers.get("cf-connecting-ip")
+  if (cf) return cf
+  const xff = req.headers.get("x-forwarded-for")
+  if (xff) return xff.split(",")[0]!.trim() || null
+  return req.headers.get("x-real-ip")
+}
+
+async function sha256Hex(input: string): Promise<string> {
+  const bytes  = new TextEncoder().encode(input)
+  const digest = await crypto.subtle.digest("SHA-256", bytes)
+  return Array.from(new Uint8Array(digest))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("")
+}
+
 export interface RegistrationBody {
   email?:    string
   password?: string
@@ -48,7 +67,17 @@ export interface RegistrationBody {
   details:       Record<string, unknown>
   notes?:        string | null
   group_id?:     string
+  // Cloudflare Turnstile token from the SPA widget. Required on the
+  // guest path; ignored on auth'd paths (the Bearer token is already
+  // proof-of-not-a-bot).
+  turnstile_token?: string
 }
+
+// 5/min OR 50/day per IP. Tight enough to take down a script in <1
+// minute, loose enough that a real person retrying after a typo and
+// a "huh, didn't get the email" refresh won't be locked out.
+export const RATE_LIMIT_PER_60S = 5
+export const RATE_LIMIT_PER_24H = 50
 
 // ----- Narrow interfaces for injected deps. The real supabase-js
 //       client conforms structurally; tests pass vi.fn-backed shims.
@@ -100,6 +129,11 @@ export interface Env {
   mailFromAddress: string
 }
 
+export interface TurnstileResult {
+  success:    boolean
+  errorCodes?: string[]
+}
+
 export interface Deps {
   admin:            SupabaseAdminClient
   makeAuthedClient: (token: string) => SupabaseAuthedClient
@@ -107,6 +141,10 @@ export interface Deps {
   transporter:      Transporter | null
   buildPdfBase64:   (payload: RegistrationPdfPayload) => Promise<string>
   env:              Env
+  // Cloudflare Turnstile verifier. Posted token + remote IP go to
+  // https://challenges.cloudflare.com/turnstile/v0/siteverify. Tests
+  // pass a vi.fn() stub; the real implementation lives in index.ts.
+  verifyTurnstile:  (token: string, remoteIp: string | null) => Promise<TurnstileResult>
 }
 
 export async function handleRegistration(req: Request, deps: Deps): Promise<Response> {
@@ -167,6 +205,43 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     if (!body.email || !body.password) {
       return json({ error: "email and password required for guest path" }, 400)
     }
+    // Guest path gates (audit H2) — verify Turnstile, rate-limit per
+    // IP, confirm the target event actually exists. All three short-
+    // circuit BEFORE auth.admin.createUser to avoid burning MAU /
+    // sending email when the request is hostile or malformed.
+    if (!body.turnstile_token) {
+      return json({ error: "captcha token required" }, 400)
+    }
+    const remoteIp = clientIp(req)
+    const turnstile = await deps.verifyTurnstile(body.turnstile_token, remoteIp)
+    if (!turnstile.success) {
+      return json({ error: "captcha verification failed" }, 403)
+    }
+
+    const ipHashHex = await sha256Hex(remoteIp ?? "unknown")
+    const { data: counts, error: rlErr } = await admin.rpc("record_signup_attempt", {
+      p_ip_hash: `\\x${ipHashHex}`,
+    })
+    if (rlErr) {
+      return json({ error: `rate-limit check failed: ${rlErr.message}` }, 500)
+    }
+    const row = Array.isArray(counts) ? counts[0] : counts
+    const in60s = (row?.in_last_60s ?? 0) as number
+    const in24h = (row?.in_last_24h ?? 0) as number
+    if (in60s > RATE_LIMIT_PER_60S || in24h > RATE_LIMIT_PER_24H) {
+      return json({ error: "too many signup attempts, try again later" }, 429)
+    }
+
+    // Confirm the event exists in the catalog. Without this, an
+    // attacker could spend their per-IP budget on garbage event_ids
+    // and still consume MAU + emails.
+    const eventTable = body.event_type === "dive" ? "EO_dives" : "EO_courses"
+    const { data: existsRow } = await admin
+      .from(eventTable).select("_id").eq("_id", body.event_id).maybeSingle()
+    if (!existsRow) {
+      return json({ error: "event not found" }, 404)
+    }
+
     const { data, error } = await admin.auth.admin.createUser({
       email:         body.email.trim(),
       password:      body.password,
@@ -193,7 +268,29 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
 
   async function rollback(reason: string): Promise<Response> {
     if (createdGuest) {
-      await admin.auth.admin.deleteUser(userId).catch(() => { /* best-effort */ })
+      // Best-effort delete. If it fails we still leak an auth.users
+      // row — log it to orphan_auth_users so a janitor can reap it.
+      // Pre-cascade-trigger this used to leave the row forever
+      // undetectable; post 20260603020000 the cascade-down trigger
+      // will also fire if a profile delete happens, but the
+      // primary cleanup we WANT here is the auth side.
+      try {
+        const { error } = await admin.auth.admin.deleteUser(userId) as
+          { error?: { message: string } | null }
+        if (error) {
+          await admin.rpc("log_orphan_auth_user", {
+            p_user_id: userId,
+            p_email:   registrantEmail || null,
+            p_reason:  `rollback after: ${reason} | deleteUser: ${error.message}`,
+          }).catch(() => { /* log path itself failed; nothing more to do */ })
+        }
+      } catch (e) {
+        await admin.rpc("log_orphan_auth_user", {
+          p_user_id: userId,
+          p_email:   registrantEmail || null,
+          p_reason:  `rollback after: ${reason} | deleteUser threw: ${(e as Error).message}`,
+        }).catch(() => { /* log path itself failed; nothing more to do */ })
+      }
     }
     return json({ error: reason }, 500)
   }

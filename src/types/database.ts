@@ -109,6 +109,23 @@ export interface Database {
         Args: { p_user_id: string }
         Returns: void
       }
+      // Defined in 20260603040000_signup_throttling_and_orphan_log.sql.
+      // Service-role only. Inserts a signup_attempts row and returns
+      // count of attempts within the trailing 60s + 24h windows
+      // (inclusive of the just-inserted row). The create-registration
+      // edge function uses this to throttle the guest path. ip_hash is
+      // passed as a PostgREST bytea literal `\xDEADBEEF…`.
+      record_signup_attempt: {
+        Args: { p_ip_hash: string }
+        Returns: Array<{ in_last_60s: number; in_last_24h: number }>
+      }
+      // Defined in 20260603040000_signup_throttling_and_orphan_log.sql.
+      // Service-role only. Records an auth.users row that was created
+      // by the guest registration path but failed to roll back cleanly.
+      log_orphan_auth_user: {
+        Args: { p_user_id: string; p_email: string | null; p_reason: string }
+        Returns: void
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
