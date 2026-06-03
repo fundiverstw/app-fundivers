@@ -62,7 +62,7 @@ jobs:
           VITE_PUSH_WORKER_URL:    ${{ secrets.VITE_PUSH_WORKER_URL }}
           VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY }}
       - name: Deploy with Wrangler
-        uses: cloudflare/wrangler-action@9681c2997648301493e78cacbfb790a9f19c833f # v3.9.0
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -82,7 +82,7 @@ jobs:
       - run: npm ci
         working-directory: workers/push
       - name: Deploy with Wrangler
-        uses: cloudflare/wrangler-action@9681c2997648301493e78cacbfb790a9f19c833f # v3.9.0
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
