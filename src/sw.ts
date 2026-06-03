@@ -47,15 +47,21 @@ self.addEventListener('message', (event) => {
   }
 })
 
-// On every SW activation (initial install + each subsequent update),
-// drop the supabase-api cache so stragglers from the previous worker
-// can't survive into the new one. The ExpirationPlugin would evict
-// them within 5 minutes anyway; this just makes the new bundle's
-// first reads always go to the network instead of inheriting whatever
-// the previous SW happened to have cached. Anon-keyed cached data
-// only, so no confidentiality concern — the next fetch repopulates.
+// On every SW activation, wipe every cache the previous worker owned
+// (workbox precache, supabase-api, all of it) and force-reload every
+// open tab. Belt-and-suspenders against the stale-shell trap, where a
+// precached index.html points at a long-deleted bundle hash and users
+// are stuck without a path forward except manually unregistering the
+// SW. Costs a brief "no offline cache" window after each update;
+// buys a guarantee no user ever lands on a half-applied deploy.
 self.addEventListener('activate', (event) => {
-  event.waitUntil(caches.delete(SUPABASE_CACHE_NAME))
+  event.waitUntil((async () => {
+    const names = await caches.keys()
+    await Promise.all(names.map(n => caches.delete(n)))
+    await self.clients.claim()
+    const tabs = await self.clients.matchAll({ type: 'window' })
+    await Promise.all(tabs.map(t => (t as WindowClient).navigate(t.url)))
+  })())
 })
 
 interface PushPayload {
