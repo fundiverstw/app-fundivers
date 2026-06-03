@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { handleRegistration, type Deps } from './handler'
+import { handleRegistration, type Deps, type TurnstileResult } from './handler'
 
 // Security-focused unit suite for the create-registration handler.
 //
@@ -23,6 +23,8 @@ interface CapturedWrites {
   createUserCalls: Array<Record<string, unknown>>
   deleteUserCalls: string[]
   sendMailCalls:   Array<Record<string, unknown>>
+  turnstileVerifyCalls: Array<{ token: string; ip: string | null }>
+  rpcCalls:        Array<{ name: string; args: unknown }>
 }
 
 interface MockOpts {
@@ -38,18 +40,23 @@ interface MockOpts {
   existingBooking?: { id: string; status: string } | null
   createUserId?: string
   createUserError?: string
+  turnstileResult?: TurnstileResult
+  rateLimitCounts?: { in_last_60s: number; in_last_24h: number }
+  eventNotFound?:  boolean
+  deleteUserError?: string
 }
 
 function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites } {
   const captured: CapturedWrites = {
     profileUpdate: [], bookingInsert: [],
     createUserCalls: [], deleteUserCalls: [], sendMailCalls: [],
+    turnstileVerifyCalls: [], rpcCalls: [],
   }
 
   // Per-table query builder. Each call to admin.from(<table>) gets a
   // fresh chainable that resolves to the table's canned response.
   function from(table: string) {
-    const canned: Record<string, unknown> = (() => {
+    const canned: Record<string, unknown> | null = (() => {
       switch (table) {
         case 'profiles':
           // Caller-profile fetch (target_user_id path) returns role;
@@ -58,8 +65,10 @@ function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites }
           return { role: opts.callerRole ?? 'diver', parent_account: opts.targetParentAccount ?? null, full_name: 'Test', name_alt: null }
         case 'bookings':
           return { id: 'b1', status: opts.bookingStatus ?? 'pending', notes: null }
-        case 'EO_dives':   return { _id: 'd1', start_date: '2030-06-01', end_date: '2030-06-03', display_title: 'Test Dive' }
-        case 'EO_courses': return { _id: 'c1', start_date: '2030-06-01', end_date: '2030-06-03', display_title: 'Test Course' }
+        case 'EO_dives':
+          return opts.eventNotFound ? null : { _id: 'd1', start_date: '2030-06-01', end_date: '2030-06-03', display_title: 'Test Dive' }
+        case 'EO_courses':
+          return opts.eventNotFound ? null : { _id: 'c1', start_date: '2030-06-01', end_date: '2030-06-03', display_title: 'Test Course' }
         default:           return null
       }
     })()
@@ -112,11 +121,26 @@ function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites }
           data:  { user: { id, email: opts.targetEmail ?? 'target@example.com' } },
           error: null,
         })),
-        deleteUser: vi.fn(async (id: string) => { captured.deleteUserCalls.push(id); return {} }),
+        deleteUser: vi.fn(async (id: string) => {
+          captured.deleteUserCalls.push(id)
+          return opts.deleteUserError ? { error: { message: opts.deleteUserError } } : {}
+        }),
       },
     },
     from: vi.fn(from),
-  }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rpc: vi.fn(async (name: string, args: unknown): Promise<any> => {
+      captured.rpcCalls.push({ name, args })
+      if (name === 'record_signup_attempt') {
+        const counts = opts.rateLimitCounts ?? { in_last_60s: 1, in_last_24h: 1 }
+        return { data: [counts], error: null }
+      }
+      if (name === 'log_orphan_auth_user') {
+        return { data: null, error: null }
+      }
+      return { data: null, error: null }
+    }),
+  } as Deps['admin']
 
   const makeAuthedClient = vi.fn(() => ({
     auth: {
@@ -140,6 +164,11 @@ function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites }
     sendMail: vi.fn(async (msg) => { captured.sendMailCalls.push(msg as Record<string, unknown>); return {} }),
   }
 
+  const verifyTurnstile: Deps['verifyTurnstile'] = vi.fn(async (token, ip) => {
+    captured.turnstileVerifyCalls.push({ token, ip })
+    return opts.turnstileResult ?? { success: true }
+  })
+
   const deps: Deps = {
     admin,
     makeAuthedClient,
@@ -147,6 +176,7 @@ function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites }
     transporter,
     buildPdfBase64: vi.fn(async () => 'ZmFrZS1wZGY='),
     env: { companyEmail: 'fundiverstw@gmail.com', mailFromName: 'FunDivers TW', mailFromAddress: 'fundiverstw@gmail.com' },
+    verifyTurnstile,
   }
   return { deps, captured }
 }
@@ -215,6 +245,7 @@ describe('handleRegistration — guest path security (audit C2)', () => {
       ...goodBody,
       email:    'mallory@example.com',
       password: 'hunter2hunter2',
+      turnstile_token: 'tk',
       profile_patch: { role: 'admin', full_name: 'Mallory' },
     }), deps)
     expect(res.status).toBe(200)
@@ -229,6 +260,7 @@ describe('handleRegistration — guest path security (audit C2)', () => {
       ...goodBody,
       email:    'g@example.com',
       password: 'hunter2hunter2',
+      turnstile_token: 'tk',
       profile_patch: { status: 'active', full_name: 'G' },
     }), deps)
     expect(captured.profileUpdate[0].status).toBe('pending')
@@ -240,6 +272,7 @@ describe('handleRegistration — guest path security (audit C2)', () => {
       ...goodBody,
       email:    'g@example.com',
       password: 'hunter2hunter2',
+      turnstile_token: 'tk',
       profile_patch: { parent_account: 'someone-else-uid', full_name: 'G' },
     }), deps)
     expect(captured.profileUpdate[0]).not.toHaveProperty('parent_account')
@@ -251,6 +284,7 @@ describe('handleRegistration — guest path security (audit C2)', () => {
       ...goodBody,
       email:    'g@example.com',
       password: 'hunter2hunter2',
+      turnstile_token: 'tk',
       profile_patch: {
         id:             'pwned',
         role:           'admin',
@@ -360,6 +394,7 @@ describe('handleRegistration — rollback semantics', () => {
       ...goodBody,
       email:    'g@example.com',
       password: 'hunter2hunter2',
+      turnstile_token: 'tk',
     }), deps)
     expect(res.status).toBe(500)
     expect(captured.deleteUserCalls).toEqual(['new-user-id'])
@@ -384,6 +419,7 @@ describe('handleRegistration — rollback semantics', () => {
       ...goodBody,
       email:    'g@example.com',
       password: 'hunter2hunter2',
+      turnstile_token: 'tk',
     }), deps)
     expect(res.status).toBe(500)
     expect(captured.deleteUserCalls).toEqual(['new-user-id'])
@@ -398,6 +434,7 @@ describe('handleRegistration — rollback semantics', () => {
       ...goodBody,
       email:    'g@example.com',
       password: 'hunter2hunter2',
+      turnstile_token: 'tk',
     }), deps)
     expect(res.status).toBe(500)
     expect(captured.deleteUserCalls).toEqual(['new-user-id'])
@@ -412,6 +449,7 @@ describe('handleRegistration — email behaviour', () => {
       ...goodBody,
       email:    'g@example.com',
       password: 'hunter2hunter2',
+      turnstile_token: 'tk',
     }), deps)
     expect(res.status).toBe(200)
     expect(captured.sendMailCalls).toEqual([])
@@ -424,6 +462,7 @@ describe('handleRegistration — email behaviour', () => {
       ...goodBody,
       email:    'g@example.com',
       password: 'hunter2hunter2',
+      turnstile_token: 'tk',
     }), deps)
     expect(res.status).toBe(200)
   })
@@ -434,6 +473,7 @@ describe('handleRegistration — email behaviour', () => {
       ...goodBody,
       email:    'fundiverstw@gmail.com',
       password: 'hunter2hunter2',
+      turnstile_token: 'tk',
     }), deps)
     expect(captured.sendMailCalls).toHaveLength(1)
     expect(captured.sendMailCalls[0].to).toBe('fundiverstw@gmail.com')
@@ -445,12 +485,162 @@ describe('handleRegistration — email behaviour', () => {
       ...goodBody,
       email:    'g@example.com',
       password: 'hunter2hunter2',
+      turnstile_token: 'tk',
     }), deps)
     expect(captured.sendMailCalls.length).toBeGreaterThan(0)
     for (const msg of captured.sendMailCalls) {
       expect(msg.attachments).toBeUndefined()
       expect(msg.subject).toMatch(/^waitlist--/)
     }
+  })
+})
+
+describe('handleRegistration — H2 guest path gates (Turnstile, rate limit, event existence)', () => {
+  it('rejects guest path when turnstile_token is missing', async () => {
+    const { deps, captured } = makeDeps()
+    const res = await handleRegistration(postJson({
+      ...goodBody,
+      email:    'g@example.com',
+      password: 'hunter2hunter2',
+    }), deps)
+    expect(res.status).toBe(400)
+    expect(captured.createUserCalls).toEqual([])
+  })
+
+  it('rejects guest path when Turnstile verify fails', async () => {
+    const { deps, captured } = makeDeps({
+      turnstileResult: { success: false, errorCodes: ['invalid-input-response'] },
+    })
+    const res = await handleRegistration(postJson({
+      ...goodBody,
+      email:    'g@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'tampered',
+    }), deps)
+    expect(res.status).toBe(403)
+    expect(captured.turnstileVerifyCalls).toHaveLength(1)
+    expect(captured.createUserCalls).toEqual([])
+  })
+
+  it('forwards the client IP from cf-connecting-ip to verifyTurnstile', async () => {
+    const { deps, captured } = makeDeps()
+    await handleRegistration(postJson({
+      ...goodBody,
+      email:    'g@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'tk',
+    }, { 'cf-connecting-ip': '203.0.113.10' }), deps)
+    expect(captured.turnstileVerifyCalls[0].ip).toBe('203.0.113.10')
+  })
+
+  it('falls through to x-forwarded-for when cf-connecting-ip is absent', async () => {
+    const { deps, captured } = makeDeps()
+    await handleRegistration(postJson({
+      ...goodBody,
+      email:    'g@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'tk',
+    }, { 'x-forwarded-for': '198.51.100.7, 10.0.0.1' }), deps)
+    expect(captured.turnstileVerifyCalls[0].ip).toBe('198.51.100.7')
+  })
+
+  it('throttles when 60s window exceeded', async () => {
+    const { deps, captured } = makeDeps({
+      rateLimitCounts: { in_last_60s: 6, in_last_24h: 6 },
+    })
+    const res = await handleRegistration(postJson({
+      ...goodBody,
+      email:    'g@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'tk',
+    }), deps)
+    expect(res.status).toBe(429)
+    expect(captured.createUserCalls).toEqual([])
+  })
+
+  it('throttles when 24h window exceeded', async () => {
+    const { deps, captured } = makeDeps({
+      rateLimitCounts: { in_last_60s: 1, in_last_24h: 51 },
+    })
+    const res = await handleRegistration(postJson({
+      ...goodBody,
+      email:    'g@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'tk',
+    }), deps)
+    expect(res.status).toBe(429)
+    expect(captured.createUserCalls).toEqual([])
+  })
+
+  it('rejects an unknown event_id before creating an auth user', async () => {
+    const { deps, captured } = makeDeps({ eventNotFound: true })
+    const res = await handleRegistration(postJson({
+      ...goodBody,
+      event_id: 'does-not-exist',
+      email:    'g@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'tk',
+    }), deps)
+    expect(res.status).toBe(404)
+    expect(captured.createUserCalls).toEqual([])
+  })
+
+  it('authed self-signup skips Turnstile entirely (no token required)', async () => {
+    const { deps, captured } = makeDeps({ callerUserId: 'self-uid' })
+    const res = await handleRegistration(
+      postJson(goodBody, { Authorization: 'Bearer self-jwt' }),
+      deps,
+    )
+    expect(res.status).toBe(200)
+    expect(captured.turnstileVerifyCalls).toEqual([])
+  })
+
+  it('authed on-behalf-of skips Turnstile entirely', async () => {
+    const { deps, captured } = makeDeps({ callerRole: 'admin' })
+    const res = await handleRegistration(
+      postJson({ ...goodBody, target_user_id: 'kid' }, { Authorization: 'Bearer admin-jwt' }),
+      deps,
+    )
+    expect(res.status).toBe(200)
+    expect(captured.turnstileVerifyCalls).toEqual([])
+  })
+})
+
+describe('handleRegistration — H2 orphan logging on rollback failure', () => {
+  it('logs to orphan_auth_users when deleteUser returns an error', async () => {
+    const { deps, captured } = makeDeps({
+      createUserId:   'new-user-id',
+      bookingError:   'unique violation',
+      deleteUserError: 'auth service down',
+    })
+    const res = await handleRegistration(postJson({
+      ...goodBody,
+      email:    'g@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'tk',
+    }), deps)
+    expect(res.status).toBe(500)
+    expect(captured.deleteUserCalls).toEqual(['new-user-id'])
+    const orphanCall = captured.rpcCalls.find(c => c.name === 'log_orphan_auth_user')
+    expect(orphanCall).toBeDefined()
+    const args = orphanCall!.args as { p_user_id: string; p_email: string; p_reason: string }
+    expect(args.p_user_id).toBe('new-user-id')
+    expect(args.p_email).toBe('g@example.com')
+    expect(args.p_reason).toMatch(/auth service down/)
+  })
+
+  it('no orphan log when deleteUser succeeds (happy rollback)', async () => {
+    const { deps, captured } = makeDeps({
+      createUserId: 'new-user-id',
+      bookingError: 'unique violation',
+    })
+    await handleRegistration(postJson({
+      ...goodBody,
+      email:    'g@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'tk',
+    }), deps)
+    expect(captured.rpcCalls.find(c => c.name === 'log_orphan_auth_user')).toBeUndefined()
   })
 })
 
@@ -461,6 +651,7 @@ describe('handleRegistration — happy path returns the booking id and session',
       ...goodBody,
       email:    'g@example.com',
       password: 'hunter2hunter2',
+      turnstile_token: 'tk',
     }), deps)
     expect(res.status).toBe(200)
     const body = await res.json() as { booking_id: string; status: string; session: unknown }
