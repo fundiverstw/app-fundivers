@@ -18,14 +18,15 @@ export function ResetPasswordPage() {
   const [done, setDone] = useState(false)
 
   useEffect(() => {
-    // The recovery link sets up a session asynchronously after the page
-    // loads; wait for either an existing session or the PASSWORD_RECOVERY
-    // event before letting the form submit.
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setReady(true)
-    })
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY' || session) setReady(true)
+    // Audit M9 — gate strictly on PASSWORD_RECOVERY. Previously this
+    // also unlocked the form for any pre-existing session, which let an
+    // already-signed-in user navigate to /reset-password directly and
+    // rotate their password without re-authenticating. Recovery sessions
+    // arrive via onAuthStateChange with event === 'PASSWORD_RECOVERY';
+    // anything else (SIGNED_IN, INITIAL_SESSION, etc.) means the user
+    // didn't actually click a fresh recovery link.
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') setReady(true)
     })
     return () => sub.subscription.unsubscribe()
   }, [])

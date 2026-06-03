@@ -4,7 +4,7 @@
 // (real supabase-js clients, real nodemailer, real PDF builder) and
 // forward the Request to the handler.
 
-import { createClient } from "jsr:@supabase/supabase-js@2"
+import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
 import { buildPdfBase64 } from "../_shared/pdf.ts"
 import { handleRegistration, type Deps } from "./handler.ts"

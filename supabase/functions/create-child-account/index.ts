@@ -14,23 +14,11 @@
 // Body: { email, full_name, display_name?, name_alt? }
 // Returns: { ok: true, user_id, email_sent }
 
-import { createClient } from "jsr:@supabase/supabase-js@2"
+import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
+import { corsOk, jsonResponse, safeError } from "../_shared/responses.ts"
 
 const COMPANY_EMAIL = "fundiverstw@gmail.com"
-
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin":  "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-}
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json", ...CORS_HEADERS },
-  })
-}
 
 interface Body {
   email:         string
@@ -46,7 +34,8 @@ function randomTempPassword(): string {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS })
+  const json = (body: unknown, status = 200) => jsonResponse(req, body, status)
+  if (req.method === "OPTIONS") return corsOk(req)
   if (req.method !== "POST")    return json({ error: "method not allowed" }, 405)
 
   const auth = req.headers.get("Authorization") ?? ""
@@ -97,7 +86,7 @@ Deno.serve(async (req) => {
     email_confirm: true,
   })
   if (createErr || !created.user) {
-    return json({ error: createErr?.message ?? "createUser failed" }, 400)
+    return json({ error: safeError(createErr, "createUser failed") }, 400)
   }
   const newUserId = created.user.id
 
@@ -117,7 +106,7 @@ Deno.serve(async (req) => {
   if (profErr) {
     // Best-effort cleanup so a half-created account doesn't linger.
     await admin.auth.admin.deleteUser(newUserId).catch(() => { /* ignore */ })
-    return json({ error: profErr.message }, 500)
+    return json({ error: safeError(profErr, "profile update failed") }, 500)
   }
 
   // Courtesy email to the child. Mirrors the admin-create-diver wording —

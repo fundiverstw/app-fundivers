@@ -16,28 +16,17 @@
 //          204 { ok: true, dive_count: 0 } when there's nothing to export
 //              (we still count this as a request to discourage hammering).
 
-import { createClient } from "jsr:@supabase/supabase-js@2"
+import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
 import { buildDiveLogCsv, DIVE_LOG_CSV_COLUMNS, type DiveLogCsvRow } from "../_shared/dive-log-csv.ts"
+import { corsOk, jsonResponse, safeError } from "../_shared/responses.ts"
 
 const COMPANY_EMAIL = "fundiverstw@gmail.com"
 const COOLDOWN_HOURS = 24
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin":  "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-}
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json", ...CORS_HEADERS },
-  })
-}
-
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS })
+  const json = (body: unknown, status = 200) => jsonResponse(req, body, status)
+  if (req.method === "OPTIONS") return corsOk(req)
   if (req.method !== "POST")    return json({ error: "method not allowed" }, 405)
 
   const auth = req.headers.get("Authorization") ?? ""
@@ -69,7 +58,7 @@ Deno.serve(async (req) => {
     .gte("requested_at", cutoff)
     .order("requested_at", { ascending: false })
     .limit(1)
-  if (rErr) return json({ error: rErr.message }, 500)
+  if (rErr) return json({ error: safeError(rErr, "rate-limit check failed") }, 500)
   if (recent && recent.length > 0) {
     const last = new Date(recent[0].requested_at as string)
     const nextAvailable = last.getTime() + COOLDOWN_HOURS * 3600 * 1000
@@ -98,7 +87,7 @@ Deno.serve(async (req) => {
     // Oldest-first matches paper-logbook chronological order.
     .order("dived_on", { ascending: true })
     .order("dive_number", { ascending: true })
-  if (lErr) return json({ error: lErr.message }, 500)
+  if (lErr) return json({ error: safeError(lErr, "dive logs fetch failed") }, 500)
 
   const rows = (logs ?? []) as unknown as DiveLogCsvRow[]
   const csv = buildDiveLogCsv(rows)
@@ -135,7 +124,7 @@ Deno.serve(async (req) => {
   const { error: insErr } = await admin
     .from("dive_log_export_requests")
     .insert({ user_id: userId })
-  if (insErr) return json({ error: insErr.message }, 500)
+  if (insErr) return json({ error: safeError(insErr, "request log insert failed") }, 500)
 
   return json({ ok: true, dive_count: rows.length, requested_at: new Date().toISOString() })
 })

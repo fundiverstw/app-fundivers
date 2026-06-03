@@ -23,12 +23,13 @@ dashboard could not be checked from the code.
 
 ## TL;DR
 
-**Update 2026-06-03:** the entire Critical + High tier is now FIXED.
-C1, C2, C3, H1–H8, plus L10 and M5 each carry a `**Status: FIXED**`
-header on their respective sections with the migration / file that
-closed them. The original findings are preserved verbatim below for
-context; read the FIXED block at the top of each section before the
-prose. Open work is now Medium tier and below.
+**Update 2026-06-03:** every Critical, High, and Medium finding is
+now FIXED. C1–C3, H1–H8, M1–M13, plus L10 each carry a
+`**Status: FIXED**` header on their respective sections with the
+migration / file that closed them. The original findings are preserved
+verbatim below for context; read the FIXED block at the top of each
+section before the prose. Open work is now only the Low tier (hygiene
+items L1–L9, L11–L13).
 
 Three findings collapse the authorization model end-to-end:
 
@@ -634,6 +635,14 @@ still apply on top.
 
 ### M1. `credits` policy lets staff issue / modify / delete credits
 
+**Status: FIXED 2026-06-03** in
+`supabase/migrations/20260603070000_medium_tier_policy_lockdowns.sql`.
+Dropped "credits: staff manage all" and replaced with four scoped
+policies: staff_or_admin SELECT, admin-only INSERT / UPDATE / DELETE.
+`tests/integration/credits.test.ts` updated to assert staff can read
+but cannot write (RLS hides INSERT → 42501; UPDATE / DELETE just
+0-row no-ops with the row unchanged).
+
 **Where:** `supabase/migrations/20260521010000_credits.sql:47`
 
 The migration's own comment says "issuance is admin-driven only,"
@@ -642,6 +651,13 @@ themselves arbitrary amounts. Split into `select` for staff_or_admin
 and `insert/update/delete` for admin-only via `is_admin()`.
 
 ### M2. `push_subscriptions` UPDATE policy missing `WITH CHECK` and `TO authenticated`
+
+**Status: FIXED 2026-06-03** in
+`supabase/migrations/20260603070000_medium_tier_policy_lockdowns.sql`.
+Recreated the SELECT / UPDATE / DELETE policies on
+`push_subscriptions` with `to authenticated` (was defaulting to
+public/anon) and added `with check (auth.uid() = user_id)` on UPDATE
+so a user can't repoint their device endpoint at another user's id.
 
 **Where:** `supabase/migrations/20260422180000_push_notifications.sql`
 
@@ -661,6 +677,14 @@ check (auth.uid() = user_id)`.
 
 ### M3. `bookings: parent insert for children` skips the active-user gate
 
+**Status: FIXED 2026-06-03** in
+`supabase/migrations/20260603070000_medium_tier_policy_lockdowns.sql`.
+Recreated "bookings: parent insert for children" to require
+`public.is_active_user() and exists (… parent_account = auth.uid())`.
+Pending parents can no longer insert bookings for their kids until
+their own profile is approved — matches the gate the diver self-insert
+policy already had.
+
 **Where:** `supabase/migrations/20260514030000_parent_child_accounts.sql`
 
 `20260501100000_profile_status.sql` adds `and public.is_active_user()`
@@ -669,6 +693,23 @@ added later doesn't include the gate. A pending parent can insert
 bookings for their children even before manual verification.
 
 ### M4. CORS `*` + verbatim Postgres errors on edge function 4xx/5xx
+
+**Status: FIXED 2026-06-03.** New shared module
+`supabase/functions/_shared/responses.ts` exports `corsHeaders(req)`,
+`corsOk(req)`, `jsonResponse(req, body, status)`, and `safeError(err,
+fallback)`. CORS is now an allowlist echo
+(`app.fundiverstw.com` + localhost dev origins) with `Vary: Origin`
+always set. `safeError` maps known SQLSTATEs (23505 → "Already
+exists", 42501 → "Permission denied", etc.) and suppresses raw
+Postgres / PostgREST messages while console.error'ing them for
+debugging; authored Error messages still pass through. All seven
+edge functions (`create-registration`, `notify-application-decision`,
+`admin-create-diver`, `create-child-account`,
+`request-dive-log-export`, `export-event-divers`,
+`notify-waitlist-offer`) now import the helpers; verbatim `err.message`
+returns replaced with `safeError(err, fallback)`. 11 unit cases in
+`supabase/functions/_shared/responses.test.ts` pin the CORS + error
+behavior.
 
 **Where:** all `supabase/functions/*/index.ts`
 
@@ -702,6 +743,17 @@ trace. Have the function insert one synthetic rollup row per run
 
 ### M6. `admin_audit_log` is RLS-append-only but not trigger-append-only
 
+**Status: FIXED 2026-06-03** in
+`supabase/migrations/20260603070000_medium_tier_policy_lockdowns.sql`.
+Added `public.audit_log_no_mutations()` plus
+`admin_audit_log_block_update` and `admin_audit_log_block_delete`
+BEFORE UPDATE / DELETE triggers that raise
+`insufficient_privilege` unconditionally. Studio SQL editor running
+as postgres can no longer rewrite audit history without first
+explicitly `ALTER TABLE … DISABLE TRIGGER`-ing the guards (a noisy,
+auditable act). The audit-write trigger that inserts into this table
+fires at default trigger depth and is unaffected.
+
 **Where:** `supabase/migrations/20260423140000_admin_audit_log.sql`
 
 RLS gives admin SELECT only — no INSERT/UPDATE/DELETE. But the
@@ -712,6 +764,17 @@ role can still `ALTER TABLE … DISABLE TRIGGER` for legitimate
 redactions, and that act itself shows in `pg_stat`.
 
 ### M7. Inconsistent admin gates: inline subqueries vs `is_admin()` helper
+
+**Status: FIXED 2026-06-03** in
+`supabase/migrations/20260603070000_medium_tier_policy_lockdowns.sql`.
+Recreated every policy that used inline
+`exists (select 1 from profiles where role = 'admin')` to call
+`public.is_admin()` (or `public.is_staff_or_admin()` where
+appropriate) instead: 4 policies on `public.duties`, 2 on
+`public.admin_notes` (update + delete; select + insert were already
+migrated in 20260429240000_staff_role.sql), and 12 storage.objects
+policies covering the cert-cards / nitrox-cards / deep-cards admin
+read/insert/update/delete tetrad.
 
 **Where:** `admin_notes`, `duties`, `credits`, several `storage.objects`
 policies, all newer migrations.
@@ -726,6 +789,12 @@ recreates each of those policies using `is_admin()` /
 `is_staff_or_admin()`.
 
 ### M8. SPA Supabase client uses default `flowType: 'implicit'`
+
+**Status: FIXED 2026-06-03** in `src/lib/supabase.ts`. The client is
+now constructed with `auth: { flowType: 'pkce', autoRefreshToken:
+true, persistSession: true, detectSessionInUrl: true }`. Access tokens
+no longer arrive in URL fragments on magic-link / OAuth redirect (which
+bled into browser history + document.referrer).
 
 **Where:** `src/lib/supabase.ts:12`
 
@@ -742,6 +811,12 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
 
 ### M9. `ResetPasswordPage` unlocks on any active session, not just `PASSWORD_RECOVERY`
 
+**Status: FIXED 2026-06-03** in `src/pages/ResetPasswordPage.tsx`. The
+gate now requires `event === 'PASSWORD_RECOVERY'` exclusively;
+pre-existing SIGNED_IN / INITIAL_SESSION events no longer unlock the
+form. An already-signed-in user navigating to `/reset-password`
+directly stays on the "Verifying reset link…" placeholder.
+
 **Where:** `src/pages/ResetPasswordPage.tsx:27-29`
 
 ```ts
@@ -754,6 +829,13 @@ rotate their password without re-authenticating. Gate strictly on
 
 ### M10. Push notification `url` is followed without same-origin check
 
+**Status: FIXED 2026-06-03.** Extracted the navigation-target
+validator into `src/sw-notification-target.ts` so it can be unit
+tested without the WebWorker globals; `sw.ts` imports it. The helper
+returns `/` for anything that isn't a bare `/foo` same-origin path —
+absolute URLs, protocol-relative `//host`, `javascript:`, relative
+paths, non-strings. 7 unit cases in `src/sw-notification-target.test.ts`.
+
 **Where:** `src/sw.ts:54-68`
 
 `target` is taken straight from `event.notification.data.url`. A push
@@ -764,11 +846,20 @@ in the SW before `navigate` / `openWindow`.
 
 ### M11. Root SPA `wrangler.toml` `compatibility_date` is 14 months stale
 
+**Status: FIXED 2026-06-03.** Bumped `wrangler.toml` `compatibility_date`
+from `2025-04-16` to `2026-04-01`, matching the push worker. Smoke-test
+on next deploy.
+
 **Where:** `wrangler.toml:2` → `2025-04-16`. Push worker is current at
 `2026-04-01`. Stale compat dates miss security defaults Cloudflare
 ships. Bump to a recent date and smoke-test.
 
 ### M12. `tsconfig.app.json` / `tsconfig.node.json` lack `"strict": true`
+
+**Status: FIXED 2026-06-03.** Added `"strict": true` to both
+`tsconfig.app.json` and `tsconfig.node.json`. The codebase compiled
+clean on the first run — no implicit `any` or null-check issues
+surfaced (existing typing discipline was already strict-compatible).
 
 `workers/push/tsconfig.json` has it. The SPA tsconfigs only enable
 `noUnusedLocals` / `noUnusedParameters`. Implicit `any` lets a class
@@ -776,6 +867,14 @@ of input-shape bugs ship. Add `"strict": true`, fix the resulting
 errors.
 
 ### M13. Supabase edge functions have no central `import_map.json`
+
+**Status: FIXED 2026-06-03 (in-place pin).** Replaced the floating
+`jsr:@supabase/supabase-js@2` specifier with the exact pin
+`jsr:@supabase/supabase-js@2.103.2` in every edge function entry
+point. `nodemailer@6.9.14` and `jspdf@2.5.1` were already pinned.
+This avoids the import_map.json + config.toml restructuring that the
+audit suggested while still locking the version that ships per
+cold start. A future centralisation pass remains an option.
 
 Versions drift across files (`jsr:@supabase/supabase-js@2`,
 `npm:nodemailer@6.9.14`, `npm:jspdf@2.5.1`). The bare `@2` floats per
