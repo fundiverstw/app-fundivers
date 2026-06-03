@@ -47,6 +47,17 @@ self.addEventListener('message', (event) => {
   }
 })
 
+// On every SW activation (initial install + each subsequent update),
+// drop the supabase-api cache so stragglers from the previous worker
+// can't survive into the new one. The ExpirationPlugin would evict
+// them within 5 minutes anyway; this just makes the new bundle's
+// first reads always go to the network instead of inheriting whatever
+// the previous SW happened to have cached. Anon-keyed cached data
+// only, so no confidentiality concern — the next fetch repopulates.
+self.addEventListener('activate', (event) => {
+  event.waitUntil(caches.delete(SUPABASE_CACHE_NAME))
+})
+
 interface PushPayload {
   title: string
   body?: string
