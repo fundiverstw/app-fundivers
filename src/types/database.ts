@@ -102,6 +102,13 @@ export interface Database {
         Args: { p_version: number }
         Returns: void
       }
+      // Defined in 20260603020000_profile_delete_cascade_and_admin_rpc.sql.
+      // Admin-only. Deletes auth.users for the target id; the existing
+      // FK cascade handles profiles + dependents. Refuses self-deletion.
+      admin_delete_user: {
+        Args: { p_user_id: string }
+        Returns: void
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>

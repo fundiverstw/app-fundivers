@@ -227,6 +227,31 @@ export function AdminUsersPage() {
     }
   }
 
+  async function handleDeleteUser(target: Profile) {
+    const name = target.full_name || target.display_name || target.contact_id || target.id
+    const confirmed = window.confirm(
+      `Permanently delete ${name}?\n\n` +
+      `This removes their account, profile, bookings, payments, ` +
+      `credits, notifications, dive log entries, and every other ` +
+      `record tied to them. This cannot be undone.`,
+    )
+    if (!confirmed) return
+    try {
+      const { error } = await supabase.rpc('admin_delete_user', { p_user_id: target.id })
+      if (error) throw error
+      setUsers(prev => prev.filter(u => u.id !== target.id))
+      setExpanded(null)
+      setExtrasCache(prev => {
+        const next = new Map(prev)
+        next.delete(target.id)
+        return next
+      })
+      toast.success(`Deleted ${name}`)
+    } catch (err) {
+      toast.error(`Could not delete: ${errorMessage(err)}`)
+    }
+  }
+
   async function handleVoidPayment(userId: string, bookingId: string, paymentId: string) {
     const extras = extrasCache.get(userId)
     if (!extras) return
@@ -305,7 +330,9 @@ export function AdminUsersPage() {
             onCreateCredit={(amount, reason, bookingId) => handleCreateCredit(u.id, amount, reason, bookingId)}
             onSettleCredit={(creditId, note) => handleSettleCredit(u.id, creditId, note)}
             onReopenCredit={(creditId) => handleReopenCredit(u.id, creditId)}
+            onDelete={() => handleDeleteUser(u)}
             isAdmin={isAdmin}
+            isSelf={profile?.id === u.id}
           />
         ))}
         {visible.length === 0 && (
@@ -318,7 +345,7 @@ export function AdminUsersPage() {
 
 function UserCard({
   user, allUsers, onFamilyChanged, open, extras, loading, editing, onToggle, onEdit, onCancelEdit, onProfileSaved,
-  onRecordPayment, onVoidPayment, onCreateCredit, onSettleCredit, onReopenCredit, isAdmin,
+  onRecordPayment, onVoidPayment, onCreateCredit, onSettleCredit, onReopenCredit, onDelete, isAdmin, isSelf,
 }: {
   user: Profile
   allUsers: Profile[]
@@ -336,7 +363,9 @@ function UserCard({
   onCreateCredit: (amount: number, reason: string, bookingId: string | null) => Promise<void>
   onSettleCredit: (creditId: string, note: string) => Promise<void>
   onReopenCredit: (creditId: string) => Promise<void>
+  onDelete: () => Promise<void>
   isAdmin: boolean
+  isSelf: boolean
 }) {
   const { user: authUser } = useAuth()
   return (
@@ -398,7 +427,16 @@ function UserCard({
             </div>
           ) : (
             <>
-              <div className="flex justify-end">
+              <div className="flex justify-end items-center gap-4">
+                {isAdmin && !isSelf && (
+                  <button
+                    type="button"
+                    onClick={onDelete}
+                    className="text-xs text-red-700 hover:text-red-900 underline"
+                  >
+                    Delete user
+                  </button>
+                )}
                 {isAdmin && (
                   <button
                     type="button"
