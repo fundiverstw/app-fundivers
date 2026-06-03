@@ -1,0 +1,15 @@
+# Dependabot config. Opens a PR every time a pinned GitHub Action ships a
+# new tag, with the new commit SHA already swapped in and the changelog
+# summarised in the PR body. Pairs with the SHA-pinning we did for audit
+# H7 — pinning gives us immutability, Dependabot gives us a timely
+# upgrade path so the pins don't go stale and miss security fixes.
+
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
