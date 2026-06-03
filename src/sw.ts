@@ -8,7 +8,10 @@
 import { precacheAndRoute } from 'workbox-precaching'
 import { registerRoute } from 'workbox-routing'
 import { NetworkFirst } from 'workbox-strategies'
+import { CacheableResponsePlugin } from 'workbox-cacheable-response'
+import { ExpirationPlugin } from 'workbox-expiration'
 import { enableFastActivation } from './sw-fast-activation'
+import { isSupabaseCacheable, SUPABASE_CACHE_NAME } from './sw-cache-policy'
 
 declare const self: ServiceWorkerGlobalScope
 
@@ -16,10 +19,32 @@ enableFastActivation(self)
 
 precacheAndRoute(self.__WB_MANIFEST)
 
+// Audit H4 — only cache GETs that aren't /auth/v1/* and don't carry an
+// Authorization header. See sw-cache-policy.ts for the rule and the
+// privacy reasons behind it.
 registerRoute(
-  ({ url }) => url.hostname.endsWith('.supabase.co'),
-  new NetworkFirst({ cacheName: 'supabase-api', networkTimeoutSeconds: 10 })
+  ({ url, request }) => isSupabaseCacheable(url, request),
+  new NetworkFirst({
+    cacheName:             SUPABASE_CACHE_NAME,
+    networkTimeoutSeconds: 10,
+    plugins: [
+      new CacheableResponsePlugin({ statuses: [200] }),
+      new ExpirationPlugin({
+        maxAgeSeconds:  60 * 5,
+        purgeOnQuotaError: true,
+      }),
+    ],
+  }),
 )
+
+// useAuth.signOut posts CLEAR_SUPABASE_CACHE after a successful
+// signOut so the next user on this device starts from a clean cache.
+self.addEventListener('message', (event) => {
+  const msg = event.data as { type?: string } | null
+  if (msg?.type === 'CLEAR_SUPABASE_CACHE') {
+    event.waitUntil(caches.delete(SUPABASE_CACHE_NAME))
+  }
+})
 
 interface PushPayload {
   title: string
