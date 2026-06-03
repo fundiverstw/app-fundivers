@@ -191,19 +191,46 @@ export function ProfileForm({ user, profile, onSaved }: {
   const certLevelWatched = useWatch({ control, name: 'cert_level' }) ?? ''
   const certCardMissing = certLevelWatched.trim() !== '' && !certCardPath
   // Distinct orgs in the order returned by the rank-sorted query (PADI rows
-  // come first because they're the seed; agency rows follow).
+  // come first because they're the seed; agency rows follow). Always
+  // include the saved agency so the dropdown can render it even before the
+  // cert_levels fetch completes — and so the option's React key stays
+  // stable across the fetch transition. Without the dedup-and-prepend,
+  // the saved agency would briefly render as a no-key legacy fallback
+  // then get remounted as a keyed orgs.map child, and the brief absence
+  // of a matching <option> drops the (uncontrolled) select's value to "".
   const orgs = useMemo(() => {
     const seen = new Set<string>()
     const out: string[] = []
     for (const c of certLevels) {
       if (!seen.has(c.organization)) { seen.add(c.organization); out.push(c.organization) }
     }
+    if (profile.cert_agency && !seen.has(profile.cert_agency)) {
+      out.unshift(profile.cert_agency)
+    }
     return out
-  }, [certLevels])
-  const filteredLevels = useMemo(
-    () => certLevels.filter(c => c.organization === selectedAgency),
-    [certLevels, selectedAgency],
-  )
+  }, [certLevels, profile.cert_agency])
+  // Same stable-key story as `orgs`: include the saved level when it
+  // matches the selected agency. Dedup against the real list so the
+  // dropdown doesn't show two "Rescue"s. The synthetic id satisfies the
+  // CertLevel type and is otherwise unused — the <option>'s React key
+  // is the level *name* (unique within a single-agency filter), and
+  // keying by name is what keeps the DOM node stable across the
+  // empty → fetched transition.
+  const filteredLevels = useMemo(() => {
+    const matched = certLevels.filter(c => c.organization === selectedAgency)
+    const saved = profile.cert_level
+    if (
+      saved
+      && profile.cert_agency === selectedAgency
+      && !matched.some(c => c.name === saved)
+    ) {
+      return [
+        { id: '__saved_level__', organization: selectedAgency, name: saved, rank: -1 },
+        ...matched,
+      ] as CertLevel[]
+    }
+    return matched
+  }, [certLevels, selectedAgency, profile.cert_agency, profile.cert_level])
 
   const initialShoe = useMemo(() => parseShoeSize(profile.shoe_size), [profile.shoe_size])
   const [shoeUnit, setShoeUnit] = useState<ShoeUnit>(() => initialShoe?.unit ?? 'eu')
@@ -431,11 +458,6 @@ export function ProfileForm({ user, profile, onSaved }: {
               className={inputClass}
             >
               <option value="">— select agency —</option>
-              {/* Preserve any legacy free-text agency on the existing profile
-                   so opening the form doesn't silently drop it. */}
-              {profile.cert_agency
-                && !orgs.includes(profile.cert_agency)
-                && <option value={profile.cert_agency}>{profile.cert_agency}</option>}
               {orgs.map(o => (
                 <option key={o} value={o}>{o}</option>
               ))}
@@ -444,14 +466,13 @@ export function ProfileForm({ user, profile, onSaved }: {
           <Field label="Level" required>
             <select {...register('cert_level')} className={inputClass} disabled={!selectedAgency}>
               <option value="">{selectedAgency ? '— select level —' : '— pick agency first —'}</option>
-              {/* Preserve a legacy free-text level if the current selection
-                   isn't in the filtered list — only when the agency matches. */}
-              {profile.cert_level
-                && profile.cert_agency === selectedAgency
-                && !filteredLevels.some(c => c.name === profile.cert_level)
-                && <option value={profile.cert_level}>{profile.cert_level}</option>}
+              {/* Keyed by name (unique inside a single-agency filter), not
+                   by row id. The id swaps from the synthetic __saved_level__
+                   to the real DB id once cert_levels fetches, and a key swap
+                   would remount the option mid-transition — see filteredLevels
+                   comment above. */}
               {filteredLevels.map(c => (
-                <option key={c.id} value={c.name}>{c.name}</option>
+                <option key={c.name} value={c.name}>{c.name}</option>
               ))}
             </select>
             {errors.cert_level && <p className="text-red-600 text-xs mt-1">{errors.cert_level.message}</p>}
