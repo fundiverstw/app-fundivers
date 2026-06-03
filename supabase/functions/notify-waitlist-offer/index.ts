@@ -50,11 +50,24 @@ Deno.serve(async (req) => {
 
   const { data: offer, error: oErr } = await admin
     .from("waitlist_offers")
-    .select("id, expires_at, status, booking_id")
+    .select("id, expires_at, status, booking_id, offered_at, notified_at")
     .eq("id", body.offer_id)
     .maybeSingle()
   if (oErr || !offer) return json({ error: "offer not found" }, 404)
   if (offer.status !== "pending") return json({ ok: true, sent: false, reason: "offer not pending" })
+
+  // Audit L2 — defence in depth against a leaked service-role key
+  // being used to mass-replay legitimate offer_ids. Reject offers
+  // older than 1h (the worker fires within seconds of offer creation;
+  // a 1h+ gap means something abnormal) and offers already marked
+  // notified_at (re-sending the same email is the replay surface).
+  const offeredAt = new Date(offer.offered_at as string).getTime()
+  if (Number.isFinite(offeredAt) && Date.now() - offeredAt > 60 * 60 * 1000) {
+    return json({ ok: true, sent: false, reason: "offer is stale" })
+  }
+  if (offer.notified_at) {
+    return json({ ok: true, sent: false, reason: "offer already notified" })
+  }
 
   const { data: booking } = await admin
     .from("bookings")
@@ -115,6 +128,10 @@ Deno.serve(async (req) => {
   } catch (e) {
     return json({ error: `email failed: ${(e as Error).message}` }, 500)
   }
+
+  // Stamp notified_at so a subsequent call (worker retry, replay
+  // attempt) is rejected by the L2 guard above instead of re-sending.
+  await admin.from("waitlist_offers").update({ notified_at: new Date().toISOString() }).eq("id", offer.id)
 
   return json({ ok: true, sent: true })
 })

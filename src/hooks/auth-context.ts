@@ -1,0 +1,18 @@
+import { createContext } from 'react'
+import type { Session, User } from '@supabase/supabase-js'
+import type { Profile } from '../types/database'
+
+// Split from AuthProvider.tsx so react-refresh works cleanly — its
+// "only export components" rule trips when a context is exported
+// alongside a component from the same module. AuthProvider is in its
+// sibling file; both consume this context type.
+
+export interface AuthContextValue {
+  session: Session | null
+  user:    User    | null
+  profile: Profile | null
+  loading: boolean
+  signOut: () => Promise<void>
+}
+
+export const AuthContext = createContext<AuthContextValue | null>(null)

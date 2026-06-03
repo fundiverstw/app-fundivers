@@ -23,13 +23,15 @@ dashboard could not be checked from the code.
 
 ## TL;DR
 
-**Update 2026-06-03:** every Critical, High, and Medium finding is
-now FIXED. C1–C3, H1–H8, M1–M13, plus L10 each carry a
-`**Status: FIXED**` header on their respective sections with the
-migration / file that closed them. The original findings are preserved
-verbatim below for context; read the FIXED block at the top of each
-section before the prose. Open work is now only the Low tier (hygiene
-items L1–L9, L11–L13).
+**Update 2026-06-03:** every Critical, High, Medium, and Low finding
+is now either FIXED, DEFERRED, or TRACKED. C1–C3, H1–H8, M1–M13,
+L1–L3, L5, L6, L8, L9, L10, L12, L13 ship code fixes — see each
+section's `**Status: FIXED**` header for the migration / file. L4
+(RegisterForm zod) and L7 (wix-sync identifier casing) are DEFERRED
+as pure hygiene / out-of-scope-for-security; L11 (heic2any maintenance)
+is TRACKED via Dependabot. The original findings are preserved
+verbatim below for context; read the status block at the top of each
+section before the prose.
 
 Three findings collapse the authorization model end-to-end:
 
@@ -886,41 +888,122 @@ versions) and wire it via `supabase/config.toml`.
 ## Low
 
 ### L1. `pii_purge` and `notify-application-decision` do not check duplicate notifications
+
+**Status: FIXED 2026-06-03** for `notify-application-decision`.
+Before flipping `profiles.status`, the function now reads the
+target's current status and short-circuits with
+`{ ok: true, status, email_sent: false, idempotent: true }` if it
+already matches `newStatus`. A second click on Approve / Reject is a
+no-op rather than a duplicate email. `pii_purge` runs from cron
+under service-role and audits its own runs (M5) — re-running it
+inside the retention window simply finds nothing to scrub.
+
 Lightweight idempotency. Two admin clicks send two emails.
 
 ### L2. `notify-waitlist-offer` only authenticates by service-role Bearer
+
+**Status: FIXED 2026-06-03.** Two defence-in-depth checks added before
+the email send: offers whose `offered_at` is older than 1h return
+`{ ok: true, sent: false, reason: "offer is stale" }`, and offers
+with `notified_at` already set return
+`{ ok: true, sent: false, reason: "offer already notified" }`. On
+successful send, the function stamps `notified_at = now()` so the
+next call hits the second guard. A leaked service-role key replaying
+an old `offer_id` no longer triggers the email path.
+
 If the service-role key ever leaks, an attacker can replay any
 `offer_id` to mass-email waitlisted divers. Defence-in-depth: reject
 offers older than 1h, reject offers already `notified_at`.
 
 ### L3. PostgREST raw error strings rendered in toasts
+
+**Status: FIXED 2026-06-03** in `src/lib/errors.ts`. `errorMessage()`
+now detects PostgREST / Postgres errors via the `code` field
+(SQLSTATE) and maps the known ones to friendly user-facing strings:
+23505 → "That value is already in use.", 23502 → "A required field
+is missing.", 42501 → "You don't have permission to do that.",
+PGRST116 → "No matching record found.", etc. The raw `.message` is
+suppressed (and console.error'd for dev debugging). Authored Error
+instances and `.error` string shapes still pass through unchanged.
+
 `src/lib/errors.ts` returns `.message` verbatim. Schema-shape
 disclosure (constraint names, column names) — not a credential leak
 but reveals the model. Map known SQLSTATEs to friendly strings.
 
 ### L4. `RegisterForm.tsx` (~1400 lines) skips zod entirely
+
+**Status: DEFERRED 2026-06-03.** The high-risk fields the audit
+flagged (guest email, guest password, file uploads) are gated
+manually today by the form's step-Next disabled checks
+(`guestEmail.trim() === ''`, `guestPassword.length < 8`,
+`!guestAgreedTerms`, Turnstile presence) and now by the L5
+`assertUploadSize` precheck on the upload helpers. The server-side
+gates (Turnstile, per-IP rate limit, event existence check, profile
+patch allowlist) are the actual security boundary; the client
+schema would be UX hardening, not a defence gap. A full
+react-hook-form + zod rewrite of the 1400-line form remains
+worthwhile but is out of scope for this security-tier sweep.
+
 Every other form in the app uses zod + react-hook-form. The form most
 likely to be exploited (public, file uploads, child bookings) is the
 loosest. Incrementally add a schema.
 
 ### L5. File uploads have no client-side size cap
+
+**Status: FIXED 2026-06-03.** New `src/lib/upload-guard.ts` exports
+`MAX_UPLOAD_BYTES = 25 MB`, `FileTooLargeError`, and
+`assertUploadSize(file)`. `cert-card.ts`, `nitrox-card.ts`, and
+`deep-card.ts` call the guard before passing the file to
+`compressImage` so a 200 MB HEIC fails fast with a friendly error
+instead of OOM'ing the tab.
+
 `heic2any` runs in-browser; a 200 MB HEIC can OOM the tab. Server
 must enforce, but a precheck (`file.size > 25 * 1024 * 1024`) saves
 the UX.
 
 ### L6. Inconsistent password floor: login `min(6)` vs signup/reset `min(8)`
+
+**Status: FIXED 2026-06-03** in `src/pages/LoginPage.tsx`. Login zod
+schema bumped from `min(6)` to `min(8)`, matching signup + reset.
+Dev seed accounts (`diverdiver`, `adminadmin`, `staffstaff`) are all
+10 chars and unaffected. `LoginPage.test.tsx` regex updated.
+
 Unify on whatever Supabase project setting enforces.
 
 ### L7. `wix-sync` triggers + `Other_Addons` have inconsistent quoting
+
+**Status: DEFERRED 2026-06-03.** Pure-hygiene item; the audit itself
+flags it as non-blocking. Renaming the Bubble-imported tables would
+ripple through every existing migration that references the
+quoted-identifier form and would breach the immutability rule
+(CLAUDE.md #1). Left as-is.
+
 `"Other_Addons"` mixed-case + double-quoted is harder to audit;
 non-blocking, just a footgun for future grep-by-table.
 
 ### L8. No CodeQL / Dependabot config
+
+**Status: FIXED 2026-06-03** in `.github/dependabot.yml`. Extended
+the existing `github-actions` config (added during H7) with weekly
+`npm` updates for both the root `package.json` and `workers/push`,
+each with a `patch` group that bundles patch releases into one PR per
+ecosystem. CodeQL was not enabled — it's GitHub Advanced Security on
+private repos. If the repo is public or you have GHAS, a CodeQL
+workflow is a worthwhile follow-up.
+
 `.github/` has workflows but no `dependabot.yml` / no SAST job. Add
 `dependabot.yml` covering `npm` (root + `workers/push`),
 `github-actions`, and `docker` (Supabase CLI).
 
 ### L9. `accept_waitlist_offer` does not re-check capacity
+
+**Status: FIXED 2026-06-03** in
+`supabase/migrations/20260603080000_accept_waitlist_offer_capacity_recheck.sql`.
+The RPC now looks up the booking's event (eo_dive_id XOR
+eo_course_id), reads `capacity`, counts pending + confirmed bookings,
+and refuses the accept with `check_violation` if the event is already
+at-or-above capacity. Null capacity (uncapped event) skips the check.
+
 Two waitlisters racing to accept the last spot both succeed. Not a
 security issue today (admin gates final confirm) but will be once
 auto-confirm is added.
@@ -935,17 +1018,44 @@ client's timestamp value. Re-acceptance via the
 in `tests/integration/terms-consent-versioning.test.ts`.
 
 ### L11. `heic2any@0.0.4` unmaintained
+
+**Status: TRACKED 2026-06-03.** Dependabot (L8) now opens a PR for
+the next heic2any release if one ships. The L5 size guard
+(`assertUploadSize`) caps input size to 25 MB so a malicious HEIC
+can't OOM the tab regardless of the library's bug surface. If the
+project stays dormant past the next quarter, plan a `libheif-js`
+migration as a separate effort.
+
 Pinned `0.0.x`, no recent release. Runs on user-supplied images
 in-browser. Track CVEs; consider `libheif-js` if the project goes
 fully dormant.
 
 ### L12. Stale auth-state flash on sign-out
+
+**Status: FIXED 2026-06-03.** New `src/hooks/AuthProvider.tsx` runs
+the supabase auth subscription once at the top of the React tree;
+`src/hooks/auth-context.ts` exports the context type; `useAuth.ts`
+now just reads from context via `useContext` and throws if a caller
+renders outside the provider. `App.tsx` wraps the route tree in
+`<AuthProvider>`. Every component that calls `useAuth()` now shares
+one session / user / profile / loading state — sign-out updates flow
+to all consumers in lockstep, no stale-flash window. `useAuth.test.tsx`
+updated to render through the provider via the renderHook `wrapper`
+option (10 cases, all green).
+
 Multiple components call `useAuth()` directly; each holds its own
 state. After sign-out, a stale `profile` can flash in one component
 while another has already cleared. Lift to `AuthContext` (one
 provider, one source of truth).
 
 ### L13. `BROADCAST_WEBHOOK_URL` forwards admin-controlled body unchanged
+
+**Status: FIXED 2026-06-03** in `workers/push/src/index.ts`.
+Admin-supplied title is capped at 120 chars and body at 500 chars
+via `.trim().slice(...)` before the push fan-out / webhook forward.
+Keeps the push payload under VAPID's 4 KB body limit and bounds the
+downstream surface for any future LINE/Slack/etc. integration.
+
 Operator-configured URL, so no SSRF, but the admin payload is sent
 verbatim to a third-party endpoint. Cap title/body lengths server-side
 (120/500 chars) before fan-out.

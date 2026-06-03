@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { compressImage } from './image-compress'
+import { assertUploadSize } from './upload-guard'
 
 export const CERT_CARD_BUCKET = 'cert-cards'
 
@@ -12,6 +13,7 @@ const SIGNED_URL_TTL_SECONDS = 60 * 60
  * user's folder. Returns the stored object path (not a URL).
  */
 export async function uploadCertCard(userId: string, file: File): Promise<string> {
+  assertUploadSize(file)
   const blob = await compressImage(file)
   const path = `${userId}/card_${Date.now()}.jpg`
   const { error } = await supabase.storage

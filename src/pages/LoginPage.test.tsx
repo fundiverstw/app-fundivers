@@ -46,7 +46,7 @@ describe('LoginPage', () => {
     renderWithRouter(<LoginPage />)
     await user.click(screen.getByRole('button', { name: /sign in/i }))
     expect(await screen.findByText(/invalid email/i)).toBeInTheDocument()
-    expect(screen.getByText(/at least 6 characters/i)).toBeInTheDocument()
+    expect(screen.getByText(/at least 8 characters/i)).toBeInTheDocument()
     expect(signInWithPassword).not.toHaveBeenCalled()
   })
 
@@ -56,7 +56,7 @@ describe('LoginPage', () => {
     await user.type(byName('email'), 'a@b.com')
     await user.type(byName('password'), '12345')
     await user.click(screen.getByRole('button', { name: /sign in/i }))
-    expect(await screen.findByText(/at least 6 characters/i)).toBeInTheDocument()
+    expect(await screen.findByText(/at least 8 characters/i)).toBeInTheDocument()
     expect(signInWithPassword).not.toHaveBeenCalled()
   })
 
