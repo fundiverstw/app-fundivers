@@ -12,6 +12,7 @@ import { CacheableResponsePlugin } from 'workbox-cacheable-response'
 import { ExpirationPlugin } from 'workbox-expiration'
 import { enableFastActivation } from './sw-fast-activation'
 import { isSupabaseCacheable, SUPABASE_CACHE_NAME } from './sw-cache-policy'
+import { safeNotificationTarget } from './sw-notification-target'
 
 declare const self: ServiceWorkerGlobalScope
 
@@ -76,11 +77,12 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const target = (event.notification.data as { url?: string } | null)?.url ?? '/'
+  const target = safeNotificationTarget(
+    (event.notification.data as { url?: unknown } | null)?.url,
+  )
 
   event.waitUntil((async () => {
     const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-    // Prefer focusing an already-open window — navigate it to the deep link.
     for (const client of clients) {
       if ('focus' in client) {
         await (client as WindowClient).focus()

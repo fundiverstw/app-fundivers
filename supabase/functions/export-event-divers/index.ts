@@ -18,28 +18,17 @@
 //          401/403 on auth or role failure
 //          500 on database / email failure
 
-import { createClient } from "jsr:@supabase/supabase-js@2"
+import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
 import { Buffer } from "node:buffer"
 import { buildEventDiversPdfBase64, type EventDiverRow } from "../_shared/event-divers-pdf.ts"
+import { corsOk, jsonResponse, safeError } from "../_shared/responses.ts"
 
 const COMPANY_EMAIL = "fundiverstw@gmail.com"
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin":  "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-}
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json", ...CORS_HEADERS },
-  })
-}
-
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS })
+  const json = (body: unknown, status = 200) => jsonResponse(req, body, status)
+  if (req.method === "OPTIONS") return corsOk(req)
   if (req.method !== "POST")    return json({ error: "method not allowed" }, 405)
 
   const auth = req.headers.get("Authorization") ?? ""
@@ -76,7 +65,7 @@ Deno.serve(async (req) => {
     .select("role")
     .eq("id", u.user.id)
     .single()
-  if (profErr) return json({ error: profErr.message }, 500)
+  if (profErr) return json({ error: safeError(profErr, "profile fetch failed") }, 500)
   if (callerProfile?.role !== "admin") return json({ error: "admin only" }, 403)
 
   // Pull the event row.
@@ -87,7 +76,7 @@ Deno.serve(async (req) => {
     .select(`_id, start_date, end_date, ${titleCols}`)
     .eq("_id", eventId)
     .single()
-  if (eErr || !event) return json({ error: eErr?.message ?? "event not found" }, 404)
+  if (eErr || !event) return json({ error: safeError(eErr, "event not found") }, 404)
 
   // Bookings for this event whose divers are expected to attend.
   const fkCol = eventType === "dive" ? "eo_dive_id" : "eo_course_id"
@@ -96,7 +85,7 @@ Deno.serve(async (req) => {
     .select("user_id, status")
     .eq(fkCol, eventId)
     .in("status", ["pending", "confirmed"])
-  if (bErr) return json({ error: bErr.message }, 500)
+  if (bErr) return json({ error: safeError(bErr, "bookings fetch failed") }, 500)
 
   const userIds = [...new Set((bookings ?? []).map(b => b.user_id as string))]
   let profiles: Array<{
@@ -113,7 +102,7 @@ Deno.serve(async (req) => {
       .from("profiles")
       .select("id, full_name, display_name, name_alt, date_of_birth, nationality, id_number")
       .in("id", userIds)
-    if (pErr) return json({ error: pErr.message }, 500)
+    if (pErr) return json({ error: safeError(pErr, "profiles fetch failed") }, 500)
     profiles = profs ?? []
   }
 

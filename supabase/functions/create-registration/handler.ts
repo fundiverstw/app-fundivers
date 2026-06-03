@@ -16,20 +16,8 @@
 
 import { Buffer } from "node:buffer"
 import { sanitizeProfilePatch } from "../_shared/profile-patch.ts"
+import { corsHeaders, safeError } from "../_shared/responses.ts"
 import type { RegistrationPdfPayload } from "../_shared/pdf.ts"
-
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin":  "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-}
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json", ...CORS_HEADERS },
-  })
-}
 
 // Matches RegisterForm.tsx's payment_method enum verbatim.
 function paymentWireLabel(m: string | null | undefined): string {
@@ -148,7 +136,11 @@ export interface Deps {
 }
 
 export async function handleRegistration(req: Request, deps: Deps): Promise<Response> {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS })
+  const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json", ...corsHeaders(req) },
+  })
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) })
   if (req.method !== "POST")    return json({ error: "method not allowed" }, 405)
 
   let body: RegistrationBody
@@ -223,7 +215,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
       p_ip_hash: `\\x${ipHashHex}`,
     })
     if (rlErr) {
-      return json({ error: `rate-limit check failed: ${rlErr.message}` }, 500)
+      return json({ error: safeError(rlErr, "rate-limit check failed") }, 500)
     }
     const row = Array.isArray(counts) ? counts[0] : counts
     const in60s = (row?.in_last_60s ?? 0) as number
@@ -302,7 +294,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     .from("profiles")
     .update(safePatch)
     .eq("id", userId)
-  if (profErr) return rollback(profErr.message)
+  if (profErr) return rollback(safeError(profErr, "profile update failed"))
 
   // 2. Booking insert — pre-check for active booking; partial unique
   //    index is the race safety net.
@@ -333,7 +325,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     })
     .select()
     .single()
-  if (bErr || !booking) return rollback(bErr?.message ?? "booking insert failed")
+  if (bErr || !booking) return rollback(safeError(bErr, "booking insert failed"))
   const isWaitlisted = booking.status === "waitlisted"
 
   // 3. Build PDF payload from data we already have or can fetch.

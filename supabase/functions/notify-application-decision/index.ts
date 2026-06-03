@@ -15,23 +15,11 @@
 // endpoint lets us run the email send in the same request and gives one
 // place to add audit-log writes / rate limits later.
 
-import { createClient } from "jsr:@supabase/supabase-js@2"
+import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
+import { corsOk, jsonResponse, safeError } from "../_shared/responses.ts"
 
 const COMPANY_EMAIL = "fundiverstw@gmail.com"
-
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin":  "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-}
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json", ...CORS_HEADERS },
-  })
-}
 
 interface DecisionBody {
   user_id:  string
@@ -40,7 +28,8 @@ interface DecisionBody {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS })
+  const json = (body: unknown, status = 200) => jsonResponse(req, body, status)
+  if (req.method === "OPTIONS") return corsOk(req)
   if (req.method !== "POST")    return json({ error: "method not allowed" }, 405)
 
   const auth = req.headers.get("Authorization") ?? ""
@@ -93,7 +82,7 @@ Deno.serve(async (req) => {
     .from("profiles")
     .update({ status: newStatus })
     .eq("id", body.user_id)
-  if (updErr) return json({ error: updErr.message }, 500)
+  if (updErr) return json({ error: safeError(updErr, "status update failed") }, 500)
 
   // Look up the target's email for the notification.
   const { data: target } = await admin.auth.admin.getUserById(body.user_id)
