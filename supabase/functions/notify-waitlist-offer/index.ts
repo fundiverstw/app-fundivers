@@ -11,30 +11,19 @@
 // Body: { offer_id: string }
 // Returns: { ok: true, sent: boolean } on success.
 
-import { createClient } from "jsr:@supabase/supabase-js@2"
+import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
+import { corsOk, jsonResponse } from "../_shared/responses.ts"
 
 const COMPANY_EMAIL = "fundiverstw@gmail.com"
-
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin":  "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-}
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json", ...CORS_HEADERS },
-  })
-}
 
 interface OfferEmailBody {
   offer_id: string
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS })
+  const json = (body: unknown, status = 200) => jsonResponse(req, body, status)
+  if (req.method === "OPTIONS") return corsOk(req)
   if (req.method !== "POST")    return json({ error: "method not allowed" }, 405)
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!

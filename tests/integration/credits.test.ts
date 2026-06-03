@@ -52,23 +52,42 @@ describe('credits', () => {
     await admin.from('credits').delete().eq('id', ins.data!.id)
   })
 
-  it('staff can issue and settle credits', async () => {
-    const staffApi = await userClient(staffUser.email, staffUser.password)
-    const ins = await staffApi.from('credits').insert({
+  it('staff can read credits but cannot issue or settle them (audit M1)', async () => {
+    // Pre-existing credit so staff has something to read.
+    const ins = await admin.from('credits').insert({
       user_id: diver.id,
       amount:  500,
       reason:  'Goodwill credit',
-      created_by: staffUser.id,
+      created_by: adminUser.id,
     }).select().single()
     expect(ins.error).toBeNull()
 
-    const upd = await staffApi.from('credits').update({
-      status: 'settled',
-      settled_at: new Date().toISOString(),
-      settled_note: 'Refunded via bank transfer',
-    }).eq('id', ins.data!.id).select().single()
-    expect(upd.error).toBeNull()
-    expect(upd.data?.status).toBe('settled')
+    const staffApi = await userClient(staffUser.email, staffUser.password)
+
+    // SELECT — allowed (staff_or_admin)
+    const read = await staffApi.from('credits').select('*').eq('id', ins.data!.id).single()
+    expect(read.error).toBeNull()
+    expect(read.data?.amount).toBe(500)
+
+    // INSERT — denied (admin only). RLS with-check rejects → 42501.
+    const staffInsert = await staffApi.from('credits').insert({
+      user_id: diver.id,
+      amount:  100,
+      reason:  'staff self-issue attempt',
+      created_by: staffUser.id,
+    }).select().single()
+    expect(staffInsert.error?.code).toBe('42501')
+
+    // UPDATE — hidden by RLS so 0 rows match. PostgREST returns success
+    // with no body and no error; the row stays untouched.
+    await staffApi.from('credits').update({ status: 'settled' }).eq('id', ins.data!.id)
+    const afterStaffUpdate = await admin.from('credits').select('status').eq('id', ins.data!.id).single()
+    expect(afterStaffUpdate.data?.status).toBe('open')
+
+    // DELETE — same shape. 0 rows matched, row still present.
+    await staffApi.from('credits').delete().eq('id', ins.data!.id)
+    const afterStaffDelete = await admin.from('credits').select('id').eq('id', ins.data!.id).maybeSingle()
+    expect(afterStaffDelete.data).not.toBeNull()
 
     await admin.from('credits').delete().eq('id', ins.data!.id)
   })

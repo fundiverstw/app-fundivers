@@ -207,7 +207,12 @@ describe('handleRegistration — request validation', () => {
     const { deps } = makeDeps()
     const res = await handleRegistration(new Request('http://x/', { method: 'OPTIONS' }), deps)
     expect(res.status).toBe(200)
-    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*')
+    // Audit M4 — Allow-Origin is now an allowlist echo, not '*'. The
+    // Request constructor in happy-dom strips Origin (forbidden
+    // header), so the live OPTIONS we exercise here has no Origin and
+    // thus no Allow-Origin echo. Always-set CORS metadata still ships.
+    expect(res.headers.get('Vary')).toBe('Origin')
+    expect(res.headers.get('Access-Control-Allow-Methods')).toBe('POST, OPTIONS')
   })
 
   it('non-POST is 405', async () => {
