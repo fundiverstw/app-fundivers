@@ -118,6 +118,40 @@ describe('useAuth', () => {
     expect(signOut).toHaveBeenCalledWith({ scope: 'local' })
   })
 
+  it('posts CLEAR_SUPABASE_CACHE to the SW after sign-out (audit H4)', async () => {
+    // The previous user's RLS-scoped reads sit in the supabase-api SW
+    // cache. After sign-out, the next user on the same device must
+    // not see them — so we wipe the cache via postMessage. Without
+    // this signal, /rest/v1/profiles?id=... could return another
+    // account's row offline.
+    getSession.mockResolvedValue({ data: { session: null } })
+    const postMessage = vi.fn()
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: { controller: { postMessage } },
+    })
+
+    const useAuth = await importHook()
+    const { result } = renderHook(() => useAuth())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    await act(async () => { await result.current.signOut() })
+
+    expect(postMessage).toHaveBeenCalledWith({ type: 'CLEAR_SUPABASE_CACHE' })
+  })
+
+  it('sign-out is safe when no SW controller is registered', async () => {
+    getSession.mockResolvedValue({ data: { session: null } })
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: { controller: null },
+    })
+
+    const useAuth = await importHook()
+    const { result } = renderHook(() => useAuth())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    await expect(act(async () => { await result.current.signOut() })).resolves.not.toThrow()
+  })
+
   it('unsubscribes on unmount', async () => {
     getSession.mockResolvedValue({ data: { session: null } })
     const useAuth = await importHook()
