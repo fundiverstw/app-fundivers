@@ -11,6 +11,7 @@ import { NetworkFirst } from 'workbox-strategies'
 import { CacheableResponsePlugin } from 'workbox-cacheable-response'
 import { ExpirationPlugin } from 'workbox-expiration'
 import { enableFastActivation } from './sw-fast-activation'
+import { wipeCachesAndClaim } from './sw-activation-reset'
 import { isSupabaseCacheable, SUPABASE_CACHE_NAME } from './sw-cache-policy'
 import { safeNotificationTarget } from './sw-notification-target'
 
@@ -47,24 +48,10 @@ self.addEventListener('message', (event) => {
   }
 })
 
-// On every SW activation, wipe every cache the previous worker owned
-// (workbox precache, supabase-api, all of it) and claim every open tab.
-// Belt-and-suspenders against the stale-shell trap, where a precached
-// index.html points at a long-deleted bundle hash and users are stuck
-// without a path forward except manually unregistering the SW.
-// clients.claim() fires controllerchange in each tab, which
-// vite-plugin-pwa's updateServiceWorker(true) already listens for to
-// reload the page — so the page reloads itself onto the fresh bundle.
-// We deliberately do NOT call client.navigate() here: it races with
-// that page-side reload and locks the tab in mid-transition. Costs a
-// brief "no offline cache" window after each update; buys a guarantee
-// no user ever lands on a half-applied deploy.
+// Wipe stale caches + claim open tabs. See sw-activation-reset.ts for the
+// stale-shell rationale and why the order is load-bearing.
 self.addEventListener('activate', (event) => {
-  event.waitUntil((async () => {
-    const names = await caches.keys()
-    await Promise.all(names.map(n => caches.delete(n)))
-    await self.clients.claim()
-  })())
+  event.waitUntil(wipeCachesAndClaim(self))
 })
 
 interface PushPayload {
