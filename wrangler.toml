@@ -1,8 +1,10 @@
 name = "app-fundiverstw"
+main = "src/worker.ts"
 compatibility_date = "2025-04-16"
 
 [assets]
 directory = "./dist"
+binding = "ASSETS"
 # Serve index.html for unknown paths so client-side routes (e.g. /calendar)
 # don't 404 when the browser re-fetches them on reload.
 not_found_handling = "single-page-application"
