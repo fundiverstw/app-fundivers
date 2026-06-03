@@ -64,4 +64,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm ci
+        working-directory: workers/push
       - run: npx vitest run --project unit
