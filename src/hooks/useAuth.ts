@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { CLEAR_SUPABASE_CACHE_MSG } from '../sw-cache-policy'
 import type { Profile } from '../types/database'
 
 export function useAuth() {
@@ -44,6 +45,13 @@ export function useAuth() {
     // logged in on too — not what users expect when they sign out
     // of one browser. Sessions are per-environment.
     await supabase.auth.signOut({ scope: 'local' })
+    // Audit H4 — nuke the supabase-api SW cache so a future user on
+    // this device can't be served the prior user's RLS-scoped reads.
+    // Best-effort: if the SW controller isn't ready (private mode,
+    // first load) the cache wasn't populated under that user anyway.
+    if (typeof navigator !== 'undefined' && navigator.serviceWorker?.controller) {
+      navigator.serviceWorker.controller.postMessage(CLEAR_SUPABASE_CACHE_MSG)
+    }
   }
 
   return { session, user, profile, loading, signOut }
