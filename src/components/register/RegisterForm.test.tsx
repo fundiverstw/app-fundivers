@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
@@ -19,6 +19,15 @@ vi.mock('../../lib/supabase', () => ({
     functions: { invoke: (...a: unknown[]) => invoke(...a) },
     auth: { setSession: (...a: unknown[]) => setSession(...a) },
   },
+}))
+
+// Stub the Turnstile widget so guest tests can "solve" the captcha without
+// loading Cloudflare's script: clicking the button hands a token to the form,
+// the same contract the real widget fulfils via its onToken callback.
+vi.mock('./TurnstileWidget', () => ({
+  TurnstileWidget: ({ onToken }: { onToken: (t: string) => void }) => (
+    <button type="button" onClick={() => onToken('test-turnstile-token')}>solve captcha</button>
+  ),
 }))
 
 const sampleEvent: AppEvent = {
@@ -106,6 +115,13 @@ beforeEach(() => {
   invoke.mockReset(); setSession.mockReset()
   invoke.mockResolvedValue({ data: { booking_id: 'b-new', session: null }, error: null })
   setSession.mockResolvedValue({ data: null, error: null })
+  // Default: a site key is present so the captcha widget renders. Individual
+  // tests override this to exercise the missing-key guardrail.
+  vi.stubEnv('VITE_TURNSTILE_SITE_KEY', 'test-site-key')
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
 })
 
 describe('RegisterForm', () => {
@@ -451,6 +467,7 @@ describe('RegisterForm', () => {
     await user.type(screen.getByLabelText(/email \*/i), 'new@diver.test')
     await user.type(screen.getByLabelText(/password/i), 'abcdefgh')
     await user.click(screen.getByLabelText(/I agree to the/i))
+    await user.click(screen.getByRole('button', { name: /solve captcha/i }))
     await user.type(screen.getByLabelText(/full name/i), 'Grace Hopper')
     // Step 2 → 3 → 4 → confirm
     await user.click(screen.getByRole('button', { name: /next/i }))
@@ -462,10 +479,11 @@ describe('RegisterForm', () => {
     const [fnName, opts] = invoke.mock.calls[0] as [string, { body: Record<string, unknown> }]
     expect(fnName).toBe('create-registration')
     expect(opts.body).toMatchObject({
-      email:      'new@diver.test',
-      password:   'abcdefgh',
-      event_type: 'dive',
-      event_id:   'dive_abc',
+      email:           'new@diver.test',
+      password:        'abcdefgh',
+      event_type:      'dive',
+      event_id:        'dive_abc',
+      turnstile_token: 'test-turnstile-token',
     })
     expect(typeof opts.body.agreed_to_terms_at).toBe('string')
     expect(opts.body.profile_patch).toMatchObject({ full_name: 'Grace Hopper' })
@@ -498,6 +516,7 @@ describe('RegisterForm', () => {
     await user.type(screen.getByLabelText(/email \*/i), 'taken@diver.test')
     await user.type(screen.getByLabelText(/password/i), 'abcdefgh')
     await user.click(screen.getByLabelText(/I agree to the/i))
+    await user.click(screen.getByRole('button', { name: /solve captcha/i }))
     await user.type(screen.getByLabelText(/full name/i), 'Grace Hopper')
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
@@ -506,6 +525,29 @@ describe('RegisterForm', () => {
 
     expect(await screen.findByText(/account with that email already exists/i)).toBeInTheDocument()
     expect(screen.getByText(/sign in/i)).toBeInTheDocument()
+  })
+
+  it('guest path: with no Turnstile site key, shows an unavailable notice and blocks advancing past step 2', async () => {
+    setupFrom()
+    vi.stubEnv('VITE_TURNSTILE_SITE_KEY', '')
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter>
+        <RegisterFormBody event={sampleEvent} profile={null} onSubmitSuccess={() => {}} />
+      </MemoryRouter>
+    )
+
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.type(screen.getByLabelText(/email \*/i), 'new@diver.test')
+    await user.type(screen.getByLabelText(/password/i), 'abcdefgh')
+    await user.click(screen.getByLabelText(/I agree to the/i))
+    await user.type(screen.getByLabelText(/full name/i), 'Grace Hopper')
+
+    // No captcha widget renders — the notice replaces it and there is no
+    // token, so the only way forward is blocked.
+    expect(screen.queryByRole('button', { name: /solve captcha/i })).not.toBeInTheDocument()
+    expect(screen.getByText(/registration is temporarily unavailable/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
   })
 
   it('uses event.transport_price for the surcharge — when null/0, hides the checkbox and renders "included" copy', async () => {
