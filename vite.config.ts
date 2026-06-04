@@ -1,10 +1,38 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
-export default defineConfig({
-  plugins: [
+export default defineConfig(({ command, mode }) => {
+  // Client env vars whose absence silently breaks a core flow at runtime
+  // rather than at build. Each baked into the bundle at build time, so a
+  // missing value ships a broken app that only fails in the browser. Fail
+  // the production build loudly instead. Vars that degrade gracefully
+  // (VITE_VAPID_PUBLIC_KEY / VITE_PUSH_WORKER_URL — push just stays off) are
+  // intentionally not gated here.
+  const REQUIRED_BUILD_ENV: Record<string, string> = {
+    VITE_SUPABASE_URL:       'Supabase client cannot initialise — the whole app fails to boot.',
+    VITE_SUPABASE_ANON_KEY:  'Supabase client cannot initialise — the whole app fails to boot.',
+    VITE_TURNSTILE_SITE_KEY: 'Guest registration captcha cannot render, yet the edge function still requires a token — guest signup dead-ends.',
+  }
+
+  if (command === 'build') {
+    // loadEnv merges matching process.env keys, so this also catches a
+    // missing CI secret in the GitHub Actions build (no .env.local present).
+    const env = loadEnv(mode, process.cwd(), 'VITE_')
+    const missing = Object.keys(REQUIRED_BUILD_ENV)
+      .filter(key => !env[key] && !process.env[key])
+    if (missing.length > 0) {
+      const lines = missing.map(key => `  - ${key}: ${REQUIRED_BUILD_ENV[key]}`)
+      throw new Error(
+        `Missing required build env var(s):\n${lines.join('\n')}\n` +
+        'Set the GitHub Actions secret(s) (or .env value) before building.',
+      )
+    }
+  }
+
+  return {
+    plugins: [
     react(),
     tailwindcss(),
     VitePWA({
@@ -38,5 +66,6 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
       },
     }),
-  ],
+    ],
+  }
 })

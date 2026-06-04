@@ -13,8 +13,6 @@ import { isHeicFile } from '../../lib/image-compress'
 import { TurnstileWidget } from './TurnstileWidget'
 import type { AppEvent, Booking, BookingDetails, CancellationPolicy, Database, EOAddon, EORoom, Profile } from '../../types/database'
 
-const TURNSTILE_SITE_KEY = (import.meta.env.VITE_TURNSTILE_SITE_KEY ?? '') as string
-
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
 
 // RegisterForm = modal wrapper around RegisterFormBody.
@@ -346,6 +344,14 @@ interface RegisterFormBodyInnerProps extends RegisterFormBodyProps {
 function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCancel, onBackBeforeStepOne, existingBooking, actingOnBehalfOf, pickerHeader, additionalTargets = [] }: RegisterFormBodyInnerProps) {
   const isGuest = !userId && !actingOnBehalfOf
   const isEdit = !!existingBooking
+  // Read at render (not module load) so tests can stub it per-case. A guest
+  // signup is gated by Cloudflare Turnstile, and the create-registration edge
+  // function rejects any guest request without a verified token. If the bundle
+  // ships without a site key the widget can't render and there's nothing to
+  // solve — so when the key is absent we block the guest path with a clear
+  // notice instead of letting the diver fill the whole form and dead-end on a
+  // "captcha token required" error at submit.
+  const turnstileSiteKey = (import.meta.env.VITE_TURNSTILE_SITE_KEY ?? '') as string
   // On-behalf-of (admin or parent): relax the diver-facing required-field
   // gates so the caller can register a diver whose profile is still
   // incomplete (no cert card, missing full name, no transport choice, no
@@ -854,8 +860,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                   <a href="/terms" target="_blank" rel="noreferrer" className="text-blue-700 hover:underline">Terms of Use & Privacy</a>.
                 </span>
               </label>
-              {TURNSTILE_SITE_KEY && (
-                <TurnstileWidget siteKey={TURNSTILE_SITE_KEY} onToken={setTurnstileToken} />
+              {turnstileSiteKey ? (
+                <TurnstileWidget siteKey={turnstileSiteKey} onToken={setTurnstileToken} />
+              ) : (
+                <p role="alert" className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                  Account registration is temporarily unavailable. Please contact us directly to book this event.
+                </p>
               )}
             </div>
           )}
@@ -1328,7 +1338,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 (!isOnBehalfOf && certBlocked) ||
                 (!isOnBehalfOf && nitroxBlocked) ||
                 (!isOnBehalfOf && deepBlocked) ||
-                (isGuest && (guestEmail.trim() === '' || guestPassword.length < 8 || !guestAgreedTerms || (!!TURNSTILE_SITE_KEY && !turnstileToken)))
+                (isGuest && (guestEmail.trim() === '' || guestPassword.length < 8 || !guestAgreedTerms || !turnstileToken))
               )) ||
               (step === 3 && !isOnBehalfOf && needsTransport === null)
             }

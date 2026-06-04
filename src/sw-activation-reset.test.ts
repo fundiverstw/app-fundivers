@@ -9,7 +9,7 @@ import { wipeCachesAndClaim } from './sw-activation-reset'
 function makeStorage(initial: string[]) {
   return {
     keys: vi.fn(async () => initial),
-    delete: vi.fn(async (_name: string) => true),
+    delete: vi.fn(async () => true),
   }
 }
 
