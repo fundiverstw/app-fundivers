@@ -164,6 +164,31 @@ describe('RegisterForm', () => {
     expect(onBooked.mock.calls[0][0]).toEqual({ id: 'b-new', status: 'pending' })
   })
 
+  it('shows an in-flight "Confirming…" state while the submit round-trip is pending', async () => {
+    setupFrom()
+    // Hold the edge-function call open so we can observe the button mid-flight
+    // — this is the gap that previously looked frozen.
+    let resolveInvoke!: (v: unknown) => void
+    invoke.mockReturnValueOnce(new Promise(res => { resolveInvoke = res }))
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+    const busy = await screen.findByRole('button', { name: /confirming/i })
+    expect(busy).toBeDisabled()
+
+    resolveInvoke({ data: { booking_id: 'b-new', session: null }, error: null })
+    await waitFor(() => expect(screen.getByRole('button', { name: /confirm booking/i })).toBeInTheDocument())
+  })
+
   it('includes gear items and add-ons in the details payload', async () => {
     setupFrom()
     const onBooked = vi.fn()

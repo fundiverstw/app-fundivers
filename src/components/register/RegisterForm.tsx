@@ -1348,8 +1348,11 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           </button>
         ) : (
           <button onClick={submit} disabled={saving || (!isOnBehalfOf && !!cancelPolicy && !policyAcked)}
-            className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg">
-            {saving ? '…' : isEdit ? 'Save changes' : 'Confirm booking'}
+            className="bg-blue-900 hover:bg-blue-950 disabled:opacity-60 disabled:cursor-wait text-white text-sm font-semibold py-2 px-4 rounded-lg inline-flex items-center gap-2">
+            {saving && (
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+            )}
+            {saving ? (isEdit ? 'Saving…' : 'Confirming…') : isEdit ? 'Save changes' : 'Confirm booking'}
           </button>
         )}
       </footer>

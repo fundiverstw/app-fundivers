@@ -135,4 +135,34 @@ describe('MultiRegisterForm parent diver picker', () => {
     expect(e1Body.group_id).toBe(e2Body.group_id)
     expect(onAll).toHaveBeenCalled()
   })
+
+  it('shows a disabled "Submitting…" state while the booking round-trip is pending', async () => {
+    setupFrom([])
+    // Hold the booking call open to observe the in-flight button — the gap
+    // that previously looked frozen.
+    let resolveInvoke!: (v: unknown) => void
+    invoke.mockReturnValueOnce(new Promise(res => { resolveInvoke = res }))
+    const onAll = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <MultiRegisterForm
+        events={[sampleEvent('e1', 'Kenting')]}
+        profile={parentProfile} userId="p1"
+        onClose={() => {}} onAllBooked={onAll}
+      />
+    )
+    await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
+
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/No, I'll get there myself/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /confirm/i }))
+
+    const busy = await screen.findByRole('button', { name: /submitting/i })
+    expect(busy).toBeDisabled()
+
+    resolveInvoke({ data: { booking_id: 'b-new', status: 'pending' }, error: null })
+    await waitFor(() => expect(onAll).toHaveBeenCalled())
+  })
 })
