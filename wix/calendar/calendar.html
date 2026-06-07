@@ -343,6 +343,24 @@ body { font-family:"Segoe UI",sans-serif; margin:0; padding:1rem; background:tra
 .event-row-date { font-size:0.78rem; color:#1e3a8a; opacity:0.85; }
 .event-row-price { font-size:0.78rem; font-weight:700; color:#1e3a8a; white-space:nowrap; }
 .event-row-empty { font-size:0.85rem; color:#1e3a8a; opacity:0.7; padding:4px 2px; }
+
+/* Phones — one responsive element serves both form factors (no separate
+   mobile build). The 7-column grid stays (matching the app); we just
+   shrink the cells, headers, and nav so it fits a narrow screen, and the
+   "This month" list below carries the full titles where the grid pills
+   truncate. Event bars keep their 18px height so the multi-day text
+   overlay (sized in JS) stays aligned. */
+@media (max-width: 640px) {
+  body { padding:0.5rem; }
+  .month { min-width:0; }
+  .day { height:96px; }
+  .day-header { height:24px; font-size:0.6rem; }
+  .date { font-size:0.62rem; }
+  .cal-nav-title { min-width:84px; font-size:0.95rem; }
+  .nav-arrow { height:36px; font-size:1.4rem; }
+  .chip { padding:4px 9px; font-size:0.7rem; }
+  .event-row-title { font-size:0.82rem; }
+}
 </style>
 
 <script>
