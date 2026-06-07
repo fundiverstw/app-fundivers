@@ -123,10 +123,11 @@ export function NotificationsPage() {
 // to the duty page, etc.
 function actionLabelForKind(kind: string): string {
   switch (kind) {
-    case 'reminder':  return 'Open event'
-    case 'duty':      return 'Go to duty'
-    case 'broadcast': return 'Open link'
-    default:          return 'Open'
+    case 'reminder':          return 'Open event'
+    case 'duty':              return 'Go to duty'
+    case 'broadcast':         return 'Open link'
+    case 'event_reschedule':  return 'View change'
+    default:                  return 'Open'
   }
 }
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth,
+  format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth,
   addMonths, subMonths, startOfWeek, endOfWeek,
 } from 'date-fns'
 import {
@@ -8,6 +8,8 @@ import {
   type CellSegment, type EventRange, type LayoutEvent,
 } from '../../lib/calendar-layout'
 import { formatEventSpan } from '../../lib/events'
+import { isReschedulable } from '../../lib/reschedule'
+import { ConfirmDialog } from '../ui/ConfirmDialog'
 import type { AppEvent, StaffBusyEntry } from '../../types/database'
 
 // Shared by CalendarPage (diver) and AdminEventsPage (admin). The only
@@ -179,12 +181,18 @@ export interface MonthCalendarProps {
   onCreateBusy?: (day: Date) => void
   /** Click handler for tapping an existing busy bar. */
   onPickBusy?: (b: StaffBusyEntry) => void
+  /** Admin-only: persist a one-day move of an event. When provided,
+   *  reschedulable event bars (see isReschedulable) become drag targets —
+   *  long-press on touch / press-drag with a mouse, then a confirm dialog.
+   *  `fromKey`/`toKey` are 'YYYY-MM-DD'. Omit on diver surfaces to disable. */
+  onRescheduleDay?: (event: AppEvent, fromKey: string, toKey: string) => Promise<void>
 }
 
 export function MonthCalendar({
   month, onMonthChange, events, onPickEvent, renderListBadge, hidePastInList, listTitle = 'This month',
   highlightedIds,
   busyEntries, busyShown, onToggleBusy, currentUserId, ownDutyDays, onCreateBusy, onPickBusy,
+  onRescheduleDay,
 }: MonthCalendarProps) {
   const [diveShown, setDiveShown] = useState(true)
   const [hiddenCourses, setHiddenCourses] = useState<Set<string>>(new Set())
@@ -192,6 +200,12 @@ export function MonthCalendar({
   // event id so every segment of that event can cross-highlight. Cleared on
   // mouse leave.
   const [hoveredEventId, setHoveredEventId] = useState<string | null>(null)
+
+  // Drag-to-reschedule (admin). `dropTargetKey` highlights the cell under
+  // an in-flight drag; `pending` holds the proposed move until confirmed.
+  const rescheduleEnabled = !!onRescheduleDay
+  const [dropTargetKey, setDropTargetKey] = useState<string | null>(null)
+  const [pending, setPending] = useState<{ event: AppEvent; fromKey: string; toKey: string } | null>(null)
 
   const days = eachDayOfInterval({ start: startOfMonth(month), end: endOfMonth(month) })
 
@@ -303,7 +317,30 @@ export function MonthCalendar({
         onCreateBusy={onCreateBusy}
         hoveredEventId={hoveredEventId}
         onHoverEvent={setHoveredEventId}
+        rescheduleEnabled={rescheduleEnabled}
+        dropTargetKey={dropTargetKey}
+        onDragHoverDay={setDropTargetKey}
+        onDropReschedule={(event, fromKey, toKey) => setPending({ event, fromKey, toKey })}
       />
+
+      {pending && onRescheduleDay && (
+        <ConfirmDialog
+          title="Move event day"
+          confirmLabel="Move it"
+          message={
+            <>
+              Change <span className="font-semibold">{pending.event.calendar_title || pending.event.title}</span>{' '}
+              from <span className="font-semibold">{format(parseISO(pending.fromKey), 'EEE, MMM d')}</span>{' '}
+              to <span className="font-semibold">{format(parseISO(pending.toKey), 'EEE, MMM d')}</span>?
+            </>
+          }
+          onConfirm={async () => {
+            await onRescheduleDay(pending.event, pending.fromKey, pending.toKey)
+            setPending(null)
+          }}
+          onCancel={() => setPending(null)}
+        />
+      )}
 
       <div className="space-y-2">
         <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider">{listTitle}</h2>
@@ -361,11 +398,16 @@ interface MonthGridProps {
   onCreateBusy?: (day: Date) => void
   hoveredEventId: string | null
   onHoverEvent: (id: string | null) => void
+  rescheduleEnabled: boolean
+  dropTargetKey: string | null
+  onDragHoverDay: (key: string | null) => void
+  onDropReschedule: (event: AppEvent, fromKey: string, toKey: string) => void
 }
 
 function MonthGrid({
   month, days, ranges, busyRanges, trackRows, busyTrackRows, ownDutyDays, highlightedIds,
   onPickEvent, onPickBusy, onCreateBusy, hoveredEventId, onHoverEvent,
+  rescheduleEnabled, dropTargetKey, onDragHoverDay, onDropReschedule,
 }: MonthGridProps) {
   const leading = days[0].getDay()
   const totalRows = Math.max(1, trackRows) + busyTrackRows
@@ -400,6 +442,10 @@ function MonthGrid({
           onCreateBusy={onCreateBusy}
           hoveredEventId={hoveredEventId}
           onHoverEvent={onHoverEvent}
+          rescheduleEnabled={rescheduleEnabled}
+          dropTargetKey={dropTargetKey}
+          onDragHoverDay={onDragHoverDay}
+          onDropReschedule={onDropReschedule}
         />
       ))}
     </div>
@@ -409,6 +455,7 @@ function MonthGrid({
 function DayCell({
   day, ranges, busyRanges, month, trackRows, busyTrackRows, minHeight, ownDutyDays, highlightedIds,
   onPickEvent, onPickBusy, onCreateBusy, hoveredEventId, onHoverEvent,
+  rescheduleEnabled, dropTargetKey, onDragHoverDay, onDropReschedule,
 }: {
   day: Date
   ranges: EventRange<AppEvent>[]
@@ -424,6 +471,10 @@ function DayCell({
   onCreateBusy?: (day: Date) => void
   hoveredEventId: string | null
   onHoverEvent: (id: string | null) => void
+  rescheduleEnabled: boolean
+  dropTargetKey: string | null
+  onDragHoverDay: (key: string | null) => void
+  onDropReschedule: (event: AppEvent, fromKey: string, toKey: string) => void
 }) {
   const weekStart = startOfWeek(day, { weekStartsOn: 0 })
   const weekEnd = endOfWeek(day, { weekStartsOn: 0 })
@@ -441,13 +492,17 @@ function DayCell({
   // wired; event/busy bars stopPropagation so they keep their own intent.
   const cellClickable = !!onCreateBusy
   const handleCellClick = cellClickable ? () => onCreateBusy!(day) : undefined
+  const isDropTarget = dropTargetKey === dayKey
 
   return (
     <div
+      data-day={dayKey}
       onClick={handleCellClick}
       className={`relative pt-1 border-b border-sky-200/60 ${
         isToday ? 'bg-red-50' : ''
-      } ${!inMonth ? 'opacity-40' : ''} ${cellClickable ? 'cursor-pointer hover:bg-amber-50/60' : ''}`}
+      } ${!inMonth ? 'opacity-40' : ''} ${cellClickable ? 'cursor-pointer hover:bg-amber-50/60' : ''} ${
+        isDropTarget ? 'ring-2 ring-inset ring-amber-400 bg-amber-50/70' : ''
+      }`}
       style={{ minHeight }}
     >
       <span className={`text-[10px] block text-center w-5 h-5 flex items-center justify-center mx-auto ${
@@ -461,11 +516,15 @@ function DayCell({
             key={`${seg.event.id}_${seg.event.start_time}`}
             seg={seg}
             track={track}
+            dayKey={dayKey}
             isOwnDuty={!!ownDutyDays?.get(seg.event.id)?.has(dayKey)}
             highlighted={!!highlightedIds?.has(seg.event.id)}
             onClick={() => onPickEvent(seg.event)}
             hovered={hoveredEventId === seg.event.id}
             onHoverEvent={onHoverEvent}
+            draggable={rescheduleEnabled && isReschedulable(seg.event)}
+            onDragHoverDay={onDragHoverDay}
+            onDropReschedule={onDropReschedule}
           />
         ))}
       </div>
@@ -487,15 +546,108 @@ function DayCell({
   )
 }
 
-function EventBar({ seg, track, isOwnDuty, highlighted, onClick, hovered, onHoverEvent }: {
+// How long a press must be held (ms) before a drag begins, and how far the
+// pointer may travel first before we treat it as a scroll/swipe and abort.
+const LONG_PRESS_MS = 400
+const MOVE_CANCEL_PX = 10
+
+function dayKeyAtPoint(x: number, y: number): string | null {
+  const el = document.elementFromPoint(x, y)
+  return el?.closest('[data-day]')?.getAttribute('data-day') ?? null
+}
+
+function EventBar({
+  seg, track, dayKey, isOwnDuty, highlighted, onClick, hovered, onHoverEvent,
+  draggable, onDragHoverDay, onDropReschedule,
+}: {
   seg: CellSegment<AppEvent>
   track: number
+  dayKey: string
   isOwnDuty: boolean
   highlighted: boolean
   onClick: () => void
   hovered: boolean
   onHoverEvent: (id: string | null) => void
+  draggable: boolean
+  onDragHoverDay: (key: string | null) => void
+  onDropReschedule: (event: AppEvent, fromKey: string, toKey: string) => void
 }) {
+  // Long-press-then-drag state. All kept in refs so pointermove doesn't
+  // re-render per frame; only `lifted` (the visual "picked up" cue) is
+  // state. `suppressClick` swallows the synthetic click that follows a
+  // pointerup we've already handled (tap → select, drag → confirm).
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const startPt = useRef<{ x: number; y: number } | null>(null)
+  const dragging = useRef(false)
+  const aborted = useRef(false)
+  const suppressClick = useRef(false)
+  const [lifted, setLifted] = useState(false)
+
+  function reset() {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null }
+    startPt.current = null
+    dragging.current = false
+    setLifted(false)
+    onDragHoverDay(null)
+  }
+
+  function onPointerDown(e: React.PointerEvent) {
+    if (!draggable) return
+    startPt.current = { x: e.clientX, y: e.clientY }
+    dragging.current = false
+    aborted.current = false
+    e.currentTarget.setPointerCapture(e.pointerId)
+    timer.current = setTimeout(() => {
+      dragging.current = true
+      setLifted(true)
+      navigator.vibrate?.(10)
+      onDragHoverDay(dayKey)
+    }, LONG_PRESS_MS)
+  }
+
+  function onPointerMove(e: React.PointerEvent) {
+    if (!draggable || !startPt.current) return
+    if (dragging.current) {
+      // Active drag — block scroll and track the cell under the pointer.
+      e.preventDefault()
+      onDragHoverDay(dayKeyAtPoint(e.clientX, e.clientY))
+      return
+    }
+    const dx = e.clientX - startPt.current.x
+    const dy = e.clientY - startPt.current.y
+    if (Math.hypot(dx, dy) > MOVE_CANCEL_PX) {
+      // Moved before the hold completed → it's a scroll/swipe, not a drag.
+      if (timer.current) { clearTimeout(timer.current); timer.current = null }
+      aborted.current = true
+    }
+  }
+
+  function onPointerUp(e: React.PointerEvent) {
+    if (!draggable) return
+    if (timer.current) { clearTimeout(timer.current); timer.current = null }
+    if (dragging.current) {
+      const target = dayKeyAtPoint(e.clientX, e.clientY)
+      suppressClick.current = true
+      reset()
+      if (target && target !== dayKey) onDropReschedule(seg.event, dayKey, target)
+    } else if (!aborted.current) {
+      // Clean tap → select. Suppress the trailing synthetic click.
+      suppressClick.current = true
+      reset()
+      onClick()
+    } else {
+      reset()
+    }
+  }
+
+  function handleClick(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (suppressClick.current) { suppressClick.current = false; return }
+    // Non-draggable bars (diver calendar, multi-day dives) never set up
+    // pointer handling, so the native click drives selection as before.
+    if (!draggable) onClick()
+  }
+
   const baseClass = eventBarClass(seg.event, hovered)
   const leftInset = seg.isStart ? 2 : 0
   const rightInset = seg.isEnd ? 2 : 0
@@ -525,18 +677,24 @@ function EventBar({ seg, track, isOwnDuty, highlighted, onClick, hovered, onHove
   return (
     <button
       type="button"
-      onClick={e => { e.stopPropagation(); onClick() }}
+      onClick={handleClick}
+      onPointerDown={draggable ? onPointerDown : undefined}
+      onPointerMove={draggable ? onPointerMove : undefined}
+      onPointerUp={draggable ? onPointerUp : undefined}
+      onPointerCancel={draggable ? reset : undefined}
       onMouseEnter={() => onHoverEvent(seg.event.id)}
       onMouseLeave={() => onHoverEvent(null)}
       title={seg.event.title}
-      className={`absolute text-[10px] font-semibold truncate text-left px-1 transition-colors ${baseClass} ${leftRadius} ${rightRadius}`}
+      className={`absolute text-[10px] font-semibold truncate text-left px-1 transition-all ${baseClass} ${leftRadius} ${rightRadius} ${
+        lifted ? 'z-30 scale-105 opacity-90 shadow-lg' : ''
+      }`}
       style={{
         top: track * (TRACK_HEIGHT + TRACK_GAP),
         height: TRACK_HEIGHT,
         left: leftInset,
         right: rightInset,
         backgroundImage: isOwnDuty ? OWN_DUTY_STRIPE : undefined,
-        boxShadow: featuredShadow,
+        boxShadow: lifted ? undefined : featuredShadow,
       }}
     >
       {seg.showTitle ? (

@@ -159,6 +159,37 @@ notification does **not** flip the column. Use the existing "Cancel event"
 flow for that; the two are intentionally independent so admins can also
 broadcast "back on" updates without restoring the row.
 
+## Event reschedule push (`/admin-event-reschedule`)
+
+Fired automatically whenever an admin changes an event's date(s). Two
+SPA paths feed it (`src/lib/reschedule.ts`), both fire-and-forget:
+- **Calendar drag** (`AdminEventsPage` → `notifyEventRescheduled`) sends
+  `from_date` + `to_date` for the single day that moved.
+- **Edit form** (`AdminEditEventPage` → `notifyEventScheduleChanged`)
+  sends neither — it fires only when the saved dates actually differ.
+
+Notifies **every non-cancelled registrant** (confirmed, pending, *and*
+waitlisted) — wider than `/admin-event-broadcast`, because anyone holding
+a spot needs to know. Gated by `profiles.role = 'admin'` in the worker.
+
+```
+POST /admin-event-reschedule
+Authorization: Bearer <admin user's session JWT>
+{ "event_id": "<EO_dives._id | EO_courses._id>",
+  "event_type": "dive" | "course",
+  "from_date": "YYYY-MM-DD",   // optional — both present = single-day move
+  "to_date":   "YYYY-MM-DD" }  // optional
+→ { "sent": N, "skipped": M, "recipients": K }
+```
+
+Title/body are auto-built (`rescheduleNotificationText` in
+`workers/push/src/pure.ts`): *"Schedule change: {title}"* with either
+*"A day moved from {Sat, May 16} to {Mon, May 18}…"* (both dates) or a
+generic *"The schedule has changed…"* (dates omitted). Tap target is
+`/notifications`; inbox rows are written `kind = 'event_reschedule'`.
+Both dates present and equal is a no-op. No new secrets; reuses the
+admin-gate `SUPABASE_ANON_KEY` + service-role key.
+
 ## Duty-assigned push (`/notify-duty`)
 
 When an admin assigns a duty (`/admin/duty`), the SPA fires a

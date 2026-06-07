@@ -82,3 +82,27 @@ export function addDays(ymd: string, days: number): string {
   d.setUTCDate(d.getUTCDate() + days)
   return d.toISOString().slice(0, 10)
 }
+
+/**
+ * 'YYYY-MM-DD' → a friendly Taipei-anchored label like 'Mon, May 18'.
+ * Anchored to +08:00 so the weekday/day never drift under the runner's
+ * timezone (Taiwan has no DST — a fixed offset is correct).
+ */
+export function formatDayLabel(ymd: string): string {
+  return new Date(`${ymd}T00:00:00+08:00`).toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', timeZone: 'Asia/Taipei',
+  })
+}
+
+/**
+ * Auto-built push/inbox copy for an event schedule change. Pure so it's
+ * testable without the worker runtime. When both dates are given (a
+ * single-day calendar drag), the body names the move; otherwise (an edit
+ * that changed dates more broadly) it gives a generic prompt to re-check.
+ */
+export function rescheduleNotificationText(eventTitle: string, fromKey?: string, toKey?: string): { title: string; body: string } {
+  const body = fromKey && toKey
+    ? `A day moved from ${formatDayLabel(fromKey)} to ${formatDayLabel(toKey)}. Check your bookings for the updated schedule.`
+    : `The schedule has changed. Check your bookings for the updated dates.`
+  return { title: `Schedule change: ${eventTitle}`, body }
+}
