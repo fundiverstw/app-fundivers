@@ -5,10 +5,35 @@ import {
   todayInTaipei,
   addDays,
   toHhmm,
+  formatDayLabel,
+  rescheduleNotificationText,
   type Booking,
   type DiveRow,
   type CourseRow,
 } from './pure'
+
+describe('formatDayLabel', () => {
+  it('renders a Taipei-anchored weekday/month/day label', () => {
+    expect(formatDayLabel('2026-05-18')).toBe('Mon, May 18')
+    expect(formatDayLabel('2026-05-16')).toBe('Sat, May 16')
+  })
+})
+
+describe('rescheduleNotificationText', () => {
+  it('names the move when both dates are given (single-day drag)', () => {
+    const { title, body } = rescheduleNotificationText('Open Water Course', '2026-05-16', '2026-05-18')
+    expect(title).toBe('Schedule change: Open Water Course')
+    expect(body).toContain('Sat, May 16')
+    expect(body).toContain('Mon, May 18')
+  })
+
+  it('falls back to a generic body when dates are omitted (edit-form change)', () => {
+    const { title, body } = rescheduleNotificationText('Open Water Course')
+    expect(title).toBe('Schedule change: Open Water Course')
+    expect(body).toMatch(/schedule has changed/i)
+    expect(body).not.toMatch(/May/)
+  })
+})
 
 describe('todayInTaipei', () => {
   it('returns the Taipei-local date', () => {
