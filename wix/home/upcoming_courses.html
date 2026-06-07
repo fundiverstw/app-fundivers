@@ -97,6 +97,28 @@
     function details(id)  { window.open('https://www.fundiverstw.com/course/' + encodeURIComponent(id), '_top'); }
     function book(id)     { window.open('https://app.fundiverstw.com/register/course/' + encodeURIComponent(id), '_top'); }
 
+    // Render the days a course runs on (EO_courses.course_days, max 4),
+    // grouping consecutive dates into ranges — e.g. "May 9–10, May 16".
+    // Falls back to the start/end envelope for any legacy row without the
+    // array. Dates are formatted in UTC so a bare calendar date doesn't
+    // shift a day for viewers west of UTC.
+    function courseDates(c) {
+      let raw = c.course_days;
+      if (typeof raw === 'string') raw = raw.replace(/^\{|\}$/g, '').split(',');
+      let days = (Array.isArray(raw) ? raw : []).map(s => String(s).slice(0, 10)).filter(Boolean);
+      if (!days.length) days = [c.start_date, c.end_date].filter(Boolean).map(s => String(s).slice(0, 10));
+      days = Array.from(new Set(days)).sort();
+      if (!days.length) return '';
+      const runs = [];
+      for (const d of days) {
+        const last = runs[runs.length - 1];
+        if (last && (new Date(d + 'T00:00:00Z') - new Date(last[1] + 'T00:00:00Z')) === 86400000) last[1] = d;
+        else runs.push([d, d]);
+      }
+      const fmt = (iso) => new Date(iso + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+      return runs.map(([a, b]) => a === b ? fmt(a) : `${fmt(a)}–${fmt(b)}`).join(', ');
+    }
+
     window.addEventListener('message', (e) => {
       const courses = e.data;
       if (!Array.isArray(courses)) return;
@@ -111,7 +133,7 @@
           <div class="card-overlay"></div>
           <div class="card-info">
             <div class="card-title">${c.display_title || c.title || ''}</div>
-            <div class="card-date">${c.start_date || ''}${c.end_date && c.end_date !== c.start_date ? ' → ' + c.end_date : ''}</div>
+            <div class="card-date">${courseDates(c)}</div>
             ${c.schedule ? `<div class="card-schedule">${c.schedule}</div>` : ''}
             ${c.starting_at != null ? `<div class="card-price">From ${parseInt(c.starting_at)} NTD</div>` : ''}
           </div>

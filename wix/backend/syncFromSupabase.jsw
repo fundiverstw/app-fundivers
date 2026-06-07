@@ -46,9 +46,13 @@ const MULTI_REF_FIELDS = {
 // parse as UTC midnight, which renders as May 30 for every viewer
 // west of UTC. We re-anchor to UTC noon — 12h from either day
 // boundary — so every populated timezone displays the intended date.
+// course_days is intentionally absent: it's a date[] array, not a scalar
+// DateTime, so toUtcNoon() would mangle it — it passes through untouched
+// as an array of 'YYYY-MM-DD' strings. special_date was dropped from the
+// schema (replaced by course_days), so it's gone from here too.
 const DATE_FIELDS = {
   EO_dives:   ['start_date', 'end_date', 'cancel_date', 'full_payment_deadline'],
-  EO_courses: ['start_date', 'end_date', 'special_date', 'cancel_date', 'full_payment_deadline'],
+  EO_courses: ['start_date', 'end_date', 'cancel_date', 'full_payment_deadline'],
 };
 
 function multiRefsFor(collection) {
