@@ -12,6 +12,24 @@ import {
 import type { EOCourse, EODive } from '../../types/database'
 import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
+import { notifyEventScheduleChanged } from '../../lib/reschedule'
+
+// Normalize a day list (sort + dedupe + drop blanks) for comparison.
+function normDays(days: string[]): string[] {
+  return [...new Set(days.filter(Boolean))].sort()
+}
+
+// Whether the edit changed the event's date(s) — the trigger for notifying
+// registered divers. Courses compare their day list; dives compare the
+// start/end envelope.
+function datesChanged(before: FormState, after: FormState): boolean {
+  if (after.type === 'course') {
+    const a = normDays(before.courseDays)
+    const b = normDays(after.courseDays)
+    return a.length !== b.length || a.some((d, i) => d !== b[i])
+  }
+  return before.start_date !== after.start_date || (before.end_date || '') !== (after.end_date || '')
+}
 
 // Edit page — load the existing dive/course row, hand the prefilled
 // FormState to the shared EventForm, and on submit call .update().eq()
@@ -59,12 +77,16 @@ export function AdminEditEventPage() {
 
   async function handleSubmit(form: FormState) {
     if (!id) throw new Error('Missing event id.')
+    // Capture before the update so we can notify registrants if the dates
+    // moved. `initial` is the loaded row's FormState, untouched by editing.
+    const dateChange = !!initial && datesChanged(initial, form)
     if (form.type === 'dive') {
       const { error } = await supabase
         .from('EO_dives')
         .update(divePayloadFromForm(form) as never)
         .eq('_id', id)
       if (error) throw error
+      if (dateChange) notifyEventScheduleChanged(id, 'dive').catch(() => { /* best-effort */ })
       toast.success('Dive updated')
       navigate(`/admin/events/dive/${id}`)
     } else {
@@ -73,6 +95,7 @@ export function AdminEditEventPage() {
         .update(coursePayloadFromForm(form) as never)
         .eq('_id', id)
       if (error) throw error
+      if (dateChange) notifyEventScheduleChanged(id, 'course').catch(() => { /* best-effort */ })
       toast.success('Course updated')
       navigate(`/admin/events/course/${id}`)
     }

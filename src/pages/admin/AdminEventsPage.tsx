@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { startOfMonth, endOfMonth, format } from 'date-fns'
+import { startOfMonth, endOfMonth, format, parseISO } from 'date-fns'
 import { fetchEventsInRange } from '../../lib/events'
+import { rescheduleEventDay, notifyEventRescheduled } from '../../lib/reschedule'
 import { fetchMyDutyDays } from '../../lib/duties'
 import { fetchStaffAvailabilityInRange } from '../../lib/staff-availability'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
+import { useToast } from '../../hooks/useToast'
 import { MonthCalendar } from '../../components/calendar/MonthCalendar'
 import { BusyEntryModal } from '../../components/admin/BusyEntryModal'
 import type { AppEvent, StaffBusyEntry } from '../../types/database'
@@ -29,7 +31,10 @@ function readStoredMonth(): Date {
 export function AdminEventsPage() {
   const navigate = useNavigate()
   const { user, profile } = useAuth()
+  const toast = useToast()
   const [month, setMonth] = useState<Date>(readStoredMonth)
+  // Bumped to re-run the data fetch after a write (e.g. a drag-reschedule).
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
     try { sessionStorage.setItem(MONTH_STORAGE_KEY, month.toISOString()) } catch { /* ignore */ }
@@ -90,12 +95,13 @@ export function AdminEventsPage() {
     })()
 
     return () => { cancelled = true }
-  }, [month, user])
+  }, [month, user, refreshKey])
 
   // Busy overlay defaults ON for both roles so unavailable periods are
   // visible the moment staff/admin land on the calendar — they can flip
   // it off when they want a clean view of just the events.
   const isStaffOrAdmin = profile?.role === 'staff' || profile?.role === 'admin'
+  const isAdmin = profile?.role === 'admin'
   const busyShown = busyShownOverride ?? isStaffOrAdmin
 
   return (
@@ -105,6 +111,18 @@ export function AdminEventsPage() {
         onMonthChange={setMonth}
         events={events}
         onPickEvent={ev => navigate(`/admin/events/${ev.type}/${ev.id}`)}
+        // Only admins can write EO_* rows (is_admin() RLS). The drag
+        // gesture is gated on this prop, so staff/divers never see it.
+        onRescheduleDay={isAdmin
+          ? async (ev, from, to) => {
+              await rescheduleEventDay(ev, from, to)
+              // Best-effort: notify registered divers of the date change.
+              // A push failure must not block the move from showing success.
+              notifyEventRescheduled(ev.id, ev.type, from, to).catch(() => { /* best-effort */ })
+              toast.success(`Moved to ${format(parseISO(to), 'EEE, MMM d')}`)
+              setRefreshKey(k => k + 1)
+            }
+          : undefined}
         hidePastInList
         renderListBadge={ev => {
           const regs = counts.get(ev.id) ?? 0
