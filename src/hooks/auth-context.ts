@@ -13,6 +13,11 @@ export interface AuthContextValue {
   profile: Profile | null
   loading: boolean
   signOut: () => Promise<void>
+  // Re-fetch the signed-in user's profile into context. Callers that
+  // mutate the profile server-side (e.g. accepting updated terms via the
+  // accept_current_terms RPC) must call this before relying on the new
+  // value, otherwise route guards keep reading the stale cached profile.
+  refreshProfile: () => Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)
