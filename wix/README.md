@@ -57,9 +57,11 @@ does **nothing** — Wix is still serving the previously pasted copy.
     plus the reference-flattening helpers (`resolveStartingAt`,
     `resolveRefId`, `resolveRoomOptions`, `wixImageToUrl`, etc.)
   - `sendRequest.web.js` — try-dive / course-info request emails
-- `calendar/` — desktop and mobile calendar HTML elements + the Velo
-  page script that wires them up. Receives events from
-  `getCalendarEvents()` and posts back `book_event` for the PWA
+- `calendar/` — one responsive calendar HTML element (`calendar.html`,
+  styled to match the PWA calendar) + the Velo page script
+  (`calendar.js`) that wires it up. Place the same `#htmlCalendar`
+  element on both the desktop and mobile breakpoints. Receives events
+  from `getCalendarEvents()` and posts back `book_event` for the PWA
   registration deep-link.
 - `home/` — homepage Velo script plus the HTML elements embedded on
   the homepage (upcoming dives card, upcoming courses card, request
