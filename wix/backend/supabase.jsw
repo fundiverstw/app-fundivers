@@ -253,8 +253,38 @@ export async function getCalendarEvents() {
   const toStr = (val) => val ? new Date(val).toISOString().split('T')[0] : null;
   const dayDiff = (a, b) => Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000);
 
+  // A course runs on an explicit list of days (EO_courses.course_days, a
+  // date[], max 4) — this replaced the old single special_date column.
+  // PostgREST serializes the array as a JS array of 'YYYY-MM-DD' strings;
+  // tolerate a Postgres array literal ('{2026-05-09,2026-05-10}') just in
+  // case, and fall back to the start/end envelope for any legacy row.
+  const courseDayKeys = (item) => {
+    let raw = item.course_days;
+    if (typeof raw === 'string') raw = raw.replace(/^\{|\}$/g, '').split(',');
+    let keys = (Array.isArray(raw) ? raw : []).map(toStr).filter(Boolean);
+    if (keys.length === 0) {
+      keys = [toStr(item.start_date), toStr(item.end_date)].filter(Boolean);
+    }
+    return Array.from(new Set(keys)).sort();
+  };
+
+  // Group sorted days into runs of consecutive dates → one calendar
+  // segment per run. Adjacent days render as a single continuous bar;
+  // gaps render as separate pills. Mirrors courseToEvents in
+  // src/lib/events.ts so the Wix calendar matches the PWA.
+  const groupRuns = (days) => {
+    const runs = [];
+    for (const d of days) {
+      const last = runs[runs.length - 1];
+      if (last && dayDiff(last[1], d) === 1) last[1] = d;
+      else runs.push([d, d]);
+    }
+    return runs;
+  };
+
   const courseEvents = courses.flatMap((item) => {
-    if (!item.start_date) return [];
+    const days = courseDayKeys(item);
+    if (days.length === 0) return [];
     const base = {
       id: item._id || item.id,
       title: item.calendar_title || '',
@@ -264,38 +294,7 @@ export async function getCalendarEvents() {
       starting_at: resolveStartingAt(item, priceMap),
       url: (item.url && String(item.url).trim()) || item['link-eo-courses-course_title'] || '',
     };
-
-    const startStr   = toStr(item.start_date);
-    const endStr     = toStr(item.end_date) || startStr;
-    const specialStr = toStr(item.special_date);
-
-    if (!specialStr) return [{ ...base, start_date: startStr, end_date: endStr }];
-
-    if (specialStr === endStr) return [
-      { ...base, start_date: startStr, end_date: startStr },
-      { ...base, start_date: endStr,   end_date: endStr   },
-    ];
-
-    if (Math.abs(dayDiff(startStr, specialStr)) === 1) {
-      const [rangeStart, rangeEnd] = startStr < specialStr ? [startStr, specialStr] : [specialStr, startStr];
-      return [
-        { ...base, start_date: rangeStart, end_date: rangeEnd },
-        { ...base, start_date: endStr,     end_date: endStr   },
-      ];
-    }
-
-    if (Math.abs(dayDiff(endStr, specialStr)) === 1) {
-      const [rangeStart, rangeEnd] = endStr < specialStr ? [endStr, specialStr] : [specialStr, endStr];
-      return [
-        { ...base, start_date: startStr,  end_date: startStr },
-        { ...base, start_date: rangeStart, end_date: rangeEnd },
-      ];
-    }
-
-    return [
-      { ...base, start_date: startStr,   end_date: endStr     },
-      { ...base, start_date: specialStr, end_date: specialStr },
-    ];
+    return groupRuns(days).map(([start_date, end_date]) => ({ ...base, start_date, end_date }));
   });
 
   const diveEvents = dives.flatMap((item) => {
