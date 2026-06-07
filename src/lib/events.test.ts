@@ -1,11 +1,8 @@
 /**
- * Covers the Wix special_date branches from courseToEvents (see
- * wix-site/calendar/calendar.js lines 39-75). The four branches:
- *   A) no special → one segment
- *   B) special == end → two single-day segments (start + end)
- *   C) special adjacent to start (±1d) → merged [start/special] + lone end
- *   D) special adjacent to end (±1d) → lone start + merged [end/special]
- *   E) far apart → full range + lone special
+ * Covers courseToEvents — a course runs on an explicit list of days
+ * (course_days, max 4). Adjacent days group into one continuous segment;
+ * gaps emit separate segments. start_date/end_date are the min/max
+ * envelope used by the range fetch and per-booking span lookups.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -22,7 +19,7 @@ interface CourseRow {
   start_date: string
   start_time: string | null
   end_date: string | null
-  special_date: string | null
+  course_days: string[] | null
   price: string | null
   other_addons: string | null
   dive_days: number | null
@@ -55,8 +52,8 @@ async function fetchAndGet(courseRow: CourseRow) {
   return events
 }
 
-describe('courseToEvents — Wix special_date branches', () => {
-  const baseCourse: Omit<CourseRow, 'start_date' | 'end_date' | 'special_date'> = {
+describe('courseToEvents — course_days run grouping', () => {
+  const baseCourse: Omit<CourseRow, 'start_date' | 'end_date' | 'course_days'> = {
     _id: 'c1',
     display_title: 'AOW',
     start_time: '09:00:00',
@@ -67,101 +64,96 @@ describe('courseToEvents — Wix special_date branches', () => {
     calendar_title: null,
   }
 
-  it('A: no special_date — one segment spanning start..end', async () => {
-    const events = await fetchAndGet({
-      ...baseCourse, start_date: '2026-05-10', end_date: '2026-05-12', special_date: null,
-    })
+  // Convenience: build a row whose envelope matches its day list.
+  function course(days: string[], extra: Partial<CourseRow> = {}): CourseRow {
+    return {
+      ...baseCourse,
+      start_date: days[0],
+      end_date: days[days.length - 1],
+      course_days: days,
+      ...extra,
+    }
+  }
+
+  it('single day — one single-day segment', async () => {
+    const events = await fetchAndGet(course(['2026-05-10']))
+    expect(events).toHaveLength(1)
+    expect(events[0].start_time.slice(0, 10)).toBe('2026-05-10')
+    expect(events[0].end_time?.slice(0, 10)).toBe('2026-05-10')
+  })
+
+  it('two adjacent days — one continuous segment', async () => {
+    const events = await fetchAndGet(course(['2026-05-10', '2026-05-11']))
+    expect(events).toHaveLength(1)
+    expect(events[0].start_time.slice(0, 10)).toBe('2026-05-10')
+    expect(events[0].end_time?.slice(0, 10)).toBe('2026-05-11')
+  })
+
+  it('three adjacent days — one continuous segment', async () => {
+    const events = await fetchAndGet(course(['2026-05-10', '2026-05-11', '2026-05-12']))
     expect(events).toHaveLength(1)
     expect(events[0].start_time.slice(0, 10)).toBe('2026-05-10')
     expect(events[0].end_time?.slice(0, 10)).toBe('2026-05-12')
   })
 
-  it('B: special_date == end_date — two single-day pills (start + end)', async () => {
-    const events = await fetchAndGet({
-      ...baseCourse, start_date: '2026-05-10', end_date: '2026-05-15', special_date: '2026-05-15',
-    })
+  it('a gap splits into two segments', async () => {
+    const events = await fetchAndGet(course(['2026-05-10', '2026-05-12']))
     expect(events).toHaveLength(2)
     const dates = events.map(e => [e.start_time.slice(0, 10), e.end_time?.slice(0, 10)])
     expect(dates).toContainEqual(['2026-05-10', '2026-05-10'])
-    expect(dates).toContainEqual(['2026-05-15', '2026-05-15'])
+    expect(dates).toContainEqual(['2026-05-12', '2026-05-12'])
   })
 
-  it('C: special adjacent to start_date — merged [start..special] + lone end', async () => {
-    const events = await fetchAndGet({
-      ...baseCourse, start_date: '2026-05-10', end_date: '2026-05-20', special_date: '2026-05-11',
-    })
+  it('OW-3 shape {09,10,16} — merged [09..10] + lone [16]', async () => {
+    const events = await fetchAndGet(course(['2026-05-09', '2026-05-10', '2026-05-16']))
     expect(events).toHaveLength(2)
     const dates = events.map(e => [e.start_time.slice(0, 10), e.end_time?.slice(0, 10)])
-    expect(dates).toContainEqual(['2026-05-10', '2026-05-11'])
-    expect(dates).toContainEqual(['2026-05-20', '2026-05-20'])
+    expect(dates).toContainEqual(['2026-05-09', '2026-05-10'])
+    expect(dates).toContainEqual(['2026-05-16', '2026-05-16'])
   })
 
-  it('D: special adjacent to end_date — lone start + merged [end..special]', async () => {
-    const events = await fetchAndGet({
-      ...baseCourse, start_date: '2026-05-10', end_date: '2026-05-20', special_date: '2026-05-21',
-    })
-    expect(events).toHaveLength(2)
-    const dates = events.map(e => [e.start_time.slice(0, 10), e.end_time?.slice(0, 10)])
-    expect(dates).toContainEqual(['2026-05-10', '2026-05-10'])
-    expect(dates).toContainEqual(['2026-05-20', '2026-05-21'])
+  it('sorts + dedupes unordered/duplicate days before grouping', async () => {
+    const events = await fetchAndGet(course(['2026-05-12', '2026-05-10', '2026-05-10', '2026-05-11']))
+    expect(events).toHaveLength(1)
+    expect(events[0].start_time.slice(0, 10)).toBe('2026-05-10')
+    expect(events[0].end_time?.slice(0, 10)).toBe('2026-05-12')
   })
 
-  it('E: special far from both — full [start..end] + lone [special]', async () => {
-    const events = await fetchAndGet({
-      ...baseCourse, start_date: '2026-05-10', end_date: '2026-05-12', special_date: '2026-05-25',
-    })
-    expect(events).toHaveLength(2)
-    const dates = events.map(e => [e.start_time.slice(0, 10), e.end_time?.slice(0, 10)])
-    expect(dates).toContainEqual(['2026-05-10', '2026-05-12'])
-    expect(dates).toContainEqual(['2026-05-25', '2026-05-25'])
-  })
-
-  it('all segments share the course _id so either click books the same course', async () => {
-    const events = await fetchAndGet({
-      ...baseCourse, start_date: '2026-05-10', end_date: '2026-05-12', special_date: '2026-05-25',
-    })
+  it('all segments share the course _id so any click books the same course', async () => {
+    const events = await fetchAndGet(course(['2026-05-10', '2026-05-12', '2026-05-25']))
     expect(new Set(events.map(e => e.id))).toEqual(new Set(['c1']))
   })
 
   it('carries start_time_hhmm from the course start_time column', async () => {
-    const events = await fetchAndGet({
-      ...baseCourse, start_time: '14:30:00.000', start_date: '2026-05-10', end_date: '2026-05-10', special_date: null,
-    })
+    const events = await fetchAndGet(course(['2026-05-10'], { start_time: '14:30:00.000' }))
     expect(events).toHaveLength(1)
     expect(events[0].start_time_hhmm).toBe('14:30')
   })
 
   it('emits start_time_hhmm = null when course has no start_time set', async () => {
-    const events = await fetchAndGet({
-      ...baseCourse, start_time: '', start_date: '2026-05-10', end_date: '2026-05-10', special_date: null,
-    })
+    const events = await fetchAndGet(course(['2026-05-10'], { start_time: '' }))
     expect(events).toHaveLength(1)
     expect(events[0].start_time_hhmm).toBeNull()
   })
 
-  it('fetches courses whose special_date lands in the window even when start_date is outside it', async () => {
-    // The mock builder swallows all chain calls but captures the `.or()`
-    // argument so we can assert the special_date branch is part of the
-    // filter — the staff-busy calendar relies on this to render the
-    // special pill for a course that started before the visible month.
-    const orCalls: string[] = []
-    const courseRows = [{
-      ...baseCourse,
-      start_date: '2026-04-01',
-      end_date: '2026-04-03',
-      special_date: '2026-05-15',
-    }]
+  it('fetches courses by the start_date/end_date envelope overlap', async () => {
+    // The calendar relies on the envelope overlap so a course whose first
+    // day is before the visible window still renders its in-window days.
+    const lteCalls: [string, string][] = []
+    const gteCalls: [string, string][] = []
+    const courseRows = [course(['2026-04-30', '2026-05-15'])]
     const courseBuilder: Record<string, unknown> = {}
-    const courseChain = ['select', 'eq', 'gte', 'lte', 'order', 'in', 'is']
-    for (const m of courseChain) courseBuilder[m] = () => courseBuilder
-    courseBuilder.or = (filter: string) => { orCalls.push(filter); return courseBuilder }
+    const chain = ['select', 'eq', 'order', 'in', 'is', 'or']
+    for (const m of chain) courseBuilder[m] = () => courseBuilder
+    courseBuilder.lte = (col: string, val: string) => { lteCalls.push([col, val]); return courseBuilder }
+    courseBuilder.gte = (col: string, val: string) => { gteCalls.push([col, val]); return courseBuilder }
     courseBuilder.then = (cb?: (r: unknown) => unknown) =>
       Promise.resolve({ data: courseRows, error: null }).then(cb)
 
     from.mockImplementation((table: string) => {
       if (table === 'EO_courses') return courseBuilder
       const empty: Record<string, unknown> = {}
-      for (const m of [...courseChain, 'or']) empty[m] = () => empty
+      for (const m of [...chain, 'lte', 'gte']) empty[m] = () => empty
       empty.then = (cb?: (r: unknown) => unknown) =>
         Promise.resolve({ data: [], error: null }).then(cb)
       return empty
@@ -169,24 +161,21 @@ describe('courseToEvents — Wix special_date branches', () => {
 
     const { fetchEventsInRange } = await import('./events')
     const events = await fetchEventsInRange('2026-05-01', '2026-05-31')
-    expect(orCalls).toHaveLength(1)
-    expect(orCalls[0]).toContain('start_date.gte.2026-05-01')
-    expect(orCalls[0]).toContain('special_date.gte.2026-05-01')
-    expect(orCalls[0]).toContain('special_date.lte.2026-05-31')
-    // Course returned by the mock should still produce the special pill.
-    const specialPill = events.find(e => e.start_time.startsWith('2026-05-15'))
-    expect(specialPill).toBeDefined()
+    expect(lteCalls).toContainEqual(['start_date', '2026-05-31'])
+    expect(gteCalls).toContainEqual(['end_date', '2026-05-01'])
+    // The 05-15 day still renders even though 04-30 is outside the window.
+    expect(events.find(e => e.start_time.startsWith('2026-05-15'))).toBeDefined()
   })
 })
 
 describe('fetchEventsForBookings — full course span', () => {
   // For per-booking lookups (e.g. AdminEventDetailPage → EventStaffSection),
-  // the representative event for a course must cover the full
-  // [start_date..end_date] range — not a sub-segment. Otherwise the
-  // staff-on-duty date picker's min/max bounds can exclude half of a
-  // course whose special_date splits the calendar pills (Wix branches
-  // B/C/D). This regressed when a rescue course May 30 → June 3 with a
-  // gap had its duty picker stuck on May, blocking June 3 selection.
+  // the representative event for a course must cover the full span — first
+  // to last of every day the course runs on — not just the first run of
+  // consecutive days. Otherwise the staff-on-duty date picker's min/max
+  // bounds exclude the days outside the first run. This regressed when a
+  // rescue course on May 30 + June 3 (with a gap) had its duty picker stuck
+  // on May, blocking June 3 selection.
   function setupForBookings(course: CourseRow) {
     const courseBuilder: Record<string, unknown> = {}
     const chain = ['select', 'eq', 'gte', 'lte', 'order', 'in', 'is', 'or']
@@ -205,10 +194,11 @@ describe('fetchEventsForBookings — full course span', () => {
     })
   }
 
-  it('returns one entry per course covering the full start..end range when special_date splits into two pills', async () => {
+  it('returns one entry per course covering the full span when days split into two runs', async () => {
     setupForBookings({
       _id: 'c-split', display_title: 'Rescue', start_time: '09:00:00',
-      start_date: '2026-05-30', end_date: '2026-06-03', special_date: '2026-05-31',
+      start_date: '2026-05-30', end_date: '2026-06-03',
+      course_days: ['2026-05-30', '2026-05-31', '2026-06-03'],
       price: null, other_addons: null, dive_days: null,
       admin_title: null, calendar_title: null,
     })
@@ -220,55 +210,26 @@ describe('fetchEventsForBookings — full course span', () => {
     expect(ev?.end_time?.slice(0, 10)).toBe('2026-06-03')
   })
 
-  it('preserves the start..end range when special_date == end_date', async () => {
+  it('covers the full span when the last day is detached from the rest', async () => {
     setupForBookings({
-      _id: 'c-end-special', display_title: 'AOW', start_time: '09:00:00',
-      start_date: '2026-05-30', end_date: '2026-06-03', special_date: '2026-06-03',
+      _id: 'c-far', display_title: 'Rescue', start_time: '09:00:00',
+      start_date: '2026-05-31', end_date: '2026-06-06',
+      course_days: ['2026-05-31', '2026-06-06'],
       price: null, other_addons: null, dive_days: null,
       admin_title: null, calendar_title: null,
     })
     const { fetchEventsForBookings } = await import('./events')
-    const map = await fetchEventsForBookings([], ['c-end-special'])
-    const ev = map.get('c-end-special')
-    expect(ev?.start_time.slice(0, 10)).toBe('2026-05-30')
-    expect(ev?.end_time?.slice(0, 10)).toBe('2026-06-03')
-  })
-
-  it('extends the range to cover special_date when it lands far from the main span (branch E)', async () => {
-    // Single-day course (May 31) with a special_date weeks later (Jun 6).
-    // The duty picker needs Jun 6 inside its min/max bounds so admins can
-    // assign staff to that day.
-    setupForBookings({
-      _id: 'c-far-special', display_title: 'Rescue', start_time: '09:00:00',
-      start_date: '2026-05-31', end_date: '2026-05-31', special_date: '2026-06-06',
-      price: null, other_addons: null, dive_days: null,
-      admin_title: null, calendar_title: null,
-    })
-    const { fetchEventsForBookings } = await import('./events')
-    const map = await fetchEventsForBookings([], ['c-far-special'])
-    const ev = map.get('c-far-special')
+    const map = await fetchEventsForBookings([], ['c-far'])
+    const ev = map.get('c-far')
     expect(ev?.start_time.slice(0, 10)).toBe('2026-05-31')
     expect(ev?.end_time?.slice(0, 10)).toBe('2026-06-06')
   })
 
-  it('extends backwards when special_date is before start_date', async () => {
-    setupForBookings({
-      _id: 'c-special-before', display_title: 'AOW', start_time: '09:00:00',
-      start_date: '2026-06-05', end_date: '2026-06-07', special_date: '2026-05-29',
-      price: null, other_addons: null, dive_days: null,
-      admin_title: null, calendar_title: null,
-    })
-    const { fetchEventsForBookings } = await import('./events')
-    const map = await fetchEventsForBookings([], ['c-special-before'])
-    const ev = map.get('c-special-before')
-    expect(ev?.start_time.slice(0, 10)).toBe('2026-05-29')
-    expect(ev?.end_time?.slice(0, 10)).toBe('2026-06-07')
-  })
-
-  it('still works for plain single-segment courses (no special_date)', async () => {
+  it('works for a contiguous multi-day course', async () => {
     setupForBookings({
       _id: 'c-plain', display_title: 'OW', start_time: '09:00:00',
-      start_date: '2026-05-10', end_date: '2026-05-12', special_date: null,
+      start_date: '2026-05-10', end_date: '2026-05-12',
+      course_days: ['2026-05-10', '2026-05-11', '2026-05-12'],
       price: null, other_addons: null, dive_days: null,
       admin_title: null, calendar_title: null,
     })
@@ -277,6 +238,21 @@ describe('fetchEventsForBookings — full course span', () => {
     const ev = map.get('c-plain')
     expect(ev?.start_time.slice(0, 10)).toBe('2026-05-10')
     expect(ev?.end_time?.slice(0, 10)).toBe('2026-05-12')
+  })
+
+  it('works for a single-day course', async () => {
+    setupForBookings({
+      _id: 'c-one', display_title: 'EFR', start_time: '09:00:00',
+      start_date: '2026-05-10', end_date: '2026-05-10',
+      course_days: ['2026-05-10'],
+      price: null, other_addons: null, dive_days: null,
+      admin_title: null, calendar_title: null,
+    })
+    const { fetchEventsForBookings } = await import('./events')
+    const map = await fetchEventsForBookings([], ['c-one'])
+    const ev = map.get('c-one')
+    expect(ev?.start_time.slice(0, 10)).toBe('2026-05-10')
+    expect(ev?.end_time?.slice(0, 10)).toBe('2026-05-10')
   })
 })
 
