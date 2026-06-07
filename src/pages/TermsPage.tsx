@@ -187,7 +187,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 // or arriving via the ?reaccept=1 query param. Anonymous visitors and
 // users already at CURRENT_TERMS_VERSION see nothing.
 function ReacceptBanner() {
-  const { profile } = useAuth()
+  const { profile, refreshProfile } = useAuth()
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const [submitting, setSubmitting] = useState(false)
@@ -207,6 +207,10 @@ function ReacceptBanner() {
       setSubmitting(false)
       return
     }
+    // Refresh the cached profile before navigating — otherwise
+    // RequireCurrentTerms reads the stale agreed_to_terms_version and
+    // bounces straight back here, trapping the user on the gate.
+    await refreshProfile()
     navigate('/', { replace: true })
   }
 
