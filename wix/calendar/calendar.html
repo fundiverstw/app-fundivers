@@ -150,10 +150,14 @@ body { font-family:"Segoe UI",sans-serif; margin:0; padding:1rem; background:tra
 
 #eventDetailModal {
   display:none;
-  position:fixed;
-  top:50%;
+  /* Anchored in JS to the current scroll position. position:fixed is
+     unreliable inside Wix's mobile iframe (it's treated as absolute-to-
+     document, so top:50% lands halfway down the tall calendar, off-screen)
+     — so we position absolutely at scrollY and scroll it into view. */
+  position:absolute;
+  top:16px;
   left:50%;
-  transform:translate(-50%,-50%);
+  transform:translateX(-50%);
   width:90%;
   max-width:420px;
   background:rgba(255,255,255,0.92);
@@ -554,7 +558,6 @@ function buildCalendar(){
   const label = document.getElementById("navMonthLabel");
   if (label) label.textContent = `${monthNames[currentMonth]} ${currentYear}`;
   buildEventList(currentMonth, currentYear);
-  setTimeout(adjustMultiDayTextWidths, 100);
 }
 
 // Format a course/dive's segments (one per consecutive-day run) into a
@@ -656,71 +659,8 @@ function buildEventList(monthIndex, year) {
       row.appendChild(price);
     }
 
-    row.addEventListener('click', () => showEventDetail(ev));
+    row.addEventListener('click', () => showEventDetail(ev, row));
     list.appendChild(row);
-  });
-}
-
-function adjustMultiDayTextWidths() {
-  const GAP = 1;
-  const PADDING = 4;
-  const TEXT_STYLES = {
-    position: 'absolute',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    color: '#fff',
-    fontSize: '0.72rem',
-    fontWeight: '600',
-    zIndex: '20',
-    cursor: 'pointer',
-    pointerEvents: 'auto',
-    height: '18px',
-    lineHeight: '18px',
-    minWidth: '0',
-    paddingLeft: '6px',
-    paddingRight: '4px',
-    boxSizing: 'border-box'
-  };
-  
-  document.querySelectorAll('.event > span').forEach(span => {
-    const eventDiv = span.parentElement;
-    const dayDiv = eventDiv.parentElement;
-    const daysGrid = dayDiv?.closest('.days');
-    if (!daysGrid || !dayDiv?.classList.contains('day')) return;
-    
-    const dayCount = parseInt(eventDiv.getAttribute('data-day-count')) || 1;
-    const dayRect = dayDiv.getBoundingClientRect();
-    const gridRect = daysGrid.getBoundingClientRect();
-    const eventRect = eventDiv.getBoundingClientRect();
-
-    const dayWidth = dayRect.width;
-    if (!dayWidth) return;
-
-    const colIndex = Math.round((dayRect.left - gridRect.left) / dayWidth);
-    const daysLeftInRow = 7 - (colIndex % 7);
-    const effectiveDayCount = Math.min(dayCount, daysLeftInRow);
-
-    const totalWidth = effectiveDayCount > 1
-      ? (dayWidth * effectiveDayCount) + (GAP * (effectiveDayCount - 1)) + 4
-      : dayWidth;
-    
-    const textStyles = { ...TEXT_STYLES };
-
-    Object.assign(span.style, textStyles, {
-      left: `${dayRect.left - gridRect.left + 2}px`,
-      top: `${eventRect.top - gridRect.top}px`,
-      width: `${totalWidth - PADDING}px`,
-      maxWidth: `${totalWidth - PADDING}px`
-    });
-    
-    span.addEventListener('click', (e) => {
-      e.stopPropagation();
-      eventDiv.click();
-    });
-    
-    eventDiv.removeChild(span);
-    daysGrid.appendChild(span);
   });
 }
 
@@ -845,9 +785,6 @@ function buildMonth(container, monthIndex, year){
         textSpan.textContent = label;
         evDiv.appendChild(textSpan);
         evDiv.title = ev.title;
-        if(isMultiDay && d === startDay) {
-          evDiv.setAttribute('data-day-count', endDay - startDay + 1);
-        }
       } else {
         evDiv.title = ev.title;
       }
@@ -855,7 +792,7 @@ function buildMonth(container, monthIndex, year){
       const topOffset = 24 + track * 20;
       evDiv.style.top = `${topOffset}px`;
 
-      evDiv.addEventListener("click", ()=>showEventDetail(ev));
+      evDiv.addEventListener("click", ()=>showEventDetail(ev, evDiv));
       dayDiv.appendChild(evDiv);
     }
   });
@@ -892,7 +829,7 @@ function formatDate(dateString) {
   return date.toLocaleDateString('en-US', options);
 }
 
-function showEventDetail(ev){
+function showEventDetail(ev, anchorEl){
   eventDetailModal.classList.toggle('course', ev.type === 'course');
   eventDetailModal.classList.toggle('dive',   ev.type === 'dive');
   eventDetailModal.classList.toggle('featured', !!ev.featured);
@@ -919,6 +856,26 @@ function showEventDetail(ev){
   bookLink.onclick = () => window.parent.postMessage({ type: 'book_event', eventId: ev.id, eventType: ev.type }, '*');
   bookLink.classList.remove("hidden");
 
-  eventDetailModal.style.display="block";
+  // Render first so we can measure the popup, then anchor it on the tapped
+  // element (an event bar or list row). That element is necessarily in the
+  // user's current view, so centering the popup on it opens it in view —
+  // regardless of how the Wix iframe scrolls (we can't read the parent's
+  // scroll position from inside the iframe).
+  eventDetailModal.style.display = "block";
+  const modalH = eventDetailModal.offsetHeight || 0;
+  const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+  const viewH = window.innerHeight || document.documentElement.clientHeight || 0;
+  // Keep at least this much breathing room from the top of the view.
+  const TOP_MARGIN = 28;
+  let top = scrollTop + TOP_MARGIN;
+  if (anchorEl && typeof anchorEl.getBoundingClientRect === "function") {
+    const r = anchorEl.getBoundingClientRect();
+    top = r.top + scrollTop + (r.height / 2) - (modalH / 2);
+  }
+  const minTop = scrollTop + TOP_MARGIN;
+  const maxTop = scrollTop + Math.max(viewH - modalH - 8, TOP_MARGIN);
+  top = Math.max(minTop, Math.min(top, maxTop));
+  eventDetailModal.style.top = top + "px";
+  eventDetailModal.scrollIntoView({ block: "nearest" });
 }
 </script>
