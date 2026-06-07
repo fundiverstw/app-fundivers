@@ -101,6 +101,30 @@ describe('EO_* catalog table constraints', () => {
     expect(String(error?.message ?? '')).toMatch(/foreign|violat/i)
   })
 
+  it('EO_courses.course_days accepts up to 4 days and round-trips them', async () => {
+    const courseId = rid()
+    const days = ['2026-05-09', '2026-05-10', '2026-05-12', '2026-05-16']
+    const { error } = await admin.from('EO_courses' as never).insert({
+      _id: courseId, display_title: 'Four-day course', course_days: days,
+    } as never)
+    expect(error).toBeNull()
+    createdCourseIds.push(courseId)
+
+    const { data } = await admin.from('EO_courses' as never)
+      .select('course_days').eq('_id', courseId).single()
+    expect((data as { course_days: string[] }).course_days).toEqual(days)
+  })
+
+  it('EO_courses.course_days rejects more than 4 days (CHECK eo_courses_course_days_len)', async () => {
+    const { error } = await admin.from('EO_courses' as never).insert({
+      _id: rid(),
+      display_title: 'Five-day course',
+      course_days: ['2026-05-09', '2026-05-10', '2026-05-11', '2026-05-12', '2026-05-13'],
+    } as never)
+    expect(error).toBeTruthy()
+    expect(String(error?.message ?? '')).toMatch(/course_days|violat|check/i)
+  })
+
   it('EO_rooms and Other_Addons have _id primary keys (round-trips cleanly)', async () => {
     const roomId = rid()
     const ins = await admin.from('EO_rooms' as never).insert({

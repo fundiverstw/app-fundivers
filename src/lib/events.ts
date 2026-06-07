@@ -107,20 +107,42 @@ function dayDiff(a: string, b: string): number {
 }
 
 /**
- * Courses may carry a `special_date` representing a separate session that
- * should appear as its own pill on the calendar. Wix's calendar.js (lines
- * 39–75) emits 1, 2 or 2-merged segments depending on how `special_date`
- * relates to start/end. We mirror those four branches so our calendar
- * looks like the Wix one.
+ * Sort + dedupe a course's day list and group adjacent dates into
+ * continuous runs. Returns runs as [firstKey, lastKey] pairs, in order.
+ * A single day is its own run; consecutive calendar days merge into one.
+ */
+function groupConsecutive(dayKeys: string[]): [string, string][] {
+  const sorted = [...new Set(dayKeys)].sort()
+  const runs: [string, string][] = []
+  for (const key of sorted) {
+    const last = runs[runs.length - 1]
+    if (last && dayDiff(last[1], key) === 1) last[1] = key
+    else runs.push([key, key])
+  }
+  return runs
+}
+
+/**
+ * A course runs on an explicit list of days (`course_days`, max 4).
+ * Adjacent days render as one continuous bar — exactly like a multi-day
+ * dive's start_date..end_date range — while gaps render as separate
+ * pills. We emit one segment per run of consecutive days.
  *
- * All returned segments share the course's `_id` (so clicking either goes
- * to the same booking target).
+ * All returned segments share the course's `_id` (so clicking any of
+ * them goes to the same booking target). Falls back to the
+ * start_date..end_date envelope if course_days is absent (malformed row).
  */
 function courseToEvents(c: EOCourse, priceIndex: Map<string, EOPrice>, addonIds: string[]): AppEvent[] {
   const startKey = toDateKey(c.start_date)
-  if (!startKey) return []
-  const endKey = toDateKey(c.end_date) || startKey
-  const specialKey = toDateKey((c as EOCourse & { special_date?: string | null }).special_date ?? null)
+  const dayKeys = (c.course_days ?? [])
+    .map(toDateKey)
+    .filter((k): k is string => !!k)
+  if (dayKeys.length === 0) {
+    if (startKey) dayKeys.push(startKey)
+    const endKey = toDateKey(c.end_date)
+    if (endKey) dayKeys.push(endKey)
+  }
+  if (dayKeys.length === 0) return []
 
   const p = c.price ? priceIndex.get(c.price) : undefined
   const shared = {
@@ -157,31 +179,8 @@ function courseToEvents(c: EOCourse, priceIndex: Map<string, EOPrice>, addonIds:
     return { ...shared, start_time: start, end_time: end }
   }
 
-  // 1. No special_date → single segment spanning the main range
-  if (!specialKey) {
-    const only = makeSegment(startKey, endKey)
-    return only ? [only] : []
-  }
-
-  // 2. special_date == end_date → start-only + end-only (two separate day pills)
-  if (specialKey === endKey) {
-    return [makeSegment(startKey, startKey), makeSegment(endKey, endKey)].filter((x): x is AppEvent => !!x)
-  }
-
-  // 3. special is adjacent to start_date (±1 day) → merged [start..special] + [end alone]
-  if (Math.abs(dayDiff(startKey, specialKey)) === 1) {
-    const [a, b] = startKey < specialKey ? [startKey, specialKey] : [specialKey, startKey]
-    return [makeSegment(a, b), makeSegment(endKey, endKey)].filter((x): x is AppEvent => !!x)
-  }
-
-  // 4. special is adjacent to end_date (±1 day) → [start alone] + merged [end..special]
-  if (Math.abs(dayDiff(endKey, specialKey)) === 1) {
-    const [a, b] = endKey < specialKey ? [endKey, specialKey] : [specialKey, endKey]
-    return [makeSegment(startKey, startKey), makeSegment(a, b)].filter((x): x is AppEvent => !!x)
-  }
-
-  // 5. Far apart → full [start..end] + lone [special]
-  return [makeSegment(startKey, endKey), makeSegment(specialKey, specialKey)]
+  return groupConsecutive(dayKeys)
+    .map(([from, to]) => makeSegment(from, to))
     .filter((x): x is AppEvent => !!x)
 }
 
@@ -254,24 +253,25 @@ async function attachPrices(dives: EODive[], courses: EOCourse[]): Promise<Map<s
 }
 
 const DIVE_COLS = '_id, admin_title, display_title, calendar_title, start_date, time, end_date, featured, fully_booked, capacity, price, has_rooms, room_types, hasotheraddons, other_addons, gear_rental, nitrox_required, dive_days, cancelled_at, full_payment_deadline, cancel_policy, cancel_date'
-const COURSE_COLS = '_id, admin_title, display_title, calendar_title, start_date, start_time, end_date, price, other_addons, dive_days, special_date, cancelled_at, full_payment_deadline, cancel_policy, cancel_date, fully_booked, capacity'
+const COURSE_COLS = '_id, admin_title, display_title, calendar_title, start_date, start_time, end_date, price, other_addons, dive_days, course_days, cancelled_at, full_payment_deadline, cancel_policy, cancel_date, fully_booked, capacity'
 
 /**
- * Fetch dives + courses whose start_date falls within [fromDate, toDate]
- * (inclusive, 'YYYY-MM-DD'). Courses also match when their `special_date`
- * lands inside the window — the calendar emits a separate pill for that
- * day, and a course with start_date outside the window but special_date
- * inside it still needs to render so the staff-busy overlay can flag
- * conflicts on the special day. Events with `cancelled_at` set are
- * hidden — admin soft-cancellations vanish from the calendar / listing
- * surfaces. Use `fetchEventsForBookings` when bookings against cancelled
- * events still need to resolve their event details.
+ * Fetch dives whose start_date falls within [fromDate, toDate] plus
+ * courses whose [start_date..end_date] envelope overlaps the window
+ * (inclusive, 'YYYY-MM-DD'). A course's envelope spans every day it runs
+ * on (start_date/end_date are kept as min/max of course_days), so any
+ * course with a session inside the window is fetched — courseToEvents
+ * then emits a segment per run of consecutive days, and the staff-busy
+ * overlay can flag conflicts on every day. Events with `cancelled_at`
+ * set are hidden — admin soft-cancellations vanish from the calendar /
+ * listing surfaces. Use `fetchEventsForBookings` when bookings against
+ * cancelled events still need to resolve their event details.
  */
 export async function fetchEventsInRange(fromDate: string, toDate: string): Promise<AppEvent[]> {
   const [divesResp, coursesResp] = await Promise.all([
     supabase.from('EO_dives').select(DIVE_COLS).is('cancelled_at', null).gte('start_date', fromDate).lte('start_date', toDate).order('start_date'),
     supabase.from('EO_courses').select(COURSE_COLS).is('cancelled_at', null)
-      .or(`and(start_date.gte.${fromDate},start_date.lte.${toDate}),and(special_date.gte.${fromDate},special_date.lte.${toDate})`)
+      .lte('start_date', toDate).gte('end_date', fromDate)
       .order('start_date'),
   ])
 
@@ -320,20 +320,19 @@ export async function fetchEventsForBookings(
   }
   for (const c of courses) {
     // For per-booking lookups we want a single representative entry per
-    // course that covers the FULL span [min(start, special)..max(end,
-    // special)] — not segs[0]. segs[0] alone collapses to a sub-segment for
-    // special_date-split courses (Wix branches B/C/D), and even the full
-    // [start..end] range misses the special pill when it's far from the
-    // main span (branch E: a single-day course with a special date weeks
-    // later). Per-booking surfaces (staff-on-duty date picker, span labels)
-    // need every day the course actually exists on, otherwise the picker's
-    // min/max bound out the missing half.
+    // course that covers the FULL span — first..last of every day the
+    // course runs on — not segs[0], which collapses to one run of
+    // consecutive days. Per-booking surfaces (staff-on-duty date picker,
+    // span labels) need every day, otherwise the picker's min/max bound
+    // out the days outside the first run.
     const segs = courseToEvents(c, prices, addons.get(c._id) ?? [])
     if (segs.length === 0) continue
-    const startKey = toDateKey(c.start_date)
-    const endKey = toDateKey(c.end_date) || startKey
-    const specialKey = toDateKey((c as EOCourse & { special_date?: string | null }).special_date ?? null)
-    const candidates = [startKey, endKey, specialKey].filter((k): k is string => !!k)
+    const dayKeys = (c.course_days ?? [])
+      .map(toDateKey)
+      .filter((k): k is string => !!k)
+    const candidates = dayKeys.length
+      ? dayKeys
+      : [toDateKey(c.start_date), toDateKey(c.end_date)].filter((k): k is string => !!k)
     const earliest = candidates.length ? candidates.reduce((a, b) => a < b ? a : b) : null
     const latest = candidates.length ? candidates.reduce((a, b) => a > b ? a : b) : null
     out.set(segs[0].id, {

@@ -44,8 +44,9 @@ export interface FormState {
   // back client-side to "7 days before start_date". The deposit is always
   // "ASAP" and has no per-event deadline.
   full_payment_deadline: string
-  // course
-  special_date: string
+  // course — the explicit dates a course runs on (max 4). Adjacent dates
+  // render as one continuous calendar bar; gaps render as separate pills.
+  courseDays: string[]
   course_name: string
   included: string
   schedule: string
@@ -67,7 +68,7 @@ export const EMPTY_FORM: FormState = {
   cancel_date: '', cancel_policy: '',
   destinationIds: [], divetravel_reference: '',
   full_payment_deadline: '',
-  special_date: '', course_name: '',
+  courseDays: [], course_name: '',
   included: '', schedule: '',
 }
 
@@ -140,24 +141,27 @@ export function formStateFromDive(d: EODive): FormState {
     full_payment_deadline: d.full_payment_deadline ?? '',
     featured_image: d.featured_image ?? '',
     second_image: d.second_image ?? '',
-    special_date: '', course_name: '',
+    courseDays: [], course_name: '',
     included: '', schedule: '',
   }
 }
 
 /** Build a FormState from an existing EO_courses row (used by edit page). */
 export function formStateFromCourse(c: EOCourse): FormState {
+  const courseDays = [...new Set((c.course_days ?? []).filter(Boolean))].sort()
   return {
     type: 'course',
     admin_title: c.admin_title ?? '',
     display_title: stripCapacitySuffix(c.display_title),
     calendar_title: c.calendar_title ?? '',
     course_name: c.course_name ?? '',
-    start_date: c.start_date ?? '',
+    // start_date / end_date are the min/max envelope, derived from
+    // courseDays; the form edits courseDays, not these directly.
+    start_date: courseDays[0] ?? c.start_date ?? '',
     start_time: toHhmm(c.start_time),
-    end_date: c.end_date ?? '',
+    end_date: courseDays[courseDays.length - 1] ?? c.end_date ?? '',
     capacity: c.capacity != null ? String(c.capacity) : '',
-    special_date: c.special_date ?? '',
+    courseDays,
     price: c.price ?? '',
     prereq_cert_id: c.prereq_cert_id ?? '',
     req_dives: c.req_dives ?? '',
@@ -222,16 +226,19 @@ export function divePayloadFromForm(form: FormState): Record<string, unknown> {
 export function coursePayloadFromForm(form: FormState): Record<string, unknown> {
   const timeText = form.start_time ? `${form.start_time}:00` : ''
   const addonsJson = form.addonIds.length ? JSON.stringify(form.addonIds) : ''
+  // Sort + dedupe the entered days; start_date / end_date are the min/max
+  // envelope kept in sync so range queries and span lookups keep working.
+  const days = [...new Set(form.courseDays.filter(Boolean))].sort()
   return {
     admin_title: form.admin_title || null,
     display_title: form.display_title.trim() || null,
     calendar_title: form.calendar_title || null,
     course_name: form.course_name || null,
-    start_date: form.start_date || null,
+    start_date: days[0] ?? null,
     start_time: timeText || null,
-    end_date: form.end_date || null,
+    end_date: days[days.length - 1] ?? null,
     capacity: form.capacity ? Number(form.capacity) : null,
-    special_date: form.special_date || null,
+    course_days: days.length ? days : null,
     price: form.price || null,
     prereq_cert_id: form.prereq_cert_id || null,
     req_dives: form.req_dives || null,    // text on courses
