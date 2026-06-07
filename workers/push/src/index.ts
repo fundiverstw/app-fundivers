@@ -212,7 +212,7 @@ export async function handleNotifyDuty(req: Request, env: Env): Promise<Response
       await webpush.sendNotification(
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
         payload,
-        { TTL: 60 * 60 * 24 }
+        { TTL: 60 * 60 * 24, urgency: 'high' }
       )
       sent++
     } catch (err: unknown) {
@@ -310,7 +310,7 @@ export async function handleAdminBroadcast(req: Request, env: Env): Promise<Resp
       await webpush.sendNotification(
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
         payload,
-        { TTL: 60 * 60 * 24 }
+        { TTL: 60 * 60 * 24, urgency: 'high' }
       )
       sent++
     } catch (err: unknown) {
@@ -466,7 +466,7 @@ export async function handleAdminEventBroadcast(req: Request, env: Env): Promise
       await webpush.sendNotification(
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
         payload,
-        { TTL: 60 * 60 * 24 }
+        { TTL: 60 * 60 * 24, urgency: 'high' }
       )
       sent++
     } catch (err: unknown) {
@@ -582,7 +582,7 @@ export async function handleAdminEventReschedule(req: Request, env: Env): Promis
       await webpush.sendNotification(
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
         payload,
-        { TTL: 60 * 60 * 24 }
+        { TTL: 60 * 60 * 24, urgency: 'high' }
       )
       sent++
     } catch (err: unknown) {
@@ -729,7 +729,7 @@ async function deliver(
     await webpush.sendNotification(
       { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
       payload,
-      { TTL: 60 * 60 * 24 }
+      { TTL: 60 * 60 * 24, urgency: 'high' }
     )
   } catch (err: unknown) {
     const status = (err as { statusCode?: number })?.statusCode
@@ -851,7 +851,7 @@ export async function processWaitlistOffers(env: Env): Promise<{ sent: number; e
           await webpush.sendNotification(
             { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
             payload,
-            { TTL: 60 * 60 * 24 }
+            { TTL: 60 * 60 * 24, urgency: 'high' }
           )
         } catch (err: unknown) {
           const status = (err as { statusCode?: number })?.statusCode
