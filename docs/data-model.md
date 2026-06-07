@@ -58,7 +58,7 @@ edit specific columns.
 | Table | Primary key | Date/time fields |
 | --- | --- | --- |
 | `EO_dives` | `_id` (text) | `start_date` / `end_date` / `time` are **text** (`'YYYY-MM-DD'`, `'HH:MM:SS.sss'`) |
-| `EO_courses` | `_id` (text) | same shape, plus `special_date` (see [events-and-bookings.md](./events-and-bookings.md#special_date)) |
+| `EO_courses` | `_id` (text) | same shape, plus `course_days` (`date[]`, max 4 — the days the course runs on; see [events-and-bookings.md](./events-and-bookings.md#course_days)) |
 | `EO_prices` | `_id` (text) | `starting_at` (price), `deposit_amount` |
 | `EO_rooms` | `_id` (text) | `added_price`, `currency` |
 | `Other_Addons` | `_id` (text) | `price`, `currency` |

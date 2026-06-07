@@ -498,7 +498,7 @@ export interface Database {
           price: string | null
           other_addons: string | null
           dive_days: number | null
-          special_date: string | null
+          course_days: string[] | null
           // Read by /admin/new's preload-from-past picker.
           course_name: string | null
           featured_image: string | null
@@ -526,7 +526,7 @@ export interface Database {
           price?: string | null
           other_addons?: string | null
           dive_days?: number | null
-          special_date?: string | null
+          course_days?: string[] | null
           cancelled_at?: string | null
           full_payment_deadline?: string | null
           cancel_date?: string | null

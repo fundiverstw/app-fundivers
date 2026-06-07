@@ -161,6 +161,23 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
     return () => { cancelled = true }
   }, [mode])
 
+  // Preloading from a past event — or editing a row imported with stale
+  // reference ids — can leave a FK field (cert level / price tier /
+  // cancellation policy) pointing at an option that no longer exists. The
+  // <Select> can't render the missing option, so it silently reads as
+  // "None" while the stale id lingers in form state, then the insert
+  // fails with an opaque FK error. Drop any value that isn't in its
+  // (loaded) option list so what the admin sees matches what gets saved.
+  // Guarded on non-empty lists so a valid value isn't wiped before its
+  // list has loaded.
+  function sanitizeStaleRefs(f: FormState): FormState {
+    const next = { ...f }
+    if (certLevels.length && next.prereq_cert_id && !certLevels.some(c => c.id === next.prereq_cert_id)) next.prereq_cert_id = ''
+    if (prices.length && next.price && !prices.some(p => p._id === next.price)) next.price = ''
+    if (cancelPolicies.length && next.cancel_policy && !cancelPolicies.some(p => p._id === next.cancel_policy)) next.cancel_policy = ''
+    return next
+  }
+
   const filteredPastEvents = pastEvents.filter(p => p.kind === form.type)
 
   function applyPreload(p: PastEvent) {
@@ -180,6 +197,22 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm(f => ({ ...f, [key]: value }))
+  }
+
+  function setCourseDay(index: number, value: string) {
+    setForm(f => {
+      const next = [...f.courseDays]
+      next[index] = value
+      return { ...f, courseDays: next }
+    })
+  }
+
+  function addCourseDay() {
+    setForm(f => (f.courseDays.length >= 4 ? f : { ...f, courseDays: [...f.courseDays, ''] }))
+  }
+
+  function removeCourseDay(index: number) {
+    setForm(f => ({ ...f, courseDays: f.courseDays.filter((_, i) => i !== index) }))
   }
 
   function toggleId(key: 'addonIds' | 'roomIds' | 'destinationIds', id: string) {
@@ -314,18 +347,23 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
     setError(null)
 
     // Validate the per-type required fields up front.
-    if (form.type === 'dive' && !form.admin_title.trim()) {
-      setError('Admin title is required.')
-      return
-    }
-    if (!form.start_date) {
-      setError('Start date is required.')
+    if (form.type === 'dive') {
+      if (!form.admin_title.trim()) {
+        setError('Admin title is required.')
+        return
+      }
+      if (!form.start_date) {
+        setError('Start date is required.')
+        return
+      }
+    } else if (!form.courseDays.some(Boolean)) {
+      setError('At least one course day is required.')
       return
     }
 
     setSubmitting(true)
     try {
-      await onSubmit(form)
+      await onSubmit(sanitizeStaleRefs(form))
     } catch (err) {
       setError(errorMessage(err))
       setSubmitting(false)
@@ -379,17 +417,56 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
         <Field label="Calendar title (calendar widget; short)">
           <Input value={form.calendar_title} onChange={v => set('calendar_title', v)} />
         </Field>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Field label="Start date">
-            <Input type="date" value={form.start_date} onChange={v => set('start_date', v)} required />
-          </Field>
-          <Field label="Start time (24h)">
-            <Input type="time" value={form.start_time} onChange={v => set('start_time', v)} />
-          </Field>
-          <Field label="End date">
-            <Input type="date" value={form.end_date} onChange={v => set('end_date', v)} />
-          </Field>
-        </div>
+        {form.type === 'dive' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Field label="Start date">
+              <Input type="date" value={form.start_date} onChange={v => set('start_date', v)} required />
+            </Field>
+            <Field label="Start time (24h)">
+              <Input type="time" value={form.start_time} onChange={v => set('start_time', v)} />
+            </Field>
+            <Field label="End date">
+              <Input type="date" value={form.end_date} onChange={v => set('end_date', v)} />
+            </Field>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div>
+              <span className="text-xs font-medium text-white/80">Course days (up to 4)</span>
+              <p className="text-xs text-white/60">
+                Enter each day the course runs on. Adjacent days show as one
+                continuous bar on the calendar; gaps show as separate sessions.
+              </p>
+            </div>
+            <div className="space-y-2">
+              {form.courseDays.map((day, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Input type="date" value={day} onChange={v => setCourseDay(i, v)} />
+                  <button
+                    type="button"
+                    onClick={() => removeCourseDay(i)}
+                    className="px-2 py-1 rounded-md text-xs font-medium text-white/80 hover:text-white border border-white/30"
+                    aria-label={`Remove day ${i + 1}`}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+            {form.courseDays.length < 4 && (
+              <button
+                type="button"
+                onClick={addCourseDay}
+                className="self-start text-xs font-medium text-amber-300 hover:text-amber-200"
+              >
+                + Add day
+              </button>
+            )}
+            <Field label="Start time (24h)">
+              <Input type="time" value={form.start_time} onChange={v => set('start_time', v)} />
+            </Field>
+          </div>
+        )}
         <Field label="Price tier">
           <Select value={form.price} onChange={v => set('price', v)}>
             <option value="">— None —</option>
@@ -630,9 +707,6 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
         <Section title="Course details">
           <Field label="Course name">
             <Input value={form.course_name} onChange={v => set('course_name', v)} />
-          </Field>
-          <Field label="Special date (extra session)">
-            <Input type="date" value={form.special_date} onChange={v => set('special_date', v)} />
           </Field>
           <Field label="Included">
             <Textarea value={form.included} onChange={v => set('included', v)} />

@@ -5,8 +5,8 @@
 Two catalog tables drive everything shown on the calendar:
 
 - `EO_dives` — single-session dives.
-- `EO_courses` — multi-day courses, sometimes with a detached
-  "special" session (see [#special_date](#special_date)).
+- `EO_courses` — courses that run on an explicit list of days
+  (see [#course_days](#course_days)).
 
 Both use **text** `_id`, `start_date`, `end_date`, and time columns.
 Normalization into a uniform `AppEvent` type happens in
@@ -56,23 +56,28 @@ Every UI surface reads `AppEvent`, not raw `EO_*` rows.
 3. **Today marker.** Today's cell wears a `rose-900/30` background and
    a red day number.
 
-### `special_date`
+### `course_days`
 
-A course row can carry `special_date` — a separate session that's
-visually distinct from the main date range. `courseToEvents()` in
-`src/lib/events.ts` mirrors Wix's original calendar emission by fanning
-one course row out into 1–2 segments:
+A course runs on an explicit list of dates: `EO_courses.course_days`
+(a `date[]`, max 4 — DB CHECK `eo_courses_course_days_len`). Admins
+enter each day in the event form. `courseToEvents()` in
+`src/lib/events.ts` sorts + dedupes the list, groups **consecutive**
+calendar days into one continuous segment, and emits one `AppEvent`
+per run — exactly how a multi-day dive's `start_date..end_date` range
+renders. Non-adjacent days emit separate pills.
 
-| Relationship | Segments emitted |
+| `course_days` | Segments emitted |
 | --- | --- |
-| `special_date` is null | `[start .. end]` |
-| `special_date == end_date` | `[start]` + `[end]` |
-| `special_date` is ±1 day from `start_date` | merged `[start..special]` + `[end]` |
-| `special_date` is ±1 day from `end_date` | `[start]` + merged `[end..special]` |
-| Far apart | `[start..end]` + lone `[special]` |
+| `{05-10}` | `[05-10]` (single-day pill) |
+| `{05-10, 05-11, 05-12}` | `[05-10 .. 05-12]` (one continuous bar) |
+| `{05-10, 05-12}` | `[05-10]` + `[05-12]` |
+| `{05-09, 05-10, 05-16}` | `[05-09 .. 05-10]` + `[05-16]` |
 
-Every segment shares the course `_id`, so clicking any of them opens
-the same booking target.
+`start_date` / `end_date` are kept as the min/max **envelope** of
+`course_days` so range fetches (`fetchEventsInRange` overlaps on the
+envelope) and per-booking span lookups (`fetchEventsForBookings`) cover
+every day the course exists on. Every segment shares the course `_id`,
+so clicking any of them opens the same booking target.
 
 ## Register flow
 
