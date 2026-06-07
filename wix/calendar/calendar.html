@@ -1,22 +1,26 @@
 <!-- calendar -->
 <div style="display:flex; flex-direction:column; align-items:center; gap:0.35rem; width:100%; max-width:100%; overflow-x:hidden; box-sizing:border-box; padding:0 12px;">
 
-  <div id="calendarNav" style="display:flex; align-items:center; justify-content:center; gap:1.25rem; margin-bottom:4px; flex-wrap:wrap; padding:10px; overflow:visible;">
-    <button id="prevMonth" class="nav-arrow" type="button" aria-label="Previous month">◀</button>
-    <div id="colorLegend" style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
-      <div class="legend-item" data-type="course" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-        <div class="legend-color course"></div>
-        <span>Courses</span>
-      </div>
-      <div class="legend-item" data-type="dive" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-        <div class="legend-color dive"></div>
-        <span>Dives</span>
-      </div>
+  <div id="filterLegend" class="filter-legend">
+    <button id="diveChip" class="chip" type="button" aria-pressed="true" aria-label="Toggle dives">
+      <span class="chip-dot dive"></span>Dives
+    </button>
+    <div class="chip-dropdown">
+      <button id="coursesChip" class="chip" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Filter courses">
+        <span class="chip-dot course-split"></span>Courses<span id="coursesCount" class="chip-count"></span><span class="chip-caret" aria-hidden="true">▾</span>
+      </button>
+      <div id="coursesMenu" class="chip-menu" role="menu" hidden></div>
     </div>
-    <button id="nextMonth" class="nav-arrow" type="button" aria-label="Next month">▶</button>
+  </div>
+
+  <div id="calendarNav" class="cal-nav">
+    <button id="prevMonth" class="nav-arrow" type="button" aria-label="Previous month">‹</button>
+    <span id="navMonthLabel" class="cal-nav-title"></span>
+    <button id="nextMonth" class="nav-arrow" type="button" aria-label="Next month">›</button>
   </div>
 
   <div id="calendarContainer" style="width:100%; max-width:1200px;"></div>
+  <div id="eventList" class="event-list"></div>
 </div>
 
 <div id="eventDetailModal" role="dialog" aria-modal="true">
@@ -43,73 +47,106 @@
 </div>
 
 <style>
-body { font-family:"Segoe UI",sans-serif; margin:0; padding:1rem; background:transparent; color:#333; overflow-x:hidden; }
+/* Palette mirrors the PWA calendar (src/components/calendar/MonthCalendar.tsx):
+   translucent-white sky-bordered card, sky-100 day headers, a red "today"
+   cell, thin flat event bars, three course-color buckets
+   (OW=sky-500, AOW=orange-500, Specialty=pink-500), emerald dives, and
+   gold-ring featured bars with a ★ prefix. Tailwind hexes inlined. */
+body { font-family:"Segoe UI",sans-serif; margin:0; padding:1rem; background:transparent; color:#1e3a8a; overflow-x:hidden; }
 #calendarContainer { display:flex; flex-wrap:wrap; gap:1rem; justify-content:center; max-width:100%; box-sizing:border-box; }
-.month { border:1px solid rgba(0,0,0,0.2); border-radius:10px; background:rgba(255,255,255,0.2); backdrop-filter:blur(8px); padding:8px; overflow:visible; min-width:250px; flex:1; max-width:100%; box-sizing:border-box; }
-.month-name { text-align:center; font-weight:bold; font-size:1.1rem; margin-bottom:6px; color:#333; }
-.days { display:grid; grid-template-columns:repeat(7,1fr); gap:1px; position:relative; overflow:visible; background:rgba(0,0,0,0.08); }
-.day { border:none; position:relative; font-size:11px; cursor:pointer; background:rgba(255,255,255,0.25); overflow:visible; display:flex; flex-direction:column; height:140px; z-index:1; }
+.month { border:1px solid #bae6fd; border-radius:12px; background:rgba(255,255,255,0.7); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); padding:0; overflow:hidden; min-width:280px; flex:1; max-width:100%; box-sizing:border-box; }
+.days { display:grid; grid-template-columns:repeat(7,1fr); gap:1px; position:relative; overflow:visible; background:rgba(186,230,253,0.6); }
+.day { border:none; position:relative; font-size:11px; cursor:pointer; background:rgba(255,255,255,0.85); overflow:visible; display:flex; flex-direction:column; height:132px; z-index:1; }
 .day.has-multi-day { z-index:2; }
-.day-header { background:rgba(255,255,255,0.35); font-weight:bold; display:flex; align-items:center; justify-content:center; height:32px; color:#333; }
-.date { position:absolute; top:2px; left:2px; font-size:0.75rem; color:#333; font-weight:bold; z-index:20; }
-.event { position:absolute; left:0; right:0; height:28px; margin:2px 0; border-radius:4px; font-size:0.85rem; color:#fff; padding:0; cursor:pointer; z-index:15; overflow:visible; }
-.event > span { position:absolute; left:0; right:0; top:0; bottom:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; color:#fff; font-size:0.85rem; cursor:pointer; line-height:28px; padding-left:8px; padding-right:4px; box-sizing:border-box; }
-.event.course { background:#4a90e2; }
-.event.dive { background:#2ecc71; }
-.event.featured { 
-  background: linear-gradient(135deg, #ffd700 0%, #f0c000 100%);
-  border: 2px solid #c0c0c0;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.3) inset;
-}
-.event.featured.course { 
-  background: linear-gradient(135deg, #ffd700 0%, #f0c000 100%);
-  border: 2px solid #c0c0c0;
-}
-.event.featured.dive { 
-  background: linear-gradient(135deg, #ffd700 0%, #f0c000 100%);
-  border: 2px solid #c0c0c0;
-}
-.event.featured > span {
-  color: #b22222 !important;
-  font-weight: 700;
-  text-shadow: 0 0 1px rgba(139,0,0,0.4), 0 1px 2px rgba(0,0,0,0.15);
-  letter-spacing: 0.02em;
-}
+.day-header { background:#e0f2fe; font-weight:700; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.04em; display:flex; align-items:center; justify-content:center; height:28px; color:#1e3a8a; cursor:default; }
+.day.today { background:#fef2f2; }
+.date { position:absolute; top:3px; left:0; right:0; text-align:center; font-size:0.7rem; color:#1e3a8a; font-weight:600; z-index:20; }
+.date.today { color:#b91c1c; font-weight:800; }
+.event { position:absolute; left:2px; right:2px; height:18px; margin:1px 0; border-radius:3px; font-size:0.72rem; color:#fff; padding:0; cursor:pointer; z-index:15; overflow:visible; }
+.event > span { position:absolute; left:0; right:0; top:0; bottom:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; color:#fff; font-size:0.72rem; font-weight:600; cursor:pointer; line-height:18px; padding-left:6px; padding-right:4px; box-sizing:border-box; }
+/* Type / course-bucket fills. .course is always present; the bucket class
+   (ow/aow/specialty) is added in JS from the title. */
+.event.dive { background:#059669; }
+.event.course { background:#0ea5e9; }
+.event.course.ow { background:#0ea5e9; }
+.event.course.aow { background:#f97316; }
+.event.course.specialty { background:#ec4899; }
+/* Featured: keep the type/bucket fill, add a gold inset ring (per edge for
+   multi-day spans) + a ★ prefix (added to the title in JS). */
+.event.featured { box-shadow: inset 0 2px 0 #fcd34d, inset 0 -2px 0 #fcd34d; }
+.event.featured:not(.multi-day) { box-shadow: inset 0 0 0 2px #fcd34d; }
 
+/* Month nav — mirrors the PWA: two wide rounded chevron bars flanking a
+   centered "Month yyyy" label (src/components/calendar/MonthCalendar.tsx). */
+.cal-nav {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  width:100%;
+  max-width:1200px;
+  margin-bottom:4px;
+  box-sizing:border-box;
+}
+.cal-nav-title {
+  flex:0 0 auto;
+  text-align:center;
+  font-size:1.1rem;
+  font-weight:700;
+  color:#1e3a8a;
+  min-width:140px;
+}
 .nav-arrow {
-  width:40px; height:40px;
-  border-radius:50%;
-  border:2px solid rgba(0,0,0,0.25);
+  flex:1 1 0;
+  height:40px;
+  border-radius:12px;
+  border:1px solid #bae6fd;
   background:rgba(255,255,255,0.6);
-  color:#333;
-  font-size:1rem;
+  color:#1e3a8a;
+  font-size:1.6rem;
+  line-height:1;
   cursor:pointer;
   display:flex;
   align-items:center;
   justify-content:center;
-  transition:background 0.2s, border-color 0.2s, transform 0.15s;
+  transition:background 0.2s, border-color 0.2s;
 }
 .nav-arrow:hover {
-  background:rgba(255,255,255,0.9);
-  border-color:rgba(0,0,0,0.4);
-  transform:scale(1.08);
+  background:#e0f2fe;
+  border-color:#7dd3fc;
 }
-.nav-arrow:active { transform:scale(0.96); }
+.nav-arrow:active { background:#bae6fd; }
 
-.legend-item { transition:opacity 0.2s; color:#333; }
-.legend-item:hover { opacity:0.8; }
-.legend-item.disabled { opacity:0.4; }
-.legend-item.disabled .legend-color { opacity:0.5; }
-.legend-color { width:20px; height:20px; border-radius:4px; transition:opacity 0.2s; }
-.legend-color.course { background:#4a90e2; }
-.legend-color.dive { background:#2ecc71; }
-.event.hidden { display:none; }
-.event.multi-day.start { border-top-left-radius:4px; border-bottom-left-radius:4px; border-top-right-radius:0; border-bottom-right-radius:0; right:-1px; }
+/* Filter chips — mirrors the PWA's FilterLegend: a right-aligned row of
+   pill toggles. "Dives" toggles all dives; "Courses" is a dropdown of
+   per-category checkboxes. An off chip goes sky-100 + line-through. */
+.filter-legend { display:flex; align-items:center; justify-content:flex-start; gap:8px; flex-wrap:wrap; width:100%; max-width:1200px; padding:4px 2px 2px; box-sizing:border-box; }
+.chip { display:inline-flex; align-items:center; gap:6px; padding:4px 11px; border-radius:9999px; border:1px solid #1e3a8a; background:#fff; color:#1e3a8a; font-size:0.75rem; font-weight:600; line-height:1.4; cursor:pointer; transition:background 0.15s, border-color 0.15s; }
+.chip:hover { background:#f0f9ff; }
+.chip.off { background:#e0f2fe; border-color:#bae6fd; text-decoration:line-through; }
+.chip-dot { width:9px; height:9px; border-radius:9999px; overflow:hidden; flex:0 0 auto; }
+.chip-dot.dive { background:#059669; }
+.chip-dot.course-split { background:linear-gradient(90deg,#0ea5e9 0 33.3%,#f97316 33.3% 66.6%,#ec4899 66.6% 100%); }
+.chip-count { font-size:0.65rem; font-weight:600; opacity:0.85; }
+.chip-caret { font-size:0.7rem; }
+.chip-dropdown { position:relative; }
+.chip-menu { position:absolute; left:0; top:100%; margin-top:4px; z-index:50; min-width:200px; background:#fff; border:1px solid #ef4444; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.15); padding:6px; display:flex; flex-direction:column; gap:2px; }
+.chip-menu[hidden] { display:none; }
+.chip-menu-empty { font-size:0.75rem; color:#1e3a8a; opacity:0.7; padding:6px 8px; }
+.chip-menu-item { display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; cursor:pointer; font-size:0.78rem; color:#1e3a8a; }
+.chip-menu-item:hover { background:#f0f9ff; }
+.chip-menu-item input { accent-color:#1e3a8a; margin:0; cursor:pointer; }
+.chip-menu-dot { width:9px; height:9px; border-radius:9999px; flex:0 0 auto; }
+.chip-menu-dot.ow { background:#0ea5e9; }
+.chip-menu-dot.aow { background:#f97316; }
+.chip-menu-dot.specialty { background:#ec4899; }
+.chip-menu-short { font-weight:700; }
+.chip-menu-full { opacity:0.7; font-size:0.72rem; }
+.event.multi-day.start { border-top-left-radius:3px; border-bottom-left-radius:3px; border-top-right-radius:0; border-bottom-right-radius:0; right:-1px; }
 .event.multi-day.middle { border-radius:0; left:-1px; right:-1px; }
-.event.multi-day.end { border-top-right-radius:4px; border-bottom-right-radius:4px; border-top-left-radius:0; border-bottom-left-radius:0; left:-1px; }
-.event.featured.multi-day.start { border-right:none; box-shadow:none; background:#ffd700; }
-.event.featured.multi-day.middle { border-left:none; border-right:none; box-shadow:none; background:#ffd700; }
-.event.featured.multi-day.end { border-left:none; box-shadow:none; background:#ffd700; }
+.event.multi-day.end { border-top-right-radius:3px; border-bottom-right-radius:3px; border-top-left-radius:0; border-bottom-left-radius:0; left:-1px; }
+.event.featured.multi-day.start { box-shadow: inset 2px 0 0 #fcd34d, inset 0 2px 0 #fcd34d, inset 0 -2px 0 #fcd34d; }
+.event.featured.multi-day.middle { box-shadow: inset 0 2px 0 #fcd34d, inset 0 -2px 0 #fcd34d; }
+.event.featured.multi-day.end { box-shadow: inset -2px 0 0 #fcd34d, inset 0 2px 0 #fcd34d, inset 0 -2px 0 #fcd34d; }
 
 #eventDetailModal {
   display:none;
@@ -138,7 +175,7 @@ body { font-family:"Segoe UI",sans-serif; margin:0; padding:1rem; background:tra
   left:0;
   right:0;
   height:3px;
-  background:linear-gradient(90deg, #1e3a8a 0%, #4a90e2 50%, #b22222 100%);
+  background:linear-gradient(90deg, #1e3a8a 0%, #0ea5e9 50%, #b91c1c 100%);
 }
 #eventDetailModal .close-btn {
   position:absolute;
@@ -182,12 +219,12 @@ body { font-family:"Segoe UI",sans-serif; margin:0; padding:1rem; background:tra
   border-radius:999px;
 }
 #eventDetailModal .type-chip.course {
-  background:rgba(74,144,226,0.15);
-  color:#2c5d99;
+  background:rgba(14,165,233,0.15);
+  color:#0369a1;
 }
 #eventDetailModal .type-chip.dive {
-  background:rgba(46,204,113,0.15);
-  color:#1e7a44;
+  background:rgba(5,150,105,0.15);
+  color:#047857;
 }
 #eventDetailModal .featured-chip {
   display:none;
@@ -233,7 +270,7 @@ body { font-family:"Segoe UI",sans-serif; margin:0; padding:1rem; background:tra
   font-weight:700;
   letter-spacing:0.08em;
   text-transform:uppercase;
-  color:#2c5d99;
+  color:#1e3a8a;
   min-width:50px;
 }
 #eventDetailModal .modal-actions {
@@ -272,40 +309,113 @@ body { font-family:"Segoe UI",sans-serif; margin:0; padding:1rem; background:tra
   border-color:rgba(0,0,0,0.28);
 }
 #eventDetailModal .book-btn {
-  background:#4a90e2;
+  background:#0ea5e9;
   color:#fff;
 }
 #eventDetailModal.dive .book-btn {
-  background:#2ecc71;
+  background:#059669;
 }
 #eventDetailModal.featured .book-btn {
-  background:linear-gradient(135deg,#ffd700 0%,#f0c000 100%);
-  color:#7a4c00;
-  border:1px solid rgba(192,192,192,0.6);
+  box-shadow: inset 0 0 0 2px #fcd34d;
 }
 #eventDetailModal #detailLink.hidden,
 #eventDetailModal #bookLink.hidden {
   display:none;
 }
+
+/* "This month" list under the grid — mirrors the PWA's list of in-month
+   events (src/components/calendar/MonthCalendar.tsx): translucent cards
+   with a sky border that turns red on hover, a colored type/bucket pill,
+   the title (★ when featured) and the date span. */
+.event-list { width:100%; max-width:1200px; box-sizing:border-box; display:flex; flex-direction:column; gap:8px; margin-top:6px; padding:0 2px 8px; }
+.event-list-title { font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#1e3a8a; opacity:0.7; padding:2px; }
+.event-row { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; text-align:left; width:100%; box-sizing:border-box; background:rgba(255,255,255,0.7); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); border:1px solid #bae6fd; border-radius:12px; padding:10px 12px; cursor:pointer; transition:border-color 0.15s; }
+.event-row:hover { border-color:#ef4444; }
+.event-row-main { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.event-row-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.event-row-pill { font-size:0.62rem; font-weight:700; color:#fff; padding:2px 9px; border-radius:9999px; white-space:nowrap; }
+.event-row-pill.dive { background:#059669; }
+.event-row-pill.ow { background:#0ea5e9; }
+.event-row-pill.aow { background:#f97316; }
+.event-row-pill.specialty { background:#ec4899; }
+.event-row-title { font-size:0.9rem; font-weight:600; color:#1e3a8a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.event-row-star { color:#dc2626; font-size:0.8rem; }
+.event-row-date { font-size:0.78rem; color:#1e3a8a; opacity:0.85; }
+.event-row-price { font-size:0.78rem; font-weight:700; color:#1e3a8a; white-space:nowrap; }
+.event-row-empty { font-size:0.85rem; color:#1e3a8a; opacity:0.7; padding:4px 2px; }
 </style>
 
 <script>
 let allEvents = [];
 let currentMonth = new Date().getMonth();
 let currentYear = new Date().getFullYear();
-let visibleTypes = { course: true, dive: true };
+// Filter state — mirrors the PWA: dives toggle as a whole, courses filter
+// per-category (by full title). hiddenCourses holds the categories the
+// user has switched off.
+let diveShown = true;
+const hiddenCourses = new Set();
 
 const monthNames=["January","February","March","April","May","June","July","August","September","October","November","December"];
 const dayNames=["S","M","T","W","T","F","S"];
 
+// Course color buckets — mirrors courseColor() in the PWA
+// (src/components/calendar/MonthCalendar.tsx) so the two calendars match:
+//   Open Water Course      → sky   (.ow)
+//   Advanced Open Water    → orange (.aow)
+//   everything else        → pink  (.specialty)
+// Titles may carry a capacity suffix ("… (2 spots open)") — strip it first.
+function stripTitleSuffix(title) {
+  return String(title || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+}
+function courseColorClass(title) {
+  const base = stripTitleSuffix(title);
+  if (base.indexOf('Advanced Open Water') === 0) return 'aow';
+  if (base.indexOf('Open Water Course') === 0) return 'ow';
+  return 'specialty';
+}
+
+// Short chip labels for the course-category menu (mirrors COURSE_SHORT in
+// the PWA). Unknown titles fall back to the full title.
+const COURSE_SHORT = {
+  'Open Water Course':   'OW',
+  'Advanced Open Water': 'AOW',
+  'PADI Rescue Course':  'Rescue',
+  'EFR Course':          'EFR',
+  'Equipment Course':    'Equipment',
+  'Deep Specialty':      'Deep',
+};
+function courseShortLabel(category) {
+  return COURSE_SHORT[stripTitleSuffix(category)] || category;
+}
+
+// Category key for a course = its full title (display_title), matching the
+// PWA's courseCategories. Calendar segments use calendar_title in `title`,
+// so prefer display_title.
+function categoryOf(ev) {
+  return ev.display_title || ev.title || '';
+}
+function courseCategoriesOf() {
+  const set = new Set();
+  allEvents.forEach(ev => { if (ev.type === 'course') set.add(categoryOf(ev)); });
+  return Array.from(set).filter(Boolean).sort();
+}
+// A calendar segment is shown when its type/category is enabled.
+function isVisible(ev) {
+  return ev.type === 'dive' ? diveShown : !hiddenCourses.has(categoryOf(ev));
+}
+
 window.addEventListener("message", e=>{
   allEvents = e.data || [];
+  renderCoursesMenu();
+  updateChipStates();
   buildCalendar();
 });
 
 function init() {
+  setupLegend();
+  renderCoursesMenu();
+  updateChipStates();
   buildCalendar();
-  setupLegendToggles();
 }
 
 if (document.readyState === 'loading') {
@@ -314,17 +424,98 @@ if (document.readyState === 'loading') {
   init();
 }
 
-function setupLegendToggles() {
-  document.querySelectorAll('.legend-item').forEach(item => {
-    item.addEventListener('click', function() {
-      const type = this.getAttribute('data-type');
-      visibleTypes[type] = !visibleTypes[type];
-      this.classList.toggle('disabled', !visibleTypes[type]);
-      document.querySelectorAll(`.event.${type}`).forEach(event => {
-        event.classList.toggle('hidden', !visibleTypes[type]);
-      });
-    });
+// Wire the (static) chip handlers once: the Dives toggle, the Courses
+// dropdown open/close, and an outside-click that closes the menu.
+function setupLegend() {
+  const diveChip = document.getElementById('diveChip');
+  const coursesChip = document.getElementById('coursesChip');
+  const coursesMenu = document.getElementById('coursesMenu');
+
+  diveChip.addEventListener('click', () => {
+    diveShown = !diveShown;
+    updateChipStates();
+    buildCalendar();
   });
+
+  coursesChip.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = coursesMenu.hasAttribute('hidden');
+    if (open) coursesMenu.removeAttribute('hidden'); else coursesMenu.setAttribute('hidden', '');
+    coursesChip.setAttribute('aria-expanded', String(open));
+  });
+  // Keep clicks inside the menu from bubbling to the document closer.
+  coursesMenu.addEventListener('click', (e) => e.stopPropagation());
+  document.addEventListener('click', () => {
+    coursesMenu.setAttribute('hidden', '');
+    coursesChip.setAttribute('aria-expanded', 'false');
+  });
+}
+
+// (Re)build the per-category checkboxes. Called when the event set changes
+// (categories may differ); NOT on every toggle, so the menu stays open
+// while the diver flips categories.
+function renderCoursesMenu() {
+  const menu = document.getElementById('coursesMenu');
+  if (!menu) return;
+  menu.innerHTML = '';
+  const cats = courseCategoriesOf();
+  if (cats.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'chip-menu-empty';
+    empty.textContent = 'No courses in view.';
+    menu.appendChild(empty);
+    return;
+  }
+  cats.forEach(cat => {
+    const label = document.createElement('label');
+    label.className = 'chip-menu-item';
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = !hiddenCourses.has(cat);
+    cb.addEventListener('change', () => {
+      if (cb.checked) hiddenCourses.delete(cat); else hiddenCourses.add(cat);
+      updateChipStates();
+      buildCalendar();
+    });
+
+    const dot = document.createElement('span');
+    dot.className = 'chip-menu-dot ' + courseColorClass(cat);
+
+    const short = document.createElement('span');
+    short.className = 'chip-menu-short';
+    short.textContent = courseShortLabel(cat);
+
+    label.appendChild(cb);
+    label.appendChild(dot);
+    label.appendChild(short);
+
+    const full = stripTitleSuffix(cat);
+    if (courseShortLabel(cat) !== full) {
+      const fullEl = document.createElement('span');
+      fullEl.className = 'chip-menu-full';
+      fullEl.textContent = full;
+      label.appendChild(fullEl);
+    }
+    menu.appendChild(label);
+  });
+}
+
+// Reflect filter state on the chips: off styling + the "(visible/total)"
+// course count.
+function updateChipStates() {
+  const diveChip = document.getElementById('diveChip');
+  const coursesChip = document.getElementById('coursesChip');
+  const count = document.getElementById('coursesCount');
+  if (diveChip) {
+    diveChip.classList.toggle('off', !diveShown);
+    diveChip.setAttribute('aria-pressed', String(diveShown));
+  }
+  const cats = courseCategoriesOf();
+  const visible = cats.filter(c => !hiddenCourses.has(c)).length;
+  const allHidden = cats.length > 0 && visible === 0;
+  if (coursesChip) coursesChip.classList.toggle('off', allHidden);
+  if (count) count.textContent = (visible < cats.length && !allHidden) ? ` (${visible}/${cats.length})` : '';
 }
 
 document.getElementById("prevMonth").addEventListener("click", ()=>{
@@ -342,7 +533,114 @@ function buildCalendar(){
   const container = document.getElementById("calendarContainer");
   container.innerHTML="";
   buildMonth(container, currentMonth, currentYear);
+  const label = document.getElementById("navMonthLabel");
+  if (label) label.textContent = `${monthNames[currentMonth]} ${currentYear}`;
+  buildEventList(currentMonth, currentYear);
   setTimeout(adjustMultiDayTextWidths, 100);
+}
+
+// Format a course/dive's segments (one per consecutive-day run) into a
+// human date string, e.g. "Sat, May 9 → May 10, May 16". Single-day runs
+// show the weekday; ranges add the end day.
+function eventDateLabel(segs) {
+  const fmtFull  = (iso) => { const d = parseDateStr(iso); return d ? d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }) : iso; };
+  const fmtShort = (iso) => { const d = parseDateStr(iso); return d ? d.toLocaleDateString('en-US', { month:'short', day:'numeric' }) : iso; };
+  return segs
+    .slice()
+    .sort((a, b) => (a.start_date < b.start_date ? -1 : 1))
+    .map(s => (s.end_date && s.end_date !== s.start_date) ? `${fmtFull(s.start_date)} → ${fmtShort(s.end_date)}` : fmtFull(s.start_date))
+    .join(', ');
+}
+
+// "This month" list under the grid. Groups the calendar segments back into
+// one row per event (a gapped course is several segments sharing an id),
+// honors the legend type toggles, hides fully-past events, and sorts by
+// date. Clicking a row opens the same detail modal as a calendar bar.
+function buildEventList(monthIndex, year) {
+  const list = document.getElementById('eventList');
+  if (!list) return;
+  list.innerHTML = '';
+
+  const heading = document.createElement('div');
+  heading.className = 'event-list-title';
+  heading.textContent = 'This month';
+  list.appendChild(heading);
+
+  const monthStart = new Date(year, monthIndex, 1);
+  const monthEnd = new Date(year, monthIndex + 1, 0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  const groups = new Map();
+  allEvents.forEach(ev => {
+    if (!isVisible(ev)) return;
+    const s = parseDateStr(ev.start_date);
+    const e = parseDateStr(ev.end_date) || s;
+    if (!s) return;
+    if (e < monthStart || s > monthEnd) return;
+    const key = ev.type + ':' + ev.id;
+    if (!groups.has(key)) groups.set(key, { ev, segs: [] });
+    groups.get(key).segs.push({ start_date: ev.start_date, end_date: ev.end_date, start: s, end: e });
+  });
+
+  const rows = Array.from(groups.values())
+    .filter(g => g.segs.some(seg => seg.end >= today))
+    .sort((a, b) => Math.min(...a.segs.map(x => x.start.getTime())) - Math.min(...b.segs.map(x => x.start.getTime())));
+
+  if (rows.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'event-row-empty';
+    empty.textContent = 'No upcoming events this month.';
+    list.appendChild(empty);
+    return;
+  }
+
+  rows.forEach(({ ev, segs }) => {
+    const colorClass = ev.type === 'dive' ? 'dive' : courseColorClass(ev.display_title || ev.title);
+
+    const row = document.createElement('div');
+    row.className = 'event-row';
+
+    const main = document.createElement('div');
+    main.className = 'event-row-main';
+
+    const head = document.createElement('div');
+    head.className = 'event-row-head';
+
+    const pill = document.createElement('span');
+    pill.className = 'event-row-pill ' + colorClass;
+    pill.textContent = ev.type === 'dive' ? 'Dive' : 'Course';
+    head.appendChild(pill);
+
+    const titleEl = document.createElement('span');
+    titleEl.className = 'event-row-title';
+    titleEl.textContent = ev.display_title || ev.title || '';
+    head.appendChild(titleEl);
+
+    if (ev.featured) {
+      const star = document.createElement('span');
+      star.className = 'event-row-star';
+      star.textContent = '★';
+      head.appendChild(star);
+    }
+
+    const dateEl = document.createElement('div');
+    dateEl.className = 'event-row-date';
+    dateEl.textContent = eventDateLabel(segs);
+
+    main.appendChild(head);
+    main.appendChild(dateEl);
+    row.appendChild(main);
+
+    if (ev.starting_at != null && !isNaN(parseInt(ev.starting_at))) {
+      const price = document.createElement('div');
+      price.className = 'event-row-price';
+      price.textContent = 'From ' + parseInt(ev.starting_at) + ' NTD';
+      row.appendChild(price);
+    }
+
+    row.addEventListener('click', () => showEventDetail(ev));
+    list.appendChild(row);
+  });
 }
 
 function adjustMultiDayTextWidths() {
@@ -354,14 +652,15 @@ function adjustMultiDayTextWidths() {
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
     color: '#fff',
-    fontSize: '0.85rem',
+    fontSize: '0.72rem',
+    fontWeight: '600',
     zIndex: '20',
     cursor: 'pointer',
     pointerEvents: 'auto',
-    height: '28px',
-    lineHeight: '28px',
+    height: '18px',
+    lineHeight: '18px',
     minWidth: '0',
-    paddingLeft: '8px',
+    paddingLeft: '6px',
     paddingRight: '4px',
     boxSizing: 'border-box'
   };
@@ -388,13 +687,8 @@ function adjustMultiDayTextWidths() {
       ? (dayWidth * effectiveDayCount) + (GAP * (effectiveDayCount - 1)) + 4
       : dayWidth;
     
-    const isFeatured = eventDiv.classList.contains('featured');
     const textStyles = { ...TEXT_STYLES };
-    if (isFeatured) {
-      textStyles.color = '#b22222';
-      textStyles.fontWeight = '700';
-    }
-    
+
     Object.assign(span.style, textStyles, {
       left: `${dayRect.left - gridRect.left + 2}px`,
       top: `${eventRect.top - gridRect.top}px`,
@@ -415,11 +709,6 @@ function adjustMultiDayTextWidths() {
 function buildMonth(container, monthIndex, year){
   const monthDiv = document.createElement("div");
   monthDiv.className="month";
-
-  const title = document.createElement("div");
-  title.className="month-name";
-  title.textContent = `${monthNames[monthIndex]} ${year}`;
-  monthDiv.appendChild(title);
 
   const daysDiv = document.createElement("div");
   daysDiv.className="days";
@@ -442,19 +731,25 @@ function buildMonth(container, monthIndex, year){
     dayCells.push(blank);
   }
 
+  const now = new Date();
+  const isCurrentMonth = now.getFullYear() === year && now.getMonth() === monthIndex;
   for(let d=1; d<=daysInMonth; d++){
     const dayDiv = document.createElement("div");
     dayDiv.className="day";
     const dateDiv = document.createElement("div");
     dateDiv.className="date";
     dateDiv.textContent=d;
+    if(isCurrentMonth && d === now.getDate()){
+      dayDiv.classList.add("today");
+      dateDiv.classList.add("today");
+    }
     dayDiv.appendChild(dateDiv);
     daysDiv.appendChild(dayDiv);
     dayCells.push(dayDiv);
   }
 
   const eventsInMonth = [];
-  allEvents.forEach(ev=>{
+  allEvents.filter(isVisible).forEach(ev=>{
     const evStart = parseDateStr(ev.start_date);
     const evEnd = parseDateStr(ev.end_date) || parseDateStr(ev.start_date);
 
@@ -470,20 +765,6 @@ function buildMonth(container, monthIndex, year){
       track: -1
     });
   });
-
-  function darkenColor(hex, amount) {
-    hex = hex.replace('#', '');
-    const r = parseInt(hex.substr(0, 2), 16);
-    const g = parseInt(hex.substr(2, 2), 16);
-    const b = parseInt(hex.substr(4, 2), 16);
-    const newR = Math.max(0, Math.floor(r * (1 - amount)));
-    const newG = Math.max(0, Math.floor(g * (1 - amount)));
-    const newB = Math.max(0, Math.floor(b * (1 - amount)));
-    return '#' + [newR, newG, newB].map(x => {
-      const hex = x.toString(16);
-      return hex.length === 1 ? '0' + hex : hex;
-    }).join('');
-  }
 
   eventsInMonth.forEach(eventData => {
     const { startDay, endDay } = eventData;
@@ -509,51 +790,28 @@ function buildMonth(container, monthIndex, year){
 
   eventsInMonth.forEach(eventData => {
     const { event: ev, startDay, endDay, track } = eventData;
-    
-    const overlappingSameType = eventsInMonth.filter(other => {
-      return other.event.type === ev.type && 
-             other !== eventData &&
-             !(endDay < other.startDay || startDay > other.endDay);
-    });
-    
-    const allOverlapping = [eventData, ...overlappingSameType].sort((a, b) => a.track - b.track);
-    const shadeIndex = allOverlapping.findIndex(ed => ed === eventData);
-    
-    eventData.shadeIndex = shadeIndex;
-  });
 
-  eventsInMonth.forEach(eventData => {
-    const { event: ev, startDay, endDay, track } = eventData;
-    
     const isMultiDay = startDay !== endDay;
-    
+    // Courses get a color bucket (ow/aow/specialty) derived from the full
+    // title; flat fills come from CSS — no per-overlap shading (the app
+    // separates overlaps by stacking tracks, which we already do).
+    const bucket = ev.type === 'course' ? ' ' + courseColorClass(ev.display_title || ev.title) : '';
+    const label = (ev.featured ? '★ ' : '') + (ev.title || '');
+
     if(isMultiDay) {
       for(let d=startDay; d<=endDay; d++){
         const dayDiv = dayCells[firstDay + d -1];
         if(dayDiv) dayDiv.classList.add("has-multi-day");
       }
     }
-    
+
     for(let d=startDay; d<=endDay; d++){
       const dayDiv = dayCells[firstDay + d -1];
       if(!dayDiv) continue;
 
       const evDiv = document.createElement("div");
-      evDiv.className = `event ${ev.type}${ev.featured ? ' featured' : ''}`;
-      
-      const shadeIndex = eventData.shadeIndex || 0;
-      
-      const baseColors = {
-        course: '#4a90e2',
-        dive: '#2ecc71'
-      };
-      
-      if (baseColors[ev.type] && !ev.featured) {
-        const darkenAmount = Math.min(shadeIndex * 0.12, 0.6);
-        const darkerColor = darkenColor(baseColors[ev.type], darkenAmount);
-        evDiv.style.backgroundColor = darkerColor;
-      }
-      
+      evDiv.className = `event ${ev.type}${bucket}${ev.featured ? ' featured' : ''}`;
+
       if(isMultiDay) {
         if(d === startDay) {
           evDiv.classList.add("multi-day", "start");
@@ -563,14 +821,10 @@ function buildMonth(container, monthIndex, year){
           evDiv.classList.add("multi-day", "middle");
         }
       }
-      
+
       if(d === startDay || !isMultiDay) {
         const textSpan = document.createElement("span");
-        textSpan.textContent = ev.title;
-        if (ev.featured) {
-          textSpan.style.color = '#b22222';
-          textSpan.style.fontWeight = '700';
-        }
+        textSpan.textContent = label;
         evDiv.appendChild(textSpan);
         evDiv.title = ev.title;
         if(isMultiDay && d === startDay) {
@@ -580,7 +834,7 @@ function buildMonth(container, monthIndex, year){
         evDiv.title = ev.title;
       }
 
-      const topOffset = 20 + track * 30;
+      const topOffset = 24 + track * 20;
       evDiv.style.top = `${topOffset}px`;
 
       evDiv.addEventListener("click", ()=>showEventDetail(ev));
