@@ -18,6 +18,37 @@ describe('errorMessage', () => {
       .toBe('Couldn\'t parse that.')
   })
 
+  it('translates known constraint names to field-specific messages', () => {
+    // FK / check violations name the constraint in message/details. We
+    // map that to our own copy naming the field — without echoing the raw
+    // Postgres text — so the admin knows exactly which entry to fix.
+    expect(errorMessage({
+      code: '23503',
+      message: 'insert or update on table "EO_courses" violates foreign key constraint "EO_courses_prereq_cert_id_fkey"',
+      details: 'Key is not present in table "cert_levels".',
+    })).toMatch(/required certification/i)
+
+    expect(errorMessage({
+      code: '23503',
+      message: 'violates foreign key constraint "EO_courses_price_fkey"',
+    })).toMatch(/price tier/i)
+
+    expect(errorMessage({
+      code: '23503',
+      message: 'violates foreign key constraint "EO_dives_cancel_policy_fkey"',
+    })).toMatch(/cancellation policy/i)
+
+    expect(errorMessage({
+      code: '23514',
+      message: 'new row violates check constraint "eo_courses_course_days_len"',
+    })).toMatch(/at most 4 days/i)
+  })
+
+  it('falls back to the generic SQLSTATE string when no constraint matches', () => {
+    expect(errorMessage({ code: '23503', message: 'violates foreign key constraint "some_other_fkey"' }))
+      .toBe('A referenced item could not be found.')
+  })
+
   it('extracts .error string from auth-style failures', () => {
     expect(errorMessage({ error: 'Invalid login credentials' })).toBe('Invalid login credentials')
   })

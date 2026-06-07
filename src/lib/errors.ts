@@ -25,8 +25,29 @@ const SQLSTATE_FRIENDLY: Record<string, string> = {
   'PGRST301': 'Authentication required.',
 }
 
+// Field-specific translations. Postgres names the offending constraint /
+// column in its `message` / `details` (e.g. "violates foreign key
+// constraint \"EO_courses_prereq_cert_id_fkey\""). We match on that name
+// and return our OWN authored copy that tells the user which field to fix
+// — we never echo the raw Postgres text (audit L3 still holds). The
+// generic SQLSTATE string is the fallback when nothing matches.
+const CONSTRAINT_FRIENDLY: { pattern: RegExp; message: string }[] = [
+  { pattern: /prereq_cert_id/, message: 'The required certification you selected is no longer available. Choose a different level or select "None".' },
+  { pattern: /_price_fkey/,    message: 'The price tier you selected is no longer available. Pick a different one.' },
+  { pattern: /cancel_policy/,  message: 'The cancellation policy you selected is no longer available. Pick a different one.' },
+  { pattern: /course_days/,    message: 'A course can have at most 4 days.' },
+]
+
+function fieldSpecificMessage(haystack: string): string | null {
+  for (const { pattern, message } of CONSTRAINT_FRIENDLY) {
+    if (pattern.test(haystack)) return message
+  }
+  return null
+}
+
 interface ErrorLike {
   message?: unknown
+  details?: unknown
   error?:   unknown
   code?:    unknown
 }
@@ -41,7 +62,12 @@ export function errorMessage(err: unknown, fallback = 'Something went wrong.'): 
     // PostgREST / Postgres errors carry a `code`. Map to a friendly
     // string; suppress the verbose underlying message.
     if (typeof obj.code === 'string' && obj.code.length > 0) {
-      if (typeof obj.message === 'string') console.error(`errorMessage suppressed [${obj.code}]:`, obj.message)
+      const raw     = typeof obj.message === 'string' ? obj.message : ''
+      const details = typeof obj.details === 'string' ? obj.details : ''
+      if (raw) console.error(`errorMessage suppressed [${obj.code}]:`, raw)
+      // Prefer a field-specific message derived from the constraint name.
+      const specific = fieldSpecificMessage(`${raw} ${details}`)
+      if (specific) return specific
       return SQLSTATE_FRIENDLY[obj.code] ?? fallback
     }
 
