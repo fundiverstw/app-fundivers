@@ -71,15 +71,22 @@ self.addEventListener('push', (event) => {
     }
   }
 
-  event.waitUntil(
-    self.registration.showNotification(payload.title, {
-      body: payload.body,
-      tag:  payload.tag,
-      icon: '/icons/icon-192.png',
-      badge: '/icons/icon-192.png',
-      data: { url: payload.url ?? '/' },
-    })
-  )
+  const options: NotificationOptions = {
+    body: payload.body,
+    tag:  payload.tag,
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    // Keep the banner on screen until the diver acts on it instead of
+    // auto-dismissing after a few seconds.
+    requireInteraction: true,
+    data: { url: payload.url ?? '/' },
+  }
+  // renotify re-alerts (re-surface + sound/vibration) when a notification
+  // reuses a tag — it requires a tag, so only set it when one is present.
+  // Not yet in this TS lib's NotificationOptions; browsers honor it.
+  if (payload.tag) (options as { renotify?: boolean }).renotify = true
+
+  event.waitUntil(self.registration.showNotification(payload.title, options))
 })
 
 self.addEventListener('notificationclick', (event) => {
