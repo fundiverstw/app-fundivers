@@ -55,21 +55,41 @@ describe('instructorsNeeded', () => {
   })
 
   it('subtracts already-assigned instructors', () => {
-    expect(instructorsNeeded([{ role: 'instructor' }], 5)).toBe(0)
-    expect(instructorsNeeded([{ role: 'instructor' }], 10)).toBe(1)
-    expect(instructorsNeeded([{ role: 'instructor' }, { role: 'instructor' }], 10)).toBe(0)
+    expect(instructorsNeeded([{ role: 'instructor', assignee_id: 'a' }], 5)).toBe(0)
+    expect(instructorsNeeded([{ role: 'instructor', assignee_id: 'a' }], 10)).toBe(1)
+    expect(instructorsNeeded(
+      [{ role: 'instructor', assignee_id: 'a' }, { role: 'instructor', assignee_id: 'b' }],
+      10,
+    )).toBe(0)
+  })
+
+  it('counts distinct instructors — multiple single-day rows for the same person count once', () => {
+    // A course instructor on a 3-day course holds 3 single-day duty rows
+    // but is still one instructor toward the requirement.
+    expect(instructorsNeeded(
+      [
+        { role: 'instructor', assignee_id: 'a' },
+        { role: 'instructor', assignee_id: 'a' },
+        { role: 'instructor', assignee_id: 'a' },
+      ],
+      10,
+    )).toBe(1)
   })
 
   it('does not count guides/support toward the instructor requirement', () => {
     expect(instructorsNeeded(
-      [{ role: 'guide' }, { role: 'support' }],
+      [{ role: 'guide', assignee_id: 'a' }, { role: 'support', assignee_id: 'b' }],
       5,
     )).toBe(1)
   })
 
   it('never returns a negative — extra instructors are fine', () => {
     expect(instructorsNeeded(
-      [{ role: 'instructor' }, { role: 'instructor' }, { role: 'instructor' }],
+      [
+        { role: 'instructor', assignee_id: 'a' },
+        { role: 'instructor', assignee_id: 'b' },
+        { role: 'instructor', assignee_id: 'c' },
+      ],
       5,
     )).toBe(0)
   })
