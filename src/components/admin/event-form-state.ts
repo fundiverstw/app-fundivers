@@ -155,11 +155,11 @@ export function formStateFromCourse(c: EOCourse): FormState {
     display_title: stripCapacitySuffix(c.display_title),
     calendar_title: c.calendar_title ?? '',
     course_name: c.course_name ?? '',
-    // start_date / end_date are the min/max envelope, derived from
-    // courseDays; the form edits courseDays, not these directly.
-    start_date: courseDays[0] ?? c.start_date ?? '',
+    // The form's start_date/end_date are derived from courseDays (the
+    // course itself has no envelope columns); the form edits courseDays.
+    start_date: courseDays[0] ?? '',
     start_time: toHhmm(c.start_time),
-    end_date: courseDays[courseDays.length - 1] ?? c.end_date ?? '',
+    end_date: courseDays[courseDays.length - 1] ?? '',
     capacity: c.capacity != null ? String(c.capacity) : '',
     courseDays,
     price: c.price ?? '',
@@ -226,17 +226,15 @@ export function divePayloadFromForm(form: FormState): Record<string, unknown> {
 export function coursePayloadFromForm(form: FormState): Record<string, unknown> {
   const timeText = form.start_time ? `${form.start_time}:00` : ''
   const addonsJson = form.addonIds.length ? JSON.stringify(form.addonIds) : ''
-  // Sort + dedupe the entered days; start_date / end_date are the min/max
-  // envelope kept in sync so range queries and span lookups keep working.
+  // Sort + dedupe the entered days. course_days is the sole date source —
+  // there's no start_date/end_date envelope on EO_courses anymore.
   const days = [...new Set(form.courseDays.filter(Boolean))].sort()
   return {
     admin_title: form.admin_title || null,
     display_title: form.display_title.trim() || null,
     calendar_title: form.calendar_title || null,
     course_name: form.course_name || null,
-    start_date: days[0] ?? null,
     start_time: timeText || null,
-    end_date: days[days.length - 1] ?? null,
     capacity: form.capacity ? Number(form.capacity) : null,
     course_days: days.length ? days : null,
     price: form.price || null,

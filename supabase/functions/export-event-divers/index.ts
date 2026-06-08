@@ -86,15 +86,24 @@ Deno.serve(async (req) => {
   if (profErr) return json({ error: safeError(profErr, "profile fetch failed") }, 500)
   if (callerProfile?.role !== "admin") return json({ error: "admin only" }, 403)
 
-  // Pull the event row.
+  // Pull the event row. Dives carry a start_date/end_date envelope;
+  // courses only carry course_days, so the manifest's date stamp comes
+  // from the earliest course day instead.
   const table = eventType === "dive" ? "EO_dives" : "EO_courses"
   const titleCols = "display_title, admin_title, calendar_title"
+  const dateCols = eventType === "dive" ? "start_date, end_date" : "course_days"
   const { data: event, error: eErr } = await admin
     .from(table)
-    .select(`_id, start_date, end_date, ${titleCols}`)
+    .select(`_id, ${dateCols}, ${titleCols}`)
     .eq("_id", eventId)
     .single()
   if (eErr || !event) return json({ error: safeError(eErr, "event not found") }, 404)
+
+  // Earliest date the event runs on, used only for the email subject /
+  // filename stamp.
+  const eventStartDate = eventType === "dive"
+    ? (event.start_date as string | null)
+    : ([...((event.course_days as string[] | null) ?? [])].sort()[0] ?? null)
 
   // Bookings for this event whose divers are expected to attend.
   const fkCol = eventType === "dive" ? "eo_dive_id" : "eo_course_id"
@@ -161,7 +170,7 @@ Deno.serve(async (req) => {
       host: "smtp.gmail.com", port: 465, secure: true,
       auth: { user: GMAIL_USER, pass: GMAIL_PASS },
     })
-    const stamp = (event.start_date as string | null) ?? new Date().toISOString().slice(0, 10)
+    const stamp = eventStartDate ?? new Date().toISOString().slice(0, 10)
     const subject  = `manifest--${eventTitle}--${stamp}`
     const filename = `manifest-${stamp}.xlsx`
     const text = `Diver manifest for ${eventTitle} (${stamp}). ${divers.length} diver${divers.length === 1 ? "" : "s"} registered.`

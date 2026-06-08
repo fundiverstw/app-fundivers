@@ -77,22 +77,22 @@ describe('replaceDayInList', () => {
 })
 
 describe('rescheduleEventDay', () => {
-  it('course: swaps one day and re-derives the start/end envelope', async () => {
+  it('course: swaps one day in course_days', async () => {
     courseDaysData = ['2026-05-09', '2026-05-10', '2026-05-16']
     const { rescheduleEventDay } = await import('./reschedule')
     await rescheduleEventDay(ev({ id: 'c1', type: 'course' }), '2026-05-16', '2026-05-18')
     expect(updates).toEqual([{
       table: 'EO_courses',
-      payload: { course_days: ['2026-05-09', '2026-05-10', '2026-05-18'], start_date: '2026-05-09', end_date: '2026-05-18' },
+      payload: { course_days: ['2026-05-09', '2026-05-10', '2026-05-18'] },
     }])
   })
 
-  it('course: moving the first day re-sorts the envelope', async () => {
+  it('course: moving the first day re-sorts course_days', async () => {
     courseDaysData = ['2026-05-09', '2026-05-10', '2026-05-16']
     const { rescheduleEventDay } = await import('./reschedule')
     await rescheduleEventDay(ev({ id: 'c1', type: 'course' }), '2026-05-09', '2026-05-20')
     expect(updates[0].payload).toEqual({
-      course_days: ['2026-05-10', '2026-05-16', '2026-05-20'], start_date: '2026-05-10', end_date: '2026-05-20',
+      course_days: ['2026-05-10', '2026-05-16', '2026-05-20'],
     })
   })
 

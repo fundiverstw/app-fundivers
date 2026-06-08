@@ -68,7 +68,7 @@ function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites }
         case 'EO_dives':
           return opts.eventNotFound ? null : { _id: 'd1', start_date: '2030-06-01', end_date: '2030-06-03', display_title: 'Test Dive' }
         case 'EO_courses':
-          return opts.eventNotFound ? null : { _id: 'c1', start_date: '2030-06-01', end_date: '2030-06-03', display_title: 'Test Course' }
+          return opts.eventNotFound ? null : { _id: 'c1', course_days: ['2030-06-01', '2030-06-02', '2030-06-03'], display_title: 'Test Course' }
         default:           return null
       }
     })()

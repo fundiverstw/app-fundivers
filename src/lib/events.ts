@@ -129,19 +129,13 @@ function groupConsecutive(dayKeys: string[]): [string, string][] {
  * pills. We emit one segment per run of consecutive days.
  *
  * All returned segments share the course's `_id` (so clicking any of
- * them goes to the same booking target). Falls back to the
- * start_date..end_date envelope if course_days is absent (malformed row).
+ * them goes to the same booking target). A course with no course_days
+ * (malformed row) renders nothing.
  */
 function courseToEvents(c: EOCourse, priceIndex: Map<string, EOPrice>, addonIds: string[]): AppEvent[] {
-  const startKey = toDateKey(c.start_date)
   const dayKeys = (c.course_days ?? [])
     .map(toDateKey)
     .filter((k): k is string => !!k)
-  if (dayKeys.length === 0) {
-    if (startKey) dayKeys.push(startKey)
-    const endKey = toDateKey(c.end_date)
-    if (endKey) dayKeys.push(endKey)
-  }
   if (dayKeys.length === 0) return []
 
   const p = c.price ? priceIndex.get(c.price) : undefined
@@ -253,26 +247,37 @@ async function attachPrices(dives: EODive[], courses: EOCourse[]): Promise<Map<s
 }
 
 const DIVE_COLS = '_id, admin_title, display_title, calendar_title, start_date, time, end_date, featured, fully_booked, capacity, price, has_rooms, room_types, hasotheraddons, other_addons, gear_rental, nitrox_required, dive_days, cancelled_at, full_payment_deadline, cancel_policy, cancel_date'
-const COURSE_COLS = '_id, admin_title, display_title, calendar_title, start_date, start_time, end_date, price, other_addons, dive_days, course_days, cancelled_at, full_payment_deadline, cancel_policy, cancel_date, fully_booked, capacity'
+const COURSE_COLS = '_id, admin_title, display_title, calendar_title, start_time, price, other_addons, dive_days, course_days, cancelled_at, full_payment_deadline, cancel_policy, cancel_date, fully_booked, capacity'
+
+// Every 'YYYY-MM-DD' from `fromDate` to `toDate` inclusive. Used to ask
+// PostgREST for courses whose course_days array shares at least one day
+// with the window (`&&` overlap), since there's no scalar envelope to
+// range-query anymore.
+function datesInRange(fromDate: string, toDate: string): string[] {
+  const out: string[] = []
+  const end = new Date(toDate + 'T00:00:00Z')
+  for (let d = new Date(fromDate + 'T00:00:00Z'); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+    out.push(d.toISOString().slice(0, 10))
+  }
+  return out
+}
 
 /**
  * Fetch dives whose start_date falls within [fromDate, toDate] plus
- * courses whose [start_date..end_date] envelope overlaps the window
- * (inclusive, 'YYYY-MM-DD'). A course's envelope spans every day it runs
- * on (start_date/end_date are kept as min/max of course_days), so any
- * course with a session inside the window is fetched — courseToEvents
- * then emits a segment per run of consecutive days, and the staff-busy
- * overlay can flag conflicts on every day. Events with `cancelled_at`
- * set are hidden — admin soft-cancellations vanish from the calendar /
- * listing surfaces. Use `fetchEventsForBookings` when bookings against
- * cancelled events still need to resolve their event details.
+ * courses with at least one session day inside the window (inclusive,
+ * 'YYYY-MM-DD'). Courses are matched by overlapping `course_days` against
+ * every date in the window — courseToEvents then emits a segment per run
+ * of consecutive days, and the staff-busy overlay can flag conflicts on
+ * every day. Events with `cancelled_at` set are hidden — admin
+ * soft-cancellations vanish from the calendar / listing surfaces. Use
+ * `fetchEventsForBookings` when bookings against cancelled events still
+ * need to resolve their event details.
  */
 export async function fetchEventsInRange(fromDate: string, toDate: string): Promise<AppEvent[]> {
   const [divesResp, coursesResp] = await Promise.all([
     supabase.from('EO_dives').select(DIVE_COLS).is('cancelled_at', null).gte('start_date', fromDate).lte('start_date', toDate).order('start_date'),
     supabase.from('EO_courses').select(COURSE_COLS).is('cancelled_at', null)
-      .lte('start_date', toDate).gte('end_date', fromDate)
-      .order('start_date'),
+      .overlaps('course_days', datesInRange(fromDate, toDate)),
   ])
 
   const dives = (divesResp.data ?? []) as EODive[]
@@ -330,11 +335,8 @@ export async function fetchEventsForBookings(
     const dayKeys = (c.course_days ?? [])
       .map(toDateKey)
       .filter((k): k is string => !!k)
-    const candidates = dayKeys.length
-      ? dayKeys
-      : [toDateKey(c.start_date), toDateKey(c.end_date)].filter((k): k is string => !!k)
-    const earliest = candidates.length ? candidates.reduce((a, b) => a < b ? a : b) : null
-    const latest = candidates.length ? candidates.reduce((a, b) => a > b ? a : b) : null
+    const earliest = dayKeys.length ? dayKeys.reduce((a, b) => a < b ? a : b) : null
+    const latest = dayKeys.length ? dayKeys.reduce((a, b) => a > b ? a : b) : null
     out.set(segs[0].id, {
       ...segs[0],
       start_time: earliest ? toIso(earliest, c.start_time) ?? segs[0].start_time : segs[0].start_time,

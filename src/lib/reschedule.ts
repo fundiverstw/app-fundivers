@@ -62,11 +62,7 @@ export async function rescheduleEventDay(ev: AppEvent, fromKey: string, toKey: s
     const days = replaceDayInList(current, fromKey, toKey)
     const { error: updErr } = await supabase
       .from('EO_courses')
-      .update({
-        course_days: days,
-        start_date: days[0],
-        end_date: days[days.length - 1],
-      } as never)
+      .update({ course_days: days } as never)
       .eq('_id', ev.id)
     if (updErr) throw updErr
     return

@@ -199,10 +199,10 @@ insert into public."EO_dives" (
   '9fd90874-cd94-470c-b07c-c7655b558741'::uuid
 ) on conflict (_id) do nothing;
 
--- Crowded course: 28 days out, 4-day OW.
+-- Crowded course: 28 days out, 4-day OW (course_days is the date source).
 insert into public."EO_courses" (
   _id, admin_title, display_title, calendar_title,
-  start_date, start_time, end_date,
+  course_days, start_time,
   course_name, schedule, dive_days, capacity,
   price, starting_at
 ) values (
@@ -210,9 +210,8 @@ insert into public."EO_courses" (
   'Crowded test course',
   'Crowded test course',
   'Crowded test course',
-  current_date + 28,
+  array[current_date + 28, current_date + 29, current_date + 30, current_date + 31]::date[],
   '09:00:00'::time,
-  current_date + 31,
   'Open Water',
   '4 days, Thu–Sun',
   4, 40,
