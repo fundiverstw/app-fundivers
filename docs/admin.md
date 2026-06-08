@@ -54,6 +54,26 @@ All routes are also wrapped by `ProtectedRoute` — see
     `status = 'refunded'`.
 - **Event memos** — see below.
 
+### Boat manifest export
+
+The **Export diver info** button opens a modal for the vessel details
+(boat name, registration, footer notes — pre-filled and remembered in
+`localStorage` since the chartered boat varies per trip), then calls the
+`export-event-divers` edge function. The function emails an `.xlsx`
+matching the Taiwanese recreational-fishing-vessel passenger form
+(娛樂漁業漁船出海人員名冊) to the shop inbox, BCCing the requesting admin.
+
+- Rows: every **pending** or **confirmed** booking (cancelled and
+  waitlisted divers are excluded).
+- Columns are the official Chinese form (編號 / 姓名 / 身分證字號 / 出生
+  年月日 / 性別 / 潛水執照等級 / 潛水總支數 / 國家 / 備註). The sheet is
+  Unicode, so no font embedding is needed.
+- Gender and nationality are best-effort localized to Chinese
+  (`male`→`男`, `American`→`美國`); unrecognized free-text values pass
+  through untouched. See `_shared/event-divers-manifest.ts` (pure,
+  unit-tested) for the mappings and `_shared/event-divers-xlsx.ts` for
+  the SheetJS serialization.
+
 ## Event memos
 
 `event_memos` is a free-form "sticky note" table for operational flags.

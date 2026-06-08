@@ -1,5 +1,9 @@
-// export-event-divers — admin-only PDF manifest of every diver registered
-// for a single event, emailed to the company inbox.
+// export-event-divers — admin-only boat-manifest (.xlsx) of every diver
+// registered for a single event, emailed to the company inbox.
+//
+// The sheet matches the Taiwanese recreational-fishing-vessel passenger
+// form (娛樂漁業漁船出海人員名冊). XLSX is Unicode-native, so the Chinese
+// headers / names / values need no font embedding.
 //
 // Flow:
 //   1. Verify caller via Bearer JWT.
@@ -8,11 +12,13 @@
 //   4. Fetch all 'pending' / 'confirmed' bookings for the event (cancelled
 //      and waitlisted divers aren't on the manifest — they won't show up).
 //   5. Join in profiles for each booking to read name / name_alt /
-//      date_of_birth / nationality / id_number.
-//   6. Build a PDF via _shared/event-divers-pdf.ts and email it to
+//      date_of_birth / nationality / id_number / gender / cert_level /
+//      logged_dives.
+//   6. Build an .xlsx via _shared/event-divers-xlsx.ts and email it to
 //      fundiverstw@gmail.com with the caller BCCed.
 //
-// Body: { event_type: 'dive' | 'course', event_id: string }
+// Body: { event_type: 'dive' | 'course', event_id: string,
+//         boat?: { boat_name?: string, registration?: string, notes?: string[] } }
 // Returns: 200 { ok: true, diver_count }
 //          400 on bad request
 //          401/403 on auth or role failure
@@ -21,8 +27,10 @@
 import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
 import { Buffer } from "node:buffer"
-import { buildEventDiversPdfBase64, type EventDiverRow } from "../_shared/event-divers-pdf.ts"
+import { buildEventDiversXlsxBase64, type EventDiverRow } from "../_shared/event-divers-xlsx.ts"
 import { corsOk, jsonResponse, safeError } from "../_shared/responses.ts"
+
+const XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 const COMPANY_EMAIL = "fundiverstw@gmail.com"
 
@@ -35,7 +43,7 @@ Deno.serve(async (req) => {
   if (!auth.startsWith("Bearer ")) return json({ error: "unauthorized" }, 401)
   const token = auth.slice("Bearer ".length)
 
-  let body: { event_type?: unknown; event_id?: unknown }
+  let body: { event_type?: unknown; event_id?: unknown; boat?: unknown }
   try { body = await req.json() } catch { return json({ error: "invalid json body" }, 400) }
   const eventType = body.event_type
   const eventId   = body.event_id
@@ -44,6 +52,16 @@ Deno.serve(async (req) => {
   }
   if (typeof eventId !== "string" || eventId.length === 0) {
     return json({ error: "event_id required" }, 400)
+  }
+
+  // Boat header / footer notes are admin-supplied per export (the chartered
+  // vessel varies by trip). All fields optional — the builder degrades to
+  // just the form title + diver table when they're absent.
+  const boatRaw = (body.boat ?? {}) as { boat_name?: unknown; registration?: unknown; notes?: unknown }
+  const boat = {
+    boatName:     typeof boatRaw.boat_name === "string" ? boatRaw.boat_name : "",
+    registration: typeof boatRaw.registration === "string" ? boatRaw.registration : "",
+    notes:        Array.isArray(boatRaw.notes) ? boatRaw.notes.filter((n): n is string => typeof n === "string") : [],
   }
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
@@ -96,11 +114,14 @@ Deno.serve(async (req) => {
     date_of_birth: string | null
     nationality: string | null
     id_number: string | null
+    gender: string | null
+    cert_level: string | null
+    logged_dives: number | null
   }> = []
   if (userIds.length > 0) {
     const { data: profs, error: pErr } = await admin
       .from("profiles")
-      .select("id, full_name, display_name, name_alt, date_of_birth, nationality, id_number")
+      .select("id, full_name, display_name, name_alt, date_of_birth, nationality, id_number, gender, cert_level, logged_dives")
       .in("id", userIds)
     if (pErr) return json({ error: safeError(pErr, "profiles fetch failed") }, 500)
     profiles = profs ?? []
@@ -115,6 +136,9 @@ Deno.serve(async (req) => {
       dob:         p.date_of_birth ?? null,
       nationality: p.nationality?.trim() || null,
       idNumber:    p.id_number?.trim() || null,
+      gender:      p.gender?.trim() || null,
+      certLevel:   p.cert_level?.trim() || null,
+      loggedDives: p.logged_dives ?? null,
     }))
     .sort((a, b) => a.name.localeCompare(b.name))
 
@@ -124,17 +148,12 @@ Deno.serve(async (req) => {
     return json({ error: "email not configured" }, 500)
   }
 
-  let pdfBuffer: Buffer
+  let xlsxBuffer: Buffer
   try {
-    const b64 = await buildEventDiversPdfBase64({
-      eventTitle,
-      startDate: (event.start_date as string | null) ?? null,
-      endDate:   (event.end_date   as string | null) ?? null,
-      divers,
-    })
-    pdfBuffer = Buffer.from(b64, "base64")
+    const b64 = buildEventDiversXlsxBase64({ divers, config: boat })
+    xlsxBuffer = Buffer.from(b64, "base64")
   } catch (e) {
-    return json({ error: `pdf build failed: ${(e as Error).message}` }, 500)
+    return json({ error: `xlsx build failed: ${(e as Error).message}` }, 500)
   }
 
   try {
@@ -144,7 +163,7 @@ Deno.serve(async (req) => {
     })
     const stamp = (event.start_date as string | null) ?? new Date().toISOString().slice(0, 10)
     const subject  = `manifest--${eventTitle}--${stamp}`
-    const filename = `manifest-${stamp}.pdf`
+    const filename = `manifest-${stamp}.xlsx`
     const text = `Diver manifest for ${eventTitle} (${stamp}). ${divers.length} diver${divers.length === 1 ? "" : "s"} registered.`
 
     await transporter.sendMail({
@@ -155,7 +174,7 @@ Deno.serve(async (req) => {
       bcc:     callerEmail && callerEmail.toLowerCase() !== COMPANY_EMAIL ? callerEmail : undefined,
       subject,
       text,
-      attachments: [{ filename, content: pdfBuffer, contentType: "application/pdf" }],
+      attachments: [{ filename, content: xlsxBuffer, contentType: XLSX_CONTENT_TYPE }],
     })
   } catch (e) {
     return json({ error: `email failed: ${(e as Error).message}` }, 500)
