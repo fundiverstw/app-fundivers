@@ -34,63 +34,59 @@ beforeEach(() => {
   useAuthMock.mockReturnValue({ user: { id: 'admin-1' } })
 })
 
-describe('EventStaffSection date range', () => {
-  it('defaults start/end to the event dates and lets admins narrow to a subset of days', async () => {
-    // Initial loads: no existing duties, two admin profiles.
+describe('EventStaffSection course day selection', () => {
+  it('shows the course days as chips and creates one single-day duty per selected day', async () => {
+    // Spread-out 3-day course: Feb 10, 12, 15 (non-consecutive).
     from.mockImplementation((table: string) => {
       if (table === 'duties')   return mockQueryBuilder({ data: [] })
       if (table === 'profiles') return mockQueryBuilder({ data: [
         { id: 'admin-1', role: 'admin', display_name: 'Ada',   full_name: 'Ada Lovelace' },
         { id: 'admin-2', role: 'admin', display_name: 'Grace', full_name: 'Grace Hopper' },
       ] })
+      if (table === 'EO_courses') return mockQueryBuilder({
+        data: { course_days: ['2030-02-10', '2030-02-12', '2030-02-15'] },
+      })
       return mockQueryBuilder({ data: [] })
     })
-    createDutyWithNotify.mockResolvedValue({
+    let n = 0
+    createDutyWithNotify.mockImplementation((payload: { start_date: string }) => Promise.resolve({
       duty: {
-        id: 'd1', created_at: '', created_by: 'admin-1', assignee_id: 'admin-2',
-        role: 'guide', start_date: '2030-02-11', end_date: '2030-02-12',
+        id: `d${++n}`, created_at: '', created_by: 'admin-1', assignee_id: 'admin-2',
+        role: 'instructor', start_date: payload.start_date, end_date: null,
         eo_dive_id: null, eo_course_id: 'course-x', notes: null,
       },
       error: null,
-    })
+    }))
 
     const user = userEvent.setup()
     render(
       <EventStaffSection
         eventType="course"
         eventId="course-x"
-        eventStartDate="2030-02-10T09:00:00Z"  // 3-day course
-        eventEndDate="2030-02-12T18:00:00Z"
+        eventStartDate="2030-02-10T09:00:00Z"
+        eventEndDate="2030-02-15T18:00:00Z"
         nonAdminDiverCount={0}
       />
     )
 
-    // Wait for load, then inspect the date inputs. They default to the event span.
-    const startInput = await screen.findByDisplayValue('2030-02-10') as HTMLInputElement
-    const endInput = screen.getByDisplayValue('2030-02-12') as HTMLInputElement
-    expect(startInput.type).toBe('date')
-    expect(endInput.type).toBe('date')
+    // All three course days render as chips, selected by default. There are
+    // no From/To date inputs for a course.
+    const day10 = await screen.findByRole('button', { name: /Feb 10/ })
+    await screen.findByRole('button', { name: /Feb 12/ })
+    await screen.findByRole('button', { name: /Feb 15/ })
+    expect(screen.queryByDisplayValue('2030-02-10')).not.toBeInTheDocument()
 
-    // Admin narrows the range to days 2–3.
-    await user.clear(startInput)
-    await user.type(startInput, '2030-02-11')
-    await user.clear(endInput)
-    await user.type(endInput, '2030-02-12')
-
-    // Pick the assignee and submit. Two selects in the form — assignee first.
+    // Deselect Feb 10 → assign should create duties only for Feb 12 + 15.
+    await user.click(day10)
     await user.selectOptions(screen.getAllByRole('combobox')[0], 'admin-2')
-    await user.click(screen.getByRole('button', { name: /assign/i }))
+    await user.click(screen.getByRole('button', { name: /^assign$/i }))
 
-    await waitFor(() => expect(createDutyWithNotify).toHaveBeenCalledTimes(1))
-    const [payload, createdBy] = createDutyWithNotify.mock.calls[0]
-    expect(createdBy).toBe('admin-1')
-    expect(payload).toMatchObject({
-      assignee_id: 'admin-2',
-      role: 'instructor',          // default for course events
-      start_date: '2030-02-11',
-      end_date:   '2030-02-12',
-      eo_course_id: 'course-x',
-    })
+    await waitFor(() => expect(createDutyWithNotify).toHaveBeenCalledTimes(2))
+    const days = createDutyWithNotify.mock.calls.map(c => c[0].start_date).sort()
+    expect(days).toEqual(['2030-02-12', '2030-02-15'])
+    for (const [payload] of createDutyWithNotify.mock.calls) {
+      expect(payload).toMatchObject({ assignee_id: 'admin-2', role: 'instructor', end_date: null, eo_course_id: 'course-x' })
+    }
   })
 
   it('defaults to the local-time date, not the UTC date (regression: Taipei-midnight events drifted back a day)', async () => {
