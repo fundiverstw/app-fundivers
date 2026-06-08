@@ -607,12 +607,18 @@ export async function runDailyReminders(env: Env): Promise<{ sent: number; skipp
   const WINDOWS = [1, 3, 7, 14, 21]
   const targetDates = WINDOWS.map((d) => addDays(today, d))
 
+  const targetSet = new Set(targetDates)
   const [divesResp, coursesResp] = await Promise.all([
     sb.from('EO_dives').select('_id, admin_title, display_title, start_date, time').in('start_date', targetDates),
-    sb.from('EO_courses').select('_id, admin_title, display_title, start_date, start_time').in('start_date', targetDates),
+    // Courses have no start_date — fetch any course with a day on a target
+    // date, then anchor the reminder to its first day so behavior matches
+    // the old start_date-keyed reminder (one reminder, before day 1).
+    sb.from('EO_courses').select('_id, admin_title, display_title, course_days, start_time').overlaps('course_days', targetDates),
   ])
   const dives   = divesResp.data   ?? []
-  const courses = coursesResp.data ?? []
+  const courses = (coursesResp.data ?? [])
+    .map((c) => ({ ...c, start_date: [...((c.course_days as string[] | null) ?? [])].sort()[0] ?? null }))
+    .filter((c) => c.start_date && targetSet.has(c.start_date))
   if (!dives.length && !courses.length) return { sent: 0, skipped: 0 }
 
   const diveIds   = dives.map((d) => d._id)

@@ -126,8 +126,10 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
         mode === 'create'
           ? supabase.from('EO_dives').select('*').lt('start_date', todayStr).order('start_date', { ascending: false }).limit(50)
           : Promise.resolve({ data: [] as EODive[] }),
+        // Courses have no scalar date column to filter/order on — fetch a
+        // bounded set and narrow to "past" client-side via course_days.
         mode === 'create'
-          ? supabase.from('EO_courses').select('*').lt('start_date', todayStr).order('start_date', { ascending: false }).limit(50)
+          ? supabase.from('EO_courses').select('*').limit(200)
           : Promise.resolve({ data: [] as EOCourse[] }),
         supabase.from('cert_levels').select('*').order('rank'),
         supabase.from('cancellation_policies').select('*').order('title'),
@@ -152,9 +154,15 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
       const pastDives = dataOf<EODive>(3).map<PastEvent>(d => ({
         kind: 'dive', id: d._id, startDate: d.start_date ?? '', title: d.display_title ?? d.admin_title ?? '(untitled dive)', row: d,
       }))
-      const pastCourses = dataOf<EOCourse>(4).map<PastEvent>(c => ({
-        kind: 'course', id: c._id, startDate: c.start_date ?? '', title: c.display_title ?? c.admin_title ?? '(untitled course)', row: c,
-      }))
+      const pastCourses = dataOf<EOCourse>(4)
+        .map<PastEvent>(c => ({
+          kind: 'course',
+          id: c._id,
+          startDate: [...(c.course_days ?? [])].filter(Boolean).sort()[0] ?? '',
+          title: c.display_title ?? c.admin_title ?? '(untitled course)',
+          row: c,
+        }))
+        .filter(c => c.startDate && c.startDate < todayStr)
       const merged = [...pastDives, ...pastCourses].sort((a, b) => b.startDate.localeCompare(a.startDate))
       setPastEvents(merged)
     })()

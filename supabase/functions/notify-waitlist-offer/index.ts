@@ -86,10 +86,11 @@ Deno.serve(async (req) => {
     startDate  = (data?.start_date ?? null) as string | null
   } else if (booking.eo_course_id) {
     const { data } = await admin.from("EO_courses")
-      .select("display_title, admin_title, start_date")
+      .select("display_title, admin_title, course_days")
       .eq("_id", booking.eo_course_id).maybeSingle()
     eventTitle = (data?.display_title ?? data?.admin_title ?? eventTitle) as string
-    startDate  = (data?.start_date ?? null) as string | null
+    // Courses have no start_date — use the earliest course day.
+    startDate  = [...((data?.course_days ?? []) as string[])].sort()[0] ?? null
   }
 
   const { data: target } = await admin.auth.admin.getUserById(booking.user_id)
