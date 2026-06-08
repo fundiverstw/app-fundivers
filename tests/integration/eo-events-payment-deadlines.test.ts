@@ -89,7 +89,7 @@ describe('EO_courses.full_payment_deadline', () => {
     const id = crypto.randomUUID()
     createdCourseIds.push(id)
     await admin.from('EO_courses' as never).insert({
-      _id: id, display_title: 'OW course', start_date: '2027-07-10',
+      _id: id, display_title: 'OW course', course_days: ['2027-07-10'],
     } as never)
     const { error } = await sb.from('EO_courses' as never).update({
       full_payment_deadline: '2027-07-03',

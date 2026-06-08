@@ -370,7 +370,14 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
       .filter((s: string) => s.length > 0)
   }
 
-  const startDate = (event?.start_date ?? null) as string | null
+  // Dives carry start_date/end_date; courses derive both from course_days.
+  const courseDays = [...((event?.course_days ?? []) as string[])].filter(Boolean).sort()
+  const startDate = (body.event_type === "course"
+    ? (courseDays[0] ?? null)
+    : (event?.start_date ?? null)) as string | null
+  const endDate = (body.event_type === "course"
+    ? (courseDays[courseDays.length - 1] ?? null)
+    : (event?.end_date ?? null)) as string | null
   function shiftDays(yyyyMmDd: string, deltaDays: number): string {
     const d = new Date(yyyyMmDd + "T00:00:00Z")
     d.setUTCDate(d.getUTCDate() + deltaDays)
@@ -419,7 +426,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
   const payload: RegistrationPdfPayload = {
     eventTitle: titleFallback,
     startDate,
-    endDate:    (event?.end_date ?? null) as string | null,
+    endDate,
     name:            profile?.full_name ?? "",
     nameAlt:         profile?.name_alt ?? null,
     email:           registrantEmail,

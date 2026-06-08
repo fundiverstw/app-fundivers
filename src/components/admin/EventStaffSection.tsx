@@ -27,13 +27,18 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
   const eventEnd = eventEndDate ? format(parseISO(eventEndDate), 'yyyy-MM-dd') : null
   const isMultiDay = !!eventEnd && eventEnd !== eventStart
 
-  // Form state for the "assign" row. Date range defaults to the event's
-  // full span; admins can narrow to specific days for multi-day events
-  // (e.g. an instructor covering only day 2 of a 3-day course).
+  // Form state for the "assign" row.
   const [assigneeId, setAssigneeId] = useState('')
   const [role, setRole] = useState<DutyRole>(eventType === 'course' ? 'instructor' : 'guide')
+  // Dives use a date range (contiguous span); admins can narrow to a subset
+  // of days for multi-day dives.
   const [startDate, setStartDate] = useState(eventStart)
   const [endDate, setEndDate] = useState(eventEnd ?? '')
+  // Courses run on an explicit (possibly non-consecutive) day list, so duty
+  // days are picked one-by-one from those days rather than as a From/To
+  // range. Each selected day becomes its own single-day duty.
+  const [courseDays, setCourseDays] = useState<string[]>([])
+  const [selectedDays, setSelectedDays] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
@@ -42,21 +47,31 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const [dutiesRes, adminsRes] = await Promise.all([
+      const [dutiesRes, adminsRes, courseRes] = await Promise.all([
         supabase.from('duties').select('*').eq(fkColumn, eventId).order('role'),
         supabase.from('profiles').select('*').in('role', ['admin', 'staff']).order('display_name'),
+        eventType === 'course'
+          ? supabase.from('EO_courses').select('course_days').eq('_id', eventId).single()
+          : Promise.resolve({ data: null }),
       ])
       if (cancelled) return
       setDuties(dutiesRes.data ?? [])
       setAdmins(adminsRes.data ?? [])
+      if (eventType === 'course') {
+        const days = [...((courseRes.data?.course_days as string[] | null) ?? [])]
+          .filter(Boolean).sort()
+        setCourseDays(days)
+        setSelectedDays(days)  // default: staff covers the whole course
+      }
       setLoading(false)
     })()
     return () => { cancelled = true }
-  }, [eventId, fkColumn])
+  }, [eventId, fkColumn, eventType])
 
   const adminMap = useMemo(() => new Map(admins.map(a => [a.id, a])), [admins])
 
-  async function assign() {
+  // Dives: one duty over the chosen [start, end] range.
+  async function assignDive() {
     if (!user || !assigneeId || !startDate) return
     if (endDate && endDate < startDate) { setErr('End date must be on or after start date'); return }
     setSubmitting(true); setErr(null)
@@ -71,9 +86,44 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
     if (error || !duty) { setErr(error?.message ?? 'Failed to assign'); return }
     setDuties(prev => [...prev, duty])
     setAssigneeId('')
-    // Reset date range to event defaults for the next assignment.
     setStartDate(eventStart)
     setEndDate(eventEnd ?? '')
+  }
+
+  // Courses: one single-day duty per selected day (days may be
+  // non-consecutive, so a single range can't represent them).
+  async function assignCourse() {
+    if (!user || !assigneeId) return
+    const days = [...selectedDays].sort()
+    if (!days.length) { setErr('Pick at least one day'); return }
+    setSubmitting(true); setErr(null)
+    const created: Duty[] = []
+    try {
+      for (const day of days) {
+        const { duty, error } = await createDutyWithNotify({
+          assignee_id: assigneeId,
+          role,
+          start_date: day,
+          end_date: null,
+          [fkColumn]: eventId,
+        } as Parameters<typeof createDutyWithNotify>[0], user.id)
+        if (error || !duty) throw error ?? new Error('Failed to assign')
+        created.push(duty)
+      }
+      setAssigneeId('')
+      setSelectedDays([...courseDays])
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      if (created.length) setDuties(prev => [...prev, ...created])
+      setSubmitting(false)
+    }
+  }
+
+  const assign = eventType === 'course' ? assignCourse : assignDive
+
+  function toggleDay(day: string) {
+    setSelectedDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])
   }
 
   async function remove(id: string) {
@@ -149,33 +199,63 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
           </select>
         </div>
         <div className="space-y-2 text-xs">
-          <label className="flex items-center gap-2">
-            <span className="text-blue-900 font-medium shrink-0 w-12">{isMultiDay ? 'From' : 'Date'}</span>
-            <input
-              type="date"
-              value={startDate}
-              min={eventStart}
-              max={eventEnd ?? eventStart}
-              onChange={e => setStartDate(e.target.value)}
-              className="flex-1 min-w-0 bg-white border border-sky-300 rounded px-2 py-1 text-blue-900"
-            />
-          </label>
-          {isMultiDay && (
-            <label className="flex items-center gap-2">
-              <span className="text-blue-900 font-medium shrink-0 w-12">To</span>
-              <input
-                type="date"
-                value={endDate}
-                min={startDate}
-                max={eventEnd ?? eventStart}
-                onChange={e => setEndDate(e.target.value)}
-                className="flex-1 min-w-0 bg-white border border-sky-300 rounded px-2 py-1 text-blue-900"
-              />
-            </label>
+          {eventType === 'course' ? (
+            // Pick which course days this person is on duty for. Each
+            // selected day becomes its own single-day duty.
+            <div className="space-y-1">
+              <span className="text-blue-900 font-medium">Days on duty</span>
+              <div className="flex flex-wrap gap-1.5">
+                {courseDays.map(day => {
+                  const on = selectedDays.includes(day)
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => toggleDay(day)}
+                      className={`px-2 py-1 rounded border font-medium ${
+                        on
+                          ? 'bg-sky-700 text-white border-sky-700'
+                          : 'bg-white text-blue-900 border-sky-300 hover:bg-sky-50'
+                      }`}
+                    >
+                      {format(parseISO(day), 'EEE, MMM d')}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ) : (
+            <>
+              <label className="flex items-center gap-2">
+                <span className="text-blue-900 font-medium shrink-0 w-12">{isMultiDay ? 'From' : 'Date'}</span>
+                <input
+                  type="date"
+                  value={startDate}
+                  min={eventStart}
+                  max={eventEnd ?? eventStart}
+                  onChange={e => setStartDate(e.target.value)}
+                  className="flex-1 min-w-0 bg-white border border-sky-300 rounded px-2 py-1 text-blue-900"
+                />
+              </label>
+              {isMultiDay && (
+                <label className="flex items-center gap-2">
+                  <span className="text-blue-900 font-medium shrink-0 w-12">To</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    min={startDate}
+                    max={eventEnd ?? eventStart}
+                    onChange={e => setEndDate(e.target.value)}
+                    className="flex-1 min-w-0 bg-white border border-sky-300 rounded px-2 py-1 text-blue-900"
+                  />
+                </label>
+              )}
+            </>
           )}
           <button
             onClick={assign}
-            disabled={!assigneeId || !startDate || submitting}
+            disabled={!assigneeId || submitting || (eventType === 'course' ? selectedDays.length === 0 : !startDate)}
             className="w-full bg-sky-700 hover:bg-sky-600 disabled:bg-sky-100 disabled:text-blue-950 font-medium text-white font-semibold px-3 py-1.5 rounded"
           >
             Assign
