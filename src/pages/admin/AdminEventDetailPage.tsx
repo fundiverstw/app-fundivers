@@ -49,7 +49,7 @@ export function AdminEventDetailPage() {
   const [cancelInFlight, setCancelInFlight] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
   const [notifyModalOpen, setNotifyModalOpen] = useState(false)
-  const [exportingDivers, setExportingDivers] = useState(false)
+  const [exportModalOpen, setExportModalOpen] = useState(false)
   // Delete-event flow state. Only surfaced after the event is cancelled
   // so admins can't accidentally hard-delete an active event. The actual
   // DELETE relies on the existing ON DELETE CASCADE FKs to clean up
@@ -331,22 +331,10 @@ export function AdminEventDetailPage() {
                 </button>
                 <button
                   type="button"
-                  disabled={exportingDivers}
-                  onClick={async () => {
-                    if (!type || !id) return
-                    setExportingDivers(true)
-                    try {
-                      const res = await requestEventDiverExport(type, id)
-                      toast.success(`Manifest emailed — ${res.diver_count} diver${res.diver_count === 1 ? '' : 's'}.`)
-                    } catch (err) {
-                      toast.error(`Export failed: ${errorMessage(err)}`)
-                    } finally {
-                      setExportingDivers(false)
-                    }
-                  }}
-                  className="text-xs bg-sky-700/80 hover:bg-sky-700 disabled:opacity-50 text-white px-3 py-1 rounded-lg"
+                  onClick={() => setExportModalOpen(true)}
+                  className="text-xs bg-sky-700/80 hover:bg-sky-700 text-white px-3 py-1 rounded-lg"
                 >
-                  {exportingDivers ? 'Exporting…' : 'Export diver info'}
+                  Export diver info
                 </button>
               </>
             )}
@@ -474,6 +462,19 @@ export function AdminEventDetailPage() {
             toast.success(summary)
             setNotifyModalOpen(false)
           }}
+        />
+      )}
+
+      {exportModalOpen && type && id && (
+        <ExportManifestModal
+          eventType={type}
+          eventId={id}
+          onClose={() => setExportModalOpen(false)}
+          onDone={summary => {
+            toast.success(summary)
+            setExportModalOpen(false)
+          }}
+          onError={msg => toast.error(msg)}
         />
       )}
     </div>
@@ -769,6 +770,146 @@ function NotifyDiversModal({
               }`}
             >
               {submitting ? 'Sending…' : `Send to ${confirmedCount}`}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// Boat-manifest defaults. The chartered vessel varies per trip, so these
+// pre-fill the export modal and the admin's last-used values are remembered
+// in localStorage. Notes default to the standard pre-trip boat instructions
+// (Chinese — the manifest matches the official Taiwanese vessel form).
+const BOAT_MANIFEST_LS_KEY = 'fd_boat_manifest_v1'
+const DEFAULT_BOAT_MANIFEST = {
+  boatName: '坤成8號',
+  registration: 'CT2-6445',
+  notes: [
+    '1.石城或龜山都上午：6點30分集合，7點發船，請提前抵港。下午：12點30分集合，1點出船。(時間會依海況及實際情況再做調整)',
+    '2. 裝備用網袋不要帶箱子上船',
+    '3.繳交有相片的證件，以方便海巡安檢快速出港。',
+    '4.有需要高氧的就要先說，每支加100元。',
+    '5.船上有配重120kg供使用，但配重帶要自備。',
+  ].join('\n'),
+}
+
+function loadBoatManifestDefaults(): { boatName: string; registration: string; notes: string } {
+  try {
+    const raw = localStorage.getItem(BOAT_MANIFEST_LS_KEY)
+    if (raw) {
+      const v = JSON.parse(raw) as Partial<typeof DEFAULT_BOAT_MANIFEST>
+      return {
+        boatName:     typeof v.boatName === 'string' ? v.boatName : DEFAULT_BOAT_MANIFEST.boatName,
+        registration: typeof v.registration === 'string' ? v.registration : DEFAULT_BOAT_MANIFEST.registration,
+        notes:        typeof v.notes === 'string' ? v.notes : DEFAULT_BOAT_MANIFEST.notes,
+      }
+    }
+  } catch { /* corrupt / unavailable storage — fall back to defaults */ }
+  return { ...DEFAULT_BOAT_MANIFEST }
+}
+
+function ExportManifestModal({
+  eventType, eventId, onClose, onDone, onError,
+}: {
+  eventType: 'dive' | 'course'
+  eventId: string
+  onClose: () => void
+  onDone: (summary: string) => void
+  onError: (message: string) => void
+}) {
+  const initial = loadBoatManifestDefaults()
+  const [boatName, setBoatName] = useState(initial.boatName)
+  const [registration, setRegistration] = useState(initial.registration)
+  const [notes, setNotes] = useState(initial.notes)
+  const [submitting, setSubmitting] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSubmitting(true)
+    try {
+      try {
+        localStorage.setItem(BOAT_MANIFEST_LS_KEY, JSON.stringify({ boatName, registration, notes }))
+      } catch { /* non-fatal: just won't remember next time */ }
+      const res = await requestEventDiverExport(eventType, eventId, {
+        boat_name: boatName.trim(),
+        registration: registration.trim(),
+        notes: notes.split('\n').map(n => n.trim()).filter(Boolean),
+      })
+      onDone(`Manifest emailed — ${res.diver_count} diver${res.diver_count === 1 ? '' : 's'}.`)
+    } catch (err) {
+      onError(`Export failed: ${errorMessage(err)}`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/50 flex items-start justify-center p-4 pt-8 overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="export-manifest-title"
+      onClick={onClose}
+    >
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3" onClick={e => e.stopPropagation()}>
+        <h2 id="export-manifest-title" className="text-lg font-bold text-blue-900">
+          Export boat manifest
+        </h2>
+        <p className="text-sm text-blue-900">
+          Builds the vessel passenger manifest (.xlsx) for pending and confirmed
+          divers and emails it to the shop inbox. Boat details are remembered for
+          next time.
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="flex gap-2">
+            <label className="flex-1 space-y-1">
+              <span className="text-xs font-medium text-blue-900">Boat name</span>
+              <input
+                type="text"
+                value={boatName}
+                onChange={e => setBoatName(e.target.value)}
+                className="w-full bg-white border border-sky-300 rounded-md px-3 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
+              />
+            </label>
+            <label className="flex-1 space-y-1">
+              <span className="text-xs font-medium text-blue-900">Registration</span>
+              <input
+                type="text"
+                value={registration}
+                onChange={e => setRegistration(e.target.value)}
+                className="w-full bg-white border border-sky-300 rounded-md px-3 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
+              />
+            </label>
+          </div>
+
+          <label className="block space-y-1">
+            <span className="text-xs font-medium text-blue-900">Footer notes (one per line)</span>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              rows={6}
+              className="w-full bg-white border border-sky-300 rounded-md px-3 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900 resize-none"
+            />
+          </label>
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="flex-1 py-2 rounded-lg text-sm font-medium text-blue-900 border border-sky-300 hover:bg-sky-50 disabled:opacity-50"
+            >
+              Back
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 py-2 rounded-lg text-sm font-semibold text-white bg-blue-900 hover:bg-blue-950 disabled:opacity-50"
+            >
+              {submitting ? 'Exporting…' : 'Export & email'}
             </button>
           </div>
         </form>

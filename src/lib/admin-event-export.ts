@@ -1,16 +1,25 @@
 import { supabase } from './supabase'
 
 // Wrapper around the export-event-divers edge function. Admins call this
-// from AdminEventDetailPage; the function builds a PDF manifest and emails
-// it to the company address (BCCing the calling admin).
+// from AdminEventDetailPage; the function builds an .xlsx boat manifest and
+// emails it to the company address (BCCing the calling admin). The boat
+// header / footer notes are supplied per export since the chartered vessel
+// varies by trip.
+
+export interface BoatManifestInput {
+  boat_name: string
+  registration: string
+  notes: string[]
+}
 
 export async function requestEventDiverExport(
   eventType: 'dive' | 'course',
   eventId: string,
+  boat: BoatManifestInput,
 ): Promise<{ ok: boolean; diver_count: number }> {
   const { data, error } = await supabase.functions.invoke<{ ok: boolean; diver_count: number }>(
     'export-event-divers',
-    { body: { event_type: eventType, event_id: eventId } },
+    { body: { event_type: eventType, event_id: eventId, boat } },
   )
   if (error) {
     // supabase-js wraps non-2xx as FunctionsHttpError; the response body
