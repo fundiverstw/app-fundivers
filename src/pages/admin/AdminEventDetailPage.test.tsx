@@ -568,11 +568,21 @@ describe('AdminEventDetailPage', () => {
     const user = userEvent.setup()
     renderAt('/admin/events/dive/dive_x')
 
+    // Opens the boat-manifest modal; the export fires on confirm.
     await user.click(await screen.findByRole('button', { name: /export diver info/i }))
+    await user.click(await screen.findByRole('button', { name: /export & email/i }))
 
     await waitFor(() => expect(invoke).toHaveBeenCalledWith(
       'export-event-divers',
-      { body: { event_type: 'dive', event_id: 'dive_x' } },
+      { body: expect.objectContaining({
+        event_type: 'dive',
+        event_id: 'dive_x',
+        boat: expect.objectContaining({
+          boat_name: expect.any(String),
+          registration: expect.any(String),
+          notes: expect.any(Array),
+        }),
+      }) },
     ))
     await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith(expect.stringMatching(/7 divers/)))
   })
@@ -689,6 +699,7 @@ describe('AdminEventDetailPage', () => {
     renderAt('/admin/events/dive/dive_x')
 
     await user.click(await screen.findByRole('button', { name: /export diver info/i }))
+    await user.click(await screen.findByRole('button', { name: /export & email/i }))
 
     await waitFor(() => expect(toastError).toHaveBeenCalledWith(expect.stringMatching(/Export failed.*smtp down/)))
   })
