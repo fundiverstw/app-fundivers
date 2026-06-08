@@ -59,8 +59,7 @@ describe('cancelled events are filtered from listing reads', () => {
     await admin.from('EO_courses' as never).insert({
       _id: id,
       display_title: 'Cancellation test course',
-      start_date: start,
-      end_date: start,
+      course_days: [start],
     } as never)
 
     const before = await fetchEventsInRange('2027-09-01', '2027-09-30')

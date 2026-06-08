@@ -48,8 +48,10 @@ const MULTI_REF_FIELDS = {
 // boundary — so every populated timezone displays the intended date.
 // course_days is intentionally absent: it's a date[] array, not a scalar
 // DateTime, so toUtcNoon() would mangle it — it passes through untouched
-// as an array of 'YYYY-MM-DD' strings. special_date was dropped from the
-// schema (replaced by course_days), so it's gone from here too.
+// as an array of 'YYYY-MM-DD' strings. For EO_courses, start_date/end_date
+// no longer exist as Supabase columns; toWixItem derives them from
+// course_days (still listed here so the derived values get UTC-noon
+// anchored). special_date was dropped from the schema too.
 const DATE_FIELDS = {
   EO_dives:   ['start_date', 'end_date', 'cancel_date', 'full_payment_deadline'],
   EO_courses: ['start_date', 'end_date', 'cancel_date', 'full_payment_deadline'],
@@ -140,9 +142,29 @@ function toWixItem(row, collection) {
     if (RESERVED.has(k)) continue;
     out[k] = dateKeys.has(k) ? toUtcNoon(v) : v;
   }
+  // EO_courses no longer stores a start_date/end_date envelope in Supabase
+  // (course_days is the source of truth). Derive it here so the CMS
+  // start_date/end_date fields — which the dynamic course pages filter and
+  // sort on — stay populated.
+  if (collection === 'EO_courses') {
+    const days = courseDayList(row.course_days);
+    out.start_date = days.length ? toUtcNoon(days[0]) : null;
+    out.end_date   = days.length ? toUtcNoon(days[days.length - 1]) : null;
+  }
   const id = row._id ?? row.id;
   out._id = id == null ? undefined : String(id);
   return out;
+}
+
+// Normalize a course_days value (PostgREST may hand back a JSON array or a
+// Postgres array string like "{2026-04-11,2026-04-12}") into a sorted,
+// deduped list of 'YYYY-MM-DD' strings.
+function courseDayList(raw) {
+  let arr = raw;
+  if (typeof arr === 'string') arr = arr.replace(/^\{|\}$/g, '').split(',');
+  if (!Array.isArray(arr)) return [];
+  const days = arr.map((s) => String(s).slice(0, 10)).filter(Boolean);
+  return Array.from(new Set(days)).sort();
 }
 
 async function bulkSaveChunked(collection, items) {

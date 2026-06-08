@@ -492,12 +492,12 @@ export interface Database {
           admin_title: string | null
           display_title: string | null
           calendar_title: string | null
-          start_date: string | null
           start_time: string | null
-          end_date: string | null
           price: string | null
           other_addons: string | null
           dive_days: number | null
+          // Sole source of truth for the days a course runs on (max 4).
+          // Replaced the old start_date/end_date envelope.
           course_days: string[] | null
           // Read by /admin/new's preload-from-past picker.
           course_name: string | null
@@ -520,9 +520,7 @@ export interface Database {
           admin_title?: string | null
           display_title?: string | null
           calendar_title?: string | null
-          start_date?: string | null
           start_time?: string | null
-          end_date?: string | null
           price?: string | null
           other_addons?: string | null
           dive_days?: number | null

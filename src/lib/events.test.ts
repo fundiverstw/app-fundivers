@@ -1,8 +1,9 @@
 /**
  * Covers courseToEvents — a course runs on an explicit list of days
  * (course_days, max 4). Adjacent days group into one continuous segment;
- * gaps emit separate segments. start_date/end_date are the min/max
- * envelope used by the range fetch and per-booking span lookups.
+ * gaps emit separate segments. The range fetch matches courses by
+ * overlapping course_days against every date in the window (there is no
+ * start_date/end_date envelope on EO_courses anymore).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -16,9 +17,7 @@ beforeEach(() => { from.mockReset() })
 interface CourseRow {
   _id: string
   display_title: string
-  start_date: string
   start_time: string | null
-  end_date: string | null
   course_days: string[] | null
   price: string | null
   other_addons: string | null
@@ -29,7 +28,7 @@ interface CourseRow {
 
 function setup(courses: CourseRow[]) {
   const builder: Record<string, unknown> = {}
-  const chain = ['select', 'eq', 'gte', 'lte', 'order', 'in', 'is', 'or']
+  const chain = ['select', 'eq', 'gte', 'lte', 'order', 'in', 'is', 'or', 'overlaps']
   for (const m of chain) builder[m] = () => builder
   builder.then = (cb?: (r: unknown) => unknown) =>
     Promise.resolve({ data: courses, error: null }).then(cb)
@@ -53,7 +52,7 @@ async function fetchAndGet(courseRow: CourseRow) {
 }
 
 describe('courseToEvents — course_days run grouping', () => {
-  const baseCourse: Omit<CourseRow, 'start_date' | 'end_date' | 'course_days'> = {
+  const baseCourse: Omit<CourseRow, 'course_days'> = {
     _id: 'c1',
     display_title: 'AOW',
     start_time: '09:00:00',
@@ -64,12 +63,10 @@ describe('courseToEvents — course_days run grouping', () => {
     calendar_title: null,
   }
 
-  // Convenience: build a row whose envelope matches its day list.
+  // Convenience: build a row from its day list.
   function course(days: string[], extra: Partial<CourseRow> = {}): CourseRow {
     return {
       ...baseCourse,
-      start_date: days[0],
-      end_date: days[days.length - 1],
       course_days: days,
       ...extra,
     }
@@ -136,24 +133,23 @@ describe('courseToEvents — course_days run grouping', () => {
     expect(events[0].start_time_hhmm).toBeNull()
   })
 
-  it('fetches courses by the start_date/end_date envelope overlap', async () => {
-    // The calendar relies on the envelope overlap so a course whose first
-    // day is before the visible window still renders its in-window days.
-    const lteCalls: [string, string][] = []
-    const gteCalls: [string, string][] = []
+  it('fetches courses by overlapping course_days against every date in the window', async () => {
+    // The calendar asks for courses sharing at least one day with the
+    // visible window. A course with a day before the window still renders
+    // its in-window days (only those days emit segments).
+    const overlapsCalls: [string, string[]][] = []
     const courseRows = [course(['2026-04-30', '2026-05-15'])]
     const courseBuilder: Record<string, unknown> = {}
-    const chain = ['select', 'eq', 'order', 'in', 'is', 'or']
+    const chain = ['select', 'eq', 'lte', 'gte', 'order', 'in', 'is', 'or']
     for (const m of chain) courseBuilder[m] = () => courseBuilder
-    courseBuilder.lte = (col: string, val: string) => { lteCalls.push([col, val]); return courseBuilder }
-    courseBuilder.gte = (col: string, val: string) => { gteCalls.push([col, val]); return courseBuilder }
+    courseBuilder.overlaps = (col: string, val: string[]) => { overlapsCalls.push([col, val]); return courseBuilder }
     courseBuilder.then = (cb?: (r: unknown) => unknown) =>
       Promise.resolve({ data: courseRows, error: null }).then(cb)
 
     from.mockImplementation((table: string) => {
       if (table === 'EO_courses') return courseBuilder
       const empty: Record<string, unknown> = {}
-      for (const m of [...chain, 'lte', 'gte']) empty[m] = () => empty
+      for (const m of [...chain, 'overlaps']) empty[m] = () => empty
       empty.then = (cb?: (r: unknown) => unknown) =>
         Promise.resolve({ data: [], error: null }).then(cb)
       return empty
@@ -161,8 +157,13 @@ describe('courseToEvents — course_days run grouping', () => {
 
     const { fetchEventsInRange } = await import('./events')
     const events = await fetchEventsInRange('2026-05-01', '2026-05-31')
-    expect(lteCalls).toContainEqual(['start_date', '2026-05-31'])
-    expect(gteCalls).toContainEqual(['end_date', '2026-05-01'])
+    expect(overlapsCalls).toHaveLength(1)
+    const [col, dates] = overlapsCalls[0]
+    expect(col).toBe('course_days')
+    // Inclusive enumeration of the window: first, last, and a sample middle.
+    expect(dates[0]).toBe('2026-05-01')
+    expect(dates[dates.length - 1]).toBe('2026-05-31')
+    expect(dates).toContain('2026-05-15')
     // The 05-15 day still renders even though 04-30 is outside the window.
     expect(events.find(e => e.start_time.startsWith('2026-05-15'))).toBeDefined()
   })
@@ -197,7 +198,6 @@ describe('fetchEventsForBookings — full course span', () => {
   it('returns one entry per course covering the full span when days split into two runs', async () => {
     setupForBookings({
       _id: 'c-split', display_title: 'Rescue', start_time: '09:00:00',
-      start_date: '2026-05-30', end_date: '2026-06-03',
       course_days: ['2026-05-30', '2026-05-31', '2026-06-03'],
       price: null, other_addons: null, dive_days: null,
       admin_title: null, calendar_title: null,
@@ -213,7 +213,6 @@ describe('fetchEventsForBookings — full course span', () => {
   it('covers the full span when the last day is detached from the rest', async () => {
     setupForBookings({
       _id: 'c-far', display_title: 'Rescue', start_time: '09:00:00',
-      start_date: '2026-05-31', end_date: '2026-06-06',
       course_days: ['2026-05-31', '2026-06-06'],
       price: null, other_addons: null, dive_days: null,
       admin_title: null, calendar_title: null,

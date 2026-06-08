@@ -98,9 +98,8 @@ export async function createTestCourse(admin: DB = adminClient()): Promise<strin
   const { error } = await admin.from('EO_courses' as never).insert({
     _id: id,
     display_title: 'Test Course',
-    start_date: startDate,
     start_time: '09:00:00',
-    end_date: startDate,
+    course_days: [startDate],
   } as never)
   if (error) throw new Error(`createTestCourse failed: ${error.message}`)
   return id

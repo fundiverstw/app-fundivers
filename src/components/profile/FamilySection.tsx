@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
+import { ProfileForm } from '../../pages/ProfilePage'
 import type { Profile } from '../../types/database'
 
 // Diver-facing "Family" panel on /profile. Lets a top-level diver (one
@@ -23,6 +24,8 @@ function FamilyPanel({ parent }: { parent: Profile }) {
   const [children, setChildren] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  // Which child's full profile editor is currently expanded (null = none).
+  const [editingId, setEditingId] = useState<string | null>(null)
   // Bumped after a successful create so the effect refires. Keeps the
   // fetch inline (no separate refresh() helper) which sidesteps the
   // react-hooks/set-state-in-effect lint rule.
@@ -62,18 +65,41 @@ function FamilyPanel({ parent }: { parent: Profile }) {
       ) : (
         <ul className="space-y-1">
           {children.map(c => (
-            <li key={c.id} className="bg-sky-50 border border-sky-200 rounded-lg px-3 py-2">
-              <p className="text-sm font-medium text-blue-900">
-                {c.full_name ?? '(no name)'}
-                {c.display_name && <span className="text-blue-900/80"> “{c.display_name}”</span>}
-              </p>
-              <p className="text-xs text-blue-900/70">
-                {c.cert_agency && c.cert_level ? `${c.cert_agency} ${c.cert_level}` : 'Uncertified'}
-                {c.status && c.status !== 'active' && (
-                  <span className="ml-2 uppercase tracking-wider text-red-700">{c.status}</span>
-                )}
-              </p>
-              {/* Per-child management UI ships in Phase B. */}
+            <li key={c.id} className="bg-sky-50 border border-sky-200 rounded-lg px-3 py-2 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-blue-900">
+                    {c.full_name ?? '(no name)'}
+                    {c.display_name && <span className="text-blue-900/80"> “{c.display_name}”</span>}
+                  </p>
+                  <p className="text-xs text-blue-900/70">
+                    {c.cert_agency && c.cert_level ? `${c.cert_agency} ${c.cert_level}` : 'Uncertified'}
+                    {c.status && c.status !== 'active' && (
+                      <span className="ml-2 uppercase tracking-wider text-red-700">{c.status}</span>
+                    )}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingId(prev => prev === c.id ? null : c.id)}
+                  aria-expanded={editingId === c.id}
+                  className="shrink-0 text-xs font-semibold text-blue-900 border border-sky-300 rounded-lg px-3 py-1 hover:bg-sky-100"
+                >
+                  {editingId === c.id ? 'Close' : 'Edit'}
+                </button>
+              </div>
+              {editingId === c.id && (
+                <div className="border-t border-sky-200 pt-2">
+                  {/* Full profile editor — parent updates the child's row
+                      directly (RLS + storage policies scope it to children). */}
+                  <ProfileForm
+                    key={c.id}
+                    user={{ id: parent.id }}
+                    profile={c}
+                    onSaved={() => { setEditingId(null); setRefreshKey(k => k + 1) }}
+                  />
+                </div>
+              )}
             </li>
           ))}
         </ul>
