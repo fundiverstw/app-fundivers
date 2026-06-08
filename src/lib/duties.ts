@@ -98,10 +98,14 @@ function expandDateRange(start: string, end: string | null): string[] {
 // per 5 non-admin divers. Returns the number of additional instructors needed
 // (0 if staffed, >0 if understaffed).
 export function instructorsNeeded(
-  duties: Pick<Duty, 'role'>[],
+  duties: Pick<Duty, 'role' | 'assignee_id'>[],
   nonAdminDiverCount: number,
 ): number {
   const required = Math.ceil(nonAdminDiverCount / 5)
-  const have = duties.filter(d => d.role === 'instructor').length
+  // Count distinct instructors — a course duty is now stored as one
+  // single-day row per day, so the same instructor can hold several rows.
+  const have = new Set(
+    duties.filter(d => d.role === 'instructor').map(d => d.assignee_id),
+  ).size
   return Math.max(0, required - have)
 }
