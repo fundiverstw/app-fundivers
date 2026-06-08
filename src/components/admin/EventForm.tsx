@@ -539,8 +539,8 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
           <Field label="Dive days">
             <Input type="number" value={form.dive_days} onChange={v => set('dive_days', v)} />
           </Field>
-          <Field label="Capacity (max confirmed; blank = no cap)">
-            <Input type="number" value={form.capacity} onChange={v => set('capacity', v)} />
+          <Field label="Capacity">
+            <Input type="number" value={form.capacity} onChange={v => set('capacity', v)} placeholder="Blank = no cap" />
           </Field>
         </div>
         <Field label="Required certification">
@@ -906,14 +906,15 @@ const INPUT_CLASS =
   'placeholder:text-blue-900/40 focus:outline-none focus:border-red-500'
 
 function Input({
-  value, onChange, type = 'text', required = false,
-}: { value: string; onChange: (v: string) => void; type?: string; required?: boolean }) {
+  value, onChange, type = 'text', required = false, placeholder,
+}: { value: string; onChange: (v: string) => void; type?: string; required?: boolean; placeholder?: string }) {
   return (
     <input
       type={type}
       value={value}
       onChange={e => onChange(e.target.value)}
       required={required}
+      placeholder={placeholder}
       className={INPUT_CLASS}
     />
   )
