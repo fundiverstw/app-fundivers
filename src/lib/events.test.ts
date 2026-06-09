@@ -169,6 +169,40 @@ describe('courseToEvents — course_days run grouping', () => {
   })
 })
 
+describe('fetchEventsInRange — private dives', () => {
+  // Records the .eq() filters applied to the EO_dives query so we can assert
+  // whether private dives are excluded.
+  function setupCaptureDiveEq() {
+    const diveEq: [string, unknown][] = []
+    const chain = ['select', 'eq', 'gte', 'lte', 'order', 'in', 'is', 'or', 'overlaps']
+    const make = (data: unknown, onEq?: (c: string, v: unknown) => void) => {
+      const b: Record<string, unknown> = {}
+      for (const m of chain) {
+        b[m] = (...args: unknown[]) => { if (m === 'eq' && onEq) onEq(args[0] as string, args[1]); return b }
+      }
+      b.then = (cb?: (r: unknown) => unknown) => Promise.resolve({ data, error: null }).then(cb)
+      return b
+    }
+    from.mockImplementation((table: string) =>
+      table === 'EO_dives' ? make([], (c, v) => diveEq.push([c, v])) : make([]))
+    return diveEq
+  }
+
+  it('excludes private dives by default (diver-facing)', async () => {
+    const diveEq = setupCaptureDiveEq()
+    const { fetchEventsInRange } = await import('./events')
+    await fetchEventsInRange('2026-05-01', '2026-05-31')
+    expect(diveEq).toContainEqual(['is_private', false])
+  })
+
+  it('includes private dives when includePrivate is set (admin calendar)', async () => {
+    const diveEq = setupCaptureDiveEq()
+    const { fetchEventsInRange } = await import('./events')
+    await fetchEventsInRange('2026-05-01', '2026-05-31', { includePrivate: true })
+    expect(diveEq).not.toContainEqual(['is_private', false])
+  })
+})
+
 describe('fetchEventsForBookings — full course span', () => {
   // For per-booking lookups (e.g. AdminEventDetailPage → EventStaffSection),
   // the representative event for a course must cover the full span — first

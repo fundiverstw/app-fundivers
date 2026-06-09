@@ -61,7 +61,8 @@ export function AdminEventsPage() {
     let cancelled = false
     ;(async () => {
       const [evs, busy, dutyDays] = await Promise.all([
-        fetchEventsInRange(from, to),
+        // Admin calendar shows private dives (hidden from diver-facing views).
+        fetchEventsInRange(from, to, { includePrivate: true }),
         fetchStaffAvailabilityInRange(from, to),
         user ? fetchMyDutyDays(user.id, from, to) : Promise.resolve(new Map<string, Set<string>>()),
       ])

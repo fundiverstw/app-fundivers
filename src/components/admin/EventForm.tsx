@@ -567,6 +567,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
               <Checkbox checked={form.featured}        onChange={v => set('featured', v)}        label="Featured" />
               <Checkbox checked={form.fully_booked}    onChange={v => set('fully_booked', v)}    label="Fully booked" />
               <Checkbox checked={form.nitrox_required} onChange={v => set('nitrox_required', v)} label="Nitrox required" />
+              <Checkbox checked={form.is_private}      onChange={v => set('is_private', v)}      label="Private (hidden from public calendars)" />
             </div>
             <Field label="Gear rental info">
               <Input value={form.gear_rental} onChange={v => set('gear_rental', v)} />
