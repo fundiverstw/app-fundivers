@@ -26,6 +26,22 @@ balanceDue  = max(0, booking.details.total   − paid)
 All computation lives client-side in
 `src/pages/PaymentsPage.tsx` (`refetch()` → `paymentsByBooking`).
 
+### Card / PayPal surcharge
+
+Credit card and PayPal carry a 5% surcharge (bank transfer / cash pass
+through at face value). It's computed in `RegisterForm` and folded into
+the `total` / `deposit` snapshots — it is **not** a separate ledger line.
+The surcharge applies only to the amount actually put on the card *now*:
+
+- **Pay full now** → 5% of the whole subtotal.
+- **Pay deposit only** → 5% of the **deposit only**; the remainder (paid
+  later, off the card) carries no surcharge. So `total = subtotal + 5% ×
+  deposit` and the stored `deposit` is surcharge-inclusive (what's charged
+  to secure the spot).
+
+`MultiRegisterForm` always pays in full, so its surcharge is always on the
+whole subtotal.
+
 ## Payment row semantics
 
 `payments.status` is one of:

@@ -323,6 +323,40 @@ describe('RegisterForm', () => {
     expect(details.total).toBe(Math.round(2800 * 1.05))
   })
 
+  it('charges the 5% card surcharge on the deposit only (not the full amount) when paying deposit-only by card', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    // sampleEvent: price 2800, deposit_amount 1000.
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/credit card/i))
+    await user.click(screen.getByLabelText(/pay deposit only/i))
+
+    // Pay-now is deposit + 5% of the deposit (1000 + 50); the remainder
+    // (2800 − 1000 = 1800) carries no card surcharge.
+    expect(screen.getByText((_, el) =>
+      el?.tagName === 'P' && /pay deposit\s+ASAP\s*:/i.test(el.textContent ?? '') && /1,050/.test(el.textContent ?? '')
+    )).toBeInTheDocument()
+    expect(screen.getByText((_, el) =>
+      el?.tagName === 'P' && /pay remaining balance by/i.test(el.textContent ?? '') && /1,800/.test(el.textContent ?? '')
+    )).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+    const details = (invoke.mock.calls[0][1] as { body: Record<string, unknown> }).body.details as { total: number; deposit: number }
+    // Total owed = subtotal + 5% of the deposit (2800 + 50), NOT 2800 * 1.05.
+    expect(details.total).toBe(2850)
+    expect(details.total).not.toBe(Math.round(2800 * 1.05))
+    // Stored deposit is surcharge-inclusive (what's charged to the card now).
+    expect(details.deposit).toBe(1050)
+  })
+
   it('applies a 5% surcharge for PayPal payment on the total', async () => {
     setupFrom()
     const user = userEvent.setup()
