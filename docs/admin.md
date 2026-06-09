@@ -48,6 +48,11 @@ All routes are also wrapped by `ProtectedRoute` — see
 - **Per-registrant actions:**
   - Change `bookings.status` to any of
     `pending` / `confirmed` / `waitlisted` / `cancelled`.
+  - **Mark deposit paid** — shown on pending bookings. A pure status
+    shortcut: confirms the booking (deposit received off-app) and does
+    **not** record a payment or change the owed/paid balance. Record the
+    actual amount received via the payments ledger; the owed/paid figures
+    only ever move from recorded payments + amendments.
   - **Approve refund** — visible when `refund_requested_at` is set.
     Sets `status = 'cancelled'`. The actual refund transfer happens
     out-of-band; record it by inserting a `payments` row with
