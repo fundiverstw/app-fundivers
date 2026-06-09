@@ -3,6 +3,7 @@ import {
   createStaffAvailability, updateStaffAvailability, deleteStaffAvailability,
 } from '../../lib/staff-availability'
 import type { StaffBusyEntry } from '../../types/database'
+import { DateField } from '../DateField'
 import {
   MODAL_BACKDROP, MODAL_PANEL, INPUT, INPUT_LABEL,
   BTN_PRIMARY, BTN_DANGER, TEXT_HEADING, TEXT_BODY, TEXT_ERROR,
@@ -116,9 +117,9 @@ export function BusyEntryModal(props: BusyEntryModalProps) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="busy-start-date" className={INPUT_LABEL}>Start date</label>
-              <input
-                id="busy-start-date" type="date" required
-                value={startDate} onChange={e => setStartDate(e.target.value)}
+              <DateField
+                id="busy-start-date" required
+                value={startDate} onChange={setStartDate}
                 className={INPUT}
               />
             </div>
@@ -134,9 +135,9 @@ export function BusyEntryModal(props: BusyEntryModalProps) {
 
           <div>
             <label htmlFor="busy-end-date" className={INPUT_LABEL}>End date (inclusive)</label>
-            <input
-              id="busy-end-date" type="date" required
-              value={endDate} onChange={e => setEndDate(e.target.value)}
+            <DateField
+              id="busy-end-date" required
+              value={endDate} onChange={setEndDate}
               min={startDate || undefined}
               className={INPUT}
             />

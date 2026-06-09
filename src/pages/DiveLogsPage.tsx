@@ -7,6 +7,7 @@ import {
   getLastExportRequestAt, nextExportAvailableAt, requestExport,
 } from '../lib/dive-logs'
 import { GEAR_ITEMS } from '../lib/gear'
+import { DateField } from '../components/DateField'
 import { DIVE_TYPES, GAS_MIXES, type DiveLog, type DiveLogInsert, type DiveType, type GasMix } from '../types/database'
 import {
   CARD, CARD_ELEVATED, BTN_PRIMARY, BTN_GHOST, BTN_DANGER, BTN_LIGHT,
@@ -333,8 +334,8 @@ function DiveLogForm({
 
       <div className={`${CARD_ELEVATED} p-4 grid grid-cols-1 sm:grid-cols-2 gap-3`}>
         <Field label="Date" required>
-          <input type="date" required className={INPUT} value={form.dived_on}
-            onChange={e => set('dived_on', e.target.value)} />
+          <DateField required className={INPUT} value={form.dived_on}
+            onChange={v => set('dived_on', v)} />
         </Field>
         <Field label="Site" required>
           <input type="text" required maxLength={120} className={INPUT} value={form.site}

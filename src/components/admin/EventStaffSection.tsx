@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { createDutyWithNotify, instructorsNeeded } from '../../lib/duties'
 import { DUTY_ROLES, type Duty, type DutyRole, type Profile } from '../../types/database'
+import { DateField } from '../DateField'
 
 interface Props {
   eventType: 'dive' | 'course'
@@ -230,24 +231,22 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
             <>
               <label className="flex items-center gap-2">
                 <span className="text-blue-900 font-medium shrink-0 w-12">{isMultiDay ? 'From' : 'Date'}</span>
-                <input
-                  type="date"
+                <DateField
                   value={startDate}
                   min={eventStart}
                   max={eventEnd ?? eventStart}
-                  onChange={e => setStartDate(e.target.value)}
+                  onChange={setStartDate}
                   className="flex-1 min-w-0 bg-white border border-sky-300 rounded px-2 py-1 text-blue-900"
                 />
               </label>
               {isMultiDay && (
                 <label className="flex items-center gap-2">
                   <span className="text-blue-900 font-medium shrink-0 w-12">To</span>
-                  <input
-                    type="date"
+                  <DateField
                     value={endDate}
                     min={startDate}
                     max={eventEnd ?? eventStart}
-                    onChange={e => setEndDate(e.target.value)}
+                    onChange={setEndDate}
                     className="flex-1 min-w-0 bg-white border border-sky-300 rounded px-2 py-1 text-blue-900"
                   />
                 </label>

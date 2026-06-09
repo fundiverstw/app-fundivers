@@ -12,6 +12,7 @@ import { uploadNitroxCard } from '../../lib/nitrox-card'
 import { uploadDeepCard } from '../../lib/deep-card'
 import { isHeicFile } from '../../lib/image-compress'
 import { TurnstileWidget } from './TurnstileWidget'
+import { DateField } from '../DateField'
 import type { AppEvent, Booking, BookingDetails, CancellationPolicy, Database, EOAddon, EORoom, Profile } from '../../types/database'
 
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
@@ -1451,15 +1452,24 @@ function TextField({
   return (
     <label className="block">
       <span className="block text-xs text-blue-900 font-medium mb-1">{label}</span>
-      <input
-        type={type}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        required={required}
-        placeholder={placeholder}
-        min={min}
-        className="w-full bg-white border border-sky-300 rounded-lg px-2 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
-      />
+      {type === 'date' ? (
+        <DateField
+          value={value}
+          onChange={onChange}
+          required={required}
+          className="w-full bg-white border border-sky-300 rounded-lg px-2 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
+        />
+      ) : (
+        <input
+          type={type}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          required={required}
+          placeholder={placeholder}
+          min={min}
+          className="w-full bg-white border border-sky-300 rounded-lg px-2 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
+        />
+      )}
       {hint && <span className="block text-xs text-blue-900/70 mt-1">{hint}</span>}
     </label>
   )
