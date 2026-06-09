@@ -564,7 +564,7 @@ export interface Database {
           name: string
           name_zh: string | null
           rank: number
-          /** 'PADI' / 'BSAC' / 'CMAS' / 'SSI' / 'NAUI' / 'SAA'. */
+          /** 'PADI' / 'BSAC' / 'CMAS' / 'SSI' / 'NAUI' / 'SAA' / 'SDI' / 'TDI'. */
           organization: string
           /** PADI rank this level resolves to for prereq comparisons.
            *  Self-id for PADI rows; closest PADI rank for agency rows. */
