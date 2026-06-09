@@ -541,7 +541,20 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const transportIncluded = transportSurcharge <= 0
   const transportCost = !transportIncluded && needsTransport === true ? transportSurcharge : 0
   const subTotal = base + gearCost + roomCost + addonsCost + transportCost + ((showNitroxAddon && addNitroxCourse) ? NITROX_COURSE_FEE : 0)
-  const total = Math.round(subTotal * (1 + paymentSurcharge))
+
+  // The card/PayPal surcharge applies only to what actually goes on the card
+  // *now*: the deposit when the diver pays deposit-only, otherwise the whole
+  // subtotal. Charging 5% of the full amount when only the deposit is on the
+  // card over-charges — the remainder is paid later, off the card.
+  const depositFace = hasDeposit ? Math.min(event.deposit_amount ?? 0, subTotal) : 0
+  const payingDepositOnly = hasDeposit && payDepositOnly
+  const fullSurcharge    = Math.round(subTotal * paymentSurcharge)
+  const depositSurcharge = Math.round(depositFace * paymentSurcharge)
+  const total = subTotal + (payingDepositOnly ? depositSurcharge : fullSurcharge)
+  // "How much to pay now" figures for each option:
+  const fullNow        = subTotal + fullSurcharge            // pay full now (surcharge on everything)
+  const depositNow     = depositFace + depositSurcharge      // pay deposit now (surcharge on the deposit only)
+  const remainderLater = Math.max(0, subTotal - depositFace) // balance due later, no card surcharge
 
   function toggleItem(item: string) {
     // First toggle promotes the rendered default (or existing list) into
@@ -645,7 +658,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       pay_deposit_only: hasDeposit ? payDepositOnly : false,
       nitrox_course_addon: showNitroxAddon && addNitroxCourse,
       total,
-      deposit: event.deposit_amount ?? undefined,
+      // Surcharge-inclusive when paying by card/PayPal — the actual amount due
+      // to secure the spot. Equals the face deposit for bank transfer / cash.
+      deposit: hasDeposit ? depositNow : undefined,
       // Stamp the ack only when there's a policy and the diver ticked the
       // box — preserving any prior ack on the existing booking otherwise.
       cancellation_policy_acked_at: cancelPolicy && policyAcked
@@ -1232,7 +1247,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             {addonsCost > 0       && <Row label="Add-ons"        value={addonsCost}   currency={event.currency} />}
             {transportCost > 0    && <Row label="Transport"      value={transportCost} currency={event.currency} />}
             {(showNitroxAddon && addNitroxCourse) && <Row label="Nitrox course" value={NITROX_COURSE_FEE} currency={event.currency} />}
-            {paymentSurcharge > 0 && <Row label="Credit surcharge (5%)" value={total - subTotal} currency={event.currency} />}
+            {paymentSurcharge > 0 && <Row label={`Credit surcharge (5%${payingDepositOnly ? ' of deposit' : ''})`} value={total - subTotal} currency={event.currency} />}
             <div className="border-t border-sky-200 pt-1 mt-1">
               <Row label="Total" value={total} currency={event.currency} bold />
             </div>
@@ -1246,7 +1261,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 <span className="flex-1">
                   <span className="block">Pay full amount now</span>
                   <span className="block text-xs text-blue-950 font-medium">
-                    {event.currency} {total.toLocaleString()} — settles your booking in one go.
+                    {event.currency} {fullNow.toLocaleString()} — settles your booking in one go.
                   </span>
                 </span>
               </label>
@@ -1255,7 +1270,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 <span className="flex-1">
                   <span className="block">Pay deposit only</span>
                   <span className="block text-xs text-blue-950 font-medium">
-                    {event.currency} {(event.deposit_amount ?? 0).toLocaleString()} now, remainder due before the trip.
+                    {event.currency} {depositNow.toLocaleString()} now, remainder due before the trip.
                   </span>
                 </span>
               </label>
@@ -1271,11 +1286,11 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               <div className="border-t border-sky-200 pt-1 mt-1 space-y-0.5">
                 <p>
                   Pay deposit <strong>ASAP</strong>:{' '}
-                  <strong>{event.currency} {(event.deposit_amount ?? 0).toLocaleString()}</strong>
+                  <strong>{event.currency} {depositNow.toLocaleString()}</strong>
                 </p>
                 <p>
                   Pay remaining balance by {formatDeadline(fullPaymentDeadline)}:{' '}
-                  <strong>{event.currency} {Math.max(0, total - (event.deposit_amount ?? 0)).toLocaleString()}</strong>
+                  <strong>{event.currency} {remainderLater.toLocaleString()}</strong>
                 </p>
               </div>
             )}
@@ -1307,7 +1322,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           {!isEdit && (
             <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded p-2">
               Please note: your reservation is not confirmed until the deposit
-              {event.deposit_amount != null && ` (${event.currency} ${event.deposit_amount.toLocaleString()})`} has been paid.
+              {event.deposit_amount != null && ` (${event.currency} ${depositNow.toLocaleString()})`} has been paid.
             </p>
           )}
 
