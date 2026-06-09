@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { useForm, useWatch, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { supabase } from '../lib/supabase'
@@ -13,6 +13,7 @@ import { uploadDeepCard, getDeepCardSignedUrl, deleteDeepCard } from '../lib/dee
 import { isHeicFile } from '../lib/image-compress'
 import { fetchCreditsForUser, openCreditBalance } from '../lib/credits'
 import { FamilySection } from '../components/profile/FamilySection'
+import { DateField } from '../components/DateField'
 import type { Profile, CertLevel } from '../types/database'
 import {
   SHOE_UNITS,
@@ -337,7 +338,13 @@ export function ProfileForm({ user, profile, onSaved }: {
           </Field>
           <Field label="Phone"><input {...register('phone')} type="tel" className={inputClass} /></Field>
           <Field label="Date of birth" required>
-            <input {...register('date_of_birth')} type="date" className={inputClass} />
+            <Controller
+              control={control}
+              name="date_of_birth"
+              render={({ field }) => (
+                <DateField value={field.value ?? ''} onChange={field.onChange} className={inputClass} />
+              )}
+            />
             {errors.date_of_birth && <p className="text-red-600 text-xs mt-1">{errors.date_of_birth.message}</p>}
           </Field>
           <Field label="Nationality"><input {...register('nationality')} className={inputClass} /></Field>
@@ -479,7 +486,15 @@ export function ProfileForm({ user, profile, onSaved }: {
             <input {...register('logged_dives')} type="number" min="0" className={inputClass} />
             {errors.logged_dives && <p className="text-red-600 text-xs mt-1">{errors.logged_dives.message}</p>}
           </Field>
-          <Field label="Last dive"><input {...register('last_dive_date')} type="date" className={inputClass} /></Field>
+          <Field label="Last dive">
+            <Controller
+              control={control}
+              name="last_dive_date"
+              render={({ field }) => (
+                <DateField value={field.value ?? ''} onChange={field.onChange} className={inputClass} />
+              )}
+            />
+          </Field>
           <label className="flex items-center gap-2 text-sm text-blue-900">
             <input type="checkbox" {...register('nitrox_certified')} className="accent-blue-900" />
             Nitrox certified

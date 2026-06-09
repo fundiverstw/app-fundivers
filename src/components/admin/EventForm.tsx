@@ -8,6 +8,7 @@ import {
   formStateFromDive,
   type FormState,
 } from './event-form-state'
+import { DateField } from '../DateField'
 
 // Shared form for creating and editing an EO_dive / EO_course. Owns all
 // field state, the lookup data (prices / rooms / addons / cert levels),
@@ -908,6 +909,11 @@ const INPUT_CLASS =
 function Input({
   value, onChange, type = 'text', required = false, placeholder,
 }: { value: string; onChange: (v: string) => void; type?: string; required?: boolean; placeholder?: string }) {
+  // Dates route through DateField so they can be typed, not just picked from
+  // a (sometimes month-at-a-time) native calendar.
+  if (type === 'date') {
+    return <DateField value={value} onChange={onChange} required={required} className={INPUT_CLASS} />
+  }
   return (
     <input
       type={type}
