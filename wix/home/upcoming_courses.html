@@ -99,14 +99,12 @@
 
     // Render the days a course runs on (EO_courses.course_days, max 4),
     // grouping consecutive dates into ranges — e.g. "May 9–10, May 16".
-    // Falls back to the start/end envelope for any legacy row without the
-    // array. Dates are formatted in UTC so a bare calendar date doesn't
-    // shift a day for viewers west of UTC.
+    // Dates are formatted in UTC so a bare calendar date doesn't shift a
+    // day for viewers west of UTC.
     function courseDates(c) {
       let raw = c.course_days;
       if (typeof raw === 'string') raw = raw.replace(/^\{|\}$/g, '').split(',');
       let days = (Array.isArray(raw) ? raw : []).map(s => String(s).slice(0, 10)).filter(Boolean);
-      if (!days.length) days = [c.start_date, c.end_date].filter(Boolean).map(s => String(s).slice(0, 10));
       days = Array.from(new Set(days)).sort();
       if (!days.length) return '';
       const runs = [];

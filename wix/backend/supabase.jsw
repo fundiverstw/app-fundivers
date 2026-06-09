@@ -47,6 +47,19 @@ function resolveStartingAt(item, priceMap) {
   return priceMap[priceId]?.starting_at ?? null;
 }
 
+// EO_courses runs on an explicit list of days (course_days, a date[], max 4)
+// — this replaced the old start_date/end_date envelope. PostgREST serializes
+// the array as JS 'YYYY-MM-DD' strings; tolerate a Postgres array literal
+// ('{2026-05-09,2026-05-10}') just in case. Returns sorted unique day keys.
+function courseDayKeys(item) {
+  let raw = item.course_days;
+  if (typeof raw === 'string') raw = raw.replace(/^\{|\}$/g, '').split(',');
+  const keys = (Array.isArray(raw) ? raw : [])
+    .map(s => String(s).slice(0, 10))
+    .filter(Boolean);
+  return Array.from(new Set(keys)).sort();
+}
+
 export async function queryTable(table, filters = {}) {
   const key = await getKey();
   const params = new URLSearchParams(filters).toString();
@@ -71,16 +84,25 @@ export async function getUpcomingDives(limit = 4) {
 export async function getUpcomingCourses(limit = 4) {
   const key = await getKey();
   const todayStr = new Date().toISOString().split('T')[0];
-  const params = `start_date=gte.${todayStr}&order=start_date.asc&limit=${limit}`;
+  // EO_courses has no start_date column to filter/order on — a course runs on
+  // course_days (a date[]). PostgREST can't gte/order by an array's min, so
+  // fetch the catalog and pick the upcoming ones (earliest day today-or-later)
+  // sorted by that day, client-side. The table is small (marketing catalog).
   const [courses, priceMap] = await Promise.all([
-    fetchTable(key, 'EO_courses', params),
+    fetchTable(key, 'EO_courses'),
     fetchPriceMap(key),
   ]);
-  return courses.map((item, i) => ({
-    ...item,
-    _id: String(item._id || item.id || i),
-    starting_at: resolveStartingAt(item, priceMap),
-  }));
+  return courses
+    .map((item, i) => ({
+      ...item,
+      _id: String(item._id || item.id || i),
+      starting_at: resolveStartingAt(item, priceMap),
+      _firstDay: courseDayKeys(item)[0] || null,
+    }))
+    .filter(c => c._firstDay && c._firstDay >= todayStr)
+    .sort((a, b) => a._firstDay.localeCompare(b._firstDay))
+    .slice(0, limit)
+    .map(({ _firstDay, ...c }) => c);
 }
 
 function slugify(s) {
@@ -250,23 +272,7 @@ export async function getCalendarEvents() {
     fetchPriceMap(key),
   ]);
 
-  const toStr = (val) => val ? new Date(val).toISOString().split('T')[0] : null;
   const dayDiff = (a, b) => Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000);
-
-  // A course runs on an explicit list of days (EO_courses.course_days, a
-  // date[], max 4) — this replaced the old single special_date column.
-  // PostgREST serializes the array as a JS array of 'YYYY-MM-DD' strings;
-  // tolerate a Postgres array literal ('{2026-05-09,2026-05-10}') just in
-  // case, and fall back to the start/end envelope for any legacy row.
-  const courseDayKeys = (item) => {
-    let raw = item.course_days;
-    if (typeof raw === 'string') raw = raw.replace(/^\{|\}$/g, '').split(',');
-    let keys = (Array.isArray(raw) ? raw : []).map(toStr).filter(Boolean);
-    if (keys.length === 0) {
-      keys = [toStr(item.start_date), toStr(item.end_date)].filter(Boolean);
-    }
-    return Array.from(new Set(keys)).sort();
-  };
 
   // Group sorted days into runs of consecutive dates → one calendar
   // segment per run. Adjacent days render as a single continuous bar;
