@@ -45,7 +45,7 @@ function routedRender(start = '/admin') {
 describe('AdminShell pending badge', () => {
   it('shows pending count for admin when > 0', async () => {
     useAuthMock.mockReturnValue({
-      profile: { id: 'a1', role: 'admin', display_name: 'Ada' },
+      profile: { id: 'a1', role: 'admin', nickname: 'Ada' },
       signOut: vi.fn(),
     })
     from.mockReturnValue(buildPendingCountQuery(3))
@@ -55,7 +55,7 @@ describe('AdminShell pending badge', () => {
 
   it('hides badge when count is 0', async () => {
     useAuthMock.mockReturnValue({
-      profile: { id: 'a1', role: 'admin', display_name: 'Ada' },
+      profile: { id: 'a1', role: 'admin', nickname: 'Ada' },
       signOut: vi.fn(),
     })
     from.mockReturnValue(buildPendingCountQuery(0))
@@ -67,7 +67,7 @@ describe('AdminShell pending badge', () => {
 
   it('does not query for staff users', async () => {
     useAuthMock.mockReturnValue({
-      profile: { id: 's1', role: 'staff', display_name: 'Sam' },
+      profile: { id: 's1', role: 'staff', nickname: 'Sam' },
       signOut: vi.fn(),
     })
     routedRender()

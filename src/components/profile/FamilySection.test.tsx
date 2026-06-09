@@ -26,7 +26,7 @@ const parent = { id: 'p1', parent_account: null, status: 'active' } as unknown a
 function childRow(over: Partial<Profile>): Profile {
   return {
     id: 'c1', parent_account: 'p1', status: 'active',
-    full_name: 'Kid One', display_name: null, cert_agency: null, cert_level: null,
+    name: 'Kid One', nickname: null, cert_agency: null, cert_level: null,
     ...over,
   } as unknown as Profile
 }
@@ -35,7 +35,7 @@ beforeEach(() => from.mockReset())
 
 describe('FamilySection per-child editor', () => {
   it('toggles the full ProfileForm for a child and collapses it on save', async () => {
-    from.mockImplementation(() => mockQueryBuilder({ data: [childRow({ id: 'c1', full_name: 'Kid One' })] }))
+    from.mockImplementation(() => mockQueryBuilder({ data: [childRow({ id: 'c1', name: 'Kid One' })] }))
 
     const user = userEvent.setup()
     render(<FamilySection parent={parent} />)

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { personName } from '../../lib/names'
 import { supabase } from '../../lib/supabase'
 import { formatEventSpan } from '../../lib/events'
 import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/payment-instructions'
@@ -65,7 +66,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
       .from('profiles')
       .select('*')
       .eq('parent_account', userId)
-      .order('full_name', { ascending: true })
+      .order('name', { ascending: true })
       .then(({ data }) => {
         if (cancelled) return
         setChildren((data ?? []) as Profile[])
@@ -97,7 +98,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   // actually matters for a confirmed-attendance form. Card uploads are
   // skipped in this flow (signed-in only; assume on-file or admin
   // follow-up). The diver can update the full profile from /profile.
-  const [fullName, setFullName]               = useState(profile?.full_name ?? '')
+  const [fullName, setFullName]               = useState(profile?.name ?? '')
   const [phone, setPhone]                     = useState(profile?.phone ?? '')
   const [contactMethod, setContactMethod]     = useState<ContactMethod | ''>(profile?.contact_method ?? '')
   const [contactId, setContactId]             = useState(profile?.contact_id ?? '')
@@ -156,7 +157,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
 
     const nullish = (v: string) => v.trim() === '' ? null : v.trim()
     const profilePatch: ProfileUpdate = {
-      full_name:               nullish(fullName),
+      name:               nullish(fullName),
       phone:                   nullish(phone),
       contact_method:          (contactMethod || null) as ContactMethod | null,
       contact_id:              nullish(contactId),
@@ -342,10 +343,10 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                         aria-label={`Diver for ${ev.title}`}
                         className="w-full bg-white border border-sky-300 rounded-lg px-2 py-1.5 text-sm text-blue-900"
                       >
-                        <option value="">Myself ({profile?.display_name ?? profile?.full_name ?? 'me'})</option>
+                        <option value="">Myself ({personName(profile?.name, profile?.nickname) || 'me'})</option>
                         {children.map(c => (
                           <option key={c.id} value={c.id}>
-                            {c.full_name ?? '(no name)'}{c.display_name ? ` “${c.display_name}”` : ''}
+                            {c.name ?? '(no name)'}{c.nickname ? ` (${c.nickname})` : ''}
                           </option>
                         ))}
                       </select>
@@ -438,7 +439,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                   : profile
                 const showNitroxAddon = ev.nitrox_required && !(targetProfile?.nitrox_certified ?? false)
                 const targetLabel = targetForDiverId
-                  ? (targetProfile?.display_name ?? targetProfile?.full_name ?? '(child)')
+                  ? (personName(targetProfile?.name, targetProfile?.nickname) || '(child)')
                   : null
                 return (
                   <div key={ev.id} className="bg-sky-50 border border-sky-200 rounded-lg p-3 space-y-2">

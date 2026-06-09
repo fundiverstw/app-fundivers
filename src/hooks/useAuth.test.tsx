@@ -66,7 +66,7 @@ describe('useAuth', () => {
 
   it('fetches profile when session exists', async () => {
     const session = { user: { id: 'u1' } }
-    const profile = { id: 'u1', full_name: 'Ada', role: 'customer' }
+    const profile = { id: 'u1', name: 'Ada', role: 'customer' }
     getSession.mockResolvedValue({ data: { session } })
     profileSingle.mockResolvedValue({ data: profile })
 

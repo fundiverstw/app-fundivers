@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { personName } from '../../lib/names'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useToast } from '../../hooks/useToast'
@@ -133,7 +134,7 @@ export function AdminApplicationsPage() {
               >
                 <div className="min-w-0">
                   <div className="font-semibold text-blue-950 truncate">
-                    {u.full_name || u.display_name || '(no name yet)'}
+                    {personName(u.name, u.nickname) || '(no name yet)'}
                   </div>
                   <div className={`text-xs ${TEXT_MUTED}`}>
                     submitted {format(new Date(u.created_at), 'PP')}

@@ -159,10 +159,8 @@ export interface Database {
           id: string
           created_at: string
           updated_at: string
-          full_name: string | null
-          display_name: string | null
-          /** Optional name in a non-Latin script (kanji, zhuyin, hangul, etc.). */
-          name_alt: string | null
+          name: string | null
+          nickname: string | null
           phone: string | null
           date_of_birth: string | null
           nationality: string | null
@@ -212,9 +210,8 @@ export interface Database {
           id: string
           created_at?: string
           updated_at?: string
-          full_name?: string | null
-          display_name?: string | null
-          name_alt?: string | null
+          name?: string | null
+          nickname?: string | null
           phone?: string | null
           date_of_birth?: string | null
           nationality?: string | null
@@ -249,9 +246,8 @@ export interface Database {
         Update: {
           id?: string
           updated_at?: string
-          full_name?: string | null
-          display_name?: string | null
-          name_alt?: string | null
+          name?: string | null
+          nickname?: string | null
           phone?: string | null
           date_of_birth?: string | null
           nationality?: string | null

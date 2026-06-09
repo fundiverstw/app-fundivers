@@ -223,7 +223,7 @@ it deliberately, not by spreading.
 
 ```ts
 const PROFILE_PATCH_ALLOW = new Set([
-  "full_name", "name_alt", "display_name", "date_of_birth",
+  "name", "nickname", "date_of_birth",
   "nationality", "id_number", "contact_method", "contact_id",
   "cert_level", "cert_agency", "height_cm", "weight_kg",
   "shoe_size", "nitrox_certified", "deep_certified",

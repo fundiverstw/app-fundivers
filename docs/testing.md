@@ -45,7 +45,7 @@ beforeEach(() => {
 })
 
 it('does a thing', async () => {
-  useAuthMock.mockReturnValue({ user: { id: 'u1' }, profile: { id: 'u1', full_name: 'Ada' } })
+  useAuthMock.mockReturnValue({ user: { id: 'u1' }, profile: { id: 'u1', name: 'Ada' } })
   from.mockReturnValue(mockQueryBuilder({ data: [...] }))
   renderWithRouter(<SomePage />)
   // drive UI, assert

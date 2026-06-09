@@ -95,7 +95,7 @@ describe('parent ↔ child RLS', () => {
 
     const { error: childErr } = await asParent
       .from('profiles')
-      .update({ display_name: 'Renamed by parent' } as never)
+      .update({ nickname: 'Renamed by parent' } as never)
       .eq('id', child.id)
     expect(childErr).toBeNull()
 
@@ -103,11 +103,11 @@ describe('parent ↔ child RLS', () => {
     // back through admin to verify nothing changed.
     await asParent
       .from('profiles')
-      .update({ display_name: 'Hacked' } as never)
+      .update({ nickname: 'Hacked' } as never)
       .eq('id', unrelated.id)
     const { data: unrelatedRow } = await admin
-      .from('profiles').select('display_name').eq('id', unrelated.id).single<{ display_name: string | null }>()
-    expect(unrelatedRow?.display_name).not.toBe('Hacked')
+      .from('profiles').select('nickname').eq('id', unrelated.id).single<{ nickname: string | null }>()
+    expect(unrelatedRow?.nickname).not.toBe('Hacked')
   })
 
   it('parent can SELECT bookings belonging to their child', async () => {

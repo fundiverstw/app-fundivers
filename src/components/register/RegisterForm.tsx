@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { personName } from '../../lib/names'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { CURRENT_TERMS_VERSION } from '../../lib/terms-version'
@@ -146,7 +147,7 @@ export function RegisterFormBody(props: RegisterFormBodyProps) {
       .from('profiles')
       .select('*')
       .eq('parent_account', userId)
-      .order('full_name', { ascending: true })
+      .order('name', { ascending: true })
       .then(({ data }) => {
         if (cancelled) return
         const rows = (data ?? []) as Profile[]
@@ -225,7 +226,7 @@ function formatSelectionLabel(selection: Profile[], selfId: string | null): stri
   const names = selection.map(p =>
     (selfId && p.id === selfId)
       ? 'Myself'
-      : (p.display_name ?? p.full_name ?? '(unnamed)')
+      : (personName(p.name, p.nickname) || '(unnamed)')
   )
   return names.join(', ')
 }
@@ -286,21 +287,21 @@ function DiverPickerStep({
                   type="checkbox"
                   checked={checked}
                   onChange={() => toggle(p.id)}
-                  aria-label={isSelf ? 'Myself' : (p.full_name ?? '(unnamed child)')}
+                  aria-label={isSelf ? 'Myself' : (p.name ?? '(unnamed child)')}
                   className="accent-blue-900 mt-1"
                 />
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-blue-900">
                     {isSelf ? 'Myself' : (
                       <>
-                        {p.full_name ?? '(no name)'}
-                        {p.display_name && <span className="text-blue-900/80"> “{p.display_name}”</span>}
+                        {p.name ?? '(no name)'}
+                        {p.nickname && <span className="text-blue-900/80"> ({p.nickname})</span>}
                       </>
                     )}
                   </p>
                   <p className="text-xs text-blue-900/70">
                     {isSelf
-                      ? (p.display_name ?? p.full_name ?? '(your account)')
+                      ? (personName(p.name, p.nickname) || '(your account)')
                       : (p.cert_agency && p.cert_level ? `${p.cert_agency} ${p.cert_level}` : 'Uncertified')}
                     {!isSelf && p.status && p.status !== 'active' && (
                       <span className="ml-2 uppercase tracking-wider text-red-700">{p.status}</span>
@@ -439,8 +440,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // missing values so the inputs are controlled). On submit we UPSERT any
   // changes back to profiles so a Wix visitor who fills these in the first
   // time has them pre-filled for every future registration.
-  const [fullName, setFullName]  = useState(profile?.full_name  ?? '')
-  const [nameAlt, setNameAlt]    = useState(profile?.name_alt   ?? '')
+  const [fullName, setFullName]  = useState(profile?.name  ?? '')
+  const [nickname, setNickname]  = useState(profile?.nickname  ?? '')
   const [dob, setDob]            = useState(profile?.date_of_birth ?? '')
   const [nationality, setNationality] = useState(profile?.nationality ?? '')
   const [idNumber, setIdNumber]  = useState(profile?.id_number  ?? '')
@@ -598,8 +599,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
     const nullish = (v: string) => v.trim() === '' ? null : v.trim()
     const profilePatch: ProfileUpdate = {
-      full_name:               nullish(fullName),
-      name_alt:                nullish(nameAlt),
+      name:               nullish(fullName),
+      nickname:                nullish(nickname),
       date_of_birth:           nullish(dob),
       nationality:             nullish(nationality),
       id_number:               nullish(idNumber),
@@ -771,7 +772,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       })
       const settled = await Promise.allSettled(calls)
       const results = settled.map((res, i) => ({
-        targetName: additionalTargets[i].display_name ?? additionalTargets[i].full_name ?? '(diver)',
+        targetName: personName(additionalTargets[i].name, additionalTargets[i].nickname) || '(diver)',
         ok:    res.status === 'fulfilled',
         error: res.status === 'rejected'
           ? (res.reason instanceof Error ? res.reason.message : String(res.reason))
@@ -871,12 +872,18 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           )}
 
           <div className="space-y-3">
-            <TextField label="Full name *"      value={fullName}      onChange={setFullName} required />
             <TextField
-              label="Name in another script (optional)"
-              value={nameAlt}
-              onChange={setNameAlt}
-              placeholder="e.g. 陳大文 / 山田太郎 / 김민수"
+              label="Name *"
+              value={fullName}
+              onChange={setFullName}
+              required
+              hint="First and last name, exactly as it appears on your passport / ID."
+            />
+            <TextField
+              label="Nickname (optional)"
+              value={nickname}
+              onChange={setNickname}
+              placeholder="An English name, alias, or what you'd like to be called"
             />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <TextField label="Date of birth" type="date" value={dob} onChange={setDob} />
@@ -1430,7 +1437,7 @@ function PaymentInstructionLine({ line }: { line: string }) {
 // Small labeled input for the About-you step. `label` wraps the input so
 // getByLabelText / screen readers find the association without needing id.
 function TextField({
-  label, value, onChange, type = 'text', required, placeholder, min,
+  label, value, onChange, type = 'text', required, placeholder, min, hint,
 }: {
   label: string
   value: string
@@ -1439,6 +1446,7 @@ function TextField({
   required?: boolean
   placeholder?: string
   min?: number
+  hint?: string
 }) {
   return (
     <label className="block">
@@ -1452,6 +1460,7 @@ function TextField({
         min={min}
         className="w-full bg-white border border-sky-300 rounded-lg px-2 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
       />
+      {hint && <span className="block text-xs text-blue-900/70 mt-1">{hint}</span>}
     </label>
   )
 }

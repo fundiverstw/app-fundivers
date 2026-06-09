@@ -33,7 +33,7 @@ const sampleEvent = (id: string, title: string): AppEvent => ({
 
 const parentProfile: Profile = {
   id: 'p1', created_at: '', updated_at: '',
-  full_name: 'Parent Pat', display_name: 'Pat', phone: null,
+  name: 'Parent Pat', nickname: 'Pat', phone: null,
   date_of_birth: null, nationality: null, id_number: null,
   emergency_contact_name: null, emergency_contact_phone: null,
   cert_agency: 'PADI', cert_level: 'AOW',
@@ -47,7 +47,7 @@ const parentProfile: Profile = {
 }
 
 const childProfile: Profile = {
-  ...parentProfile, id: 'c1', full_name: 'Kid Junior', display_name: 'KJ',
+  ...parentProfile, id: 'c1', name: 'Kid Junior', nickname: 'KJ',
   cert_level: null, cert_card_path: null,
 }
 
@@ -129,7 +129,7 @@ describe('MultiRegisterForm parent diver picker', () => {
     expect(e1Body.target_user_id).toBe('c1')
     expect(e1Body.profile_patch).toEqual({})
     expect(e2Body.target_user_id).toBeUndefined()
-    expect((e2Body.profile_patch as Record<string, unknown>).full_name).toBe('Parent Pat')
+    expect((e2Body.profile_patch as Record<string, unknown>).name).toBe('Parent Pat')
 
     // Both share the same group_id.
     expect(e1Body.group_id).toBe(e2Body.group_id)

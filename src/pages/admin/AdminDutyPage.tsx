@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { personName } from '../../lib/names'
 import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
@@ -155,7 +156,7 @@ function DutyRow({ enriched, highlight }: { enriched: Enriched; highlight?: bool
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium text-blue-900 truncate">
-            {assignee?.display_name || assignee?.full_name || '(unknown admin)'}
+            {personName(assignee?.name, assignee?.nickname) || '(unknown admin)'}
           </p>
           <p className="text-xs text-blue-900 font-medium">{dateSpan}</p>
         </div>

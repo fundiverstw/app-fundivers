@@ -62,7 +62,7 @@ function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites }
           // Caller-profile fetch (target_user_id path) returns role;
           // target-profile fetch returns parent_account; readback for
           // PDF returns a minimal profile.
-          return { role: opts.callerRole ?? 'diver', parent_account: opts.targetParentAccount ?? null, full_name: 'Test', name_alt: null }
+          return { role: opts.callerRole ?? 'diver', parent_account: opts.targetParentAccount ?? null, name: 'Test' }
         case 'bookings':
           return { id: 'b1', status: opts.bookingStatus ?? 'pending', notes: null }
         case 'EO_dives':
@@ -251,12 +251,12 @@ describe('handleRegistration — guest path security (audit C2)', () => {
       email:    'mallory@example.com',
       password: 'hunter2hunter2',
       turnstile_token: 'tk',
-      profile_patch: { role: 'admin', full_name: 'Mallory' },
+      profile_patch: { role: 'admin', name: 'Mallory' },
     }), deps)
     expect(res.status).toBe(200)
     expect(captured.profileUpdate).toHaveLength(1)
     expect(captured.profileUpdate[0]).not.toHaveProperty('role')
-    expect(captured.profileUpdate[0].full_name).toBe('Mallory')
+    expect(captured.profileUpdate[0].name).toBe('Mallory')
   })
 
   it('forces status="pending" on guest path even if patch contained "active"', async () => {
@@ -266,7 +266,7 @@ describe('handleRegistration — guest path security (audit C2)', () => {
       email:    'g@example.com',
       password: 'hunter2hunter2',
       turnstile_token: 'tk',
-      profile_patch: { status: 'active', full_name: 'G' },
+      profile_patch: { status: 'active', name: 'G' },
     }), deps)
     expect(captured.profileUpdate[0].status).toBe('pending')
   })
@@ -278,7 +278,7 @@ describe('handleRegistration — guest path security (audit C2)', () => {
       email:    'g@example.com',
       password: 'hunter2hunter2',
       turnstile_token: 'tk',
-      profile_patch: { parent_account: 'someone-else-uid', full_name: 'G' },
+      profile_patch: { parent_account: 'someone-else-uid', name: 'G' },
     }), deps)
     expect(captured.profileUpdate[0]).not.toHaveProperty('parent_account')
   })
@@ -351,10 +351,10 @@ describe('handleRegistration — target_user_id (on-behalf-of) path security', (
     await handleRegistration(postJson({
       ...goodBody,
       target_user_id: 'child-uid',
-      profile_patch:  { role: 'admin', full_name: 'Innocent Child' },
+      profile_patch:  { role: 'admin', name: 'Innocent Child' },
     }, { Authorization: 'Bearer parent-jwt' }), deps)
     expect(captured.profileUpdate[0]).not.toHaveProperty('role')
-    expect(captured.profileUpdate[0].full_name).toBe('Innocent Child')
+    expect(captured.profileUpdate[0].name).toBe('Innocent Child')
   })
 
   it('on-behalf-of path does NOT force status="pending" (only guest signup does)', async () => {
@@ -362,7 +362,7 @@ describe('handleRegistration — target_user_id (on-behalf-of) path security', (
     await handleRegistration(postJson({
       ...goodBody,
       target_user_id: 'some-target-uid',
-      profile_patch:  { status: 'active', full_name: 'X' },
+      profile_patch:  { status: 'active', name: 'X' },
     }, { Authorization: 'Bearer admin-jwt' }), deps)
     // status was sanitized out of the patch by the allowlist; nothing forces it back in
     expect(captured.profileUpdate[0]).not.toHaveProperty('status')
@@ -374,7 +374,7 @@ describe('handleRegistration — authed self path security', () => {
     const { deps, captured } = makeDeps({ callerUserId: 'self-uid', callerEmail: 'self@example.com' })
     await handleRegistration(postJson({
       ...goodBody,
-      profile_patch: { role: 'admin', full_name: 'Self' },
+      profile_patch: { role: 'admin', name: 'Self' },
     }, { Authorization: 'Bearer self-jwt' }), deps)
     expect(captured.profileUpdate[0]).not.toHaveProperty('role')
   })

@@ -74,7 +74,7 @@ describe('AdminEventDetailPage', () => {
       details: { add_ons: ['addon-a', 'addon-b'], gear: { rent: false } },
     }]
     const profiles = [{
-      id: 'u1', full_name: 'Ada Lovelace', display_name: 'Ada',
+      id: 'u1', name: 'Ada Lovelace', nickname: 'Ada',
       cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: true,
       logged_dives: 20, height_cm: 165, weight_kg: 60, shoe_size: 'EU 41 M',
       phone: null, contact_method: null, contact_id: null,
@@ -273,7 +273,7 @@ describe('AdminEventDetailPage', () => {
       details: {},
     }]
     const profiles = [{
-      id: 'u1', full_name: 'Ada Lovelace', display_name: 'Ada',
+      id: 'u1', name: 'Ada Lovelace', nickname: 'Ada',
       cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false,
       logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null,
       phone: null, contact_method: null, contact_id: null,
@@ -315,11 +315,11 @@ describe('AdminEventDetailPage', () => {
     ]))
 
     const profiles = [
-      { id: 'u-ada',  full_name: 'Ada Lovelace',     display_name: 'Ada',
+      { id: 'u-ada',  name: 'Ada Lovelace',     nickname: 'Ada',
         cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false,
         logged_dives: 0, phone: null, contact_method: null, contact_id: null,
         height_cm: null, weight_kg: null, shoe_size: null, status: 'active' },
-      { id: 'u-bob',  full_name: 'Bob Roberts',      display_name: null,
+      { id: 'u-bob',  name: 'Bob Roberts',      nickname: null,
         cert_agency: 'PADI', cert_level: 'OW', nitrox_certified: false,
         logged_dives: 0, phone: null, contact_method: null, contact_id: null,
         height_cm: null, weight_kg: null, shoe_size: null, status: 'active' },
@@ -364,7 +364,7 @@ describe('AdminEventDetailPage', () => {
       details: { total: 4900, deposit: 4900, payment_method: 'cash' },
     }]
     const profiles = [{
-      id: 'u1', full_name: 'Ada Lovelace', display_name: 'Ada',
+      id: 'u1', name: 'Ada Lovelace', nickname: 'Ada',
       cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false,
       logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null,
       phone: null, contact_method: null, contact_id: null,
@@ -426,7 +426,7 @@ describe('AdminEventDetailPage', () => {
       details: { total: 12000, deposit: 2000, payment_method: 'bank_transfer' },
     }]
     const profiles = [{
-      id: 'u1', full_name: 'Ada Lovelace', display_name: 'Ada',
+      id: 'u1', name: 'Ada Lovelace', nickname: 'Ada',
       cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false,
       logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null,
       phone: null, contact_method: null, contact_id: null,
@@ -501,7 +501,7 @@ describe('AdminEventDetailPage', () => {
     ]))
 
     const newProfile = {
-      id: 'u-new', full_name: 'Eve Tester', display_name: 'Eve', name_alt: null,
+      id: 'u-new', name: 'Eve Tester', nickname: 'Eve',
       cert_agency: null, cert_level: null, nitrox_certified: false,
       logged_dives: 0, phone: null, contact_method: null, contact_id: null,
       height_cm: null, weight_kg: null, shoe_size: null, status: 'active',
@@ -538,8 +538,8 @@ describe('AdminEventDetailPage', () => {
     expect(form).toBeInTheDocument()
 
     await user.type(screen.getByLabelText(/^email \*$/i), 'eve@example.com')
-    await user.type(screen.getByLabelText(/^full name \*$/i), 'Eve Tester')
-    await user.type(screen.getByLabelText(/^display name$/i), 'Eve')
+    await user.type(screen.getByLabelText(/^name \*/i), 'Eve Tester')
+    await user.type(screen.getByLabelText(/^nickname$/i), 'Eve')
 
     await user.click(screen.getByRole('button', { name: /create account/i }))
 
@@ -547,8 +547,8 @@ describe('AdminEventDetailPage', () => {
     const invokeArgs = invoke.mock.calls[0]?.[1] as { body: Record<string, unknown> }
     expect(invokeArgs.body).toMatchObject({
       email: 'eve@example.com',
-      full_name: 'Eve Tester',
-      display_name: 'Eve',
+      name: 'Eve Tester',
+      nickname: 'Eve',
       event_title: 'Kenting',
     })
 
@@ -598,7 +598,7 @@ describe('AdminEventDetailPage', () => {
       details: {},
     }]
     const profiles = [{
-      id: 'u1', full_name: 'Ada Lovelace', display_name: 'Ada',
+      id: 'u1', name: 'Ada Lovelace', nickname: 'Ada',
       cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false,
       logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null,
       phone: null, contact_method: null, contact_id: null,
@@ -654,11 +654,11 @@ describe('AdminEventDetailPage', () => {
         details: { transportation: true } },
     ]
     const profiles = [
-      { id: 'u1', full_name: 'Ada Lovelace',  display_name: 'Ada',  cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, phone: null, contact_method: null, contact_id: null },
-      { id: 'u2', full_name: 'Bob Roberts',   display_name: null,   cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, phone: null, contact_method: null, contact_id: null },
-      { id: 'u3', full_name: 'Carol Carlson', display_name: null,   cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, phone: null, contact_method: null, contact_id: null },
-      { id: 'u4', full_name: 'Dave Diver',    display_name: null,   cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, phone: null, contact_method: null, contact_id: null },
-      { id: 'u5', full_name: 'Eve Tester',    display_name: null,   cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, phone: null, contact_method: null, contact_id: null },
+      { id: 'u1', name: 'Ada Lovelace',  nickname: 'Ada',  cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, phone: null, contact_method: null, contact_id: null },
+      { id: 'u2', name: 'Bob Roberts',   nickname: null,   cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, phone: null, contact_method: null, contact_id: null },
+      { id: 'u3', name: 'Carol Carlson', nickname: null,   cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, phone: null, contact_method: null, contact_id: null },
+      { id: 'u4', name: 'Dave Diver',    nickname: null,   cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, phone: null, contact_method: null, contact_id: null },
+      { id: 'u5', name: 'Eve Tester',    nickname: null,   cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, phone: null, contact_method: null, contact_id: null },
     ]
 
     from.mockImplementation((table: string) => {

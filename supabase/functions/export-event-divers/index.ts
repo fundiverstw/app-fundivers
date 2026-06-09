@@ -11,7 +11,7 @@
 //   3. Fetch the EO_dive or EO_course row to pull title + dates.
 //   4. Fetch all 'pending' / 'confirmed' bookings for the event (cancelled
 //      and waitlisted divers aren't on the manifest — they won't show up).
-//   5. Join in profiles for each booking to read name / name_alt /
+//   5. Join in profiles for each booking to read name (legal, as on ID) /
 //      date_of_birth / nationality / id_number / gender / cert_level /
 //      logged_dives.
 //   6. Fetch the duties for the event and append the staff on board
@@ -37,13 +37,11 @@ import { corsOk, jsonResponse, safeError } from "../_shared/responses.ts"
 // Profile columns the manifest reads, shared by the booked-diver and
 // on-duty-staff fetches.
 const PROFILE_COLS =
-  "id, full_name, display_name, name_alt, date_of_birth, nationality, id_number, gender, cert_level, logged_dives"
+  "id, name, date_of_birth, nationality, id_number, gender, cert_level, logged_dives"
 
 interface ManifestProfile {
   id: string
-  full_name: string | null
-  display_name: string | null
-  name_alt: string | null
+  name: string | null
   date_of_birth: string | null
   nationality: string | null
   id_number: string | null
@@ -52,12 +50,12 @@ interface ManifestProfile {
   logged_dives: number | null
 }
 
-// Map a profile row to a manifest line. `remark` flags a staffer's role
-// (教練 etc.); booked divers pass null and leave the 備註 cell blank.
+// Map a profile row to a manifest line. The 姓名 column is the legal name
+// exactly as on the diver's ID. `remark` flags a staffer's role (教練 etc.);
+// booked divers pass null and leave the 備註 cell blank.
 function toManifestRow(p: ManifestProfile, remark: string | null = null): EventDiverRow {
   return {
-    name:        p.full_name?.trim() || p.display_name?.trim() || "(unnamed)",
-    nameAlt:     p.name_alt?.trim() || null,
+    name:        p.name?.trim() || "(unnamed)",
     dob:         p.date_of_birth ?? null,
     nationality: p.nationality?.trim() || null,
     idNumber:    p.id_number?.trim() || null,
@@ -163,8 +161,8 @@ Deno.serve(async (req) => {
     profiles = (profs ?? []) as ManifestProfile[]
   }
 
-  // Sort by full_name for a predictable manifest order. Profiles missing
-  // a full_name fall back to display_name → '(unnamed)' so they still appear.
+  // Sort by name for a predictable manifest order. Profiles missing
+  // a name fall back to nickname → '(unnamed)' so they still appear.
   const divers: EventDiverRow[] = profiles
     .map(p => toManifestRow(p))
     .sort((a, b) => a.name.localeCompare(b.name))

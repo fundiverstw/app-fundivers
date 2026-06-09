@@ -64,7 +64,7 @@ const noExtrasEvent: AppEvent = {
 
 const sampleProfile: Profile = {
   id: 'u1', created_at: '', updated_at: '',
-  full_name: 'Ada', display_name: 'Ada', phone: null,
+  name: 'Ada', nickname: 'Ada', phone: null,
   date_of_birth: null, nationality: null, id_number: null,
   emergency_contact_name: null, emergency_contact_phone: null,
   cert_agency: 'PADI', cert_level: 'Advanced Open Water',
@@ -136,7 +136,7 @@ describe('RegisterForm', () => {
 
     // Step 1 (event) → 2 (about you)
     await user.click(screen.getByRole('button', { name: /next/i }))
-    // Step 2 → 3 (extras) — sampleProfile has full_name so step-2 Next isn't gated
+    // Step 2 → 3 (extras) — sampleProfile has name so step-2 Next isn't gated
     await user.click(screen.getByRole('button', { name: /next/i }))
     // Transport is required; pick "no" so the Next button on step 3 is enabled.
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
@@ -368,7 +368,7 @@ describe('RegisterForm', () => {
   it('step 2 Next is gated on full-name being set (enforces the one required field)', async () => {
     setupFrom()
     const user = userEvent.setup()
-    const blankProfile: Profile = { ...sampleProfile, full_name: null }
+    const blankProfile: Profile = { ...sampleProfile, name: null }
     render(
       <RegisterForm event={sampleEvent} profile={blankProfile} userId="u1"
         onClose={() => {}} onBooked={() => {}} />
@@ -377,7 +377,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     const next = screen.getByRole('button', { name: /next/i })
     expect(next).toBeDisabled()
-    await user.type(screen.getByLabelText(/full name/i), 'Grace Hopper')
+    await user.type(screen.getByLabelText(/^name \*/i), 'Grace Hopper')
     expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
   })
 
@@ -493,7 +493,7 @@ describe('RegisterForm', () => {
     await user.type(screen.getByLabelText(/password/i), 'abcdefgh')
     await user.click(screen.getByLabelText(/I agree to the/i))
     await user.click(screen.getByRole('button', { name: /solve captcha/i }))
-    await user.type(screen.getByLabelText(/full name/i), 'Grace Hopper')
+    await user.type(screen.getByLabelText(/^name \*/i), 'Grace Hopper')
     // Step 2 → 3 → 4 → confirm
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
@@ -511,7 +511,7 @@ describe('RegisterForm', () => {
       turnstile_token: 'test-turnstile-token',
     })
     expect(typeof opts.body.agreed_to_terms_at).toBe('string')
-    expect(opts.body.profile_patch).toMatchObject({ full_name: 'Grace Hopper' })
+    expect(opts.body.profile_patch).toMatchObject({ name: 'Grace Hopper' })
 
     // Session token from the function gets handed to setSession so the
     // diver lands authed without a second round-trip.
@@ -542,7 +542,7 @@ describe('RegisterForm', () => {
     await user.type(screen.getByLabelText(/password/i), 'abcdefgh')
     await user.click(screen.getByLabelText(/I agree to the/i))
     await user.click(screen.getByRole('button', { name: /solve captcha/i }))
-    await user.type(screen.getByLabelText(/full name/i), 'Grace Hopper')
+    await user.type(screen.getByLabelText(/^name \*/i), 'Grace Hopper')
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
@@ -566,7 +566,7 @@ describe('RegisterForm', () => {
     await user.type(screen.getByLabelText(/email \*/i), 'new@diver.test')
     await user.type(screen.getByLabelText(/password/i), 'abcdefgh')
     await user.click(screen.getByLabelText(/I agree to the/i))
-    await user.type(screen.getByLabelText(/full name/i), 'Grace Hopper')
+    await user.type(screen.getByLabelText(/^name \*/i), 'Grace Hopper')
 
     // No captcha widget renders — the notice replaces it and there is no
     // token, so the only way forward is blocked.
@@ -915,7 +915,7 @@ describe('RegisterForm', () => {
     // but the admin path should sail through.
     const sparseProfile: Profile = {
       ...sampleProfile,
-      full_name: null,
+      name: null,
       cert_card_path: null,
     }
     render(
@@ -934,7 +934,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     // Full name left blank, cert_level pre-filled from profile with no
     // card on file — Next should still be enabled.
-    expect((screen.getByLabelText(/full name/i) as HTMLInputElement).value).toBe('')
+    expect((screen.getByLabelText(/^name \*/i) as HTMLInputElement).value).toBe('')
     expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
     await user.click(screen.getByRole('button', { name: /next/i }))
     // Step 3 — don't touch transport; Next should still be enabled.
@@ -956,12 +956,12 @@ describe('RegisterForm', () => {
   // the form with the right primary target and additionalTargets.
   describe('parent diver picker', () => {
     const childProfile: Profile = {
-      ...sampleProfile, id: 'child-1', full_name: 'Bee Junior',
-      display_name: 'Bee Jr', cert_level: null, cert_card_path: null,
+      ...sampleProfile, id: 'child-1', name: 'Bee Junior',
+      nickname: 'Bee Jr', cert_level: null, cert_card_path: null,
     }
     const childTwoProfile: Profile = {
-      ...sampleProfile, id: 'child-2', full_name: 'Bee The Second',
-      display_name: 'Bee II', cert_level: null, cert_card_path: null,
+      ...sampleProfile, id: 'child-2', name: 'Bee The Second',
+      nickname: 'Bee II', cert_level: null, cert_card_path: null,
     }
 
     function setupFromWithChildren(children: Profile[]) {
@@ -1026,7 +1026,7 @@ describe('RegisterForm', () => {
       await user.click(screen.getByRole('button', { name: /continue/i }))
 
       // Banner shows the chosen target.
-      await waitFor(() => expect(screen.getByText(/booking for: bee jr/i)).toBeInTheDocument())
+      await waitFor(() => expect(screen.getByText(/booking for: bee junior/i)).toBeInTheDocument())
 
       await user.click(screen.getByRole('button', { name: /next/i }))
       await user.click(screen.getByRole('button', { name: /next/i }))
@@ -1073,7 +1073,7 @@ describe('RegisterForm', () => {
       // Child's call carries an empty patch (don't overwrite the child's profile).
       expect(childBody?.profile_patch).toEqual({})
       // Self's call carries the parent's typed-in name.
-      expect((selfBody?.profile_patch as Record<string, unknown>).full_name).toBe('Ada')
+      expect((selfBody?.profile_patch as Record<string, unknown>).name).toBe('Ada')
 
       expect(onBooked).toHaveBeenCalled()
     })

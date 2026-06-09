@@ -46,7 +46,7 @@ describe('ProfilePage', () => {
   it('shows required error when full name is cleared and submitted', async () => {
     useAuthMock.mockReturnValue({
       user: { id: 'u1' },
-      profile: { id: 'u1', full_name: 'Ada Lovelace' },
+      profile: { id: 'u1', name: 'Ada Lovelace' },
     })
     from.mockReturnValue({
       ...mockQueryBuilder(),
@@ -55,9 +55,9 @@ describe('ProfilePage', () => {
     const user = userEvent.setup()
     renderWithRouter(<ProfilePage />)
 
-    await waitFor(() => expect((input('full_name') as HTMLInputElement).value).toBe('Ada Lovelace'))
+    await waitFor(() => expect((input('name') as HTMLInputElement).value).toBe('Ada Lovelace'))
 
-    await user.clear(input('full_name'))
+    await user.clear(input('name'))
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
     expect((await screen.findAllByText(/required/i)).length).toBeGreaterThan(0)
@@ -67,7 +67,7 @@ describe('ProfilePage', () => {
   it('submit is disabled when the form is clean', async () => {
     useAuthMock.mockReturnValue({
       user: { id: 'u1' },
-      profile: { id: 'u1', full_name: 'Ada' },
+      profile: { id: 'u1', name: 'Ada' },
     })
     from.mockReturnValue(mockQueryBuilder())
     renderWithRouter(<ProfilePage />)
@@ -80,8 +80,8 @@ describe('ProfilePage', () => {
       user: { id: 'u1' },
       profile: {
         id: 'u1',
-        full_name: 'Ada',
-        display_name: 'Ada',
+        name: 'Ada',
+        nickname: 'Ada',
         date_of_birth: '1815-12-10',
         contact_method: 'email',
         contact_id: 'ada@example.com',
@@ -106,17 +106,17 @@ describe('ProfilePage', () => {
 
     const user = userEvent.setup()
     renderWithRouter(<ProfilePage />)
-    await waitFor(() => expect((input('full_name') as HTMLInputElement).value).toBe('Ada'))
+    await waitFor(() => expect((input('name') as HTMLInputElement).value).toBe('Ada'))
 
-    await user.clear(input('full_name'))
-    await user.type(input('full_name'), 'Ada L.')
+    await user.clear(input('name'))
+    await user.type(input('name'), 'Ada L.')
     await user.type(input('phone'), '+886-900-123')
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
     await waitFor(() => expect(update).toHaveBeenCalledOnce())
     const payload = update.mock.calls[0][0] as Record<string, unknown>
     expect(payload.id).toBeUndefined() // id is in the .eq filter, not the payload
-    expect(payload.full_name).toBe('Ada L.')
+    expect(payload.name).toBe('Ada L.')
     expect(payload.phone).toBe('+886-900-123')
     expect(typeof payload.updated_at).toBe('string')
     expect(new Date(payload.updated_at as string).toString()).not.toBe('Invalid Date')
@@ -129,8 +129,8 @@ describe('ProfilePage', () => {
       user: { id: 'u1' },
       profile: {
         id: 'u1',
-        full_name: 'Ada',
-        display_name: 'Ada',
+        name: 'Ada',
+        nickname: 'Ada',
         date_of_birth: '1815-12-10',
         contact_method: 'email',
         contact_id: 'ada@example.com',
@@ -147,7 +147,7 @@ describe('ProfilePage', () => {
 
     const user = userEvent.setup()
     renderWithRouter(<ProfilePage />)
-    await waitFor(() => expect((input('full_name') as HTMLInputElement).value).toBe('Ada'))
+    await waitFor(() => expect((input('name') as HTMLInputElement).value).toBe('Ada'))
 
     await user.click(screen.getByLabelText('BCD'))
     await user.click(screen.getByLabelText('Fins'))
@@ -163,8 +163,8 @@ describe('ProfilePage', () => {
       user: { id: 'u1' },
       profile: {
         id: 'u1',
-        full_name: 'Ada',
-        display_name: 'Ada',
+        name: 'Ada',
+        nickname: 'Ada',
         date_of_birth: '1815-12-10',
         contact_method: 'email',
         contact_id: 'ada@example.com',
@@ -210,7 +210,7 @@ describe('ProfilePage', () => {
   it('uploads and saves a cert card when the user picks a file', async () => {
     useAuthMock.mockReturnValue({
       user: { id: 'u1' },
-      profile: { id: 'u1', full_name: 'Ada' },
+      profile: { id: 'u1', name: 'Ada' },
     })
     from.mockReturnValue(mockQueryBuilder({ data: { cert_card_path: null } }))
     uploadCertCard.mockResolvedValue('u1/card_123.jpg')
@@ -230,7 +230,7 @@ describe('ProfilePage', () => {
   it('removes the cert card on demand', async () => {
     useAuthMock.mockReturnValue({
       user: { id: 'u1' },
-      profile: { id: 'u1', full_name: 'Ada' },
+      profile: { id: 'u1', name: 'Ada' },
     })
     from.mockReturnValue(mockQueryBuilder({ data: { cert_card_path: 'u1/existing.jpg' } }))
     getCertCardSignedUrl.mockResolvedValue('https://signed.example/existing.jpg')
@@ -250,8 +250,8 @@ describe('ProfilePage', () => {
       user: { id: 'u1' },
       profile: {
         id: 'u1',
-        full_name: 'Ada',
-        display_name: 'Ada',
+        name: 'Ada',
+        nickname: 'Ada',
         date_of_birth: '1815-12-10',
         contact_method: 'email',
         contact_id: 'ada@example.com',

@@ -15,12 +15,12 @@ beforeEach(() => {
 
 interface Row {
   _id: string
-  display_name: string | null
+  nickname: string | null
   price: number | null
 }
 
 const FIELDS: CatalogField<Row>[] = [
-  { key: 'display_name', label: 'Display name', type: 'text', required: true },
+  { key: 'nickname', label: 'Display name', type: 'text', required: true },
   { key: 'price',        label: 'Price', type: 'number' },
 ]
 
@@ -58,7 +58,7 @@ function renderManager(seed: Row[]) {
       table="things"
       noun="thing"
       fields={FIELDS}
-      rowLabel={r => r.display_name ?? r._id}
+      rowLabel={r => r.nickname ?? r._id}
       rowDetail={r => r.price != null ? `${r.price}` : null}
     />
   )
@@ -69,8 +69,8 @@ function renderManager(seed: Row[]) {
 describe('CatalogManager', () => {
   it('lists existing rows with display name + detail', async () => {
     renderManager([
-      { _id: 'a', display_name: 'Twin', price: 1000 },
-      { _id: 'b', display_name: 'Single', price: 500 },
+      { _id: 'a', nickname: 'Twin', price: 1000 },
+      { _id: 'b', nickname: 'Single', price: 500 },
     ])
 
     expect(await screen.findByText('Twin')).toBeInTheDocument()
@@ -98,14 +98,14 @@ describe('CatalogManager', () => {
     const payload = inserts[0] as Record<string, unknown>
     expect(typeof payload._id).toBe('string')
     expect(payload._id).toMatch(/[0-9a-f-]{36}/)
-    expect(payload.display_name).toBe('Suite')
+    expect(payload.nickname).toBe('Suite')
     expect(payload.price).toBe(7500)
     // List grew by one optimistically without a refetch.
     expect(screen.getByText('Suite')).toBeInTheDocument()
   })
 
   it('opens the edit form prefilled and updates by _id without sending _id in the payload', async () => {
-    const { updates } = renderManager([{ _id: 'r-1', display_name: 'Twin', price: 1000 }])
+    const { updates } = renderManager([{ _id: 'r-1', nickname: 'Twin', price: 1000 }])
     const user = userEvent.setup()
 
     await user.click(await screen.findByRole('button', { name: /edit/i }))
@@ -119,12 +119,12 @@ describe('CatalogManager', () => {
     await waitFor(() => expect(updates).toHaveLength(1))
     const { payload, eq } = updates[0]
     expect(eq).toEqual(['_id', 'r-1'])
-    expect((payload as Record<string, unknown>).display_name).toBe('Twin Ocean View')
+    expect((payload as Record<string, unknown>).nickname).toBe('Twin Ocean View')
     expect((payload as Record<string, unknown>)._id).toBeUndefined()
   })
 
   it('deletes after confirmation and removes the row from the list', async () => {
-    const { deletes } = renderManager([{ _id: 'r-1', display_name: 'Twin', price: 1000 }])
+    const { deletes } = renderManager([{ _id: 'r-1', nickname: 'Twin', price: 1000 }])
     const user = userEvent.setup()
 
     await user.click(await screen.findByRole('button', { name: /^delete$/i }))

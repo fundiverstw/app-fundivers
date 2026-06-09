@@ -18,7 +18,7 @@ import { CARD_ELEVATED, BTN_PRIMARY, TEXT_MUTED } from '../styles/tokens'
 // "Complete" means the seven diver-required fields are populated; an
 // admin-set status is the next step.
 const REQUIRED: Array<keyof Profile> = [
-  'full_name', 'display_name', 'date_of_birth',
+  'name', 'nickname', 'date_of_birth',
   'cert_level', 'contact_method', 'contact_id',
 ]
 function isProfileComplete(p: Profile | null | undefined): boolean {

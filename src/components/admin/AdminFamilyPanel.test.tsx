@@ -20,7 +20,7 @@ vi.mock('../../hooks/useToast', () => ({
 function makeProfile(overrides: Partial<Profile>): Profile {
   return {
     id: 'x', created_at: '', updated_at: '',
-    full_name: 'X', display_name: null, name_alt: null,
+    name: 'X', nickname: null,
     phone: null, date_of_birth: null, nationality: null, id_number: null,
     emergency_contact_name: null, emergency_contact_phone: null,
     cert_agency: null, cert_level: null, cert_card_path: null, nitrox_card_path: null,
@@ -43,8 +43,8 @@ beforeEach(() => {
 
 describe('AdminFamilyPanel', () => {
   it('top-level diver with no children: shows the picker and empty-children message', () => {
-    const parent = makeProfile({ id: 'p1', full_name: 'Pat Parent' })
-    const eligible = makeProfile({ id: 'c1', full_name: 'Cara Candidate' })
+    const parent = makeProfile({ id: 'p1', name: 'Pat Parent' })
+    const eligible = makeProfile({ id: 'c1', name: 'Cara Candidate' })
     render(<AdminFamilyPanel user={parent} allUsers={[parent, eligible]} onChanged={() => {}} />)
 
     expect(screen.getByText(/no linked child accounts/i)).toBeInTheDocument()
@@ -53,8 +53,8 @@ describe('AdminFamilyPanel', () => {
   })
 
   it('lists already-linked children and shows an Unlink button per row', () => {
-    const parent = makeProfile({ id: 'p1', full_name: 'Pat Parent' })
-    const child  = makeProfile({ id: 'c1', full_name: 'Kid One', parent_account: 'p1' })
+    const parent = makeProfile({ id: 'p1', name: 'Pat Parent' })
+    const child  = makeProfile({ id: 'c1', name: 'Kid One', parent_account: 'p1' })
     render(<AdminFamilyPanel user={parent} allUsers={[parent, child]} onChanged={() => {}} />)
 
     expect(screen.getByText('Kid One')).toBeInTheDocument()
@@ -62,12 +62,12 @@ describe('AdminFamilyPanel', () => {
   })
 
   it('eligibility filter excludes self, non-divers, existing parents, and existing children', () => {
-    const parent     = makeProfile({ id: 'p1', full_name: 'Pat Parent' })
-    const childOwn   = makeProfile({ id: 'c-own', full_name: 'Own Child', parent_account: 'p1' })
-    const childOther = makeProfile({ id: 'c-other', full_name: 'Other Child', parent_account: 'p2' })
-    const otherParent = makeProfile({ id: 'p2', full_name: 'Other Parent' })  // has childOther → ineligible
-    const staff      = makeProfile({ id: 's1', full_name: 'Stella Staff', role: 'staff' })
-    const eligible   = makeProfile({ id: 'd1', full_name: 'Diane Diver' })
+    const parent     = makeProfile({ id: 'p1', name: 'Pat Parent' })
+    const childOwn   = makeProfile({ id: 'c-own', name: 'Own Child', parent_account: 'p1' })
+    const childOther = makeProfile({ id: 'c-other', name: 'Other Child', parent_account: 'p2' })
+    const otherParent = makeProfile({ id: 'p2', name: 'Other Parent' })  // has childOther → ineligible
+    const staff      = makeProfile({ id: 's1', name: 'Stella Staff', role: 'staff' })
+    const eligible   = makeProfile({ id: 'd1', name: 'Diane Diver' })
 
     render(
       <AdminFamilyPanel
@@ -86,9 +86,9 @@ describe('AdminFamilyPanel', () => {
   })
 
   it('search filter narrows the picker by name', async () => {
-    const parent = makeProfile({ id: 'p1', full_name: 'Pat' })
-    const ada    = makeProfile({ id: 'a',  full_name: 'Ada Lovelace' })
-    const bob    = makeProfile({ id: 'b',  full_name: 'Bob Roberts' })
+    const parent = makeProfile({ id: 'p1', name: 'Pat' })
+    const ada    = makeProfile({ id: 'a',  name: 'Ada Lovelace' })
+    const bob    = makeProfile({ id: 'b',  name: 'Bob Roberts' })
 
     const user = userEvent.setup()
     render(<AdminFamilyPanel user={parent} allUsers={[parent, ada, bob]} onChanged={() => {}} />)
@@ -112,8 +112,8 @@ describe('AdminFamilyPanel', () => {
       return mockQueryBuilder({ data: [] })
     })
 
-    const parent  = makeProfile({ id: 'p1', full_name: 'Pat Parent' })
-    const candidate = makeProfile({ id: 'c1', full_name: 'Cara Candidate' })
+    const parent  = makeProfile({ id: 'p1', name: 'Pat Parent' })
+    const candidate = makeProfile({ id: 'c1', name: 'Cara Candidate' })
     const onChanged = vi.fn()
 
     const user = userEvent.setup()
@@ -136,8 +136,8 @@ describe('AdminFamilyPanel', () => {
       return mockQueryBuilder({ data: [] })
     })
 
-    const parent = makeProfile({ id: 'p1', full_name: 'Pat Parent' })
-    const child  = makeProfile({ id: 'c1', full_name: 'Kid One', parent_account: 'p1' })
+    const parent = makeProfile({ id: 'p1', name: 'Pat Parent' })
+    const child  = makeProfile({ id: 'c1', name: 'Kid One', parent_account: 'p1' })
     const onChanged = vi.fn()
 
     const user = userEvent.setup()
@@ -160,8 +160,8 @@ describe('AdminFamilyPanel', () => {
       return mockQueryBuilder({ data: [] })
     })
 
-    const parent = makeProfile({ id: 'p1', full_name: 'Pat Parent' })
-    const child  = makeProfile({ id: 'c1', full_name: 'Kid One', parent_account: 'p1' })
+    const parent = makeProfile({ id: 'p1', name: 'Pat Parent' })
+    const child  = makeProfile({ id: 'c1', name: 'Kid One', parent_account: 'p1' })
     const onChanged = vi.fn()
 
     const user = userEvent.setup()
@@ -190,8 +190,8 @@ describe('AdminFamilyPanel', () => {
       return mockQueryBuilder({ data: [] })
     })
 
-    const parent = makeProfile({ id: 'p1', full_name: 'Pat' })
-    const candidate = makeProfile({ id: 'c1', full_name: 'Cara' })
+    const parent = makeProfile({ id: 'p1', name: 'Pat' })
+    const candidate = makeProfile({ id: 'c1', name: 'Cara' })
     const user = userEvent.setup()
     render(<AdminFamilyPanel user={parent} allUsers={[parent, candidate]} onChanged={() => {}} />)
 

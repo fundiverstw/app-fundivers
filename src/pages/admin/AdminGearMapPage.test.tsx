@@ -33,7 +33,7 @@ const sampleBooking = {
   details: { gear: { rent: true, mode: 'full' } },
 }
 const sampleProfile = {
-  id: 'u1', display_name: 'Ada Lovelace',
+  id: 'u1', nickname: 'Ada Lovelace',
   height_cm: 170, weight_kg: 65, shoe_size: null,
   fin_size: 'M', bcd_size: 'L', wetsuit_size: null,
   gear_owned: [],

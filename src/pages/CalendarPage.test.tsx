@@ -252,7 +252,7 @@ describe('CalendarPage', () => {
     useAuthMock.mockReturnValue({
       user:    { id: 'u1' },
       profile: {
-        id: 'u1', full_name: 'Ada Lovelace', phone: null, contact_method: null, contact_id: null,
+        id: 'u1', name: 'Ada Lovelace', phone: null, contact_method: null, contact_id: null,
         cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false, deep_certified: false,
         emergency_contact_name: null, emergency_contact_phone: null,
       },
