@@ -455,6 +455,7 @@ export interface Database {
           cancelled_at: string | null
           full_payment_deadline: string | null
           capacity: number | null
+          is_private: boolean | null
         }
         Insert: {
           _id: string
@@ -478,6 +479,7 @@ export interface Database {
           cancelled_at?: string | null
           full_payment_deadline?: string | null
           capacity?: number | null
+          is_private?: boolean | null
         }
         Update: Partial<Database['public']['Tables']['EO_dives']['Insert']>
         Relationships: []
@@ -1134,6 +1136,10 @@ export interface AppEvent {
   dive_days: number | null
   /** ISO timestamp of when the event was cancelled by an admin; null = active. */
   cancelled_at: string | null
+  /** Dive flagged private: hidden from all diver-facing listings (in-app +
+   *  Wix calendars, upcoming feeds), registerable only via a direct link.
+   *  Always false for courses. */
+  is_private: boolean
   /**
    * Admin-set full-payment deadline (YYYY-MM-DD). When null the
    * registration form falls back to "7 days before start_date" — see

@@ -88,6 +88,7 @@ function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: stri
     nitrox_required: d.nitrox_required ?? false,
     dive_days: d.dive_days ?? null,
     cancelled_at: d.cancelled_at ?? null,
+    is_private: d.is_private ?? false,
     full_payment_deadline: d.full_payment_deadline ?? null,
     cancel_policy: d.cancel_policy ?? null,
     cancel_date: d.cancel_date ?? null,
@@ -161,6 +162,7 @@ function courseToEvents(c: EOCourse, priceIndex: Map<string, EOPrice>, addonIds:
     nitrox_required: false,
     dive_days: c.dive_days ?? null,
     cancelled_at: c.cancelled_at ?? null,
+    is_private: false,
     full_payment_deadline: c.full_payment_deadline ?? null,
     cancel_policy: c.cancel_policy ?? null,
     cancel_date: c.cancel_date ?? null,
@@ -246,7 +248,7 @@ async function attachPrices(dives: EODive[], courses: EOCourse[]): Promise<Map<s
   return new Map((data ?? []).map(p => [p._id, p as EOPrice]))
 }
 
-const DIVE_COLS = '_id, admin_title, display_title, calendar_title, start_date, time, end_date, featured, fully_booked, capacity, price, has_rooms, room_types, hasotheraddons, other_addons, gear_rental, nitrox_required, dive_days, cancelled_at, full_payment_deadline, cancel_policy, cancel_date'
+const DIVE_COLS = '_id, admin_title, display_title, calendar_title, start_date, time, end_date, featured, fully_booked, capacity, price, has_rooms, room_types, hasotheraddons, other_addons, gear_rental, nitrox_required, dive_days, cancelled_at, full_payment_deadline, cancel_policy, cancel_date, is_private'
 const COURSE_COLS = '_id, admin_title, display_title, calendar_title, start_time, price, other_addons, dive_days, course_days, cancelled_at, full_payment_deadline, cancel_policy, cancel_date, fully_booked, capacity'
 
 // Every 'YYYY-MM-DD' from `fromDate` to `toDate` inclusive. Used to ask
@@ -273,9 +275,18 @@ function datesInRange(fromDate: string, toDate: string): string[] {
  * `fetchEventsForBookings` when bookings against cancelled events still
  * need to resolve their event details.
  */
-export async function fetchEventsInRange(fromDate: string, toDate: string): Promise<AppEvent[]> {
+export async function fetchEventsInRange(
+  fromDate: string,
+  toDate: string,
+  opts: { includePrivate?: boolean } = {},
+): Promise<AppEvent[]> {
+  // Private dives are hidden from diver-facing calendars; the admin calendar
+  // passes includePrivate to see them. Courses have no private concept.
+  let diveQuery = supabase.from('EO_dives').select(DIVE_COLS).is('cancelled_at', null)
+    .gte('start_date', fromDate).lte('start_date', toDate).order('start_date')
+  if (!opts.includePrivate) diveQuery = diveQuery.eq('is_private', false)
   const [divesResp, coursesResp] = await Promise.all([
-    supabase.from('EO_dives').select(DIVE_COLS).is('cancelled_at', null).gte('start_date', fromDate).lte('start_date', toDate).order('start_date'),
+    diveQuery,
     supabase.from('EO_courses').select(COURSE_COLS).is('cancelled_at', null)
       .overlaps('course_days', datesInRange(fromDate, toDate)),
   ])

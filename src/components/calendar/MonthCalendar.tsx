@@ -81,6 +81,18 @@ function eventDotClass(ev: AppEvent): string {
   return COURSE_DOT[courseColor(ev.title)]
 }
 
+// Closed-eye (eye-off) marker for private dives — admin-only, since private
+// events are filtered out of every diver-facing fetch before they'd render.
+function EyeOffIcon({ className = 'w-3.5 h-3.5 text-blue-900/70 shrink-0' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+         className={className} role="img" aria-label="Private">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+  )
+}
+
 // Busy/duty signals use violet so they don't collide with the new
 // AOW-orange / Specialty-pink course palette. Own = vivid violet (you're
 // the focal point of your own calendar); other staff = neutral gray so
@@ -355,7 +367,7 @@ export function MonthCalendar({
               highlightedIds?.has(ev.id)
                 ? 'bg-amber-100 border-2 border-amber-400 hover:border-amber-500'
                 : 'bg-white/70 border border-sky-200 hover:border-red-500'
-            }`}
+            } ${ev.is_private ? 'opacity-60' : ''}`}
           >
             <div className="flex items-start justify-between">
               <div>
@@ -363,6 +375,7 @@ export function MonthCalendar({
                   <span className={`text-xs px-1.5 py-0.5 rounded-full text-white ${eventDotClass(ev)}`}>
                     {TYPE_LABELS[ev.type]}
                   </span>
+                  {ev.is_private && <EyeOffIcon />}
                   <span className="font-medium text-blue-900 text-sm">{ev.title}</span>
                   {ev.featured && <span className="text-xs text-red-600">★</span>}
                 </div>
@@ -686,7 +699,7 @@ function EventBar({
       onMouseLeave={() => onHoverEvent(null)}
       title={seg.event.title}
       className={`absolute text-[10px] font-semibold truncate text-left px-1 transition-all ${baseClass} ${leftRadius} ${rightRadius} ${
-        lifted ? 'z-30 scale-105 opacity-90 shadow-lg' : ''
+        lifted ? 'z-30 scale-105 opacity-90 shadow-lg' : seg.event.is_private ? 'opacity-50' : ''
       }`}
       style={{
         top: track * (TRACK_HEIGHT + TRACK_GAP),
@@ -699,6 +712,7 @@ function EventBar({
     >
       {seg.showTitle ? (
         <>
+          {seg.event.is_private && <EyeOffIcon className="inline-block w-2.5 h-2.5 align-text-bottom mr-0.5" />}
           {seg.event.featured && '★ '}
           {seg.event.calendar_title || seg.event.title}
         </>

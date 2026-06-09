@@ -334,3 +334,42 @@ describe('MonthCalendar course color buckets', () => {
     expect(bar.className).toMatch(/bg-orange/)
   })
 })
+
+describe('MonthCalendar private dives', () => {
+  const baseDive = {
+    id: 'P1', type: 'dive' as const, title: 'Charter dive',
+    calendar_title: null,
+    start_time: '2030-06-12T09:00:00', end_time: '2030-06-12T15:00:00',
+    start_time_hhmm: '09:00',
+    featured: false, fully_booked: false, capacity: null, confirmed_count: null,
+    price: null, deposit_amount: null, transport_price: null, currency: 'TWD',
+    has_rooms: false, room_type_ids: [], has_addons: false, addon_ids: [],
+    gear_rental_info: null, nitrox_required: false, dive_days: null,
+    cancelled_at: null, full_payment_deadline: null, cancel_policy: null, cancel_date: null,
+  }
+
+  it('flags a private dive with the closed-eye "Private" indicator', () => {
+    render(
+      <MonthCalendar
+        month={new Date('2030-06-15')}
+        onMonthChange={() => {}}
+        events={[{ ...baseDive, is_private: true }]}
+        onPickEvent={() => {}}
+      />
+    )
+    // The eye-off icon appears (both the month grid bar and the list row).
+    expect(screen.getAllByLabelText('Private').length).toBeGreaterThan(0)
+  })
+
+  it('does not flag a normal dive', () => {
+    render(
+      <MonthCalendar
+        month={new Date('2030-06-15')}
+        onMonthChange={() => {}}
+        events={[{ ...baseDive, is_private: false }]}
+        onPickEvent={() => {}}
+      />
+    )
+    expect(screen.queryByLabelText('Private')).not.toBeInTheDocument()
+  })
+})

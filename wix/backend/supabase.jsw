@@ -69,7 +69,9 @@ export async function queryTable(table, filters = {}) {
 export async function getUpcomingDives(limit = 4) {
   const key = await getKey();
   const todayStr = new Date().toISOString().split('T')[0];
-  const params = `start_date=gte.${todayStr}&order=start_date.asc&limit=${limit}`;
+  // is_private dives are hidden from the public site — registerable only via
+  // a direct admin-shared link.
+  const params = `start_date=gte.${todayStr}&is_private=eq.false&order=start_date.asc&limit=${limit}`;
   const [dives, priceMap] = await Promise.all([
     fetchTable(key, 'EO_dives', params),
     fetchPriceMap(key),
@@ -224,6 +226,9 @@ export async function getDiveById(id) {
   ]);
   const dive = rows[0];
   if (!dive) return null;
+  // Private dives aren't browsable on the public site (the marketing dive
+  // page); registration happens via the direct app link only.
+  if (dive.is_private) return null;
   const travel = travelMap[resolveRefId(dive.DiveTravel_reference)] || null;
   const cancellation = cancellationMap[resolveRefId(dive.cancel_policy)] || null;
   return {
@@ -305,6 +310,7 @@ export async function getCalendarEvents() {
 
   const diveEvents = dives.flatMap((item) => {
     if (!item.start_date) return [];
+    if (item.is_private) return [];   // hidden from the public calendar
     const start = new Date(item.start_date);
     const end = item.end_date ? new Date(item.end_date) : start;
     return [{

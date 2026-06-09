@@ -32,6 +32,7 @@ export interface FormState {
   notes: string          // dive-only NOT NULL
   featured: boolean
   fully_booked: boolean
+  is_private: boolean    // dive-only: hidden from diver-facing calendars
   has_rooms: boolean
   roomIds: string[]      // FK multi → EO_rooms (CSV-encoded)
   nitrox_required: boolean
@@ -62,7 +63,7 @@ export const EMPTY_FORM: FormState = {
   req_dives: '', dive_days: '',
   addonIds: [],
   featured_image: '', second_image: '',
-  notes: '', featured: false, fully_booked: false,
+  notes: '', featured: false, fully_booked: false, is_private: false,
   has_rooms: false, roomIds: [],
   nitrox_required: false, gear_rental: '',
   cancel_date: '', cancel_policy: '',
@@ -130,6 +131,7 @@ export function formStateFromDive(d: EODive): FormState {
     notes: d.notes ?? '',
     featured: !!d.featured,
     fully_booked: !!d.fully_booked,
+    is_private: !!d.is_private,
     has_rooms: !!d.has_rooms,
     roomIds: parseCsvIds(d.room_types),
     nitrox_required: d.nitrox_required ?? false,
@@ -174,7 +176,7 @@ export function formStateFromCourse(c: EOCourse): FormState {
     cancel_policy: c.cancel_policy ?? '',
     featured_image: c.featured_image ?? '',
     second_image: '',
-    notes: '', featured: false, fully_booked: false,
+    notes: '', featured: false, fully_booked: false, is_private: false,
     has_rooms: false, roomIds: [],
     nitrox_required: false, gear_rental: '',
     destinationIds: [], divetravel_reference: '',
@@ -201,6 +203,7 @@ export function divePayloadFromForm(form: FormState): Record<string, unknown> {
     notes: form.notes,                   // NOT NULL — empty string OK
     featured: form.featured,
     fully_booked: form.fully_booked,
+    is_private: form.is_private,
     prereq_cert_id: form.prereq_cert_id || null,
     req_dives: form.req_dives ? Number(form.req_dives) : null,
     dive_days: form.dive_days ? Number(form.dive_days) : null,
