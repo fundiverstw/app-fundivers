@@ -962,21 +962,35 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
       {/* Dense single-line row when collapsed: caret + name + status + payment.
           Cert / sizing / contact info moved to the expanded block so the
           scroll-length stays short on mobile. */}
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setExpanded(v => !v)}
+        onKeyDown={e => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(v => !v) }
+        }}
         aria-expanded={expanded}
-        className="w-full text-left flex items-center gap-2 px-3 py-2 focus:outline-none"
+        className="w-full text-left flex items-center gap-2 px-3 py-2 cursor-pointer focus:outline-none"
       >
         <span aria-hidden="true" className="text-xs text-blue-950 font-medium shrink-0">
           {expanded ? '▾' : '▸'}
         </span>
         <span className="flex-1 min-w-0 text-sm truncate">
-          <span className="text-blue-900 font-medium">
+          {/* Names stay selectable for copy/paste; clicking one places a
+              caret rather than toggling the card (stopPropagation). */}
+          <span
+            className="text-blue-900 font-medium select-text cursor-text"
+            onClick={e => e.stopPropagation()}
+          >
             {r.profile?.full_name ?? '(no profile)'}
           </span>
           {r.profile?.display_name && (
-            <span className="text-blue-900/80 font-medium"> “{r.profile.display_name}”</span>
+            <span
+              className="text-blue-900/80 font-medium select-text cursor-text"
+              onClick={e => e.stopPropagation()}
+            >
+              {' '}“{r.profile.display_name}”
+            </span>
           )}
           {r.diverNotes.length > 0 && (
             <span className="ml-2 text-xs font-semibold text-red-700">
@@ -1009,7 +1023,7 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
             {paymentStatus === 'none'    && 'Unpaid'}
           </span>
         </span>
-      </button>
+      </div>
 
       {expanded && (
         <div className="border-t border-sky-200 px-3 pb-3 pt-2 space-y-2">
