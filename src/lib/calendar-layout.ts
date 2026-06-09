@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, isAfter, isSameDay, isSameMonth, startOfDay } from 'date-fns'
+import { isAfter, isSameDay, startOfDay } from 'date-fns'
 import type { AppEvent } from '../types/database'
 
 // Minimum shape the layout helpers need from anything that wants to be
@@ -87,28 +87,4 @@ export function segmentsForDay<T extends LayoutEvent>(
     })
   }
   return out
-}
-
-/** Number of vertical tracks needed for the given month (upper bound across cells). */
-export function maxTracksInRange<T extends LayoutEvent>(
-  ranges: EventRange<T>[], monthStart: Date, monthEnd: Date,
-): number {
-  let max = 0
-  for (const r of ranges) {
-    if (r.end < monthStart || r.start > monthEnd) continue
-    if (r.track + 1 > max) max = r.track + 1
-  }
-  return max
-}
-
-/** Keep only ranges that touch the given month (so we don't waste tracks on out-of-scope events). */
-export function rangesIntersectingMonth<T extends LayoutEvent>(
-  ranges: EventRange<T>[], month: Date,
-): EventRange<T>[] {
-  return ranges.filter(r => isSameMonth(r.start, month) || isSameMonth(r.end, month)
-    || (r.start < month && r.end > month))
-}
-
-export function daysBetween(a: Date, b: Date) {
-  return Math.abs(differenceInCalendarDays(a, b))
 }

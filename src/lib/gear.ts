@@ -2,9 +2,3 @@
 // own" checklist and the register-form a-la-carte checklist so the two
 // sides can be matched 1:1 (items you own are excluded from rental).
 export const GEAR_ITEMS = ['BCD', 'Regulator', 'Wetsuit', 'Fins', 'Mask', 'Boots', 'Dive computer'] as const
-
-export type GearItem = (typeof GEAR_ITEMS)[number]
-
-export function isGearItem(s: string): s is GearItem {
-  return (GEAR_ITEMS as readonly string[]).includes(s)
-}
