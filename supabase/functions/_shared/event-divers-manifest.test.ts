@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
   formatManifestDob,
-  manifestName,
   genderToZh,
   nationalityToZh,
   roleToZh,
@@ -23,16 +22,6 @@ describe('formatManifestDob', () => {
   it('returns empty for null and the raw string for unparseable input', () => {
     expect(formatManifestDob(null)).toBe('')
     expect(formatManifestDob('not-a-date')).toBe('not-a-date')
-  })
-})
-
-describe('manifestName', () => {
-  it('joins Latin and alt-script names', () => {
-    expect(manifestName('Mike Lee', '李邁先')).toBe('Mike Lee 李邁先')
-  })
-  it('uses whichever side is present alone', () => {
-    expect(manifestName('Thomas Purtell', null)).toBe('Thomas Purtell')
-    expect(manifestName('', '陳子妮')).toBe('陳子妮')
   })
 })
 
@@ -88,11 +77,11 @@ describe('manifestTitle', () => {
 describe('buildManifestAoa', () => {
   const divers: EventDiverRow[] = [
     {
-      name: 'Mike Lee', nameAlt: '李邁先', dob: '1985-07-06', nationality: 'Taiwanese',
+      name: '李邁先 Mike Lee', dob: '1985-07-06', nationality: 'Taiwanese',
       idNumber: 'A126167207', gender: 'male', certLevel: 'IDC Staff', loggedDives: 1000,
     },
     {
-      name: 'Anita Gregory', nameAlt: null, dob: '1979-06-23', nationality: 'Poland',
+      name: 'Anita Gregory', dob: '1979-06-23', nationality: 'Poland',
       idNumber: 'F900171266', gender: 'female', certLevel: 'AOW+EANx', loggedDives: 204,
     },
   ]
@@ -102,7 +91,7 @@ describe('buildManifestAoa', () => {
     const aoa = buildManifestAoa(divers, config)
     expect(aoa[0]).toEqual([`坤成8號 (CT2-6445) ${MANIFEST_TITLE_SUFFIX}`])
     expect(aoa[1]).toEqual([...MANIFEST_HEADERS])
-    expect(aoa[2]).toEqual([1, 'Mike Lee 李邁先', 'A126167207', 'Jul 6,1985', '男', 'IDC Staff', 1000, '台灣', ''])
+    expect(aoa[2]).toEqual([1, '李邁先 Mike Lee', 'A126167207', 'Jul 6,1985', '男', 'IDC Staff', 1000, '台灣', ''])
     expect(aoa[3]).toEqual([2, 'Anita Gregory', 'F900171266', 'Jun 23,1979', '女', 'AOW+EANx', 204, '波蘭', ''])
     // blank spacer then one row per note
     expect(aoa[4]).toEqual([])

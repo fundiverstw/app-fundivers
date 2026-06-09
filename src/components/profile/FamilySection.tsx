@@ -37,7 +37,7 @@ function FamilyPanel({ parent }: { parent: Profile }) {
       .from('profiles')
       .select('*')
       .eq('parent_account', parent.id)
-      .order('full_name', { ascending: true })
+      .order('name', { ascending: true })
       .then(({ data }) => {
         if (cancelled) return
         setChildren((data ?? []) as Profile[])
@@ -69,8 +69,8 @@ function FamilyPanel({ parent }: { parent: Profile }) {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-blue-900">
-                    {c.full_name ?? '(no name)'}
-                    {c.display_name && <span className="text-blue-900/80"> “{c.display_name}”</span>}
+                    {c.name ?? '(no name)'}
+                    {c.nickname && <span className="text-blue-900/80"> ({c.nickname})</span>}
                   </p>
                   <p className="text-xs text-blue-900/70">
                     {c.cert_agency && c.cert_level ? `${c.cert_agency} ${c.cert_level}` : 'Uncertified'}
@@ -132,8 +132,7 @@ function CreateChildForm({
   const toast = useToast()
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
-  const [displayName, setDisplayName] = useState('')
-  const [nameAlt, setNameAlt] = useState('')
+  const [nickname, setNickname] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -143,7 +142,7 @@ function CreateChildForm({
     const trimmedEmail = email.trim().toLowerCase()
     const trimmedName  = fullName.trim()
     if (!trimmedEmail || !trimmedName) {
-      setError('Email and full name are required.')
+      setError('Email and name are required.')
       return
     }
     setSubmitting(true)
@@ -155,9 +154,8 @@ function CreateChildForm({
       }>('create-child-account', {
         body: {
           email:        trimmedEmail,
-          full_name:    trimmedName,
-          display_name: displayName.trim() || undefined,
-          name_alt:     nameAlt.trim() || undefined,
+          name:    trimmedName,
+          nickname: nickname.trim() || undefined,
         },
       })
       if (invokeErr) throw new Error(invokeErr.message)
@@ -188,28 +186,22 @@ function CreateChildForm({
         />
       </label>
       <label className="block">
-        <span className="text-xs font-medium text-blue-900">Full name *</span>
+        <span className="text-xs font-medium text-blue-900">Name *</span>
         <input
           type="text" required
           value={fullName} onChange={e => setFullName(e.target.value)}
           className="w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-blue-900 text-sm focus:outline-none focus:border-blue-900"
         />
+        <span className="block text-xs text-blue-900/70 mt-1">
+          First and last name, exactly as on their passport / ID.
+        </span>
       </label>
       <label className="block">
-        <span className="text-xs font-medium text-blue-900">Display name</span>
+        <span className="text-xs font-medium text-blue-900">Nickname</span>
         <input
           type="text"
-          value={displayName} onChange={e => setDisplayName(e.target.value)}
-          placeholder="What you call them day-to-day (optional)"
-          className="w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-blue-900 text-sm focus:outline-none focus:border-blue-900"
-        />
-      </label>
-      <label className="block">
-        <span className="text-xs font-medium text-blue-900">Alternate name</span>
-        <input
-          type="text"
-          value={nameAlt} onChange={e => setNameAlt(e.target.value)}
-          placeholder="Chinese name or alias (optional)"
+          value={nickname} onChange={e => setNickname(e.target.value)}
+          placeholder="English name, alias, or what you call them (optional)"
           className="w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-blue-900 text-sm focus:outline-none focus:border-blue-900"
         />
       </label>

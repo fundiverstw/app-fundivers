@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
+import { personName } from '../../lib/names'
 import { RegisterFormBody } from '../register/RegisterForm'
 import type { AppEvent, Profile } from '../../types/database'
 import { MODAL_BACKDROP, TEXT_HEADING, TEXT_BODY, INPUT, INPUT_LABEL, BTN_PRIMARY } from '../../styles/tokens'
 
 // Three-step "register a diver on behalf" modal:
-//   1. pick which diver — search profiles by name / display name / contact,
+//   1. pick which diver — search profiles by name / nickname / contact,
 //      or click "Create new diver account" to mint a fresh profile.
 //   2. (optional) create-new-account form — admin fills minimal identity,
 //      edge function provisions the auth user + emails a one-time link
@@ -37,7 +38,7 @@ export function AdminAddDiverModal({
     supabase
       .from('profiles')
       .select('*')
-      .order('full_name', { ascending: true })
+      .order('name', { ascending: true })
       .then(({ data }) => {
         if (cancelled) return
         setProfiles((data ?? []) as Profile[])
@@ -47,13 +48,13 @@ export function AdminAddDiverModal({
 
   const visible = profiles.filter(p => {
     if (!filter) return true
-    const haystack = [p.full_name, p.display_name, p.name_alt, p.contact_id, p.phone]
+    const haystack = [p.name, p.nickname, p.contact_id, p.phone]
       .filter(Boolean).join(' ').toLowerCase()
     return haystack.includes(filter.toLowerCase())
   })
 
   const title = target
-    ? `Register ${target.display_name ?? target.full_name}`
+    ? `Register ${personName(target.name, target.nickname) || 'diver'}`
     : creatingNew
       ? 'Create new diver account'
       : 'Add diver to event'
@@ -133,9 +134,8 @@ export function AdminAddDiverModal({
                     className="w-full text-left bg-white/70 hover:bg-sky-100 border border-sky-200 rounded-lg px-3 py-2"
                   >
                     <p className="text-sm font-medium text-blue-900">
-                      {p.full_name ?? '(no name)'}
-                      {p.display_name && <span className="text-blue-900/80"> “{p.display_name}”</span>}
-                      {p.name_alt && <span className="text-blue-900/80"> ({p.name_alt})</span>}
+                      {p.name ?? '(no name)'}
+                      {p.nickname && <span className="text-blue-900/80"> ({p.nickname})</span>}
                     </p>
                     <p className="text-xs text-blue-900/70">
                       {p.cert_agency && p.cert_level && `${p.cert_agency} ${p.cert_level}`}
@@ -171,8 +171,7 @@ function CreateNewDiverForm({
   const toast = useToast()
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
-  const [displayName, setDisplayName] = useState('')
-  const [nameAlt, setNameAlt] = useState('')
+  const [nickname, setNickname] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -182,7 +181,7 @@ function CreateNewDiverForm({
     const trimmedEmail = email.trim().toLowerCase()
     const trimmedName = fullName.trim()
     if (!trimmedEmail || !trimmedName) {
-      setError('Email and full name are required.')
+      setError('Email and name are required.')
       return
     }
     setSubmitting(true)
@@ -194,9 +193,8 @@ function CreateNewDiverForm({
       }>('admin-create-diver', {
         body: {
           email:        trimmedEmail,
-          full_name:    trimmedName,
-          display_name: displayName.trim() || undefined,
-          name_alt:     nameAlt.trim() || undefined,
+          name:    trimmedName,
+          nickname: nickname.trim() || undefined,
           event_title:  eventTitle,
         },
       })
@@ -243,28 +241,22 @@ function CreateNewDiverForm({
         />
       </label>
       <label className="block">
-        <span className={INPUT_LABEL}>Full name *</span>
+        <span className={INPUT_LABEL}>Name *</span>
         <input
           type="text" required
           value={fullName} onChange={e => setFullName(e.target.value)}
           className={`${INPUT} text-sm`}
         />
+        <span className="block text-xs text-blue-900/70 mt-1">
+          First and last name, exactly as on their passport / ID.
+        </span>
       </label>
       <label className="block">
-        <span className={INPUT_LABEL}>Display name</span>
+        <span className={INPUT_LABEL}>Nickname</span>
         <input
           type="text"
-          value={displayName} onChange={e => setDisplayName(e.target.value)}
-          placeholder="What we call them day-to-day (optional)"
-          className={`${INPUT} text-sm`}
-        />
-      </label>
-      <label className="block">
-        <span className={INPUT_LABEL}>Alternate name</span>
-        <input
-          type="text"
-          value={nameAlt} onChange={e => setNameAlt(e.target.value)}
-          placeholder="Chinese name or alias (optional)"
+          value={nickname} onChange={e => setNickname(e.target.value)}
+          placeholder="English name, alias, or what they go by (optional)"
           className={`${INPUT} text-sm`}
         />
       </label>

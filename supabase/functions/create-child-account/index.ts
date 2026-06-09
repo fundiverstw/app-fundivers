@@ -11,7 +11,7 @@
 // the trigger is the source of truth; the function pre-check gives a
 // nicer error message before we burn a createUser call.
 //
-// Body: { email, full_name, display_name?, name_alt? }
+// Body: { email, name, nickname? }
 // Returns: { ok: true, user_id, email_sent }
 
 import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
@@ -22,9 +22,8 @@ const COMPANY_EMAIL = "fundiverstw@gmail.com"
 
 interface Body {
   email:         string
-  full_name:     string
-  display_name?: string
-  name_alt?:     string
+  name:     string
+  nickname?: string
 }
 
 function randomTempPassword(): string {
@@ -45,9 +44,9 @@ Deno.serve(async (req) => {
   let body: Body
   try { body = await req.json() as Body } catch { return json({ error: "invalid json" }, 400) }
   const email = body.email?.trim().toLowerCase()
-  const fullName = body.full_name?.trim()
+  const fullName = body.name?.trim()
   if (!email)    return json({ error: "email required" }, 400)
-  if (!fullName) return json({ error: "full_name required" }, 400)
+  if (!fullName) return json({ error: "name required" }, 400)
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
   const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -95,9 +94,8 @@ Deno.serve(async (req) => {
   const { error: profErr } = await admin
     .from("profiles")
     .update({
-      full_name:                fullName,
-      display_name:             body.display_name?.trim() || null,
-      name_alt:                 body.name_alt?.trim() || null,
+      name:                fullName,
+      nickname:             body.nickname?.trim() || null,
       status:                   "active",
       parent_account:           parentId,
       application_submitted_at: new Date().toISOString(),

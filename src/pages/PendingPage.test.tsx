@@ -52,7 +52,7 @@ describe('PendingPage', () => {
       user: { id: 'u1' },
       profile: {
         id: 'u1', status: 'pending',
-        full_name: 'Ada', display_name: 'Ada',
+        name: 'Ada', nickname: 'Ada',
         date_of_birth: '1990-01-01',
         cert_level: 'Open Water',
         contact_method: 'email', contact_id: 'ada@example.com',

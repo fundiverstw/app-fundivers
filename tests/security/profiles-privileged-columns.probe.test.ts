@@ -233,15 +233,15 @@ describe('Trigger semantics (verify the trigger lets through what it should)', (
     }
   })
 
-  it('diver PATCH display_name → 204 (regression — non-privileged column still writable)', async () => {
+  it('diver PATCH nickname → 204 (regression — non-privileged column still writable)', async () => {
     const r = await rawFetch(restUrl(`/profiles?id=eq.${diverA.id}`), {
       method: 'PATCH',
       headers: diverHeaders(),
-      body: { display_name: 'wire-probe-edit' },
+      body: { nickname: 'wire-probe-edit' },
     })
     expect([200, 204]).toContain(r.status)
-    const after = await admin.from('profiles').select('display_name').eq('id', diverA.id).single()
-    expect(after.data?.display_name).toBe('wire-probe-edit')
+    const after = await admin.from('profiles').select('nickname').eq('id', diverA.id).single()
+    expect(after.data?.nickname).toBe('wire-probe-edit')
   })
 
   it('diver PATCH role with the SAME current value is a no-op (trigger uses IS DISTINCT FROM)', async () => {

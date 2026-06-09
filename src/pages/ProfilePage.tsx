@@ -36,9 +36,8 @@ import {
 // which surfaced as a save that only worked once the user typed into
 // every empty field.
 const schema = z.object({
-  full_name: z.string().min(1, 'Required'),
-  display_name: z.string().min(1, 'Required'),
-  name_alt: z.string().nullish(),
+  name: z.string().min(1, 'Required'),
+  nickname: z.string().nullish(),
   phone: z.string().nullish(),
   date_of_birth: z.string().min(1, 'Required'),
   nationality: z.string().nullish(),
@@ -283,9 +282,8 @@ export function ProfileForm({ user, profile, onSaved }: {
     // and there is no INSERT policy on profiles — upsert hits the INSERT
     // RLS check and 403s even when only updating an existing row.
     const { error } = await supabase.from('profiles').update({
-      full_name: data.full_name,
-      display_name: strOrNull(data.display_name),
-      name_alt: strOrNull(data.name_alt),
+      name: data.name,
+      nickname: strOrNull(data.nickname),
       phone: strOrNull(data.phone),
       date_of_birth: strOrNull(data.date_of_birth),
       nationality: strOrNull(data.nationality),
@@ -322,20 +320,20 @@ export function ProfileForm({ user, profile, onSaved }: {
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Personal Info</h2>
-          <Field label="Full name" required>
-            <input {...register('full_name')} className={inputClass} />
-            {errors.full_name && <p className="text-red-600 text-xs mt-1">{errors.full_name.message}</p>}
+          <Field label="Name" required>
+            <input {...register('name')} className={inputClass} />
+            <p className="text-xs text-blue-900/70 mt-1">
+              First and last name, exactly as it appears on your passport / ID.
+            </p>
+            {errors.name && <p className="text-red-600 text-xs mt-1">{errors.name.message}</p>}
           </Field>
-          <Field label="Display name" required>
-            <input {...register('display_name')} className={inputClass} />
-            {errors.display_name && <p className="text-red-600 text-xs mt-1">{errors.display_name.message}</p>}
-          </Field>
-          <Field label="Name in another script (optional)">
+          <Field label="Nickname">
             <input
-              {...register('name_alt')}
+              {...register('nickname')}
               className={inputClass}
-              placeholder="e.g. 陳大文 / 山田太郎 / 김민수"
+              placeholder="An English name, alias, or what you'd like to be called (optional)"
             />
+            {errors.nickname && <p className="text-red-600 text-xs mt-1">{errors.nickname.message}</p>}
           </Field>
           <Field label="Phone"><input {...register('phone')} type="tel" className={inputClass} /></Field>
           <Field label="Date of birth" required>

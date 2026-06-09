@@ -83,9 +83,9 @@ describe('staff_availability RLS', () => {
   })
 
   it('a non-owner reading via the view sees masked title + details + the owner display name', async () => {
-    // Give the owning staff user a recognizable display_name so we can
+    // Give the owning staff user a recognizable nickname so we can
     // assert the join lands.
-    await admin.from('profiles').update({ display_name: 'Owner-Ada' }).eq('id', staffUser.id)
+    await admin.from('profiles').update({ nickname: 'Owner-Ada' }).eq('id', staffUser.id)
     const { data: row } = await admin.from('staff_availability').insert({
       user_id: staffUser.id,
       start_date: '2030-02-25', start_time: '09:00:00', end_date: '2030-02-26',

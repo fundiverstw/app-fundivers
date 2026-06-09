@@ -982,14 +982,14 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
             className="text-blue-900 font-medium select-text cursor-text"
             onClick={e => e.stopPropagation()}
           >
-            {r.profile?.full_name ?? '(no profile)'}
+            {r.profile?.name ?? '(no profile)'}
           </span>
-          {r.profile?.display_name && (
+          {r.profile?.nickname && (
             <span
               className="text-blue-900/80 font-medium select-text cursor-text"
               onClick={e => e.stopPropagation()}
             >
-              {' '}“{r.profile.display_name}”
+              {' '}({r.profile.nickname})
             </span>
           )}
           {r.diverNotes.length > 0 && (
@@ -1029,10 +1029,8 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
         <div className="border-t border-sky-200 px-3 pb-3 pt-2 space-y-2">
           {r.profile && (
             <div className="space-y-1">
-              {(r.profile.cert_agency || r.profile.cert_level || r.profile.nitrox_certified || r.profile.deep_certified || r.profile.name_alt) && (
+              {(r.profile.cert_agency || r.profile.cert_level || r.profile.nitrox_certified || r.profile.deep_certified) && (
                 <p className="text-xs text-blue-900 font-medium select-text">
-                  {r.profile.name_alt && <span>{r.profile.name_alt}</span>}
-                  {r.profile.name_alt && r.profile.cert_agency && r.profile.cert_level && ' · '}
                   {r.profile.cert_agency && r.profile.cert_level && `${r.profile.cert_agency} ${r.profile.cert_level}`}
                   {r.profile.nitrox_certified && ' · Nitrox'}
                   {r.profile.deep_certified && ' · Deep'}
@@ -1342,9 +1340,9 @@ function TransportGroup({ title, rows, emptyHint, note }: {
           {rows.map(r => (
             <li key={r.booking.id} className="py-1.5 flex items-baseline justify-between gap-3">
               <span className="text-sm text-blue-900 font-medium">
-                {r.profile?.full_name ?? '(no profile)'}
-                {r.profile?.display_name && r.profile.display_name !== r.profile.full_name && (
-                  <span className="text-blue-900 font-medium"> “{r.profile.display_name}”</span>
+                {r.profile?.name ?? '(no profile)'}
+                {r.profile?.nickname && r.profile.nickname !== r.profile.name && (
+                  <span className="text-blue-900 font-medium"> ({r.profile.nickname})</span>
                 )}
               </span>
               {r.profile?.phone && (

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { personName } from '../../lib/names'
 import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
@@ -163,7 +164,7 @@ function DiverGearCard({ row, onProfilePatched }: { row: Row; onProfilePatched: 
       bcd_size:     bcdSize     || null,
       wetsuit_size: wetsuitSize || null,
     })
-    toast.success(`Saved sizes for ${profile.display_name || profile.full_name || 'diver'}`)
+    toast.success(`Saved sizes for ${personName(profile.name, profile.nickname) || 'diver'}`)
   }
 
   return (
@@ -171,7 +172,7 @@ function DiverGearCard({ row, onProfilePatched }: { row: Row; onProfilePatched: 
       <header className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-blue-900">
-            {profile?.display_name || profile?.full_name || '(unknown)'}
+            {personName(profile?.name, profile?.nickname) || '(unknown)'}
           </h2>
           {sizing && <p className="text-xs text-blue-900 font-medium">{sizing}</p>}
         </div>

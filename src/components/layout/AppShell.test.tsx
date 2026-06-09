@@ -39,19 +39,18 @@ function routedRender(start = '/calendar') {
 }
 
 describe('AppShell', () => {
-  it('prefers display_name when present', () => {
+  it('shows the name with the nickname in parentheses', () => {
     useAuthMock.mockReturnValue({
-      profile: { display_name: 'Ada', full_name: 'Ada Lovelace' },
+      profile: { nickname: 'Ada', name: 'Ada Lovelace' },
       signOut,
     })
     routedRender()
-    expect(screen.getByText('Ada')).toBeInTheDocument()
-    expect(screen.queryByText('Ada Lovelace')).not.toBeInTheDocument()
+    expect(screen.getByText('Ada Lovelace (Ada)')).toBeInTheDocument()
   })
 
-  it('falls back to full_name when display_name is absent', () => {
+  it('falls back to name when nickname is absent', () => {
     useAuthMock.mockReturnValue({
-      profile: { display_name: null, full_name: 'Grace Hopper' },
+      profile: { nickname: null, name: 'Grace Hopper' },
       signOut,
     })
     routedRender()
@@ -120,17 +119,17 @@ describe('AppShell', () => {
 
   it("renders the admin's name as a link to /admin (the view-toggle affordance)", () => {
     useAuthMock.mockReturnValue({
-      profile: { display_name: 'Admin', full_name: 'Eric', role: 'admin' },
+      profile: { nickname: 'Admin', name: 'Eric', role: 'admin' },
       signOut,
     })
     routedRender()
-    const link = screen.getByRole('link', { name: 'Admin' })
+    const link = screen.getByRole('link', { name: 'Eric (Admin)' })
     expect(link).toHaveAttribute('href', '/admin')
   })
 
   it("renders a diver's name as plain text, not a link", () => {
     useAuthMock.mockReturnValue({
-      profile: { display_name: 'Alice', full_name: 'Alice', role: 'diver' },
+      profile: { nickname: 'Alice', name: 'Alice', role: 'diver' },
       signOut,
     })
     routedRender()

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { personName } from '../../lib/names'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { usePWAInstall } from '../../hooks/usePWAInstall'
@@ -123,10 +124,10 @@ export function AppShell() {
           <NotificationBell />
           {profile?.role === 'admin' || profile?.role === 'staff' ? (
             <Link to={profile.role === 'admin' ? '/admin' : '/admin/events'} className={`text-sm ${ON_DEEP_BODY} hover:text-white`}>
-              {profile.display_name ?? profile.full_name}
+              {personName(profile.name, profile.nickname)}
             </Link>
           ) : (
-            <span className={`text-sm ${ON_DEEP_BODY}`}>{profile?.display_name ?? profile?.full_name}</span>
+            <span className={`text-sm ${ON_DEEP_BODY}`}>{personName(profile?.name, profile?.nickname)}</span>
           )}
           <button onClick={handleSignOut} className={`text-xs ${ON_DEEP_MUTED} hover:text-white`}>
             Sign out

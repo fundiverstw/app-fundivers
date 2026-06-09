@@ -55,8 +55,8 @@ describe('AdminApplicationsPage', () => {
   it('lists pending profiles newest first and shows the count', async () => {
     from.mockReturnValueOnce(mockQueryBuilder({
       data: [
-        { id: 'u1', full_name: 'Alice', created_at: '2026-04-30T00:00:00Z', status: 'pending' },
-        { id: 'u2', full_name: 'Bob',   created_at: '2026-04-29T00:00:00Z', status: 'pending' },
+        { id: 'u1', name: 'Alice', created_at: '2026-04-30T00:00:00Z', status: 'pending' },
+        { id: 'u2', name: 'Bob',   created_at: '2026-04-29T00:00:00Z', status: 'pending' },
       ],
     }))
     renderPage()
@@ -67,7 +67,7 @@ describe('AdminApplicationsPage', () => {
 
   it('approve calls notify-application-decision and removes the row', async () => {
     from.mockReturnValueOnce(mockQueryBuilder({
-      data: [{ id: 'u1', full_name: 'Alice', created_at: '2026-04-30T00:00:00Z', status: 'pending' }],
+      data: [{ id: 'u1', name: 'Alice', created_at: '2026-04-30T00:00:00Z', status: 'pending' }],
     }))
     // Second from() call when user expands to look up first booking
     from.mockReturnValueOnce(mockQueryBuilder({ data: [] }))
@@ -90,7 +90,7 @@ describe('AdminApplicationsPage', () => {
 
   it('reject sends the typed reason in the body', async () => {
     from.mockReturnValueOnce(mockQueryBuilder({
-      data: [{ id: 'u1', full_name: 'Alice', created_at: '2026-04-30T00:00:00Z', status: 'pending' }],
+      data: [{ id: 'u1', name: 'Alice', created_at: '2026-04-30T00:00:00Z', status: 'pending' }],
     }))
     from.mockReturnValueOnce(mockQueryBuilder({ data: [] }))
     invoke.mockResolvedValue({ data: { ok: true, status: 'rejected', email_sent: true }, error: null })
@@ -112,7 +112,7 @@ describe('AdminApplicationsPage', () => {
 
   it('shows an error toast when the function call fails', async () => {
     from.mockReturnValueOnce(mockQueryBuilder({
-      data: [{ id: 'u1', full_name: 'Alice', created_at: '2026-04-30T00:00:00Z', status: 'pending' }],
+      data: [{ id: 'u1', name: 'Alice', created_at: '2026-04-30T00:00:00Z', status: 'pending' }],
     }))
     from.mockReturnValueOnce(mockQueryBuilder({ data: [] }))
     invoke.mockResolvedValue({ data: null, error: { message: 'forbidden' } })

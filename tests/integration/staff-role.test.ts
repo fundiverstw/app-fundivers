@@ -152,7 +152,7 @@ describe('staff role: blocked writes on operational tables', () => {
   it('cannot UPDATE another user\'s profile (PII immutable from staff)', async () => {
     const sb = await userClient(staff.email, staff.password)
     const { count } = await sb.from('profiles')
-      .update({ full_name: 'staff-changed' }, { count: 'exact' })
+      .update({ name: 'staff-changed' }, { count: 'exact' })
       .eq('id', diver.id)
     expect(count).toBe(0)
   })

@@ -11,8 +11,8 @@ import { sanitizeProfilePatch, PROFILE_PATCH_ALLOW } from './profile-patch'
 describe('sanitizeProfilePatch — blocked attack keys', () => {
   it('drops role (C2: pre-auth admin promotion)', () => {
     expect(sanitizeProfilePatch({ role: 'admin' })).toEqual({})
-    expect(sanitizeProfilePatch({ role: 'staff', full_name: 'Mallory' }))
-      .toEqual({ full_name: 'Mallory' })
+    expect(sanitizeProfilePatch({ role: 'staff', name: 'Mallory' }))
+      .toEqual({ name: 'Mallory' })
   })
 
   it('drops status (manual-verification gate)', () => {
@@ -69,8 +69,8 @@ describe('sanitizeProfilePatch — allowed keys (SPA registration-form contract)
   // profilePatch builder (~line 589). When the SPA adds a column to
   // profile_patch, add it both here AND in PROFILE_PATCH_ALLOW.
   const SPA_PATCH_FIELDS: ReadonlyArray<string> = [
-    'full_name',
-    'name_alt',
+    'name',
+    'nickname',
     'date_of_birth',
     'nationality',
     'id_number',
@@ -99,8 +99,8 @@ describe('sanitizeProfilePatch — allowed keys (SPA registration-form contract)
   })
 
   it('preserves null values (SPA uses null to clear a column)', () => {
-    expect(sanitizeProfilePatch({ full_name: null, name_alt: null }))
-      .toEqual({ full_name: null, name_alt: null })
+    expect(sanitizeProfilePatch({ name: null, nickname: null }))
+      .toEqual({ name: null, nickname: null })
   })
 
   it('preserves numeric and boolean values verbatim', () => {
@@ -121,11 +121,11 @@ describe('sanitizeProfilePatch — mixed attack + legit', () => {
     expect(sanitizeProfilePatch({
       role:       'admin',           // dropped
       status:     'active',          // dropped
-      full_name:  'Mallory',         // kept
+      name:  'Mallory',         // kept
       cert_level: 'Open Water',      // kept
       fin_size:   'XL',              // dropped
     })).toEqual({
-      full_name:  'Mallory',
+      name:  'Mallory',
       cert_level: 'Open Water',
     })
   })
@@ -145,14 +145,14 @@ describe('sanitizeProfilePatch — defensive shape handling', () => {
   })
 
   it('array input → {} (does not iterate index keys)', () => {
-    expect(sanitizeProfilePatch(['full_name', 'role'])).toEqual({})
+    expect(sanitizeProfilePatch(['name', 'role'])).toEqual({})
   })
 
   it('does not mutate input', () => {
-    const input: Record<string, unknown> = { role: 'admin', full_name: 'M' }
+    const input: Record<string, unknown> = { role: 'admin', name: 'M' }
     const out   = sanitizeProfilePatch(input)
-    expect(input).toEqual({ role: 'admin', full_name: 'M' })
-    expect(out).toEqual({ full_name: 'M' })
+    expect(input).toEqual({ role: 'admin', name: 'M' })
+    expect(out).toEqual({ name: 'M' })
     expect(out).not.toBe(input)
   })
 

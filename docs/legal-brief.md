@@ -71,9 +71,8 @@ trigger on every `auth.users` insert. Columns relevant for privacy:
 | Column | Type | Sensitivity | Notes |
 | --- | --- | --- | --- |
 | `id` | uuid | n/a | matches `auth.users.id` |
-| `full_name` | text | identifier | usually legal name |
-| `name_alt` | text | identifier | optional non-Latin script name |
-| `display_name` | text | low | shop-floor name |
+| `name` | text | identifier | legal name, exactly as on passport / ID |
+| `nickname` | text | low | optional informal name (English name, alias, shop-floor name) |
 | `date_of_birth` | date | sensitive | required for adult-only events / insurance |
 | `nationality` | text | sensitive | required for dive-permit submission |
 | `id_number` | text | **highly sensitive** | passport / ARC; required for dive-permit submission; purged at 12 months inactive |

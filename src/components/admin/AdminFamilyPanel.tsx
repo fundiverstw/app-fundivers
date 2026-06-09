@@ -57,7 +57,7 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
     const q = filter.trim().toLowerCase()
     if (!q) return eligibleChildren.slice(0, 20)
     return eligibleChildren
-      .filter(u => `${u.full_name ?? ''} ${u.display_name ?? ''} ${u.name_alt ?? ''}`.toLowerCase().includes(q))
+      .filter(u => `${u.name ?? ''} ${u.nickname ?? ''}`.toLowerCase().includes(q))
       .slice(0, 20)
   }, [filter, eligibleChildren])
 
@@ -100,7 +100,7 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
   // and offer an Unlink-from-parent control. No add-child UI here — the
   // one-level rule means a child can't have children.
   if (user.parent_account) {
-    const parentName = currentParent?.full_name ?? currentParent?.display_name ?? '(unknown)'
+    const parentName = currentParent?.name ?? currentParent?.nickname ?? '(unknown)'
     return (
       <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-2" aria-label="Family">
         <h2 className="text-sm font-semibold text-red-600 uppercase tracking-wider">Family</h2>
@@ -133,16 +133,16 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
           {children.map(c => (
             <li key={c.id} className="flex items-center justify-between gap-2 bg-sky-50 border border-sky-200 rounded-lg px-3 py-2">
               <span className="text-sm text-blue-900 font-medium">
-                {c.full_name ?? '(unnamed)'}
-                {c.display_name && c.display_name !== c.full_name && (
-                  <span className="text-blue-900/80"> “{c.display_name}”</span>
+                {c.name ?? '(unnamed)'}
+                {c.nickname && c.nickname !== c.name && (
+                  <span className="text-blue-900/80"> ({c.nickname})</span>
                 )}
               </span>
               <button
                 type="button"
                 onClick={() => unlink(c.id)}
                 disabled={unlinkingId === c.id}
-                aria-label={`Unlink ${c.full_name ?? 'child'}`}
+                aria-label={`Unlink ${c.name ?? 'child'}`}
                 className="text-xs text-red-700 hover:text-red-800 font-semibold disabled:opacity-50"
               >
                 {unlinkingId === c.id ? 'Unlinking…' : 'Unlink'}
@@ -173,16 +173,16 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
             {filtered.map(c => (
               <li key={c.id} className="flex items-center justify-between gap-2 bg-white border border-sky-200 rounded-lg px-3 py-1.5">
                 <span className="text-sm text-blue-900 font-medium">
-                  {c.full_name ?? '(unnamed)'}
-                  {c.display_name && c.display_name !== c.full_name && (
-                    <span className="text-blue-900/80"> “{c.display_name}”</span>
+                  {c.name ?? '(unnamed)'}
+                  {c.nickname && c.nickname !== c.name && (
+                    <span className="text-blue-900/80"> ({c.nickname})</span>
                   )}
                 </span>
                 <button
                   type="button"
                   onClick={() => linkChild(c.id)}
                   disabled={linking}
-                  aria-label={`Link ${c.full_name ?? 'diver'} as child`}
+                  aria-label={`Link ${c.name ?? 'diver'} as child`}
                   className="text-xs bg-blue-900 hover:bg-blue-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded-lg"
                 >
                   Link as child

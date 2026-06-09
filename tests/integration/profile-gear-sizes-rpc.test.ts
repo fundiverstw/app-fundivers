@@ -103,7 +103,7 @@ describe('update_diver_gear_sizes RPC', () => {
 
   it('diver can still update non-gear profile fields without tripping the gear trigger', async () => {
     const sb = await userClient(diverB.email, diverB.password)
-    const { error } = await sb.from('profiles').update({ display_name: 'New Name' }).eq('id', diverB.id)
+    const { error } = await sb.from('profiles').update({ nickname: 'New Name' }).eq('id', diverB.id)
     expect(error).toBeNull()
   })
 

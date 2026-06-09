@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { personName } from '../../lib/names'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -49,7 +50,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
     ;(async () => {
       const [dutiesRes, adminsRes, courseRes] = await Promise.all([
         supabase.from('duties').select('*').eq(fkColumn, eventId).order('role'),
-        supabase.from('profiles').select('*').in('role', ['admin', 'staff']).order('display_name'),
+        supabase.from('profiles').select('*').in('role', ['admin', 'staff']).order('name'),
         eventType === 'course'
           ? supabase.from('EO_courses').select('course_days').eq('_id', eventId).single()
           : Promise.resolve({ data: null }),
@@ -159,14 +160,14 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
             return (
               <li key={d.id} className="flex items-center justify-between text-xs bg-sky-50 rounded p-2">
                 <span className="min-w-0">
-                  <span className="font-medium text-blue-900">{p?.display_name || p?.full_name || '(unknown)'}</span>
+                  <span className="font-medium text-blue-900">{personName(p?.name, p?.nickname) || '(unknown)'}</span>
                   <span className="text-blue-900 font-medium"> · <span className="capitalize">{d.role}</span> · {span}</span>
                 </span>
                 {!readOnly && (
                   <button
                     onClick={() => remove(d.id)}
                     className="text-blue-950 font-medium hover:text-red-600 ml-2"
-                    aria-label={`Remove duty for ${p?.display_name || p?.full_name || 'admin'}`}
+                    aria-label={`Remove duty for ${personName(p?.name, p?.nickname) || 'admin'}`}
                   >
                     ✕
                   </button>
@@ -187,7 +188,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
           >
             <option value="">Pick admin/staff…</option>
             {admins.map(a => (
-              <option key={a.id} value={a.id}>{a.display_name || a.full_name || a.id}</option>
+              <option key={a.id} value={a.id}>{personName(a.name, a.nickname) || a.id}</option>
             ))}
           </select>
           <select

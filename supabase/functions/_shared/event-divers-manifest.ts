@@ -11,10 +11,8 @@
 // or garbage entry still appears for the admin to fix by hand.
 
 export interface EventDiverRow {
-  /** Primary legal name. Combined with nameAlt into the 姓名 column. */
+  /** Legal name exactly as on the diver's passport / ID — the 姓名 column. */
   name: string
-  /** Optional name in another script (e.g. 中文). */
-  nameAlt: string | null
   /** YYYY-MM-DD or null. */
   dob: string | null
   /** Free-text nationality from the profile (e.g. "American", "Taiwanese"). */
@@ -72,14 +70,6 @@ export function formatManifestDob(yyyyMmDd: string | null): string {
   return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()},${d.getUTCFullYear()}`
 }
 
-// Combine the Latin name and the alt-script name into the single 姓名 cell,
-// e.g. "Mike Lee" + "李邁先" → "Mike Lee 李邁先".
-export function manifestName(name: string, nameAlt: string | null): string {
-  const a = (name ?? '').trim()
-  const b = (nameAlt ?? '').trim()
-  if (a && b) return `${a} ${b}`
-  return a || b
-}
 
 // male → 男, female → 女. Unknown / free-text values pass through untouched.
 export function genderToZh(gender: string | null): string {
@@ -166,7 +156,7 @@ export function buildManifestAoa(
   divers.forEach((d, i) => {
     aoa.push([
       i + 1,
-      manifestName(d.name, d.nameAlt),
+      (d.name ?? '').trim(),
       d.idNumber ?? '',
       formatManifestDob(d.dob),
       genderToZh(d.gender),

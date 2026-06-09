@@ -44,7 +44,7 @@ export function AdminUsersPage() {
     supabase
       .from('profiles')
       .select('*')
-      .order('full_name', { ascending: true })
+      .order('name', { ascending: true })
       .then(({ data }) => setUsers((data ?? []) as Profile[]))
   }, [])
 
@@ -201,7 +201,7 @@ export function AdminUsersPage() {
     const { data } = await supabase
       .from('profiles')
       .select('*')
-      .order('full_name', { ascending: true })
+      .order('name', { ascending: true })
     setUsers((data ?? []) as Profile[])
   }
 
@@ -228,7 +228,7 @@ export function AdminUsersPage() {
   }
 
   async function handleDeleteUser(target: Profile) {
-    const name = target.full_name || target.display_name || target.contact_id || target.id
+    const name = target.name || target.nickname || target.contact_id || target.id
     const confirmed = window.confirm(
       `Permanently delete ${name}?\n\n` +
       `This removes their account, profile, bookings, payments, ` +
@@ -293,7 +293,7 @@ export function AdminUsersPage() {
 
   const visible = users.filter(u => {
     if (!filter) return true
-    const haystack = [u.full_name, u.display_name, u.name_alt, u.contact_id, u.phone]
+    const haystack = [u.name, u.nickname, u.contact_id, u.phone]
       .filter(Boolean).join(' ').toLowerCase()
     return haystack.includes(filter.toLowerCase())
   })
@@ -377,9 +377,8 @@ function UserCard({
       >
         <div className="flex-1 min-w-0">
           <p className="font-medium text-blue-900 text-sm">
-            {user.full_name ?? '(unnamed)'}
-            {user.display_name && <span className="text-blue-900 font-medium"> “{user.display_name}”</span>}
-            {user.name_alt && <span className="text-blue-900 font-medium"> ({user.name_alt})</span>}
+            {user.name ?? '(unnamed)'}
+            {user.nickname && <span className="text-blue-900 font-medium"> ({user.nickname})</span>}
           </p>
           <p className="text-xs text-blue-900 font-medium">
             {user.cert_agency && user.cert_level ? `${user.cert_agency} ${user.cert_level}` : 'Uncertified'}

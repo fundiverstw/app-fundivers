@@ -21,7 +21,7 @@ export function WelcomeModal({ user, onDismiss }: { user: User; onDismiss: () =>
     onDismiss()
   }
 
-  const firstName = (user.user_metadata?.full_name as string | undefined)?.split(' ')[0]
+  const firstName = (user.user_metadata?.name as string | undefined)?.split(' ')[0]
 
   return (
     <div

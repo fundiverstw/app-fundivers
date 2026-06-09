@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { personName } from '../../lib/names'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -16,8 +17,8 @@ const TAG_STYLES: Record<NoteTag, string> = {
 }
 
 type NoteWithAuthors = AdminNote & {
-  author: Pick<Profile, 'id' | 'display_name' | 'full_name'> | null
-  resolver: Pick<Profile, 'id' | 'display_name' | 'full_name'> | null
+  author: Pick<Profile, 'id' | 'nickname' | 'name'> | null
+  resolver: Pick<Profile, 'id' | 'nickname' | 'name'> | null
 }
 
 export type NoteTarget =
@@ -73,11 +74,11 @@ export function AdminNotes({ target, tagFilter, title = 'Notes' }: Props) {
       ...(rows ?? []).map(r => r.created_by),
       ...(rows ?? []).map(r => r.resolved_by).filter((x): x is string => !!x),
     ]
-    let profMap = new Map<string, Pick<Profile, 'id' | 'display_name' | 'full_name'>>()
+    let profMap = new Map<string, Pick<Profile, 'id' | 'nickname' | 'name'>>()
     if (ids.length) {
       const { data: profs } = await supabase
         .from('profiles')
-        .select('id, display_name, full_name')
+        .select('id, nickname, name')
         .in('id', [...new Set(ids)])
       profMap = new Map((profs ?? []).map(p => [p.id, p]))
     }
@@ -194,7 +195,7 @@ function NoteCard({ note, onResolve, onUnresolve }: {
   onResolve?: () => void
   onUnresolve?: () => void
 }) {
-  const author = note.author?.display_name ?? note.author?.full_name ?? 'unknown'
+  const author = personName(note.author?.name, note.author?.nickname) || 'unknown'
   return (
     <div className={`bg-sky-50 rounded-lg p-3 text-sm ${note.resolved ? 'opacity-60' : ''}`}>
       <div className="flex items-start gap-2">
@@ -212,7 +213,7 @@ function NoteCard({ note, onResolve, onUnresolve }: {
       <p className="text-xs text-blue-950 font-medium mt-1">
         {author} · {format(new Date(note.created_at), 'MMM d · HH:mm')}
         {note.resolved && note.resolved_at && (
-          <> · resolved by {note.resolver?.display_name ?? note.resolver?.full_name ?? 'unknown'} {format(new Date(note.resolved_at), 'MMM d')}</>
+          <> · resolved by {personName(note.resolver?.name, note.resolver?.nickname) || 'unknown'} {format(new Date(note.resolved_at), 'MMM d')}</>
         )}
       </p>
     </div>

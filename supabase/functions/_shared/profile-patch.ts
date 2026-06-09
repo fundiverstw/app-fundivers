@@ -18,8 +18,8 @@
 // suite (Node).
 
 export const PROFILE_PATCH_ALLOW: ReadonlySet<string> = new Set<string>([
-  'full_name',
-  'name_alt',
+  'name',
+  'nickname',
   'date_of_birth',
   'nationality',
   'id_number',

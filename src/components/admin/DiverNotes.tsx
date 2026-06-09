@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
+import { personName } from '../../lib/names'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import type { DiverNote, Profile } from '../../types/database'
 
 type NoteWithAuthor = DiverNote & {
-  author: Pick<Profile, 'id' | 'display_name' | 'full_name'> | null
-  editor: Pick<Profile, 'id' | 'display_name' | 'full_name'> | null
+  author: Pick<Profile, 'id' | 'nickname' | 'name'> | null
+  editor: Pick<Profile, 'id' | 'nickname' | 'name'> | null
 }
 
 interface Props {
@@ -34,11 +35,11 @@ export function DiverNotes({ profileId, title = 'Diver notes (staff only)' }: Pr
       ...(rows ?? []).map(r => r.created_by),
       ...(rows ?? []).map(r => r.edited_by).filter((x): x is string => !!x),
     ]
-    let profMap = new Map<string, Pick<Profile, 'id' | 'display_name' | 'full_name'>>()
+    let profMap = new Map<string, Pick<Profile, 'id' | 'nickname' | 'name'>>()
     if (ids.length) {
       const { data: profs } = await supabase
         .from('profiles')
-        .select('id, display_name, full_name')
+        .select('id, nickname, name')
         .in('id', [...new Set(ids)])
       profMap = new Map((profs ?? []).map(p => [p.id, p]))
     }
@@ -144,14 +145,14 @@ export function DiverNotes({ profileId, title = 'Diver notes (staff only)' }: Pr
                     <div className="flex gap-2 shrink-0">
                       <button
                         onClick={() => startEdit(n)}
-                        aria-label={`Edit note from ${n.author?.display_name ?? n.author?.full_name ?? 'unknown'}`}
+                        aria-label={`Edit note from ${personName(n.author?.name, n.author?.nickname) || 'unknown'}`}
                         className="text-xs text-blue-900 font-semibold hover:text-blue-700"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => deleteNote(n.id)}
-                        aria-label={`Delete note from ${n.author?.display_name ?? n.author?.full_name ?? 'unknown'}`}
+                        aria-label={`Delete note from ${personName(n.author?.name, n.author?.nickname) || 'unknown'}`}
                         className="text-xs text-red-700 font-semibold hover:text-red-800"
                       >
                         Delete
@@ -160,9 +161,9 @@ export function DiverNotes({ profileId, title = 'Diver notes (staff only)' }: Pr
                   )}
                 </div>
                 <p className="text-xs text-blue-950 font-medium">
-                  {n.author?.display_name ?? n.author?.full_name ?? 'unknown'} · {format(new Date(n.created_at), 'MMM d, yyyy · HH:mm')}
+                  {personName(n.author?.name, n.author?.nickname) || 'unknown'} · {format(new Date(n.created_at), 'MMM d, yyyy · HH:mm')}
                   {n.edited_at && (
-                    <> · edited{n.editor && ` by ${n.editor.display_name ?? n.editor.full_name}`} {format(new Date(n.edited_at), 'MMM d')}</>
+                    <> · edited{n.editor && ` by ${personName(n.editor.name, n.editor.nickname)}`} {format(new Date(n.edited_at), 'MMM d')}</>
                   )}
                 </p>
               </>

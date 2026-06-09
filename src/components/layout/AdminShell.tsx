@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { personName } from '../../lib/names'
 import { NavLink, Outlet, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../lib/supabase'
@@ -83,7 +84,7 @@ export function AdminShell() {
             </Link>
           )}
           <Link to="/calendar" className="text-sm font-semibold text-amber-300 hover:text-amber-200">
-            {profile?.display_name ?? profile?.full_name}
+            {personName(profile?.name, profile?.nickname)}
           </Link>
           <button onClick={handleSignOut} className={`text-xs ${ON_DEEP_MUTED} hover:text-white`}>
             Sign out

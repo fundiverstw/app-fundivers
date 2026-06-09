@@ -427,8 +427,8 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     eventTitle: titleFallback,
     startDate,
     endDate,
-    name:            profile?.full_name ?? "",
-    nameAlt:         profile?.name_alt ?? null,
+    name:            profile?.name ?? "",
+    nickname:        profile?.nickname ?? null,
     email:           registrantEmail,
     dob:             profile?.date_of_birth ?? null,
     nationality:     profile?.nationality ?? null,
@@ -471,8 +471,8 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
   // 4. Email — optional. transporter=null skips entirely.
   if (deps.transporter) {
     try {
-      const subjectName = payload.nameAlt
-        ? `${payload.name} ${payload.nameAlt}`
+      const subjectName = payload.nickname
+        ? `${payload.name} (${payload.nickname})`
         : payload.name
       const fromHeader = { name: deps.env.mailFromName, address: deps.env.mailFromAddress }
       if (isWaitlisted) {
