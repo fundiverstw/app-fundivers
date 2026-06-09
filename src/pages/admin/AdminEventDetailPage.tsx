@@ -1030,7 +1030,7 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
           {r.profile && (
             <div className="space-y-1">
               {(r.profile.cert_agency || r.profile.cert_level || r.profile.nitrox_certified || r.profile.deep_certified || r.profile.name_alt) && (
-                <p className="text-xs text-blue-900 font-medium">
+                <p className="text-xs text-blue-900 font-medium select-text">
                   {r.profile.name_alt && <span>{r.profile.name_alt}</span>}
                   {r.profile.name_alt && r.profile.cert_agency && r.profile.cert_level && ' · '}
                   {r.profile.cert_agency && r.profile.cert_level && `${r.profile.cert_agency} ${r.profile.cert_level}`}
@@ -1038,17 +1038,29 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
                   {r.profile.deep_certified && ' · Deep'}
                 </p>
               )}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-blue-900 font-medium">
-                {r.profile.phone       && <span>📞 {r.profile.phone}</span>}
-                {r.profile.contact_method && r.profile.contact_id && (
-                  <span>{methodEmoji(r.profile.contact_method)} {r.profile.contact_id}</span>
+              {/* Decorative emoji are select-none so a drag-select copies the
+                  clean value; phone / contact id are select-all for one-click copy. */}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-blue-900 font-medium select-text">
+                {r.profile.phone && (
+                  <span>
+                    <span aria-hidden="true" className="select-none">📞 </span>
+                    <span className="select-all">{r.profile.phone}</span>
+                  </span>
                 )}
-                {r.profile.logged_dives > 0 && <span>📖 {r.profile.logged_dives} logged</span>}
+                {r.profile.contact_method && r.profile.contact_id && (
+                  <span>
+                    <span aria-hidden="true" className="select-none">{methodEmoji(r.profile.contact_method)} </span>
+                    <span className="select-all">{r.profile.contact_id}</span>
+                  </span>
+                )}
+                {r.profile.logged_dives > 0 && (
+                  <span><span aria-hidden="true" className="select-none">📖 </span>{r.profile.logged_dives} logged</span>
+                )}
                 {r.profile.height_cm && r.profile.weight_kg && (
-                  <span>📏 {r.profile.height_cm}cm / {r.profile.weight_kg}kg</span>
+                  <span><span aria-hidden="true" className="select-none">📏 </span>{r.profile.height_cm}cm / {r.profile.weight_kg}kg</span>
                 )}
                 {r.profile.shoe_size && (
-                  <span>👟 {shoeAsJp(r.profile.shoe_size) ?? r.profile.shoe_size}</span>
+                  <span><span aria-hidden="true" className="select-none">👟 </span>{shoeAsJp(r.profile.shoe_size) ?? r.profile.shoe_size}</span>
                 )}
               </div>
             </div>
@@ -1086,7 +1098,9 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
           )}
 
           {r.booking.notes && (
-            <p className="text-xs text-blue-950 font-medium bg-sky-50 rounded p-2">📝 {r.booking.notes}</p>
+            <p className="text-xs text-blue-950 font-medium bg-sky-50 rounded p-2 select-text">
+              <span aria-hidden="true" className="select-none">📝 </span>{r.booking.notes}
+            </p>
           )}
 
           <BookingPaymentsBlock
