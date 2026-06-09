@@ -27,6 +27,9 @@ export interface EventDiverRow {
   certLevel: string | null
   /** Total logged dives. */
   loggedDives: number | null
+  /** Optional 備註 (remark) text — used to flag a staff member's role
+   *  (e.g. 教練). Booked divers leave this blank. */
+  remark?: string | null
 }
 
 export interface BoatManifestConfig {
@@ -124,6 +127,18 @@ export function nationalityToZh(nationality: string | null): string {
   return NATIONALITY_ZH[raw.toLowerCase()] ?? raw
 }
 
+// Duty role → Chinese label for the 備註 column when a staff member is on the
+// manifest. instructor → 教練, guide → 導潛, support → 支援. Unknown / empty
+// values pass through untouched so an unmapped role still renders.
+export function roleToZh(role: string | null): string {
+  switch ((role ?? '').trim().toLowerCase()) {
+    case 'instructor': return '教練'
+    case 'guide':      return '導潛'
+    case 'support':    return '支援'
+    default:           return (role ?? '').trim()
+  }
+}
+
 // Title row text: "<boat> (<reg>) 娛樂漁業漁船出海人員名冊". Omits the
 // parens when there's no registration, and the leading space when there's
 // no boat name at all.
@@ -158,7 +173,7 @@ export function buildManifestAoa(
       (d.certLevel ?? '').trim(),
       d.loggedDives ?? '',
       nationalityToZh(d.nationality),
-      '',
+      (d.remark ?? '').trim(),
     ])
   })
 

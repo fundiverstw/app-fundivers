@@ -14,7 +14,10 @@
 //   5. Join in profiles for each booking to read name / name_alt /
 //      date_of_birth / nationality / id_number / gender / cert_level /
 //      logged_dives.
-//   6. Build an .xlsx via _shared/event-divers-xlsx.ts and email it to
+//   6. Fetch the duties for the event and append the staff on board
+//      (instructors / guides / support), deduped by person, with their role
+//      noted in the 備註 column. Anyone already booked as a diver is skipped.
+//   7. Build an .xlsx via _shared/event-divers-xlsx.ts and email it to
 //      fundiverstw@gmail.com with the caller BCCed.
 //
 // Body: { event_type: 'dive' | 'course', event_id: string,
@@ -28,7 +31,42 @@ import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
 import { Buffer } from "node:buffer"
 import { buildEventDiversXlsxBase64, type EventDiverRow } from "../_shared/event-divers-xlsx.ts"
+import { roleToZh } from "../_shared/event-divers-manifest.ts"
 import { corsOk, jsonResponse, safeError } from "../_shared/responses.ts"
+
+// Profile columns the manifest reads, shared by the booked-diver and
+// on-duty-staff fetches.
+const PROFILE_COLS =
+  "id, full_name, display_name, name_alt, date_of_birth, nationality, id_number, gender, cert_level, logged_dives"
+
+interface ManifestProfile {
+  id: string
+  full_name: string | null
+  display_name: string | null
+  name_alt: string | null
+  date_of_birth: string | null
+  nationality: string | null
+  id_number: string | null
+  gender: string | null
+  cert_level: string | null
+  logged_dives: number | null
+}
+
+// Map a profile row to a manifest line. `remark` flags a staffer's role
+// (教練 etc.); booked divers pass null and leave the 備註 cell blank.
+function toManifestRow(p: ManifestProfile, remark: string | null = null): EventDiverRow {
+  return {
+    name:        p.full_name?.trim() || p.display_name?.trim() || "(unnamed)",
+    nameAlt:     p.name_alt?.trim() || null,
+    dob:         p.date_of_birth ?? null,
+    nationality: p.nationality?.trim() || null,
+    idNumber:    p.id_number?.trim() || null,
+    gender:      p.gender?.trim() || null,
+    certLevel:   p.cert_level?.trim() || null,
+    loggedDives: p.logged_dives ?? null,
+    remark,
+  }
+}
 
 const XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -115,41 +153,61 @@ Deno.serve(async (req) => {
   if (bErr) return json({ error: safeError(bErr, "bookings fetch failed") }, 500)
 
   const userIds = [...new Set((bookings ?? []).map(b => b.user_id as string))]
-  let profiles: Array<{
-    id: string
-    full_name: string | null
-    display_name: string | null
-    name_alt: string | null
-    date_of_birth: string | null
-    nationality: string | null
-    id_number: string | null
-    gender: string | null
-    cert_level: string | null
-    logged_dives: number | null
-  }> = []
+  let profiles: ManifestProfile[] = []
   if (userIds.length > 0) {
     const { data: profs, error: pErr } = await admin
       .from("profiles")
-      .select("id, full_name, display_name, name_alt, date_of_birth, nationality, id_number, gender, cert_level, logged_dives")
+      .select(PROFILE_COLS)
       .in("id", userIds)
     if (pErr) return json({ error: safeError(pErr, "profiles fetch failed") }, 500)
-    profiles = profs ?? []
+    profiles = (profs ?? []) as ManifestProfile[]
   }
 
   // Sort by full_name for a predictable manifest order. Profiles missing
   // a full_name fall back to display_name → '(unnamed)' so they still appear.
   const divers: EventDiverRow[] = profiles
-    .map(p => ({
-      name:        p.full_name?.trim() || p.display_name?.trim() || "(unnamed)",
-      nameAlt:     p.name_alt?.trim() || null,
-      dob:         p.date_of_birth ?? null,
-      nationality: p.nationality?.trim() || null,
-      idNumber:    p.id_number?.trim() || null,
-      gender:      p.gender?.trim() || null,
-      certLevel:   p.cert_level?.trim() || null,
-      loggedDives: p.logged_dives ?? null,
-    }))
+    .map(p => toManifestRow(p))
     .sort((a, b) => a.name.localeCompare(b.name))
+
+  // Staff on duty for this event also board the boat, so they belong on the
+  // manifest. A staffer may hold several duty rows (one per course day) and
+  // cover more than one role — dedupe by person, collecting distinct roles.
+  // The duty FK column matches the booking FK column (eo_dive_id / eo_course_id).
+  const { data: dutyRows, error: dErr } = await admin
+    .from("duties")
+    .select("assignee_id, role")
+    .eq(fkCol, eventId)
+  if (dErr) return json({ error: safeError(dErr, "duties fetch failed") }, 500)
+
+  // Don't list anyone twice: a person already on the diver manifest (a booked
+  // diver) is skipped here even if they also hold a duty for the event.
+  const diverIdSet = new Set(userIds)
+  const rolesByStaff = new Map<string, Set<string>>()
+  for (const d of dutyRows ?? []) {
+    const id = d.assignee_id as string | null
+    if (!id || diverIdSet.has(id)) continue
+    let roles = rolesByStaff.get(id)
+    if (!roles) { roles = new Set(); rolesByStaff.set(id, roles) }
+    if (d.role) roles.add(d.role as string)
+  }
+
+  let staff: EventDiverRow[] = []
+  if (rolesByStaff.size > 0) {
+    const { data: staffProfs, error: spErr } = await admin
+      .from("profiles")
+      .select(PROFILE_COLS)
+      .in("id", [...rolesByStaff.keys()])
+    if (spErr) return json({ error: safeError(spErr, "staff profiles fetch failed") }, 500)
+    staff = ((staffProfs ?? []) as ManifestProfile[])
+      .map(p => toManifestRow(
+        p,
+        [...(rolesByStaff.get(p.id) ?? [])].map(roleToZh).join("、"),
+      ))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }
+
+  // Divers first (numbered), then staff — one continuous "people aboard" list.
+  const manifestRows = [...divers, ...staff]
 
   const eventTitle = (event.display_title || event.admin_title || event.calendar_title || "(untitled event)") as string
 
@@ -159,7 +217,7 @@ Deno.serve(async (req) => {
 
   let xlsxBuffer: Buffer
   try {
-    const b64 = buildEventDiversXlsxBase64({ divers, config: boat })
+    const b64 = buildEventDiversXlsxBase64({ divers: manifestRows, config: boat })
     xlsxBuffer = Buffer.from(b64, "base64")
   } catch (e) {
     return json({ error: `xlsx build failed: ${(e as Error).message}` }, 500)
@@ -173,7 +231,8 @@ Deno.serve(async (req) => {
     const stamp = eventStartDate ?? new Date().toISOString().slice(0, 10)
     const subject  = `manifest--${eventTitle}--${stamp}`
     const filename = `manifest-${stamp}.xlsx`
-    const text = `Diver manifest for ${eventTitle} (${stamp}). ${divers.length} diver${divers.length === 1 ? "" : "s"} registered.`
+    const staffPart = staff.length ? ` + ${staff.length} staff` : ""
+    const text = `Boat manifest for ${eventTitle} (${stamp}). ${divers.length} diver${divers.length === 1 ? "" : "s"}${staffPart}.`
 
     await transporter.sendMail({
       from:    { name: "FunDivers TW", address: GMAIL_USER },
@@ -189,5 +248,5 @@ Deno.serve(async (req) => {
     return json({ error: `email failed: ${(e as Error).message}` }, 500)
   }
 
-  return json({ ok: true, diver_count: divers.length })
+  return json({ ok: true, diver_count: divers.length, staff_count: staff.length })
 })

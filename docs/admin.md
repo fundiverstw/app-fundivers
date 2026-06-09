@@ -64,15 +64,23 @@ matching the Taiwanese recreational-fishing-vessel passenger form
 (娛樂漁業漁船出海人員名冊) to the shop inbox, BCCing the requesting admin.
 
 - Rows: every **pending** or **confirmed** booking (cancelled and
-  waitlisted divers are excluded).
+  waitlisted divers are excluded), followed by the **staff on duty** for
+  the event (the `duties` rows — instructors / guides / support). Staff
+  are deduped by person (a course duty is one row per day) and anyone
+  already listed as a booked diver is skipped, so no one appears twice.
 - Columns are the official Chinese form (編號 / 姓名 / 身分證字號 / 出生
   年月日 / 性別 / 潛水執照等級 / 潛水總支數 / 國家 / 備註). The sheet is
   Unicode, so no font embedding is needed.
+- A staff member's role is written into the 備註 (remark) column,
+  localized to Chinese (`instructor`→`教練`, `guide`→`導潛`,
+  `support`→`支援`); booked divers leave 備註 blank.
 - Gender and nationality are best-effort localized to Chinese
   (`male`→`男`, `American`→`美國`); unrecognized free-text values pass
   through untouched. See `_shared/event-divers-manifest.ts` (pure,
   unit-tested) for the mappings and `_shared/event-divers-xlsx.ts` for
   the SheetJS serialization.
+- The function returns `{ diver_count, staff_count }`; the toast shows
+  both (e.g. "7 divers + 2 staff").
 
 ## Event memos
 
