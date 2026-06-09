@@ -1043,8 +1043,6 @@ export type Payment = Database['public']['Tables']['payments']['Row']
 export type BookingAmendment = Database['public']['Tables']['booking_amendments']['Row']
 export type Credit = Database['public']['Tables']['credits']['Row']
 export type CreditInsert = Database['public']['Tables']['credits']['Insert']
-export type CreditUpdate = Database['public']['Tables']['credits']['Update']
-export type BookingAmendmentInsert = Database['public']['Tables']['booking_amendments']['Insert']
 export type EODive = Database['public']['Tables']['EO_dives']['Row']
 export type EOCourse = Database['public']['Tables']['EO_courses']['Row']
 export type EOPrice = Database['public']['Tables']['EO_prices']['Row']
@@ -1057,8 +1055,6 @@ export type DiveSite = Database['public']['Tables']['dive_sites']['Row']
 export type CertLevel = Database['public']['Tables']['cert_levels']['Row']
 export type AdminNote = Database['public']['Tables']['admin_notes']['Row']
 export type DiverNote = Database['public']['Tables']['diver_notes']['Row']
-export type DiverNoteInsert = Database['public']['Tables']['diver_notes']['Insert']
-export type DiverNoteUpdate = Database['public']['Tables']['diver_notes']['Update']
 export const NOTE_TAGS = ['urgent','payment','gear','logistics','cert','medical','note','general'] as const
 export type NoteTag = typeof NOTE_TAGS[number]
 export type Duty = Database['public']['Tables']['duties']['Row']
@@ -1072,17 +1068,13 @@ export type GasMix = typeof GAS_MIXES[number]
 
 export type DiveLog = Database['public']['Tables']['dive_logs']['Row']
 export type DiveLogInsert = Database['public']['Tables']['dive_logs']['Insert']
-export type DiveLogExportRequest = Database['public']['Tables']['dive_log_export_requests']['Row']
 
 export const WAITLIST_OFFER_STATUSES = ['pending', 'accepted', 'expired'] as const
 export type WaitlistOfferStatus = typeof WAITLIST_OFFER_STATUSES[number]
 export type WaitlistOffer = Database['public']['Tables']['waitlist_offers']['Row']
-export const NOTIFICATION_KINDS = ['reminder', 'broadcast', 'duty', 'waitlist_offer'] as const
-export type NotificationKind = typeof NOTIFICATION_KINDS[number]
 export const DUTY_ROLES = ['instructor', 'guide', 'support'] as const
 export type DutyRole = typeof DUTY_ROLES[number]
 
-export type StaffAvailability = Database['public']['Tables']['staff_availability']['Row']
 export type StaffAvailabilityInsert = Database['public']['Tables']['staff_availability']['Insert']
 export type StaffAvailabilityUpdate = Database['public']['Tables']['staff_availability']['Update']
 /** Privacy-projected row used by the UI. title/details are NULL for any

@@ -33,4 +33,3 @@ export function isSupabaseCacheable(url: URL, request: Request): boolean {
 // useAuth.signOut posts it after a successful signOut so a future
 // user on the same device doesn't see the prior user's cached rows.
 export const CLEAR_SUPABASE_CACHE_MSG = { type: 'CLEAR_SUPABASE_CACHE' as const }
-export type ClearSupabaseCacheMsg = typeof CLEAR_SUPABASE_CACHE_MSG

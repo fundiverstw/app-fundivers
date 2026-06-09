@@ -12,9 +12,6 @@ export type ReminderKind =
   | 'event_7d' | 'event_1d'
   | 'payment_21d' | 'payment_14d' | 'payment_7d' | 'payment_3d' | 'payment_1d'
 
-export const EVENT_WINDOWS   = [7, 1] as const
-export const PAYMENT_WINDOWS = [21, 14, 7, 3, 1] as const
-
 export function eventKindForDays(days: number): ReminderKind | null {
   if (days === 7) return 'event_7d'
   if (days === 1) return 'event_1d'
