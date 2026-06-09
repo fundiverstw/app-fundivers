@@ -16,8 +16,8 @@ export async function requestEventDiverExport(
   eventType: 'dive' | 'course',
   eventId: string,
   boat: BoatManifestInput,
-): Promise<{ ok: boolean; diver_count: number }> {
-  const { data, error } = await supabase.functions.invoke<{ ok: boolean; diver_count: number }>(
+): Promise<{ ok: boolean; diver_count: number; staff_count: number }> {
+  const { data, error } = await supabase.functions.invoke<{ ok: boolean; diver_count: number; staff_count: number }>(
     'export-event-divers',
     { body: { event_type: eventType, event_id: eventId, boat } },
   )

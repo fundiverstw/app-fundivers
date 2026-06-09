@@ -837,7 +837,8 @@ function ExportManifestModal({
         registration: registration.trim(),
         notes: notes.split('\n').map(n => n.trim()).filter(Boolean),
       })
-      onDone(`Manifest emailed — ${res.diver_count} diver${res.diver_count === 1 ? '' : 's'}.`)
+      const staffPart = res.staff_count ? ` + ${res.staff_count} staff` : ''
+      onDone(`Manifest emailed — ${res.diver_count} diver${res.diver_count === 1 ? '' : 's'}${staffPart}.`)
     } catch (err) {
       onError(`Export failed: ${errorMessage(err)}`)
     } finally {
@@ -859,8 +860,8 @@ function ExportManifestModal({
         </h2>
         <p className="text-sm text-blue-900">
           Builds the vessel passenger manifest (.xlsx) for pending and confirmed
-          divers and emails it to the shop inbox. Boat details are remembered for
-          next time.
+          divers plus the staff on duty (instructors, guides, support) and emails
+          it to the shop inbox. Boat details are remembered for next time.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-3">

@@ -563,7 +563,7 @@ describe('AdminEventDetailPage', () => {
       ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
     ]))
     from.mockImplementation(() => mockQueryBuilder({ data: [] }))
-    invoke.mockResolvedValue({ data: { ok: true, diver_count: 7 }, error: null })
+    invoke.mockResolvedValue({ data: { ok: true, diver_count: 7, staff_count: 2 }, error: null })
 
     const user = userEvent.setup()
     renderAt('/admin/events/dive/dive_x')
@@ -584,7 +584,7 @@ describe('AdminEventDetailPage', () => {
         }),
       }) },
     ))
-    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith(expect.stringMatching(/7 divers/)))
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith(expect.stringMatching(/7 divers \+ 2 staff/)))
   })
 
   it('flags diver notes on the registrant card and shows them inline when expanded', async () => {

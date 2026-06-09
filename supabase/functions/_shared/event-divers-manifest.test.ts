@@ -4,6 +4,7 @@ import {
   manifestName,
   genderToZh,
   nationalityToZh,
+  roleToZh,
   manifestTitle,
   buildManifestAoa,
   MANIFEST_HEADERS,
@@ -61,6 +62,19 @@ describe('nationalityToZh', () => {
   })
 })
 
+describe('roleToZh', () => {
+  it('maps duty roles to Chinese labels', () => {
+    expect(roleToZh('instructor')).toBe('教練')
+    expect(roleToZh('guide')).toBe('導潛')
+    expect(roleToZh('support')).toBe('支援')
+    expect(roleToZh('Instructor')).toBe('教練')
+  })
+  it('passes through unknown / empty values', () => {
+    expect(roleToZh('captain')).toBe('captain')
+    expect(roleToZh(null)).toBe('')
+  })
+})
+
 describe('manifestTitle', () => {
   it('combines boat name, registration, and the fixed form suffix', () => {
     expect(manifestTitle('坤成8號', 'CT2-6445')).toBe(`坤成8號 (CT2-6445) ${MANIFEST_TITLE_SUFFIX}`)
@@ -107,5 +121,17 @@ describe('buildManifestAoa', () => {
       { ...config, notes: [] },
     )
     expect(aoa[2][6]).toBe('')
+  })
+
+  it('puts a staff remark in the 備註 column and leaves it blank for divers', () => {
+    const aoa = buildManifestAoa(
+      [
+        divers[0],
+        { ...divers[1], remark: '教練、導潛' },
+      ],
+      { ...config, notes: [] },
+    )
+    expect(aoa[2][8]).toBe('')          // booked diver: blank remark
+    expect(aoa[3][8]).toBe('教練、導潛') // staff: role(s) in 備註
   })
 })
