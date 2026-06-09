@@ -353,7 +353,7 @@ describe('AdminEventDetailPage', () => {
     expect(screen.getByRole('heading', { name: /Register Ada/i })).toBeInTheDocument()
   })
 
-  it('records a deposit payment and auto-promotes a pending booking to confirmed', async () => {
+  it('"Mark deposit paid" confirms a pending booking without recording a payment or touching the balance', async () => {
     fetchEventsForBookings.mockResolvedValue(new Map([
       ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
     ]))
@@ -403,15 +403,14 @@ describe('AdminEventDetailPage', () => {
     renderAt('/admin/events/dive/dive_x')
 
     await user.click(await screen.findByRole('button', { expanded: false, name: /Ada Lovelace/ }))
-    await user.click(await screen.findByRole('button', { name: /mark deposit paid \(4,900\)/i }))
+    // The button label no longer carries the deposit amount — it's a pure
+    // status action now.
+    await user.click(await screen.findByRole('button', { name: /^mark deposit paid$/i }))
 
-    await waitFor(() => expect(paymentInsert).toHaveBeenCalled())
-    const insertedPayment = paymentInsert.mock.calls[0]?.[0] as Record<string, unknown>
-    expect(insertedPayment).toMatchObject({
-      user_id: 'u1', booking_id: 'b1', amount: 4900, status: 'paid', method: 'cash', note: 'Deposit',
-    })
-
+    // Status promotes to confirmed …
     await waitFor(() => expect(bookingUpdate).toHaveBeenCalledWith({ status: 'confirmed' }))
+    // … but NO payment is recorded and the balance is untouched.
+    expect(paymentInsert).not.toHaveBeenCalled()
   })
 
   it('records a custom partial balance payment without promoting status', async () => {

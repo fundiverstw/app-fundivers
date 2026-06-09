@@ -389,6 +389,7 @@ export function AdminEventDetailPage() {
                   onAddAmendment={submitAmendment}
                   onRecordPayment={(amount, note) => recordPayment(r, amount, note)}
                   onVoidPayment={(paymentId) => voidPayment(r, paymentId)}
+                  onMarkDepositPaid={() => updateStatus(r.booking.id, 'confirmed')}
                   readOnly={!isAdmin}
                 />
               ))}
@@ -921,7 +922,7 @@ function ExportManifestModal({
 
 const BOOKING_STATUSES: Booking['status'][] = ['pending', 'confirmed', 'waitlisted', 'cancelled']
 
-function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRefund, onEdit, onAddAmendment, onRecordPayment, onVoidPayment, readOnly }: {
+function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRefund, onEdit, onAddAmendment, onRecordPayment, onVoidPayment, onMarkDepositPaid, readOnly }: {
   r: Registrant
   addonNames: AddonNameMap
   roomNames: RoomNameMap
@@ -931,16 +932,15 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
   onAddAmendment: (id: string, sign: '+' | '-', amount: number, note: string) => Promise<void>
   onRecordPayment: (amount: number, note: string) => Promise<void>
   onVoidPayment: (paymentId: string) => Promise<void>
+  onMarkDepositPaid: () => Promise<void>
   readOnly?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
 
   const baseTotal = Number((r.booking.details as { total?: number } | undefined)?.total ?? 0)
-  const deposit = Number((r.booking.details as { deposit?: number } | undefined)?.deposit ?? 0)
   const adjusted = baseTotal + amendmentsDelta(r.amendments)
   const totalPaid = r.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
   const outstanding = Math.max(0, adjusted - totalPaid)
-  const depositDue = Math.max(0, deposit - totalPaid)
   const paymentStatus = totalPaid === 0
     ? 'none'
     : outstanding > 0 ? 'partial' : 'paid'
@@ -1106,11 +1106,12 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
             owed={adjusted}
             paid={totalPaid}
             outstanding={outstanding}
-            depositDue={depositDue}
+            pending={r.booking.status === 'pending'}
             cancelled={r.booking.status === 'cancelled'}
             readOnly={!!readOnly}
             onRecord={onRecordPayment}
             onVoid={onVoidPayment}
+            onMarkDepositPaid={onMarkDepositPaid}
           />
 
           <AmendmentsSection

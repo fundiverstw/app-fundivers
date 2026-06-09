@@ -138,6 +138,32 @@ export function AdminUsersPage() {
     }
   }
 
+  // "Mark deposit paid" — confirm a pending booking (deposit received
+  // off-app) WITHOUT recording a payment or touching the balance.
+  async function handleMarkDepositPaid(userId: string, bookingId: string) {
+    const extras = extrasCache.get(userId)
+    const booking = extras?.bookings.find(b => b.id === bookingId)
+    if (!booking || booking.status !== 'pending') return
+    try {
+      const { error } = await supabase.from('bookings').update({ status: 'confirmed' }).eq('id', bookingId)
+      if (error) throw error
+      setExtrasCache(prev => {
+        const next = new Map(prev)
+        const cur = next.get(userId)
+        if (!cur) return prev
+        next.set(userId, {
+          ...cur,
+          bookings: cur.bookings.map(b => b.id === bookingId ? { ...b, status: 'confirmed' } : b),
+        })
+        return next
+      })
+      toast.success('Marked deposit paid · status set to confirmed')
+    } catch (err) {
+      toast.error(`Could not update status: ${errorMessage(err)}`)
+      throw err
+    }
+  }
+
   async function handleCreateCredit(userId: string, amount: number, reason: string, bookingId: string | null) {
     if (!profile?.id) return
     try {
@@ -327,6 +353,7 @@ export function AdminUsersPage() {
             onProfileSaved={() => { refetchUser(u.id); setEditingId(null) }}
             onRecordPayment={(bookingId, amount, note) => handleRecordPayment(u.id, bookingId, amount, note)}
             onVoidPayment={(bookingId, paymentId) => handleVoidPayment(u.id, bookingId, paymentId)}
+            onMarkDepositPaid={(bookingId) => handleMarkDepositPaid(u.id, bookingId)}
             onCreateCredit={(amount, reason, bookingId) => handleCreateCredit(u.id, amount, reason, bookingId)}
             onSettleCredit={(creditId, note) => handleSettleCredit(u.id, creditId, note)}
             onReopenCredit={(creditId) => handleReopenCredit(u.id, creditId)}
@@ -345,7 +372,7 @@ export function AdminUsersPage() {
 
 function UserCard({
   user, allUsers, onFamilyChanged, open, extras, loading, editing, onToggle, onEdit, onCancelEdit, onProfileSaved,
-  onRecordPayment, onVoidPayment, onCreateCredit, onSettleCredit, onReopenCredit, onDelete, isAdmin, isSelf,
+  onRecordPayment, onVoidPayment, onMarkDepositPaid, onCreateCredit, onSettleCredit, onReopenCredit, onDelete, isAdmin, isSelf,
 }: {
   user: Profile
   allUsers: Profile[]
@@ -360,6 +387,7 @@ function UserCard({
   onProfileSaved: () => void
   onRecordPayment: (bookingId: string, amount: number, note: string) => Promise<void>
   onVoidPayment: (bookingId: string, paymentId: string) => Promise<void>
+  onMarkDepositPaid: (bookingId: string) => Promise<void>
   onCreateCredit: (amount: number, reason: string, bookingId: string | null) => Promise<void>
   onSettleCredit: (creditId: string, note: string) => Promise<void>
   onReopenCredit: (creditId: string) => Promise<void>
@@ -459,6 +487,7 @@ function UserCard({
                   extras={extras}
                   onRecordPayment={onRecordPayment}
                   onVoidPayment={onVoidPayment}
+                  onMarkDepositPaid={onMarkDepositPaid}
                   onCreateCredit={onCreateCredit}
                   onSettleCredit={onSettleCredit}
                   onReopenCredit={onReopenCredit}
@@ -521,10 +550,11 @@ function ProfileDetails({ user }: { user: Profile }) {
   )
 }
 
-function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onCreateCredit, onSettleCredit, onReopenCredit, isAdmin }: {
+function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid, onCreateCredit, onSettleCredit, onReopenCredit, isAdmin }: {
   extras: UserExtras
   onRecordPayment: (bookingId: string, amount: number, note: string) => Promise<void>
   onVoidPayment: (bookingId: string, paymentId: string) => Promise<void>
+  onMarkDepositPaid: (bookingId: string) => Promise<void>
   onCreateCredit: (amount: number, reason: string, bookingId: string | null) => Promise<void>
   onSettleCredit: (creditId: string, note: string) => Promise<void>
   onReopenCredit: (creditId: string) => Promise<void>
@@ -541,11 +571,9 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onCreateCredit, o
             {activeBookings.map(b => {
               const bookingPayments = extras.payments.filter(p => p.booking_id === b.id)
               const baseTotal = Number((b.details as { total?: number } | undefined)?.total ?? 0)
-              const deposit = Number((b.details as { deposit?: number } | undefined)?.deposit ?? 0)
               const owed = baseTotal + amendmentsDelta(extras.amendments.get(b.id) ?? [])
               const paid = bookingPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
               const outstanding = Math.max(0, owed - paid)
-              const depositDue = Math.max(0, deposit - paid)
               return (
                 <div key={b.id} className="space-y-1">
                   <div className="flex items-start justify-between text-xs">
@@ -562,11 +590,12 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onCreateCredit, o
                     owed={owed}
                     paid={paid}
                     outstanding={outstanding}
-                    depositDue={depositDue}
+                    pending={b.status === 'pending'}
                     cancelled={false}
                     readOnly={!isAdmin}
                     onRecord={(amount, note) => onRecordPayment(b.id, amount, note)}
                     onVoid={(paymentId) => onVoidPayment(b.id, paymentId)}
+                    onMarkDepositPaid={() => onMarkDepositPaid(b.id)}
                   />
                 </div>
               )

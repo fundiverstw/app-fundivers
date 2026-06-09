@@ -5,21 +5,28 @@ import type { Payment } from '../../types/database'
 
 /**
  * Per-booking payments block: shows running owed/paid/outstanding tab,
- * lists recorded payments, and (for admin viewers) offers a "Mark deposit
- * paid" shortcut plus a free-form amount input for partial balance payments.
+ * lists recorded payments, and (for admin viewers) a free-form amount input
+ * for recording payments. The owed/paid figures only ever move from recorded
+ * payments + amendments, never from the deposit shortcut.
  *
- * Pure render component — caller owns the supabase write via `onRecord`.
- * Used on AdminEventDetailPage (one block per registrant) and on
- * AdminUsersPage (one block per active booking).
+ * The "Mark deposit paid" button is purely a status action: it confirms a
+ * pending booking (deposit received off-app) WITHOUT recording a payment or
+ * changing any balance figure. Admins enter the actual amount received via
+ * the free-form input and track the remaining balance themselves.
+ *
+ * Pure render component — caller owns the supabase writes via `onRecord` /
+ * `onMarkDepositPaid`. Used on AdminEventDetailPage (one block per
+ * registrant) and on AdminUsersPage (one block per active booking).
  */
 export function BookingPaymentsBlock({
-  payments, owed, paid, outstanding, depositDue, cancelled, readOnly, onRecord, onVoid,
+  payments, owed, paid, outstanding, pending, cancelled, readOnly, onRecord, onVoid, onMarkDepositPaid,
 }: {
   payments: Payment[]
   owed: number
   paid: number
   outstanding: number
-  depositDue: number
+  /** The booking is still 'pending' — gates the "Mark deposit paid" button. */
+  pending: boolean
   cancelled: boolean
   readOnly: boolean
   onRecord: (amount: number, note: string) => Promise<void>
@@ -27,12 +34,29 @@ export function BookingPaymentsBlock({
    *  omitted, the per-row Void button is hidden (e.g. on read-only or
    *  diver-facing surfaces). The caller owns the supabase write. */
   onVoid?: (paymentId: string) => Promise<void>
+  /** Confirm a pending booking (deposit received). Does NOT touch the
+   *  balance. Optional — button hidden when absent. Caller owns the write. */
+  onMarkDepositPaid?: () => Promise<void>
 }) {
   const [amountStr, setAmountStr] = useState('')
   const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const [voidingId, setVoidingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  async function handleMarkDepositPaid() {
+    if (!onMarkDepositPaid) return
+    setError(null)
+    setConfirming(true)
+    try {
+      await onMarkDepositPaid()
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setConfirming(false)
+    }
+  }
 
   async function submit(amount: number, defaultNote: string) {
     setError(null)
@@ -133,14 +157,14 @@ export function BookingPaymentsBlock({
 
       {!readOnly && !cancelled && (
         <div className="space-y-1.5 pt-1 border-t border-sky-200">
-          {depositDue > 0 && (
+          {pending && onMarkDepositPaid && (
             <button
               type="button"
-              disabled={submitting}
-              onClick={() => submit(depositDue, 'Deposit')}
+              disabled={confirming}
+              onClick={handleMarkDepositPaid}
               className="w-full text-xs bg-blue-900 hover:bg-blue-950 disabled:opacity-50 text-white font-semibold px-3 py-1.5 rounded"
             >
-              {submitting ? 'Recording…' : `Mark deposit paid (${depositDue.toLocaleString()})`}
+              {confirming ? 'Marking…' : 'Mark deposit paid'}
             </button>
           )}
 
