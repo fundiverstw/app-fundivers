@@ -1250,7 +1250,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             {addonsCost > 0       && <Row label="Add-ons"        value={addonsCost}   currency={event.currency} />}
             {transportCost > 0    && <Row label="Transport"      value={transportCost} currency={event.currency} />}
             {(showNitroxAddon && addNitroxCourse) && <Row label="Nitrox course" value={NITROX_COURSE_FEE} currency={event.currency} />}
-            {paymentSurcharge > 0 && <Row label={`Credit surcharge (5%${payingDepositOnly ? ' of deposit' : ''})`} value={total - subTotal} currency={event.currency} />}
+            {paymentSurcharge > 0 && <Row label={`Card/PayPal surcharge (5%${payingDepositOnly ? ' of deposit' : ''})`} value={total - subTotal} currency={event.currency} />}
             <div className="border-t border-sky-200 pt-1 mt-1">
               <Row label="Total" value={total} currency={event.currency} bold />
             </div>
