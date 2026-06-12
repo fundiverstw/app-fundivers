@@ -6,7 +6,7 @@ import { CURRENT_TERMS_VERSION } from '../../lib/terms-version'
 import { formatEventSpan, eventIsFull } from '../../lib/events'
 import { computeEffectiveFullPaymentDeadline } from '../../lib/payment-deadlines'
 import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/payment-instructions'
-import { GEAR_ITEMS } from '../../lib/gear'
+import { GEAR_ITEMS, isGearIncludedCourse } from '../../lib/gear'
 import { uploadCertCard } from '../../lib/cert-card'
 import { uploadNitroxCard } from '../../lib/nitrox-card'
 import { uploadDeepCard } from '../../lib/deep-card'
@@ -367,11 +367,14 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const initialDetails = existingBooking?.details as BookingDetails | undefined
   // Gating derived from the event
   const diveDays = Math.max(1, event.dive_days ?? 1)
-  // Courses with dive days bundle gear in — we record the fact in the
-  // booking but don't prompt. Dives expose the rent toggle when the
-  // admin filled in gear_rental_info on EO_dives.
-  const gearIncluded = event.type === 'course' && (event.dive_days ?? 0) > 0
-  const showGearRentChoice = event.type === 'dive' && !!event.gear_rental_info
+  // Open Water / DSD courses bundle gear into the fee — we record the fact
+  // in the booking but don't prompt. Every other course (AOW, EANx, Deep,
+  // Rescue, ...) lets the diver rent, same as a dive. Dives expose the rent
+  // toggle when the admin filled in gear_rental_info on EO_dives.
+  const gearIncluded = event.type === 'course' && isGearIncludedCourse(event.title)
+  const showGearRentChoice =
+    (event.type === 'dive' && !!event.gear_rental_info) ||
+    (event.type === 'course' && !isGearIncludedCourse(event.title))
   const showRooms = event.has_rooms && event.room_type_ids.length > 0
   const showAddons = event.has_addons && event.addon_ids.length > 0
   const showNitroxAddon = event.nitrox_required && !(profile?.nitrox_certified ?? false)

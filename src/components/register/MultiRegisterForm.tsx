@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { personName } from '../../lib/names'
+import { isGearIncludedCourse } from '../../lib/gear'
 import { supabase } from '../../lib/supabase'
 import { formatEventSpan } from '../../lib/events'
 import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/payment-instructions'
@@ -119,7 +120,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
       const c = choicesById[ev.id] ?? { rentGear: false, gearMode: 'full', needsTransport: null, addNitroxCourse: false }
       const base       = ev.price ?? 0
       const days       = Math.max(1, ev.dive_days ?? 1)
-      const gearIncluded = ev.type === 'course' && (ev.dive_days ?? 0) > 0
+      const gearIncluded = ev.type === 'course' && isGearIncludedCourse(ev.title)
       const gearCost   = (!gearIncluded && c.rentGear && c.gearMode === 'full')
         ? GEAR_FULLSET_DAILY * days
         : 0
@@ -179,7 +180,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
     // circuiting on the first error.
     const calls = cart.map(async (ev) => {
       const c = choicesById[ev.id]
-      const gearIncluded = ev.type === 'course' && (ev.dive_days ?? 0) > 0
+      const gearIncluded = ev.type === 'course' && isGearIncludedCourse(ev.title)
       // When the booking is for a linked child, look up nitrox status on
       // the child's profile (not the parent's) so we don't show / charge
       // for a nitrox course they don't need.
@@ -429,8 +430,10 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
             <div className="space-y-3">
               {cart.map(ev => {
                 const c = choicesById[ev.id]
-                const gearIncluded = ev.type === 'course' && (ev.dive_days ?? 0) > 0
-                const showGearRentChoice = ev.type === 'dive' && !!ev.gear_rental_info
+                const gearIncluded = ev.type === 'course' && isGearIncludedCourse(ev.title)
+                const showGearRentChoice =
+                  (ev.type === 'dive' && !!ev.gear_rental_info) ||
+                  (ev.type === 'course' && !isGearIncludedCourse(ev.title))
                 const transportSurcharge = ev.transport_price ?? 0
                 const transportIncluded = transportSurcharge <= 0
                 const targetForDiverId = forDiverByEvent[ev.id] ?? null

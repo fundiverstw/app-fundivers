@@ -47,7 +47,7 @@ const sampleEvent: AppEvent = {
 }
 
 const noExtrasEvent: AppEvent = {
-  id: 'course_xyz', type: 'course', title: 'EFR Course',
+  id: 'dive_noextras', type: 'dive', title: 'Quiet shore dive',
   start_time: '2027-05-15T00:00:00.000Z',
   end_time: null, start_time_hhmm: null,
   featured: false, fully_booked: false,
@@ -265,6 +265,34 @@ describe('RegisterForm', () => {
     // → the "Ride with the shop" radio shows an "Included in base price" sub-label.
     expect(screen.getByLabelText(/ride with the shop/i)).toBeInTheDocument()
     expect(screen.getByText(/included in base price/i)).toBeInTheDocument()
+  })
+
+  it('Open Water course bundles gear — shows the included note, no rent option', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    const owCourse: AppEvent = { ...noExtrasEvent, type: 'course', title: 'Open Water Course' }
+    render(
+      <RegisterForm event={owCourse} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    expect(await screen.findByText(/gear is included with this course/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/rent gear/i)).not.toBeInTheDocument()
+  })
+
+  it('Advanced Open Water course offers gear rental (gear is not bundled)', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    const aowCourse: AppEvent = { ...noExtrasEvent, type: 'course', title: 'Advanced Open Water' }
+    render(
+      <RegisterForm event={aowCourse} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    expect(await screen.findByLabelText(/rent gear/i)).toBeInTheDocument()
+    expect(screen.queryByText(/gear is included with this course/i)).not.toBeInTheDocument()
   })
 
   it('prefills a-la-carte rental list with items the diver does NOT already own', async () => {
