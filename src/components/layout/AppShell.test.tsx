@@ -137,6 +137,12 @@ describe('AppShell', () => {
     expect(screen.getByText('Alice')).toBeInTheDocument()
   })
 
+  it('renders the Partner Connect (PX) shortcut linking to /partner-connect', () => {
+    useAuthMock.mockReturnValue({ profile: null, signOut })
+    routedRender()
+    expect(screen.getByRole('link', { name: /partner connect/i })).toHaveAttribute('href', '/partner-connect')
+  })
+
   // The update banner moved to UpdateBannerHost (mounted at App root so it
   // shows on every route, not just shelled ones). Behavior is covered by
   // UpdateBannerHost.test.tsx.
