@@ -25,6 +25,7 @@ import {
   addDays,
   toHhmm,
   rescheduleNotificationText,
+  cancellationNotificationText,
   type Booking,
 } from './pure'
 
@@ -90,6 +91,9 @@ export default {
     }
     if (url.pathname === '/admin-event-reschedule' && req.method === 'POST') {
       return withCors(await handleAdminEventReschedule(req, env), req)
+    }
+    if (url.pathname === '/admin-event-cancellation' && req.method === 'POST') {
+      return withCors(await handleAdminEventCancellation(req, env), req)
     }
     return withCors(new Response('not found', { status: 404 }), req)
   },
@@ -572,6 +576,109 @@ export async function handleAdminEventReschedule(req: Request, env: Env): Promis
     title,
     body: text,
     tag:  `event-reschedule:${eventId}:${Date.now()}`,
+    url:  '/notifications',
+  })
+
+  let sent = 0
+  let skipped = 0
+  for (const s of subs ?? []) {
+    try {
+      await webpush.sendNotification(
+        { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+        payload,
+        { TTL: 60 * 60 * 24, urgency: 'high' }
+      )
+      sent++
+    } catch (err: unknown) {
+      const sc = (err as { statusCode?: number })?.statusCode
+      if (sc === 404 || sc === 410) {
+        await service.from('push_subscriptions').delete().eq('endpoint', s.endpoint)
+      }
+      skipped++
+    }
+  }
+  return Response.json({ sent, skipped, recipients: recipientIds.length })
+}
+
+// Push + in-app inbox for an event cancellation. Mirrors
+// handleAdminEventReschedule: admin-gated, every non-cancelled registrant
+// (pending/waitlisted included), inbox row first then push fan-out. The
+// matching cancellation EMAIL is sent separately by the
+// notify-event-cancellation edge function (the worker can't run SMTP).
+export async function handleAdminEventCancellation(req: Request, env: Env): Promise<Response> {
+  const auth = req.headers.get('authorization') ?? ''
+  if (!auth.startsWith('Bearer ')) return new Response('unauthorized', { status: 401 })
+  const token = auth.slice('Bearer '.length)
+
+  let body: { event_id?: string; event_type?: 'dive' | 'course' }
+  try { body = await req.json() } catch { return new Response('bad request', { status: 400 }) }
+  const eventId   = (body.event_id ?? '').trim()
+  const eventType = body.event_type
+  if (!eventId)                                       return new Response('event_id is required', { status: 400 })
+  if (eventType !== 'dive' && eventType !== 'course') return new Response('event_type must be dive or course', { status: 400 })
+
+  const anonKey = env.SUPABASE_ANON_KEY
+  if (!anonKey) return new Response('SUPABASE_ANON_KEY not configured', { status: 500 })
+
+  const userClient = createClient<Database>(env.SUPABASE_URL, anonKey, {
+    global: { headers: { Authorization: auth } },
+    auth: { persistSession: false },
+  })
+  const { data: userRes } = await userClient.auth.getUser(token)
+  const userId = userRes?.user?.id
+  if (!userId) return new Response('unauthorized', { status: 401 })
+  const { data: prof } = await userClient
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .maybeSingle()
+  if (prof?.role !== 'admin') return new Response('forbidden', { status: 403 })
+
+  const service = createClient<Database>(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false },
+  })
+
+  let eventTitle = 'Event'
+  if (eventType === 'dive') {
+    const { data } = await service.from('EO_dives').select('display_title, admin_title').eq('_id', eventId).maybeSingle()
+    eventTitle = data?.display_title || data?.admin_title || eventTitle
+  } else {
+    const { data } = await service.from('EO_courses').select('display_title, admin_title').eq('_id', eventId).maybeSingle()
+    eventTitle = data?.display_title || data?.admin_title || eventTitle
+  }
+
+  const { title, body: text } = cancellationNotificationText(eventTitle)
+
+  const column = eventType === 'dive' ? 'eo_dive_id' : 'eo_course_id'
+  const { data: bookings } = await service
+    .from('bookings')
+    .select('user_id')
+    .eq(column, eventId)
+    .neq('status', 'cancelled')
+  const recipientIds = unique((bookings ?? []).map(b => b.user_id))
+  if (!recipientIds.length) return Response.json({ sent: 0, skipped: 0, recipients: 0 })
+
+  webpush.setVapidDetails(env.VAPID_SUBJECT, env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY)
+
+  const inboxRows = recipientIds.map(uid => ({
+    user_id:  uid,
+    title,
+    body:     text,
+    url:      '/notifications',
+    kind:     'event_cancellation' as const,
+    event_id: eventId,
+  }))
+  await service.from('notifications').insert(inboxRows)
+
+  const { data: subs } = await service
+    .from('push_subscriptions')
+    .select('user_id, endpoint, p256dh, auth')
+    .in('user_id', recipientIds)
+
+  const payload = JSON.stringify({
+    title,
+    body: text,
+    tag:  `event-cancellation:${eventId}:${Date.now()}`,
     url:  '/notifications',
   })
 

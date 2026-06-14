@@ -127,6 +127,7 @@ function actionLabelForKind(kind: string): string {
     case 'duty':              return 'Go to duty'
     case 'broadcast':         return 'Open link'
     case 'event_reschedule':  return 'View change'
+    case 'event_cancellation': return 'View booking'
     default:                  return 'Open'
   }
 }
