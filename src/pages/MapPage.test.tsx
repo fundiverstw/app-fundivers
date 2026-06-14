@@ -61,6 +61,23 @@ describe('MapPage', () => {
     })
   })
 
+  it('links a site to its Wix travel-destination page when it has a slug', async () => {
+    fakeSites([
+      { id: 'w1', name: 'Wan An Jian Navy Wreck', tagline: 'Navy wreck.', latitude: 24.9618, longitude: 121.9458, region: 'yilan', dive_type: 'boat', wix_slug: 'wan-an-jian-navy-wreck', created_at: '', updated_at: '' },
+      { id: 'w2', name: 'Cathedral', tagline: 'Surprises.', latitude: 25.0328, longitude: 121.9426, region: 'yilan', dive_type: 'boat', wix_slug: null, created_at: '', updated_at: '' },
+    ])
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(listButton(/yilan/i))
+
+    const link = await screen.findByRole('link', { name: 'Wan An Jian Navy Wreck' })
+    expect(link).toHaveAttribute('href', 'https://www.fundiverstw.com/traveldestinations/wan-an-jian-navy-wreck')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'))
+    // A site without a slug stays plain text, not a link.
+    expect(screen.queryByRole('link', { name: 'Cathedral' })).not.toBeInTheDocument()
+  })
+
   it('switches the panel when a different region is picked', async () => {
     fakeSites()
     const user = userEvent.setup()
