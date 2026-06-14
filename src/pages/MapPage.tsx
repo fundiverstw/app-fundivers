@@ -3,6 +3,7 @@ import taiwanGeo from '../assets/taiwan.geo.json'
 import { supabase } from '../lib/supabase'
 import type { DiveSite } from '../types/database'
 import { placeLabels } from '../lib/map-layout'
+import { wixSiteUrl } from '../lib/dive-site-links'
 
 // High-detail Taiwan map. Coastline data is GADM 4.1 country-level boundaries
 // (1,800+ vertices on the main island, 30+ separate Penghu islets, plus
@@ -460,14 +461,28 @@ export function MapPage() {
                 Dive sites
               </h3>
               <ul className="text-sm text-blue-900 space-y-2">
-                {visibleSites.map(s => (
-                  <li key={s.id}>
-                    <strong className="font-semibold">{s.name}</strong>
-                    {s.tagline && (
-                      <p className="text-xs text-blue-900/80 mt-0.5">{s.tagline}</p>
-                    )}
-                  </li>
-                ))}
+                {visibleSites.map(s => {
+                  const wixUrl = wixSiteUrl(s.wix_slug)
+                  return (
+                    <li key={s.id}>
+                      {wixUrl ? (
+                        <a
+                          href={wixUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold text-blue-900 underline decoration-blue-900/40 underline-offset-2 hover:decoration-blue-900"
+                        >
+                          {s.name}
+                        </a>
+                      ) : (
+                        <strong className="font-semibold">{s.name}</strong>
+                      )}
+                      {s.tagline && (
+                        <p className="text-xs text-blue-900/80 mt-0.5">{s.tagline}</p>
+                      )}
+                    </li>
+                  )
+                })}
               </ul>
             </>
           )}
