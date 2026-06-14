@@ -106,3 +106,14 @@ export function rescheduleNotificationText(eventTitle: string, fromKey?: string,
     : `The schedule has changed. Check your bookings for the updated dates.`
   return { title: `Schedule change: ${eventTitle}`, body }
 }
+
+/**
+ * Auto-built push/inbox copy for an event cancellation. Pure so it's
+ * testable without the worker runtime.
+ */
+export function cancellationNotificationText(eventTitle: string): { title: string; body: string } {
+  return {
+    title: `Cancelled: ${eventTitle}`,
+    body: `${eventTitle} has been cancelled. Contact the shop if you have any questions.`,
+  }
+}

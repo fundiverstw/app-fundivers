@@ -7,6 +7,7 @@ import {
   toHhmm,
   formatDayLabel,
   rescheduleNotificationText,
+  cancellationNotificationText,
   type Booking,
   type DiveRow,
   type CourseRow,
@@ -32,6 +33,15 @@ describe('rescheduleNotificationText', () => {
     expect(title).toBe('Schedule change: Open Water Course')
     expect(body).toMatch(/schedule has changed/i)
     expect(body).not.toMatch(/May/)
+  })
+})
+
+describe('cancellationNotificationText', () => {
+  it('names the cancelled event in the title and body', () => {
+    const { title, body } = cancellationNotificationText('Green Island Trip')
+    expect(title).toBe('Cancelled: Green Island Trip')
+    expect(body).toContain('Green Island Trip')
+    expect(body).toMatch(/cancelled/i)
   })
 })
 

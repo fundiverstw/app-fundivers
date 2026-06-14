@@ -81,8 +81,9 @@ The push cron encodes this in `selectReminders()` in
      currently no UI for this — clear it manually via Supabase Studio
      if needed).
 
-The app **does not move money itself** — Stripe is not wired up.
-Payments are bank transfers and cash, tracked by hand in the ledger.
+The app **does not move money itself** — there is no payment processor
+wired up. Payments are bank transfers and cash, tracked by hand in the
+ledger.
 
 ## Summary cards
 

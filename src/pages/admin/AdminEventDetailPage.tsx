@@ -12,6 +12,7 @@ import { EventStaffSection } from '../../components/admin/EventStaffSection'
 import { RegisterForm } from '../../components/register/RegisterForm'
 import { shoeAsJp } from '../../lib/shoe-size'
 import { uniqueUuids } from '../../lib/uuid'
+import { notifyEventCancelled } from '../../lib/event-cancellation'
 import { fetchAmendmentsForBookings, addAmendment, formAmount, amendmentsDelta } from '../../lib/booking-amendments'
 import { recordPayment as recordPaymentRow, voidPayment as voidPaymentRow } from '../../lib/booking-payments'
 import { requestEventDiverExport } from '../../lib/admin-event-export'
@@ -229,6 +230,9 @@ export function AdminEventDetailPage() {
       if (error) throw error
       setEvent(prev => (prev ? { ...prev, cancelled_at: value } : prev))
       setCancelModalOpen(false)
+      // Notify registrants on cancel only (not restore) — email + in-app +
+      // push, best-effort so a notification failure never blocks the cancel.
+      if (value) notifyEventCancelled(id, type as AppEvent['type']).catch(() => { /* best-effort */ })
       toast.success(value ? 'Event cancelled' : 'Event restored')
     } catch (err) {
       const msg = errorMessage(err)
@@ -513,7 +517,7 @@ function CancelEventModal({
             </p>
             {activeBookingCount > 0 && (
               <p className="text-sm font-semibold text-red-700 bg-red-50 border border-red-500 rounded px-3 py-2">
-                {activeBookingCount} active booking{activeBookingCount === 1 ? '' : 's'} on this event will need refunds. Issue them in Stripe separately.
+                {activeBookingCount} active booking{activeBookingCount === 1 ? '' : 's'} on this event will need refunds. Issue those refunds separately and record them on each booking.
               </p>
             )}
           </>

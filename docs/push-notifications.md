@@ -190,6 +190,40 @@ generic *"The schedule has changed…"* (dates omitted). Tap target is
 Both dates present and equal is a no-op. No new secrets; reuses the
 admin-gate `SUPABASE_ANON_KEY` + service-role key.
 
+## Event cancellation (`/admin-event-cancellation` + email)
+
+Fired automatically when an admin cancels an event (sets `cancelled_at`)
+in `AdminEventDetailPage`. The SPA's `notifyEventCancelled`
+(`src/lib/event-cancellation.ts`) fans out to **all three channels** for
+**every non-cancelled registrant** (confirmed, pending, *and* waitlisted),
+best-effort so a notification failure never blocks the cancel. Restoring
+(un-cancelling) sends nothing.
+
+Two backends, because of where the keys live:
+- **Push + in-app inbox** — `POST /admin-event-cancellation` on the push
+  worker (it owns the VAPID key). Mirrors `/admin-event-reschedule`:
+  admin-gated by `profiles.role`, inbox row first then push fan-out, inbox
+  `kind = 'event_cancellation'`, tap target `/notifications`.
+- **Email** — the `notify-event-cancellation` Supabase edge function
+  (Cloudflare Workers can't run SMTP; Gmail SMTP lives in Deno). Gated on
+  the caller's admin JWT, resolves each registrant's address via
+  `auth.admin.getUserById`, sends one email per recipient.
+
+```
+POST /admin-event-cancellation
+Authorization: Bearer <admin user's session JWT>
+{ "event_id": "<EO_dives._id | EO_courses._id>",
+  "event_type": "dive" | "course" }
+→ { "sent": N, "skipped": M, "recipients": K }
+```
+
+Push/inbox copy is `cancellationNotificationText` (`workers/push/src/pure.ts`);
+email copy is `buildCancellationEmail`
+(`supabase/functions/_shared/event-cancellation-email.ts`). No new
+secrets — reuses the worker's admin-gate keys and the existing
+`GMAIL_USER` / `GMAIL_APP_PASSWORD`. **Requires redeploying the push
+worker and deploying the new edge function.**
+
 ## Duty-assigned push (`/notify-duty`)
 
 When an admin assigns a duty (`/admin/duty`), the SPA fires a
