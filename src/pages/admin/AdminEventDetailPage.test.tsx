@@ -71,7 +71,7 @@ describe('AdminEventDetailPage', () => {
     const bookings = [{
       id: 'b1', user_id: 'u1', status: 'confirmed', created_at: '2026-04-20',
       eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null,
-      details: { add_ons: ['addon-a', 'addon-b'], gear: { rent: false } },
+      details: { add_ons: ['11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222'], gear: { rent: false } },
     }]
     const profiles = [{
       id: 'u1', name: 'Ada Lovelace', nickname: 'Ada',
@@ -81,8 +81,8 @@ describe('AdminEventDetailPage', () => {
     }]
     const payments: unknown[] = []
     const addons = [
-      { _id: 'addon-a', display_title: 'SMB Rental', admin_title: 'SMB' },
-      { _id: 'addon-b', display_title: 'Camera Rental (1 Dive)', admin_title: 'Cam' },
+      { _id: '11111111-1111-4111-8111-111111111111', display_title: 'SMB Rental', admin_title: 'SMB' },
+      { _id: '22222222-2222-4222-8222-222222222222', display_title: 'Camera Rental (1 Dive)', admin_title: 'Cam' },
     ]
 
     from.mockImplementation((table: string) => {
@@ -101,7 +101,7 @@ describe('AdminEventDetailPage', () => {
     await screen.findByText('Ada Lovelace')
     expect(screen.queryByText(/PADI AOW · Nitrox/)).not.toBeInTheDocument()
     expect(screen.queryByText(/SMB Rental/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/addon-a/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/11111111-1111/)).not.toBeInTheDocument()
 
     // Expand the card by clicking it.
     await user.click(screen.getByRole('button', { expanded: false, name: /Ada Lovelace/ }))
@@ -112,10 +112,47 @@ describe('AdminEventDetailPage', () => {
       expect(screen.getByText(/SMB Rental/)).toBeInTheDocument()
     })
     expect(screen.getByText(/Camera Rental \(1 Dive\)/)).toBeInTheDocument()
-    expect(screen.queryByText(/addon-a/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/11111111-1111/)).not.toBeInTheDocument()
 
     // Shoe size displayed as JP for admins.
     expect(screen.getByText(/JP 26/)).toBeInTheDocument()
+  })
+
+  it('resolves valid add-on names even when a booking carries a malformed add-on id', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
+    ]))
+
+    const bookings = [{
+      id: 'b1', user_id: 'u1', status: 'confirmed', created_at: '2026-04-20',
+      eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null,
+      details: { add_ons: ['11111111-1111-4111-8111-111111111111', 'legacy-bubble-id'], gear: { rent: false } },
+    }]
+    const profiles = [{
+      id: 'u1', name: 'Ada Lovelace', nickname: 'Ada',
+      cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: true,
+      logged_dives: 20, height_cm: 165, weight_kg: 60, shoe_size: 'EU 41 M',
+      phone: null, contact_method: null, contact_id: null,
+    }]
+    const addons = [
+      { _id: '11111111-1111-4111-8111-111111111111', display_title: 'SMB Rental', admin_title: 'SMB' },
+    ]
+
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings')     return mockQueryBuilder({ data: bookings })
+      if (table === 'profiles')     return mockQueryBuilder({ data: profiles })
+      if (table === 'payments')     return mockQueryBuilder({ data: [] })
+      if (table === 'Other_Addons') return mockQueryBuilder({ data: addons })
+      if (table === 'EO_rooms')     return mockQueryBuilder({ data: [] })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    const user = userEvent.setup()
+    renderAt('/admin/events/dive/dive_x')
+    await user.click(await screen.findByRole('button', { expanded: false, name: /Ada Lovelace/ }))
+
+    await waitFor(() => expect(screen.getByText(/SMB Rental/)).toBeInTheDocument())
+    expect(screen.queryByText(/11111111-1111/)).not.toBeInTheDocument()
   })
 
   it('cancels an event via the confirmation modal and updates EO_dives.cancelled_at', async () => {

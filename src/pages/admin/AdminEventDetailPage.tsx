@@ -11,6 +11,7 @@ import { AdminAddDiverModal } from '../../components/admin/AdminAddDiverModal'
 import { EventStaffSection } from '../../components/admin/EventStaffSection'
 import { RegisterForm } from '../../components/register/RegisterForm'
 import { shoeAsJp } from '../../lib/shoe-size'
+import { uniqueUuids } from '../../lib/uuid'
 import { fetchAmendmentsForBookings, addAmendment, formAmount, amendmentsDelta } from '../../lib/booking-amendments'
 import { recordPayment as recordPaymentRow, voidPayment as voidPaymentRow } from '../../lib/booking-payments'
 import { requestEventDiverExport } from '../../lib/admin-event-export'
@@ -110,19 +111,14 @@ export function AdminEventDetailPage() {
 
       // Resolve any add-on / room IDs referenced in the bookings to display
       // names so the admin doesn't see raw UUIDs.
-      const addonIds = new Set<string>()
-      const roomIds = new Set<string>()
-      for (const b of bookings) {
-        const d = b.details as BookingDetails
-        for (const id of d.add_ons ?? []) addonIds.add(id)
-        if (d.room?.option_id) roomIds.add(d.room.option_id)
-      }
+      const addonIds = uniqueUuids(bookings.flatMap(b => (b.details as BookingDetails).add_ons ?? []))
+      const roomIds = uniqueUuids(bookings.map(b => (b.details as BookingDetails).room?.option_id))
       const [addonRes, roomRes] = await Promise.all([
-        addonIds.size
-          ? supabase.from('Other_Addons').select('_id, display_title, admin_title').in('_id', [...addonIds])
+        addonIds.length
+          ? supabase.from('Other_Addons').select('_id, display_title, admin_title').in('_id', addonIds)
           : Promise.resolve({ data: [] as { _id: string; display_title: string | null; admin_title: string | null }[] }),
-        roomIds.size
-          ? supabase.from('EO_rooms').select('_id, display_title, admin_title').in('_id', [...roomIds])
+        roomIds.length
+          ? supabase.from('EO_rooms').select('_id, display_title, admin_title').in('_id', roomIds)
           : Promise.resolve({ data: [] as { _id: string; display_title: string | null; admin_title: string | null }[] }),
       ])
       if (cancelled) return
