@@ -70,10 +70,13 @@ describe('MapPage', () => {
     renderPage()
     await user.click(listButton(/yilan/i))
 
-    const link = await screen.findByRole('link', { name: 'Wan An Jian Navy Wreck' })
-    expect(link).toHaveAttribute('href', 'https://www.fundiverstw.com/traveldestinations/wan-an-jian-navy-wreck')
-    expect(link).toHaveAttribute('target', '_blank')
-    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'))
+    // The name links out from both the map marker and the panel list.
+    await waitFor(() => expect(screen.getAllByRole('link', { name: 'Wan An Jian Navy Wreck' }).length).toBe(2))
+    for (const link of screen.getAllByRole('link', { name: 'Wan An Jian Navy Wreck' })) {
+      expect(link).toHaveAttribute('href', 'https://www.fundiverstw.com/traveldestinations/wan-an-jian-navy-wreck')
+      expect(link).toHaveAttribute('target', '_blank')
+      expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'))
+    }
     // A site without a slug stays plain text, not a link.
     expect(screen.queryByRole('link', { name: 'Cathedral' })).not.toBeInTheDocument()
   })
