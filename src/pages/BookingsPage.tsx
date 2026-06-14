@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
 import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
 import { fetchAmendmentsForBookings, amendmentsDelta } from '../lib/booking-amendments'
+import { uniqueUuids } from '../lib/uuid'
 import { ShareEventButton } from '../components/ShareEventButton'
 import type { AppEvent, Booking, BookingAmendment, Payment, WaitlistOffer } from '../types/database'
 import {
@@ -110,16 +111,12 @@ export function BookingsPage() {
     }))
 
     // Resolve add-on IDs → display names so the breakdown doesn't show UUIDs.
-    const addonIds = new Set<string>()
-    for (const b of bookings) {
-      const d = b.details as Booking['details']
-      for (const id of d?.add_ons ?? []) addonIds.add(id)
-    }
-    if (addonIds.size) {
+    const addonIds = uniqueUuids(bookings.flatMap(b => (b.details as Booking['details'])?.add_ons ?? []))
+    if (addonIds.length) {
       const { data } = await supabase
         .from('Other_Addons')
         .select('_id, display_title, admin_title')
-        .in('_id', [...addonIds])
+        .in('_id', addonIds)
       setAddonNames(new Map((data ?? []).map(a => [a._id, a.display_title || a.admin_title || a._id])))
     } else {
       setAddonNames(new Map())
