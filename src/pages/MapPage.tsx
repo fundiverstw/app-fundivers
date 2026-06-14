@@ -391,31 +391,50 @@ export function MapPage() {
               region's transform so they land at the right geographic spot
               while keeping a fixed visual size. paint-order=stroke gives
               labels a white halo so they stay legible over coastline. */}
-          {selected && visibleSiteLayout.map(({ site, vx, vy, labelX, labelY, anchor, leaderStart, leaderEnd }) => (
-            <g key={site.id} className="pointer-events-none">
-              <line
-                x1={leaderStart[0]} y1={leaderStart[1]}
-                x2={leaderEnd[0]}   y2={leaderEnd[1]}
-                stroke="#dc2626" strokeWidth="1.4" strokeOpacity="0.8"
-                markerEnd="url(#site-arrow)"
-              />
-              <circle cx={vx} cy={vy} r="3" fill="#dc2626" stroke="white" strokeWidth="1.2" />
-              <text
-                x={labelX}
-                y={labelY}
-                textAnchor={anchor}
-                fontSize="10"
-                fontWeight="700"
-                fill="#1e3a8a"
-                stroke="white"
-                strokeWidth="3.2"
-                paintOrder="stroke fill"
-                strokeLinejoin="round"
-              >
-                {site.name}
-              </text>
-            </g>
-          ))}
+          {selected && visibleSiteLayout.map(({ site, vx, vy, labelX, labelY, anchor, leaderStart, leaderEnd }) => {
+            const wixUrl = wixSiteUrl(site.wix_slug)
+            const marker = (
+              <>
+                <circle cx={vx} cy={vy} r="3" fill="#dc2626" stroke="white" strokeWidth="1.2" />
+                <text
+                  x={labelX}
+                  y={labelY}
+                  textAnchor={anchor}
+                  fontSize="10"
+                  fontWeight="700"
+                  fill="#1e3a8a"
+                  stroke="white"
+                  strokeWidth="3.2"
+                  paintOrder="stroke fill"
+                  strokeLinejoin="round"
+                  style={wixUrl ? { textDecoration: 'underline' } : undefined}
+                >
+                  {site.name}
+                </text>
+              </>
+            )
+            return (
+              <g key={site.id} className="pointer-events-none">
+                <line
+                  x1={leaderStart[0]} y1={leaderStart[1]}
+                  x2={leaderEnd[0]}   y2={leaderEnd[1]}
+                  stroke="#dc2626" strokeWidth="1.4" strokeOpacity="0.8"
+                  markerEnd="url(#site-arrow)"
+                />
+                {wixUrl ? (
+                  <a
+                    href={wixUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={site.name}
+                    className="pointer-events-auto cursor-pointer"
+                  >
+                    {marker}
+                  </a>
+                ) : marker}
+              </g>
+            )
+          })}
         </svg>
       </div>
 
