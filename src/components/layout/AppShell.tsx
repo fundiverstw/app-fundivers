@@ -96,14 +96,6 @@ export function AppShell() {
               maskPosition: 'center',
             }}
           />
-          <a
-            href="https://www.fundiverstw.com/weeklyspecial"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Weekly special"
-          >
-            <img src="/imgs/tanks.png" alt="" className="h-8 w-auto" />
-          </a>
           <Link
             to="/map"
             aria-label="Dive site map"

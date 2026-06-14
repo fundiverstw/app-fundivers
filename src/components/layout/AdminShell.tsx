@@ -61,14 +61,6 @@ export function AdminShell() {
           >
             <img src="/imgs/broadcast.png" alt="" className="h-8 w-auto" />
           </a>
-          <a
-            href="https://www.fundiverstw.com/weeklyspecial"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Weekly special"
-          >
-            <img src="/imgs/tanks.png" alt="" className="h-8 w-auto" />
-          </a>
         </div>
         <Link to="/admin" aria-label="Admin home" className="shrink-0">
           <Logo size="sm" />
