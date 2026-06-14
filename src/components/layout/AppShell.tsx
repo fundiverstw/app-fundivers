@@ -104,11 +104,6 @@ export function AppShell() {
           >
             <MapIcon />
           </Link>
-        </div>
-        <Link to="/dashboard" aria-label="Home" className="shrink-0">
-          <Logo size="sm" />
-        </Link>
-        <div className="flex-1 flex items-center justify-end gap-3">
           <Link
             to="/partner-connect"
             aria-label="Partner Connect (PX)"
@@ -116,6 +111,11 @@ export function AppShell() {
           >
             <PartnerConnectIcon />
           </Link>
+        </div>
+        <Link to="/dashboard" aria-label="Home" className="shrink-0">
+          <Logo size="sm" />
+        </Link>
+        <div className="flex-1 flex items-center justify-end gap-3">
           {showInstallButton && (
             <button onClick={handleInstallClick} className={`text-xs px-2 py-1 rounded-md ${BTN_LIGHT}`}>
               Install app
