@@ -10,6 +10,7 @@ import { CalendarIcon } from '../icons/CalendarIcon'
 import { ChatIcon } from '../icons/ChatIcon'
 import { CrosshairIcon } from '../icons/CrosshairIcon'
 import { MapIcon } from '../icons/MapIcon'
+import { PartnerConnectIcon } from '../icons/PartnerConnectIcon'
 import { PersonIcon } from '../icons/PersonIcon'
 import { NotificationBell } from '../NotificationBell'
 import {
@@ -108,6 +109,13 @@ export function AppShell() {
           <Logo size="sm" />
         </Link>
         <div className="flex-1 flex items-center justify-end gap-3">
+          <Link
+            to="/partner-connect"
+            aria-label="Partner Connect (PX)"
+            className="text-red-500 hover:text-red-400 transition-colors"
+          >
+            <PartnerConnectIcon />
+          </Link>
           {showInstallButton && (
             <button onClick={handleInstallClick} className={`text-xs px-2 py-1 rounded-md ${BTN_LIGHT}`}>
               Install app
