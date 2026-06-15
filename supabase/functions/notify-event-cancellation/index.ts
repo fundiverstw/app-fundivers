@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
         text,
       })
       sent++
-    } catch (_e) { /* best-effort per recipient — one bad address shouldn't abort the rest */ }
+    } catch { /* best-effort per recipient — one bad address shouldn't abort the rest */ }
   }
 
   return json({ ok: true, sent, recipients: uniqueEmails.length })
