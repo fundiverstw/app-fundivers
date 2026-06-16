@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { personName } from '../../lib/names'
-import { isGearIncludedCourse } from '../../lib/gear'
+import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../lib/gear'
 import { supabase } from '../../lib/supabase'
 import { formatEventSpan } from '../../lib/events'
 import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/payment-instructions'
@@ -8,7 +8,6 @@ import type { AppEvent, Booking, BookingDetails, Database, Profile } from '../..
 
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
 
-const GEAR_FULLSET_DAILY = 1500
 const NITROX_COURSE_FEE  = 6000
 
 type PaymentMethod = 'bank_transfer' | 'credit_card' | 'paypal' | 'cash'
@@ -21,7 +20,9 @@ type ContactMethod = 'whatsapp' | 'line' | 'phone' | 'email'
 // room / empty add-ons so the trip still goes through.
 interface EventChoices {
   rentGear:        boolean
-  gearMode:        'full' | 'a-la-carte'
+  // À-la-carte rental: the specific items the diver wants prepared. Only
+  // meaningful when rentGear is true.
+  gearItems:       string[]
   needsTransport:  boolean | null
   addNitroxCourse: boolean
 }
@@ -87,7 +88,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
     for (const e of events) {
       init[e.id] = {
         rentGear:        false,
-        gearMode:        'full',
+        gearItems:       [],
         needsTransport:  null,
         addNitroxCourse: false,
       }
@@ -117,12 +118,12 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   const eventTotals = useMemo(() => {
     const surcharge = payment === 'credit_card' || payment === 'paypal' ? 0.05 : 0
     return cart.map(ev => {
-      const c = choicesById[ev.id] ?? { rentGear: false, gearMode: 'full', needsTransport: null, addNitroxCourse: false }
+      const c = choicesById[ev.id] ?? { rentGear: false, gearItems: [], needsTransport: null, addNitroxCourse: false }
       const base       = ev.price ?? 0
       const days       = Math.max(1, ev.dive_days ?? 1)
       const gearIncluded = ev.type === 'course' && isGearIncludedCourse(ev.title)
-      const gearCost   = (!gearIncluded && c.rentGear && c.gearMode === 'full')
-        ? GEAR_FULLSET_DAILY * days
+      const gearCost   = (!gearIncluded && c.rentGear)
+        ? c.gearItems.reduce((s, item) => s + (GEAR_ALACARTE_PRICES[item] ?? 0) * days, 0)
         : 0
       const transportSurcharge = ev.transport_price ?? 0
       const transportCost = transportSurcharge > 0 && c.needsTransport === true ? transportSurcharge : 0
@@ -193,7 +194,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
       const details: BookingDetails = {
         gear: gearIncluded
           ? { rent: false, included: true }
-          : (c.rentGear ? { rent: true, mode: c.gearMode } : { rent: false }),
+          : (c.rentGear ? { rent: true, mode: 'a-la-carte', items: c.gearItems } : { rent: false }),
         add_ons: [],
         transportation: c.needsTransport === true,
         payment_method: payment,
@@ -456,10 +457,41 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                       <p className="text-xs text-blue-950 font-medium">Gear is included with this course.</p>
                     )}
                     {showGearRentChoice && (
-                      <label className="flex items-center gap-2 text-sm text-blue-950 font-medium">
-                        <input type="checkbox" checked={c.rentGear} onChange={e => updateChoice(ev.id, { rentGear: e.target.checked })} className="accent-blue-900" />
-                        Rent full gear set (+{GEAR_FULLSET_DAILY.toLocaleString()}/day)
-                      </label>
+                      <div className="space-y-1">
+                        <label className="flex items-center gap-2 text-sm text-blue-950 font-medium">
+                          <input
+                            type="checkbox"
+                            checked={c.rentGear}
+                            onChange={e => updateChoice(ev.id, e.target.checked
+                              ? { rentGear: true, gearItems: GEAR_ITEMS.filter(i => !(targetProfile?.gear_owned ?? []).includes(i)) }
+                              : { rentGear: false })}
+                            className="accent-blue-900"
+                          />
+                          Rent gear
+                        </label>
+                        {c.rentGear && (
+                          <div className="pl-6 space-y-1">
+                            <p className="text-xs text-blue-950 font-medium">Check the items you need us to prepare for you:</p>
+                            <div className="grid grid-cols-2 gap-1">
+                              {GEAR_ITEMS.map(item => (
+                                <label key={item} className="flex items-center gap-1 text-xs text-blue-950 font-medium">
+                                  <input
+                                    type="checkbox"
+                                    checked={c.gearItems.includes(item)}
+                                    onChange={() => updateChoice(ev.id, {
+                                      gearItems: c.gearItems.includes(item)
+                                        ? c.gearItems.filter(i => i !== item)
+                                        : [...c.gearItems, item],
+                                    })}
+                                    className="accent-blue-900"
+                                  />
+                                  {item} ({GEAR_ALACARTE_PRICES[item]})
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     )}
                     <fieldset className="space-y-1">
                       <legend className="text-xs font-semibold text-blue-900">Transportation *</legend>

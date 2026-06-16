@@ -10,7 +10,7 @@ import { useToast } from '../../hooks/useToast'
 import type { AppEvent, Booking, Profile } from '../../types/database'
 
 // What items the shop actually needs to pack for this diver. Derived from
-// the booking-time gear selection — `details.gear.mode` + `items` — not from
+// the booking-time gear selection — `details.gear.items` — not from
 // profile.gear_owned. The diver made a choice at registration; that's the
 // source of truth for what to physically pack.
 function packList(booking: Booking): { summary: string; items: string[] } {
@@ -22,12 +22,10 @@ function packList(booking: Booking): { summary: string; items: string[] } {
   // the course".
   if (g.included) return { summary: 'Included with course', items: [...GEAR_ITEMS] }
   if (!g.rent) return { summary: 'Own gear', items: [] }
-  if (g.mode === 'full') return { summary: 'Full set', items: [...GEAR_ITEMS] }
-  if (g.mode === 'a-la-carte') return {
+  return {
     summary: g.items?.length ? `À-la-carte (${g.items.length})` : 'À-la-carte (none)',
     items: g.items ?? [],
   }
-  return { summary: 'Own gear', items: [] }
 }
 
 interface Row {

@@ -155,8 +155,8 @@ interface BookingDetails {
   gear?: {
     rent: boolean
     included?: boolean              // event bundles gear (e.g. OW course)
-    mode?: 'full' | 'a-la-carte'
-    items?: string[]                // EO_gear._id list when à-la-carte
+    mode?: 'a-la-carte'             // gear is rented à-la-carte only
+    items?: string[]                // chosen gear items
     size_overrides?: { height_cm?, weight_kg?, shoe_size? }
   }
   room?: { option_id?: string | null; notes?: string | null }

@@ -93,8 +93,8 @@ Clicking an event in the calendar opens `RegisterForm`
 
 ```
 total = base_price
-      + gear_cost       (0 if included; full_daily × days for full-set;
-                         ∑ per-item × days for à-la-carte)
+      + gear_cost       (0 if included; otherwise à-la-carte only:
+                         ∑ per-item × days for the chosen items)
       + room_cost       (selected EO_rooms.added_price)
       + addons_cost     (∑ Other_Addons.price for selected ids)
       + transport_cost  (event.transport_price if surcharge>0 and ticked;

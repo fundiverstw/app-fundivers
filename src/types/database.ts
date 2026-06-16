@@ -13,7 +13,8 @@ export interface BookingDetails {
      *  doesn't prompt the diver in this case; we just record the fact so
      *  the PDF can say "Included with course" instead of "No". */
     included?: boolean
-    mode?: 'full' | 'a-la-carte'
+    /** Gear is rented à-la-carte only; `items` lists the chosen pieces. */
+    mode?: 'a-la-carte'
     items?: string[]
     size_overrides?: {
       height_cm?: number | null

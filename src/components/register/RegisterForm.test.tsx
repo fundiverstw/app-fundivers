@@ -210,10 +210,8 @@ describe('RegisterForm', () => {
     // Wait for async room/addon fetch to populate the extras step
     await screen.findByLabelText(/SMB 1 Day/i)
 
-    // Step 3: turn on gear, pick à-la-carte + Wetsuit
+    // Step 3: turn on gear (à-la-carte is the only mode), pick Wetsuit
     await user.click(screen.getByLabelText(/rent gear/i))
-    const gearSelect = await screen.findByDisplayValue(/full set/i)
-    await user.selectOptions(gearSelect, 'a-la-carte')
     await user.click(await screen.findByLabelText(/wetsuit/i))
 
     // Transport, Nitrox course, one add-on
@@ -312,8 +310,6 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
 
     await user.click(screen.getByLabelText(/rent gear/i))
-    const gearSelect = await screen.findByDisplayValue(/full set/i)
-    await user.selectOptions(gearSelect, 'a-la-carte')
 
     // Items the diver owns should be unchecked; the rest should be pre-checked.
     await waitFor(() => {
@@ -909,7 +905,6 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await waitFor(() => {
       expect((screen.getByLabelText(/rent gear/i) as HTMLInputElement).checked).toBe(true)
-      expect((screen.getByDisplayValue(/à-la-carte/i) as HTMLSelectElement).value).toBe('a-la-carte')
     })
     // Items checked to match the existing booking's a-la-carte list, not the
     // profile's gear_owned (which would otherwise seed a different set).
