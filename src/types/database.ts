@@ -159,6 +159,10 @@ export interface Database {
           id: string
           created_at: string
           updated_at: string
+          /** Read-only mirror of auth.users.email, kept in sync by DB
+           *  triggers (20260616000000_profiles_email.sql). The app never
+           *  writes it — hence absent from Insert/Update. */
+          email: string | null
           name: string | null
           nickname: string | null
           phone: string | null

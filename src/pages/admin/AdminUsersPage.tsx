@@ -515,6 +515,7 @@ function ProfileDetails({ user }: { user: Profile }) {
   return (
     <div className="space-y-3">
       <Section title="Personal">
+        <Row k="Email" v={user.email} />
         <Row k="Phone" v={user.phone} />
         <Row k="Email contact" v={contact} />
         <Row k="DOB" v={user.date_of_birth ? format(new Date(user.date_of_birth), 'MMM d, yyyy') : null} />

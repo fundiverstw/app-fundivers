@@ -8,6 +8,18 @@ matching row in `public.profiles` created automatically by the
 `20260416111642_initial_schema.sql`. **Do not insert into `profiles`
 manually during signup.**
 
+The email of record lives in `auth.users`, but `profiles.email` mirrors
+it (added in `20260616000000_profiles_email.sql`) so the admin Users page
+can show it through the normal `profiles` select instead of a service-role
+lookup. The copy is **read-only** — `handle_new_user` seeds it at signup,
+a `before update` trigger (`profiles_email_mirror_auth`) coerces it back to
+the `auth.users` value on any profile edit so it can't be spoofed, and an
+`after update of email on auth.users` trigger (`sync_profile_email`)
+propagates a future email change. It inherits the existing `profiles`
+SELECT policies, so only self, staff/admin, and a parent-of-child can read
+it. The app never writes it — hence it's absent from the `Insert`/`Update`
+types in `src/types/database.ts`.
+
 ## Sign-up flow
 
 There are **two** entry points:
