@@ -1262,7 +1262,9 @@ function AmendmentsSection({ amendments, baseTotal, adjusted, readOnly, onAdd }:
 
 function renderDetails(d: BookingDetails, names: { addonNames: AddonNameMap; roomNames: RoomNameMap }) {
   const bits: React.ReactNode[] = []
-  if (d.gear?.rent) {
+  if (d.gear?.assistance_note) {
+    bits.push(<p key="gear">🧰 Gear — needs help: {d.gear.assistance_note}</p>)
+  } else if (d.gear?.rent) {
     const items = d.gear.items?.length ? `: ${d.gear.items.join(', ')}` : ''
     bits.push(<p key="gear">🧰 Gear{items}</p>)
   }

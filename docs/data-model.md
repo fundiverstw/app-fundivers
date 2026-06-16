@@ -157,6 +157,8 @@ interface BookingDetails {
     included?: boolean              // event bundles gear (e.g. OW course)
     mode?: 'a-la-carte'             // gear is rented à-la-carte only
     items?: string[]                // chosen gear items
+    assistance_note?: string        // diver picked "ask a human"; their note
+                                    //   (when set, rent is false)
     size_overrides?: { height_cm?, weight_kg?, shoe_size? }
   }
   room?: { option_id?: string | null; notes?: string | null }

@@ -13,7 +13,7 @@ import type { AppEvent, Booking, Profile } from '../../types/database'
 // the booking-time gear selection — `details.gear.items` — not from
 // profile.gear_owned. The diver made a choice at registration; that's the
 // source of truth for what to physically pack.
-function packList(booking: Booking): { summary: string; items: string[] } {
+function packList(booking: Booking): { summary: string; items: string[]; note?: string } {
   const g = booking.details?.gear
   if (!g) return { summary: 'Own gear', items: [] }
   // Course-bundled gear (g.included) is functionally a full set the shop
@@ -21,6 +21,9 @@ function packList(booking: Booking): { summary: string; items: string[] } {
   // distinguishes "diver paid to rent" from "shop provides as part of
   // the course".
   if (g.included) return { summary: 'Included with course', items: [...GEAR_ITEMS] }
+  // Diver wasn't sure and asked for help — surface their note so staff can
+  // follow up before the trip. Nothing to pack until that's resolved.
+  if (g.assistance_note) return { summary: 'Needs help', items: [], note: g.assistance_note }
   if (!g.rent) return { summary: 'Own gear', items: [] }
   return {
     summary: g.items?.length ? `À-la-carte (${g.items.length})` : 'À-la-carte (none)',
@@ -175,11 +178,17 @@ function DiverGearCard({ row, onProfilePatched }: { row: Row; onProfilePatched: 
           {sizing && <p className="text-xs text-blue-900 font-medium">{sizing}</p>}
         </div>
         <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
-          pack.items.length > 0 ? 'bg-red-100 text-red-700 border border-red-500' : 'bg-sky-100 text-blue-950 font-medium'
+          pack.items.length > 0 || pack.note ? 'bg-red-100 text-red-700 border border-red-500' : 'bg-sky-100 text-blue-950 font-medium'
         }`}>
           {pack.summary}
         </span>
       </header>
+
+      {pack.note && (
+        <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded p-2 whitespace-pre-wrap">
+          {pack.note}
+        </p>
+      )}
 
       {pack.items.length > 0 && (
         <div className="flex flex-wrap gap-1.5">

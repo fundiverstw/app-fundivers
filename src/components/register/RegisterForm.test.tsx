@@ -140,6 +140,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     // Transport is required; pick "no" so the Next button on step 3 is enabled.
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
     // Step 3 → 4 (payment)
     await user.click(screen.getByRole('button', { name: /next/i }))
     // Step 4: confirm
@@ -179,6 +180,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
 
@@ -210,8 +212,8 @@ describe('RegisterForm', () => {
     // Wait for async room/addon fetch to populate the extras step
     await screen.findByLabelText(/SMB 1 Day/i)
 
-    // Step 3: turn on gear (à-la-carte is the only mode), pick Wetsuit
-    await user.click(screen.getByLabelText(/rent gear/i))
+    // Step 3: choose "I need to rent" (à-la-carte is the only mode), pick Wetsuit
+    await user.click(screen.getByLabelText(/i need to rent/i))
     await user.click(await screen.findByLabelText(/wetsuit/i))
 
     // Transport, Nitrox course, one add-on
@@ -255,7 +257,7 @@ describe('RegisterForm', () => {
 
     // Step 3 should show "no extras" copy and hide all optional sections
     expect(await screen.findByText(/no extras/i)).toBeInTheDocument()
-    expect(screen.queryByLabelText(/rent gear/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/i need to rent/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/^room$/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/^add-ons$/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/add nitrox course/i)).not.toBeInTheDocument()
@@ -276,7 +278,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
     expect(await screen.findByText(/gear is included with this course/i)).toBeInTheDocument()
-    expect(screen.queryByLabelText(/rent gear/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/i need to rent/i)).not.toBeInTheDocument()
   })
 
   it('Advanced Open Water course offers gear rental (gear is not bundled)', async () => {
@@ -289,7 +291,7 @@ describe('RegisterForm', () => {
     )
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
-    expect(await screen.findByLabelText(/rent gear/i)).toBeInTheDocument()
+    expect(await screen.findByLabelText(/i need to rent/i)).toBeInTheDocument()
     expect(screen.queryByText(/gear is included with this course/i)).not.toBeInTheDocument()
   })
 
@@ -309,7 +311,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
-    await user.click(screen.getByLabelText(/rent gear/i))
+    await user.click(screen.getByLabelText(/i need to rent/i))
 
     // Items the diver owns should be unchecked; the rest should be pre-checked.
     await waitFor(() => {
@@ -337,6 +339,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/credit card/i))
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
@@ -358,6 +361,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/credit card/i))
     await user.click(screen.getByLabelText(/pay deposit only/i))
@@ -391,6 +395,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/^paypal/i))
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
@@ -401,7 +406,7 @@ describe('RegisterForm', () => {
     expect(details.total).toBe(Math.round(2800 * 1.05))
   })
 
-  it('step 3 Next is blocked until the diver explicitly answers the transport question', async () => {
+  it('step 3 Next is blocked until the diver answers BOTH the transport and gear questions', async () => {
     setupFrom()
     const user = userEvent.setup()
     render(
@@ -412,14 +417,20 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
-    // Neither radio is pre-checked.
+    // Nothing pre-checked: neither transport nor gear.
     expect((screen.getByLabelText(/ride with the shop/i) as HTMLInputElement).checked).toBe(false)
     expect((screen.getByLabelText(/no, i don't need a ride/i) as HTMLInputElement).checked).toBe(false)
+    expect((screen.getByLabelText(/i have all the required gear/i) as HTMLInputElement).checked).toBe(false)
 
-    // Next is disabled until a choice is made.
+    // Next stays disabled with neither answered.
     expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
 
+    // Answering only transport is not enough — gear is still unanswered.
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+
+    // Answering gear too unblocks it.
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
     expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
   })
 
@@ -555,6 +566,7 @@ describe('RegisterForm', () => {
     // Step 2 → 3 → 4 → confirm
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
 
@@ -603,6 +615,7 @@ describe('RegisterForm', () => {
     await user.type(screen.getByLabelText(/^name \*/i), 'Grace Hopper')
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
 
@@ -650,6 +663,7 @@ describe('RegisterForm', () => {
 
     // Confirm submit and assert the cost row excludes a transport line.
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
     await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
@@ -674,6 +688,7 @@ describe('RegisterForm', () => {
     const rideRadio = screen.getByLabelText(/ride with the shop/i)
     expect(rideRadio).toBeInTheDocument()
     await user.click(rideRadio)
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
     await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
@@ -712,6 +727,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
     // Policy heading + body + cancel-by date + checkbox all visible.
@@ -744,6 +760,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
     // Default = bank_transfer → local bank-details block.
@@ -779,6 +796,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
     const expectReminder = () => {
@@ -811,6 +829,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
     // Deposit is always due ASAP; only the balance carries the admin date.
@@ -834,6 +853,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
     await user.click(screen.getByLabelText(/pay deposit only/i))
@@ -904,7 +924,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await waitFor(() => {
-      expect((screen.getByLabelText(/rent gear/i) as HTMLInputElement).checked).toBe(true)
+      expect((screen.getByLabelText(/i need to rent/i) as HTMLInputElement).checked).toBe(true)
     })
     // Items checked to match the existing booking's a-la-carte list, not the
     // profile's gear_owned (which would otherwise seed a different set).
@@ -946,6 +966,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
 
@@ -1088,6 +1109,7 @@ describe('RegisterForm', () => {
       await user.click(screen.getByRole('button', { name: /next/i }))
       await user.click(screen.getByRole('button', { name: /next/i }))
       await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
       await user.click(screen.getByRole('button', { name: /next/i }))
       await user.click(screen.getByRole('button', { name: /confirm booking/i }))
 
@@ -1114,6 +1136,7 @@ describe('RegisterForm', () => {
       await user.click(screen.getByRole('button', { name: /next/i }))
       await user.click(screen.getByRole('button', { name: /next/i }))
       await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
       await user.click(screen.getByRole('button', { name: /next/i }))
       await user.click(screen.getByRole('button', { name: /confirm booking/i }))
 
@@ -1157,6 +1180,7 @@ describe('RegisterForm', () => {
       await user.click(screen.getByRole('button', { name: /next/i }))
       await user.click(screen.getByRole('button', { name: /next/i }))
       await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
       await user.click(screen.getByRole('button', { name: /next/i }))
       await user.click(screen.getByRole('button', { name: /confirm booking/i }))
 

@@ -380,7 +380,9 @@ function WaitlistOfferBanner({
 function Breakdown({ details, addonNames }: { details: Booking['details'] | undefined; addonNames: AddonNameMap }) {
   const d = details ?? {}
   const items: Array<[string, string | null]> = []
-  if (d.gear?.rent) {
+  if (d.gear?.assistance_note) {
+    items.push(['Gear — needs help', d.gear.assistance_note])
+  } else if (d.gear?.rent) {
     const extras = d.gear.items?.length ? d.gear.items.join(', ') : null
     items.push(['Gear', extras])
   }

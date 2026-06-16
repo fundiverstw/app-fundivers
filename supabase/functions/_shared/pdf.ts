@@ -54,8 +54,11 @@ export interface RegistrationPdfPayload {
   /** True when the event itself bundles gear (e.g. OW course). Wins over
    *  rentGear in the PDF so the row reads "Included with course". */
   gearIncluded: boolean
-  gearMode: 'full' | 'a-la-carte' | ''
+  gearMode: 'a-la-carte' | ''
   gearItems: string[]
+  /** Free text the diver left when they picked "I need to ask a human" on the
+   *  gear step. When set, it's shown as the gear value so staff see it. */
+  gearAssistanceNote: string | null
   diveDays: number | null
   height: number | string | null
   weight: number | string | null
@@ -233,10 +236,15 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   const gearDays = p.diveDays && p.diveDays > 1 ? p.diveDays : 1
   const gearLabel = p.gearIncluded
     ? "Included with course"
-    : p.rentGear
-      ? ((p.gearMode === "full" ? "Full set" : "A-la-carte") + (gearDays > 1 ? " x" + gearDays + " days" : ""))
-      : "No"
+    : p.gearAssistanceNote
+      ? "NEEDS HELP — see note below"
+      : p.rentGear
+        ? ("A-la-carte" + (gearDays > 1 ? " x" + gearDays + " days" : ""))
+        : "No"
   y = row(doc, y, "Gear rental", gearLabel, altState)
+  if (p.gearAssistanceNote) {
+    y = row(doc, y, "Gear note", p.gearAssistanceNote, altState)
+  }
   if (p.rentGear && p.gearItems && p.gearItems.length) {
     y = row(doc, y, "Items", p.gearItems.join(", "), altState)
   }

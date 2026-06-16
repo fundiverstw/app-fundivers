@@ -343,7 +343,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
   const details = body.details as Record<string, unknown>
   const roomDetail = details.room as { option_id?: string; notes?: string } | undefined
   const addOnIds   = Array.isArray(details.add_ons) ? details.add_ons as string[] : []
-  const gearDetail = details.gear as { rent?: boolean; included?: boolean; mode?: string; items?: string[] } | undefined
+  const gearDetail = details.gear as { rent?: boolean; included?: boolean; mode?: string; items?: string[]; assistance_note?: string } | undefined
 
   let roomBoard: string | null = null
   if (roomDetail?.option_id) {
@@ -449,6 +449,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     gearIncluded:    !!gearDetail?.included,
     gearMode:        (gearDetail?.mode ?? "") as RegistrationPdfPayload["gearMode"],
     gearItems:       gearDetail?.items ?? [],
+    gearAssistanceNote: gearDetail?.assistance_note ?? null,
     diveDays:        (event?.dive_days as number | null) ?? 1,
     height:          profile?.height_cm ?? null,
     weight:          profile?.weight_kg ?? null,

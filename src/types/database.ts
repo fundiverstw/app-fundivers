@@ -16,6 +16,11 @@ export interface BookingDetails {
     /** Gear is rented à-la-carte only; `items` lists the chosen pieces. */
     mode?: 'a-la-carte'
     items?: string[]
+    /** Set when the diver picked "I'm not sure — I need to ask a human" on
+     *  the gear step. Free text describing their situation; surfaced
+     *  prominently in the gear field on the PDF and every admin view so
+     *  staff can follow up. When present, `rent` is false. */
+    assistance_note?: string
     size_overrides?: {
       height_cm?: number | null
       weight_kg?: number | null
