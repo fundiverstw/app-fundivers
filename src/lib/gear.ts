@@ -3,6 +3,12 @@
 // sides can be matched 1:1 (items you own are excluded from rental).
 export const GEAR_ITEMS = ['BCD', 'Regulator', 'Wetsuit', 'Fins', 'Mask', 'Boots', 'Dive computer'] as const
 
+// Per-item daily rental price (NTD). Gear is rented à-la-carte only — the
+// diver picks exactly the items they need and pays per item per dive day.
+export const GEAR_ALACARTE_PRICES: Record<string, number> = {
+  BCD: 450, Regulator: 500, Wetsuit: 200, Fins: 150, Mask: 100, Boots: 50, 'Dive computer': 300,
+}
+
 // Courses that don't prompt for gear rental: Open Water and Discover Scuba
 // (DSD / "Try Dive") bundle a full set into the fee (those divers don't own
 // gear yet), and EFR is a dry first-aid course that needs none. Every other

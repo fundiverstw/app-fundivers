@@ -382,7 +382,7 @@ function Breakdown({ details, addonNames }: { details: Booking['details'] | unde
   const items: Array<[string, string | null]> = []
   if (d.gear?.rent) {
     const extras = d.gear.items?.length ? d.gear.items.join(', ') : null
-    items.push([`Gear (${d.gear.mode ?? 'full'})`, extras])
+    items.push(['Gear', extras])
   }
   if (d.room?.option_id) items.push(['Room', d.room.notes ?? null])
   if ((d.add_ons?.length ?? 0) > 0) {

@@ -1263,8 +1263,8 @@ function AmendmentsSection({ amendments, baseTotal, adjusted, readOnly, onAdd }:
 function renderDetails(d: BookingDetails, names: { addonNames: AddonNameMap; roomNames: RoomNameMap }) {
   const bits: React.ReactNode[] = []
   if (d.gear?.rent) {
-    const items = d.gear.items?.length ? ` (${d.gear.items.join(', ')})` : ''
-    bits.push(<p key="gear">🧰 Gear: {d.gear.mode ?? 'full'}{items}</p>)
+    const items = d.gear.items?.length ? `: ${d.gear.items.join(', ')}` : ''
+    bits.push(<p key="gear">🧰 Gear{items}</p>)
   }
   if (d.room?.option_id) {
     const roomLabel = names.roomNames.get(d.room.option_id) ?? d.room.option_id

@@ -30,7 +30,7 @@ vi.mock('../../components/admin/AdminNotes', () => ({
 
 const sampleBooking = {
   id: 'b1', user_id: 'u1', status: 'pending',
-  details: { gear: { rent: true, mode: 'full' } },
+  details: { gear: { rent: true, mode: 'a-la-carte', items: ['BCD', 'Wetsuit'] } },
 }
 const sampleProfile = {
   id: 'u1', nickname: 'Ada Lovelace',

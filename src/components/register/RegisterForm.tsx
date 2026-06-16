@@ -6,7 +6,7 @@ import { CURRENT_TERMS_VERSION } from '../../lib/terms-version'
 import { formatEventSpan, eventIsFull } from '../../lib/events'
 import { computeEffectiveFullPaymentDeadline } from '../../lib/payment-deadlines'
 import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/payment-instructions'
-import { GEAR_ITEMS, isGearIncludedCourse } from '../../lib/gear'
+import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../lib/gear'
 import { uploadCertCard } from '../../lib/cert-card'
 import { uploadNitroxCard } from '../../lib/nitrox-card'
 import { uploadDeepCard } from '../../lib/deep-card'
@@ -52,10 +52,6 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked, existi
   )
 }
 
-const GEAR_ALACARTE_PRICES: Record<string, number> = {
-  BCD: 450, Regulator: 500, Wetsuit: 200, Fins: 150, Mask: 100, Boots: 50, 'Dive computer': 300,
-}
-const GEAR_FULLSET_DAILY = 1500
 const NITROX_COURSE_FEE = 6000
 // Per-event transport surcharge now lives on the linked EO_prices row
 // (see event.transport_price). NULL or 0 = transportation bundled into
@@ -397,11 +393,6 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
   // Form state — pre-populated from existingBooking when editing.
   const [rentGear, setRentGear] = useState(initialDetails?.gear?.rent ?? false)
-  const [gearMode, setGearMode] = useState<'full' | 'a-la-carte'>(
-    // Legacy bookings may carry mode: 'provided' from the old dropdown;
-    // treat that as "no rental" rather than crashing the dropdown.
-    initialDetails?.gear?.rent && initialDetails.gear.mode === 'a-la-carte' ? 'a-la-carte' : 'full'
-  )
   // À-la-carte selection: explicitly chosen items (or null = use the
   // "everything the diver doesn't already own" default derived from
   // profile.gear_owned). Splitting this two-step keeps the default
@@ -522,9 +513,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
   const gearCost = useMemo(() => {
     if (!showGearRentChoice || !rentGear) return 0
-    if (gearMode === 'full') return GEAR_FULLSET_DAILY * diveDays
     return gearItems.reduce((s, item) => s + (GEAR_ALACARTE_PRICES[item] ?? 0) * diveDays, 0)
-  }, [showGearRentChoice, rentGear, gearMode, gearItems, diveDays])
+  }, [showGearRentChoice, rentGear, gearItems, diveDays])
 
   const roomCost = useMemo(() => rooms.find(r => r._id === roomId)?.added_price ?? 0, [rooms, roomId])
   const addonsCost = useMemo(() => {
@@ -642,8 +632,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         : (showGearRentChoice && rentGear
           ? {
               rent: true,
-              mode: gearMode,
-              items: gearMode === 'a-la-carte' ? gearItems : undefined,
+              mode: 'a-la-carte',
+              items: gearItems,
               size_overrides: {
                 height_cm: profile?.height_cm ?? null,
                 weight_kg: profile?.weight_kg ?? null,
@@ -1101,27 +1091,15 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               )}
               {rentGear && (
                 <div className="pl-6 space-y-2">
-                  <select
-                    value={gearMode}
-                    onChange={e => setGearMode(e.target.value as typeof gearMode)}
-                    className="bg-white border border-sky-300 rounded-lg px-2 py-1 text-sm text-blue-900"
-                  >
-                    <option value="full">Full set ({GEAR_FULLSET_DAILY.toLocaleString()}/day)</option>
-                    <option value="a-la-carte">À-la-carte</option>
-                  </select>
-                  {gearMode === 'a-la-carte' && (
-                    <>
-                      <p className="text-xs text-blue-950 font-medium">Check the items you need us to prepare for you:</p>
-                      <div className="grid grid-cols-2 gap-1">
-                        {GEAR_ITEMS.map(item => (
-                          <label key={item} className="flex items-center gap-1 text-xs text-blue-950 font-medium">
-                            <input type="checkbox" checked={gearItems.includes(item)} onChange={() => toggleItem(item)} className="accent-blue-900" />
-                            {item} ({GEAR_ALACARTE_PRICES[item]})
-                          </label>
-                        ))}
-                      </div>
-                    </>
-                  )}
+                  <p className="text-xs text-blue-950 font-medium">Check the items you need us to prepare for you:</p>
+                  <div className="grid grid-cols-2 gap-1">
+                    {GEAR_ITEMS.map(item => (
+                      <label key={item} className="flex items-center gap-1 text-xs text-blue-950 font-medium">
+                        <input type="checkbox" checked={gearItems.includes(item)} onChange={() => toggleItem(item)} className="accent-blue-900" />
+                        {item} ({GEAR_ALACARTE_PRICES[item]})
+                      </label>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
