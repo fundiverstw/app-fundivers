@@ -1,4 +1,3 @@
-import { format } from 'date-fns'
 import { supabase } from './supabase'
 import type { AppEvent, Credit, CreditInsert } from '../types/database'
 
@@ -118,7 +117,13 @@ export async function issueCancellationCredits(args: {
   if (eErr) throw eErr
   const alreadyCredited = new Set((existing ?? []).map(c => c.booking_id))
 
-  const reason = `Refund credit for cancelled event: ${event.title} (${format(new Date(event.start_time), 'MMM d, yyyy')})`
+  // Format in the shop's timezone (Taiwan) so the date in the reason matches
+  // the event's calendar day regardless of where this runs — start_time is a
+  // UTC instant, and a naive local format shifts the day in non-+08 runtimes.
+  const eventDate = new Date(event.start_time).toLocaleDateString('en-US', {
+    year: 'numeric', month: 'short', day: 'numeric', timeZone: 'Asia/Taipei',
+  })
+  const reason = `Refund credit for cancelled event: ${event.title} (${eventDate})`
 
   const rows: CreditInsert[] = bookings
     .filter(b => !alreadyCredited.has(b.id) && (paidByBooking.get(b.id) ?? 0) > 0)
