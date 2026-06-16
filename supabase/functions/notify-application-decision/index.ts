@@ -122,7 +122,9 @@ Deno.serve(async (req) => {
       await transporter.sendMail({
         from: { name: "FunDivers TW", address: GMAIL_USER },
         to:      targetEmail,
-        bcc:     COMPANY_EMAIL,
+        // Copy the company on rejections only — approvals are routine and
+        // don't need a business-side notification.
+        ...(body.decision === "reject" ? { bcc: COMPANY_EMAIL } : {}),
         subject,
         text,
       })
