@@ -79,6 +79,7 @@ async function readFunctionsError(error: { message: string; context?: unknown },
 
 type Step = 1 | 2 | 3 | 4
 type ContactMethod = 'whatsapp' | 'line' | 'phone' | 'email'
+type GearChoice = 'none' | 'rent' | 'help'
 
 export interface RegisterFormBodyProps {
   event: AppEvent
@@ -392,7 +393,14 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   >([])
 
   // Form state — pre-populated from existingBooking when editing.
-  const [rentGear, setRentGear] = useState(initialDetails?.gear?.rent ?? false)
+  // Gear is a single three-way choice: 'none' (diver has everything),
+  // 'rent' (pick items to rent), or 'help' (unsure — leave a note for staff).
+  // null = not yet chosen on a new booking; step-3 Next is gated until set.
+  const initialGearChoice: GearChoice | null = initialDetails?.gear
+    ? (initialDetails.gear.assistance_note ? 'help' : initialDetails.gear.rent ? 'rent' : 'none')
+    : null
+  const [gearChoice, setGearChoice] = useState<GearChoice | null>(initialGearChoice)
+  const [gearHelpNote, setGearHelpNote] = useState(initialDetails?.gear?.assistance_note ?? '')
   // À-la-carte selection: explicitly chosen items (or null = use the
   // "everything the diver doesn't already own" default derived from
   // profile.gear_owned). Splitting this two-step keeps the default
@@ -512,9 +520,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   }, [event.id, showRooms, showAddons, event.room_type_ids, event.addon_ids, event.cancel_policy])
 
   const gearCost = useMemo(() => {
-    if (!showGearRentChoice || !rentGear) return 0
+    if (!showGearRentChoice || gearChoice !== 'rent') return 0
     return gearItems.reduce((s, item) => s + (GEAR_ALACARTE_PRICES[item] ?? 0) * diveDays, 0)
-  }, [showGearRentChoice, rentGear, gearItems, diveDays])
+  }, [showGearRentChoice, gearChoice, gearItems, diveDays])
 
   const roomCost = useMemo(() => rooms.find(r => r._id === roomId)?.added_price ?? 0, [rooms, roomId])
   const addonsCost = useMemo(() => {
@@ -629,18 +637,22 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     const details: BookingDetails = {
       gear: gearIncluded
         ? { rent: false, included: true }
-        : (showGearRentChoice && rentGear
-          ? {
-              rent: true,
-              mode: 'a-la-carte',
-              items: gearItems,
-              size_overrides: {
-                height_cm: profile?.height_cm ?? null,
-                weight_kg: profile?.weight_kg ?? null,
-                shoe_size: profile?.shoe_size ?? null,
-              },
-            }
-          : { rent: false }),
+        : !showGearRentChoice
+          ? { rent: false }
+          : gearChoice === 'rent'
+            ? {
+                rent: true,
+                mode: 'a-la-carte',
+                items: gearItems,
+                size_overrides: {
+                  height_cm: profile?.height_cm ?? null,
+                  weight_kg: profile?.weight_kg ?? null,
+                  shoe_size: profile?.shoe_size ?? null,
+                },
+              }
+            : gearChoice === 'help'
+              ? { rent: false, assistance_note: gearHelpNote.trim() || 'Diver is unsure what gear they need and asked for help.' }
+              : { rent: false },
       room: (showRooms && roomId) ? { option_id: roomId, notes: roomNotes || null } : undefined,
       add_ons: showAddons ? [...addonIds] : [],
       transportation: needsTransport === true,
@@ -1082,14 +1094,29 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
           {showGearRentChoice && (
             <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm text-blue-950 font-medium">
-                <input type="checkbox" checked={rentGear} onChange={e => setRentGear(e.target.checked)} className="accent-blue-900" />
-                Rent gear
-              </label>
+              <p className="text-sm font-semibold text-blue-900">Gear rental</p>
+              <p className="text-xs text-blue-950 font-medium">
+                This section is only about renting equipment from us. Tell us
+                exactly what you need so we can have it ready for you.
+              </p>
               {event.gear_rental_info && (
-                <p className="text-xs text-blue-950 font-medium pl-6">{event.gear_rental_info}</p>
+                <p className="text-xs text-blue-950 font-medium">{event.gear_rental_info}</p>
               )}
-              {rentGear && (
+              <div className="space-y-1">
+                <label className="flex items-start gap-2 text-sm text-blue-950 font-medium">
+                  <input type="radio" name="gear-choice" checked={gearChoice === 'none'} onChange={() => setGearChoice('none')} className="accent-blue-900 mt-1" />
+                  <span className="flex-1">I have all the required gear, and I do not need to rent anything.</span>
+                </label>
+                <label className="flex items-start gap-2 text-sm text-blue-950 font-medium">
+                  <input type="radio" name="gear-choice" checked={gearChoice === 'rent'} onChange={() => setGearChoice('rent')} className="accent-blue-900 mt-1" />
+                  <span className="flex-1">I need to rent some or all of the required gear.</span>
+                </label>
+                <label className="flex items-start gap-2 text-sm text-blue-950 font-medium">
+                  <input type="radio" name="gear-choice" checked={gearChoice === 'help'} onChange={() => setGearChoice('help')} className="accent-blue-900 mt-1" />
+                  <span className="flex-1">I have no idea what I&apos;m doing and I need to ask a human.</span>
+                </label>
+              </div>
+              {gearChoice === 'rent' && (
                 <div className="pl-6 space-y-2">
                   <p className="text-xs text-blue-950 font-medium">Check the items you need us to prepare for you:</p>
                   <div className="grid grid-cols-2 gap-1">
@@ -1100,6 +1127,21 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                       </label>
                     ))}
                   </div>
+                </div>
+              )}
+              {gearChoice === 'help' && (
+                <div className="pl-6 space-y-1">
+                  <p className="text-xs text-blue-950 font-medium">
+                    No worries! Tell us about your gear situation and we&apos;ll
+                    sort it out with you.
+                  </p>
+                  <textarea
+                    value={gearHelpNote}
+                    onChange={e => setGearHelpNote(e.target.value)}
+                    rows={3}
+                    placeholder="e.g. I'm a new diver and not sure what I own or need — please advise."
+                    className="w-full bg-white border border-sky-300 rounded-lg px-2 py-1 text-sm text-blue-900"
+                  />
                 </div>
               )}
             </div>
@@ -1344,7 +1386,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 (!isOnBehalfOf && deepBlocked) ||
                 (isGuest && (guestEmail.trim() === '' || guestPassword.length < 8 || !guestAgreedTerms || !turnstileToken))
               )) ||
-              (step === 3 && !isOnBehalfOf && needsTransport === null)
+              (step === 3 && !isOnBehalfOf && needsTransport === null) ||
+              (step === 3 && !isOnBehalfOf && showGearRentChoice && gearChoice === null)
             }
             className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
           >
