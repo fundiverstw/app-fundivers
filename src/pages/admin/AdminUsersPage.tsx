@@ -564,7 +564,7 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
   const activeBookings = extras.bookings.filter(b => b.status !== 'cancelled')
   return (
     <div className="space-y-3 pt-2 border-t border-sky-200">
-      <Section title="Bookings">
+      <Section title="Bookings" defaultOpen>
         {activeBookings.length === 0 ? (
           <p className="text-blue-950 font-medium text-xs">None active.</p>
         ) : (
@@ -605,7 +605,7 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
         )}
       </Section>
 
-      <Section title="Account credits">
+      <Section title="Account credits" defaultOpen>
         <CreditsPanel
           credits={extras.credits}
           openBalance={extras.openCreditBalance}
@@ -617,7 +617,7 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
         />
       </Section>
 
-      <Section title="Totals across all bookings">
+      <Section title="Totals across all bookings" defaultOpen>
         <div className="flex justify-between text-xs">
           <span className="text-blue-900 font-medium">Paid</span>
           <span className="text-blue-900 font-semibold">{extras.paidSum.toLocaleString()}</span>
@@ -817,12 +817,15 @@ function CreditsPanel({ credits, openBalance, bookings, readOnly, onCreate, onSe
   )
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
   return (
-    <div className="space-y-1">
-      <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider">{title}</p>
-      <div className="pl-1 space-y-0.5">{children}</div>
-    </div>
+    <details open={defaultOpen} className="group space-y-1">
+      <summary className="flex items-center gap-1 cursor-pointer select-none list-none text-xs font-semibold text-blue-700 uppercase tracking-wider [&::-webkit-details-marker]:hidden">
+        <span className="text-blue-400 transition-transform group-open:rotate-90">&#9656;</span>
+        {title}
+      </summary>
+      <div className="pl-1 pt-1 space-y-0.5">{children}</div>
+    </details>
   )
 }
 
