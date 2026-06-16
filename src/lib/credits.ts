@@ -1,5 +1,6 @@
+import { format } from 'date-fns'
 import { supabase } from './supabase'
-import type { Credit, CreditInsert } from '../types/database'
+import type { AppEvent, Credit, CreditInsert } from '../types/database'
 
 /**
  * "Credits" are money the business owes a diver — typically issued when
@@ -67,6 +68,75 @@ export async function settleCredit(args: {
     .single()
   if (error || !data) throw error ?? new Error('credit update returned no row')
   return data as Credit
+}
+
+/**
+ * Auto-issue an open credit to every non-cancelled registrant of an event
+ * the admin just cancelled, each worth what that diver has actually paid
+ * (Σ payments where status='paid'). The credit's reason names the specific
+ * event so the diver and admin both see why it appeared.
+ *
+ * Idempotent per booking: a booking that already carries any credit is
+ * skipped, so cancel → restore → cancel never double-issues (restoring an
+ * event intentionally leaves issued credits untouched). Bookings with
+ * nothing paid get no credit.
+ */
+export async function issueCancellationCredits(args: {
+  event: AppEvent
+  createdBy: string
+}): Promise<{ issued: number; totalAmount: number }> {
+  const { event, createdBy } = args
+  const column = event.type === 'dive' ? 'eo_dive_id' : 'eo_course_id'
+
+  const { data: bookings, error: bErr } = await supabase
+    .from('bookings')
+    .select('id, user_id')
+    .eq(column, event.id)
+    .neq('status', 'cancelled')
+  if (bErr) throw bErr
+  if (!bookings?.length) return { issued: 0, totalAmount: 0 }
+
+  const bookingIds = bookings.map(b => b.id)
+
+  const { data: payments, error: pErr } = await supabase
+    .from('payments')
+    .select('booking_id, amount')
+    .in('booking_id', bookingIds)
+    .eq('status', 'paid')
+  if (pErr) throw pErr
+
+  const paidByBooking = new Map<string, number>()
+  for (const p of payments ?? []) {
+    if (!p.booking_id) continue
+    paidByBooking.set(p.booking_id, (paidByBooking.get(p.booking_id) ?? 0) + Number(p.amount))
+  }
+
+  const { data: existing, error: eErr } = await supabase
+    .from('credits')
+    .select('booking_id')
+    .in('booking_id', bookingIds)
+  if (eErr) throw eErr
+  const alreadyCredited = new Set((existing ?? []).map(c => c.booking_id))
+
+  const reason = `Refund credit for cancelled event: ${event.title} (${format(new Date(event.start_time), 'MMM d, yyyy')})`
+
+  const rows: CreditInsert[] = bookings
+    .filter(b => !alreadyCredited.has(b.id) && (paidByBooking.get(b.id) ?? 0) > 0)
+    .map(b => ({
+      user_id:    b.user_id,
+      booking_id: b.id,
+      amount:     paidByBooking.get(b.id)!,
+      reason,
+      created_by: createdBy,
+      status:     'open',
+    }))
+
+  if (!rows.length) return { issued: 0, totalAmount: 0 }
+
+  const { error: iErr } = await supabase.from('credits').insert(rows)
+  if (iErr) throw iErr
+
+  return { issued: rows.length, totalAmount: rows.reduce((s, r) => s + r.amount, 0) }
 }
 
 export async function reopenCredit(creditId: string): Promise<Credit> {

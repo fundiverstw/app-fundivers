@@ -13,6 +13,7 @@ import { RegisterForm } from '../../components/register/RegisterForm'
 import { shoeAsJp } from '../../lib/shoe-size'
 import { uniqueUuids } from '../../lib/uuid'
 import { notifyEventCancelled } from '../../lib/event-cancellation'
+import { issueCancellationCredits } from '../../lib/credits'
 import { fetchAmendmentsForBookings, addAmendment, formAmount, amendmentsDelta } from '../../lib/booking-amendments'
 import { recordPayment as recordPaymentRow, voidPayment as voidPaymentRow } from '../../lib/booking-payments'
 import { requestEventDiverExport } from '../../lib/admin-event-export'
@@ -234,6 +235,19 @@ export function AdminEventDetailPage() {
       // push, best-effort so a notification failure never blocks the cancel.
       if (value) notifyEventCancelled(id, type as AppEvent['type']).catch(() => { /* best-effort */ })
       toast.success(value ? 'Event cancelled' : 'Event restored')
+      // Auto-credit each registrant what they've paid. The cancel already
+      // committed, so a failure here can't un-cancel it — surface it instead
+      // so the admin knows to issue the credits by hand on the Users page.
+      if (value && event && profile?.id) {
+        try {
+          const { issued, totalAmount } = await issueCancellationCredits({ event, createdBy: profile.id })
+          if (issued > 0) {
+            toast.success(`Credited ${issued} diver${issued === 1 ? '' : 's'} ${event.currency} ${totalAmount.toLocaleString()}`)
+          }
+        } catch (err) {
+          toast.error(`Event cancelled, but auto-crediting failed: ${errorMessage(err)}. Issue credits manually on the Users page.`)
+        }
+      }
     } catch (err) {
       const msg = errorMessage(err)
       setCancelError(msg)

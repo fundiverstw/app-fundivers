@@ -85,6 +85,31 @@ The app **does not move money itself** — there is no payment processor
 wired up. Payments are bank transfers and cash, tracked by hand in the
 ledger.
 
+## Credits
+
+`public.credits` tracks money the business owes a diver (the opposite
+direction from `payments`). A credit is `open` until an admin settles it
+— either paying the diver back out of band or recording a `payments` row
+when the diver applies it to a new booking. The corresponding payment is
+recorded as a **separate** action so the two-sided trail stays explicit
+(`src/lib/credits.ts`). `openCreditBalance()` is the diver's spendable
+balance, surfaced on `ProfilePage` and `PaymentsPage`.
+
+### Auto-credit on event cancellation
+
+When an admin cancels an event from the event-detail page
+(`AdminEventDetailPage.setCancelledAt`), `issueCancellationCredits()`
+issues each non-cancelled registrant an `open` credit worth what they've
+actually paid (Σ `payments` where `status='paid'`), with a `reason`
+naming the cancelled event. Bookings with nothing paid get no credit.
+
+It's idempotent per booking: a booking that already carries any credit is
+skipped, so cancel → restore → cancel never double-issues. Restoring an
+event intentionally leaves issued credits untouched — an admin reopens or
+settles them by hand on the Users page. Crediting runs after the cancel
+has committed, so a failure can't un-cancel the event; the admin gets a
+toast telling them to issue the credits manually instead.
+
 ## Summary cards
 
 `PaymentsPage` shows three summary cards at the top:
