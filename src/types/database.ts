@@ -1163,4 +1163,10 @@ export interface AppEvent {
   cancel_policy: string | null
   /** YYYY-MM-DD — the cancel-by date the policy text references. */
   cancel_date: string | null
+  /** Dive-only calendar classification derived from the dive's linked
+   *  TravelDestinations: 'trip' = a boat dive or a destination beyond the
+   *  local Northeast shore (→ yellow); 'local' = a Northeast shore dive
+   *  (→ green); null/absent when no destination is tagged, so the calendar
+   *  falls back to matching the title. Always absent for courses. */
+  dive_outing?: 'local' | 'trip' | null
 }

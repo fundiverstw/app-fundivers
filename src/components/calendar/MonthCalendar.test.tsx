@@ -272,7 +272,7 @@ describe('MonthCalendar course color buckets', () => {
     }
   }
 
-  it('renders Open Water Course bars in sky-blue (OW bucket)', () => {
+  it('renders Open Water Course bars in blue (OW bucket)', () => {
     render(
       <MonthCalendar
         month={new Date('2030-06-15')}
@@ -282,7 +282,7 @@ describe('MonthCalendar course color buckets', () => {
       />
     )
     const bar = screen.getByTitle('Open Water Course')
-    expect(bar.className).toMatch(/bg-sky/)
+    expect(bar.className).toMatch(/bg-blue/)
   })
 
   it('renders Advanced Open Water bars in orange (AOW bucket)', () => {
@@ -296,10 +296,10 @@ describe('MonthCalendar course color buckets', () => {
     )
     const bar = screen.getByTitle('Advanced Open Water')
     expect(bar.className).toMatch(/bg-orange/)
-    expect(bar.className).not.toMatch(/bg-sky/)
+    expect(bar.className).not.toMatch(/bg-blue/)
   })
 
-  it('renders Rescue / EFR / Deep specialty courses in pink', () => {
+  it('renders Rescue / EFR / O2 Provider courses in red', () => {
     render(
       <MonthCalendar
         month={new Date('2030-06-15')}
@@ -307,14 +307,32 @@ describe('MonthCalendar course color buckets', () => {
         events={[
           makeCourse('c-rescue', 'PADI Rescue Course'),
           makeCourse('c-efr',    'EFR Course'),
-          makeCourse('c-deep',   'Deep Specialty'),
+          makeCourse('c-o2',     'O2 Provider'),
         ]}
         onPickEvent={() => {}}
       />
     )
-    for (const t of ['PADI Rescue Course', 'EFR Course', 'Deep Specialty']) {
+    for (const t of ['PADI Rescue Course', 'EFR Course', 'O2 Provider']) {
       const bar = screen.getByTitle(t)
-      expect(bar.className).toMatch(/bg-pink/)
+      expect(bar.className).toMatch(/bg-red/)
+    }
+  })
+
+  it('renders other specialty courses (Deep, Nitrox, ...) in purple', () => {
+    render(
+      <MonthCalendar
+        month={new Date('2030-06-15')}
+        onMonthChange={() => {}}
+        events={[
+          makeCourse('c-deep',   'Deep Specialty'),
+          makeCourse('c-nitrox', 'Nitrox Course'),
+        ]}
+        onPickEvent={() => {}}
+      />
+    )
+    for (const t of ['Deep Specialty', 'Nitrox Course']) {
+      const bar = screen.getByTitle(t)
+      expect(bar.className).toMatch(/bg-purple/)
     }
   })
 
@@ -332,6 +350,54 @@ describe('MonthCalendar course color buckets', () => {
     )
     const bar = screen.getByTitle('Advanced Open Water (2 spots open)')
     expect(bar.className).toMatch(/bg-orange/)
+  })
+})
+
+describe('MonthCalendar dive color buckets', () => {
+  function makeDive(id: string, title: string, dive_outing?: 'local' | 'trip' | null) {
+    return {
+      id, type: 'dive' as const, title, calendar_title: null,
+      start_time: '2030-06-12T09:00:00',
+      end_time:   '2030-06-12T15:00:00',
+      start_time_hhmm: '09:00',
+      featured: false, fully_booked: false,
+      capacity: null, confirmed_count: null,
+      price: null, deposit_amount: null, transport_price: null, currency: 'TWD' as const,
+      has_rooms: false, room_type_ids: [] as string[],
+      has_addons: false, addon_ids: [] as string[],
+      gear_rental_info: null, nitrox_required: false, dive_days: null,
+      cancelled_at: null, dive_outing,
+    }
+  }
+
+  function renderDive(dive: ReturnType<typeof makeDive>) {
+    render(
+      <MonthCalendar
+        month={new Date('2030-06-15')}
+        onMonthChange={() => {}}
+        events={[dive]}
+        onPickEvent={() => {}}
+      />
+    )
+    return screen.getByTitle(dive.title)
+  }
+
+  it('colors a local Northeast shore dive green', () => {
+    expect(renderDive(makeDive('d1', '3 Day Dives at Long Dong Bay', 'local')).className).toMatch(/bg-emerald/)
+  })
+
+  it('colors a tagged trip/boat dive yellow', () => {
+    expect(renderDive(makeDive('d2', 'Quiet shore dive', 'trip')).className).toMatch(/bg-yellow/)
+  })
+
+  it('falls back to the title when no destination is tagged', () => {
+    expect(renderDive(makeDive('d3', 'Boat Dives Cathedral', null)).className).toMatch(/bg-yellow/)
+    expect(renderDive(makeDive('d4', 'Seven Star in Kenting')).className).toMatch(/bg-yellow/)
+    expect(renderDive(makeDive('d5', 'Fun Diving at Batcave', null)).className).toMatch(/bg-emerald/)
+  })
+
+  it('lets a tagged local override a boat-sounding title', () => {
+    expect(renderDive(makeDive('d6', 'Boat Dives Cathedral', 'local')).className).toMatch(/bg-emerald/)
   })
 })
 
