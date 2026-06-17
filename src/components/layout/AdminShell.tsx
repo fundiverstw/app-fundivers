@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../lib/supabase'
 import { Logo } from '../Logo'
 import { CalendarIcon } from '../icons/CalendarIcon'
+import { ChartIcon } from '../icons/ChartIcon'
 import { CrosshairIcon } from '../icons/CrosshairIcon'
 import { PeopleIcon } from '../icons/PeopleIcon'
 import { PlusCircleIcon } from '../icons/PlusCircleIcon'
@@ -15,10 +16,11 @@ import {
 
 type NavItem = { to: string; label: string; icon: React.ReactNode; adminOnly?: boolean }
 const adminNav: NavItem[] = [
-  { to: '/admin/events', label: 'Calendar', icon: <CalendarIcon /> },
-  { to: '/admin/users',  label: 'Divers',   icon: <PeopleIcon />,    adminOnly: true },
-  { to: '/admin/duty',   label: 'Duty',     icon: <CrosshairIcon />, adminOnly: true },
-  { to: '/admin/new',    label: 'Manage',   icon: <PlusCircleIcon />, adminOnly: true },
+  { to: '/admin/events',    label: 'Calendar',  icon: <CalendarIcon /> },
+  { to: '/admin/dashboard', label: 'Dashboard', icon: <ChartIcon />,      adminOnly: true },
+  { to: '/admin/users',     label: 'Divers',    icon: <PeopleIcon />,     adminOnly: true },
+  { to: '/admin/duty',      label: 'Duty',      icon: <CrosshairIcon />,  adminOnly: true },
+  { to: '/admin/new',       label: 'Manage',    icon: <PlusCircleIcon />, adminOnly: true },
 ]
 
 export function AdminShell() {

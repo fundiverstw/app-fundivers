@@ -1,0 +1,212 @@
+import { useEffect, useState } from 'react'
+import { supabase } from '../../lib/supabase'
+import { errorMessage } from '../../lib/errors'
+import {
+  computeDashboard,
+  type Dashboard,
+  type EventLite,
+  type PaymentLite,
+  type BookingLite,
+  type ProfileLite,
+  type ConfirmedCount,
+} from '../../lib/admin-dashboard'
+import { StatCard, ChartCard, BarList, ColumnChart } from '../../components/admin/dashboard-charts'
+import { fiscalYearRange } from '../../lib/accounting-export'
+
+// Admin BI dashboard. Pulls the current calendar year of payments + bookings,
+// all profiles, and upcoming events, then computes every metric client-side
+// (see src/lib/admin-dashboard.ts). The calendar-year axis (Jan→Dec) keeps the
+// peak season (Jun–Aug) centred in the monthly charts. RLS already restricts
+// these tables to admins. Asia/Taipei throughout.
+
+function taipeiDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' })
+}
+
+function taipeiYear(iso: string): number {
+  return Number(taipeiDate(iso).slice(0, 4))
+}
+
+type DiveRow = { _id: string; display_title: string | null; admin_title: string | null; capacity: number | null; start_date: string | null }
+type CourseRow = { _id: string; display_title: string | null; admin_title: string | null; capacity: number | null; course_days: string[] | null }
+
+const titleOf = (r: { display_title: string | null; admin_title: string | null }, fallback: string) =>
+  r.display_title || r.admin_title || fallback
+
+function courseDateKey(days: string[] | null, today: string): string | null {
+  const sorted = (days ?? []).map(d => d.slice(0, 10)).sort()
+  if (!sorted.length) return null
+  return sorted.find(d => d >= today) ?? sorted[sorted.length - 1]
+}
+
+async function loadDashboard(): Promise<Dashboard> {
+  const nowIso = new Date().toISOString()
+  const today = taipeiDate(nowIso)
+  const { startIso, endIso } = fiscalYearRange(taipeiYear(nowIso))
+
+  const [paymentsRes, bookingsRes, profilesRes, pendingRes, divesRes, coursesRes] = await Promise.all([
+    supabase.from('payments').select('user_id, booking_id, amount, status, method, created_at').gte('created_at', startIso).lt('created_at', endIso),
+    supabase.from('bookings').select('id, user_id, eo_dive_id, eo_course_id, status, created_at, details').gte('created_at', startIso).lt('created_at', endIso),
+    supabase.from('profiles').select('id, role, status, created_at, nationality, cert_level'),
+    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'pending').not('application_submitted_at', 'is', null),
+    supabase.from('EO_dives').select('_id, display_title, admin_title, capacity, start_date').is('cancelled_at', null).gte('start_date', today),
+    supabase.from('EO_courses').select('_id, display_title, admin_title, capacity, course_days').is('cancelled_at', null),
+  ])
+  if (paymentsRes.error) throw paymentsRes.error
+  if (bookingsRes.error) throw bookingsRes.error
+  if (profilesRes.error) throw profilesRes.error
+
+  const payments = (paymentsRes.data ?? []) as PaymentLite[]
+  const bookings = (bookingsRes.data ?? []) as BookingLite[]
+  const profiles = (profilesRes.data ?? []) as ProfileLite[]
+  const pendingApplications = pendingRes.count ?? 0
+  const upcomingDives = (divesRes.data ?? []) as DiveRow[]
+  const allCourses = (coursesRes.data ?? []) as CourseRow[]
+
+  // Event rows we still need titles for: events referenced by bookings that
+  // aren't already in the upcoming-dives / all-courses sets we loaded.
+  const haveDiveIds = new Set(upcomingDives.map(d => d._id))
+  const refDiveIds = [...new Set(bookings.map(b => b.eo_dive_id).filter((x): x is string => !!x && !haveDiveIds.has(x)))]
+  const extraDives = refDiveIds.length
+    ? (await supabase.from('EO_dives').select('_id, display_title, admin_title, capacity, start_date').in('_id', refDiveIds)).data as DiveRow[] ?? []
+    : []
+
+  const events: EventLite[] = [
+    ...[...upcomingDives, ...extraDives].map((d): EventLite => ({
+      id: d._id, type: 'dive', title: titleOf(d, 'Dive'), capacity: d.capacity,
+      dateKey: d.start_date ? d.start_date.slice(0, 10) : null,
+    })),
+    ...allCourses.map((c): EventLite => ({
+      id: c._id, type: 'course', title: titleOf(c, 'Course'), capacity: c.capacity,
+      dateKey: courseDateKey(c.course_days, today),
+    })),
+  ]
+
+  // Confirmed counts for the genuinely-upcoming events (any-time bookings, not
+  // just the trailing window) so fill rates are accurate.
+  const upcomingDiveIds = events.filter(e => e.type === 'dive' && e.dateKey && e.dateKey >= today).map(e => e.id)
+  const upcomingCourseIds = events.filter(e => e.type === 'course' && e.dateKey && e.dateKey >= today).map(e => e.id)
+  const [confDivesRes, confCoursesRes] = await Promise.all([
+    upcomingDiveIds.length
+      ? supabase.from('bookings').select('eo_dive_id').eq('status', 'confirmed').in('eo_dive_id', upcomingDiveIds)
+      : Promise.resolve({ data: [] as Array<{ eo_dive_id: string | null }> }),
+    upcomingCourseIds.length
+      ? supabase.from('bookings').select('eo_course_id').eq('status', 'confirmed').in('eo_course_id', upcomingCourseIds)
+      : Promise.resolve({ data: [] as Array<{ eo_course_id: string | null }> }),
+  ])
+  const counts = new Map<string, number>()
+  for (const r of confDivesRes.data ?? []) if (r.eo_dive_id) counts.set(r.eo_dive_id, (counts.get(r.eo_dive_id) ?? 0) + 1)
+  for (const r of confCoursesRes.data ?? []) if (r.eo_course_id) counts.set(r.eo_course_id, (counts.get(r.eo_course_id) ?? 0) + 1)
+  const confirmed: ConfirmedCount[] = [...counts.entries()].map(([eventId, count]) => ({ eventId, count }))
+
+  return computeDashboard({ nowIso, payments, bookings, profiles, events, confirmed, pendingApplications })
+}
+
+const TWD = (n: number) => `TWD ${Math.round(n).toLocaleString()}`
+
+export function AdminDashboardPage() {
+  const [dash, setDash] = useState<Dashboard | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    loadDashboard()
+      .then(d => { if (alive) setDash(d) })
+      .catch(e => { if (alive) setError(errorMessage(e)) })
+    return () => { alive = false }
+  }, [])
+
+  if (error) {
+    return <div className="max-w-5xl mx-auto"><p className="text-sm text-red-200 bg-red-900/40 border border-red-500 rounded-lg p-3">{error}</p></div>
+  }
+  if (!dash) {
+    return (
+      <div className="max-w-5xl mx-auto flex justify-center py-16">
+        <div className="w-6 h-6 border-2 border-sky-300 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  const k = dash.kpis
+  const year = taipeiYear(new Date().toISOString())
+  return (
+    <div className="max-w-5xl mx-auto space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+        <p className="text-sm text-white/70">{year} · peak season (Jun–Aug) centred · revenue netted (paid − refunded), Asia/Taipei.</p>
+      </div>
+
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard label="Revenue this month" value={TWD(k.netRevenueThisMonth)} />
+        <StatCard label={`Revenue ${year}`} value={TWD(k.netRevenueYear)} />
+        <StatCard label="Bookings this month" value={k.bookingsThisMonth} sub={`${k.confirmedBookingsThisMonth} confirmed`} />
+        <StatCard label="Active divers" value={k.activeDivers} />
+        <StatCard label="Pending applications" value={k.pendingApplications} />
+        <StatCard label="Upcoming events" value={k.upcomingEvents} />
+        <StatCard label="Avg fill (upcoming)" value={k.avgFillPct == null ? '—' : `${k.avgFillPct}%`} />
+      </section>
+
+      <section className="grid lg:grid-cols-2 gap-4">
+        <ChartCard title="Net revenue by month" empty={dash.revenueByMonth.every(p => p.value === 0)}>
+          <ColumnChart items={dash.revenueByMonth} kind="money" />
+        </ChartCard>
+        <ChartCard title="Bookings by month" empty={dash.bookingsByMonth.every(p => p.value === 0)}>
+          <ColumnChart items={dash.bookingsByMonth} />
+        </ChartCard>
+        <ChartCard title="New divers by month" empty={dash.signupsByMonth.every(p => p.value === 0)}>
+          <ColumnChart items={dash.signupsByMonth} />
+        </ChartCard>
+        <ChartCard title="Bookings by status" empty={dash.bookingsByStatus.every(p => p.value === 0)}>
+          <BarList items={dash.bookingsByStatus} />
+        </ChartCard>
+        <ChartCard title="Revenue by payment method" empty={!dash.revenueByMethod.length}>
+          <BarList items={dash.revenueByMethod} kind="money" />
+        </ChartCard>
+        <ChartCard title="Revenue by event type" empty={!dash.revenueByEventType.length}>
+          <BarList items={dash.revenueByEventType} kind="money" />
+        </ChartCard>
+        <ChartCard title="Revenue by nationality" empty={!dash.revenueByNationality.length}>
+          <BarList items={dash.revenueByNationality} kind="money" />
+        </ChartCard>
+        <ChartCard title="Revenue by certification" empty={!dash.revenueByCertLevel.length}>
+          <BarList items={dash.revenueByCertLevel} kind="money" />
+        </ChartCard>
+        <ChartCard title="Active divers by certification" empty={!dash.certLevelMix.length}>
+          <BarList items={dash.certLevelMix} />
+        </ChartCard>
+        <ChartCard title="Top events by revenue" empty={!dash.topEventsByRevenue.length}>
+          <BarList items={dash.topEventsByRevenue} kind="money" />
+        </ChartCard>
+      </section>
+
+      <ChartCard title="Upcoming events — fill" empty={!dash.upcomingFill.length}>
+        <div className="max-h-80 overflow-y-auto -mx-1 px-1">
+          <table className="w-full text-xs text-blue-900">
+            <thead className="text-blue-900/60 text-left">
+              <tr>
+                <th className="font-medium pb-1">Event</th>
+                <th className="font-medium pb-1">Date</th>
+                <th className="font-medium pb-1 text-right">Confirmed</th>
+                <th className="font-medium pb-1 text-right">Capacity</th>
+                <th className="font-medium pb-1 text-right">Fill</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dash.upcomingFill.map(r => (
+                <tr key={`${r.type}:${r.id}`} className="border-t border-sky-100">
+                  <td className="py-1 pr-2 truncate max-w-[14rem]">{r.title}</td>
+                  <td className="py-1 pr-2 tabular-nums">{r.date ?? '—'}</td>
+                  <td className="py-1 text-right tabular-nums">{r.confirmed}</td>
+                  <td className="py-1 text-right tabular-nums">{r.capacity ?? '—'}</td>
+                  <td className={`py-1 text-right tabular-nums ${r.fillPct != null && r.fillPct >= 100 ? 'text-red-600 font-semibold' : ''}`}>
+                    {r.fillPct == null ? '—' : `${r.fillPct}%`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </ChartCard>
+    </div>
+  )
+}
