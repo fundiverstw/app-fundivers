@@ -1,7 +1,56 @@
 import { format, isSameDay, parseISO } from 'date-fns'
 import { supabase } from './supabase'
 import { diveOutingFromDestinations, type DiveOuting } from './event-colors'
-import type { AppEvent, EOCourse, EODive, EOPrice } from '../types/database'
+import type { AppEvent, EventDetails, EOCourse, EODive, EOPrice } from '../types/database'
+
+type DiveTravelDetail = {
+  _id: string
+  included: string | null
+  not_included: string | null
+  transportation: string | null
+  itinerary: string | null
+  prerequisites: string | null
+}
+
+function cleanText(s: string | null | undefined): string | null {
+  return s && s.trim() ? s.trim() : null
+}
+
+/** Drop an EventDetails to null when it carries no content at all, so the
+ *  calendar modal can gate the whole section on a single truthy check. */
+function nonEmptyDetails(d: EventDetails): EventDetails | null {
+  const hasContent =
+    d.description || d.included || d.not_included || d.schedule ||
+    d.transportation || d.prerequisites || d.required_cert || d.required_dives != null
+  return hasContent ? d : null
+}
+
+function diveDetails(d: EODive, travel: DiveTravelDetail | null, requiredCert: string | null): EventDetails | null {
+  return nonEmptyDetails({
+    description: cleanText(d.notes),
+    included: cleanText(travel?.included),
+    not_included: cleanText(travel?.not_included),
+    schedule: cleanText(travel?.itinerary),
+    transportation: cleanText(travel?.transportation),
+    prerequisites: cleanText(d.prereqs) ?? cleanText(travel?.prerequisites),
+    required_cert: requiredCert,
+    required_dives: d.req_dives ?? null,
+  })
+}
+
+function courseDetails(c: EOCourse, requiredCert: string | null): EventDetails | null {
+  const reqDives = c.req_dives && c.req_dives.trim() ? Number(c.req_dives.trim()) : null
+  return nonEmptyDetails({
+    description: null,
+    included: cleanText(c.included),
+    not_included: null,
+    schedule: cleanText(c.schedule),
+    transportation: null,
+    prerequisites: cleanText(c.prereqs),
+    required_cert: requiredCert,
+    required_dives: reqDives != null && Number.isFinite(reqDives) ? reqDives : null,
+  })
+}
 
 /**
  * Render an event's date span as a human string. Policy:
@@ -60,7 +109,7 @@ function toHhmm(raw: string | null | undefined): string | null {
   return `${m[1].padStart(2, '0')}:${m[2]}`
 }
 
-function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: string[], roomIds: string[], outing: DiveOuting | null): AppEvent | null {
+function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: string[], roomIds: string[], outing: DiveOuting | null, travel: DiveTravelDetail | null, requiredCert: string | null): AppEvent | null {
   const start = toIso(d.start_date, d.time)
   if (!start) return null
   const p = d.price ? priceIndex.get(d.price) : undefined
@@ -94,6 +143,7 @@ function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: stri
     cancel_policy: d.cancel_policy ?? null,
     cancel_date: d.cancel_date ?? null,
     dive_outing: outing,
+    details: diveDetails(d, travel, requiredCert),
   }
 }
 
@@ -135,7 +185,7 @@ function groupConsecutive(dayKeys: string[]): [string, string][] {
  * them goes to the same booking target). A course with no course_days
  * (malformed row) renders nothing.
  */
-function courseToEvents(c: EOCourse, priceIndex: Map<string, EOPrice>, addonIds: string[]): AppEvent[] {
+function courseToEvents(c: EOCourse, priceIndex: Map<string, EOPrice>, addonIds: string[], requiredCert: string | null): AppEvent[] {
   const dayKeys = (c.course_days ?? [])
     .map(toDateKey)
     .filter((k): k is string => !!k)
@@ -168,6 +218,7 @@ function courseToEvents(c: EOCourse, priceIndex: Map<string, EOPrice>, addonIds:
     full_payment_deadline: c.full_payment_deadline ?? null,
     cancel_policy: c.cancel_policy ?? null,
     cancel_date: c.cancel_date ?? null,
+    details: courseDetails(c, requiredCert),
   }
 
   const makeSegment = (fromKey: string, toKey: string): AppEvent | null => {
@@ -272,6 +323,40 @@ async function attachAddonIds(diveIds: string[], courseIds: string[]): Promise<M
   return out
 }
 
+/**
+ * Fetch the DiveTravel rows referenced by a batch of dives (via
+ * EO_dives.DiveTravel_reference, a single id). Returns a map keyed by
+ * DiveTravel._id so diveToEvent can resolve a dive's included / itinerary /
+ * transportation copy. Dives with no reference are simply absent.
+ */
+async function attachDiveTravel(refs: Array<string | null>): Promise<Map<string, DiveTravelDetail>> {
+  const out = new Map<string, DiveTravelDetail>()
+  const ids = [...new Set(refs.filter((x): x is string => !!x))]
+  if (!ids.length) return out
+  const { data } = await supabase
+    .from('DiveTravel')
+    .select('_id, included, not_included, transportation, itinerary, prerequisites')
+    .in('_id', ids)
+  for (const row of data ?? []) out.set(row._id, row as DiveTravelDetail)
+  return out
+}
+
+/**
+ * Resolve `prereq_cert_id` (→ cert_levels.id) to the level's display name for
+ * a batch of dives + courses. Returns a map keyed by cert_levels.id.
+ */
+async function attachCertNames(ids: Array<string | null>): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  const certIds = [...new Set(ids.filter((x): x is string => !!x))]
+  if (!certIds.length) return out
+  const { data } = await supabase
+    .from('cert_levels')
+    .select('id, name')
+    .in('id', certIds)
+  for (const row of data ?? []) if (row.name) out.set(row.id, row.name)
+  return out
+}
+
 async function attachPrices(dives: EODive[], courses: EOCourse[]): Promise<Map<string, EOPrice>> {
   const priceIds = [
     ...dives.map(d => d.price),
@@ -288,8 +373,8 @@ async function attachPrices(dives: EODive[], courses: EOCourse[]): Promise<Map<s
   return new Map((data ?? []).map(p => [p._id, p as EOPrice]))
 }
 
-const DIVE_COLS = '_id, admin_title, display_title, calendar_title, start_date, time, end_date, featured, fully_booked, capacity, price, has_rooms, room_types, hasotheraddons, other_addons, gear_rental, nitrox_required, dive_days, cancelled_at, full_payment_deadline, cancel_policy, cancel_date, is_private'
-const COURSE_COLS = '_id, admin_title, display_title, calendar_title, start_time, price, other_addons, dive_days, course_days, cancelled_at, full_payment_deadline, cancel_policy, cancel_date, fully_booked, capacity'
+const DIVE_COLS = '_id, admin_title, display_title, calendar_title, start_date, time, end_date, featured, fully_booked, capacity, price, has_rooms, room_types, hasotheraddons, other_addons, gear_rental, nitrox_required, dive_days, cancelled_at, full_payment_deadline, cancel_policy, cancel_date, is_private, notes, prereqs, req_dives, DiveTravel_reference, prereq_cert_id'
+const COURSE_COLS = '_id, admin_title, display_title, calendar_title, start_time, price, other_addons, dive_days, course_days, cancelled_at, full_payment_deadline, cancel_policy, cancel_date, fully_booked, capacity, included, schedule, prereqs, req_dives, prereq_cert_id'
 
 // Every 'YYYY-MM-DD' from `fromDate` to `toDate` inclusive. Used to ask
 // PostgREST for courses whose course_days array shares at least one day
@@ -333,16 +418,18 @@ export async function fetchEventsInRange(
 
   const dives = (divesResp.data ?? []) as EODive[]
   const courses = (coursesResp.data ?? []) as EOCourse[]
-  const [prices, addons, rooms, outings] = await Promise.all([
+  const [prices, addons, rooms, outings, travel, certNames] = await Promise.all([
     attachPrices(dives, courses),
     attachAddonIds(dives.map(d => d._id), courses.map(c => c._id)),
     attachRoomIds(dives.map(d => d._id)),
     attachDiveOutings(dives.map(d => d._id)),
+    attachDiveTravel(dives.map(d => d.DiveTravel_reference)),
+    attachCertNames([...dives.map(d => d.prereq_cert_id), ...courses.map(c => c.prereq_cert_id)]),
   ])
 
   const events = [
-    ...dives.map(d => diveToEvent(d, prices, addons.get(d._id) ?? [], rooms.get(d._id) ?? [], outings.get(d._id) ?? null)).filter((x): x is AppEvent => !!x),
-    ...courses.flatMap(c => courseToEvents(c, prices, addons.get(c._id) ?? [])),
+    ...dives.map(d => diveToEvent(d, prices, addons.get(d._id) ?? [], rooms.get(d._id) ?? [], outings.get(d._id) ?? null, d.DiveTravel_reference ? travel.get(d.DiveTravel_reference) ?? null : null, d.prereq_cert_id ? certNames.get(d.prereq_cert_id) ?? null : null)).filter((x): x is AppEvent => !!x),
+    ...courses.flatMap(c => courseToEvents(c, prices, addons.get(c._id) ?? [], c.prereq_cert_id ? certNames.get(c.prereq_cert_id) ?? null : null)),
   ].sort((a, b) => a.start_time.localeCompare(b.start_time))
   await attachConfirmedCounts(events)
   return events
@@ -364,16 +451,18 @@ export async function fetchEventsForBookings(
 
   const dives = (divesResp.data ?? []) as EODive[]
   const courses = (coursesResp.data ?? []) as EOCourse[]
-  const [prices, addons, rooms, outings] = await Promise.all([
+  const [prices, addons, rooms, outings, travel, certNames] = await Promise.all([
     attachPrices(dives, courses),
     attachAddonIds(dives.map(d => d._id), courses.map(c => c._id)),
     attachRoomIds(dives.map(d => d._id)),
     attachDiveOutings(dives.map(d => d._id)),
+    attachDiveTravel(dives.map(d => d.DiveTravel_reference)),
+    attachCertNames([...dives.map(d => d.prereq_cert_id), ...courses.map(c => c.prereq_cert_id)]),
   ])
 
   const out = new Map<string, AppEvent>()
   for (const d of dives) {
-    const ev = diveToEvent(d, prices, addons.get(d._id) ?? [], rooms.get(d._id) ?? [], outings.get(d._id) ?? null)
+    const ev = diveToEvent(d, prices, addons.get(d._id) ?? [], rooms.get(d._id) ?? [], outings.get(d._id) ?? null, d.DiveTravel_reference ? travel.get(d.DiveTravel_reference) ?? null : null, d.prereq_cert_id ? certNames.get(d.prereq_cert_id) ?? null : null)
     if (ev) out.set(ev.id, ev)
   }
   for (const c of courses) {
@@ -383,7 +472,7 @@ export async function fetchEventsForBookings(
     // consecutive days. Per-booking surfaces (staff-on-duty date picker,
     // span labels) need every day, otherwise the picker's min/max bound
     // out the days outside the first run.
-    const segs = courseToEvents(c, prices, addons.get(c._id) ?? [])
+    const segs = courseToEvents(c, prices, addons.get(c._id) ?? [], c.prereq_cert_id ? certNames.get(c.prereq_cert_id) ?? null : null)
     if (segs.length === 0) continue
     const dayKeys = (c.course_days ?? [])
       .map(toDateKey)

@@ -1169,4 +1169,33 @@ export interface AppEvent {
    *  (→ green); null/absent when no destination is tagged, so the calendar
    *  falls back to matching the title. Always absent for courses. */
   dive_outing?: 'local' | 'trip' | null
+  /** Human-readable event detail surfaced to divers in the calendar modal.
+   *  Assembled in src/lib/events.ts from the descriptive columns admins fill
+   *  in (a dive's `notes` + linked DiveTravel row; a course's `included` /
+   *  `schedule`) plus the prereq cert/dive requirements. Null when the event
+   *  has no descriptive content at all. Always populated by fetchEventsInRange
+   *  / fetchEventsForBookings; optional so lighter event literals can omit it. */
+  details?: EventDetails | null
+}
+
+/** Descriptive, diver-facing detail for an event. Every field is optional
+ *  content; a section renders only when its field is non-null. */
+export interface EventDetails {
+  /** Free-text overview — a dive's `notes`. Courses have no equivalent. */
+  description: string | null
+  /** What the price covers — a course's `included` or a dive's DiveTravel.included. */
+  included: string | null
+  /** What the price excludes — dive DiveTravel.not_included. Null for courses. */
+  not_included: string | null
+  /** Day-by-day plan — a course's `schedule` or a dive's DiveTravel.itinerary. */
+  schedule: string | null
+  /** Transport arrangements — dive DiveTravel.transportation. Null for courses. */
+  transportation: string | null
+  /** Free-text prerequisites — the event's `prereqs` (dive falls back to
+   *  DiveTravel.prerequisites). */
+  prerequisites: string | null
+  /** Minimum certification level name, resolved from `prereq_cert_id`. */
+  required_cert: string | null
+  /** Minimum logged dives required. */
+  required_dives: number | null
 }

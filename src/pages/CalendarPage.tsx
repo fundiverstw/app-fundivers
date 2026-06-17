@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { fetchEventsInRange, formatEventSpan, eventIsFull } from '../lib/events'
 import { MonthCalendar } from '../components/calendar/MonthCalendar'
+import { EventDetails } from '../components/calendar/EventDetails'
 import { RegisterForm } from '../components/register/RegisterForm'
 import { MultiRegisterForm } from '../components/register/MultiRegisterForm'
 import { ShareEventButton } from '../components/ShareEventButton'
@@ -210,6 +211,7 @@ export function CalendarPage() {
               {/* Capacity status is part of selected.title (set by the
                   display_title trigger). No separate badge needed. */}
             </div>
+            {selected.details && <EventDetails details={selected.details} />}
             <button
               onClick={isBooked(selected) ? cancelBooking : startRegister}
               disabled={bookingLoading || (!isBooked(selected) && eventIsFull(selected))}
