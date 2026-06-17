@@ -24,6 +24,10 @@ interface CourseRow {
   dive_days: number | null
   admin_title?: string | null
   calendar_title?: string | null
+  included?: string | null
+  schedule?: string | null
+  prereqs?: string | null
+  req_dives?: string | null
 }
 
 function setup(courses: CourseRow[]) {
@@ -131,6 +135,27 @@ describe('courseToEvents — course_days run grouping', () => {
     const events = await fetchAndGet(course(['2026-05-10'], { start_time: '' }))
     expect(events).toHaveLength(1)
     expect(events[0].start_time_hhmm).toBeNull()
+  })
+
+  it('maps course included / schedule / prereqs into event.details', async () => {
+    const events = await fetchAndGet(course(['2026-05-10'], {
+      included: 'Certification, materials, 4 dives',
+      schedule: 'Day 1 pool, Day 2 open water',
+      prereqs: 'Able to swim 200m',
+      req_dives: '10',
+    }))
+    expect(events).toHaveLength(1)
+    const d = events[0].details
+    expect(d?.included).toBe('Certification, materials, 4 dives')
+    expect(d?.schedule).toBe('Day 1 pool, Day 2 open water')
+    expect(d?.prerequisites).toBe('Able to swim 200m')
+    expect(d?.required_dives).toBe(10)
+    expect(d?.description).toBeNull()
+  })
+
+  it('leaves event.details null when the course has no descriptive content', async () => {
+    const events = await fetchAndGet(course(['2026-05-10']))
+    expect(events[0].details).toBeNull()
   })
 
   it('fetches courses by overlapping course_days against every date in the window', async () => {
