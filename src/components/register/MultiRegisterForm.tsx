@@ -114,8 +114,8 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   const [payment, setPayment] = useState<PaymentMethod>('bank_transfer')
   const [creditCardInvoiceEmail, setCreditCardInvoiceEmail] = useState('')
 
-  // Per-event totals derived from the diver's choices.
-  const eventTotals = useMemo(() => {
+  // Per-event price breakdown derived from the diver's choices.
+  const eventBreakdowns = useMemo(() => {
     const surcharge = payment === 'credit_card' || payment === 'paypal' ? 0.05 : 0
     return cart.map(ev => {
       const c = choicesById[ev.id] ?? { rentGear: false, gearItems: [], needsTransport: null, addNitroxCourse: false }
@@ -134,11 +134,13 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
       const showNitroxAddon = ev.nitrox_required && !(targetProfile?.nitrox_certified ?? false)
       const nitroxFee = showNitroxAddon && c.addNitroxCourse ? NITROX_COURSE_FEE : 0
       const subTotal = base + gearCost + transportCost + nitroxFee
-      return Math.round(subTotal * (1 + surcharge))
+      const surchargeCost = Math.round(subTotal * surcharge)
+      const total = subTotal + surchargeCost
+      return { base, gearCost, transportCost, nitroxFee, surchargeCost, total }
     })
   }, [cart, choicesById, payment, profile, forDiverByEvent, childById])
 
-  const grandTotal = eventTotals.reduce((s, n) => s + n, 0)
+  const grandTotal = eventBreakdowns.reduce((s, b) => s + b.total, 0)
 
   function updateChoice(eventId: string, patch: Partial<EventChoices>) {
     setChoicesById(prev => ({ ...prev, [eventId]: { ...prev[eventId], ...patch } }))
@@ -203,7 +205,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
           : undefined,
         pay_deposit_only: false,
         nitrox_course_addon: showNitroxAddon && c.addNitroxCourse,
-        total: eventTotals[cart.indexOf(ev)],
+        total: eventBreakdowns[cart.indexOf(ev)]?.total,
         deposit: ev.deposit_amount ?? undefined,
       }
 
@@ -557,13 +559,27 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
 
             <PaymentInstructionsBlock method={payment} />
 
-            <div className="text-sm text-blue-950 font-medium bg-sky-50 rounded-lg p-3 space-y-1">
-              {cart.map((ev, i) => (
-                <div key={ev.id} className="flex justify-between">
-                  <span className="truncate pr-2">{ev.title}</span>
-                  <span className="shrink-0">{ev.currency} {eventTotals[i]?.toLocaleString() ?? '0'}</span>
-                </div>
-              ))}
+            <div className="text-sm text-blue-950 font-medium bg-sky-50 rounded-lg p-3 space-y-2">
+              {cart.map((ev, i) => {
+                const b = eventBreakdowns[i]
+                return (
+                  <div key={ev.id} className="space-y-0.5">
+                    <div className="flex justify-between font-semibold text-blue-900">
+                      <span className="truncate pr-2">{ev.title}</span>
+                      <span className="shrink-0">{ev.currency} {b?.total.toLocaleString() ?? '0'}</span>
+                    </div>
+                    {b && (
+                      <div className="pl-3 space-y-0.5 text-xs text-blue-900/80">
+                        <Row label="Event"         value={b.base}          currency={ev.currency} />
+                        {b.gearCost > 0      && <Row label="Gear"          value={b.gearCost}      currency={ev.currency} />}
+                        {b.transportCost > 0 && <Row label="Transport"     value={b.transportCost} currency={ev.currency} />}
+                        {b.nitroxFee > 0     && <Row label="Nitrox course" value={b.nitroxFee}     currency={ev.currency} />}
+                        {b.surchargeCost > 0 && <Row label="Card/PayPal surcharge (5%)" value={b.surchargeCost} currency={ev.currency} />}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
               <div className="border-t border-sky-200 pt-1 mt-1 flex justify-between font-bold text-blue-900">
                 <span>Grand total</span>
                 <span>{cart[0]?.currency ?? 'TWD'} {grandTotal.toLocaleString()}</span>
@@ -644,6 +660,15 @@ function PaymentInstructionsBlock({ method }: { method: PaymentMethod }) {
         {reminder.lines.map((line, i) => <p key={i}>{line}</p>)}
       </div>
     </>
+  )
+}
+
+function Row({ label, value, currency }: { label: string; value: number; currency: string }) {
+  return (
+    <div className="flex justify-between">
+      <span>{label}</span>
+      <span>{currency} {value.toLocaleString()}</span>
+    </div>
   )
 }
 
