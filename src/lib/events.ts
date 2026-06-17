@@ -12,6 +12,28 @@ type DiveTravelDetail = {
   prerequisites: string | null
 }
 
+// Descriptive columns that drive the event-detail modal. They live on the
+// EO_* tables but are NOT guaranteed to exist in every environment — the
+// Bubble-imported cloud schema can drift from local. They are therefore
+// fetched separately and best-effort (see attachEventDetails); a missing
+// column must never break the calendar's core event query.
+type DiveDetailRow = {
+  _id: string
+  notes: string | null
+  prereqs: string | null
+  req_dives: number | null
+  DiveTravel_reference: string | null
+  prereq_cert_id: string | null
+}
+type CourseDetailRow = {
+  _id: string
+  included: string | null
+  schedule: string | null
+  prereqs: string | null
+  req_dives: string | null
+  prereq_cert_id: string | null
+}
+
 function cleanText(s: string | null | undefined): string | null {
   return s && s.trim() ? s.trim() : null
 }
@@ -25,7 +47,7 @@ function nonEmptyDetails(d: EventDetails): EventDetails | null {
   return hasContent ? d : null
 }
 
-function diveDetails(d: EODive, travel: DiveTravelDetail | null, requiredCert: string | null): EventDetails | null {
+function diveDetails(d: DiveDetailRow, travel: DiveTravelDetail | null, requiredCert: string | null): EventDetails | null {
   return nonEmptyDetails({
     description: cleanText(d.notes),
     included: cleanText(travel?.included),
@@ -38,7 +60,7 @@ function diveDetails(d: EODive, travel: DiveTravelDetail | null, requiredCert: s
   })
 }
 
-function courseDetails(c: EOCourse, requiredCert: string | null): EventDetails | null {
+function courseDetails(c: CourseDetailRow, requiredCert: string | null): EventDetails | null {
   const reqDives = c.req_dives && c.req_dives.trim() ? Number(c.req_dives.trim()) : null
   return nonEmptyDetails({
     description: null,
@@ -109,7 +131,7 @@ function toHhmm(raw: string | null | undefined): string | null {
   return `${m[1].padStart(2, '0')}:${m[2]}`
 }
 
-function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: string[], roomIds: string[], outing: DiveOuting | null, travel: DiveTravelDetail | null, requiredCert: string | null): AppEvent | null {
+function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: string[], roomIds: string[], outing: DiveOuting | null, details: EventDetails | null): AppEvent | null {
   const start = toIso(d.start_date, d.time)
   if (!start) return null
   const p = d.price ? priceIndex.get(d.price) : undefined
@@ -143,7 +165,7 @@ function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: stri
     cancel_policy: d.cancel_policy ?? null,
     cancel_date: d.cancel_date ?? null,
     dive_outing: outing,
-    details: diveDetails(d, travel, requiredCert),
+    details,
   }
 }
 
@@ -185,7 +207,7 @@ function groupConsecutive(dayKeys: string[]): [string, string][] {
  * them goes to the same booking target). A course with no course_days
  * (malformed row) renders nothing.
  */
-function courseToEvents(c: EOCourse, priceIndex: Map<string, EOPrice>, addonIds: string[], requiredCert: string | null): AppEvent[] {
+function courseToEvents(c: EOCourse, priceIndex: Map<string, EOPrice>, addonIds: string[], details: EventDetails | null): AppEvent[] {
   const dayKeys = (c.course_days ?? [])
     .map(toDateKey)
     .filter((k): k is string => !!k)
@@ -218,7 +240,7 @@ function courseToEvents(c: EOCourse, priceIndex: Map<string, EOPrice>, addonIds:
     full_payment_deadline: c.full_payment_deadline ?? null,
     cancel_policy: c.cancel_policy ?? null,
     cancel_date: c.cancel_date ?? null,
-    details: courseDetails(c, requiredCert),
+    details,
   }
 
   const makeSegment = (fromKey: string, toKey: string): AppEvent | null => {
@@ -357,6 +379,56 @@ async function attachCertNames(ids: Array<string | null>): Promise<Map<string, s
   return out
 }
 
+/**
+ * Best-effort fetch of the descriptive detail columns for a batch of dives +
+ * courses, returning a map of event id → EventDetails. Kept entirely separate
+ * from the core event query: these columns can be absent in a drifted EO_*
+ * schema (Bubble-imported cloud), and a 42703 "column does not exist" here is
+ * swallowed so the calendar still renders — events simply carry no detail.
+ */
+async function attachEventDetails(diveIds: string[], courseIds: string[]): Promise<Map<string, EventDetails>> {
+  const out = new Map<string, EventDetails>()
+
+  let diveRows: DiveDetailRow[] = []
+  if (diveIds.length) {
+    const { data, error } = await supabase
+      .from('EO_dives')
+      .select('_id, notes, prereqs, req_dives, DiveTravel_reference, prereq_cert_id')
+      .in('_id', diveIds)
+    if (!error && data) diveRows = data as DiveDetailRow[]
+  }
+
+  let courseRows: CourseDetailRow[] = []
+  if (courseIds.length) {
+    const { data, error } = await supabase
+      .from('EO_courses')
+      .select('_id, included, schedule, prereqs, req_dives, prereq_cert_id')
+      .in('_id', courseIds)
+    if (!error && data) courseRows = data as CourseDetailRow[]
+  }
+
+  if (!diveRows.length && !courseRows.length) return out
+
+  const [travel, certNames] = await Promise.all([
+    attachDiveTravel(diveRows.map(r => r.DiveTravel_reference)),
+    attachCertNames([...diveRows.map(r => r.prereq_cert_id), ...courseRows.map(r => r.prereq_cert_id)]),
+  ])
+
+  for (const r of diveRows) {
+    const det = diveDetails(
+      r,
+      r.DiveTravel_reference ? travel.get(r.DiveTravel_reference) ?? null : null,
+      r.prereq_cert_id ? certNames.get(r.prereq_cert_id) ?? null : null,
+    )
+    if (det) out.set(r._id, det)
+  }
+  for (const r of courseRows) {
+    const det = courseDetails(r, r.prereq_cert_id ? certNames.get(r.prereq_cert_id) ?? null : null)
+    if (det) out.set(r._id, det)
+  }
+  return out
+}
+
 async function attachPrices(dives: EODive[], courses: EOCourse[]): Promise<Map<string, EOPrice>> {
   const priceIds = [
     ...dives.map(d => d.price),
@@ -373,8 +445,11 @@ async function attachPrices(dives: EODive[], courses: EOCourse[]): Promise<Map<s
   return new Map((data ?? []).map(p => [p._id, p as EOPrice]))
 }
 
-const DIVE_COLS = '_id, admin_title, display_title, calendar_title, start_date, time, end_date, featured, fully_booked, capacity, price, has_rooms, room_types, hasotheraddons, other_addons, gear_rental, nitrox_required, dive_days, cancelled_at, full_payment_deadline, cancel_policy, cancel_date, is_private, notes, prereqs, req_dives, DiveTravel_reference, prereq_cert_id'
-const COURSE_COLS = '_id, admin_title, display_title, calendar_title, start_time, price, other_addons, dive_days, course_days, cancelled_at, full_payment_deadline, cancel_policy, cancel_date, fully_booked, capacity, included, schedule, prereqs, req_dives, prereq_cert_id'
+// Core columns only — every one is guaranteed to exist in the EO_* schema.
+// The descriptive detail columns are deliberately excluded and fetched
+// best-effort by attachEventDetails, so schema drift can't break the calendar.
+const DIVE_COLS = '_id, admin_title, display_title, calendar_title, start_date, time, end_date, featured, fully_booked, capacity, price, has_rooms, room_types, hasotheraddons, other_addons, gear_rental, nitrox_required, dive_days, cancelled_at, full_payment_deadline, cancel_policy, cancel_date, is_private'
+const COURSE_COLS = '_id, admin_title, display_title, calendar_title, start_time, price, other_addons, dive_days, course_days, cancelled_at, full_payment_deadline, cancel_policy, cancel_date, fully_booked, capacity'
 
 // Every 'YYYY-MM-DD' from `fromDate` to `toDate` inclusive. Used to ask
 // PostgREST for courses whose course_days array shares at least one day
@@ -418,18 +493,17 @@ export async function fetchEventsInRange(
 
   const dives = (divesResp.data ?? []) as EODive[]
   const courses = (coursesResp.data ?? []) as EOCourse[]
-  const [prices, addons, rooms, outings, travel, certNames] = await Promise.all([
+  const [prices, addons, rooms, outings, details] = await Promise.all([
     attachPrices(dives, courses),
     attachAddonIds(dives.map(d => d._id), courses.map(c => c._id)),
     attachRoomIds(dives.map(d => d._id)),
     attachDiveOutings(dives.map(d => d._id)),
-    attachDiveTravel(dives.map(d => d.DiveTravel_reference)),
-    attachCertNames([...dives.map(d => d.prereq_cert_id), ...courses.map(c => c.prereq_cert_id)]),
+    attachEventDetails(dives.map(d => d._id), courses.map(c => c._id)),
   ])
 
   const events = [
-    ...dives.map(d => diveToEvent(d, prices, addons.get(d._id) ?? [], rooms.get(d._id) ?? [], outings.get(d._id) ?? null, d.DiveTravel_reference ? travel.get(d.DiveTravel_reference) ?? null : null, d.prereq_cert_id ? certNames.get(d.prereq_cert_id) ?? null : null)).filter((x): x is AppEvent => !!x),
-    ...courses.flatMap(c => courseToEvents(c, prices, addons.get(c._id) ?? [], c.prereq_cert_id ? certNames.get(c.prereq_cert_id) ?? null : null)),
+    ...dives.map(d => diveToEvent(d, prices, addons.get(d._id) ?? [], rooms.get(d._id) ?? [], outings.get(d._id) ?? null, details.get(d._id) ?? null)).filter((x): x is AppEvent => !!x),
+    ...courses.flatMap(c => courseToEvents(c, prices, addons.get(c._id) ?? [], details.get(c._id) ?? null)),
   ].sort((a, b) => a.start_time.localeCompare(b.start_time))
   await attachConfirmedCounts(events)
   return events
@@ -451,18 +525,17 @@ export async function fetchEventsForBookings(
 
   const dives = (divesResp.data ?? []) as EODive[]
   const courses = (coursesResp.data ?? []) as EOCourse[]
-  const [prices, addons, rooms, outings, travel, certNames] = await Promise.all([
+  const [prices, addons, rooms, outings, details] = await Promise.all([
     attachPrices(dives, courses),
     attachAddonIds(dives.map(d => d._id), courses.map(c => c._id)),
     attachRoomIds(dives.map(d => d._id)),
     attachDiveOutings(dives.map(d => d._id)),
-    attachDiveTravel(dives.map(d => d.DiveTravel_reference)),
-    attachCertNames([...dives.map(d => d.prereq_cert_id), ...courses.map(c => c.prereq_cert_id)]),
+    attachEventDetails(dives.map(d => d._id), courses.map(c => c._id)),
   ])
 
   const out = new Map<string, AppEvent>()
   for (const d of dives) {
-    const ev = diveToEvent(d, prices, addons.get(d._id) ?? [], rooms.get(d._id) ?? [], outings.get(d._id) ?? null, d.DiveTravel_reference ? travel.get(d.DiveTravel_reference) ?? null : null, d.prereq_cert_id ? certNames.get(d.prereq_cert_id) ?? null : null)
+    const ev = diveToEvent(d, prices, addons.get(d._id) ?? [], rooms.get(d._id) ?? [], outings.get(d._id) ?? null, details.get(d._id) ?? null)
     if (ev) out.set(ev.id, ev)
   }
   for (const c of courses) {
@@ -472,7 +545,7 @@ export async function fetchEventsForBookings(
     // consecutive days. Per-booking surfaces (staff-on-duty date picker,
     // span labels) need every day, otherwise the picker's min/max bound
     // out the days outside the first run.
-    const segs = courseToEvents(c, prices, addons.get(c._id) ?? [], c.prereq_cert_id ? certNames.get(c.prereq_cert_id) ?? null : null)
+    const segs = courseToEvents(c, prices, addons.get(c._id) ?? [], details.get(c._id) ?? null)
     if (segs.length === 0) continue
     const dayKeys = (c.course_days ?? [])
       .map(toDateKey)
