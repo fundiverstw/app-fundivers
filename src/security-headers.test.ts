@@ -18,9 +18,9 @@ describe('CSP_HEADER', () => {
     expect(CSP_HEADER).toMatch(/script-src 'self' https:\/\/challenges\.cloudflare\.com/)
   })
 
-  it('connect-src allows self + Supabase + Turnstile', () => {
+  it('connect-src allows self + Supabase + Turnstile + Open-Meteo', () => {
     expect(CSP_HEADER).toMatch(
-      /connect-src 'self' https:\/\/\*\.supabase\.co https:\/\/challenges\.cloudflare\.com/,
+      /connect-src 'self' https:\/\/\*\.supabase\.co https:\/\/challenges\.cloudflare\.com https:\/\/\*\.open-meteo\.com/,
     )
   })
 

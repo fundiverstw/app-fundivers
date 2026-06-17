@@ -53,6 +53,54 @@ export function BarList({
   )
 }
 
+/**
+ * Grouped vertical columns: one cluster per month, one thin bar per series
+ * (e.g. one series per year). Bars are scaled against the global max across
+ * every series so the seasons are visually comparable. Null values render as
+ * a gap. `color` is a Tailwind bg class per series.
+ */
+export function GroupedColumnChart({
+  months, series, fmt,
+}: {
+  months: string[]
+  series: Array<{ label: string; color: string; values: Array<number | null> }>
+  fmt?: (n: number) => string
+}) {
+  const f = fmt ?? ((n: number) => n.toLocaleString())
+  const max = Math.max(1, ...series.flatMap(s => s.values.map(v => v ?? 0)))
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-x-3 gap-y-1">
+        {series.map(s => (
+          <span key={s.label} className="flex items-center gap-1 text-[11px] text-blue-900/80">
+            <span className={`inline-block w-2.5 h-2.5 rounded-sm ${s.color}`} />{s.label}
+          </span>
+        ))}
+      </div>
+      <div className="flex items-end gap-1 h-32">
+        {months.map((m, i) => (
+          <div key={m} className="flex-1 flex flex-col items-center justify-end h-full">
+            <div className="flex items-end justify-center gap-px w-full h-full">
+              {series.map(s => {
+                const v = s.values[i]
+                return (
+                  <div
+                    key={s.label}
+                    className={`flex-1 max-w-[7px] rounded-t ${s.color} ${v == null ? 'opacity-0' : ''}`}
+                    style={{ height: `${((v ?? 0) / max) * 100}%` }}
+                    title={`${s.label} · ${m}: ${v == null ? '—' : f(v)}`}
+                  />
+                )
+              })}
+            </div>
+            <span className="text-[9px] text-blue-900/60 mt-1">{m.slice(5)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 /** Vertical columns for a monthly time series. Labels show the month (MM). */
 export function ColumnChart({
   items, kind = 'count',
