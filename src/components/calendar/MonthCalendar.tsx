@@ -8,6 +8,7 @@ import {
   type CellSegment, type EventRange, type LayoutEvent,
 } from '../../lib/calendar-layout'
 import { formatEventSpan } from '../../lib/events'
+import { courseColor, diveIsTripOrBoat, type CourseColor } from '../../lib/event-colors'
 import { isReschedulable } from '../../lib/reschedule'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
 import type { AppEvent, StaffBusyEntry } from '../../types/database'
@@ -22,32 +23,37 @@ import type { AppEvent, StaffBusyEntry } from '../../types/database'
 // on MonthCalendar). The hover: variant is intentionally NOT on the base
 // class — per-segment self-hover would only light up one day of a bar.
 //
-// Courses split into three color buckets so the calendar reads at a glance:
-//   OW        → blue   (Open Water Course)
-//   AOW       → orange (Advanced Open Water)
-//   Specialty → pink   (Rescue, EFR, Equipment, Deep Specialty, and any
-//                        other course that isn't OW/AOW)
-// See courseColor() for the title-matching logic.
-type CourseColor = 'ow' | 'aow' | 'specialty'
+// The color buckets (course title / dive destination matching) live in
+// src/lib/event-colors.ts so they stay unit-testable; this file only owns
+// the Tailwind classes each bucket maps to.
+//   Courses: ow → blue, aow → orange, rescue → red, specialty → purple.
+//   Dives:   local → green, trip (boat or beyond Keelung) → yellow.
 
-const DIVE_BAR       = 'bg-emerald-600 text-white'
-const DIVE_BAR_HOVER = 'bg-emerald-500 text-white'
-const DIVE_DOT       = 'bg-emerald-600'
+// Yellow needs dark text to stay legible; every other fill pairs with white.
+const DIVE_LOCAL_BAR       = 'bg-emerald-600 text-white'
+const DIVE_LOCAL_BAR_HOVER = 'bg-emerald-500 text-white'
+const DIVE_LOCAL_DOT       = 'bg-emerald-600'
+const DIVE_TRIP_BAR        = 'bg-yellow-400 text-blue-950'
+const DIVE_TRIP_BAR_HOVER  = 'bg-yellow-300 text-blue-950'
+const DIVE_TRIP_DOT        = 'bg-yellow-400'
 
 const COURSE_BAR: Record<CourseColor, string> = {
-  ow:        'bg-sky-500 text-white',
+  ow:        'bg-blue-600 text-white',
   aow:       'bg-orange-500 text-white',
-  specialty: 'bg-pink-500 text-white',
+  rescue:    'bg-red-600 text-white',
+  specialty: 'bg-purple-600 text-white',
 }
 const COURSE_BAR_HOVER: Record<CourseColor, string> = {
-  ow:        'bg-sky-400 text-white',
+  ow:        'bg-blue-500 text-white',
   aow:       'bg-orange-400 text-white',
-  specialty: 'bg-pink-400 text-white',
+  rescue:    'bg-red-500 text-white',
+  specialty: 'bg-purple-500 text-white',
 }
 const COURSE_DOT: Record<CourseColor, string> = {
-  ow:        'bg-sky-500',
+  ow:        'bg-blue-600',
   aow:       'bg-orange-500',
-  specialty: 'bg-pink-500',
+  rescue:    'bg-red-600',
+  specialty: 'bg-purple-600',
 }
 
 const TYPE_LABELS: Record<AppEvent['type'], string> = {
@@ -55,30 +61,13 @@ const TYPE_LABELS: Record<AppEvent['type'], string> = {
   course: 'Course',
 }
 
-// Course titles arrive with a capacity hint appended by the
-// display_title_capacity_suffix trigger (e.g. "Open Water Course (2 spots
-// open)"). Strip the trailing parenthetical so we match against the
-// canonical title.
-function stripTitleSuffix(title: string): string {
-  return title.replace(/\s*\([^)]*\)\s*$/, '').trim()
-}
-
-function courseColor(title: string): CourseColor {
-  const base = stripTitleSuffix(title)
-  if (base.startsWith('Advanced Open Water')) return 'aow'
-  if (base.startsWith('Open Water Course')) return 'ow'
-  return 'specialty'
-}
-
 function eventBarClass(ev: AppEvent, hovered: boolean): string {
-  if (ev.type === 'dive') return hovered ? DIVE_BAR_HOVER : DIVE_BAR
+  if (ev.type === 'dive') {
+    if (diveIsTripOrBoat(ev)) return hovered ? DIVE_TRIP_BAR_HOVER : DIVE_TRIP_BAR
+    return hovered ? DIVE_LOCAL_BAR_HOVER : DIVE_LOCAL_BAR
+  }
   const key = courseColor(ev.title)
   return hovered ? COURSE_BAR_HOVER[key] : COURSE_BAR[key]
-}
-
-function eventDotClass(ev: AppEvent): string {
-  if (ev.type === 'dive') return DIVE_DOT
-  return COURSE_DOT[courseColor(ev.title)]
 }
 
 // Closed-eye (eye-off) marker for private dives — admin-only, since private
@@ -93,11 +82,12 @@ function EyeOffIcon({ className = 'w-3.5 h-3.5 text-blue-900/70 shrink-0' }: { c
   )
 }
 
-// Busy/duty signals use violet so they don't collide with the new
-// AOW-orange / Specialty-pink course palette. Own = vivid violet (you're
-// the focal point of your own calendar); other staff = neutral gray so
-// they read as "background constraints to plan around" rather than
-// competing for attention.
+// Busy/duty signals use violet. It's adjacent to the specialty-course
+// purple, but the busy overlay renders in its own strip below the event
+// bars so the two never sit side by side. Own = vivid violet (you're the
+// focal point of your own calendar); other staff = neutral gray so they
+// read as "background constraints to plan around" rather than competing
+// for attention.
 const OWN_BUSY_BAR         = 'bg-violet-600 text-white'
 const OWN_BUSY_BAR_HOVER   = 'bg-violet-500 text-white'
 const OTHER_BUSY_BAR       = 'bg-slate-500 text-white'
@@ -372,7 +362,7 @@ export function MonthCalendar({
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full text-white ${eventDotClass(ev)}`}>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${eventBarClass(ev, false)}`}>
                     {TYPE_LABELS[ev.type]}
                   </span>
                   {ev.is_private && <EyeOffIcon />}
@@ -803,7 +793,10 @@ function FilterLegend({
             : 'bg-sky-100 border-sky-200 text-blue-950 font-medium line-through'
         }`}
       >
-        <span className={`w-2 h-2 rounded-full ${DIVE_DOT}`} />
+        <span className="w-2 h-2 rounded-full overflow-hidden flex" aria-hidden="true">
+          <span className={`flex-1 ${DIVE_LOCAL_DOT}`} />
+          <span className={`flex-1 ${DIVE_TRIP_DOT}`} />
+        </span>
         {TYPE_LABELS.dive}
       </button>
 
@@ -823,6 +816,7 @@ function FilterLegend({
           <span className="w-2 h-2 rounded-full overflow-hidden flex" aria-hidden="true">
             <span className={`flex-1 ${COURSE_DOT.ow}`} />
             <span className={`flex-1 ${COURSE_DOT.aow}`} />
+            <span className={`flex-1 ${COURSE_DOT.rescue}`} />
             <span className={`flex-1 ${COURSE_DOT.specialty}`} />
           </span>
           Courses

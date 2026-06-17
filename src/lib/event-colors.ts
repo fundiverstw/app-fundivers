@@ -1,0 +1,56 @@
+import type { AppEvent } from '../types/database'
+
+// Calendar color buckets for events. Kept here (not in the calendar
+// component) so the title/destination matching is unit-testable on its own
+// and so events.ts can reuse the structured dive classification.
+//
+// Courses bucket by title:
+//   ow        → blue    Open Water
+//   aow       → orange  Advanced Open Water
+//   rescue    → red     Rescue, EFR, O2 / Oxygen Provider (life-support tier)
+//   specialty → purple  everything else (Deep, Nitrox, Equipment, ...)
+//
+// Dives bucket by where they happen:
+//   trip → yellow  boat dives, or anything beyond the usual Taipei→Keelung
+//                  drive (Green Island, Kenting, Penghu, international, ...)
+//   local → green  routine Northeast-coast shore dives
+export type CourseColor = 'ow' | 'aow' | 'rescue' | 'specialty'
+export type DiveOuting = 'local' | 'trip'
+
+// Course titles arrive with a capacity hint appended by the
+// display_title_capacity_suffix trigger (e.g. "Open Water Course (2 spots
+// open)"). Strip the trailing parenthetical so we match the canonical title.
+export function stripTitleSuffix(title: string): string {
+  return title.replace(/\s*\([^)]*\)\s*$/, '').trim()
+}
+
+export function courseColor(title: string): CourseColor {
+  const base = stripTitleSuffix(title).toLowerCase()
+  if (base.startsWith('advanced open water')) return 'aow'
+  if (base.startsWith('open water')) return 'ow'
+  if (/rescue|efr|emergency first response|o2 provider|oxygen provider/.test(base)) return 'rescue'
+  return 'specialty'
+}
+
+// Structured dive classification from a dive's linked TravelDestinations.
+// 'trip' (→ yellow) when ANY linked destination is a boat-diving site or
+// sits outside the Northeast coast; 'local' (→ green) when every linked
+// destination is a Northeast shore site; null when the dive has no
+// destination tagged, so the caller falls back to title matching.
+export function diveOutingFromDestinations(
+  dests: Array<{ divetype: string | null; northeast_diving: boolean | null }>,
+): DiveOuting | null {
+  if (!dests.length) return null
+  const trip = dests.some(d => d.divetype === 'Boat Diving' || d.northeast_diving !== true)
+  return trip ? 'trip' : 'local'
+}
+
+const TRIP_TITLE_RE = /\bboat\b|green island|kenting|penghu|lambai|xiao\s?liuqiu|orchid island|anilao|palau|panglao|bohol|tubbataha|puerto galera/i
+
+// Final yellow/green decision for a dive bar: trust the tagged destination
+// when present, otherwise sniff the title for boat / known-trip keywords.
+export function diveIsTripOrBoat(ev: Pick<AppEvent, 'title' | 'dive_outing'>): boolean {
+  if (ev.dive_outing === 'trip') return true
+  if (ev.dive_outing === 'local') return false
+  return TRIP_TITLE_RE.test(ev.title)
+}

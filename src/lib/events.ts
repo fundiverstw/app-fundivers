@@ -1,5 +1,6 @@
 import { format, isSameDay, parseISO } from 'date-fns'
 import { supabase } from './supabase'
+import { diveOutingFromDestinations, type DiveOuting } from './event-colors'
 import type { AppEvent, EOCourse, EODive, EOPrice } from '../types/database'
 
 /**
@@ -59,7 +60,7 @@ function toHhmm(raw: string | null | undefined): string | null {
   return `${m[1].padStart(2, '0')}:${m[2]}`
 }
 
-function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: string[], roomIds: string[]): AppEvent | null {
+function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: string[], roomIds: string[], outing: DiveOuting | null): AppEvent | null {
   const start = toIso(d.start_date, d.time)
   if (!start) return null
   const p = d.price ? priceIndex.get(d.price) : undefined
@@ -92,6 +93,7 @@ function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: stri
     full_payment_deadline: d.full_payment_deadline ?? null,
     cancel_policy: d.cancel_policy ?? null,
     cancel_date: d.cancel_date ?? null,
+    dive_outing: outing,
   }
 }
 
@@ -205,6 +207,44 @@ async function attachRoomIds(diveIds: string[]): Promise<Map<string, string[]>> 
   return out
 }
 
+/**
+ * Resolve each dive's calendar color bucket ('local' | 'trip') from its
+ * linked destinations. Two explicit queries (junction, then the
+ * destination rows) rather than a PostgREST embed, mirroring attachRoomIds.
+ * Dives with no destination tagged are absent from the map — diveToEvent
+ * stores null and the calendar falls back to title matching.
+ */
+async function attachDiveOutings(diveIds: string[]): Promise<Map<string, DiveOuting>> {
+  const out = new Map<string, DiveOuting>()
+  if (!diveIds.length) return out
+  const { data: links } = await supabase
+    .from('eo_dive_destinations')
+    .select('eo_dive_id, destination_id')
+    .in('eo_dive_id', diveIds)
+  if (!links?.length) return out
+
+  const destIds = [...new Set(links.map(l => l.destination_id))]
+  const { data: dests } = await supabase
+    .from('TravelDestinations')
+    .select('_id, divetype, northeast_diving')
+    .in('_id', destIds)
+  const destById = new Map((dests ?? []).map(d => [d._id, d]))
+
+  const byDive = new Map<string, Array<{ divetype: string | null; northeast_diving: boolean | null }>>()
+  for (const l of links) {
+    const d = destById.get(l.destination_id)
+    if (!d) continue
+    const arr = byDive.get(l.eo_dive_id) ?? []
+    arr.push({ divetype: d.divetype, northeast_diving: d.northeast_diving })
+    byDive.set(l.eo_dive_id, arr)
+  }
+  for (const [id, ds] of byDive) {
+    const o = diveOutingFromDestinations(ds)
+    if (o) out.set(id, o)
+  }
+  return out
+}
+
 async function attachAddonIds(diveIds: string[], courseIds: string[]): Promise<Map<string, string[]>> {
   const out = new Map<string, string[]>()
   if (diveIds.length) {
@@ -293,14 +333,15 @@ export async function fetchEventsInRange(
 
   const dives = (divesResp.data ?? []) as EODive[]
   const courses = (coursesResp.data ?? []) as EOCourse[]
-  const [prices, addons, rooms] = await Promise.all([
+  const [prices, addons, rooms, outings] = await Promise.all([
     attachPrices(dives, courses),
     attachAddonIds(dives.map(d => d._id), courses.map(c => c._id)),
     attachRoomIds(dives.map(d => d._id)),
+    attachDiveOutings(dives.map(d => d._id)),
   ])
 
   const events = [
-    ...dives.map(d => diveToEvent(d, prices, addons.get(d._id) ?? [], rooms.get(d._id) ?? [])).filter((x): x is AppEvent => !!x),
+    ...dives.map(d => diveToEvent(d, prices, addons.get(d._id) ?? [], rooms.get(d._id) ?? [], outings.get(d._id) ?? null)).filter((x): x is AppEvent => !!x),
     ...courses.flatMap(c => courseToEvents(c, prices, addons.get(c._id) ?? [])),
   ].sort((a, b) => a.start_time.localeCompare(b.start_time))
   await attachConfirmedCounts(events)
@@ -323,15 +364,16 @@ export async function fetchEventsForBookings(
 
   const dives = (divesResp.data ?? []) as EODive[]
   const courses = (coursesResp.data ?? []) as EOCourse[]
-  const [prices, addons, rooms] = await Promise.all([
+  const [prices, addons, rooms, outings] = await Promise.all([
     attachPrices(dives, courses),
     attachAddonIds(dives.map(d => d._id), courses.map(c => c._id)),
     attachRoomIds(dives.map(d => d._id)),
+    attachDiveOutings(dives.map(d => d._id)),
   ])
 
   const out = new Map<string, AppEvent>()
   for (const d of dives) {
-    const ev = diveToEvent(d, prices, addons.get(d._id) ?? [], rooms.get(d._id) ?? [])
+    const ev = diveToEvent(d, prices, addons.get(d._id) ?? [], rooms.get(d._id) ?? [], outings.get(d._id) ?? null)
     if (ev) out.set(ev.id, ev)
   }
   for (const c of courses) {
