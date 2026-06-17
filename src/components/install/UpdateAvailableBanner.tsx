@@ -18,7 +18,7 @@ export function UpdateAvailableBanner({ onUpdate }: Props) {
     <div
       role="alert"
       aria-live="polite"
-      className="bg-red-500 text-white px-4 py-2 flex items-center justify-between gap-3 text-sm"
+      className="fixed top-0 inset-x-0 z-[110] bg-red-500 text-white px-4 py-2 flex items-center justify-between gap-3 text-sm shadow-md"
     >
       <span className="font-semibold">A new version is available.</span>
       <button

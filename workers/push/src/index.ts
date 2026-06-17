@@ -716,11 +716,11 @@ export async function runDailyReminders(env: Env): Promise<{ sent: number; skipp
 
   const targetSet = new Set(targetDates)
   const [divesResp, coursesResp] = await Promise.all([
-    sb.from('EO_dives').select('_id, admin_title, display_title, start_date, time').in('start_date', targetDates),
+    sb.from('EO_dives').select('_id, admin_title, display_title, start_date, time').in('start_date', targetDates).is('cancelled_at', null),
     // Courses have no start_date — fetch any course with a day on a target
     // date, then anchor the reminder to its first day so behavior matches
     // the old start_date-keyed reminder (one reminder, before day 1).
-    sb.from('EO_courses').select('_id, admin_title, display_title, course_days, start_time').overlaps('course_days', targetDates),
+    sb.from('EO_courses').select('_id, admin_title, display_title, course_days, start_time').overlaps('course_days', targetDates).is('cancelled_at', null),
   ])
   const dives   = divesResp.data   ?? []
   const courses = (coursesResp.data ?? [])
