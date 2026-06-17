@@ -136,6 +136,30 @@ describe('MultiRegisterForm parent diver picker', () => {
     expect(onAll).toHaveBeenCalled()
   })
 
+  it('shows an itemized price breakdown per event on the payment step', async () => {
+    setupFrom([])
+    const user = userEvent.setup()
+    render(
+      <MultiRegisterForm
+        events={[sampleEvent('e1', 'Kenting')]}
+        profile={parentProfile} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
+
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/No, I'll get there myself/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    // The summary itemizes the base event fee rather than only the total.
+    expect(screen.getByText('Event')).toBeInTheDocument()
+    expect(screen.getByText('Grand total')).toBeInTheDocument()
+    const fees = screen.getAllByText(/TWD 2,800/)
+    expect(fees.length).toBeGreaterThanOrEqual(2)
+  })
+
   it('shows a disabled "Submitting…" state while the booking round-trip is pending', async () => {
     setupFrom([])
     // Hold the booking call open to observe the in-flight button — the gap
