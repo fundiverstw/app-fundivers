@@ -24,6 +24,7 @@ const CARDS: ManageCard[] = [
   { to: '/admin/travel',    title: 'DiveTravel',    blurb: 'Add or edit "what’s included" and transportation copy used by EO_dives.' },
   { to: '/admin/prices',    title: 'Price tiers',   blurb: 'Total / deposit / transport for each event price tier.' },
   { to: '/admin/notifications', title: 'One-off notification', blurb: 'Send an immediate push (and optional LINE relay) to every opted-in device.' },
+  { to: '/admin/accounting', title: 'Accounting export', blurb: 'Download a fiscal-year bookkeeping ZIP: per-transaction, by-event, and summary CSVs.' },
 ]
 
 export function AdminManagePage() {
