@@ -54,6 +54,37 @@ export function BarList({
 }
 
 /**
+ * Plot frame shared by the column charts: a left y-axis gutter (max / mid / 0
+ * ticks), a baselined bar area, and a month-label row beneath. `bars` is the
+ * row of equal-flex columns; the label row mirrors its column count so they
+ * stay aligned.
+ */
+function ChartFrame({ max, fmt, labels, bars }: {
+  max: number
+  fmt: (n: number) => string
+  labels: string[]
+  bars: ReactNode
+}) {
+  return (
+    <div className="flex gap-1">
+      <div className="shrink-0 flex flex-col justify-between h-32 text-[9px] text-blue-900/50 tabular-nums text-right pr-0.5">
+        <span>{fmt(max)}</span>
+        <span>{fmt(max / 2)}</span>
+        <span>0</span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-end gap-1 h-32 border-b border-sky-300">{bars}</div>
+        <div className="flex gap-1 mt-1">
+          {labels.map((l, i) => (
+            <span key={i} className="flex-1 text-center text-[9px] text-blue-900/60">{l.slice(5)}</span>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
  * Grouped vertical columns: one cluster per month, one thin bar per series
  * (e.g. one series per year). Bars are scaled against the global max across
  * every series so the seasons are visually comparable. Null values render as
@@ -77,26 +108,26 @@ export function GroupedColumnChart({
           </span>
         ))}
       </div>
-      <div className="flex items-end gap-1 h-32">
-        {months.map((m, i) => (
-          <div key={m} className="flex-1 flex flex-col items-center justify-end h-full">
-            <div className="flex items-end justify-center gap-px w-full h-full">
-              {series.map(s => {
-                const v = s.values[i]
-                return (
-                  <div
-                    key={s.label}
-                    className={`flex-1 max-w-[7px] rounded-t ${s.color} ${v == null ? 'opacity-0' : ''}`}
-                    style={{ height: `${((v ?? 0) / max) * 100}%` }}
-                    title={`${s.label} · ${m}: ${v == null ? '—' : f(v)}`}
-                  />
-                )
-              })}
-            </div>
-            <span className="text-[9px] text-blue-900/60 mt-1">{m.slice(5)}</span>
+      <ChartFrame
+        max={max}
+        fmt={f}
+        labels={months}
+        bars={months.map((m, i) => (
+          <div key={m} className="flex-1 flex items-end justify-center gap-px h-full">
+            {series.map(s => {
+              const v = s.values[i]
+              return (
+                <div
+                  key={s.label}
+                  className={`flex-1 max-w-[7px] rounded-t ${s.color} ${v == null ? 'opacity-0' : ''}`}
+                  style={{ height: `${((v ?? 0) / max) * 100}%` }}
+                  title={`${s.label} · ${m}: ${v == null ? '—' : f(v)}`}
+                />
+              )
+            })}
           </div>
         ))}
-      </div>
+      />
     </div>
   )
 }
@@ -108,22 +139,19 @@ export function ColumnChart({
   const max = Math.max(1, ...items.map(i => i.value))
   const fmt = kind === 'money' ? TWD : (n: number) => n.toLocaleString()
   return (
-    <div className="flex items-end gap-1 h-32">
-      {items.map(i => (
-        <div key={i.label} className="flex-1 flex flex-col items-center justify-end h-full group">
-          <div className="relative w-full flex justify-center">
-            <span className="absolute -top-4 text-[9px] text-blue-900/70 tabular-nums opacity-0 group-hover:opacity-100 whitespace-nowrap">
-              {fmt(i.value)}
-            </span>
-          </div>
-          <div
-            className="w-full bg-blue-600 rounded-t min-h-[2px]"
-            style={{ height: `${(i.value / max) * 100}%` }}
-            title={`${i.label}: ${fmt(i.value)}`}
-          />
-          <span className="text-[9px] text-blue-900/60 mt-1">{i.label.slice(5)}</span>
+    <ChartFrame
+      max={max}
+      fmt={fmt}
+      labels={items.map(i => i.label)}
+      bars={items.map(i => (
+        <div
+          key={i.label}
+          className="flex-1 flex items-end justify-center h-full"
+          title={`${i.label}: ${fmt(i.value)}`}
+        >
+          <div className="w-full bg-blue-600 rounded-t min-h-[2px]" style={{ height: `${(i.value / max) * 100}%` }} />
         </div>
       ))}
-    </div>
+    />
   )
 }
