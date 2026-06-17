@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
 import {
@@ -131,9 +132,12 @@ export function AdminDashboardPage() {
   const year = taipeiYear(new Date().toISOString())
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-        <p className="text-sm text-white/70">{year} · peak season (Jun–Aug) centred · revenue netted (paid − refunded), Asia/Taipei.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+          <p className="text-sm text-white/70">{year} · peak season (Jun–Aug) centred · revenue netted (paid − refunded), Asia/Taipei.</p>
+        </div>
+        <Link to="/admin/history" className="text-sm text-amber-300 hover:text-amber-200 shrink-0 mt-1">Historical perspective →</Link>
       </div>
 
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">

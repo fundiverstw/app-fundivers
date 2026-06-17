@@ -6,7 +6,8 @@
 // Directives kept tight on purpose:
 //   * frame-ancestors 'none'      — clickjacking defence on the admin panel
 //   * script-src 'self' …         — only same-origin + Turnstile widget
-//   * connect-src 'self' …        — only same-origin, Supabase, Turnstile
+//   * connect-src 'self' …        — same-origin, Supabase, Turnstile,
+//                                    Open-Meteo (admin weather BI fetch)
 //   * object-src 'none'           — no flash / java / pdf-embed surface
 //   * base-uri 'self'             — pin <base> against rewrite attacks
 //
@@ -25,7 +26,7 @@ const CSP_DIRECTIVES: Record<string, string[]> = {
   'style-src':       ["'self'", "'unsafe-inline'"],
   'img-src':         ["'self'", 'data:', 'blob:', 'https://*.supabase.co'],
   'font-src':        ["'self'"],
-  'connect-src':     ["'self'", 'https://*.supabase.co', 'https://challenges.cloudflare.com'],
+  'connect-src':     ["'self'", 'https://*.supabase.co', 'https://challenges.cloudflare.com', 'https://*.open-meteo.com'],
   'frame-src':       ['https://challenges.cloudflare.com'],
   'worker-src':      ["'self'"],
   'manifest-src':    ["'self'"],
