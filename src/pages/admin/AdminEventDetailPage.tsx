@@ -19,8 +19,9 @@ import { recordPayment as recordPaymentRow, voidPayment as voidPaymentRow } from
 import { requestEventDiverExport } from '../../lib/admin-event-export'
 import { BookingPaymentsBlock } from '../../components/admin/BookingPaymentsBlock'
 import { resolveCharges, type ChargeLine } from '../../lib/booking-charges'
+import { openCreditForBooking } from '../../lib/credits'
 import { ShareEventButton } from '../../components/ShareEventButton'
-import type { AppEvent, Booking, BookingAmendment, BookingDetails, DiverNote, Payment, Profile } from '../../types/database'
+import type { AppEvent, Booking, BookingAmendment, BookingDetails, Credit, DiverNote, Payment, Profile } from '../../types/database'
 
 interface Registrant {
   booking: Booking
@@ -29,6 +30,8 @@ interface Registrant {
   amendments: BookingAmendment[]
   diverNotes: DiverNote[]
   charges: ChargeLine[]
+  /** Open (unsettled) credit awarded to this diver for this event. */
+  credit: number
 }
 
 type AddonNameMap = Map<string, string>
@@ -91,14 +94,16 @@ export function AdminEventDetailPage() {
       const userIds = [...new Set(bookings.map(b => b.user_id))]
       const bookingIds = bookings.map(b => b.id)
 
-      const [profilesRes, paymentsRes, amendmentsByBooking, diverNotesRes] = await Promise.all([
+      const [profilesRes, paymentsRes, amendmentsByBooking, diverNotesRes, creditsRes] = await Promise.all([
         supabase.from('profiles').select('*').in('id', userIds),
         supabase.from('payments').select('*').in('booking_id', bookingIds),
         fetchAmendmentsForBookings(bookingIds),
         supabase.from('diver_notes').select('*').in('profile_id', userIds).order('created_at', { ascending: false }),
+        supabase.from('credits').select('*').in('booking_id', bookingIds),
       ])
       if (cancelled) return
 
+      const credits = (creditsRes.data ?? []) as Credit[]
       const profileMap = new Map((profilesRes.data ?? []).map(p => [p.id, p]))
       const diverNotesByUser = new Map<string, DiverNote[]>()
       for (const n of diverNotesRes.data ?? []) {
@@ -144,6 +149,7 @@ export function AdminEventDetailPage() {
         amendments: amendmentsByBooking.get(b.id) ?? [],
         diverNotes: diverNotesByUser.get(b.user_id) ?? [],
         charges: resolveCharges({ details: b.details as BookingDetails, event: ev, roomPrices, addonPrices }),
+        credit: openCreditForBooking(credits, b.id),
       })))
       setLoading(false)
     })()
@@ -967,10 +973,12 @@ function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, on
   const baseTotal = Number((r.booking.details as { total?: number } | undefined)?.total ?? 0)
   const adjusted = baseTotal + amendmentsDelta(r.amendments)
   const totalPaid = r.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
-  const outstanding = Math.max(0, adjusted - totalPaid)
-  const paymentStatus = totalPaid === 0
-    ? 'none'
-    : outstanding > 0 ? 'partial' : 'paid'
+  // Balance nets open credit-for-this-event against what's owed. Positive =
+  // diver still owes (red); negative = diver is net in credit (green).
+  const balance = adjusted - totalPaid - r.credit
+  const paymentStatus = balance > 0
+    ? (totalPaid === 0 && r.credit === 0 ? 'none' : 'partial')
+    : balance < 0 ? 'credit' : 'paid'
 
   const statusStyles: Record<string, string> = {
     confirmed:  'text-blue-900 font-semibold',
@@ -981,6 +989,7 @@ function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, on
   const payStyles: Record<string, string> = {
     paid:    'text-blue-900 font-semibold',
     partial: 'text-red-600',
+    credit:  'text-emerald-700 font-semibold',
     none:    'text-blue-950 font-medium',
   }
 
@@ -1045,8 +1054,9 @@ function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, on
             </span>
           )}
           <span className={`${payStyles[paymentStatus]} text-xs font-medium whitespace-nowrap`}>
-            {paymentStatus === 'paid'    && `Paid ${totalPaid.toLocaleString()}`}
-            {paymentStatus === 'partial' && `${outstanding.toLocaleString()} due`}
+            {paymentStatus === 'paid'    && (totalPaid > 0 ? `Paid ${totalPaid.toLocaleString()}` : 'Settled')}
+            {paymentStatus === 'partial' && `${balance.toLocaleString()} due`}
+            {paymentStatus === 'credit'  && `${(-balance).toLocaleString()} credit`}
             {paymentStatus === 'none'    && 'Unpaid'}
           </span>
         </span>
@@ -1132,7 +1142,7 @@ function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, on
             payments={r.payments}
             owed={adjusted}
             paid={totalPaid}
-            outstanding={outstanding}
+            credit={r.credit}
             charges={r.charges}
             currency={currency}
             pending={r.booking.status === 'pending'}

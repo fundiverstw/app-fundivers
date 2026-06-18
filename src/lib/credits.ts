@@ -25,6 +25,15 @@ export function openCreditBalance(credits: Credit[]): number {
   return credits.filter(c => c.status === 'open').reduce((s, c) => s + Number(c.amount), 0)
 }
 
+/** Sum of *open* credits tied to a specific booking — the live credit that
+ *  offsets what the diver owes for that one event. Settled credits are already
+ *  resolved (refunded or applied elsewhere) and never count here. */
+export function openCreditForBooking(credits: Credit[], bookingId: string): number {
+  return credits
+    .filter(c => c.status === 'open' && c.booking_id === bookingId)
+    .reduce((s, c) => s + Number(c.amount), 0)
+}
+
 export async function createCredit(input: {
   user_id: string
   amount: number

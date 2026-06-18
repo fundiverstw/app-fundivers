@@ -8,6 +8,7 @@ import { fetchAmendmentsForBookings, amendmentsDelta } from '../lib/booking-amen
 import { uniqueUuids } from '../lib/uuid'
 import { resolveCharges, type ChargeLine } from '../lib/booking-charges'
 import { fetchChargeCatalog } from '../lib/booking-charge-catalog'
+import { fetchCreditsForUser, openCreditForBooking } from '../lib/credits'
 import { ShareEventButton } from '../components/ShareEventButton'
 import { ChargeBreakdown } from '../components/ChargeBreakdown'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Payment, WaitlistOffer } from '../types/database'
@@ -20,6 +21,8 @@ type Row = Booking & {
   payments: Payment[]
   paidSum: number
   charges: ChargeLine[]
+  /** Open credit awarded for this event — offsets what's owed. */
+  credit: number
   amendments: BookingAmendment[]
   /** Live (status='pending', not expired) waitlist offer on this booking,
    *  if any. Drives the "Spot opened — Accept this spot" banner. */
@@ -59,9 +62,10 @@ export function BookingsPage() {
   const [acceptingOfferId, setAcceptingOfferId] = useState<string | null>(null)
 
   async function refetch(uid: string) {
-    const [bookingsRes, paymentsRes] = await Promise.all([
+    const [bookingsRes, paymentsRes, credits] = await Promise.all([
       supabase.from('bookings').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('payments').select('*').eq('user_id', uid),
+      fetchCreditsForUser(uid),
     ])
     const bookings = bookingsRes.data ?? []
     const payments = (paymentsRes.data ?? []) as Payment[]
@@ -113,6 +117,7 @@ export function BookingsPage() {
         payments: bookingPayments,
         paidSum,
         charges: resolveCharges({ details: b.details as BookingDetails, event, ...catalog }),
+        credit: openCreditForBooking(credits, b.id),
         amendments: amendmentsByBooking.get(b.id) ?? [],
         offer,
         offerRemainingLabel: offer ? formatRemaining(offer.expires_at, nowMs) : null,
@@ -249,6 +254,10 @@ function Card({
   const deposit = Number((details as { deposit?: number } | undefined)?.deposit ?? 0)
   const canCancel = row.status === 'pending' && row.paidSum === 0 && !row.refund_requested_at
   const canRefund = row.paidSum > 0 && row.status !== 'cancelled' && !row.refund_requested_at
+  const currency = row.event?.currency ?? 'TWD'
+  // Balance nets open credit-for-this-event against what's owed (incl.
+  // amendments). Positive = still owed (red); negative = net in credit (green).
+  const balance = total + amendmentsDelta(row.amendments) - row.paidSum - row.credit
 
   return (
     <div className={CARD}>
@@ -326,7 +335,25 @@ function Card({
           {row.paidSum > 0 && (
             <div className={`flex justify-between ${TEXT_BODY}`}>
               <span>Paid so far</span>
-              <span className="text-blue-900 font-semibold">{row.event?.currency ?? 'TWD'} {row.paidSum.toLocaleString()}</span>
+              <span className="text-blue-900 font-semibold">{currency} {row.paidSum.toLocaleString()}</span>
+            </div>
+          )}
+          {row.credit > 0 && (
+            <div className={`flex justify-between ${TEXT_BODY}`}>
+              <span>Credit (this event)</span>
+              <span className="text-emerald-700 font-semibold">{currency} {row.credit.toLocaleString()}</span>
+            </div>
+          )}
+          {total > 0 && (
+            <div className={`flex justify-between font-semibold pt-1 border-t border-sky-200 ${TEXT_BODY}`}>
+              <span>Balance</span>
+              {balance > 0 ? (
+                <span className={TEXT_ERROR}>{currency} {balance.toLocaleString()} due</span>
+              ) : balance < 0 ? (
+                <span className="text-emerald-700">{currency} {(-balance).toLocaleString()} credit</span>
+              ) : (
+                <span className="text-blue-900">Settled ✓</span>
+              )}
             </div>
           )}
 

@@ -128,7 +128,7 @@ function CreditBalanceLine({ userId }: { userId: string }) {
   if (balance <= 0) return null
   return (
     <div className="bg-emerald-50 border border-emerald-400 rounded-lg p-3 text-sm text-emerald-900">
-      Account credit: <strong>NTD {balance.toLocaleString()}</strong> — see Payments for details.
+      Account credit (all events): <strong>NTD {balance.toLocaleString()}</strong> — see Payments for details.
     </div>
   )
 }

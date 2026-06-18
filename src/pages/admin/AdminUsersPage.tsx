@@ -12,7 +12,7 @@ import { resolveCharges, type ChargeLine } from '../../lib/booking-charges'
 import { fetchChargeCatalog } from '../../lib/booking-charge-catalog'
 import { getCertCardSignedUrl } from '../../lib/cert-card'
 import { shoeAsJp } from '../../lib/shoe-size'
-import { fetchCreditsForUser, openCreditBalance, createCredit, settleCredit, reopenCredit } from '../../lib/credits'
+import { fetchCreditsForUser, openCreditBalance, openCreditForBooking, createCredit, settleCredit, reopenCredit } from '../../lib/credits'
 import { ProfileForm } from '../ProfilePage'
 import { DiverNotes } from '../../components/admin/DiverNotes'
 import { AdminFamilyPanel } from '../../components/admin/AdminFamilyPanel'
@@ -586,7 +586,7 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
               const baseTotal = Number((b.details as { total?: number } | undefined)?.total ?? 0)
               const owed = baseTotal + amendmentsDelta(extras.amendments.get(b.id) ?? [])
               const paid = bookingPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
-              const outstanding = Math.max(0, owed - paid)
+              const credit = openCreditForBooking(extras.credits, b.id)
               return (
                 <div key={b.id} className="space-y-1">
                   <div className="flex items-start justify-between text-xs">
@@ -602,7 +602,7 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
                     payments={bookingPayments}
                     owed={owed}
                     paid={paid}
-                    outstanding={outstanding}
+                    credit={credit}
                     charges={b.charges}
                     currency={b.event?.currency ?? 'NTD'}
                     pending={b.status === 'pending'}

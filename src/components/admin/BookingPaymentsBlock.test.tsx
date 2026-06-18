@@ -9,7 +9,6 @@ const baseProps = {
   payments: [],
   owed: 3200,
   paid: 0,
-  outstanding: 3200,
   pending: false,
   cancelled: false,
   readOnly: true,
@@ -34,5 +33,26 @@ describe('BookingPaymentsBlock — charge breakdown', () => {
     expect(screen.queryByText('Charges')).not.toBeInTheDocument()
     // The Payments section still renders.
     expect(screen.getByText('Payments')).toBeInTheDocument()
+  })
+})
+
+describe('BookingPaymentsBlock — Balance', () => {
+  it('shows a red owed balance when nothing is paid or credited', () => {
+    render(<BookingPaymentsBlock {...baseProps} owed={3200} paid={1000} />)
+    expect(screen.getByText('Balance')).toBeInTheDocument()
+    expect(screen.getByText('2,200 owed')).toBeInTheDocument()
+  })
+
+  it('nets open credit against what is owed and shows a green credit balance', () => {
+    render(<BookingPaymentsBlock {...baseProps} owed={3200} paid={1000} credit={2500} />)
+    expect(screen.getByText('Credit (this event)')).toBeInTheDocument()
+    expect(screen.getByText('2,500')).toBeInTheDocument()
+    // 3200 - 1000 - 2500 = -300 → 300 credit
+    expect(screen.getByText('300 credit')).toBeInTheDocument()
+  })
+
+  it('shows Settled when paid plus credit exactly covers what is owed', () => {
+    render(<BookingPaymentsBlock {...baseProps} owed={3200} paid={3200} />)
+    expect(screen.getByText('Settled ✓')).toBeInTheDocument()
   })
 })

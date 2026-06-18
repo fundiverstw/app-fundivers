@@ -45,6 +45,27 @@ const event = {
   start_time: '2026-05-18T00:00:00+08:00',
 } as unknown as AppEvent
 
+describe('openCreditForBooking', () => {
+  const credits = [
+    { id: 'c1', booking_id: 'b1', amount: 1000, status: 'open' },
+    { id: 'c2', booking_id: 'b1', amount: 500, status: 'open' },
+    { id: 'c3', booking_id: 'b1', amount: 9999, status: 'settled' },
+    { id: 'c4', booking_id: 'b2', amount: 700, status: 'open' },
+    { id: 'c5', booking_id: null, amount: 300, status: 'open' },
+  ] as unknown as import('../types/database').Credit[]
+
+  it('sums only open credits tied to the given booking', async () => {
+    const { openCreditForBooking } = await import('./credits')
+    expect(openCreditForBooking(credits, 'b1')).toBe(1500)
+    expect(openCreditForBooking(credits, 'b2')).toBe(700)
+  })
+
+  it('returns 0 when a booking has no open credits', async () => {
+    const { openCreditForBooking } = await import('./credits')
+    expect(openCreditForBooking(credits, 'b3')).toBe(0)
+  })
+})
+
 describe('issueCancellationCredits', () => {
   it('credits each registrant their paid total, skipping zero-paid and already-credited bookings', async () => {
     setup({
