@@ -380,32 +380,42 @@ async function attachCertNames(ids: Array<string | null>): Promise<Map<string, s
 }
 
 /**
+ * Run a detail-column select that tolerates EO_* schema drift: when PostgREST
+ * rejects a single column with 42703 ("column does not exist"), drop just that
+ * column and retry, so the columns that DO exist still come back. The previous
+ * all-in-one select meant one drifted column (e.g. cloud lacking `prereqs`)
+ * wiped details for every event; this degrades per-column instead.
+ */
+async function selectDetailCols<T>(table: string, columns: string[], ids: string[]): Promise<T[]> {
+  let cols = [...columns]
+  while (cols.length > 1) {
+    const { data, error } = await supabase.from(table).select(cols.join(', ')).in('_id', ids)
+    if (!error) return (data ?? []) as T[]
+    if (error.code !== '42703') return []
+    const missing = error.message.match(/column \S+\.(\w+) does not exist/)?.[1]
+    if (!missing || missing === '_id') return []
+    cols = cols.filter(c => c !== missing)
+  }
+  return []
+}
+
+/**
  * Best-effort fetch of the descriptive detail columns for a batch of dives +
- * courses, returning a map of event id → EventDetails. Kept entirely separate
- * from the core event query: these columns can be absent in a drifted EO_*
- * schema (Bubble-imported cloud), and a 42703 "column does not exist" here is
- * swallowed so the calendar still renders — events simply carry no detail.
+ * courses, returning a map of event id → EventDetails. Kept separate from the
+ * core event query and drift-tolerant per column (see selectDetailCols) so a
+ * missing EO_* column degrades to a thinner detail rather than no detail.
  */
 async function attachEventDetails(diveIds: string[], courseIds: string[]): Promise<Map<string, EventDetails>> {
   const out = new Map<string, EventDetails>()
 
-  let diveRows: DiveDetailRow[] = []
-  if (diveIds.length) {
-    const { data, error } = await supabase
-      .from('EO_dives')
-      .select('_id, notes, prereqs, req_dives, DiveTravel_reference, prereq_cert_id')
-      .in('_id', diveIds)
-    if (!error && data) diveRows = data as DiveDetailRow[]
-  }
-
-  let courseRows: CourseDetailRow[] = []
-  if (courseIds.length) {
-    const { data, error } = await supabase
-      .from('EO_courses')
-      .select('_id, included, schedule, prereqs, req_dives, prereq_cert_id')
-      .in('_id', courseIds)
-    if (!error && data) courseRows = data as CourseDetailRow[]
-  }
+  const [diveRows, courseRows] = await Promise.all([
+    diveIds.length
+      ? selectDetailCols<DiveDetailRow>('EO_dives', ['_id', 'notes', 'prereqs', 'req_dives', 'DiveTravel_reference', 'prereq_cert_id'], diveIds)
+      : Promise.resolve<DiveDetailRow[]>([]),
+    courseIds.length
+      ? selectDetailCols<CourseDetailRow>('EO_courses', ['_id', 'included', 'schedule', 'prereqs', 'req_dives', 'prereq_cert_id'], courseIds)
+      : Promise.resolve<CourseDetailRow[]>([]),
+  ])
 
   if (!diveRows.length && !courseRows.length) return out
 
