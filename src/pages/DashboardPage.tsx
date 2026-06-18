@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
-import { SharkBouncer } from '../components/dashboard/SharkBouncer'
-import { TurtleBouncer } from '../components/dashboard/TurtleBouncer'
+import { EelBouncer } from '../components/dashboard/EelBouncer'
+import { FrogBouncer } from '../components/dashboard/FrogBouncer'
 import { NudibranchBouncer } from '../components/dashboard/NudibranchBouncer'
 import { WelcomeBanner } from '../components/welcome/WelcomeBanner'
 
@@ -149,8 +149,8 @@ export function DashboardPage() {
           <WelcomeBanner user={user} />
         </div>
       )}
-      <SharkBouncer />
-      <TurtleBouncer />
+      <EelBouncer />
+      <FrogBouncer />
       <NudibranchBouncer />
     </div>
   )
