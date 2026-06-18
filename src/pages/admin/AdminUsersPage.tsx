@@ -333,7 +333,12 @@ export function AdminUsersPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
-      <h1 className="text-xl font-bold text-white">People</h1>
+      <div className="flex items-baseline justify-between gap-2">
+        <h1 className="text-xl font-bold text-white">People</h1>
+        <span className="text-sm font-medium text-white/80">
+          {filter ? `${visible.length} of ${users.length}` : `${users.length}`} account{users.length === 1 ? '' : 's'}
+        </span>
+      </div>
 
       <input
         type="text"
