@@ -4,7 +4,10 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
 import { fetchCreditsForUser, openCreditBalance } from '../lib/credits'
-import type { AppEvent, Booking, Payment } from '../types/database'
+import { resolveCharges, type ChargeLine } from '../lib/booking-charges'
+import { fetchChargeCatalog } from '../lib/booking-charge-catalog'
+import { ChargeBreakdown } from '../components/ChargeBreakdown'
+import type { AppEvent, Booking, BookingDetails, Payment } from '../types/database'
 import {
   CARD, BTN_GHOST, TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR, PAGE_BODY,
 } from '../styles/tokens'
@@ -13,6 +16,7 @@ interface BookingLine {
   booking: Booking
   event: AppEvent | null
   payments: Payment[]
+  charges: ChargeLine[]
   total: number
   deposit: number
   paid: number
@@ -53,9 +57,12 @@ export function PaymentsPage() {
 
     const diveIds = bookings.map(b => b.eo_dive_id).filter((x): x is string => !!x)
     const courseIds = bookings.map(b => b.eo_course_id).filter((x): x is string => !!x)
-    const eventMap = (diveIds.length || courseIds.length)
-      ? await fetchEventsForBookings(diveIds, courseIds)
-      : new Map<string, AppEvent>()
+    const [eventMap, catalog] = await Promise.all([
+      (diveIds.length || courseIds.length)
+        ? fetchEventsForBookings(diveIds, courseIds)
+        : Promise.resolve(new Map<string, AppEvent>()),
+      fetchChargeCatalog(bookings.map(b => b.details as BookingDetails)),
+    ])
 
     const paymentsByBooking = new Map<string, Payment[]>()
     for (const p of payRows) {
@@ -67,6 +74,7 @@ export function PaymentsPage() {
 
     setLines(bookings.map(b => {
       const eventId = b.eo_dive_id ?? b.eo_course_id ?? ''
+      const event = eventMap.get(eventId) ?? null
       const d = (b.details ?? {}) as { total?: number; deposit?: number }
       const total = Number(d.total ?? 0)
       const deposit = Number(d.deposit ?? 0)
@@ -74,8 +82,9 @@ export function PaymentsPage() {
       const paid = bookingPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
       return {
         booking: b,
-        event: eventMap.get(eventId) ?? null,
+        event,
         payments: bookingPayments,
+        charges: resolveCharges({ details: b.details as BookingDetails, event, ...catalog }),
         total,
         deposit,
         paid,
@@ -178,7 +187,7 @@ function LineCard({
   onToggle: () => void
   onRefund: (id: string) => void
 }) {
-  const { booking, event, total, deposit, paid, due, depositDue, payments } = line
+  const { booking, event, charges, total, deposit, paid, due, depositDue, payments } = line
   const label = event?.title ?? '(event)'
   const refundRequested = !!booking.refund_requested_at
   const canRefundDeposit = paid > 0 && !refundRequested
@@ -215,6 +224,14 @@ function LineCard({
 
       {open && (
         <div className="px-4 pb-4 border-t border-sky-200 pt-3 space-y-3 text-sm">
+          {charges.length > 0
+            ? <ChargeBreakdown lines={charges} currency={currency} total={total} />
+            : total > 0 && (
+                <div className={`flex justify-between ${TEXT_BODY}`}>
+                  <span>Total</span>
+                  <span>{currency} {total.toLocaleString()}</span>
+                </div>
+              )}
           {deposit > 0 && (
             <div className="flex justify-between">
               <span className={TEXT_BODY}>Deposit</span>
@@ -223,12 +240,6 @@ function LineCard({
                   ? `${currency} ${depositDue.toLocaleString()} due`
                   : `${currency} ${deposit.toLocaleString()} paid ✓`}
               </span>
-            </div>
-          )}
-          {total > 0 && (
-            <div className={`flex justify-between ${TEXT_BODY}`}>
-              <span>Total</span>
-              <span>{currency} {total.toLocaleString()}</span>
             </div>
           )}
           {paid > 0 && (

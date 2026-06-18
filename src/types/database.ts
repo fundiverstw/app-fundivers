@@ -1,3 +1,5 @@
+import type { ChargeLine } from '../lib/booking-charges'
+
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[]
 
 /**
@@ -45,6 +47,12 @@ export interface BookingDetails {
   nitrox_course_addon?: boolean
   total?: number
   deposit?: number
+  /** Itemized snapshot of every charge that makes up `total` (base, per-item
+   *  gear, room, add-ons, transport, nitrox course, card surcharge). Frozen at
+   *  registration so later catalog price changes can't rewrite history. Absent
+   *  on bookings created before this field existed — surfaces fall back to a
+   *  current-price recompute via resolveCharges() in src/lib/booking-charges. */
+  charges?: ChargeLine[]
   /** ISO timestamp of when the diver checked the "I have read the cancellation
    *  policy" box on the registration form. Required when the event has a
    *  cancel_policy set — gates the form's submit button. */

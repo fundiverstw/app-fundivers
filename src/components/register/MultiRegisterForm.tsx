@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { personName } from '../../lib/names'
 import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../lib/gear'
+import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
 import { supabase } from '../../lib/supabase'
 import { formatEventSpan } from '../../lib/events'
 import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/payment-instructions'
 import type { AppEvent, Booking, BookingDetails, Database, Profile } from '../../types/database'
 
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
-
-const NITROX_COURSE_FEE  = 6000
 
 type PaymentMethod = 'bank_transfer' | 'credit_card' | 'paypal' | 'cash'
 type ContactMethod = 'whatsapp' | 'line' | 'phone' | 'email'
@@ -136,7 +135,17 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
       const subTotal = base + gearCost + transportCost + nitroxFee
       const surchargeCost = Math.round(subTotal * surcharge)
       const total = subTotal + surchargeCost
-      return { base, gearCost, transportCost, nitroxFee, surchargeCost, total }
+      const charges = buildCharges({
+        base,
+        gear: (!gearIncluded && c.rentGear)
+          ? c.gearItems.map(item => ({ item, amount: (GEAR_ALACARTE_PRICES[item] ?? 0) * days }))
+          : [],
+        gearDays: days,
+        transport: transportCost,
+        nitroxCourse: nitroxFee,
+        surcharge: surchargeCost > 0 ? { label: 'Card/PayPal surcharge (5%)', amount: surchargeCost } : null,
+      })
+      return { base, gearCost, transportCost, nitroxFee, surchargeCost, total, charges }
     })
   }, [cart, choicesById, payment, profile, forDiverByEvent, childById])
 
@@ -205,6 +214,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
           : undefined,
         pay_deposit_only: false,
         nitrox_course_addon: showNitroxAddon && c.addNitroxCourse,
+        charges: eventBreakdowns[cart.indexOf(ev)]?.charges,
         total: eventBreakdowns[cart.indexOf(ev)]?.total,
         deposit: ev.deposit_amount ?? undefined,
       }
@@ -570,11 +580,9 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                     </div>
                     {b && (
                       <div className="pl-3 space-y-0.5 text-xs text-blue-900/80">
-                        <Row label="Event"         value={b.base}          currency={ev.currency} />
-                        {b.gearCost > 0      && <Row label="Gear"          value={b.gearCost}      currency={ev.currency} />}
-                        {b.transportCost > 0 && <Row label="Transport"     value={b.transportCost} currency={ev.currency} />}
-                        {b.nitroxFee > 0     && <Row label="Nitrox course" value={b.nitroxFee}     currency={ev.currency} />}
-                        {b.surchargeCost > 0 && <Row label="Card/PayPal surcharge (5%)" value={b.surchargeCost} currency={ev.currency} />}
+                        {b.charges.map((cl, ci) => (
+                          <Row key={`${cl.kind}-${ci}`} label={cl.kind === 'base' ? 'Event' : cl.label} value={cl.amount} currency={ev.currency} />
+                        ))}
                       </div>
                     )}
                   </div>

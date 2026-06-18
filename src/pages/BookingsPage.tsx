@@ -6,8 +6,11 @@ import { useToast } from '../hooks/useToast'
 import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
 import { fetchAmendmentsForBookings, amendmentsDelta } from '../lib/booking-amendments'
 import { uniqueUuids } from '../lib/uuid'
+import { resolveCharges, type ChargeLine } from '../lib/booking-charges'
+import { fetchChargeCatalog } from '../lib/booking-charge-catalog'
 import { ShareEventButton } from '../components/ShareEventButton'
-import type { AppEvent, Booking, BookingAmendment, Payment, WaitlistOffer } from '../types/database'
+import { ChargeBreakdown } from '../components/ChargeBreakdown'
+import type { AppEvent, Booking, BookingAmendment, BookingDetails, Payment, WaitlistOffer } from '../types/database'
 import {
   CARD, BTN_GHOST, BTN_DANGER, TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR, PAGE_BODY,
 } from '../styles/tokens'
@@ -16,6 +19,7 @@ type Row = Booking & {
   event: AppEvent | null
   payments: Payment[]
   paidSum: number
+  charges: ChargeLine[]
   amendments: BookingAmendment[]
   /** Live (status='pending', not expired) waitlist offer on this booking,
    *  if any. Drives the "Spot opened — Accept this spot" banner. */
@@ -80,9 +84,12 @@ export function BookingsPage() {
 
     const diveIds = bookings.map(b => b.eo_dive_id).filter((x): x is string => !!x)
     const courseIds = bookings.map(b => b.eo_course_id).filter((x): x is string => !!x)
-    const eventMap = (diveIds.length || courseIds.length)
-      ? await fetchEventsForBookings(diveIds, courseIds)
-      : new Map<string, AppEvent>()
+    const [eventMap, catalog] = await Promise.all([
+      (diveIds.length || courseIds.length)
+        ? fetchEventsForBookings(diveIds, courseIds)
+        : Promise.resolve(new Map<string, AppEvent>()),
+      fetchChargeCatalog(bookings.map(b => b.details as BookingDetails)),
+    ])
 
     const paymentsByBooking = new Map<string, Payment[]>()
     for (const p of payments) {
@@ -99,11 +106,13 @@ export function BookingsPage() {
       const bookingPayments = paymentsByBooking.get(b.id) ?? []
       const paidSum = bookingPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
       const offer = offersByBooking.get(b.id) ?? null
+      const event = eventMap.get((b.eo_dive_id ?? b.eo_course_id)!) ?? null
       return {
         ...b,
-        event: eventMap.get((b.eo_dive_id ?? b.eo_course_id)!) ?? null,
+        event,
         payments: bookingPayments,
         paidSum,
+        charges: resolveCharges({ details: b.details as BookingDetails, event, ...catalog }),
         amendments: amendmentsByBooking.get(b.id) ?? [],
         offer,
         offerRemainingLabel: offer ? formatRemaining(offer.expires_at, nowMs) : null,
@@ -276,12 +285,14 @@ function Card({
 
       {open && (
         <div className="px-4 pb-4 border-t border-sky-200 pt-3 space-y-3 text-sm">
-          {total > 0 && (
-            <div className={`flex justify-between ${TEXT_BODY}`}>
-              <span>Total</span>
-              <span className="font-semibold">{row.event?.currency ?? 'TWD'} {total.toLocaleString()}</span>
-            </div>
-          )}
+          {row.charges.length > 0
+            ? <ChargeBreakdown lines={row.charges} currency={row.event?.currency ?? 'TWD'} total={total} />
+            : total > 0 && (
+                <div className={`flex justify-between ${TEXT_BODY}`}>
+                  <span>Total</span>
+                  <span className="font-semibold">{row.event?.currency ?? 'TWD'} {total.toLocaleString()}</span>
+                </div>
+              )}
           {deposit > 0 && (
             <div className={`flex justify-between ${TEXT_BODY}`}>
               <span>Deposit</span>

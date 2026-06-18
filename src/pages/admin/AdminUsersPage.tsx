@@ -8,16 +8,18 @@ import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
 import { fetchAmendmentsForBookings, amendmentsDelta } from '../../lib/booking-amendments'
 import { recordPayment, voidPayment } from '../../lib/booking-payments'
 import { BookingPaymentsBlock } from '../../components/admin/BookingPaymentsBlock'
+import { resolveCharges, type ChargeLine } from '../../lib/booking-charges'
+import { fetchChargeCatalog } from '../../lib/booking-charge-catalog'
 import { getCertCardSignedUrl } from '../../lib/cert-card'
 import { shoeAsJp } from '../../lib/shoe-size'
 import { fetchCreditsForUser, openCreditBalance, createCredit, settleCredit, reopenCredit } from '../../lib/credits'
 import { ProfileForm } from '../ProfilePage'
 import { DiverNotes } from '../../components/admin/DiverNotes'
 import { AdminFamilyPanel } from '../../components/admin/AdminFamilyPanel'
-import type { AppEvent, Booking, BookingAmendment, Credit, Payment, Profile } from '../../types/database'
+import type { AppEvent, Booking, BookingAmendment, BookingDetails, Credit, Payment, Profile } from '../../types/database'
 
 interface UserExtras {
-  bookings: Array<Booking & { event: AppEvent | null }>
+  bookings: Array<Booking & { event: AppEvent | null; charges: ChargeLine[] }>
   payments: Payment[]
   amendments: Map<string, BookingAmendment[]>
   credits: Credit[]
@@ -67,17 +69,22 @@ export function AdminUsersPage() {
 
     const diveIds = bookings.map(b => b.eo_dive_id).filter((x): x is string => !!x)
     const courseIds = bookings.map(b => b.eo_course_id).filter((x): x is string => !!x)
-    const [eventMap, amendments] = await Promise.all([
+    const [eventMap, amendments, catalog] = await Promise.all([
       diveIds.length || courseIds.length
         ? fetchEventsForBookings(diveIds, courseIds)
         : Promise.resolve(new Map<string, AppEvent>()),
       fetchAmendmentsForBookings(bookings.map(b => b.id)),
+      fetchChargeCatalog(bookings.map(b => b.details as BookingDetails)),
     ])
 
-    const hydrated = bookings.map(b => ({
-      ...b,
-      event: eventMap.get((b.eo_dive_id ?? b.eo_course_id)!) ?? null,
-    }))
+    const hydrated = bookings.map(b => {
+      const event = eventMap.get((b.eo_dive_id ?? b.eo_course_id)!) ?? null
+      return {
+        ...b,
+        event,
+        charges: resolveCharges({ details: b.details as BookingDetails, event, ...catalog }),
+      }
+    })
     const paidSum = payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
     const pendingSum = payments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0)
 
@@ -591,6 +598,8 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
                     owed={owed}
                     paid={paid}
                     outstanding={outstanding}
+                    charges={b.charges}
+                    currency={b.event?.currency ?? 'NTD'}
                     pending={b.status === 'pending'}
                     cancelled={false}
                     readOnly={!isAdmin}
@@ -642,7 +651,7 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
 function CreditsPanel({ credits, openBalance, bookings, readOnly, onCreate, onSettle, onReopen }: {
   credits: Credit[]
   openBalance: number
-  bookings: Array<Booking & { event: AppEvent | null }>
+  bookings: Array<Booking & { event: AppEvent | null; charges: ChargeLine[] }>
   readOnly: boolean
   onCreate: (amount: number, reason: string, bookingId: string | null) => Promise<void>
   onSettle: (creditId: string, note: string) => Promise<void>

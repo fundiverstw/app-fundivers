@@ -7,6 +7,7 @@ import { formatEventSpan, eventIsFull } from '../../lib/events'
 import { computeEffectiveFullPaymentDeadline } from '../../lib/payment-deadlines'
 import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/payment-instructions'
 import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../lib/gear'
+import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
 import { uploadCertCard } from '../../lib/cert-card'
 import { uploadNitroxCard } from '../../lib/nitrox-card'
 import { uploadDeepCard } from '../../lib/deep-card'
@@ -52,7 +53,6 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked, existi
   )
 }
 
-const NITROX_COURSE_FEE = 6000
 // Per-event transport surcharge now lives on the linked EO_prices row
 // (see event.transport_price). NULL or 0 = transportation bundled into
 // the base price.
@@ -557,6 +557,34 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const depositNow     = depositFace + depositSurcharge      // pay deposit now (surcharge on the deposit only)
   const remainderLater = Math.max(0, subTotal - depositFace) // balance due later, no card surcharge
 
+  // Itemized breakdown of every charge that makes up `total`. Drives both the
+  // on-screen summary and the snapshot written into details.charges, so what
+  // the diver sees is exactly what gets frozen onto the booking.
+  const charges = useMemo(() => {
+    const room = (showRooms && roomId) ? rooms.find(r => r._id === roomId) ?? null : null
+    return buildCharges({
+      base,
+      gear: (showGearRentChoice && gearChoice === 'rent')
+        ? gearItems.map(item => ({ item, amount: (GEAR_ALACARTE_PRICES[item] ?? 0) * diveDays }))
+        : [],
+      gearDays: diveDays,
+      room: room ? { label: room.display_title ?? room.admin_title ?? 'Room', amount: roomCost } : null,
+      addons: showAddons
+        ? [...addonIds].map(id => {
+            const a = addons.find(x => x._id === id)
+            return { label: a?.display_title ?? a?.admin_title ?? id, amount: a?.price ?? 0 }
+          })
+        : [],
+      transport: transportCost,
+      nitroxCourse: (showNitroxAddon && addNitroxCourse) ? NITROX_COURSE_FEE : 0,
+      surcharge: paymentSurcharge > 0
+        ? { label: `Card/PayPal surcharge (5%${payingDepositOnly ? ' of deposit' : ''})`, amount: total - subTotal }
+        : null,
+    })
+  }, [base, showGearRentChoice, gearChoice, gearItems, diveDays, showRooms, roomId, rooms, roomCost,
+      showAddons, addonIds, addons, transportCost, showNitroxAddon, addNitroxCourse,
+      paymentSurcharge, payingDepositOnly, total, subTotal])
+
   function toggleItem(item: string) {
     // First toggle promotes the rendered default (or existing list) into
     // an explicit edited list; subsequent toggles update it.
@@ -662,6 +690,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         : undefined,
       pay_deposit_only: hasDeposit ? payDepositOnly : false,
       nitrox_course_addon: showNitroxAddon && addNitroxCourse,
+      charges,
       total,
       // Surcharge-inclusive when paying by card/PayPal — the actual amount due
       // to secure the spot. Equals the face deposit for bank transfer / cash.
@@ -1264,13 +1293,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           <PaymentConfirmationReminderBlock />
 
           <div className="text-sm text-blue-950 font-medium bg-sky-50 rounded-lg p-3 space-y-1">
-            <Row label="Base"                value={base} currency={event.currency} />
-            {gearCost > 0         && <Row label="Gear"           value={gearCost}     currency={event.currency} />}
-            {roomCost > 0         && <Row label="Room"           value={roomCost}     currency={event.currency} />}
-            {addonsCost > 0       && <Row label="Add-ons"        value={addonsCost}   currency={event.currency} />}
-            {transportCost > 0    && <Row label="Transport"      value={transportCost} currency={event.currency} />}
-            {(showNitroxAddon && addNitroxCourse) && <Row label="Nitrox course" value={NITROX_COURSE_FEE} currency={event.currency} />}
-            {paymentSurcharge > 0 && <Row label={`Card/PayPal surcharge (5%${payingDepositOnly ? ' of deposit' : ''})`} value={total - subTotal} currency={event.currency} />}
+            {charges.map((c, i) => <Row key={`${c.kind}-${i}`} label={c.label} value={c.amount} currency={event.currency} />)}
             <div className="border-t border-sky-200 pt-1 mt-1">
               <Row label="Total" value={total} currency={event.currency} bold />
             </div>
