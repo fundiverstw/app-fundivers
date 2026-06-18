@@ -62,4 +62,23 @@ describe('BookingPaymentsBlock — Balance', () => {
     expect(screen.getByText('550 overpaid')).toBeInTheDocument()
     expect(screen.queryByText('550 credit')).not.toBeInTheDocument()
   })
+
+  it('shows a discount amendment in the breakdown so it ties out to Owed', () => {
+    // The reported case: charged 8,950, −800 "2 person discount", paid 8,700.
+    render(
+      <BookingPaymentsBlock
+        {...baseProps}
+        owed={8150}
+        paid={8700}
+        charges={[{ kind: 'base', label: 'Base', amount: 8950 }]}
+        amendments={[{ label: '2 person discount', amount: -800 }]}
+        currency="TWD"
+      />,
+    )
+    expect(screen.getByText('2 person discount')).toBeInTheDocument()
+    expect(screen.getByText('−TWD 800')).toBeInTheDocument()
+    // Breakdown total equals Owed, and the balance reads overpaid.
+    expect(screen.getByText('TWD 8,150')).toBeInTheDocument()
+    expect(screen.getByText('550 overpaid')).toBeInTheDocument()
+  })
 })

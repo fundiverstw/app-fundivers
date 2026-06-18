@@ -7,7 +7,8 @@ import { fetchCreditsForUser, openCreditBalance, openCreditForBooking } from '..
 import { bookingBalance } from '../lib/booking-balance'
 import { resolveCharges, type ChargeLine } from '../lib/booking-charges'
 import { fetchChargeCatalog } from '../lib/booking-charge-catalog'
-import { ChargeBreakdown } from '../components/ChargeBreakdown'
+import { fetchAmendmentsForBookings, amendmentsDelta } from '../lib/booking-amendments'
+import { ChargeBreakdown, type AmendmentLine } from '../components/ChargeBreakdown'
 import type { AppEvent, Booking, BookingDetails, Payment } from '../types/database'
 import {
   CARD, BTN_GHOST, TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR, PAGE_BODY,
@@ -18,7 +19,10 @@ interface BookingLine {
   event: AppEvent | null
   payments: Payment[]
   charges: ChargeLine[]
+  amendments: AmendmentLine[]
   total: number
+  /** total + amendments — what the diver actually owes before payments. */
+  owed: number
   deposit: number
   paid: number
   /** Open credit awarded for this event — offsets what's owed. */
@@ -60,11 +64,12 @@ export function PaymentsPage() {
 
     const diveIds = bookings.map(b => b.eo_dive_id).filter((x): x is string => !!x)
     const courseIds = bookings.map(b => b.eo_course_id).filter((x): x is string => !!x)
-    const [eventMap, catalog] = await Promise.all([
+    const [eventMap, catalog, amendmentsByBooking] = await Promise.all([
       (diveIds.length || courseIds.length)
         ? fetchEventsForBookings(diveIds, courseIds)
         : Promise.resolve(new Map<string, AppEvent>()),
       fetchChargeCatalog(bookings.map(b => b.details as BookingDetails)),
+      fetchAmendmentsForBookings(bookings.map(b => b.id)),
     ])
 
     const paymentsByBooking = new Map<string, Payment[]>()
@@ -84,16 +89,20 @@ export function PaymentsPage() {
       const bookingPayments = paymentsByBooking.get(b.id) ?? []
       const paid = bookingPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
       const credit = openCreditForBooking(credits, b.id)
+      const rows = amendmentsByBooking.get(b.id) ?? []
+      const owed = total + amendmentsDelta(rows)
       return {
         booking: b,
         event,
         payments: bookingPayments,
         charges: resolveCharges({ details: b.details as BookingDetails, event, ...catalog }),
+        amendments: rows.map(a => ({ label: a.note, amount: a.amount })),
         total,
+        owed,
         deposit,
         paid,
         credit,
-        due: Math.max(0, total - paid - credit),
+        due: Math.max(0, owed - paid - credit),
         depositDue: Math.max(0, deposit - paid),
       }
     }))
@@ -192,14 +201,14 @@ function LineCard({
   onToggle: () => void
   onRefund: (id: string) => void
 }) {
-  const { booking, event, charges, total, deposit, paid, credit, depositDue, payments } = line
+  const { booking, event, charges, amendments, total, owed, deposit, paid, credit, depositDue, payments } = line
   const label = event?.title ?? '(event)'
   const refundRequested = !!booking.refund_requested_at
   const canRefundDeposit = paid > 0 && !refundRequested
-  // Balance nets open credit-for-this-event against what's owed. 'overpaid' is
-  // kept distinct from 'credit' so paying more than owed isn't shown as an
-  // awarded account credit.
-  const bal = bookingBalance(total, paid, credit)
+  // Balance nets open credit-for-this-event against what's owed (incl.
+  // amendments). 'overpaid' is kept distinct from 'credit' so paying more than
+  // owed isn't shown as an awarded account credit.
+  const bal = bookingBalance(owed, paid, credit)
 
   return (
     <div className={CARD}>
@@ -234,8 +243,8 @@ function LineCard({
 
       {open && (
         <div className="px-4 pb-4 border-t border-sky-200 pt-3 space-y-3 text-sm">
-          {charges.length > 0
-            ? <ChargeBreakdown lines={charges} currency={currency} total={total} />
+          {(charges.length > 0 || amendments.length > 0)
+            ? <ChargeBreakdown lines={charges} amendments={amendments} currency={currency} total={owed} />
             : total > 0 && (
                 <div className={`flex justify-between ${TEXT_BODY}`}>
                   <span>Total</span>
