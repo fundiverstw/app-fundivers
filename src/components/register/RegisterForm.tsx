@@ -462,8 +462,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const [nickname, setNickname]  = useState(profile?.nickname  ?? '')
   const [dob, setDob]            = useState(profile?.date_of_birth ?? '')
   const [nationality, setNationality] = useState(profile?.nationality ?? '')
+  const [gender, setGender]      = useState(profile?.gender     ?? '')
   const [idNumber, setIdNumber]  = useState(profile?.id_number  ?? '')
-  const [phone, setPhone]        = useState(profile?.phone      ?? '')
   const [contactMethod, setContactMethod] = useState<ContactMethod | ''>(profile?.contact_method ?? '')
   const [contactId, setContactId] = useState(profile?.contact_id ?? '')
   const [certAgency, setCertAgency] = useState(profile?.cert_agency ?? '')
@@ -514,6 +514,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
   const [emergencyName, setEmergencyName]   = useState(profile?.emergency_contact_name  ?? '')
   const [emergencyPhone, setEmergencyPhone] = useState(profile?.emergency_contact_phone ?? '')
+
+  // Gender and nationality are mandatory on a diver's own profile — block the
+  // step-2 Next until both are set. Relaxed on the on-behalf-of paths (admin /
+  // parent), same as the other diver-facing required-field gates; the target
+  // diver completes their profile later.
+  const profileFieldsBlocked = !isOnBehalfOf && (nationality.trim() === '' || gender.trim() === '')
 
   // Guest-mode credentials — only collected when the visitor isn't signed in.
   // At submit, we signUp with these before inserting the booking.
@@ -685,8 +691,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       nickname:                nullish(nickname),
       date_of_birth:           nullish(dob),
       nationality:             nullish(nationality),
+      gender:                  nullish(gender),
       id_number:               nullish(idNumber),
-      phone:                   nullish(phone),
       contact_method:          (contactMethod || null) as ContactMethod | null,
       contact_id:              nullish(contactId),
       cert_agency:             nullish(certAgency),
@@ -982,12 +988,25 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <TextField label="Date of birth" type="date" value={dob} onChange={setDob} />
-              <TextField label="Nationality" value={nationality} onChange={setNationality} />
+              <TextField label="Nationality *" value={nationality} onChange={setNationality} required />
             </div>
             <TextField label="Passport / ID number" value={idNumber} onChange={setIdNumber} />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <TextField label="Phone" type="tel" value={phone} onChange={setPhone} />
+              <label className="block">
+                <span className="block text-xs text-blue-900 font-medium mb-1">Gender *</span>
+                <select
+                  value={gender}
+                  onChange={e => setGender(e.target.value)}
+                  className="w-full bg-white border border-sky-300 rounded-lg px-2 py-2 text-sm text-blue-900"
+                >
+                  <option value="">—</option>
+                  <option value="female">Female</option>
+                  <option value="male">Male</option>
+                  <option value="other">Other</option>
+                  <option value="prefer_not_to_say">Prefer not to say</option>
+                </select>
+              </label>
               <label className="block">
                 <span className="block text-xs text-blue-900 font-medium mb-1">Preferred contact</span>
                 <select
@@ -1490,6 +1509,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               pastBlocked ||
               (step === 2 && (
                 (!isOnBehalfOf && fullName.trim() === '') ||
+                profileFieldsBlocked ||
                 (!isOnBehalfOf && certBlocked) ||
                 (!isOnBehalfOf && nitroxBlocked) ||
                 (!isOnBehalfOf && deepBlocked) ||

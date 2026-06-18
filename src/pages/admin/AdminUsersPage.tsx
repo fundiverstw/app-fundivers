@@ -350,7 +350,7 @@ export function AdminUsersPage() {
 
   const visible = users.filter(u => {
     if (!filter) return true
-    const haystack = [u.name, u.nickname, u.contact_id, u.phone]
+    const haystack = [u.name, u.nickname, u.contact_id]
       .filter(Boolean).join(' ').toLowerCase()
     return haystack.includes(filter.toLowerCase())
   })
@@ -552,7 +552,6 @@ function ProfileDetails({ user }: { user: Profile }) {
     <div className="space-y-3">
       <Section title="Personal">
         <Row k="Email" v={user.email} />
-        <Row k="Phone" v={user.phone} />
         <Row k="Preferred contact" v={contact} />
         <Row k="DOB" v={user.date_of_birth ? format(new Date(user.date_of_birth), 'MMM d, yyyy') : null} />
         <Row k="Nationality" v={user.nationality} />

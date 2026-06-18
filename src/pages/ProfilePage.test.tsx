@@ -85,6 +85,9 @@ describe('ProfilePage', () => {
         name: 'Ada',
         nickname: 'Ada',
         date_of_birth: '1815-12-10',
+        // gender + nationality are now required to save; seed them so this
+        // test exercises a valid submit rather than tripping the new gate.
+        gender: 'female',
         contact_method: 'email',
         contact_id: 'ada@example.com',
         cert_level: 'Open Water',
@@ -112,14 +115,14 @@ describe('ProfilePage', () => {
 
     await user.clear(input('name'))
     await user.type(input('name'), 'Ada L.')
-    await user.type(input('phone'), '+886-900-123')
+    await user.type(input('nationality'), 'British')
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
     await waitFor(() => expect(update).toHaveBeenCalledOnce())
     const payload = update.mock.calls[0][0] as Record<string, unknown>
     expect(payload.id).toBeUndefined() // id is in the .eq filter, not the payload
     expect(payload.name).toBe('Ada L.')
-    expect(payload.phone).toBe('+886-900-123')
+    expect(payload.nationality).toBe('British')
     expect(typeof payload.updated_at).toBe('string')
     expect(new Date(payload.updated_at as string).toString()).not.toBe('Invalid Date')
     expect(from).toHaveBeenCalledWith('profiles')
@@ -134,6 +137,8 @@ describe('ProfilePage', () => {
         name: 'Ada',
         nickname: 'Ada',
         date_of_birth: '1815-12-10',
+        nationality: 'British',
+        gender: 'female',
         contact_method: 'email',
         contact_id: 'ada@example.com',
         cert_level: 'Open Water',
@@ -168,6 +173,8 @@ describe('ProfilePage', () => {
         name: 'Ada',
         nickname: 'Ada',
         date_of_birth: '1815-12-10',
+        nationality: 'British',
+        gender: 'female',
         contact_method: 'email',
         contact_id: 'ada@example.com',
         cert_level: 'Open Water',
@@ -214,6 +221,7 @@ describe('ProfilePage', () => {
       user: { id: 'u1' },
       profile: {
         id: 'u1', name: 'Ada', nickname: 'Ada', date_of_birth: '1815-12-10',
+        nationality: 'British', gender: 'female',
         contact_method: 'email', contact_id: 'ada@example.com', logged_dives: 0,
       },
     })

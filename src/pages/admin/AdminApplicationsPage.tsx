@@ -196,7 +196,6 @@ function ApplicantSummary({ profile }: { profile: Profile }) {
   return (
     <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
       <Row k="Email" v={profile.contact_id ?? '—'} />
-      <Row k="Phone" v={profile.phone ?? '—'} />
       <Row k="Cert"  v={profile.cert_level ? `${profile.cert_agency ?? ''} ${profile.cert_level}`.trim() : '—'} />
       <Row k="Logged dives" v={String(profile.logged_dives ?? 0)} />
       <Row k="Nationality" v={profile.nationality ?? '—'} />

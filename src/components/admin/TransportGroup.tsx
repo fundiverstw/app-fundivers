@@ -35,8 +35,8 @@ export function TransportGroup({ title, rows, emptyHint, note }: {
                   <span className="text-blue-900 font-medium"> ({r.profile.nickname})</span>
                 )}
               </span>
-              {r.profile?.phone && (
-                <span className="text-xs text-blue-950 font-medium shrink-0">{r.profile.phone}</span>
+              {r.profile?.contact_id && (
+                <span className="text-xs text-blue-950 font-medium shrink-0">{r.profile.contact_id}</span>
               )}
             </li>
           ))}

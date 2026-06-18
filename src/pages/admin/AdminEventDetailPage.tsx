@@ -1078,14 +1078,8 @@ function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, on
                 </p>
               )}
               {/* Decorative emoji are select-none so a drag-select copies the
-                  clean value; phone / contact id are select-all for one-click copy. */}
+                  clean value; the contact id is select-all for one-click copy. */}
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-blue-900 font-medium select-text">
-                {r.profile.phone && (
-                  <span>
-                    <span aria-hidden="true" className="select-none">📞 </span>
-                    <span className="select-all">{r.profile.phone}</span>
-                  </span>
-                )}
                 {r.profile.contact_method && r.profile.contact_id && (
                   <span>
                     <span aria-hidden="true" className="select-none">{methodEmoji(r.profile.contact_method)} </span>

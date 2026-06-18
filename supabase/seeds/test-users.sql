@@ -164,7 +164,6 @@ begin
            cert_level       = levels[1 + (i % array_length(levels, 1))],
            nitrox_certified = (i % 3 = 0),
            deep_certified   = (i % 5 = 0),
-           phone            = '+886 912-' || lpad(((i * 37) % 1000)::text, 3, '0') || '-' || lpad(((i * 53) % 1000)::text, 3, '0'),
            contact_method   = (methods[1 + (i % array_length(methods, 1))])::text,
            contact_id       = first_names[i] || '.' || methods[1 + (i % array_length(methods, 1))],
            logged_dives     = 5 + (i * 7) % 90,

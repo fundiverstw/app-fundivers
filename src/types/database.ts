@@ -179,7 +179,6 @@ export interface Database {
           email: string | null
           name: string | null
           nickname: string | null
-          phone: string | null
           date_of_birth: string | null
           nationality: string | null
           id_number: string | null
@@ -233,7 +232,6 @@ export interface Database {
           updated_at?: string
           name?: string | null
           nickname?: string | null
-          phone?: string | null
           date_of_birth?: string | null
           nationality?: string | null
           id_number?: string | null
@@ -270,7 +268,6 @@ export interface Database {
           updated_at?: string
           name?: string | null
           nickname?: string | null
-          phone?: string | null
           date_of_birth?: string | null
           nationality?: string | null
           id_number?: string | null
