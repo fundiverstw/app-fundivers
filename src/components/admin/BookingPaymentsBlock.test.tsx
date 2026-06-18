@@ -55,4 +55,11 @@ describe('BookingPaymentsBlock — Balance', () => {
     render(<BookingPaymentsBlock {...baseProps} owed={3200} paid={3200} />)
     expect(screen.getByText('Settled ✓')).toBeInTheDocument()
   })
+
+  it('labels a plain overpayment as "overpaid", not "credit"', () => {
+    // Legacy case: owed 8,150, paid 8,700, no awarded credit.
+    render(<BookingPaymentsBlock {...baseProps} owed={8150} paid={8700} />)
+    expect(screen.getByText('550 overpaid')).toBeInTheDocument()
+    expect(screen.queryByText('550 credit')).not.toBeInTheDocument()
+  })
 })

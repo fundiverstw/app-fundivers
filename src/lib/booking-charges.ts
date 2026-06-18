@@ -14,6 +14,7 @@ export type ChargeKind =
   | 'transport'
   | 'nitrox_course'
   | 'surcharge'
+  | 'adjustment'
 
 /** One line of a booking's itemized charge breakdown. Snapshotted into
  *  bookings.details.charges at registration so later catalog price changes
@@ -125,5 +126,24 @@ export function resolveCharges(input: ResolveChargesInput): ChargeLine[] {
     }
   }
 
-  return buildCharges({ base, gear, gearDays: days, room, addons, transport, nitroxCourse, surcharge })
+  const lines = buildCharges({ base, gear, gearDays: days, room, addons, transport, nitroxCourse, surcharge })
+
+  // Legacy reconciliation: this booking predates the snapshot, so the lines
+  // above are rebuilt from *current* prices and may not sum to what was
+  // actually charged (e.g. gear booked as the since-removed full-set package).
+  // Rather than silently show two conflicting totals, tie the breakdown back to
+  // the recorded total with an explicit, labelled adjustment so the reason for
+  // the difference is transparent.
+  if (details.total != null) {
+    const diff = details.total - chargesTotal(lines)
+    if (diff !== 0) {
+      lines.push({
+        kind: 'adjustment',
+        label: 'Legacy pricing adjustment (booked before itemized pricing)',
+        amount: diff,
+      })
+    }
+  }
+
+  return lines
 }

@@ -9,6 +9,7 @@ import { uniqueUuids } from '../lib/uuid'
 import { resolveCharges, type ChargeLine } from '../lib/booking-charges'
 import { fetchChargeCatalog } from '../lib/booking-charge-catalog'
 import { fetchCreditsForUser, openCreditForBooking } from '../lib/credits'
+import { bookingBalance } from '../lib/booking-balance'
 import { ShareEventButton } from '../components/ShareEventButton'
 import { ChargeBreakdown } from '../components/ChargeBreakdown'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Payment, WaitlistOffer } from '../types/database'
@@ -256,8 +257,9 @@ function Card({
   const canRefund = row.paidSum > 0 && row.status !== 'cancelled' && !row.refund_requested_at
   const currency = row.event?.currency ?? 'TWD'
   // Balance nets open credit-for-this-event against what's owed (incl.
-  // amendments). Positive = still owed (red); negative = net in credit (green).
-  const balance = total + amendmentsDelta(row.amendments) - row.paidSum - row.credit
+  // amendments). 'overpaid' stays distinct from 'credit' so paying more than
+  // owed isn't shown as an awarded account credit.
+  const bal = bookingBalance(total + amendmentsDelta(row.amendments), row.paidSum, row.credit)
 
   return (
     <div className={CARD}>
@@ -347,13 +349,10 @@ function Card({
           {total > 0 && (
             <div className={`flex justify-between font-semibold pt-1 border-t border-sky-200 ${TEXT_BODY}`}>
               <span>Balance</span>
-              {balance > 0 ? (
-                <span className={TEXT_ERROR}>{currency} {balance.toLocaleString()} due</span>
-              ) : balance < 0 ? (
-                <span className="text-emerald-700">{currency} {(-balance).toLocaleString()} credit</span>
-              ) : (
-                <span className="text-blue-900">Settled ✓</span>
-              )}
+              {bal.state === 'due' && <span className={TEXT_ERROR}>{currency} {bal.amount.toLocaleString()} due</span>}
+              {bal.state === 'credit' && <span className="text-emerald-700">{currency} {bal.amount.toLocaleString()} credit</span>}
+              {bal.state === 'overpaid' && <span className="text-amber-600">{currency} {bal.amount.toLocaleString()} overpaid</span>}
+              {bal.state === 'settled' && <span className="text-blue-900">Settled ✓</span>}
             </div>
           )}
 

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { format } from 'date-fns'
 import { errorMessage } from '../../lib/errors'
 import { ChargeBreakdown } from '../ChargeBreakdown'
+import { bookingBalance } from '../../lib/booking-balance'
 import type { ChargeLine } from '../../lib/booking-charges'
 import type { Payment } from '../../types/database'
 
@@ -120,7 +121,7 @@ export function BookingPaymentsBlock({
       {/* Balance = owed − paid − open credit for this event. Positive means the
           diver still owes (red); negative means they're net in credit (green). */}
       {(() => {
-        const balance = owed - paid - credit
+        const bal = bookingBalance(owed, paid, credit)
         return (
           <>
             <div className="grid grid-cols-3 gap-2 text-blue-900">
@@ -134,13 +135,10 @@ export function BookingPaymentsBlock({
               </div>
               <div>
                 <p className="font-medium opacity-70">Balance</p>
-                {balance > 0 ? (
-                  <p className="font-semibold text-red-600">{balance.toLocaleString()} owed</p>
-                ) : balance < 0 ? (
-                  <p className="font-semibold text-emerald-700">{(-balance).toLocaleString()} credit</p>
-                ) : (
-                  <p className="font-semibold text-emerald-700">Settled ✓</p>
-                )}
+                {bal.state === 'due' && <p className="font-semibold text-red-600">{bal.amount.toLocaleString()} owed</p>}
+                {bal.state === 'credit' && <p className="font-semibold text-emerald-700">{bal.amount.toLocaleString()} credit</p>}
+                {bal.state === 'overpaid' && <p className="font-semibold text-amber-600">{bal.amount.toLocaleString()} overpaid</p>}
+                {bal.state === 'settled' && <p className="font-semibold text-emerald-700">Settled ✓</p>}
               </div>
             </div>
             {credit > 0 && (
@@ -148,6 +146,11 @@ export function BookingPaymentsBlock({
                 <span className="font-medium">Credit (this event)</span>
                 <span className="font-semibold">{credit.toLocaleString()}</span>
               </div>
+            )}
+            {bal.state === 'overpaid' && (
+              <p className="text-amber-700">
+                Paid more than owed — refund the diver or issue an account credit.
+              </p>
             )}
           </>
         )

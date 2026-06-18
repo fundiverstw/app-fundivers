@@ -1,6 +1,6 @@
 import type { ChargeLine } from '../lib/booking-charges'
 import { chargesTotal } from '../lib/booking-charges'
-import { TEXT_BODY, TEXT_SUBTLE } from '../styles/tokens'
+import { TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE } from '../styles/tokens'
 
 /**
  * Itemized list of a booking's charges (base + every additional charge with its
@@ -26,9 +26,14 @@ export function ChargeBreakdown({
   return (
     <div className="space-y-1 text-sm">
       {lines.map((l, i) => (
-        <div key={`${l.kind}-${i}`} className={`flex justify-between gap-3 ${TEXT_SUBTLE}`}>
+        <div
+          key={`${l.kind}-${i}`}
+          className={`flex justify-between gap-3 ${l.kind === 'adjustment' ? `italic ${TEXT_MUTED}` : TEXT_SUBTLE}`}
+        >
           <span className="min-w-0 break-words">{l.label}</span>
-          <span className="shrink-0 tabular-nums">{currency} {l.amount.toLocaleString()}</span>
+          <span className="shrink-0 tabular-nums">
+            {l.amount < 0 ? '−' : ''}{currency} {Math.abs(l.amount).toLocaleString()}
+          </span>
         </div>
       ))}
       <div className={`flex justify-between gap-3 pt-1 mt-1 border-t border-sky-200 ${TEXT_BODY}`}>

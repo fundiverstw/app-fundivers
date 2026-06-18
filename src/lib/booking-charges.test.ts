@@ -96,6 +96,31 @@ describe('resolveCharges', () => {
     expect(lines.map(l => l.kind)).toEqual(['base'])
   })
 
+  it('reconciles a legacy recompute to the recorded total with an adjustment line', () => {
+    // Gear that today sums to 1,650 was once a cheaper full-set package, so the
+    // recorded total (8,150) is below base 7,200 + current gear 1,650 = 8,850.
+    const details: BookingDetails = {
+      gear: { rent: true, items: ['BCD', 'Regulator', 'Wetsuit', 'Fins', 'Mask', 'Boots', 'Dive computer'] },
+      payment_method: 'bank_transfer',
+      total: 8150,
+    }
+    const lines = resolveCharges({
+      details,
+      event: { price: 7200, transport_price: 0, dive_days: 1, deposit_amount: 0 } as AppEvent,
+    })
+    const adj = lines.find(l => l.kind === 'adjustment')
+    expect(adj?.amount).toBe(8150 - 8850) // -700
+    expect(adj?.label).toMatch(/legacy/i)
+    // The reconciled breakdown ties out to the recorded total.
+    expect(chargesTotal(lines)).toBe(8150)
+  })
+
+  it('adds no adjustment when the recompute already matches the recorded total', () => {
+    const details: BookingDetails = { gear: { rent: false }, payment_method: 'cash', total: 1000 }
+    const lines = resolveCharges({ details, event: { price: 1000, transport_price: 0, dive_days: 1, deposit_amount: 0 } as AppEvent })
+    expect(lines.some(l => l.kind === 'adjustment')).toBe(false)
+  })
+
   it('returns [] when details or event is missing', () => {
     expect(resolveCharges({ details: null, event })).toEqual([])
     expect(resolveCharges({ details: { payment_method: 'cash' }, event: null })).toEqual([])
