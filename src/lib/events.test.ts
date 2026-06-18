@@ -376,3 +376,52 @@ describe('eventSpotsRemaining + eventIsFull', () => {
     expect(eventIsFull({ fully_booked: true, capacity: 10, confirmed_count: 0 })).toBe(true)
   })
 })
+
+describe('attachEventDetails — EO_* schema drift tolerance', () => {
+  // Cloud's Bubble-imported EO_courses/EO_dives can lack `prereqs`. The detail
+  // select must drop just that column and retry so the remaining details still
+  // render, rather than a single 42703 wiping details for every event.
+  const selects: string[] = []
+
+  function courseBuilder() {
+    let cols = ''
+    const b: Record<string, unknown> = {}
+    for (const m of ['eq', 'gte', 'lte', 'order', 'in', 'is', 'or', 'overlaps']) b[m] = () => b
+    b.select = (c: string) => { cols = c; selects.push(c); return b }
+    b.then = (cb?: (r: unknown) => unknown) => {
+      // The detail select includes `prereqs`; cloud rejects it. The core
+      // query (COURSE_COLS) and the post-retry detail select do not.
+      const res = cols.includes('prereqs')
+        ? { data: null, error: { code: '42703', message: 'column EO_courses.prereqs does not exist' } }
+        : { data: [{ _id: 'c9', display_title: 'AOW', start_time: '09:00:00', price: null, other_addons: null, dive_days: null, admin_title: null, calendar_title: null, course_days: ['2026-05-10'], included: '4 dives', schedule: '2 days', req_dives: '10' }], error: null }
+      return Promise.resolve(res).then(cb)
+    }
+    return b
+  }
+
+  it('drops a missing column and still maps the surviving details', async () => {
+    selects.length = 0
+    from.mockImplementation((table: string) => {
+      if (table === 'EO_courses') return courseBuilder()
+      const empty: Record<string, unknown> = {}
+      for (const m of ['select', 'eq', 'gte', 'lte', 'order', 'in', 'is', 'or', 'overlaps']) empty[m] = () => empty
+      empty.then = (cb?: (r: unknown) => unknown) =>
+        Promise.resolve({ data: [], error: null }).then(cb)
+      return empty
+    })
+
+    const { fetchEventsInRange } = await import('./events')
+    const events = await fetchEventsInRange('2026-05-01', '2026-05-31')
+
+    expect(events).toHaveLength(1)
+    const d = events[0].details
+    expect(d?.included).toBe('4 dives')
+    expect(d?.schedule).toBe('2 days')
+    expect(d?.required_dives).toBe(10)
+    // The dropped column degrades to no value rather than crashing the query.
+    expect(d?.prerequisites).toBeNull()
+    // A first detail select carried `prereqs`; a later one retried without it.
+    expect(selects.some(s => s.includes('prereqs'))).toBe(true)
+    expect(selects.some(s => s.includes('included') && !s.includes('prereqs'))).toBe(true)
+  })
+})
