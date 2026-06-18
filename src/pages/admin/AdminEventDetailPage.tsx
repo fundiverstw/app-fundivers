@@ -992,7 +992,6 @@ function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, on
     settled: 'text-blue-900 font-semibold',
     partial: 'text-red-600',
     credit:  'text-emerald-700 font-semibold',
-    overpaid:'text-amber-600 font-semibold',
     none:    'text-blue-950 font-medium',
   }
 
@@ -1060,7 +1059,6 @@ function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, on
             {paymentStatus === 'settled'  && (totalPaid > 0 ? `Paid ${totalPaid.toLocaleString()}` : 'Settled')}
             {paymentStatus === 'partial'  && `${bal.amount.toLocaleString()} due`}
             {paymentStatus === 'credit'   && `${bal.amount.toLocaleString()} credit`}
-            {paymentStatus === 'overpaid' && `${bal.amount.toLocaleString()} overpaid`}
             {paymentStatus === 'none'     && 'Unpaid'}
           </span>
         </span>

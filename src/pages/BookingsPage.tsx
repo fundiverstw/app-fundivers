@@ -259,8 +259,8 @@ function Card({
   const amendmentLines = row.amendments.map(a => ({ label: a.note, amount: a.amount }))
   const owed = total + amendmentsDelta(row.amendments)
   // Balance nets open credit-for-this-event against what's owed (incl.
-  // amendments). 'overpaid' stays distinct from 'credit' so paying more than
-  // owed isn't shown as an awarded account credit.
+  // amendments). A negative balance — whether from an awarded credit or an
+  // overpayment — is money the shop owes the diver, shown as a credit.
   const bal = bookingBalance(owed, row.paidSum, row.credit)
 
   return (
@@ -332,7 +332,6 @@ function Card({
               <span>Balance</span>
               {bal.state === 'due' && <span className={TEXT_ERROR}>{currency} {bal.amount.toLocaleString()} due</span>}
               {bal.state === 'credit' && <span className="text-emerald-700">{currency} {bal.amount.toLocaleString()} credit</span>}
-              {bal.state === 'overpaid' && <span className="text-amber-600">{currency} {bal.amount.toLocaleString()} overpaid</span>}
               {bal.state === 'settled' && <span className="text-blue-900">Settled ✓</span>}
             </div>
           )}

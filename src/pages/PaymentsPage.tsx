@@ -3,7 +3,7 @@ import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
-import { fetchCreditsForUser, openCreditBalance, openCreditForBooking } from '../lib/credits'
+import { fetchCreditsForUser, openCreditForBooking, diverCreditBalance } from '../lib/credits'
 import { bookingBalance } from '../lib/booking-balance'
 import { resolveCharges, type ChargeLine } from '../lib/booking-charges'
 import { fetchChargeCatalog } from '../lib/booking-charge-catalog'
@@ -58,7 +58,6 @@ export function PaymentsPage() {
       supabase.from('payments').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
       fetchCreditsForUser(uid),
     ])
-    setOpenCredit(openCreditBalance(credits))
     const bookings = bookingsRes.data ?? []
     const payRows = (paymentsRes.data ?? []) as Payment[]
 
@@ -80,7 +79,7 @@ export function PaymentsPage() {
       paymentsByBooking.set(p.booking_id, arr)
     }
 
-    setLines(bookings.map(b => {
+    const lineData: BookingLine[] = bookings.map(b => {
       const eventId = b.eo_dive_id ?? b.eo_course_id ?? ''
       const event = eventMap.get(eventId) ?? null
       const d = (b.details ?? {}) as { total?: number; deposit?: number }
@@ -105,7 +104,15 @@ export function PaymentsPage() {
         due: Math.max(0, owed - paid - credit),
         depositDue: Math.max(0, deposit - paid),
       }
-    }))
+    })
+    setLines(lineData)
+    // Account credit = awarded credits + overpayments across active bookings.
+    setOpenCredit(diverCreditBalance(
+      credits,
+      lineData
+        .filter(l => l.booking.status !== 'cancelled')
+        .map(l => ({ id: l.booking.id, owed: l.owed, paid: l.paid })),
+    ))
     setLoading(false)
   }
 
@@ -206,8 +213,8 @@ function LineCard({
   const refundRequested = !!booking.refund_requested_at
   const canRefundDeposit = paid > 0 && !refundRequested
   // Balance nets open credit-for-this-event against what's owed (incl.
-  // amendments). 'overpaid' is kept distinct from 'credit' so paying more than
-  // owed isn't shown as an awarded account credit.
+  // amendments). A negative balance — awarded credit or overpayment — is money
+  // the shop owes the diver, shown as a credit.
   const bal = bookingBalance(owed, paid, credit)
 
   return (
@@ -233,7 +240,6 @@ function LineCard({
               <p className={`text-sm font-semibold ${TEXT_HEADING}`}>{currency} {total.toLocaleString()}</p>
               {bal.state === 'due' && <p className={`text-xs ${TEXT_ERROR}`}>{currency} {bal.amount.toLocaleString()} due</p>}
               {bal.state === 'credit' && <p className="text-xs text-emerald-700 font-semibold">{currency} {bal.amount.toLocaleString()} credit</p>}
-              {bal.state === 'overpaid' && <p className="text-xs text-amber-600 font-semibold">{currency} {bal.amount.toLocaleString()} overpaid</p>}
               {bal.state === 'settled' && <p className="text-xs text-blue-900 font-semibold">Paid in full</p>}
             </>
           ) : <p className={`text-xs ${TEXT_SUBTLE}`}>—</p>}
@@ -278,7 +284,6 @@ function LineCard({
               <span>Balance</span>
               {bal.state === 'due' && <span className={TEXT_ERROR}>{currency} {bal.amount.toLocaleString()} due</span>}
               {bal.state === 'credit' && <span className="text-emerald-700">{currency} {bal.amount.toLocaleString()} credit</span>}
-              {bal.state === 'overpaid' && <span className="text-amber-600">{currency} {bal.amount.toLocaleString()} overpaid</span>}
               {bal.state === 'settled' && <span className="text-blue-900">Settled ✓</span>}
             </div>
           )}

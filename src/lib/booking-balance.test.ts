@@ -15,8 +15,8 @@ describe('bookingBalance', () => {
     expect(bookingBalance(1000, 0, 1500)).toEqual({ net: -500, amount: 500, state: 'credit' })
   })
 
-  it('is "overpaid" — NOT credit — when they paid more than owed with no awarded credit', () => {
-    // The legacy case: owed 8,150, paid 8,700, no credit row.
-    expect(bookingBalance(8150, 8700, 0)).toEqual({ net: -550, amount: 550, state: 'overpaid' })
+  it('is "credit" when they paid more than owed (an overpayment is money owed back)', () => {
+    // Owed 8,150, paid 8,700, no awarded credit row → 550 credit to the diver.
+    expect(bookingBalance(8150, 8700, 0)).toEqual({ net: -550, amount: 550, state: 'credit' })
   })
 })

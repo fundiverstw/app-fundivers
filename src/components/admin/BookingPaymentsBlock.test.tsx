@@ -56,11 +56,11 @@ describe('BookingPaymentsBlock — Balance', () => {
     expect(screen.getByText('Settled ✓')).toBeInTheDocument()
   })
 
-  it('labels a plain overpayment as "overpaid", not "credit"', () => {
-    // Legacy case: owed 8,150, paid 8,700, no awarded credit.
+  it('treats a plain overpayment as a credit owed to the diver', () => {
+    // owed 8,150, paid 8,700, no awarded credit row → 550 credit.
     render(<BookingPaymentsBlock {...baseProps} owed={8150} paid={8700} />)
-    expect(screen.getByText('550 overpaid')).toBeInTheDocument()
-    expect(screen.queryByText('550 credit')).not.toBeInTheDocument()
+    expect(screen.getByText('550 credit')).toBeInTheDocument()
+    expect(screen.queryByText(/overpaid/i)).not.toBeInTheDocument()
   })
 
   it('shows a discount amendment in the breakdown so it ties out to Owed', () => {
@@ -77,8 +77,8 @@ describe('BookingPaymentsBlock — Balance', () => {
     )
     expect(screen.getByText('2 person discount')).toBeInTheDocument()
     expect(screen.getByText('−TWD 800')).toBeInTheDocument()
-    // Breakdown total equals Owed, and the balance reads overpaid.
+    // Breakdown total equals Owed, and the 550 overpayment reads as credit.
     expect(screen.getByText('TWD 8,150')).toBeInTheDocument()
-    expect(screen.getByText('550 overpaid')).toBeInTheDocument()
+    expect(screen.getByText('550 credit')).toBeInTheDocument()
   })
 })
