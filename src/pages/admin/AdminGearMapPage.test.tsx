@@ -70,7 +70,7 @@ describe('AdminGearMapPage gear-size editor', () => {
     expect(wetInput.value).toBe('')
 
     // Save is disabled when nothing changed.
-    const save = screen.getByRole('button', { name: /save sizes/i })
+    const save = screen.getByRole('button', { name: 'Save' })
     expect(save).toBeDisabled()
 
     const user = userEvent.setup()
@@ -101,10 +101,10 @@ describe('AdminGearMapPage gear-size editor', () => {
 
     const user = userEvent.setup()
     await user.clear(finInput); await user.type(finInput, 'XS')
-    await user.click(screen.getByRole('button', { name: /save sizes/i }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByText(/staff or admin required/i)).toBeInTheDocument()
     // Save remains enabled (still dirty) so the user can retry / fix.
-    expect(screen.getByRole('button', { name: /save sizes/i })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
   })
 })

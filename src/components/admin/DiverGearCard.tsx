@@ -70,10 +70,10 @@ export function DiverGearCard({
   }
 
   return (
-    <article className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
+    <article className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-3 space-y-2">
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-blue-900">
+          <h2 className="text-sm font-semibold text-blue-900">
             {personName(profile?.name, profile?.nickname) || '(unknown)'}
           </h2>
           {sizing && <p className="text-xs text-blue-900 font-medium">{sizing}</p>}
@@ -110,28 +110,25 @@ export function DiverGearCard({
       )}
 
       {profile && (
-        <div className="border-t border-sky-200 pt-3 space-y-2">
-          <p className="text-xs font-semibold text-blue-900 uppercase tracking-wider">Sizes</p>
-          <div className="grid grid-cols-3 gap-2">
+        <div className="border-t border-sky-200 pt-2 space-y-2">
+          <div className="flex items-end gap-2">
             <SizeField label="Fin"     value={finSize}     onChange={setFinSize} />
             <SizeField label="BCD"     value={bcdSize}     onChange={setBcdSize} />
             <SizeField label="Wetsuit" value={wetsuitSize} onChange={setWetsuitSize} />
-          </div>
-          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={saveSizes}
               disabled={!sizesDirty || savingSizes}
-              className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-xs font-semibold py-1.5 px-3 rounded-md"
+              className="shrink-0 bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-xs font-semibold py-1 px-2.5 rounded-md"
             >
-              {savingSizes ? 'Saving…' : 'Save sizes'}
+              {savingSizes ? '…' : 'Save'}
             </button>
-            {sizeError && <span className="text-xs text-red-600">{sizeError}</span>}
           </div>
+          {sizeError && <span className="text-xs text-red-600">{sizeError}</span>}
         </div>
       )}
 
-      <AdminNotes target={{ kind: 'booking', id: booking.id }} tagFilter="gear" title="Gear flags" />
+      <AdminNotes target={{ kind: 'booking', id: booking.id }} tagFilter="gear" title="Gear flags" compact />
     </article>
   )
 }
