@@ -159,9 +159,9 @@ export function AdminLogisticsPage() {
             <section key={g.event.id} className="space-y-2 pt-2">
               {/* Bold banner per event so the sections are obvious when
                   scrolling a tall phone screen. */}
-              <div className="bg-blue-900 text-white rounded-xl px-4 py-2.5 flex items-baseline justify-between gap-3">
-                <h2 className="text-base font-semibold truncate">{g.event.title}</h2>
-                <span className="text-xs text-white/80 shrink-0">
+              <div className="bg-blue-900 text-white rounded-xl px-4 py-2.5 space-y-0.5">
+                <h2 className="text-base font-semibold break-words">{g.event.title}</h2>
+                <span className="block text-xs text-white/80">
                   {formatEventSpan(g.event, { style: 'compact' })} · {g.rows.length} diver{g.rows.length === 1 ? '' : 's'}
                 </span>
               </div>

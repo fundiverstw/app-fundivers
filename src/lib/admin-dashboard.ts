@@ -4,6 +4,7 @@
 //
 // Money is netted the same way as the accounting export: `paid` counts
 // positive, `refunded` negative, `voided` is excluded entirely.
+import { canonicalCertLevel } from './cert-level'
 import type { Booking, Payment } from '../types/database'
 
 export interface MoneyPoint { label: string; value: number }
@@ -147,7 +148,7 @@ export function computeDashboard(input: DashboardInput): Dashboard {
     if (!contrib) continue
     const prof = profileById.get(p.user_id)
     const nat = prof?.nationality?.trim() || 'Unknown'
-    const cert = prof?.cert_level?.trim() || 'Unknown'
+    const cert = canonicalCertLevel(prof?.cert_level) || 'Unknown'
     natTotals.set(nat, (natTotals.get(nat) ?? 0) + contrib)
     certTotals.set(cert, (certTotals.get(cert) ?? 0) + contrib)
   }
@@ -181,7 +182,7 @@ export function computeDashboard(input: DashboardInput): Dashboard {
   const certMix = new Map<string, number>()
   for (const p of divers) {
     if (p.status !== 'active') continue
-    const cert = p.cert_level?.trim() || 'Unknown'
+    const cert = canonicalCertLevel(p.cert_level) || 'Unknown'
     certMix.set(cert, (certMix.get(cert) ?? 0) + 1)
   }
   const certLevelMix = [...certMix.entries()]
