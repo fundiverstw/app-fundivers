@@ -48,7 +48,7 @@ export function AdminAddDiverModal({
 
   const visible = profiles.filter(p => {
     if (!filter) return true
-    const haystack = [p.name, p.nickname, p.contact_id, p.phone]
+    const haystack = [p.name, p.nickname, p.contact_id]
       .filter(Boolean).join(' ').toLowerCase()
     return haystack.includes(filter.toLowerCase())
   })
@@ -139,8 +139,8 @@ export function AdminAddDiverModal({
                     </p>
                     <p className="text-xs text-blue-900/70">
                       {p.cert_agency && p.cert_level && `${p.cert_agency} ${p.cert_level}`}
-                      {(p.cert_agency || p.cert_level) && (p.contact_id || p.phone) && ' · '}
-                      {p.contact_id ?? p.phone ?? ''}
+                      {(p.cert_agency || p.cert_level) && p.contact_id && ' · '}
+                      {p.contact_id ?? ''}
                       {p.status && p.status !== 'active' && (
                         <span className="ml-2 uppercase tracking-wider text-red-700">{p.status}</span>
                       )}

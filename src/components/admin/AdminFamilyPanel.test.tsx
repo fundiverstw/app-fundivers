@@ -21,7 +21,7 @@ function makeProfile(overrides: Partial<Profile>): Profile {
   return {
     id: 'x', created_at: '', updated_at: '',
     name: 'X', nickname: null,
-    phone: null, date_of_birth: null, nationality: null, id_number: null,
+    date_of_birth: null, nationality: null, id_number: null,
     emergency_contact_name: null, emergency_contact_phone: null,
     cert_agency: null, cert_level: null, cert_card_path: null, nitrox_card_path: null,
     medical_notes: null, avatar_url: null, role: 'diver',

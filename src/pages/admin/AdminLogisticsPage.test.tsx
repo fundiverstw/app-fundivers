@@ -30,8 +30,8 @@ const bookings = [
     details: { transportation: false, gear: { rent: true, items: ['Wetsuit'] } } },
 ]
 const profiles = [
-  { id: 'u1', name: 'Ada', nickname: 'Ada', phone: '0900', gear_owned: [] },
-  { id: 'u2', name: 'Bo',  nickname: 'Bo',  phone: '0901', gear_owned: [] },
+  { id: 'u1', name: 'Ada', nickname: 'Ada', contact_id: '0900', gear_owned: [] },
+  { id: 'u2', name: 'Bo',  nickname: 'Bo',  contact_id: '0901', gear_owned: [] },
 ]
 
 beforeEach(() => {

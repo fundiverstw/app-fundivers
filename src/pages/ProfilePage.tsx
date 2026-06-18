@@ -30,9 +30,8 @@ import { ShoeSizeField } from '../components/ShoeSizeField'
 const schema = z.object({
   name: z.string().min(1, 'Required'),
   nickname: z.string().nullish(),
-  phone: z.string().nullish(),
   date_of_birth: z.string().min(1, 'Required'),
-  nationality: z.string().nullish(),
+  nationality: z.string().min(1, 'Required'),
   id_number: z.string().nullish(),
   emergency_contact_name: z.string().nullish(),
   emergency_contact_phone: z.string().nullish(),
@@ -42,7 +41,7 @@ const schema = z.object({
   medical_notes: z.string().nullish(),
   height_cm: z.union([z.string(), z.number()]).nullish(),
   weight_kg: z.union([z.string(), z.number()]).nullish(),
-  gender: z.string().nullish(),
+  gender: z.string().min(1, 'Required'),
   contact_method: z.string().min(1, 'Required'),
   contact_id: z.string().min(1, 'Required'),
   nitrox_certified: z.boolean().nullish(),
@@ -261,7 +260,6 @@ export function ProfileForm({ user, profile, onSaved }: {
     const { error } = await supabase.from('profiles').update({
       name: data.name,
       nickname: strOrNull(data.nickname),
-      phone: strOrNull(data.phone),
       date_of_birth: strOrNull(data.date_of_birth),
       nationality: strOrNull(data.nationality),
       id_number: strOrNull(data.id_number),
@@ -313,7 +311,6 @@ export function ProfileForm({ user, profile, onSaved }: {
             />
             {errors.nickname && <p className="text-red-600 text-xs mt-1">{errors.nickname.message}</p>}
           </Field>
-          <Field label="Phone"><input {...register('phone')} type="tel" className={inputClass} /></Field>
           <Field label="Date of birth" required>
             <Controller
               control={control}
@@ -324,9 +321,12 @@ export function ProfileForm({ user, profile, onSaved }: {
             />
             {errors.date_of_birth && <p className="text-red-600 text-xs mt-1">{errors.date_of_birth.message}</p>}
           </Field>
-          <Field label="Nationality"><input {...register('nationality')} className={inputClass} /></Field>
+          <Field label="Nationality" required>
+            <input {...register('nationality')} className={inputClass} />
+            {errors.nationality && <p className="text-red-600 text-xs mt-1">{errors.nationality.message}</p>}
+          </Field>
           <Field label="ID / Passport number"><input {...register('id_number')} className={inputClass} /></Field>
-          <Field label="Gender">
+          <Field label="Gender" required>
             <select {...register('gender')} className={inputClass}>
               <option value="">—</option>
               <option value="female">Female</option>
@@ -334,6 +334,7 @@ export function ProfileForm({ user, profile, onSaved }: {
               <option value="other">Other</option>
               <option value="prefer_not_to_say">Prefer not to say</option>
             </select>
+            {errors.gender && <p className="text-red-600 text-xs mt-1">{errors.gender.message}</p>}
           </Field>
         </section>
 

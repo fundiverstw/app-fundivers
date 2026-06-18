@@ -100,7 +100,8 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   // skipped in this flow (signed-in only; assume on-file or admin
   // follow-up). The diver can update the full profile from /profile.
   const [fullName, setFullName]               = useState(profile?.name ?? '')
-  const [phone, setPhone]                     = useState(profile?.phone ?? '')
+  const [nationality, setNationality]         = useState(profile?.nationality ?? '')
+  const [gender, setGender]                   = useState(profile?.gender ?? '')
   const [contactMethod, setContactMethod]     = useState<ContactMethod | ''>(profile?.contact_method ?? '')
   const [contactId, setContactId]             = useState(profile?.contact_id ?? '')
   const [certAgency, setCertAgency]           = useState(profile?.cert_agency ?? '')
@@ -166,7 +167,9 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   const hasBlockedPast = !viewerPrivileged && pastInCart.length > 0
 
   // Step gates — same spirit as solo flow, only the multi-applicable ones.
-  const step2Blocked = fullName.trim() === '' || hasBlockedPast
+  // Gender + nationality are mandatory on the diver's profile, same as the
+  // solo flow.
+  const step2Blocked = fullName.trim() === '' || nationality.trim() === '' || gender.trim() === '' || hasBlockedPast
   const step3Blocked = cart.some(ev => choicesById[ev.id]?.needsTransport === null)
   const submitBlocked = cart.length === 0 || hasBlockedPast
 
@@ -177,7 +180,8 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
     const nullish = (v: string) => v.trim() === '' ? null : v.trim()
     const profilePatch: ProfileUpdate = {
       name:               nullish(fullName),
-      phone:                   nullish(phone),
+      nationality:             nullish(nationality),
+      gender:                  nullish(gender),
       contact_method:          (contactMethod || null) as ContactMethod | null,
       contact_id:              nullish(contactId),
       cert_agency:             nullish(certAgency),
@@ -404,7 +408,23 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
             <div className="space-y-3">
               <TextField label="Full name *" value={fullName} onChange={setFullName} required />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <TextField label="Phone" type="tel" value={phone} onChange={setPhone} />
+                <TextField label="Nationality *" value={nationality} onChange={setNationality} required />
+                <label className="block">
+                  <span className="block text-xs text-blue-900 font-medium mb-1">Gender *</span>
+                  <select
+                    value={gender}
+                    onChange={e => setGender(e.target.value)}
+                    className="w-full bg-white border border-sky-300 rounded-lg px-2 py-2 text-sm text-blue-900"
+                  >
+                    <option value="">—</option>
+                    <option value="female">Female</option>
+                    <option value="male">Male</option>
+                    <option value="other">Other</option>
+                    <option value="prefer_not_to_say">Prefer not to say</option>
+                  </select>
+                </label>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label className="block">
                   <span className="block text-xs text-blue-900 font-medium mb-1">Preferred contact</span>
                   <select

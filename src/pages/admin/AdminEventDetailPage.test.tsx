@@ -77,7 +77,7 @@ describe('AdminEventDetailPage', () => {
       id: 'u1', name: 'Ada Lovelace', nickname: 'Ada',
       cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: true,
       logged_dives: 20, height_cm: 165, weight_kg: 60, shoe_size: 'EU 41 M',
-      phone: null, contact_method: null, contact_id: null,
+      contact_method: null, contact_id: null,
     }]
     const payments: unknown[] = []
     const addons = [
@@ -132,7 +132,7 @@ describe('AdminEventDetailPage', () => {
       id: 'u1', name: 'Ada Lovelace', nickname: 'Ada',
       cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: true,
       logged_dives: 20, height_cm: 165, weight_kg: 60, shoe_size: 'EU 41 M',
-      phone: null, contact_method: null, contact_id: null,
+      contact_method: null, contact_id: null,
     }]
     const addons = [
       { _id: '11111111-1111-4111-8111-111111111111', display_title: 'SMB Rental', admin_title: 'SMB' },
@@ -313,7 +313,7 @@ describe('AdminEventDetailPage', () => {
       id: 'u1', name: 'Ada Lovelace', nickname: 'Ada',
       cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false,
       logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null,
-      phone: null, contact_method: null, contact_id: null,
+      contact_method: null, contact_id: null,
     }]
     from.mockImplementation((table: string) => {
       if (table === 'bookings') return mockQueryBuilder({ data: bookings })
@@ -354,11 +354,11 @@ describe('AdminEventDetailPage', () => {
     const profiles = [
       { id: 'u-ada',  name: 'Ada Lovelace',     nickname: 'Ada',
         cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false,
-        logged_dives: 0, phone: null, contact_method: null, contact_id: null,
+        logged_dives: 0, contact_method: null, contact_id: null,
         height_cm: null, weight_kg: null, shoe_size: null, status: 'active' },
       { id: 'u-bob',  name: 'Bob Roberts',      nickname: null,
         cert_agency: 'PADI', cert_level: 'OW', nitrox_certified: false,
-        logged_dives: 0, phone: null, contact_method: null, contact_id: null,
+        logged_dives: 0, contact_method: null, contact_id: null,
         height_cm: null, weight_kg: null, shoe_size: null, status: 'active' },
     ]
 
@@ -404,7 +404,7 @@ describe('AdminEventDetailPage', () => {
       id: 'u1', name: 'Ada Lovelace', nickname: 'Ada',
       cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false,
       logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null,
-      phone: null, contact_method: null, contact_id: null,
+      contact_method: null, contact_id: null,
     }]
 
     const paymentInsert = vi.fn().mockReturnValue({
@@ -465,7 +465,7 @@ describe('AdminEventDetailPage', () => {
       id: 'u1', name: 'Ada Lovelace', nickname: 'Ada',
       cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false,
       logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null,
-      phone: null, contact_method: null, contact_id: null,
+      contact_method: null, contact_id: null,
     }]
     const existingPayments = [{
       id: 'pay-0', created_at: '2026-05-01T10:00:00Z', amount: 2000,
@@ -539,7 +539,7 @@ describe('AdminEventDetailPage', () => {
     const newProfile = {
       id: 'u-new', name: 'Eve Tester', nickname: 'Eve',
       cert_agency: null, cert_level: null, nitrox_certified: false,
-      logged_dives: 0, phone: null, contact_method: null, contact_id: null,
+      logged_dives: 0, contact_method: null, contact_id: null,
       height_cm: null, weight_kg: null, shoe_size: null, status: 'active',
     }
 
@@ -637,7 +637,7 @@ describe('AdminEventDetailPage', () => {
       id: 'u1', name: 'Ada Lovelace', nickname: 'Ada',
       cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false,
       logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null,
-      phone: null, contact_method: null, contact_id: null,
+      contact_method: null, contact_id: null,
     }]
     const diverNotes = [
       { id: 'n1', profile_id: 'u1', created_by: 'staff-1', content: 'Severe shellfish allergy',
@@ -690,11 +690,11 @@ describe('AdminEventDetailPage', () => {
         details: { transportation: true } },
     ]
     const profiles = [
-      { id: 'u1', name: 'Ada Lovelace',  nickname: 'Ada',  cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, phone: null, contact_method: null, contact_id: null },
-      { id: 'u2', name: 'Bob Roberts',   nickname: null,   cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, phone: null, contact_method: null, contact_id: null },
-      { id: 'u3', name: 'Carol Carlson', nickname: null,   cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, phone: null, contact_method: null, contact_id: null },
-      { id: 'u4', name: 'Dave Diver',    nickname: null,   cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, phone: null, contact_method: null, contact_id: null },
-      { id: 'u5', name: 'Eve Tester',    nickname: null,   cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, phone: null, contact_method: null, contact_id: null },
+      { id: 'u1', name: 'Ada Lovelace',  nickname: 'Ada',  cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, contact_method: null, contact_id: null },
+      { id: 'u2', name: 'Bob Roberts',   nickname: null,   cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, contact_method: null, contact_id: null },
+      { id: 'u3', name: 'Carol Carlson', nickname: null,   cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, contact_method: null, contact_id: null },
+      { id: 'u4', name: 'Dave Diver',    nickname: null,   cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, contact_method: null, contact_id: null },
+      { id: 'u5', name: 'Eve Tester',    nickname: null,   cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, contact_method: null, contact_id: null },
     ]
 
     from.mockImplementation((table: string) => {

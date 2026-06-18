@@ -60,12 +60,12 @@ describe('profiles RLS', () => {
     const sb = await userClient(adminUser.email, adminUser.password)
     const ok = await sb.from('profiles').update({
       nickname: 'Admin-edited',
-      phone: '+886-900-555-555',
+      nationality: 'Atlantean',
       cert_level: 'Rescue Diver',
     }).eq('id', diverB.id).select().single()
     expect(ok.error).toBeNull()
     expect(ok.data?.nickname).toBe('Admin-edited')
-    expect(ok.data?.phone).toBe('+886-900-555-555')
+    expect(ok.data?.nationality).toBe('Atlantean')
     expect(ok.data?.cert_level).toBe('Rescue Diver')
   })
 

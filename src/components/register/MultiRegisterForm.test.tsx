@@ -33,15 +33,15 @@ const sampleEvent = (id: string, title: string): AppEvent => ({
 
 const parentProfile: Profile = {
   id: 'p1', created_at: '', updated_at: '',
-  name: 'Parent Pat', nickname: 'Pat', phone: null,
-  date_of_birth: null, nationality: null, id_number: null,
+  name: 'Parent Pat', nickname: 'Pat',
+  date_of_birth: null, nationality: 'Taiwanese', id_number: null,
   emergency_contact_name: null, emergency_contact_phone: null,
   cert_agency: 'PADI', cert_level: 'AOW',
   cert_number: null, cert_date: null, cert_card_path: 'p1/c.jpg',
   nitrox_card_path: null, medical_notes: null,
   avatar_url: null, role: 'diver',
   height_cm: 170, weight_kg: 65, shoe_size: null,
-  gender: null, contact_method: null, contact_id: null,
+  gender: 'male', contact_method: null, contact_id: null,
   nitrox_certified: false, logged_dives: 50, last_dive_date: null,
   gear_owned: [],
 }

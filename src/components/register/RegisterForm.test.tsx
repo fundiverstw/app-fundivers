@@ -71,8 +71,8 @@ const noExtrasEvent: AppEvent = {
 
 const sampleProfile: Profile = {
   id: 'u1', created_at: '', updated_at: '',
-  name: 'Ada', nickname: 'Ada', phone: null,
-  date_of_birth: null, nationality: null, id_number: null,
+  name: 'Ada', nickname: 'Ada',
+  date_of_birth: null, nationality: 'British', id_number: null,
   emergency_contact_name: null, emergency_contact_phone: null,
   cert_agency: 'PADI', cert_level: 'Advanced Open Water',
   cert_number: null, cert_date: null,
@@ -662,6 +662,8 @@ describe('RegisterForm', () => {
     await user.click(screen.getByLabelText(/I agree to the/i))
     await user.click(screen.getByRole('button', { name: /solve captcha/i }))
     await user.type(screen.getByLabelText(/^name \*/i), 'Grace Hopper')
+    await user.type(screen.getByLabelText(/nationality \*/i), 'American')
+    await user.selectOptions(screen.getByLabelText(/gender \*/i), 'female')
     // Step 2 → 3 → 4 → confirm
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
@@ -680,7 +682,7 @@ describe('RegisterForm', () => {
       turnstile_token: 'test-turnstile-token',
     })
     expect(typeof opts.body.agreed_to_terms_at).toBe('string')
-    expect(opts.body.profile_patch).toMatchObject({ name: 'Grace Hopper' })
+    expect(opts.body.profile_patch).toMatchObject({ name: 'Grace Hopper', nationality: 'American', gender: 'female' })
 
     // Session token from the function gets handed to setSession so the
     // diver lands authed without a second round-trip.
@@ -712,6 +714,8 @@ describe('RegisterForm', () => {
     await user.click(screen.getByLabelText(/I agree to the/i))
     await user.click(screen.getByRole('button', { name: /solve captcha/i }))
     await user.type(screen.getByLabelText(/^name \*/i), 'Grace Hopper')
+    await user.type(screen.getByLabelText(/nationality \*/i), 'American')
+    await user.selectOptions(screen.getByLabelText(/gender \*/i), 'female')
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
     await user.click(screen.getByLabelText(/i have all the required gear/i))
@@ -1093,6 +1097,8 @@ describe('RegisterForm', () => {
     const sparseProfile: Profile = {
       ...sampleProfile,
       name: null,
+      nationality: null,
+      gender: null,
       cert_card_path: null,
     }
     render(
