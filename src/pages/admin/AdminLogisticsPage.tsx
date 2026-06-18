@@ -30,6 +30,8 @@ export function AdminLogisticsPage() {
 
   useEffect(() => {
     let cancelled = false
+    // Reset to the loading spinner whenever the selected day changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setGroups(null)
     ;(async () => {
       // fetchEventsInRange(day, day) returns dives starting that day and
@@ -154,12 +156,14 @@ export function AdminLogisticsPage() {
           </section>
 
           {groups.map(g => (
-            <section key={g.event.id} className="space-y-3">
-              <div className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4">
-                <h2 className="text-base font-semibold text-blue-900">{g.event.title}</h2>
-                <p className="text-sm text-blue-900 font-medium">
+            <section key={g.event.id} className="space-y-2 pt-2">
+              {/* Bold banner per event so the sections are obvious when
+                  scrolling a tall phone screen. */}
+              <div className="bg-blue-900 text-white rounded-xl px-4 py-2.5 flex items-baseline justify-between gap-3">
+                <h2 className="text-base font-semibold truncate">{g.event.title}</h2>
+                <span className="text-xs text-white/80 shrink-0">
                   {formatEventSpan(g.event, { style: 'compact' })} · {g.rows.length} diver{g.rows.length === 1 ? '' : 's'}
-                </p>
+                </span>
               </div>
               {g.rows.length === 0 ? (
                 <p className="text-xs text-blue-950/70 font-medium italic pl-1">No active registrants.</p>

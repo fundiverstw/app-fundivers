@@ -32,6 +32,10 @@ interface Props {
   tagFilter?: NoteTag
   /** Optional: override the section heading. */
   title?: string
+  /** Dense inline variant for embedding inside another card (e.g. the gear
+   *  card): no outer card chrome, one-line empty state, add form behind a
+   *  toggle so the common "no flags" case takes a single row. */
+  compact?: boolean
 }
 
 function columnFor(target: NoteTarget): 'eo_dive_id' | 'eo_course_id' | 'booking_id' {
@@ -48,7 +52,7 @@ function fkPayload(target: NoteTarget) {
   }
 }
 
-export function AdminNotes({ target, tagFilter, title = 'Notes' }: Props) {
+export function AdminNotes({ target, tagFilter, title = 'Notes', compact = false }: Props) {
   const { user, profile } = useAuth()
   const isAdmin = profile?.role === 'admin'
   const [notes, setNotes] = useState<NoteWithAuthors[]>([])
@@ -56,6 +60,8 @@ export function AdminNotes({ target, tagFilter, title = 'Notes' }: Props) {
   const [tag, setTag] = useState<NoteTag>(tagFilter ?? 'note')
   const [content, setContent] = useState('')
   const [saving, setSaving] = useState(false)
+  // Compact mode keeps the add form hidden until the user opts in.
+  const [adding, setAdding] = useState(false)
 
   // useCallback so the refetch identity is stable across renders that
   // don't change target/tagFilter, satisfying react-hooks/exhaustive-deps
@@ -110,6 +116,7 @@ export function AdminNotes({ target, tagFilter, title = 'Notes' }: Props) {
     if (!tagFilter) setTag('note')
     await refetch()
     setSaving(false)
+    if (compact) setAdding(false)
   }
 
   async function resolve(noteId: string) {
@@ -131,62 +138,89 @@ export function AdminNotes({ target, tagFilter, title = 'Notes' }: Props) {
 
   const open = notes.filter(m => !m.resolved)
   const resolved = notes.filter(m => m.resolved)
+  const showForm = !compact || adding
+
+  const Tag = compact ? 'div' : 'section'
+  const wrapperClass = compact
+    ? 'pt-2 mt-1 border-t border-sky-200 space-y-2'
+    : 'bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3'
 
   return (
-    <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-red-600 uppercase tracking-wider">{title}</h2>
-        {resolved.length > 0 && (
-          <button
-            onClick={() => setShowResolved(v => !v)}
-            className="text-xs text-blue-900 font-medium hover:text-blue-900"
-          >
-            {showResolved ? 'Hide resolved' : `Show resolved (${resolved.length})`}
-          </button>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        {open.length === 0 && (
-          <p className="text-xs text-blue-950 font-medium">No open notes.</p>
-        )}
-        {open.map(m => (
-          <NoteCard key={m.id} note={m} onResolve={isAdmin ? () => resolve(m.id) : undefined} />
-        ))}
-        {showResolved && resolved.map(m => (
-          <NoteCard key={m.id} note={m} onUnresolve={isAdmin ? () => unresolve(m.id) : undefined} />
-        ))}
-      </div>
-
-      <div className="pt-2 border-t border-sky-200 space-y-2">
-        <div className="flex flex-col sm:flex-row gap-2">
-          {!tagFilter && (
-            <select
-              value={tag}
-              onChange={e => setTag(e.target.value as NoteTag)}
-              className="sm:shrink-0 bg-white border border-sky-300 rounded-lg px-2 py-1 text-xs text-blue-900"
-            >
-              {NOTE_TAGS.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
+    <Tag className={wrapperClass}>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className={compact
+          ? 'text-xs font-semibold text-blue-900'
+          : 'text-sm font-semibold text-red-600 uppercase tracking-wider'}>
+          {title}
+          {compact && open.length === 0 && (
+            <span className="font-normal text-blue-950/60"> · none</span>
           )}
-          <input
-            type="text"
-            value={content}
-            onChange={e => setContent(e.target.value)}
-            placeholder="New note…"
-            className="sm:flex-1 min-w-0 bg-white border border-sky-300 rounded-lg px-3 py-1.5 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
-            onKeyDown={e => { if (e.key === 'Enter') addNote() }}
-          />
-          <button
-            onClick={addNote}
-            disabled={saving || !content.trim()}
-            className="sm:shrink-0 bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-xs font-semibold py-1.5 sm:py-1 px-3 rounded-lg"
-          >
-            Add
-          </button>
+        </h2>
+        <div className="flex items-center gap-3">
+          {resolved.length > 0 && (
+            <button
+              onClick={() => setShowResolved(v => !v)}
+              className="text-xs text-blue-900 font-medium hover:text-blue-900"
+            >
+              {showResolved ? 'Hide resolved' : `Show resolved (${resolved.length})`}
+            </button>
+          )}
+          {compact && (
+            <button
+              onClick={() => setAdding(a => !a)}
+              className="text-xs text-blue-900 font-semibold hover:text-blue-950 shrink-0"
+            >
+              {adding ? 'Cancel' : '+ Add'}
+            </button>
+          )}
         </div>
       </div>
-    </section>
+
+      {(open.length > 0 || (showResolved && resolved.length > 0)) && (
+        <div className="space-y-2">
+          {open.map(m => (
+            <NoteCard key={m.id} note={m} onResolve={isAdmin ? () => resolve(m.id) : undefined} />
+          ))}
+          {showResolved && resolved.map(m => (
+            <NoteCard key={m.id} note={m} onUnresolve={isAdmin ? () => unresolve(m.id) : undefined} />
+          ))}
+        </div>
+      )}
+      {!compact && open.length === 0 && (
+        <p className="text-xs text-blue-950 font-medium">No open notes.</p>
+      )}
+
+      {showForm && (
+        <div className={compact ? 'space-y-2' : 'pt-2 border-t border-sky-200 space-y-2'}>
+          <div className="flex flex-col sm:flex-row gap-2">
+            {!tagFilter && (
+              <select
+                value={tag}
+                onChange={e => setTag(e.target.value as NoteTag)}
+                className="sm:shrink-0 bg-white border border-sky-300 rounded-lg px-2 py-1 text-xs text-blue-900"
+              >
+                {NOTE_TAGS.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            )}
+            <input
+              type="text"
+              value={content}
+              onChange={e => setContent(e.target.value)}
+              placeholder="New note…"
+              className="sm:flex-1 min-w-0 bg-white border border-sky-300 rounded-lg px-3 py-1.5 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
+              onKeyDown={e => { if (e.key === 'Enter') addNote() }}
+            />
+            <button
+              onClick={addNote}
+              disabled={saving || !content.trim()}
+              className="sm:shrink-0 bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-xs font-semibold py-1.5 sm:py-1 px-3 rounded-lg"
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      )}
+    </Tag>
   )
 }
 
