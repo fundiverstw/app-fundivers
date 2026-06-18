@@ -43,6 +43,7 @@ interface MockOpts {
   turnstileResult?: TurnstileResult
   rateLimitCounts?: { in_last_60s: number; in_last_24h: number }
   eventNotFound?:  boolean
+  eventPast?:      boolean
   deleteUserError?: string
 }
 
@@ -66,9 +67,17 @@ function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites }
         case 'bookings':
           return { id: 'b1', status: opts.bookingStatus ?? 'pending', notes: null }
         case 'EO_dives':
-          return opts.eventNotFound ? null : { _id: 'd1', start_date: '2030-06-01', end_date: '2030-06-03', display_title: 'Test Dive' }
+          return opts.eventNotFound ? null : {
+            _id: 'd1', display_title: 'Test Dive',
+            ...(opts.eventPast
+              ? { start_date: '2020-01-01', end_date: '2020-01-03' }
+              : { start_date: '2030-06-01', end_date: '2030-06-03' }),
+          }
         case 'EO_courses':
-          return opts.eventNotFound ? null : { _id: 'c1', course_days: ['2030-06-01', '2030-06-02', '2030-06-03'], display_title: 'Test Course' }
+          return opts.eventNotFound ? null : {
+            _id: 'c1', display_title: 'Test Course',
+            course_days: opts.eventPast ? ['2020-01-01', '2020-01-02'] : ['2030-06-01', '2030-06-02', '2030-06-03'],
+          }
         default:           return null
       }
     })()
@@ -688,5 +697,41 @@ describe('handleRegistration — happy path returns the booking id and session',
     expect(res.status).toBe(200)
     const body = await res.json() as { session: unknown }
     expect(body.session).toBeNull()
+  })
+})
+
+describe('handleRegistration — past-event guard', () => {
+  it('rejects an authed diver registering for a past event', async () => {
+    const { deps, captured } = makeDeps({ callerUserId: 'self-uid', callerRole: 'diver', eventPast: true })
+    const res = await handleRegistration(postJson(goodBody, { Authorization: 'Bearer self-jwt' }), deps)
+    expect(res.status).toBe(403)
+    expect(captured.bookingInsert).toHaveLength(0)
+  })
+
+  it('rejects a guest registering for a past event before creating the user', async () => {
+    const { deps, captured } = makeDeps({ eventPast: true })
+    const res = await handleRegistration(postJson({
+      ...goodBody, email: 'g@example.com', password: 'hunter2hunter2', turnstile_token: 'tk',
+    }), deps)
+    expect(res.status).toBe(403)
+    expect(captured.createUserCalls).toHaveLength(0)
+    expect(captured.bookingInsert).toHaveLength(0)
+  })
+
+  it('lets an admin register a diver for a past event (full control)', async () => {
+    const { deps, captured } = makeDeps({ callerRole: 'admin', eventPast: true })
+    const res = await handleRegistration(postJson({
+      ...goodBody, target_user_id: 'some-target-uid',
+    }, { Authorization: 'Bearer admin-jwt' }), deps)
+    expect(res.status).toBe(200)
+    expect(captured.bookingInsert).toHaveLength(1)
+  })
+
+  it('rejects a parent registering a child for a past event', async () => {
+    const { deps } = makeDeps({ callerRole: 'diver', callerUserId: 'parent-uid', targetParentAccount: 'parent-uid', eventPast: true })
+    const res = await handleRegistration(postJson({
+      ...goodBody, target_user_id: 'child-uid',
+    }, { Authorization: 'Bearer parent-jwt' }), deps)
+    expect(res.status).toBe(403)
   })
 })
