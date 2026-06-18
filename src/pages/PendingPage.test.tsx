@@ -64,4 +64,37 @@ describe('PendingPage', () => {
     // Form is hidden in this state.
     expect(screen.queryByRole('button', { name: /save changes/i })).not.toBeInTheDocument()
   })
+
+  it('treats an uncertified diver (no cert level) as complete', () => {
+    useAuthMock.mockReturnValue({
+      user: { id: 'u1' },
+      profile: {
+        id: 'u1', status: 'pending',
+        name: 'Ada', nickname: 'Ada',
+        date_of_birth: '1990-01-01',
+        cert_level: null, uncertified: true,
+        contact_method: 'email', contact_id: 'ada@example.com',
+      },
+      signOut,
+    })
+    renderPage()
+    expect(screen.getByRole('heading', { name: /application submitted/i })).toBeInTheDocument()
+  })
+
+  it('keeps a diver who has neither a cert level nor an uncertified flag on the form', () => {
+    useAuthMock.mockReturnValue({
+      user: { id: 'u1' },
+      profile: {
+        id: 'u1', status: 'pending',
+        name: 'Ada', nickname: 'Ada',
+        date_of_birth: '1990-01-01',
+        cert_level: null,
+        contact_method: 'email', contact_id: 'ada@example.com',
+      },
+      signOut,
+    })
+    renderPage()
+    expect(screen.getByRole('heading', { name: /under review/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument()
+  })
 })
