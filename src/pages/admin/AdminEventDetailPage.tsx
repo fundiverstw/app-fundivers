@@ -20,6 +20,7 @@ import { requestEventDiverExport } from '../../lib/admin-event-export'
 import { BookingPaymentsBlock } from '../../components/admin/BookingPaymentsBlock'
 import { resolveCharges, type ChargeLine } from '../../lib/booking-charges'
 import { openCreditForBooking } from '../../lib/credits'
+import { bookingBalance } from '../../lib/booking-balance'
 import { ShareEventButton } from '../../components/ShareEventButton'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Credit, DiverNote, Payment, Profile } from '../../types/database'
 
@@ -973,12 +974,13 @@ function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, on
   const baseTotal = Number((r.booking.details as { total?: number } | undefined)?.total ?? 0)
   const adjusted = baseTotal + amendmentsDelta(r.amendments)
   const totalPaid = r.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
-  // Balance nets open credit-for-this-event against what's owed. Positive =
-  // diver still owes (red); negative = diver is net in credit (green).
-  const balance = adjusted - totalPaid - r.credit
-  const paymentStatus = balance > 0
+  // Balance nets open credit-for-this-event against what's owed. 'overpaid' is
+  // kept distinct from 'credit' so a plain overpayment is never mislabelled as
+  // an awarded account credit.
+  const bal = bookingBalance(adjusted, totalPaid, r.credit)
+  const paymentStatus = bal.state === 'due'
     ? (totalPaid === 0 && r.credit === 0 ? 'none' : 'partial')
-    : balance < 0 ? 'credit' : 'paid'
+    : bal.state
 
   const statusStyles: Record<string, string> = {
     confirmed:  'text-blue-900 font-semibold',
@@ -987,9 +989,10 @@ function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, on
     waitlisted: 'text-violet-400',
   }
   const payStyles: Record<string, string> = {
-    paid:    'text-blue-900 font-semibold',
+    settled: 'text-blue-900 font-semibold',
     partial: 'text-red-600',
     credit:  'text-emerald-700 font-semibold',
+    overpaid:'text-amber-600 font-semibold',
     none:    'text-blue-950 font-medium',
   }
 
@@ -1054,10 +1057,11 @@ function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, on
             </span>
           )}
           <span className={`${payStyles[paymentStatus]} text-xs font-medium whitespace-nowrap`}>
-            {paymentStatus === 'paid'    && (totalPaid > 0 ? `Paid ${totalPaid.toLocaleString()}` : 'Settled')}
-            {paymentStatus === 'partial' && `${balance.toLocaleString()} due`}
-            {paymentStatus === 'credit'  && `${(-balance).toLocaleString()} credit`}
-            {paymentStatus === 'none'    && 'Unpaid'}
+            {paymentStatus === 'settled'  && (totalPaid > 0 ? `Paid ${totalPaid.toLocaleString()}` : 'Settled')}
+            {paymentStatus === 'partial'  && `${bal.amount.toLocaleString()} due`}
+            {paymentStatus === 'credit'   && `${bal.amount.toLocaleString()} credit`}
+            {paymentStatus === 'overpaid' && `${bal.amount.toLocaleString()} overpaid`}
+            {paymentStatus === 'none'     && 'Unpaid'}
           </span>
         </span>
       </div>

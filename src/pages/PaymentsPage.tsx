@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
 import { fetchCreditsForUser, openCreditBalance, openCreditForBooking } from '../lib/credits'
+import { bookingBalance } from '../lib/booking-balance'
 import { resolveCharges, type ChargeLine } from '../lib/booking-charges'
 import { fetchChargeCatalog } from '../lib/booking-charge-catalog'
 import { ChargeBreakdown } from '../components/ChargeBreakdown'
@@ -195,9 +196,10 @@ function LineCard({
   const label = event?.title ?? '(event)'
   const refundRequested = !!booking.refund_requested_at
   const canRefundDeposit = paid > 0 && !refundRequested
-  // Balance nets open credit-for-this-event against what's owed. Positive =
-  // still owed (red); negative = net in credit (green).
-  const balance = total - paid - credit
+  // Balance nets open credit-for-this-event against what's owed. 'overpaid' is
+  // kept distinct from 'credit' so paying more than owed isn't shown as an
+  // awarded account credit.
+  const bal = bookingBalance(total, paid, credit)
 
   return (
     <div className={CARD}>
@@ -220,11 +222,10 @@ function LineCard({
           {total > 0 ? (
             <>
               <p className={`text-sm font-semibold ${TEXT_HEADING}`}>{currency} {total.toLocaleString()}</p>
-              {balance > 0
-                ? <p className={`text-xs ${TEXT_ERROR}`}>{currency} {balance.toLocaleString()} due</p>
-                : balance < 0
-                  ? <p className="text-xs text-emerald-700 font-semibold">{currency} {(-balance).toLocaleString()} credit</p>
-                  : <p className="text-xs text-blue-900 font-semibold">Paid in full</p>}
+              {bal.state === 'due' && <p className={`text-xs ${TEXT_ERROR}`}>{currency} {bal.amount.toLocaleString()} due</p>}
+              {bal.state === 'credit' && <p className="text-xs text-emerald-700 font-semibold">{currency} {bal.amount.toLocaleString()} credit</p>}
+              {bal.state === 'overpaid' && <p className="text-xs text-amber-600 font-semibold">{currency} {bal.amount.toLocaleString()} overpaid</p>}
+              {bal.state === 'settled' && <p className="text-xs text-blue-900 font-semibold">Paid in full</p>}
             </>
           ) : <p className={`text-xs ${TEXT_SUBTLE}`}>—</p>}
           <p className={`text-xs ${TEXT_SUBTLE} mt-0.5`}>{open ? '▲' : '▼'}</p>
@@ -266,13 +267,10 @@ function LineCard({
           {total > 0 && (
             <div className={`flex justify-between font-semibold pt-1 border-t border-sky-200 ${TEXT_BODY}`}>
               <span>Balance</span>
-              {balance > 0 ? (
-                <span className={TEXT_ERROR}>{currency} {balance.toLocaleString()} due</span>
-              ) : balance < 0 ? (
-                <span className="text-emerald-700">{currency} {(-balance).toLocaleString()} credit</span>
-              ) : (
-                <span className="text-blue-900">Settled ✓</span>
-              )}
+              {bal.state === 'due' && <span className={TEXT_ERROR}>{currency} {bal.amount.toLocaleString()} due</span>}
+              {bal.state === 'credit' && <span className="text-emerald-700">{currency} {bal.amount.toLocaleString()} credit</span>}
+              {bal.state === 'overpaid' && <span className="text-amber-600">{currency} {bal.amount.toLocaleString()} overpaid</span>}
+              {bal.state === 'settled' && <span className="text-blue-900">Settled ✓</span>}
             </div>
           )}
 
