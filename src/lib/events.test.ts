@@ -346,6 +346,31 @@ describe('formatEventSpan — start_time_hhmm rendering', () => {
   })
 })
 
+describe('isPastEvent', () => {
+  const now = new Date('2026-06-18T04:00:00.000Z') // 2026-06-18 noon Taipei
+
+  it('is true when the event day is before today (Taipei)', async () => {
+    const { isPastEvent } = await import('./events')
+    expect(isPastEvent({ start_time: '2026-06-17T01:00:00.000Z', end_time: null }, now)).toBe(true)
+  })
+
+  it('is false on the event day itself (can still register the morning of)', async () => {
+    const { isPastEvent } = await import('./events')
+    expect(isPastEvent({ start_time: '2026-06-18T00:30:00.000Z', end_time: null }, now)).toBe(false)
+  })
+
+  it('is false for a future event', async () => {
+    const { isPastEvent } = await import('./events')
+    expect(isPastEvent({ start_time: '2026-06-20T00:15:00.000Z', end_time: null }, now)).toBe(false)
+  })
+
+  it('uses the last day for a multi-day event', async () => {
+    const { isPastEvent } = await import('./events')
+    // started in the past but ends in the future → not past.
+    expect(isPastEvent({ start_time: '2026-06-16T01:00:00.000Z', end_time: '2026-06-20T01:00:00.000Z' }, now)).toBe(false)
+  })
+})
+
 describe('eventSpotsRemaining + eventIsFull', () => {
   it('returns null when capacity is unset (uncapped event)', async () => {
     const { eventSpotsRemaining, eventIsFull } = await import('./events')

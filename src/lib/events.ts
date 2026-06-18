@@ -108,6 +108,21 @@ export function formatEventSpan(
 }
 
 /**
+ * True when an event's last day is before today in the shop's timezone
+ * (Asia/Taipei) — i.e. the event has already happened. Used to close
+ * registration to divers for past events (admins/staff bypass this). Compared
+ * by calendar day, not instant, so a diver can still register the morning of.
+ */
+export function isPastEvent(
+  event: Pick<AppEvent, 'start_time' | 'end_time'>,
+  now: Date = new Date(),
+): boolean {
+  const dayKey = (d: Date | string) =>
+    new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' })
+  return dayKey(event.end_time ?? event.start_time) < dayKey(now)
+}
+
+/**
  * Build an ISO timestamp from an EO_* date column ('YYYY-MM-DD') and a
  * time column ('HH:MM:SS'). PostgREST serializes both as strings.
  * Defaults to midnight when the time is null or empty.

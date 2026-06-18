@@ -21,6 +21,13 @@ vi.mock('../../lib/supabase', () => ({
   },
 }))
 
+// The form reads the viewer's role to decide whether to block past-event
+// registration. Default to a diver; the sample events are future-dated so the
+// block stays off for the existing flow tests.
+vi.mock('../../hooks/useAuth', () => ({
+  useAuth: () => ({ profile: { role: 'diver' } }),
+}))
+
 // Stub the Turnstile widget so guest tests can "solve" the captcha without
 // loading Cloudflare's script: clicking the button hands a token to the form,
 // the same contract the real widget fulfils via its onToken callback.
@@ -125,6 +132,21 @@ afterEach(() => {
 })
 
 describe('RegisterForm', () => {
+  it('blocks a diver from registering for a past event', async () => {
+    setupFrom()
+    render(
+      <RegisterForm
+        event={{ ...sampleEvent, start_time: '2020-01-01T00:00:00.000Z', full_payment_deadline: null }}
+        profile={sampleProfile}
+        userId="u1"
+        onClose={() => {}}
+        onBooked={() => {}}
+      />
+    )
+    expect(await screen.findByText(/already taken place/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+  })
+
   it('walks through 4 steps and submits a minimal booking with empty details structure', async () => {
     setupFrom()
     const onBooked = vi.fn()

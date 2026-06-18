@@ -3,7 +3,7 @@ import { personName } from '../../lib/names'
 import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../lib/gear'
 import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
 import { supabase } from '../../lib/supabase'
-import { formatEventSpan } from '../../lib/events'
+import { formatEventSpan, isPastEvent } from '../../lib/events'
 import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/payment-instructions'
 import type { AppEvent, Booking, BookingDetails, Database, Profile } from '../../types/database'
 
@@ -159,10 +159,16 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
     setCart(prev => prev.filter(e => e.id !== eventId))
   }
 
+  // Past events can't be booked (admins/staff manage those from the admin
+  // pages instead). The diver must drop them from the cart to continue.
+  const viewerPrivileged = profile?.role === 'admin' || profile?.role === 'staff'
+  const pastInCart = cart.filter(ev => isPastEvent(ev))
+  const hasBlockedPast = !viewerPrivileged && pastInCart.length > 0
+
   // Step gates — same spirit as solo flow, only the multi-applicable ones.
-  const step2Blocked = fullName.trim() === ''
+  const step2Blocked = fullName.trim() === '' || hasBlockedPast
   const step3Blocked = cart.some(ev => choicesById[ev.id]?.needsTransport === null)
-  const submitBlocked = cart.length === 0
+  const submitBlocked = cart.length === 0 || hasBlockedPast
 
   async function submit() {
     setSaving(true)
@@ -323,6 +329,14 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
             <p className="text-sm text-blue-950 font-medium">
               Review the events you're registering for. Tap × on any row to drop it.
             </p>
+            {hasBlockedPast && (
+              <div role="alert" className="bg-red-50 border border-red-500 rounded-lg px-3 py-2 text-xs text-red-700">
+                <p className="font-semibold">
+                  {pastInCart.length === 1 ? 'One event has' : `${pastInCart.length} events have`} already taken place.
+                </p>
+                <p>Registration is closed for past events — drop {pastInCart.length === 1 ? 'it' : 'them'} to continue.</p>
+              </div>
+            )}
             <ul className="space-y-2">
               {cart.map(ev => (
                 <li key={ev.id} className="bg-sky-50 border border-sky-200 rounded-lg px-3 py-2 space-y-2">
@@ -628,7 +642,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
             <button
               onClick={() => setStep((step + 1) as Step)}
               disabled={
-                (step === 1 && cart.length === 0) ||
+                (step === 1 && (cart.length === 0 || hasBlockedPast)) ||
                 (step === 2 && step2Blocked) ||
                 (step === 3 && step3Blocked)
               }

@@ -135,6 +135,29 @@ export interface Deps {
   verifyTurnstile:  (token: string, remoteIp: string | null) => Promise<TurnstileResult>
 }
 
+/**
+ * True when the target event's last day is before today (Asia/Taipei). EO_*
+ * date columns are 'YYYY-MM-DD' Taipei calendar days, so a lexical compare is
+ * correct. Used to reject diver/guest registrations for events that already
+ * happened; admins/staff bypass this server-side check too.
+ */
+async function eventHasPassed(admin: SupabaseAdminClient, eventType: string, eventId: string): Promise<boolean> {
+  const table = eventType === "dive" ? "EO_dives" : "EO_courses"
+  const cols  = eventType === "dive" ? "start_date, end_date" : "course_days"
+  const { data } = await admin.from(table).select(cols).eq("_id", eventId).maybeSingle()
+  if (!data) return false // unknown event — existing existence checks handle it
+  let lastDay: string | null
+  if (eventType === "dive") {
+    lastDay = (data.end_date ?? data.start_date) ?? null
+  } else {
+    const days = [...((data.course_days ?? []) as string[])].filter(Boolean).sort()
+    lastDay = days.length ? days[days.length - 1] : null
+  }
+  if (!lastDay) return false
+  const todayTaipei = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" })
+  return String(lastDay).slice(0, 10) < todayTaipei
+}
+
 export async function handleRegistration(req: Request, deps: Deps): Promise<Response> {
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
     status,
@@ -159,6 +182,10 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
   let registrantEmail: string
   let session: unknown = null
   let createdGuest = false
+  // Admins/staff may book past events (recording after the fact); divers,
+  // parents and guests may not. Defaults false; set true only for the
+  // privileged auth paths below.
+  let callerIsPrivileged = false
 
   const auth = req.headers.get("Authorization") ?? ""
   if (auth.startsWith("Bearer ") && body.target_user_id) {
@@ -172,6 +199,8 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     const { data: callerProfile } = await admin
       .from("profiles").select("role").eq("id", c.user.id).single()
     const isAdmin = callerProfile?.role === "admin"
+    // Admin/staff acting on behalf may book past events; a parent may not.
+    callerIsPrivileged = isAdmin || callerProfile?.role === "staff"
     if (!isAdmin) {
       const { data: targetProfile } = await admin
         .from("profiles").select("parent_account").eq("id", body.target_user_id).maybeSingle()
@@ -193,6 +222,9 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     userId = u.user.id
     registrantEmail = u.user.email ?? ""
     if (!registrantEmail) return json({ error: "user has no email" }, 400)
+    const { data: selfProfile } = await admin
+      .from("profiles").select("role").eq("id", u.user.id).single()
+    callerIsPrivileged = selfProfile?.role === "admin" || selfProfile?.role === "staff"
   } else {
     if (!body.email || !body.password) {
       return json({ error: "email and password required for guest path" }, 400)
@@ -232,6 +264,12 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
       .from(eventTable).select("_id").eq("_id", body.event_id).maybeSingle()
     if (!existsRow) {
       return json({ error: "event not found" }, 404)
+    }
+
+    // Guests can never book a past event — reject before burning a MAU on
+    // createUser.
+    if (await eventHasPassed(admin, body.event_type, body.event_id)) {
+      return json({ error: "Registration is closed — this event has already taken place." }, 403)
     }
 
     const { data, error } = await admin.auth.admin.createUser({
@@ -295,6 +333,12 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     .update(safePatch)
     .eq("id", userId)
   if (profErr) return rollback(safeError(profErr, "profile update failed"))
+
+  // Past-event guard for the authed self + parent-on-behalf paths (the guest
+  // path already checked before createUser). Admins/staff bypass.
+  if (!callerIsPrivileged && await eventHasPassed(admin, body.event_type, body.event_id)) {
+    return json({ error: "Registration is closed — this event has already taken place." }, 403)
+  }
 
   // 2. Booking insert — pre-check for active booking; partial unique
   //    index is the race safety net.

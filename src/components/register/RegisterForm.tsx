@@ -3,7 +3,8 @@ import { personName } from '../../lib/names'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { CURRENT_TERMS_VERSION } from '../../lib/terms-version'
-import { formatEventSpan, eventIsFull } from '../../lib/events'
+import { formatEventSpan, eventIsFull, isPastEvent } from '../../lib/events'
+import { useAuth } from '../../hooks/useAuth'
 import { computeEffectiveFullPaymentDeadline } from '../../lib/payment-deadlines'
 import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/payment-instructions'
 import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../lib/gear'
@@ -362,6 +363,13 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // upload from /profile later.
   const isOnBehalfOf = !!actingOnBehalfOf
   const initialDetails = existingBooking?.details as BookingDetails | undefined
+  // Registration is closed for events that have already happened — but admins
+  // and staff keep full control (e.g. recording a booking after the fact) and
+  // the admin edit path is always allowed. Guests (no session) are never
+  // privileged, so a deep-link to a past event is blocked too.
+  const { profile: viewerProfile } = useAuth()
+  const viewerPrivileged = viewerProfile?.role === 'admin' || viewerProfile?.role === 'staff'
+  const pastBlocked = !isEdit && !viewerPrivileged && isPastEvent(event)
   // Gating derived from the event
   const diveDays = Math.max(1, event.dive_days ?? 1)
   // Open Water / DSD courses bundle gear into the fee — we record the fact
@@ -870,6 +878,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         <section className="space-y-3">
           {event.price != null && (
             <p className="text-sm text-blue-950 font-medium">From {event.currency} {event.price.toLocaleString()}</p>
+          )}
+          {pastBlocked && (
+            <div role="alert" className="bg-red-50 border border-red-500 rounded-lg px-3 py-2 text-xs text-red-700">
+              <p className="font-semibold">This event has already taken place.</p>
+              <p>Registration is closed. Check the calendar for upcoming dives and courses.</p>
+            </div>
           )}
           {/* Title carries the "(N spot(s) open)" / "(fully booked …)"
               suffix via the display_title trigger. We still show a fuller
@@ -1402,6 +1416,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           <button
             onClick={() => setStep((step + 1) as Step)}
             disabled={
+              pastBlocked ||
               (step === 2 && (
                 (!isOnBehalfOf && fullName.trim() === '') ||
                 (!isOnBehalfOf && certBlocked) ||
@@ -1417,7 +1432,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             Next ›
           </button>
         ) : (
-          <button onClick={submit} disabled={saving || (!isOnBehalfOf && !!cancelPolicy && !policyAcked)}
+          <button onClick={submit} disabled={saving || pastBlocked || (!isOnBehalfOf && !!cancelPolicy && !policyAcked)}
             className="bg-blue-900 hover:bg-blue-950 disabled:opacity-60 disabled:cursor-wait text-white text-sm font-semibold py-2 px-4 rounded-lg inline-flex items-center gap-2">
             {saving && (
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" />
