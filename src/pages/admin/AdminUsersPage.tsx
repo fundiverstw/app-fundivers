@@ -604,6 +604,7 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
                     paid={paid}
                     credit={credit}
                     charges={b.charges}
+                    amendments={(extras.amendments.get(b.id) ?? []).map(a => ({ label: a.note, amount: a.amount }))}
                     currency={b.event?.currency ?? 'NTD'}
                     pending={b.status === 'pending'}
                     cancelled={false}

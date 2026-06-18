@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
 import { errorMessage } from '../../lib/errors'
-import { ChargeBreakdown } from '../ChargeBreakdown'
+import { ChargeBreakdown, type AmendmentLine } from '../ChargeBreakdown'
 import { bookingBalance } from '../../lib/booking-balance'
 import type { ChargeLine } from '../../lib/booking-charges'
 import type { Payment } from '../../types/database'
@@ -23,7 +23,7 @@ import type { Payment } from '../../types/database'
  */
 export function BookingPaymentsBlock({
   payments, owed, paid, credit = 0, pending, cancelled, readOnly, onRecord, onVoid, onMarkDepositPaid,
-  charges, currency,
+  charges, amendments, currency,
 }: {
   payments: Payment[]
   owed: number
@@ -35,6 +35,9 @@ export function BookingPaymentsBlock({
    *  present, an itemized list is shown above the owed/paid figures so staff
    *  can trace exactly what the diver was charged. */
   charges?: ChargeLine[]
+  /** Post-booking adjustments (discounts / surcharges). Shown in the breakdown
+   *  after the charges so it ties out to `owed`. */
+  amendments?: AmendmentLine[]
   currency?: string
   /** The booking is still 'pending' — gates the "Mark deposit paid" button. */
   pending: boolean
@@ -109,10 +112,10 @@ export function BookingPaymentsBlock({
 
   return (
     <div className="text-xs bg-sky-50 rounded p-2 space-y-2">
-      {charges && charges.length > 0 && (
+      {((charges && charges.length > 0) || (amendments && amendments.length > 0)) && (
         <div className="pb-2 border-b border-sky-200 space-y-1">
           <p className="font-semibold text-blue-900">Charges</p>
-          <ChargeBreakdown lines={charges} currency={currency ?? 'NTD'} />
+          <ChargeBreakdown lines={charges ?? []} amendments={amendments} total={owed} currency={currency ?? 'NTD'} />
         </div>
       )}
 

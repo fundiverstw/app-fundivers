@@ -1148,6 +1148,7 @@ function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, on
             paid={totalPaid}
             credit={r.credit}
             charges={r.charges}
+            amendments={r.amendments.map(a => ({ label: a.note, amount: a.amount }))}
             currency={currency}
             pending={r.booking.status === 'pending'}
             cancelled={r.booking.status === 'cancelled'}
@@ -1158,9 +1159,6 @@ function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, on
           />
 
           <AmendmentsSection
-            amendments={r.amendments}
-            baseTotal={baseTotal}
-            adjusted={adjusted}
             readOnly={!!readOnly}
             onAdd={(sign, amount, note) => onAddAmendment(r.booking.id, sign, amount, note)}
           />
@@ -1181,10 +1179,11 @@ function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, on
   )
 }
 
-function AmendmentsSection({ amendments, baseTotal, adjusted, readOnly, onAdd }: {
-  amendments: BookingAmendment[]
-  baseTotal: number
-  adjusted: number
+// Admin-only control for adding a balance amendment (discount / surcharge).
+// The amendments themselves are listed inside the Charges breakdown above, so
+// this section is purely the "add" affordance — hidden entirely for read-only
+// (staff) viewers.
+function AmendmentsSection({ readOnly, onAdd }: {
   readOnly: boolean
   onAdd: (sign: '+' | '-', amount: number, note: string) => Promise<void>
 }) {
@@ -1217,34 +1216,12 @@ function AmendmentsSection({ amendments, baseTotal, adjusted, readOnly, onAdd }:
     }
   }
 
-  if (amendments.length === 0 && readOnly) return null
+  if (readOnly) return null
 
   return (
     <div className="text-xs bg-sky-50 rounded p-2 space-y-2">
-      <p className="font-semibold text-blue-900">Balance amendments</p>
-      {amendments.length === 0 ? (
-        <p className="text-blue-900 font-medium italic">No amendments yet.</p>
-      ) : (
-        <ul className="space-y-1">
-          {amendments.map(a => (
-            <li key={a.id} className="flex items-baseline justify-between gap-2">
-              <span className="text-blue-950 font-medium flex-1">{a.note}</span>
-              <span className={`shrink-0 font-semibold ${a.amount >= 0 ? 'text-red-600' : 'text-blue-900'}`}>
-                {a.amount >= 0 ? '+' : '−'}{Math.abs(a.amount).toLocaleString()}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {amendments.length > 0 && baseTotal > 0 && (
-        <p className="text-blue-900 font-medium pt-1 border-t border-sky-200 flex items-baseline justify-between">
-          <span>Adjusted total</span>
-          <span className="font-semibold">{adjusted.toLocaleString()}</span>
-        </p>
-      )}
-
-      {!readOnly && (
-        <form onSubmit={handleSubmit} className="space-y-1.5 pt-1 border-t border-sky-200">
+      <p className="font-semibold text-blue-900">Add balance amendment</p>
+      <form onSubmit={handleSubmit} className="space-y-1.5">
           <div className="flex items-center gap-2">
             <select
               value={sign}
@@ -1283,8 +1260,7 @@ function AmendmentsSection({ amendments, baseTotal, adjusted, readOnly, onAdd }:
               {submitting ? 'Adding…' : 'Add amendment'}
             </button>
           </div>
-        </form>
-      )}
+      </form>
     </div>
   )
 }

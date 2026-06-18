@@ -19,6 +19,20 @@ describe('ChargeBreakdown', () => {
     expect(screen.getByText('NTD 3,780')).toBeInTheDocument()
   })
 
+  it('renders amendment lines (discounts shown with a minus) and ties out to the total', () => {
+    render(
+      <ChargeBreakdown
+        lines={[{ kind: 'base', label: 'Base', amount: 8950 }]}
+        amendments={[{ label: '2 person discount', amount: -800 }]}
+        currency="TWD"
+      />,
+    )
+    expect(screen.getByText('2 person discount')).toBeInTheDocument()
+    expect(screen.getByText('−TWD 800')).toBeInTheDocument()
+    // 8950 − 800 = 8150, computed when no explicit total is passed.
+    expect(screen.getByText('TWD 8,150')).toBeInTheDocument()
+  })
+
   it('falls back to summing the lines when no total is given', () => {
     render(<ChargeBreakdown lines={lines} currency="NTD" />)
     expect(screen.getByText('NTD 3,780')).toBeInTheDocument()

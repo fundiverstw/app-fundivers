@@ -256,10 +256,12 @@ function Card({
   const canCancel = row.status === 'pending' && row.paidSum === 0 && !row.refund_requested_at
   const canRefund = row.paidSum > 0 && row.status !== 'cancelled' && !row.refund_requested_at
   const currency = row.event?.currency ?? 'TWD'
+  const amendmentLines = row.amendments.map(a => ({ label: a.note, amount: a.amount }))
+  const owed = total + amendmentsDelta(row.amendments)
   // Balance nets open credit-for-this-event against what's owed (incl.
   // amendments). 'overpaid' stays distinct from 'credit' so paying more than
   // owed isn't shown as an awarded account credit.
-  const bal = bookingBalance(total + amendmentsDelta(row.amendments), row.paidSum, row.credit)
+  const bal = bookingBalance(owed, row.paidSum, row.credit)
 
   return (
     <div className={CARD}>
@@ -296,41 +298,20 @@ function Card({
 
       {open && (
         <div className="px-4 pb-4 border-t border-sky-200 pt-3 space-y-3 text-sm">
-          {row.charges.length > 0
-            ? <ChargeBreakdown lines={row.charges} currency={row.event?.currency ?? 'TWD'} total={total} />
+          {(row.charges.length > 0 || amendmentLines.length > 0)
+            ? <ChargeBreakdown lines={row.charges} amendments={amendmentLines} currency={currency} total={owed} />
             : total > 0 && (
                 <div className={`flex justify-between ${TEXT_BODY}`}>
                   <span>Total</span>
-                  <span className="font-semibold">{row.event?.currency ?? 'TWD'} {total.toLocaleString()}</span>
+                  <span className="font-semibold">{currency} {total.toLocaleString()}</span>
                 </div>
               )}
           {deposit > 0 && (
             <div className={`flex justify-between ${TEXT_BODY}`}>
               <span>Deposit</span>
               <span className={row.paidSum >= deposit ? 'text-blue-900 font-semibold' : TEXT_ERROR}>
-                {row.event?.currency ?? 'TWD'} {deposit.toLocaleString()} {row.paidSum >= deposit ? '✓' : 'due'}
+                {currency} {deposit.toLocaleString()} {row.paidSum >= deposit ? '✓' : 'due'}
               </span>
-            </div>
-          )}
-          {row.amendments.length > 0 && (
-            <div className={`text-xs ${TEXT_BODY} bg-sky-50 rounded p-2 space-y-1`}>
-              <p className={`font-semibold ${TEXT_HEADING}`}>Amendments</p>
-              <ul className="space-y-0.5">
-                {row.amendments.map(a => (
-                  <li key={a.id} className="flex items-baseline justify-between gap-2">
-                    <span className="flex-1">{a.note}</span>
-                    <span className={`shrink-0 font-semibold ${a.amount >= 0 ? 'text-red-600' : 'text-blue-900'}`}>
-                      {a.amount >= 0 ? '+' : '−'}{Math.abs(a.amount).toLocaleString()}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <p className={`pt-1 border-t border-sky-200 flex items-baseline justify-between ${TEXT_HEADING}`}>
-                <span>Adjusted total</span>
-                <span className="font-semibold">
-                  {row.event?.currency ?? 'TWD'} {(total + amendmentsDelta(row.amendments)).toLocaleString()}
-                </span>
-              </p>
             </div>
           )}
 
