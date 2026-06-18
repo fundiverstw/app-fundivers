@@ -1,5 +1,34 @@
 import { describe, it, expect } from 'vitest'
-import { isGearIncludedCourse } from './gear'
+import { isGearIncludedCourse, gearPackList } from './gear'
+import type { Booking } from '../types/database'
+
+const bookingWith = (gear: unknown): Booking =>
+  ({ details: { gear } } as unknown as Booking)
+
+describe('gearPackList', () => {
+  it('packs nothing for a diver on their own gear', () => {
+    expect(gearPackList(bookingWith({ rent: false }))).toEqual({ summary: 'Own gear', items: [] })
+    expect(gearPackList(bookingWith(undefined))).toEqual({ summary: 'Own gear', items: [] })
+  })
+
+  it('packs a full set for course-included gear', () => {
+    const out = gearPackList(bookingWith({ rent: false, included: true }))
+    expect(out.summary).toBe('Included with course')
+    expect(out.items).toContain('BCD')
+    expect(out.items).toContain('Dive computer')
+  })
+
+  it('surfaces the assistance note and packs nothing yet', () => {
+    const out = gearPackList(bookingWith({ rent: false, assistance_note: 'unsure on fins' }))
+    expect(out).toEqual({ summary: 'Needs help', items: [], note: 'unsure on fins' })
+  })
+
+  it('packs exactly the à-la-carte items', () => {
+    const out = gearPackList(bookingWith({ rent: true, items: ['BCD', 'Fins'] }))
+    expect(out.summary).toBe('À-la-carte (2)')
+    expect(out.items).toEqual(['BCD', 'Fins'])
+  })
+})
 
 describe('isGearIncludedCourse', () => {
   it('treats Open Water courses as gear-included', () => {

@@ -9,6 +9,7 @@ import { ChartIcon } from '../icons/ChartIcon'
 import { CrosshairIcon } from '../icons/CrosshairIcon'
 import { PeopleIcon } from '../icons/PeopleIcon'
 import { PlusCircleIcon } from '../icons/PlusCircleIcon'
+import { LogisticsIcon } from '../icons/LogisticsIcon'
 import {
   PAGE, NAV_BAR, NAV_BOTTOM,
   ON_DEEP_MUTED, ON_DEEP_SUBTLE,
@@ -17,6 +18,7 @@ import {
 type NavItem = { to: string; label: string; icon: React.ReactNode; adminOnly?: boolean }
 const adminNav: NavItem[] = [
   { to: '/admin/events',    label: 'Calendar',  icon: <CalendarIcon /> },
+  { to: '/admin/logistics', label: 'Logistics', icon: <LogisticsIcon /> },
   { to: '/admin/dashboard', label: 'Dashboard', icon: <ChartIcon />,      adminOnly: true },
   { to: '/admin/users',     label: 'Divers',    icon: <PeopleIcon />,     adminOnly: true },
   { to: '/admin/duty',      label: 'Duty',      icon: <CrosshairIcon />,  adminOnly: true },
