@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildCharges, chargesTotal, resolveCharges, NITROX_COURSE_FEE } from './booking-charges'
+import { GEAR_ALACARTE_PRICES } from './gear'
 import type { AppEvent, BookingDetails } from '../types/database'
 
 describe('buildCharges', () => {
@@ -97,10 +98,14 @@ describe('resolveCharges', () => {
   })
 
   it('reconciles a legacy recompute to the recorded total with an adjustment line', () => {
-    // Gear that today sums to 1,650 was once a cheaper full-set package, so the
-    // recorded total (8,150) is below base 7,200 + current gear 1,650 = 8,850.
+    // A legacy full-set package was cheaper than today's à-la-carte gear, so the
+    // recorded total (8,150) is below base 7,200 + the current gear sum. Derive
+    // the gear sum from the live prices so this stays correct as prices change.
+    const items = ['BCD', 'Regulator', 'Wetsuit', 'Fins', 'Mask', 'Boots', 'Dive computer']
+    const gearSum = items.reduce((s, i) => s + GEAR_ALACARTE_PRICES[i], 0)
+    const recompute = 7200 + gearSum
     const details: BookingDetails = {
-      gear: { rent: true, items: ['BCD', 'Regulator', 'Wetsuit', 'Fins', 'Mask', 'Boots', 'Dive computer'] },
+      gear: { rent: true, items },
       payment_method: 'bank_transfer',
       total: 8150,
     }
@@ -109,7 +114,7 @@ describe('resolveCharges', () => {
       event: { price: 7200, transport_price: 0, dive_days: 1, deposit_amount: 0 } as AppEvent,
     })
     const adj = lines.find(l => l.kind === 'adjustment')
-    expect(adj?.amount).toBe(8150 - 8850) // -700
+    expect(adj?.amount).toBe(8150 - recompute)
     expect(adj?.label).toMatch(/legacy/i)
     // The reconciled breakdown ties out to the recorded total.
     expect(chargesTotal(lines)).toBe(8150)
