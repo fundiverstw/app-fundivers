@@ -1,0 +1,47 @@
+import type { Profile } from '../../types/database'
+
+export interface TransportRow {
+  booking: { id: string }
+  profile: Profile | null
+}
+
+/**
+ * A labelled list of divers for one transport bucket (needs ride / self /
+ * unspecified) showing name + phone. Shared by the per-event transportation
+ * tab and the day-of Logistics view.
+ */
+export function TransportGroup({ title, rows, emptyHint, note }: {
+  title: string
+  rows: TransportRow[]
+  emptyHint: string
+  note?: string
+}) {
+  return (
+    <div role="group" aria-label={title} className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-sm font-bold text-blue-900">{title}</h2>
+        <span className="text-xs text-blue-900 font-semibold">{rows.length}</span>
+      </div>
+      {note && <p className="text-xs text-blue-950 font-medium italic">{note}</p>}
+      {rows.length === 0 ? (
+        <p className="text-xs text-blue-950/70 font-medium italic">{emptyHint}</p>
+      ) : (
+        <ul className="divide-y divide-sky-200">
+          {rows.map(r => (
+            <li key={r.booking.id} className="py-1.5 flex items-baseline justify-between gap-3">
+              <span className="text-sm text-blue-900 font-medium">
+                {r.profile?.name ?? '(no profile)'}
+                {r.profile?.nickname && r.profile.nickname !== r.profile.name && (
+                  <span className="text-blue-900 font-medium"> ({r.profile.nickname})</span>
+                )}
+              </span>
+              {r.profile?.phone && (
+                <span className="text-xs text-blue-950 font-medium shrink-0">{r.profile.phone}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}

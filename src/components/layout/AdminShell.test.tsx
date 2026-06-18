@@ -75,4 +75,15 @@ describe('AdminShell pending badge', () => {
     expect(from).not.toHaveBeenCalled()
     expect(screen.queryByText(/pending/i)).not.toBeInTheDocument()
   })
+
+  it('shows the Logistics tab to staff (and admins)', async () => {
+    useAuthMock.mockReturnValue({
+      profile: { id: 's1', role: 'staff', nickname: 'Sam' },
+      signOut: vi.fn(),
+    })
+    routedRender()
+    expect(screen.getByRole('link', { name: 'Logistics' })).toBeInTheDocument()
+    // Admin-only tabs stay hidden for staff.
+    expect(screen.queryByRole('link', { name: 'Divers' })).not.toBeInTheDocument()
+  })
 })

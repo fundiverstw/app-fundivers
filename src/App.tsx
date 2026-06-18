@@ -36,6 +36,7 @@ import { NudibranchoutPage } from './pages/NudibranchoutPage'
 import { AdminEventsPage } from './pages/admin/AdminEventsPage'
 import { AdminEventDetailPage } from './pages/admin/AdminEventDetailPage'
 import { AdminGearMapPage } from './pages/admin/AdminGearMapPage'
+import { AdminLogisticsPage } from './pages/admin/AdminLogisticsPage'
 import { AdminUsersPage } from './pages/admin/AdminUsersPage'
 import { AdminApplicationsPage } from './pages/admin/AdminApplicationsPage'
 import { AdminDutyPage } from './pages/admin/AdminDutyPage'
@@ -119,6 +120,7 @@ export default function App() {
                 <Route path="/admin/events" element={<AdminEventsPage />} />
                 <Route path="/admin/events/:type/:id" element={<AdminEventDetailPage />} />
                 <Route path="/admin/events/:type/:id/gear-map" element={<AdminGearMapPage />} />
+                <Route path="/admin/logistics" element={<AdminLogisticsPage />} />
               </Route>
             </Route>
             {/* Write/manage routes — admin only */}

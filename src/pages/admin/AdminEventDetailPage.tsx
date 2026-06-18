@@ -21,6 +21,8 @@ import { BookingPaymentsBlock } from '../../components/admin/BookingPaymentsBloc
 import { resolveCharges, type ChargeLine } from '../../lib/booking-charges'
 import { openCreditForBooking } from '../../lib/credits'
 import { bookingBalance } from '../../lib/booking-balance'
+import { splitByTransport } from '../../lib/logistics'
+import { TransportGroup } from '../../components/admin/TransportGroup'
 import { ShareEventButton } from '../../components/ShareEventButton'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Credit, DiverNote, Payment, Profile } from '../../types/database'
 
@@ -1311,24 +1313,16 @@ function TransportationView({ registrants }: { registrants: Registrant[] }) {
   // Cancelled bookings aren't coming on the trip — they'd skew the count for
   // whoever's planning the van.
   const active = registrants.filter(r => r.booking.status !== 'cancelled')
-  const needsRide:    Registrant[] = []
-  const selfTransport: Registrant[] = []
-  const unanswered:   Registrant[] = []
-  for (const r of active) {
-    const t = (r.booking.details as BookingDetails | undefined)?.transportation
-    if (t === true)       needsRide.push(r)
-    else if (t === false) selfTransport.push(r)
-    else                  unanswered.push(r)
-  }
+  const { needsRide, selfTransport, unspecified } = splitByTransport(active)
 
   return (
     <section className="space-y-3">
       <TransportGroup title="Needs ride" rows={needsRide} emptyHint="No one has asked for a ride." />
       <TransportGroup title="Self-transport" rows={selfTransport} emptyHint="No one has opted to drive themselves." />
-      {unanswered.length > 0 && (
+      {unspecified.length > 0 && (
         <TransportGroup
           title="Not specified"
-          rows={unanswered}
+          rows={unspecified}
           emptyHint=""
           note="Legacy bookings from before transport was a required question."
         />
@@ -1337,41 +1331,5 @@ function TransportationView({ registrants }: { registrants: Registrant[] }) {
         <p className="text-xs text-blue-950/70 font-medium italic">Cancelled bookings hidden.</p>
       )}
     </section>
-  )
-}
-
-function TransportGroup({ title, rows, emptyHint, note }: {
-  title: string
-  rows: Registrant[]
-  emptyHint: string
-  note?: string
-}) {
-  return (
-    <div role="group" aria-label={title} className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-2">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-bold text-blue-900">{title}</h2>
-        <span className="text-xs text-blue-900 font-semibold">{rows.length}</span>
-      </div>
-      {note && <p className="text-xs text-blue-950 font-medium italic">{note}</p>}
-      {rows.length === 0 ? (
-        <p className="text-xs text-blue-950/70 font-medium italic">{emptyHint}</p>
-      ) : (
-        <ul className="divide-y divide-sky-200">
-          {rows.map(r => (
-            <li key={r.booking.id} className="py-1.5 flex items-baseline justify-between gap-3">
-              <span className="text-sm text-blue-900 font-medium">
-                {r.profile?.name ?? '(no profile)'}
-                {r.profile?.nickname && r.profile.nickname !== r.profile.name && (
-                  <span className="text-blue-900 font-medium"> ({r.profile.nickname})</span>
-                )}
-              </span>
-              {r.profile?.phone && (
-                <span className="text-xs text-blue-950 font-medium shrink-0">{r.profile.phone}</span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
   )
 }
