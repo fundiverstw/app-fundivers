@@ -157,6 +157,7 @@ export function CalendarPage() {
           return null
         }}
         hidePastInList
+        disablePastEvents
       />
 
       {mode === 'multi' && (
