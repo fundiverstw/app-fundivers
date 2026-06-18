@@ -386,7 +386,7 @@ async function attachCertNames(ids: Array<string | null>): Promise<Map<string, s
  * all-in-one select meant one drifted column (e.g. cloud lacking `prereqs`)
  * wiped details for every event; this degrades per-column instead.
  */
-async function selectDetailCols<T>(table: string, columns: string[], ids: string[]): Promise<T[]> {
+async function selectDetailCols<T>(table: 'EO_dives' | 'EO_courses', columns: string[], ids: string[]): Promise<T[]> {
   let cols = [...columns]
   while (cols.length > 1) {
     const { data, error } = await supabase.from(table).select(cols.join(', ')).in('_id', ids)
