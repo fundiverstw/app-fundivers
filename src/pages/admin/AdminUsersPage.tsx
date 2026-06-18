@@ -12,7 +12,7 @@ import { resolveCharges, type ChargeLine } from '../../lib/booking-charges'
 import { fetchChargeCatalog } from '../../lib/booking-charge-catalog'
 import { getCertCardSignedUrl } from '../../lib/cert-card'
 import { shoeAsJp } from '../../lib/shoe-size'
-import { fetchCreditsForUser, openCreditBalance, openCreditForBooking, createCredit, settleCredit, reopenCredit } from '../../lib/credits'
+import { fetchCreditsForUser, openCreditForBooking, diverCreditBalance, createCredit, settleCredit, reopenCredit } from '../../lib/credits'
 import { ProfileForm } from '../ProfilePage'
 import { DiverNotes } from '../../components/admin/DiverNotes'
 import { AdminFamilyPanel } from '../../components/admin/AdminFamilyPanel'
@@ -26,6 +26,27 @@ interface UserExtras {
   paidSum: number
   pendingSum: number
   openCreditBalance: number
+}
+
+// Active-booking {owed, paid} rows for diverCreditBalance — owed folds in
+// amendments; paid sums the diver's paid payments per booking.
+function activeCreditRows(
+  bookings: Array<Booking & { event: AppEvent | null }>,
+  payments: Payment[],
+  amendments: Map<string, BookingAmendment[]>,
+): Array<{ id: string; owed: number; paid: number }> {
+  const paidByBooking = new Map<string, number>()
+  for (const p of payments) {
+    if (!p.booking_id || p.status !== 'paid') continue
+    paidByBooking.set(p.booking_id, (paidByBooking.get(p.booking_id) ?? 0) + p.amount)
+  }
+  return bookings
+    .filter(b => b.status !== 'cancelled')
+    .map(b => ({
+      id: b.id,
+      owed: Number((b.details as { total?: number } | null)?.total ?? 0) + amendmentsDelta(amendments.get(b.id) ?? []),
+      paid: paidByBooking.get(b.id) ?? 0,
+    }))
 }
 
 export function AdminUsersPage() {
@@ -97,7 +118,8 @@ export function AdminUsersPage() {
         credits,
         paidSum,
         pendingSum,
-        openCreditBalance: openCreditBalance(credits),
+        // Account credit = awarded credits + overpayments across active bookings.
+        openCreditBalance: diverCreditBalance(credits, activeCreditRows(hydrated, payments, amendments)),
       })
       return next
     })
@@ -134,7 +156,8 @@ export function AdminUsersPage() {
           payments: updatedPayments,
           paidSum: updatedPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0),
           pendingSum: updatedPayments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0),
-          openCreditBalance: cur.openCreditBalance,
+          // A payment change can push the diver into/out of overpayment, which counts as credit.
+          openCreditBalance: diverCreditBalance(cur.credits, activeCreditRows(updatedBookings, updatedPayments, cur.amendments)),
         })
         return next
       })
@@ -189,7 +212,7 @@ export function AdminUsersPage() {
         next.set(userId, {
           ...cur,
           credits: updatedCredits,
-          openCreditBalance: openCreditBalance(updatedCredits),
+          openCreditBalance: diverCreditBalance(updatedCredits, activeCreditRows(cur.bookings, cur.payments, cur.amendments)),
         })
         return next
       })
@@ -211,7 +234,7 @@ export function AdminUsersPage() {
         next.set(userId, {
           ...cur,
           credits: updatedCredits,
-          openCreditBalance: openCreditBalance(updatedCredits),
+          openCreditBalance: diverCreditBalance(updatedCredits, activeCreditRows(cur.bookings, cur.payments, cur.amendments)),
         })
         return next
       })
@@ -249,7 +272,7 @@ export function AdminUsersPage() {
         next.set(userId, {
           ...cur,
           credits: updatedCredits,
-          openCreditBalance: openCreditBalance(updatedCredits),
+          openCreditBalance: diverCreditBalance(updatedCredits, activeCreditRows(cur.bookings, cur.payments, cur.amendments)),
         })
         return next
       })
@@ -313,7 +336,8 @@ export function AdminUsersPage() {
           payments: updatedPayments,
           paidSum: updatedPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0),
           pendingSum: updatedPayments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0),
-          openCreditBalance: cur.openCreditBalance,
+          // A payment change can push the diver into/out of overpayment, which counts as credit.
+          openCreditBalance: diverCreditBalance(cur.credits, activeCreditRows(updatedBookings, updatedPayments, cur.amendments)),
         })
         return next
       })
@@ -713,7 +737,7 @@ function CreditsPanel({ credits, openBalance, bookings, readOnly, onCreate, onSe
   return (
     <div className="text-xs space-y-2">
       <div className="flex justify-between">
-        <span className="text-blue-900 font-medium">Open balance</span>
+        <span className="text-blue-900 font-medium">Credit owed (incl. overpayments)</span>
         <span className={`font-semibold ${openBalance > 0 ? 'text-emerald-700' : 'text-blue-900'}`}>
           {openBalance.toLocaleString()}
         </span>

@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { fetchAmendmentsForBookings, amendmentsDelta } from './booking-amendments'
 import type { AppEvent, Credit, CreditInsert } from '../types/database'
 
 /**
@@ -32,6 +33,55 @@ export function openCreditForBooking(credits: Credit[], bookingId: string): numb
   return credits
     .filter(c => c.status === 'open' && c.booking_id === bookingId)
     .reduce((s, c) => s + Number(c.amount), 0)
+}
+
+/**
+ * Total money the shop owes a diver — their "account credit". Two sources:
+ *  1. Open awarded credits not tied to one of `bookings` (general credits,
+ *     incl. cancellation credits whose booking is excluded as cancelled).
+ *  2. Per active booking, any amount the diver is net ahead — an overpayment
+ *     (paid more than owed) OR an awarded credit beyond what's owed. An
+ *     overpayment is money owed back, so it counts as credit.
+ * `bookings` should be the diver's NON-cancelled bookings with their adjusted
+ * `owed` (total + amendments) and `paid` sums.
+ */
+export function diverCreditBalance(
+  credits: Credit[],
+  bookings: Array<{ id: string; owed: number; paid: number }>,
+): number {
+  const bookingIds = new Set(bookings.map(b => b.id))
+  const general = credits
+    .filter(c => c.status === 'open' && (!c.booking_id || !bookingIds.has(c.booking_id)))
+    .reduce((s, c) => s + Number(c.amount), 0)
+  const perBooking = bookings.reduce(
+    (s, b) => s + Math.max(0, b.paid + openCreditForBooking(credits, b.id) - b.owed),
+    0,
+  )
+  return general + perBooking
+}
+
+/** Load everything needed to compute a diver's account credit (credits +
+ *  bookings + payments + amendments) and return the net figure. Used by the
+ *  diver's own profile, which doesn't otherwise load booking/payment data. */
+export async function fetchDiverCreditBalance(userId: string): Promise<number> {
+  const [bookingsRes, paymentsRes, credits] = await Promise.all([
+    supabase.from('bookings').select('id, details, status').eq('user_id', userId),
+    supabase.from('payments').select('booking_id, amount, status').eq('user_id', userId),
+    fetchCreditsForUser(userId),
+  ])
+  const bookings = (bookingsRes.data ?? []).filter(b => b.status !== 'cancelled')
+  const amendments = await fetchAmendmentsForBookings(bookings.map(b => b.id))
+  const paidByBooking = new Map<string, number>()
+  for (const p of (paymentsRes.data ?? [])) {
+    if (!p.booking_id || p.status !== 'paid') continue
+    paidByBooking.set(p.booking_id, (paidByBooking.get(p.booking_id) ?? 0) + Number(p.amount))
+  }
+  const rows = bookings.map(b => ({
+    id: b.id,
+    owed: Number((b.details as { total?: number } | null)?.total ?? 0) + amendmentsDelta(amendments.get(b.id) ?? []),
+    paid: paidByBooking.get(b.id) ?? 0,
+  }))
+  return diverCreditBalance(credits, rows)
 }
 
 export async function createCredit(input: {

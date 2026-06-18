@@ -66,6 +66,30 @@ describe('openCreditForBooking', () => {
   })
 })
 
+describe('diverCreditBalance', () => {
+  it('counts an overpayment as credit owed to the diver', async () => {
+    const { diverCreditBalance } = await import('./credits')
+    // owed 8,150, paid 8,700 → 550 credit; no awarded rows.
+    expect(diverCreditBalance([], [{ id: 'b1', owed: 8150, paid: 8700 }])).toBe(550)
+  })
+
+  it('adds awarded open credits to overpayments and ignores underpayments', async () => {
+    const { diverCreditBalance } = await import('./credits')
+    const credits = [
+      { id: 'c1', booking_id: null, amount: 1000, status: 'open' },   // general
+      { id: 'c2', booking_id: 'b2', amount: 200, status: 'open' },    // tied to b2
+      { id: 'c3', booking_id: 'bX', amount: 999, status: 'settled' }, // settled → ignored
+    ] as unknown as import('../types/database').Credit[]
+    const bookings = [
+      { id: 'b1', owed: 100, paid: 250 },   // 150 overpaid
+      { id: 'b2', owed: 500, paid: 100 },   // owes 400, but +200 awarded credit → still owes, contributes 0
+      { id: 'b3', owed: 300, paid: 300 },   // settled, 0
+    ]
+    // general 1000 + b1 overpay 150 + b2 max(0,100+200-500)=0 + b3 0 = 1150
+    expect(diverCreditBalance(credits, bookings)).toBe(1150)
+  })
+})
+
 describe('issueCancellationCredits', () => {
   it('credits each registrant their paid total, skipping zero-paid and already-credited bookings', async () => {
     setup({

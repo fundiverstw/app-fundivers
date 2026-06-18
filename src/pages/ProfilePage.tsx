@@ -11,7 +11,7 @@ import { uploadCertCard, getCertCardSignedUrl, deleteCertCard } from '../lib/cer
 import { uploadNitroxCard, getNitroxCardSignedUrl, deleteNitroxCard } from '../lib/nitrox-card'
 import { uploadDeepCard, getDeepCardSignedUrl, deleteDeepCard } from '../lib/deep-card'
 import { isHeicFile } from '../lib/image-compress'
-import { fetchCreditsForUser, openCreditBalance } from '../lib/credits'
+import { fetchDiverCreditBalance } from '../lib/credits'
 import { FamilySection } from '../components/profile/FamilySection'
 import { DateField } from '../components/DateField'
 import type { Profile, CertLevel } from '../types/database'
@@ -123,8 +123,9 @@ function CreditBalanceLine({ userId }: { userId: string }) {
     let cancelled = false
     ;(async () => {
       try {
-        const credits = await fetchCreditsForUser(userId)
-        if (!cancelled) setBalance(openCreditBalance(credits))
+        // Includes awarded credits AND overpayments — any money the shop owes.
+        const owed = await fetchDiverCreditBalance(userId)
+        if (!cancelled) setBalance(owed)
       } catch {
         /* best-effort — silent on failure */
       }

@@ -140,7 +140,6 @@ export function BookingPaymentsBlock({
                 <p className="font-medium opacity-70">Balance</p>
                 {bal.state === 'due' && <p className="font-semibold text-red-600">{bal.amount.toLocaleString()} owed</p>}
                 {bal.state === 'credit' && <p className="font-semibold text-emerald-700">{bal.amount.toLocaleString()} credit</p>}
-                {bal.state === 'overpaid' && <p className="font-semibold text-amber-600">{bal.amount.toLocaleString()} overpaid</p>}
                 {bal.state === 'settled' && <p className="font-semibold text-emerald-700">Settled ✓</p>}
               </div>
             </div>
@@ -150,9 +149,9 @@ export function BookingPaymentsBlock({
                 <span className="font-semibold">{credit.toLocaleString()}</span>
               </div>
             )}
-            {bal.state === 'overpaid' && (
-              <p className="text-amber-700">
-                Paid more than owed — refund the diver or issue an account credit.
+            {bal.state === 'credit' && (
+              <p className="text-emerald-700">
+                The shop owes this diver {(currency ?? 'NTD')} {bal.amount.toLocaleString()} — included in their account credit.
               </p>
             )}
           </>
