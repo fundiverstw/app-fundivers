@@ -19,14 +19,18 @@ import { CARD_ELEVATED, BTN_PRIMARY, TEXT_MUTED } from '../styles/tokens'
 // admin-set status is the next step.
 const REQUIRED: Array<keyof Profile> = [
   'name', 'nickname', 'date_of_birth',
-  'cert_level', 'contact_method', 'contact_id',
+  'contact_method', 'contact_id',
 ]
 function isProfileComplete(p: Profile | null | undefined): boolean {
   if (!p) return false
-  return REQUIRED.every(k => {
+  const baseFilled = REQUIRED.every(k => {
     const v = p[k]
     return typeof v === 'string' ? v.trim().length > 0 : v != null
   })
+  // Certification is satisfied either by an explicit "uncertified" declaration
+  // or by a named cert level (uncertified divers legitimately have none).
+  const certFilled = p.uncertified === true || (p.cert_level ?? '').trim().length > 0
+  return baseFilled && certFilled
 }
 
 export function PendingPage() {

@@ -45,8 +45,9 @@ const schema = z.object({
   id_number: z.string().nullish(),
   emergency_contact_name: z.string().nullish(),
   emergency_contact_phone: z.string().nullish(),
+  cert_status: z.enum(['certified', 'uncertified'], { message: 'Please choose one' }),
   cert_agency: z.string().nullish(),
-  cert_level: z.string().min(1, 'Required'),
+  cert_level: z.string().nullish(),
   medical_notes: z.string().nullish(),
   height_cm: z.union([z.string(), z.number()]).nullish(),
   weight_kg: z.union([z.string(), z.number()]).nullish(),
@@ -59,6 +60,11 @@ const schema = z.object({
     .union([z.string(), z.number()])
     .refine(v => typeof v === 'number' || v.length > 0, { message: 'Required' }),
   last_dive_date: z.string().nullish(),
+}).superRefine((data, ctx) => {
+  // A certified diver must name their level; an uncertified one leaves it blank.
+  if (data.cert_status === 'certified' && !(data.cert_level ?? '').trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['cert_level'], message: 'Required' })
+  }
 })
 type FormData = z.infer<typeof schema>
 
@@ -144,7 +150,15 @@ export function ProfileForm({ user, profile, onSaved }: {
   const toast = useToast()
   const { register, handleSubmit, reset, control, setValue, formState: { errors, isSubmitting, isDirty } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: profile as unknown as FormData,
+    defaultValues: {
+      ...(profile as unknown as FormData),
+      // Derive the cert-status choice: an explicit uncertified flag wins;
+      // otherwise an existing cert_level means certified; a fresh profile
+      // (neither) starts unchosen so the diver is forced to pick.
+      cert_status: profile.uncertified
+        ? 'uncertified'
+        : (profile.cert_level ? 'certified' : (undefined as unknown as 'certified')),
+    },
   })
 
   const [gearOwned, setGearOwned] = useState<string[]>(
@@ -188,8 +202,11 @@ export function ProfileForm({ user, profile, onSaved }: {
   const nitroxCardMissing = !!nitroxCertifiedWatched && !nitroxCardPath
   const deepCertifiedWatched = useWatch({ control, name: 'deep_certified' }) ?? false
   const deepCardMissing = !!deepCertifiedWatched && !deepCardPath
-  const certLevelWatched = useWatch({ control, name: 'cert_level' }) ?? ''
-  const certCardMissing = certLevelWatched.trim() !== '' && !certCardPath
+  const certStatus = useWatch({ control, name: 'cert_status' }) as 'certified' | 'uncertified' | undefined
+  const isCertified = certStatus === 'certified'
+  // A certified diver must have a cert-card photo on file; an uncertified one
+  // never does.
+  const certCardMissing = isCertified && !certCardPath
   // Distinct orgs in the order returned by the rank-sorted query (PADI rows
   // come first because they're the seed; agency rows follow). Always
   // include the saved agency so the dropdown can render it even before the
@@ -291,8 +308,9 @@ export function ProfileForm({ user, profile, onSaved }: {
       id_number: strOrNull(data.id_number),
       emergency_contact_name: strOrNull(data.emergency_contact_name),
       emergency_contact_phone: strOrNull(data.emergency_contact_phone),
-      cert_agency: strOrNull(data.cert_agency),
-      cert_level: strOrNull(data.cert_level),
+      uncertified: data.cert_status === 'uncertified',
+      cert_agency: data.cert_status === 'uncertified' ? null : strOrNull(data.cert_agency),
+      cert_level: data.cert_status === 'uncertified' ? null : strOrNull(data.cert_level),
       medical_notes: strOrNull(data.medical_notes),
       height_cm: numOrNull(data.height_cm),
       weight_kg: numOrNull(data.weight_kg),
@@ -450,38 +468,56 @@ export function ProfileForm({ user, profile, onSaved }: {
 
         <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Certification</h2>
-          <Field label="Agency">
-            <select
-              // Clearing cert_level on agency change keeps the user from
-              // saving a cert level that belongs to a different org. We do
-              // it here on the register-level onChange (not via watch())
-              // so it only fires for user-initiated edits — not for the
-              // initial defaultValues hydration.
-              {...register('cert_agency', {
-                onChange: () => setValue('cert_level', '', { shouldDirty: true }),
-              })}
-              className={inputClass}
-            >
-              <option value="">— select agency —</option>
-              {orgs.map(o => (
-                <option key={o} value={o}>{o}</option>
-              ))}
-            </select>
+          <Field label="Certification status" required>
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center gap-2 text-sm text-blue-900">
+                <input type="radio" value="certified" {...register('cert_status')} className="accent-blue-900" />
+                I have a certification
+              </label>
+              <label className="flex items-center gap-2 text-sm text-blue-900">
+                <input type="radio" value="uncertified" {...register('cert_status')} className="accent-blue-900" />
+                I am uncertified
+              </label>
+            </div>
+            {errors.cert_status && <p className="text-red-600 text-xs mt-1">{errors.cert_status.message}</p>}
           </Field>
-          <Field label="Level" required>
-            <select {...register('cert_level')} className={inputClass} disabled={!selectedAgency}>
-              <option value="">{selectedAgency ? '— select level —' : '— pick agency first —'}</option>
-              {/* Keyed by name (unique inside a single-agency filter), not
-                   by row id. The id swaps from the synthetic __saved_level__
-                   to the real DB id once cert_levels fetches, and a key swap
-                   would remount the option mid-transition — see filteredLevels
-                   comment above. */}
-              {filteredLevels.map(c => (
-                <option key={c.name} value={c.name}>{c.name}</option>
-              ))}
-            </select>
-            {errors.cert_level && <p className="text-red-600 text-xs mt-1">{errors.cert_level.message}</p>}
-          </Field>
+
+          {isCertified && (
+            <>
+              <Field label="Agency">
+                <select
+                  // Clearing cert_level on agency change keeps the user from
+                  // saving a cert level that belongs to a different org. We do
+                  // it here on the register-level onChange (not via watch())
+                  // so it only fires for user-initiated edits — not for the
+                  // initial defaultValues hydration.
+                  {...register('cert_agency', {
+                    onChange: () => setValue('cert_level', '', { shouldDirty: true }),
+                  })}
+                  className={inputClass}
+                >
+                  <option value="">— select agency —</option>
+                  {orgs.map(o => (
+                    <option key={o} value={o}>{o}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Level" required>
+                <select {...register('cert_level')} className={inputClass} disabled={!selectedAgency}>
+                  <option value="">{selectedAgency ? '— select level —' : '— pick agency first —'}</option>
+                  {/* Keyed by name (unique inside a single-agency filter), not
+                       by row id. The id swaps from the synthetic __saved_level__
+                       to the real DB id once cert_levels fetches, and a key swap
+                       would remount the option mid-transition — see filteredLevels
+                       comment above. */}
+                  {filteredLevels.map(c => (
+                    <option key={c.name} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
+                {errors.cert_level && <p className="text-red-600 text-xs mt-1">{errors.cert_level.message}</p>}
+              </Field>
+            </>
+          )}
           <Field label="Logged dives" required>
             <input {...register('logged_dives')} type="number" min="0" className={inputClass} />
             {errors.logged_dives && <p className="text-red-600 text-xs mt-1">{errors.logged_dives.message}</p>}
@@ -513,7 +549,9 @@ export function ProfileForm({ user, profile, onSaved }: {
           <DeepCardSection userId={profile.id} onPathChange={setDeepCardPath} />
         )}
 
-        <CertCardSection userId={profile.id} onPathChange={setCertCardPath} />
+        {isCertified && (
+          <CertCardSection userId={profile.id} onPathChange={setCertCardPath} />
+        )}
 
         <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Medical Notes</h2>
@@ -545,7 +583,7 @@ export function ProfileForm({ user, profile, onSaved }: {
 
         <button
           type="submit"
-          disabled={isSubmitting || certCardMissing || nitroxCardMissing || deepCardMissing || (!isDirty && !dirtyExtras)}
+          disabled={isSubmitting || !certStatus || certCardMissing || nitroxCardMissing || deepCardMissing || (!isDirty && !dirtyExtras)}
           className="w-full bg-emerald-400 hover:bg-emerald-300 text-blue-950 font-semibold py-2 rounded-lg transition-colors disabled:opacity-50"
         >
           {isSubmitting ? 'Saving…' : 'Save changes'}

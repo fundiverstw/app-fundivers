@@ -46,7 +46,9 @@ describe('ProfilePage', () => {
   it('shows required error when full name is cleared and submitted', async () => {
     useAuthMock.mockReturnValue({
       user: { id: 'u1' },
-      profile: { id: 'u1', name: 'Ada Lovelace' },
+      // uncertified so the cert-status gate is satisfied and Save can fire,
+      // isolating the name-required assertion.
+      profile: { id: 'u1', name: 'Ada Lovelace', uncertified: true },
     })
     from.mockReturnValue({
       ...mockQueryBuilder(),
@@ -207,10 +209,42 @@ describe('ProfilePage', () => {
     expect(payload.gear_owned).toEqual(['BCD', 'Fins'])
   })
 
+  it('lets an uncertified diver save without a cert level or card', async () => {
+    useAuthMock.mockReturnValue({
+      user: { id: 'u1' },
+      profile: {
+        id: 'u1', name: 'Ada', nickname: 'Ada', date_of_birth: '1815-12-10',
+        contact_method: 'email', contact_id: 'ada@example.com', logged_dives: 0,
+      },
+    })
+    from.mockReturnValue({
+      ...mockQueryBuilder(),
+      update: (...a: unknown[]) => { update(...a); return mockQueryBuilder() },
+    })
+    const user = userEvent.setup()
+    renderWithRouter(<ProfilePage />)
+    await waitFor(() => expect((input('name') as HTMLInputElement).value).toBe('Ada'))
+
+    // No agency dropdown or cert-card upload until a status is chosen.
+    expect(screen.queryByText('— select agency —')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Upload certification card')).not.toBeInTheDocument()
+
+    await user.click(screen.getByLabelText('I am uncertified'))
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(update).toHaveBeenCalledOnce())
+    const payload = update.mock.calls[0][0] as Record<string, unknown>
+    expect(payload.uncertified).toBe(true)
+    expect(payload.cert_level).toBeNull()
+    // Still no cert-card section after choosing uncertified.
+    expect(screen.queryByLabelText('Upload certification card')).not.toBeInTheDocument()
+  })
+
   it('uploads and saves a cert card when the user picks a file', async () => {
     useAuthMock.mockReturnValue({
       user: { id: 'u1' },
-      profile: { id: 'u1', name: 'Ada' },
+      // cert_level set ⇒ certified ⇒ the cert-card section is shown.
+      profile: { id: 'u1', name: 'Ada', cert_level: 'Open Water' },
     })
     from.mockReturnValue(mockQueryBuilder({ data: { cert_card_path: null } }))
     uploadCertCard.mockResolvedValue('u1/card_123.jpg')
@@ -230,7 +264,8 @@ describe('ProfilePage', () => {
   it('removes the cert card on demand', async () => {
     useAuthMock.mockReturnValue({
       user: { id: 'u1' },
-      profile: { id: 'u1', name: 'Ada' },
+      // cert_level set ⇒ certified ⇒ the cert-card section is shown.
+      profile: { id: 'u1', name: 'Ada', cert_level: 'Open Water' },
     })
     from.mockReturnValue(mockQueryBuilder({ data: { cert_card_path: 'u1/existing.jpg' } }))
     getCertCardSignedUrl.mockResolvedValue('https://signed.example/existing.jpg')

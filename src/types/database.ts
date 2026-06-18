@@ -205,6 +205,9 @@ export interface Database {
           contact_id: string | null
           nitrox_certified: boolean
           deep_certified: boolean
+          /** Diver explicitly declared they hold no certification. When true,
+           *  cert_agency/cert_level are null and no cert-card photo is required. */
+          uncertified: boolean
           logged_dives: number
           last_dive_date: string | null
           gear_owned: string[]
@@ -255,6 +258,7 @@ export interface Database {
           contact_id?: string | null
           nitrox_certified?: boolean
           deep_certified?: boolean
+          uncertified?: boolean
           logged_dives?: number
           last_dive_date?: string | null
           gear_owned?: string[]
@@ -291,6 +295,7 @@ export interface Database {
           contact_id?: string | null
           nitrox_certified?: boolean
           deep_certified?: boolean
+          uncertified?: boolean
           logged_dives?: number
           last_dive_date?: string | null
           gear_owned?: string[]
