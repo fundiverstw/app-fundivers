@@ -7,7 +7,7 @@ import {
   assignTracks, segmentsForDay,
   type CellSegment, type EventRange, type LayoutEvent,
 } from '../../lib/calendar-layout'
-import { formatEventSpan } from '../../lib/events'
+import { formatEventSpan, isPastEvent } from '../../lib/events'
 import { courseColor, diveIsTripOrBoat, type CourseColor } from '../../lib/event-colors'
 import { isReschedulable } from '../../lib/reschedule'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
@@ -154,6 +154,10 @@ export interface MonthCalendarProps {
   renderListBadge?: (ev: AppEvent) => React.ReactNode
   /** If true, the "this month" list hides events that have already started before today. */
   hidePastInList?: boolean
+  /** If true, grid bars for events that have already happened render muted and
+   *  non-clickable (diver calendar — you can't book the past). Admins leave it
+   *  off so they can still open past events to manage them. */
+  disablePastEvents?: boolean
   /** Optional heading for the list below the grid. */
   listTitle?: string
   /** Event ids to visually highlight on the grid and the list (e.g. the
@@ -192,7 +196,7 @@ export interface MonthCalendarProps {
 
 export function MonthCalendar({
   month, onMonthChange, events, onPickEvent, renderListBadge, hidePastInList, listTitle = 'This month',
-  highlightedIds,
+  highlightedIds, disablePastEvents,
   busyEntries, busyShown, onToggleBusy, currentUserId, ownDutyDays, onCreateBusy, onPickBusy,
   onRescheduleDay,
 }: MonthCalendarProps) {
@@ -314,6 +318,7 @@ export function MonthCalendar({
         busyTrackRows={cellBusyTrackRows}
         ownDutyDays={ownDutyDays}
         highlightedIds={highlightedIds}
+        disablePastEvents={disablePastEvents}
         onPickEvent={onPickEvent}
         onPickBusy={onPickBusy}
         onCreateBusy={onCreateBusy}
@@ -396,6 +401,7 @@ interface MonthGridProps {
   busyTrackRows: number
   ownDutyDays?: Map<string, Set<string>>
   highlightedIds?: Set<string>
+  disablePastEvents?: boolean
   onPickEvent: (ev: AppEvent) => void
   onPickBusy?: (b: StaffBusyEntry) => void
   onCreateBusy?: (day: Date) => void
@@ -408,7 +414,7 @@ interface MonthGridProps {
 }
 
 function MonthGrid({
-  month, days, ranges, busyRanges, trackRows, busyTrackRows, ownDutyDays, highlightedIds,
+  month, days, ranges, busyRanges, trackRows, busyTrackRows, ownDutyDays, highlightedIds, disablePastEvents,
   onPickEvent, onPickBusy, onCreateBusy, hoveredEventId, onHoverEvent,
   rescheduleEnabled, dropTargetKey, onDragHoverDay, onDropReschedule,
 }: MonthGridProps) {
@@ -440,6 +446,7 @@ function MonthGrid({
           minHeight={cellMinHeight}
           ownDutyDays={ownDutyDays}
           highlightedIds={highlightedIds}
+          disablePastEvents={disablePastEvents}
           onPickEvent={onPickEvent}
           onPickBusy={onPickBusy}
           onCreateBusy={onCreateBusy}
@@ -456,7 +463,7 @@ function MonthGrid({
 }
 
 function DayCell({
-  day, ranges, busyRanges, month, trackRows, busyTrackRows, minHeight, ownDutyDays, highlightedIds,
+  day, ranges, busyRanges, month, trackRows, busyTrackRows, minHeight, ownDutyDays, highlightedIds, disablePastEvents,
   onPickEvent, onPickBusy, onCreateBusy, hoveredEventId, onHoverEvent,
   rescheduleEnabled, dropTargetKey, onDragHoverDay, onDropReschedule,
 }: {
@@ -469,6 +476,7 @@ function DayCell({
   minHeight: number
   ownDutyDays?: Map<string, Set<string>>
   highlightedIds?: Set<string>
+  disablePastEvents?: boolean
   onPickEvent: (ev: AppEvent) => void
   onPickBusy?: (b: StaffBusyEntry) => void
   onCreateBusy?: (day: Date) => void
@@ -522,6 +530,7 @@ function DayCell({
             dayKey={dayKey}
             isOwnDuty={!!ownDutyDays?.get(seg.event.id)?.has(dayKey)}
             highlighted={!!highlightedIds?.has(seg.event.id)}
+            disabled={!!disablePastEvents && isPastEvent(seg.event)}
             onClick={() => onPickEvent(seg.event)}
             hovered={hoveredEventId === seg.event.id}
             onHoverEvent={onHoverEvent}
@@ -560,7 +569,7 @@ function dayKeyAtPoint(x: number, y: number): string | null {
 }
 
 function EventBar({
-  seg, track, dayKey, isOwnDuty, highlighted, onClick, hovered, onHoverEvent,
+  seg, track, dayKey, isOwnDuty, highlighted, disabled, onClick, hovered, onHoverEvent,
   draggable, onDragHoverDay, onDropReschedule,
 }: {
   seg: CellSegment<AppEvent>
@@ -568,6 +577,9 @@ function EventBar({
   dayKey: string
   isOwnDuty: boolean
   highlighted: boolean
+  /** Event already happened on a surface that forbids booking the past. The
+   *  bar renders muted and ignores taps/drags. */
+  disabled: boolean
   onClick: () => void
   hovered: boolean
   onHoverEvent: (id: string | null) => void
@@ -645,6 +657,7 @@ function EventBar({
 
   function handleClick(e: React.MouseEvent) {
     e.stopPropagation()
+    if (disabled) return
     if (suppressClick.current) { suppressClick.current = false; return }
     // Non-draggable bars (diver calendar, multi-day dives) never set up
     // pointer handling, so the native click drives selection as before.
@@ -681,15 +694,16 @@ function EventBar({
     <button
       type="button"
       onClick={handleClick}
-      onPointerDown={draggable ? onPointerDown : undefined}
-      onPointerMove={draggable ? onPointerMove : undefined}
-      onPointerUp={draggable ? onPointerUp : undefined}
-      onPointerCancel={draggable ? reset : undefined}
+      aria-disabled={disabled || undefined}
+      onPointerDown={draggable && !disabled ? onPointerDown : undefined}
+      onPointerMove={draggable && !disabled ? onPointerMove : undefined}
+      onPointerUp={draggable && !disabled ? onPointerUp : undefined}
+      onPointerCancel={draggable && !disabled ? reset : undefined}
       onMouseEnter={() => onHoverEvent(seg.event.id)}
       onMouseLeave={() => onHoverEvent(null)}
-      title={seg.event.title}
+      title={disabled ? `${seg.event.title} — already happened` : seg.event.title}
       className={`absolute text-[10px] font-semibold truncate text-left px-1 transition-all ${baseClass} ${leftRadius} ${rightRadius} ${
-        lifted ? 'z-30 scale-105 opacity-90 shadow-lg' : seg.event.is_private ? 'opacity-50' : ''
+        disabled ? 'opacity-40 cursor-default saturate-50' : lifted ? 'z-30 scale-105 opacity-90 shadow-lg' : seg.event.is_private ? 'opacity-50' : ''
       }`}
       style={{
         top: track * (TRACK_HEIGHT + TRACK_GAP),

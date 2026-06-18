@@ -439,3 +439,49 @@ describe('MonthCalendar private dives', () => {
     expect(screen.queryByLabelText('Private')).not.toBeInTheDocument()
   })
 })
+
+describe('MonthCalendar disablePastEvents', () => {
+  const pastDive = {
+    id: 'PAST1', type: 'dive' as const, title: 'Old Dive', calendar_title: null,
+    start_time: '2020-06-10T09:00:00', end_time: null, start_time_hhmm: '09:00',
+    featured: false, fully_booked: false, capacity: null, confirmed_count: null,
+    price: null, deposit_amount: null, transport_price: null, currency: 'TWD',
+    has_rooms: false, room_type_ids: [], has_addons: false, addon_ids: [],
+    gear_rental_info: null, nitrox_required: false, dive_days: null,
+    cancelled_at: null, full_payment_deadline: null, cancel_policy: null, cancel_date: null,
+    is_private: false,
+  }
+
+  it('ignores taps on a past event when disablePastEvents is set (diver calendar)', async () => {
+    const onPick = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <MonthCalendar
+        month={new Date('2020-06-15')}
+        onMonthChange={() => {}}
+        events={[pastDive]}
+        onPickEvent={onPick}
+        hidePastInList
+        disablePastEvents
+      />
+    )
+    await user.click(screen.getByRole('button', { name: /old dive/i }))
+    expect(onPick).not.toHaveBeenCalled()
+  })
+
+  it('still opens a past event without the flag (admin calendar)', async () => {
+    const onPick = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <MonthCalendar
+        month={new Date('2020-06-15')}
+        onMonthChange={() => {}}
+        events={[pastDive]}
+        onPickEvent={onPick}
+        hidePastInList
+      />
+    )
+    await user.click(screen.getByRole('button', { name: /old dive/i }))
+    expect(onPick).toHaveBeenCalledTimes(1)
+  })
+})
