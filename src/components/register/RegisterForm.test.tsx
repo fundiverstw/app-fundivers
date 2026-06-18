@@ -276,6 +276,73 @@ describe('RegisterForm', () => {
     expect(details.charges.reduce((s, c) => s + c.amount, 0)).toBe(details.total)
   })
 
+  it('requires a shoe size to rent fins and saves it to the profile', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    // Owns everything except fins, and has no shoe size on file.
+    const profile: Profile = {
+      ...sampleProfile,
+      shoe_size: null,
+      gear_owned: ['BCD', 'Regulator', 'Wetsuit', 'Mask', 'Boots', 'Dive computer'],
+    }
+    render(<RegisterForm event={sampleEvent} profile={profile} userId="u1" onClose={() => {}} onBooked={() => {}} />)
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/i need to rent/i))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+
+    // Fins is the only un-owned item, so it's pre-checked → shoe size required.
+    expect(await screen.findByText(/we need your sizes/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+
+    await user.selectOptions(screen.getByLabelText('Shoe size value'), '40')
+    expect(screen.getByRole('button', { name: /next/i })).toBeEnabled()
+
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+    const body = invoke.mock.calls[0][1] as { body: { profile_patch: Record<string, unknown> } }
+    expect(body.body.profile_patch.shoe_size).toBe('EU 40 M')
+  })
+
+  it('requires height and weight to rent a wetsuit', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    // Owns everything except the wetsuit, and has no height/weight on file.
+    const profile: Profile = {
+      ...sampleProfile,
+      height_cm: null,
+      weight_kg: null,
+      gear_owned: ['BCD', 'Regulator', 'Fins', 'Mask', 'Boots', 'Dive computer'],
+    }
+    render(<RegisterForm event={sampleEvent} profile={profile} userId="u1" onClose={() => {}} onBooked={() => {}} />)
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/i need to rent/i))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+
+    expect(await screen.findByText(/we need your sizes/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+
+    await user.type(screen.getByLabelText(/height \(cm\)/i), '175')
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled() // weight still missing
+    await user.type(screen.getByLabelText(/weight \(kg\)/i), '70')
+    expect(screen.getByRole('button', { name: /next/i })).toBeEnabled()
+  })
+
+  it('does not prompt for sizes when the profile already has them', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    // sampleProfile has height/weight/shoe; owns nothing so renting all items.
+    render(<RegisterForm event={sampleEvent} profile={{ ...sampleProfile, gear_owned: [] }} userId="u1" onClose={() => {}} onBooked={() => {}} />)
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/i need to rent/i))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    expect(screen.queryByText(/we need your sizes/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /next/i })).toBeEnabled()
+  })
+
   it('hides gear/room/addon/nitrox sections when the event does not offer them', async () => {
     setupFrom()
     const user = userEvent.setup()

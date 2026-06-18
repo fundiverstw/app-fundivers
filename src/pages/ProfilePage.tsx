@@ -15,16 +15,7 @@ import { fetchDiverCreditBalance } from '../lib/credits'
 import { FamilySection } from '../components/profile/FamilySection'
 import { DateField } from '../components/DateField'
 import type { Profile, CertLevel } from '../types/database'
-import {
-  SHOE_UNITS,
-  SHOE_GENDERS,
-  convertShoeSize,
-  formatShoeSize,
-  parseShoeSize,
-  shoeSizesFor,
-  type ShoeGender,
-  type ShoeUnit,
-} from '../lib/shoe-size'
+import { ShoeSizeField } from '../components/ShoeSizeField'
 
 // Schema intentionally matches what the HTML form emits (strings for text +
 // number inputs, booleans for checkboxes). Numeric/enum coercion happens in
@@ -250,53 +241,20 @@ export function ProfileForm({ user, profile, onSaved }: {
     return matched
   }, [certLevels, selectedAgency, profile.cert_agency, profile.cert_level])
 
-  const initialShoe = useMemo(() => parseShoeSize(profile.shoe_size), [profile.shoe_size])
-  const [shoeUnit, setShoeUnit] = useState<ShoeUnit>(() => initialShoe?.unit ?? 'eu')
-  const [shoeGender, setShoeGender] = useState<ShoeGender>(() => initialShoe?.gender ?? 'm')
-  const [shoeValue, setShoeValue] = useState<string>(() => initialShoe ? String(initialShoe.value) : '')
+  // Canonical shoe size ('' = unset); the ShoeSizeField below owns the
+  // unit/gender/value picker and reports the canonical string up.
+  const [shoeSize, setShoeSize] = useState<string>(profile.shoe_size ?? '')
   const [dirtyExtras, setDirtyExtras] = useState(false)
-
-  const shoeOptions = useMemo(() => shoeSizesFor(shoeUnit, shoeGender), [shoeUnit, shoeGender])
-  const jpHint = useMemo(() => {
-    if (!shoeValue || shoeUnit === 'jp') return null
-    const converted = convertShoeSize(parseFloat(shoeValue), shoeUnit, 'jp', shoeGender)
-    return converted != null ? `JP: ${converted}` : null
-  }, [shoeValue, shoeUnit, shoeGender])
 
   function toggleGearOwned(item: string) {
     setGearOwned(prev => prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item])
     setDirtyExtras(true)
   }
 
-  // Switching unit/gender snaps the current size to the nearest row in the new
-  // unit so the user's selection isn't lost when they change the selector.
-  function handleUnitChange(next: ShoeUnit) {
-    if (shoeValue) {
-      const converted = convertShoeSize(parseFloat(shoeValue), shoeUnit, next, shoeGender)
-      if (converted != null) setShoeValue(String(converted))
-    }
-    setShoeUnit(next)
-    setDirtyExtras(true)
-  }
-  function handleGenderChange(next: ShoeGender) {
-    if (shoeValue) {
-      // Map through JP (body reference) so the physical size is preserved.
-      const asJp = convertShoeSize(parseFloat(shoeValue), shoeUnit, 'jp', shoeGender)
-      if (asJp != null) {
-        const back = convertShoeSize(asJp, 'jp', shoeUnit, next)
-        if (back != null) setShoeValue(String(back))
-      }
-    }
-    setShoeGender(next)
-    setDirtyExtras(true)
-  }
-
   async function onSubmit(data: FormData) {
     if (!user) return
     const method = data.contact_method
-    const shoeSizeCanonical = shoeValue
-      ? formatShoeSize(parseFloat(shoeValue), shoeUnit, shoeGender)
-      : null
+    const shoeSizeCanonical = shoeSize.trim() || null
     // Update, not upsert: the row is created by handle_new_user at signup,
     // and there is no INSERT policy on profiles — upsert hits the INSERT
     // RLS check and 403s even when only updating an existing row.
@@ -410,34 +368,10 @@ export function ProfileForm({ user, profile, onSaved }: {
           <Field label="Weight (kg)"><input {...register('weight_kg')} type="number" step="0.1" className={inputClass} /></Field>
           <div>
             <label className="block text-xs text-blue-900 font-medium mb-1 uppercase tracking-wide">Shoe size</label>
-            <div className="flex gap-1.5">
-              <select
-                aria-label="Shoe size unit"
-                value={shoeUnit}
-                onChange={e => handleUnitChange(e.target.value as ShoeUnit)}
-                className="shrink-0 w-16 bg-white border border-sky-300 rounded-lg px-1.5 py-2 text-blue-900 text-sm focus:outline-none focus:border-blue-900"
-              >
-                {SHOE_UNITS.map(u => <option key={u} value={u}>{u.toUpperCase()}</option>)}
-              </select>
-              <select
-                aria-label="Shoe size gender"
-                value={shoeGender}
-                onChange={e => handleGenderChange(e.target.value as ShoeGender)}
-                className="shrink-0 w-14 bg-white border border-sky-300 rounded-lg px-1.5 py-2 text-blue-900 text-sm focus:outline-none focus:border-blue-900"
-              >
-                {SHOE_GENDERS.map(g => <option key={g} value={g}>{g.toUpperCase()}</option>)}
-              </select>
-              <select
-                aria-label="Shoe size value"
-                value={shoeValue}
-                onChange={e => { setShoeValue(e.target.value); setDirtyExtras(true) }}
-                className={`${inputClass} flex-1 min-w-0`}
-              >
-                <option value="">—</option>
-                {shoeOptions.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            {jpHint && <p className="text-xs text-red-600 mt-1">{jpHint}</p>}
+            <ShoeSizeField
+              initial={profile.shoe_size}
+              onChange={c => { setShoeSize(c); setDirtyExtras(true) }}
+            />
           </div>
         </section>
 

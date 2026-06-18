@@ -67,9 +67,10 @@ describe('computeDashboard', () => {
       { label: 'Taiwan', value: 800 },
       { label: 'Japan', value: 500 },
     ])
+    // Cert levels are canonicalized: 'AOW' → 'Advanced Open Water', 'OW' → 'Open Water'.
     expect(d.revenueByCertLevel).toEqual([
-      { label: 'AOW', value: 800 },
-      { label: 'OW', value: 500 },
+      { label: 'Advanced Open Water', value: 800 },
+      { label: 'Open Water', value: 500 },
     ])
     expect(d.topEventsByRevenue).toEqual([
       { label: 'Long Dong', value: 800 },
@@ -94,8 +95,8 @@ describe('computeDashboard', () => {
     expect(d.kpis.activeDivers).toBe(2) // admin excluded
     expect(d.signupsByMonth.find(p => p.label === '2026-06')).toEqual({ label: '2026-06', value: 1 }) // only d1
     expect(d.certLevelMix).toEqual([
-      { label: 'AOW', value: 1 },
-      { label: 'OW', value: 1 },
+      { label: 'Advanced Open Water', value: 1 },
+      { label: 'Open Water', value: 1 },
     ])
   })
 

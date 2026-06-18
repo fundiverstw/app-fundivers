@@ -15,6 +15,7 @@ import { uploadDeepCard } from '../../lib/deep-card'
 import { isHeicFile } from '../../lib/image-compress'
 import { TurnstileWidget } from './TurnstileWidget'
 import { DateField } from '../DateField'
+import { ShoeSizeField } from '../ShoeSizeField'
 import type { AppEvent, Booking, BookingDetails, CancellationPolicy, Database, EOAddon, EORoom, Profile } from '../../types/database'
 
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
@@ -421,6 +422,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     return (GEAR_ITEMS as readonly string[]).filter(item => !owned.has(item))
   }, [profile])
   const gearItems = editedGearItems ?? defaultGearItems
+  // Rental gear needs sizes on file: shoe size for Fins/Boots, height + weight
+  // for Wetsuit/BCD. When the diver's profile is missing the relevant size we
+  // collect it here and save it back to their profile on submit.
+  const [shoeSize, setShoeSize] = useState(profile?.shoe_size ?? '')
+  const [heightCm, setHeightCm] = useState(profile?.height_cm != null ? String(profile.height_cm) : '')
+  const [weightKg, setWeightKg] = useState(profile?.weight_kg != null ? String(profile.weight_kg) : '')
   const [roomId, setRoomId] = useState<string>(initialDetails?.room?.option_id ?? '')
   const [roomNotes, setRoomNotes] = useState(initialDetails?.room?.notes ?? '')
   const [addonIds, setAddonIds] = useState<Set<string>>(new Set(initialDetails?.add_ons ?? []))
@@ -488,6 +495,23 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const [certFileErr, setCertFileErr] = useState<string | null>(null)
   const hasCertCardOnFile = !!profile?.cert_card_path
   const certBlocked = certLevel.trim() !== '' && !hasCertCardOnFile && !certFile
+
+  // Size requirements for the gear being rented (Fins/Boots → shoe size;
+  // Wetsuit/BCD → height + weight). We only prompt for sizes the profile is
+  // missing; once present, the booking just reuses them.
+  const rentingGear = showGearRentChoice && gearChoice === 'rent'
+  const rentedItems = rentingGear ? gearItems : []
+  const askShoe   = (rentedItems.includes('Fins') || rentedItems.includes('Boots')) && !profile?.shoe_size
+  const askBody   = rentedItems.includes('Wetsuit') || rentedItems.includes('BCD')
+  const askHeight = askBody && profile?.height_cm == null
+  const askWeight = askBody && profile?.weight_kg == null
+  const shoeMissing   = askShoe   && !shoeSize.trim()
+  const heightMissing = askHeight && !(Number(heightCm) > 0)
+  const weightMissing = askWeight && !(Number(weightKg) > 0)
+  // Admins/parents acting on behalf can fill sizes later — only gate the
+  // diver's own registration (matches the cert / transport gating).
+  const sizesBlocked = !isOnBehalfOf && (shoeMissing || heightMissing || weightMissing)
+
   const [emergencyName, setEmergencyName]   = useState(profile?.emergency_contact_name  ?? '')
   const [emergencyPhone, setEmergencyPhone] = useState(profile?.emergency_contact_phone ?? '')
 
@@ -649,8 +673,15 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     }
 
     const nullish = (v: string) => v.trim() === '' ? null : v.trim()
+    // Sizes entered for gear rental fall back to whatever's already on file.
+    const resolvedHeight = heightCm.trim() === '' ? (profile?.height_cm ?? null) : Number(heightCm)
+    const resolvedWeight = weightKg.trim() === '' ? (profile?.weight_kg ?? null) : Number(weightKg)
+    const resolvedShoe = shoeSize.trim() === '' ? (profile?.shoe_size ?? null) : shoeSize.trim()
     const profilePatch: ProfileUpdate = {
       name:               nullish(fullName),
+      height_cm:               resolvedHeight,
+      weight_kg:               resolvedWeight,
+      shoe_size:               resolvedShoe,
       nickname:                nullish(nickname),
       date_of_birth:           nullish(dob),
       nationality:             nullish(nationality),
@@ -681,9 +712,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 mode: 'a-la-carte',
                 items: gearItems,
                 size_overrides: {
-                  height_cm: profile?.height_cm ?? null,
-                  weight_kg: profile?.weight_kg ?? null,
-                  shoe_size: profile?.shoe_size ?? null,
+                  height_cm: resolvedHeight,
+                  weight_kg: resolvedWeight,
+                  shoe_size: resolvedShoe,
                 },
               }
             : gearChoice === 'help'
@@ -1170,6 +1201,46 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                       </label>
                     ))}
                   </div>
+
+                  {(askShoe || askHeight || askWeight) && (
+                    <div className="border-t border-sky-200 pt-2 space-y-2">
+                      <p className="text-xs font-semibold text-blue-900">
+                        We need your sizes to prep this gear
+                        <span className="text-red-600"> *</span>
+                      </p>
+                      {askHeight && (
+                        <label className="block text-xs text-blue-950 font-medium">
+                          Height (cm)
+                          <input
+                            type="number" min="1" step="0.1" inputMode="decimal"
+                            value={heightCm}
+                            onChange={e => setHeightCm(e.target.value)}
+                            className="mt-0.5 w-full bg-white border border-sky-300 rounded-lg px-2 py-1 text-sm text-blue-900"
+                          />
+                        </label>
+                      )}
+                      {askWeight && (
+                        <label className="block text-xs text-blue-950 font-medium">
+                          Weight (kg)
+                          <input
+                            type="number" min="1" step="0.1" inputMode="decimal"
+                            value={weightKg}
+                            onChange={e => setWeightKg(e.target.value)}
+                            className="mt-0.5 w-full bg-white border border-sky-300 rounded-lg px-2 py-1 text-sm text-blue-900"
+                          />
+                        </label>
+                      )}
+                      {askShoe && (
+                        <div className="text-xs text-blue-950 font-medium">
+                          Shoe size
+                          <div className="mt-0.5">
+                            <ShoeSizeField initial={profile?.shoe_size ?? null} onChange={setShoeSize} />
+                          </div>
+                        </div>
+                      )}
+                      <p className="text-[11px] text-blue-950/70 font-medium">Saved to your profile for next time.</p>
+                    </div>
+                  )}
                 </div>
               )}
               {gearChoice === 'help' && (
@@ -1425,14 +1496,15 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 (isGuest && (guestEmail.trim() === '' || guestPassword.length < 8 || !guestAgreedTerms || !turnstileToken))
               )) ||
               (step === 3 && !isOnBehalfOf && needsTransport === null) ||
-              (step === 3 && !isOnBehalfOf && showGearRentChoice && gearChoice === null)
+              (step === 3 && !isOnBehalfOf && showGearRentChoice && gearChoice === null) ||
+              (step === 3 && sizesBlocked)
             }
             className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
           >
             Next ›
           </button>
         ) : (
-          <button onClick={submit} disabled={saving || pastBlocked || (!isOnBehalfOf && !!cancelPolicy && !policyAcked)}
+          <button onClick={submit} disabled={saving || pastBlocked || sizesBlocked || (!isOnBehalfOf && !!cancelPolicy && !policyAcked)}
             className="bg-blue-900 hover:bg-blue-950 disabled:opacity-60 disabled:cursor-wait text-white text-sm font-semibold py-2 px-4 rounded-lg inline-flex items-center gap-2">
             {saving && (
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" />
