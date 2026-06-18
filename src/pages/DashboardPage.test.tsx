@@ -7,11 +7,11 @@ const { useAuthMock } = vi.hoisted(() => ({ useAuthMock: vi.fn() }))
 vi.mock('../hooks/useAuth', () => ({ useAuth: () => useAuthMock() }))
 // Bouncers do their own timers/pointer math; stub them here since this
 // test is only about the bubble console overlay and role label.
-vi.mock('../components/dashboard/SharkBouncer', () => ({
-  SharkBouncer: () => null,
+vi.mock('../components/dashboard/EelBouncer', () => ({
+  EelBouncer: () => null,
 }))
-vi.mock('../components/dashboard/TurtleBouncer', () => ({
-  TurtleBouncer: () => null,
+vi.mock('../components/dashboard/FrogBouncer', () => ({
+  FrogBouncer: () => null,
 }))
 vi.mock('../components/dashboard/NudibranchBouncer', () => ({
   NudibranchBouncer: () => null,

@@ -1,20 +1,21 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { NudibranchIcon } from './creature-icons'
+import { FrogIcon } from './creature-icons'
 
-// Third bouncer — a cute nudibranch icon leads to the brick-breaker minigame.
-// Kept separate from EelBouncer / FrogBouncer for the same reason the others
-// stayed separate: each tunes its own glow, palette, and target route, and
-// three near-duplicates are easier to read than one generalized component
-// with config props.
+// Sibling of EelBouncer — a cute frog icon drifting around the dashboard at
+// its own random cadence, leads to the frogger minigame.
+//
+// Kept as a separate component (not a generalized <Bouncer />) because the
+// per-creature tuning (speed, glow tint, target route) reads clearer inline
+// than behind a shared abstraction for three of them.
 
-const SIZE = 56
+const FROG_SIZE = 56
 const HIT_PADDING = 28
 const BOUNCES_BEFORE_DISAPPEAR = 6
 const MIN_DELAY_MS = 25_000
 const MAX_DELAY_MS = 45_000
-const BASE_SPEED = 240
-const SPEED_JITTER = 130
+const BASE_SPEED = 200
+const SPEED_JITTER = 110
 
 type Kinetic = {
   x: number; y: number; vx: number; vy: number
@@ -29,15 +30,15 @@ function spawnKinetics(): Kinetic {
   const edge = Math.floor(Math.random() * 4)
   let x = 0, y = 0, vx = 0, vy = 0
   switch (edge) {
-    case 0: x = Math.random() * (W - SIZE); y = 0;                          vx = sign() * speed * 0.6; vy = speed;  break
-    case 1: x = W - SIZE;                   y = Math.random() * (H - SIZE); vx = -speed;               vy = sign() * speed * 0.6; break
-    case 2: x = Math.random() * (W - SIZE); y = H - SIZE;                   vx = sign() * speed * 0.6; vy = -speed; break
-    case 3: x = 0;                          y = Math.random() * (H - SIZE); vx = speed;                vy = sign() * speed * 0.6; break
+    case 0: x = Math.random() * (W - FROG_SIZE); y = 0;                               vx = sign() * speed * 0.6; vy = speed;  break
+    case 1: x = W - FROG_SIZE;                   y = Math.random() * (H - FROG_SIZE); vx = -speed;               vy = sign() * speed * 0.6; break
+    case 2: x = Math.random() * (W - FROG_SIZE); y = H - FROG_SIZE;                   vx = sign() * speed * 0.6; vy = -speed; break
+    case 3: x = 0;                               y = Math.random() * (H - FROG_SIZE); vx = speed;                vy = sign() * speed * 0.6; break
   }
   return { x, y, vx, vy, bouncesLeft: BOUNCES_BEFORE_DISAPPEAR, active: true }
 }
 
-export function NudibranchBouncer() {
+export function FrogBouncer() {
   const navigate = useNavigate()
   const btnRef = useRef<HTMLButtonElement>(null)
   const state = useRef<Kinetic>({ x: 0, y: 0, vx: 0, vy: 0, bouncesLeft: 0, active: false })
@@ -60,10 +61,10 @@ export function NudibranchBouncer() {
       const W = window.innerWidth
       const H = window.innerHeight
 
-      if (s.x < 0)               { s.x = 0;              s.vx = -s.vx; s.bouncesLeft-- }
-      else if (s.x > W - SIZE)   { s.x = W - SIZE;       s.vx = -s.vx; s.bouncesLeft-- }
-      if (s.y < 0)               { s.y = 0;              s.vy = -s.vy; s.bouncesLeft-- }
-      else if (s.y > H - SIZE)   { s.y = H - SIZE;       s.vy = -s.vy; s.bouncesLeft-- }
+      if (s.x < 0)                   { s.x = 0;                   s.vx = -s.vx; s.bouncesLeft-- }
+      else if (s.x > W - FROG_SIZE)  { s.x = W - FROG_SIZE;       s.vx = -s.vx; s.bouncesLeft-- }
+      if (s.y < 0)                   { s.y = 0;                   s.vy = -s.vy; s.bouncesLeft-- }
+      else if (s.y > H - FROG_SIZE)  { s.y = H - FROG_SIZE;       s.vy = -s.vy; s.bouncesLeft-- }
 
       const flip = s.vx < 0 ? 'scaleX(-1)' : 'scaleX(1)'
       el.style.transform = `translate(${s.x}px, ${s.y}px) ${flip}`
@@ -105,12 +106,12 @@ export function NudibranchBouncer() {
     <button
       ref={btnRef}
       type="button"
-      aria-label="Play nudibranchout"
-      onClick={() => navigate('/minigame/nudibranchout')}
+      aria-label="Play frogger"
+      onClick={() => navigate('/minigame/turtler')}
       className="fixed top-0 left-0 z-40 transition-opacity duration-300 cursor-pointer flex items-center justify-center"
       style={{
-        width: SIZE + HIT_PADDING * 2,
-        height: SIZE + HIT_PADDING * 2,
+        width: FROG_SIZE + HIT_PADDING * 2,
+        height: FROG_SIZE + HIT_PADDING * 2,
         padding: HIT_PADDING,
         opacity: 0,
         pointerEvents: 'none',
@@ -119,7 +120,7 @@ export function NudibranchBouncer() {
         marginTop: -HIT_PADDING,
       }}
     >
-      <NudibranchIcon className="drop-shadow-[0_0_12px_rgba(236,72,153,0.55)]" />
+      <FrogIcon className="drop-shadow-[0_0_10px_rgba(74,222,128,0.5)]" />
     </button>
   )
 }
