@@ -21,13 +21,15 @@ import type { Payment } from '../../types/database'
  * registrant) and on AdminUsersPage (one block per active booking).
  */
 export function BookingPaymentsBlock({
-  payments, owed, paid, outstanding, pending, cancelled, readOnly, onRecord, onVoid, onMarkDepositPaid,
+  payments, owed, paid, credit = 0, pending, cancelled, readOnly, onRecord, onVoid, onMarkDepositPaid,
   charges, currency,
 }: {
   payments: Payment[]
   owed: number
   paid: number
-  outstanding: number
+  /** Open (unsettled) credit awarded to the diver for THIS event. Offsets what
+   *  they owe in the Balance figure below. Settled credits don't count. */
+  credit?: number
   /** Itemized charge breakdown for this booking (from resolveCharges). When
    *  present, an itemized list is shown above the owed/paid figures so staff
    *  can trace exactly what the diver was charged. */
@@ -115,23 +117,41 @@ export function BookingPaymentsBlock({
 
       <p className="font-semibold text-blue-900">Payments</p>
 
-      <div className="grid grid-cols-3 gap-2 text-blue-900">
-        <div>
-          <p className="font-medium opacity-70">Owed</p>
-          <p className="font-semibold">{owed.toLocaleString()}</p>
-        </div>
-        <div>
-          <p className="font-medium opacity-70">Paid</p>
-          <p className="font-semibold">{paid.toLocaleString()}</p>
-        </div>
-        <div>
-          <p className="font-medium opacity-70">Outstanding</p>
-          <p className={`font-semibold ${outstanding > 0 ? 'text-red-600' : ''}`}>
-            {outstanding.toLocaleString()}
-            {outstanding === 0 && owed > 0 && ' ✓'}
-          </p>
-        </div>
-      </div>
+      {/* Balance = owed − paid − open credit for this event. Positive means the
+          diver still owes (red); negative means they're net in credit (green). */}
+      {(() => {
+        const balance = owed - paid - credit
+        return (
+          <>
+            <div className="grid grid-cols-3 gap-2 text-blue-900">
+              <div>
+                <p className="font-medium opacity-70">Owed</p>
+                <p className="font-semibold">{owed.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="font-medium opacity-70">Paid</p>
+                <p className="font-semibold">{paid.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="font-medium opacity-70">Balance</p>
+                {balance > 0 ? (
+                  <p className="font-semibold text-red-600">{balance.toLocaleString()} owed</p>
+                ) : balance < 0 ? (
+                  <p className="font-semibold text-emerald-700">{(-balance).toLocaleString()} credit</p>
+                ) : (
+                  <p className="font-semibold text-emerald-700">Settled ✓</p>
+                )}
+              </div>
+            </div>
+            {credit > 0 && (
+              <div className="flex justify-between text-emerald-700">
+                <span className="font-medium">Credit (this event)</span>
+                <span className="font-semibold">{credit.toLocaleString()}</span>
+              </div>
+            )}
+          </>
+        )
+      })()}
 
       {payments.length === 0 ? (
         <p className="text-blue-900 font-medium italic">No payments recorded yet.</p>

@@ -3,7 +3,7 @@ import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
-import { fetchCreditsForUser, openCreditBalance } from '../lib/credits'
+import { fetchCreditsForUser, openCreditBalance, openCreditForBooking } from '../lib/credits'
 import { resolveCharges, type ChargeLine } from '../lib/booking-charges'
 import { fetchChargeCatalog } from '../lib/booking-charge-catalog'
 import { ChargeBreakdown } from '../components/ChargeBreakdown'
@@ -20,6 +20,8 @@ interface BookingLine {
   total: number
   deposit: number
   paid: number
+  /** Open credit awarded for this event — offsets what's owed. */
+  credit: number
   due: number
   depositDue: number
 }
@@ -80,6 +82,7 @@ export function PaymentsPage() {
       const deposit = Number(d.deposit ?? 0)
       const bookingPayments = paymentsByBooking.get(b.id) ?? []
       const paid = bookingPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
+      const credit = openCreditForBooking(credits, b.id)
       return {
         booking: b,
         event,
@@ -88,7 +91,8 @@ export function PaymentsPage() {
         total,
         deposit,
         paid,
-        due: Math.max(0, total - paid),
+        credit,
+        due: Math.max(0, total - paid - credit),
         depositDue: Math.max(0, deposit - paid),
       }
     }))
@@ -187,10 +191,13 @@ function LineCard({
   onToggle: () => void
   onRefund: (id: string) => void
 }) {
-  const { booking, event, charges, total, deposit, paid, due, depositDue, payments } = line
+  const { booking, event, charges, total, deposit, paid, credit, depositDue, payments } = line
   const label = event?.title ?? '(event)'
   const refundRequested = !!booking.refund_requested_at
   const canRefundDeposit = paid > 0 && !refundRequested
+  // Balance nets open credit-for-this-event against what's owed. Positive =
+  // still owed (red); negative = net in credit (green).
+  const balance = total - paid - credit
 
   return (
     <div className={CARD}>
@@ -213,9 +220,11 @@ function LineCard({
           {total > 0 ? (
             <>
               <p className={`text-sm font-semibold ${TEXT_HEADING}`}>{currency} {total.toLocaleString()}</p>
-              {due > 0
-                ? <p className={`text-xs ${TEXT_ERROR}`}>{currency} {due.toLocaleString()} due</p>
-                : <p className="text-xs text-blue-900 font-semibold">Paid in full</p>}
+              {balance > 0
+                ? <p className={`text-xs ${TEXT_ERROR}`}>{currency} {balance.toLocaleString()} due</p>
+                : balance < 0
+                  ? <p className="text-xs text-emerald-700 font-semibold">{currency} {(-balance).toLocaleString()} credit</p>
+                  : <p className="text-xs text-blue-900 font-semibold">Paid in full</p>}
             </>
           ) : <p className={`text-xs ${TEXT_SUBTLE}`}>—</p>}
           <p className={`text-xs ${TEXT_SUBTLE} mt-0.5`}>{open ? '▲' : '▼'}</p>
@@ -246,6 +255,24 @@ function LineCard({
             <div className={`flex justify-between ${TEXT_BODY}`}>
               <span>Paid</span>
               <span className="text-blue-900 font-semibold">{currency} {paid.toLocaleString()}</span>
+            </div>
+          )}
+          {credit > 0 && (
+            <div className={`flex justify-between ${TEXT_BODY}`}>
+              <span>Credit (this event)</span>
+              <span className="text-emerald-700 font-semibold">{currency} {credit.toLocaleString()}</span>
+            </div>
+          )}
+          {total > 0 && (
+            <div className={`flex justify-between font-semibold pt-1 border-t border-sky-200 ${TEXT_BODY}`}>
+              <span>Balance</span>
+              {balance > 0 ? (
+                <span className={TEXT_ERROR}>{currency} {balance.toLocaleString()} due</span>
+              ) : balance < 0 ? (
+                <span className="text-emerald-700">{currency} {(-balance).toLocaleString()} credit</span>
+              ) : (
+                <span className="text-blue-900">Settled ✓</span>
+              )}
             </div>
           )}
 
