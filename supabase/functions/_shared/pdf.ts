@@ -75,6 +75,10 @@ export interface RegistrationPdfPayload {
   creditCardInvoiceEmail: string | null
   deposit: number | string | null
   total: number | null
+  /** Itemized charge lines (base + every additional charge with its amount)
+   *  snapshotted on the booking. When present, the Payment section lists each
+   *  line so the total is fully backtrackable. Null/empty for older bookings. */
+  charges: Array<{ label: string; amount: number }> | null
   /** True when the diver chose deposit-only at registration. */
   payDepositOnly: boolean
   /** YYYY-MM-DD; deposit is always due ASAP, so only the balance carries a date. */
@@ -267,6 +271,11 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
     : p.paymentMethod === "cash"        ? "Cash"
     : (p.paymentMethod || "")
   y = row(doc, y, "Method", methodLabel, altState)
+  // Itemized charge breakdown — each line sums into the highlighted Total
+  // below, so staff and divers can trace exactly what was charged.
+  if (p.charges && p.charges.length) {
+    for (const c of p.charges) y = row(doc, y, c.label, c.amount, altState)
+  }
   y = row(doc, y, "Deposit due (NTD)", p.deposit, altState)
   y += 2
 

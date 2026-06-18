@@ -167,13 +167,28 @@ interface BookingDetails {
   payment_method?: 'bank_transfer' | 'credit_card' | 'cash'
   pay_deposit_only?: boolean        // deposit-only-at-registration flag
   nitrox_course_addon?: boolean
+  charges?: ChargeLine[]            // itemized snapshot — see below
   total?: number                    // final-charge snapshot
   deposit?: number                  // EO_prices.deposit_amount snapshot
   cancellation_policy_acked_at?: string  // gate for submit when policy attached
 }
 ```
 
-**Design note:** `total` and `deposit` are snapshotted into the booking
-so later price changes don't retroactively alter what the diver owes.
+**Design note:** `total`, `deposit`, and `charges` are snapshotted into
+the booking so later catalog price changes don't retroactively alter what
+the diver owes — the lesson from removing the full-gear-set package, which
+had silently rewritten paid divers' amounts because every surface
+*recomputed* the breakdown from current prices.
 `cancellation_policy_acked_at` is preserved across edits — admin
 edits to `notes`/`details` don't reset the diver's prior ack.
+
+**`charges` (`ChargeLine[]`)** — the itemized breakdown behind `total`
+(base, per-item gear, room, each add-on, transport, nitrox course, card
+surcharge), each `{ kind, label, amount }`. Built once by `buildCharges()`
+in `src/lib/booking-charges.ts` at registration and rendered from the
+snapshot everywhere: the PDF/email, the diver's Bookings/Payments pages,
+and the admin event + per-diver views (via the shared `<ChargeBreakdown>`
+and `BookingPaymentsBlock`). Bookings created before this field existed
+have no snapshot; `resolveCharges()` reconstructs their lines from the
+stored selections using *current* catalog prices (so the figures can
+drift) — it never mutates stored rows.

@@ -498,6 +498,23 @@ describe('handleRegistration — email behaviour', () => {
       expect(msg.subject).toMatch(/^waitlist--/)
     }
   })
+
+  it('forwards the itemized charge snapshot into the PDF payload', async () => {
+    const { deps } = makeDeps()
+    const charges = [
+      { kind: 'base', label: 'Base', amount: 2800 },
+      { kind: 'gear', label: 'Gear: BCD', amount: 400 },
+    ]
+    await handleRegistration(postJson({
+      ...goodBody,
+      email:    'g@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'tk',
+      details:  { charges, total: 3200 },
+    }), deps)
+    const buildPdf = deps.buildPdfBase64 as unknown as { mock: { calls: Array<[{ charges: unknown }]> } }
+    expect(buildPdf.mock.calls[0][0].charges).toEqual(charges)
+  })
 })
 
 describe('handleRegistration — H2 guest path gates (Turnstile, rate limit, event existence)', () => {

@@ -461,6 +461,9 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     creditCardInvoiceEmail: (details.credit_card_invoice_email as string | null | undefined) ?? null,
     deposit:         (details.deposit as number | null) ?? null,
     total:           (details.total as number | null) ?? null,
+    charges:         Array.isArray(details.charges)
+      ? (details.charges as Array<{ label: string; amount: number }>)
+      : null,
     payDepositOnly:  !!details.pay_deposit_only,
     fullPaymentDeadline,
     cancellationPolicyTitle,

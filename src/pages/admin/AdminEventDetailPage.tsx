@@ -18,6 +18,7 @@ import { fetchAmendmentsForBookings, addAmendment, formAmount, amendmentsDelta }
 import { recordPayment as recordPaymentRow, voidPayment as voidPaymentRow } from '../../lib/booking-payments'
 import { requestEventDiverExport } from '../../lib/admin-event-export'
 import { BookingPaymentsBlock } from '../../components/admin/BookingPaymentsBlock'
+import { resolveCharges, type ChargeLine } from '../../lib/booking-charges'
 import { ShareEventButton } from '../../components/ShareEventButton'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, DiverNote, Payment, Profile } from '../../types/database'
 
@@ -27,6 +28,7 @@ interface Registrant {
   payments: Payment[]
   amendments: BookingAmendment[]
   diverNotes: DiverNote[]
+  charges: ChargeLine[]
 }
 
 type AddonNameMap = Map<string, string>
@@ -72,7 +74,8 @@ export function AdminEventDetailPage() {
         type === 'course' ? [id] : []
       )
       if (cancelled) return
-      setEvent(eventMap.get(id) ?? null)
+      const ev = eventMap.get(id) ?? null
+      setEvent(ev)
 
       // Bookings on this event
       const column = type === 'dive' ? 'eo_dive_id' : 'eo_course_id'
@@ -117,15 +120,22 @@ export function AdminEventDetailPage() {
       const roomIds = uniqueUuids(bookings.map(b => (b.details as BookingDetails).room?.option_id))
       const [addonRes, roomRes] = await Promise.all([
         addonIds.length
-          ? supabase.from('Other_Addons').select('_id, display_title, admin_title').in('_id', addonIds)
-          : Promise.resolve({ data: [] as { _id: string; display_title: string | null; admin_title: string | null }[] }),
+          ? supabase.from('Other_Addons').select('_id, display_title, admin_title, price').in('_id', addonIds)
+          : Promise.resolve({ data: [] as { _id: string; display_title: string | null; admin_title: string | null; price: number | null }[] }),
         roomIds.length
-          ? supabase.from('EO_rooms').select('_id, display_title, admin_title').in('_id', roomIds)
-          : Promise.resolve({ data: [] as { _id: string; display_title: string | null; admin_title: string | null }[] }),
+          ? supabase.from('EO_rooms').select('_id, display_title, admin_title, added_price').in('_id', roomIds)
+          : Promise.resolve({ data: [] as { _id: string; display_title: string | null; admin_title: string | null; added_price: number | null }[] }),
       ])
       if (cancelled) return
-      setAddonNames(new Map((addonRes.data ?? []).map(a => [a._id, a.display_title || a.admin_title || a._id])))
-      setRoomNames(new Map((roomRes.data ?? []).map(r => [r._id, r.display_title || r.admin_title || r._id])))
+      const addonNameMap = new Map((addonRes.data ?? []).map(a => [a._id, a.display_title || a.admin_title || a._id]))
+      const roomNameMap = new Map((roomRes.data ?? []).map(r => [r._id, r.display_title || r.admin_title || r._id]))
+      setAddonNames(addonNameMap)
+      setRoomNames(roomNameMap)
+
+      // Price maps drive the display-time recompute for bookings created before
+      // the itemized charge snapshot existed (see resolveCharges).
+      const addonPrices = new Map((addonRes.data ?? []).map(a => [a._id, { label: addonNameMap.get(a._id) ?? a._id, amount: a.price ?? 0 }]))
+      const roomPrices = new Map((roomRes.data ?? []).map(r => [r._id, { label: roomNameMap.get(r._id) ?? r._id, amount: r.added_price ?? 0 }]))
 
       setRegistrants(bookings.map(b => ({
         booking: b,
@@ -133,6 +143,7 @@ export function AdminEventDetailPage() {
         payments: paymentsByBooking.get(b.id) ?? [],
         amendments: amendmentsByBooking.get(b.id) ?? [],
         diverNotes: diverNotesByUser.get(b.user_id) ?? [],
+        charges: resolveCharges({ details: b.details as BookingDetails, event: ev, roomPrices, addonPrices }),
       })))
       setLoading(false)
     })()
@@ -397,6 +408,7 @@ export function AdminEventDetailPage() {
                   r={r}
                   addonNames={addonNames}
                   roomNames={roomNames}
+                  currency={event?.currency ?? 'NTD'}
                   onStatusChange={updateStatus}
                   onApproveRefund={approveRefund}
                   onEdit={() => setEditing(r)}
@@ -936,10 +948,11 @@ function ExportManifestModal({
 
 const BOOKING_STATUSES: Booking['status'][] = ['pending', 'confirmed', 'waitlisted', 'cancelled']
 
-function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRefund, onEdit, onAddAmendment, onRecordPayment, onVoidPayment, onMarkDepositPaid, readOnly }: {
+function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, onApproveRefund, onEdit, onAddAmendment, onRecordPayment, onVoidPayment, onMarkDepositPaid, readOnly }: {
   r: Registrant
   addonNames: AddonNameMap
   roomNames: RoomNameMap
+  currency: string
   onStatusChange: (id: string, s: Booking['status']) => void
   onApproveRefund: (id: string) => void
   onEdit: () => void
@@ -1120,6 +1133,8 @@ function RegistrantCard({ r, addonNames, roomNames, onStatusChange, onApproveRef
             owed={adjusted}
             paid={totalPaid}
             outstanding={outstanding}
+            charges={r.charges}
+            currency={currency}
             pending={r.booking.status === 'pending'}
             cancelled={r.booking.status === 'cancelled'}
             readOnly={!!readOnly}

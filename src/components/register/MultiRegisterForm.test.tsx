@@ -134,6 +134,13 @@ describe('MultiRegisterForm parent diver picker', () => {
     // Both share the same group_id.
     expect(e1Body.group_id).toBe(e2Body.group_id)
     expect(onAll).toHaveBeenCalled()
+
+    // Each booking carries an itemized charge snapshot that sums to its total.
+    for (const body of [e1Body, e2Body]) {
+      const details = body.details as { total?: number; charges?: Array<{ kind: string; amount: number }> }
+      expect(details.charges?.[0]?.kind).toBe('base')
+      expect(details.charges?.reduce((s, c) => s + c.amount, 0)).toBe(details.total)
+    }
   })
 
   it('shows an itemized price breakdown per event on the payment step', async () => {

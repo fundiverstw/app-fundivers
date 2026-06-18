@@ -233,6 +233,7 @@ describe('RegisterForm', () => {
       transportation: boolean
       nitrox_course_addon: boolean
       total: number
+      charges: Array<{ kind: string; label: string; amount: number }>
     }
     expect(details.gear.rent).toBe(true)
     expect(details.gear.mode).toBe('a-la-carte')
@@ -242,6 +243,15 @@ describe('RegisterForm', () => {
     expect(details.nitrox_course_addon).toBe(true)
     // base 2800 + gear wetsuit 200 + transport 1300 + nitrox 6000 + addon 100 = 10400
     expect(details.total).toBe(10400)
+    // The itemized snapshot mirrors the total, line by line.
+    expect(details.charges.map(c => [c.label, c.amount])).toEqual([
+      ['Base', 2800],
+      ['Gear: Wetsuit', 200],
+      ['Add-on: SMB 1 Day', 100],
+      ['Transport', 1300],
+      ['Nitrox course', 6000],
+    ])
+    expect(details.charges.reduce((s, c) => s + c.amount, 0)).toBe(details.total)
   })
 
   it('hides gear/room/addon/nitrox sections when the event does not offer them', async () => {

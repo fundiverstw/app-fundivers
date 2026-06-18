@@ -104,12 +104,19 @@ total = base_price
 total *= 1.05           (if payment_method === 'credit_card')
 ```
 
-The static constants `GEAR_FULLSET_DAILY`, `GEAR_ALACARTE_PRICES`,
-and `NITROX_COURSE_FEE` live at the top of `RegisterForm.tsx` —
-change them there. **Transport** moved out of the constants in
+Gear prices (`GEAR_ALACARTE_PRICES`) live in `src/lib/gear.ts`;
+`NITROX_COURSE_FEE` lives in `src/lib/booking-charges.ts` (shared by both
+register forms and the display-time recompute). Gear is à-la-carte only —
+there is no full-set package. **Transport** moved out of the constants in
 migration `20260430030000_eo_prices_transport_int.sql`: it's now a
 per-event integer on the linked `EO_prices.transport` row, surfaced
 on `AppEvent` as `transport_price`.
+
+`buildCharges()` in `src/lib/booking-charges.ts` turns these into an
+itemized `ChargeLine[]` that is both shown in the form summary and
+snapshotted onto the booking as `details.charges`, so the breakdown is
+frozen against later price changes (see
+[data-model.md § BookingDetails](./data-model.md#bookingdetails-jsonb-shape)).
 
 ### What gets written
 
@@ -127,7 +134,7 @@ The form does **not** write to `bookings` directly. It invokes the
    - `notes` — free-text field from the form
    - `details` JSONB — see
      [data-model.md § BookingDetails](./data-model.md#bookingdetails-jsonb-shape)
-     (`total` and `deposit` are snapshots).
+     (`total`, `deposit`, and the itemized `charges` are snapshots).
 4. Builds a registration PDF (`supabase/functions/_shared/pdf.ts`) and
    sends it via Gmail SMTP to `fundiverstw@gmail.com` and the diver.
 5. Returns `{ booking_id, session? }` — `session` populated on the
