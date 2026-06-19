@@ -123,6 +123,17 @@ export interface Database {
         Args: { p_user_id: string }
         Returns: void
       }
+      // Defined in 20260620000000_apply_credit_to_booking.sql.
+      // Security-definer. Spends the booking owner's open account credit
+      // toward the booking's unpaid balance: consumes open credit rows
+      // oldest-first (carrying any remainder forward), records an offsetting
+      // 'account_credit' payment, and auto-confirms a pending booking once
+      // the deposit is covered. auth.uid() must own the booking or be admin.
+      // Returns the amount actually applied (clamped to owed / available).
+      apply_credit_to_booking: {
+        Args: { p_booking_id: string; p_amount: number }
+        Returns: number
+      }
       // Defined in 20260603040000_signup_throttling_and_orphan_log.sql.
       // Service-role only. Inserts a signup_attempts row and returns
       // count of attempts within the trailing 60s + 24h windows

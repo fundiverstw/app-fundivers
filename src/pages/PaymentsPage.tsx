@@ -3,15 +3,16 @@ import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
-import { fetchCreditsForUser, openCreditForBooking, diverCreditBalance } from '../lib/credits'
+import { fetchCreditsForUser, openCreditForBooking, openCreditBalance, diverCreditBalance, applyCreditToBooking } from '../lib/credits'
+import { useToast } from '../hooks/useToast'
 import { bookingBalance } from '../lib/booking-balance'
 import { resolveCharges, type ChargeLine } from '../lib/booking-charges'
 import { fetchChargeCatalog } from '../lib/booking-charge-catalog'
 import { fetchAmendmentsForBookings, amendmentsDelta } from '../lib/booking-amendments'
 import { ChargeBreakdown, type AmendmentLine } from '../components/ChargeBreakdown'
-import type { AppEvent, Booking, BookingDetails, Payment } from '../types/database'
+import type { AppEvent, Booking, BookingDetails, Credit, Payment } from '../types/database'
 import {
-  CARD, BTN_GHOST, TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR, PAGE_BODY,
+  CARD, BTN_GHOST, BTN_PRIMARY, TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR, PAGE_BODY,
 } from '../styles/tokens'
 
 interface BookingLine {
@@ -47,10 +48,16 @@ const STATUS_STYLES: Record<Booking['status'], string> = {
 
 export function PaymentsPage() {
   const { user } = useAuth()
+  const toast = useToast()
   const [lines, setLines] = useState<BookingLine[]>([])
   const [openCredit, setOpenCredit] = useState<number>(0)
+  /** Open credit not tied to any single booking's offset — the spendable
+   *  pool a diver can apply to a balance. Indexed nowhere; we recompute the
+   *  per-booking applicable amount from this and openCreditForBooking. */
+  const [creditRows, setCreditRows] = useState<Credit[]>([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [applying, setApplying] = useState<string | null>(null)
 
   async function refetch(uid: string) {
     const [bookingsRes, paymentsRes, credits] = await Promise.all([
@@ -106,6 +113,7 @@ export function PaymentsPage() {
       }
     })
     setLines(lineData)
+    setCreditRows(credits)
     // Account credit = awarded credits + overpayments across active bookings.
     setOpenCredit(diverCreditBalance(
       credits,
@@ -130,6 +138,20 @@ export function PaymentsPage() {
     if (user) await refetch(user.id)
   }
 
+  async function applyCredit(bookingId: string, amount: number) {
+    setApplying(bookingId)
+    try {
+      const applied = await applyCreditToBooking({ bookingId, amount })
+      if (applied > 0) toast.success(`Applied ${currency} ${applied.toLocaleString()} credit`)
+      else toast.info('Nothing to apply')
+      if (user) await refetch(user.id)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not apply credit')
+    } finally {
+      setApplying(null)
+    }
+  }
+
   const active = lines.filter(l => l.booking.status !== 'cancelled')
   const totalOwed = active.reduce((s, l) => s + l.due, 0)
   const totalDepositDue = active.reduce((s, l) => s + l.depositDue, 0)
@@ -150,9 +172,8 @@ export function PaymentsPage() {
             Account credit: {currency} {openCredit.toLocaleString()}
           </p>
           <p className="text-xs text-emerald-900">
-            We owe you this much — usually from a cancelled event. Mention
-            it when you sign up for your next trip and we'll apply it to
-            the balance.
+            We owe you this much — usually from a cancelled event. Open any
+            booking with a balance due below to apply it.
           </p>
         </div>
       )}
@@ -174,9 +195,12 @@ export function PaymentsPage() {
                 key={l.booking.id}
                 line={l}
                 currency={currency}
+                spendable={Math.max(0, openCreditBalance(creditRows) - openCreditForBooking(creditRows, l.booking.id))}
+                applying={applying === l.booking.id}
                 open={expanded === l.booking.id}
                 onToggle={() => setExpanded(expanded === l.booking.id ? null : l.booking.id)}
                 onRefund={requestRefund}
+                onApplyCredit={applyCredit}
               />
             ))}
           </div>
@@ -186,6 +210,46 @@ export function PaymentsPage() {
       <p className={`text-xs ${TEXT_SUBTLE} text-center`}>
         Deposit is due up-front to confirm your spot. Balance is settled closer to the event.
       </p>
+    </div>
+  )
+}
+
+function ApplyCreditControl({
+  max, currency, busy, onApply,
+}: {
+  max: number
+  currency: string
+  busy: boolean
+  onApply: (amount: number) => void
+}) {
+  const [amount, setAmount] = useState<number>(max)
+  const clamped = Math.min(Math.max(0, amount || 0), max)
+
+  return (
+    <div className="bg-emerald-50 border border-emerald-400 rounded-lg p-3 space-y-2">
+      <p className="text-xs text-emerald-900">
+        You have {currency} {max.toLocaleString()} in account credit you can apply to this balance.
+      </p>
+      <div className="flex items-center gap-2">
+        <span className={`text-xs ${TEXT_MUTED}`}>{currency}</span>
+        <input
+          type="number"
+          aria-label="Credit amount to apply"
+          min={1}
+          max={max}
+          value={amount}
+          onChange={e => setAmount(Number(e.target.value))}
+          className="flex-1 min-w-0 rounded-md border border-emerald-400 px-2 py-1 text-sm text-blue-950"
+        />
+        <button
+          type="button"
+          disabled={busy || clamped <= 0}
+          onClick={() => onApply(clamped)}
+          className={`${BTN_PRIMARY} text-xs py-1.5 px-3 disabled:opacity-50`}
+        >
+          {busy ? 'Applying…' : 'Apply credit'}
+        </button>
+      </div>
     </div>
   )
 }
@@ -200,18 +264,24 @@ function Summary({ label, value, currency, accent }: { label: string; value: num
 }
 
 function LineCard({
-  line, currency, open, onToggle, onRefund,
+  line, currency, spendable, applying, open, onToggle, onRefund, onApplyCredit,
 }: {
   line: BookingLine
   currency: string
+  spendable: number
+  applying: boolean
   open: boolean
   onToggle: () => void
   onRefund: (id: string) => void
+  onApplyCredit: (id: string, amount: number) => void
 }) {
-  const { booking, event, charges, amendments, total, owed, deposit, paid, credit, depositDue, payments } = line
+  const { booking, event, charges, amendments, total, owed, deposit, paid, credit, due, depositDue, payments } = line
   const label = event?.title ?? '(event)'
   const refundRequested = !!booking.refund_requested_at
   const canRefundDeposit = paid > 0 && !refundRequested
+  // What this booking can absorb from the diver's spendable credit pool:
+  // its outstanding balance, capped by credit not already offsetting it.
+  const applicable = Math.min(due, spendable)
   // Balance nets open credit-for-this-event against what's owed (incl.
   // amendments). A negative balance — awarded credit or overpayment — is money
   // the shop owes the diver, shown as a credit.
@@ -306,6 +376,15 @@ function LineCard({
                 </div>
               ))}
             </div>
+          )}
+
+          {applicable > 0 && (
+            <ApplyCreditControl
+              max={applicable}
+              currency={currency}
+              busy={applying}
+              onApply={amount => onApplyCredit(booking.id, amount)}
+            />
           )}
 
           {canRefundDeposit && (

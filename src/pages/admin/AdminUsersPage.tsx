@@ -12,7 +12,7 @@ import { resolveCharges, type ChargeLine } from '../../lib/booking-charges'
 import { fetchChargeCatalog } from '../../lib/booking-charge-catalog'
 import { getCertCardSignedUrl } from '../../lib/cert-card'
 import { shoeAsJp } from '../../lib/shoe-size'
-import { fetchCreditsForUser, openCreditForBooking, diverCreditBalance, createCredit, settleCredit, reopenCredit } from '../../lib/credits'
+import { fetchCreditsForUser, openCreditForBooking, openCreditBalance, diverCreditBalance, createCredit, settleCredit, reopenCredit, applyCreditToBooking } from '../../lib/credits'
 import { ProfileForm } from '../ProfilePage'
 import { DiverNotes } from '../../components/admin/DiverNotes'
 import { AdminFamilyPanel } from '../../components/admin/AdminFamilyPanel'
@@ -80,6 +80,16 @@ export function AdminUsersPage() {
     if (extrasCache.has(userId)) return
 
     setExtrasLoading(userId)
+    const extras = await fetchExtras(userId)
+    setExtrasCache(prev => new Map(prev).set(userId, extras))
+    setExtrasLoading(null)
+  }
+
+  // Load (or reload) a diver's bookings/payments/credits panel data. Used on
+  // first expand and after credit-apply, which mutates credits + payments +
+  // booking status in one server round-trip — cheaper to refetch than to
+  // mirror the RPC's consume-and-split locally.
+  async function fetchExtras(userId: string): Promise<UserExtras> {
     const [bookingsRes, paymentsRes, credits] = await Promise.all([
       supabase.from('bookings').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
       supabase.from('payments').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
@@ -109,21 +119,16 @@ export function AdminUsersPage() {
     const paidSum = payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
     const pendingSum = payments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0)
 
-    setExtrasCache(prev => {
-      const next = new Map(prev)
-      next.set(userId, {
-        bookings: hydrated,
-        payments,
-        amendments,
-        credits,
-        paidSum,
-        pendingSum,
-        // Account credit = awarded credits + overpayments across active bookings.
-        openCreditBalance: diverCreditBalance(credits, activeCreditRows(hydrated, payments, amendments)),
-      })
-      return next
-    })
-    setExtrasLoading(null)
+    return {
+      bookings: hydrated,
+      payments,
+      amendments,
+      credits,
+      paidSum,
+      pendingSum,
+      // Account credit = awarded credits + overpayments across active bookings.
+      openCreditBalance: diverCreditBalance(credits, activeCreditRows(hydrated, payments, amendments)),
+    }
   }
 
   async function handleRecordPayment(userId: string, bookingId: string, amount: number, note: string) {
@@ -190,6 +195,18 @@ export function AdminUsersPage() {
       toast.success('Marked deposit paid · status set to confirmed')
     } catch (err) {
       toast.error(`Could not update status: ${errorMessage(err)}`)
+      throw err
+    }
+  }
+
+  async function handleApplyCredit(userId: string, bookingId: string, amount: number) {
+    try {
+      const applied = await applyCreditToBooking({ bookingId, amount })
+      const extras = await fetchExtras(userId)
+      setExtrasCache(prev => new Map(prev).set(userId, extras))
+      toast.success(applied > 0 ? `Applied ${applied.toLocaleString()} credit` : 'Nothing to apply')
+    } catch (err) {
+      toast.error(`Could not apply credit: ${errorMessage(err)}`)
       throw err
     }
   }
@@ -391,6 +408,7 @@ export function AdminUsersPage() {
             onVoidPayment={(bookingId, paymentId) => handleVoidPayment(u.id, bookingId, paymentId)}
             onMarkDepositPaid={(bookingId) => handleMarkDepositPaid(u.id, bookingId)}
             onCreateCredit={(amount, reason, bookingId) => handleCreateCredit(u.id, amount, reason, bookingId)}
+            onApplyCredit={(bookingId, amount) => handleApplyCredit(u.id, bookingId, amount)}
             onSettleCredit={(creditId, note) => handleSettleCredit(u.id, creditId, note)}
             onReopenCredit={(creditId) => handleReopenCredit(u.id, creditId)}
             onDelete={() => handleDeleteUser(u)}
@@ -408,7 +426,7 @@ export function AdminUsersPage() {
 
 function UserCard({
   user, allUsers, onFamilyChanged, open, extras, loading, editing, onToggle, onEdit, onCancelEdit, onProfileSaved,
-  onRecordPayment, onVoidPayment, onMarkDepositPaid, onCreateCredit, onSettleCredit, onReopenCredit, onDelete, isAdmin, isSelf,
+  onRecordPayment, onVoidPayment, onMarkDepositPaid, onCreateCredit, onApplyCredit, onSettleCredit, onReopenCredit, onDelete, isAdmin, isSelf,
 }: {
   user: Profile
   allUsers: Profile[]
@@ -425,6 +443,7 @@ function UserCard({
   onVoidPayment: (bookingId: string, paymentId: string) => Promise<void>
   onMarkDepositPaid: (bookingId: string) => Promise<void>
   onCreateCredit: (amount: number, reason: string, bookingId: string | null) => Promise<void>
+  onApplyCredit: (bookingId: string, amount: number) => Promise<void>
   onSettleCredit: (creditId: string, note: string) => Promise<void>
   onReopenCredit: (creditId: string) => Promise<void>
   onDelete: () => Promise<void>
@@ -525,6 +544,7 @@ function UserCard({
                   onVoidPayment={onVoidPayment}
                   onMarkDepositPaid={onMarkDepositPaid}
                   onCreateCredit={onCreateCredit}
+                  onApplyCredit={onApplyCredit}
                   onSettleCredit={onSettleCredit}
                   onReopenCredit={onReopenCredit}
                   isAdmin={isAdmin}
@@ -586,17 +606,25 @@ function ProfileDetails({ user }: { user: Profile }) {
   )
 }
 
-function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid, onCreateCredit, onSettleCredit, onReopenCredit, isAdmin }: {
+function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid, onCreateCredit, onApplyCredit, onSettleCredit, onReopenCredit, isAdmin }: {
   extras: UserExtras
   onRecordPayment: (bookingId: string, amount: number, note: string) => Promise<void>
   onVoidPayment: (bookingId: string, paymentId: string) => Promise<void>
   onMarkDepositPaid: (bookingId: string) => Promise<void>
   onCreateCredit: (amount: number, reason: string, bookingId: string | null) => Promise<void>
+  onApplyCredit: (bookingId: string, amount: number) => Promise<void>
   onSettleCredit: (creditId: string, note: string) => Promise<void>
   onReopenCredit: (creditId: string) => Promise<void>
   isAdmin: boolean
 }) {
   const activeBookings = extras.bookings.filter(b => b.status !== 'cancelled')
+  // Bookings that still owe money — credit-apply targets for the panel below.
+  const applyTargets = activeBookings.map(b => {
+    const paid = extras.payments.filter(p => p.booking_id === b.id && p.status === 'paid').reduce((s, p) => s + p.amount, 0)
+    const owed = Number((b.details as { total?: number } | undefined)?.total ?? 0) + amendmentsDelta(extras.amendments.get(b.id) ?? [])
+    const due = Math.max(0, owed - paid - openCreditForBooking(extras.credits, b.id))
+    return { id: b.id, label: b.event?.title ?? '(event)', due }
+  }).filter(t => t.due > 0)
   return (
     <div className="space-y-3 pt-2 border-t border-sky-200">
       <Section title="Bookings" defaultOpen>
@@ -648,8 +676,10 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
           credits={extras.credits}
           openBalance={extras.openCreditBalance}
           bookings={extras.bookings}
+          applyTargets={applyTargets}
           readOnly={!isAdmin}
           onCreate={onCreateCredit}
+          onApply={onApplyCredit}
           onSettle={onSettleCredit}
           onReopen={onReopenCredit}
         />
@@ -677,12 +707,14 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
   )
 }
 
-function CreditsPanel({ credits, openBalance, bookings, readOnly, onCreate, onSettle, onReopen }: {
+function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, onCreate, onApply, onSettle, onReopen }: {
   credits: Credit[]
   openBalance: number
   bookings: Array<Booking & { event: AppEvent | null; charges: ChargeLine[] }>
+  applyTargets: Array<{ id: string; label: string; due: number }>
   readOnly: boolean
   onCreate: (amount: number, reason: string, bookingId: string | null) => Promise<void>
+  onApply: (bookingId: string, amount: number) => Promise<void>
   onSettle: (creditId: string, note: string) => Promise<void>
   onReopen: (creditId: string) => Promise<void>
 }) {
@@ -693,6 +725,7 @@ function CreditsPanel({ credits, openBalance, bookings, readOnly, onCreate, onSe
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [settlingId, setSettlingId] = useState<string | null>(null)
+  const spendable = openCreditBalance(credits)
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -789,6 +822,15 @@ function CreditsPanel({ credits, openBalance, bookings, readOnly, onCreate, onSe
         </ul>
       )}
 
+      {!readOnly && spendable > 0 && applyTargets.length > 0 && (
+        <ApplyToBookingForm
+          spendable={spendable}
+          targets={applyTargets}
+          tiedCredit={bookingId => openCreditForBooking(credits, bookingId)}
+          onApply={onApply}
+        />
+      )}
+
       {!readOnly && (
         <div className="pt-1 border-t border-sky-200">
           {!showForm ? (
@@ -852,6 +894,66 @@ function CreditsPanel({ credits, openBalance, bookings, readOnly, onCreate, onSe
         </div>
       )}
     </div>
+  )
+}
+
+function ApplyToBookingForm({ spendable, targets, tiedCredit, onApply }: {
+  spendable: number
+  targets: Array<{ id: string; label: string; due: number }>
+  tiedCredit: (bookingId: string) => number
+  onApply: (bookingId: string, amount: number) => Promise<void>
+}) {
+  const [bookingId, setBookingId] = useState(targets[0]?.id ?? '')
+  const target = targets.find(t => t.id === bookingId) ?? targets[0]
+  // Spendable here excludes credit already tied to (and offsetting) this same
+  // booking — the RPC clamps identically, this just keeps the UI honest.
+  const cap = target ? Math.min(target.due, Math.max(0, spendable - tiedCredit(target.id))) : 0
+  const [amountStr, setAmountStr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const amount = Math.min(Math.max(0, parseInt(amountStr || '0', 10) || 0), cap)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!target || amount <= 0) return
+    setBusy(true)
+    try {
+      await onApply(target.id, amount)
+      setAmountStr('')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="pt-1 border-t border-sky-200 space-y-1.5">
+      <p className="text-blue-900 font-medium">Apply credit to a booking</p>
+      <div className="flex items-center gap-2">
+        <select
+          value={bookingId}
+          onChange={e => { setBookingId(e.target.value); setAmountStr('') }}
+          className="flex-1 bg-white border border-sky-300 rounded px-2 py-1 text-xs text-blue-900"
+        >
+          {targets.map(t => (
+            <option key={t.id} value={t.id}>{t.label} · {t.due.toLocaleString()} due</option>
+          ))}
+        </select>
+        <input
+          type="number" inputMode="numeric" min={1} max={cap} step={1}
+          value={amountStr}
+          onChange={e => setAmountStr(e.target.value)}
+          placeholder={cap.toLocaleString()}
+          className="w-24 bg-white border border-sky-300 rounded px-2 py-1 text-xs text-blue-900"
+        />
+        <button
+          type="submit"
+          disabled={busy || amount <= 0}
+          className="text-xs bg-blue-900 hover:bg-blue-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded"
+        >
+          {busy ? 'Applying…' : 'Apply'}
+        </button>
+      </div>
+      <p className="text-blue-950">Up to {cap.toLocaleString()} of {spendable.toLocaleString()} available credit.</p>
+    </form>
   )
 }
 

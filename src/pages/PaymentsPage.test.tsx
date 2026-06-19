@@ -1,17 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { PaymentsPage } from './PaymentsPage'
 import { renderWithRouter, mockQueryBuilder } from '../../tests/test-utils'
 import type { AppEvent } from '../types/database'
 
-const { from, useAuthMock, fetchEventsForBookings } = vi.hoisted(() => ({
+const { from, rpc, useAuthMock, fetchEventsForBookings } = vi.hoisted(() => ({
   from: vi.fn(),
+  rpc: vi.fn(),
   useAuthMock: vi.fn(),
   fetchEventsForBookings: vi.fn(),
 }))
 
 vi.mock('../lib/supabase', () => ({
-  supabase: { from: (...a: unknown[]) => from(...a) },
+  supabase: { from: (...a: unknown[]) => from(...a), rpc: (...a: unknown[]) => rpc(...a) },
+}))
+
+const toastSuccess = vi.fn()
+vi.mock('../hooks/useToast', () => ({
+  useToast: () => ({ success: toastSuccess, error: vi.fn(), info: vi.fn() }),
 }))
 
 vi.mock('../lib/events', async () => {
@@ -28,6 +35,8 @@ vi.mock('../hooks/useAuth', () => ({
 
 beforeEach(() => {
   from.mockReset()
+  rpc.mockReset()
+  toastSuccess.mockReset()
   fetchEventsForBookings.mockReset()
   useAuthMock.mockReset()
   useAuthMock.mockReturnValue({ user: { id: 'u1' } })
@@ -52,10 +61,11 @@ function event(overrides: Partial<AppEvent> & Pick<AppEvent, 'id' | 'type' | 'ti
   }
 }
 
-function setupFrom(bookings: unknown[], payments: unknown[]) {
+function setupFrom(bookings: unknown[], payments: unknown[], credits: unknown[] = []) {
   from.mockImplementation((table: string) => {
     if (table === 'bookings') return mockQueryBuilder({ data: bookings })
     if (table === 'payments') return mockQueryBuilder({ data: payments })
+    if (table === 'credits') return mockQueryBuilder({ data: credits })
     return mockQueryBuilder()
   })
 }
@@ -95,6 +105,31 @@ describe('PaymentsPage', () => {
     expect(screen.getByText(/TWD\s*6,500/)).toBeInTheDocument()
     // Payment history now lives inside the expanded card — assert at least the summary renders.
     expect(screen.getByText(/Dive B/)).toBeInTheDocument()
+  })
+
+  it('lets a diver apply available account credit to a booking with a balance due', async () => {
+    const bookings = [
+      { id: 'b1', user_id: 'u1', eo_dive_id: 'd1', eo_course_id: null, status: 'pending', notes: null, created_at: new Date().toISOString(), details: { total: 3000 } },
+    ]
+    const credits = [
+      { id: 'c1', user_id: 'u1', booking_id: null, amount: 2000, currency: 'TWD', reason: 'Cancelled trip', status: 'open', created_by: null, created_at: new Date().toISOString(), settled_at: null, settled_note: null },
+    ]
+    setupFrom(bookings, [], credits)
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['d1', event({ id: 'd1', type: 'dive', title: 'Dive A', price: 3000 })],
+    ]))
+    rpc.mockResolvedValue({ data: 2000, error: null })
+
+    const user = userEvent.setup()
+    renderWithRouter(<PaymentsPage />)
+
+    // Expand the booking card to reveal the apply-credit control.
+    await user.click(await screen.findByText('Dive A'))
+    const applyBtn = await screen.findByRole('button', { name: /apply credit/i })
+    await user.click(applyBtn)
+
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('apply_credit_to_booking', { p_booking_id: 'b1', p_amount: 2000 }))
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalled())
   })
 
   it('handles bookings with no details.total gracefully (shows dash, no error)', async () => {

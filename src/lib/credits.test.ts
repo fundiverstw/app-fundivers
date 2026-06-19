@@ -1,17 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { AppEvent } from '../types/database'
 
-const { from, creditsInsert } = vi.hoisted(() => ({
+const { from, rpc, creditsInsert } = vi.hoisted(() => ({
   from: vi.fn(),
+  rpc: vi.fn(),
   creditsInsert: vi.fn(),
 }))
 
 vi.mock('./supabase', () => ({
-  supabase: { from: (...a: unknown[]) => from(...a) },
+  supabase: { from: (...a: unknown[]) => from(...a), rpc: (...a: unknown[]) => rpc(...a) },
 }))
 
 beforeEach(() => {
   from.mockReset()
+  rpc.mockReset()
   creditsInsert.mockReset().mockResolvedValue({ error: null })
 })
 
@@ -167,5 +169,29 @@ describe('issueCancellationCredits', () => {
     const { issueCancellationCredits } = await import('./credits')
     await issueCancellationCredits({ event: courseEvent, createdBy: 'admin1' })
     expect(eqSpy).toHaveBeenCalledWith('eo_course_id', 'crs9')
+  })
+})
+
+describe('applyCreditToBooking', () => {
+  it('forwards booking + amount to the RPC and returns the applied figure', async () => {
+    rpc.mockResolvedValue({ data: 1500, error: null })
+    const { applyCreditToBooking } = await import('./credits')
+
+    const applied = await applyCreditToBooking({ bookingId: 'b1', amount: 2000 })
+
+    expect(applied).toBe(1500)
+    expect(rpc).toHaveBeenCalledWith('apply_credit_to_booking', { p_booking_id: 'b1', p_amount: 2000 })
+  })
+
+  it('coerces a null result to 0', async () => {
+    rpc.mockResolvedValue({ data: null, error: null })
+    const { applyCreditToBooking } = await import('./credits')
+    expect(await applyCreditToBooking({ bookingId: 'b1', amount: 500 })).toBe(0)
+  })
+
+  it('throws when the RPC errors', async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: 'not your booking' } })
+    const { applyCreditToBooking } = await import('./credits')
+    await expect(applyCreditToBooking({ bookingId: 'b1', amount: 500 })).rejects.toBeTruthy()
   })
 })
