@@ -203,6 +203,28 @@ export async function issueCancellationCredits(args: {
   return { issued: rows.length, totalAmount: rows.reduce((s, r) => s + r.amount, 0) }
 }
 
+/**
+ * Spend a diver's open account credit toward a booking's unpaid balance.
+ * Runs entirely inside the apply_credit_to_booking SECURITY DEFINER RPC
+ * (20260620000000): it consumes open credit rows oldest-first, carries any
+ * unspent remainder forward as a fresh credit, records an offsetting
+ * 'account_credit' payment, and auto-confirms a pending booking once the
+ * deposit is covered. The RPC clamps the request to what's owed and what's
+ * available, so the returned figure is the amount actually applied (0 when
+ * there's nothing to do). Callers should refetch afterwards.
+ */
+export async function applyCreditToBooking(args: {
+  bookingId: string
+  amount: number
+}): Promise<number> {
+  const { data, error } = await supabase.rpc('apply_credit_to_booking', {
+    p_booking_id: args.bookingId,
+    p_amount: args.amount,
+  })
+  if (error) throw error
+  return Number(data ?? 0)
+}
+
 export async function reopenCredit(creditId: string): Promise<Credit> {
   const { data, error } = await supabase
     .from('credits')

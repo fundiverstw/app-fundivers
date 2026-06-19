@@ -88,12 +88,31 @@ ledger.
 ## Credits
 
 `public.credits` tracks money the business owes a diver (the opposite
-direction from `payments`). A credit is `open` until an admin settles it
-— either paying the diver back out of band or recording a `payments` row
-when the diver applies it to a new booking. The corresponding payment is
-recorded as a **separate** action so the two-sided trail stays explicit
-(`src/lib/credits.ts`). `openCreditBalance()` is the diver's spendable
+direction from `payments`). A credit is `open` until it's settled — by
+paying the diver back out of band, or by spending it on a booking (see
+"Applying credit" below). `openCreditBalance()` is the diver's spendable
 balance, surfaced on `ProfilePage` and `PaymentsPage`.
+
+### Applying credit to a booking
+
+Divers can spend their open account credit toward an unpaid booking
+themselves (per-booking control on `PaymentsPage`); admins can do it for
+any diver from the registrant card on `AdminEventDetailPage` or the
+credits panel on `AdminUsersPage`. All three go through one SECURITY
+DEFINER RPC, `apply_credit_to_booking(p_booking_id, p_amount)`
+(migration `20260620000000`), because divers can't write `credits` or
+`payments` under RLS — the RPC is the only path.
+
+The RPC clamps the request to `min(requested, balance due, spendable
+pool)` and, in one transaction: consumes open credit rows oldest-first
+(settling each; the row that straddles the boundary is settled in full
+and its unspent part **carried forward** as a fresh `open` credit),
+inserts an offsetting `payments` row with `method='account_credit'` and
+`status='paid'`, and confirms a pending booking once the deposit is
+covered (same rule as `recordPayment`). Credit already tied to the
+target booking is *not* spent — it already offsets that booking's
+balance, so the spendable pool excludes it. Returns the amount actually
+applied. See `applyCreditToBooking()` in `src/lib/credits.ts`.
 
 ### Auto-credit on event cancellation
 

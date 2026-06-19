@@ -13,7 +13,7 @@ import { RegisterForm } from '../../components/register/RegisterForm'
 import { shoeAsJp } from '../../lib/shoe-size'
 import { uniqueUuids } from '../../lib/uuid'
 import { notifyEventCancelled } from '../../lib/event-cancellation'
-import { issueCancellationCredits } from '../../lib/credits'
+import { issueCancellationCredits, applyCreditToBooking } from '../../lib/credits'
 import { fetchAmendmentsForBookings, addAmendment, formAmount, amendmentsDelta } from '../../lib/booking-amendments'
 import { recordPayment as recordPaymentRow, voidPayment as voidPaymentRow } from '../../lib/booking-payments'
 import { requestEventDiverExport } from '../../lib/admin-event-export'
@@ -35,6 +35,9 @@ interface Registrant {
   charges: ChargeLine[]
   /** Open (unsettled) credit awarded to this diver for this event. */
   credit: number
+  /** Diver's open account credit NOT already tied to this booking — the
+   *  pool spendable against this booking's balance. */
+  spendable: number
 }
 
 type AddonNameMap = Map<string, string>
@@ -102,10 +105,12 @@ export function AdminEventDetailPage() {
         supabase.from('payments').select('*').in('booking_id', bookingIds),
         fetchAmendmentsForBookings(bookingIds),
         supabase.from('diver_notes').select('*').in('profile_id', userIds).order('created_at', { ascending: false }),
-        supabase.from('credits').select('*').in('booking_id', bookingIds),
+        supabase.from('credits').select('*').in('user_id', userIds).eq('status', 'open'),
       ])
       if (cancelled) return
 
+      // Every open credit row for these divers (event-tied or general), so we
+      // can both offset this event's balance and size the spendable pool.
       const credits = (creditsRes.data ?? []) as Credit[]
       const profileMap = new Map((profilesRes.data ?? []).map(p => [p.id, p]))
       const diverNotesByUser = new Map<string, DiverNote[]>()
@@ -153,6 +158,9 @@ export function AdminEventDetailPage() {
         diverNotes: diverNotesByUser.get(b.user_id) ?? [],
         charges: resolveCharges({ details: b.details as BookingDetails, event: ev, roomPrices, addonPrices }),
         credit: openCreditForBooking(credits, b.id),
+        spendable: credits
+          .filter(c => c.user_id === b.user_id && c.booking_id !== b.id)
+          .reduce((s, c) => s + Number(c.amount), 0),
       })))
       setLoading(false)
     })()
@@ -212,6 +220,22 @@ export function AdminEventDetailPage() {
       toast.success(promoted ? 'Payment recorded · status set to confirmed' : 'Payment recorded')
     } catch (err) {
       toast.error(`Could not record payment: ${errorMessage(err)}`)
+    }
+  }
+
+  async function applyCredit(r: Registrant, amount: number) {
+    try {
+      const applied = await applyCreditToBooking({ bookingId: r.booking.id, amount })
+      if (applied > 0) {
+        toast.success(`Applied ${event?.currency ?? 'NTD'} ${applied.toLocaleString()} credit`)
+        // Credit-apply settles/splits credit rows and inserts a payment in one
+        // round-trip; reload rather than mirror that locally.
+        setRefreshKey(k => k + 1)
+      } else {
+        toast.info('Nothing to apply')
+      }
+    } catch (err) {
+      toast.error(`Could not apply credit: ${errorMessage(err)}`)
     }
   }
 
@@ -423,6 +447,7 @@ export function AdminEventDetailPage() {
                   onEdit={() => setEditing(r)}
                   onAddAmendment={submitAmendment}
                   onRecordPayment={(amount, note) => recordPayment(r, amount, note)}
+                  onApplyCredit={(amount) => applyCredit(r, amount)}
                   onVoidPayment={(paymentId) => voidPayment(r, paymentId)}
                   onMarkDepositPaid={() => updateStatus(r.booking.id, 'confirmed')}
                   readOnly={!isAdmin}
@@ -957,7 +982,49 @@ function ExportManifestModal({
 
 const BOOKING_STATUSES: Booking['status'][] = ['pending', 'confirmed', 'waitlisted', 'cancelled']
 
-function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, onApproveRefund, onEdit, onAddAmendment, onRecordPayment, onVoidPayment, onMarkDepositPaid, readOnly }: {
+function ApplyCreditInline({ cap, spendable, currency, onApply }: {
+  cap: number
+  spendable: number
+  currency: string
+  onApply: (amount: number) => Promise<void>
+}) {
+  const [amountStr, setAmountStr] = useState(String(cap))
+  const [busy, setBusy] = useState(false)
+  const amount = Math.min(Math.max(0, parseInt(amountStr || '0', 10) || 0), cap)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (amount <= 0) return
+    setBusy(true)
+    try { await onApply(amount) } finally { setBusy(false) }
+  }
+
+  return (
+    <form onSubmit={submit} className="bg-emerald-50 border border-emerald-300 rounded p-2 space-y-1.5">
+      <p className="text-xs text-emerald-900">
+        Diver has {currency} {spendable.toLocaleString()} account credit — apply up to {currency} {cap.toLocaleString()}.
+      </p>
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-blue-950 font-medium">{currency}</span>
+        <input
+          type="number" inputMode="numeric" min={1} max={cap} step={1}
+          value={amountStr}
+          onChange={e => setAmountStr(e.target.value)}
+          className="w-24 bg-white border border-emerald-300 rounded px-2 py-1 text-xs text-blue-900"
+        />
+        <button
+          type="submit"
+          disabled={busy || amount <= 0}
+          className="text-xs bg-blue-900 hover:bg-blue-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded"
+        >
+          {busy ? 'Applying…' : 'Apply credit'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, onApproveRefund, onEdit, onAddAmendment, onRecordPayment, onApplyCredit, onVoidPayment, onMarkDepositPaid, readOnly }: {
   r: Registrant
   addonNames: AddonNameMap
   roomNames: RoomNameMap
@@ -967,6 +1034,7 @@ function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, on
   onEdit: () => void
   onAddAmendment: (id: string, sign: '+' | '-', amount: number, note: string) => Promise<void>
   onRecordPayment: (amount: number, note: string) => Promise<void>
+  onApplyCredit: (amount: number) => Promise<void>
   onVoidPayment: (paymentId: string) => Promise<void>
   onMarkDepositPaid: () => Promise<void>
   readOnly?: boolean
@@ -1151,6 +1219,15 @@ function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, on
             onVoid={onVoidPayment}
             onMarkDepositPaid={onMarkDepositPaid}
           />
+
+          {!readOnly && r.spendable > 0 && bal.state === 'due' && (
+            <ApplyCreditInline
+              cap={Math.min(bal.amount, r.spendable)}
+              spendable={r.spendable}
+              currency={currency}
+              onApply={onApplyCredit}
+            />
+          )}
 
           <AmendmentsSection
             readOnly={!!readOnly}
