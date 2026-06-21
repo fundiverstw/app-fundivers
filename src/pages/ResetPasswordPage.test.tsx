@@ -4,11 +4,19 @@ import userEvent from '@testing-library/user-event'
 import { renderWithRouter, byName } from '../../tests/test-utils'
 import { ResetPasswordPage } from './ResetPasswordPage'
 
-const { onAuthStateChange, getSession, updateUser, authCallbackParams } = vi.hoisted(() => ({
+const { onAuthStateChange, getSession, updateUser, verifyOtp, authCallbackParams } = vi.hoisted(() => ({
   onAuthStateChange: vi.fn(),
   getSession: vi.fn(),
   updateUser: vi.fn(),
-  authCallbackParams: { code: null as string | null, error: null as string | null, errorCode: null, errorDescription: null },
+  verifyOtp: vi.fn(),
+  authCallbackParams: {
+    code: null as string | null,
+    tokenHash: null as string | null,
+    type: null as string | null,
+    error: null as string | null,
+    errorCode: null,
+    errorDescription: null,
+  },
 }))
 
 vi.mock('../lib/supabase', () => ({
@@ -17,6 +25,7 @@ vi.mock('../lib/supabase', () => ({
       onAuthStateChange: (...a: unknown[]) => onAuthStateChange(...a),
       getSession: (...a: unknown[]) => getSession(...a),
       updateUser: (...a: unknown[]) => updateUser(...a),
+      verifyOtp: (...a: unknown[]) => verifyOtp(...a),
     },
   },
   authCallbackParams,
@@ -28,7 +37,10 @@ beforeEach(() => {
   onAuthStateChange.mockReset()
   getSession.mockReset()
   updateUser.mockReset()
+  verifyOtp.mockReset()
   authCallbackParams.code = null
+  authCallbackParams.tokenHash = null
+  authCallbackParams.type = null
   authCallbackParams.error = null
   authCb = null
 
@@ -38,6 +50,7 @@ beforeEach(() => {
   })
   getSession.mockResolvedValue({ data: { session: null } })
   updateUser.mockResolvedValue({ error: null })
+  verifyOtp.mockResolvedValue({ data: { session: null }, error: { message: 'token expired' } })
 })
 
 describe('ResetPasswordPage', () => {
@@ -82,6 +95,27 @@ describe('ResetPasswordPage', () => {
   it('shows the error when a recovery code is present but the exchange produced no session', async () => {
     authCallbackParams.code = 'pkce-code'
     getSession.mockResolvedValue({ data: { session: null } })
+    renderWithRouter(<ResetPasswordPage />)
+
+    expect(await screen.findByText(/link expired/i)).toBeInTheDocument()
+  })
+
+  it('verifies a token_hash recovery link via verifyOtp and unlocks the form', async () => {
+    authCallbackParams.tokenHash = 'hash-abc'
+    authCallbackParams.type = 'recovery'
+    verifyOtp.mockResolvedValue({ data: { session: { user: { id: 'u1' } } }, error: null })
+    renderWithRouter(<ResetPasswordPage />)
+
+    await waitFor(() => expect(byName('password')).toBeInTheDocument())
+    expect(verifyOtp).toHaveBeenCalledWith({ type: 'recovery', token_hash: 'hash-abc' })
+    // The PKCE listener path is not used for token_hash links.
+    expect(onAuthStateChange).not.toHaveBeenCalled()
+  })
+
+  it('shows the error when verifyOtp rejects a consumed/expired token_hash', async () => {
+    authCallbackParams.tokenHash = 'hash-dead'
+    authCallbackParams.type = 'recovery'
+    verifyOtp.mockResolvedValue({ data: { session: null }, error: { message: 'Token has expired or is invalid' } })
     renderWithRouter(<ResetPasswordPage />)
 
     expect(await screen.findByText(/link expired/i)).toBeInTheDocument()
