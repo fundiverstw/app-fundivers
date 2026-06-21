@@ -10,9 +10,10 @@
 //      status = 'active'. The admin is vouching for the diver — we skip
 //      the normal pending → review flow.
 //   4. Send a courtesy "we made an account for you on your behalf" email
-//      via Gmail SMTP. No login link in the email — the diver can ignore
-//      it entirely if they don't want app access. If they do, they reply
-//      and an admin issues credentials manually.
+//      via Gmail SMTP. The diver can ignore it entirely if they don't want
+//      app access. If they do, they take the account over themselves via
+//      the standard password-reset flow (the throwaway password set here is
+//      never shared) — the email walks them through it.
 //
 // Body: { email, name, nickname?, event_title? }
 // Returns: { ok: true, user_id, email_sent }
@@ -31,8 +32,8 @@ interface Body {
 }
 
 // Throwaway password — admin never sees this. The auth.users row needs a
-// password column to be set; the diver gets credentials issued manually if
-// they later want app access.
+// password set; if the diver later wants app access they overwrite it
+// themselves via the password-reset link in the courtesy email below.
 function randomTempPassword(): string {
   const bytes = new Uint8Array(24)
   crypto.getRandomValues(bytes)
@@ -103,8 +104,10 @@ Deno.serve(async (req) => {
     return json({ error: safeError(profErr, "profile update failed") }, 500)
   }
 
-  // Courtesy email — no login link. The diver only needs to act if they
-  // want app access; otherwise their event registration stands on its own.
+  // Courtesy email — points the diver at the self-service password-reset
+  // flow so they can take the account over with their own password. They
+  // only need to act if they want app access; otherwise their event
+  // registration stands on its own.
   let emailSent = false
   if (GMAIL_USER && GMAIL_PASS) {
     try {
@@ -124,9 +127,13 @@ Deno.serve(async (req) => {
           `Hi ${fullName},\n\n` +
           `We have created a FunDivers TW app diver account on your behalf.\n\n` +
           `If you would like to access this account for all the great features on the app ` +
-          `(dive logs, easy event registration, push notifications, fun games, etc.) please ` +
-          `reply to this email or message us, and we'll issue you a temporary username and ` +
-          `password to log in with.\n\n` +
+          `(dive logs, easy event registration, push notifications, fun games, etc.), you can ` +
+          `set your own password and take it over in a minute:\n\n` +
+          `  1. Go to https://app.fundiverstw.com/forgot-password\n` +
+          `  2. Enter this email address: ${email}\n` +
+          `  3. Open the reset link we send you and choose a password\n\n` +
+          `That's it — you'll be signed in. If the link gives you any trouble, just reply to ` +
+          `this email and we'll help you out.\n\n` +
           `Otherwise no further action is required for ${eventClause}.\n\n` +
           `— FunDivers TW`,
       })
