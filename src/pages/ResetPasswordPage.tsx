@@ -40,6 +40,9 @@ export function ResetPasswordPage() {
       supabase.auth
         .verifyOtp({ type: 'recovery', token_hash: authCallbackParams.tokenHash })
         .then(({ data, error }) => {
+          // Drop the (now consumed) token_hash from the address bar + history,
+          // matching the cleanup detectSessionInUrl does for the ?code= path.
+          window.history.replaceState({}, '', window.location.pathname)
           if (error || !data?.session) setLinkError(LINK_ERROR)
           else setReady(true)
         })
