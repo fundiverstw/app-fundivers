@@ -19,13 +19,19 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // Both PKCE (query) and the legacy implicit (hash) shapes are covered.
 function readAuthCallbackParams() {
   if (typeof window === 'undefined') {
-    return { code: null, error: null, errorCode: null, errorDescription: null }
+    return { code: null, tokenHash: null, type: null, error: null, errorCode: null, errorDescription: null }
   }
   const search = new URLSearchParams(window.location.search)
   const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
   const pick = (k: string) => search.get(k) ?? hash.get(k)
   return {
     code:             pick('code'),
+    // token_hash + type drive the verifyOtp recovery flow — the link points
+    // at this app (not GoTrue's /verify endpoint), so a mail scanner that
+    // pre-fetches it does not burn the one-time token, and verification needs
+    // no PKCE code_verifier (works cross-device).
+    tokenHash:        pick('token_hash'),
+    type:             pick('type'),
     error:            pick('error'),
     errorCode:        pick('error_code'),
     errorDescription: pick('error_description'),

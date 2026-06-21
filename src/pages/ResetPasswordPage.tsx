@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase, authCallbackParams } from '../lib/supabase'
 import { Logo } from '../components/Logo'
@@ -7,12 +7,16 @@ import { CARD_ELEVATED, INPUT, INPUT_LABEL, BTN_PRIMARY, TEXT_ERROR, TEXT_LINK, 
 const LINK_ERROR =
   'This reset link is invalid or has expired — links can only be used once, and some email providers open them automatically. Request a fresh one and use it right away.'
 
-// Public landing page for the reset-password email link. Supabase's recovery
-// URL drops the diver here and, on a same-browser PKCE exchange, fires a
-// PASSWORD_RECOVERY auth event; we capture a new password and call updateUser.
-// When the link is expired / already consumed / opened on a different device,
-// no recovery session is established — we surface an actionable error instead
-// of hanging on "Verifying…".
+// Public landing page for the reset-password email link. Two arrival shapes:
+//   - token_hash + type=recovery → we verifyOtp() it here. Preferred: the link
+//     points at this app, so a mail scanner pre-fetching it can't burn the
+//     one-time token, and it needs no PKCE verifier (works cross-device).
+//   - ?code= (legacy PKCE) → detectSessionInUrl exchanges it during client
+//     init and fires PASSWORD_RECOVERY; kept as a fallback for links already
+//     in flight before the email template switched to token_hash.
+// Either way we only unlock for a *fresh* recovery link (audit M9), never a
+// pre-existing login, and surface an actionable error instead of hanging when
+// the link is expired / consumed / opened on a different device.
 export function ResetPasswordPage() {
   const navigate = useNavigate()
   const [ready, setReady] = useState(false)   // recovery session present?
@@ -23,14 +27,30 @@ export function ResetPasswordPage() {
   const [done, setDone] = useState(false)
   // GoTrue reports a dead link as ?error=...&error_code=otp_expired on the URL.
   const [linkError, setLinkError] = useState(authCallbackParams.error ? LINK_ERROR : '')
+  const verifyStarted = useRef(false)
 
   useEffect(() => {
     if (linkError) return
+
+    // Preferred path: exchange the token_hash via verifyOtp. Ref-guarded so a
+    // StrictMode double-mount can't fire it twice and burn the token itself.
+    if (authCallbackParams.tokenHash && authCallbackParams.type === 'recovery') {
+      if (verifyStarted.current) return
+      verifyStarted.current = true
+      supabase.auth
+        .verifyOtp({ type: 'recovery', token_hash: authCallbackParams.tokenHash })
+        .then(({ data, error }) => {
+          if (error || !data?.session) setLinkError(LINK_ERROR)
+          else setReady(true)
+        })
+      return
+    }
+
     let active = true
     let recovered = false
 
-    // Audit M9 — only a fresh recovery link may unlock the form, never a
-    // pre-existing login. The PASSWORD_RECOVERY event is that proof.
+    // Legacy ?code= path. Audit M9 — only a fresh recovery link may unlock the
+    // form, never a pre-existing login; the PASSWORD_RECOVERY event is proof.
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') { recovered = true; setReady(true) }
     })
