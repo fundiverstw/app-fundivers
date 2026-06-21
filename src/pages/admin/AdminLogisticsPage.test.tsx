@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { AdminLogisticsPage } from './AdminLogisticsPage'
 import { mockQueryBuilder } from '../../../tests/test-utils'
 
-const { from, rpc, fetchEventsInRange } = vi.hoisted(() => ({
+const { from, rpc, fetchEventsInRange, fetchUpcomingEventDays } = vi.hoisted(() => ({
   from: vi.fn(),
   rpc:  vi.fn(),
   fetchEventsInRange: vi.fn(),
+  fetchUpcomingEventDays: vi.fn(),
 }))
 
 vi.mock('../../lib/supabase', () => ({
@@ -17,6 +18,7 @@ vi.mock('../../lib/supabase', () => ({
 
 vi.mock('../../lib/events', () => ({
   fetchEventsInRange: (...a: unknown[]) => fetchEventsInRange(...a),
+  fetchUpcomingEventDays: (...a: unknown[]) => fetchUpcomingEventDays(...a),
   formatEventSpan: () => 'Jun 18',
 }))
 
@@ -35,9 +37,10 @@ const profiles = [
 ]
 
 beforeEach(() => {
-  from.mockReset(); rpc.mockReset(); fetchEventsInRange.mockReset()
+  from.mockReset(); rpc.mockReset(); fetchEventsInRange.mockReset(); fetchUpcomingEventDays.mockReset()
   rpc.mockResolvedValue({ error: null })
   fetchEventsInRange.mockResolvedValue([diveEvent])
+  fetchUpcomingEventDays.mockResolvedValue([])
   from.mockImplementation((table: string) => {
     if (table === 'bookings') return mockQueryBuilder({ data: bookings })
     if (table === 'profiles') return mockQueryBuilder({ data: profiles })
@@ -79,5 +82,47 @@ describe('AdminLogisticsPage', () => {
     fetchEventsInRange.mockResolvedValue([])
     renderPage()
     expect(await screen.findByText(/no events scheduled/i)).toBeInTheDocument()
+  })
+
+  it('lets you pick another day from the dropdown of upcoming event-days', async () => {
+    fetchUpcomingEventDays.mockResolvedValue(['2026-07-10', '2026-07-15'])
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText(/1 event · 2 divers/i)
+
+    await user.click(screen.getByRole('tab', { name: /other day/i }))
+    const select = await screen.findByRole('combobox', { name: /select a day/i })
+    await user.selectOptions(select, '2026-07-15')
+
+    await waitFor(() => {
+      const last = fetchEventsInRange.mock.calls.at(-1)!
+      expect(last[0]).toBe('2026-07-15')
+      expect(last[1]).toBe('2026-07-15')
+    })
+  })
+
+  it('counts on-duty staff distinctly in the summary and lists them per event', async () => {
+    const duties = [
+      { id: 'd1', assignee_id: 's1', role: 'guide', eo_dive_id: 'e1', eo_course_id: null, start_date: '2026-06-18', end_date: null },
+    ]
+    const withStaff = [...profiles, { id: 's1', name: 'Dana', nickname: 'Dana', contact_id: '0999', gear_owned: [] }]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: bookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: withStaff })
+      if (table === 'duties') return mockQueryBuilder({ data: duties })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    renderPage()
+    await screen.findByText(/1 event · 2 divers/i)
+
+    // Summary: distinct staff count, separate from the divers' ride count.
+    const summary = screen.getByText(/need a ride/i)
+    expect(summary).toHaveTextContent(/1 on-duty staff/i)
+
+    // Per-event group lists the staff member with their role.
+    const group = screen.getByRole('group', { name: /on-duty staff/i })
+    expect(within(group).getByText(/Dana/)).toBeInTheDocument()
+    expect(within(group).getByText(/guide/)).toBeInTheDocument()
   })
 })

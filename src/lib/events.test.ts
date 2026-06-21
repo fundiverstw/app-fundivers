@@ -450,3 +450,39 @@ describe('attachEventDetails — EO_* schema drift tolerance', () => {
     expect(selects.some(s => s.includes('included') && !s.includes('prereqs'))).toBe(true)
   })
 })
+
+describe('fetchUpcomingEventDays', () => {
+  function setupDays(
+    dives: { start_date: string | null }[],
+    courses: { course_days: string[] | null }[],
+  ) {
+    from.mockImplementation((table: string) => {
+      const b: Record<string, unknown> = {}
+      for (const m of ['select', 'eq', 'gte', 'lte', 'order', 'in', 'is', 'or', 'overlaps']) b[m] = () => b
+      const data = table === 'EO_dives' ? dives : table === 'EO_courses' ? courses : []
+      b.then = (cb?: (r: unknown) => unknown) => Promise.resolve({ data, error: null }).then(cb)
+      return b
+    })
+  }
+
+  it('merges dive start_dates and course days into a distinct sorted list', async () => {
+    setupDays(
+      [{ start_date: '2026-07-12' }, { start_date: '2026-07-10' }, { start_date: '2026-07-10' }],
+      [{ course_days: ['2026-07-11', '2026-07-12'] }],
+    )
+    const { fetchUpcomingEventDays } = await import('./events')
+    const days = await fetchUpcomingEventDays('2026-07-01', '2026-07-31')
+    // 07-10 deduped, 07-12 from both dive + course collapsed, sorted ascending.
+    expect(days).toEqual(['2026-07-10', '2026-07-11', '2026-07-12'])
+  })
+
+  it('drops course days that fall outside the requested window', async () => {
+    setupDays(
+      [],
+      [{ course_days: ['2026-06-30', '2026-07-05', '2026-08-01'] }],
+    )
+    const { fetchUpcomingEventDays } = await import('./events')
+    const days = await fetchUpcomingEventDays('2026-07-01', '2026-07-31')
+    expect(days).toEqual(['2026-07-05'])
+  })
+})

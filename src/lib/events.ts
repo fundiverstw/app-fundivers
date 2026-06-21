@@ -534,6 +534,37 @@ export async function fetchEventsInRange(
   return events
 }
 
+/**
+ * Distinct 'YYYY-MM-DD' days in [fromDate, toDate] that have at least one
+ * non-cancelled event, read straight from the raw date columns the day-of
+ * Logistics view filters on — dive `start_date` (a dive shows only on its
+ * start day there) and course `course_days` (a course shows on each of its
+ * days). Returned sorted ascending. Powers the "Other day" picker so admins
+ * only pick days that actually have something scheduled. Private dives are
+ * included — this is an admin-only surface.
+ */
+export async function fetchUpcomingEventDays(
+  fromDate: string,
+  toDate: string,
+): Promise<string[]> {
+  const [divesResp, coursesResp] = await Promise.all([
+    supabase.from('EO_dives').select('start_date').is('cancelled_at', null)
+      .gte('start_date', fromDate).lte('start_date', toDate),
+    supabase.from('EO_courses').select('course_days').is('cancelled_at', null)
+      .overlaps('course_days', datesInRange(fromDate, toDate)),
+  ])
+  const days = new Set<string>()
+  for (const d of (divesResp.data ?? []) as { start_date: string | null }[]) {
+    if (d.start_date) days.add(d.start_date)
+  }
+  for (const c of (coursesResp.data ?? []) as { course_days: string[] | null }[]) {
+    for (const day of c.course_days ?? []) {
+      if (day >= fromDate && day <= toDate) days.add(day)
+    }
+  }
+  return [...days].sort()
+}
+
 /** Fetch the events referenced by a batch of bookings. */
 export async function fetchEventsForBookings(
   diveIds: string[],

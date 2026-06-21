@@ -1,0 +1,41 @@
+import type { DutyRole, Profile } from '../../types/database'
+
+export interface StaffDutyRow {
+  dutyId: string
+  role: DutyRole
+  profile: Profile | null
+}
+
+/**
+ * On-duty staff for one event, surfaced inside the day-of Logistics ride
+ * planning. Staff have no stored transport preference, so they're all listed
+ * here as people the shop must get to the site — kept visually distinct from
+ * the divers' "Needs ride" bucket. Shows name + role (+ contact if known).
+ */
+export function StaffDutyGroup({ rows }: { rows: StaffDutyRow[] }) {
+  if (rows.length === 0) return null
+  return (
+    <div role="group" aria-label="On-duty staff" className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-sm font-bold text-blue-900">On-duty staff</h2>
+        <span className="text-xs text-blue-900 font-semibold">{rows.length}</span>
+      </div>
+      <ul className="divide-y divide-sky-200">
+        {rows.map(r => (
+          <li key={r.dutyId} className="py-1.5 flex items-baseline justify-between gap-3">
+            <span className="text-sm text-blue-900 font-medium">
+              {r.profile?.name ?? '(no profile)'}
+              {r.profile?.nickname && r.profile.nickname !== r.profile.name && (
+                <span className="text-blue-900 font-medium"> ({r.profile.nickname})</span>
+              )}
+              <span className="text-xs text-blue-950 font-medium"> · {r.role}</span>
+            </span>
+            {r.profile?.contact_id && (
+              <span className="text-xs text-blue-950 font-medium shrink-0">{r.profile.contact_id}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
