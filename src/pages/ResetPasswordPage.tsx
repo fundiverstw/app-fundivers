@@ -1,35 +1,54 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { supabase, authCallbackParams } from '../lib/supabase'
 import { Logo } from '../components/Logo'
 import { CARD_ELEVATED, INPUT, INPUT_LABEL, BTN_PRIMARY, TEXT_ERROR, TEXT_LINK, TEXT_MUTED, TEXT_HEADING } from '../styles/tokens'
 
-// Public landing page for the reset-password email link.
-// Supabase's recovery URL drops the diver here with a recovery-scoped
-// session already attached (PASSWORD_RECOVERY auth event); we just need
-// to capture a new password and call updateUser.
+const LINK_ERROR =
+  'This reset link is invalid or has expired — links can only be used once, and some email providers open them automatically. Request a fresh one and use it right away.'
+
+// Public landing page for the reset-password email link. Supabase's recovery
+// URL drops the diver here and, on a same-browser PKCE exchange, fires a
+// PASSWORD_RECOVERY auth event; we capture a new password and call updateUser.
+// When the link is expired / already consumed / opened on a different device,
+// no recovery session is established — we surface an actionable error instead
+// of hanging on "Verifying…".
 export function ResetPasswordPage() {
   const navigate = useNavigate()
-  const [ready, setReady] = useState(false)   // session present?
+  const [ready, setReady] = useState(false)   // recovery session present?
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [done, setDone] = useState(false)
+  // GoTrue reports a dead link as ?error=...&error_code=otp_expired on the URL.
+  const [linkError, setLinkError] = useState(authCallbackParams.error ? LINK_ERROR : '')
 
   useEffect(() => {
-    // Audit M9 — gate strictly on PASSWORD_RECOVERY. Previously this
-    // also unlocked the form for any pre-existing session, which let an
-    // already-signed-in user navigate to /reset-password directly and
-    // rotate their password without re-authenticating. Recovery sessions
-    // arrive via onAuthStateChange with event === 'PASSWORD_RECOVERY';
-    // anything else (SIGNED_IN, INITIAL_SESSION, etc.) means the user
-    // didn't actually click a fresh recovery link.
+    if (linkError) return
+    let active = true
+    let recovered = false
+
+    // Audit M9 — only a fresh recovery link may unlock the form, never a
+    // pre-existing login. The PASSWORD_RECOVERY event is that proof.
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') setReady(true)
+      if (event === 'PASSWORD_RECOVERY') { recovered = true; setReady(true) }
     })
-    return () => sub.subscription.unsubscribe()
-  }, [])
+
+    // Fallback for when PASSWORD_RECOVERY is emitted during client init (URL
+    // processing) before this listener attaches. getSession() resolves only
+    // after init, so the code exchange has settled by then. We still honour
+    // M9: unlock only when a recovery `code` was actually present in the URL
+    // and produced a session — a bare session (ordinary login) does not.
+    ;(async () => {
+      const { data } = await supabase.auth.getSession()
+      if (!active || recovered) return
+      if (authCallbackParams.code && data.session) setReady(true)
+      else setLinkError(LINK_ERROR)
+    })()
+
+    return () => { active = false; sub.subscription.unsubscribe() }
+  }, [linkError])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -56,6 +75,14 @@ export function ResetPasswordPage() {
             <h2 className={`text-lg font-semibold ${TEXT_HEADING}`}>Password updated</h2>
             <p className={`text-sm ${TEXT_MUTED}`}>Signing you in…</p>
           </div>
+        ) : linkError ? (
+          <div className="text-center space-y-4">
+            <h2 className={`text-lg font-semibold ${TEXT_HEADING}`}>Link expired</h2>
+            <p className={`text-sm ${TEXT_ERROR}`}>{linkError}</p>
+            <Link to="/forgot-password" className={`inline-block w-full ${BTN_PRIMARY}`}>
+              Request a new link
+            </Link>
+          </div>
         ) : !ready ? (
           <div className={`text-center ${TEXT_MUTED} text-sm`}>Verifying reset link…</div>
         ) : (
@@ -63,7 +90,7 @@ export function ResetPasswordPage() {
             <div>
               <label className={INPUT_LABEL}>New password</label>
               <input
-                type="password" required minLength={8}
+                type="password" name="password" required minLength={8}
                 value={password} onChange={e => setPassword(e.target.value)}
                 className={INPUT}
               />
@@ -71,7 +98,7 @@ export function ResetPasswordPage() {
             <div>
               <label className={INPUT_LABEL}>Confirm password</label>
               <input
-                type="password" required minLength={8}
+                type="password" name="confirm" required minLength={8}
                 value={confirm} onChange={e => setConfirm(e.target.value)}
                 className={INPUT}
               />
