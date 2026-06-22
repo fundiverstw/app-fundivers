@@ -206,6 +206,11 @@ export function RegisterFormBody(props: RegisterFormBodyProps) {
 
   const headerLabel = formatSelectionLabel(effectiveSelection, userId ?? null)
 
+  // When the parent's selection includes any child, they (the lead booker)
+  // can be the single payer for the whole group. Null otherwise — including
+  // the admin-on-behalf / edit paths above, which never reach here.
+  const leadPayerId = childSelections.length > 0 ? (userId ?? null) : null
+
   return (
     <RegisterFormBodyInner
       {...props}
@@ -213,6 +218,7 @@ export function RegisterFormBody(props: RegisterFormBodyProps) {
       profile={primaryProfile}
       actingOnBehalfOf={primaryActingOnBehalfOf}
       additionalTargets={additionalTargets}
+      leadPayerId={leadPayerId}
       pickerHeader={children.length > 0 && headerLabel ? {
         targetName: headerLabel,
         onChange: () => { setPickerConfirmed(false) },
@@ -340,9 +346,14 @@ interface RegisterFormBodyInnerProps extends RegisterFormBodyProps {
    *  empty profile_patch (so the parent's typed values don't overwrite
    *  the child's profile). All calls share one group_id. */
   additionalTargets?: Profile[]
+  /** When set, the lead booker (this id) can opt to pay for the whole
+   *  family group: every booking in the submit is stamped with payer_id =
+   *  leadPayerId so the balance consolidates onto the lead's account. Null
+   *  on solo / admin-on-behalf bookings. */
+  leadPayerId?: string | null
 }
 
-function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCancel, onBackBeforeStepOne, existingBooking, actingOnBehalfOf, pickerHeader, additionalTargets = [] }: RegisterFormBodyInnerProps) {
+function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCancel, onBackBeforeStepOne, existingBooking, actingOnBehalfOf, pickerHeader, additionalTargets = [], leadPayerId = null }: RegisterFormBodyInnerProps) {
   const isGuest = !userId && !actingOnBehalfOf
   const isEdit = !!existingBooking
   // Read at render (not module load) so tests can stub it per-case. A guest
@@ -446,6 +457,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const [creditCardInvoiceEmail, setCreditCardInvoiceEmail] = useState<string>(
     initialDetails?.credit_card_invoice_email ?? ''
   )
+  // Lead booker pays for the whole family group. Only offered (and only
+  // meaningful) when leadPayerId is set, i.e. the selection includes a child.
+  const [payForEveryone, setPayForEveryone] = useState(true)
+  const leadPays = !!leadPayerId && payForEveryone
   // Default to full payment per product spec. Only meaningful when the event
   // has a deposit_amount — otherwise the radio is hidden entirely.
   const [payDepositOnly, setPayDepositOnly] = useState<boolean>(initialDetails?.pay_deposit_only ?? false)
@@ -791,6 +806,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           details,
           notes:         notes || null,
           ...(groupId ? { group_id: groupId } : {}),
+          ...(leadPays && leadPayerId ? { payer_id: leadPayerId } : {}),
         },
       },
     )
@@ -858,6 +874,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               details,
               notes:          notes || null,
               ...(groupId ? { group_id: groupId } : {}),
+              ...(leadPays && leadPayerId ? { payer_id: leadPayerId } : {}),
             },
           },
         )
@@ -1358,6 +1375,25 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       {step === 4 && (
         <section className="space-y-3">
           <h2 className="text-lg font-bold text-blue-900">Payment</h2>
+
+          {leadPayerId && (
+            <label className="flex items-start gap-2 text-sm text-blue-950 font-medium bg-sky-50 border border-sky-200 rounded-lg p-3">
+              <input
+                type="checkbox"
+                checked={payForEveryone}
+                onChange={e => setPayForEveryone(e.target.checked)}
+                className="accent-blue-900 mt-1"
+              />
+              <span className="flex-1">
+                I'll pay for everyone in this group
+                <span className="block text-xs text-blue-900/80">
+                  The whole group's balance sits on your account; the other divers
+                  won't be billed separately. Uncheck to have each diver pay their own.
+                </span>
+              </span>
+            </label>
+          )}
+
           <div className="space-y-2">
             {(['bank_transfer', 'paypal', 'credit_card', 'cash'] as const).map(method => (
               <label key={method} className="flex gap-2 text-sm text-blue-950 font-medium items-start">

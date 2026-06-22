@@ -366,6 +366,34 @@ describe('handleRegistration — target_user_id (on-behalf-of) path security', (
     expect(captured.profileUpdate[0].name).toBe('Innocent Child')
   })
 
+  it('parent on-behalf-of: payer_id=parent (the caller) is written onto the child booking', async () => {
+    const { deps, captured } = makeDeps({
+      callerRole: 'diver',
+      callerUserId: 'parent-uid',
+      targetParentAccount: 'parent-uid',
+    })
+    await handleRegistration(postJson({
+      ...goodBody,
+      target_user_id: 'child-uid',
+      payer_id:       'parent-uid',
+    }, { Authorization: 'Bearer parent-jwt' }), deps)
+    expect(captured.bookingInsert[0].payer_id).toBe('parent-uid')
+  })
+
+  it('drops a payer_id that is neither the registrant nor the caller', async () => {
+    const { deps, captured } = makeDeps({
+      callerRole: 'diver',
+      callerUserId: 'parent-uid',
+      targetParentAccount: 'parent-uid',
+    })
+    await handleRegistration(postJson({
+      ...goodBody,
+      target_user_id: 'child-uid',
+      payer_id:       'some-stranger-uid',
+    }, { Authorization: 'Bearer parent-jwt' }), deps)
+    expect(captured.bookingInsert[0].payer_id).toBeNull()
+  })
+
   it('on-behalf-of path does NOT force status="pending" (only guest signup does)', async () => {
     const { deps, captured } = makeDeps({ callerRole: 'admin' })
     await handleRegistration(postJson({
