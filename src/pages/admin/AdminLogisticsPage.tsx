@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { fetchEventsInRange, fetchUpcomingEventDays, formatEventSpan } from '../../lib/events'
-import { gearTotals, splitByTransport, dayKeyOffset } from '../../lib/logistics'
+import { gearTotals, splitByTransport, dayKeyOffset, careTotals, isCareGearItem } from '../../lib/logistics'
 import { DiverGearCard, type DiverGearRow } from '../../components/admin/DiverGearCard'
 import { TransportGroup } from '../../components/admin/TransportGroup'
 import { StaffDutyGroup, type StaffDutyRow } from '../../components/admin/StaffDutyGroup'
-import type { AppEvent, Booking, Duty, Profile } from '../../types/database'
+import { CareGearGroup } from '../../components/admin/CareGearGroup'
+import type { AppEvent, Booking, BookingDetails, Duty, Profile } from '../../types/database'
 
 interface EventGroup {
   event: AppEvent
@@ -26,6 +27,9 @@ export function AdminLogisticsPage() {
   const [upcomingDays, setUpcomingDays] = useState<string[] | null>(null)
   // null = loading; [] = loaded, no events that day.
   const [groups, setGroups] = useState<EventGroup[] | null>(null)
+  // add-on _id → catalog title, for classifying "handle with care" rentals
+  // (dive lights, cameras) that have no category column.
+  const [addonTitles, setAddonTitles] = useState<Map<string, string>>(new Map())
 
   const todayKey = useMemo(
     () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }),
@@ -97,6 +101,19 @@ export function AdminLogisticsPage() {
       const bookings = [...(divesB.data ?? []), ...(coursesB.data ?? [])] as Booking[]
       const duties = [...(dutyDivesB.data ?? []), ...(dutyCoursesB.data ?? [])] as Duty[]
 
+      // Resolve catalog titles for the day's add-ons so we can pick out the
+      // delicate ones (lights, cameras) for the care inventory.
+      const addonIds = [...new Set(
+        bookings.flatMap(b => (b.details as BookingDetails | undefined)?.add_ons ?? []),
+      )]
+      const addonsRes = addonIds.length
+        ? await supabase.from('Other_Addons').select('_id, display_title, admin_title').in('_id', addonIds)
+        : { data: [] as Array<{ _id: string; display_title: string | null; admin_title: string | null }> }
+      if (cancelled) return
+      setAddonTitles(new Map(
+        (addonsRes.data ?? []).map(a => [a._id, a.display_title || a.admin_title || a._id]),
+      ))
+
       const userIds = [...new Set([
         ...bookings.map(b => b.user_id),
         ...duties.map(d => d.assignee_id),
@@ -147,7 +164,10 @@ export function AdminLogisticsPage() {
   }
 
   const allRows = (groups ?? []).flatMap(g => g.rows)
-  const overallGear = gearTotals(allRows)
+  // Care items (dive computers, lights, cameras) are issued and tracked
+  // separately, so drop them from the dive-bag "Gear to pack" chips.
+  const overallGear = gearTotals(allRows).filter(g => !isCareGearItem(g.item))
+  const overallCare = careTotals(allRows, addonTitles)
   const transport = splitByTransport(allRows)
   // One seat per staff member regardless of how many of the day's events they
   // cover, so the ride count isn't double-counted.
@@ -226,6 +246,18 @@ export function AdminLogisticsPage() {
                 </div>
               )}
             </div>
+            {overallCare.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">Handle with care</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {overallCare.map(({ item, divers }) => (
+                    <span key={item} className="text-xs px-2 py-0.5 rounded-full border border-amber-500 bg-amber-50 text-amber-900 font-semibold">
+                      {item} ×{divers.length}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
 
           {groups.map(g => (
@@ -240,6 +272,7 @@ export function AdminLogisticsPage() {
               </div>
               <EventTransport rows={g.rows} />
               <StaffDutyGroup rows={g.staff} />
+              <CareGearGroup rows={careTotals(g.rows, addonTitles)} />
               {g.rows.length === 0 ? (
                 <p className="text-xs text-blue-950/70 font-medium italic pl-1">No active registrants.</p>
               ) : (
