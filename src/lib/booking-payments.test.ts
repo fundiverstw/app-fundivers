@@ -9,18 +9,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { Booking, Payment } from '../types/database'
 
 // Hoisted spies for the chained supabase mock.
-const { from, paymentsUpdate, bookingsUpdate } = vi.hoisted(() => ({
+const { from, rpc, paymentsUpdate, bookingsUpdate } = vi.hoisted(() => ({
   from: vi.fn(),
+  rpc: vi.fn(),
   paymentsUpdate: vi.fn(),
   bookingsUpdate: vi.fn(),
 }))
 
 vi.mock('./supabase', () => ({
-  supabase: { from: (...a: unknown[]) => from(...a) },
+  supabase: { from: (...a: unknown[]) => from(...a), rpc: (...a: unknown[]) => rpc(...a) },
 }))
 
 beforeEach(() => {
   from.mockReset()
+  rpc.mockReset()
   paymentsUpdate.mockReset()
   bookingsUpdate.mockReset()
 })
@@ -140,5 +142,34 @@ describe('voidPayment', () => {
         paymentId: 'p1',
       })
     ).rejects.toThrow(/not found/i)
+  })
+})
+
+describe('recordGroupPayment', () => {
+  it('calls the record_group_payment RPC and returns the applied amount', async () => {
+    rpc.mockResolvedValue({ data: 6000, error: null })
+    const { recordGroupPayment } = await import('./booking-payments')
+
+    const applied = await recordGroupPayment({ leadId: 'lead-1', amount: 6000, groupId: 'g1' })
+    expect(applied).toBe(6000)
+    expect(rpc).toHaveBeenCalledWith('record_group_payment', {
+      p_lead: 'lead-1', p_amount: 6000, p_group_id: 'g1',
+    })
+  })
+
+  it('defaults p_group_id to null when no group is given, and coerces a null result to 0', async () => {
+    rpc.mockResolvedValue({ data: null, error: null })
+    const { recordGroupPayment } = await import('./booking-payments')
+
+    expect(await recordGroupPayment({ leadId: 'lead-1', amount: 1000 })).toBe(0)
+    expect(rpc).toHaveBeenCalledWith('record_group_payment', {
+      p_lead: 'lead-1', p_amount: 1000, p_group_id: null,
+    })
+  })
+
+  it('throws when the RPC returns an error', async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: 'admin only' } })
+    const { recordGroupPayment } = await import('./booking-payments')
+    await expect(recordGroupPayment({ leadId: 'lead-1', amount: 1000 })).rejects.toBeTruthy()
   })
 })

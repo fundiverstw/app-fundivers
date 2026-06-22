@@ -44,16 +44,26 @@ export function openCreditForBooking(credits: Credit[], bookingId: string): numb
  *     overpayment is money owed back, so it counts as credit.
  * `bookings` should be the diver's NON-cancelled bookings with their adjusted
  * `owed` (total + amendments) and `paid` sums.
+ *
+ * `coveredBookingIds` are bookings a lead booker pays for on this diver's
+ * behalf (payer_id set to someone else). The money on those bookings —
+ * including any overpayment recorded under this diver's user_id by a group
+ * payment — belongs to the lead, not this diver, so they're dropped from
+ * both the per-booking and general terms.
  */
 export function diverCreditBalance(
   credits: Credit[],
   bookings: Array<{ id: string; owed: number; paid: number }>,
+  coveredBookingIds?: Set<string>,
 ): number {
-  const bookingIds = new Set(bookings.map(b => b.id))
+  const owned = coveredBookingIds
+    ? bookings.filter(b => !coveredBookingIds.has(b.id))
+    : bookings
+  const bookingIds = new Set(owned.map(b => b.id))
   const general = credits
     .filter(c => c.status === 'open' && (!c.booking_id || !bookingIds.has(c.booking_id)))
     .reduce((s, c) => s + Number(c.amount), 0)
-  const perBooking = bookings.reduce(
+  const perBooking = owned.reduce(
     (s, b) => s + Math.max(0, b.paid + openCreditForBooking(credits, b.id) - b.owed),
     0,
   )
@@ -65,7 +75,7 @@ export function diverCreditBalance(
  *  diver's own profile, which doesn't otherwise load booking/payment data. */
 export async function fetchDiverCreditBalance(userId: string): Promise<number> {
   const [bookingsRes, paymentsRes, credits] = await Promise.all([
-    supabase.from('bookings').select('id, details, status').eq('user_id', userId),
+    supabase.from('bookings').select('id, details, status, payer_id').eq('user_id', userId),
     supabase.from('payments').select('booking_id, amount, status').eq('user_id', userId),
     fetchCreditsForUser(userId),
   ])
@@ -76,12 +86,17 @@ export async function fetchDiverCreditBalance(userId: string): Promise<number> {
     if (!p.booking_id || p.status !== 'paid') continue
     paidByBooking.set(p.booking_id, (paidByBooking.get(p.booking_id) ?? 0) + Number(p.amount))
   }
+  // Bookings a lead booker pays for on this diver's behalf: exclude their
+  // money from the diver's own account credit.
+  const covered = new Set(
+    bookings.filter(b => b.payer_id && b.payer_id !== userId).map(b => b.id),
+  )
   const rows = bookings.map(b => ({
     id: b.id,
     owed: Number((b.details as { total?: number } | null)?.total ?? 0) + amendmentsDelta(amendments.get(b.id) ?? []),
     paid: paidByBooking.get(b.id) ?? 0,
   }))
-  return diverCreditBalance(credits, rows)
+  return diverCreditBalance(credits, rows, covered)
 }
 
 export async function createCredit(input: {

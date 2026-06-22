@@ -113,6 +113,12 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
 
   const [payment, setPayment] = useState<PaymentMethod>('bank_transfer')
   const [creditCardInvoiceEmail, setCreditCardInvoiceEmail] = useState('')
+  // When the cart books for linked children, the parent (lead booker) can be
+  // the single payer for the whole group. Default on — the parent is already
+  // paying the full cart upfront here.
+  const [payForEveryone, setPayForEveryone] = useState(true)
+  const anyChildTargeted = cart.some(ev => (forDiverByEvent[ev.id] ?? null) !== null)
+  const leadPays = payForEveryone && anyChildTargeted
 
   // Per-event price breakdown derived from the diver's choices.
   const eventBreakdowns = useMemo(() => {
@@ -245,6 +251,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
             notes:         null,
             group_id:      groupId,
             ...(targetForDiverId ? { target_user_id: targetForDiverId } : {}),
+            ...(leadPays ? { payer_id: userId } : {}),
           },
         },
       )
@@ -598,6 +605,24 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                   placeholder="Defaults to your registered email"
                   className="w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-sm text-blue-900"
                 />
+              </label>
+            )}
+
+            {anyChildTargeted && (
+              <label className="flex items-start gap-2 text-sm text-blue-950 font-medium bg-sky-50 border border-sky-200 rounded-lg p-3">
+                <input
+                  type="checkbox"
+                  checked={payForEveryone}
+                  onChange={e => setPayForEveryone(e.target.checked)}
+                  className="accent-blue-900 mt-1"
+                />
+                <span className="flex-1">
+                  I'll pay for everyone in this group
+                  <span className="block text-xs text-blue-900/80">
+                    The whole group's balance sits on your account; the other divers
+                    won't be billed separately. Uncheck to have each diver pay their own.
+                  </span>
+                </span>
               </label>
             )}
 

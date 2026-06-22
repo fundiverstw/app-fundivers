@@ -15,7 +15,8 @@ import { uniqueUuids } from '../../lib/uuid'
 import { notifyEventCancelled } from '../../lib/event-cancellation'
 import { issueCancellationCredits, applyCreditToBooking } from '../../lib/credits'
 import { fetchAmendmentsForBookings, addAmendment, formAmount, amendmentsDelta } from '../../lib/booking-amendments'
-import { recordPayment as recordPaymentRow, voidPayment as voidPaymentRow } from '../../lib/booking-payments'
+import { recordPayment as recordPaymentRow, voidPayment as voidPaymentRow, recordGroupPayment } from '../../lib/booking-payments'
+import { personName } from '../../lib/names'
 import { requestEventDiverExport } from '../../lib/admin-event-export'
 import { BookingPaymentsBlock } from '../../components/admin/BookingPaymentsBlock'
 import { resolveCharges, type ChargeLine } from '../../lib/booking-charges'
@@ -38,6 +39,9 @@ interface Registrant {
   /** Diver's open account credit NOT already tied to this booking — the
    *  pool spendable against this booking's balance. */
   spendable: number
+  /** Display name of the lead booker paying for this booking, when someone
+   *  other than the diver covers it. Null when the diver pays their own. */
+  payerName: string | null
 }
 
 type AddonNameMap = Map<string, string>
@@ -97,7 +101,7 @@ export function AdminEventDetailPage() {
       if (cancelled) return
       if (!bookings?.length) { setRegistrants([]); setLoading(false); return }
 
-      const userIds = [...new Set(bookings.map(b => b.user_id))]
+      const userIds = [...new Set(bookings.flatMap(b => [b.user_id, b.payer_id]).filter((x): x is string => !!x))]
       const bookingIds = bookings.map(b => b.id)
 
       const [profilesRes, paymentsRes, amendmentsByBooking, diverNotesRes, creditsRes] = await Promise.all([
@@ -161,6 +165,9 @@ export function AdminEventDetailPage() {
         spendable: credits
           .filter(c => c.user_id === b.user_id && c.booking_id !== b.id)
           .reduce((s, c) => s + Number(c.amount), 0),
+        payerName: (b.payer_id && b.payer_id !== b.user_id)
+          ? (personName(profileMap.get(b.payer_id)?.name, profileMap.get(b.payer_id)?.nickname) || '(lead booker)')
+          : null,
       })))
       setLoading(false)
     })()
@@ -173,6 +180,28 @@ export function AdminEventDetailPage() {
     setRegistrants(prev => prev.map(r =>
       r.booking.id === bookingId ? { ...r, booking: { ...r.booking, status: newStatus } } : r
     ))
+  }
+
+  // Revert a lead-paid booking back to the diver paying their own share. The
+  // already-recorded payments stay on the booking (the money was applied to
+  // this diver's event); only future responsibility changes.
+  async function billToDiver(bookingId: string) {
+    await supabase.from('bookings').update({ payer_id: null }).eq('id', bookingId)
+    setRegistrants(prev => prev.map(r =>
+      r.booking.id === bookingId
+        ? { ...r, booking: { ...r.booking, payer_id: null }, payerName: null }
+        : r
+    ))
+  }
+
+  // Record one lump payment from the lead booker, distributed across the
+  // group's bookings (deposits first, then balances). Refetch to reflect the
+  // new payment rows + any auto-confirmed siblings.
+  async function recordGroupPaymentFor(leadId: string, groupId: string | null, amount: number) {
+    const applied = await recordGroupPayment({ leadId, amount, groupId })
+    if (applied > 0) toast.success(`Recorded ${applied.toLocaleString()} across the group`)
+    else toast.info('Nothing outstanding to apply')
+    setRefreshKey(k => k + 1)
   }
 
   async function approveRefund(bookingId: string) {
@@ -346,6 +375,9 @@ export function AdminEventDetailPage() {
       onApplyCredit={(amount) => applyCredit(r, amount)}
       onVoidPayment={(paymentId) => voidPayment(r, paymentId)}
       onMarkDepositPaid={() => updateStatus(r.booking.id, 'confirmed')}
+      onBillToDiver={() => billToDiver(r.booking.id)}
+      onRecordGroupPayment={(amount) =>
+        recordGroupPaymentFor(r.booking.payer_id ?? r.booking.user_id, r.booking.group_id, amount)}
       readOnly={!isAdmin}
     />
   )
@@ -1005,6 +1037,56 @@ function ExportManifestModal({
 
 const BOOKING_STATUSES: Booking['status'][] = ['pending', 'confirmed', 'waitlisted', 'cancelled']
 
+/** Record one lump payment from the lead booker, distributed across their
+ *  whole group (deposits first, then balances). Shown only on the lead's own
+ *  booking so it's offered exactly once per group. */
+function GroupPaymentInline({ currency, onRecord }: {
+  currency: string
+  onRecord: (amount: number) => Promise<void>
+}) {
+  const [amountStr, setAmountStr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const amount = Math.max(0, parseInt(amountStr || '0', 10) || 0)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (amount <= 0) return
+    setBusy(true)
+    try {
+      await onRecord(amount)
+      setAmountStr('')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="bg-violet-50 border border-violet-200 rounded p-2 space-y-1.5">
+      <p className="text-xs font-semibold text-violet-900">Record group payment</p>
+      <p className="text-[11px] text-violet-800">
+        One lump from the lead — spread across deposits first, then balances, for everyone they cover.
+      </p>
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-violet-900 font-medium">{currency}</span>
+        <input
+          type="number" inputMode="numeric" min={1} step={1}
+          value={amountStr}
+          onChange={e => setAmountStr(e.target.value)}
+          placeholder="Amount received"
+          className="flex-1 bg-white border border-violet-300 rounded px-2 py-1 text-xs text-blue-900"
+        />
+        <button
+          type="submit"
+          disabled={busy || amount <= 0}
+          className="text-xs bg-violet-700 hover:bg-violet-800 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded shrink-0"
+        >
+          {busy ? 'Recording…' : 'Record'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
 function ApplyCreditInline({ cap, spendable, currency, onApply }: {
   cap: number
   spendable: number
@@ -1047,7 +1129,7 @@ function ApplyCreditInline({ cap, spendable, currency, onApply }: {
   )
 }
 
-function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, onApproveRefund, onEdit, onAddAmendment, onRecordPayment, onApplyCredit, onVoidPayment, onMarkDepositPaid, readOnly }: {
+function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, onApproveRefund, onEdit, onAddAmendment, onRecordPayment, onApplyCredit, onVoidPayment, onMarkDepositPaid, onBillToDiver, onRecordGroupPayment, readOnly }: {
   r: Registrant
   addonNames: AddonNameMap
   roomNames: RoomNameMap
@@ -1060,8 +1142,15 @@ function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, on
   onApplyCredit: (amount: number) => Promise<void>
   onVoidPayment: (paymentId: string) => Promise<void>
   onMarkDepositPaid: () => Promise<void>
+  onBillToDiver: () => Promise<void>
+  onRecordGroupPayment: (amount: number) => Promise<void>
   readOnly?: boolean
 }) {
+  // payer_id set to someone else → this diver is covered by a lead booker.
+  // payer_id set to themselves → this is the lead's own booking (the place to
+  // record one group payment for everyone they cover).
+  const coveredByLead = !!r.payerName
+  const isLeadOwn = !!r.booking.payer_id && r.booking.payer_id === r.booking.user_id
   const [expanded, setExpanded] = useState(false)
 
   const baseTotal = Number((r.booking.details as { total?: number } | undefined)?.total ?? 0)
@@ -1127,6 +1216,12 @@ function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, on
             <span className="ml-2 text-xs font-semibold text-red-700">
               {r.diverNotes.length} diver note{r.diverNotes.length === 1 ? '' : 's'}
             </span>
+          )}
+          {coveredByLead && (
+            <span className="ml-2 text-xs font-semibold text-violet-700">Paid by {r.payerName}</span>
+          )}
+          {isLeadOwn && (
+            <span className="ml-2 text-xs font-semibold text-violet-700">Lead payer</span>
           )}
         </span>
         <span className="shrink-0 flex items-center gap-1.5">
@@ -1235,6 +1330,7 @@ function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, on
             charges={r.charges}
             amendments={r.amendments.map(a => ({ label: a.note, amount: a.amount }))}
             currency={currency}
+            payerNote={coveredByLead ? `Paid by ${r.payerName}` : (isLeadOwn ? 'Lead payer for this group' : undefined)}
             pending={r.booking.status === 'pending'}
             cancelled={r.booking.status === 'cancelled'}
             readOnly={!!readOnly}
@@ -1242,6 +1338,20 @@ function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, on
             onVoid={onVoidPayment}
             onMarkDepositPaid={onMarkDepositPaid}
           />
+
+          {!readOnly && coveredByLead && r.booking.status !== 'cancelled' && (
+            <button
+              type="button"
+              onClick={onBillToDiver}
+              className="w-full text-xs bg-white border border-violet-300 hover:bg-violet-50 text-violet-800 font-semibold px-3 py-1.5 rounded"
+            >
+              Bill to this diver instead
+            </button>
+          )}
+
+          {!readOnly && isLeadOwn && r.booking.status !== 'cancelled' && (
+            <GroupPaymentInline currency={currency} onRecord={onRecordGroupPayment} />
+          )}
 
           {!readOnly && r.spendable > 0 && bal.state === 'due' && (
             <ApplyCreditInline

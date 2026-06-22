@@ -55,6 +55,11 @@ export interface RegistrationBody {
   details:       Record<string, unknown>
   notes?:        string | null
   group_id?:     string
+  // The lead booker paying for this booking, when the group opted into a
+  // single payer. Must be the registrant themselves or the authenticated
+  // caller (a parent registering a child). Ignored on the guest path. The
+  // DB trigger (20260622000000) is the authoritative guard.
+  payer_id?:     string
   // Cloudflare Turnstile token from the SPA widget. Required on the
   // guest path; ignored on auth'd paths (the Bearer token is already
   // proof-of-not-a-bot).
@@ -182,6 +187,9 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
   let registrantEmail: string
   let session: unknown = null
   let createdGuest = false
+  // The authenticated caller's id (parent/admin/self), used to authorize a
+  // lead-payer designation. Null on the guest path.
+  let callerId: string | null = null
   // Admins/staff may book past events (recording after the fact); divers,
   // parents and guests may not. Defaults false; set true only for the
   // privileged auth paths below.
@@ -195,6 +203,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     const caller = deps.makeAuthedClient(token)
     const { data: c, error: cErr } = await caller.auth.getUser()
     if (cErr || !c.user) return json({ error: "invalid bearer" }, 401)
+    callerId = c.user.id
 
     const { data: callerProfile } = await admin
       .from("profiles").select("role").eq("id", c.user.id).single()
@@ -220,6 +229,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     const { data: u, error: uErr } = await caller.auth.getUser()
     if (uErr || !u.user) return json({ error: "invalid bearer" }, 401)
     userId = u.user.id
+    callerId = u.user.id
     registrantEmail = u.user.email ?? ""
     if (!registrantEmail) return json({ error: "user has no email" }, 400)
     const { data: selfProfile } = await admin
@@ -357,6 +367,13 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
   const fk = body.event_type === "dive"
     ? { eo_dive_id: body.event_id, eo_course_id: null }
     : { eo_dive_id: null, eo_course_id: body.event_id }
+  // A lead-payer designation is only honoured when it names the registrant
+  // themselves or the authenticated caller (a parent paying for a child).
+  // Anything else is dropped; the DB trigger rejects an invalid payer too.
+  const payerId =
+    body.payer_id && (body.payer_id === userId || body.payer_id === callerId)
+      ? body.payer_id
+      : null
   const { data: booking, error: bErr } = await admin
     .from("bookings")
     .insert({
@@ -365,6 +382,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
       notes:    body.notes ?? null,
       details:  body.details,
       group_id: body.group_id ?? null,
+      payer_id: payerId,
       ...fk,
     })
     .select()

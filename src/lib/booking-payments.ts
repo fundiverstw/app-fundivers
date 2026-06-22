@@ -51,6 +51,30 @@ export async function recordPayment(args: {
 }
 
 /**
+ * Record a single lump payment from a lead booker against the whole group
+ * they're paying for. Runs inside the record_group_payment SECURITY DEFINER
+ * RPC (20260622000000): it distributes the amount across the lead's active
+ * bookings (optionally narrowed to one group_id) — deposits first so spots
+ * confirm, then balances, oldest first — inserting one paid payment row per
+ * touched booking and auto-confirming pending siblings whose deposit is now
+ * covered. Admin-only. Returns the amount actually applied (clamped to the
+ * group's outstanding balances). Callers should refetch afterwards.
+ */
+export async function recordGroupPayment(args: {
+  leadId: string
+  amount: number
+  groupId?: string | null
+}): Promise<number> {
+  const { data, error } = await supabase.rpc('record_group_payment', {
+    p_lead: args.leadId,
+    p_amount: args.amount,
+    p_group_id: args.groupId ?? null,
+  })
+  if (error) throw error
+  return Number(data ?? 0)
+}
+
+/**
  * Revert a payment that was incorrectly marked as paid. Sets status to
  * 'voided' (kept in the table for audit — every paid-sum aggregator
  * filters by status='paid' so voided rows drop out). Symmetrically with

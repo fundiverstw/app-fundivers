@@ -61,11 +61,12 @@ function event(overrides: Partial<AppEvent> & Pick<AppEvent, 'id' | 'type' | 'ti
   }
 }
 
-function setupFrom(bookings: unknown[], payments: unknown[], credits: unknown[] = []) {
+function setupFrom(bookings: unknown[], payments: unknown[], credits: unknown[] = [], profiles: unknown[] = []) {
   from.mockImplementation((table: string) => {
     if (table === 'bookings') return mockQueryBuilder({ data: bookings })
     if (table === 'payments') return mockQueryBuilder({ data: payments })
     if (table === 'credits') return mockQueryBuilder({ data: credits })
+    if (table === 'profiles') return mockQueryBuilder({ data: profiles })
     return mockQueryBuilder()
   })
 }
@@ -130,6 +131,62 @@ describe('PaymentsPage', () => {
 
     await waitFor(() => expect(rpc).toHaveBeenCalledWith('apply_credit_to_booking', { p_booking_id: 'b1', p_amount: 2000 }))
     await waitFor(() => expect(toastSuccess).toHaveBeenCalled())
+  })
+
+  it('rolls a lead booker\'s family group into one consolidated balance', async () => {
+    // u1 (parent) pays for their own booking + their child's; both payer_id=u1.
+    const bookings = [
+      { id: 'b1', user_id: 'u1', payer_id: 'u1', group_id: 'g1', eo_dive_id: 'd1', eo_course_id: null, status: 'confirmed', notes: null, created_at: new Date().toISOString(), details: { total: 3000 } },
+      { id: 'b2', user_id: 'c1', payer_id: 'u1', group_id: 'g1', eo_dive_id: 'd1', eo_course_id: null, status: 'pending',   notes: null, created_at: new Date().toISOString(), details: { total: 3000 } },
+    ]
+    const payments = [
+      { id: 'p1', user_id: 'u1', booking_id: 'b1', amount: 3000, currency: 'TWD', status: 'paid', method: 'Bank', note: null, created_at: new Date().toISOString(), recorded_by: null },
+    ]
+    const profiles = [
+      { id: 'u1', name: 'Parent Pat', nickname: null },
+      { id: 'c1', name: 'Kid Casey', nickname: null },
+    ]
+    setupFrom(bookings, payments, [], profiles)
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['d1', event({ id: 'd1', type: 'dive', title: 'Kenting', price: 3000 })],
+    ]))
+
+    const user = userEvent.setup()
+    renderWithRouter(<PaymentsPage />)
+
+    // The group card shows a combined balance (owed 6000, paid 3000 → 3000 due).
+    await screen.findByText(/group of 2 bookings/i)
+    // Child is named in the collapsed roster; parent shows as "You".
+    expect(screen.getByText(/You, Kid Casey/)).toBeInTheDocument()
+    await user.click(screen.getByText(/group of 2 bookings/i))
+    // Expanding reveals the per-member balance breakdown.
+    expect(await screen.findByText('Group balance')).toBeInTheDocument()
+    // Balance-due summary reflects the group (3000 still owed).
+    expect((await screen.findAllByText(/TWD\s*3,000/)).length).toBeGreaterThan(0)
+  })
+
+  it('shows a child "Covered by [lead]" with nothing due and no controls', async () => {
+    // Viewer is the child c1; their booking is paid by parent u1.
+    useAuthMock.mockReturnValue({ user: { id: 'c1' } })
+    const bookings = [
+      { id: 'b1', user_id: 'c1', payer_id: 'u1', group_id: 'g1', eo_dive_id: 'd1', eo_course_id: null, status: 'confirmed', notes: null, created_at: new Date().toISOString(), details: { total: 3000 } },
+    ]
+    const profiles = [
+      { id: 'c1', name: 'Kid Casey', nickname: null },
+      { id: 'u1', name: 'Parent Pat', nickname: null },
+    ]
+    setupFrom(bookings, [], [], profiles)
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['d1', event({ id: 'd1', type: 'dive', title: 'Kenting', price: 3000 })],
+    ]))
+
+    renderWithRouter(<PaymentsPage />)
+
+    expect(await screen.findByText(/covered by parent pat/i)).toBeInTheDocument()
+    expect(screen.getByText(/nothing due/i)).toBeInTheDocument()
+    // No refund / apply-credit controls for a covered booking.
+    expect(screen.queryByRole('button', { name: /refund/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /apply credit/i })).not.toBeInTheDocument()
   })
 
   it('handles bookings with no details.total gracefully (shows dash, no error)', async () => {

@@ -90,6 +90,28 @@ describe('diverCreditBalance', () => {
     // general 1000 + b1 overpay 150 + b2 max(0,100+200-500)=0 + b3 0 = 1150
     expect(diverCreditBalance(credits, bookings)).toBe(1150)
   })
+
+  it('excludes lead-covered bookings — their overpayment belongs to the lead, not this diver', async () => {
+    const { diverCreditBalance } = await import('./credits')
+    const bookings = [
+      { id: 'b1', owed: 100, paid: 250 },   // 150 overpaid by the diver
+      { id: 'b2', owed: 500, paid: 800 },   // lead overpaid 300 — NOT the diver's
+    ]
+    // Without exclusion both overpayments would count (450); with b2 covered, only b1's 150.
+    expect(diverCreditBalance([], bookings)).toBe(450)
+    expect(diverCreditBalance([], bookings, new Set(['b2']))).toBe(150)
+  })
+
+  it('drops a covered booking\'s tied credit from the per-booking term', async () => {
+    const { diverCreditBalance } = await import('./credits')
+    const credits = [
+      { id: 'c1', booking_id: 'b2', amount: 200, status: 'open' }, // tied to the covered booking
+    ] as unknown as import('../types/database').Credit[]
+    const bookings = [{ id: 'b2', owed: 500, paid: 800 }] // lead overpaid 300
+    // b2 is covered → excluded from per-booking; its tied credit is then treated
+    // as general (counted once): result 200, not 300+200.
+    expect(diverCreditBalance(credits, bookings, new Set(['b2']))).toBe(200)
+  })
 })
 
 describe('issueCancellationCredits', () => {

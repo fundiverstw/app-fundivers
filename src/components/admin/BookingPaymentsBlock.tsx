@@ -23,11 +23,15 @@ import type { Payment } from '../../types/database'
  */
 export function BookingPaymentsBlock({
   payments, owed, paid, credit = 0, pending, cancelled, readOnly, onRecord, onVoid, onMarkDepositPaid,
-  charges, amendments, currency,
+  charges, amendments, currency, payerNote,
 }: {
   payments: Payment[]
   owed: number
   paid: number
+  /** When this booking is part of a lead-paid group, a short note naming the
+   *  payer (e.g. "Paid by Alex"). Surfaced so staff see at a glance that the
+   *  balance belongs to a group rather than this diver alone. */
+  payerNote?: string
   /** Open (unsettled) credit awarded to the diver for THIS event. Offsets what
    *  they owe in the Balance figure below. Settled credits don't count. */
   credit?: number
@@ -120,6 +124,10 @@ export function BookingPaymentsBlock({
       )}
 
       <p className="font-semibold text-blue-900">Payments</p>
+
+      {payerNote && (
+        <p className="text-violet-800 font-semibold">{payerNote}</p>
+      )}
 
       {/* Balance = owed − paid − open credit for this event. Positive means the
           diver still owes (red); negative means they're net in credit (green). */}

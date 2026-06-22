@@ -5,8 +5,9 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { AdminEventDetailPage } from './AdminEventDetailPage'
 import { mockQueryBuilder } from '../../../tests/test-utils'
 
-const { from, invoke, useAuthMock, fetchEventsForBookings } = vi.hoisted(() => ({
+const { from, rpc, invoke, useAuthMock, fetchEventsForBookings } = vi.hoisted(() => ({
   from: vi.fn(),
+  rpc: vi.fn(),
   invoke: vi.fn(),
   useAuthMock: vi.fn(),
   fetchEventsForBookings: vi.fn(),
@@ -15,6 +16,7 @@ const { from, invoke, useAuthMock, fetchEventsForBookings } = vi.hoisted(() => (
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: (...a: unknown[]) => from(...a),
+    rpc: (...a: unknown[]) => rpc(...a),
     functions: { invoke: (...a: unknown[]) => invoke(...a) },
   },
 }))
@@ -54,6 +56,7 @@ function renderAt(path: string) {
 
 beforeEach(() => {
   from.mockReset()
+  rpc.mockReset()
   invoke.mockReset()
   useAuthMock.mockReset()
   fetchEventsForBookings.mockReset()
@@ -738,6 +741,54 @@ describe('AdminEventDetailPage', () => {
     await user.click(await screen.findByRole('button', { name: /export & email/i }))
 
     await waitFor(() => expect(toastError).toHaveBeenCalledWith(expect.stringMatching(/Export failed.*smtp down/)))
+  })
+
+  it('shows lead-payer badges, records one group payment, and can bill a covered diver back to themselves', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
+    ]))
+    const bookings = [
+      { id: 'b-lead', user_id: 'u1', payer_id: 'u1', group_id: 'g1', status: 'confirmed', created_at: '2026-04-20',
+        eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null, details: { total: 3000, deposit: 1000 } },
+      { id: 'b-kid',  user_id: 'u2', payer_id: 'u1', group_id: 'g1', status: 'pending', created_at: '2026-04-20',
+        eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null, details: { total: 3000, deposit: 1000 } },
+    ]
+    const profiles = [
+      { id: 'u1', name: 'Parent Pat', nickname: null, cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, contact_method: null, contact_id: null },
+      { id: 'u2', name: 'Kid Casey',  nickname: null, cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, contact_method: null, contact_id: null },
+    ]
+    const bookingsUpdate = vi.fn(() => ({ eq: () => Promise.resolve({ error: null }) }))
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') {
+        const qb = mockQueryBuilder({ data: bookings })
+        ;(qb as unknown as { update: unknown }).update = bookingsUpdate
+        return qb
+      }
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      return mockQueryBuilder({ data: [] })
+    })
+    rpc.mockResolvedValue({ data: 2000, error: null })
+
+    const user = userEvent.setup()
+    renderAt('/admin/events/dive/dive_x')
+
+    // Badges: the lead's own card reads "Lead payer"; the child's "Paid by Parent Pat".
+    await screen.findByText('Parent Pat')
+    expect(screen.getByText('Lead payer')).toBeInTheDocument()
+    expect(screen.getByText(/Paid by Parent Pat/)).toBeInTheDocument()
+
+    // Expand the lead's card (its row carries the "Lead payer" badge) and
+    // record one group payment → calls the RPC.
+    await user.click(screen.getByRole('button', { name: /Lead payer/ }))
+    const amount = await screen.findByPlaceholderText(/amount received/i)
+    await user.type(amount, '2000')
+    await user.click(screen.getByRole('button', { name: /^record$/i }))
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('record_group_payment', { p_lead: 'u1', p_amount: 2000, p_group_id: 'g1' }))
+
+    // Expand the child's card and bill it back to the diver → clears payer_id.
+    await user.click(screen.getByRole('button', { name: /Kid Casey/ }))
+    await user.click(screen.getByRole('button', { name: /bill to this diver/i }))
+    await waitFor(() => expect(bookingsUpdate).toHaveBeenCalledWith({ payer_id: null }))
   })
 
   it('hides cancelled bookings from the roster and counts, surfacing them only in a collapsed disclosure', async () => {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { personName } from '../lib/names'
 import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
 import { fetchCreditsForUser, openCreditForBooking, openCreditBalance, diverCreditBalance, applyCreditToBooking } from '../lib/credits'
 import { useToast } from '../hooks/useToast'
@@ -30,6 +31,12 @@ interface BookingLine {
   credit: number
   due: number
   depositDue: number
+  /** Display name of the diver this booking belongs to (for the lead's
+   *  group rollup, where siblings belong to different family members). */
+  ownerName: string
+  /** Display name of the lead booker paying for this booking, when someone
+   *  other than the viewer covers it. Null otherwise. */
+  coveredByName: string | null
 }
 
 const PAYMENT_STATUS_STYLES: Record<Payment['status'], string> = {
@@ -60,23 +67,34 @@ export function PaymentsPage() {
   const [applying, setApplying] = useState<string | null>(null)
 
   async function refetch(uid: string) {
-    const [bookingsRes, paymentsRes, credits] = await Promise.all([
-      supabase.from('bookings').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
-      supabase.from('payments').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
+    // Fetch both the diver's own bookings AND any the diver pays for as the
+    // lead booker (payer_id = me) — children's bookings included. Payments are
+    // pulled by booking_id so the lead sees what's been paid on each sibling.
+    const [bookingsRes, credits] = await Promise.all([
+      supabase.from('bookings').select('*').or(`user_id.eq.${uid},payer_id.eq.${uid}`).order('created_at', { ascending: false }),
       fetchCreditsForUser(uid),
     ])
     const bookings = bookingsRes.data ?? []
-    const payRows = (paymentsRes.data ?? []) as Payment[]
+    const bookingIds = bookings.map(b => b.id)
+    const personIds = [...new Set(bookings.flatMap(b => [b.user_id, b.payer_id]).filter((x): x is string => !!x))]
 
     const diveIds = bookings.map(b => b.eo_dive_id).filter((x): x is string => !!x)
     const courseIds = bookings.map(b => b.eo_course_id).filter((x): x is string => !!x)
-    const [eventMap, catalog, amendmentsByBooking] = await Promise.all([
+    const [paymentsRes, profilesRes, eventMap, catalog, amendmentsByBooking] = await Promise.all([
+      bookingIds.length
+        ? supabase.from('payments').select('*').in('booking_id', bookingIds)
+        : Promise.resolve({ data: [] as Payment[] }),
+      supabase.from('profiles').select('id, name, nickname').in('id', personIds),
       (diveIds.length || courseIds.length)
         ? fetchEventsForBookings(diveIds, courseIds)
         : Promise.resolve(new Map<string, AppEvent>()),
       fetchChargeCatalog(bookings.map(b => b.details as BookingDetails)),
       fetchAmendmentsForBookings(bookings.map(b => b.id)),
     ])
+    const payRows = (paymentsRes.data ?? []) as Payment[]
+    const nameById = new Map<string, string>(
+      (profilesRes.data ?? []).map(p => [p.id, personName(p.name, p.nickname) || '(diver)']),
+    )
 
     const paymentsByBooking = new Map<string, Payment[]>()
     for (const p of payRows) {
@@ -97,6 +115,7 @@ export function PaymentsPage() {
       const credit = openCreditForBooking(credits, b.id)
       const rows = amendmentsByBooking.get(b.id) ?? []
       const owed = total + amendmentsDelta(rows)
+      const coveredByOther = !!b.payer_id && b.payer_id !== uid && b.user_id === uid
       return {
         booking: b,
         event,
@@ -110,16 +129,21 @@ export function PaymentsPage() {
         credit,
         due: Math.max(0, owed - paid - credit),
         depositDue: Math.max(0, deposit - paid),
+        ownerName: nameById.get(b.user_id) ?? '(diver)',
+        coveredByName: coveredByOther ? (b.payer_id ? nameById.get(b.payer_id) ?? '(lead booker)' : null) : null,
       }
     })
     setLines(lineData)
     setCreditRows(credits)
-    // Account credit = awarded credits + overpayments across active bookings.
+    // Account credit = awarded credits + overpayments across active bookings,
+    // excluding bookings a lead booker covers (that money is the lead's).
+    const covered = new Set(lineData.filter(l => l.coveredByName).map(l => l.booking.id))
     setOpenCredit(diverCreditBalance(
       credits,
       lineData
         .filter(l => l.booking.status !== 'cancelled')
         .map(l => ({ id: l.booking.id, owed: l.owed, paid: l.paid })),
+      covered,
     ))
     setLoading(false)
   }
@@ -152,10 +176,31 @@ export function PaymentsPage() {
     }
   }
 
+  const uid = user?.id
   const active = lines.filter(l => l.booking.status !== 'cancelled')
-  const totalOwed = active.reduce((s, l) => s + l.due, 0)
-  const totalDepositDue = active.reduce((s, l) => s + l.depositDue, 0)
-  const totalPaid = active.reduce((s, l) => s + l.paid, 0)
+  // Bookings a lead booker pays on my behalf — shown read-only, I owe nothing.
+  const coveredMine = active.filter(l => l.coveredByName)
+  // Bookings I pay as the lead booker (my own + family members'), rolled up
+  // into one balance per group.
+  const leadPaid = active.filter(l => uid && l.booking.payer_id === uid)
+  // My ordinary solo bookings (no lead-payer designation).
+  const ownLines = active.filter(l => uid && l.booking.user_id === uid && !l.booking.payer_id)
+
+  const groupMap = new Map<string, BookingLine[]>()
+  for (const l of leadPaid) {
+    const key = l.booking.group_id ?? l.booking.id
+    const arr = groupMap.get(key) ?? []
+    arr.push(l)
+    groupMap.set(key, arr)
+  }
+  const leadGroups = [...groupMap.entries()]
+
+  // Summary totals cover what the viewer is responsible for: their own
+  // bookings plus the groups they lead. Covered-by-someone-else is excluded.
+  const payable = [...ownLines, ...leadPaid]
+  const totalOwed = payable.reduce((s, l) => s + l.due, 0)
+  const totalDepositDue = payable.reduce((s, l) => s + l.depositDue, 0)
+  const totalPaid = payable.reduce((s, l) => s + l.paid, 0)
   const currency = lines.find(l => l.event)?.event?.currency ?? 'TWD'
 
   if (loading) {
@@ -184,28 +229,66 @@ export function PaymentsPage() {
         <Summary label="Total paid"   value={totalPaid}       currency={currency} accent="text-blue-900" />
       </div>
 
-      <section>
-        <h2 className={`text-sm font-semibold ${TEXT_MUTED} uppercase tracking-wider mb-2`}>Per booking</h2>
-        {active.length === 0 ? (
+      {active.length === 0 ? (
+        <section>
+          <h2 className={`text-sm font-semibold ${TEXT_MUTED} uppercase tracking-wider mb-2`}>Per booking</h2>
           <p className={`${PAGE_BODY} text-sm`}>No active bookings yet. Check the calendar!</p>
-        ) : (
-          <div className="space-y-2">
-            {active.map(l => (
-              <LineCard
-                key={l.booking.id}
-                line={l}
-                currency={currency}
-                spendable={Math.max(0, openCreditBalance(creditRows) - openCreditForBooking(creditRows, l.booking.id))}
-                applying={applying === l.booking.id}
-                open={expanded === l.booking.id}
-                onToggle={() => setExpanded(expanded === l.booking.id ? null : l.booking.id)}
-                onRefund={requestRefund}
-                onApplyCredit={applyCredit}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+        </section>
+      ) : (
+        <>
+          {leadGroups.length > 0 && (
+            <section>
+              <h2 className={`text-sm font-semibold ${TEXT_MUTED} uppercase tracking-wider mb-2`}>
+                Group bookings — you're paying
+              </h2>
+              <div className="space-y-2">
+                {leadGroups.map(([key, groupLines]) => (
+                  <GroupCard
+                    key={key}
+                    lines={groupLines}
+                    currency={currency}
+                    selfId={uid ?? null}
+                    open={expanded === `group:${key}`}
+                    onToggle={() => setExpanded(expanded === `group:${key}` ? null : `group:${key}`)}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {ownLines.length > 0 && (
+            <section>
+              <h2 className={`text-sm font-semibold ${TEXT_MUTED} uppercase tracking-wider mb-2`}>Per booking</h2>
+              <div className="space-y-2">
+                {ownLines.map(l => (
+                  <LineCard
+                    key={l.booking.id}
+                    line={l}
+                    currency={currency}
+                    spendable={Math.max(0, openCreditBalance(creditRows) - openCreditForBooking(creditRows, l.booking.id))}
+                    applying={applying === l.booking.id}
+                    open={expanded === l.booking.id}
+                    onToggle={() => setExpanded(expanded === l.booking.id ? null : l.booking.id)}
+                    onRefund={requestRefund}
+                    onApplyCredit={applyCredit}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {coveredMine.length > 0 && (
+            <section>
+              <h2 className={`text-sm font-semibold ${TEXT_MUTED} uppercase tracking-wider mb-2`}>
+                Paid by your group lead
+              </h2>
+              <div className="space-y-2">
+                {coveredMine.map(l => <CoveredCard key={l.booking.id} line={l} currency={currency} />)}
+              </div>
+            </section>
+          )}
+        </>
+      )}
 
       <p className={`text-xs ${TEXT_SUBTLE} text-center`}>
         Deposit is due up-front to confirm your spot. Balance is settled closer to the event.
@@ -394,6 +477,97 @@ function LineCard({
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+/** One consolidated card for a group the viewer pays for as the lead booker:
+ *  combined owed/paid/balance across every sibling booking, expandable to the
+ *  per-diver lines. The lead settles the whole balance in one payment (the
+ *  shop records it); there are no per-line refund / apply-credit controls. */
+function GroupCard({
+  lines, currency, selfId, open, onToggle,
+}: {
+  lines: BookingLine[]
+  currency: string
+  selfId: string | null
+  open: boolean
+  onToggle: () => void
+}) {
+  const owed = lines.reduce((s, l) => s + l.owed, 0)
+  const paid = lines.reduce((s, l) => s + l.paid, 0)
+  const credit = lines.reduce((s, l) => s + l.credit, 0)
+  const bal = bookingBalance(owed, paid, credit)
+  const divers = [...new Set(lines.map(l => (selfId && l.booking.user_id === selfId) ? 'You' : l.ownerName))]
+
+  return (
+    <div className={CARD}>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full text-left p-4 flex items-start justify-between hover:bg-sky-50 rounded-xl transition-colors"
+      >
+        <div className="flex-1 min-w-0">
+          <p className={`font-medium ${TEXT_HEADING} text-sm`}>Group of {lines.length} booking{lines.length === 1 ? '' : 's'}</p>
+          <p className={`text-xs ${TEXT_MUTED} mt-0.5 truncate`}>{divers.join(', ')}</p>
+        </div>
+        <div className="text-right shrink-0 ml-3">
+          <p className={`text-sm font-semibold ${TEXT_HEADING}`}>{currency} {owed.toLocaleString()}</p>
+          {bal.state === 'due' && <p className={`text-xs ${TEXT_ERROR}`}>{currency} {bal.amount.toLocaleString()} due</p>}
+          {bal.state === 'credit' && <p className="text-xs text-emerald-700 font-semibold">{currency} {bal.amount.toLocaleString()} credit</p>}
+          {bal.state === 'settled' && <p className="text-xs text-blue-900 font-semibold">Paid in full</p>}
+          <p className={`text-xs ${TEXT_SUBTLE} mt-0.5`}>{open ? '▲' : '▼'}</p>
+        </div>
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4 border-t border-sky-200 pt-3 space-y-2 text-sm">
+          {lines.map(l => {
+            const lb = bookingBalance(l.owed, l.paid, l.credit)
+            return (
+              <div key={l.booking.id} className="flex items-baseline justify-between gap-3">
+                <span className={`${TEXT_BODY} min-w-0`}>
+                  <span className="font-medium">{l.event?.title ?? '(event)'}</span>
+                  <span className={`${TEXT_SUBTLE} text-xs`}> · {(selfId && l.booking.user_id === selfId) ? 'You' : l.ownerName}</span>
+                </span>
+                <span className="shrink-0 text-xs">
+                  {lb.state === 'due' && <span className={TEXT_ERROR}>{currency} {lb.amount.toLocaleString()} due</span>}
+                  {lb.state === 'settled' && <span className="text-blue-900 font-semibold">Paid ✓</span>}
+                  {lb.state === 'credit' && <span className="text-emerald-700 font-semibold">{currency} {lb.amount.toLocaleString()} credit</span>}
+                </span>
+              </div>
+            )
+          })}
+          <div className={`flex justify-between font-semibold pt-2 border-t border-sky-200 ${TEXT_BODY}`}>
+            <span>Group balance</span>
+            {bal.state === 'due' && <span className={TEXT_ERROR}>{currency} {bal.amount.toLocaleString()} due</span>}
+            {bal.state === 'credit' && <span className="text-emerald-700">{currency} {bal.amount.toLocaleString()} credit</span>}
+            {bal.state === 'settled' && <span className="text-blue-900">Settled ✓</span>}
+          </div>
+          <p className={`text-xs ${TEXT_SUBTLE}`}>
+            Pay the group balance in one transfer; the shop records it against everyone.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** A booking someone else (the group lead) is paying for. Read-only: the
+ *  viewer owes nothing here, so no balance figure or payment controls. */
+function CoveredCard({ line, currency }: { line: BookingLine; currency: string }) {
+  const { event, total } = line
+  return (
+    <div className={`${CARD} p-4 flex items-start justify-between gap-3`}>
+      <div className="min-w-0">
+        <p className={`font-medium ${TEXT_HEADING} text-sm`}>{event?.title ?? '(event)'}</p>
+        {event && <p className={`text-xs ${TEXT_MUTED} mt-0.5`}>{formatEventSpan(event, { withYear: true })}</p>}
+        <p className="text-xs text-emerald-700 font-semibold mt-0.5">Covered by {line.coveredByName}</p>
+      </div>
+      <div className="text-right shrink-0">
+        {total > 0 && <p className={`text-sm ${TEXT_SUBTLE} line-through`}>{currency} {total.toLocaleString()}</p>}
+        <p className="text-xs text-blue-900 font-semibold">Nothing due</p>
+      </div>
     </div>
   )
 }

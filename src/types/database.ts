@@ -134,6 +134,17 @@ export interface Database {
         Args: { p_booking_id: string; p_amount: number }
         Returns: number
       }
+      // Defined in 20260622000000_lead_payer.sql.
+      // Security-definer, admin-only. Distributes a single lump payment
+      // across all of a lead booker's active bookings (optionally narrowed
+      // to one group_id): deposits first so spots confirm, then remaining
+      // balances, oldest first. Inserts one paid payment row per touched
+      // booking and confirms pending siblings whose deposit is now covered.
+      // Returns the amount actually applied (clamped to outstanding balances).
+      record_group_payment: {
+        Args: { p_lead: string; p_amount: number; p_group_id?: string | null }
+        Returns: number
+      }
       // Defined in 20260603040000_signup_throttling_and_orphan_log.sql.
       // Service-role only. Inserts a signup_attempts row and returns
       // count of attempts within the trailing 60s + 24h windows
@@ -328,6 +339,12 @@ export interface Database {
            *  20260514030000_parent_child_accounts.sql; populated by the
            *  group-booking submission flow in Phase B. */
           group_id: string | null
+          /** The lead booker responsible for paying this booking. Null = the
+           *  diver pays their own (default). When set (to the diver or their
+           *  parent_account), the cost rolls up to this payer and the diver's
+           *  own account shows "covered by the lead". Added in
+           *  20260622000000_lead_payer.sql. */
+          payer_id: string | null
         }
         Insert: {
           id?: string
@@ -340,6 +357,7 @@ export interface Database {
           details?: BookingDetails
           refund_requested_at?: string | null
           group_id?: string | null
+          payer_id?: string | null
         }
         Update: {
           id?: string
@@ -351,6 +369,7 @@ export interface Database {
           details?: BookingDetails
           refund_requested_at?: string | null
           group_id?: string | null
+          payer_id?: string | null
         }
         Relationships: []
       }

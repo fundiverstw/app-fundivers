@@ -133,6 +133,10 @@ describe('MultiRegisterForm parent diver picker', () => {
 
     // Both share the same group_id.
     expect(e1Body.group_id).toBe(e2Body.group_id)
+    // Default "I'll pay for everyone" is on → every sibling carries the
+    // parent as payer.
+    expect(e1Body.payer_id).toBe('p1')
+    expect(e2Body.payer_id).toBe('p1')
     expect(onAll).toHaveBeenCalled()
 
     // Each booking carries an itemized charge snapshot that sums to its total.
@@ -141,6 +145,34 @@ describe('MultiRegisterForm parent diver picker', () => {
       expect(details.charges?.[0]?.kind).toBe('base')
       expect(details.charges?.reduce((s, c) => s + c.amount, 0)).toBe(details.total)
     }
+  })
+
+  it('omits payer_id when the parent unchecks "I\'ll pay for everyone"', async () => {
+    setupFrom([childProfile])
+    const user = userEvent.setup()
+    render(
+      <MultiRegisterForm
+        events={[sampleEvent('e1', 'Kenting')]}
+        profile={parentProfile} userId="p1"
+        onClose={() => {}} onAllBooked={vi.fn()}
+      />
+    )
+    await waitFor(() => expect(screen.getByLabelText(/diver for kenting/i)).toBeInTheDocument())
+    await user.selectOptions(screen.getByLabelText(/diver for kenting/i), 'c1')
+    await user.click(screen.getByRole('button', { name: /next/i }))  // 1→2
+    await user.click(screen.getByRole('button', { name: /next/i }))  // 2→3
+    await user.click(screen.getByLabelText(/No, I'll get there myself/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))  // 3→4
+
+    // Toggle is shown (child is in the cart) and defaults on — turn it off.
+    const toggle = screen.getByLabelText(/pay for everyone/i)
+    expect(toggle).toBeChecked()
+    await user.click(toggle)
+
+    await user.click(screen.getByRole('button', { name: /confirm/i }))
+    await waitFor(() => expect(invoke).toHaveBeenCalled())
+    const body = (invoke.mock.calls[0][1] as { body: Record<string, unknown> }).body
+    expect(body.payer_id).toBeUndefined()
   })
 
   it('shows an itemized price breakdown per event on the payment step', async () => {

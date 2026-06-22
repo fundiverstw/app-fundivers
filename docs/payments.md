@@ -142,6 +142,32 @@ intentional: the balance is "what still needs to be received for this
 event in total." Don't sum deposits + balance to get "total owed" —
 you'd double-count.
 
+## Lead booker pays for a group
+
+When a parent registers a family group they can opt to be the single payer
+(the "I'll pay for everyone" toggle in both register flows). Every booking
+in the group is stamped with `bookings.payer_id` = the lead (added in
+`20260622000000_lead_payer.sql`). Semantics:
+
+- `payer_id` is per-booking on purpose — an admin can revert ONE diver to
+  paying their own (the "Bill to this diver instead" button just clears
+  `payer_id`). A `BEFORE` trigger restricts `payer_id` to the diver
+  themselves or their `parent_account`, and is authoritative even under the
+  service role (the registration edge function inserts that way).
+- The lead's `PaymentsPage` rolls the siblings up by `group_id` into one
+  combined owed/paid/balance; a covered diver sees "Covered by [lead]" with
+  no balance and no refund / apply-credit controls. `diverCreditBalance`
+  drops covered bookings so a child's overpayment counts as the lead's
+  credit, not the child's.
+- Recording one group payment goes through the `record_group_payment`
+  SECURITY DEFINER RPC (admin-only): it distributes the lump across the
+  group's bookings — **deposits first** so every spot confirms, then
+  balances, oldest first — inserting one ordinary `payments` row per touched
+  booking (note `Group payment`). Because they're ordinary per-booking rows,
+  all the balance/accounting math above is unchanged; "group paid" is just
+  their sum. Reverting a diver later doesn't move already-recorded payments
+  (the money was applied to that diver's event).
+
 ## Related reminders
 
 See [push-notifications.md](./push-notifications.md). The cron fires

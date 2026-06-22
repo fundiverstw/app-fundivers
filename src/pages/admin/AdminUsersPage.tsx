@@ -41,7 +41,10 @@ function activeCreditRows(
     paidByBooking.set(p.booking_id, (paidByBooking.get(p.booking_id) ?? 0) + p.amount)
   }
   return bookings
-    .filter(b => b.status !== 'cancelled')
+    // Exclude cancelled bookings and any a lead booker pays for on this
+    // diver's behalf — that money (incl. overpayment) is the lead's, not a
+    // credit owed to this diver.
+    .filter(b => b.status !== 'cancelled' && !(b.payer_id && b.payer_id !== b.user_id))
     .map(b => ({
       id: b.id,
       owed: Number((b.details as { total?: number } | null)?.total ?? 0) + amendmentsDelta(amendments.get(b.id) ?? []),

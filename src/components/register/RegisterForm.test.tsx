@@ -1255,6 +1255,10 @@ describe('RegisterForm', () => {
       // Both calls share the same group_id.
       expect(selfBody?.group_id).toBeTruthy()
       expect(selfBody?.group_id).toBe(childBody?.group_id)
+      // "I'll pay for everyone" defaults on → both bookings carry the parent
+      // as payer (the lead's own booking included, so the rollup covers it).
+      expect(selfBody?.payer_id).toBe('u1')
+      expect(childBody?.payer_id).toBe('u1')
       // Child's call carries an empty patch (don't overwrite the child's profile).
       expect(childBody?.profile_patch).toEqual({})
       // Self's call carries the parent's typed-in name.
