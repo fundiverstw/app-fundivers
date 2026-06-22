@@ -105,6 +105,29 @@ export function gearTotals(rows: BookingRow[]): Array<{ item: string; count: num
     .filter(x => x.count > 0)
 }
 
+/**
+ * Every add-on rented across a set of bookings, by catalog title, with how
+ * many divers bought each — the full prep list for an event (SMBs, extra
+ * wetsuits, nitrox tanks, course upgrades, …). Titles with no resolved name
+ * are skipped. Ordered alphabetically so the list is stable.
+ */
+export function addonTotals(
+  rows: BookingRow[],
+  addonTitleById: Map<string, string>,
+): Array<{ title: string; count: number }> {
+  const counts = new Map<string, number>()
+  for (const r of rows) {
+    for (const id of (r.booking.details as BookingDetails | undefined)?.add_ons ?? []) {
+      const title = addonTitleById.get(id)
+      if (!title) continue
+      counts.set(title, (counts.get(title) ?? 0) + 1)
+    }
+  }
+  return [...counts.entries()]
+    .map(([title, count]) => ({ title, count }))
+    .sort((a, b) => a.title.localeCompare(b.title))
+}
+
 /** Shift a 'YYYY-MM-DD' day key by n calendar days, returning 'YYYY-MM-DD'.
  *  Pure date arithmetic on the calendar day — no timezone drift. */
 export function dayKeyOffset(dayKey: string, n: number): string {
