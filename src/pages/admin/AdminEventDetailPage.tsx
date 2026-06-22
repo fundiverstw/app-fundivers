@@ -75,7 +75,7 @@ export function AdminEventDetailPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [deleteInFlight, setDeleteInFlight] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
-  const [view, setView] = useState<'registrants' | 'transportation'>('registrants')
+  const [view, setView] = useState<'registrants' | 'transportation' | 'balances'>('registrants')
 
   useEffect(() => {
     if (!type || !id) return
@@ -489,6 +489,9 @@ export function AdminEventDetailPage() {
             <TabButton active={view === 'transportation'} onClick={() => setView('transportation')}>
               Transportation
             </TabButton>
+            <TabButton active={view === 'balances'} onClick={() => setView('balances')}>
+              Amount owed
+            </TabButton>
           </nav>
 
           {view === 'registrants' && (
@@ -513,6 +516,10 @@ export function AdminEventDetailPage() {
 
           {view === 'transportation' && (
             <TransportationView registrants={registrants} />
+          )}
+
+          {view === 'balances' && (
+            <BalancesView registrants={activeRegistrants} currency={event?.currency ?? 'NTD'} />
           )}
         </>
       )}
@@ -1129,6 +1136,16 @@ function ApplyCreditInline({ cap, spendable, currency, onApply }: {
   )
 }
 
+/** What a registrant owes for this event: total + amendments, net of paid
+ *  payments and any open event credit. Shared by the registrant card and the
+ *  Balances summary so the figure is computed in exactly one place. */
+function registrantBalance(r: Registrant) {
+  const owed = Number((r.booking.details as { total?: number } | undefined)?.total ?? 0)
+    + amendmentsDelta(r.amendments)
+  const paid = r.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
+  return { owed, paid, bal: bookingBalance(owed, paid, r.credit) }
+}
+
 function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, onApproveRefund, onEdit, onAddAmendment, onRecordPayment, onApplyCredit, onVoidPayment, onMarkDepositPaid, onBillToDiver, onRecordGroupPayment, readOnly }: {
   r: Registrant
   addonNames: AddonNameMap
@@ -1153,13 +1170,10 @@ function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, on
   const isLeadOwn = !!r.booking.payer_id && r.booking.payer_id === r.booking.user_id
   const [expanded, setExpanded] = useState(false)
 
-  const baseTotal = Number((r.booking.details as { total?: number } | undefined)?.total ?? 0)
-  const adjusted = baseTotal + amendmentsDelta(r.amendments)
-  const totalPaid = r.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
   // Balance nets open credit-for-this-event against what's owed. 'overpaid' is
   // kept distinct from 'credit' so a plain overpayment is never mislabelled as
   // an awarded account credit.
-  const bal = bookingBalance(adjusted, totalPaid, r.credit)
+  const { owed: adjusted, paid: totalPaid, bal } = registrantBalance(r)
   const paymentStatus = bal.state === 'due'
     ? (totalPaid === 0 && r.credit === 0 ? 'none' : 'partial')
     : bal.state
@@ -1533,6 +1547,60 @@ function TransportationView({ registrants }: { registrants: Registrant[] }) {
       )}
       {registrants.some(r => r.booking.status === 'cancelled') && (
         <p className="text-xs text-blue-950/70 font-medium italic">Cancelled bookings hidden.</p>
+      )}
+    </section>
+  )
+}
+
+/** Per-event money summary: every active diver and what they still owe, with
+ *  the event's outstanding total. Read-only — settle payments on a diver's
+ *  card under the Registrants tab. */
+function BalancesView({ registrants, currency }: { registrants: Registrant[]; currency: string }) {
+  const lines = registrants.map(r => ({ r, ...registrantBalance(r) }))
+  const totalDue = lines.reduce((s, l) => s + (l.bal.state === 'due' ? l.bal.amount : 0), 0)
+  const totalPaid = lines.reduce((s, l) => s + l.paid, 0)
+  const everyoneSettled = lines.every(l => l.bal.state !== 'due')
+
+  return (
+    <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-sm font-bold text-blue-900">Amount owed</h2>
+        <span className={`text-xs font-semibold ${totalDue > 0 ? 'text-red-600' : 'text-blue-900'}`}>
+          {totalDue > 0 ? `${currency} ${totalDue.toLocaleString()} outstanding` : 'All settled'}
+        </span>
+      </div>
+      {lines.length === 0 ? (
+        <p className="text-sm text-blue-950/70 font-medium italic">No active registrants.</p>
+      ) : (
+        <ul className="divide-y divide-sky-200">
+          {lines.map(({ r, bal }) => (
+            <li key={r.booking.id} className="py-1.5 flex items-baseline justify-between gap-3">
+              <span className="text-sm text-blue-900 font-medium min-w-0">
+                {r.profile?.name ?? '(no profile)'}
+                {r.profile?.nickname && r.profile.nickname !== r.profile.name && (
+                  <span className="text-blue-900/80 font-medium"> ({r.profile.nickname})</span>
+                )}
+                {r.payerName && (
+                  <span className="text-xs text-violet-700 font-semibold"> · paid by {r.payerName}</span>
+                )}
+              </span>
+              <span className="shrink-0 text-xs font-semibold">
+                {bal.state === 'due' && <span className="text-red-600">{currency} {bal.amount.toLocaleString()} due</span>}
+                {bal.state === 'settled' && <span className="text-blue-900">Settled ✓</span>}
+                {bal.state === 'credit' && <span className="text-emerald-700">{currency} {bal.amount.toLocaleString()} credit</span>}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex items-baseline justify-between gap-3 pt-1 border-t border-sky-200 text-sm font-semibold text-blue-900">
+        <span>Total paid</span>
+        <span>{currency} {totalPaid.toLocaleString()}</span>
+      </div>
+      {!everyoneSettled && (
+        <p className="text-xs text-blue-950/70 font-medium italic">
+          Record payments on each diver's card under the Registrants tab.
+        </p>
       )}
     </section>
   )
