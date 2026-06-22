@@ -791,6 +791,45 @@ describe('AdminEventDetailPage', () => {
     await waitFor(() => expect(bookingsUpdate).toHaveBeenCalledWith({ payer_id: null }))
   })
 
+  it('Amount owed tab lists each diver\'s balance and the event\'s outstanding total', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
+    ]))
+    const bookings = [
+      { id: 'b1', user_id: 'u1', status: 'confirmed', created_at: '2026-04-20',
+        eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null, details: { total: 3000 } },
+      { id: 'b2', user_id: 'u2', status: 'pending', created_at: '2026-04-20',
+        eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null, details: { total: 3000 } },
+    ]
+    const profiles = [
+      { id: 'u1', name: 'Ada Lovelace', nickname: null, cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, contact_method: null, contact_id: null },
+      { id: 'u2', name: 'Bob Roberts',  nickname: null, cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, contact_method: null, contact_id: null },
+    ]
+    // Ada paid in full (3000); Bob has paid nothing → 3000 outstanding.
+    const payments = [
+      { id: 'p1', user_id: 'u1', booking_id: 'b1', amount: 3000, currency: 'TWD', status: 'paid', method: 'Bank', note: null, created_at: '2026-04-21', recorded_by: null },
+    ]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: bookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      if (table === 'payments') return mockQueryBuilder({ data: payments })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    const user = userEvent.setup()
+    renderAt('/admin/events/dive/dive_x')
+    await screen.findByText('Ada Lovelace')
+
+    await user.click(screen.getByRole('tab', { name: /amount owed/i }))
+    const owed = await screen.findByRole('heading', { name: /amount owed/i })
+    const panel = owed.closest('section')!
+    // Bob still owes 3000; Ada is settled; the event total reflects Bob.
+    expect(within(panel).getByText(/Bob Roberts/)).toBeInTheDocument()
+    expect(within(panel).getByText(/3,000 due/)).toBeInTheDocument()
+    expect(within(panel).getByText(/Settled/)).toBeInTheDocument()
+    expect(within(panel).getByText(/3,000 outstanding/)).toBeInTheDocument()
+  })
+
   it('hides cancelled bookings from the roster and counts, surfacing them only in a collapsed disclosure', async () => {
     fetchEventsForBookings.mockResolvedValue(new Map([
       ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
