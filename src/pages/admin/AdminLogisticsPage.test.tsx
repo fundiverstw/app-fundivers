@@ -125,4 +125,42 @@ describe('AdminLogisticsPage', () => {
     expect(within(group).getByText(/Dana/)).toBeInTheDocument()
     expect(within(group).getByText(/guide/)).toBeInTheDocument()
   })
+
+  it('shows delicate rentals in a separate "Handle with care" inventory, out of the gear chips', async () => {
+    const careBookings = [
+      // Ada: rents a dive computer (gear) — care item, NOT a dive-bag chip.
+      { id: 'b1', user_id: 'u1', eo_dive_id: 'e1', eo_course_id: null, status: 'pending',
+        details: { transportation: true, gear: { rent: true, items: ['BCD', 'Dive computer'] }, add_ons: [] } },
+      // Bo: rents a dive light (add-on) + an SMB (dive-bag add-on, ignored).
+      { id: 'b2', user_id: 'u2', eo_dive_id: 'e1', eo_course_id: null, status: 'pending',
+        details: { transportation: false, gear: { rent: false }, add_ons: ['light2', 'smb'] } },
+    ]
+    const addons = [
+      { _id: 'light2', display_title: 'Light Rental (2 Days)', admin_title: 'Light 2' },
+      { _id: 'smb',    display_title: 'SMB Rental',            admin_title: 'SMB' },
+    ]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: careBookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      if (table === 'Other_Addons') return mockQueryBuilder({ data: addons })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    renderPage()
+    await screen.findByText(/1 event · 2 divers/i)
+
+    // The care section lists each delicate item with the renter's name.
+    const care = await screen.findByRole('group', { name: /handle with care/i })
+    expect(within(care).getByText(/Dive computer/)).toBeInTheDocument()
+    expect(within(care).getByText(/Ada/)).toBeInTheDocument()
+    expect(within(care).getByText(/Dive light/)).toBeInTheDocument()
+    expect(within(care).getByText(/Bo/)).toBeInTheDocument()
+    // SMB stays in the dive bags — never a care item.
+    expect(within(care).queryByText(/SMB/)).not.toBeInTheDocument()
+
+    // Dive computer is pulled OUT of the "Gear to pack" chips (BCD stays).
+    const gearSection = screen.getByText(/gear to pack/i).closest('div')!
+    expect(within(gearSection).getByText(/BCD ×1/)).toBeInTheDocument()
+    expect(within(gearSection).queryByText(/Dive computer/)).not.toBeInTheDocument()
+  })
 })
