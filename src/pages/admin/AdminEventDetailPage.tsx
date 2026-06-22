@@ -324,6 +324,32 @@ export function AdminEventDetailPage() {
     return <div className="flex justify-center pt-12"><div className="w-6 h-6 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" /></div>
   }
 
+  // Cancelled bookings drop out of the roster and every headcount — a diver who
+  // cancelled (or cancelled then re-registered, leaving a stale cancelled row)
+  // isn't attending. They stay reachable in a collapsed disclosure so an admin
+  // can still restore one via its status dropdown.
+  const activeRegistrants = registrants.filter(r => r.booking.status !== 'cancelled')
+  const cancelledRegistrants = registrants.filter(r => r.booking.status === 'cancelled')
+
+  const renderRegistrant = (r: Registrant) => (
+    <RegistrantCard
+      key={r.booking.id}
+      r={r}
+      addonNames={addonNames}
+      roomNames={roomNames}
+      currency={event?.currency ?? 'NTD'}
+      onStatusChange={updateStatus}
+      onApproveRefund={approveRefund}
+      onEdit={() => setEditing(r)}
+      onAddAmendment={submitAmendment}
+      onRecordPayment={(amount, note) => recordPayment(r, amount, note)}
+      onApplyCredit={(amount) => applyCredit(r, amount)}
+      onVoidPayment={(paymentId) => voidPayment(r, paymentId)}
+      onMarkDepositPaid={() => updateStatus(r.booking.id, 'confirmed')}
+      readOnly={!isAdmin}
+    />
+  )
+
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <Link to="/admin/events" className="text-sm text-white/70 hover:text-white">‹ back to events</Link>
@@ -338,7 +364,7 @@ export function AdminEventDetailPage() {
             {event.price != null && ` · From ${event.currency} ${event.price.toLocaleString()}`}
           </p>
         )}
-        <p className="text-sm text-red-600 mt-2">{registrants.length} registrant{registrants.length === 1 ? '' : 's'}</p>
+        <p className="text-sm text-red-600 mt-2">{activeRegistrants.length} registrant{activeRegistrants.length === 1 ? '' : 's'}</p>
         {event?.cancelled_at && (
           <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-red-700 bg-red-50 border border-red-500 rounded px-2 py-1 inline-block">
             Cancelled {format(new Date(event.cancelled_at), 'MMM d, yyyy')}
@@ -412,7 +438,7 @@ export function AdminEventDetailPage() {
               eventId={id}
               eventStartDate={event.start_time}
               eventEndDate={event.end_time}
-              nonAdminDiverCount={registrants.length}
+              nonAdminDiverCount={activeRegistrants.length}
               readOnly={!isAdmin}
             />
           )}
@@ -426,7 +452,7 @@ export function AdminEventDetailPage() {
         <>
           <nav role="tablist" aria-label="Event sections" className="flex gap-2">
             <TabButton active={view === 'registrants'} onClick={() => setView('registrants')}>
-              Registrants ({registrants.length})
+              Registrants ({activeRegistrants.length})
             </TabButton>
             <TabButton active={view === 'transportation'} onClick={() => setView('transportation')}>
               Transportation
@@ -435,24 +461,21 @@ export function AdminEventDetailPage() {
 
           {view === 'registrants' && (
             <section className="space-y-2">
-              {registrants.map(r => (
-                <RegistrantCard
-                  key={r.booking.id}
-                  r={r}
-                  addonNames={addonNames}
-                  roomNames={roomNames}
-                  currency={event?.currency ?? 'NTD'}
-                  onStatusChange={updateStatus}
-                  onApproveRefund={approveRefund}
-                  onEdit={() => setEditing(r)}
-                  onAddAmendment={submitAmendment}
-                  onRecordPayment={(amount, note) => recordPayment(r, amount, note)}
-                  onApplyCredit={(amount) => applyCredit(r, amount)}
-                  onVoidPayment={(paymentId) => voidPayment(r, paymentId)}
-                  onMarkDepositPaid={() => updateStatus(r.booking.id, 'confirmed')}
-                  readOnly={!isAdmin}
-                />
-              ))}
+              {activeRegistrants.length === 0 ? (
+                <p className="text-blue-950 font-medium text-sm">No active registrants — every booking for this event was cancelled.</p>
+              ) : (
+                activeRegistrants.map(renderRegistrant)
+              )}
+              {cancelledRegistrants.length > 0 && (
+                <details className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl px-4 py-2">
+                  <summary className="text-sm font-medium text-blue-950/70 cursor-pointer select-none">
+                    Cancelled ({cancelledRegistrants.length})
+                  </summary>
+                  <div className="space-y-2 pt-2">
+                    {cancelledRegistrants.map(renderRegistrant)}
+                  </div>
+                </details>
+              )}
             </section>
           )}
 

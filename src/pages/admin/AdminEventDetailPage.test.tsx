@@ -739,4 +739,53 @@ describe('AdminEventDetailPage', () => {
 
     await waitFor(() => expect(toastError).toHaveBeenCalledWith(expect.stringMatching(/Export failed.*smtp down/)))
   })
+
+  it('hides cancelled bookings from the roster and counts, surfacing them only in a collapsed disclosure', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
+    ]))
+
+    // Bob registered, cancelled, then re-registered for the same event — a
+    // stale cancelled row alongside a fresh confirmed one. Eve simply cancelled.
+    const bookings = [
+      { id: 'b-bob-old', user_id: 'u2', status: 'cancelled', created_at: '2026-04-19',
+        eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null, details: {} },
+      { id: 'b-ada',     user_id: 'u1', status: 'confirmed', created_at: '2026-04-20',
+        eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null, details: {} },
+      { id: 'b-bob-new', user_id: 'u2', status: 'confirmed', created_at: '2026-04-21',
+        eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null, details: {} },
+      { id: 'b-eve',     user_id: 'u5', status: 'cancelled', created_at: '2026-04-20',
+        eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null, details: {} },
+    ]
+    const profiles = [
+      { id: 'u1', name: 'Ada Lovelace', nickname: null, cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, contact_method: null, contact_id: null },
+      { id: 'u2', name: 'Bob Roberts',  nickname: null, cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, contact_method: null, contact_id: null },
+      { id: 'u5', name: 'Eve Tester',   nickname: null, cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, contact_method: null, contact_id: null },
+    ]
+
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: bookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    const user = userEvent.setup()
+    renderAt('/admin/events/dive/dive_x')
+
+    // Roster + tab count reflect only the 2 active divers (Ada + re-registered Bob).
+    await screen.findByText('Ada Lovelace')
+    expect(screen.getByRole('tab', { name: /registrants \(2\)/i })).toBeInTheDocument()
+
+    const details = screen.getByText(/cancelled \(2\)/i).closest('details') as HTMLElement
+    // The re-registered Bob shows in the active roster (outside the disclosure).
+    expect(screen.getAllByText('Bob Roberts').some(el => !details.contains(el))).toBe(true)
+
+    // Eve's cancelled booking is in the DOM but tucked inside the collapsed
+    // disclosure, so the admin doesn't see her in the active roster.
+    expect(within(details).getByText('Eve Tester')).not.toBeVisible()
+
+    // Expanding the disclosure reveals the cancelled rows (still restorable).
+    await user.click(screen.getByText(/cancelled \(2\)/i))
+    await waitFor(() => expect(within(details).getByText('Eve Tester')).toBeVisible())
+  })
 })
