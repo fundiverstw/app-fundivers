@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { fetchEventsInRange, fetchUpcomingEventDays, formatEventSpan } from '../../lib/events'
-import { gearTotals, splitByTransport, dayKeyOffset, careTotals, isCareGearItem } from '../../lib/logistics'
+import { gearTotals, splitByTransport, dayKeyOffset, careTotals, isCareGearItem, addonTotals } from '../../lib/logistics'
 import { DiverGearCard, type DiverGearRow } from '../../components/admin/DiverGearCard'
 import { TransportGroup } from '../../components/admin/TransportGroup'
 import { StaffDutyGroup, type StaffDutyRow } from '../../components/admin/StaffDutyGroup'
 import { CareGearGroup } from '../../components/admin/CareGearGroup'
+import { AddonSummaryGroup } from '../../components/admin/AddonSummaryGroup'
 import type { AppEvent, Booking, BookingDetails, Duty, Profile } from '../../types/database'
 
 interface EventGroup {
@@ -273,6 +274,7 @@ export function AdminLogisticsPage() {
               <EventTransport rows={g.rows} />
               <StaffDutyGroup rows={g.staff} />
               <CareGearGroup rows={careTotals(g.rows, addonTitles)} />
+              <AddonSummaryGroup rows={addonTotals(g.rows, addonTitles)} />
               {g.rows.length === 0 ? (
                 <p className="text-xs text-blue-950/70 font-medium italic pl-1">No active registrants.</p>
               ) : (

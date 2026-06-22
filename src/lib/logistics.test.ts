@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { splitByTransport, gearTotals, dayKeyOffset, careItemsForBooking, careTotals, isCareGearItem } from './logistics'
+import { splitByTransport, gearTotals, dayKeyOffset, careItemsForBooking, careTotals, isCareGearItem, addonTotals } from './logistics'
 import type { Booking, Profile } from '../types/database'
 
 const row = (transportation: boolean | undefined, items: string[] = []) => ({
@@ -84,6 +84,29 @@ describe('careTotals', () => {
       { item: 'Dive computer', divers: [{ bookingId: 'b1', name: 'Ada' }, { bookingId: 'b3', name: 'Cy' }] },
       { item: 'Dive light',    divers: [{ bookingId: 'b2', name: 'Bo' }, { bookingId: 'b3', name: 'Cy' }] },
     ])
+  })
+})
+
+describe('addonTotals', () => {
+  const titles = new Map([
+    ['smb', 'SMB Rental'],
+    ['nx', '2 Nitrox Tanks'],
+    ['light', 'Light Rental (1 Day)'],
+  ])
+  const addonRow = (ids: string[]) => ({ booking: { details: { add_ons: ids } } as unknown as Booking })
+
+  it('counts every add-on by catalog title, alphabetically, including delicate ones', () => {
+    const rows = [addonRow(['smb', 'nx']), addonRow(['smb', 'light']), addonRow([])]
+    expect(addonTotals(rows, titles)).toEqual([
+      { title: '2 Nitrox Tanks', count: 1 },
+      { title: 'Light Rental (1 Day)', count: 1 },
+      { title: 'SMB Rental', count: 2 },
+    ])
+  })
+
+  it('skips add-on ids with no resolved title and returns [] when there are none', () => {
+    expect(addonTotals([addonRow(['unknown-id'])], titles)).toEqual([])
+    expect(addonTotals([addonRow([])], titles)).toEqual([])
   })
 })
 

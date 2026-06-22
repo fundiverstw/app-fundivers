@@ -162,5 +162,11 @@ describe('AdminLogisticsPage', () => {
     const gearSection = screen.getByText(/gear to pack/i).closest('div')!
     expect(within(gearSection).getByText(/BCD ×1/)).toBeInTheDocument()
     expect(within(gearSection).queryByText(/Dive computer/)).not.toBeInTheDocument()
+
+    // The full per-event Add-ons summary lists every add-on by catalog title —
+    // including the SMB (a dive-bag add-on) and the rented light.
+    const addonsGroup = await screen.findByRole('group', { name: /^add-ons$/i })
+    expect(within(addonsGroup).getByText(/SMB Rental ×1/)).toBeInTheDocument()
+    expect(within(addonsGroup).getByText(/Light Rental \(2 Days\) ×1/)).toBeInTheDocument()
   })
 })
