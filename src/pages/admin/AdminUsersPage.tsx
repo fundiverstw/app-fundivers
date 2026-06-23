@@ -456,10 +456,18 @@ function UserCard({
   const { user: authUser } = useAuth()
   return (
     <div className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full text-left p-3 flex items-start justify-between hover:bg-sky-100 rounded-xl transition-colors"
+      {/* role="button", not a real <button>: text inside a <button> can't be
+          selected by click-drag on desktop, so admins couldn't copy a diver's
+          name/cert. A div keeps the whole row tappable while leaving the text
+          selectable; the onClick guard skips the expand/collapse when the click
+          is the tail end of a text selection. */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        onClick={() => { if (!window.getSelection()?.toString()) onToggle() }}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle() } }}
+        className="w-full text-left p-3 flex items-start justify-between hover:bg-sky-100 rounded-xl transition-colors cursor-pointer"
       >
         <div className="flex-1 min-w-0">
           <p className="font-medium text-blue-900 text-sm">
@@ -474,16 +482,16 @@ function UserCard({
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0 ml-3">
-          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full select-none ${
             user.role === 'admin' ? 'bg-red-500 text-white'
             : user.role === 'staff' ? 'bg-amber-500 text-white'
             : 'bg-blue-900 text-white'
           }`}>
             {user.role}
           </span>
-          <span className="text-xs text-blue-950 font-medium">{open ? '▲' : '▼'}</span>
+          <span className="text-xs text-blue-950 font-medium select-none">{open ? '▲' : '▼'}</span>
         </div>
-      </button>
+      </div>
 
       {open && (
         <div className="px-4 pb-4 border-t border-sky-200 pt-3 space-y-4 text-sm">
