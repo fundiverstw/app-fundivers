@@ -11,6 +11,7 @@ import { ChatIcon } from '../icons/ChatIcon'
 import { CrosshairIcon } from '../icons/CrosshairIcon'
 import { MapIcon } from '../icons/MapIcon'
 import { PartnerConnectIcon } from '../icons/PartnerConnectIcon'
+import { TripBoardIcon } from '../icons/TripBoardIcon'
 import { PersonIcon } from '../icons/PersonIcon'
 import { NotificationBell } from '../NotificationBell'
 import {
@@ -110,6 +111,13 @@ export function AppShell() {
             className="text-red-500 hover:text-red-400 transition-colors"
           >
             <PartnerConnectIcon />
+          </Link>
+          <Link
+            to="/trips"
+            aria-label="Trip Board"
+            className="text-red-500 hover:text-red-400 transition-colors"
+          >
+            <TripBoardIcon />
           </Link>
         </div>
         <Link to="/dashboard" aria-label="Home" className="shrink-0">

@@ -27,6 +27,8 @@ import { DiveLogsPage } from './pages/DiveLogsPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { ContactPage } from './pages/ContactPage'
 import { PartnerConnectPage } from './pages/PartnerConnectPage'
+import { TripBoardPage } from './pages/TripBoardPage'
+import { TripDetailPage } from './pages/TripDetailPage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { DutiesPage } from './pages/DutiesPage'
@@ -51,6 +53,7 @@ import { AdminNotificationsPage } from './pages/admin/AdminNotificationsPage'
 import { AdminAccountingPage } from './pages/admin/AdminAccountingPage'
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage'
 import { AdminHistoryPage } from './pages/admin/AdminHistoryPage'
+import { AdminTripBoardPage } from './pages/admin/AdminTripBoardPage'
 
 // Public registration flow — /register (pick an event) and /register/:type/:id
 // (deep-link from Wix calendar) both render RegisterPage. Outside ProtectedRoute
@@ -107,6 +110,8 @@ export default function App() {
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/partner-connect" element={<PartnerConnectPage />} />
+              <Route path="/trips" element={<TripBoardPage />} />
+              <Route path="/trips/:id" element={<TripDetailPage />} />
               <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/duties" element={<DutiesPage />} />
             </Route>
@@ -138,6 +143,7 @@ export default function App() {
                 <Route path="/admin/duty" element={<AdminDutyPage />} />
                 <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
                 <Route path="/admin/accounting" element={<AdminAccountingPage />} />
+                <Route path="/admin/trip-board" element={<AdminTripBoardPage />} />
                 <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
                 <Route path="/admin/history" element={<AdminHistoryPage />} />
               </Route>
