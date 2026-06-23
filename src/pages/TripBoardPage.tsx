@@ -5,7 +5,7 @@ import { tripDateLabel } from '../lib/trip-format'
 import { errorMessage } from '../lib/errors'
 import type { TripBoardItem, MyTripReferral } from '../types/database'
 import {
-  CARD, PAGE_HEADING, PAGE_BODY, TEXT_LINK, TEXT_HEADING, TEXT_SUBTLE,
+  CARD, PAGE_HEADING, PAGE_BODY, ON_DEEP_LINK, TEXT_HEADING, TEXT_SUBTLE,
 } from '../styles/tokens'
 
 // Trip Board (diver-facing) — the curated trips abroad we vouch for. Booking
@@ -46,7 +46,7 @@ export function TripBoardPage() {
           give you a reference code and connect you with the shop directly.
         </p>
         <p className="text-sm">
-          <Link to="/partner-connect" className={TEXT_LINK}>
+          <Link to="/partner-connect" className={ON_DEEP_LINK}>
             Headed somewhere not listed? Try Partner Connect →
           </Link>
         </p>

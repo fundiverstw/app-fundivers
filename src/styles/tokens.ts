@@ -52,6 +52,7 @@ export const TEXT_ERROR   = 'text-red-700 font-semibold'
 export const ON_DEEP_BODY    = 'text-white/80'
 export const ON_DEEP_MUTED   = 'text-white/70'
 export const ON_DEEP_SUBTLE  = 'text-white/60'
+export const ON_DEEP_LINK    = 'text-amber-300 font-semibold hover:text-amber-200 hover:underline'
 
 // ── Buttons ────────────────────────────────────────────────────────
 const BUTTON_BASE = 'font-semibold py-2 rounded-lg transition-colors disabled:opacity-50'
