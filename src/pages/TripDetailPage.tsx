@@ -6,7 +6,7 @@ import { useToast } from '../hooks/useToast'
 import { tripDateLabel } from '../lib/trip-format'
 import type { TripBoardItem, MyTripReferral } from '../types/database'
 import {
-  CARD, BTN_PRIMARY, PAGE_BODY, TEXT_LINK, TEXT_HEADING, TEXT_BODY, TEXT_SUBTLE,
+  CARD, BTN_PRIMARY, PAGE_BODY, TEXT_LINK, ON_DEEP_LINK, TEXT_HEADING, TEXT_BODY, TEXT_SUBTLE,
 } from '../styles/tokens'
 
 // Trip detail — full pitch for one curated trip, plus the "I'm interested"
@@ -171,5 +171,5 @@ function InterestedCard({ trip, referral }: { trip: TripBoardItem; referral: MyT
 }
 
 function BackLink() {
-  return <Link to="/trips" className={`text-sm ${TEXT_LINK}`}>← Trip Board</Link>
+  return <Link to="/trips" className={`text-sm ${ON_DEEP_LINK}`}>← Trip Board</Link>
 }
