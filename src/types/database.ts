@@ -145,6 +145,13 @@ export interface Database {
         Args: { p_lead: string; p_amount: number; p_group_id?: string | null }
         Returns: number
       }
+      // Defined in 20260623000000_trip_board.sql. A diver expresses interest
+      // in a published trip; mints (or returns the existing live) referral and
+      // returns just the FD-XXXXXX code. Idempotent. authenticated-only.
+      express_trip_interest: {
+        Args: { p_trip_id: string }
+        Returns: string
+      }
       // Defined in 20260603040000_signup_throttling_and_orphan_log.sql.
       // Service-role only. Inserts a signup_attempts row and returns
       // count of attempts within the trailing 60s + 24h windows
@@ -183,6 +190,54 @@ export interface Database {
           owner_display_name: string | null
           created_at: string
           updated_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      // Defined in 20260623000000_trip_board.sql. Owner-privileged projection
+      // of published trips joined to the partner shop we vouch for — diver-safe
+      // columns only (no kickback rate). Divers have no access to base `trips`.
+      trip_board: {
+        Row: {
+          id: string
+          title: string
+          destination: string
+          summary: string | null
+          description: string | null
+          start_date: string | null
+          end_date: string | null
+          price: number | null
+          currency: string
+          hero_image_url: string | null
+          highlights: string[]
+          booking_url: string | null
+          published_at: string | null
+          partner_shop_id: string
+          partner_name: string
+          partner_country: string
+          partner_location: string | null
+          partner_website: string | null
+          partner_logo_url: string | null
+          partner_vouch_notes: string | null
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      // Defined in 20260623000000_trip_board.sql. The caller's own referrals
+      // (scoped to auth.uid()) with trip/partner labels — the kickback ledger
+      // columns are intentionally absent.
+      my_trip_referrals: {
+        Row: {
+          id: string
+          trip_id: string
+          referral_code: string
+          status: 'interested' | 'introduced' | 'booked' | 'completed' | 'cancelled'
+          created_at: string
+          trip_title: string
+          trip_destination: string
+          partner_name: string
         }
         Insert: never
         Update: never
@@ -470,6 +525,117 @@ export interface Database {
           settled_at?: string | null
           settled_note?: string | null
         }
+        Relationships: []
+      }
+      partner_shops: {
+        Row: {
+          id: string
+          created_at: string
+          name: string
+          country: string
+          location: string | null
+          website: string | null
+          contact_name: string | null
+          contact_email: string | null
+          vouch_notes: string | null
+          logo_url: string | null
+          default_kickback_rate: number
+          active: boolean
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          name: string
+          country: string
+          location?: string | null
+          website?: string | null
+          contact_name?: string | null
+          contact_email?: string | null
+          vouch_notes?: string | null
+          logo_url?: string | null
+          default_kickback_rate?: number
+          active?: boolean
+          created_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['partner_shops']['Insert']>
+        Relationships: []
+      }
+      trips: {
+        Row: {
+          id: string
+          created_at: string
+          partner_shop_id: string
+          title: string
+          destination: string
+          summary: string | null
+          description: string | null
+          start_date: string | null
+          end_date: string | null
+          price: number | null
+          currency: string
+          hero_image_url: string | null
+          highlights: string[]
+          booking_url: string | null
+          kickback_rate: number
+          status: 'draft' | 'published' | 'archived'
+          published_at: string | null
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          partner_shop_id: string
+          title: string
+          destination: string
+          summary?: string | null
+          description?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          price?: number | null
+          currency?: string
+          hero_image_url?: string | null
+          highlights?: string[]
+          booking_url?: string | null
+          kickback_rate?: number
+          status?: 'draft' | 'published' | 'archived'
+          published_at?: string | null
+          created_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['trips']['Insert']>
+        Relationships: []
+      }
+      trip_referrals: {
+        Row: {
+          id: string
+          created_at: string
+          trip_id: string
+          diver_id: string
+          referral_code: string
+          status: 'interested' | 'introduced' | 'booked' | 'completed' | 'cancelled'
+          booked_amount: number | null
+          booked_currency: string | null
+          kickback_rate: number | null
+          kickback_amount: number | null
+          kickback_status: 'pending' | 'invoiced' | 'received'
+          received_at: string | null
+          admin_notes: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          trip_id: string
+          diver_id: string
+          referral_code?: string
+          status?: 'interested' | 'introduced' | 'booked' | 'completed' | 'cancelled'
+          booked_amount?: number | null
+          booked_currency?: string | null
+          kickback_rate?: number | null
+          kickback_status?: 'pending' | 'invoiced' | 'received'
+          received_at?: string | null
+          admin_notes?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['trip_referrals']['Insert']>
         Relationships: []
       }
       EO_dives: {
@@ -1122,6 +1288,21 @@ export type GasMix = typeof GAS_MIXES[number]
 
 export type DiveLog = Database['public']['Tables']['dive_logs']['Row']
 export type DiveLogInsert = Database['public']['Tables']['dive_logs']['Insert']
+
+// Trip Board — partner referral network
+export type PartnerShop = Database['public']['Tables']['partner_shops']['Row']
+export type PartnerShopInsert = Database['public']['Tables']['partner_shops']['Insert']
+export type Trip = Database['public']['Tables']['trips']['Row']
+export type TripInsert = Database['public']['Tables']['trips']['Insert']
+export type TripReferral = Database['public']['Tables']['trip_referrals']['Row']
+export type TripBoardItem = Database['public']['Views']['trip_board']['Row']
+export type MyTripReferral = Database['public']['Views']['my_trip_referrals']['Row']
+export const TRIP_STATUSES = ['draft','published','archived'] as const
+export type TripStatus = typeof TRIP_STATUSES[number]
+export const REFERRAL_STATUSES = ['interested','introduced','booked','completed','cancelled'] as const
+export type ReferralStatus = typeof REFERRAL_STATUSES[number]
+export const KICKBACK_STATUSES = ['pending','invoiced','received'] as const
+export type KickbackStatus = typeof KICKBACK_STATUSES[number]
 
 export const WAITLIST_OFFER_STATUSES = ['pending', 'accepted', 'expired'] as const
 export type WaitlistOfferStatus = typeof WAITLIST_OFFER_STATUSES[number]

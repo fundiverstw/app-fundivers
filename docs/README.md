@@ -12,6 +12,7 @@ into source.
 | [events-and-bookings.md](./events-and-bookings.md)     | Calendar rendering, register-form wizard, `bookings.details` JSONB shape |
 | [payments.md](./payments.md)                           | Deposit vs balance semantics, payments ledger, refund flow |
 | [admin.md](./admin.md)                                 | Admin routes, event memos, user search, role-view toggle |
+| [trip-board.md](./trip-board.md)                       | Partner referral network: curated trips abroad, referral codes, kickback ledger |
 | [push-notifications.md](./push-notifications.md)       | Web Push: VAPID, service worker, Cloudflare cron sender, `/admin-broadcast`, `/notify-duty`, CORS |
 | [testing.md](./testing.md)                             | Unit vs integration conventions, `mockQueryBuilder`, Makefile surface |
 | [deployment.md](./deployment.md)                       | Env vars (which secret lives where), Cloudflare deploy (CLI + GitHub Actions), Supabase link / push / pull / verify, edge functions |
