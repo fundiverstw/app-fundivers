@@ -168,5 +168,12 @@ describe('AdminLogisticsPage', () => {
     const addonsGroup = await screen.findByRole('group', { name: /^add-ons$/i })
     expect(within(addonsGroup).getByText(/SMB Rental ×1/)).toBeInTheDocument()
     expect(within(addonsGroup).getByText(/Light Rental \(2 Days\) ×1/)).toBeInTheDocument()
+
+    // …and the whole-day total now sits in the Overall summary too, beside
+    // "Gear to pack" and "Handle with care".
+    const overall = screen.getByText(/^overall/i).closest('section')!
+    const overallAddons = within(overall).getByText(/^add-ons$/i).closest('div')!
+    expect(within(overallAddons).getByText(/SMB Rental ×1/)).toBeInTheDocument()
+    expect(within(overallAddons).getByText(/Light Rental \(2 Days\) ×1/)).toBeInTheDocument()
   })
 })
