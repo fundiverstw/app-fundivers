@@ -1,13 +1,11 @@
-// Globe glyph for the Trip Board header shortcut — the curated trips abroad
-// we vouch for. currentColor so the parent sets the tint (red on the diver
-// header), matching the map / Partner Connect affordances beside it.
+// Lucide "plane" glyph for the Trip Board header shortcut — the curated trips
+// abroad we vouch for. currentColor so the parent sets the tint (red on the
+// diver header), matching the map / Partner Connect affordances beside it.
 export function TripBoardIcon() {
   return (
     <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none"
       stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M3 12h18" />
-      <path d="M12 3c2.5 2.5 3.8 5.7 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.7-3.8-9S9.5 5.5 12 3z" />
+      <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z" />
     </svg>
   )
 }
