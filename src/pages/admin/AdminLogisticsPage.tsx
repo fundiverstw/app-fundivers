@@ -169,6 +169,9 @@ export function AdminLogisticsPage() {
   // separately, so drop them from the dive-bag "Gear to pack" chips.
   const overallGear = gearTotals(allRows).filter(g => !isCareGearItem(g.item))
   const overallCare = careTotals(allRows, addonTitles)
+  // Whole-day add-on tally (SMBs, nitrox tanks, course upgrades, lights, …) so
+  // the shop's prep list sits next to gear + handle-with-care in the summary.
+  const overallAddons = addonTotals(allRows, addonTitles)
   const transport = splitByTransport(allRows)
   // One seat per staff member regardless of how many of the day's events they
   // cover, so the ride count isn't double-counted.
@@ -254,6 +257,18 @@ export function AdminLogisticsPage() {
                   {overallCare.map(({ item, divers }) => (
                     <span key={item} className="text-xs px-2 py-0.5 rounded-full border border-amber-500 bg-amber-50 text-amber-900 font-semibold">
                       {item} ×{divers.length}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {overallAddons.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-blue-900 uppercase tracking-wide">Add-ons</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {overallAddons.map(({ title, count }) => (
+                    <span key={title} className="text-xs px-2 py-0.5 rounded-full border border-sky-400 bg-sky-50 text-blue-900 font-medium">
+                      {title} ×{count}
                     </span>
                   ))}
                 </div>
