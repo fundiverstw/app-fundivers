@@ -6,7 +6,7 @@ import { CURRENT_TERMS_VERSION } from '../../lib/terms-version'
 import { formatEventSpan, eventIsFull, isPastEvent } from '../../lib/events'
 import { useAuth } from '../../hooks/useAuth'
 import { computeEffectiveFullPaymentDeadline } from '../../lib/payment-deadlines'
-import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/payment-instructions'
+import { paymentInstructionsFor } from '../../lib/payment-instructions'
 import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../lib/gear'
 import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
 import { uploadCertCard } from '../../lib/cert-card'
@@ -14,6 +14,7 @@ import { uploadNitroxCard } from '../../lib/nitrox-card'
 import { uploadDeepCard } from '../../lib/deep-card'
 import { isHeicFile } from '../../lib/image-compress'
 import { TurnstileWidget } from './TurnstileWidget'
+import { WhatHappensNext } from './WhatHappensNext'
 import { DateField } from '../DateField'
 import { ShoeSizeField } from '../ShoeSizeField'
 import type { AppEvent, Booking, BookingDetails, CancellationPolicy, Database, EOAddon, EORoom, Profile } from '../../types/database'
@@ -33,9 +34,13 @@ interface Props {
   /** If provided, the form opens in edit mode: pre-populated from this row
    *  and submit UPDATEs instead of INSERTing. Used by the admin edit modal. */
   existingBooking?: Booking
+  /** Diver-facing modal flow: after a successful submit, show a "What happens
+   *  next" panel inside the modal (and defer onBooked until the diver taps
+   *  Done) instead of closing silently. Off for admin / edit flows. */
+  inlineConfirmation?: boolean
 }
 
-export function RegisterForm({ event, profile, userId, onClose, onBooked, existingBooking }: Props) {
+export function RegisterForm({ event, profile, userId, onClose, onBooked, existingBooking, inlineConfirmation }: Props) {
   return (
     <div className="fixed inset-0 bg-blue-900/60 backdrop-blur-sm flex items-start justify-center z-50 px-4 pt-8 pb-4 overflow-y-auto" onClick={onClose}>
       <div
@@ -49,6 +54,7 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked, existi
           onSubmitSuccess={onBooked}
           onCancel={onClose}
           existingBooking={existingBooking}
+          inlineConfirmation={inlineConfirmation}
         />
       </div>
     </div>
@@ -109,6 +115,11 @@ export interface RegisterFormBodyProps {
    *  confirmation email goes to that user's address. Profile / userId
    *  must be the *target* diver — not the admin. */
   actingOnBehalfOf?: string
+  /** Show the inline "What happens next" confirmation panel after a
+   *  successful (non-edit, non-on-behalf) submit, deferring onSubmitSuccess
+   *  until the diver dismisses it. The standalone /register page leaves this
+   *  off — it has its own LockedConfirmation success screen. */
+  inlineConfirmation?: boolean
 }
 
 // Outer wrapper around the multi-step form. Adds an optional "Who is this
@@ -353,7 +364,7 @@ interface RegisterFormBodyInnerProps extends RegisterFormBodyProps {
   leadPayerId?: string | null
 }
 
-function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCancel, onBackBeforeStepOne, existingBooking, actingOnBehalfOf, pickerHeader, additionalTargets = [], leadPayerId = null }: RegisterFormBodyInnerProps) {
+function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCancel, onBackBeforeStepOne, existingBooking, actingOnBehalfOf, pickerHeader, additionalTargets = [], leadPayerId = null, inlineConfirmation = false }: RegisterFormBodyInnerProps) {
   const isGuest = !userId && !actingOnBehalfOf
   const isEdit = !!existingBooking
   // Read at render (not module load) so tests can stub it per-case. A guest
@@ -411,6 +422,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const [additionalResults, setAdditionalResults] = useState<
     Array<{ targetName: string; ok: boolean; error?: string }>
   >([])
+  // Inline-confirmation terminal state: a successful submit parks the booking
+  // result here so the modal can show "What happens next" before handing back
+  // to the parent (deferred onSubmitSuccess) on Done. Null = still in the form.
+  const [doneInline, setDoneInline] = useState<{ id: string; status: string } | null>(null)
 
   // Form state — pre-populated from existingBooking when editing.
   // Gear is a single three-way choice: 'none' (diver has everything),
@@ -918,10 +933,42 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     }
 
     setSaving(false)
+    if (!allOk) { setErr('Some divers could not be registered — see details below.'); return }
     // Pass status through so the parent can render a different success
     // toast when the booking landed as 'waitlisted' rather than 'pending'.
-    if (allOk) onSubmitSuccess({ id: data.booking_id, status: data.status ?? 'pending' })
-    else setErr('Some divers could not be registered — see details below.')
+    const result = { id: data.booking_id, status: data.status ?? 'pending' }
+    // Diver-facing modal: park the result and show "What happens next" inside
+    // the modal, handing back to the parent only when the diver taps Done.
+    if (inlineConfirmation) setDoneInline(result)
+    else onSubmitSuccess(result)
+  }
+
+  // Terminal "What happens next" view — modal flow only. Replaces the form
+  // once the booking lands; Done hands control back to the parent (which
+  // closes the modal and refreshes its bookings).
+  if (doneInline) {
+    const waitlisted = doneInline.status === 'waitlisted'
+    return (
+      <div className="space-y-4">
+        <header className="space-y-1">
+          <h1 className="text-xl font-bold text-blue-900 leading-tight">
+            {waitlisted ? "You're on the waitlist" : 'Registration submitted'}
+          </h1>
+          <p className="text-xs text-blue-900 font-medium">
+            {event.title} · {formatEventSpan(event, { style: 'long' })}
+          </p>
+        </header>
+        <WhatHappensNext waitlisted={waitlisted} />
+        <div className="flex justify-end">
+          <button
+            onClick={() => onSubmitSuccess(doneInline)}
+            className="bg-blue-900 hover:bg-blue-950 text-white text-sm font-semibold py-2 px-5 rounded-lg"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -1453,8 +1500,6 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             invoiceEmail={payment === 'credit_card' ? creditCardInvoiceEmail.trim() || null : null}
           />
 
-          <PaymentConfirmationReminderBlock />
-
           <div className="text-sm text-blue-950 font-medium bg-sky-50 rounded-lg p-3 space-y-1">
             {charges.map((c, i) => <Row key={`${c.kind}-${i}`} label={c.label} value={c.amount} currency={event.currency} />)}
             <div className="border-t border-sky-200 pt-1 mt-1">
@@ -1534,13 +1579,6 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 <span>I have read and agree to the cancellation policy.</span>
               </label>
             </div>
-          )}
-
-          {!isEdit && (
-            <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded p-2">
-              Please note: your reservation is not confirmed until the deposit
-              {event.deposit_amount != null && ` (${event.currency} ${(showGroupTotals ? groupDepositNow : depositNow).toLocaleString()}${showGroupTotals ? ` for all ${groupCount} divers` : ''})`} has been paid.
-            </p>
           )}
 
           {additionalResults.length > 0 && (
@@ -1629,19 +1667,6 @@ function PaymentInstructionsBlock({
     <div className="text-xs text-blue-950 font-medium bg-white/70 border border-sky-200 rounded-lg p-3 space-y-1">
       <p className="font-semibold text-blue-900">{instr.title}</p>
       {instr.lines.map((line, i) => <PaymentInstructionLine key={i} line={line} />)}
-    </div>
-  )
-}
-
-// "After you pay" reminder block — same copy for every method so the diver
-// always sees how to confirm receipt with the shop and where to watch for
-// status updates.
-function PaymentConfirmationReminderBlock() {
-  const reminder = paymentConfirmationReminder()
-  return (
-    <div className="text-xs text-blue-950 font-medium bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-1">
-      <p className="font-semibold text-blue-900">{reminder.title}</p>
-      {reminder.lines.map((line, i) => <PaymentInstructionLine key={i} line={line} />)}
     </div>
   )
 }

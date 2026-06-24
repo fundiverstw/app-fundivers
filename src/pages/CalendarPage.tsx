@@ -240,6 +240,7 @@ export function CalendarPage() {
           userId={user.id}
           onClose={() => setRegistering(null)}
           onBooked={handleBooked}
+          inlineConfirmation
         />
       )}
 
