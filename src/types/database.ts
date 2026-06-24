@@ -1330,6 +1330,11 @@ export interface AppEvent {
   /** Short label for the calendar grid pill — falls back to `title` at the
    *  call site when blank. Null when the source row has no calendar_title set. */
   calendar_title: string | null
+  /** Course-only administrative category (EO_courses.admin_title), e.g.
+   *  "OW" / "AOW" / "EFR". Groups courses by type for the calendar's course
+   *  filter — the diver-facing `title` varies per offering (and carries a
+   *  capacity suffix), so it makes a noisy filter key. Null/absent for dives. */
+  course_category?: string | null
   start_time: string // ISO timestamp
   end_time: string | null
   /**

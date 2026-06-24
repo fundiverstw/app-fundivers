@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MonthCalendar } from './MonthCalendar'
 import type { StaffBusyEntry } from '../../types/database'
@@ -350,6 +350,77 @@ describe('MonthCalendar course color buckets', () => {
     )
     const bar = screen.getByTitle('Advanced Open Water (2 spots open)')
     expect(bar.className).toMatch(/bg-orange/)
+  })
+})
+
+describe('MonthCalendar course filter', () => {
+  function makeCourse(id: string, title: string, course_category: string | null) {
+    return {
+      id, type: 'course' as const, title, calendar_title: null,
+      course_category,
+      start_time: '2030-06-12T09:00:00',
+      end_time:   '2030-06-12T15:00:00',
+      start_time_hhmm: '09:00',
+      featured: false, fully_booked: false,
+      capacity: null, confirmed_count: null,
+      price: null, deposit_amount: null, transport_price: null, currency: 'TWD' as const,
+      has_rooms: false, room_type_ids: [] as string[],
+      has_addons: false, addon_ids: [] as string[],
+      gear_rental_info: null, nitrox_required: false, dive_days: null,
+      cancelled_at: null,
+    }
+  }
+
+  // The diver-facing title varies per offering and carries a capacity suffix,
+  // so grouping the filter by title produced repetitive rows ("OW", "Open
+  // Water", "Open Water (1 remaining)"). Grouping by admin_title collapses
+  // every OW offering into one "OW" row.
+  it('groups the filter by admin_title (one row per course type, not per title)', async () => {
+    const user = userEvent.setup()
+    render(
+      <MonthCalendar
+        month={new Date('2030-06-15')}
+        onMonthChange={() => {}}
+        events={[
+          makeCourse('c-ow1', 'Open Water Course (1 remaining)', 'OW'),
+          makeCourse('c-ow2', 'Open Water Course (3 spots open)', 'OW'),
+          makeCourse('c-aow', 'Advanced Open Water', 'AOW'),
+        ]}
+        onPickEvent={() => {}}
+      />
+    )
+    await user.click(screen.getByLabelText('Filter courses'))
+    const menu = screen.getByRole('menu')
+    const checkboxes = within(menu).getAllByRole('checkbox')
+    expect(checkboxes).toHaveLength(2)
+    expect(within(menu).getByText('OW')).toBeInTheDocument()
+    expect(within(menu).getByText('AOW')).toBeInTheDocument()
+    expect(within(menu).queryByText(/Open Water Course/)).not.toBeInTheDocument()
+  })
+
+  it('hides every offering of a type when its category is toggled off', async () => {
+    const user = userEvent.setup()
+    render(
+      <MonthCalendar
+        month={new Date('2030-06-15')}
+        onMonthChange={() => {}}
+        events={[
+          makeCourse('c-ow1', 'Open Water Course (1 remaining)', 'OW'),
+          makeCourse('c-ow2', 'Open Water Course (3 spots open)', 'OW'),
+          makeCourse('c-aow', 'Advanced Open Water', 'AOW'),
+        ]}
+        onPickEvent={() => {}}
+      />
+    )
+    expect(screen.getByTitle('Open Water Course (1 remaining)')).toBeInTheDocument()
+    expect(screen.getByTitle('Open Water Course (3 spots open)')).toBeInTheDocument()
+
+    await user.click(screen.getByLabelText('Filter courses'))
+    await user.click(within(screen.getByRole('menu')).getByLabelText('OW'))
+
+    expect(screen.queryByTitle('Open Water Course (1 remaining)')).not.toBeInTheDocument()
+    expect(screen.queryByTitle('Open Water Course (3 spots open)')).not.toBeInTheDocument()
+    expect(screen.getByTitle('Advanced Open Water')).toBeInTheDocument()
   })
 })
 

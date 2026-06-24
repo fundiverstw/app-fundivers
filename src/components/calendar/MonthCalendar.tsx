@@ -101,19 +101,6 @@ const BUSY_DOT             = 'bg-violet-600'
 // same shade as own-busy bars so the two duty-signals share one palette.
 const OWN_DUTY_STRIPE = 'repeating-linear-gradient(45deg, transparent 0 6px, #7c3aed 6px 12px)'
 
-// Short chip labels for the course-category filter popover.
-const COURSE_SHORT: Record<string, string> = {
-  'Open Water Course':   'OW',
-  'Advanced Open Water': 'AOW',
-  'PADI Rescue Course':  'Rescue',
-  'EFR Course':          'EFR',
-  'Equipment Course':    'Equipment',
-  'Deep Specialty':      'Deep',
-}
-function courseShortLabel(category: string): string {
-  return COURSE_SHORT[category] ?? category
-}
-
 const TRACK_HEIGHT = 18
 const TRACK_GAP = 2
 
@@ -215,15 +202,25 @@ export function MonthCalendar({
 
   const days = eachDayOfInterval({ start: startOfMonth(month), end: endOfMonth(month) })
 
+  // Group courses by admin_title (course type) rather than the diver-facing
+  // title — the latter varies per offering and carries a capacity suffix, so
+  // it produces a noisy, repetitive filter ("OW", "Open Water", "Open Water (1
+  // remaining)"). One row per type; the dot's color comes from a representative
+  // event (display_title still drives the bar color, so it's uniform per type).
   const courseCategories = useMemo(() => {
-    const seen = new Set<string>()
-    for (const e of events) if (e.type === 'course') seen.add(e.title)
-    return Array.from(seen).sort()
+    const byCat = new Map<string, CourseColor>()
+    for (const e of events) {
+      if (e.type !== 'course') continue
+      const cat = e.course_category ?? e.title
+      if (!byCat.has(cat)) byCat.set(cat, courseColor(e.title))
+    }
+    return Array.from(byCat, ([category, color]) => ({ category, color }))
+      .sort((a, b) => a.category.localeCompare(b.category))
   }, [events])
 
   const filteredEvents = useMemo(() => events.filter(e => {
     if (e.type === 'dive') return diveShown
-    return !hiddenCourses.has(e.title)
+    return !hiddenCourses.has(e.course_category ?? e.title)
   }), [events, diveShown, hiddenCourses])
 
   const ranges: EventRange<AppEvent>[] = useMemo(() => assignTracks(filteredEvents), [filteredEvents])
@@ -768,7 +765,7 @@ function BusyBar({ seg, track, onClick, hovered, onHoverEvent }: {
 interface FilterLegendProps {
   diveShown: boolean
   onToggleDive: () => void
-  courseCategories: string[]
+  courseCategories: { category: string; color: CourseColor }[]
   hiddenCourses: Set<string>
   onToggleCategory: (cat: string) => void
   busyToggle?: { shown: boolean; onToggle: () => void }
@@ -848,24 +845,21 @@ function FilterLegend({
             {courseCategories.length === 0 && (
               <p className="text-blue-900 font-medium text-xs px-2 py-1">No courses in this range.</p>
             )}
-            {courseCategories.map(cat => {
-              const shown = !hiddenCourses.has(cat)
-              const short = courseShortLabel(cat)
-              const dot = COURSE_DOT[courseColor(cat)]
+            {courseCategories.map(({ category, color }) => {
+              const shown = !hiddenCourses.has(category)
               return (
                 <label
-                  key={cat}
+                  key={category}
                   className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-sky-50 cursor-pointer"
                 >
                   <input
                     type="checkbox"
                     checked={shown}
-                    onChange={() => onToggleCategory(cat)}
+                    onChange={() => onToggleCategory(category)}
                     className="accent-blue-900"
                   />
-                  <span className={`w-2 h-2 rounded-full ${dot}`} aria-hidden="true" />
-                  <span className="text-blue-900 text-xs font-semibold">{short}</span>
-                  {short !== cat && <span className="text-blue-900 font-medium text-[11px]">{cat}</span>}
+                  <span className={`w-2 h-2 rounded-full ${COURSE_DOT[color]}`} aria-hidden="true" />
+                  <span className="text-blue-900 text-xs font-semibold">{category}</span>
                 </label>
               )
             })}
