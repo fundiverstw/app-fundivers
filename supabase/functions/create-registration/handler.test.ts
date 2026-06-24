@@ -509,6 +509,20 @@ describe('handleRegistration — email behaviour', () => {
     expect(res.status).toBe(200)
   })
 
+  it('suppress_email skips the per-diver email (group summary sent separately)', async () => {
+    const { deps, captured } = makeDeps()
+    const res = await handleRegistration(postJson({
+      ...goodBody,
+      email:    'g@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'tk',
+      group_id: 'grp-1',
+      suppress_email: true,
+    }), deps)
+    expect(res.status).toBe(200)
+    expect(captured.sendMailCalls).toEqual([])
+  })
+
   it('does not send a duplicate email to the company inbox when registrant === company', async () => {
     const { deps, captured } = makeDeps()
     await handleRegistration(postJson({

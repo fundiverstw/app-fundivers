@@ -121,10 +121,19 @@ describe('MultiRegisterForm parent diver picker', () => {
     // Submit
     await user.click(screen.getByRole('button', { name: /confirm/i }))
 
-    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2))
-    const bodies = invoke.mock.calls.map(c => (c[1] as { body: Record<string, unknown> }).body)
+    // Two create-registration calls plus one consolidated group summary.
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(3))
+    const regCalls = invoke.mock.calls.filter(c => c[0] === 'create-registration')
+    expect(regCalls).toHaveLength(2)
+    const bodies = regCalls.map(c => (c[1] as { body: Record<string, unknown> }).body)
     const e1Body = bodies.find(b => b.event_id === 'e1')!
     const e2Body = bodies.find(b => b.event_id === 'e2')!
+
+    // Per-diver emails suppressed; one group summary sent for the shared group.
+    expect(e1Body.suppress_email).toBe(true)
+    expect(e2Body.suppress_email).toBe(true)
+    const summaryCall = invoke.mock.calls.find(c => c[0] === 'send-group-summary')!
+    expect((summaryCall[1] as { body: { group_id: string } }).body.group_id).toBe(e1Body.group_id)
 
     expect(e1Body.target_user_id).toBe('c1')
     expect(e1Body.profile_patch).toEqual({})
