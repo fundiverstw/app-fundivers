@@ -234,6 +234,7 @@ function courseToEvents(c: EOCourse, priceIndex: Map<string, EOPrice>, addonIds:
     type: 'course' as const,
     title: c.display_title || c.admin_title || 'Course',
     calendar_title: c.calendar_title ?? null,
+    course_category: c.admin_title ?? null,
     start_time_hhmm: toHhmm(c.start_time),
     featured: false,
     fully_booked: c.fully_booked ?? false,
