@@ -99,6 +99,31 @@ describe('AdminLogisticsPage', () => {
     expect(within(due).getByText(/paid by Ada/i)).toBeInTheDocument()
   })
 
+  it('plans which vehicles carry the divers who need a ride', async () => {
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: bookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      if (table === 'vehicles') return mockQueryBuilder({ data: [
+        { id: 'v1', created_at: '', name: 'Delica', passenger_seats: 7, active: true, created_by: null },
+      ] })
+      return mockQueryBuilder({ data: [] })
+    })
+    renderPage()
+    await screen.findByText(/1 event · 2 divers/i)
+
+    // Only Ada needs a ride (Bo self-transports) → one Delica covers it.
+    const overall = screen.getByText(/^overall/i).closest('section')!
+    expect(within(overall).getByText(/Take 1 vehicle: Delica \(7\)/i)).toBeInTheDocument()
+    expect(within(overall).getByText(/7 seats for 1 rider/i)).toBeInTheDocument()
+  })
+
+  it('prompts to add vehicles when riders need a ride but the fleet is empty', async () => {
+    renderPage()
+    await screen.findByText(/1 event · 2 divers/i)
+    const overall = screen.getByText(/^overall/i).closest('section')!
+    expect(within(overall).getByText(/No vehicles in the fleet yet/i)).toBeInTheDocument()
+  })
+
   it('refetches for a different day when a day tab is clicked', async () => {
     const user = userEvent.setup()
     renderPage()

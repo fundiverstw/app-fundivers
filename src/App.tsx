@@ -54,6 +54,7 @@ import { AdminAccountingPage } from './pages/admin/AdminAccountingPage'
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage'
 import { AdminHistoryPage } from './pages/admin/AdminHistoryPage'
 import { AdminTripBoardPage } from './pages/admin/AdminTripBoardPage'
+import { AdminVehiclesPage } from './pages/admin/AdminVehiclesPage'
 
 // Public registration flow — /register (pick an event) and /register/:type/:id
 // (deep-link from Wix calendar) both render RegisterPage. Outside ProtectedRoute
@@ -144,6 +145,7 @@ export default function App() {
                 <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
                 <Route path="/admin/accounting" element={<AdminAccountingPage />} />
                 <Route path="/admin/trip-board" element={<AdminTripBoardPage />} />
+                <Route path="/admin/vehicles" element={<AdminVehiclesPage />} />
                 <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
                 <Route path="/admin/history" element={<AdminHistoryPage />} />
               </Route>

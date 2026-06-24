@@ -12,7 +12,10 @@ import { StaffDutyGroup, type StaffDutyRow } from '../../components/admin/StaffD
 import { CareGearGroup } from '../../components/admin/CareGearGroup'
 import { AddonSummaryGroup } from '../../components/admin/AddonSummaryGroup'
 import { PaymentsDueGroup } from '../../components/admin/PaymentsDueGroup'
-import type { AppEvent, Booking, BookingDetails, Credit, Duty, Payment, Profile } from '../../types/database'
+import { TransportFleetPlan } from '../../components/admin/TransportFleetPlan'
+import { fetchActiveVehicles } from '../../lib/vehicles'
+import { planFleet } from '../../lib/vehicle-planning'
+import type { AppEvent, Booking, BookingDetails, Credit, Duty, Payment, Profile, Vehicle } from '../../types/database'
 
 // Per-booking outstanding balance + the lead responsible for it (if covered).
 interface BookingBalanceRow { bal: BookingBalance; payerName: string | null }
@@ -40,6 +43,8 @@ export function AdminLogisticsPage() {
   const [addonTitles, setAddonTitles] = useState<Map<string, string>>(new Map())
   // booking id → outstanding balance, for the day's "who still owes" view.
   const [balances, setBalances] = useState<Map<string, BookingBalanceRow>>(new Map())
+  // The active transport fleet — loaded once; rides are planned against it.
+  const [vehicles, setVehicles] = useState<Vehicle[]>([])
 
   const todayKey = useMemo(
     () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }),
@@ -51,6 +56,18 @@ export function AdminLogisticsPage() {
     tab === 'today' ? todayKey
       : tab === 'tomorrow' ? tomorrowKey
         : otherDay
+
+  // Load the transport fleet once — it's the same across every day.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const v = await fetchActiveVehicles()
+        if (!cancelled) setVehicles(v)
+      } catch { /* fleet just won't be planned; logistics still works */ }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   // Populate the "Other day" dropdown with upcoming days that actually have
   // events, so the admin never picks a dead day.
@@ -217,6 +234,11 @@ export function AdminLogisticsPage() {
   // the shop's prep list sits next to gear + handle-with-care in the summary.
   const overallAddons = addonTotals(allRows, addonTitles)
   const transport = splitByTransport(allRows)
+  // One seat per staff member regardless of how many of the day's events they
+  // cover, so the ride count isn't double-counted.
+  const onDutyStaffCount = new Set(
+    (groups ?? []).flatMap(g => g.staff).map(s => s.profile?.id ?? s.dutyId),
+  ).size
   // Divers who still owe — for the whole-day summary and each event's list.
   const currency = (groups ?? [])[0]?.event.currency ?? 'TWD'
   const dueRowsFor = (rows: DiverGearRow[]) => rows.flatMap(r => {
@@ -231,11 +253,13 @@ export function AdminLogisticsPage() {
   })
   const dayDue = dueRowsFor(allRows)
   const dayOutstanding = dayDue.reduce((s, x) => s + x.amount, 0)
-  // One seat per staff member regardless of how many of the day's events they
-  // cover, so the ride count isn't double-counted.
-  const onDutyStaffCount = new Set(
-    (groups ?? []).flatMap(g => g.staff).map(s => s.profile?.id ?? s.dutyId),
-  ).size
+  // Ride plan: seat the divers who need a ride in the fewest vehicles, one
+  // on-duty staff driving each.
+  const fleetPlan = planFleet(
+    transport.needsRide.length,
+    vehicles.map(v => ({ name: v.name, passenger_seats: v.passenger_seats })),
+    onDutyStaffCount,
+  )
 
   const promptForDay = tab === 'other' && !otherDay
 
@@ -305,6 +329,9 @@ export function AdminLogisticsPage() {
                 {' · '}{transport.selfTransport.length} self-transport
                 {transport.unspecified.length > 0 && <> · {transport.unspecified.length} unspecified</>}
               </p>
+              {transport.needsRide.length > 0 && (
+                <TransportFleetPlan plan={fleetPlan} fleetSize={vehicles.length} availableDrivers={onDutyStaffCount} />
+              )}
             </div>
             <div className="space-y-1">
               <p className="text-xs font-semibold text-blue-900 uppercase tracking-wide">Gear to pack</p>

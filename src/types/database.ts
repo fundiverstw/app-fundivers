@@ -561,6 +561,26 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['partner_shops']['Insert']>
         Relationships: []
       }
+      vehicles: {
+        Row: {
+          id: string
+          created_at: string
+          name: string
+          passenger_seats: number
+          active: boolean
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          name: string
+          passenger_seats: number
+          active?: boolean
+          created_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['vehicles']['Insert']>
+        Relationships: []
+      }
       trips: {
         Row: {
           id: string
@@ -1288,6 +1308,10 @@ export type GasMix = typeof GAS_MIXES[number]
 
 export type DiveLog = Database['public']['Tables']['dive_logs']['Row']
 export type DiveLogInsert = Database['public']['Tables']['dive_logs']['Insert']
+
+// Transport fleet — shop vehicles for logistics ride planning
+export type Vehicle = Database['public']['Tables']['vehicles']['Row']
+export type VehicleInsert = Database['public']['Tables']['vehicles']['Insert']
 
 // Trip Board — partner referral network
 export type PartnerShop = Database['public']['Tables']['partner_shops']['Row']
