@@ -250,6 +250,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
             details,
             notes:         null,
             group_id:      groupId,
+            ...(cart.length > 1 ? { suppress_email: true } : {}),
             ...(targetForDiverId ? { target_user_id: targetForDiverId } : {}),
             ...(leadPays ? { payer_id: userId } : {}),
           },
@@ -299,6 +300,15 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
     setSubmitResults(results)
 
     if (successes.length === cart.length) {
+      // The per-booking emails were suppressed for a multi-booking group;
+      // send one consolidated group summary. Best-effort (bookings are done).
+      if (cart.length > 1) {
+        try {
+          await supabase.functions.invoke('send-group-summary', { body: { group_id: groupId } })
+        } catch (e) {
+          console.error('group summary email failed:', e)
+        }
+      }
       onAllBooked(successes)
       return
     }

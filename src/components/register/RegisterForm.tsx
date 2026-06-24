@@ -610,6 +610,18 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const depositNow     = depositFace + depositSurcharge      // pay deposit now (surcharge on the deposit only)
   const remainderLater = Math.max(0, subTotal - depositFace) // balance due later, no card surcharge
 
+  // Every diver in a single-event family submit gets the same booking details,
+  // so each booking's total is identical — the lead owes the per-diver figure
+  // times the number of divers. Surface that cumulative figure when the lead
+  // pays for the group; otherwise each diver is billed their own amount and the
+  // per-diver figures stand alone.
+  const groupCount       = 1 + additionalTargets.length
+  const showGroupTotals  = leadPays && groupCount > 1
+  const groupTotal       = total * groupCount
+  const groupFullNow     = fullNow * groupCount
+  const groupDepositNow  = depositNow * groupCount
+  const groupRemainder   = remainderLater * groupCount
+
   // Itemized breakdown of every charge that makes up `total`. Drives both the
   // on-screen summary and the snapshot written into details.charges, so what
   // the diver sees is exactly what gets frozen onto the booking.
@@ -805,7 +817,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           profile_patch: profilePatch,
           details,
           notes:         notes || null,
-          ...(groupId ? { group_id: groupId } : {}),
+          ...(groupId ? { group_id: groupId, suppress_email: true } : {}),
           ...(leadPays && leadPayerId ? { payer_id: leadPayerId } : {}),
         },
       },
@@ -873,7 +885,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               profile_patch:  {},
               details,
               notes:          notes || null,
-              ...(groupId ? { group_id: groupId } : {}),
+              ...(groupId ? { group_id: groupId, suppress_email: true } : {}),
               ...(leadPays && leadPayerId ? { payer_id: leadPayerId } : {}),
             },
           },
@@ -892,6 +904,17 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       }))
       setAdditionalResults(results)
       allOk = results.every(r => r.ok)
+    }
+
+    // Every booking in the group suppressed its own confirmation email; send
+    // one consolidated group summary instead. Best-effort — the bookings
+    // already succeeded, so a summary hiccup shouldn't fail the registration.
+    if (groupId && allOk) {
+      try {
+        await supabase.functions.invoke('send-group-summary', { body: { group_id: groupId } })
+      } catch (e) {
+        console.error('group summary email failed:', e)
+      }
     }
 
     setSaving(false)
@@ -1435,8 +1458,14 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           <div className="text-sm text-blue-950 font-medium bg-sky-50 rounded-lg p-3 space-y-1">
             {charges.map((c, i) => <Row key={`${c.kind}-${i}`} label={c.label} value={c.amount} currency={event.currency} />)}
             <div className="border-t border-sky-200 pt-1 mt-1">
-              <Row label="Total" value={total} currency={event.currency} bold />
+              <Row label={showGroupTotals ? 'Per diver' : 'Total'} value={total} currency={event.currency} bold />
             </div>
+            {showGroupTotals && (
+              <div className="border-t border-sky-200 pt-1 mt-1 space-y-0.5">
+                <Row label={`Group total (${groupCount} divers)`} value={groupTotal} currency={event.currency} bold />
+                <p className="text-xs text-blue-900/80">You're paying for the whole group — every diver shares these options.</p>
+              </div>
+            )}
           </div>
 
           {hasDeposit && (
@@ -1447,7 +1476,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 <span className="flex-1">
                   <span className="block">Pay full amount now</span>
                   <span className="block text-xs text-blue-950 font-medium">
-                    {event.currency} {fullNow.toLocaleString()} — settles your booking in one go.
+                    {event.currency} {(showGroupTotals ? groupFullNow : fullNow).toLocaleString()}
+                    {showGroupTotals ? ` — settles all ${groupCount} divers in one go.` : ' — settles your booking in one go.'}
                   </span>
                 </span>
               </label>
@@ -1456,7 +1486,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 <span className="flex-1">
                   <span className="block">Pay deposit only</span>
                   <span className="block text-xs text-blue-950 font-medium">
-                    {event.currency} {depositNow.toLocaleString()} now, remainder due before the trip.
+                    {event.currency} {(showGroupTotals ? groupDepositNow : depositNow).toLocaleString()} now, remainder due before the trip.
                   </span>
                 </span>
               </label>
@@ -1472,11 +1502,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               <div className="border-t border-sky-200 pt-1 mt-1 space-y-0.5">
                 <p>
                   Pay deposit <strong>ASAP</strong>:{' '}
-                  <strong>{event.currency} {depositNow.toLocaleString()}</strong>
+                  <strong>{event.currency} {(showGroupTotals ? groupDepositNow : depositNow).toLocaleString()}</strong>
+                  {showGroupTotals && ` (whole group, ${groupCount} divers)`}
                 </p>
                 <p>
                   Pay remaining balance by {formatDeadline(fullPaymentDeadline)}:{' '}
-                  <strong>{event.currency} {remainderLater.toLocaleString()}</strong>
+                  <strong>{event.currency} {(showGroupTotals ? groupRemainder : remainderLater).toLocaleString()}</strong>
                 </p>
               </div>
             )}
@@ -1508,7 +1539,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           {!isEdit && (
             <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded p-2">
               Please note: your reservation is not confirmed until the deposit
-              {event.deposit_amount != null && ` (${event.currency} ${depositNow.toLocaleString()})`} has been paid.
+              {event.deposit_amount != null && ` (${event.currency} ${(showGroupTotals ? groupDepositNow : depositNow).toLocaleString()}${showGroupTotals ? ` for all ${groupCount} divers` : ''})`} has been paid.
             </p>
           )}
 

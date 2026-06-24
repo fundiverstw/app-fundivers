@@ -55,6 +55,11 @@ export interface RegistrationBody {
   details:       Record<string, unknown>
   notes?:        string | null
   group_id?:     string
+  // Set by the client when this booking is one of several submitted
+  // together as a group. The per-diver confirmation email is skipped —
+  // the client follows up with a single consolidated group summary via
+  // send-group-summary, so the group gets one email, not N.
+  suppress_email?: boolean
   // The lead booker paying for this booking, when the group opted into a
   // single payer. Must be the registrant themselves or the authenticated
   // caller (a parent registering a child). Ignored on the guest path. The
@@ -534,8 +539,9 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     cancellationPolicyAckedAt,
   }
 
-  // 4. Email — optional. transporter=null skips entirely.
-  if (deps.transporter) {
+  // 4. Email — optional. transporter=null skips entirely; suppress_email
+  //    skips for grouped bookings (a single group summary is sent instead).
+  if (deps.transporter && !body.suppress_email) {
     try {
       const subjectName = payload.nickname
         ? `${payload.name} (${payload.nickname})`

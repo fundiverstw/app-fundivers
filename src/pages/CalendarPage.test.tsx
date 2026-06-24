@@ -60,6 +60,7 @@ function buildEvent(overrides: Partial<AppEvent> = {}): AppEvent {
     id: overrides.id ?? 'dive_a1',
     type: overrides.type ?? 'dive',
     title: overrides.title ?? 'Green Island Dive',
+    course_category: overrides.course_category,
     start_time: overrides.start_time ?? future(),
     end_time: overrides.end_time ?? null,
     featured: overrides.featured ?? false,
@@ -200,8 +201,8 @@ describe('CalendarPage', () => {
 
   it('course popover filters by category (OW / AOW)', async () => {
     fetchEventsInRange.mockResolvedValue([
-      buildEvent({ id: 'ow_1', type: 'course', title: 'Open Water Course' }),
-      buildEvent({ id: 'aow_1', type: 'course', title: 'Advanced Open Water' }),
+      buildEvent({ id: 'ow_1', type: 'course', title: 'Open Water Course', course_category: 'OW' }),
+      buildEvent({ id: 'aow_1', type: 'course', title: 'Advanced Open Water', course_category: 'AOW' }),
     ])
     setupBookings([])
     const user = userEvent.setup()
@@ -222,10 +223,11 @@ describe('CalendarPage', () => {
     expect(owChip).toBeChecked()
     expect(aowChip).toBeChecked()
 
-    // Uncheck OW → OW event disappears from the calendar bar and list row.
-    // Only the popover's own "Open Water Course" label remains.
+    // Uncheck OW → the OW event disappears from the calendar bar and list
+    // row. The popover labels by category ("OW"), not the diver-facing title,
+    // so "Open Water Course" is gone entirely.
     await user.click(owChip)
-    expect(screen.getAllByText('Open Water Course')).toHaveLength(1)
+    expect(screen.queryByText('Open Water Course')).not.toBeInTheDocument()
     expect(screen.getAllByText('Advanced Open Water').length).toBeGreaterThanOrEqual(2)
 
     // Popover still open, AOW still checked
@@ -288,12 +290,19 @@ describe('CalendarPage', () => {
     await user.click(within(dialog).getByRole('button', { name: /next/i }))                    // step 3 → 4
     await user.click(within(dialog).getByRole('button', { name: /confirm 2 bookings/i }))      // submit
 
-    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2))
-    const firstBody  = (invoke.mock.calls[0][1] as { body: Record<string, unknown> }).body
-    const secondBody = (invoke.mock.calls[1][1] as { body: Record<string, unknown> }).body
+    // Two create-registration calls (one per cart event) plus one
+    // consolidated group summary now that the cart is a multi-booking group.
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(3))
+    const regCalls = invoke.mock.calls.filter(c => c[0] === 'create-registration')
+    expect(regCalls).toHaveLength(2)
+    const firstBody  = (regCalls[0][1] as { body: Record<string, unknown> }).body
+    const secondBody = (regCalls[1][1] as { body: Record<string, unknown> }).body
     // Both calls share the same group_id — that's the whole point of the cart.
     expect(firstBody.group_id).toBeDefined()
     expect(firstBody.group_id).toEqual(secondBody.group_id)
     expect([firstBody.event_id, secondBody.event_id].sort()).toEqual(['dive_aa', 'dive_bb'])
+    // The group summary targets that shared group_id.
+    const summaryCall = invoke.mock.calls.find(c => c[0] === 'send-group-summary')!
+    expect((summaryCall[1] as { body: { group_id: string } }).body.group_id).toEqual(firstBody.group_id)
   })
 })

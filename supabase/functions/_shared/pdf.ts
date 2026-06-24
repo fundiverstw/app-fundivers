@@ -399,6 +399,214 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   return dataUri.split(",")[1]
 }
 
+// ── Consolidated group registration PDF ──────────────────────────────
+// One PDF for a whole group submitted together (a parent paying for the
+// family, or one diver across several events). Each booking is a column;
+// a left column carries the field labels; two divers fit per page, and
+// 3+ paginate two-at-a-time. A group-total band sums what the lead owes.
+
+export interface GroupDiverColumn {
+  name: string
+  nickname: string | null
+  eventTitle: string
+  dateStr: string | null
+  dob: string | null
+  nationality: string | null
+  certLevel: string | null
+  certOrg: string | null
+  nitrox: boolean
+  /** Pre-formatted gear label (e.g. "Own", "A-la-carte x2 days", "Included"). */
+  gearLabel: string
+  /** Pre-formatted transportation label. */
+  ride: string
+  room: string | null
+  addons: string[]
+  /** Booking status — pending / waitlisted / confirmed. */
+  status: string
+  deposit: number | null
+  total: number | null
+}
+
+export interface GroupRegistrationPdfPayload {
+  /** Lead booker the summary is addressed to. */
+  generatedFor: string
+  leadEmail: string
+  /** Raw payment method (bank_transfer | credit_card | paypal | cash). */
+  paymentMethod: string
+  creditCardInvoiceEmail: string | null
+  /** Sum of every booking's total — what the lead owes for the group. */
+  groupTotal: number
+  /** Sum of every booking's deposit, when all carry one. */
+  groupDeposit: number | null
+  fullPaymentDeadline: string | null
+  divers: GroupDiverColumn[]
+}
+
+const GROUP_FIELDS: Array<{ label: string; get: (d: GroupDiverColumn) => string }> = [
+  { label: "Event",         get: d => d.eventTitle },
+  { label: "Date",          get: d => d.dateStr ?? "" },
+  { label: "Name",          get: d => d.name },
+  { label: "Nickname",      get: d => d.nickname ?? "" },
+  { label: "Date of birth", get: d => d.dob ?? "" },
+  { label: "Nationality",   get: d => d.nationality ?? "" },
+  { label: "Cert level",    get: d => d.certLevel ?? "" },
+  { label: "Cert org",      get: d => d.certOrg ?? "" },
+  { label: "Nitrox",        get: d => d.nitrox ? "Yes" : "" },
+  { label: "Gear",          get: d => d.gearLabel },
+  { label: "Transport",     get: d => d.ride },
+  { label: "Room",          get: d => d.room ?? "" },
+  { label: "Add-ons",       get: d => d.addons.join(", ") },
+  { label: "Status",        get: d => d.status },
+  { label: "Deposit (NTD)", get: d => d.deposit != null ? String(d.deposit) : "" },
+  { label: "Total (NTD)",   get: d => d.total != null ? String(d.total) : "" },
+]
+
+const GROUP_LABEL_X = ML + 2
+
+// Column x-anchors + wrap widths for the 1- or 2-diver case on a page.
+function groupColumns(n: number): Array<{ x: number; w: number }> {
+  if (n <= 1) return [{ x: 60, w: MR - 60 }]
+  return [{ x: 55, w: 66 }, { x: 128, w: MR - 128 }]
+}
+
+function groupRow(
+  doc: jsPDF, y: number, label: string, values: string[],
+  cols: Array<{ x: number; w: number }>, altState: { alt: boolean },
+): number {
+  const wraps = values.map((v, i) => doc.splitTextToSize(v || "—", cols[i].w))
+  const maxLines = Math.max(1, ...wraps.map(w => w.length))
+  const blockH = 6 + (maxLines - 1) * 4
+  doc.setFillColor(...(altState.alt ? C.oceanBg : C.white))
+  doc.rect(0, y - 4.5, 210, blockH, "F")
+  altState.alt = !altState.alt
+  doc.setFontSize(8)
+  doc.setFont("helvetica", "normal")
+  doc.setTextColor(...C.gray)
+  doc.text(label, GROUP_LABEL_X, y)
+  doc.setFont("helvetica", "bold")
+  doc.setTextColor(...C.dark)
+  wraps.forEach((w, i) => { for (let l = 0; l < w.length; l++) doc.text(w[l], cols[i].x, y + l * 4) })
+  return y + blockH
+}
+
+export async function buildGroupPdfBase64(p: GroupRegistrationPdfPayload): Promise<string> {
+  const doc = new jsPDF({ unit: "mm", format: "a4" })
+
+  const logo = await loadLogoDataUrl()
+  let y = 8
+  doc.setFontSize(7.5)
+  doc.setFont("helvetica", "normal")
+  doc.setTextColor(...C.gray)
+  doc.text("Generated: " + formatGeneratedDate(), MR, y, { align: "right" })
+  y += 5
+  if (logo) {
+    try {
+      const props = doc.getImageProperties(logo.dataUrl)
+      const maxW = 50, maxH = 24
+      const ratio = props.width / props.height
+      let logoW = maxW, logoH = maxW / ratio
+      if (logoH > maxH) { logoH = maxH; logoW = maxH * ratio }
+      doc.addImage(logo.dataUrl, logo.format, (210 - logoW) / 2, y, logoW, logoH)
+      y += logoH + 3
+    } catch { y += 4 }
+  }
+  doc.setFontSize(16)
+  doc.setFont("helvetica", "bold")
+  doc.setTextColor(...C.ocean)
+  doc.text("Group Registration", 105, y, { align: "center" })
+  y += 4
+  doc.setFontSize(8.5)
+  doc.setFont("helvetica", "normal")
+  doc.setTextColor(...C.gray)
+  doc.text(`Paid by ${p.generatedFor} · ${p.divers.length} divers`, 105, y + 4, { align: "center" })
+  y += 8
+  doc.setDrawColor(...C.ocean)
+  doc.setLineWidth(0.5)
+  doc.line(ML, y, MR, y)
+  y += 6
+
+  // Two divers per page. Each chunk renders its own header band + the
+  // full field list, so a column never splits across a page.
+  for (let i = 0; i < p.divers.length; i += 2) {
+    const chunk = p.divers.slice(i, i + 2)
+    const cols = groupColumns(chunk.length)
+    if (i > 0) { doc.addPage(); y = 18 }
+
+    doc.setFillColor(...C.ocean)
+    doc.rect(0, y, 210, 8, "F")
+    doc.setTextColor(...C.white)
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(8.5)
+    chunk.forEach((d, c) => doc.text(`Diver ${i + c + 1}`, cols[c].x, y + 5.5))
+    doc.text(`DIVERS ${i + 1}–${i + chunk.length}`, GROUP_LABEL_X, y + 5.5)
+    doc.setFont("helvetica", "normal")
+    doc.setTextColor(...C.dark)
+    y += 11
+
+    const altState = { alt: false }
+    for (const f of GROUP_FIELDS) {
+      y = groupRow(doc, y, f.label, chunk.map(f.get), cols, altState)
+    }
+    y += 4
+  }
+
+  // Group total band.
+  y = ensureY(doc, y, 14)
+  doc.setFillColor(...C.oceanLight)
+  doc.rect(0, y - 5, 210, 10, "F")
+  doc.setFontSize(9)
+  doc.setFont("helvetica", "bold")
+  doc.setTextColor(...C.ocean)
+  doc.text(`Group total (${p.divers.length} divers) (NTD)`, GROUP_LABEL_X, y + 1)
+  doc.setFontSize(13)
+  doc.text(String(p.groupTotal), 130, y + 1)
+  y += 10
+
+  // How to pay — the group shares one payment method (the lead settles once).
+  const instr = paymentInstructionsFor(p.paymentMethod, {
+    invoiceEmail: p.creditCardInvoiceEmail ?? p.leadEmail,
+  })
+  if (instr) {
+    y += 4
+    y = section(doc, y, instr.title)
+    doc.setFontSize(8.5)
+    doc.setFont("helvetica", "normal")
+    doc.setTextColor(...C.dark)
+    for (const line of instr.lines) {
+      for (const w of doc.splitTextToSize(line, MR - ML - 2)) {
+        y = ensureY(doc, y, 6)
+        doc.text(w, ML + 2, y)
+        y += 4.5
+      }
+    }
+  }
+
+  const reminder = paymentConfirmationReminder()
+  y += 6
+  y = section(doc, y, reminder.title)
+  doc.setFontSize(8.5)
+  doc.setFont("helvetica", "normal")
+  doc.setTextColor(...C.dark)
+  for (const line of reminder.lines) {
+    for (const w of doc.splitTextToSize(line, MR - ML - 2)) {
+      y = ensureY(doc, y, 6)
+      doc.text(w, ML + 2, y)
+      y += 4.5
+    }
+  }
+
+  y += 4
+  y = ensureY(doc, y, 8)
+  doc.setFont("helvetica", "normal")
+  const summary = p.fullPaymentDeadline
+    ? `Pay deposit ASAP to hold the group's spots. Pay the remaining balance by ${formatDeadlineLong(p.fullPaymentDeadline)} to complete the registration.`
+    : `Pay deposit ASAP to hold the group's spots. Pay the remaining balance to complete the registration.`
+  for (const line of doc.splitTextToSize(summary, MR - ML - 2)) { doc.text(line, ML + 2, y); y += 4.5 }
+
+  const dataUri = doc.output("datauristring")
+  return dataUri.split(",")[1]
+}
+
 // Render a YYYY-MM-DD string as 'EEE, MMM d' (e.g. 'Sat, May 1') without
 // pulling in date-fns on the edge runtime. Falls back to the raw string
 // when input is null/empty.

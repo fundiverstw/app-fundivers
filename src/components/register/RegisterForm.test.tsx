@@ -1245,8 +1245,11 @@ describe('RegisterForm', () => {
       await user.click(screen.getByRole('button', { name: /next/i }))
       await user.click(screen.getByRole('button', { name: /confirm booking/i }))
 
-      await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2))
-      const bodies = invoke.mock.calls.map(c => (c[1] as { body: Record<string, unknown> }).body)
+      // Two create-registration calls (self + child) plus one group summary.
+      await waitFor(() => expect(invoke).toHaveBeenCalledTimes(3))
+      const regCalls = invoke.mock.calls.filter(c => c[0] === 'create-registration')
+      expect(regCalls).toHaveLength(2)
+      const bodies = regCalls.map(c => (c[1] as { body: Record<string, unknown> }).body)
       const selfBody  = bodies.find(b => !b.target_user_id)
       const childBody = bodies.find(b => b.target_user_id === 'child-1')
 
@@ -1259,12 +1262,42 @@ describe('RegisterForm', () => {
       // as payer (the lead's own booking included, so the rollup covers it).
       expect(selfBody?.payer_id).toBe('u1')
       expect(childBody?.payer_id).toBe('u1')
+      // Per-diver emails suppressed; one consolidated group summary follows.
+      expect(selfBody?.suppress_email).toBe(true)
+      expect(childBody?.suppress_email).toBe(true)
+      const summaryCall = invoke.mock.calls.find(c => c[0] === 'send-group-summary')!
+      expect((summaryCall[1] as { body: { group_id: string } }).body.group_id).toBe(selfBody?.group_id)
       // Child's call carries an empty patch (don't overwrite the child's profile).
       expect(childBody?.profile_patch).toEqual({})
       // Self's call carries the parent's typed-in name.
       expect((selfBody?.profile_patch as Record<string, unknown>).name).toBe('Ada')
 
       expect(onBooked).toHaveBeenCalled()
+    })
+
+    it('shows the cumulative group total when the lead pays for everyone', async () => {
+      setupFromWithChildren([childProfile])
+      const user = userEvent.setup()
+      render(
+        <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+          onClose={() => {}} onBooked={() => {}} />
+      )
+      await waitFor(() => expect(screen.getByText(/who is this booking for/i)).toBeInTheDocument())
+      // Myself + one child = 2 divers; "I'll pay for everyone" defaults on.
+      await user.click(screen.getByRole('checkbox', { name: /bee junior/i }))
+      await user.click(screen.getByRole('button', { name: /continue/i }))
+
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+      await user.click(screen.getByLabelText(/i have all the required gear/i))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+
+      // Per-diver price is the 2,800 event fee; the group total doubles it.
+      const perDiver = screen.getByText('Per diver').closest('div')!
+      expect(perDiver).toHaveTextContent('TWD 2,800')
+      const groupRow = screen.getByText(/group total \(2 divers\)/i).closest('div')!
+      expect(groupRow).toHaveTextContent('TWD 5,600')
     })
 
     it('surfaces per-diver results when an additional child call fails', async () => {

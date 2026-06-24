@@ -136,7 +136,8 @@ The form does **not** write to `bookings` directly. It invokes the
      [data-model.md § BookingDetails](./data-model.md#bookingdetails-jsonb-shape)
      (`total`, `deposit`, and the itemized `charges` are snapshots).
 4. Builds a registration PDF (`supabase/functions/_shared/pdf.ts`) and
-   sends it via Gmail SMTP to `fundiverstw@gmail.com` and the diver.
+   sends it via Gmail SMTP to `fundiverstw@gmail.com` and the diver —
+   unless `suppress_email` is set (group registration; see below).
 5. Returns `{ booking_id, session? }` — `session` populated on the
    guest path so the SPA can `setSession()` without a second
    round-trip.
@@ -147,6 +148,33 @@ the just-created auth user so the diver can retry cleanly.
 The **admin edit path** (`existingBooking` set) skips the edge
 function and updates `bookings.notes` / `bookings.details` directly
 under the admin's RLS — no PDF, no account creation.
+
+### Group registrations — one consolidated PDF
+
+When a parent registers several divers together (the single-event
+family picker in `RegisterForm`, or the multi-event cart in
+`MultiRegisterForm`), every booking still goes through its own
+`create-registration` call and shares a `group_id`. The difference is
+email: each grouped call passes `suppress_email: true`, so
+`create-registration` creates the booking but sends **no** per-diver
+PDF. Once all the bookings land, the client calls
+`send-group-summary` once with the shared `group_id`.
+
+`send-group-summary`
+(`supabase/functions/send-group-summary/handler.ts`) authorizes the
+caller (must be a booked diver or the group's `payer_id`), reads every
+booking in the group, and builds **one** consolidated PDF
+(`buildGroupPdfBase64` in `_shared/pdf.ts`): a left column of field
+labels plus one column per diver, two divers to a page, with a
+group-total band summing every booking's `details.total`. It emails
+that single PDF to the shop and the lead — N divers, one email each
+way, instead of N separate PDFs. Solo registrations (one booking) are
+unchanged: they still get the per-diver `buildPdfBase64` PDF.
+
+This is why the **cost summary** on `RegisterForm`'s payment step shows
+a *group total* (per-diver figure × diver count) when the lead pays for
+everyone: each sibling booking carries the same per-diver `total`, so
+what the lead owes is the sum.
 
 The unique indexes `bookings_user_dive_uniq` /
 `bookings_user_course_uniq` prevent a diver from double-booking the
