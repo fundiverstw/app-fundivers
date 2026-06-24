@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { fetchEventsForBookings, fetchEventsInRange, formatEventSpan } from '../lib/events'
 import { RegisterFormBody } from '../components/register/RegisterForm'
+import { WhatHappensNext } from '../components/register/WhatHappensNext'
 import { Logo } from '../components/Logo'
 import type { AppEvent, Booking } from '../types/database'
 
@@ -180,14 +181,12 @@ function LockedConfirmation({ event, booking, alreadyExisting = false }: { event
         <p className="text-xs text-blue-950 font-medium uppercase tracking-wider mb-1">Status</p>
         <p className="capitalize">{booking.status}</p>
       </div>
-      {isWaitlisted ? (
-        <p className="text-xs text-blue-950 font-medium">
-          We'll send you a push notification and an email if a spot opens up. You'll have 24 hours to accept before the offer rolls to the next person on the list.
-        </p>
-      ) : (
+      {alreadyExisting ? (
         <p className="text-xs text-blue-950 font-medium">
           Sign in any time at <a href="https://app.fundiverstw.com" className="text-blue-700 hover:underline">app.fundiverstw.com</a> to track your booking and payment status.
         </p>
+      ) : (
+        <WhatHappensNext waitlisted={isWaitlisted} />
       )}
       <Link to="/records/bookings" className="inline-block bg-blue-900 hover:bg-blue-950 text-white font-semibold px-5 py-2 rounded-lg">
         View my bookings

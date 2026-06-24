@@ -889,12 +889,13 @@ describe('RegisterForm', () => {
     expect(screen.getByText(/909-083-683/)).toBeInTheDocument()
   })
 
-  it('step 4 always shows the "After you pay" reminder naming all three contact channels, regardless of method', async () => {
+  it('offloads the post-payment reminder off step 4 into a post-submit "What happens next" panel', async () => {
     setupFrom()
     const user = userEvent.setup()
+    const onBooked = vi.fn()
     render(
       <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
-        onClose={() => {}} onBooked={() => {}} />
+        onClose={() => {}} onBooked={onBooked} inlineConfirmation />
     )
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
@@ -902,24 +903,22 @@ describe('RegisterForm', () => {
     await user.click(screen.getByLabelText(/i have all the required gear/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
-    const expectReminder = () => {
-      expect(screen.getByText(/after you pay/i)).toBeInTheDocument()
-      const reminder = screen.getByText(/contact FunDivers by email, LINE, or WhatsApp/i)
-      expect(reminder).toBeInTheDocument()
-      expect(screen.getByText(/fundivers tw app/i)).toBeInTheDocument()
-    }
+    // The verbose reminder no longer clutters the payment step…
+    expect(screen.queryByText(/after you pay/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/reservation is not confirmed/i)).not.toBeInTheDocument()
+    // …but the actionable payment instructions stay (the diver pays from here).
+    expect(screen.getByText(/how to pay/i)).toBeInTheDocument()
 
-    // Default = bank_transfer
-    expectReminder()
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
 
-    await user.click(screen.getByLabelText(/^paypal/i))
-    expectReminder()
+    // After submit: the "What happens next" panel with the spam-folder nudge,
+    // and onBooked is deferred until the diver taps Done.
+    expect(await screen.findByText(/what happens next/i)).toBeInTheDocument()
+    expect(screen.getByText(/spam or junk folder/i)).toBeInTheDocument()
+    expect(onBooked).not.toHaveBeenCalled()
 
-    await user.click(screen.getByLabelText(/credit card/i))
-    expectReminder()
-
-    await user.click(screen.getByLabelText(/^cash/i))
-    expectReminder()
+    await user.click(screen.getByRole('button', { name: /^done$/i }))
+    expect(onBooked).toHaveBeenCalledWith({ id: expect.any(String), status: 'pending' })
   })
 
   it('shows the admin-set deadline summary on step 4 and hides the deposit-only block when paying full', async () => {
