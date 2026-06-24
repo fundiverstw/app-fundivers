@@ -3,12 +3,19 @@ import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { fetchEventsInRange, fetchUpcomingEventDays, formatEventSpan } from '../../lib/events'
 import { gearTotals, splitByTransport, dayKeyOffset, careTotals, isCareGearItem, addonTotals } from '../../lib/logistics'
+import { bookingBalance, type BookingBalance } from '../../lib/booking-balance'
+import { openCreditForBooking } from '../../lib/credits'
+import { personName } from '../../lib/names'
 import { DiverGearCard, type DiverGearRow } from '../../components/admin/DiverGearCard'
 import { TransportGroup } from '../../components/admin/TransportGroup'
 import { StaffDutyGroup, type StaffDutyRow } from '../../components/admin/StaffDutyGroup'
 import { CareGearGroup } from '../../components/admin/CareGearGroup'
 import { AddonSummaryGroup } from '../../components/admin/AddonSummaryGroup'
-import type { AppEvent, Booking, BookingDetails, Duty, Profile } from '../../types/database'
+import { PaymentsDueGroup } from '../../components/admin/PaymentsDueGroup'
+import type { AppEvent, Booking, BookingDetails, Credit, Duty, Payment, Profile } from '../../types/database'
+
+// Per-booking outstanding balance + the lead responsible for it (if covered).
+interface BookingBalanceRow { bal: BookingBalance; payerName: string | null }
 
 interface EventGroup {
   event: AppEvent
@@ -31,6 +38,8 @@ export function AdminLogisticsPage() {
   // add-on _id → catalog title, for classifying "handle with care" rentals
   // (dive lights, cameras) that have no category column.
   const [addonTitles, setAddonTitles] = useState<Map<string, string>>(new Map())
+  // booking id → outstanding balance, for the day's "who still owes" view.
+  const [balances, setBalances] = useState<Map<string, BookingBalanceRow>>(new Map())
 
   const todayKey = useMemo(
     () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }),
@@ -117,12 +126,47 @@ export function AdminLogisticsPage() {
 
       const userIds = [...new Set([
         ...bookings.map(b => b.user_id),
+        // Lead payers may not themselves be booked that day, but we still need
+        // their name for "paid by …" on a covered diver's balance.
+        ...bookings.map(b => b.payer_id).filter((x): x is string => !!x),
         ...duties.map(d => d.assignee_id),
       ])]
-      const profsRes = userIds.length
-        ? await supabase.from('profiles').select('*').in('id', userIds)
-        : { data: [] as Profile[] }
+      const bookingIds = bookings.map(b => b.id)
+      const [profsRes, paymentsRes, creditsRes] = await Promise.all([
+        userIds.length
+          ? supabase.from('profiles').select('*').in('id', userIds)
+          : Promise.resolve({ data: [] as Profile[] }),
+        bookingIds.length
+          ? supabase.from('payments').select('*').in('booking_id', bookingIds)
+          : Promise.resolve({ data: [] as Payment[] }),
+        userIds.length
+          ? supabase.from('credits').select('*').in('user_id', userIds).eq('status', 'open')
+          : Promise.resolve({ data: [] as Credit[] }),
+      ])
+      if (cancelled) return
       const profMap = new Map((profsRes.data ?? []).map(p => [p.id, p]))
+
+      // Per-booking "what's still owed" — total minus paid payments and any
+      // open credit, mirroring the event page's Amount-owed math so the two
+      // never disagree. A covered booking keeps its own balance but notes the
+      // lead who's responsible for it.
+      const paidByBooking = new Map<string, number>()
+      for (const p of (paymentsRes.data ?? []) as Payment[]) {
+        if (!p.booking_id || p.status !== 'paid') continue
+        paidByBooking.set(p.booking_id, (paidByBooking.get(p.booking_id) ?? 0) + p.amount)
+      }
+      const credits = (creditsRes.data ?? []) as Credit[]
+      const balByBooking = new Map<string, BookingBalanceRow>()
+      for (const b of bookings) {
+        const owed = Number((b.details as BookingDetails | undefined)?.total ?? 0)
+        const paid = paidByBooking.get(b.id) ?? 0
+        const payerName = (b.payer_id && b.payer_id !== b.user_id)
+          ? (personName(profMap.get(b.payer_id)?.name, profMap.get(b.payer_id)?.nickname) || '(lead booker)')
+          : null
+        balByBooking.set(b.id, { bal: bookingBalance(owed, paid, openCreditForBooking(credits, b.id)), payerName })
+      }
+      if (cancelled) return
+      setBalances(balByBooking)
 
       const byEvent = new Map<string, DiverGearRow[]>()
       for (const b of bookings) {
@@ -173,6 +217,20 @@ export function AdminLogisticsPage() {
   // the shop's prep list sits next to gear + handle-with-care in the summary.
   const overallAddons = addonTotals(allRows, addonTitles)
   const transport = splitByTransport(allRows)
+  // Divers who still owe — for the whole-day summary and each event's list.
+  const currency = (groups ?? [])[0]?.event.currency ?? 'TWD'
+  const dueRowsFor = (rows: DiverGearRow[]) => rows.flatMap(r => {
+    const e = balances.get(r.booking.id)
+    if (!e || e.bal.state !== 'due') return []
+    return [{
+      bookingId: r.booking.id,
+      name: personName(r.profile?.name, r.profile?.nickname) || '(no profile)',
+      amount: e.bal.amount,
+      payerName: e.payerName,
+    }]
+  })
+  const dayDue = dueRowsFor(allRows)
+  const dayOutstanding = dayDue.reduce((s, x) => s + x.amount, 0)
   // One seat per staff member regardless of how many of the day's events they
   // cover, so the ride count isn't double-counted.
   const onDutyStaffCount = new Set(
@@ -225,6 +283,18 @@ export function AdminLogisticsPage() {
             <p className="text-sm text-blue-900 font-medium">
               {groups.length} event{groups.length === 1 ? '' : 's'} · {allRows.length} diver{allRows.length === 1 ? '' : 's'}
             </p>
+            {allRows.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-blue-900 uppercase tracking-wide">Payments</p>
+                {dayOutstanding > 0 ? (
+                  <p className="text-sm font-semibold text-red-600">
+                    {dayDue.length} diver{dayDue.length === 1 ? '' : 's'} still owe · {currency} {dayOutstanding.toLocaleString()} outstanding
+                  </p>
+                ) : (
+                  <p className="text-sm text-blue-900 font-medium">All settled.</p>
+                )}
+              </div>
+            )}
             <div className="space-y-1">
               <p className="text-xs font-semibold text-blue-900 uppercase tracking-wide">Transportation</p>
               <p className="text-sm text-blue-900 font-medium">
@@ -290,6 +360,7 @@ export function AdminLogisticsPage() {
               <StaffDutyGroup rows={g.staff} />
               <CareGearGroup rows={careTotals(g.rows, addonTitles)} />
               <AddonSummaryGroup rows={addonTotals(g.rows, addonTitles)} />
+              <PaymentsDueGroup rows={dueRowsFor(g.rows)} currency={currency} />
               {g.rows.length === 0 ? (
                 <p className="text-xs text-blue-950/70 font-medium italic pl-1">No active registrants.</p>
               ) : (

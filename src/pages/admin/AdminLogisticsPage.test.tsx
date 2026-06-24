@@ -65,6 +65,40 @@ describe('AdminLogisticsPage', () => {
     expect(screen.getByRole('group', { name: /needs ride/i })).toBeInTheDocument()
   })
 
+  it('shows who still owes for the day — overall total plus a per-event list, covered divers flagged', async () => {
+    const payBookings = [
+      // Ada owes her full 3,200 (no payments); pays for herself.
+      { id: 'b1', user_id: 'u1', payer_id: 'u1', eo_dive_id: 'e1', eo_course_id: null, status: 'pending',
+        details: { transportation: false, gear: { rent: false }, total: 3200 } },
+      // Bo's 2,800 is covered by the lead (Ada); 1,000 paid → 1,800 still due.
+      { id: 'b2', user_id: 'u2', payer_id: 'u1', eo_dive_id: 'e1', eo_course_id: null, status: 'pending',
+        details: { transportation: false, gear: { rent: false }, total: 2800 } },
+    ]
+    const payments = [{ id: 'p1', booking_id: 'b2', amount: 1000, status: 'paid' }]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: payBookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      if (table === 'payments') return mockQueryBuilder({ data: payments })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    renderPage()
+    await screen.findByText(/1 event · 2 divers/i)
+
+    // Overall summary: both owe, 3,200 + 1,800 = 5,000 outstanding.
+    const overall = screen.getByText(/^overall/i).closest('section')!
+    expect(within(overall).getByText(/2 divers still owe/i)).toBeInTheDocument()
+    expect(within(overall).getByText(/5,000 outstanding/i)).toBeInTheDocument()
+
+    // Per-event "Payments due": each diver, their amount, and the lead on the
+    // hook for the covered one.
+    const due = screen.getByRole('group', { name: /payments due/i })
+    expect(within(due).getByText(/Bo/)).toBeInTheDocument()
+    expect(within(due).getByText(/3,200 due/)).toBeInTheDocument()
+    expect(within(due).getByText(/1,800 due/)).toBeInTheDocument()
+    expect(within(due).getByText(/paid by Ada/i)).toBeInTheDocument()
+  })
+
   it('refetches for a different day when a day tab is clicked', async () => {
     const user = userEvent.setup()
     renderPage()
