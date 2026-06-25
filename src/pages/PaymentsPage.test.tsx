@@ -133,6 +133,30 @@ describe('PaymentsPage', () => {
     await waitFor(() => expect(toastSuccess).toHaveBeenCalled())
   })
 
+  it('offers a top-level button to apply account credit across due balances', async () => {
+    const bookings = [
+      { id: 'b1', user_id: 'u1', eo_dive_id: 'd1', eo_course_id: null, status: 'pending', notes: null, created_at: new Date(Date.now() - 2000).toISOString(), details: { total: 3000 } },
+    ]
+    const credits = [
+      { id: 'c1', user_id: 'u1', booking_id: null, amount: 2000, currency: 'TWD', reason: 'Cancelled trip', status: 'open', created_by: null, created_at: new Date().toISOString(), settled_at: null, settled_note: null },
+    ]
+    setupFrom(bookings, [], credits)
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['d1', event({ id: 'd1', type: 'dive', title: 'Dive A', price: 3000 })],
+    ]))
+    rpc.mockResolvedValue({ data: 2000, error: null })
+
+    const user = userEvent.setup()
+    renderWithRouter(<PaymentsPage />)
+
+    // The banner surfaces the apply action without expanding any card.
+    const useBtn = await screen.findByRole('button', { name: /use .* credit on your balance/i })
+    await user.click(useBtn)
+
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('apply_credit_to_booking', { p_booking_id: 'b1', p_amount: 3000 }))
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalled())
+  })
+
   it('rolls a lead booker\'s family group into one consolidated balance', async () => {
     // u1 (parent) pays for their own booking + their child's; both payer_id=u1.
     const bookings = [

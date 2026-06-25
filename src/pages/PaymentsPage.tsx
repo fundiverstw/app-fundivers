@@ -65,6 +65,7 @@ export function PaymentsPage() {
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [applying, setApplying] = useState<string | null>(null)
+  const [applyingAll, setApplyingAll] = useState(false)
 
   async function refetch(uid: string) {
     // Fetch both the diver's own bookings AND any the diver pays for as the
@@ -176,6 +177,31 @@ export function PaymentsPage() {
     }
   }
 
+  // One-tap spend of the diver's spendable credit across their own due
+  // bookings, oldest first. Each RPC call settles credit rows server-side, so
+  // awaiting them in sequence lets the pool drain accurately without a refetch
+  // between calls — the next call only takes what's still open.
+  async function applyCreditToBalances() {
+    setApplyingAll(true)
+    try {
+      const targets = lines
+        .filter(l => uid && l.booking.user_id === uid && !l.booking.payer_id
+          && l.booking.status !== 'cancelled' && l.due > 0)
+        .sort((a, b) => new Date(a.booking.created_at).getTime() - new Date(b.booking.created_at).getTime())
+      let total = 0
+      for (const l of targets) {
+        total += await applyCreditToBooking({ bookingId: l.booking.id, amount: l.due })
+      }
+      if (total > 0) toast.success(`Applied ${currency} ${total.toLocaleString()} credit`)
+      else toast.info('Nothing to apply')
+      if (user) await refetch(user.id)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not apply credit')
+    } finally {
+      setApplyingAll(false)
+    }
+  }
+
   const uid = user?.id
   const active = lines.filter(l => l.booking.status !== 'cancelled')
   // Bookings a lead booker pays on my behalf — shown read-only, I owe nothing.
@@ -202,6 +228,12 @@ export function PaymentsPage() {
   const totalDepositDue = payable.reduce((s, l) => s + l.depositDue, 0)
   const totalPaid = payable.reduce((s, l) => s + l.paid, 0)
   const currency = lines.find(l => l.event)?.event?.currency ?? 'TWD'
+  // Open credit the diver can actually spend via the RPC (awarded credit rows,
+  // excluding overpayment-derived balance which has no row to consume). The
+  // top-level apply button only surfaces when there's both a pool and a due
+  // own-booking to spend it against.
+  const spendablePool = openCreditBalance(creditRows)
+  const hasDueOwn = ownLines.some(l => l.due > 0)
 
   if (loading) {
     return <div className="flex justify-center pt-12"><div className="w-6 h-6 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" /></div>
@@ -212,14 +244,33 @@ export function PaymentsPage() {
       <h1 className="text-xl font-bold text-white">Payments</h1>
 
       {openCredit > 0 && (
-        <div className="bg-emerald-50 border border-emerald-400 rounded-lg p-3 space-y-1">
+        <div className="bg-emerald-50 border border-emerald-400 rounded-lg p-3 space-y-2">
           <p className="text-sm font-semibold text-emerald-900">
             Account credit: {currency} {openCredit.toLocaleString()}
           </p>
-          <p className="text-xs text-emerald-900">
-            We owe you this much — usually from a cancelled event. Open any
-            booking with a balance due below to apply it.
-          </p>
+          {spendablePool > 0 && hasDueOwn ? (
+            <>
+              <p className="text-xs text-emerald-900">
+                Use it toward what you owe — we'll apply it across your booking
+                balances, oldest first. Anything left over stays on your account.
+              </p>
+              <button
+                type="button"
+                disabled={applyingAll}
+                onClick={applyCreditToBalances}
+                className={`${BTN_PRIMARY} text-xs py-1.5 px-3 disabled:opacity-50`}
+              >
+                {applyingAll
+                  ? 'Applying…'
+                  : `Use ${currency} ${Math.min(spendablePool, totalOwed).toLocaleString()} credit on your balance`}
+              </button>
+            </>
+          ) : (
+            <p className="text-xs text-emerald-900">
+              We owe you this much — usually from a cancelled event. Open any
+              booking with a balance due below to apply it.
+            </p>
+          )}
         </div>
       )}
 

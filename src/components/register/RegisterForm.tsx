@@ -9,6 +9,7 @@ import { computeEffectiveFullPaymentDeadline } from '../../lib/payment-deadlines
 import { paymentInstructionsFor } from '../../lib/payment-instructions'
 import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../lib/gear'
 import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
+import { fetchCreditsForUser, openCreditBalance, applyCreditToBooking } from '../../lib/credits'
 import { uploadCertCard } from '../../lib/cert-card'
 import { uploadNitroxCard } from '../../lib/nitrox-card'
 import { uploadDeepCard } from '../../lib/deep-card'
@@ -385,6 +386,13 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // under another user's folder, and either way the target diver can
   // upload from /profile later.
   const isOnBehalfOf = !!actingOnBehalfOf
+  // A signed-in diver booking only for themselves can spend their in-store
+  // account credit on the new booking right at checkout. Guests (brand-new
+  // accounts), edits, on-behalf-of, and family-group submits are excluded —
+  // group leads use the Payments page to apply credit to the consolidated
+  // balance afterward.
+  const creditEligible = !!userId && !isGuest && !isEdit && !isOnBehalfOf
+    && additionalTargets.length === 0 && !leadPayerId
   const initialDetails = existingBooking?.details as BookingDetails | undefined
   // Registration is closed for events that have already happened — but admins
   // and staff keep full control (e.g. recording a booking after the fact) and
@@ -476,6 +484,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // meaningful) when leadPayerId is set, i.e. the selection includes a child.
   const [payForEveryone, setPayForEveryone] = useState(true)
   const leadPays = !!leadPayerId && payForEveryone
+  // Spendable account credit for a self-booking diver, plus their opt-in to
+  // apply it at checkout (default on — use credit before paying out of pocket).
+  // creditApplied records what the RPC actually consumed, for the success view.
+  const [availableCredit, setAvailableCredit] = useState(0)
+  const [useAccountCredit, setUseAccountCredit] = useState(true)
+  const [creditApplied, setCreditApplied] = useState(0)
   // Default to full payment per product spec. Only meaningful when the event
   // has a deposit_amount — otherwise the radio is hidden entirely.
   const [payDepositOnly, setPayDepositOnly] = useState<boolean>(initialDetails?.pay_deposit_only ?? false)
@@ -586,6 +600,18 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     })()
     return () => { cancelled = true }
   }, [event.id, showRooms, showAddons, event.room_type_ids, event.addon_ids, event.cancel_policy])
+
+  // Load the diver's spendable account credit so step 4 can offer to apply it.
+  // Best-effort: a failure just hides the option (the diver can still use the
+  // Payments page later).
+  useEffect(() => {
+    if (!creditEligible || !userId) return
+    let cancelled = false
+    fetchCreditsForUser(userId)
+      .then(rows => { if (!cancelled) setAvailableCredit(openCreditBalance(rows)) })
+      .catch(() => { /* no credit option shown on failure */ })
+    return () => { cancelled = true }
+  }, [creditEligible, userId])
 
   const gearCost = useMemo(() => {
     if (!showGearRentChoice || gearChoice !== 'rent') return 0
@@ -932,6 +958,17 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       }
     }
 
+    // Spend the diver's account credit against the brand-new booking when they
+    // opted in. Best-effort: the booking already succeeded, so a credit hiccup
+    // shouldn't fail registration — the diver can still apply it from Payments.
+    if (creditEligible && useAccountCredit && availableCredit > 0 && data.booking_id) {
+      try {
+        setCreditApplied(await applyCreditToBooking({ bookingId: data.booking_id, amount: availableCredit }))
+      } catch (e) {
+        console.error('account credit apply failed:', e)
+      }
+    }
+
     setSaving(false)
     if (!allOk) { setErr('Some divers could not be registered — see details below.'); return }
     // Pass status through so the parent can render a different success
@@ -958,6 +995,11 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             {event.title} · {formatEventSpan(event, { style: 'long' })}
           </p>
         </header>
+        {creditApplied > 0 && (
+          <p className="text-sm font-semibold text-emerald-800 bg-emerald-50 border border-emerald-400 rounded-lg p-3">
+            Applied {event.currency} {creditApplied.toLocaleString()} account credit to this booking.
+          </p>
+        )}
         <WhatHappensNext waitlisted={waitlisted} />
         <div className="flex justify-end">
           <button
@@ -1512,6 +1554,24 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               </div>
             )}
           </div>
+
+          {creditEligible && availableCredit > 0 && (
+            <label className="flex items-start gap-2 text-sm text-blue-950 font-medium bg-emerald-50 border border-emerald-400 rounded-lg p-3">
+              <input
+                type="checkbox"
+                checked={useAccountCredit}
+                onChange={e => setUseAccountCredit(e.target.checked)}
+                className="accent-blue-900 mt-1"
+              />
+              <span className="flex-1">
+                Use my account credit ({event.currency} {availableCredit.toLocaleString()} available)
+                <span className="block text-xs text-blue-900/80">
+                  We'll put it toward this booking as soon as it's created. Anything
+                  left over stays on your account.
+                </span>
+              </span>
+            </label>
+          )}
 
           {hasDeposit && (
             <div className="space-y-2">

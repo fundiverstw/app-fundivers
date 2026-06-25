@@ -6,16 +6,18 @@ import { RegisterForm, RegisterFormBody } from './RegisterForm'
 import { mockQueryBuilder } from '../../../tests/test-utils'
 import type { AppEvent, EOAddon, EORoom, Profile } from '../../types/database'
 
-const { from, update, invoke, setSession } = vi.hoisted(() => ({
+const { from, update, invoke, setSession, rpc } = vi.hoisted(() => ({
   from: vi.fn(),
   update: vi.fn(),
   invoke: vi.fn(),
   setSession: vi.fn(),
+  rpc: vi.fn(),
 }))
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: (...a: unknown[]) => from(...a),
+    rpc: (...a: unknown[]) => rpc(...a),
     functions: { invoke: (...a: unknown[]) => invoke(...a) },
     auth: { setSession: (...a: unknown[]) => setSession(...a) },
   },
@@ -119,7 +121,8 @@ function setupFrom(updated: unknown = { id: 'b-existing' }) {
 
 beforeEach(() => {
   from.mockReset(); update.mockReset()
-  invoke.mockReset(); setSession.mockReset()
+  invoke.mockReset(); setSession.mockReset(); rpc.mockReset()
+  rpc.mockResolvedValue({ data: 0, error: null })
   invoke.mockResolvedValue({ data: { booking_id: 'b-new', session: null }, error: null })
   setSession.mockResolvedValue({ data: null, error: null })
   // Default: a site key is present so the captcha widget renders. Individual
@@ -185,6 +188,77 @@ describe('RegisterForm', () => {
 
     await waitFor(() => expect(onBooked).toHaveBeenCalledOnce())
     expect(onBooked.mock.calls[0][0]).toEqual({ id: 'b-new', status: 'pending' })
+  })
+
+  it('offers and applies the diver\'s account credit at checkout for a solo booking', async () => {
+    const openCredit = {
+      id: 'c1', user_id: 'u1', booking_id: null, amount: 2000, currency: 'TWD',
+      reason: 'Cancelled trip', status: 'open', created_by: null,
+      created_at: new Date().toISOString(), settled_at: null, settled_note: null,
+    }
+    from.mockImplementation((table: string) => {
+      if (table === 'EO_rooms')     return mockQueryBuilder({ data: sampleRooms })
+      if (table === 'Other_Addons') return mockQueryBuilder({ data: sampleAddons })
+      if (table === 'credits')      return mockQueryBuilder({ data: [openCredit] })
+      return mockQueryBuilder()
+    })
+    rpc.mockResolvedValue({ data: 2000, error: null })
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    // Step 4 surfaces the opt-in (on by default) showing the available credit.
+    expect(await screen.findByText(/use my account credit/i)).toBeInTheDocument()
+    expect(screen.getByText(/TWD 2,000 available/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+    // Credit is spent against the freshly-created booking via the RPC.
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith(
+      'apply_credit_to_booking', { p_booking_id: 'b-new', p_amount: 2000 },
+    ))
+  })
+
+  it('does not offer account credit when registering a family group', async () => {
+    const child: Profile = { ...sampleProfile, id: 'kid1', name: 'Kid', nickname: null, parent_account: 'u1' }
+    const openCredit = {
+      id: 'c1', user_id: 'u1', booking_id: null, amount: 2000, currency: 'TWD',
+      reason: 'Cancelled trip', status: 'open', created_by: null,
+      created_at: new Date().toISOString(), settled_at: null, settled_note: null,
+    }
+    from.mockImplementation((table: string) => {
+      if (table === 'EO_rooms')     return mockQueryBuilder({ data: sampleRooms })
+      if (table === 'Other_Addons') return mockQueryBuilder({ data: sampleAddons })
+      if (table === 'credits')      return mockQueryBuilder({ data: [openCredit] })
+      if (table === 'profiles')     return mockQueryBuilder({ data: [child] })
+      return mockQueryBuilder()
+    })
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+
+    // Parent + child both selected → group submit, which routes credit through
+    // the Payments page instead of the checkout toggle.
+    await screen.findByText(/who is this booking for/i)
+    await user.click(screen.getByLabelText(/kid/i))
+    await user.click(screen.getByRole('button', { name: /continue/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    expect(screen.queryByText(/use my account credit/i)).not.toBeInTheDocument()
   })
 
   it('shows an in-flight "Confirming…" state while the submit round-trip is pending', async () => {
