@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { fetchNotifications, markRead, markAllRead } from '../lib/notifications'
 import type { Notification } from '../types/database'
 import { ON_DEEP_MUTED } from '../styles/tokens'
@@ -11,7 +10,6 @@ export function NotificationsPage() {
   // Tap a row to expand; tap again to collapse. Only one row open at a
   // time so the list stays scannable.
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const navigate = useNavigate()
 
   useEffect(() => {
     let cancelled = false
@@ -94,19 +92,10 @@ export function NotificationsPage() {
                 </button>
 
                 {expanded && (
-                  <div className="border-t border-sky-200/60 bg-sky-50 px-3 pb-3 pt-2 space-y-2">
+                  <div className="border-t border-sky-200/60 bg-sky-50 px-3 pb-3 pt-2">
                     {n.body
                       ? <p className="text-sm text-blue-950 whitespace-pre-wrap break-words">{n.body}</p>
                       : <p className="text-xs italic text-blue-900/70">No additional details.</p>}
-                    {n.url && (
-                      <button
-                        type="button"
-                        onClick={() => navigate(n.url!)}
-                        className="text-xs px-3 py-1.5 rounded-md bg-blue-900 hover:bg-blue-950 text-white font-semibold transition-colors"
-                      >
-                        {actionLabelForKind(n.kind)}
-                      </button>
-                    )}
                   </div>
                 )}
               </div>
@@ -116,20 +105,6 @@ export function NotificationsPage() {
       </ul>
     </div>
   )
-}
-
-// Action button label inside the expanded view. Tied to the `kind` so the
-// CTA reads naturally — a reminder takes you to the event, a duty assignment
-// to the duty page, etc.
-function actionLabelForKind(kind: string): string {
-  switch (kind) {
-    case 'reminder':          return 'Open event'
-    case 'duty':              return 'Go to duty'
-    case 'broadcast':         return 'Open link'
-    case 'event_reschedule':  return 'View change'
-    case 'event_cancellation': return 'View booking'
-    default:                  return 'Open'
-  }
 }
 
 function relativeTime(iso: string): string {

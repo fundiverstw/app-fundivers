@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Routes, Route } from 'react-router-dom'
+import { MemoryRouter } from 'react-router-dom'
 import { NotificationsPage } from './NotificationsPage'
 import { mockQueryBuilder } from '../../tests/test-utils'
 
@@ -37,19 +37,6 @@ function setup(rows = sample, updateSpy?: ReturnType<typeof vi.fn>) {
 
 function renderPage() {
   return render(<MemoryRouter><NotificationsPage /></MemoryRouter>)
-}
-
-// Lets us observe navigation when the user taps "Open event" inside an
-// expanded row.
-function renderPageWithRoutes() {
-  return render(
-    <MemoryRouter initialEntries={['/notifications']}>
-      <Routes>
-        <Route path="/notifications" element={<NotificationsPage />} />
-        <Route path="/bookings" element={<div>BOOKINGS_PAGE</div>} />
-      </Routes>
-    </MemoryRouter>
-  )
 }
 
 describe('NotificationsPage', () => {
@@ -97,19 +84,16 @@ describe('NotificationsPage', () => {
     expect(updateSpy).toHaveBeenCalledTimes(1)
   })
 
-  it('navigates only when the explicit "Open event" button is tapped', async () => {
+  it('expanding a row shows only the body, with no navigation CTA', async () => {
     setup(sample)
     const user = userEvent.setup()
-    renderPageWithRoutes()
+    renderPage()
     await screen.findByText('Trip in 3 days')
 
-    // Expanding the row should NOT navigate.
     await user.click(screen.getByRole('button', { name: /Trip in 3 days/i }))
-    expect(screen.queryByText('BOOKINGS_PAGE')).not.toBeInTheDocument()
-
-    // The action button does navigate.
-    await user.click(screen.getByRole('button', { name: /open event/i }))
-    expect(await screen.findByText('BOOKINGS_PAGE')).toBeInTheDocument()
+    expect(await screen.findByText('Pay deposit')).toBeInTheDocument()
+    // The old "Open event" action button is gone.
+    expect(screen.queryByRole('button', { name: /open event/i })).not.toBeInTheDocument()
   })
 
   it('shows the empty state when there are no notifications', async () => {
@@ -120,20 +104,4 @@ describe('NotificationsPage', () => {
     expect(screen.queryByRole('button', { name: /mark all read/i })).not.toBeInTheDocument()
   })
 
-  it('omits the action button entirely when the notification has no url (admin sent broadcast with no link)', async () => {
-    setup([{
-      id: 'n-no-link', user_id: 'u',
-      title: 'No link broadcast', body: 'Body only',
-      url: null, kind: 'broadcast',
-      event_id: null,
-      created_at: '2026-05-05T00:00:00.000Z',
-      read_at: null,
-    }])
-    const user = userEvent.setup()
-    renderPage()
-    await user.click(await screen.findByRole('button', { name: /no link broadcast/i }))
-    // Body shows; CTA button is suppressed.
-    expect(screen.getByText('Body only')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /open link/i })).not.toBeInTheDocument()
-  })
 })
