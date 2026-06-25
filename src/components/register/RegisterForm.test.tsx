@@ -742,7 +742,7 @@ describe('RegisterForm', () => {
     // Step 1 → 2 (about you with the new-account section, because !userId).
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.type(screen.getByLabelText(/email \*/i), 'new@diver.test')
-    await user.type(screen.getByLabelText(/password/i), 'abcdefgh')
+    await user.type(screen.getByLabelText(/password/i, { selector: 'input' }), 'abcdefgh')
     await user.click(screen.getByLabelText(/I agree to the/i))
     await user.click(screen.getByRole('button', { name: /solve captcha/i }))
     await user.type(screen.getByLabelText(/^name \*/i), 'Grace Hopper')
@@ -794,7 +794,7 @@ describe('RegisterForm', () => {
 
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.type(screen.getByLabelText(/email \*/i), 'taken@diver.test')
-    await user.type(screen.getByLabelText(/password/i), 'abcdefgh')
+    await user.type(screen.getByLabelText(/password/i, { selector: 'input' }), 'abcdefgh')
     await user.click(screen.getByLabelText(/I agree to the/i))
     await user.click(screen.getByRole('button', { name: /solve captcha/i }))
     await user.type(screen.getByLabelText(/^name \*/i), 'Grace Hopper')
@@ -822,7 +822,7 @@ describe('RegisterForm', () => {
 
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.type(screen.getByLabelText(/email \*/i), 'new@diver.test')
-    await user.type(screen.getByLabelText(/password/i), 'abcdefgh')
+    await user.type(screen.getByLabelText(/password/i, { selector: 'input' }), 'abcdefgh')
     await user.click(screen.getByLabelText(/I agree to the/i))
     await user.type(screen.getByLabelText(/^name \*/i), 'Grace Hopper')
 

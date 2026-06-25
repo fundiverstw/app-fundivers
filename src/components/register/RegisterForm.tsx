@@ -10,6 +10,7 @@ import { paymentInstructionsFor } from '../../lib/payment-instructions'
 import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../lib/gear'
 import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
 import { fetchCreditsForUser, openCreditBalance, applyCreditToBooking } from '../../lib/credits'
+import { PasswordInput } from '../PasswordInput'
 import { uploadCertCard } from '../../lib/cert-card'
 import { uploadNitroxCard } from '../../lib/nitrox-card'
 import { uploadDeepCard } from '../../lib/deep-card'
@@ -1799,6 +1800,14 @@ function TextField({
           value={value}
           onChange={onChange}
           required={required}
+          className="w-full bg-white border border-sky-300 rounded-lg px-2 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
+        />
+      ) : type === 'password' ? (
+        <PasswordInput
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          required={required}
+          placeholder={placeholder}
           className="w-full bg-white border border-sky-300 rounded-lg px-2 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
         />
       ) : (

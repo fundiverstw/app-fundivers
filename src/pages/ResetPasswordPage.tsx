@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase, authCallbackParams } from '../lib/supabase'
 import { Logo } from '../components/Logo'
+import { PasswordInput } from '../components/PasswordInput'
 import { CARD_ELEVATED, INPUT, INPUT_LABEL, BTN_PRIMARY, TEXT_ERROR, TEXT_LINK, TEXT_MUTED, TEXT_HEADING } from '../styles/tokens'
 
 const LINK_ERROR =
@@ -112,16 +113,16 @@ export function ResetPasswordPage() {
           <form onSubmit={submit} className="space-y-4">
             <div>
               <label className={INPUT_LABEL}>New password</label>
-              <input
-                type="password" name="password" required minLength={8}
+              <PasswordInput
+                name="password" required minLength={8}
                 value={password} onChange={e => setPassword(e.target.value)}
                 className={INPUT}
               />
             </div>
             <div>
               <label className={INPUT_LABEL}>Confirm password</label>
-              <input
-                type="password" name="confirm" required minLength={8}
+              <PasswordInput
+                name="confirm" required minLength={8}
                 value={confirm} onChange={e => setConfirm(e.target.value)}
                 className={INPUT}
               />

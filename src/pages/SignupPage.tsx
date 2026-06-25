@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { supabase } from '../lib/supabase'
 import { CURRENT_TERMS_VERSION } from '../lib/terms-version'
 import { Logo } from '../components/Logo'
+import { PasswordInput } from '../components/PasswordInput'
 import { CARD_ELEVATED, INPUT, INPUT_LABEL, BTN_PRIMARY, TEXT_ERROR, TEXT_LINK, TEXT_MUTED } from '../styles/tokens'
 
 const schema = z.object({
@@ -60,13 +61,13 @@ export function SignupPage() {
 
           <div>
             <label className={INPUT_LABEL}>Password</label>
-            <input {...register('password')} type="password" className={INPUT} />
+            <PasswordInput {...register('password')} className={INPUT} />
             {errors.password && <p className={`${TEXT_ERROR} text-xs mt-1`}>{errors.password.message}</p>}
           </div>
 
           <div>
             <label className={INPUT_LABEL}>Confirm password</label>
-            <input {...register('confirm')} type="password" className={INPUT} />
+            <PasswordInput {...register('confirm')} className={INPUT} />
             {errors.confirm && <p className={`${TEXT_ERROR} text-xs mt-1`}>{errors.confirm.message}</p>}
           </div>
 

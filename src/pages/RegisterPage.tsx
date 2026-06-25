@@ -6,6 +6,7 @@ import { fetchEventsForBookings, fetchEventsInRange, formatEventSpan } from '../
 import { RegisterFormBody } from '../components/register/RegisterForm'
 import { WhatHappensNext } from '../components/register/WhatHappensNext'
 import { Logo } from '../components/Logo'
+import { PasswordInput } from '../components/PasswordInput'
 import type { AppEvent, Booking } from '../types/database'
 
 // Public standalone registration page. Two entry paths:
@@ -318,8 +319,8 @@ function SignInBanner() {
             onChange={e => setEmail(e.target.value)}
             className="w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-blue-900 focus:outline-none focus:border-blue-900"
           />
-          <input
-            type="password" required placeholder="Password" value={password}
+          <PasswordInput
+            required placeholder="Password" value={password}
             onChange={e => setPassword(e.target.value)}
             className="w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-blue-900 focus:outline-none focus:border-blue-900"
           />
