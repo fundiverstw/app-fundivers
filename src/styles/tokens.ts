@@ -61,9 +61,23 @@ export const BTN_GHOST   = `${BUTTON_BASE} border border-blue-900 text-blue-900 
 export const BTN_DANGER  = `${BUTTON_BASE} bg-sky-100 hover:bg-red-100 text-red-700 border border-red-500`
 export const BTN_LIGHT   = `${BUTTON_BASE} bg-white text-blue-900 hover:bg-sky-100`
 
+// Outline "cancel / dismiss" button used in modal + form footers. Sky
+// outline on a transparent fill so it reads as the secondary action next
+// to a solid BTN_PRIMARY. Layout width (e.g. flex-1) stays at the call
+// site — this token is just the button identity.
+export const BTN_SECONDARY = 'py-2 rounded-lg text-sm font-medium text-blue-900 border border-sky-300 hover:bg-sky-50 disabled:opacity-50'
+
 // ── Inputs ─────────────────────────────────────────────────────────
 export const INPUT       = 'w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-blue-900 focus:outline-none focus:border-blue-900'
 export const INPUT_LABEL = 'block text-sm text-blue-900 mb-1'
+
+// ── Inline error notes ─────────────────────────────────────────────
+// Small validation / load-failure <p> banners. Two variants: the dark
+// one sits on navy chrome (light-red text on a translucent red wash);
+// the light one sits inside a white card (dark-red text on a pale red
+// fill). Both use the brand red-500 hairline border.
+export const ERROR_NOTE       = 'text-xs text-red-200 bg-red-900/50 border border-red-500 rounded-md p-2'
+export const ERROR_NOTE_LIGHT = 'text-xs text-red-700 bg-red-50 border border-red-500 rounded px-2 py-1'
 
 // ── Navigation chrome ──────────────────────────────────────────────
 // Darker than PAGE so the top/bottom bars sit visibly above the water

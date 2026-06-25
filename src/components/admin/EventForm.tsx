@@ -9,6 +9,7 @@ import {
   type FormState,
 } from './event-form-state'
 import { DateField } from '../DateField'
+import { ERROR_NOTE } from '../../styles/tokens'
 
 // Shared form for creating and editing an EO_dive / EO_course. Owns all
 // field state, the lookup data (prices / rooms / addons / cert levels),
@@ -512,7 +513,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
               <Input type="number" value={priceForm.transport} onChange={v => setPriceForm(f => ({ ...f, transport: v }))} />
             </Field>
             {priceError && (
-              <p className="text-xs text-red-200 bg-red-900/50 border border-red-500 rounded-md p-2">{priceError}</p>
+              <p className={ERROR_NOTE}>{priceError}</p>
             )}
             <div className="flex gap-2">
               <button
@@ -630,7 +631,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
                   <Textarea value={travelForm.transportation} onChange={v => setTravelForm(f => ({ ...f, transportation: v }))} />
                 </Field>
                 {travelError && (
-                  <p className="text-xs text-red-200 bg-red-900/50 border border-red-500 rounded-md p-2">{travelError}</p>
+                  <p className={ERROR_NOTE}>{travelError}</p>
                 )}
                 <div className="flex gap-2">
                   <button
@@ -687,7 +688,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
                   <Input type="number" value={roomForm.added_price} onChange={v => setRoomForm(f => ({ ...f, added_price: v }))} />
                 </Field>
                 {roomError && (
-                  <p className="text-xs text-red-200 bg-red-900/50 border border-red-500 rounded-md p-2">{roomError}</p>
+                  <p className={ERROR_NOTE}>{roomError}</p>
                 )}
                 <div className="flex gap-2">
                   <button
@@ -793,7 +794,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
               <Input type="number" value={addonForm.price} onChange={v => setAddonForm(f => ({ ...f, price: v }))} />
             </Field>
             {addonError && (
-              <p className="text-xs text-red-200 bg-red-900/50 border border-red-500 rounded-md p-2">{addonError}</p>
+              <p className={ERROR_NOTE}>{addonError}</p>
             )}
             <div className="flex gap-2">
               <button

@@ -14,7 +14,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
-import { corsOk, jsonResponse, safeError } from "../_shared/responses.ts"
+import { corsOk, jsonResponse, safeError, bearerToken } from "../_shared/responses.ts"
 import { buildCancellationEmail } from "../_shared/event-cancellation-email.ts"
 
 Deno.serve(async (req) => {
@@ -28,9 +28,8 @@ Deno.serve(async (req) => {
   const GMAIL_USER   = Deno.env.get("GMAIL_USER")
   const GMAIL_PASS   = Deno.env.get("GMAIL_APP_PASSWORD")
 
-  const auth = req.headers.get("Authorization") ?? ""
-  if (!auth.startsWith("Bearer ")) return json({ error: "unauthorized" }, 401)
-  const token = auth.slice("Bearer ".length)
+  const token = bearerToken(req)
+  if (!token) return json({ error: "unauthorized" }, 401)
 
   const caller = createClient(SUPABASE_URL, ANON_KEY, { auth: { persistSession: false } })
   const { data: u, error: uErr } = await caller.auth.getUser(token)

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { PageLoading } from '../../components/ui/Spinner'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
@@ -26,6 +27,7 @@ import { splitByTransport } from '../../lib/logistics'
 import { TransportGroup } from '../../components/admin/TransportGroup'
 import { ShareEventButton } from '../../components/ShareEventButton'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Credit, DiverNote, Payment, Profile } from '../../types/database'
+import { BTN_SECONDARY, ERROR_NOTE_LIGHT } from '../../styles/tokens'
 
 interface Registrant {
   booking: Booking
@@ -350,7 +352,7 @@ export function AdminEventDetailPage() {
   }
 
   if (loading) {
-    return <div className="flex justify-center pt-12"><div className="w-6 h-6 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" /></div>
+    return <PageLoading />
   }
 
   // Cancelled bookings drop out of the roster and every headcount — a diver who
@@ -645,14 +647,14 @@ function CancelEventModal({
           </>
         )}
         {error && (
-          <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded px-2 py-1">{error}</p>
+          <p className={ERROR_NOTE_LIGHT}>{error}</p>
         )}
         <div className="flex gap-2 pt-1">
           <button
             type="button"
             onClick={onClose}
             disabled={inFlight}
-            className="flex-1 py-2 rounded-lg text-sm font-medium text-blue-900 border border-sky-300 hover:bg-sky-50 disabled:opacity-50"
+            className={`flex-1 ${BTN_SECONDARY}`}
           >
             Back
           </button>
@@ -721,14 +723,14 @@ function DeleteEventModal({
           />
         </label>
         {error && (
-          <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded px-2 py-1">{error}</p>
+          <p className={ERROR_NOTE_LIGHT}>{error}</p>
         )}
         <div className="flex gap-2 pt-1">
           <button
             type="button"
             onClick={onClose}
             disabled={inFlight}
-            className="flex-1 py-2 rounded-lg text-sm font-medium text-blue-900 border border-sky-300 hover:bg-sky-50 disabled:opacity-50"
+            className={`flex-1 ${BTN_SECONDARY}`}
           >
             Back
           </button>
@@ -871,7 +873,7 @@ function NotifyDiversModal({
           </label>
 
           {error && (
-            <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded px-2 py-1">{error}</p>
+            <p className={ERROR_NOTE_LIGHT}>{error}</p>
           )}
 
           <div className="flex gap-2 pt-1">
@@ -879,7 +881,7 @@ function NotifyDiversModal({
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="flex-1 py-2 rounded-lg text-sm font-medium text-blue-900 border border-sky-300 hover:bg-sky-50 disabled:opacity-50"
+              className={`flex-1 ${BTN_SECONDARY}`}
             >
               Back
             </button>
@@ -1024,7 +1026,7 @@ function ExportManifestModal({
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="flex-1 py-2 rounded-lg text-sm font-medium text-blue-900 border border-sky-300 hover:bg-sky-50 disabled:opacity-50"
+              className={`flex-1 ${BTN_SECONDARY}`}
             >
               Back
             </button>

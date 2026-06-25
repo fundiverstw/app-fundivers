@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Spinner } from '../../components/ui/Spinner'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
@@ -123,7 +124,7 @@ export function AdminDashboardPage() {
   if (!dash) {
     return (
       <div className="max-w-5xl mx-auto flex justify-center py-16">
-        <div className="w-6 h-6 border-2 border-sky-300 border-t-transparent rounded-full animate-spin" />
+        <Spinner className="w-6 h-6 border-2 border-sky-300" />
       </div>
     )
   }

@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { isoDate } from '../lib/dates'
+import { PageLoading } from '../components/ui/Spinner'
 import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../lib/supabase'
@@ -34,7 +36,6 @@ export function DutiesPage() {
       const today = new Date()
       const start = new Date(today); start.setMonth(start.getMonth() - 1)
       const end = new Date(today); end.setMonth(end.getMonth() + 3)
-      const isoDate = (d: Date) => d.toISOString().slice(0, 10)
 
       const [dutiesRes, events] = await Promise.all([
         supabase.from('duties').select('*').eq('assignee_id', user.id).order('start_date', { ascending: true }),
@@ -55,7 +56,7 @@ export function DutiesPage() {
   }, [user])
 
   if (loading) {
-    return <div className="flex justify-center pt-12"><div className="w-6 h-6 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" /></div>
+    return <PageLoading />
   }
 
   const today = format(new Date(), 'yyyy-MM-dd')

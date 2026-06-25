@@ -32,7 +32,7 @@ import nodemailer from "npm:nodemailer@6.9.14"
 import { Buffer } from "node:buffer"
 import { buildEventDiversXlsxBase64, type EventDiverRow } from "../_shared/event-divers-xlsx.ts"
 import { roleToZh } from "../_shared/event-divers-manifest.ts"
-import { corsOk, jsonResponse, safeError } from "../_shared/responses.ts"
+import { corsOk, jsonResponse, safeError, bearerToken } from "../_shared/responses.ts"
 
 // Profile columns the manifest reads, shared by the booked-diver and
 // on-duty-staff fetches.
@@ -75,9 +75,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsOk(req)
   if (req.method !== "POST")    return json({ error: "method not allowed" }, 405)
 
-  const auth = req.headers.get("Authorization") ?? ""
-  if (!auth.startsWith("Bearer ")) return json({ error: "unauthorized" }, 401)
-  const token = auth.slice("Bearer ".length)
+  const token = bearerToken(req)
+  if (!token) return json({ error: "unauthorized" }, 401)
 
   let body: { event_type?: unknown; event_id?: unknown; boat?: unknown }
   try { body = await req.json() } catch { return json({ error: "invalid json body" }, 400) }

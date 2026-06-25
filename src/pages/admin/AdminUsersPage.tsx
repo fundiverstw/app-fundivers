@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Spinner } from '../../components/ui/Spinner'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -546,7 +547,7 @@ function UserCard({
                 <AdminFamilyPanel user={user} allUsers={allUsers} onChanged={onFamilyChanged} />
               )}
               {loading && (
-                <div className="flex justify-center py-2"><div className="w-5 h-5 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" /></div>
+                <div className="flex justify-center py-2"><Spinner className="w-5 h-5 border-2 border-blue-900" /></div>
               )}
               {extras && (
                 <ExtrasBlock

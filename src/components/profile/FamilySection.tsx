@@ -4,6 +4,7 @@ import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
 import { ProfileForm } from '../../pages/ProfilePage'
 import type { Profile } from '../../types/database'
+import { BTN_SECONDARY } from '../../styles/tokens'
 
 // Diver-facing "Family" panel on /profile. Lets a top-level diver (one
 // whose own parent_account is null) see + create child accounts they
@@ -213,7 +214,7 @@ function CreateChildForm({
           type="button"
           onClick={onCancel}
           disabled={submitting}
-          className="flex-1 py-2 rounded-lg text-sm font-medium text-blue-900 border border-sky-300 hover:bg-sky-50 disabled:opacity-50"
+          className={`flex-1 ${BTN_SECONDARY}`}
         >
           Cancel
         </button>
