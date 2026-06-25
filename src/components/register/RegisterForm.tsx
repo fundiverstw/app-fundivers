@@ -663,6 +663,18 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const groupDepositNow  = depositNow * groupCount
   const groupRemainder   = remainderLater * groupCount
 
+  // Account credit the diver applies at checkout (solo path only — the group
+  // toggle above and the credit toggle are mutually exclusive). It pays the
+  // booking down deposit-first, so it trims what's owed now and the leftover
+  // balance. When the toggle is off (or no credit) these fall back to the gross
+  // figures, so the same expressions render both cases.
+  const creditNow            = creditEligible && useAccountCredit ? availableCredit : 0
+  const creditDeducted       = Math.min(creditNow, total)
+  const totalAfterCredit     = Math.max(0, total - creditNow)
+  const fullNowAfterCredit   = Math.max(0, fullNow - creditNow)
+  const depositNowAfterCredit = Math.max(0, depositNow - creditNow)
+  const remainderAfterCredit = Math.max(0, remainderLater - Math.max(0, creditNow - depositNow))
+
   // Itemized breakdown of every charge that makes up `total`. Drives both the
   // on-screen summary and the snapshot written into details.charges, so what
   // the diver sees is exactly what gets frozen onto the booking.
@@ -1547,6 +1559,15 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             <div className="border-t border-sky-200 pt-1 mt-1">
               <Row label={showGroupTotals ? 'Per diver' : 'Total'} value={total} currency={event.currency} bold />
             </div>
+            {creditNow > 0 && (
+              <div className="border-t border-sky-200 pt-1 mt-1 space-y-0.5">
+                <div className="flex justify-between text-emerald-700">
+                  <span>Account credit</span>
+                  <span>− {event.currency} {creditDeducted.toLocaleString()}</span>
+                </div>
+                <Row label="You'll pay (after credit)" value={totalAfterCredit} currency={event.currency} bold />
+              </div>
+            )}
             {showGroupTotals && (
               <div className="border-t border-sky-200 pt-1 mt-1 space-y-0.5">
                 <Row label={`Group total (${groupCount} divers)`} value={groupTotal} currency={event.currency} bold />
@@ -1581,7 +1602,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 <span className="flex-1">
                   <span className="block">Pay full amount now</span>
                   <span className="block text-xs text-blue-950 font-medium">
-                    {event.currency} {(showGroupTotals ? groupFullNow : fullNow).toLocaleString()}
+                    {event.currency} {(showGroupTotals ? groupFullNow : fullNowAfterCredit).toLocaleString()}
                     {showGroupTotals ? ` — settles all ${groupCount} divers in one go.` : ' — settles your booking in one go.'}
                   </span>
                 </span>
@@ -1591,7 +1612,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 <span className="flex-1">
                   <span className="block">Pay deposit only</span>
                   <span className="block text-xs text-blue-950 font-medium">
-                    {event.currency} {(showGroupTotals ? groupDepositNow : depositNow).toLocaleString()} now, remainder due before the trip.
+                    {event.currency} {(showGroupTotals ? groupDepositNow : depositNowAfterCredit).toLocaleString()} now, remainder due before the trip.
                   </span>
                 </span>
               </label>
@@ -1607,12 +1628,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               <div className="border-t border-sky-200 pt-1 mt-1 space-y-0.5">
                 <p>
                   Pay deposit <strong>ASAP</strong>:{' '}
-                  <strong>{event.currency} {(showGroupTotals ? groupDepositNow : depositNow).toLocaleString()}</strong>
+                  <strong>{event.currency} {(showGroupTotals ? groupDepositNow : depositNowAfterCredit).toLocaleString()}</strong>
                   {showGroupTotals && ` (whole group, ${groupCount} divers)`}
                 </p>
                 <p>
                   Pay remaining balance by {formatDeadline(fullPaymentDeadline)}:{' '}
-                  <strong>{event.currency} {(showGroupTotals ? groupRemainder : remainderLater).toLocaleString()}</strong>
+                  <strong>{event.currency} {(showGroupTotals ? groupRemainder : remainderAfterCredit).toLocaleString()}</strong>
                 </p>
               </div>
             )}

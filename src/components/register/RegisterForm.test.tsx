@@ -219,6 +219,16 @@ describe('RegisterForm', () => {
     expect(await screen.findByText(/use my account credit/i)).toBeInTheDocument()
     expect(screen.getByText(/TWD 2,000 available/i)).toBeInTheDocument()
 
+    // With the toggle on, the total reflects the credit: 2,800 − 2,000 = 800.
+    expect(screen.getByText(/you'll pay \(after credit\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/^TWD\s*800$/)).toBeInTheDocument()
+
+    // Unchecking restores the gross total and hides the after-credit line.
+    await user.click(screen.getByRole('checkbox', { name: /use my account credit/i }))
+    expect(screen.queryByText(/you'll pay \(after credit\)/i)).not.toBeInTheDocument()
+    // Re-check so the confirm path still spends the credit.
+    await user.click(screen.getByRole('checkbox', { name: /use my account credit/i }))
+
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
 
     // Credit is spent against the freshly-created booking via the RPC.
