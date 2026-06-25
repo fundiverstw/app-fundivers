@@ -15,6 +15,9 @@ dist-ssr
 .env.local
 .env.push
 
+# Reference-only Wix site code — not part of the app build
+wix/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
