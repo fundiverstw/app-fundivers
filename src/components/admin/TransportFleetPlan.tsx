@@ -1,18 +1,19 @@
 import { Link } from 'react-router-dom'
 import type { FleetPlan } from '../../lib/vehicle-planning'
 
+const plural = (n: number) => (n === 1 ? '' : 's')
+
 /**
- * The day's ride plan: which vehicles seat the divers who need a ride, and
- * whether there are enough on-duty staff to drive them. Read-only — the fleet
- * itself is edited under Manage → Vehicles. Renders nothing of substance when
- * nobody needs a ride (the caller guards on that).
+ * The day's ride plan: which vehicles carry everyone who travels in the fleet
+ * — the divers who need a ride plus all on-duty staff, one of whom drives each
+ * vehicle taken. Read-only; the fleet is edited under Manage → Vehicles. The
+ * caller guards on at least one diver needing a ride.
  */
 export function TransportFleetPlan({
-  plan, fleetSize, availableDrivers,
+  plan, fleetSize,
 }: {
   plan: FleetPlan
   fleetSize: number
-  availableDrivers: number
 }) {
   if (fleetSize === 0) {
     return (
@@ -23,33 +24,39 @@ export function TransportFleetPlan({
     )
   }
 
-  const fleetLabel = plan.used.map(v => `${v.name} (${v.passenger_seats})`).join(' + ')
-
-  if (!plan.fits) {
+  if (plan.reason === 'no-drivers') {
     return (
       <p className="text-sm font-semibold text-red-600">
-        Fleet short by {plan.shortfall} seat{plan.shortfall === 1 ? '' : 's'} — {plan.seats} seat
-        {plan.seats === 1 ? '' : 's'} across {fleetSize} vehicle{fleetSize === 1 ? '' : 's'} for {plan.riders} rider
-        {plan.riders === 1 ? '' : 's'}. Add a vehicle or run a second trip.
+        No on-duty staff to drive — assign staff to the day before planning rides
+        ({plan.divers} diver{plural(plan.divers)} need a ride).
       </p>
     )
   }
 
+  if (!plan.fits) {
+    const tail = plan.reason === 'driver-limited'
+      ? `only ${plan.staff} on-duty staff to drive ${plan.staff} car${plural(plan.staff)} (one each). Add staff or run a second trip.`
+      : 'fleet maxed out. Add a vehicle or run a second trip.'
+    return (
+      <p className="text-sm font-semibold text-red-600">
+        Fleet short by {plan.shortfall} seat{plural(plan.shortfall)} — {plan.seats} seat{plural(plan.seats)} across{' '}
+        {plan.driversNeeded} vehicle{plural(plan.driversNeeded)} for {plan.passengers} rider{plural(plan.passengers)}{' '}
+        ({plan.divers} diver{plural(plan.divers)} + {plan.ridingStaff} riding staff) — {tail}
+      </p>
+    )
+  }
+
+  const fleetLabel = plan.used.map(v => `${v.name} (${v.passenger_seats})`).join(' + ')
   return (
     <div className="space-y-0.5">
       <p className="text-sm font-medium text-blue-900">
-        Take {plan.driversNeeded} vehicle{plan.driversNeeded === 1 ? '' : 's'}: {fleetLabel}
-        {' '}— {plan.seats} seat{plan.seats === 1 ? '' : 's'} for {plan.riders} rider{plan.riders === 1 ? '' : 's'}.
+        Take {plan.driversNeeded} vehicle{plural(plan.driversNeeded)}: {fleetLabel}
+        {' '}— {plan.seats} seat{plural(plan.seats)} for {plan.passengers} rider{plural(plan.passengers)}.
       </p>
-      {plan.enoughDrivers ? (
-        <p className="text-xs font-medium text-blue-900/80">
-          Needs {plan.driversNeeded} driver{plan.driversNeeded === 1 ? '' : 's'} · {availableDrivers} on-duty staff available.
-        </p>
-      ) : (
-        <p className="text-xs font-semibold text-red-600">
-          Needs {plan.driversNeeded} drivers but only {availableDrivers} on-duty staff to drive.
-        </p>
-      )}
+      <p className="text-xs font-medium text-blue-900/80">
+        {plan.divers} diver{plural(plan.divers)} ride · {plan.driversNeeded} of {plan.staff} on-duty staff driving
+        {plan.ridingStaff > 0 ? `, ${plan.ridingStaff} riding` : ''}.
+      </p>
     </div>
   )
 }

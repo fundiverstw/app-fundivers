@@ -253,12 +253,12 @@ export function AdminLogisticsPage() {
   })
   const dayDue = dueRowsFor(allRows)
   const dayOutstanding = dayDue.reduce((s, x) => s + x.amount, 0)
-  // Ride plan: seat the divers who need a ride in the fewest vehicles, one
-  // on-duty staff driving each.
+  // Ride plan: seat everyone who travels in the fleet — divers who need a ride
+  // plus all on-duty staff, one of whom drives each vehicle taken.
   const fleetPlan = planFleet(
     transport.needsRide.length,
-    vehicles.map(v => ({ name: v.name, passenger_seats: v.passenger_seats })),
     onDutyStaffCount,
+    vehicles.map(v => ({ name: v.name, passenger_seats: v.passenger_seats })),
   )
 
   const promptForDay = tab === 'other' && !otherDay
@@ -330,7 +330,7 @@ export function AdminLogisticsPage() {
                 {transport.unspecified.length > 0 && <> · {transport.unspecified.length} unspecified</>}
               </p>
               {transport.needsRide.length > 0 && (
-                <TransportFleetPlan plan={fleetPlan} fleetSize={vehicles.length} availableDrivers={onDutyStaffCount} />
+                <TransportFleetPlan plan={fleetPlan} fleetSize={vehicles.length} />
               )}
             </div>
             <div className="space-y-1">
