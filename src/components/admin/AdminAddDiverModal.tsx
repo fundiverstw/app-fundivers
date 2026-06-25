@@ -5,7 +5,7 @@ import { errorMessage } from '../../lib/errors'
 import { personName } from '../../lib/names'
 import { RegisterFormBody } from '../register/RegisterForm'
 import type { AppEvent, Profile } from '../../types/database'
-import { MODAL_BACKDROP, TEXT_HEADING, TEXT_BODY, INPUT, INPUT_LABEL, BTN_PRIMARY } from '../../styles/tokens'
+import { MODAL_BACKDROP, TEXT_HEADING, TEXT_BODY, INPUT, INPUT_LABEL, BTN_PRIMARY, BTN_SECONDARY } from '../../styles/tokens'
 
 // Three-step "register a diver on behalf" modal:
 //   1. pick which diver — search profiles by name / nickname / contact,
@@ -268,7 +268,7 @@ function CreateNewDiverForm({
           type="button"
           onClick={onCancel}
           disabled={submitting}
-          className="flex-1 py-2 rounded-lg text-sm font-medium text-blue-900 border border-sky-300 hover:bg-sky-50 disabled:opacity-50"
+          className={`flex-1 ${BTN_SECONDARY}`}
         >
           Cancel
         </button>

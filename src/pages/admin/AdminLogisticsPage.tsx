@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { PageLoading } from '../../components/ui/Spinner'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { fetchEventsInRange, fetchUpcomingEventDays, formatEventSpan } from '../../lib/events'
@@ -297,7 +298,7 @@ export function AdminLogisticsPage() {
       {promptForDay ? (
         <p className="text-blue-950 font-medium text-sm">Pick a day above to see its logistics.</p>
       ) : groups === null ? (
-        <div className="flex justify-center pt-12"><div className="w-6 h-6 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" /></div>
+        <PageLoading />
       ) : groups.length === 0 ? (
         <p className="text-blue-950 font-medium text-sm">No events scheduled for {dayKey}.</p>
       ) : (

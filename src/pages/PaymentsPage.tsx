@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { STATUS_STYLES } from '../lib/booking-status'
+import { PageLoading } from '../components/ui/Spinner'
 import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -46,12 +48,6 @@ const PAYMENT_STATUS_STYLES: Record<Payment['status'], string> = {
   voided: 'text-blue-950 font-medium line-through',
 }
 
-const STATUS_STYLES: Record<Booking['status'], string> = {
-  pending: 'text-red-600',
-  confirmed: 'text-blue-900 font-semibold',
-  cancelled: 'text-blue-900/40 line-through',
-  waitlisted: 'text-sky-600',
-}
 
 export function PaymentsPage() {
   const { user } = useAuth()
@@ -236,7 +232,7 @@ export function PaymentsPage() {
   const hasDueOwn = ownLines.some(l => l.due > 0)
 
   if (loading) {
-    return <div className="flex justify-center pt-12"><div className="w-6 h-6 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" /></div>
+    return <PageLoading />
   }
 
   return (

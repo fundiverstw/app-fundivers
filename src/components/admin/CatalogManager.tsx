@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
 import type { Database } from '../../types/database'
+import { BTN_SECONDARY, ERROR_NOTE_LIGHT } from '../../styles/tokens'
 
 // Tables CatalogManager can drive. Constraining to the real Database
 // keys (rather than `string`) is what lets supabase-js's from() overload
@@ -307,14 +308,14 @@ function CatalogFormModal<Row>({
           <FieldRow key={f.key} field={f} value={form[f.key] ?? ''} onChange={v => onChange(f.key, v)} />
         ))}
         {submitError && (
-          <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded px-2 py-1">{submitError}</p>
+          <p className={ERROR_NOTE_LIGHT}>{submitError}</p>
         )}
         <div className="flex gap-2 pt-1">
           <button
             type="button"
             onClick={onClose}
             disabled={submitting}
-            className="flex-1 py-2 rounded-lg text-sm font-medium text-blue-900 border border-sky-300 hover:bg-sky-50 disabled:opacity-50"
+            className={`flex-1 ${BTN_SECONDARY}`}
           >
             Cancel
           </button>
@@ -379,14 +380,14 @@ function ConfirmDeleteModal({
         longer appear in pickers.
       </p>
       {error && (
-        <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded px-2 py-1">{error}</p>
+        <p className={ERROR_NOTE_LIGHT}>{error}</p>
       )}
       <div className="flex gap-2 pt-1">
         <button
           type="button"
           onClick={onClose}
           disabled={inFlight}
-          className="flex-1 py-2 rounded-lg text-sm font-medium text-blue-900 border border-sky-300 hover:bg-sky-50 disabled:opacity-50"
+          className={`flex-1 ${BTN_SECONDARY}`}
         >
           Cancel
         </button>

@@ -1,4 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { Spinner } from '../ui/Spinner'
 import { useAuth } from '../../hooks/useAuth'
 import { Logo } from '../Logo'
 import { CURRENT_TERMS_VERSION } from '../../lib/terms-version'
@@ -23,7 +24,7 @@ export function RequireCurrentTerms() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 gap-6">
         <Logo size="xl" />
-        <div className="w-8 h-8 border-4 border-sky-500 border-t-transparent rounded-full animate-spin" />
+        <Spinner className="w-8 h-8 border-4 border-sky-500" />
       </div>
     )
   }

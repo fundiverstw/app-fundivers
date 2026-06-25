@@ -16,7 +16,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
-import { corsOk, jsonResponse, safeError } from "../_shared/responses.ts"
+import { corsOk, jsonResponse, safeError, bearerToken } from "../_shared/responses.ts"
 import { parsePartnerConnectInput, buildPartnerConnectEmail } from "../_shared/partner-connect.ts"
 
 const COMPANY_EMAIL = "fundiverstw@gmail.com"
@@ -26,9 +26,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsOk(req)
   if (req.method !== "POST")    return json({ error: "method not allowed" }, 405)
 
-  const auth = req.headers.get("Authorization") ?? ""
-  if (!auth.startsWith("Bearer ")) return json({ error: "unauthorized" }, 401)
-  const token = auth.slice("Bearer ".length)
+  const token = bearerToken(req)
+  if (!token) return json({ error: "unauthorized" }, 401)
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
   const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!

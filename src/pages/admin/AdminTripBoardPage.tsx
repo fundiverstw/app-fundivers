@@ -10,6 +10,7 @@ import { AdminReferralsTab } from '../../components/admin/AdminReferralsTab'
 import type {
   PartnerShop, PartnerShopInsert, Trip, TripInsert, TripStatus,
 } from '../../types/database'
+import { BTN_SECONDARY } from '../../styles/tokens'
 
 // Admin home for the Trip Board referral network. Two tabs:
 //   - Shops: the registry of partner dive shops we vouch for (+ default
@@ -518,7 +519,7 @@ function FormButtons({ submitting, submitLabel, onClose }: { submitting: boolean
   return (
     <div className="flex gap-2 pt-1">
       <button type="button" onClick={onClose} disabled={submitting}
-        className="flex-1 py-2 rounded-lg text-sm font-medium text-blue-900 border border-sky-300 hover:bg-sky-50 disabled:opacity-50">Cancel</button>
+        className={`flex-1 ${BTN_SECONDARY}`}>Cancel</button>
       <button type="submit" disabled={submitting}
         className="flex-1 py-2 rounded-lg text-sm font-semibold bg-blue-900 hover:bg-blue-950 text-white disabled:opacity-50">
         {submitting ? 'Saving…' : submitLabel}

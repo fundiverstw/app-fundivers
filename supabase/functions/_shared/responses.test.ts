@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { corsHeaders, jsonResponse, safeError } from './responses'
+import { corsHeaders, jsonResponse, safeError, bearerToken } from './responses'
 
 // happy-dom strips the `Origin` header on Request construction (it's
 // a forbidden request-header in browser contexts), so we hand the
@@ -94,5 +94,31 @@ describe('safeError (audit M4)', () => {
       expect.stringContaining('unique constraint xyz'),
     )
     spy.mockRestore()
+  })
+})
+
+function reqWithAuth(auth: string | null): Request {
+  return {
+    headers: {
+      get: (name: string) => name.toLowerCase() === 'authorization' ? auth : null,
+    },
+  } as unknown as Request
+}
+
+describe('bearerToken', () => {
+  it('returns the token from a Bearer header', () => {
+    expect(bearerToken(reqWithAuth('Bearer abc.def.ghi'))).toBe('abc.def.ghi')
+  })
+
+  it('returns null when the Authorization header is absent', () => {
+    expect(bearerToken(reqWithAuth(null))).toBeNull()
+  })
+
+  it('returns null for a non-Bearer scheme', () => {
+    expect(bearerToken(reqWithAuth('Basic abc'))).toBeNull()
+  })
+
+  it('returns an empty string for a bare "Bearer " prefix', () => {
+    expect(bearerToken(reqWithAuth('Bearer '))).toBe('')
   })
 })

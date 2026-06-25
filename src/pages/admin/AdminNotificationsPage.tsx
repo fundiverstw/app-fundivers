@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
+import { ERROR_NOTE_LIGHT } from '../../styles/tokens'
 
 // Admin-only one-off broadcast. Posts the title+body to the push worker's
 // /admin-broadcast endpoint, which fans out web-push to every opted-in
@@ -128,7 +129,7 @@ export function AdminNotificationsPage() {
           </span>
         </label>
         {submitError && (
-          <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded px-2 py-1">{submitError}</p>
+          <p className={ERROR_NOTE_LIGHT}>{submitError}</p>
         )}
         <div className="flex justify-end">
           <button

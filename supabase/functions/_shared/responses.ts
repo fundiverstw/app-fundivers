@@ -52,6 +52,14 @@ export function corsOk(req: Request): Response {
   return new Response("ok", { headers: corsHeaders(req) })
 }
 
+// The bearer token from the Authorization header, or null when the header is
+// absent or not a `Bearer <token>`. Every function gates on a caller JWT, so
+// this parse was copy-pasted into each entry point — centralised here.
+export function bearerToken(req: Request): string | null {
+  const auth = req.headers.get("Authorization") ?? ""
+  return auth.startsWith("Bearer ") ? auth.slice("Bearer ".length) : null
+}
+
 // Maps a handful of common SQLSTATEs to safe public messages. Anything
 // not in the table falls back to the caller-supplied `fallback`.
 const SQLSTATE_SAFE_MESSAGES: Record<string, string> = {

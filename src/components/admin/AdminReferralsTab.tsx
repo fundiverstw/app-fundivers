@@ -7,6 +7,7 @@ import {
   summarizeKickbacks, type AdminReferral,
 } from '../../lib/trip-referrals'
 import type { Trip, ReferralStatus, KickbackStatus } from '../../types/database'
+import { BTN_SECONDARY } from '../../styles/tokens'
 
 // Referrals pipeline + kickback ledger. Each row is one diver-interest; the
 // admin walks it interested → introduced → booked → completed (or cancelled),
@@ -275,7 +276,7 @@ function RecordBookingModal({
         <p className="text-xs text-blue-900/80">Kickback: <span className="font-semibold">{preview.toLocaleString()} {currency}</span></p>
         <div className="flex gap-2 pt-1">
           <button type="button" onClick={onClose} disabled={submitting}
-            className="flex-1 py-2 rounded-lg text-sm font-medium text-blue-900 border border-sky-300 hover:bg-sky-50 disabled:opacity-50">Cancel</button>
+            className={`flex-1 ${BTN_SECONDARY}`}>Cancel</button>
           <button type="submit" disabled={submitting}
             className="flex-1 py-2 rounded-lg text-sm font-semibold bg-blue-900 hover:bg-blue-950 text-white disabled:opacity-50">
             {submitting ? 'Saving…' : 'Record booking'}

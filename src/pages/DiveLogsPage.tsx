@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { isoDate } from '../lib/dates'
 import { format } from 'date-fns'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
@@ -25,7 +26,7 @@ import {
 type FormState = Omit<DiveLogInsert, 'user_id'>
 
 const blankForm = (): FormState => ({
-  dived_on:           new Date().toISOString().slice(0, 10),
+  dived_on:           isoDate(new Date()),
   site:               '',
   dive_type:          null,
   max_depth_m:        null,

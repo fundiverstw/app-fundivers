@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { isoDate as iso } from '../lib/dates'
+import { Spinner } from '../components/ui/Spinner'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -131,7 +133,7 @@ export function RegisterPage() {
 function Spinner() {
   return (
     <div className="flex justify-center pt-12">
-      <div className="w-6 h-6 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" />
+      <Spinner />
     </div>
   )
 }
@@ -209,7 +211,6 @@ function EventPickerStep() {
     ;(async () => {
       const today = new Date()
       const end = new Date(today); end.setMonth(end.getMonth() + 3)
-      const iso = (d: Date) => d.toISOString().slice(0, 10)
       const evs = await fetchEventsInRange(iso(today), iso(end))
       if (cancelled) return
       const upcoming = evs.filter(e => new Date(e.start_time) >= today && !e.fully_booked)
@@ -233,7 +234,7 @@ function EventPickerStep() {
 
       {loading ? (
         <div className="flex justify-center py-8">
-          <div className="w-6 h-6 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" />
+          <Spinner />
         </div>
       ) : events.length === 0 ? (
         <p className="text-blue-950 font-medium text-sm">No upcoming events available right now.</p>

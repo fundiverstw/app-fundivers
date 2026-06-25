@@ -13,7 +13,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
-import { corsOk, jsonResponse } from "../_shared/responses.ts"
+import { corsOk, jsonResponse, bearerToken } from "../_shared/responses.ts"
 
 const COMPANY_EMAIL = "fundiverstw@gmail.com"
 
@@ -38,8 +38,7 @@ Deno.serve(async (req) => {
   // client, which forwards the service-role key as the Bearer. We verify
   // the value matches our local SERVICE_KEY env so a leaked anon key can't
   // call this endpoint and trigger emails.
-  const auth  = req.headers.get("Authorization") ?? ""
-  const token = auth.startsWith("Bearer ") ? auth.slice("Bearer ".length) : ""
+  const token = bearerToken(req) ?? ""
   if (token !== SERVICE_KEY) return json({ error: "unauthorized" }, 401)
 
   let body: OfferEmailBody
