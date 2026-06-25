@@ -100,6 +100,30 @@ describe('AdminLogisticsPage', () => {
   })
 
   it('plans which vehicles carry the divers who need a ride', async () => {
+    // One on-duty staff member drives; Ada needs a ride, Bo self-transports.
+    const duties = [
+      { id: 'd1', assignee_id: 's1', role: 'guide', eo_dive_id: 'e1', eo_course_id: null, start_date: '2026-06-18', end_date: null },
+    ]
+    const withStaff = [...profiles, { id: 's1', name: 'Dana', nickname: 'Dana', contact_id: '0999', gear_owned: [] }]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: bookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: withStaff })
+      if (table === 'duties') return mockQueryBuilder({ data: duties })
+      if (table === 'vehicles') return mockQueryBuilder({ data: [
+        { id: 'v1', created_at: '', name: 'Delica', passenger_seats: 7, active: true, created_by: null },
+      ] })
+      return mockQueryBuilder({ data: [] })
+    })
+    renderPage()
+    await screen.findByText(/1 event · 2 divers/i)
+
+    // 1 diver rides + the lone staff drives → one Delica covers it.
+    const overall = screen.getByText(/^overall/i).closest('section')!
+    expect(within(overall).getByText(/Take 1 vehicle: Delica \(7\)/i)).toBeInTheDocument()
+    expect(within(overall).getByText(/7 seats for 1 rider/i)).toBeInTheDocument()
+  })
+
+  it('warns when divers need a ride but no on-duty staff can drive', async () => {
     from.mockImplementation((table: string) => {
       if (table === 'bookings') return mockQueryBuilder({ data: bookings })
       if (table === 'profiles') return mockQueryBuilder({ data: profiles })
@@ -111,10 +135,8 @@ describe('AdminLogisticsPage', () => {
     renderPage()
     await screen.findByText(/1 event · 2 divers/i)
 
-    // Only Ada needs a ride (Bo self-transports) → one Delica covers it.
     const overall = screen.getByText(/^overall/i).closest('section')!
-    expect(within(overall).getByText(/Take 1 vehicle: Delica \(7\)/i)).toBeInTheDocument()
-    expect(within(overall).getByText(/7 seats for 1 rider/i)).toBeInTheDocument()
+    expect(within(overall).getByText(/no on-duty staff to drive/i)).toBeInTheDocument()
   })
 
   it('prompts to add vehicles when riders need a ride but the fleet is empty', async () => {
