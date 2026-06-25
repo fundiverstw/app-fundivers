@@ -217,3 +217,97 @@ describe('applyCreditToBooking', () => {
     await expect(applyCreditToBooking({ bookingId: 'b1', amount: 500 })).rejects.toBeTruthy()
   })
 })
+
+describe('openCreditBalance', () => {
+  it('sums only open credits, ignoring settled, and coerces string amounts', async () => {
+    const { openCreditBalance } = await import('./credits')
+    const credits = [
+      { id: 'c1', status: 'open', amount: 5000 },
+      { id: 'c2', status: 'open', amount: '2500' },
+      { id: 'c3', status: 'settled', amount: 9999 },
+    ] as unknown as import('../types/database').Credit[]
+    expect(openCreditBalance(credits)).toBe(7500)
+  })
+
+  it('returns 0 for an empty list', async () => {
+    const { openCreditBalance } = await import('./credits')
+    expect(openCreditBalance([])).toBe(0)
+  })
+})
+
+// createCredit / settleCredit / reopenCredit all end in
+// .insert|update(...).select('*').single(); this stub captures the write
+// payload and resolves the chain to a canned row.
+function setupCreditWrite(result: { data: unknown; error?: unknown }) {
+  const single = () => Promise.resolve({ data: result.data, error: result.error ?? null })
+  const select = vi.fn(() => ({ single }))
+  const eq = vi.fn(() => ({ select }))
+  const update = vi.fn(() => ({ eq }))
+  const insert = vi.fn(() => ({ select }))
+  from.mockImplementation((table: string) => {
+    if (table === 'credits') return { insert, update }
+    throw new Error(`unexpected table: ${table}`)
+  })
+  return { insert, update }
+}
+
+const settledRow = { id: 'c9', status: 'open', amount: 1000 } as unknown as import('../types/database').Credit
+
+describe('createCredit', () => {
+  it('inserts an open credit, defaulting currency to TWD and booking_id to null', async () => {
+    const { insert } = setupCreditWrite({ data: settledRow })
+    const { createCredit } = await import('./credits')
+    await createCredit({ user_id: 'u1', amount: 1500, reason: 'Goodwill', created_by: 'admin' })
+    expect(insert).toHaveBeenCalledWith({
+      user_id: 'u1', booking_id: null, amount: 1500, currency: 'TWD',
+      reason: 'Goodwill', created_by: 'admin', status: 'open',
+    })
+  })
+
+  it('passes through an explicit currency and booking_id', async () => {
+    const { insert } = setupCreditWrite({ data: settledRow })
+    const { createCredit } = await import('./credits')
+    await createCredit({ user_id: 'u1', amount: 200, reason: 'r', created_by: 'a', booking_id: 'b1', currency: 'USD' })
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ booking_id: 'b1', currency: 'USD' }))
+  })
+
+  it('throws when the insert returns no row', async () => {
+    setupCreditWrite({ data: null, error: { message: 'insert failed' } })
+    const { createCredit } = await import('./credits')
+    await expect(createCredit({ user_id: 'u1', amount: 1, reason: 'r', created_by: 'a' })).rejects.toBeTruthy()
+  })
+})
+
+describe('settleCredit', () => {
+  it('marks the credit settled with a note and a timestamp', async () => {
+    const { update } = setupCreditWrite({ data: { ...settledRow, status: 'settled' } })
+    const { settleCredit } = await import('./credits')
+    const result = await settleCredit({ creditId: 'c9', note: 'Refunded by bank transfer' })
+    expect(result.status).toBe('settled')
+    const payload = update.mock.calls[0][0] as { status: string; settled_note: string; settled_at: string }
+    expect(payload.status).toBe('settled')
+    expect(payload.settled_note).toBe('Refunded by bank transfer')
+    expect(typeof payload.settled_at).toBe('string')
+  })
+
+  it('throws when the update returns no row', async () => {
+    setupCreditWrite({ data: null })
+    const { settleCredit } = await import('./credits')
+    await expect(settleCredit({ creditId: 'c9', note: 'x' })).rejects.toBeTruthy()
+  })
+})
+
+describe('reopenCredit', () => {
+  it('clears the settled fields and flips status back to open', async () => {
+    const { update } = setupCreditWrite({ data: settledRow })
+    const { reopenCredit } = await import('./credits')
+    await reopenCredit('c9')
+    expect(update).toHaveBeenCalledWith({ status: 'open', settled_at: null, settled_note: null })
+  })
+
+  it('throws when the update returns no row', async () => {
+    setupCreditWrite({ data: null })
+    const { reopenCredit } = await import('./credits')
+    await expect(reopenCredit('c9')).rejects.toBeTruthy()
+  })
+})
