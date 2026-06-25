@@ -72,7 +72,7 @@ function eventBarClass(ev: AppEvent, hovered: boolean): string {
 
 // Closed-eye (eye-off) marker for private dives — admin-only, since private
 // events are filtered out of every diver-facing fetch before they'd render.
-function EyeOffIcon({ className = 'w-3.5 h-3.5 text-blue-900/70 shrink-0' }: { className?: string }) {
+function PrivateIcon({ className = 'w-3.5 h-3.5 text-blue-900/70 shrink-0' }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
          className={className} role="img" aria-label="Private">
@@ -367,7 +367,7 @@ export function MonthCalendar({
                   <span className={`text-xs px-1.5 py-0.5 rounded-full ${eventBarClass(ev, false)}`}>
                     {TYPE_LABELS[ev.type]}
                   </span>
-                  {ev.is_private && <EyeOffIcon />}
+                  {ev.is_private && <PrivateIcon />}
                   <span className="font-medium text-blue-900 text-sm">{ev.title}</span>
                   {ev.featured && <span className="text-xs text-red-600">★</span>}
                 </div>
@@ -713,7 +713,7 @@ function EventBar({
     >
       {seg.showTitle ? (
         <>
-          {seg.event.is_private && <EyeOffIcon className="inline-block w-2.5 h-2.5 align-text-bottom mr-0.5" />}
+          {seg.event.is_private && <PrivateIcon className="inline-block w-2.5 h-2.5 align-text-bottom mr-0.5" />}
           {seg.event.featured && '★ '}
           {seg.event.calendar_title || seg.event.title}
         </>
