@@ -16,6 +16,11 @@ vi.mock('../components/dashboard/FrogBouncer', () => ({
 vi.mock('../components/dashboard/NudibranchBouncer', () => ({
   NudibranchBouncer: () => null,
 }))
+// FeaturedEvents fetches on mount; it has its own test. Stub it here so these
+// tests stay focused on the bubble overlay and welcome banner.
+vi.mock('../components/dashboard/FeaturedEvents', () => ({
+  FeaturedEvents: () => null,
+}))
 
 // happy-dom provides a Canvas stub but getContext returns null by default.
 // We replace it with a minimal 2d-context stand-in so the effect can complete
