@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { isoDate as iso } from '../lib/dates'
-import { Spinner } from '../components/ui/Spinner'
+import { Spinner, PageLoading } from '../components/ui/Spinner'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -90,7 +90,7 @@ export function RegisterPage() {
       </header>
 
       <main className="max-w-lg mx-auto p-4 space-y-5">
-        {phase === 'loading' && <Spinner />}
+        {phase === 'loading' && <PageLoading />}
 
         {phase === 'event-picker' && <EventPickerStep />}
 
@@ -126,14 +126,6 @@ export function RegisterPage() {
           </>
         )}
       </main>
-    </div>
-  )
-}
-
-function Spinner() {
-  return (
-    <div className="flex justify-center pt-12">
-      <Spinner />
     </div>
   )
 }
