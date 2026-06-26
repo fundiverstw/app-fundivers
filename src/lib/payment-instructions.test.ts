@@ -19,14 +19,14 @@ describe('paymentInstructionsFor', () => {
     expect(body.toLowerCase()).toContain('in person')
   })
 
-  it('bank_transfer → local bank details (code, account, name, branch)', () => {
+  it('bank_transfer → tells the diver the bank details arrive by email (no raw account details)', () => {
     const i = paymentInstructionsFor('bank_transfer')
     expect(i.title).toMatch(/bank transfer/i)
-    const body = i.lines.join(' ')
-    expect(body).toMatch(/code/i)
-    expect(body).toMatch(/account/i)
-    expect(body).toMatch(/name/i)
-    expect(body).toMatch(/branch/i)
+    const body = i.lines.join(' ').toLowerCase()
+    expect(body).toContain('email')
+    expect(body).toContain('bank transfer details')
+    // The real account number/name/branch must not be embedded anymore.
+    expect(body).not.toMatch(/code:|account:|branch:/)
   })
 
   it('paypal → paypal.me link + name-in-note instruction', () => {

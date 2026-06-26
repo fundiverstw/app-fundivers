@@ -950,10 +950,9 @@ describe('RegisterForm', () => {
     await user.click(screen.getByLabelText(/i have all the required gear/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
-    // Default = bank_transfer → local bank-details block.
+    // Default = bank_transfer → "details by email" block (no raw account info).
     expect(screen.getByText(/how to pay — local bank transfer/i)).toBeInTheDocument()
-    expect(screen.getByText(/code:/i)).toBeInTheDocument()
-    expect(screen.getByText(/branch:/i)).toBeInTheDocument()
+    expect(screen.getByText(/bank transfer details shortly/i)).toBeInTheDocument()
 
     // Switch to PayPal → paypal.me link block.
     await user.click(screen.getByLabelText(/^paypal/i))

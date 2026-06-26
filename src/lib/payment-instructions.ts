@@ -8,11 +8,6 @@ export const SHOP_PHONE    = '+886 909-083-683'
 export const SHOP_ADDRESS  = 'No. 8, Heping St, Yonghe District, New Taipei City, 23446'
 export const SHOP_MAPS_URL = 'https://maps.app.goo.gl/tDgtMirMrNX9QEjAA'
 
-export const BANK_CODE           = '822'
-export const BANK_ACCOUNT_NUMBER = '1305 4100 1904'
-export const BANK_ACCOUNT_NAME   = 'Wong, Dennis'
-export const BANK_BRANCH         = 'Shuang He'
-
 export const PAYPAL_LINK = 'https://paypal.me/fundiverstw'
 
 export type PaymentMethod = 'bank_transfer' | 'credit_card' | 'paypal' | 'cash'
@@ -46,10 +41,7 @@ export function paymentInstructionsFor(
       return {
         title: 'How to pay — Local bank transfer',
         lines: [
-          `Code: ${BANK_CODE}`,
-          `Account: ${BANK_ACCOUNT_NUMBER}`,
-          `Name: ${BANK_ACCOUNT_NAME}`,
-          `Branch: ${BANK_BRANCH}`,
+          "We'll email you our bank transfer details shortly so you can complete your payment.",
         ],
       }
     case 'paypal':
