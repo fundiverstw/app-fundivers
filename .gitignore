@@ -18,6 +18,9 @@ dist-ssr
 # Reference-only Wix site code — not part of the app build
 wix/
 
+# Competitor research — opposition research notes, not part of the app
+competitors/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
