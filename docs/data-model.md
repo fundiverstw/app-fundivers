@@ -137,6 +137,10 @@ Notable milestones to skim if you're new to the schema:
 - `20260624000000_vehicles.sql` — transport-fleet catalog.
 - `20260627000000_event_vehicles.sql` — per-event car allocation
   (exclusive per date via unique `(vehicle_id, event_date)`).
+- `20260628000000_event_ride_seats.sql` — `event_ride_seats()` SECURITY
+  DEFINER RPC: an event's ride-seat capacity (distinct assigned cars) and
+  claimed count (transportation=true bookings), readable by any diver so the
+  registration form can gate the "I need a ride" option.
 - `20260423130000_core_rls_and_booking_immutability.sql` — the
   bookings-immutable-once-inserted trigger; the policy that makes
   divers' bookings tamper-resistant by design.

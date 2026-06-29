@@ -5,6 +5,7 @@ import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
 import { supabase } from '../../lib/supabase'
 import { formatEventSpan, isPastEvent } from '../../lib/events'
 import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/payment-instructions'
+import { fetchRideSeats, canRequestRide, type RideSeats } from '../../lib/event-vehicles'
 import type { AppEvent, Booking, BookingDetails, Database, Profile } from '../../types/database'
 
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
@@ -80,6 +81,22 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
     for (const c of children) m.set(c.id, c)
     return m
   }, [children])
+
+  // Ride-seat tally per dive in the cart — gates each event's "ride with the
+  // shop" option when the cars assigned to it are full. Best-effort per event.
+  const [rideSeatsByEvent, setRideSeatsByEvent] = useState<Record<string, RideSeats>>({})
+  const diveKey = cart.filter(e => e.type === 'dive').map(e => e.id).join(',')
+  useEffect(() => {
+    let cancelled = false
+    for (const ev of cart) {
+      if (ev.type !== 'dive') continue
+      fetchRideSeats({ dive_id: ev.id })
+        .then(seats => { if (!cancelled) setRideSeatsByEvent(prev => ({ ...prev, [ev.id]: seats })) })
+        .catch(() => { /* fail open for that event */ })
+    }
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [diveKey])
 
   // Per-event choices live in a map keyed by event id; initialized lazily.
   const [choicesById, setChoicesById] = useState<Record<string, EventChoices>>(() => {
@@ -500,6 +517,10 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                   (ev.type === 'course' && !isGearIncludedCourse(ev.title))
                 const transportSurcharge = ev.transport_price ?? 0
                 const transportIncluded = transportSurcharge <= 0
+                const evSeats = rideSeatsByEvent[ev.id]
+                const rideAllowed = ev.type !== 'dive' || !evSeats
+                  ? true
+                  : canRequestRide({ capacity: evSeats.capacity, claimed: evSeats.claimed, alreadyHasRide: false })
                 const targetForDiverId = forDiverByEvent[ev.id] ?? null
                 const targetProfile = targetForDiverId
                   ? (childById.get(targetForDiverId) ?? profile)
@@ -558,15 +579,21 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                     )}
                     <fieldset className="space-y-1">
                       <legend className="text-xs font-semibold text-blue-900">Transportation *</legend>
-                      <label className="flex items-start gap-2 text-sm text-blue-950 font-medium">
-                        <input type="radio" name={`t-${ev.id}`} checked={c.needsTransport === true} onChange={() => updateChoice(ev.id, { needsTransport: true })} className="accent-blue-900 mt-1" />
+                      <label className={`flex items-start gap-2 text-sm font-medium ${rideAllowed ? 'text-blue-950' : 'text-blue-950/40'}`}>
+                        <input type="radio" name={`t-${ev.id}`} checked={c.needsTransport === true} disabled={!rideAllowed} onChange={() => updateChoice(ev.id, { needsTransport: true })} className="accent-blue-900 mt-1" />
                         <span className="flex-1">
                           Yes, ride with the shop
                           {!transportIncluded && transportSurcharge > 0 && (
                             <span className="block text-xs text-blue-950 font-medium">+{transportSurcharge.toLocaleString()} {ev.currency}</span>
                           )}
-                          {transportIncluded && (
+                          {transportIncluded && rideAllowed && (
                             <span className="block text-xs text-blue-950 font-medium">Included in base price</span>
+                          )}
+                          {!rideAllowed && (
+                            <span className="block text-xs text-red-600 font-semibold">Shop ride is full for this dive.</span>
+                          )}
+                          {rideAllowed && evSeats && evSeats.capacity > 0 && (
+                            <span className="block text-xs text-blue-950/70 font-medium">{evSeats.available} ride seat{evSeats.available === 1 ? '' : 's'} left</span>
                           )}
                         </span>
                       </label>

@@ -5,14 +5,16 @@ import { MultiRegisterForm } from './MultiRegisterForm'
 import { mockQueryBuilder } from '../../../tests/test-utils'
 import type { AppEvent, Profile } from '../../types/database'
 
-const { from, invoke } = vi.hoisted(() => ({
+const { from, invoke, rpc } = vi.hoisted(() => ({
   from: vi.fn(),
   invoke: vi.fn(),
+  rpc: vi.fn(),
 }))
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: (...a: unknown[]) => from(...a),
+    rpc: (...a: unknown[]) => rpc(...a),
     functions: { invoke: (...a: unknown[]) => invoke(...a) },
   },
 }))
@@ -59,8 +61,10 @@ function setupFrom(children: Profile[]) {
 }
 
 beforeEach(() => {
-  from.mockReset(); invoke.mockReset()
+  from.mockReset(); invoke.mockReset(); rpc.mockReset()
   invoke.mockResolvedValue({ data: { booking_id: 'b-new', status: 'pending' }, error: null })
+  // Default: no cars assigned (capacity 0) → ride gate fails open everywhere.
+  rpc.mockResolvedValue({ data: [{ capacity: 0, claimed: 0 }], error: null })
 })
 
 describe('MultiRegisterForm parent diver picker', () => {
@@ -206,6 +210,29 @@ describe('MultiRegisterForm parent diver picker', () => {
     expect(screen.getByText('Grand total')).toBeInTheDocument()
     const fees = screen.getAllByText(/TWD 2,800/)
     expect(fees.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('disables a dive\'s ride option when its assigned cars are full', async () => {
+    setupFrom([])
+    rpc.mockImplementation((name: string) =>
+      Promise.resolve(name === 'event_ride_seats'
+        ? { data: [{ capacity: 4, claimed: 4 }], error: null }
+        : { data: [], error: null }))
+    const user = userEvent.setup()
+    render(
+      <MultiRegisterForm
+        events={[sampleEvent('e1', 'Kenting')]}
+        profile={parentProfile} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    expect(await screen.findByText(/shop ride is full for this dive/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/yes, ride with the shop/i)).toBeDisabled()
+    expect(screen.getByLabelText(/no, i'll get there myself/i)).not.toBeDisabled()
   })
 
   it('shows a disabled "Submitting…" state while the booking round-trip is pending', async () => {

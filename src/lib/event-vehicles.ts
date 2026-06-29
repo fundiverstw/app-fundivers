@@ -54,3 +54,42 @@ export function allocationEventId(a: EventVehicle): string | null {
 export function availableVehicles(active: Vehicle[], allocatedIds: Set<string>): Vehicle[] {
   return active.filter(v => !allocatedIds.has(v.id))
 }
+
+export interface RideSeats {
+  /** Passenger seats across the cars assigned to the event (driver excluded). */
+  capacity: number
+  /** Divers already holding a ride (non-cancelled, transportation = true). */
+  claimed: number
+  /** Free seats = max(0, capacity - claimed). */
+  available: number
+}
+
+// Ride-seat tally for an event, via the event_ride_seats SECURITY DEFINER RPC
+// (20260628000000) — the only way the registration form, run as a plain diver,
+// can learn the count without read access to event_vehicles / others' bookings.
+export async function fetchRideSeats(
+  event: { dive_id?: string | null; course_id?: string | null },
+): Promise<RideSeats> {
+  const { data, error } = await supabase.rpc('event_ride_seats', {
+    p_dive_id: event.dive_id ?? null,
+    p_course_id: event.course_id ?? null,
+  })
+  if (error) throw error
+  const row = (data as { capacity: number; claimed: number }[] | null)?.[0]
+  const capacity = row?.capacity ?? 0
+  const claimed = row?.claimed ?? 0
+  return { capacity, claimed, available: Math.max(0, capacity - claimed) }
+}
+
+// Whether the registration form should still offer "Yes, I need a ride".
+//   - capacity 0 → no cars assigned yet, ride capacity isn't configured, so
+//     don't block (keeps the plan-the-van-later flow working).
+//   - otherwise allow only while a seat is free. A diver editing a booking that
+//     already holds a ride keeps it — their own claim is credited back.
+export function canRequestRide(
+  args: { capacity: number; claimed: number; alreadyHasRide: boolean },
+): boolean {
+  if (args.capacity <= 0) return true
+  if (args.alreadyHasRide) return true
+  return args.capacity - args.claimed > 0
+}

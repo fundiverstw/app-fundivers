@@ -10,6 +10,7 @@ import { paymentInstructionsFor } from '../../lib/payment-instructions'
 import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../lib/gear'
 import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
 import { fetchCreditsForUser, openCreditBalance, applyCreditToBooking } from '../../lib/credits'
+import { fetchRideSeats, canRequestRide, type RideSeats } from '../../lib/event-vehicles'
 import { PasswordInput } from '../PasswordInput'
 import { uploadCertCard } from '../../lib/cert-card'
 import { uploadNitroxCard } from '../../lib/nitrox-card'
@@ -474,6 +475,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const [needsTransport, setNeedsTransport] = useState<boolean | null>(
     initialDetails?.transportation ?? null
   )
+  // Ride-seat tally from the cars assigned to this dive — gates the "I need a
+  // ride" option when the assigned fleet is full. null until loaded.
+  const [rideSeats, setRideSeats] = useState<RideSeats | null>(null)
   const [addNitroxCourse, setAddNitroxCourse] = useState(initialDetails?.nitrox_course_addon ?? false)
   const [payment, setPayment] = useState<'bank_transfer' | 'credit_card' | 'paypal' | 'cash'>(
     initialDetails?.payment_method ?? 'bank_transfer'
@@ -614,6 +618,17 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     return () => { cancelled = true }
   }, [creditEligible, userId])
 
+  // Load this dive's ride-seat tally to gate the transport opt-in. Best-effort:
+  // on failure rideSeats stays null and the gate fails open (option offered).
+  useEffect(() => {
+    if (event.type !== 'dive') return
+    let cancelled = false
+    fetchRideSeats({ dive_id: event.id })
+      .then(seats => { if (!cancelled) setRideSeats(seats) })
+      .catch(() => { /* fail open — no gate */ })
+    return () => { cancelled = true }
+  }, [event.type, event.id])
+
   const gearCost = useMemo(() => {
     if (!showGearRentChoice || gearChoice !== 'rent') return 0
     return gearItems.reduce((s, item) => s + (GEAR_ALACARTE_PRICES[item] ?? 0) * diveDays, 0)
@@ -636,6 +651,15 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const transportSurcharge = event.transport_price ?? 0
   const transportIncluded = transportSurcharge <= 0
   const transportCost = !transportIncluded && needsTransport === true ? transportSurcharge : 0
+  // Gate the ride opt-in on assigned-car seats. Fail open while loading (null).
+  // A diver editing a booking that already holds a ride keeps the option.
+  const rideAllowed = rideSeats == null
+    ? true
+    : canRequestRide({
+      capacity: rideSeats.capacity,
+      claimed: rideSeats.claimed,
+      alreadyHasRide: initialDetails?.transportation === true,
+    })
   const subTotal = base + gearCost + roomCost + addonsCost + transportCost + ((showNitroxAddon && addNitroxCourse) ? NITROX_COURSE_FEE : 0)
 
   // The card/PayPal surcharge applies only to what actually goes on the card
@@ -1459,15 +1483,25 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
           <fieldset className="space-y-2">
             <legend className="text-sm font-semibold text-blue-900">Transportation *</legend>
-            <label className="flex gap-2 text-sm text-blue-950 font-medium items-start">
-              <input type="radio" name="transport" checked={needsTransport === true} onChange={() => setNeedsTransport(true)} className="accent-blue-900 mt-1" />
+            <label className={`flex gap-2 text-sm font-medium items-start ${rideAllowed ? 'text-blue-950' : 'text-blue-950/40'}`}>
+              <input type="radio" name="transport" checked={needsTransport === true} disabled={!rideAllowed} onChange={() => setNeedsTransport(true)} className="accent-blue-900 mt-1" />
               <span className="flex-1">
                 <span className="block">Yes, I'll ride with the shop from the dive shop to the site</span>
                 {!transportIncluded && transportSurcharge > 0 && (
                   <span className="block text-xs text-blue-950 font-medium">+{transportSurcharge.toLocaleString()} {event.currency}</span>
                 )}
-                {transportIncluded && (
+                {transportIncluded && rideAllowed && (
                   <span className="block text-xs text-blue-950 font-medium">Included in base price</span>
+                )}
+                {!rideAllowed && (
+                  <span className="block text-xs text-red-600 font-semibold">
+                    The shop ride is full for this dive — please arrange your own transport or contact the shop.
+                  </span>
+                )}
+                {rideAllowed && rideSeats != null && rideSeats.capacity > 0 && (
+                  <span className="block text-xs text-blue-950/70 font-medium">
+                    {rideSeats.available} ride seat{rideSeats.available === 1 ? '' : 's'} left
+                  </span>
                 )}
               </span>
             </label>
