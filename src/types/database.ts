@@ -107,6 +107,17 @@ export interface Database {
         }
         Returns: Array<{ event_id: string; event_type: 'dive' | 'course'; n: number }>
       }
+      // Defined in 20260628000000_event_ride_seats.sql. Ride-seat tally for an
+      // event: capacity (sum of passenger_seats over the distinct assigned
+      // vehicles) and claimed (non-cancelled bookings with transportation=true).
+      // SECURITY DEFINER so the registration form can read it as a plain diver.
+      event_ride_seats: {
+        Args: {
+          p_dive_id:   string | null
+          p_course_id: string | null
+        }
+        Returns: Array<{ capacity: number; claimed: number }>
+      }
       // Defined in 20260603000000_terms_consent_versioning.sql.
       // Server-stamps both agreed_to_terms_at (now()) and
       // agreed_to_terms_version (caller-supplied) on the caller's

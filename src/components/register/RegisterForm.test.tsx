@@ -190,6 +190,44 @@ describe('RegisterForm', () => {
     expect(onBooked.mock.calls[0][0]).toEqual({ id: 'b-new', status: 'pending' })
   })
 
+  it('disables the "I need a ride" option when the assigned cars are full', async () => {
+    setupFrom()
+    // event_ride_seats reports 7 capacity / 7 claimed → no seats left.
+    rpc.mockImplementation((name: string) =>
+      Promise.resolve(name === 'event_ride_seats'
+        ? { data: [{ capacity: 7, claimed: 7 }], error: null }
+        : { data: 0, error: null }))
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i })) // step 1 → 2
+    await user.click(screen.getByRole('button', { name: /next/i })) // step 2 → 3
+
+    expect(await screen.findByText(/the shop ride is full/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/yes, i'll ride with the shop/i)).toBeDisabled()
+    expect(screen.getByLabelText(/no, i don't need a ride/i)).not.toBeDisabled()
+  })
+
+  it('shows remaining ride seats when the assigned cars still have room', async () => {
+    setupFrom()
+    rpc.mockImplementation((name: string) =>
+      Promise.resolve(name === 'event_ride_seats'
+        ? { data: [{ capacity: 7, claimed: 5 }], error: null }
+        : { data: 0, error: null }))
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    expect(await screen.findByText(/2 ride seats left/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/yes, i'll ride with the shop/i)).not.toBeDisabled()
+  })
+
   it('offers and applies the diver\'s account credit at checkout for a solo booking', async () => {
     const openCredit = {
       id: 'c1', user_id: 'u1', booking_id: null, amount: 2000, currency: 'TWD',

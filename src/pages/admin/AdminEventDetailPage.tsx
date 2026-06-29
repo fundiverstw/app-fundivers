@@ -23,8 +23,7 @@ import { BookingPaymentsBlock } from '../../components/admin/BookingPaymentsBloc
 import { resolveCharges, type ChargeLine } from '../../lib/booking-charges'
 import { openCreditForBooking } from '../../lib/credits'
 import { bookingBalance } from '../../lib/booking-balance'
-import { splitByTransport } from '../../lib/logistics'
-import { TransportGroup } from '../../components/admin/TransportGroup'
+import { EventTransportPanel } from '../../components/admin/EventTransportPanel'
 import { ShareEventButton } from '../../components/ShareEventButton'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Credit, DiverNote, Payment, Profile } from '../../types/database'
 import { BTN_SECONDARY, ERROR_NOTE_LIGHT } from '../../styles/tokens'
@@ -516,8 +515,16 @@ export function AdminEventDetailPage() {
             </section>
           )}
 
-          {view === 'transportation' && (
-            <TransportationView registrants={registrants} />
+          {view === 'transportation' && event && (
+            <EventTransportPanel
+              event={event}
+              registrants={registrants}
+              isAdmin={isAdmin}
+              createdBy={profile?.id ?? null}
+              onRideChanged={(bookingId, details) => setRegistrants(prev => prev.map(r =>
+                r.booking.id === bookingId ? { ...r, booking: { ...r.booking, details } } : r,
+              ))}
+            />
           )}
 
           {view === 'balances' && (
@@ -1526,31 +1533,6 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
     >
       {children}
     </button>
-  )
-}
-
-function TransportationView({ registrants }: { registrants: Registrant[] }) {
-  // Cancelled bookings aren't coming on the trip — they'd skew the count for
-  // whoever's planning the van.
-  const active = registrants.filter(r => r.booking.status !== 'cancelled')
-  const { needsRide, selfTransport, unspecified } = splitByTransport(active)
-
-  return (
-    <section className="space-y-3">
-      <TransportGroup title="Needs ride" rows={needsRide} emptyHint="No one has asked for a ride." />
-      <TransportGroup title="Self-transport" rows={selfTransport} emptyHint="No one has opted to drive themselves." />
-      {unspecified.length > 0 && (
-        <TransportGroup
-          title="Not specified"
-          rows={unspecified}
-          emptyHint=""
-          note="Legacy bookings from before transport was a required question."
-        />
-      )}
-      {registrants.some(r => r.booking.status === 'cancelled') && (
-        <p className="text-xs text-blue-950/70 font-medium italic">Cancelled bookings hidden.</p>
-      )}
-    </section>
   )
 }
 

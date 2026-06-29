@@ -1,15 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mockQueryBuilder } from '../../tests/test-utils'
 import {
-  availableVehicles, allocationEventId,
-  fetchVehicleAllocationsForDate, assignVehicleToEvent, unassignVehicle,
+  availableVehicles, allocationEventId, canRequestRide,
+  fetchVehicleAllocationsForDate, assignVehicleToEvent, unassignVehicle, fetchRideSeats,
 } from './event-vehicles'
 import { supabase } from './supabase'
 import type { EventVehicle, Vehicle } from '../types/database'
 
-vi.mock('./supabase', () => ({ supabase: { from: vi.fn() } }))
+vi.mock('./supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }))
 const from = supabase.from as unknown as ReturnType<typeof vi.fn>
-beforeEach(() => from.mockReset())
+const rpc = supabase.rpc as unknown as ReturnType<typeof vi.fn>
+beforeEach(() => { from.mockReset(); rpc.mockReset() })
 
 const vehicle = (id: string, name: string, seats = 7, active = true): Vehicle => ({
   id, name, passenger_seats: seats, active, created_at: '', created_by: null,
@@ -103,5 +104,43 @@ describe('unassignVehicle', () => {
   it('surfaces a supabase error', async () => {
     from.mockReturnValue(mockQueryBuilder({ error: { message: 'boom' } }))
     await expect(unassignVehicle('a1')).rejects.toBeTruthy()
+  })
+})
+
+describe('fetchRideSeats', () => {
+  it('derives available from the RPC capacity/claimed', async () => {
+    rpc.mockResolvedValue({ data: [{ capacity: 7, claimed: 2 }], error: null })
+    expect(await fetchRideSeats({ dive_id: 'D1' })).toEqual({ capacity: 7, claimed: 2, available: 5 })
+    expect(rpc).toHaveBeenCalledWith('event_ride_seats', { p_dive_id: 'D1', p_course_id: null })
+  })
+
+  it('never reports negative availability', async () => {
+    rpc.mockResolvedValue({ data: [{ capacity: 4, claimed: 9 }], error: null })
+    expect(await fetchRideSeats({ dive_id: 'D1' })).toEqual({ capacity: 4, claimed: 9, available: 0 })
+  })
+
+  it('treats an empty result as 0/0', async () => {
+    rpc.mockResolvedValue({ data: [], error: null })
+    expect(await fetchRideSeats({ course_id: 'C1' })).toEqual({ capacity: 0, claimed: 0, available: 0 })
+  })
+
+  it('surfaces a supabase error', async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: 'boom' } })
+    await expect(fetchRideSeats({ dive_id: 'D1' })).rejects.toBeTruthy()
+  })
+})
+
+describe('canRequestRide', () => {
+  it('allows when no cars are assigned yet (capacity 0 = unconfigured)', () => {
+    expect(canRequestRide({ capacity: 0, claimed: 5, alreadyHasRide: false })).toBe(true)
+  })
+  it('allows while a seat is free', () => {
+    expect(canRequestRide({ capacity: 7, claimed: 6, alreadyHasRide: false })).toBe(true)
+  })
+  it('blocks when the assigned cars are full', () => {
+    expect(canRequestRide({ capacity: 7, claimed: 7, alreadyHasRide: false })).toBe(false)
+  })
+  it('lets a diver who already holds a ride keep it even when full', () => {
+    expect(canRequestRide({ capacity: 7, claimed: 7, alreadyHasRide: true })).toBe(true)
   })
 })

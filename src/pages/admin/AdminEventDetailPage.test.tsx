@@ -670,7 +670,7 @@ describe('AdminEventDetailPage', () => {
     })
   })
 
-  it('Transportation tab groups divers by transport choice and excludes cancelled bookings', async () => {
+  it('Transportation tab lets an admin set each diver\'s ride choice and excludes cancelled bookings', async () => {
     fetchEventsForBookings.mockResolvedValue(new Map([
       ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
     ]))
@@ -712,19 +712,25 @@ describe('AdminEventDetailPage', () => {
     await screen.findByText('Ada Lovelace')
     await user.click(screen.getByRole('tab', { name: /^transportation$/i }))
 
-    // Group counts (Ada + Bob = 2 need ride; Carol = 1 self-transport; Dave = 1 not specified).
-    const needsGroup  = screen.getByRole('group', { name: /needs ride/i })
-    const selfGroup   = screen.getByRole('group', { name: /self-transport/i })
-    const legacyGroup = screen.getByRole('group', { name: /not specified/i })
+    // Admin sees an editable "Ride choices" list with every active diver and
+    // their current choice reflected on the segmented control.
+    const choices = await screen.findByRole('group', { name: /ride choices/i })
+    const rowOf = (name: string) => within(choices).getByText(name).closest('li') as HTMLElement
 
-    expect(within(needsGroup).getByText('Ada Lovelace')).toBeInTheDocument()
-    expect(within(needsGroup).getByText('Bob Roberts')).toBeInTheDocument()
-    expect(within(selfGroup).getByText('Carol Carlson')).toBeInTheDocument()
-    expect(within(legacyGroup).getByText('Dave Diver')).toBeInTheDocument()
+    expect(within(rowOf('Ada Lovelace')).getByRole('button', { name: 'Needs ride' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(rowOf('Carol Carlson')).getByRole('button', { name: 'Self' })).toHaveAttribute('aria-pressed', 'true')
+    // Legacy (unspecified) diver: neither option pre-selected.
+    expect(within(rowOf('Dave Diver')).getByRole('button', { name: 'Needs ride' })).toHaveAttribute('aria-pressed', 'false')
+    expect(within(rowOf('Dave Diver')).getByRole('button', { name: 'Self' })).toHaveAttribute('aria-pressed', 'false')
 
-    // Cancelled diver hidden from every group, and a footer note explains why.
+    // Cancelled diver excluded, with a footer note explaining why.
     expect(screen.queryByText('Eve Tester')).not.toBeInTheDocument()
     expect(screen.getByText(/cancelled bookings hidden/i)).toBeInTheDocument()
+
+    // Flipping Ada to Self updates her control (logistics-only; persisted via
+    // the mocked bookings update).
+    await user.click(within(rowOf('Ada Lovelace')).getByRole('button', { name: 'Self' }))
+    expect(within(rowOf('Ada Lovelace')).getByRole('button', { name: 'Self' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('surfaces the export error from the edge function', async () => {
