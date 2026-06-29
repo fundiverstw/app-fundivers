@@ -581,6 +581,30 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['vehicles']['Insert']>
         Relationships: []
       }
+      event_vehicles: {
+        Row: {
+          id: string
+          created_at: string
+          created_by: string | null
+          vehicle_id: string
+          event_date: string
+          eo_dive_id: string | null
+          eo_course_id: string | null
+          notes: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          created_by?: string | null
+          vehicle_id: string
+          event_date: string
+          eo_dive_id?: string | null
+          eo_course_id?: string | null
+          notes?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['event_vehicles']['Insert']>
+        Relationships: []
+      }
       trips: {
         Row: {
           id: string
@@ -1312,6 +1336,8 @@ export type DiveLogInsert = Database['public']['Tables']['dive_logs']['Insert']
 // Transport fleet — shop vehicles for logistics ride planning
 export type Vehicle = Database['public']['Tables']['vehicles']['Row']
 export type VehicleInsert = Database['public']['Tables']['vehicles']['Insert']
+export type EventVehicle = Database['public']['Tables']['event_vehicles']['Row']
+export type EventVehicleInsert = Database['public']['Tables']['event_vehicles']['Insert']
 
 // Trip Board — partner referral network
 export type PartnerShop = Database['public']['Tables']['partner_shops']['Row']
