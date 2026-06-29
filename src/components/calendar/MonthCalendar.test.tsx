@@ -336,6 +336,25 @@ describe('MonthCalendar course color buckets', () => {
     }
   })
 
+  it('renders DSD / Try Dive and Refresher courses in pink', () => {
+    render(
+      <MonthCalendar
+        month={new Date('2030-06-15')}
+        onMonthChange={() => {}}
+        events={[
+          makeCourse('c-dsd',       'Discover Scuba Diving'),
+          makeCourse('c-refresher', 'Refresher Course'),
+        ]}
+        onPickEvent={() => {}}
+      />
+    )
+    for (const t of ['Discover Scuba Diving', 'Refresher Course']) {
+      const bar = screen.getByTitle(t)
+      expect(bar.className).toMatch(/bg-pink/)
+      expect(bar.className).not.toMatch(/bg-purple/)
+    }
+  })
+
   it('classifies titles correctly even with a capacity suffix appended', () => {
     // display_title_capacity_suffix trigger appends "(2 spots open)" /
     // "(fully booked -- register for waitlist)" — the color bucket must

@@ -26,7 +26,7 @@ import type { AppEvent, StaffBusyEntry } from '../../types/database'
 // The color buckets (course title / dive destination matching) live in
 // src/lib/event-colors.ts so they stay unit-testable; this file only owns
 // the Tailwind classes each bucket maps to.
-//   Courses: ow → blue, aow → orange, rescue → red, specialty → purple.
+//   Courses: ow → blue, aow → orange, dsd → pink, rescue → red, specialty → purple.
 //   Dives:   local → green, trip (boat or beyond Keelung) → yellow.
 
 // Yellow needs dark text to stay legible; every other fill pairs with white.
@@ -40,18 +40,21 @@ const DIVE_TRIP_DOT        = 'bg-yellow-400'
 const COURSE_BAR: Record<CourseColor, string> = {
   ow:        'bg-blue-600 text-white',
   aow:       'bg-orange-500 text-white',
+  dsd:       'bg-pink-500 text-white',
   rescue:    'bg-red-600 text-white',
   specialty: 'bg-purple-600 text-white',
 }
 const COURSE_BAR_HOVER: Record<CourseColor, string> = {
   ow:        'bg-blue-500 text-white',
   aow:       'bg-orange-400 text-white',
+  dsd:       'bg-pink-400 text-white',
   rescue:    'bg-red-500 text-white',
   specialty: 'bg-purple-500 text-white',
 }
 const COURSE_DOT: Record<CourseColor, string> = {
   ow:        'bg-blue-600',
   aow:       'bg-orange-500',
+  dsd:       'bg-pink-500',
   rescue:    'bg-red-600',
   specialty: 'bg-purple-600',
 }
@@ -827,6 +830,7 @@ function FilterLegend({
           <span className="w-2 h-2 rounded-full overflow-hidden flex" aria-hidden="true">
             <span className={`flex-1 ${COURSE_DOT.ow}`} />
             <span className={`flex-1 ${COURSE_DOT.aow}`} />
+            <span className={`flex-1 ${COURSE_DOT.dsd}`} />
             <span className={`flex-1 ${COURSE_DOT.rescue}`} />
             <span className={`flex-1 ${COURSE_DOT.specialty}`} />
           </span>
