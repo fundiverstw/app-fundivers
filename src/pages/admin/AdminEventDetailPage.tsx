@@ -479,10 +479,11 @@ export function AdminEventDetailPage() {
         </>
       )}
 
-      {registrants.length === 0 ? (
-        <p className="text-blue-950 font-medium text-sm">No one has registered for this event yet.</p>
-      ) : (
+      {event && (
         <>
+          {/* Tabs are available even before anyone registers — an admin needs
+              to assign cars and set transport info on a fresh event (the
+              registration ride-gate depends on cars being assigned first). */}
           <nav role="tablist" aria-label="Event sections" className="flex gap-2">
             <TabButton active={view === 'registrants'} onClick={() => setView('registrants')}>
               Registrants ({activeRegistrants.length})
@@ -497,7 +498,9 @@ export function AdminEventDetailPage() {
 
           {view === 'registrants' && (
             <section className="space-y-2">
-              {activeRegistrants.length === 0 ? (
+              {registrants.length === 0 ? (
+                <p className="text-blue-950 font-medium text-sm">No one has registered for this event yet.</p>
+              ) : activeRegistrants.length === 0 ? (
                 <p className="text-blue-950 font-medium text-sm">No active registrants — every booking for this event was cancelled.</p>
               ) : (
                 activeRegistrants.map(renderRegistrant)

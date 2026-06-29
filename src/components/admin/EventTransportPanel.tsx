@@ -2,13 +2,9 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { splitByTransport } from '../../lib/logistics'
 import { TransportGroup } from './TransportGroup'
-import { EventVehicleGroup } from './EventVehicleGroup'
+import { EventCarAssignment } from './EventCarAssignment'
 import { setBookingTransportation } from '../../lib/booking-transport'
-import { fetchVehicles } from '../../lib/vehicles'
-import {
-  fetchVehicleAllocationsForDate, availableVehicles, allocationEventId,
-} from '../../lib/event-vehicles'
-import type { AppEvent, Booking, BookingDetails, EventVehicle, Profile, Vehicle } from '../../types/database'
+import type { AppEvent, Booking, BookingDetails, Profile } from '../../types/database'
 
 export interface TransportRegistrant {
   booking: Booking
@@ -59,8 +55,8 @@ export function EventTransportPanel({ event, registrants, isAdmin, createdBy, on
       {isDive && (
         <>
           <TransportTextEditor event={event} isAdmin={isAdmin} />
-          <DiveVehicleSection
-            event={event}
+          <EventCarAssignment
+            eventId={event.id}
             isAdmin={isAdmin}
             createdBy={createdBy}
             riders={needsRideCount}
@@ -247,83 +243,6 @@ function TransportTextEditor({ event, isAdmin }: { event: AppEvent; isAdmin: boo
             {error && <span className="text-xs text-red-600 font-medium">{error}</span>}
           </div>
         </>
-      )}
-    </div>
-  )
-}
-
-// ── 3. Cars assigned to the dive on its date + ride seats ────────────────────
-function DiveVehicleSection({ event, isAdmin, createdBy, riders }: {
-  event: AppEvent; isAdmin: boolean; createdBy: string | null; riders: number
-}) {
-  const [dayKey, setDayKey] = useState<string | null>(null)
-  const [vehicles, setVehicles] = useState<Vehicle[]>([])
-  const [allocations, setAllocations] = useState<EventVehicle[]>([])
-  const [reload, setReload] = useState(0)
-
-  // A dive's allocations are keyed by its start_date (the day logistics shows
-  // it on), so fetch that plain date rather than reconstructing it from the ISO
-  // start_time (which can shift across the date line by timezone).
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      const { data } = await supabase
-        .from('EO_dives').select('start_date').eq('_id', event.id).maybeSingle()
-      if (!cancelled) setDayKey((data as { start_date: string | null } | null)?.start_date ?? null)
-    })()
-    return () => { cancelled = true }
-  }, [event.id])
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const v = await fetchVehicles()
-        if (!cancelled) setVehicles(v)
-      } catch { /* section just won't offer a picker */ }
-    })()
-    return () => { cancelled = true }
-  }, [])
-
-  useEffect(() => {
-    if (!dayKey) return
-    let cancelled = false
-    ;(async () => {
-      try {
-        const rows = await fetchVehicleAllocationsForDate(dayKey)
-        if (!cancelled) setAllocations(rows)
-      } catch { if (!cancelled) setAllocations([]) }
-    })()
-    return () => { cancelled = true }
-  }, [dayKey, reload])
-
-  if (!dayKey) return null
-
-  const activeVehicles = vehicles.filter(v => v.active)
-  const vehicleMap = new Map(vehicles.map(v => [v.id, v]))
-  const allocatedVehicleIds = new Set(allocations.map(a => a.vehicle_id))
-  const available = availableVehicles(activeVehicles, allocatedVehicleIds)
-  const mine = allocations.filter(a => allocationEventId(a) === event.id)
-  const capacity = mine.reduce((s, a) => s + (vehicleMap.get(a.vehicle_id)?.passenger_seats ?? 0), 0)
-  const short = capacity > 0 && riders > capacity
-
-  return (
-    <div className="space-y-2">
-      <EventVehicleGroup
-        event={{ id: event.id, type: 'dive' }}
-        dayKey={dayKey}
-        allocations={mine}
-        available={available}
-        vehicleMap={vehicleMap}
-        riders={riders}
-        isAdmin={isAdmin}
-        createdBy={createdBy}
-        onChanged={() => setReload(k => k + 1)}
-      />
-      {short && (
-        <p className="text-xs text-red-600 font-semibold pl-1">
-          Short {riders - capacity} seat{riders - capacity === 1 ? '' : 's'} — {riders} need a ride but only {capacity} assigned.
-        </p>
       )}
     </div>
   )

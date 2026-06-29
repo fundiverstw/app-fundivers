@@ -1,17 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { AdminEditEventPage } from './AdminEditEventPage'
 import { mockQueryBuilder } from '../../../tests/test-utils'
 
-const { from } = vi.hoisted(() => ({ from: vi.fn() }))
+const { from, moveSpy } = vi.hoisted(() => ({ from: vi.fn(), moveSpy: vi.fn() }))
 vi.mock('../../lib/supabase', () => ({
   supabase: { from: (...a: unknown[]) => from(...a) },
 }))
+vi.mock('../../hooks/useAuth', () => ({
+  useAuth: () => ({ profile: { id: 'admin-1', role: 'admin' } }),
+}))
+vi.mock('../../lib/event-vehicles', async () => {
+  const actual = await vi.importActual<typeof import('../../lib/event-vehicles')>('../../lib/event-vehicles')
+  return { ...actual, moveDiveCarAllocations: (...a: unknown[]) => moveSpy(...a) }
+})
 
 beforeEach(() => {
   from.mockReset()
+  moveSpy.mockReset()
+  moveSpy.mockResolvedValue({ moved: 0, dropped: 0 })
 })
 
 function renderAt(path: string) {
@@ -94,6 +103,42 @@ describe('AdminEditEventPage', () => {
     expect(payload._id).toBeUndefined()
     // Navigated to the detail page after save.
     expect(await screen.findByText('EVENT_DETAIL')).toBeInTheDocument()
+  })
+
+  it('shows the car-assignment section and moves allocations when the start date changes on save', async () => {
+    const existing = {
+      _id: 'dive_x', admin_title: 'Kenting Day Trip', display_title: 'Subtitle',
+      start_date: '2026-06-01', time: '08:00:00', end_date: '2026-06-01',
+      featured: false, fully_booked: false, price: null,
+      has_rooms: false, room_types: '', hasotheraddons: false, other_addons: '',
+      gear_rental: null, nitrox_required: false, dive_days: 1,
+      featured_image: null, second_image: null, prereqs: null, req_dives: null,
+      notes: '', cancel_date: null, cancel_policy: null,
+      destination_reference: null, DiveTravel_reference: null,
+      prereq_cert_id: null, cancelled_at: null,
+    }
+    const updateSpy = vi.fn().mockReturnValue({ eq: () => Promise.resolve({ error: null }) })
+    from.mockImplementation((table: string) => {
+      if (table === 'EO_dives') {
+        const b = mockQueryBuilder({ data: existing }) as Record<string, unknown>
+        b.update = updateSpy
+        return b
+      }
+      return mockQueryBuilder({ data: [] })
+    })
+
+    const user = userEvent.setup()
+    renderAt('/admin/events/dive/dive_x/edit')
+    await screen.findByLabelText(/admin title \(required, internal\)/i)
+
+    // The edit form now carries a "Cars for this dive" section.
+    expect(screen.getByText(/cars for this dive/i)).toBeInTheDocument()
+
+    // Move the dive a week later, then save.
+    fireEvent.change(screen.getByLabelText(/start date/i), { target: { value: '2026-06-08' } })
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(moveSpy).toHaveBeenCalledWith('dive_x', '2026-06-01', '2026-06-08'))
   })
 
   it('prefills the Wix featured/second image fields and round-trips them into the update payload', async () => {

@@ -42,6 +42,41 @@ export async function unassignVehicle(id: string): Promise<void> {
   if (error) throw error
 }
 
+// Carry a dive's car allocations to a new date when its start_date is changed
+// on the Edit event form — allocations are keyed by date, so without this they
+// would be left stranded on the old day. A car already taken on the new date
+// (the unique (vehicle_id, event_date) rule would reject it) is dropped rather
+// than moved; the admin re-picks one. Returns how many moved / were dropped.
+export async function moveDiveCarAllocations(
+  diveId: string, fromDate: string, toDate: string,
+): Promise<{ moved: number; dropped: number }> {
+  if (fromDate === toDate) return { moved: 0, dropped: 0 }
+
+  const { data: mine, error: mineErr } = await supabase
+    .from('event_vehicles').select('id, vehicle_id')
+    .eq('eo_dive_id', diveId).eq('event_date', fromDate)
+  if (mineErr) throw mineErr
+  if (!mine?.length) return { moved: 0, dropped: 0 }
+
+  const { data: taken, error: takenErr } = await supabase
+    .from('event_vehicles').select('vehicle_id').eq('event_date', toDate)
+  if (takenErr) throw takenErr
+  const takenIds = new Set((taken ?? []).map(t => (t as { vehicle_id: string }).vehicle_id))
+
+  let moved = 0, dropped = 0
+  for (const row of mine as { id: string; vehicle_id: string }[]) {
+    if (takenIds.has(row.vehicle_id)) {
+      await supabase.from('event_vehicles').delete().eq('id', row.id)
+      dropped++
+    } else {
+      await supabase.from('event_vehicles').update({ event_date: toDate }).eq('id', row.id)
+      takenIds.add(row.vehicle_id)
+      moved++
+    }
+  }
+  return { moved, dropped }
+}
+
 // The event key an allocation row points at (XOR, so exactly one is set).
 export function allocationEventId(a: EventVehicle): string | null {
   return a.eo_dive_id ?? a.eo_course_id

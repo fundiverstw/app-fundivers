@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../hooks/useAuth'
 import { EventForm } from '../../components/admin/EventForm'
+import { EventCarAssignment } from '../../components/admin/EventCarAssignment'
+import { moveDiveCarAllocations } from '../../lib/event-vehicles'
 import {
   divePayloadFromForm,
   coursePayloadFromForm,
@@ -39,6 +42,7 @@ export function AdminEditEventPage() {
   const { type, id } = useParams<{ type: 'dive' | 'course'; id: string }>()
   const navigate = useNavigate()
   const toast = useToast()
+  const { profile } = useAuth()
   const [initial, setInitial] = useState<FormState | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -87,6 +91,15 @@ export function AdminEditEventPage() {
         .eq('_id', id)
       if (error) throw error
       if (dateChange) notifyEventScheduleChanged(id, 'dive').catch(() => { /* best-effort */ })
+      // Car allocations are keyed by the dive's start_date — carry them to the
+      // new day when it moves so they don't strand on the old date.
+      if (initial && initial.start_date !== form.start_date && initial.start_date && form.start_date) {
+        try {
+          const { moved, dropped } = await moveDiveCarAllocations(id, initial.start_date, form.start_date)
+          if (dropped > 0) toast.info(`Moved ${moved} car${moved === 1 ? '' : 's'} to the new date; ${dropped} couldn't move (already booked elsewhere that day) and were unassigned.`)
+          else if (moved > 0) toast.success(`Moved ${moved} assigned car${moved === 1 ? '' : 's'} to the new date.`)
+        } catch { toast.error('The dive date changed but its car assignments could not be moved — check them on the Transportation tab.') }
+      }
       toast.success('Dive updated')
       navigate(`/admin/events/dive/${id}`)
     } else {
@@ -126,6 +139,16 @@ export function AdminEditEventPage() {
         onSubmit={handleSubmit}
         onCancel={() => navigate(`/admin/events/${type}/${id}`)}
       />
+      {type === 'dive' && id && (
+        <div className="mt-6 space-y-2">
+          <h2 className="text-sm font-bold text-white uppercase tracking-wider">Cars for this dive</h2>
+          <p className="text-xs text-white/60">
+            Allocations are tied to the dive's start date and feed the ride-seat limit on the
+            registration form. Changing the date above moves them to the new day on save.
+          </p>
+          <EventCarAssignment eventId={id} isAdmin createdBy={profile?.id ?? null} />
+        </div>
+      )}
     </div>
   )
 }
