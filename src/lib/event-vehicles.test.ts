@@ -3,6 +3,7 @@ import { mockQueryBuilder } from '../../tests/test-utils'
 import {
   availableVehicles, allocationEventId, canRequestRide,
   fetchVehicleAllocationsForDate, assignVehicleToEvent, unassignVehicle, fetchRideSeats,
+  moveDiveCarAllocations,
 } from './event-vehicles'
 import { supabase } from './supabase'
 import type { EventVehicle, Vehicle } from '../types/database'
@@ -127,6 +128,52 @@ describe('fetchRideSeats', () => {
   it('surfaces a supabase error', async () => {
     rpc.mockResolvedValue({ data: null, error: { message: 'boom' } })
     await expect(fetchRideSeats({ dive_id: 'D1' })).rejects.toBeTruthy()
+  })
+})
+
+describe('moveDiveCarAllocations', () => {
+  // One builder factory drives all three query shapes the function runs:
+  // select 'id, vehicle_id' (this dive's rows on the old date), select
+  // 'vehicle_id' (cars taken on the new date), and the per-row update/delete.
+  function evBuilder(bySelect: (cols: string | undefined) => { data: unknown; error: unknown }) {
+    let sel: string | undefined
+    const updates: string[] = []
+    const deletes: string[] = []
+    const b: Record<string, unknown> = {}
+    b.select = (cols: string) => { sel = cols; return b }
+    b.update = (patch: unknown) => { (b as { _patch?: unknown })._patch = patch; sel = 'update'; return b }
+    b.delete = () => { sel = 'delete'; return b }
+    b.eq = (col: string, val: string) => {
+      if (sel === 'update') updates.push(val)
+      if (sel === 'delete') deletes.push(val)
+      return b
+    }
+    b.then = (onF: (r: unknown) => unknown) => Promise.resolve(bySelect(sel)).then(onF)
+    return { b, updates, deletes }
+  }
+
+  it('is a no-op when the date is unchanged', async () => {
+    expect(await moveDiveCarAllocations('D1', '2031-01-01', '2031-01-01')).toEqual({ moved: 0, dropped: 0 })
+    expect(from).not.toHaveBeenCalled()
+  })
+
+  it('moves free cars and drops cars already taken on the new date', async () => {
+    const mine = [{ id: 'a1', vehicle_id: 'v1' }, { id: 'a2', vehicle_id: 'v2' }]
+    const taken = [{ vehicle_id: 'v2' }] // v2 is already on another event that day
+    const { b } = evBuilder(sel =>
+      sel === 'id, vehicle_id' ? { data: mine, error: null }
+        : sel === 'vehicle_id' ? { data: taken, error: null }
+          : { data: null, error: null })
+    from.mockReturnValue(b)
+
+    expect(await moveDiveCarAllocations('D1', '2031-01-01', '2031-02-01')).toEqual({ moved: 1, dropped: 1 })
+  })
+
+  it('reports nothing when the dive has no cars on the old date', async () => {
+    const { b } = evBuilder(sel =>
+      sel === 'id, vehicle_id' ? { data: [], error: null } : { data: [], error: null })
+    from.mockReturnValue(b)
+    expect(await moveDiveCarAllocations('D1', '2031-01-01', '2031-02-01')).toEqual({ moved: 0, dropped: 0 })
   })
 })
 

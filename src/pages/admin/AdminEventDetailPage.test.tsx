@@ -670,6 +670,27 @@ describe('AdminEventDetailPage', () => {
     })
   })
 
+  it('shows the section tabs even with no registrants, so an admin can set up transport before anyone books', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_empty', { id: 'dive_empty', type: 'dive', title: 'Fresh Dive', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
+    ]))
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: [] })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    const user = userEvent.setup()
+    renderAt('/admin/events/dive/dive_empty')
+
+    // The tab row is present despite zero registrants.
+    expect(await screen.findByRole('tab', { name: /^transportation$/i })).toBeInTheDocument()
+    expect(screen.getByText(/no one has registered for this event yet/i)).toBeInTheDocument()
+
+    // Transportation is reachable and renders its (empty) ride-choice panel.
+    await user.click(screen.getByRole('tab', { name: /^transportation$/i }))
+    expect(await screen.findByRole('group', { name: /ride choices/i })).toBeInTheDocument()
+  })
+
   it('Transportation tab lets an admin set each diver\'s ride choice and excludes cancelled bookings', async () => {
     fetchEventsForBookings.mockResolvedValue(new Map([
       ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
