@@ -5,16 +5,19 @@ import { MemoryRouter } from 'react-router-dom'
 import { AdminLogisticsPage } from './AdminLogisticsPage'
 import { mockQueryBuilder } from '../../../tests/test-utils'
 
-const { from, rpc, fetchEventsInRange, fetchUpcomingEventDays } = vi.hoisted(() => ({
+const { from, rpc, fetchEventsInRange, fetchUpcomingEventDays, useAuthMock } = vi.hoisted(() => ({
   from: vi.fn(),
   rpc:  vi.fn(),
   fetchEventsInRange: vi.fn(),
   fetchUpcomingEventDays: vi.fn(),
+  useAuthMock: vi.fn(),
 }))
 
 vi.mock('../../lib/supabase', () => ({
   supabase: { from: (...a: unknown[]) => from(...a), rpc: (...a: unknown[]) => rpc(...a) },
 }))
+
+vi.mock('../../hooks/useAuth', () => ({ useAuth: () => useAuthMock() }))
 
 vi.mock('../../lib/events', () => ({
   fetchEventsInRange: (...a: unknown[]) => fetchEventsInRange(...a),
@@ -38,6 +41,8 @@ const profiles = [
 
 beforeEach(() => {
   from.mockReset(); rpc.mockReset(); fetchEventsInRange.mockReset(); fetchUpcomingEventDays.mockReset()
+  useAuthMock.mockReset()
+  useAuthMock.mockReturnValue({ profile: { id: 'admin-1', role: 'admin' } })
   rpc.mockResolvedValue({ error: null })
   fetchEventsInRange.mockResolvedValue([diveEvent])
   fetchUpcomingEventDays.mockResolvedValue([])
@@ -63,6 +68,22 @@ describe('AdminLogisticsPage', () => {
     // By-event: the dive title and the needs-ride diver.
     expect(screen.getByText('Kenting fun dive')).toBeInTheDocument()
     expect(screen.getByRole('group', { name: /needs ride/i })).toBeInTheDocument()
+  })
+
+  it('offers a per-event car picker listing the day\'s available cars', async () => {
+    const vehicleRows = [{ id: 'v1', name: 'Delica', passenger_seats: 7, active: true, created_at: '', created_by: null }]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: bookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      if (table === 'vehicles') return mockQueryBuilder({ data: vehicleRows })
+      if (table === 'event_vehicles') return mockQueryBuilder({ data: [] })
+      return mockQueryBuilder({ data: [] })
+    })
+    renderPage()
+    const cars = await screen.findByRole('group', { name: /assigned cars/i })
+    expect(within(cars).getByText(/No car assigned yet/i)).toBeInTheDocument()
+    const picker = within(cars).getByLabelText('Assign a car')
+    expect(within(picker).getByRole('option', { name: 'Delica (7)' })).toBeInTheDocument()
   })
 
   it('shows who still owes for the day — overall total plus a per-event list, covered divers flagged', async () => {

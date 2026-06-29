@@ -41,6 +41,8 @@ public.push_subscriptions / push_notifications_sent  (cron infra)
 | `admin_notes` | `id`, `profile_id`, `created_by`, `content` | Free-text staff notes attached to a diver's profile. Read/insert open to staff+admin (insert requires `created_by = auth.uid()`); update/delete admin-only. |
 | `admin_audit_log` | `id`, `actor_id`, `action`, `target_table`, `target_id`, `before`, `after` | Append-only audit trail for admin mutations. Insert via DB triggers; reads admin-only. |
 | `duties` | `id`, `assignee_id`, `role`, `start_date`, `end_date`, `eo_dive_id` \| `eo_course_id` | Staff-or-admin shift assignments. Trigger enforces `assignee_id` references a profile with role in (admin, staff). |
+| `vehicles` | `id`, `name`, `passenger_seats`, `active` | Transport-fleet catalog (`passenger_seats` excludes the driver). Staff+admin read, admin write. Stateless capacity input to the logistics ride planner. |
+| `event_vehicles` | `id`, `vehicle_id`, `event_date`, `eo_dive_id` \| `eo_course_id` | Which car is allocated to which event on which date. XOR FK to dive/course; **unique `(vehicle_id, event_date)`** makes a car exclusive per day (the availability rule). One row per date for multi-day events. Staff+admin read, admin write. Assigned on the logistics day view. |
 | `dive_sites` | `id`, `name`, `lat`, `lng`, `dive_type` | Public catalog rendered on `/map`; readable by all authenticated users. |
 | `cert_levels` | `id`, `agency`, `name`, `prereq_cert_id` | Reference data for the certification picker. Self-referential prerequisite chain. |
 | `cancellation_policies` | `_id`, `title`, `cancelation_policy` | Bubble-imported reference data linked from EO event rows via `cancel_policy`. |
@@ -132,6 +134,9 @@ Notable milestones to skim if you're new to the schema:
 - `20260422180000_push_notifications.sql` — push subscriptions +
   idempotency ledger.
 - `20260423000000_duties.sql` — staff/admin shift assignments.
+- `20260624000000_vehicles.sql` — transport-fleet catalog.
+- `20260627000000_event_vehicles.sql` — per-event car allocation
+  (exclusive per date via unique `(vehicle_id, event_date)`).
 - `20260423130000_core_rls_and_booking_immutability.sql` — the
   bookings-immutable-once-inserted trigger; the policy that makes
   divers' bookings tamper-resistant by design.

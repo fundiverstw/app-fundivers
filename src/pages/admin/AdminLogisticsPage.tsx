@@ -14,9 +14,12 @@ import { CareGearGroup } from '../../components/admin/CareGearGroup'
 import { AddonSummaryGroup } from '../../components/admin/AddonSummaryGroup'
 import { PaymentsDueGroup } from '../../components/admin/PaymentsDueGroup'
 import { TransportFleetPlan } from '../../components/admin/TransportFleetPlan'
-import { fetchActiveVehicles } from '../../lib/vehicles'
+import { EventVehicleGroup } from '../../components/admin/EventVehicleGroup'
+import { fetchVehicles } from '../../lib/vehicles'
+import { fetchVehicleAllocationsForDate, availableVehicles, allocationEventId } from '../../lib/event-vehicles'
 import { planFleet } from '../../lib/vehicle-planning'
-import type { AppEvent, Booking, BookingDetails, Credit, Duty, Payment, Profile, Vehicle } from '../../types/database'
+import { useAuth } from '../../hooks/useAuth'
+import type { AppEvent, Booking, BookingDetails, Credit, Duty, EventVehicle, Payment, Profile, Vehicle } from '../../types/database'
 
 // Per-booking outstanding balance + the lead responsible for it (if covered).
 interface BookingBalanceRow { bal: BookingBalance; payerName: string | null }
@@ -33,6 +36,8 @@ const LOOKAHEAD_DAYS = 30
 type Tab = 'today' | 'tomorrow' | 'other'
 
 export function AdminLogisticsPage() {
+  const { profile } = useAuth()
+  const isAdmin = profile?.role === 'admin'
   const [tab, setTab] = useState<Tab>('today')
   const [otherDay, setOtherDay] = useState('')
   // null = not loaded yet; [] = loaded, no event-days in range.
@@ -44,8 +49,13 @@ export function AdminLogisticsPage() {
   const [addonTitles, setAddonTitles] = useState<Map<string, string>>(new Map())
   // booking id → outstanding balance, for the day's "who still owes" view.
   const [balances, setBalances] = useState<Map<string, BookingBalanceRow>>(new Map())
-  // The active transport fleet — loaded once; rides are planned against it.
+  // The whole transport fleet — loaded once. Active vehicles plan rides; the
+  // full list (incl. retired) names cars in existing allocations.
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
+  // Car-to-event allocations for the selected day (one row per car per event).
+  const [allocations, setAllocations] = useState<EventVehicle[]>([])
+  // Bumped after an assign/unassign to refetch the day's allocations.
+  const [allocReload, setAllocReload] = useState(0)
 
   const todayKey = useMemo(
     () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }),
@@ -63,12 +73,30 @@ export function AdminLogisticsPage() {
     let cancelled = false
     ;(async () => {
       try {
-        const v = await fetchActiveVehicles()
+        const v = await fetchVehicles()
         if (!cancelled) setVehicles(v)
       } catch { /* fleet just won't be planned; logistics still works */ }
     })()
     return () => { cancelled = true }
   }, [])
+
+  // Car allocations for the selected day — refetched when the day changes or
+  // after an assign/unassign (allocReload).
+  useEffect(() => {
+    if (!dayKey) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setAllocations([])
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const rows = await fetchVehicleAllocationsForDate(dayKey)
+        if (!cancelled) setAllocations(rows)
+      } catch { if (!cancelled) setAllocations([]) }
+    })()
+    return () => { cancelled = true }
+  }, [dayKey, allocReload])
 
   // Populate the "Other day" dropdown with upcoming days that actually have
   // events, so the admin never picks a dead day.
@@ -254,12 +282,29 @@ export function AdminLogisticsPage() {
   })
   const dayDue = dueRowsFor(allRows)
   const dayOutstanding = dayDue.reduce((s, x) => s + x.amount, 0)
+  // Active fleet plans rides and fills the assign pickers; retired cars stay in
+  // `vehicles` only to name existing allocations.
+  const activeVehicles = vehicles.filter(v => v.active)
+  const vehicleMap = new Map(vehicles.map(v => [v.id, v]))
+  // Every car already on some event that day — exclusivity removes these from
+  // every event's "assign a car" picker.
+  const allocatedVehicleIds = new Set(allocations.map(a => a.vehicle_id))
+  const availableCars = availableVehicles(activeVehicles, allocatedVehicleIds)
+  // Allocations grouped by the event they're on, for the per-event car block.
+  const allocByEvent = new Map<string, EventVehicle[]>()
+  for (const a of allocations) {
+    const eid = allocationEventId(a)
+    if (!eid) continue
+    const arr = allocByEvent.get(eid) ?? []
+    arr.push(a)
+    allocByEvent.set(eid, arr)
+  }
   // Ride plan: seat everyone who travels in the fleet — divers who need a ride
   // plus all on-duty staff, one of whom drives each vehicle taken.
   const fleetPlan = planFleet(
     transport.needsRide.length,
     onDutyStaffCount,
-    vehicles.map(v => ({ name: v.name, passenger_seats: v.passenger_seats })),
+    activeVehicles.map(v => ({ name: v.name, passenger_seats: v.passenger_seats })),
   )
 
   const promptForDay = tab === 'other' && !otherDay
@@ -331,7 +376,7 @@ export function AdminLogisticsPage() {
                 {transport.unspecified.length > 0 && <> · {transport.unspecified.length} unspecified</>}
               </p>
               {transport.needsRide.length > 0 && (
-                <TransportFleetPlan plan={fleetPlan} fleetSize={vehicles.length} />
+                <TransportFleetPlan plan={fleetPlan} fleetSize={activeVehicles.length} />
               )}
             </div>
             <div className="space-y-1">
@@ -386,6 +431,18 @@ export function AdminLogisticsPage() {
               </div>
               <EventTransport rows={g.rows} />
               <StaffDutyGroup rows={g.staff} />
+              <EventVehicleGroup
+                event={g.event}
+                dayKey={dayKey}
+                allocations={allocByEvent.get(g.event.id) ?? []}
+                available={availableCars}
+                vehicleMap={vehicleMap}
+                riders={splitByTransport(g.rows).needsRide.length
+                  + new Set(g.staff.map(s => s.profile?.id ?? s.dutyId)).size}
+                isAdmin={isAdmin}
+                createdBy={profile?.id ?? null}
+                onChanged={() => setAllocReload(k => k + 1)}
+              />
               <CareGearGroup rows={careTotals(g.rows, addonTitles)} />
               <AddonSummaryGroup rows={addonTotals(g.rows, addonTitles)} />
               <PaymentsDueGroup rows={dueRowsFor(g.rows)} currency={currency} />
