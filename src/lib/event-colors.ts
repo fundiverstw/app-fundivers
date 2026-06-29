@@ -7,6 +7,8 @@ import type { AppEvent } from '../types/database'
 // Courses bucket by title:
 //   ow        → blue    Open Water
 //   aow       → orange  Advanced Open Water
+//   dsd       → pink    Discover Scuba (DSD / Try Dive) + Refresher — the
+//                       no-/lapsed-cert "get in the water" tier
 //   rescue    → red     Rescue, EFR, O2 / Oxygen Provider (life-support tier)
 //   specialty → purple  everything else (Deep, Nitrox, Equipment, ...)
 //
@@ -14,7 +16,7 @@ import type { AppEvent } from '../types/database'
 //   trip → yellow  boat dives, or anything beyond the usual Taipei→Keelung
 //                  drive (Green Island, Kenting, Penghu, international, ...)
 //   local → green  routine Northeast-coast shore dives
-export type CourseColor = 'ow' | 'aow' | 'rescue' | 'specialty'
+export type CourseColor = 'ow' | 'aow' | 'dsd' | 'rescue' | 'specialty'
 export type DiveOuting = 'local' | 'trip'
 
 // Course titles arrive with a capacity hint appended by the
@@ -28,6 +30,7 @@ export function courseColor(title: string): CourseColor {
   const base = stripTitleSuffix(title).toLowerCase()
   if (base.startsWith('advanced open water')) return 'aow'
   if (base.startsWith('open water')) return 'ow'
+  if (/discover scuba|\bdsd\b|try dive|try scuba|refresher|scuba review|reactivate|skill update/.test(base)) return 'dsd'
   if (/rescue|efr|emergency first response|o2 provider|oxygen provider/.test(base)) return 'rescue'
   return 'specialty'
 }

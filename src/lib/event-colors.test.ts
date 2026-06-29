@@ -18,6 +18,16 @@ describe('courseColor', () => {
     expect(courseColor('Emergency Oxygen Provider')).toBe('rescue')
   })
 
+  it('buckets DSD / Try Dive and Refresher as dsd', () => {
+    expect(courseColor('Discover Scuba Diving')).toBe('dsd')
+    expect(courseColor('DSD')).toBe('dsd')
+    expect(courseColor('Try Dive')).toBe('dsd')
+    expect(courseColor('Try Scuba')).toBe('dsd')
+    expect(courseColor('Refresher Course')).toBe('dsd')
+    expect(courseColor('Scuba Review')).toBe('dsd')
+    expect(courseColor('ReActivate')).toBe('dsd')
+  })
+
   it('buckets everything else as specialty', () => {
     expect(courseColor('Deep Specialty')).toBe('specialty')
     expect(courseColor('Nitrox Course')).toBe('specialty')
