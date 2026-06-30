@@ -138,13 +138,17 @@ describe('AdminLogisticsPage', () => {
     renderPage()
     await screen.findByText(/1 event · 2 divers/i)
 
-    // 1 diver rides + the lone staff drives → one Delica covers it.
+    // 1 diver rides + the lone staff drives → one Delica covers it, named.
     const overall = screen.getByText(/^overall/i).closest('section')!
-    expect(within(overall).getByText(/Take 1 vehicle: Delica \(7\)/i)).toBeInTheDocument()
-    expect(within(overall).getByText(/7 seats for 1 rider/i)).toBeInTheDocument()
+    expect(within(overall).getByText(/Take 1 vehicle — 7 seats for 2 riders/i)).toBeInTheDocument()
+    // Dana drives the Delica; Ada rides in it; nobody is ride-less.
+    expect(within(overall).getByText(/Delica/)).toBeInTheDocument()
+    expect(within(overall).getByText(/Dana/)).toBeInTheDocument()
+    expect(within(overall).getByText('Ada')).toBeInTheDocument()
+    expect(within(overall).queryByText(/No seat/i)).not.toBeInTheDocument()
   })
 
-  it('warns when divers need a ride but no on-duty staff can drive', async () => {
+  it('buckets riders into a vehicle but flags it when no staff can drive', async () => {
     from.mockImplementation((table: string) => {
       if (table === 'bookings') return mockQueryBuilder({ data: bookings })
       if (table === 'profiles') return mockQueryBuilder({ data: profiles })
@@ -157,7 +161,11 @@ describe('AdminLogisticsPage', () => {
     await screen.findByText(/1 event · 2 divers/i)
 
     const overall = screen.getByText(/^overall/i).closest('section')!
-    expect(within(overall).getByText(/no on-duty staff to drive/i)).toBeInTheDocument()
+    // Ada is still seated in the Delica; the car just has no one to drive it.
+    expect(within(overall).getByText(/still needs a driver/i)).toBeInTheDocument()
+    expect(within(overall).getByText(/Delica/)).toBeInTheDocument()
+    expect(within(overall).getByText('Ada')).toBeInTheDocument()
+    expect(within(overall).queryByText(/No seat/i)).not.toBeInTheDocument()
   })
 
   it('prompts to add vehicles when riders need a ride but the fleet is empty', async () => {

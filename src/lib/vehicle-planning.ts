@@ -1,8 +1,14 @@
-// Stateless transport-capacity planner for the logistics day view. Everyone on
-// the trip rides in the shop fleet: the divers who need a ride PLUS all on-duty
-// staff. One staff member drives each vehicle taken; the rest of the staff are
+// Stateless transport planner for the logistics day view. Everyone on the trip
+// rides in the shop fleet: the divers who need a ride PLUS all on-duty staff.
+// One staff member drives each vehicle taken; the rest of the staff are
 // passengers alongside the divers. So a vehicle's `passenger_seats` (which
-// excludes its driver) must cover divers + non-driving staff. Pure +
+// excludes its driver) must cover divers + non-driving staff.
+//
+// Seating is driver-agnostic: riders are bucketed into the fewest largest
+// vehicles that hold them, whether or not enough staff are on duty to drive. A
+// vehicle with no on-duty staff to drive it still shows its riders, flagged so
+// the admin knows to assign a driver. Only a genuine seat shortfall — more
+// riders than the whole fleet can hold — leaves anyone ride-less. Pure +
 // side-effect-free so it unit-tests without any mocks.
 
 export interface FleetVehicle {
@@ -11,70 +17,92 @@ export interface FleetVehicle {
   passenger_seats: number
 }
 
-/** Why the fleet can't seat everyone, when it can't. */
-export type FleetShortReason = 'no-drivers' | 'driver-limited' | 'fleet-limited'
+/** A named body travelling in the fleet — a ride-needing diver or on-duty staff. */
+export interface Rider {
+  /** Stable key (profile id, falling back to a row id) for React + dedup. */
+  id: string
+  name: string
+  kind: 'diver' | 'staff'
+}
 
-export interface FleetPlan {
+/** One chosen vehicle with the people aboard it. */
+export interface CarSeating {
+  vehicle: FleetVehicle
+  /** The on-duty staff member driving, or null when none is left to drive it. */
+  driver: Rider | null
+  passengers: Rider[]
+}
+
+export interface SeatingPlan {
+  /** Vehicles taken, largest-first, each with its driver + passengers. */
+  cars: CarSeating[]
+  /** Riders with no seat — the ride-less. Empty unless the fleet is too small. */
+  unseated: Rider[]
   /** Divers who need a ride. */
   divers: number
-  /** On-duty staff — all travel in the fleet (one drives each vehicle used). */
+  /** On-duty staff (all travel in the fleet). */
   staff: number
-  /** Vehicles chosen (largest-first). */
-  used: FleetVehicle[]
-  /** Sum of passenger seats across the chosen vehicles. */
+  /** Bodies travelling = divers + staff. */
+  riders: number
+  /** Passenger seats across the chosen vehicles. */
   seats: number
-  /** One staff driver per chosen vehicle. */
+  /** Vehicles taken = cars.length. */
   driversNeeded: number
-  /** Staff not driving — they need a passenger seat too. */
-  ridingStaff: number
-  /** Bodies needing a passenger seat = divers + ridingStaff. */
-  passengers: number
-  /** True when the chosen vehicles seat every passenger. */
+  /** Vehicles with no on-duty staff to drive them (= max(0, cars − staff)). */
+  driversShort: number
+  /** True when every rider has a seat. */
   fits: boolean
-  /** Passengers left without a seat (0 when it fits). */
+  /** Riders left without a seat (0 when it fits). */
   shortfall: number
-  /** Why it doesn't fit, or null when it does. */
-  reason: FleetShortReason | null
 }
 
 /**
- * Greedy largest-first: add vehicles (biggest first) until their passenger
- * seats cover everyone who isn't driving. Each vehicle added turns one more
- * staff member into a driver, so the seat demand — divers + the staff still
- * riding — shrinks by one as the fleet grows; we recompute it each step. The
- * fleet can't field more vehicles than there are staff to drive them, so when
- * the driver cap (or the fleet) runs out before everyone's seated, the
- * shortfall is surfaced with the reason it's blocked.
+ * Greedy largest-first: take vehicles (biggest first) until their passenger
+ * seats cover everyone who isn't driving. Each vehicle taken turns one more
+ * staff member into a driver — until staff run out, after which extra vehicles
+ * carry passengers but have no driver yet — so the seat demand shrinks by one
+ * per vehicle while staff last. We recompute it each step. Then names go in:
+ * one staff drives each vehicle (as far as staff go), and the non-driving staff
+ * (they run the trip, can't be left behind) fill seats ahead of the divers.
+ * Whoever overflows the whole fleet is unseated.
  */
-export function planFleet(divers: number, staff: number, fleet: FleetVehicle[]): FleetPlan {
+export function planFleet(fleet: FleetVehicle[], divers: Rider[], staff: Rider[]): SeatingPlan {
   const sorted = [...fleet].sort((a, b) => b.passenger_seats - a.passenger_seats)
-  const maxDrivers = Math.min(staff, sorted.length)
 
-  // Passengers needing a seat once `drivers` staff are behind the wheel.
-  const passengersFor = (drivers: number) => divers + (staff - drivers)
+  // Passengers needing a seat once `cars` vehicles are taken: divers plus the
+  // staff not yet behind a wheel (each car claims one staff driver, while staff
+  // last).
+  const passengersFor = (cars: number) => divers.length + Math.max(0, staff.length - cars)
 
   const used: FleetVehicle[] = []
   let seats = 0
-  while (used.length < maxDrivers && seats < passengersFor(used.length)) {
+  while (used.length < sorted.length && seats < passengersFor(used.length)) {
     const next = sorted[used.length]
     used.push(next)
     seats += next.passenger_seats
   }
 
-  const driversNeeded = used.length
-  const ridingStaff = Math.max(0, staff - driversNeeded)
-  const passengers = divers + ridingStaff
-  const fits = seats >= passengers
-  const shortfall = fits ? 0 : passengers - seats
+  const drivers = staff.slice(0, used.length)
+  const pool = [...staff.slice(used.length), ...divers]
+  let filled = 0
+  const cars = used.map((vehicle, idx) => {
+    const passengers = pool.slice(filled, filled + vehicle.passenger_seats)
+    filled += passengers.length
+    return { vehicle, driver: drivers[idx] ?? null, passengers }
+  })
+  const unseated = pool.slice(filled)
 
-  // no-drivers: nobody to drive. driver-limited: every staff is already driving
-  // but vehicles sit spare. fleet-limited: out of vehicles.
-  let reason: FleetShortReason | null = null
-  if (!fits) {
-    if (staff === 0) reason = 'no-drivers'
-    else if (driversNeeded === staff && driversNeeded < sorted.length) reason = 'driver-limited'
-    else reason = 'fleet-limited'
+  const riders = divers.length + staff.length
+  return {
+    cars,
+    unseated,
+    divers: divers.length,
+    staff: staff.length,
+    riders,
+    seats,
+    driversNeeded: used.length,
+    driversShort: Math.max(0, used.length - staff.length),
+    fits: unseated.length === 0,
+    shortfall: unseated.length,
   }
-
-  return { divers, staff, used, seats, driversNeeded, ridingStaff, passengers, fits, shortfall, reason }
 }
