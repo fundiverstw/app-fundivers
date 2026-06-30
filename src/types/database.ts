@@ -180,6 +180,22 @@ export interface Database {
         Args: { p_user_id: string; p_email: string | null; p_reason: string }
         Returns: void
       }
+      // Defined in 20260629000000_waivers.sql. Security-definer, authenticated.
+      // Records a waiver e-signature for the caller: server-stamps
+      // signed_at = now() and diver_id = auth.uid() so the client can't
+      // backdate or forge (same non-repudiation fix as accept_current_terms).
+      // p_dive_id / p_course_id are set only for per-event waivers; annual
+      // waivers pass neither. Returns the new signature's id.
+      sign_waiver: {
+        Args: {
+          p_code:        string
+          p_version:     number
+          p_signed_name: string
+          p_dive_id?:    string | null
+          p_course_id?:  string | null
+        }
+        Returns: string
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
@@ -614,6 +630,56 @@ export interface Database {
           notes?: string | null
         }
         Update: Partial<Database['public']['Tables']['event_vehicles']['Insert']>
+        Relationships: []
+      }
+      waiver_signatures: {
+        Row: {
+          id: string
+          created_at: string
+          diver_id: string
+          waiver_code: string
+          waiver_version: number
+          signed_name: string
+          signed_at: string
+          eo_dive_id: string | null
+          eo_course_id: string | null
+        }
+        // Divers never insert directly — sign_waiver() is the only write path.
+        // Insert here covers the admin-correction policy.
+        Insert: {
+          id?: string
+          created_at?: string
+          diver_id: string
+          waiver_code: string
+          waiver_version: number
+          signed_name: string
+          signed_at?: string
+          eo_dive_id?: string | null
+          eo_course_id?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['waiver_signatures']['Insert']>
+        Relationships: []
+      }
+      event_waivers: {
+        Row: {
+          id: string
+          created_at: string
+          created_by: string | null
+          eo_dive_id: string | null
+          eo_course_id: string | null
+          waiver_code: string
+          mode: 'require' | 'exempt'
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          created_by?: string | null
+          eo_dive_id?: string | null
+          eo_course_id?: string | null
+          waiver_code: string
+          mode: 'require' | 'exempt'
+        }
+        Update: Partial<Database['public']['Tables']['event_waivers']['Insert']>
         Relationships: []
       }
       trips: {
@@ -1349,6 +1415,10 @@ export type Vehicle = Database['public']['Tables']['vehicles']['Row']
 export type VehicleInsert = Database['public']['Tables']['vehicles']['Insert']
 export type EventVehicle = Database['public']['Tables']['event_vehicles']['Row']
 export type EventVehicleInsert = Database['public']['Tables']['event_vehicles']['Insert']
+export type WaiverSignature = Database['public']['Tables']['waiver_signatures']['Row']
+export type WaiverSignatureInsert = Database['public']['Tables']['waiver_signatures']['Insert']
+export type EventWaiver = Database['public']['Tables']['event_waivers']['Row']
+export type EventWaiverInsert = Database['public']['Tables']['event_waivers']['Insert']
 
 // Trip Board — partner referral network
 export type PartnerShop = Database['public']['Tables']['partner_shops']['Row']

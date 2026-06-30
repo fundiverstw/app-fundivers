@@ -133,6 +133,8 @@ describe('AdminEditEventPage', () => {
 
     // The edit form now carries a "Cars for this dive" section.
     expect(screen.getByText(/cars for this dive/i)).toBeInTheDocument()
+    // ...and a per-event "Waiver requirements" section.
+    expect(await screen.findByText(/waiver requirements/i)).toBeInTheDocument()
 
     // Move the dive a week later, then save.
     fireEvent.change(screen.getByLabelText(/start date/i), { target: { value: '2026-06-08' } })

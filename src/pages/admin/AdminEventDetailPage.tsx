@@ -24,6 +24,8 @@ import { resolveCharges, type ChargeLine } from '../../lib/booking-charges'
 import { openCreditForBooking } from '../../lib/credits'
 import { bookingBalance } from '../../lib/booking-balance'
 import { EventTransportPanel } from '../../components/admin/EventTransportPanel'
+import { missingWaivers, fetchEventWaiverOverrides, fetchSignaturesForDivers } from '../../lib/waivers'
+import type { WaiverDef } from '../../config/waivers'
 import { ShareEventButton } from '../../components/ShareEventButton'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Credit, DiverNote, Payment, Profile } from '../../types/database'
 import { BTN_SECONDARY, ERROR_NOTE_LIGHT } from '../../styles/tokens'
@@ -56,6 +58,8 @@ export function AdminEventDetailPage() {
   const isAdmin = profile?.role === 'admin'
   const [event, setEvent] = useState<AppEvent | null>(null)
   const [registrants, setRegistrants] = useState<Registrant[]>([])
+  // Waivers each registrant still needs for this event, keyed by diver id.
+  const [missingByDiver, setMissingByDiver] = useState<Record<string, WaiverDef[]>>({})
   const [addonNames, setAddonNames] = useState<AddonNameMap>(new Map())
   const [roomNames, setRoomNames] = useState<RoomNameMap>(new Map())
   const [loading, setLoading] = useState(true)
@@ -175,6 +179,32 @@ export function AdminEventDetailPage() {
 
     return () => { cancelled = true }
   }, [type, id, refreshKey])
+
+  // Flag, per registrant, the waivers they haven't signed for this event. Staff
+  // can read all signatures, so one batched query covers the whole roster. Kept
+  // above the loading/not-found early returns to satisfy the rules of hooks.
+  const diverIdsKey = registrants.map(r => r.booking.user_id).join(',')
+  useEffect(() => {
+    if (!event || !diverIdsKey) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const diverIds = [...new Set(diverIdsKey.split(','))]
+        const [overrides, sigs] = await Promise.all([
+          fetchEventWaiverOverrides(event.type === 'dive' ? { dive_id: event.id } : { course_id: event.id }),
+          fetchSignaturesForDivers(diverIds),
+        ])
+        const now = new Date()
+        const ref = { id: event.id, type: event.type, title: event.title }
+        const map: Record<string, WaiverDef[]> = {}
+        for (const did of diverIds) {
+          map[did] = missingWaivers(ref, overrides, sigs.filter(s => s.diver_id === did), now)
+        }
+        if (!cancelled) setMissingByDiver(map)
+      } catch { /* best-effort — no badges shown on failure */ }
+    })()
+    return () => { cancelled = true }
+  }, [event, diverIdsKey])
 
   async function updateStatus(bookingId: string, newStatus: Booking['status']) {
     await supabase.from('bookings').update({ status: newStatus }).eq('id', bookingId)
@@ -365,6 +395,7 @@ export function AdminEventDetailPage() {
     <RegistrantCard
       key={r.booking.id}
       r={r}
+      waiverMissing={missingByDiver[r.booking.user_id] ?? []}
       addonNames={addonNames}
       roomNames={roomNames}
       currency={event?.currency ?? 'NTD'}
@@ -1158,8 +1189,9 @@ function registrantBalance(r: Registrant) {
   return { owed, paid, bal: bookingBalance(owed, paid, r.credit) }
 }
 
-function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, onApproveRefund, onEdit, onAddAmendment, onRecordPayment, onApplyCredit, onVoidPayment, onMarkDepositPaid, onBillToDiver, onRecordGroupPayment, readOnly }: {
+function RegistrantCard({ r, waiverMissing, addonNames, roomNames, currency, onStatusChange, onApproveRefund, onEdit, onAddAmendment, onRecordPayment, onApplyCredit, onVoidPayment, onMarkDepositPaid, onBillToDiver, onRecordGroupPayment, readOnly }: {
   r: Registrant
+  waiverMissing: WaiverDef[]
   addonNames: AddonNameMap
   roomNames: RoomNameMap
   currency: string
@@ -1242,6 +1274,16 @@ function RegistrantCard({ r, addonNames, roomNames, currency, onStatusChange, on
             <span className="ml-2 text-xs font-semibold text-red-700">
               {r.diverNotes.length} diver note{r.diverNotes.length === 1 ? '' : 's'}
             </span>
+          )}
+          {waiverMissing.length > 0 ? (
+            <span
+              className="ml-2 text-xs font-semibold text-red-700"
+              title={waiverMissing.map(w => w.title).join(', ')}
+            >
+              Missing: {waiverMissing.map(w => w.title).join(', ')}
+            </span>
+          ) : (
+            <span className="ml-2 text-xs font-semibold text-emerald-700">Waivers OK</span>
           )}
           {coveredByLead && (
             <span className="ml-2 text-xs font-semibold text-violet-700">Paid by {r.payerName}</span>

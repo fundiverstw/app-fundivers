@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { EventForm } from '../../components/admin/EventForm'
 import { EventCarAssignment } from '../../components/admin/EventCarAssignment'
+import { EventWaiverOverrides } from '../../components/admin/EventWaiverOverrides'
 import { moveDiveCarAllocations } from '../../lib/event-vehicles'
 import {
   divePayloadFromForm,
@@ -147,6 +148,15 @@ export function AdminEditEventPage() {
             registration form. Changing the date above moves them to the new day on save.
           </p>
           <EventCarAssignment eventId={id} isAdmin createdBy={profile?.id ?? null} />
+        </div>
+      )}
+      {id && type && (
+        <div className="mt-6">
+          <EventWaiverOverrides
+            event={{ id, type, title: initial.display_title || initial.admin_title || initial.course_name || '' }}
+            isAdmin
+            createdBy={profile?.id ?? null}
+          />
         </div>
       )}
     </div>

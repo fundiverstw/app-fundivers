@@ -44,6 +44,8 @@ public.push_subscriptions / push_notifications_sent  (cron infra)
 | `vehicles` | `id`, `name`, `passenger_seats`, `active` | Transport-fleet catalog (`passenger_seats` excludes the driver). Staff+admin read, admin write. Stateless capacity input to the logistics ride planner. |
 | `event_vehicles` | `id`, `vehicle_id`, `event_date`, `eo_dive_id` \| `eo_course_id` | Which car is allocated to which event on which date. XOR FK to dive/course; **unique `(vehicle_id, event_date)`** makes a car exclusive per day (the availability rule). One row per date for multi-day events. Staff+admin read, admin write. Assigned on the logistics day view. |
 | `dive_sites` | `id`, `name`, `lat`, `lng`, `dive_type` | Public catalog rendered on `/map`; readable by all authenticated users. |
+| `waiver_signatures` | `id`, `diver_id`, `waiver_code`, `waiver_version`, `signed_name`, `signed_at`, `eo_dive_id` \| `eo_course_id` | Append-only e-signature records. The waiver **catalog + global rules** live in code (`src/config/waivers.ts`), not the DB — these rows only record who signed what, when. Annual waivers leave both event keys null; per-event waivers reference exactly one (at-most-one CHECK). Writes go through the `sign_waiver()` RPC (diver reads own; staff+admin read all). |
+| `event_waivers` | `id`, `eo_dive_id` \| `eo_course_id`, `waiver_code`, `mode` | Per-event override of a waiver's global rule: `mode` `require` adds it, `exempt` drops it for one event. XOR FK to dive/course; one override per `(event, waiver_code)`. Read by any authenticated user (the registration form needs it); admin write. Edited on the admin Edit-event form. |
 | `cert_levels` | `id`, `agency`, `name`, `prereq_cert_id` | Reference data for the certification picker. Self-referential prerequisite chain. |
 | `cancellation_policies` | `_id`, `title`, `cancelation_policy` | Bubble-imported reference data linked from EO event rows via `cancel_policy`. |
 | `DiveTravel` | catalog | Transport options surface in the booking form. Bubble-imported, capitalised name preserved. |
@@ -141,6 +143,12 @@ Notable milestones to skim if you're new to the schema:
   DEFINER RPC: an event's ride-seat capacity (distinct assigned cars) and
   claimed count (transportation=true bookings), readable by any diver so the
   registration form can gate the "I need a ride" option.
+- `20260629000000_waivers.sql` — waiver tracking: `waiver_signatures`
+  (append-only e-signatures), `event_waivers` (per-event require/exempt
+  overrides), and the `sign_waiver()` SECURITY DEFINER RPC (server-stamps
+  `signed_at`/`diver_id` so signatures can't be backdated, same pattern as
+  `accept_current_terms`). The waiver catalog + global applicability rules live
+  in `src/config/waivers.ts`, not the DB, so each shop customizes them in code.
 - `20260423130000_core_rls_and_booking_immutability.sql` — the
   bookings-immutable-once-inserted trigger; the policy that makes
   divers' bookings tamper-resistant by design.

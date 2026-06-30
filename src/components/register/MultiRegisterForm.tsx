@@ -6,6 +6,9 @@ import { supabase } from '../../lib/supabase'
 import { formatEventSpan, isPastEvent } from '../../lib/events'
 import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/payment-instructions'
 import { fetchRideSeats, canRequestRide, type RideSeats } from '../../lib/event-vehicles'
+import { missingWaivers, fetchEventWaiverOverrides, fetchDiverSignatures, type WaiverEventRef } from '../../lib/waivers'
+import { WaiverSignDialog } from '../waivers/WaiverSignDialog'
+import type { WaiverDef } from '../../config/waivers'
 import type { AppEvent, Booking, BookingDetails, Database, Profile } from '../../types/database'
 
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
@@ -97,6 +100,50 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [diveKey])
+
+  // Waivers the LEAD BOOKER still needs, across the cart events they're booking
+  // for themselves (child-targeted events are excluded — the parent can't e-sign
+  // as the child). Annual waivers are deduped to one entry; per-event waivers get
+  // an entry per event. Advisory only — never blocks submit.
+  const [leadMissingW, setLeadMissingW] = useState<Array<{ def: WaiverDef; event?: WaiverEventRef }>>([])
+  const [signingW, setSigningW] = useState<{ def: WaiverDef; event?: WaiverEventRef } | null>(null)
+  const leadEventsKey = cart.map(ev => `${ev.id}:${(forDiverByEvent[ev.id] ?? '')}`).join(',')
+
+  async function refreshLeadWaivers() {
+    try {
+      const leadEvts = cart.filter(ev => (forDiverByEvent[ev.id] ?? null) === null)
+      const sigs = await fetchDiverSignatures(userId)
+      const entries: Array<{ def: WaiverDef; event?: WaiverEventRef }> = []
+      const seenAnnual = new Set<string>()
+      for (const ev of leadEvts) {
+        const ref: WaiverEventRef = { id: ev.id, type: ev.type, title: ev.title }
+        const overrides = await fetchEventWaiverOverrides(
+          ev.type === 'dive' ? { dive_id: ev.id } : { course_id: ev.id },
+        )
+        for (const def of missingWaivers(ref, overrides, sigs, new Date())) {
+          if (def.cadence === 'annual') {
+            if (seenAnnual.has(def.code)) continue
+            seenAnnual.add(def.code)
+            entries.push({ def })
+          } else {
+            entries.push({ def, event: ref })
+          }
+        }
+      }
+      return entries
+    } catch {
+      return null // fail open — no warning on error
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    refreshLeadWaivers().then(entries => {
+      if (!cancelled && entries) setLeadMissingW(entries)
+    })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leadEventsKey, userId])
 
   // Per-event choices live in a map keyed by event id; initialized lazily.
   const [choicesById, setChoicesById] = useState<Record<string, EventChoices>>(() => {
@@ -694,6 +741,30 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
               Reservations are confirmed once deposit (or full payment) is received.
             </p>
 
+            {leadMissingW.length > 0 && (
+              <div className="text-xs text-blue-950 font-medium bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2" aria-label="Outstanding waivers">
+                <p className="font-semibold text-amber-800">Waivers to sign before these events</p>
+                <p>You can still book now — sign these now or any time from your profile.</p>
+                <ul className="space-y-1">
+                  {leadMissingW.map(entry => (
+                    <li key={`${entry.def.code}:${entry.event?.id ?? 'annual'}`} className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate">
+                        {entry.def.title}
+                        {entry.event && <span className="text-blue-900/70"> · {entry.event.title}</span>}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSigningW(entry)}
+                        className="shrink-0 px-2.5 py-1 rounded-lg bg-blue-900 hover:bg-blue-950 text-white text-xs font-semibold"
+                      >
+                        Sign now
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {submitResults && submitResults.some(r => !r.ok) && (
               <div className="text-xs bg-amber-50 border border-amber-400 rounded p-2 space-y-1">
                 <p className="font-semibold text-amber-900">Some events could not be booked:</p>
@@ -746,6 +817,19 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
           )}
         </footer>
       </div>
+
+      {signingW && (
+        <WaiverSignDialog
+          def={signingW.def}
+          event={signingW.event}
+          onSigned={async () => {
+            setSigningW(null)
+            const entries = await refreshLeadWaivers()
+            if (entries) setLeadMissingW(entries)
+          }}
+          onClose={() => setSigningW(null)}
+        />
+      )}
     </div>
   )
 }
