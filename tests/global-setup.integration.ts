@@ -25,7 +25,8 @@ export default function setup() {
     throw new Error(
       `Could not drop wix_sync triggers from ${container}. Is the local ` +
         'stack up? Try `make start`. Underlying: ' +
-        (err as Error).message
+        (err as Error).message,
+      { cause: err },
     )
   }
 }
