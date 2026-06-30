@@ -101,6 +101,15 @@ create policy "event_waivers: admin manage"
 -- Server-stamped insert: signed_at = now(), diver_id = auth.uid(). Closes the
 -- backdating/forgery gap (same approach as accept_current_terms). Caller passes
 -- the dive/course id only for per-event waivers; annual waivers pass neither.
+--
+-- Trust boundary: p_code / p_version are NOT validated against the waiver
+-- catalog, because the catalog lives in app config (src/config/waivers.ts), not
+-- the DB. A caller hand-crafting the RPC could record a row for a bogus code or
+-- an inflated version, which the "is this signature current?" check
+-- (waiver_version >= config version) would then accept — letting them self-clear
+-- the warn-only registration gate and the admin's missing-waiver flag. This is
+-- accepted: enforcement is advisory, not a hard block. To make it airtight,
+-- mirror the catalog into an allowlist table and validate (code, version) here.
 create or replace function public.sign_waiver(
   p_code         text,
   p_version      int,
