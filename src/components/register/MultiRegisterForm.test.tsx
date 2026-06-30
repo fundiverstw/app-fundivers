@@ -212,6 +212,29 @@ describe('MultiRegisterForm parent diver picker', () => {
     expect(fees.length).toBeGreaterThanOrEqual(2)
   })
 
+  it('warns the lead booker about their missing waivers on the payment step', async () => {
+    setupFrom([]) // waiver_signatures / event_waivers default to empty → annual waivers missing
+    const user = userEvent.setup()
+    render(
+      <MultiRegisterForm
+        events={[sampleEvent('e1', 'Kenting')]}
+        profile={parentProfile} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
+
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/No, I'll get there myself/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    expect(await screen.findByText(/waivers to sign before these events/i)).toBeInTheDocument()
+    expect(screen.getByText(/diver medical questionnaire/i)).toBeInTheDocument()
+    // Advisory — submit stays enabled.
+    expect(screen.getByRole('button', { name: /confirm 1 booking/i })).toBeEnabled()
+  })
+
   it('disables a dive\'s ride option when its assigned cars are full', async () => {
     setupFrom([])
     rpc.mockImplementation((name: string) =>

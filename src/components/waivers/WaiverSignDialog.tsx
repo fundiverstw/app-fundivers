@@ -1,0 +1,91 @@
+import { useState } from 'react'
+import { signWaiver, type WaiverEventRef } from '../../lib/waivers'
+import type { WaiverDef } from '../../config/waivers'
+
+// E-signature dialog reused by the profile page and the registration form. The
+// diver reads the form text, types their full name and ticks the acknowledgment;
+// "Sign" is disabled until both are present. Signing goes through sign_waiver()
+// (server-stamped), so there's nothing to backdate here. `event` is passed only
+// for per-event waivers — signWaiver ignores it for annual ones.
+export function WaiverSignDialog({ def, event, onSigned, onClose }: {
+  def: WaiverDef
+  event?: WaiverEventRef
+  onSigned: () => void
+  onClose: () => void
+}) {
+  const [name, setName] = useState('')
+  const [agreed, setAgreed] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const canSign = name.trim().length > 0 && agreed && !busy
+
+  async function sign() {
+    if (!canSign) return
+    setBusy(true); setError(null)
+    try {
+      await signWaiver({ def, signedName: name.trim(), event })
+      onSigned()
+    } catch {
+      setError('Could not record your signature. Please try again.')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 bg-blue-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      role="dialog" aria-modal="true" aria-labelledby="waiver-title"
+    >
+      <div className="bg-white/90 backdrop-blur-md rounded-2xl max-w-lg w-full p-6 space-y-4 border border-sky-300 shadow-2xl max-h-[90vh] flex flex-col">
+        <h2 id="waiver-title" className="text-lg font-bold text-blue-900">{def.title}</h2>
+        <div className="text-xs text-blue-950 whitespace-pre-wrap overflow-y-auto border border-sky-200 rounded-lg p-3 bg-white/70 grow">
+          {def.body}
+        </div>
+        <div className="space-y-2">
+          <label className="block">
+            <span className="block text-xs text-blue-900 font-medium mb-1 uppercase tracking-wide">Type your full name to sign</span>
+            <input
+              type="text"
+              aria-label="Full name"
+              value={name}
+              disabled={busy}
+              onChange={e => setName(e.target.value)}
+              className="w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-blue-900 text-sm focus:outline-none focus:border-blue-900 disabled:opacity-50"
+              placeholder="Your full legal name"
+            />
+          </label>
+          <label className="flex items-start gap-2 text-sm text-blue-900">
+            <input
+              type="checkbox"
+              checked={agreed}
+              disabled={busy}
+              onChange={e => setAgreed(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>I have read this form and agree to it, and I am signing it of my own free act.</span>
+          </label>
+          {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
+        </div>
+        <div className="flex gap-2 justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="px-4 py-2 rounded-lg border border-sky-300 text-blue-900 text-sm font-semibold disabled:opacity-50 hover:bg-sky-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={sign}
+            disabled={!canSign}
+            className="px-4 py-2 rounded-lg bg-blue-900 hover:bg-blue-950 text-white text-sm font-semibold disabled:opacity-50"
+          >
+            {busy ? 'Signing…' : 'Sign'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

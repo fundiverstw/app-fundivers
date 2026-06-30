@@ -121,6 +121,44 @@ describe('AdminEventDetailPage', () => {
     expect(screen.getByText(/JP 26/)).toBeInTheDocument()
   })
 
+  it('flags a registrant who is missing required waivers, and clears the flag once signed', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
+    ]))
+    const bookings = [{
+      id: 'b1', user_id: 'u1', status: 'confirmed', created_at: '2026-04-20',
+      eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null,
+      details: { gear: { rent: false } },
+    }]
+    const profiles = [{ id: 'u1', name: 'Ada Lovelace', nickname: 'Ada', contact_method: null, contact_id: null }]
+
+    // No signatures on file → both annual dive waivers are missing.
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: bookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      return mockQueryBuilder({ data: [] })
+    })
+    const { unmount } = renderAt('/admin/events/dive/dive_x')
+    await screen.findByText('Ada Lovelace')
+    expect(await screen.findByText(/Missing:.*Boat Travel/i)).toBeInTheDocument()
+    unmount()
+
+    // Both annual waivers signed + current → the flag becomes "Waivers OK".
+    const sigs = [
+      { id: 's1', diver_id: 'u1', waiver_code: 'padi_liability', waiver_version: 1, signed_at: new Date().toISOString(), signed_name: 'Ada', eo_dive_id: null, eo_course_id: null, created_at: '' },
+      { id: 's2', diver_id: 'u1', waiver_code: 'diver_medical',  waiver_version: 1, signed_at: new Date().toISOString(), signed_name: 'Ada', eo_dive_id: null, eo_course_id: null, created_at: '' },
+    ]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: bookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      if (table === 'waiver_signatures') return mockQueryBuilder({ data: sigs })
+      return mockQueryBuilder({ data: [] })
+    })
+    renderAt('/admin/events/dive/dive_x')
+    await screen.findByText('Ada Lovelace')
+    expect(await screen.findByText(/Waivers OK/i)).toBeInTheDocument()
+  })
+
   it('resolves valid add-on names even when a booking carries a malformed add-on id', async () => {
     fetchEventsForBookings.mockResolvedValue(new Map([
       ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],

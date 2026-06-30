@@ -13,6 +13,7 @@ import { uploadDeepCard, getDeepCardSignedUrl, deleteDeepCard } from '../lib/dee
 import { isHeicFile } from '../lib/image-compress'
 import { fetchDiverCreditBalance } from '../lib/credits'
 import { FamilySection } from '../components/profile/FamilySection'
+import { MyWaivers } from '../components/profile/MyWaivers'
 import { DateField } from '../components/DateField'
 import type { Profile, CertLevel } from '../types/database'
 import { ShoeSizeField } from '../components/ShoeSizeField'
@@ -96,6 +97,7 @@ export function ProfilePage() {
         // props at mount — no sync-state-from-prop effect needed.
         <>
           <ProfileForm key={profile.id} user={user} profile={profile} />
+          <MyWaivers diverId={profile.id} />
           <FamilySection parent={profile} />
         </>
       )}

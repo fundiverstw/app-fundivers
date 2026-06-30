@@ -228,6 +228,43 @@ describe('RegisterForm', () => {
     expect(screen.getByLabelText(/yes, i'll ride with the shop/i)).not.toBeDisabled()
   })
 
+  it('warns about missing waivers on step 4 without blocking submit', async () => {
+    setupFrom() // event_waivers / waiver_signatures default to empty → all required waivers missing
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    expect(await screen.findByText(/waivers to sign before this dive/i)).toBeInTheDocument()
+    expect(screen.getByText(/boat travel & scuba diving liability release/i)).toBeInTheDocument()
+    // Advisory only — the booking can still be confirmed.
+    expect(screen.getByRole('button', { name: /confirm booking/i })).toBeEnabled()
+  })
+
+  it('opens the e-signature dialog from the step-4 waiver warning', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    await screen.findByText(/waivers to sign before this dive/i)
+    await user.click(screen.getAllByRole('button', { name: /sign now/i })[0])
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+  })
+
   it('offers and applies the diver\'s account credit at checkout for a solo booking', async () => {
     const openCredit = {
       id: 'c1', user_id: 'u1', booking_id: null, amount: 2000, currency: 'TWD',

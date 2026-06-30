@@ -11,6 +11,9 @@ import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../li
 import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
 import { fetchCreditsForUser, openCreditBalance, applyCreditToBooking } from '../../lib/credits'
 import { fetchRideSeats, canRequestRide, type RideSeats } from '../../lib/event-vehicles'
+import { missingWaivers, fetchEventWaiverOverrides, fetchDiverSignatures } from '../../lib/waivers'
+import { WaiverSignDialog } from '../waivers/WaiverSignDialog'
+import type { WaiverDef } from '../../config/waivers'
 import { PasswordInput } from '../PasswordInput'
 import { uploadCertCard } from '../../lib/cert-card'
 import { uploadNitroxCard } from '../../lib/nitrox-card'
@@ -478,6 +481,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // Ride-seat tally from the cars assigned to this dive — gates the "I need a
   // ride" option when the assigned fleet is full. null until loaded.
   const [rideSeats, setRideSeats] = useState<RideSeats | null>(null)
+  // Waivers the diver still needs for this event (null = not yet computed).
+  // Advisory only — surfaced on step 4 but never blocks submit.
+  const [missingW, setMissingW] = useState<WaiverDef[] | null>(null)
+  const [signingW, setSigningW] = useState<WaiverDef | null>(null)
   const [addNitroxCourse, setAddNitroxCourse] = useState(initialDetails?.nitrox_course_addon ?? false)
   const [payment, setPayment] = useState<'bank_transfer' | 'credit_card' | 'paypal' | 'cash'>(
     initialDetails?.payment_method ?? 'bank_transfer'
@@ -628,6 +635,41 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       .catch(() => { /* fail open — no gate */ })
     return () => { cancelled = true }
   }, [event.type, event.id])
+
+  // Waivers the diver still needs for this event. Only computed for a diver
+  // registering themselves (the e-signature is signed as auth.uid(), so it
+  // doesn't apply to guests, on-behalf-of, or admin edits). Advisory: it shows a
+  // warning + inline "Sign now" on step 4 but never blocks the booking.
+  const waiverEligible = !!userId && !isGuest && !isEdit && !isOnBehalfOf
+  const eventRef = { id: event.id, type: event.type, title: event.title }
+
+  async function refreshMissingWaivers() {
+    if (!userId) return
+    try {
+      const [overrides, sigs] = await Promise.all([
+        fetchEventWaiverOverrides(event.type === 'dive' ? { dive_id: event.id } : { course_id: event.id }),
+        fetchDiverSignatures(userId),
+      ])
+      setMissingW(missingWaivers(eventRef, overrides, sigs, new Date()))
+    } catch { /* keep the current list on a refresh failure */ }
+  }
+
+  useEffect(() => {
+    if (!waiverEligible || !userId) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const [overrides, sigs] = await Promise.all([
+          fetchEventWaiverOverrides(event.type === 'dive' ? { dive_id: event.id } : { course_id: event.id }),
+          fetchDiverSignatures(userId),
+        ])
+        if (!cancelled) {
+          setMissingW(missingWaivers({ id: event.id, type: event.type, title: event.title }, overrides, sigs, new Date()))
+        }
+      } catch { /* fail open — no warning shown on error */ }
+    })()
+    return () => { cancelled = true }
+  }, [waiverEligible, userId, event.id, event.type, event.title])
 
   const gearCost = useMemo(() => {
     if (!showGearRentChoice || gearChoice !== 'rent') return 0
@@ -1697,6 +1739,29 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             </div>
           )}
 
+          {waiverEligible && missingW && missingW.length > 0 && (
+            <div className="text-xs text-blue-950 font-medium bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2" aria-label="Outstanding waivers">
+              <p className="font-semibold text-amber-800">
+                Waivers to sign before this {event.type}
+              </p>
+              <p>You can still book now — but the shop needs these signed before you get in the water. Sign now or any time from your profile.</p>
+              <ul className="space-y-1">
+                {missingW.map(w => (
+                  <li key={w.code} className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate">{w.title}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSigningW(w)}
+                      className="shrink-0 px-2.5 py-1 rounded-lg bg-blue-900 hover:bg-blue-950 text-white text-xs font-semibold"
+                    >
+                      Sign now
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {additionalResults.length > 0 && (
             <div className="text-xs bg-sky-50 border border-sky-300 rounded p-2 space-y-1" aria-label="Per-diver registration results">
               <p className="font-semibold text-blue-900">Additional divers:</p>
@@ -1754,6 +1819,15 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           </button>
         )}
       </footer>
+
+      {signingW && (
+        <WaiverSignDialog
+          def={signingW}
+          event={eventRef}
+          onSigned={() => { setSigningW(null); refreshMissingWaivers() }}
+          onClose={() => setSigningW(null)}
+        />
+      )}
     </>
   )
 }
