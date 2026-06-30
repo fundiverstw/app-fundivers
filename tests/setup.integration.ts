@@ -15,7 +15,8 @@ try {
   throw new Error(
     'Could not run `supabase status`. Is the local stack up? Try `make start`. ' +
       'Underlying: ' +
-      (err as Error).message
+      (err as Error).message,
+    { cause: err },
   )
 }
 

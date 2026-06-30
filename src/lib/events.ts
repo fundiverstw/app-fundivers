@@ -643,7 +643,7 @@ async function attachConfirmedCounts(events: AppEvent[]): Promise<void> {
   // without rpc) leaves confirmed_count null so the UI falls back to "no
   // badge" instead of breaking the whole event fetch.
   type Row = { event_id: string; event_type: string; n: number }
-  let rows: Row[] = []
+  let rows: Row[]
   try {
     const res = await supabase.rpc('event_confirmed_counts', {
       p_dive_ids:   dedupDive,

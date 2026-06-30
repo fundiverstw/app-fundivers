@@ -398,7 +398,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
   // 3. Build PDF payload from data we already have or can fetch.
   const { data: profile } = await admin.from("profiles").select("*").eq("id", userId).single()
 
-  let event: Record<string, unknown> | null = null
+  let event: Record<string, unknown> | null
   if (body.event_type === "dive") {
     const { data } = await admin.from("EO_dives").select("*").eq("_id", body.event_id).maybeSingle()
     event = data as Record<string, unknown> | null
@@ -470,7 +470,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
   const cancelDate = (event?.cancel_date as string | null) ?? null
   const cancellationPolicyAckedAt = (details.cancellation_policy_acked_at as string | null) ?? null
 
-  let transportIncluded = false
+  let transportIncluded: boolean
   const priceId = event?.price as string | null | undefined
   if (priceId) {
     const { data: pr } = await admin

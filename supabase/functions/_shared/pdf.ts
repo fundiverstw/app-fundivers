@@ -391,7 +391,6 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
         ML + 2, y,
       )
       doc.setTextColor(...C.dark)
-      y += 4.5
     }
   }
 
