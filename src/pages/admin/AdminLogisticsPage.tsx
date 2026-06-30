@@ -17,7 +17,7 @@ import { TransportFleetPlan } from '../../components/admin/TransportFleetPlan'
 import { EventVehicleGroup } from '../../components/admin/EventVehicleGroup'
 import { fetchVehicles } from '../../lib/vehicles'
 import { fetchVehicleAllocationsForDate, availableVehicles, allocationEventId } from '../../lib/event-vehicles'
-import { planFleet } from '../../lib/vehicle-planning'
+import { planFleet, type Rider } from '../../lib/vehicle-planning'
 import { useAuth } from '../../hooks/useAuth'
 import type { AppEvent, Booking, BookingDetails, Credit, Duty, EventVehicle, Payment, Profile, Vehicle } from '../../types/database'
 
@@ -263,11 +263,27 @@ export function AdminLogisticsPage() {
   // the shop's prep list sits next to gear + handle-with-care in the summary.
   const overallAddons = addonTotals(allRows, addonTitles)
   const transport = splitByTransport(allRows)
-  // One seat per staff member regardless of how many of the day's events they
-  // cover, so the ride count isn't double-counted.
-  const onDutyStaffCount = new Set(
-    (groups ?? []).flatMap(g => g.staff).map(s => s.profile?.id ?? s.dutyId),
-  ).size
+  // Named riders for the seat-by-seat ride plan. Divers who need a ride...
+  const diverRiders: Rider[] = transport.needsRide.map(r => ({
+    id: r.profile?.id ?? r.booking.id,
+    name: personName(r.profile?.name, r.profile?.nickname) || '(no profile)',
+    kind: 'diver',
+  }))
+  // ...and each on-duty staff member once, regardless of how many of the day's
+  // events they cover, so the ride count isn't double-counted.
+  const staffRiders: Rider[] = []
+  const seenStaff = new Set<string>()
+  for (const s of (groups ?? []).flatMap(g => g.staff)) {
+    const key = s.profile?.id ?? s.dutyId
+    if (seenStaff.has(key)) continue
+    seenStaff.add(key)
+    staffRiders.push({
+      id: key,
+      name: personName(s.profile?.name, s.profile?.nickname) || '(staff)',
+      kind: 'staff',
+    })
+  }
+  const onDutyStaffCount = staffRiders.length
   // Divers who still owe — for the whole-day summary and each event's list.
   const currency = (groups ?? [])[0]?.event.currency ?? 'TWD'
   const dueRowsFor = (rows: DiverGearRow[]) => rows.flatMap(r => {
@@ -302,9 +318,9 @@ export function AdminLogisticsPage() {
   // Ride plan: seat everyone who travels in the fleet — divers who need a ride
   // plus all on-duty staff, one of whom drives each vehicle taken.
   const fleetPlan = planFleet(
-    transport.needsRide.length,
-    onDutyStaffCount,
     activeVehicles.map(v => ({ name: v.name, passenger_seats: v.passenger_seats })),
+    diverRiders,
+    staffRiders,
   )
 
   const promptForDay = tab === 'other' && !otherDay
