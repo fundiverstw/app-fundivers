@@ -159,6 +159,30 @@ describe('AdminEventDetailPage', () => {
     expect(await screen.findByText(/Waivers OK/i)).toBeInTheDocument()
   })
 
+  it('shows an unknown ("Waivers —") badge rather than a false OK when the waiver lookup fails', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
+    ]))
+    const bookings = [{
+      id: 'b1', user_id: 'u1', status: 'confirmed', created_at: '2026-04-20',
+      eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null,
+      details: { gear: { rent: false } },
+    }]
+    const profiles = [{ id: 'u1', name: 'Ada Lovelace', nickname: 'Ada', contact_method: null, contact_id: null }]
+
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: bookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      // The signature read errors → the roster must not claim everyone is covered.
+      if (table === 'waiver_signatures') return mockQueryBuilder({ error: { message: 'boom' } })
+      return mockQueryBuilder({ data: [] })
+    })
+    renderAt('/admin/events/dive/dive_x')
+    await screen.findByText('Ada Lovelace')
+    expect(await screen.findByText(/Waivers —/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Waivers OK/i)).not.toBeInTheDocument()
+  })
+
   it('resolves valid add-on names even when a booking carries a malformed add-on id', async () => {
     fetchEventsForBookings.mockResolvedValue(new Map([
       ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],

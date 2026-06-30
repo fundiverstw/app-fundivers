@@ -103,8 +103,10 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
 
   // Waivers the LEAD BOOKER still needs, across the cart events they're booking
   // for themselves (child-targeted events are excluded — the parent can't e-sign
-  // as the child). Annual waivers are deduped to one entry; per-event waivers get
-  // an entry per event. Advisory only — never blocks submit.
+  // as the child via the auth.uid()-scoped RPC). A child's own missing waivers
+  // are still surfaced to staff on the admin event page, just not in the parent's
+  // registration flow here. Annual waivers are deduped to one entry; per-event
+  // waivers get an entry per event. Advisory only — never blocks submit.
   const [leadMissingW, setLeadMissingW] = useState<Array<{ def: WaiverDef; event?: WaiverEventRef }>>([])
   const [signingW, setSigningW] = useState<{ def: WaiverDef; event?: WaiverEventRef } | null>(null)
   const leadEventsKey = cart.map(ev => `${ev.id}:${(forDiverByEvent[ev.id] ?? '')}`).join(',')

@@ -59,7 +59,10 @@ export function AdminEventDetailPage() {
   const [event, setEvent] = useState<AppEvent | null>(null)
   const [registrants, setRegistrants] = useState<Registrant[]>([])
   // Waivers each registrant still needs for this event, keyed by diver id.
+  // `waiverState` gates the badge so an unresolved/failed lookup never renders a
+  // false "Waivers OK".
   const [missingByDiver, setMissingByDiver] = useState<Record<string, WaiverDef[]>>({})
+  const [waiverState, setWaiverState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [addonNames, setAddonNames] = useState<AddonNameMap>(new Map())
   const [roomNames, setRoomNames] = useState<RoomNameMap>(new Map())
   const [loading, setLoading] = useState(true)
@@ -200,8 +203,12 @@ export function AdminEventDetailPage() {
         for (const did of diverIds) {
           map[did] = missingWaivers(ref, overrides, sigs.filter(s => s.diver_id === did), now)
         }
-        if (!cancelled) setMissingByDiver(map)
-      } catch { /* best-effort — no badges shown on failure */ }
+        if (!cancelled) { setMissingByDiver(map); setWaiverState('ready') }
+      } catch {
+        // Don't leave the roster showing a green "Waivers OK" we never verified —
+        // a read failure must read as unknown, not as covered.
+        if (!cancelled) setWaiverState('error')
+      }
     })()
     return () => { cancelled = true }
   }, [event, diverIdsKey])
@@ -396,6 +403,7 @@ export function AdminEventDetailPage() {
       key={r.booking.id}
       r={r}
       waiverMissing={missingByDiver[r.booking.user_id] ?? []}
+      waiverState={waiverState}
       addonNames={addonNames}
       roomNames={roomNames}
       currency={event?.currency ?? 'NTD'}
@@ -1189,9 +1197,10 @@ function registrantBalance(r: Registrant) {
   return { owed, paid, bal: bookingBalance(owed, paid, r.credit) }
 }
 
-function RegistrantCard({ r, waiverMissing, addonNames, roomNames, currency, onStatusChange, onApproveRefund, onEdit, onAddAmendment, onRecordPayment, onApplyCredit, onVoidPayment, onMarkDepositPaid, onBillToDiver, onRecordGroupPayment, readOnly }: {
+function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, currency, onStatusChange, onApproveRefund, onEdit, onAddAmendment, onRecordPayment, onApplyCredit, onVoidPayment, onMarkDepositPaid, onBillToDiver, onRecordGroupPayment, readOnly }: {
   r: Registrant
   waiverMissing: WaiverDef[]
+  waiverState: 'loading' | 'ready' | 'error'
   addonNames: AddonNameMap
   roomNames: RoomNameMap
   currency: string
@@ -1275,16 +1284,19 @@ function RegistrantCard({ r, waiverMissing, addonNames, roomNames, currency, onS
               {r.diverNotes.length} diver note{r.diverNotes.length === 1 ? '' : 's'}
             </span>
           )}
-          {waiverMissing.length > 0 ? (
-            <span
-              className="ml-2 text-xs font-semibold text-red-700"
-              title={waiverMissing.map(w => w.title).join(', ')}
-            >
-              Missing: {waiverMissing.map(w => w.title).join(', ')}
-            </span>
-          ) : (
-            <span className="ml-2 text-xs font-semibold text-emerald-700">Waivers OK</span>
-          )}
+          {waiverState === 'loading' ? null
+            : waiverState === 'error' ? (
+              <span className="ml-2 text-xs font-semibold text-amber-700">Waivers —</span>
+            ) : waiverMissing.length > 0 ? (
+              <span
+                className="ml-2 text-xs font-semibold text-red-700"
+                title={waiverMissing.map(w => w.title).join(', ')}
+              >
+                Missing: {waiverMissing.map(w => w.title).join(', ')}
+              </span>
+            ) : (
+              <span className="ml-2 text-xs font-semibold text-emerald-700">Waivers OK</span>
+            )}
           {coveredByLead && (
             <span className="ml-2 text-xs font-semibold text-violet-700">Paid by {r.payerName}</span>
           )}
