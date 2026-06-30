@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { signWaiver, type WaiverEventRef } from '../../lib/waivers'
 import type { WaiverDef } from '../../config/waivers'
 
@@ -32,7 +33,11 @@ export function WaiverSignDialog({ def, event, onSigned, onClose }: {
     }
   }
 
-  return (
+  // Portaled to <body> so the fixed overlay escapes any ancestor that creates
+  // a stacking context. Callers mount this inside backdrop-blur'd sections (the
+  // profile page) and inside the registration modal; without the portal the
+  // overlay is trapped under later siblings (e.g. the Family section).
+  return createPortal(
     <div
       className="fixed inset-0 bg-blue-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       role="dialog" aria-modal="true" aria-labelledby="waiver-title"
@@ -86,6 +91,7 @@ export function WaiverSignDialog({ def, event, onSigned, onClose }: {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
