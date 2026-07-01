@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type { ReminderKind } from '../../../src/lib/push-reminders'
 import {
   buildReminderInputs,
-  todayInTaipei,
+  todayInZone,
   addDays,
   toHhmm,
   formatDayLabel,
@@ -14,7 +14,7 @@ import {
 } from './pure'
 
 describe('formatDayLabel', () => {
-  it('renders a Taipei-anchored weekday/month/day label', () => {
+  it('renders a timezone-independent weekday/month/day label', () => {
     expect(formatDayLabel('2026-05-18')).toBe('Mon, May 18')
     expect(formatDayLabel('2026-05-16')).toBe('Sat, May 16')
   })
@@ -45,16 +45,22 @@ describe('cancellationNotificationText', () => {
   })
 })
 
-describe('todayInTaipei', () => {
-  it('returns the Taipei-local date', () => {
+describe('todayInZone', () => {
+  it('returns the shop-local date for the given timezone', () => {
+    const tz = 'Asia/Taipei'
     // 2026-05-01 23:00 UTC is already 2026-05-02 07:00 in Taipei
-    expect(todayInTaipei(Date.UTC(2026, 4, 1, 23, 0, 0))).toBe('2026-05-02')
+    expect(todayInZone(Date.UTC(2026, 4, 1, 23, 0, 0), tz)).toBe('2026-05-02')
     // 2026-05-01 00:00 UTC → 2026-05-01 08:00 Taipei
-    expect(todayInTaipei(Date.UTC(2026, 4, 1, 0, 0, 0))).toBe('2026-05-01')
+    expect(todayInZone(Date.UTC(2026, 4, 1, 0, 0, 0), tz)).toBe('2026-05-01')
     // 2026-05-01 15:59 UTC → 2026-05-01 23:59 Taipei (same day)
-    expect(todayInTaipei(Date.UTC(2026, 4, 1, 15, 59, 0))).toBe('2026-05-01')
+    expect(todayInZone(Date.UTC(2026, 4, 1, 15, 59, 0), tz)).toBe('2026-05-01')
     // 2026-05-01 16:00 UTC → 2026-05-02 00:00 Taipei (flips)
-    expect(todayInTaipei(Date.UTC(2026, 4, 1, 16, 0, 0))).toBe('2026-05-02')
+    expect(todayInZone(Date.UTC(2026, 4, 1, 16, 0, 0), tz)).toBe('2026-05-02')
+  })
+
+  it('honors a different timezone', () => {
+    // 2026-05-01 02:00 UTC → still 2026-04-30 in New York (UTC-4 in May)
+    expect(todayInZone(Date.UTC(2026, 4, 1, 2, 0, 0), 'America/New_York')).toBe('2026-04-30')
   })
 })
 
@@ -89,7 +95,7 @@ describe('buildReminderInputs', () => {
   it('joins a dive booking to its event and carries money state through', () => {
     const paid = new Map<string, number>([['b1', 500]])
     const sent = new Map<string, Set<ReminderKind>>()
-    const [input] = buildReminderInputs({
+    const [input] = buildReminderInputs({ currency: 'TWD',
       dives: [dive('d1', '2026-05-08')],
       courses: [],
       bookings: [booking()],
@@ -104,10 +110,11 @@ describe('buildReminderInputs', () => {
     expect(input.totalAmount).toBe(3000)
     expect(input.depositAmount).toBe(1000)
     expect(input.paidAmount).toBe(500)
+    expect(input.currency).toBe('TWD')
   })
 
   it('routes course bookings to the course map', () => {
-    const [input] = buildReminderInputs({
+    const [input] = buildReminderInputs({ currency: 'TWD',
       dives: [],
       courses: [course('c1', '2026-06-01', 'Advanced')],
       bookings: [booking({ eo_dive_id: null, eo_course_id: 'c1' })],
@@ -120,7 +127,7 @@ describe('buildReminderInputs', () => {
   })
 
   it('skips bookings whose event was not fetched or lacks a start_date', () => {
-    const out = buildReminderInputs({
+    const out = buildReminderInputs({ currency: 'TWD',
       dives:  [dive('d1', '2026-05-08')],
       courses: [],
       bookings: [
@@ -138,7 +145,7 @@ describe('buildReminderInputs', () => {
     const sent = new Map<string, Set<ReminderKind>>([
       ['u1:d1', new Set<ReminderKind>(['event_7d'])],
     ])
-    const [input] = buildReminderInputs({
+    const [input] = buildReminderInputs({ currency: 'TWD',
       dives: [dive('d1', '2026-05-08')],
       courses: [],
       bookings: [booking()],
@@ -150,7 +157,7 @@ describe('buildReminderInputs', () => {
   })
 
   it('defaults missing total/deposit in details to zero', () => {
-    const [input] = buildReminderInputs({
+    const [input] = buildReminderInputs({ currency: 'TWD',
       dives: [dive('d1', '2026-05-08')],
       courses: [],
       bookings: [booking({ details: null })],
@@ -162,7 +169,7 @@ describe('buildReminderInputs', () => {
   })
 
   it('carries dive time through as eventStartTimeHhmm when set', () => {
-    const [input] = buildReminderInputs({
+    const [input] = buildReminderInputs({ currency: 'TWD',
       dives: [{ ...dive('d1', '2026-05-08'), time: '09:00:00.000' }],
       courses: [],
       bookings: [booking()],
@@ -173,7 +180,7 @@ describe('buildReminderInputs', () => {
   })
 
   it('carries course start_time through as eventStartTimeHhmm when set', () => {
-    const [input] = buildReminderInputs({
+    const [input] = buildReminderInputs({ currency: 'TWD',
       dives: [],
       courses: [{ ...course('c1', '2026-06-01'), start_time: '14:30:00' }],
       bookings: [booking({ eo_dive_id: null, eo_course_id: 'c1' })],
@@ -184,7 +191,7 @@ describe('buildReminderInputs', () => {
   })
 
   it('emits null eventStartTimeHhmm when source row has no time', () => {
-    const [input] = buildReminderInputs({
+    const [input] = buildReminderInputs({ currency: 'TWD',
       dives: [dive('d1', '2026-05-08')],
       courses: [],
       bookings: [booking()],

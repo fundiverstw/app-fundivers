@@ -6,7 +6,7 @@ const fields: CatalogField<EORoom>[] = [
   { key: 'display_title', label: 'Display title', type: 'text', required: true, placeholder: 'e.g. Twin Sea-View' },
   { key: 'admin_title',   label: 'Admin title',   type: 'text', placeholder: 'e.g. twin' },
   { key: 'added_price',  label: 'Added price (TWD)', type: 'number', placeholder: '0' },
-  { key: 'currency',     label: 'Currency', type: 'text', placeholder: 'TWD' },
+  { key: 'currency',     label: 'Currency', type: 'text', placeholder: siteConfig.locale.currency },
 ]
 
 export function AdminRoomsPage() {

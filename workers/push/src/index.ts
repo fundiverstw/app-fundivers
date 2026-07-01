@@ -21,7 +21,7 @@ import {
 import type { Database } from '../../../src/types/database'
 import {
   buildReminderInputs,
-  todayInTaipei,
+  todayInZone,
   addDays,
   toHhmm,
   rescheduleNotificationText,
@@ -40,6 +40,11 @@ export interface Env {
   // fork's app domain). The local dev origin is always allowed. CORS is UX-only
   // here — every handler still enforces auth via the Bearer JWT.
   ALLOWED_ORIGINS?: string
+  // IANA timezone the shop operates in (e.g. "Asia/Taipei"). Controls the
+  // "today" boundary for daily reminders and the human times in offer emails.
+  TIMEZONE?: string
+  // Currency label shown in the money line of payment reminders (e.g. "TWD").
+  CURRENCY?: string
   ADMIN_TRIGGER_SECRET?: string
   // Optional: when set, /admin-broadcast also POSTs `{title, body}` JSON to
   // this URL (e.g. a LINE Messaging API relay or a third-party automation).
@@ -718,7 +723,7 @@ export async function runDailyReminders(env: Env): Promise<{ sent: number; skipp
     auth: { persistSession: false },
   })
 
-  const today = todayInTaipei()
+  const today = todayInZone(Date.now(), env.TIMEZONE ?? 'Asia/Taipei')
   const WINDOWS = [1, 3, 7, 14, 21]
   const targetDates = WINDOWS.map((d) => addDays(today, d))
 
@@ -781,7 +786,7 @@ export async function runDailyReminders(env: Env): Promise<{ sent: number; skipp
     sentMap.set(key, set)
   }
 
-  const inputs = buildReminderInputs({ dives, courses, bookings, paidByBooking, sentMap })
+  const inputs = buildReminderInputs({ dives, courses, bookings, paidByBooking, sentMap, currency: env.CURRENCY ?? 'TWD' })
   const reminders = selectReminders(today, inputs)
   if (!reminders.length) return { sent: 0, skipped: 0 }
 
@@ -943,13 +948,14 @@ export async function processWaitlistOffers(env: Env): Promise<{ sent: number; e
       eventTitle = (data?.display_title ?? data?.admin_title ?? eventTitle) as string
     }
 
+    const tz = env.TIMEZONE ?? 'Asia/Taipei'
     const expiresLabel = new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'Asia/Taipei',
+      timeZone: tz,
       day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
     }).format(new Date(offer.expires_at))
 
     const title = 'Spot opened on the waitlist'
-    const body  = `${eventTitle} — accept by ${expiresLabel} (Asia/Taipei) before it rolls to the next person.`
+    const body  = `${eventTitle} — accept by ${expiresLabel} (${tz}) before it rolls to the next person.`
     const url   = '/records/bookings'
 
     // Inbox first — the only delivery path for iOS / no-push users.

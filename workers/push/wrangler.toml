@@ -20,3 +20,5 @@ crons = ["0 2 * * *", "*/15 * * * *"]
 [vars]
 VAPID_SUBJECT = "mailto:fundiverstw@gmail.com"
 ALLOWED_ORIGINS = "https://app.fundiverstw.com"
+TIMEZONE = "Asia/Taipei"
+CURRENCY = "TWD"
