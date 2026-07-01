@@ -3,6 +3,7 @@ import { Spinner } from '../../components/ui/Spinner'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
+import { siteConfig } from '../../config/site'
 import { fiscalYearRange } from '../../lib/accounting-export'
 import { fetchYearWeather, HOME_REGION, type DailyWeather } from '../../lib/weather'
 import {
@@ -18,7 +19,7 @@ import { StatCard, ChartCard, GroupedColumnChart } from '../../components/admin/
 // in the centre. Asia/Taipei throughout.
 
 function taipeiDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' })
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: siteConfig.locale.timezone, year: 'numeric', month: '2-digit', day: '2-digit' })
 }
 
 const SERIES_COLORS = ['bg-slate-400', 'bg-orange-500', 'bg-blue-600'] // oldest → newest

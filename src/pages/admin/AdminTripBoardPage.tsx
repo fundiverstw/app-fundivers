@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode, type FormEvent } from 'react'
+import { siteConfig } from '../../config/site'
 import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
 import {
@@ -415,7 +416,7 @@ function TripForm({
   const [startDate, setStartDate] = useState(trip?.start_date ?? '')
   const [endDate, setEndDate] = useState(trip?.end_date ?? '')
   const [price, setPrice] = useState(trip?.price?.toString() ?? '')
-  const [currency, setCurrency] = useState(trip?.currency ?? 'TWD')
+  const [currency, setCurrency] = useState(trip?.currency ?? siteConfig.locale.currency)
   const [heroImageUrl, setHeroImageUrl] = useState(trip?.hero_image_url ?? '')
   const [bookingUrl, setBookingUrl] = useState(trip?.booking_url ?? '')
   const [highlights, setHighlights] = useState((trip?.highlights ?? []).join('\n'))
@@ -440,7 +441,7 @@ function TripForm({
         start_date: startDate || null,
         end_date: endDate || null,
         price: price.trim() === '' ? null : Number(price),
-        currency: currency.trim() || 'TWD',
+        currency: currency.trim() || siteConfig.locale.currency,
         hero_image_url: heroImageUrl.trim() || null,
         booking_url: bookingUrl.trim() || null,
         highlights: highlights.split('\n').map(h => h.trim()).filter(Boolean),

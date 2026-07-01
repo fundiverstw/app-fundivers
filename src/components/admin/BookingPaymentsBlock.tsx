@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { siteConfig } from '../../config/site'
 import { format } from 'date-fns'
 import { errorMessage } from '../../lib/errors'
 import { ChargeBreakdown, type AmendmentLine } from '../ChargeBreakdown'
@@ -119,7 +120,7 @@ export function BookingPaymentsBlock({
       {((charges && charges.length > 0) || (amendments && amendments.length > 0)) && (
         <div className="pb-2 border-b border-sky-200 space-y-1">
           <p className="font-semibold text-blue-900">Charges</p>
-          <ChargeBreakdown lines={charges ?? []} amendments={amendments} total={owed} currency={currency ?? 'NTD'} />
+          <ChargeBreakdown lines={charges ?? []} amendments={amendments} total={owed} currency={currency ?? siteConfig.locale.currencyLabel} />
         </div>
       )}
 
@@ -159,7 +160,7 @@ export function BookingPaymentsBlock({
             )}
             {bal.state === 'credit' && (
               <p className="text-emerald-700">
-                The shop owes this diver {(currency ?? 'NTD')} {bal.amount.toLocaleString()} — included in their account credit.
+                The shop owes this diver {(currency ?? siteConfig.locale.currencyLabel)} {bal.amount.toLocaleString()} — included in their account credit.
               </p>
             )}
           </>

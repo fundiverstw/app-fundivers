@@ -14,6 +14,7 @@ import { PartnerConnectIcon } from '../icons/PartnerConnectIcon'
 import { TripBoardIcon } from '../icons/TripBoardIcon'
 import { PersonIcon } from '../icons/PersonIcon'
 import { NotificationBell } from '../NotificationBell'
+import { siteConfig } from '../../config/site'
 import {
   PAGE, NAV_BAR, NAV_BOTTOM, BTN_LIGHT,
   ON_DEEP_MUTED, ON_DEEP_SUBTLE, ON_DEEP_BODY,
@@ -78,33 +79,37 @@ export function AppShell() {
     <div className={`min-h-screen ${PAGE} flex flex-col`}>
       <header className={NAV_BAR}>
         <div className="flex-1 flex items-center justify-start gap-4">
-          <a
-            href="https://radio.fundiverstw.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="FunDivers Radio"
-            // CSS mask makes the PNG act as a stencil for an exact red fill
-            // — `filter: hue-rotate` couldn't pin a specific shade and
-            // multi-color PNGs end up muddy. The PNG is square so h == w.
-            className="block h-6 w-6 bg-red-500 hover:bg-red-400 transition-colors"
-            style={{
-              WebkitMaskImage: 'url(/imgs/broadcast.png)',
-              maskImage: 'url(/imgs/broadcast.png)',
-              WebkitMaskSize: 'contain',
-              maskSize: 'contain',
-              WebkitMaskRepeat: 'no-repeat',
-              maskRepeat: 'no-repeat',
-              WebkitMaskPosition: 'center',
-              maskPosition: 'center',
-            }}
-          />
-          <Link
-            to="/map"
-            aria-label="Dive site map"
-            className="text-red-500 hover:text-red-400 transition-colors"
-          >
-            <MapIcon />
-          </Link>
+          {siteConfig.features.radio && (
+            <a
+              href={siteConfig.urls.radio}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`${siteConfig.identity.shortName} Radio`}
+              // CSS mask makes the PNG act as a stencil for an exact red fill
+              // — `filter: hue-rotate` couldn't pin a specific shade and
+              // multi-color PNGs end up muddy. The PNG is square so h == w.
+              className="block h-6 w-6 bg-red-500 hover:bg-red-400 transition-colors"
+              style={{
+                WebkitMaskImage: `url(${siteConfig.assets.broadcast})`,
+                maskImage: `url(${siteConfig.assets.broadcast})`,
+                WebkitMaskSize: 'contain',
+                maskSize: 'contain',
+                WebkitMaskRepeat: 'no-repeat',
+                maskRepeat: 'no-repeat',
+                WebkitMaskPosition: 'center',
+                maskPosition: 'center',
+              }}
+            />
+          )}
+          {siteConfig.features.map && (
+            <Link
+              to="/map"
+              aria-label="Dive site map"
+              className="text-red-500 hover:text-red-400 transition-colors"
+            >
+              <MapIcon />
+            </Link>
+          )}
           <Link
             to="/partner-connect"
             aria-label="Partner Connect (PX)"

@@ -1,6 +1,7 @@
 import { format, isSameDay, parseISO } from 'date-fns'
 import { supabase } from './supabase'
 import { diveOutingFromDestinations, type DiveOuting } from './event-colors'
+import { siteConfig } from '../config/site'
 import type { AppEvent, EventDetails, EOCourse, EODive, EOPrice } from '../types/database'
 
 type DiveTravelDetail = {
@@ -109,7 +110,7 @@ export function formatEventSpan(
 
 /**
  * True when an event's last day is before today in the shop's timezone
- * (Asia/Taipei) — i.e. the event has already happened. Used to close
+ * — i.e. the event has already happened. Used to close
  * registration to divers for past events (admins/staff bypass this). Compared
  * by calendar day, not instant, so a diver can still register the morning of.
  */
@@ -118,7 +119,7 @@ export function isPastEvent(
   now: Date = new Date(),
 ): boolean {
   const dayKey = (d: Date | string) =>
-    new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' })
+    new Date(d).toLocaleDateString('en-CA', { timeZone: siteConfig.locale.timezone })
   return dayKey(event.end_time ?? event.start_time) < dayKey(now)
 }
 
@@ -166,7 +167,7 @@ function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: stri
     price: p?.starting_at ?? null,
     deposit_amount: p?.deposit_amount ?? null,
     transport_price: p?.transport ?? null,
-    currency: 'TWD',
+    currency: siteConfig.locale.currency,
     has_rooms: Boolean(d.has_rooms),
     room_type_ids: roomIds,
     has_addons: addonIds.length > 0,
@@ -243,7 +244,7 @@ function courseToEvents(c: EOCourse, priceIndex: Map<string, EOPrice>, addonIds:
     price: p?.starting_at ?? null,
     deposit_amount: p?.deposit_amount ?? null,
     transport_price: p?.transport ?? null,
-    currency: 'TWD',
+    currency: siteConfig.locale.currency,
     has_rooms: false,
     room_type_ids: [] as string[],
     has_addons: addonIds.length > 0,

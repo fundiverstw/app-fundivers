@@ -9,6 +9,7 @@ import { RegisterFormBody } from '../components/register/RegisterForm'
 import { WhatHappensNext } from '../components/register/WhatHappensNext'
 import { Logo } from '../components/Logo'
 import { PasswordInput } from '../components/PasswordInput'
+import { siteConfig } from '../config/site'
 import type { AppEvent, Booking } from '../types/database'
 
 // Public standalone registration page. Two entry paths:
@@ -86,7 +87,7 @@ export function RegisterPage() {
   return (
     <div className="min-h-screen bg-sky-50 text-blue-900">
       <header className="bg-blue-950 border-b border-red-500 px-4 py-3">
-        <a href="https://fundiverstw.com" aria-label="FunDivers Taiwan home"><Logo size="sm" /></a>
+        <a href={siteConfig.urls.site} aria-label={`${siteConfig.identity.logoAlt} home`}><Logo size="sm" /></a>
       </header>
 
       <main className="max-w-lg mx-auto p-4 space-y-5">
@@ -178,7 +179,7 @@ function LockedConfirmation({ event, booking, alreadyExisting = false }: { event
       </div>
       {alreadyExisting ? (
         <p className="text-xs text-blue-950 font-medium">
-          Sign in any time at <a href="https://app.fundiverstw.com" className="text-blue-700 hover:underline">app.fundiverstw.com</a> to track your booking and payment status.
+          Sign in any time at <a href={siteConfig.urls.app} className="text-blue-700 hover:underline">{siteConfig.urls.app.replace(/^https?:\/\//, '')}</a> to track your booking and payment status.
         </p>
       ) : (
         <WhatHappensNext waitlisted={isWaitlisted} />
@@ -291,7 +292,7 @@ function SignInBanner() {
     <div className="bg-white/65 backdrop-blur-md border border-red-500 rounded-xl p-3 text-sm">
       {!open ? (
         <div className="flex items-center justify-between gap-3">
-          <span className="text-blue-900">Already have a FunDivers account?</span>
+          <span className="text-blue-900">Already have a {siteConfig.identity.shortName} account?</span>
           <button
             onClick={() => setOpen(true)}
             className="text-blue-700 font-semibold hover:underline"

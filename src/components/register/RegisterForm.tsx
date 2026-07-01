@@ -8,6 +8,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { computeEffectiveFullPaymentDeadline } from '../../lib/payment-deadlines'
 import { paymentInstructionsFor } from '../../lib/payment-instructions'
 import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../lib/gear'
+import { siteConfig } from '../../config/site'
 import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
 import { fetchCreditsForUser, openCreditBalance, applyCreditToBooking } from '../../lib/credits'
 import { fetchRideSeats, canRequestRide, type RideSeats } from '../../lib/event-vehicles'
@@ -1158,7 +1159,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               <div>
                 <p className="text-sm font-semibold text-blue-900">Account</p>
                 <p className="text-xs text-blue-900 font-medium">
-                  We'll create a FunDivers account for you so you can check your booking status and sign up for future events faster.
+                  We'll create a {siteConfig.identity.shortName} account for you so you can check your booking status and sign up for future events faster.
                 </p>
               </div>
               <TextField label="Email *" type="email" value={guestEmail} onChange={setGuestEmail} required />
@@ -1247,7 +1248,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                   </p>
                   <p className="text-xs text-blue-950 font-medium">
                     Required because you've filled in a cert level. The photo is
-                    stored privately and only visible to FunDivers staff.
+                    stored privately and only visible to {siteConfig.identity.shortName} staff.
                   </p>
                   <label className="block cursor-pointer bg-blue-900 hover:bg-blue-950 text-white text-sm font-semibold py-2 px-3 rounded-lg text-center">
                     <input
@@ -1299,7 +1300,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                   </p>
                   <p className="text-xs text-blue-950 font-medium">
                     Required because you marked yourself as nitrox certified. The
-                    photo is stored privately and only visible to FunDivers staff.
+                    photo is stored privately and only visible to {siteConfig.identity.shortName} staff.
                   </p>
                   <label className="block cursor-pointer bg-blue-900 hover:bg-blue-950 text-white text-sm font-semibold py-2 px-3 rounded-lg text-center">
                     <input
@@ -1336,7 +1337,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                   </p>
                   <p className="text-xs text-blue-950 font-medium">
                     Required because you marked yourself as Deep certified. The
-                    photo is stored privately and only visible to FunDivers staff.
+                    photo is stored privately and only visible to {siteConfig.identity.shortName} staff.
                   </p>
                   <label className="block cursor-pointer bg-blue-900 hover:bg-blue-950 text-white text-sm font-semibold py-2 px-3 rounded-lg text-center">
                     <input

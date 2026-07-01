@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { siteConfig } from '../config/site'
 import { STATUS_STYLES } from '../lib/booking-status'
 import { PageLoading } from '../components/ui/Spinner'
 import { format } from 'date-fns'
@@ -223,7 +224,7 @@ export function PaymentsPage() {
   const totalOwed = payable.reduce((s, l) => s + l.due, 0)
   const totalDepositDue = payable.reduce((s, l) => s + l.depositDue, 0)
   const totalPaid = payable.reduce((s, l) => s + l.paid, 0)
-  const currency = lines.find(l => l.event)?.event?.currency ?? 'TWD'
+  const currency = lines.find(l => l.event)?.event?.currency ?? siteConfig.locale.currency
   // Open credit the diver can actually spend via the RPC (awarded credit rows,
   // excluding overpayment-derived balance which has no row to consume). The
   // top-level apply button only surfaces when there's both a pool and a due

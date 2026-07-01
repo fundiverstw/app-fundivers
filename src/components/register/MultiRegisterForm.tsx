@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { personName } from '../../lib/names'
 import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../lib/gear'
+import { siteConfig } from '../../config/site'
 import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
 import { supabase } from '../../lib/supabase'
 import { formatEventSpan, isPastEvent } from '../../lib/events'
@@ -735,7 +736,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
               })}
               <div className="border-t border-sky-200 pt-1 mt-1 flex justify-between font-bold text-blue-900">
                 <span>Grand total</span>
-                <span>{cart[0]?.currency ?? 'TWD'} {grandTotal.toLocaleString()}</span>
+                <span>{cart[0]?.currency ?? siteConfig.locale.currency} {grandTotal.toLocaleString()}</span>
               </div>
             </div>
 

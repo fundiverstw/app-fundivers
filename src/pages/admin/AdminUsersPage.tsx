@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { siteConfig } from '../../config/site'
 import { Spinner } from '../../components/ui/Spinner'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
@@ -668,7 +669,7 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
                     credit={credit}
                     charges={b.charges}
                     amendments={(extras.amendments.get(b.id) ?? []).map(a => ({ label: a.note, amount: a.amount }))}
-                    currency={b.event?.currency ?? 'NTD'}
+                    currency={b.event?.currency ?? siteConfig.locale.currencyLabel}
                     pending={b.status === 'pending'}
                     cancelled={false}
                     readOnly={!isAdmin}

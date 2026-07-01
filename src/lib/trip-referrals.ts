@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { siteConfig } from '../config/site'
 import type { TripReferral, ReferralStatus, KickbackStatus } from '../types/database'
 
 // Admin data layer for the referral pipeline + kickback ledger. Divers create
@@ -70,7 +71,7 @@ export function summarizeKickbacks(referrals: AdminReferral[]): KickbackByCurren
   const byCur = new Map<string, { received: number; outstanding: number }>()
   for (const r of referrals) {
     if (r.kickback_amount == null) continue
-    const cur = r.booked_currency || 'TWD'
+    const cur = r.booked_currency || siteConfig.locale.currency
     const acc = byCur.get(cur) ?? { received: 0, outstanding: 0 }
     if (r.kickback_status === 'received') acc.received += r.kickback_amount
     else acc.outstanding += r.kickback_amount

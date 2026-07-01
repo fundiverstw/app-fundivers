@@ -3,6 +3,7 @@ import { Spinner } from '../../components/ui/Spinner'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
+import { siteConfig } from '../../config/site'
 import {
   computeDashboard,
   type Dashboard,
@@ -22,7 +23,7 @@ import { fiscalYearRange } from '../../lib/accounting-export'
 // these tables to admins. Asia/Taipei throughout.
 
 function taipeiDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' })
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: siteConfig.locale.timezone, year: 'numeric', month: '2-digit', day: '2-digit' })
 }
 
 function taipeiYear(iso: string): number {
@@ -104,7 +105,7 @@ async function loadDashboard(): Promise<Dashboard> {
   return computeDashboard({ nowIso, payments, bookings, profiles, events, confirmed, pendingApplications })
 }
 
-const TWD = (n: number) => `TWD ${Math.round(n).toLocaleString()}`
+const TWD = (n: number) => `${siteConfig.locale.currency} ${Math.round(n).toLocaleString()}`
 
 export function AdminDashboardPage() {
   const [dash, setDash] = useState<Dashboard | null>(null)
@@ -136,7 +137,7 @@ export function AdminDashboardPage() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-          <p className="text-sm text-white/70">{year} · peak season (Jun–Aug) centred · revenue netted (paid − refunded), Asia/Taipei.</p>
+          <p className="text-sm text-white/70">{year} · peak season (Jun–Aug) centred · revenue netted (paid − refunded), {siteConfig.locale.timezone}.</p>
         </div>
         <Link to="/admin/history" className="text-sm text-amber-300 hover:text-amber-200 shrink-0 mt-1">Historical perspective →</Link>
       </div>

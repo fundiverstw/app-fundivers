@@ -46,6 +46,16 @@ conventions and non-obvious mechanics the code doesn't spell out.
    and don't mention "Generated with Claude Code" in commit messages
    or PR bodies.
 
+10. **Shop-specific values go through the config seam, not literals.**
+    FunDive is packaged for other shops to fork (see `docs/forking.md`).
+    Shop name, contact info, URLs, timezone, currency, theme colors,
+    asset paths, gear list, and feature toggles live in the root
+    `fundive.config.ts` (pure data, read by the app, the service worker,
+    `vite.config.ts`, and the Deno edge functions); the typed handle is
+    `src/config/site.ts`. Terms text lives in `src/config/terms.tsx`.
+    Don't hardcode a new "FunDivers"/"NTD"/"Asia/Taipei"-style literal —
+    add a config field and read from it.
+
 ## Verifying from memory
 
 If a memory or prior conversation claims a file, function, or flag

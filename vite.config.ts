@@ -1,7 +1,35 @@
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { siteConfig } from './fundive.config'
+import { assertValidSiteConfig } from './src/config/site.schema'
+
+// Fail fast if the fork's fundive.config.ts is malformed or its configVersion is
+// behind the core contract — same loud-at-build philosophy as the env check
+// below. Runs at config load so `vite dev` catches it too.
+assertValidSiteConfig(siteConfig)
+
+// Replace static placeholders in index.html with values from fundive.config.ts,
+// so the title / description / theme-color / favicon track the shop config
+// rather than being hardcoded in the HTML.
+function htmlConfigPlugin(): Plugin {
+  const replacements: Record<string, string> = {
+    '%APP_TITLE%': siteConfig.identity.shopName,
+    '%APP_DESCRIPTION%': siteConfig.identity.description,
+    '%THEME_COLOR%': siteConfig.theme.themeColor,
+    '%FAVICON%': siteConfig.assets.favicon,
+  }
+  return {
+    name: 'fundive-html-config',
+    transformIndexHtml(html) {
+      return Object.entries(replacements).reduce(
+        (out, [token, value]) => out.replaceAll(token, value),
+        html,
+      )
+    },
+  }
+}
 
 export default defineConfig(({ command, mode }) => {
   // Client env vars whose absence silently breaks a core flow at runtime
@@ -35,6 +63,7 @@ export default defineConfig(({ command, mode }) => {
     plugins: [
     react(),
     tailwindcss(),
+    htmlConfigPlugin(),
     VitePWA({
       // injectManifest so src/sw.ts owns the service worker — we need the
       // `push` + `notificationclick` handlers on top of workbox precaching
@@ -50,16 +79,16 @@ export default defineConfig(({ command, mode }) => {
       registerType: 'prompt',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'icons/*.png'],
       manifest: {
-        name: 'FunDivers TW',
-        short_name: 'FunDivers',
-        description: 'Dive registration and logbook for FunDivers Taiwan',
-        theme_color: '#0ea5e9',
-        background_color: '#0f172a',
+        name: siteConfig.identity.shopName,
+        short_name: siteConfig.identity.shortName,
+        description: siteConfig.identity.description,
+        theme_color: siteConfig.theme.themeColor,
+        background_color: siteConfig.theme.backgroundColor,
         display: 'standalone',
         start_url: '/',
         icons: [
-          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+          { src: siteConfig.assets.icon192, sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+          { src: siteConfig.assets.icon512, sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
         ],
       },
       injectManifest: {

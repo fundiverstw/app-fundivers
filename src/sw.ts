@@ -14,6 +14,7 @@ import { enableFastActivation } from './sw-fast-activation'
 import { wipeCachesAndClaim } from './sw-activation-reset'
 import { isSupabaseCacheable, SUPABASE_CACHE_NAME } from './sw-cache-policy'
 import { safeNotificationTarget } from './sw-notification-target'
+import { siteConfig } from './config/site'
 
 declare const self: ServiceWorkerGlobalScope
 
@@ -62,20 +63,20 @@ interface PushPayload {
 }
 
 self.addEventListener('push', (event) => {
-  let payload: PushPayload = { title: 'FunDivers' }
+  let payload: PushPayload = { title: siteConfig.identity.shortName }
   if (event.data) {
     try {
       payload = event.data.json() as PushPayload
     } catch {
-      payload = { title: 'FunDivers', body: event.data.text() }
+      payload = { title: siteConfig.identity.shortName, body: event.data.text() }
     }
   }
 
   const options: NotificationOptions = {
     body: payload.body,
     tag:  payload.tag,
-    icon: '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
+    icon: siteConfig.assets.icon192,
+    badge: siteConfig.assets.icon192,
     // Keep the banner on screen until the diver acts on it instead of
     // auto-dismissing after a few seconds.
     requireInteraction: true,

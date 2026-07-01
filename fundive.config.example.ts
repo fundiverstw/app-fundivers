@@ -1,0 +1,83 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// TEMPLATE for a new shop's fundive.config.ts.
+//
+// Copy this file to `fundive.config.ts` and replace every value with your own.
+// Keep it PURE DATA — no imports, no React, no import.meta.env — so the browser,
+// vite.config.ts, the service worker, and the Deno edge functions can all read
+// it. The shape is checked against SiteConfig (src/config/site.ts) at build time.
+//
+// Infrastructure that does NOT live here (it's per-account, not app data): your
+// Supabase + Cloudflare secrets go in .env / GitHub Actions secrets / wrangler
+// secrets, and the Worker names live in wrangler.toml + workers/push/wrangler.toml.
+// See docs/forking.md and docs/deployment.md.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const siteConfig = {
+  // Leave at 1 for a new fork. Only bump when core's CHANGELOG tells you to.
+  configVersion: 1,
+
+  identity: {
+    appName: 'FunDive',
+    shopName: 'Your Dive Shop',
+    shortName: 'YourShop',
+    description: 'Dive registration and logbook for Your Dive Shop',
+    logoAlt: 'Your Dive Shop',
+  },
+
+  contact: {
+    email: 'hello@example.com',
+    phone: '+1 555-000-0000',
+    address: '123 Harbour Rd, Your City',
+    mapsUrl: 'https://maps.google.com/?q=your+shop',
+    lineUrl: 'https://line.me/R/ti/p/%40yourshop',
+    whatsappUrl: 'https://wa.me/15550000000',
+    paypalLink: 'https://paypal.me/yourshop',
+  },
+
+  // No trailing slashes except travelDestinationsBase (a path prefix).
+  urls: {
+    site: 'https://www.example.com',
+    app: 'https://app.example.com',
+    radio: 'https://radio.example.com',
+    travelDestinationsBase: 'https://www.example.com/traveldestinations/',
+  },
+
+  locale: {
+    timezone: 'Asia/Taipei',
+    currency: 'USD',
+    currencyLabel: 'USD',
+  },
+
+  theme: {
+    themeColor: '#0ea5e9',
+    backgroundColor: '#0f172a',
+  },
+
+  // Drop your images into public/ at these paths (or change the paths here).
+  assets: {
+    logo: '/imgs/fd_logo.png',
+    favicon: '/favicon.png',
+    icon192: '/icons/icon-192.png',
+    icon512: '/icons/icon-512.png',
+    appleTouchIcon: '/apple-touch-icon.png',
+    broadcast: '/imgs/broadcast.png',
+  },
+
+  // Turn off what you don't run. `map` ships Taiwan-specific geometry today, so
+  // most shops set it to false until per-shop maps land.
+  features: {
+    map: false,
+    radio: false,
+    push: true,
+    broadcast: false,
+  },
+
+  business: {
+    gearItems: ['BCD', 'Regulator', 'Wetsuit', 'Fins', 'Mask', 'Boots', 'Dive computer'],
+    gearPrices: {
+      BCD: 15, Regulator: 15, Wetsuit: 10, Fins: 5, Mask: 5, Boots: 3, 'Dive computer': 10,
+    },
+    paymentDeadlineFallbackDays: 7,
+    cardSurchargePercent: 5,
+  },
+}

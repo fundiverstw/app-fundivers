@@ -4,6 +4,8 @@
 // is stored; the view fetches on demand. URL builders + the response parser
 // are pure so they're unit-testable without network.
 
+import { siteConfig } from '../config/site'
+
 export interface DailyWeather {
   date: string            // YYYY-MM-DD, Asia/Taipei (Open-Meteo returns local dates)
   tempMax: number | null  // °C
@@ -16,7 +18,7 @@ export interface DailyWeather {
 
 // Longdong / Bitou — the Northeast-coast home diving area near Keelung.
 export const HOME_REGION = { latitude: 25.12, longitude: 121.92, label: 'NE coast — Longdong / Keelung' }
-const TZ = 'Asia/Taipei'
+const TZ = siteConfig.locale.timezone
 
 export function buildArchiveUrl(start: string, end: string): string {
   const p = new URLSearchParams({

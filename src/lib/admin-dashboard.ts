@@ -5,6 +5,7 @@
 // Money is netted the same way as the accounting export: `paid` counts
 // positive, `refunded` negative, `voided` is excluded entirely.
 import { canonicalCertLevel } from './cert-level'
+import { siteConfig } from '../config/site'
 import type { Booking, Payment } from '../types/database'
 
 export interface MoneyPoint { label: string; value: number }
@@ -63,7 +64,7 @@ export interface DashboardInput {
 const num = (v: unknown): number => Number(v) || 0
 
 function taipeiDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' })
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: siteConfig.locale.timezone, year: 'numeric', month: '2-digit', day: '2-digit' })
 }
 function taipeiMonth(iso: string): string {
   return taipeiDate(iso).slice(0, 7)

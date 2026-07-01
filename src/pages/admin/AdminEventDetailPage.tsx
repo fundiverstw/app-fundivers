@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { siteConfig } from '../../config/site'
 import { PageLoading } from '../../components/ui/Spinner'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
@@ -294,7 +295,7 @@ export function AdminEventDetailPage() {
     try {
       const applied = await applyCreditToBooking({ bookingId: r.booking.id, amount })
       if (applied > 0) {
-        toast.success(`Applied ${event?.currency ?? 'NTD'} ${applied.toLocaleString()} credit`)
+        toast.success(`Applied ${event?.currency ?? siteConfig.locale.currencyLabel} ${applied.toLocaleString()} credit`)
         // Credit-apply settles/splits credit rows and inserts a payment in one
         // round-trip; reload rather than mirror that locally.
         setRefreshKey(k => k + 1)
@@ -406,7 +407,7 @@ export function AdminEventDetailPage() {
       waiverState={waiverState}
       addonNames={addonNames}
       roomNames={roomNames}
-      currency={event?.currency ?? 'NTD'}
+      currency={event?.currency ?? siteConfig.locale.currencyLabel}
       onStatusChange={updateStatus}
       onApproveRefund={approveRefund}
       onEdit={() => setEditing(r)}
@@ -570,7 +571,7 @@ export function AdminEventDetailPage() {
           )}
 
           {view === 'balances' && (
-            <BalancesView registrants={activeRegistrants} currency={event?.currency ?? 'NTD'} />
+            <BalancesView registrants={activeRegistrants} currency={event?.currency ?? siteConfig.locale.currencyLabel} />
           )}
         </>
       )}

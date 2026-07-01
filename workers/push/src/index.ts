@@ -36,6 +36,10 @@ export interface Env {
   VAPID_PUBLIC_KEY: string
   VAPID_PRIVATE_KEY: string
   VAPID_SUBJECT: string
+  // Comma-separated list of browser origins allowed to call this worker (the
+  // fork's app domain). The local dev origin is always allowed. CORS is UX-only
+  // here — every handler still enforces auth via the Bearer JWT.
+  ALLOWED_ORIGINS?: string
   ADMIN_TRIGGER_SECRET?: string
   // Optional: when set, /admin-broadcast also POSTs `{title, body}` JSON to
   // this URL (e.g. a LINE Messaging API relay or a third-party automation).
@@ -60,42 +64,42 @@ export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url)
     if (req.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: corsHeaders(req) })
+      return new Response(null, { status: 204, headers: corsHeaders(req, env) })
     }
     if (url.pathname === '/run') {
       const auth = req.headers.get('authorization') ?? ''
       const expected = `Bearer ${env.ADMIN_TRIGGER_SECRET ?? ''}`
       if (!env.ADMIN_TRIGGER_SECRET || auth !== expected) {
-        return withCors(new Response('unauthorized', { status: 401 }), req)
+        return withCors(new Response('unauthorized', { status: 401 }), req, env)
       }
       const result = await runDailyReminders(env)
-      return withCors(Response.json(result), req)
+      return withCors(Response.json(result), req, env)
     }
     if (url.pathname === '/process-waitlist-offers') {
       const auth = req.headers.get('authorization') ?? ''
       const expected = `Bearer ${env.ADMIN_TRIGGER_SECRET ?? ''}`
       if (!env.ADMIN_TRIGGER_SECRET || auth !== expected) {
-        return withCors(new Response('unauthorized', { status: 401 }), req)
+        return withCors(new Response('unauthorized', { status: 401 }), req, env)
       }
       const result = await processWaitlistOffers(env)
-      return withCors(Response.json(result), req)
+      return withCors(Response.json(result), req, env)
     }
     if (url.pathname === '/notify-duty' && req.method === 'POST') {
-      return withCors(await handleNotifyDuty(req, env), req)
+      return withCors(await handleNotifyDuty(req, env), req, env)
     }
     if (url.pathname === '/admin-broadcast' && req.method === 'POST') {
-      return withCors(await handleAdminBroadcast(req, env), req)
+      return withCors(await handleAdminBroadcast(req, env), req, env)
     }
     if (url.pathname === '/admin-event-broadcast' && req.method === 'POST') {
-      return withCors(await handleAdminEventBroadcast(req, env), req)
+      return withCors(await handleAdminEventBroadcast(req, env), req, env)
     }
     if (url.pathname === '/admin-event-reschedule' && req.method === 'POST') {
-      return withCors(await handleAdminEventReschedule(req, env), req)
+      return withCors(await handleAdminEventReschedule(req, env), req, env)
     }
     if (url.pathname === '/admin-event-cancellation' && req.method === 'POST') {
-      return withCors(await handleAdminEventCancellation(req, env), req)
+      return withCors(await handleAdminEventCancellation(req, env), req, env)
     }
-    return withCors(new Response('not found', { status: 404 }), req)
+    return withCors(new Response('not found', { status: 404 }), req, env)
   },
 }
 
@@ -104,14 +108,18 @@ export default {
 // are allowlisted; other origins get no Access-Control-Allow-Origin and are
 // blocked by the browser. CORS is browser-side only — auth is still enforced
 // per-handler via the Bearer JWT, so this list is about UX, not security.
-const ALLOWED_ORIGINS = new Set([
-  'https://app.fundiverstw.com',
-  'http://localhost:5173',
-])
+// Production origin(s) come from the ALLOWED_ORIGINS env var (comma-separated)
+// so each fork sets its own app domain in wrangler.toml. The local dev origin is
+// always allowed so `make dev` can reach the worker.
+function allowedOrigins(env: Env): Set<string> {
+  const configured = (env.ALLOWED_ORIGINS ?? '')
+    .split(',').map(s => s.trim()).filter(Boolean)
+  return new Set([...configured, 'http://localhost:5173'])
+}
 
-function corsHeaders(req: Request): Record<string, string> {
+function corsHeaders(req: Request, env: Env): Record<string, string> {
   const origin = req.headers.get('origin') ?? ''
-  if (!ALLOWED_ORIGINS.has(origin)) return {}
+  if (!allowedOrigins(env).has(origin)) return {}
   return {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -121,9 +129,9 @@ function corsHeaders(req: Request): Record<string, string> {
   }
 }
 
-function withCors(res: Response, req: Request): Response {
+function withCors(res: Response, req: Request, env: Env): Response {
   const headers = new Headers(res.headers)
-  for (const [k, v] of Object.entries(corsHeaders(req))) headers.set(k, v)
+  for (const [k, v] of Object.entries(corsHeaders(req, env))) headers.set(k, v)
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
 }
 
