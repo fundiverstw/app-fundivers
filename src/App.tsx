@@ -31,9 +31,6 @@ import { TripDetailPage } from './pages/TripDetailPage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { DutiesPage } from './pages/DutiesPage'
-import { EelPage } from './pages/EelPage'
-import { TurtlerPage } from './pages/TurtlerPage'
-import { NudibranchoutPage } from './pages/NudibranchoutPage'
 import { AdminEventsPage } from './pages/admin/AdminEventsPage'
 import { AdminEventDetailPage } from './pages/admin/AdminEventDetailPage'
 import { AdminGearMapPage } from './pages/admin/AdminGearMapPage'
@@ -114,9 +111,6 @@ export default function App() {
               <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/duties" element={<DutiesPage />} />
             </Route>
-            <Route path="/minigame/eel" element={<EelPage />} />
-            <Route path="/minigame/turtler" element={<TurtlerPage />} />
-            <Route path="/minigame/nudibranchout" element={<NudibranchoutPage />} />
             {/* Read-only event surfaces — accessible to staff + admin */}
             <Route element={<StaffOrAdminRoute />}>
               <Route element={<AdminShell />}>

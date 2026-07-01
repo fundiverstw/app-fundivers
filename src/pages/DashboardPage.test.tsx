@@ -5,17 +5,6 @@ import { DashboardPage } from './DashboardPage'
 
 const { useAuthMock } = vi.hoisted(() => ({ useAuthMock: vi.fn() }))
 vi.mock('../hooks/useAuth', () => ({ useAuth: () => useAuthMock() }))
-// Bouncers do their own timers/pointer math; stub them here since this
-// test is only about the bubble console overlay and role label.
-vi.mock('../components/dashboard/EelBouncer', () => ({
-  EelBouncer: () => null,
-}))
-vi.mock('../components/dashboard/FrogBouncer', () => ({
-  FrogBouncer: () => null,
-}))
-vi.mock('../components/dashboard/NudibranchBouncer', () => ({
-  NudibranchBouncer: () => null,
-}))
 // FeaturedEvents fetches on mount; it has its own test. Stub it here so these
 // tests stay focused on the bubble overlay and welcome banner.
 vi.mock('../components/dashboard/FeaturedEvents', () => ({

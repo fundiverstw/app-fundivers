@@ -1,8 +1,5 @@
 import { useEffect, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
-import { EelBouncer } from '../components/dashboard/EelBouncer'
-import { FrogBouncer } from '../components/dashboard/FrogBouncer'
-import { NudibranchBouncer } from '../components/dashboard/NudibranchBouncer'
 import { FeaturedEvents } from '../components/dashboard/FeaturedEvents'
 import { WelcomeBanner } from '../components/welcome/WelcomeBanner'
 
@@ -151,9 +148,6 @@ export function DashboardPage() {
         </div>
       )}
       <FeaturedEvents />
-      <EelBouncer />
-      <FrogBouncer />
-      <NudibranchBouncer />
     </div>
   )
 }
