@@ -8,8 +8,13 @@
 import { jsPDF } from "npm:jspdf@2.5.1"
 import { Buffer } from "node:buffer"
 import { paymentInstructionsFor, paymentConfirmationReminder } from "./payment-instructions.ts"
+import { siteConfig } from "../../../fundive.config.ts"
 
-// Bundled alongside this file in the edge function deploy.
+// Shop currency label shown on money rows in the PDF.
+const CUR = siteConfig.locale.currencyLabel
+
+// Bundled alongside this file in the edge function deploy. Forks replace this
+// image with their own logo at the same path.
 const LOGO_PATH = new URL("./fd_logo.png", import.meta.url)
 
 // Brand colours (matching the LaTeX registration form).
@@ -276,7 +281,7 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   if (p.charges && p.charges.length) {
     for (const c of p.charges) y = row(doc, y, c.label, c.amount, altState)
   }
-  y = row(doc, y, "Deposit due (NTD)", p.deposit, altState)
+  y = row(doc, y, `Deposit due (${CUR})`, p.deposit, altState)
   y += 2
 
   // Total — highlighted row
@@ -286,7 +291,7 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   doc.setFontSize(9)
   doc.setFont("helvetica", "bold")
   doc.setTextColor(...C.ocean)
-  doc.text("Total (NTD)", ML + 2, y + 1)
+  doc.text(`Total (${CUR})`, ML + 2, y + 1)
   doc.setFontSize(13)
   doc.text(p.total != null ? String(p.total) : "-", COL, y + 1)
   y += 8
@@ -349,11 +354,11 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
     y += 2
     const remaining = Math.max(0, p.total - p.deposit)
     doc.setFont("helvetica", "bold")
-    doc.text(`Pay deposit ASAP: ${p.deposit} NTD`, ML + 2, y)
+    doc.text(`Pay deposit ASAP: ${p.deposit} ${CUR}`, ML + 2, y)
     y += 4.5
     const balanceLine = p.fullPaymentDeadline
-      ? `Pay remaining balance by ${formatDeadlineLong(p.fullPaymentDeadline)}: ${remaining} NTD`
-      : `Pay remaining balance: ${remaining} NTD`
+      ? `Pay remaining balance by ${formatDeadlineLong(p.fullPaymentDeadline)}: ${remaining} ${CUR}`
+      : `Pay remaining balance: ${remaining} ${CUR}`
     doc.text(balanceLine, ML + 2, y)
     y += 4.5
     doc.setFont("helvetica", "normal")
@@ -456,8 +461,8 @@ const GROUP_FIELDS: Array<{ label: string; get: (d: GroupDiverColumn) => string 
   { label: "Room",          get: d => d.room ?? "" },
   { label: "Add-ons",       get: d => d.addons.join(", ") },
   { label: "Status",        get: d => d.status },
-  { label: "Deposit (NTD)", get: d => d.deposit != null ? String(d.deposit) : "" },
-  { label: "Total (NTD)",   get: d => d.total != null ? String(d.total) : "" },
+  { label: `Deposit (${CUR})`, get: d => d.deposit != null ? String(d.deposit) : "" },
+  { label: `Total (${CUR})`,   get: d => d.total != null ? String(d.total) : "" },
 ]
 
 const GROUP_LABEL_X = ML + 2
@@ -556,7 +561,7 @@ export async function buildGroupPdfBase64(p: GroupRegistrationPdfPayload): Promi
   doc.setFontSize(9)
   doc.setFont("helvetica", "bold")
   doc.setTextColor(...C.ocean)
-  doc.text(`Group total (${p.divers.length} divers) (NTD)`, GROUP_LABEL_X, y + 1)
+  doc.text(`Group total (${p.divers.length} divers) (${CUR})`, GROUP_LABEL_X, y + 1)
   doc.setFontSize(13)
   doc.text(String(p.groupTotal), 130, y + 1)
   y += 10

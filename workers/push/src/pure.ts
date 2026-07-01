@@ -37,8 +37,10 @@ export function buildReminderInputs(args: {
   bookings: Booking[]
   paidByBooking: Map<string, number>
   sentMap: Map<string, Set<ReminderKind>>
+  /** Shop currency label shown in the money line of a reminder. */
+  currency: string
 }): ReminderInput[] {
-  const { dives, courses, bookings, paidByBooking, sentMap } = args
+  const { dives, courses, bookings, paidByBooking, sentMap, currency } = args
   const diveMap   = new Map(dives.map((d) => [d._id, d]))
   const courseMap = new Map(courses.map((c) => [c._id, c]))
 
@@ -63,17 +65,18 @@ export function buildReminderInputs(args: {
       totalAmount:        Number(details.total   ?? 0),
       depositAmount:      Number(details.deposit ?? 0),
       paidAmount:         paidByBooking.get(b.id) ?? 0,
-      currency:           'TWD',
+      currency,
       alreadySent:        sentMap.get(`${b.user_id}:${eventId}`) ?? new Set<ReminderKind>(),
     })
   }
   return inputs
 }
 
-/** Current date in Asia/Taipei (UTC+8, no DST), YYYY-MM-DD. */
-export function todayInTaipei(now: number = Date.now()): string {
-  const shifted = new Date(now + 8 * 3_600_000)
-  return shifted.toISOString().slice(0, 10)
+/** Current date in the given IANA timezone, YYYY-MM-DD. */
+export function todayInZone(now: number, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date(now))
 }
 
 /** Offset a YYYY-MM-DD string by N days using UTC arithmetic. */
@@ -84,13 +87,14 @@ export function addDays(ymd: string, days: number): string {
 }
 
 /**
- * 'YYYY-MM-DD' → a friendly Taipei-anchored label like 'Mon, May 18'.
- * Anchored to +08:00 so the weekday/day never drift under the runner's
- * timezone (Taiwan has no DST — a fixed offset is correct).
+ * 'YYYY-MM-DD' → a friendly label like 'Mon, May 18'. The weekday of a
+ * calendar date is timezone-independent, so we anchor at UTC midnight and
+ * format in UTC — deterministic regardless of the runner's timezone, and no
+ * shop-timezone assumption baked in.
  */
 export function formatDayLabel(ymd: string): string {
-  return new Date(`${ymd}T00:00:00+08:00`).toLocaleDateString('en-US', {
-    weekday: 'short', month: 'short', day: 'numeric', timeZone: 'Asia/Taipei',
+  return new Date(`${ymd}T00:00:00Z`).toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC',
   })
 }
 

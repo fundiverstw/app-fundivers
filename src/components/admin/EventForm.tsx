@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
+import { siteConfig } from '../../config/site'
 import type { CancellationPolicy, CertLevel, DiveTravelEntry, EOAddon, EOCourse, EODive, EOPrice, EORoom, TravelDestination } from '../../types/database'
 import {
   EMPTY_FORM,
@@ -23,13 +24,15 @@ type PastEvent =
   | { kind: 'dive';   id: string; startDate: string; title: string; row: EODive }
   | { kind: 'course'; id: string; startDate: string; title: string; row: EOCourse }
 
+const CUR = siteConfig.locale.currencyLabel
+
 // "Standard (total: 5000 NTD / deposit: 1500 NTD)" — drops parts that
 // aren't set so a tier with only one of the two prices doesn't render an
 // awkward placeholder.
 function priceOptionLabel(p: EOPrice): string {
   const parts: string[] = []
-  if (p.starting_at != null)    parts.push(`total: ${p.starting_at} NTD`)
-  if (p.deposit_amount != null) parts.push(`deposit: ${p.deposit_amount} NTD`)
+  if (p.starting_at != null)    parts.push(`total: ${p.starting_at} ${CUR}`)
+  if (p.deposit_amount != null) parts.push(`deposit: ${p.deposit_amount} ${CUR}`)
   return parts.length ? `${p.admin_title} (${parts.join(' / ')})` : p.admin_title
 }
 
@@ -509,7 +512,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
                 <Input type="number" value={priceForm.deposit_amount} onChange={v => setPriceForm(f => ({ ...f, deposit_amount: v }))} />
               </Field>
             </div>
-            <Field label="Transport (NTD per booking; blank or 0 = included in base)">
+            <Field label={`Transport (${CUR} per booking; blank or 0 = included in base)`}>
               <Input type="number" value={priceForm.transport} onChange={v => setPriceForm(f => ({ ...f, transport: v }))} />
             </Field>
             {priceError && (
@@ -684,7 +687,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
                 <Field label="Display name">
                   <Input value={roomForm.display_title} onChange={v => setRoomForm(f => ({ ...f, display_title: v }))} />
                 </Field>
-                <Field label="Added price (NTD)">
+                <Field label={`Added price (${CUR})`}>
                   <Input type="number" value={roomForm.added_price} onChange={v => setRoomForm(f => ({ ...f, added_price: v }))} />
                 </Field>
                 {roomError && (
@@ -790,7 +793,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
             <Field label="Display name">
               <Input value={addonForm.display_title} onChange={v => setAddonForm(f => ({ ...f, display_title: v }))} />
             </Field>
-            <Field label="Price (NTD)">
+            <Field label={`Price (${CUR})`}>
               <Input type="number" value={addonForm.price} onChange={v => setAddonForm(f => ({ ...f, price: v }))} />
             </Field>
             {addonError && (
