@@ -73,8 +73,6 @@ separate mechanism (baked into the manifest + `index.html` at build).
 
 `fundive.config.ts` → `features` gates optional surfaces:
 
-- `map` — the dive-site Map tab. It currently ships Taiwan-specific geometry, so
-  leave it `false` unless you're the Taiwan shop.
 - `radio` — the external radio links in the app shells.
 - `push` / `broadcast` — refine the push + admin-broadcast features (also gated by
   the VAPID / webhook env).

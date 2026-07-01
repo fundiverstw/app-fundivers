@@ -38,8 +38,6 @@ export interface SiteUrls {
   app: string
   /** External radio stream, no trailing slash. */
   radio: string
-  /** Path prefix that a dive-site slug is appended to. */
-  travelDestinationsBase: string
 }
 
 export interface SiteLocale {
@@ -68,8 +66,6 @@ export interface SiteAssets {
 }
 
 export interface SiteFeatures {
-  /** Dive-site Map tab (Taiwan-specific geometry today — off for other shops). */
-  map: boolean
   /** External radio links in the app shells. */
   radio: boolean
   /** Web-push notifications (also gated by VAPID env). */

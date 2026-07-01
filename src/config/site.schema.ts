@@ -31,7 +31,6 @@ export const siteConfigSchema = z.object({
     site: url,
     app: url,
     radio: url,
-    travelDestinationsBase: url,
   }),
   locale: z.object({
     timezone: z.string().min(1),
@@ -51,7 +50,6 @@ export const siteConfigSchema = z.object({
     broadcast: z.string().min(1),
   }),
   features: z.object({
-    map: z.boolean(),
     radio: z.boolean(),
     push: z.boolean(),
     broadcast: z.boolean(),

@@ -40,13 +40,11 @@ export const siteConfig = {
     paypalLink: 'https://paypal.me/fundiverstw',
   },
 
-  // No trailing slashes except travelDestinationsBase, which is a path prefix
-  // that dive-site slugs are appended to directly.
+  // No trailing slashes.
   urls: {
     site: 'https://www.fundiverstw.com',
     app: 'https://app.fundiverstw.com',
     radio: 'https://radio.fundiverstw.com',
-    travelDestinationsBase: 'https://www.fundiverstw.com/traveldestinations/',
   },
 
   locale: {
@@ -72,7 +70,6 @@ export const siteConfig = {
   },
 
   features: {
-    map: true,
     radio: true,
     push: true,
     broadcast: true,

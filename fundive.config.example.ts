@@ -34,12 +34,11 @@ export const siteConfig = {
     paypalLink: 'https://paypal.me/yourshop',
   },
 
-  // No trailing slashes except travelDestinationsBase (a path prefix).
+  // No trailing slashes.
   urls: {
     site: 'https://www.example.com',
     app: 'https://app.example.com',
     radio: 'https://radio.example.com',
-    travelDestinationsBase: 'https://www.example.com/traveldestinations/',
   },
 
   locale: {
@@ -63,10 +62,8 @@ export const siteConfig = {
     broadcast: '/imgs/broadcast.png',
   },
 
-  // Turn off what you don't run. `map` ships Taiwan-specific geometry today, so
-  // most shops set it to false until per-shop maps land.
+  // Turn off what you don't run.
   features: {
-    map: false,
     radio: false,
     push: true,
     broadcast: false,
