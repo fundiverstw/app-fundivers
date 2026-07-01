@@ -99,7 +99,7 @@ export function DateField({
         role="button"
         onClick={openPicker}
         aria-label="Open calendar"
-        className="absolute inset-y-0 right-0 flex items-center px-2 text-blue-900/70 hover:text-blue-900 cursor-pointer"
+        className="absolute inset-y-0 right-0 flex items-center px-2 text-brand-900/70 hover:text-brand-900 cursor-pointer"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <rect x="3" y="4" width="18" height="18" rx="2" />

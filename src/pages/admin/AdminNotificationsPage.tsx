@@ -79,7 +79,7 @@ export function AdminNotificationsPage() {
     }
   }
 
-  const inputClass = 'w-full bg-white border border-sky-300 rounded-md px-3 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900'
+  const inputClass = 'w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900'
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
@@ -90,10 +90,10 @@ export function AdminNotificationsPage() {
       </p>
       <form
         onSubmit={handleSubmit}
-        className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3"
+        className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3"
       >
         <label className="block space-y-1">
-          <span className="text-xs font-medium text-blue-900">Title *</span>
+          <span className="text-xs font-medium text-brand-900">Title *</span>
           <input
             type="text"
             value={title}
@@ -104,7 +104,7 @@ export function AdminNotificationsPage() {
           />
         </label>
         <label className="block space-y-1">
-          <span className="text-xs font-medium text-blue-900">Body *</span>
+          <span className="text-xs font-medium text-brand-900">Body *</span>
           <textarea
             value={body}
             onChange={e => setBody(e.target.value)}
@@ -115,7 +115,7 @@ export function AdminNotificationsPage() {
           />
         </label>
         <label className="block space-y-1">
-          <span className="text-xs font-medium text-blue-900">Link (optional)</span>
+          <span className="text-xs font-medium text-brand-900">Link (optional)</span>
           <input
             type="text"
             value={link}
@@ -123,7 +123,7 @@ export function AdminNotificationsPage() {
             placeholder="/records/bookings  or  https://example.com"
             className={inputClass}
           />
-          <span className="block text-[11px] text-blue-900/70">
+          <span className="block text-[11px] text-brand-900/70">
             When set, tapping the push opens this URL. When empty, tapping opens the
             in-app inbox so the diver can re-read the message.
           </span>
@@ -135,7 +135,7 @@ export function AdminNotificationsPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="py-2 px-4 rounded-lg text-sm font-semibold bg-blue-900 hover:bg-blue-950 text-white disabled:opacity-50"
+            className="py-2 px-4 rounded-lg text-sm font-semibold bg-brand-900 hover:bg-brand-950 text-white disabled:opacity-50"
           >
             {submitting ? 'Sending…' : 'Send now'}
           </button>

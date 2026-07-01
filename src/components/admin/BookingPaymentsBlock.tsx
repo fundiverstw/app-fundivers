@@ -116,15 +116,15 @@ export function BookingPaymentsBlock({
   }
 
   return (
-    <div className="text-xs bg-sky-50 rounded p-2 space-y-2">
+    <div className="text-xs bg-surface-50 rounded p-2 space-y-2">
       {((charges && charges.length > 0) || (amendments && amendments.length > 0)) && (
-        <div className="pb-2 border-b border-sky-200 space-y-1">
-          <p className="font-semibold text-blue-900">Charges</p>
+        <div className="pb-2 border-b border-surface-200 space-y-1">
+          <p className="font-semibold text-brand-900">Charges</p>
           <ChargeBreakdown lines={charges ?? []} amendments={amendments} total={owed} currency={currency ?? siteConfig.locale.currencyLabel} />
         </div>
       )}
 
-      <p className="font-semibold text-blue-900">Payments</p>
+      <p className="font-semibold text-brand-900">Payments</p>
 
       {payerNote && (
         <p className="text-violet-800 font-semibold">{payerNote}</p>
@@ -136,7 +136,7 @@ export function BookingPaymentsBlock({
         const bal = bookingBalance(owed, paid, credit)
         return (
           <>
-            <div className="grid grid-cols-3 gap-2 text-blue-900">
+            <div className="grid grid-cols-3 gap-2 text-brand-900">
               <div>
                 <p className="font-medium opacity-70">Owed</p>
                 <p className="font-semibold">{owed.toLocaleString()}</p>
@@ -168,9 +168,9 @@ export function BookingPaymentsBlock({
       })()}
 
       {payments.length === 0 ? (
-        <p className="text-blue-900 font-medium italic">No payments recorded yet.</p>
+        <p className="text-brand-900 font-medium italic">No payments recorded yet.</p>
       ) : (
-        <ul className="space-y-1 pt-1 border-t border-sky-200">
+        <ul className="space-y-1 pt-1 border-t border-surface-200">
           {payments.map(p => {
             // Both 'refunded' (money sent back) and 'voided' (admin mistake)
             // get the strikethrough treatment so the running paid sum lines
@@ -178,7 +178,7 @@ export function BookingPaymentsBlock({
             const struck = p.status === 'refunded' || p.status === 'voided'
             return (
               <li key={p.id} className="flex items-baseline justify-between gap-2">
-                <span className="text-blue-950 font-medium flex-1">
+                <span className="text-brand-950 font-medium flex-1">
                   {format(new Date(p.created_at), 'MMM d')} · {p.note ?? 'Payment'}
                   {p.method && <span className="opacity-70"> ({p.method.replace('_', ' ')})</span>}
                   {p.status !== 'paid' && <span className="text-red-600"> · {p.status}</span>}
@@ -195,7 +195,7 @@ export function BookingPaymentsBlock({
                     {voidingId === p.id ? 'Voiding…' : 'Void'}
                   </button>
                 )}
-                <span className={`shrink-0 font-semibold ${struck ? 'text-blue-950 line-through' : 'text-blue-900'}`}>
+                <span className={`shrink-0 font-semibold ${struck ? 'text-brand-950 line-through' : 'text-brand-900'}`}>
                   {p.amount.toLocaleString()}
                 </span>
               </li>
@@ -205,13 +205,13 @@ export function BookingPaymentsBlock({
       )}
 
       {!readOnly && !cancelled && (
-        <div className="space-y-1.5 pt-1 border-t border-sky-200">
+        <div className="space-y-1.5 pt-1 border-t border-surface-200">
           {pending && onMarkDepositPaid && (
             <button
               type="button"
               disabled={confirming}
               onClick={handleMarkDepositPaid}
-              className="w-full text-xs bg-blue-900 hover:bg-blue-950 disabled:opacity-50 text-white font-semibold px-3 py-1.5 rounded"
+              className="w-full text-xs bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white font-semibold px-3 py-1.5 rounded"
             >
               {confirming ? 'Marking…' : 'Mark deposit paid'}
             </button>
@@ -227,12 +227,12 @@ export function BookingPaymentsBlock({
                 value={amountStr}
                 onChange={e => setAmountStr(e.target.value)}
                 placeholder="Paid amount"
-                className="flex-1 bg-white border border-sky-300 rounded px-2 py-1 text-xs text-blue-900"
+                className="flex-1 bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
               />
               <button
                 type="submit"
                 disabled={submitting}
-                className="text-xs bg-blue-900 hover:bg-blue-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded shrink-0"
+                className="text-xs bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded shrink-0"
               >
                 {submitting ? 'Recording…' : 'Record payment'}
               </button>
@@ -243,7 +243,7 @@ export function BookingPaymentsBlock({
               onChange={e => setNote(e.target.value)}
               placeholder="Note (optional, e.g. Balance, Partial #2)"
               maxLength={500}
-              className="w-full bg-white border border-sky-300 rounded px-2 py-1 text-xs text-blue-900"
+              className="w-full bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
             />
             {error && <p className="text-red-600">{error}</p>}
           </form>

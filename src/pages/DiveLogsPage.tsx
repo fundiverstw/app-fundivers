@@ -426,7 +426,7 @@ function DiveLogForm({
                   key={g}
                   onClick={() => toggleGear(g)}
                   className={`text-xs px-2 py-1 rounded-md border transition-colors ${
-                    on ? 'bg-blue-900 text-white border-blue-900' : 'bg-white text-blue-900 border-sky-300 hover:bg-sky-100'
+                    on ? 'bg-brand-900 text-white border-brand-900' : 'bg-white text-brand-900 border-surface-300 hover:bg-surface-100'
                   }`}
                   aria-pressed={on}
                 >

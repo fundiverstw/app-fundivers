@@ -22,7 +22,9 @@ function taipeiDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-CA', { timeZone: siteConfig.locale.timezone, year: 'numeric', month: '2-digit', day: '2-digit' })
 }
 
-const SERIES_COLORS = ['bg-slate-400', 'bg-orange-500', 'bg-blue-600'] // oldest → newest
+// Categorical year-series palette (oldest → newest), independent of the brand
+// color so the three compared years stay visually distinct after a re-skin.
+const SERIES_COLORS = ['bg-slate-400', 'bg-orange-500', 'bg-blue-600']
 
 interface HistoryData {
   years: number[]
@@ -62,12 +64,12 @@ const fmtM = (n: number) => `${n} m`
 const fmtDeg = (n: number) => `${n}°C`
 
 function Delta({ curr, prev, fmt, betterWhenHigher }: { curr: number | null; prev: number | null; fmt: (n: number) => string; betterWhenHigher?: boolean }) {
-  if (curr == null || prev == null) return <span className="text-blue-900/50">vs prior year: —</span>
+  if (curr == null || prev == null) return <span className="text-brand-900/50">vs prior year: —</span>
   const diff = Math.round((curr - prev) * 10) / 10
-  if (diff === 0) return <span className="text-blue-900/60">same as prior year</span>
+  if (diff === 0) return <span className="text-brand-900/60">same as prior year</span>
   const up = diff > 0
   const good = betterWhenHigher == null ? null : up === betterWhenHigher
-  const cls = good == null ? 'text-blue-900/60' : good ? 'text-emerald-700' : 'text-red-600'
+  const cls = good == null ? 'text-brand-900/60' : good ? 'text-emerald-700' : 'text-red-600'
   return <span className={cls}>{up ? '▲' : '▼'} {fmt(Math.abs(diff))} vs prior year</span>
 }
 
@@ -84,12 +86,12 @@ export function AdminHistoryPage() {
   }, [])
 
   if (error) {
-    return <div className="max-w-5xl mx-auto"><p className="text-sm text-red-200 bg-red-900/40 border border-red-500 rounded-lg p-3">{error}</p></div>
+    return <div className="max-w-5xl mx-auto"><p className="text-sm text-red-200 bg-red-900/40 border border-accent rounded-lg p-3">{error}</p></div>
   }
   if (!data) {
     return (
       <div className="max-w-5xl mx-auto flex justify-center py-16">
-        <Spinner className="w-6 h-6 border-2 border-sky-300" />
+        <Spinner className="w-6 h-6 border-2 border-surface-300" />
       </div>
     )
   }
@@ -167,8 +169,8 @@ export function AdminHistoryPage() {
       </section>
 
       <ChartCard title={`Weather on event days vs all days — ${Y}`} empty={ev.eventDayCount === 0}>
-        <table className="w-full text-xs text-blue-900">
-          <thead className="text-blue-900/60 text-left">
+        <table className="w-full text-xs text-brand-900">
+          <thead className="text-brand-900/60 text-left">
             <tr>
               <th className="font-medium pb-1">Metric</th>
               <th className="font-medium pb-1 text-right">On event days</th>
@@ -176,12 +178,12 @@ export function AdminHistoryPage() {
             </tr>
           </thead>
           <tbody>
-            <tr className="border-t border-sky-100"><td className="py-1">Rain (mm/day)</td><td className="py-1 text-right tabular-nums">{num(ev.onEventDays.precipitation)}</td><td className="py-1 text-right tabular-nums">{num(ev.allDays.precipitation)}</td></tr>
-            <tr className="border-t border-sky-100"><td className="py-1">Wave (m)</td><td className="py-1 text-right tabular-nums">{num(ev.onEventDays.waveMax)}</td><td className="py-1 text-right tabular-nums">{num(ev.allDays.waveMax)}</td></tr>
-            <tr className="border-t border-sky-100"><td className="py-1">Wind (km/h)</td><td className="py-1 text-right tabular-nums">{num(ev.onEventDays.windMax)}</td><td className="py-1 text-right tabular-nums">{num(ev.allDays.windMax)}</td></tr>
+            <tr className="border-t border-surface-100"><td className="py-1">Rain (mm/day)</td><td className="py-1 text-right tabular-nums">{num(ev.onEventDays.precipitation)}</td><td className="py-1 text-right tabular-nums">{num(ev.allDays.precipitation)}</td></tr>
+            <tr className="border-t border-surface-100"><td className="py-1">Wave (m)</td><td className="py-1 text-right tabular-nums">{num(ev.onEventDays.waveMax)}</td><td className="py-1 text-right tabular-nums">{num(ev.allDays.waveMax)}</td></tr>
+            <tr className="border-t border-surface-100"><td className="py-1">Wind (km/h)</td><td className="py-1 text-right tabular-nums">{num(ev.onEventDays.windMax)}</td><td className="py-1 text-right tabular-nums">{num(ev.allDays.windMax)}</td></tr>
           </tbody>
         </table>
-        <p className="text-[11px] text-blue-900/60 mt-2">Across {ev.eventDayCount} event day{ev.eventDayCount === 1 ? '' : 's'} in {Y}.</p>
+        <p className="text-[11px] text-brand-900/60 mt-2">Across {ev.eventDayCount} event day{ev.eventDayCount === 1 ? '' : 's'} in {Y}.</p>
       </ChartCard>
 
       <p className="text-[11px] text-white/50">Weather: Open-Meteo, {HOME_REGION.label} ({HOME_REGION.latitude}, {HOME_REGION.longitude}).</p>

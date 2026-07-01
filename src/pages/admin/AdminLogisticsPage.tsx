@@ -328,10 +328,10 @@ export function AdminLogisticsPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
-      <header className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
+      <header className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
         <div className="flex items-baseline justify-between gap-3">
-          <h1 className="text-xl font-bold text-blue-900">Logistics</h1>
-          {dayKey && <span className="text-xs text-blue-900 font-medium">{dayKey}</span>}
+          <h1 className="text-xl font-bold text-brand-900">Logistics</h1>
+          {dayKey && <span className="text-xs text-brand-900 font-medium">{dayKey}</span>}
         </div>
         <div role="tablist" aria-label="Day" className="flex flex-wrap gap-2 items-center">
           <DayTab label="Today"     active={tab === 'today'}    onClick={() => setTab('today')} />
@@ -339,13 +339,13 @@ export function AdminLogisticsPage() {
           <DayTab label="Other day" active={tab === 'other'}    onClick={() => setTab('other')} />
           {tab === 'other' && (
             upcomingDays && upcomingDays.length === 0 ? (
-              <span className="text-xs text-blue-950 font-medium italic">No events in the next {LOOKAHEAD_DAYS} days.</span>
+              <span className="text-xs text-brand-950 font-medium italic">No events in the next {LOOKAHEAD_DAYS} days.</span>
             ) : (
               <select
                 aria-label="Select a day"
                 value={otherDay}
                 onChange={e => setOtherDay(e.target.value)}
-                className="px-3 py-1 rounded-full text-sm bg-sky-100 text-blue-900 border border-sky-200"
+                className="px-3 py-1 rounded-full text-sm bg-surface-100 text-brand-900 border border-surface-200"
               >
                 <option value="">Select a day…</option>
                 {(upcomingDays ?? []).map(d => (
@@ -358,36 +358,36 @@ export function AdminLogisticsPage() {
       </header>
 
       {promptForDay ? (
-        <p className="text-blue-950 font-medium text-sm">Pick a day above to see its logistics.</p>
+        <p className="text-brand-950 font-medium text-sm">Pick a day above to see its logistics.</p>
       ) : groups === null ? (
         <PageLoading />
       ) : groups.length === 0 ? (
-        <p className="text-blue-950 font-medium text-sm">No events scheduled for {dayKey}.</p>
+        <p className="text-brand-950 font-medium text-sm">No events scheduled for {dayKey}.</p>
       ) : (
         <>
-          <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
-            <h2 className="text-sm font-bold text-blue-900 uppercase tracking-wider">Overall — {dayKey}</h2>
-            <p className="text-sm text-blue-900 font-medium">
+          <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
+            <h2 className="text-sm font-bold text-brand-900 uppercase tracking-wider">Overall — {dayKey}</h2>
+            <p className="text-sm text-brand-900 font-medium">
               {groups.length} event{groups.length === 1 ? '' : 's'} · {allRows.length} diver{allRows.length === 1 ? '' : 's'}
             </p>
             {allRows.length > 0 && (
               <div className="space-y-1">
-                <p className="text-xs font-semibold text-blue-900 uppercase tracking-wide">Payments</p>
+                <p className="text-xs font-semibold text-brand-900 uppercase tracking-wide">Payments</p>
                 {dayOutstanding > 0 ? (
                   <p className="text-sm font-semibold text-red-600">
                     {dayDue.length} diver{dayDue.length === 1 ? '' : 's'} still owe · {currency} {dayOutstanding.toLocaleString()} outstanding
                   </p>
                 ) : (
-                  <p className="text-sm text-blue-900 font-medium">All settled.</p>
+                  <p className="text-sm text-brand-900 font-medium">All settled.</p>
                 )}
               </div>
             )}
             <div className="space-y-1">
-              <p className="text-xs font-semibold text-blue-900 uppercase tracking-wide">Transportation</p>
-              <p className="text-sm text-blue-900 font-medium">
+              <p className="text-xs font-semibold text-brand-900 uppercase tracking-wide">Transportation</p>
+              <p className="text-sm text-brand-900 font-medium">
                 <span className="text-red-600 font-semibold">{transport.needsRide.length}</span> need a ride
                 {onDutyStaffCount > 0 && (
-                  <> · <span className="text-blue-900 font-semibold">{onDutyStaffCount}</span> on-duty staff</>
+                  <> · <span className="text-brand-900 font-semibold">{onDutyStaffCount}</span> on-duty staff</>
                 )}
                 {' · '}{transport.selfTransport.length} self-transport
                 {transport.unspecified.length > 0 && <> · {transport.unspecified.length} unspecified</>}
@@ -397,13 +397,13 @@ export function AdminLogisticsPage() {
               )}
             </div>
             <div className="space-y-1">
-              <p className="text-xs font-semibold text-blue-900 uppercase tracking-wide">Gear to pack</p>
+              <p className="text-xs font-semibold text-brand-900 uppercase tracking-wide">Gear to pack</p>
               {overallGear.length === 0 ? (
-                <p className="text-sm text-blue-950/70 font-medium italic">Nothing to pack — everyone's on own gear.</p>
+                <p className="text-sm text-brand-950/70 font-medium italic">Nothing to pack — everyone's on own gear.</p>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
                   {overallGear.map(({ item, count }) => (
-                    <span key={item} className="text-xs px-2 py-0.5 rounded-full border border-blue-900 text-blue-900">
+                    <span key={item} className="text-xs px-2 py-0.5 rounded-full border border-brand-900 text-brand-900">
                       {item} ×{count}
                     </span>
                   ))}
@@ -424,10 +424,10 @@ export function AdminLogisticsPage() {
             )}
             {overallAddons.length > 0 && (
               <div className="space-y-1">
-                <p className="text-xs font-semibold text-blue-900 uppercase tracking-wide">Add-ons</p>
+                <p className="text-xs font-semibold text-brand-900 uppercase tracking-wide">Add-ons</p>
                 <div className="flex flex-wrap gap-1.5">
                   {overallAddons.map(({ title, count }) => (
-                    <span key={title} className="text-xs px-2 py-0.5 rounded-full border border-sky-400 bg-sky-50 text-blue-900 font-medium">
+                    <span key={title} className="text-xs px-2 py-0.5 rounded-full border border-surface-400 bg-surface-50 text-brand-900 font-medium">
                       {title} ×{count}
                     </span>
                   ))}
@@ -440,7 +440,7 @@ export function AdminLogisticsPage() {
             <section key={g.event.id} className="space-y-2 pt-2">
               {/* Bold banner per event so the sections are obvious when
                   scrolling a tall phone screen. */}
-              <div className="bg-blue-900 text-white rounded-xl px-4 py-2.5 space-y-0.5">
+              <div className="bg-brand-900 text-white rounded-xl px-4 py-2.5 space-y-0.5">
                 <h2 className="text-base font-semibold break-words">{g.event.title}</h2>
                 <span className="block text-xs text-white/80">
                   {formatEventSpan(g.event, { style: 'compact' })} · {g.rows.length} diver{g.rows.length === 1 ? '' : 's'}
@@ -464,7 +464,7 @@ export function AdminLogisticsPage() {
               <AddonSummaryGroup rows={addonTotals(g.rows, addonTitles)} />
               <PaymentsDueGroup rows={dueRowsFor(g.rows)} currency={currency} />
               {g.rows.length === 0 ? (
-                <p className="text-xs text-blue-950/70 font-medium italic pl-1">No active registrants.</p>
+                <p className="text-xs text-brand-950/70 font-medium italic pl-1">No active registrants.</p>
               ) : (
                 g.rows.map(r => (
                   <DiverGearCard key={r.booking.id} row={r} onProfilePatched={patchProfile} />
@@ -487,8 +487,8 @@ function DayTab({ label, active, onClick }: { label: string; active: boolean; on
       onClick={onClick}
       className={`px-3 py-1 rounded-full text-sm transition-colors ${
         active
-          ? 'bg-blue-900 text-white font-semibold'
-          : 'bg-sky-100 text-blue-900 hover:bg-sky-200'
+          ? 'bg-brand-900 text-white font-semibold'
+          : 'bg-surface-100 text-brand-900 hover:bg-surface-200'
       }`}
     >
       {label}

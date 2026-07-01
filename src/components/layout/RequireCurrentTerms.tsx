@@ -24,7 +24,7 @@ export function RequireCurrentTerms() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 gap-6">
         <Logo size="xl" />
-        <Spinner className="w-8 h-8 border-4 border-sky-500" />
+        <Spinner className="w-8 h-8 border-4 border-surface-500" />
       </div>
     )
   }

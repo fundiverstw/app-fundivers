@@ -74,7 +74,7 @@ export function IOSInstallModal({ onDismiss }: { onDismiss: () => void }) {
             Tap <strong>Add</strong> in the top-right corner.
           </li>
         </ol>
-        <p className="text-xs text-blue-900/80">
+        <p className="text-xs text-brand-900/80">
           This only works in Safari — Chrome, Firefox, and in-app browsers
           on iOS can't add to the home screen.
         </p>

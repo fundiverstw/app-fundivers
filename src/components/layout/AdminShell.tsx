@@ -76,7 +76,7 @@ export function AdminShell() {
           {displayPendingCount != null && displayPendingCount > 0 && (
             <Link
               to="/admin/applications"
-              className="text-xs font-semibold bg-red-500 text-white px-2 py-0.5 rounded-full hover:bg-red-400"
+              className="text-xs font-semibold bg-accent text-white px-2 py-0.5 rounded-full hover:bg-red-400"
               aria-label={`${displayPendingCount} pending applications`}
             >
               {displayPendingCount} pending

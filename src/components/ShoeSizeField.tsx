@@ -4,7 +4,7 @@ import {
   type ShoeUnit, type ShoeGender,
 } from '../lib/shoe-size'
 
-const SELECT = 'bg-white border border-sky-300 rounded-lg px-1.5 py-2 text-blue-900 text-sm focus:outline-none focus:border-blue-900'
+const SELECT = 'bg-white border border-surface-300 rounded-lg px-1.5 py-2 text-brand-900 text-sm focus:outline-none focus:border-brand-900'
 
 /**
  * Unit / gender / value shoe-size picker. Owns its own unit+gender display

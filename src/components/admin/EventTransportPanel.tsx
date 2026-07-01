@@ -49,7 +49,7 @@ export function EventTransportPanel({ event, registrants, isAdmin, createdBy, on
       )}
 
       {hasCancelled && (
-        <p className="text-xs text-blue-950/70 font-medium italic">Cancelled bookings hidden.</p>
+        <p className="text-xs text-brand-950/70 font-medium italic">Cancelled bookings hidden.</p>
       )}
 
       {isDive && (
@@ -73,12 +73,12 @@ function RideChoiceList({ active, onRideChanged }: {
   onRideChanged: (bookingId: string, details: BookingDetails) => void
 }) {
   return (
-    <div role="group" aria-label="Ride choices" className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-2">
-      <h2 className="text-sm font-bold text-blue-900">Ride choices</h2>
+    <div role="group" aria-label="Ride choices" className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-2">
+      <h2 className="text-sm font-bold text-brand-900">Ride choices</h2>
       {active.length === 0 ? (
-        <p className="text-xs text-blue-950/70 font-medium italic">No active registrants.</p>
+        <p className="text-xs text-brand-950/70 font-medium italic">No active registrants.</p>
       ) : (
-        <ul className="divide-y divide-sky-200">
+        <ul className="divide-y divide-surface-200">
           {active.map(r => (
             <RideChoiceRow key={r.booking.id} row={r} onRideChanged={onRideChanged} />
           ))}
@@ -113,14 +113,14 @@ function RideChoiceRow({ row, onRideChanged }: {
 
   return (
     <li className="py-2 flex items-center justify-between gap-3">
-      <span className="text-sm text-blue-900 font-medium min-w-0">
+      <span className="text-sm text-brand-900 font-medium min-w-0">
         {row.profile?.name ?? '(no profile)'}
         {row.profile?.nickname && row.profile.nickname !== row.profile.name && (
-          <span className="text-blue-900/80 font-medium"> ({row.profile.nickname})</span>
+          <span className="text-brand-900/80 font-medium"> ({row.profile.nickname})</span>
         )}
         {error && <span className="text-xs text-red-600 font-medium"> · couldn't save</span>}
       </span>
-      <span className="shrink-0 inline-flex rounded-lg overflow-hidden border border-sky-300">
+      <span className="shrink-0 inline-flex rounded-lg overflow-hidden border border-surface-300">
         <SegBtn active={current === true}  disabled={busy} onClick={() => set(true)}>Needs ride</SegBtn>
         <SegBtn active={current === false} disabled={busy} onClick={() => set(false)}>Self</SegBtn>
       </span>
@@ -138,7 +138,7 @@ function SegBtn({ active, disabled, onClick, children }: {
       disabled={disabled}
       onClick={onClick}
       className={`px-3 py-1 text-xs font-semibold transition-colors disabled:opacity-50 ${
-        active ? 'bg-blue-900 text-white' : 'bg-white text-blue-900 hover:bg-sky-50'
+        active ? 'bg-brand-900 text-white' : 'bg-white text-brand-900 hover:bg-surface-50'
       }`}
     >
       {children}
@@ -201,23 +201,23 @@ function TransportTextEditor({ event, isAdmin }: { event: AppEvent; isAdmin: boo
   if (!isAdmin) {
     if (!event.details?.transportation) return null
     return (
-      <div className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-1">
-        <h2 className="text-sm font-bold text-blue-900">Transport info</h2>
-        <p className="text-sm text-blue-950 whitespace-pre-wrap">{event.details.transportation}</p>
+      <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-1">
+        <h2 className="text-sm font-bold text-brand-900">Transport info</h2>
+        <p className="text-sm text-brand-950 whitespace-pre-wrap">{event.details.transportation}</p>
       </div>
     )
   }
 
   return (
-    <div className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-2">
-      <h2 className="text-sm font-bold text-blue-900">Transport info</h2>
+    <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-2">
+      <h2 className="text-sm font-bold text-brand-900">Transport info</h2>
       {ref === null ? (
-        <p className="text-xs text-blue-950/70 font-medium italic">
+        <p className="text-xs text-brand-950/70 font-medium italic">
           No travel entry is linked to this dive — manage transport copy from the DiveTravel catalog.
         </p>
       ) : (
         <>
-          <p className="text-xs text-blue-950/70 font-medium italic">
+          <p className="text-xs text-brand-950/70 font-medium italic">
             Shown to divers in the booking form. This edits the shared travel entry, so it affects
             every dive that uses it.
           </p>
@@ -227,7 +227,7 @@ function TransportTextEditor({ event, isAdmin }: { event: AppEvent; isAdmin: boo
             disabled={ref === undefined || saving}
             onChange={e => { setText(e.target.value); setSaved(false) }}
             rows={3}
-            className="w-full px-3 py-2 rounded-lg border border-sky-300 text-sm text-blue-950 disabled:opacity-50"
+            className="w-full px-3 py-2 rounded-lg border border-surface-300 text-sm text-brand-950 disabled:opacity-50"
             placeholder="How divers reach the site…"
           />
           <div className="flex items-center gap-3">
@@ -235,7 +235,7 @@ function TransportTextEditor({ event, isAdmin }: { event: AppEvent; isAdmin: boo
               type="button"
               disabled={ref === undefined || saving}
               onClick={save}
-              className="px-3 py-1 rounded-lg bg-blue-900 text-white text-xs font-semibold disabled:opacity-50"
+              className="px-3 py-1 rounded-lg bg-brand-900 text-white text-xs font-semibold disabled:opacity-50"
             >
               {saving ? 'Saving…' : 'Save'}
             </button>

@@ -45,13 +45,13 @@ export function PendingPage() {
   const submitted = savedThisSession || isProfileComplete(profile)
 
   return (
-    <div className="min-h-screen bg-blue-900 p-4">
+    <div className="min-h-screen bg-brand-900 p-4">
       <div className="w-full max-w-lg mx-auto space-y-4">
         <div className="flex justify-center"><Logo size="lg" /></div>
 
         {rejected ? (
           <div className={`${CARD_ELEVATED} p-6 text-center`}>
-            <h1 className="text-xl font-semibold text-blue-950 mb-2">
+            <h1 className="text-xl font-semibold text-brand-950 mb-2">
               Application not approved
             </h1>
             <p className={`${TEXT_MUTED} text-sm mb-5`}>
@@ -67,7 +67,7 @@ export function PendingPage() {
           </div>
         ) : submitted ? (
           <div className={`${CARD_ELEVATED} p-6 text-center`}>
-            <h1 className="text-xl font-semibold text-blue-950 mb-2">
+            <h1 className="text-xl font-semibold text-brand-950 mb-2">
               Application submitted
             </h1>
             <p className={`${TEXT_MUTED} text-sm mb-5`}>
@@ -82,7 +82,7 @@ export function PendingPage() {
         ) : (
           <>
             <div className={`${CARD_ELEVATED} p-4 text-center`}>
-              <h1 className="text-lg font-semibold text-blue-950 mb-1">
+              <h1 className="text-lg font-semibold text-brand-950 mb-1">
                 Application under review
               </h1>
               <p className={`${TEXT_MUTED} text-xs`}>

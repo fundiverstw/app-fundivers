@@ -16,7 +16,7 @@ import { BTN_SECONDARY } from '../../styles/tokens'
 // the partner reports (kickback_amount is computed by the DB), and tracks the
 // kickback pending → invoiced → received.
 
-const FIELD = 'w-full bg-white border border-sky-300 rounded-md px-3 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900'
+const FIELD = 'w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900'
 
 export function AdminReferralsTab({ trips }: { trips: Trip[] }) {
   const toast = useToast()
@@ -76,13 +76,13 @@ export function AdminReferralsTab({ trips }: { trips: Trip[] }) {
 
   return (
     <div className="space-y-3">
-      {error && <p className="text-sm text-red-200 bg-red-900/50 border border-red-500 rounded-md p-2">{error}</p>}
+      {error && <p className="text-sm text-red-200 bg-red-900/50 border border-accent rounded-md p-2">{error}</p>}
 
       {kickbacks.length > 0 && (
-        <div role="group" aria-label="Kickback totals" className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-3 space-y-1">
-          <h2 className="text-sm font-bold text-blue-900">Kickbacks</h2>
+        <div role="group" aria-label="Kickback totals" className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 space-y-1">
+          <h2 className="text-sm font-bold text-brand-900">Kickbacks</h2>
           {kickbacks.map(k => (
-            <p key={k.currency} className="text-xs text-blue-900/80">
+            <p key={k.currency} className="text-xs text-brand-900/80">
               <span className="font-semibold">{k.currency}</span>: {k.received.toLocaleString()} received ·{' '}
               {k.outstanding.toLocaleString()} outstanding
             </p>
@@ -144,11 +144,11 @@ function ReferralCard({
   const booked = referral.status === 'booked' || referral.status === 'completed'
 
   return (
-    <div className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-3 space-y-2">
+    <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 space-y-2">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-medium text-blue-900 text-sm truncate">{trip?.title ?? '(trip removed)'}</p>
-          <p className="text-xs text-blue-900/80 truncate">
+          <p className="font-medium text-brand-900 text-sm truncate">{trip?.title ?? '(trip removed)'}</p>
+          <p className="text-xs text-brand-900/80 truncate">
             {diverName} · <span className="font-mono">{referral.referral_code}</span>
           </p>
         </div>
@@ -156,18 +156,18 @@ function ReferralCard({
       </div>
 
       <div className="text-xs">
-        <button type="button" onClick={() => setShowContact(v => !v)} className="text-blue-800 font-semibold hover:underline">
+        <button type="button" onClick={() => setShowContact(v => !v)} className="text-brand-800 font-semibold hover:underline">
           {showContact ? 'Hide contact' : 'Reveal contact to broker intro'}
         </button>
         {showContact && referral.diver && (
-          <p className="text-blue-900/80 mt-1">
+          <p className="text-brand-900/80 mt-1">
             {referral.diver.email ?? 'no email'}{referral.diver.contact_id ? ` · ${referral.diver.contact_id}` : ''}
           </p>
         )}
       </div>
 
       {booked && (
-        <div className="text-xs text-blue-900/80 bg-sky-50 border border-sky-200 rounded-md px-2 py-1">
+        <div className="text-xs text-brand-900/80 bg-surface-50 border border-surface-200 rounded-md px-2 py-1">
           Booked {referral.booked_amount?.toLocaleString()} {referral.booked_currency} ·
           kickback {referral.kickback_amount?.toLocaleString() ?? '—'} {referral.booked_currency} ·
           <span className="font-semibold"> {referral.kickback_status}</span>
@@ -176,13 +176,13 @@ function ReferralCard({
 
       <div className="flex flex-wrap gap-2">
         {referral.status === 'interested' && (
-          <Action label="Mark introduced" color="bg-blue-600 hover:bg-blue-500" onClick={() => onSetStatus('introduced')} />
+          <Action label="Mark introduced" color="bg-brand-600 hover:bg-brand-500" onClick={() => onSetStatus('introduced')} />
         )}
         {(referral.status === 'interested' || referral.status === 'introduced') && (
           <Action label="Record booking" color="bg-emerald-700 hover:bg-emerald-800" onClick={onRecordBooking} />
         )}
         {referral.status === 'booked' && (
-          <Action label="Mark completed" color="bg-blue-900 hover:bg-blue-950" onClick={() => onSetStatus('completed')} />
+          <Action label="Mark completed" color="bg-brand-900 hover:bg-brand-950" onClick={() => onSetStatus('completed')} />
         )}
         {booked && referral.kickback_status === 'pending' && (
           <Action label="Kickback invoiced" color="bg-amber-600 hover:bg-amber-700" onClick={() => onSetKickback('invoiced')} />
@@ -208,10 +208,10 @@ function Action({ label, color, onClick }: { label: string; color: string; onCli
 
 function ReferralStatusBadge({ status }: { status: ReferralStatus }) {
   const map: Record<ReferralStatus, string> = {
-    interested: 'bg-sky-100 text-sky-800 border-sky-300',
+    interested: 'bg-surface-100 text-surface-800 border-surface-300',
     introduced: 'bg-indigo-100 text-indigo-800 border-indigo-300',
     booked: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-    completed: 'bg-blue-100 text-blue-800 border-blue-300',
+    completed: 'bg-brand-100 text-brand-800 border-brand-300',
     cancelled: 'bg-slate-100 text-slate-600 border-slate-300',
   }
   return <span className={`text-xs px-2 py-0.5 rounded-full border shrink-0 ${map[status]}`}>{status}</span>
@@ -256,30 +256,30 @@ function RecordBookingModal({
   return (
     <Modal labelledBy="record-booking-title" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-3">
-        <h2 id="record-booking-title" className="text-lg font-bold text-blue-900">Record booking</h2>
-        <p className="text-xs text-blue-900/80">
+        <h2 id="record-booking-title" className="text-lg font-bold text-brand-900">Record booking</h2>
+        <p className="text-xs text-brand-900/80">
           What the partner reported for <span className="font-mono">{referral.referral_code}</span>.
         </p>
         <label className="block space-y-1">
-          <span className="text-xs font-medium text-blue-900">Booked amount</span>
+          <span className="text-xs font-medium text-brand-900">Booked amount</span>
           <input className={FIELD} type="number" step="any" value={amount} onChange={e => setAmount(e.target.value)} aria-label="Booked amount" />
         </label>
         <div className="grid grid-cols-2 gap-2">
           <label className="block space-y-1">
-            <span className="text-xs font-medium text-blue-900">Currency</span>
+            <span className="text-xs font-medium text-brand-900">Currency</span>
             <input className={FIELD} value={currency} onChange={e => setCurrency(e.target.value)} aria-label="Currency" />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-medium text-blue-900">Kickback %</span>
+            <span className="text-xs font-medium text-brand-900">Kickback %</span>
             <input className={FIELD} type="number" step="any" value={rate} onChange={e => setRate(e.target.value)} aria-label="Kickback percent" />
           </label>
         </div>
-        <p className="text-xs text-blue-900/80">Kickback: <span className="font-semibold">{preview.toLocaleString()} {currency}</span></p>
+        <p className="text-xs text-brand-900/80">Kickback: <span className="font-semibold">{preview.toLocaleString()} {currency}</span></p>
         <div className="flex gap-2 pt-1">
           <button type="button" onClick={onClose} disabled={submitting}
             className={`flex-1 ${BTN_SECONDARY}`}>Cancel</button>
           <button type="submit" disabled={submitting}
-            className="flex-1 py-2 rounded-lg text-sm font-semibold bg-blue-900 hover:bg-blue-950 text-white disabled:opacity-50">
+            className="flex-1 py-2 rounded-lg text-sm font-semibold bg-brand-900 hover:bg-brand-950 text-white disabled:opacity-50">
             {submitting ? 'Saving…' : 'Record booking'}
           </button>
         </div>

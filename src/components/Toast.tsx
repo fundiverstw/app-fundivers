@@ -45,8 +45,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             className={
               'pointer-events-auto px-4 py-2 rounded-lg shadow-lg text-sm font-medium border ' +
               (t.variant === 'success' ? 'bg-green-50 border-green-500 text-green-900' :
-               t.variant === 'error'   ? 'bg-red-50 border-red-500 text-red-900' :
-                                          'bg-sky-50 border-sky-500 text-blue-900')
+               t.variant === 'error'   ? 'bg-red-50 border-accent text-red-900' :
+                                          'bg-surface-50 border-surface-500 text-brand-900')
             }
           >
             {t.message}

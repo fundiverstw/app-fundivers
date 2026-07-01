@@ -88,7 +88,7 @@ export function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-blue-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-brand-900 flex items-center justify-center p-4">
       <div className={`w-full max-w-sm ${CARD_ELEVATED} p-6`}>
         <div className="flex justify-center mb-3"><Logo size="lg" /></div>
         <p className={`${TEXT_MUTED} text-center mb-8 text-sm`}>Choose a new password</p>

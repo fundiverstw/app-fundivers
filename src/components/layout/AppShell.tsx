@@ -88,7 +88,7 @@ export function AppShell() {
               // CSS mask makes the PNG act as a stencil for an exact red fill
               // — `filter: hue-rotate` couldn't pin a specific shade and
               // multi-color PNGs end up muddy. The PNG is square so h == w.
-              className="block h-6 w-6 bg-red-500 hover:bg-red-400 transition-colors"
+              className="block h-6 w-6 bg-accent hover:bg-red-400 transition-colors"
               style={{
                 WebkitMaskImage: `url(${siteConfig.assets.broadcast})`,
                 maskImage: `url(${siteConfig.assets.broadcast})`,
@@ -105,7 +105,7 @@ export function AppShell() {
             <Link
               to="/map"
               aria-label="Dive site map"
-              className="text-red-500 hover:text-red-400 transition-colors"
+              className="text-accent hover:text-red-400 transition-colors"
             >
               <MapIcon />
             </Link>
@@ -113,14 +113,14 @@ export function AppShell() {
           <Link
             to="/partner-connect"
             aria-label="Partner Connect (PX)"
-            className="text-red-500 hover:text-red-400 transition-colors"
+            className="text-accent hover:text-red-400 transition-colors"
           >
             <PartnerConnectIcon />
           </Link>
           <Link
             to="/trips"
             aria-label="Trip Board"
-            className="text-red-500 hover:text-red-400 transition-colors"
+            className="text-accent hover:text-red-400 transition-colors"
           >
             <TripBoardIcon />
           </Link>

@@ -133,7 +133,7 @@ export function AdminApplicationsPage() {
                 className="w-full p-4 flex items-baseline justify-between gap-3 text-left"
               >
                 <div className="min-w-0">
-                  <div className="font-semibold text-blue-950 truncate">
+                  <div className="font-semibold text-brand-950 truncate">
                     {personName(u.name, u.nickname) || '(no name yet)'}
                   </div>
                   <div className={`text-xs ${TEXT_MUTED}`}>
@@ -148,7 +148,7 @@ export function AdminApplicationsPage() {
                   <ApplicantSummary profile={u} />
                   <FirstBooking booking={extras?.booking ?? null} />
 
-                  <div className="space-y-2 pt-2 border-t border-sky-200">
+                  <div className="space-y-2 pt-2 border-t border-surface-200">
                     <textarea
                       className={`${INPUT} text-sm`}
                       rows={2}
@@ -211,8 +211,8 @@ function FirstBooking({ booking }: { booking: (Booking & { event: AppEvent | nul
     return <p className={`${TEXT_MUTED} italic`}>No booking submitted with this application.</p>
   }
   return (
-    <div className="border-t border-sky-200 pt-3 space-y-1">
-      <div className="font-semibold text-blue-950">First booking</div>
+    <div className="border-t border-surface-200 pt-3 space-y-1">
+      <div className="font-semibold text-brand-950">First booking</div>
       <div>{booking.event?.title ?? '(unknown event)'}</div>
       {booking.event && (
         <div className={`text-xs ${TEXT_MUTED}`}>
@@ -228,7 +228,7 @@ function Row({ k, v }: { k: string; v: string }) {
   return (
     <>
       <dt className={`${TEXT_MUTED} text-xs`}>{k}</dt>
-      <dd className="text-blue-950 text-xs">{v}</dd>
+      <dd className="text-brand-950 text-xs">{v}</dd>
     </>
   )
 }

@@ -1,5 +1,45 @@
 @import "tailwindcss";
 
+/* ─────────────────────────────────────────────────────────────────────────
+ * Brand color seam (fundive Stage 2). This is the one place a fork re-skins
+ * the app. Tokens alias Tailwind's default palette, so FunDivers looks
+ * identical; override the values (any hex/oklch) to change the whole app.
+ *   --color-brand-*   the primary "navy" identity (page, nav, buttons, ink)
+ *   --color-surface-* the light "shallows" (cards, inputs, subtle fills)
+ *   --color-accent    the signature hairline / badge
+ * Status colors (emerald=success, amber=warning, red-600+=danger) stay
+ * conventional Tailwind. The PWA manifest colors live separately in
+ * fundive.config.ts (theme/backgroundColor) — keep them in sync. See
+ * docs/forking.md.
+ * ───────────────────────────────────────────────────────────────────────── */
+@theme {
+  --color-brand-50:  var(--color-blue-50);
+  --color-brand-100: var(--color-blue-100);
+  --color-brand-200: var(--color-blue-200);
+  --color-brand-300: var(--color-blue-300);
+  --color-brand-400: var(--color-blue-400);
+  --color-brand-500: var(--color-blue-500);
+  --color-brand-600: var(--color-blue-600);
+  --color-brand-700: var(--color-blue-700);
+  --color-brand-800: var(--color-blue-800);
+  --color-brand-900: var(--color-blue-900);
+  --color-brand-950: var(--color-blue-950);
+
+  --color-surface-50:  var(--color-sky-50);
+  --color-surface-100: var(--color-sky-100);
+  --color-surface-200: var(--color-sky-200);
+  --color-surface-300: var(--color-sky-300);
+  --color-surface-400: var(--color-sky-400);
+  --color-surface-500: var(--color-sky-500);
+  --color-surface-600: var(--color-sky-600);
+  --color-surface-700: var(--color-sky-700);
+  --color-surface-800: var(--color-sky-800);
+  --color-surface-900: var(--color-sky-900);
+  --color-surface-950: var(--color-sky-950);
+
+  --color-accent: var(--color-red-500);
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
 }

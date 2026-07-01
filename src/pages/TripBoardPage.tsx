@@ -53,7 +53,7 @@ export function TripBoardPage() {
       </div>
 
       {error && (
-        <p className="text-sm text-red-200 bg-red-900/50 border border-red-500 rounded-md p-2">{error}</p>
+        <p className="text-sm text-red-200 bg-red-900/50 border border-accent rounded-md p-2">{error}</p>
       )}
 
       {loading ? (
@@ -80,7 +80,7 @@ function TripCard({ trip, referral }: { trip: TripBoardItem; referral: MyTripRef
       {trip.hero_image_url ? (
         <img src={trip.hero_image_url} alt="" className="w-full h-36 object-cover" />
       ) : (
-        <div className="w-full h-36 bg-gradient-to-br from-sky-200 to-blue-300" />
+        <div className="w-full h-36 bg-gradient-to-br from-surface-200 to-brand-300" />
       )}
       <div className="p-3 space-y-1">
         <p className={`text-sm ${TEXT_HEADING} truncate`}>{trip.title}</p>
@@ -95,7 +95,7 @@ function TripCard({ trip, referral }: { trip: TripBoardItem; referral: MyTripRef
           )}
         </div>
         {referral && (
-          <p className="text-xs text-blue-800 font-semibold pt-1">
+          <p className="text-xs text-brand-800 font-semibold pt-1">
             {referral.status === 'interested' ? 'You’re interested' : `Referral: ${referral.status}`} · {referral.referral_code}
           </p>
         )}

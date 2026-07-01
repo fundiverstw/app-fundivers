@@ -523,7 +523,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
                 type="button"
                 onClick={submitNewPrice}
                 disabled={priceSubmitting}
-                className="flex-1 py-2 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 transition-colors"
+                className="flex-1 py-2 rounded-lg text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-50 transition-colors"
               >
                 {priceSubmitting ? 'Saving…' : 'Save price tier'}
               </button>
@@ -589,9 +589,9 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
             <div className="space-y-1">
               <span className="text-xs font-medium text-white/80">Destinations</span>
               {destinations.length === 0 ? (
-                <p className="text-sm text-blue-950 font-medium">No destinations defined.</p>
+                <p className="text-sm text-brand-950 font-medium">No destinations defined.</p>
               ) : (
-                <div className="space-y-1 max-h-56 overflow-y-auto bg-white/70 backdrop-blur-md border border-sky-200 rounded-md p-2">
+                <div className="space-y-1 max-h-56 overflow-y-auto bg-white/70 backdrop-blur-md border border-surface-200 rounded-md p-2">
                   {destinations.map(d => (
                     <Checkbox
                       key={d._id}
@@ -641,7 +641,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
                     type="button"
                     onClick={submitNewTravel}
                     disabled={travelSubmitting}
-                    className="flex-1 py-2 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 transition-colors"
+                    className="flex-1 py-2 rounded-lg text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-50 transition-colors"
                   >
                     {travelSubmitting ? 'Saving…' : 'Save DiveTravel entry'}
                   </button>
@@ -660,7 +660,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
           <Section title="Rooms">
             <Checkbox checked={form.has_rooms} onChange={v => set('has_rooms', v)} label="Offers rooms" />
             {form.has_rooms && rooms.length > 0 && (
-              <div className="space-y-1 max-h-48 overflow-y-auto bg-white/70 backdrop-blur-md border border-sky-200 rounded-md p-2">
+              <div className="space-y-1 max-h-48 overflow-y-auto bg-white/70 backdrop-blur-md border border-surface-200 rounded-md p-2">
                 {rooms.map(r => (
                   <Checkbox
                     key={r._id}
@@ -698,7 +698,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
                     type="button"
                     onClick={submitNewRoom}
                     disabled={roomSubmitting}
-                    className="flex-1 py-2 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 transition-colors"
+                    className="flex-1 py-2 rounded-lg text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-50 transition-colors"
                   >
                     {roomSubmitting ? 'Saving…' : 'Save room option'}
                   </button>
@@ -764,9 +764,9 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
 
       <Section title="Add-ons">
         {addons.length === 0 ? (
-          <p className="text-sm text-blue-950 font-medium">No add-ons defined.</p>
+          <p className="text-sm text-brand-950 font-medium">No add-ons defined.</p>
         ) : (
-          <div className="space-y-1 max-h-56 overflow-y-auto bg-white/70 backdrop-blur-md border border-sky-200 rounded-md p-2">
+          <div className="space-y-1 max-h-56 overflow-y-auto bg-white/70 backdrop-blur-md border border-surface-200 rounded-md p-2">
             {addons.map(a => (
               <Checkbox
                 key={a._id}
@@ -804,7 +804,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
                 type="button"
                 onClick={submitNewAddon}
                 disabled={addonSubmitting}
-                className="flex-1 py-2 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 transition-colors"
+                className="flex-1 py-2 rounded-lg text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-50 transition-colors"
               >
                 {addonSubmitting ? 'Saving…' : 'Save add-on'}
               </button>
@@ -821,14 +821,14 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
       </Section>
 
       {error && (
-        <p className="text-sm text-red-200 bg-red-900/50 border border-red-500 rounded-md p-2">{error}</p>
+        <p className="text-sm text-red-200 bg-red-900/50 border border-accent rounded-md p-2">{error}</p>
       )}
 
       <div className="flex gap-3 pt-2">
         <button
           type="submit"
           disabled={submitting}
-          className="flex-1 py-3 rounded-xl font-semibold bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 transition-colors"
+          className="flex-1 py-3 rounded-xl font-semibold bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-50 transition-colors"
         >
           {submitting ? (mode === 'create' ? 'Creating…' : 'Saving…') : (submitLabel ?? defaultSubmitLabel)}
         </button>
@@ -851,7 +851,7 @@ function TypePill({ active, onClick, children }: { active: boolean; onClick: () 
       onClick={onClick}
       className={`flex-1 py-2 px-4 rounded-xl font-semibold border transition-colors ${
         active
-          ? 'bg-blue-600 border-blue-600 text-white'
+          ? 'bg-brand-600 border-brand-600 text-white'
           : 'bg-white/10 border-white/30 text-white/80 hover:bg-white/20'
       }`}
     >
@@ -908,8 +908,8 @@ function WixImageField({
 }
 
 const INPUT_CLASS =
-  'w-full bg-white/80 border border-sky-200 rounded-md px-3 py-2 text-sm text-blue-900 ' +
-  'placeholder:text-blue-900/40 focus:outline-none focus:border-red-500'
+  'w-full bg-white/80 border border-surface-200 rounded-md px-3 py-2 text-sm text-brand-900 ' +
+  'placeholder:text-brand-900/40 focus:outline-none focus:border-accent'
 
 function Input({
   value, onChange, type = 'text', required = false, placeholder,
@@ -961,7 +961,7 @@ function Checkbox({
         type="checkbox"
         checked={checked}
         onChange={e => onChange(e.target.checked)}
-        className="accent-blue-600 w-4 h-4"
+        className="accent-brand-600 w-4 h-4"
       />
       <span>{label}</span>
     </label>

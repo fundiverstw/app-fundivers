@@ -15,23 +15,23 @@ export interface StaffDutyRow {
 export function StaffDutyGroup({ rows }: { rows: StaffDutyRow[] }) {
   if (rows.length === 0) return null
   return (
-    <div role="group" aria-label="On-duty staff" className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-2">
+    <div role="group" aria-label="On-duty staff" className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-2">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-bold text-blue-900">On-duty staff</h2>
-        <span className="text-xs text-blue-900 font-semibold">{rows.length}</span>
+        <h2 className="text-sm font-bold text-brand-900">On-duty staff</h2>
+        <span className="text-xs text-brand-900 font-semibold">{rows.length}</span>
       </div>
-      <ul className="divide-y divide-sky-200">
+      <ul className="divide-y divide-surface-200">
         {rows.map(r => (
           <li key={r.dutyId} className="py-1.5 flex items-baseline justify-between gap-3">
-            <span className="text-sm text-blue-900 font-medium">
+            <span className="text-sm text-brand-900 font-medium">
               {r.profile?.name ?? '(no profile)'}
               {r.profile?.nickname && r.profile.nickname !== r.profile.name && (
-                <span className="text-blue-900 font-medium"> ({r.profile.nickname})</span>
+                <span className="text-brand-900 font-medium"> ({r.profile.nickname})</span>
               )}
-              <span className="text-xs text-blue-950 font-medium"> · {r.role}</span>
+              <span className="text-xs text-brand-950 font-medium"> · {r.role}</span>
             </span>
             {r.profile?.contact_id && (
-              <span className="text-xs text-blue-950 font-medium shrink-0">{r.profile.contact_id}</span>
+              <span className="text-xs text-brand-950 font-medium shrink-0">{r.profile.contact_id}</span>
             )}
           </li>
         ))}

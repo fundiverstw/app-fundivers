@@ -119,7 +119,7 @@ function SegBtn({ active, disabled, onClick, children }: {
       disabled={disabled}
       onClick={onClick}
       className={`px-3 py-1 text-xs font-semibold transition-colors disabled:opacity-50 ${
-        active ? 'bg-white text-blue-900' : 'bg-transparent text-white hover:bg-white/10'
+        active ? 'bg-white text-brand-900' : 'bg-transparent text-white hover:bg-white/10'
       }`}
     >
       {children}

@@ -9,19 +9,19 @@ import { siteConfig } from '../../config/site'
 
 export function StatCard({ label, value, sub }: { label: string; value: ReactNode; sub?: string }) {
   return (
-    <div className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4">
-      <p className="text-xs font-medium text-blue-900/70">{label}</p>
-      <p className="text-2xl font-bold text-blue-900 mt-1 tabular-nums">{value}</p>
-      {sub && <p className="text-[11px] text-blue-900/60 mt-0.5">{sub}</p>}
+    <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4">
+      <p className="text-xs font-medium text-brand-900/70">{label}</p>
+      <p className="text-2xl font-bold text-brand-900 mt-1 tabular-nums">{value}</p>
+      {sub && <p className="text-[11px] text-brand-900/60 mt-0.5">{sub}</p>}
     </div>
   )
 }
 
 export function ChartCard({ title, children, empty }: { title: string; children: ReactNode; empty?: boolean }) {
   return (
-    <div className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
-      <h2 className="text-sm font-semibold text-blue-900">{title}</h2>
-      {empty ? <p className="text-xs text-blue-900/60">No data in range.</p> : children}
+    <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
+      <h2 className="text-sm font-semibold text-brand-900">{title}</h2>
+      {empty ? <p className="text-xs text-brand-900/60">No data in range.</p> : children}
     </div>
   )
 }
@@ -37,14 +37,14 @@ export function BarList({
   return (
     <ul className="space-y-1.5">
       {items.map(i => (
-        <li key={i.label} className="text-xs text-blue-900">
+        <li key={i.label} className="text-xs text-brand-900">
           <div className="flex justify-between gap-2">
             <span className="truncate">{i.label}</span>
             <span className="tabular-nums shrink-0">{fmt(i.value)}</span>
           </div>
-          <div className="h-1.5 bg-sky-100 rounded mt-0.5 overflow-hidden">
+          <div className="h-1.5 bg-surface-100 rounded mt-0.5 overflow-hidden">
             <div
-              className={`h-full rounded ${i.value < 0 ? 'bg-red-400' : 'bg-blue-600'}`}
+              className={`h-full rounded ${i.value < 0 ? 'bg-red-400' : 'bg-brand-600'}`}
               style={{ width: `${(Math.abs(i.value) / max) * 100}%` }}
             />
           </div>
@@ -68,16 +68,16 @@ function ChartFrame({ max, fmt, labels, bars }: {
 }) {
   return (
     <div className="flex gap-1">
-      <div className="shrink-0 flex flex-col justify-between h-32 text-[9px] text-blue-900/50 tabular-nums text-right pr-0.5">
+      <div className="shrink-0 flex flex-col justify-between h-32 text-[9px] text-brand-900/50 tabular-nums text-right pr-0.5">
         <span>{fmt(max)}</span>
         <span>{fmt(max / 2)}</span>
         <span>0</span>
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-end gap-1 h-32 border-b border-sky-300">{bars}</div>
+        <div className="flex items-end gap-1 h-32 border-b border-surface-300">{bars}</div>
         <div className="flex gap-1 mt-1">
           {labels.map((l, i) => (
-            <span key={i} className="flex-1 text-center text-[9px] text-blue-900/60">{l.slice(5)}</span>
+            <span key={i} className="flex-1 text-center text-[9px] text-brand-900/60">{l.slice(5)}</span>
           ))}
         </div>
       </div>
@@ -104,7 +104,7 @@ export function GroupedColumnChart({
     <div className="space-y-2">
       <div className="flex flex-wrap gap-x-3 gap-y-1">
         {series.map(s => (
-          <span key={s.label} className="flex items-center gap-1 text-[11px] text-blue-900/80">
+          <span key={s.label} className="flex items-center gap-1 text-[11px] text-brand-900/80">
             <span className={`inline-block w-2.5 h-2.5 rounded-sm ${s.color}`} />{s.label}
           </span>
         ))}
@@ -150,7 +150,7 @@ export function ColumnChart({
           className="flex-1 flex items-end justify-center h-full"
           title={`${i.label}: ${fmt(i.value)}`}
         >
-          <div className="w-full bg-blue-600 rounded-t min-h-[2px]" style={{ height: `${(i.value / max) * 100}%` }} />
+          <div className="w-full bg-brand-600 rounded-t min-h-[2px]" style={{ height: `${(i.value / max) * 100}%` }} />
         </div>
       ))}
     />

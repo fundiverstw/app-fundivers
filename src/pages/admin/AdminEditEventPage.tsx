@@ -118,7 +118,7 @@ export function AdminEditEventPage() {
   if (loadError) {
     return (
       <div className="max-w-2xl mx-auto">
-        <p className="text-sm text-red-200 bg-red-900/50 border border-red-500 rounded-md p-3">{loadError}</p>
+        <p className="text-sm text-red-200 bg-red-900/50 border border-accent rounded-md p-3">{loadError}</p>
       </div>
     )
   }

@@ -12,7 +12,7 @@ import type { AppEvent, Booking } from '../types/database'
 
 const TYPE_DOT: Record<AppEvent['type'], string> = {
   dive:   'bg-emerald-600',
-  course: 'bg-sky-500',
+  course: 'bg-surface-500',
 }
 const TYPE_LABELS: Record<AppEvent['type'], string> = {
   dive:   'Dive',
@@ -115,7 +115,7 @@ export function CalendarPage() {
         <button
           type="button"
           onClick={() => setMode('multi')}
-          className="w-full mb-3 flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-300 text-blue-950 font-bold py-2.5 px-4 rounded-xl shadow-md border-2 border-amber-500 transition-colors"
+          className="w-full mb-3 flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-300 text-brand-950 font-bold py-2.5 px-4 rounded-xl shadow-md border-2 border-amber-500 transition-colors"
         >
           <span className="text-lg leading-none">+</span>
           Register for multiple events
@@ -123,7 +123,7 @@ export function CalendarPage() {
       )}
       {user && mode === 'multi' && (
         <div className="mb-3 bg-amber-100 border-2 border-amber-400 rounded-xl px-3 py-2 flex items-center justify-between gap-3">
-          <p className="text-xs text-blue-950 font-semibold">
+          <p className="text-xs text-brand-950 font-semibold">
             Multi-event mode — tap events to add. Already-booked or full events can't be added.
           </p>
         </div>
@@ -148,11 +148,11 @@ export function CalendarPage() {
           }
           if (mode === 'multi') {
             if (eventIsFull(ev)) {
-              return <span className="text-xs text-blue-950/60 font-medium">Full</span>
+              return <span className="text-xs text-brand-950/60 font-medium">Full</span>
             }
             return cartIds.has(ev.id)
               ? <span className="text-xs text-emerald-700 font-semibold">Added</span>
-              : <span className="text-xs text-blue-900 font-medium">+ Add</span>
+              : <span className="text-xs text-brand-900 font-medium">+ Add</span>
           }
           return null
         }}
@@ -161,7 +161,7 @@ export function CalendarPage() {
       />
 
       {mode === 'multi' && (
-        <div className="fixed inset-x-0 bottom-0 bg-blue-900/95 backdrop-blur-md border-t border-blue-950 px-4 py-3 z-40">
+        <div className="fixed inset-x-0 bottom-0 bg-brand-900/95 backdrop-blur-md border-t border-brand-950 px-4 py-3 z-40">
           <div className="max-w-lg mx-auto flex items-center justify-between gap-3">
             <div className="text-white text-sm">
               <p className="font-semibold">
@@ -185,7 +185,7 @@ export function CalendarPage() {
                 type="button"
                 onClick={() => setMultiRegistering(cart)}
                 disabled={cart.length === 0}
-                className="text-sm bg-white text-blue-900 hover:bg-sky-50 disabled:opacity-50 font-semibold px-3 py-1.5 rounded-lg"
+                className="text-sm bg-white text-brand-900 hover:bg-surface-50 disabled:opacity-50 font-semibold px-3 py-1.5 rounded-lg"
               >
                 Continue →
               </button>
@@ -195,16 +195,16 @@ export function CalendarPage() {
       )}
 
       {selected && (
-        <div className="fixed inset-0 bg-blue-900/60 backdrop-blur-sm flex items-start justify-center z-50 px-4 pt-8 pb-4 overflow-y-auto" onClick={() => setSelected(null)}>
-          <div className="bg-white/75 backdrop-blur-md border border-red-500 rounded-2xl w-full max-w-lg p-6 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-brand-900/60 backdrop-blur-sm flex items-start justify-center z-50 px-4 pt-8 pb-4 overflow-y-auto" onClick={() => setSelected(null)}>
+          <div className="bg-white/75 backdrop-blur-md border border-accent rounded-2xl w-full max-w-lg p-6 space-y-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <span className={`text-xs px-2 py-1 rounded-full text-white ${TYPE_DOT[selected.type]}`}>
                 {TYPE_LABELS[selected.type]}
               </span>
-              <button onClick={() => setSelected(null)} className="text-blue-900 font-medium hover:text-blue-900 text-xl leading-none">×</button>
+              <button onClick={() => setSelected(null)} className="text-brand-900 font-medium hover:text-brand-900 text-xl leading-none">×</button>
             </div>
-            <h2 className="text-xl font-bold text-blue-900">{selected.title}</h2>
-            <div className="text-sm text-blue-900 font-medium space-y-1">
+            <h2 className="text-xl font-bold text-brand-900">{selected.title}</h2>
+            <div className="text-sm text-brand-900 font-medium space-y-1">
               <p>{formatEventSpan(selected, { style: 'long' })}</p>
               {selected.price != null && (
                 <p>💰 From {selected.currency} {selected.price.toLocaleString()}</p>
@@ -218,8 +218,8 @@ export function CalendarPage() {
               disabled={bookingLoading || (!isBooked(selected) && eventIsFull(selected))}
               className={`w-full py-3 rounded-xl font-semibold transition-colors disabled:opacity-50 ${
                 isBooked(selected)
-                  ? 'bg-sky-100 hover:bg-red-100 text-red-700 border border-red-500'
-                  : 'bg-blue-900 hover:bg-blue-950 text-white'
+                  ? 'bg-surface-100 hover:bg-red-100 text-red-700 border border-accent'
+                  : 'bg-brand-900 hover:bg-brand-950 text-white'
               }`}
             >
               {bookingLoading ? '…' : isBooked(selected) ? 'Cancel booking' : 'Register'}
@@ -227,7 +227,7 @@ export function CalendarPage() {
             <ShareEventButton
               event={selected}
               label="Share link with friends"
-              className="w-full py-2 rounded-xl text-sm font-semibold bg-sky-700 hover:bg-sky-800 text-white transition-colors"
+              className="w-full py-2 rounded-xl text-sm font-semibold bg-surface-700 hover:bg-surface-800 text-white transition-colors"
             />
           </div>
         </div>

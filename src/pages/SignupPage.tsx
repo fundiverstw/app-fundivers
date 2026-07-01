@@ -47,7 +47,7 @@ export function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-blue-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-brand-900 flex items-center justify-center p-4">
       <div className={`w-full max-w-sm ${CARD_ELEVATED} p-6`}>
         <div className="flex justify-center mb-3"><Logo size="lg" /></div>
         <p className={`${TEXT_MUTED} text-center mb-8 text-sm`}>Create your account</p>
@@ -71,8 +71,8 @@ export function SignupPage() {
             {errors.confirm && <p className={`${TEXT_ERROR} text-xs mt-1`}>{errors.confirm.message}</p>}
           </div>
 
-          <label className="flex items-start gap-2 text-xs text-blue-900">
-            <input {...register('agreedToTerms')} type="checkbox" className="accent-blue-900 mt-0.5" />
+          <label className="flex items-start gap-2 text-xs text-brand-900">
+            <input {...register('agreedToTerms')} type="checkbox" className="accent-brand-900 mt-0.5" />
             <span>
               I agree to the{' '}
               <Link to="/terms" target="_blank" className={TEXT_LINK}>Terms of Use & Privacy</Link>.

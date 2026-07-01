@@ -51,7 +51,7 @@ export function ChargeBreakdown({
           <span className="shrink-0 tabular-nums">{signed(a.amount)}</span>
         </div>
       ))}
-      <div className={`flex justify-between gap-3 pt-1 mt-1 border-t border-sky-200 ${TEXT_BODY}`}>
+      <div className={`flex justify-between gap-3 pt-1 mt-1 border-t border-surface-200 ${TEXT_BODY}`}>
         <span>Total</span>
         <span className="shrink-0 tabular-nums font-semibold">{currency} {shownTotal.toLocaleString()}</span>
       </div>

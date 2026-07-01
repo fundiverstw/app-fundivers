@@ -102,9 +102,9 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
   if (user.parent_account) {
     const parentName = currentParent?.name ?? currentParent?.nickname ?? '(unknown)'
     return (
-      <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-2" aria-label="Family">
+      <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-2" aria-label="Family">
         <h2 className="text-sm font-semibold text-red-600 uppercase tracking-wider">Family</h2>
-        <p className="text-sm text-blue-900">
+        <p className="text-sm text-brand-900">
           Linked as a child of <strong>{parentName}</strong>.
         </p>
         <div className="flex justify-end">
@@ -123,19 +123,19 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
 
   // Mode B: this diver is top-level — list any children + offer the picker.
   return (
-    <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3" aria-label="Family">
+    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3" aria-label="Family">
       <h2 className="text-sm font-semibold text-red-600 uppercase tracking-wider">Family</h2>
 
       {children.length === 0 ? (
-        <p className="text-xs text-blue-950 font-medium italic">No linked child accounts.</p>
+        <p className="text-xs text-brand-950 font-medium italic">No linked child accounts.</p>
       ) : (
         <ul className="space-y-1">
           {children.map(c => (
-            <li key={c.id} className="flex items-center justify-between gap-2 bg-sky-50 border border-sky-200 rounded-lg px-3 py-2">
-              <span className="text-sm text-blue-900 font-medium">
+            <li key={c.id} className="flex items-center justify-between gap-2 bg-surface-50 border border-surface-200 rounded-lg px-3 py-2">
+              <span className="text-sm text-brand-900 font-medium">
                 {c.name ?? '(unnamed)'}
                 {c.nickname && c.nickname !== c.name && (
-                  <span className="text-blue-900/80"> ({c.nickname})</span>
+                  <span className="text-brand-900/80"> ({c.nickname})</span>
                 )}
               </span>
               <button
@@ -152,8 +152,8 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
         </ul>
       )}
 
-      <div className="pt-2 border-t border-sky-200 space-y-2">
-        <p className="text-xs text-blue-900 font-medium">
+      <div className="pt-2 border-t border-surface-200 space-y-2">
+        <p className="text-xs text-brand-900 font-medium">
           Link an existing diver account as a child of this account:
         </p>
         <input
@@ -162,20 +162,20 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
           onChange={e => setFilter(e.target.value)}
           placeholder="Search by name…"
           aria-label="Search divers"
-          className="w-full bg-white border border-sky-300 rounded-lg px-3 py-1.5 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
+          className="w-full bg-white border border-surface-300 rounded-lg px-3 py-1.5 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
         />
         {filtered.length === 0 ? (
-          <p className="text-xs text-blue-950 font-medium italic">
+          <p className="text-xs text-brand-950 font-medium italic">
             {filter.trim() ? 'No matching eligible divers.' : 'No eligible divers to link.'}
           </p>
         ) : (
           <ul className="space-y-1 max-h-48 overflow-y-auto">
             {filtered.map(c => (
-              <li key={c.id} className="flex items-center justify-between gap-2 bg-white border border-sky-200 rounded-lg px-3 py-1.5">
-                <span className="text-sm text-blue-900 font-medium">
+              <li key={c.id} className="flex items-center justify-between gap-2 bg-white border border-surface-200 rounded-lg px-3 py-1.5">
+                <span className="text-sm text-brand-900 font-medium">
                   {c.name ?? '(unnamed)'}
                   {c.nickname && c.nickname !== c.name && (
-                    <span className="text-blue-900/80"> ({c.nickname})</span>
+                    <span className="text-brand-900/80"> ({c.nickname})</span>
                   )}
                 </span>
                 <button
@@ -183,7 +183,7 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
                   onClick={() => linkChild(c.id)}
                   disabled={linking}
                   aria-label={`Link ${c.name ?? 'diver'} as child`}
-                  className="text-xs bg-blue-900 hover:bg-blue-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded-lg"
+                  className="text-xs bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded-lg"
                 >
                   Link as child
                 </button>
@@ -192,7 +192,7 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
           </ul>
         )}
         {!filter.trim() && eligibleChildren.length > 20 && (
-          <p className="text-xs text-blue-950/70 font-medium italic">
+          <p className="text-xs text-brand-950/70 font-medium italic">
             Showing first 20 — refine the search to narrow.
           </p>
         )}

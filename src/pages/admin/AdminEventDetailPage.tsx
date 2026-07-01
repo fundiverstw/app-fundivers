@@ -427,10 +427,10 @@ export function AdminEventDetailPage() {
     <div className="max-w-3xl mx-auto space-y-4">
       <Link to="/admin/events" className="text-sm text-white/70 hover:text-white">‹ back to events</Link>
 
-      <header className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4">
-        <h1 className="text-xl font-bold text-blue-900">{event?.title ?? '(event not found)'}</h1>
+      <header className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4">
+        <h1 className="text-xl font-bold text-brand-900">{event?.title ?? '(event not found)'}</h1>
         {event && (
-          <p className="text-sm text-blue-900 font-medium mt-1">
+          <p className="text-sm text-brand-900 font-medium mt-1">
             {formatEventSpan(event, { style: 'long' })}
             {' · '}
             <span className="capitalize">{event.type}</span>
@@ -439,7 +439,7 @@ export function AdminEventDetailPage() {
         )}
         <p className="text-sm text-red-600 mt-2">{activeRegistrants.length} registrant{activeRegistrants.length === 1 ? '' : 's'}</p>
         {event?.cancelled_at && (
-          <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-red-700 bg-red-50 border border-red-500 rounded px-2 py-1 inline-block">
+          <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-red-700 bg-red-50 border border-accent rounded px-2 py-1 inline-block">
             Cancelled {format(new Date(event.cancelled_at), 'MMM d, yyyy')}
           </p>
         )}
@@ -459,7 +459,7 @@ export function AdminEventDetailPage() {
                 </button>
                 <Link
                   to={`/admin/events/${type}/${id}/edit`}
-                  className="text-xs bg-blue-900/60 hover:bg-blue-900 text-white px-3 py-1 rounded-lg"
+                  className="text-xs bg-brand-900/60 hover:bg-brand-900 text-white px-3 py-1 rounded-lg"
                 >
                   Edit
                 </Link>
@@ -489,7 +489,7 @@ export function AdminEventDetailPage() {
                 <button
                   type="button"
                   onClick={() => setExportModalOpen(true)}
-                  className="text-xs bg-sky-700/80 hover:bg-sky-700 text-white px-3 py-1 rounded-lg"
+                  className="text-xs bg-surface-700/80 hover:bg-surface-700 text-white px-3 py-1 rounded-lg"
                 >
                   Export diver info
                 </button>
@@ -497,12 +497,12 @@ export function AdminEventDetailPage() {
             )}
             <Link
               to={`/admin/events/${type}/${id}/gear-map`}
-              className="text-xs bg-sky-900/50 hover:bg-sky-900 text-sky-200 px-3 py-1 rounded-lg"
+              className="text-xs bg-surface-900/50 hover:bg-surface-900 text-surface-200 px-3 py-1 rounded-lg"
             >
               Gear map →
             </Link>
             {type && id && (
-              <ShareEventButton event={{ id, type }} className="text-xs bg-sky-700/80 hover:bg-sky-700 text-white px-3 py-1 rounded-lg" />
+              <ShareEventButton event={{ id, type }} className="text-xs bg-surface-700/80 hover:bg-surface-700 text-white px-3 py-1 rounded-lg" />
             )}
           </div>
           {event && (
@@ -539,15 +539,15 @@ export function AdminEventDetailPage() {
           {view === 'registrants' && (
             <section className="space-y-2">
               {registrants.length === 0 ? (
-                <p className="text-blue-950 font-medium text-sm">No one has registered for this event yet.</p>
+                <p className="text-brand-950 font-medium text-sm">No one has registered for this event yet.</p>
               ) : activeRegistrants.length === 0 ? (
-                <p className="text-blue-950 font-medium text-sm">No active registrants — every booking for this event was cancelled.</p>
+                <p className="text-brand-950 font-medium text-sm">No active registrants — every booking for this event was cancelled.</p>
               ) : (
                 activeRegistrants.map(renderRegistrant)
               )}
               {cancelledRegistrants.length > 0 && (
-                <details className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl px-4 py-2">
-                  <summary className="text-sm font-medium text-blue-950/70 cursor-pointer select-none">
+                <details className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl px-4 py-2">
+                  <summary className="text-sm font-medium text-brand-950/70 cursor-pointer select-none">
                     Cancelled ({cancelledRegistrants.length})
                   </summary>
                   <div className="space-y-2 pt-2">
@@ -674,23 +674,23 @@ function CancelEventModal({
       aria-labelledby="cancel-event-title"
     >
       <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3">
-        <h2 id="cancel-event-title" className="text-lg font-bold text-blue-900">
+        <h2 id="cancel-event-title" className="text-lg font-bold text-brand-900">
           {alreadyCancelled ? 'Restore event?' : 'Cancel event?'}
         </h2>
         {alreadyCancelled ? (
-          <p className="text-sm text-blue-900">
+          <p className="text-sm text-brand-900">
             This will make the event visible on the calendar again. Existing
             bookings remain attached.
           </p>
         ) : (
           <>
-            <p className="text-sm text-blue-900">
+            <p className="text-sm text-brand-900">
               The event will be hidden from the calendar and listing pages.
               Existing bookings stay attached so refund records remain
               traceable.
             </p>
             {activeBookingCount > 0 && (
-              <p className="text-sm font-semibold text-red-700 bg-red-50 border border-red-500 rounded px-3 py-2">
+              <p className="text-sm font-semibold text-red-700 bg-red-50 border border-accent rounded px-3 py-2">
                 {activeBookingCount} active booking{activeBookingCount === 1 ? '' : 's'} on this event will need refunds. Issue those refunds separately and record them on each booking.
               </p>
             )}
@@ -714,7 +714,7 @@ function CancelEventModal({
             disabled={inFlight}
             className={`flex-1 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50 ${
               alreadyCancelled
-                ? 'bg-blue-900 hover:bg-blue-950'
+                ? 'bg-brand-900 hover:bg-brand-950'
                 : 'bg-red-700 hover:bg-red-800'
             }`}
           >
@@ -751,17 +751,17 @@ function DeleteEventModal({
         <h2 id="delete-event-title" className="text-lg font-bold text-red-700">
           Delete event permanently?
         </h2>
-        <p className="text-sm text-blue-900">
+        <p className="text-sm text-brand-900">
           This permanently removes the event and cascades through every related
           row: bookings, payments, payment amendments, memos, admin notes,
           waitlist offers, and staff duties. <strong>This cannot be undone.</strong>
         </p>
         {bookingCount > 0 && (
-          <p className="text-sm font-semibold text-red-700 bg-red-50 border border-red-500 rounded px-3 py-2">
+          <p className="text-sm font-semibold text-red-700 bg-red-50 border border-accent rounded px-3 py-2">
             {bookingCount} booking{bookingCount === 1 ? '' : 's'} on this event and all linked payments will be wiped. Issue any refunds before deleting.
           </p>
         )}
-        <label className="block text-xs text-blue-900 font-medium">
+        <label className="block text-xs text-brand-900 font-medium">
           Type <span className="font-mono text-red-700">{eventTitle}</span> to confirm:
           <input
             type="text"
@@ -769,7 +769,7 @@ function DeleteEventModal({
             onChange={e => setTyped(e.target.value)}
             disabled={inFlight}
             autoFocus
-            className="mt-1 w-full bg-white border border-sky-300 rounded-lg px-2 py-2 text-sm text-blue-900 focus:outline-none focus:border-red-700"
+            className="mt-1 w-full bg-white border border-surface-300 rounded-lg px-2 py-2 text-sm text-brand-900 focus:outline-none focus:border-red-700"
           />
         </label>
         {error && (
@@ -870,25 +870,25 @@ function NotifyDiversModal({
       onClick={onClose}
     >
       <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3" onClick={e => e.stopPropagation()}>
-        <h2 id="notify-divers-title" className="text-lg font-bold text-blue-900">
+        <h2 id="notify-divers-title" className="text-lg font-bold text-brand-900">
           Notify confirmed divers
         </h2>
-        <p className="text-sm text-blue-900">
+        <p className="text-sm text-brand-900">
           Sends a push to {confirmedCount} confirmed diver{confirmedCount === 1 ? '' : 's'} on this event,
           and lands in their in-app inbox.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="space-y-1">
-            <span className="text-xs font-medium text-blue-900">Status</span>
+            <span className="text-xs font-medium text-brand-900">Status</span>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => setStatus('on')}
                 className={`flex-1 text-xs font-semibold px-3 py-2 rounded-lg border ${
                   status === 'on'
-                    ? 'bg-blue-900 text-white border-blue-900'
-                    : 'bg-white text-blue-900 border-sky-300 hover:bg-sky-50'
+                    ? 'bg-brand-900 text-white border-brand-900'
+                    : 'bg-white text-brand-900 border-surface-300 hover:bg-surface-50'
                 }`}
               >
                 ON AS SCHEDULED
@@ -899,26 +899,26 @@ function NotifyDiversModal({
                 className={`flex-1 text-xs font-semibold px-3 py-2 rounded-lg border ${
                   status === 'cancelled'
                     ? 'bg-red-700 text-white border-red-700'
-                    : 'bg-white text-blue-900 border-sky-300 hover:bg-sky-50'
+                    : 'bg-white text-brand-900 border-surface-300 hover:bg-surface-50'
                 }`}
               >
                 CANCELLED
               </button>
             </div>
-            <p className="text-[11px] text-blue-900/70 pt-1">
+            <p className="text-[11px] text-brand-900/70 pt-1">
               Push title: <span className="font-medium">{headerPreview}</span>
             </p>
           </div>
 
           <label className="block space-y-1">
-            <span className="text-xs font-medium text-blue-900">Note *</span>
+            <span className="text-xs font-medium text-brand-900">Note *</span>
             <textarea
               value={body}
               onChange={e => setBody(e.target.value)}
               placeholder="Details for the divers (e.g. weather, meeting point, refund info)."
               rows={5}
               maxLength={1000}
-              className="w-full bg-white border border-sky-300 rounded-md px-3 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900 resize-none"
+              className="w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900 resize-none"
             />
           </label>
 
@@ -941,7 +941,7 @@ function NotifyDiversModal({
               className={`flex-1 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50 ${
                 status === 'cancelled'
                   ? 'bg-red-700 hover:bg-red-800'
-                  : 'bg-blue-900 hover:bg-blue-950'
+                  : 'bg-brand-900 hover:bg-brand-950'
               }`}
             >
               {submitting ? 'Sending…' : `Send to ${confirmedCount}`}
@@ -1030,10 +1030,10 @@ function ExportManifestModal({
       onClick={onClose}
     >
       <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3" onClick={e => e.stopPropagation()}>
-        <h2 id="export-manifest-title" className="text-lg font-bold text-blue-900">
+        <h2 id="export-manifest-title" className="text-lg font-bold text-brand-900">
           Export boat manifest
         </h2>
-        <p className="text-sm text-blue-900">
+        <p className="text-sm text-brand-900">
           Builds the vessel passenger manifest (.xlsx) for pending and confirmed
           divers plus the staff on duty (instructors, guides, support) and emails
           it to the shop inbox. Boat details are remembered for next time.
@@ -1042,32 +1042,32 @@ function ExportManifestModal({
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="flex gap-2">
             <label className="flex-1 space-y-1">
-              <span className="text-xs font-medium text-blue-900">Boat name</span>
+              <span className="text-xs font-medium text-brand-900">Boat name</span>
               <input
                 type="text"
                 value={boatName}
                 onChange={e => setBoatName(e.target.value)}
-                className="w-full bg-white border border-sky-300 rounded-md px-3 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
+                className="w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
               />
             </label>
             <label className="flex-1 space-y-1">
-              <span className="text-xs font-medium text-blue-900">Registration</span>
+              <span className="text-xs font-medium text-brand-900">Registration</span>
               <input
                 type="text"
                 value={registration}
                 onChange={e => setRegistration(e.target.value)}
-                className="w-full bg-white border border-sky-300 rounded-md px-3 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
+                className="w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
               />
             </label>
           </div>
 
           <label className="block space-y-1">
-            <span className="text-xs font-medium text-blue-900">Footer notes (one per line)</span>
+            <span className="text-xs font-medium text-brand-900">Footer notes (one per line)</span>
             <textarea
               value={notes}
               onChange={e => setNotes(e.target.value)}
               rows={6}
-              className="w-full bg-white border border-sky-300 rounded-md px-3 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900 resize-none"
+              className="w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900 resize-none"
             />
           </label>
 
@@ -1083,7 +1083,7 @@ function ExportManifestModal({
             <button
               type="submit"
               disabled={submitting}
-              className="flex-1 py-2 rounded-lg text-sm font-semibold text-white bg-blue-900 hover:bg-blue-950 disabled:opacity-50"
+              className="flex-1 py-2 rounded-lg text-sm font-semibold text-white bg-brand-900 hover:bg-brand-950 disabled:opacity-50"
             >
               {submitting ? 'Exporting…' : 'Export & email'}
             </button>
@@ -1132,7 +1132,7 @@ function GroupPaymentInline({ currency, onRecord }: {
           value={amountStr}
           onChange={e => setAmountStr(e.target.value)}
           placeholder="Amount received"
-          className="flex-1 bg-white border border-violet-300 rounded px-2 py-1 text-xs text-blue-900"
+          className="flex-1 bg-white border border-violet-300 rounded px-2 py-1 text-xs text-brand-900"
         />
         <button
           type="submit"
@@ -1169,17 +1169,17 @@ function ApplyCreditInline({ cap, spendable, currency, onApply }: {
         Diver has {currency} {spendable.toLocaleString()} account credit — apply up to {currency} {cap.toLocaleString()}.
       </p>
       <div className="flex items-center gap-2">
-        <span className="text-xs text-blue-950 font-medium">{currency}</span>
+        <span className="text-xs text-brand-950 font-medium">{currency}</span>
         <input
           type="number" inputMode="numeric" min={1} max={cap} step={1}
           value={amountStr}
           onChange={e => setAmountStr(e.target.value)}
-          className="w-24 bg-white border border-emerald-300 rounded px-2 py-1 text-xs text-blue-900"
+          className="w-24 bg-white border border-emerald-300 rounded px-2 py-1 text-xs text-brand-900"
         />
         <button
           type="submit"
           disabled={busy || amount <= 0}
-          className="text-xs bg-blue-900 hover:bg-blue-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded"
+          className="text-xs bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded"
         >
           {busy ? 'Applying…' : 'Apply credit'}
         </button>
@@ -1233,20 +1233,20 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
     : bal.state
 
   const statusStyles: Record<string, string> = {
-    confirmed:  'text-blue-900 font-semibold',
+    confirmed:  'text-brand-900 font-semibold',
     pending:    'text-red-600',
-    cancelled:  'text-blue-950 font-medium line-through',
+    cancelled:  'text-brand-950 font-medium line-through',
     waitlisted: 'text-violet-400',
   }
   const payStyles: Record<string, string> = {
-    settled: 'text-blue-900 font-semibold',
+    settled: 'text-brand-900 font-semibold',
     partial: 'text-red-600',
     credit:  'text-emerald-700 font-semibold',
-    none:    'text-blue-950 font-medium',
+    none:    'text-brand-950 font-medium',
   }
 
   return (
-    <div className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-lg overflow-hidden">
+    <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-lg overflow-hidden">
       {/* Dense single-line row when collapsed: caret + name + status + payment.
           Cert / sizing / contact info moved to the expanded block so the
           scroll-length stays short on mobile. */}
@@ -1260,21 +1260,21 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
         aria-expanded={expanded}
         className="w-full text-left flex items-center gap-2 px-3 py-2 cursor-pointer focus:outline-none"
       >
-        <span aria-hidden="true" className="text-xs text-blue-950 font-medium shrink-0">
+        <span aria-hidden="true" className="text-xs text-brand-950 font-medium shrink-0">
           {expanded ? '▾' : '▸'}
         </span>
         <span className="flex-1 min-w-0 text-sm truncate">
           {/* Names stay selectable for copy/paste; clicking one places a
               caret rather than toggling the card (stopPropagation). */}
           <span
-            className="text-blue-900 font-medium select-text cursor-text"
+            className="text-brand-900 font-medium select-text cursor-text"
             onClick={e => e.stopPropagation()}
           >
             {r.profile?.name ?? '(no profile)'}
           </span>
           {r.profile?.nickname && (
             <span
-              className="text-blue-900/80 font-medium select-text cursor-text"
+              className="text-brand-900/80 font-medium select-text cursor-text"
               onClick={e => e.stopPropagation()}
             >
               {' '}({r.profile.nickname})
@@ -1308,7 +1308,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
         <span className="shrink-0 flex items-center gap-1.5">
           {/* Wrapped in a click-stopper so opening the select doesn't collapse/expand the card. */}
           {readOnly ? (
-            <span className={`bg-white border border-sky-300 rounded px-1.5 py-0.5 text-xs font-medium capitalize ${statusStyles[r.booking.status]}`}>
+            <span className={`bg-white border border-surface-300 rounded px-1.5 py-0.5 text-xs font-medium capitalize ${statusStyles[r.booking.status]}`}>
               {r.booking.status}
             </span>
           ) : (
@@ -1316,7 +1316,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
               <select
                 value={r.booking.status}
                 onChange={e => onStatusChange(r.booking.id, e.target.value as Booking['status'])}
-                className={`bg-white border border-sky-300 rounded px-1.5 py-0.5 text-xs font-medium capitalize ${statusStyles[r.booking.status]}`}
+                className={`bg-white border border-surface-300 rounded px-1.5 py-0.5 text-xs font-medium capitalize ${statusStyles[r.booking.status]}`}
               >
                 {BOOKING_STATUSES.map(s => (
                   <option key={s} value={s}>{s}</option>
@@ -1334,11 +1334,11 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
       </div>
 
       {expanded && (
-        <div className="border-t border-sky-200 px-3 pb-3 pt-2 space-y-2">
+        <div className="border-t border-surface-200 px-3 pb-3 pt-2 space-y-2">
           {r.profile && (
             <div className="space-y-1">
               {(r.profile.cert_agency || r.profile.cert_level || r.profile.nitrox_certified || r.profile.deep_certified) && (
-                <p className="text-xs text-blue-900 font-medium select-text">
+                <p className="text-xs text-brand-900 font-medium select-text">
                   {r.profile.cert_agency && r.profile.cert_level && `${r.profile.cert_agency} ${r.profile.cert_level}`}
                   {r.profile.nitrox_certified && ' · Nitrox'}
                   {r.profile.deep_certified && ' · Deep'}
@@ -1346,7 +1346,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
               )}
               {/* Decorative emoji are select-none so a drag-select copies the
                   clean value; the contact id is select-all for one-click copy. */}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-blue-900 font-medium select-text">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-brand-900 font-medium select-text">
                 {r.profile.contact_method && r.profile.contact_id && (
                   <span>
                     <span aria-hidden="true" className="select-none">{methodEmoji(r.profile.contact_method)} </span>
@@ -1367,7 +1367,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
           )}
 
           {renderDetails(r.booking.details, { addonNames, roomNames }) && (
-            <div className="text-xs text-blue-950 font-medium bg-sky-50 rounded p-2 space-y-1">
+            <div className="text-xs text-brand-950 font-medium bg-surface-50 rounded p-2 space-y-1">
               {renderDetails(r.booking.details, { addonNames, roomNames })}
             </div>
           )}
@@ -1376,20 +1376,20 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
             <div className="text-xs bg-rose-50 border border-rose-300 rounded p-2 space-y-1">
               <p className="font-semibold text-red-700 uppercase tracking-wider">Diver notes</p>
               {r.diverNotes.map(n => (
-                <p key={n.id} className="text-blue-950 font-medium whitespace-pre-wrap">{n.content}</p>
+                <p key={n.id} className="text-brand-950 font-medium whitespace-pre-wrap">{n.content}</p>
               ))}
             </div>
           )}
 
           {r.booking.refund_requested_at && r.booking.status !== 'cancelled' && (
-            <div className="flex items-center justify-between text-xs bg-red-50 border border-red-500 rounded p-2">
+            <div className="flex items-center justify-between text-xs bg-red-50 border border-accent rounded p-2">
               <span className="text-red-600">
                 🔄 Refund requested {format(new Date(r.booking.refund_requested_at), 'MMM d, HH:mm')}
               </span>
               {!readOnly && (
                 <button
                   onClick={() => onApproveRefund(r.booking.id)}
-                  className="bg-blue-900 hover:bg-blue-950 text-white text-xs font-semibold px-2 py-1 rounded"
+                  className="bg-brand-900 hover:bg-brand-950 text-white text-xs font-semibold px-2 py-1 rounded"
                 >
                   Approve refund
                 </button>
@@ -1398,7 +1398,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
           )}
 
           {r.booking.notes && (
-            <p className="text-xs text-blue-950 font-medium bg-sky-50 rounded p-2 select-text">
+            <p className="text-xs text-brand-950 font-medium bg-surface-50 rounded p-2 select-text">
               <span aria-hidden="true" className="select-none">📝 </span>{r.booking.notes}
             </p>
           )}
@@ -1452,7 +1452,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
             <div className="flex justify-end pt-1">
               <button
                 onClick={onEdit}
-                className="text-xs bg-sky-100 hover:bg-sky-700 text-blue-900 font-semibold px-3 py-1 rounded"
+                className="text-xs bg-surface-100 hover:bg-surface-700 text-brand-900 font-semibold px-3 py-1 rounded"
               >
                 Edit registration
               </button>
@@ -1504,14 +1504,14 @@ function AmendmentsSection({ readOnly, onAdd }: {
   if (readOnly) return null
 
   return (
-    <div className="text-xs bg-sky-50 rounded p-2 space-y-2">
-      <p className="font-semibold text-blue-900">Add balance amendment</p>
+    <div className="text-xs bg-surface-50 rounded p-2 space-y-2">
+      <p className="font-semibold text-brand-900">Add balance amendment</p>
       <form onSubmit={handleSubmit} className="space-y-1.5">
           <div className="flex items-center gap-2">
             <select
               value={sign}
               onChange={e => setSign(e.target.value as '+' | '-')}
-              className="bg-white border border-sky-300 rounded px-1.5 py-0.5 text-xs font-semibold text-blue-900"
+              className="bg-white border border-surface-300 rounded px-1.5 py-0.5 text-xs font-semibold text-brand-900"
             >
               <option value="+">+ owes more</option>
               <option value="-">− owes less</option>
@@ -1524,7 +1524,7 @@ function AmendmentsSection({ readOnly, onAdd }: {
               value={amountStr}
               onChange={e => setAmountStr(e.target.value)}
               placeholder="Amount"
-              className="flex-1 bg-white border border-sky-300 rounded px-2 py-0.5 text-xs text-blue-900"
+              className="flex-1 bg-white border border-surface-300 rounded px-2 py-0.5 text-xs text-brand-900"
             />
           </div>
           <input
@@ -1533,14 +1533,14 @@ function AmendmentsSection({ readOnly, onAdd }: {
             onChange={e => setNote(e.target.value)}
             placeholder="Reason (required)"
             maxLength={1000}
-            className="w-full bg-white border border-sky-300 rounded px-2 py-0.5 text-xs text-blue-900"
+            className="w-full bg-white border border-surface-300 rounded px-2 py-0.5 text-xs text-brand-900"
           />
           {error && <p className="text-red-600">{error}</p>}
           <div className="flex justify-end">
             <button
               type="submit"
               disabled={submitting}
-              className="text-xs bg-blue-900 hover:bg-blue-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded"
+              className="text-xs bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded"
             >
               {submitting ? 'Adding…' : 'Add amendment'}
             </button>
@@ -1585,7 +1585,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
       onClick={onClick}
       className={`px-3 py-1 rounded-full text-sm transition-colors ${
         active
-          ? 'bg-white text-blue-950 font-semibold'
+          ? 'bg-white text-brand-950 font-semibold'
           : 'text-white/80 hover:text-white hover:bg-white/10'
       }`}
     >
@@ -1604,23 +1604,23 @@ function BalancesView({ registrants, currency }: { registrants: Registrant[]; cu
   const everyoneSettled = lines.every(l => l.bal.state !== 'due')
 
   return (
-    <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-2">
+    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-2">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-bold text-blue-900">Amount owed</h2>
-        <span className={`text-xs font-semibold ${totalDue > 0 ? 'text-red-600' : 'text-blue-900'}`}>
+        <h2 className="text-sm font-bold text-brand-900">Amount owed</h2>
+        <span className={`text-xs font-semibold ${totalDue > 0 ? 'text-red-600' : 'text-brand-900'}`}>
           {totalDue > 0 ? `${currency} ${totalDue.toLocaleString()} outstanding` : 'All settled'}
         </span>
       </div>
       {lines.length === 0 ? (
-        <p className="text-sm text-blue-950/70 font-medium italic">No active registrants.</p>
+        <p className="text-sm text-brand-950/70 font-medium italic">No active registrants.</p>
       ) : (
-        <ul className="divide-y divide-sky-200">
+        <ul className="divide-y divide-surface-200">
           {lines.map(({ r, bal }) => (
             <li key={r.booking.id} className="py-1.5 flex items-baseline justify-between gap-3">
-              <span className="text-sm text-blue-900 font-medium min-w-0">
+              <span className="text-sm text-brand-900 font-medium min-w-0">
                 {r.profile?.name ?? '(no profile)'}
                 {r.profile?.nickname && r.profile.nickname !== r.profile.name && (
-                  <span className="text-blue-900/80 font-medium"> ({r.profile.nickname})</span>
+                  <span className="text-brand-900/80 font-medium"> ({r.profile.nickname})</span>
                 )}
                 {r.payerName && (
                   <span className="text-xs text-violet-700 font-semibold"> · paid by {r.payerName}</span>
@@ -1628,19 +1628,19 @@ function BalancesView({ registrants, currency }: { registrants: Registrant[]; cu
               </span>
               <span className="shrink-0 text-xs font-semibold">
                 {bal.state === 'due' && <span className="text-red-600">{currency} {bal.amount.toLocaleString()} due</span>}
-                {bal.state === 'settled' && <span className="text-blue-900">Settled ✓</span>}
+                {bal.state === 'settled' && <span className="text-brand-900">Settled ✓</span>}
                 {bal.state === 'credit' && <span className="text-emerald-700">{currency} {bal.amount.toLocaleString()} credit</span>}
               </span>
             </li>
           ))}
         </ul>
       )}
-      <div className="flex items-baseline justify-between gap-3 pt-1 border-t border-sky-200 text-sm font-semibold text-blue-900">
+      <div className="flex items-baseline justify-between gap-3 pt-1 border-t border-surface-200 text-sm font-semibold text-brand-900">
         <span>Total paid</span>
         <span>{currency} {totalPaid.toLocaleString()}</span>
       </div>
       {!everyoneSettled && (
-        <p className="text-xs text-blue-950/70 font-medium italic">
+        <p className="text-xs text-brand-950/70 font-medium italic">
           Record payments on each diver's card under the Registrants tab.
         </p>
       )}

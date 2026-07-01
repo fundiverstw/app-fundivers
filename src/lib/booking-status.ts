@@ -4,7 +4,7 @@ import type { Booking } from '../types/database'
 // the same colour language for each state.
 export const STATUS_STYLES: Record<Booking['status'], string> = {
   pending: 'text-red-600',
-  confirmed: 'text-blue-900 font-semibold',
-  cancelled: 'text-blue-900/40 line-through',
-  waitlisted: 'text-sky-600',
+  confirmed: 'text-brand-900 font-semibold',
+  cancelled: 'text-brand-900/40 line-through',
+  waitlisted: 'text-surface-600',
 }

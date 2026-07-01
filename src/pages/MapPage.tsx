@@ -295,8 +295,8 @@ export function MapPage() {
           aria-label="Toggle shore dives"
           className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs transition-colors ${
             showShore
-              ? 'bg-white border-blue-900 text-blue-900'
-              : 'bg-sky-100 border-sky-200 text-blue-950 line-through'
+              ? 'bg-white border-brand-900 text-brand-900'
+              : 'bg-surface-100 border-surface-200 text-brand-950 line-through'
           }`}
         >
           <span className="w-2 h-2 rounded-full bg-amber-400" />
@@ -309,11 +309,11 @@ export function MapPage() {
           aria-label="Toggle boat dives"
           className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs transition-colors ${
             showBoat
-              ? 'bg-white border-blue-900 text-blue-900'
-              : 'bg-sky-100 border-sky-200 text-blue-950 line-through'
+              ? 'bg-white border-brand-900 text-brand-900'
+              : 'bg-surface-100 border-surface-200 text-brand-950 line-through'
           }`}
         >
-          <span className="w-2 h-2 rounded-full bg-sky-500" />
+          <span className="w-2 h-2 rounded-full bg-surface-500" />
           Boat
         </button>
       </div>
@@ -321,7 +321,7 @@ export function MapPage() {
         <p className="text-sm text-white/80">Tap a marker or a region below to zoom in.</p>
       )}
 
-      <div className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 flex justify-center">
+      <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 flex justify-center">
         <svg
           viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
           className="w-full max-w-md"
@@ -451,7 +451,7 @@ export function MapPage() {
               className={`text-left p-3 rounded-lg border text-sm transition-colors ${
                 active
                   ? 'bg-emerald-100 border-emerald-500 text-emerald-900 font-semibold'
-                  : 'bg-white/70 border-sky-200 text-blue-900 hover:bg-white'
+                  : 'bg-white/70 border-surface-200 text-brand-900 hover:bg-white'
               }`}
             >
               {r.name}
@@ -461,25 +461,25 @@ export function MapPage() {
       </div>
 
       {selected && (
-        <div className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4">
+        <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4">
           <div className="flex items-start justify-between mb-2 gap-2">
-            <h2 className="text-lg font-bold text-blue-900">{REGIONS[selected].name}</h2>
+            <h2 className="text-lg font-bold text-brand-900">{REGIONS[selected].name}</h2>
             <button
               type="button"
               onClick={() => setSelected(null)}
               aria-label="Close region details"
-              className="text-blue-900/60 hover:text-blue-900 text-2xl leading-none px-2 -mt-1"
+              className="text-brand-900/60 hover:text-brand-900 text-2xl leading-none px-2 -mt-1"
             >
               ×
             </button>
           </div>
-          <p className="text-sm text-blue-900 mb-3">{REGIONS[selected].description}</p>
+          <p className="text-sm text-brand-900 mb-3">{REGIONS[selected].description}</p>
           {visibleSites.length > 0 && (
             <>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-blue-900/70 mb-1">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-brand-900/70 mb-1">
                 Dive sites
               </h3>
-              <ul className="text-sm text-blue-900 space-y-2">
+              <ul className="text-sm text-brand-900 space-y-2">
                 {visibleSites.map(s => {
                   const wixUrl = wixSiteUrl(s.wix_slug)
                   return (
@@ -489,7 +489,7 @@ export function MapPage() {
                           href={wixUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="font-semibold text-blue-900 underline decoration-blue-900/40 underline-offset-2 hover:decoration-blue-900"
+                          className="font-semibold text-brand-900 underline decoration-brand-900/40 underline-offset-2 hover:decoration-brand-900"
                         >
                           {s.name}
                         </a>
@@ -497,7 +497,7 @@ export function MapPage() {
                         <strong className="font-semibold">{s.name}</strong>
                       )}
                       {s.tagline && (
-                        <p className="text-xs text-blue-900/80 mt-0.5">{s.tagline}</p>
+                        <p className="text-xs text-brand-900/80 mt-0.5">{s.tagline}</p>
                       )}
                     </li>
                   )

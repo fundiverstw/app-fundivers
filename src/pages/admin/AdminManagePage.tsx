@@ -38,10 +38,10 @@ export function AdminManagePage() {
           <li key={c.to}>
             <Link
               to={c.to}
-              className="block bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 hover:bg-white/90 transition-colors"
+              className="block bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 hover:bg-white/90 transition-colors"
             >
-              <p className="font-semibold text-blue-900">{c.title}</p>
-              <p className="text-sm text-blue-900/80 mt-1">{c.blurb}</p>
+              <p className="font-semibold text-brand-900">{c.title}</p>
+              <p className="text-sm text-brand-900/80 mt-1">{c.blurb}</p>
             </Link>
           </li>
         ))}

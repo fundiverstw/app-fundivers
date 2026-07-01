@@ -61,7 +61,7 @@ export function TripDetailPage() {
     return (
       <div className="max-w-2xl mx-auto space-y-3">
         <BackLink />
-        <p className="text-sm text-red-200 bg-red-900/50 border border-red-500 rounded-md p-2">{error}</p>
+        <p className="text-sm text-red-200 bg-red-900/50 border border-accent rounded-md p-2">{error}</p>
       </div>
     )
   }
@@ -84,7 +84,7 @@ export function TripDetailPage() {
         {trip.hero_image_url ? (
           <img src={trip.hero_image_url} alt="" className="w-full h-48 object-cover" />
         ) : (
-          <div className="w-full h-48 bg-gradient-to-br from-sky-200 to-blue-300" />
+          <div className="w-full h-48 bg-gradient-to-br from-surface-200 to-brand-300" />
         )}
         <div className="p-4 space-y-2">
           <h1 className={`text-xl ${TEXT_HEADING}`}>{trip.title}</h1>
@@ -157,7 +157,7 @@ function InterestedCard({ trip, referral }: { trip: TripBoardItem; referral: MyT
         We’ll be in touch to connect you with {trip.partner_name}. When you
         book, mention this reference code so we’re credited:
       </p>
-      <p className="text-lg font-bold tracking-wider text-blue-900 bg-sky-50 border border-sky-300 rounded-lg px-3 py-2 text-center">
+      <p className="text-lg font-bold tracking-wider text-brand-900 bg-surface-50 border border-surface-300 rounded-lg px-3 py-2 text-center">
         {referral.referral_code}
       </p>
       <p className={`text-xs ${TEXT_SUBTLE}`}>Status: {referral.status}</p>

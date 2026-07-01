@@ -2,7 +2,7 @@
 // border/animate-spin string isn't copy-pasted across every page; override
 // `className` for a different size or colour.
 
-export function Spinner({ className = 'w-6 h-6 border-2 border-blue-900' }: { className?: string }) {
+export function Spinner({ className = 'w-6 h-6 border-2 border-brand-900' }: { className?: string }) {
   return <div className={`${className} border-t-transparent rounded-full animate-spin`} />
 }
 

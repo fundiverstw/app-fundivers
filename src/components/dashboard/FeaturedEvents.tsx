@@ -35,9 +35,9 @@ export function FeaturedEvents() {
     <div className="absolute bottom-28 left-4 right-4 sm:right-auto sm:max-w-xs z-10">
       <section
         aria-label="Featured trips"
-        className="bg-white/85 backdrop-blur-md border border-sky-200 rounded-xl p-3 space-y-2 shadow-lg"
+        className="bg-white/85 backdrop-blur-md border border-surface-200 rounded-xl p-3 space-y-2 shadow-lg"
       >
-        <h2 className="text-xs font-bold uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-brand-900 flex items-center gap-1.5">
           <span aria-hidden>★</span> Featured trips
         </h2>
         <ul className="space-y-1.5">
@@ -47,10 +47,10 @@ export function FeaturedEvents() {
               <li key={`${e.type}-${e.id}`}>
                 <Link
                   to={`/register/${e.type}/${e.id}`}
-                  className="block rounded-lg bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3 py-2 transition-colors"
+                  className="block rounded-lg bg-surface-50 hover:bg-surface-100 border border-surface-200 px-3 py-2 transition-colors"
                 >
-                  <p className="text-sm font-semibold text-blue-900 leading-tight">{e.title}</p>
-                  <p className="text-xs text-blue-900/70 mt-0.5">
+                  <p className="text-sm font-semibold text-brand-900 leading-tight">{e.title}</p>
+                  <p className="text-xs text-brand-900/70 mt-0.5">
                     {formatEventSpan(e, { withYear: true })}
                     {full && <span className="text-red-600 font-medium"> · waitlist</span>}
                   </p>

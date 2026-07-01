@@ -109,7 +109,7 @@ export function BusyEntryModal(props: BusyEntryModalProps) {
             <button
               type="button"
               onClick={props.onClose}
-              className="text-blue-900 hover:text-red-700 text-xl leading-none"
+              className="text-brand-900 hover:text-red-700 text-xl leading-none"
               aria-label="Close"
             >×</button>
           </div>

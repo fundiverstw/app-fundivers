@@ -69,7 +69,7 @@ function Headline({ plan }: { plan: SeatingPlan }) {
 
   const ridingStaff = plan.staff - plan.driversNeeded
   return (
-    <p className="text-sm font-medium text-blue-900">
+    <p className="text-sm font-medium text-brand-900">
       Take {plan.driversNeeded} vehicle{plural(plan.driversNeeded)} — {plan.seats} seat{plural(plan.seats)} for{' '}
       {plan.riders} rider{plural(plan.riders)} ({plan.divers} diver{plural(plan.divers)} ride · {plan.driversNeeded} of{' '}
       {plan.staff} on-duty staff driving{ridingStaff > 0 ? `, ${ridingStaff} riding` : ''}).
@@ -80,18 +80,18 @@ function Headline({ plan }: { plan: SeatingPlan }) {
 // One vehicle with its driver and the people aboard it.
 function CarRow({ car }: { car: CarSeating }) {
   return (
-    <li className="text-sm text-blue-900">
+    <li className="text-sm text-brand-900">
       <span className="font-semibold">{car.vehicle.name}</span>
-      <span className="text-xs text-blue-950/70 font-medium"> ({car.passengers.length}/{car.vehicle.passenger_seats})</span>
+      <span className="text-xs text-brand-950/70 font-medium"> ({car.passengers.length}/{car.vehicle.passenger_seats})</span>
       {car.driver
         ? <> — <span className="font-medium">{car.driver.name}</span> driving</>
         : <> — <span className="font-semibold text-amber-700">needs a driver</span></>}
       {car.passengers.length > 0 && (
-        <div className="pl-3 text-blue-900/90 font-medium">
+        <div className="pl-3 text-brand-900/90 font-medium">
           {car.passengers.map((p, i) => (
             <span key={p.id}>
               {i > 0 && ' · '}
-              {p.name}{p.kind === 'staff' && <span className="text-xs text-blue-950/60"> (staff)</span>}
+              {p.name}{p.kind === 'staff' && <span className="text-xs text-brand-950/60"> (staff)</span>}
             </span>
           ))}
         </div>

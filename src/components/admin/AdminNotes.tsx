@@ -8,12 +8,12 @@ import { NOTE_TAGS, type AdminNote, type NoteTag, type Profile } from '../../typ
 const TAG_STYLES: Record<NoteTag, string> = {
   urgent:    'bg-rose-700 text-rose-100',
   payment:   'bg-amber-700 text-amber-100',
-  gear:      'bg-sky-700 text-sky-100',
+  gear:      'bg-surface-700 text-surface-100',
   logistics: 'bg-violet-700 text-violet-100',
   cert:      'bg-emerald-700 text-emerald-100',
   medical:   'bg-fuchsia-700 text-fuchsia-100',
-  note:      'bg-sky-100 text-blue-900',
-  general:   'bg-sky-100 text-blue-900',
+  note:      'bg-surface-100 text-brand-900',
+  general:   'bg-surface-100 text-brand-900',
 }
 
 type NoteWithAuthors = AdminNote & {
@@ -142,25 +142,25 @@ export function AdminNotes({ target, tagFilter, title = 'Notes', compact = false
 
   const Tag = compact ? 'div' : 'section'
   const wrapperClass = compact
-    ? 'pt-2 mt-1 border-t border-sky-200 space-y-2'
-    : 'bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3'
+    ? 'pt-2 mt-1 border-t border-surface-200 space-y-2'
+    : 'bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3'
 
   return (
     <Tag className={wrapperClass}>
       <div className="flex items-center justify-between gap-2">
         <h2 className={compact
-          ? 'text-xs font-semibold text-blue-900'
+          ? 'text-xs font-semibold text-brand-900'
           : 'text-sm font-semibold text-red-600 uppercase tracking-wider'}>
           {title}
           {compact && open.length === 0 && (
-            <span className="font-normal text-blue-950/60"> · none</span>
+            <span className="font-normal text-brand-950/60"> · none</span>
           )}
         </h2>
         <div className="flex items-center gap-3">
           {resolved.length > 0 && (
             <button
               onClick={() => setShowResolved(v => !v)}
-              className="text-xs text-blue-900 font-medium hover:text-blue-900"
+              className="text-xs text-brand-900 font-medium hover:text-brand-900"
             >
               {showResolved ? 'Hide resolved' : `Show resolved (${resolved.length})`}
             </button>
@@ -168,7 +168,7 @@ export function AdminNotes({ target, tagFilter, title = 'Notes', compact = false
           {compact && (
             <button
               onClick={() => setAdding(a => !a)}
-              className="text-xs text-blue-900 font-semibold hover:text-blue-950 shrink-0"
+              className="text-xs text-brand-900 font-semibold hover:text-brand-950 shrink-0"
             >
               {adding ? 'Cancel' : '+ Add'}
             </button>
@@ -187,17 +187,17 @@ export function AdminNotes({ target, tagFilter, title = 'Notes', compact = false
         </div>
       )}
       {!compact && open.length === 0 && (
-        <p className="text-xs text-blue-950 font-medium">No open notes.</p>
+        <p className="text-xs text-brand-950 font-medium">No open notes.</p>
       )}
 
       {showForm && (
-        <div className={compact ? 'space-y-2' : 'pt-2 border-t border-sky-200 space-y-2'}>
+        <div className={compact ? 'space-y-2' : 'pt-2 border-t border-surface-200 space-y-2'}>
           <div className="flex flex-col sm:flex-row gap-2">
             {!tagFilter && (
               <select
                 value={tag}
                 onChange={e => setTag(e.target.value as NoteTag)}
-                className="sm:shrink-0 bg-white border border-sky-300 rounded-lg px-2 py-1 text-xs text-blue-900"
+                className="sm:shrink-0 bg-white border border-surface-300 rounded-lg px-2 py-1 text-xs text-brand-900"
               >
                 {NOTE_TAGS.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
@@ -207,13 +207,13 @@ export function AdminNotes({ target, tagFilter, title = 'Notes', compact = false
               value={content}
               onChange={e => setContent(e.target.value)}
               placeholder="New note…"
-              className="sm:flex-1 min-w-0 bg-white border border-sky-300 rounded-lg px-3 py-1.5 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
+              className="sm:flex-1 min-w-0 bg-white border border-surface-300 rounded-lg px-3 py-1.5 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
               onKeyDown={e => { if (e.key === 'Enter') addNote() }}
             />
             <button
               onClick={addNote}
               disabled={saving || !content.trim()}
-              className="sm:shrink-0 bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-xs font-semibold py-1.5 sm:py-1 px-3 rounded-lg"
+              className="sm:shrink-0 bg-brand-900 hover:bg-brand-950 disabled:opacity-40 text-white text-xs font-semibold py-1.5 sm:py-1 px-3 rounded-lg"
             >
               Add
             </button>
@@ -231,20 +231,20 @@ function NoteCard({ note, onResolve, onUnresolve }: {
 }) {
   const author = personName(note.author?.name, note.author?.nickname) || 'unknown'
   return (
-    <div className={`bg-sky-50 rounded-lg p-3 text-sm ${note.resolved ? 'opacity-60' : ''}`}>
+    <div className={`bg-surface-50 rounded-lg p-3 text-sm ${note.resolved ? 'opacity-60' : ''}`}>
       <div className="flex items-start gap-2">
         <span className={`text-xs font-semibold uppercase px-2 py-0.5 rounded-full shrink-0 ${TAG_STYLES[note.tag]}`}>
           {note.tag}
         </span>
-        <p className={`flex-1 text-blue-900 ${note.resolved ? 'line-through' : ''}`}>{note.content}</p>
+        <p className={`flex-1 text-brand-900 ${note.resolved ? 'line-through' : ''}`}>{note.content}</p>
         {onResolve && (
-          <button onClick={onResolve} className="text-xs text-blue-900 font-medium hover:text-blue-900 font-semibold shrink-0">✓ resolve</button>
+          <button onClick={onResolve} className="text-xs text-brand-900 font-medium hover:text-brand-900 font-semibold shrink-0">✓ resolve</button>
         )}
         {onUnresolve && (
-          <button onClick={onUnresolve} className="text-xs text-blue-900 font-medium hover:text-blue-700 shrink-0">↺ reopen</button>
+          <button onClick={onUnresolve} className="text-xs text-brand-900 font-medium hover:text-brand-700 shrink-0">↺ reopen</button>
         )}
       </div>
-      <p className="text-xs text-blue-950 font-medium mt-1">
+      <p className="text-xs text-brand-950 font-medium mt-1">
         {author} · {format(new Date(note.created_at), 'MMM d · HH:mm')}
         {note.resolved && note.resolved_at && (
           <> · resolved by {personName(note.resolver?.name, note.resolver?.nickname) || 'unknown'} {format(new Date(note.resolved_at), 'MMM d')}</>

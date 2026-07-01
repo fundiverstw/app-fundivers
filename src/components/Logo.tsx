@@ -37,7 +37,7 @@ export function Logo({
         className={`${SIZE_CLASS[size]} w-auto ${className}`}
       />
       {beta && (
-        <span className="bg-red-500 text-white rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none uppercase tracking-wide">
+        <span className="bg-accent text-white rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none uppercase tracking-wide">
           Beta
         </span>
       )}

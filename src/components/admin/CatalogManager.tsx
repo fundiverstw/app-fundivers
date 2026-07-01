@@ -209,14 +209,14 @@ export function CatalogManager<Row extends { _id: string }>({
         <button
           type="button"
           onClick={openCreate}
-          className="text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg"
+          className="text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg"
         >
           + New {noun}
         </button>
       </div>
 
       {loadError && (
-        <p className="text-sm text-red-200 bg-red-900/50 border border-red-500 rounded-md p-2">
+        <p className="text-sm text-red-200 bg-red-900/50 border border-accent rounded-md p-2">
           {loadError}
         </p>
       )}
@@ -230,19 +230,19 @@ export function CatalogManager<Row extends { _id: string }>({
           {rows.map(row => (
             <li
               key={row._id}
-              className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-3 flex items-start justify-between gap-3"
+              className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 flex items-start justify-between gap-3"
             >
               <div className="min-w-0">
-                <p className="font-medium text-blue-900 text-sm truncate">{rowLabel(row)}</p>
+                <p className="font-medium text-brand-900 text-sm truncate">{rowLabel(row)}</p>
                 {rowDetail && rowDetail(row) && (
-                  <p className="text-xs text-blue-900/80 truncate">{rowDetail(row)}</p>
+                  <p className="text-xs text-brand-900/80 truncate">{rowDetail(row)}</p>
                 )}
               </div>
               <div className="flex gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => openEdit(row)}
-                  className="text-xs font-semibold bg-blue-900 hover:bg-blue-950 text-white px-3 py-1 rounded-lg"
+                  className="text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-3 py-1 rounded-lg"
                 >
                   Edit
                 </button>
@@ -303,7 +303,7 @@ function CatalogFormModal<Row>({
   return (
     <Modal labelledBy="catalog-form-title" onClose={onClose}>
       <form onSubmit={onSubmit} className="space-y-3">
-        <h2 id="catalog-form-title" className="text-lg font-bold text-blue-900">{title}</h2>
+        <h2 id="catalog-form-title" className="text-lg font-bold text-brand-900">{title}</h2>
         {fields.map(f => (
           <FieldRow key={f.key} field={f} value={form[f.key] ?? ''} onChange={v => onChange(f.key, v)} />
         ))}
@@ -322,7 +322,7 @@ function CatalogFormModal<Row>({
           <button
             type="submit"
             disabled={submitting}
-            className="flex-1 py-2 rounded-lg text-sm font-semibold bg-blue-900 hover:bg-blue-950 text-white disabled:opacity-50"
+            className="flex-1 py-2 rounded-lg text-sm font-semibold bg-brand-900 hover:bg-brand-950 text-white disabled:opacity-50"
           >
             {submitting ? 'Saving…' : submitLabel}
           </button>
@@ -335,10 +335,10 @@ function CatalogFormModal<Row>({
 function FieldRow<Row>({
   field, value, onChange,
 }: { field: CatalogField<Row>; value: string; onChange: (v: string) => void }) {
-  const inputClass = 'w-full bg-white border border-sky-300 rounded-md px-3 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900'
+  const inputClass = 'w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900'
   return (
     <label className="block space-y-1">
-      <span className="text-xs font-medium text-blue-900">{field.label}{field.required && ' *'}</span>
+      <span className="text-xs font-medium text-brand-900">{field.label}{field.required && ' *'}</span>
       {field.type === 'textarea' ? (
         <textarea
           value={value}
@@ -373,8 +373,8 @@ function ConfirmDeleteModal({
 }) {
   return (
     <Modal labelledBy="catalog-delete-title" onClose={onClose}>
-      <h2 id="catalog-delete-title" className="text-lg font-bold text-blue-900">Delete {noun}?</h2>
-      <p className="text-sm text-blue-900">
+      <h2 id="catalog-delete-title" className="text-lg font-bold text-brand-900">Delete {noun}?</h2>
+      <p className="text-sm text-brand-900">
         “{label}” will be permanently deleted. Existing bookings that reference
         this {noun} retain a record of the choice but the catalog entry will no
         longer appear in pickers.

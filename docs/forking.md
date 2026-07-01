@@ -12,11 +12,12 @@ never touch it — that's what keeps upstream updates conflict-free.
 
 | Seam file | What you put there |
 | --- | --- |
-| `fundive.config.ts` | Shop name, contact details, URLs, locale (timezone/currency), theme colors, asset paths, feature toggles, gear list/prices. Copy `fundive.config.example.ts` to start. |
+| `fundive.config.ts` | Shop name, contact details, URLs, locale (timezone/currency), PWA manifest colors, asset paths, feature toggles, gear list/prices. Copy `fundive.config.example.ts` to start. |
+| `src/index.css` (`@theme` block) | Your **brand colors** — see [Colors](#colors) below. |
 | `src/config/terms.tsx` | Your Terms of Use / privacy text (`TermsContent`). |
 | `public/…` (the paths in `assets`) | Your logo, favicon, PWA icons, broadcast glyph. |
 | `.env.local` / `.env.production` / GitHub Actions secrets | Supabase URL + keys, Turnstile keys, VAPID keys — see [deployment.md](./deployment.md). |
-| `wrangler.toml` + `workers/push/wrangler.toml` | The two Worker `name`s (globally unique on Cloudflare), and the push worker's `[vars]` (`VAPID_SUBJECT`, `ALLOWED_ORIGINS`). |
+| `wrangler.toml` + `workers/push/wrangler.toml` | The two Worker `name`s (globally unique on Cloudflare), and the push worker's `[vars]` (`VAPID_SUBJECT`, `ALLOWED_ORIGINS`, `TIMEZONE`, `CURRENCY`). |
 
 `fundive.config.ts` is **pure data** — no imports — so it's read identically by
 the browser bundle, `vite.config.ts`, the service worker, and the Deno edge
@@ -30,6 +31,43 @@ functions. Keep it that way.
   Turnstile, Cloudflare token). Never in the config file. See [deployment.md](./deployment.md).
 - **Database (admin UI)** — catalog data you edit at runtime: vehicles, dive
   sites, cancellation policies, prices, rooms, add-ons.
+
+### Colors
+
+The whole app is skinned from **one `@theme` block in `src/index.css`**. Tailwind
+v4 is CSS-first, so brand colors live there (not in `fundive.config.ts`). Three
+token families drive everything:
+
+- `--color-brand-*` — the primary identity (page, nav, buttons, headings, body
+  ink). FunDivers' is navy.
+- `--color-surface-*` — the light "shallows": card / input borders, subtle fills.
+- `--color-accent` — the signature hairline / badge.
+
+They ship aliased to Tailwind's palette (`var(--color-blue-900)` etc.), so the
+default build looks like FunDivers. **Re-skin by overriding the values** with any
+hex/oklch, e.g.:
+
+```css
+@theme {
+  --color-brand-900: #0f5132;   /* your primary */
+  --color-brand-950: #0a3622;   /* darker variant for nav bars / hovers */
+  --color-surface-200: #d1fae5; /* your light surface */
+  --color-accent: #f59e0b;      /* your accent */
+  /* …override whichever shades your design uses… */
+}
+```
+
+Every component reads these via `bg-brand-900`, `border-surface-200`,
+`border-accent`, etc. (and the semantic helpers in `src/styles/tokens.ts`), so one
+edit re-skins the app. Two things stay on the raw Tailwind palette on purpose:
+**status colors** (`emerald`=success, `amber`=warning, `red-600`+=danger) so they
+stay universally recognizable, and the **categorical event-type palette** (the
+OW/AOW/DSD/rescue/specialty rainbow in `MonthCalendar.tsx`, the year-series in
+`AdminHistoryPage.tsx`) so re-skinning never collapses those distinct hues.
+
+Keep the PWA manifest colors in `fundive.config.ts` (`theme` / `backgroundColor` —
+browser chrome / splash) in sync with your `--color-brand-*` by hand; they're a
+separate mechanism (baked into the manifest + `index.html` at build).
 
 ### Feature toggles
 
