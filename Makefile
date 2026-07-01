@@ -80,7 +80,7 @@ wix-sync:
 	  set -a && . ./.env.local && set +a; \
 	fi; \
 	if [ -z "$$WIX_SYNC_TOKEN" ]; then \
-	  echo "WIX_SYNC_TOKEN is not set in your shell or .env.local. See wix/README.md."; \
+	  echo "WIX_SYNC_TOKEN is not set in your shell or .env.local. See ignore/wix/README.md."; \
 	  exit 1; \
 	fi; \
 	echo "Triggering Wix re-sync of every collection in SYNC_TABLES…"; \
