@@ -9,7 +9,6 @@ import { Logo } from '../Logo'
 import { CalendarIcon } from '../icons/CalendarIcon'
 import { ChatIcon } from '../icons/ChatIcon'
 import { CrosshairIcon } from '../icons/CrosshairIcon'
-import { MapIcon } from '../icons/MapIcon'
 import { PartnerConnectIcon } from '../icons/PartnerConnectIcon'
 import { TripBoardIcon } from '../icons/TripBoardIcon'
 import { PersonIcon } from '../icons/PersonIcon'
@@ -100,15 +99,6 @@ export function AppShell() {
                 maskPosition: 'center',
               }}
             />
-          )}
-          {siteConfig.features.map && (
-            <Link
-              to="/map"
-              aria-label="Dive site map"
-              className="text-accent hover:text-red-400 transition-colors"
-            >
-              <MapIcon />
-            </Link>
           )}
           <Link
             to="/partner-connect"

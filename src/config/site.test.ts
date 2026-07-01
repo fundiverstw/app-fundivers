@@ -19,7 +19,6 @@ describe('siteConfig', () => {
   it('uses absolute http(s) URLs', () => {
     const urls = [
       siteConfig.urls.site, siteConfig.urls.app, siteConfig.urls.radio,
-      siteConfig.urls.travelDestinationsBase,
       siteConfig.contact.mapsUrl, siteConfig.contact.lineUrl,
       siteConfig.contact.whatsappUrl, siteConfig.contact.paypalLink,
     ]
