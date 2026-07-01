@@ -7,7 +7,7 @@
 import { siteConfig } from '../config/site'
 
 export interface DailyWeather {
-  date: string            // YYYY-MM-DD, Asia/Taipei (Open-Meteo returns local dates)
+  date: string            // YYYY-MM-DD in the shop timezone (Open-Meteo returns local dates)
   tempMax: number | null  // °C
   tempMin: number | null  // °C
   precipitation: number | null // mm
