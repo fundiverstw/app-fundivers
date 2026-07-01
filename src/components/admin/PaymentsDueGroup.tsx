@@ -1,7 +1,7 @@
 export interface PaymentDueRow {
   bookingId: string
   name: string
-  /** Outstanding amount (NTD). */
+  /** Outstanding amount, in the shop currency. */
   amount: number
   /** Lead booker responsible for this balance, when the diver is covered. */
   payerName: string | null
