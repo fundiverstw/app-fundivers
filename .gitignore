@@ -15,11 +15,12 @@ dist-ssr
 .env.local
 .env.push
 
-# Reference-only Wix site code — not part of the app build
-wix/
+# Catch-all for non-production / non-app material kept locally but out of the
+# repo: Wix site code, competitor research, scratch notes, etc.
+ignore/
 
-# Competitor research — opposition research notes, not part of the app
-competitors/
+# Local Claude Code orientation — not shipped with the open-source package
+CLAUDE.md
 
 # Editor directories and files
 .vscode/*
