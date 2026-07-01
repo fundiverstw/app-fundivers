@@ -1,4 +1,5 @@
 import type { AppEvent } from '../types/database'
+import { siteConfig } from '../config/site'
 
 // Calendar color buckets for events. Kept here (not in the calendar
 // component) so the title/destination matching is unit-testable on its own
@@ -48,7 +49,12 @@ export function diveOutingFromDestinations(
   return trip ? 'trip' : 'local'
 }
 
-const TRIP_TITLE_RE = /\bboat\b|green island|kenting|penghu|lambai|xiao\s?liuqiu|orchid island|anilao|palau|panglao|bohol|tubbataha|puerto galera/i
+// Built from fundive.config.ts `business.tripKeywords` (regex-alternation
+// fragments). An empty list yields a regex that never matches, so title-based
+// trip detection is simply off.
+const TRIP_TITLE_RE = siteConfig.business.tripKeywords.length
+  ? new RegExp(siteConfig.business.tripKeywords.join('|'), 'i')
+  : /(?!)/
 
 // Final yellow/green decision for a dive bar: trust the tagged destination
 // when present, otherwise sniff the title for boat / known-trip keywords.
