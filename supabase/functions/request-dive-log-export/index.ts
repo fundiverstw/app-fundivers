@@ -20,8 +20,9 @@ import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
 import { buildDiveLogCsv, DIVE_LOG_CSV_COLUMNS, type DiveLogCsvRow } from "../_shared/dive-log-csv.ts"
 import { corsHeaders, corsOk, jsonResponse, safeError, bearerToken } from "../_shared/responses.ts"
+import { siteConfig } from "../../../fundive.config.ts"
 
-const COMPANY_EMAIL = "fundiverstw@gmail.com"
+const COMPANY_EMAIL = siteConfig.contact.email
 const COOLDOWN_HOURS = 24
 
 Deno.serve(async (req) => {
@@ -101,13 +102,13 @@ Deno.serve(async (req) => {
       auth: { user: GMAIL_USER, pass: GMAIL_PASS },
     })
     const stamp = new Date().toISOString().slice(0, 10)
-    const filename = `fundivers-dive-log-${stamp}.csv`
-    const subject  = "FunDivers TW — your dive log export"
+    const filename = `${siteConfig.identity.shortName.toLowerCase()}-dive-log-${stamp}.csv`
+    const subject  = `${siteConfig.identity.shopName} — your dive log export`
     const text     = rows.length === 0
-      ? `Hi,\n\nYou requested a CSV export of your dive logs, but you don't have any logged dives yet. The attached file contains only the header row.\n\nLog dives any time at https://app.fundiverstw.com/records/dive-logs.\n\n— FunDivers TW`
-      : `Hi,\n\nAttached is a CSV export of your ${rows.length} logged dive${rows.length === 1 ? "" : "s"} from FunDivers TW.\n\nYou can request another export 24 hours from now.\n\n— FunDivers TW`
+      ? `Hi,\n\nYou requested a CSV export of your dive logs, but you don't have any logged dives yet. The attached file contains only the header row.\n\nLog dives any time at ${siteConfig.urls.app}/records/dive-logs.\n\n— ${siteConfig.identity.shopName}`
+      : `Hi,\n\nAttached is a CSV export of your ${rows.length} logged dive${rows.length === 1 ? "" : "s"} from ${siteConfig.identity.shopName}.\n\nYou can request another export 24 hours from now.\n\n— ${siteConfig.identity.shopName}`
     await transporter.sendMail({
-      from: { name: "FunDivers TW", address: GMAIL_USER },
+      from: { name: siteConfig.identity.shopName, address: GMAIL_USER },
       to:      userEmail,
       bcc:     COMPANY_EMAIL,
       subject,

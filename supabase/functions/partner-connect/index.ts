@@ -18,8 +18,9 @@ import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
 import { corsOk, jsonResponse, safeError, bearerToken } from "../_shared/responses.ts"
 import { parsePartnerConnectInput, buildPartnerConnectEmail } from "../_shared/partner-connect.ts"
+import { siteConfig } from "../../../fundive.config.ts"
 
-const COMPANY_EMAIL = "fundiverstw@gmail.com"
+const COMPANY_EMAIL = siteConfig.contact.email
 
 Deno.serve(async (req) => {
   const json = (body: unknown, status = 200) => jsonResponse(req, body, status)
@@ -77,7 +78,7 @@ Deno.serve(async (req) => {
       auth: { user: GMAIL_USER, pass: GMAIL_PASS },
     })
     await transporter.sendMail({
-      from:     { name: "FunDivers TW", address: GMAIL_USER },
+      from:     { name: siteConfig.identity.shopName, address: GMAIL_USER },
       to:       COMPANY_EMAIL,
       replyTo:  userEmail,
       subject,

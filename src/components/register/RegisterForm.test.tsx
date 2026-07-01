@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { RegisterForm, RegisterFormBody } from './RegisterForm'
 import { mockQueryBuilder } from '../../../tests/test-utils'
+import { siteConfig } from '../../config/site'
 import type { AppEvent, EOAddon, EORoom, Profile } from '../../types/database'
 
 const { from, update, invoke, setSession, rpc } = vi.hoisted(() => ({
@@ -1032,7 +1033,7 @@ describe('RegisterForm', () => {
     // Switch to PayPal → paypal.me link block.
     await user.click(screen.getByLabelText(/^paypal/i))
     expect(screen.getByText(/how to pay — paypal/i)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /paypal\.me\/fundiverstw/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: siteConfig.contact.paypalLink })).toBeInTheDocument()
 
     // Switch to credit card → invoice-email block, defaults to registered email copy.
     await user.click(screen.getByLabelText(/credit card/i))

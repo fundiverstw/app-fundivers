@@ -8,6 +8,7 @@ import {
   buildAccountingCsvs,
   type AccountingTransaction,
 } from './accounting-export'
+import { siteConfig } from '../config/site'
 import type { Payment } from '../types/database'
 
 function payment(over: Partial<Payment>): Payment {
@@ -36,7 +37,7 @@ describe('fiscalYearRange', () => {
     const r = fiscalYearRange(2026)
     expect(r.startIso).toBe('2025-12-31T16:00:00.000Z') // 2026-01-01 00:00 +08:00
     expect(r.endIso).toBe('2026-12-31T16:00:00.000Z')   // 2027-01-01 00:00 +08:00
-    expect(r.label).toBe('2026-01-01 to 2026-12-31 (Asia/Taipei)')
+    expect(r.label).toBe(`2026-01-01 to 2026-12-31 (${siteConfig.locale.timezone})`)
   })
 })
 

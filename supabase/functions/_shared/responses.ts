@@ -6,10 +6,10 @@
 // cross-origin probing where an attacker triggers errors to map the
 // schema.
 //
-// CORS allowlist. Origins are matched verbatim. The SPA serves from
-// app.fundiverstw.com; local dev hits the same edge function from
-// the Vite dev server. Anything else gets no Access-Control-Allow-
-// Origin header, which browsers translate into a CORS failure.
+// CORS allowlist. Origins are matched verbatim. The production origin comes
+// from the shop config (siteConfig.urls.app); local dev hits the same edge
+// function from the Vite dev server. Anything else gets no Access-Control-
+// Allow-Origin header, which browsers translate into a CORS failure.
 //
 // safeError. PostgREST raises errors with a `code` (SQLSTATE) plus
 // a `message` that often contains the offending column / table /
@@ -20,8 +20,10 @@
 // without a SQLSTATE) pass through unchanged — they're authored by
 // us and don't leak schema.
 
+import { siteConfig } from "../../../fundive.config.ts"
+
 const ALLOWED_ORIGINS = [
-  "https://app.fundiverstw.com",
+  siteConfig.urls.app,
   "http://localhost:5173",
   "http://127.0.0.1:5173",
 ]
