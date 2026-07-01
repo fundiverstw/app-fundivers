@@ -83,6 +83,17 @@ export interface SiteBusiness {
   paymentDeadlineFallbackDays: number
   /** Surcharge shown for card / PayPal payment methods, as a whole percent. */
   cardSurchargePercent: number
+  /** Case-insensitive regex-alternation fragments that mark a dive as a "trip"
+   *  (vs a local shore dive) by title — destination names, "\\bboat\\b", etc.
+   *  Empty = never match by title. Used for calendar coloring. */
+  tripKeywords: string[]
+}
+
+/** The single reference location for the admin weather / BI baseline. */
+export interface SiteWeatherRegion {
+  latitude: number
+  longitude: number
+  label: string
 }
 
 export interface SiteConfig {
@@ -96,11 +107,12 @@ export interface SiteConfig {
   assets: SiteAssets
   features: SiteFeatures
   business: SiteBusiness
+  weatherRegion: SiteWeatherRegion
 }
 
 // Bump when the SiteConfig contract changes in a way that requires forks to
 // migrate their fundive.config.ts. The build compares this against
 // siteConfig.configVersion and fails loudly on a mismatch.
-export const CONFIG_CONTRACT_VERSION = 1
+export const CONFIG_CONTRACT_VERSION = 2
 
 export const siteConfig: SiteConfig = raw

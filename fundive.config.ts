@@ -20,7 +20,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const siteConfig = {
-  configVersion: 1,
+  configVersion: 2,
 
   identity: {
     appName: 'FunDive',
@@ -82,5 +82,15 @@ export const siteConfig = {
     },
     paymentDeadlineFallbackDays: 7,
     cardSurchargePercent: 5,
+    // Regex-alternation fragments (case-insensitive) that flag a dive as a
+    // "trip" by title when it has no tagged destination — boat dives and
+    // anywhere beyond the usual Taipei→Keelung shore drive.
+    tripKeywords: [
+      '\\bboat\\b', 'green island', 'kenting', 'penghu', 'lambai', 'xiao\\s?liuqiu',
+      'orchid island', 'anilao', 'palau', 'panglao', 'bohol', 'tubbataha', 'puerto galera',
+    ],
   },
+
+  // Home dive region for the admin "Historical perspective" weather baseline.
+  weatherRegion: { latitude: 25.12, longitude: 121.92, label: 'NE coast — Longdong / Keelung' },
 }

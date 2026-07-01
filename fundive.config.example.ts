@@ -14,7 +14,7 @@
 
 export const siteConfig = {
   // Leave at 1 for a new fork. Only bump when core's CHANGELOG tells you to.
-  configVersion: 1,
+  configVersion: 2,
 
   identity: {
     appName: 'FunDive',
@@ -76,5 +76,11 @@ export const siteConfig = {
     },
     paymentDeadlineFallbackDays: 7,
     cardSurchargePercent: 5,
+    // Case-insensitive regex fragments that mark a dive as a "trip" by title
+    // (destination names, "\\bboat\\b", …). Empty = never classify by title.
+    tripKeywords: ['\\bboat\\b'],
   },
+
+  // Home dive region for the admin weather baseline (decimal degrees).
+  weatherRegion: { latitude: 0, longitude: 0, label: 'Your home dive region' },
 }

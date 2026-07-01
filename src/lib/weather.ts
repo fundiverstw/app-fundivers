@@ -16,8 +16,8 @@ export interface DailyWeather {
   seaTemp: number | null  // °C (daily mean sea-surface temperature)
 }
 
-// Longdong / Bitou — the Northeast-coast home diving area near Keelung.
-export const HOME_REGION = { latitude: 25.12, longitude: 121.92, label: 'NE coast — Longdong / Keelung' }
+// Home dive region for the weather baseline — set per shop in fundive.config.ts.
+export const HOME_REGION = siteConfig.weatherRegion
 const TZ = siteConfig.locale.timezone
 
 export function buildArchiveUrl(start: string, end: string): string {

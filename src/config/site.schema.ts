@@ -59,6 +59,12 @@ export const siteConfigSchema = z.object({
     gearPrices: z.record(z.string(), z.number().nonnegative()),
     paymentDeadlineFallbackDays: z.number().int().positive(),
     cardSurchargePercent: z.number().nonnegative(),
+    tripKeywords: z.array(z.string().min(1)),
+  }),
+  weatherRegion: z.object({
+    latitude: z.number().min(-90).max(90),
+    longitude: z.number().min(-180).max(180),
+    label: z.string().min(1),
   }),
 })
 
