@@ -49,9 +49,9 @@ interface Props {
 
 export function RegisterForm({ event, profile, userId, onClose, onBooked, existingBooking, inlineConfirmation }: Props) {
   return (
-    <div className="fixed inset-0 bg-blue-900/60 backdrop-blur-sm flex items-start justify-center z-50 px-4 pt-8 pb-4 overflow-y-auto" onClick={onClose}>
+    <div className="fixed inset-0 bg-brand-900/60 backdrop-blur-sm flex items-start justify-center z-50 px-4 pt-8 pb-4 overflow-y-auto" onClick={onClose}>
       <div
-        className="bg-white/80 backdrop-blur-md border border-red-500 rounded-2xl w-full max-w-lg p-5 space-y-4 max-h-[90vh] overflow-y-auto"
+        className="bg-white/80 backdrop-blur-md border border-accent rounded-2xl w-full max-w-lg p-5 space-y-4 max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <RegisterFormBody
@@ -289,12 +289,12 @@ function DiverPickerStep({
     <>
       <header className="space-y-1">
         <div className="flex items-start justify-between gap-3">
-          <h1 className="text-xl font-bold text-blue-900 leading-tight">{eventTitle}</h1>
+          <h1 className="text-xl font-bold text-brand-900 leading-tight">{eventTitle}</h1>
           {onCancel && (
-            <button onClick={onCancel} className="text-blue-900 font-medium text-xl leading-none shrink-0" aria-label="Close">×</button>
+            <button onClick={onCancel} className="text-brand-900 font-medium text-xl leading-none shrink-0" aria-label="Close">×</button>
           )}
         </div>
-        <p className="text-xs text-blue-900 font-medium">Who is this booking for? (Select one or more)</p>
+        <p className="text-xs text-brand-900 font-medium">Who is this booking for? (Select one or more)</p>
       </header>
       <ul className="space-y-2">
         {all.map(p => {
@@ -303,8 +303,8 @@ function DiverPickerStep({
           return (
             <li key={p.id}>
               <label
-                className={`flex items-start gap-3 cursor-pointer bg-white/70 hover:bg-sky-100 border rounded-lg px-3 py-3 ${
-                  checked ? 'border-blue-700 ring-2 ring-blue-200' : 'border-sky-200'
+                className={`flex items-start gap-3 cursor-pointer bg-white/70 hover:bg-surface-100 border rounded-lg px-3 py-3 ${
+                  checked ? 'border-brand-700 ring-2 ring-brand-200' : 'border-surface-200'
                 }`}
               >
                 <input
@@ -312,18 +312,18 @@ function DiverPickerStep({
                   checked={checked}
                   onChange={() => toggle(p.id)}
                   aria-label={isSelf ? 'Myself' : (p.name ?? '(unnamed child)')}
-                  className="accent-blue-900 mt-1"
+                  className="accent-brand-900 mt-1"
                 />
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-blue-900">
+                  <p className="text-sm font-semibold text-brand-900">
                     {isSelf ? 'Myself' : (
                       <>
                         {p.name ?? '(no name)'}
-                        {p.nickname && <span className="text-blue-900/80"> ({p.nickname})</span>}
+                        {p.nickname && <span className="text-brand-900/80"> ({p.nickname})</span>}
                       </>
                     )}
                   </p>
-                  <p className="text-xs text-blue-900/70">
+                  <p className="text-xs text-brand-900/70">
                     {isSelf
                       ? (personName(p.name, p.nickname) || '(your account)')
                       : (p.cert_agency && p.cert_level ? `${p.cert_agency} ${p.cert_level}` : 'Uncertified')}
@@ -337,7 +337,7 @@ function DiverPickerStep({
           )
         })}
       </ul>
-      <p className="text-xs text-blue-950 font-medium">
+      <p className="text-xs text-brand-950 font-medium">
         Each diver gets their own booking — extras and payment choices apply to all of them.
       </p>
       <footer className="flex items-center justify-end gap-2 pt-2">
@@ -348,7 +348,7 @@ function DiverPickerStep({
             const sel = all.filter(p => selected.has(p.id))
             onConfirm(sel)
           }}
-          className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
+          className="bg-brand-900 hover:bg-brand-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
         >
           Continue ›
         </button>
@@ -1068,10 +1068,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     return (
       <div className="space-y-4">
         <header className="space-y-1">
-          <h1 className="text-xl font-bold text-blue-900 leading-tight">
+          <h1 className="text-xl font-bold text-brand-900 leading-tight">
             {waitlisted ? "You're on the waitlist" : 'Registration submitted'}
           </h1>
-          <p className="text-xs text-blue-900 font-medium">
+          <p className="text-xs text-brand-900 font-medium">
             {event.title} · {formatEventSpan(event, { style: 'long' })}
           </p>
         </header>
@@ -1084,7 +1084,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         <div className="flex justify-end">
           <button
             onClick={() => onSubmitSuccess(doneInline)}
-            className="bg-blue-900 hover:bg-blue-950 text-white text-sm font-semibold py-2 px-5 rounded-lg"
+            className="bg-brand-900 hover:bg-brand-950 text-white text-sm font-semibold py-2 px-5 rounded-lg"
           >
             Done
           </button>
@@ -1097,22 +1097,22 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     <>
       <header className="space-y-1">
         <div className="flex items-start justify-between gap-3">
-          <h1 className="text-xl font-bold text-blue-900 leading-tight">{event.title}</h1>
+          <h1 className="text-xl font-bold text-brand-900 leading-tight">{event.title}</h1>
           {onCancel && (
-            <button onClick={onCancel} className="text-blue-900 font-medium text-xl leading-none shrink-0">×</button>
+            <button onClick={onCancel} className="text-brand-900 font-medium text-xl leading-none shrink-0">×</button>
           )}
         </div>
-        <p className="text-xs text-blue-900 font-medium">{formatEventSpan(event, { style: 'long' })}</p>
-        <p className="text-xs text-blue-900 font-medium">Step {step} of 4</p>
+        <p className="text-xs text-brand-900 font-medium">{formatEventSpan(event, { style: 'long' })}</p>
+        <p className="text-xs text-brand-900 font-medium">Step {step} of 4</p>
         {pickerHeader && (
           <div className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-300 rounded-lg px-2 py-1">
-            <span className="text-xs text-blue-900 font-semibold">
+            <span className="text-xs text-brand-900 font-semibold">
               Booking for: {pickerHeader.targetName}
             </span>
             <button
               type="button"
               onClick={pickerHeader.onChange}
-              className="text-xs text-blue-700 hover:underline font-semibold"
+              className="text-xs text-brand-700 hover:underline font-semibold"
             >
               change
             </button>
@@ -1123,10 +1123,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       {step === 1 && (
         <section className="space-y-3">
           {event.price != null && (
-            <p className="text-sm text-blue-950 font-medium">From {event.currency} {event.price.toLocaleString()}</p>
+            <p className="text-sm text-brand-950 font-medium">From {event.currency} {event.price.toLocaleString()}</p>
           )}
           {pastBlocked && (
-            <div role="alert" className="bg-red-50 border border-red-500 rounded-lg px-3 py-2 text-xs text-red-700">
+            <div role="alert" className="bg-red-50 border border-accent rounded-lg px-3 py-2 text-xs text-red-700">
               <p className="font-semibold">This event has already taken place.</p>
               <p>Registration is closed. Check the calendar for upcoming dives and courses.</p>
             </div>
@@ -1138,7 +1138,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           {eventIsFull(event) && (
             <div
               role="alert"
-              className="bg-red-50 border border-red-500 rounded-lg px-3 py-2 text-xs text-red-700"
+              className="bg-red-50 border border-accent rounded-lg px-3 py-2 text-xs text-red-700"
             >
               <p className="font-semibold">This event is full — register for the waitlist.</p>
               <p>If a spot opens we'll send a push and email — you'll have 24 hours to claim it.</p>
@@ -1149,26 +1149,26 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
       {step === 2 && (
         <section className="space-y-4">
-          <h2 className="text-lg font-bold text-blue-900">About you</h2>
-          <p className="text-xs text-blue-900 font-medium">
+          <h2 className="text-lg font-bold text-brand-900">About you</h2>
+          <p className="text-xs text-brand-900 font-medium">
             Pre-filled if you've registered before. Edits are saved to your profile.
           </p>
 
           {isGuest && (
-            <div className="border border-sky-200 rounded-lg p-3 space-y-3 bg-sky-50">
+            <div className="border border-surface-200 rounded-lg p-3 space-y-3 bg-surface-50">
               <div>
-                <p className="text-sm font-semibold text-blue-900">Account</p>
-                <p className="text-xs text-blue-900 font-medium">
+                <p className="text-sm font-semibold text-brand-900">Account</p>
+                <p className="text-xs text-brand-900 font-medium">
                   We'll create a {siteConfig.identity.shortName} account for you so you can check your booking status and sign up for future events faster.
                 </p>
               </div>
               <TextField label="Email *" type="email" value={guestEmail} onChange={setGuestEmail} required />
               <TextField label="Password * (min 8 characters)" type="password" value={guestPassword} onChange={setGuestPassword} required />
-              <label className="flex items-start gap-2 text-xs text-blue-950 font-medium">
-                <input type="checkbox" checked={guestAgreedTerms} onChange={e => setGuestAgreedTerms(e.target.checked)} className="accent-blue-900 mt-0.5" />
+              <label className="flex items-start gap-2 text-xs text-brand-950 font-medium">
+                <input type="checkbox" checked={guestAgreedTerms} onChange={e => setGuestAgreedTerms(e.target.checked)} className="accent-brand-900 mt-0.5" />
                 <span>
                   I agree to the{' '}
-                  <a href="/terms" target="_blank" rel="noreferrer" className="text-blue-700 hover:underline">Terms of Use & Privacy</a>.
+                  <a href="/terms" target="_blank" rel="noreferrer" className="text-brand-700 hover:underline">Terms of Use & Privacy</a>.
                 </span>
               </label>
               {turnstileSiteKey ? (
@@ -1203,11 +1203,11 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="block">
-                <span className="block text-xs text-blue-900 font-medium mb-1">Gender *</span>
+                <span className="block text-xs text-brand-900 font-medium mb-1">Gender *</span>
                 <select
                   value={gender}
                   onChange={e => setGender(e.target.value)}
-                  className="w-full bg-white border border-sky-300 rounded-lg px-2 py-2 text-sm text-blue-900"
+                  className="w-full bg-white border border-surface-300 rounded-lg px-2 py-2 text-sm text-brand-900"
                 >
                   <option value="">—</option>
                   <option value="female">Female</option>
@@ -1217,11 +1217,11 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 </select>
               </label>
               <label className="block">
-                <span className="block text-xs text-blue-900 font-medium mb-1">Preferred contact</span>
+                <span className="block text-xs text-brand-900 font-medium mb-1">Preferred contact</span>
                 <select
                   value={contactMethod}
                   onChange={e => setContactMethod(e.target.value as ContactMethod | '')}
-                  className="w-full bg-white border border-sky-300 rounded-lg px-2 py-2 text-sm text-blue-900"
+                  className="w-full bg-white border border-surface-300 rounded-lg px-2 py-2 text-sm text-brand-900"
                 >
                   <option value="">—</option>
                   <option value="line">LINE</option>
@@ -1235,22 +1235,22 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               <TextField label={`${contactMethod === 'email' ? 'Email' : 'ID / number'}`} value={contactId} onChange={setContactId} />
             )}
 
-            <div className="border-t border-sky-200 pt-3 space-y-3">
-              <p className="text-xs text-blue-900 font-medium uppercase tracking-wider">Diving</p>
+            <div className="border-t border-surface-200 pt-3 space-y-3">
+              <p className="text-xs text-brand-900 font-medium uppercase tracking-wider">Diving</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <TextField label="Cert agency" placeholder="PADI, SSI…" value={certAgency} onChange={setCertAgency} />
                 <TextField label="Cert level" placeholder="OW, AOW…" value={certLevel} onChange={setCertLevel} />
               </div>
               {certLevel.trim() !== '' && !hasCertCardOnFile && !isOnBehalfOf && (
                 <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
-                  <p className="text-xs font-semibold text-blue-900">
+                  <p className="text-xs font-semibold text-brand-900">
                     Upload a photo of your highest certification card *
                   </p>
-                  <p className="text-xs text-blue-950 font-medium">
+                  <p className="text-xs text-brand-950 font-medium">
                     Required because you've filled in a cert level. The photo is
                     stored privately and only visible to {siteConfig.identity.shortName} staff.
                   </p>
-                  <label className="block cursor-pointer bg-blue-900 hover:bg-blue-950 text-white text-sm font-semibold py-2 px-3 rounded-lg text-center">
+                  <label className="block cursor-pointer bg-brand-900 hover:bg-brand-950 text-white text-sm font-semibold py-2 px-3 rounded-lg text-center">
                     <input
                       type="file"
                       accept="image/*,.heic,.heif"
@@ -1273,7 +1273,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 </div>
               )}
               {certLevel.trim() !== '' && hasCertCardOnFile && (
-                <p className="text-xs text-blue-950 font-medium">
+                <p className="text-xs text-brand-950 font-medium">
                   Certification card on file. (Update it from your profile if
                   it's changed.)
                 </p>
@@ -1284,25 +1284,25 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                   value={loggedDives === 0 ? '' : String(loggedDives)}
                   onChange={v => setLoggedDives(Number(v) || 0)}
                 />
-                <label className="flex items-center sm:items-end gap-2 text-sm text-blue-950 font-medium sm:pb-2">
-                  <input type="checkbox" checked={nitroxCertified} onChange={e => setNitroxCertified(e.target.checked)} className="accent-blue-900" />
+                <label className="flex items-center sm:items-end gap-2 text-sm text-brand-950 font-medium sm:pb-2">
+                  <input type="checkbox" checked={nitroxCertified} onChange={e => setNitroxCertified(e.target.checked)} className="accent-brand-900" />
                   Nitrox certified
                 </label>
-                <label className="flex items-center sm:items-end gap-2 text-sm text-blue-950 font-medium sm:pb-2">
-                  <input type="checkbox" checked={deepCertified} onChange={e => setDeepCertified(e.target.checked)} className="accent-blue-900" />
+                <label className="flex items-center sm:items-end gap-2 text-sm text-brand-950 font-medium sm:pb-2">
+                  <input type="checkbox" checked={deepCertified} onChange={e => setDeepCertified(e.target.checked)} className="accent-brand-900" />
                   Deep certified (40m)
                 </label>
               </div>
               {nitroxCertified && !hasNitroxCardOnFile && !isOnBehalfOf && (
                 <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
-                  <p className="text-xs font-semibold text-blue-900">
+                  <p className="text-xs font-semibold text-brand-900">
                     Upload a photo of your nitrox certification card *
                   </p>
-                  <p className="text-xs text-blue-950 font-medium">
+                  <p className="text-xs text-brand-950 font-medium">
                     Required because you marked yourself as nitrox certified. The
                     photo is stored privately and only visible to {siteConfig.identity.shortName} staff.
                   </p>
-                  <label className="block cursor-pointer bg-blue-900 hover:bg-blue-950 text-white text-sm font-semibold py-2 px-3 rounded-lg text-center">
+                  <label className="block cursor-pointer bg-brand-900 hover:bg-brand-950 text-white text-sm font-semibold py-2 px-3 rounded-lg text-center">
                     <input
                       type="file"
                       accept="image/*,.heic,.heif"
@@ -1325,21 +1325,21 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 </div>
               )}
               {nitroxCertified && hasNitroxCardOnFile && (
-                <p className="text-xs text-blue-950 font-medium">
+                <p className="text-xs text-brand-950 font-medium">
                   Nitrox card on file. (Update it from your profile if it's
                   changed.)
                 </p>
               )}
               {deepCertified && !hasDeepCardOnFile && !isOnBehalfOf && (
                 <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
-                  <p className="text-xs font-semibold text-blue-900">
+                  <p className="text-xs font-semibold text-brand-900">
                     Upload a photo of your Deep certification card *
                   </p>
-                  <p className="text-xs text-blue-950 font-medium">
+                  <p className="text-xs text-brand-950 font-medium">
                     Required because you marked yourself as Deep certified. The
                     photo is stored privately and only visible to {siteConfig.identity.shortName} staff.
                   </p>
-                  <label className="block cursor-pointer bg-blue-900 hover:bg-blue-950 text-white text-sm font-semibold py-2 px-3 rounded-lg text-center">
+                  <label className="block cursor-pointer bg-brand-900 hover:bg-brand-950 text-white text-sm font-semibold py-2 px-3 rounded-lg text-center">
                     <input
                       type="file"
                       accept="image/*,.heic,.heif"
@@ -1362,15 +1362,15 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 </div>
               )}
               {deepCertified && hasDeepCardOnFile && (
-                <p className="text-xs text-blue-950 font-medium">
+                <p className="text-xs text-brand-950 font-medium">
                   Deep card on file. (Update it from your profile if it's
                   changed.)
                 </p>
               )}
             </div>
 
-            <div className="border-t border-sky-200 pt-3 space-y-3">
-              <p className="text-xs text-blue-900 font-medium uppercase tracking-wider">Emergency contact</p>
+            <div className="border-t border-surface-200 pt-3 space-y-3">
+              <p className="text-xs text-brand-900 font-medium uppercase tracking-wider">Emergency contact</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <TextField label="Name" value={emergencyName} onChange={setEmergencyName} />
                 <TextField label="Phone" type="tel" value={emergencyPhone} onChange={setEmergencyPhone} />
@@ -1382,98 +1382,98 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
       {step === 3 && (
         <section className="space-y-4">
-          <h2 className="text-lg font-bold text-blue-900">Extras</h2>
+          <h2 className="text-lg font-bold text-brand-900">Extras</h2>
 
           {!gearIncluded && !showGearRentChoice && !showRooms && !showAddons && !showNitroxAddon && (
-            <p className="text-blue-900 font-medium text-sm">No extras for this event.</p>
+            <p className="text-brand-900 font-medium text-sm">No extras for this event.</p>
           )}
 
           {gearIncluded && (
-            <p className="text-sm text-blue-950 font-medium">
+            <p className="text-sm text-brand-950 font-medium">
               Gear is included with this course — no need to rent.
             </p>
           )}
 
           {showGearRentChoice && (
             <div className="space-y-2">
-              <p className="text-sm font-semibold text-blue-900">Gear rental</p>
-              <p className="text-xs text-blue-950 font-medium">
+              <p className="text-sm font-semibold text-brand-900">Gear rental</p>
+              <p className="text-xs text-brand-950 font-medium">
                 This section is only about renting equipment from us. Tell us
                 exactly what you need so we can have it ready for you.
               </p>
               {event.gear_rental_info && (
-                <p className="text-xs text-blue-950 font-medium">{event.gear_rental_info}</p>
+                <p className="text-xs text-brand-950 font-medium">{event.gear_rental_info}</p>
               )}
               <div className="space-y-1">
-                <label className="flex items-start gap-2 text-sm text-blue-950 font-medium">
-                  <input type="radio" name="gear-choice" checked={gearChoice === 'none'} onChange={() => setGearChoice('none')} className="accent-blue-900 mt-1" />
+                <label className="flex items-start gap-2 text-sm text-brand-950 font-medium">
+                  <input type="radio" name="gear-choice" checked={gearChoice === 'none'} onChange={() => setGearChoice('none')} className="accent-brand-900 mt-1" />
                   <span className="flex-1">I have all the required gear, and I do not need to rent anything.</span>
                 </label>
-                <label className="flex items-start gap-2 text-sm text-blue-950 font-medium">
-                  <input type="radio" name="gear-choice" checked={gearChoice === 'rent'} onChange={() => setGearChoice('rent')} className="accent-blue-900 mt-1" />
+                <label className="flex items-start gap-2 text-sm text-brand-950 font-medium">
+                  <input type="radio" name="gear-choice" checked={gearChoice === 'rent'} onChange={() => setGearChoice('rent')} className="accent-brand-900 mt-1" />
                   <span className="flex-1">I need to rent some or all of the required gear.</span>
                 </label>
-                <label className="flex items-start gap-2 text-sm text-blue-950 font-medium">
-                  <input type="radio" name="gear-choice" checked={gearChoice === 'help'} onChange={() => setGearChoice('help')} className="accent-blue-900 mt-1" />
+                <label className="flex items-start gap-2 text-sm text-brand-950 font-medium">
+                  <input type="radio" name="gear-choice" checked={gearChoice === 'help'} onChange={() => setGearChoice('help')} className="accent-brand-900 mt-1" />
                   <span className="flex-1">I have no idea what I&apos;m doing and I need to ask a human.</span>
                 </label>
               </div>
               {gearChoice === 'rent' && (
                 <div className="pl-6 space-y-2">
-                  <p className="text-xs text-blue-950 font-medium">Check the items you need us to prepare for you:</p>
+                  <p className="text-xs text-brand-950 font-medium">Check the items you need us to prepare for you:</p>
                   <div className="grid grid-cols-2 gap-1">
                     {GEAR_ITEMS.map(item => (
-                      <label key={item} className="flex items-center gap-1 text-xs text-blue-950 font-medium">
-                        <input type="checkbox" checked={gearItems.includes(item)} onChange={() => toggleItem(item)} className="accent-blue-900" />
+                      <label key={item} className="flex items-center gap-1 text-xs text-brand-950 font-medium">
+                        <input type="checkbox" checked={gearItems.includes(item)} onChange={() => toggleItem(item)} className="accent-brand-900" />
                         {item} ({GEAR_ALACARTE_PRICES[item]})
                       </label>
                     ))}
                   </div>
 
                   {(askShoe || askHeight || askWeight) && (
-                    <div className="border-t border-sky-200 pt-2 space-y-2">
-                      <p className="text-xs font-semibold text-blue-900">
+                    <div className="border-t border-surface-200 pt-2 space-y-2">
+                      <p className="text-xs font-semibold text-brand-900">
                         We need your sizes to prep this gear
                         <span className="text-red-600"> *</span>
                       </p>
                       {askHeight && (
-                        <label className="block text-xs text-blue-950 font-medium">
+                        <label className="block text-xs text-brand-950 font-medium">
                           Height (cm)
                           <input
                             type="number" min="1" step="0.1" inputMode="decimal"
                             value={heightCm}
                             onChange={e => setHeightCm(e.target.value)}
-                            className="mt-0.5 w-full bg-white border border-sky-300 rounded-lg px-2 py-1 text-sm text-blue-900"
+                            className="mt-0.5 w-full bg-white border border-surface-300 rounded-lg px-2 py-1 text-sm text-brand-900"
                           />
                         </label>
                       )}
                       {askWeight && (
-                        <label className="block text-xs text-blue-950 font-medium">
+                        <label className="block text-xs text-brand-950 font-medium">
                           Weight (kg)
                           <input
                             type="number" min="1" step="0.1" inputMode="decimal"
                             value={weightKg}
                             onChange={e => setWeightKg(e.target.value)}
-                            className="mt-0.5 w-full bg-white border border-sky-300 rounded-lg px-2 py-1 text-sm text-blue-900"
+                            className="mt-0.5 w-full bg-white border border-surface-300 rounded-lg px-2 py-1 text-sm text-brand-900"
                           />
                         </label>
                       )}
                       {askShoe && (
-                        <div className="text-xs text-blue-950 font-medium">
+                        <div className="text-xs text-brand-950 font-medium">
                           Shoe size
                           <div className="mt-0.5">
                             <ShoeSizeField initial={profile?.shoe_size ?? null} onChange={setShoeSize} />
                           </div>
                         </div>
                       )}
-                      <p className="text-[11px] text-blue-950/70 font-medium">Saved to your profile for next time.</p>
+                      <p className="text-[11px] text-brand-950/70 font-medium">Saved to your profile for next time.</p>
                     </div>
                   )}
                 </div>
               )}
               {gearChoice === 'help' && (
                 <div className="pl-6 space-y-1">
-                  <p className="text-xs text-blue-950 font-medium">
+                  <p className="text-xs text-brand-950 font-medium">
                     No worries! Tell us about your gear situation and we&apos;ll
                     sort it out with you.
                   </p>
@@ -1482,7 +1482,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                     onChange={e => setGearHelpNote(e.target.value)}
                     rows={3}
                     placeholder="e.g. I'm a new diver and not sure what I own or need — please advise."
-                    className="w-full bg-white border border-sky-300 rounded-lg px-2 py-1 text-sm text-blue-900"
+                    className="w-full bg-white border border-surface-300 rounded-lg px-2 py-1 text-sm text-brand-900"
                   />
                 </div>
               )}
@@ -1491,11 +1491,11 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
           {showRooms && rooms.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm text-blue-950 font-medium font-semibold">Room</p>
-              <p className="text-xs text-blue-950 font-medium">
+              <p className="text-sm text-brand-950 font-medium font-semibold">Room</p>
+              <p className="text-xs text-brand-950 font-medium">
                 Your base price already includes a place to sleep — upgrading is optional.
               </p>
-              <select value={roomId} onChange={e => setRoomId(e.target.value)} className="w-full bg-white border border-sky-300 rounded-lg px-2 py-1 text-sm text-blue-900">
+              <select value={roomId} onChange={e => setRoomId(e.target.value)} className="w-full bg-white border border-surface-300 rounded-lg px-2 py-1 text-sm text-brand-900">
                 <option value="">— keep included room —</option>
                 {rooms.map(r => (
                   <option key={r._id} value={r._id}>
@@ -1504,20 +1504,20 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 ))}
               </select>
               {roomId && (
-                <input value={roomNotes} onChange={e => setRoomNotes(e.target.value)} placeholder="Roommate preferences, etc." className="w-full bg-white border border-sky-300 rounded-lg px-2 py-1 text-sm text-blue-900" />
+                <input value={roomNotes} onChange={e => setRoomNotes(e.target.value)} placeholder="Roommate preferences, etc." className="w-full bg-white border border-surface-300 rounded-lg px-2 py-1 text-sm text-brand-900" />
               )}
             </div>
           )}
 
           {showAddons && addons.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm text-blue-950 font-medium font-semibold">Add-ons</p>
+              <p className="text-sm text-brand-950 font-medium font-semibold">Add-ons</p>
               <div className="max-h-40 overflow-y-auto grid grid-cols-1 gap-1 pr-1">
                 {addons.map(a => (
-                  <label key={a._id} className="flex items-center gap-2 text-xs text-blue-950 font-medium">
-                    <input type="checkbox" checked={addonIds.has(a._id)} onChange={() => toggleAddon(a._id)} className="accent-blue-900" />
+                  <label key={a._id} className="flex items-center gap-2 text-xs text-brand-950 font-medium">
+                    <input type="checkbox" checked={addonIds.has(a._id)} onChange={() => toggleAddon(a._id)} className="accent-brand-900" />
                     <span className="flex-1">{a.display_title ?? a.admin_title}</span>
-                    {a.price != null && <span className="text-blue-900 font-medium">+{a.price.toLocaleString()}</span>}
+                    {a.price != null && <span className="text-brand-900 font-medium">+{a.price.toLocaleString()}</span>}
                   </label>
                 ))}
               </div>
@@ -1525,16 +1525,16 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           )}
 
           <fieldset className="space-y-2">
-            <legend className="text-sm font-semibold text-blue-900">Transportation *</legend>
-            <label className={`flex gap-2 text-sm font-medium items-start ${rideAllowed ? 'text-blue-950' : 'text-blue-950/40'}`}>
-              <input type="radio" name="transport" checked={needsTransport === true} disabled={!rideAllowed} onChange={() => setNeedsTransport(true)} className="accent-blue-900 mt-1" />
+            <legend className="text-sm font-semibold text-brand-900">Transportation *</legend>
+            <label className={`flex gap-2 text-sm font-medium items-start ${rideAllowed ? 'text-brand-950' : 'text-brand-950/40'}`}>
+              <input type="radio" name="transport" checked={needsTransport === true} disabled={!rideAllowed} onChange={() => setNeedsTransport(true)} className="accent-brand-900 mt-1" />
               <span className="flex-1">
                 <span className="block">Yes, I'll ride with the shop from the dive shop to the site</span>
                 {!transportIncluded && transportSurcharge > 0 && (
-                  <span className="block text-xs text-blue-950 font-medium">+{transportSurcharge.toLocaleString()} {event.currency}</span>
+                  <span className="block text-xs text-brand-950 font-medium">+{transportSurcharge.toLocaleString()} {event.currency}</span>
                 )}
                 {transportIncluded && rideAllowed && (
-                  <span className="block text-xs text-blue-950 font-medium">Included in base price</span>
+                  <span className="block text-xs text-brand-950 font-medium">Included in base price</span>
                 )}
                 {!rideAllowed && (
                   <span className="block text-xs text-red-600 font-semibold">
@@ -1542,17 +1542,17 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                   </span>
                 )}
                 {rideAllowed && rideSeats != null && rideSeats.capacity > 0 && (
-                  <span className="block text-xs text-blue-950/70 font-medium">
+                  <span className="block text-xs text-brand-950/70 font-medium">
                     {rideSeats.available} ride seat{rideSeats.available === 1 ? '' : 's'} left
                   </span>
                 )}
               </span>
             </label>
-            <label className="flex gap-2 text-sm text-blue-950 font-medium items-start">
-              <input type="radio" name="transport" checked={needsTransport === false} onChange={() => setNeedsTransport(false)} className="accent-blue-900 mt-1" />
+            <label className="flex gap-2 text-sm text-brand-950 font-medium items-start">
+              <input type="radio" name="transport" checked={needsTransport === false} onChange={() => setNeedsTransport(false)} className="accent-brand-900 mt-1" />
               <span className="flex-1">
                 <span className="block">No, I don't need a ride</span>
-                <span className="block text-xs text-blue-950 font-medium">
+                <span className="block text-xs text-brand-950 font-medium">
                   I am responsible for getting myself to the dive/event site on time.
                 </span>
               </span>
@@ -1560,35 +1560,35 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           </fieldset>
 
           {showNitroxAddon && (
-            <label className="flex gap-2 text-sm text-blue-950 font-medium items-start">
-              <input type="checkbox" checked={addNitroxCourse} onChange={e => setAddNitroxCourse(e.target.checked)} className="accent-blue-900 mt-1" />
+            <label className="flex gap-2 text-sm text-brand-950 font-medium items-start">
+              <input type="checkbox" checked={addNitroxCourse} onChange={e => setAddNitroxCourse(e.target.checked)} className="accent-brand-900 mt-1" />
               <span className="flex-1">
                 <span className="block">Add Nitrox course (+{NITROX_COURSE_FEE.toLocaleString()})</span>
-                <span className="block text-xs text-blue-950 font-medium">Get your Nitrox certification during this event.</span>
+                <span className="block text-xs text-brand-950 font-medium">Get your Nitrox certification during this event.</span>
               </span>
             </label>
           )}
 
           <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Notes (optional)"
-            className="w-full bg-white border border-sky-300 rounded-lg px-2 py-1 text-sm text-blue-900" />
+            className="w-full bg-white border border-surface-300 rounded-lg px-2 py-1 text-sm text-brand-900" />
         </section>
       )}
 
       {step === 4 && (
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-blue-900">Payment</h2>
+          <h2 className="text-lg font-bold text-brand-900">Payment</h2>
 
           {leadPayerId && (
-            <label className="flex items-start gap-2 text-sm text-blue-950 font-medium bg-sky-50 border border-sky-200 rounded-lg p-3">
+            <label className="flex items-start gap-2 text-sm text-brand-950 font-medium bg-surface-50 border border-surface-200 rounded-lg p-3">
               <input
                 type="checkbox"
                 checked={payForEveryone}
                 onChange={e => setPayForEveryone(e.target.checked)}
-                className="accent-blue-900 mt-1"
+                className="accent-brand-900 mt-1"
               />
               <span className="flex-1">
                 I'll pay for everyone in this group
-                <span className="block text-xs text-blue-900/80">
+                <span className="block text-xs text-brand-900/80">
                   The whole group's balance sits on your account; the other divers
                   won't be billed separately. Uncheck to have each diver pay their own.
                 </span>
@@ -1598,8 +1598,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
           <div className="space-y-2">
             {(['bank_transfer', 'paypal', 'credit_card', 'cash'] as const).map(method => (
-              <label key={method} className="flex gap-2 text-sm text-blue-950 font-medium items-start">
-                <input type="radio" name="payment" checked={payment === method} onChange={() => setPayment(method)} className="accent-blue-900 mt-1" />
+              <label key={method} className="flex gap-2 text-sm text-brand-950 font-medium items-start">
+                <input type="radio" name="payment" checked={payment === method} onChange={() => setPayment(method)} className="accent-brand-900 mt-1" />
                 <span className="flex-1">
                   <span className="block">
                     {method === 'bank_transfer' && 'Bank transfer'}
@@ -1614,7 +1614,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
           {payment === 'credit_card' && (
             <label className="block">
-              <span className="block text-xs text-blue-900 font-medium mb-1">
+              <span className="block text-xs text-brand-900 font-medium mb-1">
                 Invoice email (optional)
               </span>
               <input
@@ -1622,7 +1622,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 value={creditCardInvoiceEmail}
                 onChange={e => setCreditCardInvoiceEmail(e.target.value)}
                 placeholder="Defaults to your registered email"
-                className="w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-sm text-blue-900"
+                className="w-full bg-white border border-surface-300 rounded-lg px-3 py-2 text-sm text-brand-900"
               />
             </label>
           )}
@@ -1632,13 +1632,13 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             invoiceEmail={payment === 'credit_card' ? creditCardInvoiceEmail.trim() || null : null}
           />
 
-          <div className="text-sm text-blue-950 font-medium bg-sky-50 rounded-lg p-3 space-y-1">
+          <div className="text-sm text-brand-950 font-medium bg-surface-50 rounded-lg p-3 space-y-1">
             {charges.map((c, i) => <Row key={`${c.kind}-${i}`} label={c.label} value={c.amount} currency={event.currency} />)}
-            <div className="border-t border-sky-200 pt-1 mt-1">
+            <div className="border-t border-surface-200 pt-1 mt-1">
               <Row label={showGroupTotals ? 'Per diver' : 'Total'} value={total} currency={event.currency} bold />
             </div>
             {creditNow > 0 && (
-              <div className="border-t border-sky-200 pt-1 mt-1 space-y-0.5">
+              <div className="border-t border-surface-200 pt-1 mt-1 space-y-0.5">
                 <div className="flex justify-between text-emerald-700">
                   <span>Account credit</span>
                   <span>− {event.currency} {creditDeducted.toLocaleString()}</span>
@@ -1647,24 +1647,24 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               </div>
             )}
             {showGroupTotals && (
-              <div className="border-t border-sky-200 pt-1 mt-1 space-y-0.5">
+              <div className="border-t border-surface-200 pt-1 mt-1 space-y-0.5">
                 <Row label={`Group total (${groupCount} divers)`} value={groupTotal} currency={event.currency} bold />
-                <p className="text-xs text-blue-900/80">You're paying for the whole group — every diver shares these options.</p>
+                <p className="text-xs text-brand-900/80">You're paying for the whole group — every diver shares these options.</p>
               </div>
             )}
           </div>
 
           {creditEligible && availableCredit > 0 && (
-            <label className="flex items-start gap-2 text-sm text-blue-950 font-medium bg-emerald-50 border border-emerald-400 rounded-lg p-3">
+            <label className="flex items-start gap-2 text-sm text-brand-950 font-medium bg-emerald-50 border border-emerald-400 rounded-lg p-3">
               <input
                 type="checkbox"
                 checked={useAccountCredit}
                 onChange={e => setUseAccountCredit(e.target.checked)}
-                className="accent-blue-900 mt-1"
+                className="accent-brand-900 mt-1"
               />
               <span className="flex-1">
                 Use my account credit ({event.currency} {availableCredit.toLocaleString()} available)
-                <span className="block text-xs text-blue-900/80">
+                <span className="block text-xs text-brand-900/80">
                   We'll put it toward this booking as soon as it's created. Anything
                   left over stays on your account.
                 </span>
@@ -1674,22 +1674,22 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
           {hasDeposit && (
             <div className="space-y-2">
-              <p className="text-sm text-blue-950 font-medium font-semibold">How much to pay now</p>
-              <label className="flex gap-2 text-sm text-blue-950 font-medium items-start">
-                <input type="radio" name="pay-amount" checked={!payDepositOnly} onChange={() => setPayDepositOnly(false)} className="accent-blue-900 mt-1" />
+              <p className="text-sm text-brand-950 font-medium font-semibold">How much to pay now</p>
+              <label className="flex gap-2 text-sm text-brand-950 font-medium items-start">
+                <input type="radio" name="pay-amount" checked={!payDepositOnly} onChange={() => setPayDepositOnly(false)} className="accent-brand-900 mt-1" />
                 <span className="flex-1">
                   <span className="block">Pay full amount now</span>
-                  <span className="block text-xs text-blue-950 font-medium">
+                  <span className="block text-xs text-brand-950 font-medium">
                     {event.currency} {(showGroupTotals ? groupFullNow : fullNowAfterCredit).toLocaleString()}
                     {showGroupTotals ? ` — settles all ${groupCount} divers in one go.` : ' — settles your booking in one go.'}
                   </span>
                 </span>
               </label>
-              <label className="flex gap-2 text-sm text-blue-950 font-medium items-start">
-                <input type="radio" name="pay-amount" checked={payDepositOnly} onChange={() => setPayDepositOnly(true)} className="accent-blue-900 mt-1" />
+              <label className="flex gap-2 text-sm text-brand-950 font-medium items-start">
+                <input type="radio" name="pay-amount" checked={payDepositOnly} onChange={() => setPayDepositOnly(true)} className="accent-brand-900 mt-1" />
                 <span className="flex-1">
                   <span className="block">Pay deposit only</span>
-                  <span className="block text-xs text-blue-950 font-medium">
+                  <span className="block text-xs text-brand-950 font-medium">
                     {event.currency} {(showGroupTotals ? groupDepositNow : depositNowAfterCredit).toLocaleString()} now, remainder due before the trip.
                   </span>
                 </span>
@@ -1697,13 +1697,13 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             </div>
           )}
 
-          <div className="text-xs text-blue-950 font-medium bg-sky-50 border border-sky-200 rounded-lg p-3 space-y-1">
+          <div className="text-xs text-brand-950 font-medium bg-surface-50 border border-surface-200 rounded-lg p-3 space-y-1">
             <p>
               Pay deposit <strong>ASAP</strong> to hold your spot.
               Pay the remaining balance by <strong>{formatDeadline(fullPaymentDeadline)}</strong> to complete your registration.
             </p>
             {hasDeposit && payDepositOnly && (
-              <div className="border-t border-sky-200 pt-1 mt-1 space-y-0.5">
+              <div className="border-t border-surface-200 pt-1 mt-1 space-y-0.5">
                 <p>
                   Pay deposit <strong>ASAP</strong>:{' '}
                   <strong>{event.currency} {(showGroupTotals ? groupDepositNow : depositNowAfterCredit).toLocaleString()}</strong>
@@ -1718,8 +1718,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           </div>
 
           {cancelPolicy && cancelPolicy.cancelation_policy && (
-            <div className="text-xs text-blue-950 font-medium bg-white/70 border border-sky-300 rounded-lg p-3 space-y-2">
-              <p className="font-semibold text-blue-900">
+            <div className="text-xs text-brand-950 font-medium bg-white/70 border border-surface-300 rounded-lg p-3 space-y-2">
+              <p className="font-semibold text-brand-900">
                 Cancellation policy{cancelPolicy.title ? ` — ${cancelPolicy.title}` : ''}
               </p>
               {event.cancel_date && (
@@ -1733,7 +1733,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                   type="checkbox"
                   checked={policyAcked}
                   onChange={e => setPolicyAcked(e.target.checked)}
-                  className="accent-blue-900 mt-0.5"
+                  className="accent-brand-900 mt-0.5"
                 />
                 <span>I have read and agree to the cancellation policy.</span>
               </label>
@@ -1741,7 +1741,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           )}
 
           {waiverEligible && missingW && missingW.length > 0 && (
-            <div className="text-xs text-blue-950 font-medium bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2" aria-label="Outstanding waivers">
+            <div className="text-xs text-brand-950 font-medium bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2" aria-label="Outstanding waivers">
               <p className="font-semibold text-amber-800">
                 Waivers to sign before this {event.type}
               </p>
@@ -1753,7 +1753,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                     <button
                       type="button"
                       onClick={() => setSigningW(w)}
-                      className="shrink-0 px-2.5 py-1 rounded-lg bg-blue-900 hover:bg-blue-950 text-white text-xs font-semibold"
+                      className="shrink-0 px-2.5 py-1 rounded-lg bg-brand-900 hover:bg-brand-950 text-white text-xs font-semibold"
                     >
                       Sign now
                     </button>
@@ -1764,8 +1764,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           )}
 
           {additionalResults.length > 0 && (
-            <div className="text-xs bg-sky-50 border border-sky-300 rounded p-2 space-y-1" aria-label="Per-diver registration results">
-              <p className="font-semibold text-blue-900">Additional divers:</p>
+            <div className="text-xs bg-surface-50 border border-surface-300 rounded p-2 space-y-1" aria-label="Per-diver registration results">
+              <p className="font-semibold text-brand-900">Additional divers:</p>
               {additionalResults.map((r, i) => (
                 <p key={i} className={r.ok ? 'text-emerald-800' : 'text-red-700'}>
                   · {r.targetName}: {r.ok ? 'registered' : `failed — ${r.error}`}
@@ -1785,7 +1785,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             else setStep((step - 1) as Step)
           }}
           disabled={step === 1 && !onBackBeforeStepOne}
-          className="text-sm text-blue-900 font-medium hover:text-blue-900 disabled:opacity-40"
+          className="text-sm text-brand-900 font-medium hover:text-brand-900 disabled:opacity-40"
         >
           ‹ Back
         </button>
@@ -1806,13 +1806,13 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               (step === 3 && !isOnBehalfOf && showGearRentChoice && gearChoice === null) ||
               (step === 3 && sizesBlocked)
             }
-            className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
+            className="bg-brand-900 hover:bg-brand-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
           >
             Next ›
           </button>
         ) : (
           <button onClick={submit} disabled={saving || pastBlocked || sizesBlocked || (!isOnBehalfOf && !!cancelPolicy && !policyAcked)}
-            className="bg-blue-900 hover:bg-blue-950 disabled:opacity-60 disabled:cursor-wait text-white text-sm font-semibold py-2 px-4 rounded-lg inline-flex items-center gap-2">
+            className="bg-brand-900 hover:bg-brand-950 disabled:opacity-60 disabled:cursor-wait text-white text-sm font-semibold py-2 px-4 rounded-lg inline-flex items-center gap-2">
             {saving && (
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" />
             )}
@@ -1835,7 +1835,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
 function Row({ label, value, currency, bold = false }: { label: string; value: number; currency: string; bold?: boolean }) {
   return (
-    <div className={`flex justify-between ${bold ? 'font-bold text-blue-900' : ''}`}>
+    <div className={`flex justify-between ${bold ? 'font-bold text-brand-900' : ''}`}>
       <span>{label}</span>
       <span>{currency} {value.toLocaleString()}</span>
     </div>
@@ -1855,8 +1855,8 @@ function PaymentInstructionsBlock({
 }) {
   const instr = paymentInstructionsFor(method, { invoiceEmail })
   return (
-    <div className="text-xs text-blue-950 font-medium bg-white/70 border border-sky-200 rounded-lg p-3 space-y-1">
-      <p className="font-semibold text-blue-900">{instr.title}</p>
+    <div className="text-xs text-brand-950 font-medium bg-white/70 border border-surface-200 rounded-lg p-3 space-y-1">
+      <p className="font-semibold text-brand-900">{instr.title}</p>
       {instr.lines.map((line, i) => <PaymentInstructionLine key={i} line={line} />)}
     </div>
   )
@@ -1878,7 +1878,7 @@ function PaymentInstructionLine({ line }: { line: string }) {
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-blue-700 underline break-all"
+        className="text-brand-700 underline break-all"
       >
         {url}
       </a>
@@ -1903,13 +1903,13 @@ function TextField({
 }) {
   return (
     <label className="block">
-      <span className="block text-xs text-blue-900 font-medium mb-1">{label}</span>
+      <span className="block text-xs text-brand-900 font-medium mb-1">{label}</span>
       {type === 'date' ? (
         <DateField
           value={value}
           onChange={onChange}
           required={required}
-          className="w-full bg-white border border-sky-300 rounded-lg px-2 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
+          className="w-full bg-white border border-surface-300 rounded-lg px-2 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
         />
       ) : type === 'password' ? (
         <PasswordInput
@@ -1917,7 +1917,7 @@ function TextField({
           onChange={e => onChange(e.target.value)}
           required={required}
           placeholder={placeholder}
-          className="w-full bg-white border border-sky-300 rounded-lg px-2 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
+          className="w-full bg-white border border-surface-300 rounded-lg px-2 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
         />
       ) : (
         <input
@@ -1927,10 +1927,10 @@ function TextField({
           required={required}
           placeholder={placeholder}
           min={min}
-          className="w-full bg-white border border-sky-300 rounded-lg px-2 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
+          className="w-full bg-white border border-surface-300 rounded-lg px-2 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
         />
       )}
-      {hint && <span className="block text-xs text-blue-900/70 mt-1">{hint}</span>}
+      {hint && <span className="block text-xs text-brand-900/70 mt-1">{hint}</span>}
     </label>
   )
 }

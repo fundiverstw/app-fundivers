@@ -116,24 +116,24 @@ export function AdminAccountingPage() {
         paid, who marked it, when, the method, and the linked event.
       </p>
 
-      <div className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-4">
+      <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-4">
         <label className="block space-y-1">
-          <span className="text-xs font-medium text-blue-900">Fiscal year</span>
+          <span className="text-xs font-medium text-brand-900">Fiscal year</span>
           <select
             value={year}
             onChange={e => setYear(Number(e.target.value))}
-            className="w-full bg-white border border-sky-300 rounded-md px-3 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
+            className="w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
           >
             {years.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </label>
 
-        <ul className="text-xs text-blue-900/80 list-disc pl-5 space-y-0.5">
+        <ul className="text-xs text-brand-900/80 list-disc pl-5 space-y-0.5">
           <li><strong>transactions-{year}.csv</strong> — one row per payment.</li>
           <li><strong>by-event-{year}.csv</strong> — paid / refunded / net per event.</li>
           <li><strong>summary-{year}.csv</strong> — totals by method, event type, and month.</li>
         </ul>
-        <p className="text-[11px] text-blue-900/70">
+        <p className="text-[11px] text-brand-900/70">
           Money totals count paid as positive and refunded as negative; voided
           rows are listed but excluded from every sum.
         </p>
@@ -143,7 +143,7 @@ export function AdminAccountingPage() {
             type="button"
             onClick={handleDownload}
             disabled={busy}
-            className="py-2 px-4 rounded-lg text-sm font-semibold bg-blue-900 hover:bg-blue-950 text-white disabled:opacity-50"
+            className="py-2 px-4 rounded-lg text-sm font-semibold bg-brand-900 hover:bg-brand-950 text-white disabled:opacity-50"
           >
             {busy ? 'Preparing…' : 'Download ZIP'}
           </button>

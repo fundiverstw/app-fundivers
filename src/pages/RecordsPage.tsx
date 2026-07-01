@@ -19,7 +19,7 @@ export function RecordsPage() {
     <div className="space-y-4">
       <nav
         aria-label="Records sections"
-        className="flex gap-2 sticky top-0 z-10 bg-blue-900/85 backdrop-blur-md -mx-4 px-4 py-2 border-b border-red-500/40"
+        className="flex gap-2 sticky top-0 z-10 bg-brand-900/85 backdrop-blur-md -mx-4 px-4 py-2 border-b border-accent/40"
       >
         {TABS.map(t => (
           <NavLink
@@ -28,7 +28,7 @@ export function RecordsPage() {
             className={({ isActive }) =>
               `px-3 py-1 rounded-full text-sm transition-colors ${
                 isActive
-                  ? 'bg-white text-blue-950 font-semibold'
+                  ? 'bg-white text-brand-950 font-semibold'
                   : 'text-white/80 hover:text-white hover:bg-white/10'
               }`
             }

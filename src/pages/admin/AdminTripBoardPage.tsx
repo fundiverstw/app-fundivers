@@ -24,7 +24,7 @@ import { BTN_SECONDARY } from '../../styles/tokens'
 type Tab = 'shops' | 'trips' | 'referrals'
 
 const PILL = 'px-3 py-1.5 rounded-lg text-sm font-semibold'
-const FIELD = 'w-full bg-white border border-sky-300 rounded-md px-3 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900'
+const FIELD = 'w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900'
 
 export function AdminTripBoardPage() {
   const toast = useToast()
@@ -81,7 +81,7 @@ export function AdminTripBoardPage() {
       </div>
 
       {loadError && (
-        <p className="text-sm text-red-200 bg-red-900/50 border border-red-500 rounded-md p-2">{loadError}</p>
+        <p className="text-sm text-red-200 bg-red-900/50 border border-accent rounded-md p-2">{loadError}</p>
       )}
 
       {loading ? (
@@ -107,7 +107,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`${PILL} ${active ? 'bg-blue-600 text-white' : 'bg-white/70 text-blue-900 hover:bg-white/90'}`}
+      className={`${PILL} ${active ? 'bg-brand-600 text-white' : 'bg-white/70 text-brand-900 hover:bg-white/90'}`}
     >
       {children}
     </button>
@@ -145,7 +145,7 @@ function ShopsTab({
     <div className="space-y-3">
       <div className="flex justify-end">
         <button type="button" onClick={() => setCreating(true)}
-          className="text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg">
+          className="text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg">
           + New partner shop
         </button>
       </div>
@@ -155,18 +155,18 @@ function ShopsTab({
       ) : (
         <ul className="space-y-2">
           {shops.map(shop => (
-            <li key={shop.id} className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-3 flex items-start justify-between gap-3">
+            <li key={shop.id} className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="font-medium text-blue-900 text-sm truncate">
-                  {shop.name}{!shop.active && <span className="ml-2 text-xs text-blue-900/60">(inactive)</span>}
+                <p className="font-medium text-brand-900 text-sm truncate">
+                  {shop.name}{!shop.active && <span className="ml-2 text-xs text-brand-900/60">(inactive)</span>}
                 </p>
-                <p className="text-xs text-blue-900/80 truncate">
+                <p className="text-xs text-brand-900/80 truncate">
                   {[shop.location, shop.country].filter(Boolean).join(', ')} · {(shop.default_kickback_rate * 100).toFixed(1)}% default
                 </p>
               </div>
               <div className="flex gap-2 shrink-0">
                 <button type="button" onClick={() => setEditing(shop)}
-                  className="text-xs font-semibold bg-blue-900 hover:bg-blue-950 text-white px-3 py-1 rounded-lg">Edit</button>
+                  className="text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-3 py-1 rounded-lg">Edit</button>
                 <button type="button" onClick={() => setConfirmDelete(shop)}
                   className="text-xs font-semibold bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded-lg">Delete</button>
               </div>
@@ -246,7 +246,7 @@ function ShopForm({
   return (
     <Modal labelledBy="shop-form-title" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-3">
-        <h2 id="shop-form-title" className="text-lg font-bold text-blue-900">{shop ? 'Edit partner shop' : 'New partner shop'}</h2>
+        <h2 id="shop-form-title" className="text-lg font-bold text-brand-900">{shop ? 'Edit partner shop' : 'New partner shop'}</h2>
         <Labelled label="Name *"><input className={FIELD} value={name} onChange={e => setName(e.target.value)} /></Labelled>
         <Labelled label="Country *"><input className={FIELD} value={country} onChange={e => setCountry(e.target.value)} /></Labelled>
         <Labelled label="Location"><input className={FIELD} value={location} onChange={e => setLocation(e.target.value)} placeholder="City / region" /></Labelled>
@@ -263,7 +263,7 @@ function ShopForm({
           <Labelled label="Default kickback %">
             <input className={FIELD} type="number" step="any" value={rate} onChange={e => setRate(e.target.value)} />
           </Labelled>
-          <label className="flex items-center gap-2 text-sm text-blue-900 pb-2">
+          <label className="flex items-center gap-2 text-sm text-brand-900 pb-2">
             <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} /> Active
           </label>
         </div>
@@ -320,7 +320,7 @@ function TripsTab({
           onClick={() => setCreating(true)}
           disabled={shops.length === 0}
           title={shops.length === 0 ? 'Add a partner shop first' : undefined}
-          className="text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg disabled:opacity-50"
+          className="text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg disabled:opacity-50"
         >
           + New trip
         </button>
@@ -335,11 +335,11 @@ function TripsTab({
       ) : (
         <ul className="space-y-2">
           {trips.map(trip => (
-            <li key={trip.id} className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-3 space-y-2">
+            <li key={trip.id} className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 space-y-2">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-medium text-blue-900 text-sm truncate">{trip.title}</p>
-                  <p className="text-xs text-blue-900/80 truncate">
+                  <p className="font-medium text-brand-900 text-sm truncate">{trip.title}</p>
+                  <p className="text-xs text-brand-900/80 truncate">
                     {trip.destination} · {shopName(trip.partner_shop_id)} · {(trip.kickback_rate * 100).toFixed(1)}%
                   </p>
                 </div>
@@ -359,7 +359,7 @@ function TripsTab({
                     className="text-xs font-semibold bg-slate-600 hover:bg-slate-700 text-white px-2.5 py-1 rounded-lg">Archive</button>
                 )}
                 <button type="button" onClick={() => setEditing(trip)}
-                  className="text-xs font-semibold bg-blue-900 hover:bg-blue-950 text-white px-2.5 py-1 rounded-lg">Edit</button>
+                  className="text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-2.5 py-1 rounded-lg">Edit</button>
                 <button type="button" onClick={() => setConfirmDelete(trip)}
                   className="text-xs font-semibold bg-red-700 hover:bg-red-800 text-white px-2.5 py-1 rounded-lg">Delete</button>
               </div>
@@ -460,7 +460,7 @@ function TripForm({
   return (
     <Modal labelledBy="trip-form-title" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-3 max-h-[80vh] overflow-y-auto">
-        <h2 id="trip-form-title" className="text-lg font-bold text-blue-900">{trip ? 'Edit trip' : 'New trip'}</h2>
+        <h2 id="trip-form-title" className="text-lg font-bold text-brand-900">{trip ? 'Edit trip' : 'New trip'}</h2>
         <Labelled label="Partner shop *">
           <select className={FIELD} value={partnerId} onChange={e => setPartnerId(e.target.value)} aria-label="Partner shop">
             {shops.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -510,7 +510,7 @@ function TripForm({
 function Labelled({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block space-y-1">
-      <span className="text-xs font-medium text-blue-900">{label}</span>
+      <span className="text-xs font-medium text-brand-900">{label}</span>
       {children}
     </label>
   )
@@ -522,7 +522,7 @@ function FormButtons({ submitting, submitLabel, onClose }: { submitting: boolean
       <button type="button" onClick={onClose} disabled={submitting}
         className={`flex-1 ${BTN_SECONDARY}`}>Cancel</button>
       <button type="submit" disabled={submitting}
-        className="flex-1 py-2 rounded-lg text-sm font-semibold bg-blue-900 hover:bg-blue-950 text-white disabled:opacity-50">
+        className="flex-1 py-2 rounded-lg text-sm font-semibold bg-brand-900 hover:bg-brand-950 text-white disabled:opacity-50">
         {submitting ? 'Saving…' : submitLabel}
       </button>
     </div>
@@ -540,11 +540,11 @@ function ConfirmModal({
 }) {
   return (
     <Modal labelledBy="confirm-title" onClose={onClose}>
-      <h2 id="confirm-title" className="text-lg font-bold text-blue-900">{title}</h2>
-      <p className="text-sm text-blue-900">{body}</p>
+      <h2 id="confirm-title" className="text-lg font-bold text-brand-900">{title}</h2>
+      <p className="text-sm text-brand-900">{body}</p>
       <div className="flex gap-2 pt-1">
         <button type="button" onClick={onClose}
-          className="flex-1 py-2 rounded-lg text-sm font-medium text-blue-900 border border-sky-300 hover:bg-sky-50">Cancel</button>
+          className="flex-1 py-2 rounded-lg text-sm font-medium text-brand-900 border border-surface-300 hover:bg-surface-50">Cancel</button>
         <button type="button" onClick={onConfirm}
           className="flex-1 py-2 rounded-lg text-sm font-semibold text-white bg-red-700 hover:bg-red-800">{confirmLabel}</button>
       </div>

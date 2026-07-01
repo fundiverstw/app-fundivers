@@ -139,18 +139,18 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
   const needed = eventType === 'course' ? instructorsNeeded(duties, nonAdminDiverCount) : 0
 
   return (
-    <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
+    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-blue-900">Staff on duty</h2>
+        <h2 className="text-sm font-semibold text-brand-900">Staff on duty</h2>
         {needed > 0 && (
-          <span className="text-xs bg-red-100 text-red-700 border border-red-500 px-2 py-0.5 rounded-full">
+          <span className="text-xs bg-red-100 text-red-700 border border-accent px-2 py-0.5 rounded-full">
             Need {needed} more instructor{needed === 1 ? '' : 's'}
           </span>
         )}
       </div>
 
       {duties.length === 0 ? (
-        <p className="text-xs text-blue-950 font-medium">Nobody assigned yet.</p>
+        <p className="text-xs text-brand-950 font-medium">Nobody assigned yet.</p>
       ) : (
         <ul className="space-y-1.5">
           {duties.map(d => {
@@ -159,15 +159,15 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
               ? `${format(parseISO(d.start_date), 'MMM d')}–${format(parseISO(d.end_date), 'MMM d')}`
               : format(parseISO(d.start_date), 'MMM d')
             return (
-              <li key={d.id} className="flex items-center justify-between text-xs bg-sky-50 rounded p-2">
+              <li key={d.id} className="flex items-center justify-between text-xs bg-surface-50 rounded p-2">
                 <span className="min-w-0">
-                  <span className="font-medium text-blue-900">{personName(p?.name, p?.nickname) || '(unknown)'}</span>
-                  <span className="text-blue-900 font-medium"> · <span className="capitalize">{d.role}</span> · {span}</span>
+                  <span className="font-medium text-brand-900">{personName(p?.name, p?.nickname) || '(unknown)'}</span>
+                  <span className="text-brand-900 font-medium"> · <span className="capitalize">{d.role}</span> · {span}</span>
                 </span>
                 {!readOnly && (
                   <button
                     onClick={() => remove(d.id)}
-                    className="text-blue-950 font-medium hover:text-red-600 ml-2"
+                    className="text-brand-950 font-medium hover:text-red-600 ml-2"
                     aria-label={`Remove duty for ${personName(p?.name, p?.nickname) || 'admin'}`}
                   >
                     ✕
@@ -180,12 +180,12 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
       )}
 
       {!readOnly && (
-      <div className="border-t border-sky-200 pt-3 space-y-2">
+      <div className="border-t border-surface-200 pt-3 space-y-2">
         <div className="flex gap-2">
           <select
             value={assigneeId}
             onChange={e => setAssigneeId(e.target.value)}
-            className="flex-1 min-w-0 bg-white border border-sky-300 rounded px-2 py-1 text-xs text-blue-900"
+            className="flex-1 min-w-0 bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
           >
             <option value="">Pick admin/staff…</option>
             {admins.map(a => (
@@ -195,7 +195,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
           <select
             value={role}
             onChange={e => setRole(e.target.value as DutyRole)}
-            className="shrink-0 bg-white border border-sky-300 rounded px-2 py-1 text-xs text-blue-900 capitalize"
+            className="shrink-0 bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900 capitalize"
           >
             {DUTY_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
@@ -205,7 +205,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
             // Pick which course days this person is on duty for. Each
             // selected day becomes its own single-day duty.
             <div className="space-y-1">
-              <span className="text-blue-900 font-medium">Days on duty</span>
+              <span className="text-brand-900 font-medium">Days on duty</span>
               <div className="flex flex-wrap gap-1.5">
                 {courseDays.map(day => {
                   const on = selectedDays.includes(day)
@@ -217,8 +217,8 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
                       onClick={() => toggleDay(day)}
                       className={`px-2 py-1 rounded border font-medium ${
                         on
-                          ? 'bg-sky-700 text-white border-sky-700'
-                          : 'bg-white text-blue-900 border-sky-300 hover:bg-sky-50'
+                          ? 'bg-surface-700 text-white border-surface-700'
+                          : 'bg-white text-brand-900 border-surface-300 hover:bg-surface-50'
                       }`}
                     >
                       {format(parseISO(day), 'EEE, MMM d')}
@@ -230,24 +230,24 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
           ) : (
             <>
               <label className="flex items-center gap-2">
-                <span className="text-blue-900 font-medium shrink-0 w-12">{isMultiDay ? 'From' : 'Date'}</span>
+                <span className="text-brand-900 font-medium shrink-0 w-12">{isMultiDay ? 'From' : 'Date'}</span>
                 <DateField
                   value={startDate}
                   min={eventStart}
                   max={eventEnd ?? eventStart}
                   onChange={setStartDate}
-                  className="flex-1 min-w-0 bg-white border border-sky-300 rounded px-2 py-1 text-blue-900"
+                  className="flex-1 min-w-0 bg-white border border-surface-300 rounded px-2 py-1 text-brand-900"
                 />
               </label>
               {isMultiDay && (
                 <label className="flex items-center gap-2">
-                  <span className="text-blue-900 font-medium shrink-0 w-12">To</span>
+                  <span className="text-brand-900 font-medium shrink-0 w-12">To</span>
                   <DateField
                     value={endDate}
                     min={startDate}
                     max={eventEnd ?? eventStart}
                     onChange={setEndDate}
-                    className="flex-1 min-w-0 bg-white border border-sky-300 rounded px-2 py-1 text-blue-900"
+                    className="flex-1 min-w-0 bg-white border border-surface-300 rounded px-2 py-1 text-brand-900"
                   />
                 </label>
               )}
@@ -256,7 +256,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
           <button
             onClick={assign}
             disabled={!assigneeId || submitting || (eventType === 'course' ? selectedDays.length === 0 : !startDate)}
-            className="w-full bg-sky-700 hover:bg-sky-600 disabled:bg-sky-100 disabled:text-blue-950 font-medium text-white font-semibold px-3 py-1.5 rounded"
+            className="w-full bg-surface-700 hover:bg-surface-600 disabled:bg-surface-100 disabled:text-brand-950 font-medium text-white font-semibold px-3 py-1.5 rounded"
           >
             Assign
           </button>

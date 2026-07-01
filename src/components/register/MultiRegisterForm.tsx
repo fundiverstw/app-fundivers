@@ -392,33 +392,33 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
 
   return (
     <div
-      className="fixed inset-0 bg-blue-900/60 backdrop-blur-sm flex items-start justify-center z-50 px-4 pt-8 pb-4 overflow-y-auto"
+      className="fixed inset-0 bg-brand-900/60 backdrop-blur-sm flex items-start justify-center z-50 px-4 pt-8 pb-4 overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-label="Multi-event registration"
       onClick={onClose}
     >
       <div
-        className="bg-white/80 backdrop-blur-md border border-red-500 rounded-2xl w-full max-w-lg p-5 space-y-4 max-h-[90vh] overflow-y-auto"
+        className="bg-white/80 backdrop-blur-md border border-accent rounded-2xl w-full max-w-lg p-5 space-y-4 max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <header className="space-y-1">
           <div className="flex items-start justify-between gap-3">
-            <h1 className="text-xl font-bold text-blue-900 leading-tight">
+            <h1 className="text-xl font-bold text-brand-900 leading-tight">
               Register for {cart.length} event{cart.length === 1 ? '' : 's'}
             </h1>
-            <button onClick={onClose} className="text-blue-900 font-medium text-xl leading-none shrink-0">×</button>
+            <button onClick={onClose} className="text-brand-900 font-medium text-xl leading-none shrink-0">×</button>
           </div>
-          <p className="text-xs text-blue-900 font-medium">Step {step} of 4</p>
+          <p className="text-xs text-brand-900 font-medium">Step {step} of 4</p>
         </header>
 
         {step === 1 && (
           <section className="space-y-3">
-            <p className="text-sm text-blue-950 font-medium">
+            <p className="text-sm text-brand-950 font-medium">
               Review the events you're registering for. Tap × on any row to drop it.
             </p>
             {hasBlockedPast && (
-              <div role="alert" className="bg-red-50 border border-red-500 rounded-lg px-3 py-2 text-xs text-red-700">
+              <div role="alert" className="bg-red-50 border border-accent rounded-lg px-3 py-2 text-xs text-red-700">
                 <p className="font-semibold">
                   {pastInCart.length === 1 ? 'One event has' : `${pastInCart.length} events have`} already taken place.
                 </p>
@@ -427,15 +427,15 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
             )}
             <ul className="space-y-2">
               {cart.map(ev => (
-                <li key={ev.id} className="bg-sky-50 border border-sky-200 rounded-lg px-3 py-2 space-y-2">
+                <li key={ev.id} className="bg-surface-50 border border-surface-200 rounded-lg px-3 py-2 space-y-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-blue-900 truncate">{ev.title}</p>
-                      <p className="text-xs text-blue-900 font-medium">
+                      <p className="text-sm font-semibold text-brand-900 truncate">{ev.title}</p>
+                      <p className="text-xs text-brand-900 font-medium">
                         {formatEventSpan(ev, { style: 'long' })}
                       </p>
                       {ev.price != null && (
-                        <p className="text-xs text-blue-950 font-medium">
+                        <p className="text-xs text-brand-950 font-medium">
                           From {ev.currency} {ev.price.toLocaleString()}
                         </p>
                       )}
@@ -444,12 +444,12 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                       type="button"
                       onClick={() => removeFromCart(ev.id)}
                       aria-label={`Remove ${ev.title}`}
-                      className="text-blue-900 font-medium text-lg leading-none px-2"
+                      className="text-brand-900 font-medium text-lg leading-none px-2"
                     >×</button>
                   </div>
                   {children.length > 0 && (
                     <label className="block">
-                      <span className="block text-xs text-blue-900 font-medium mb-1">For diver</span>
+                      <span className="block text-xs text-brand-900 font-medium mb-1">For diver</span>
                       <select
                         value={forDiverByEvent[ev.id] ?? ''}
                         onChange={e => setForDiverByEvent(prev => ({
@@ -457,7 +457,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                           [ev.id]: e.target.value || null,
                         }))}
                         aria-label={`Diver for ${ev.title}`}
-                        className="w-full bg-white border border-sky-300 rounded-lg px-2 py-1.5 text-sm text-blue-900"
+                        className="w-full bg-white border border-surface-300 rounded-lg px-2 py-1.5 text-sm text-brand-900"
                       >
                         <option value="">Myself ({personName(profile?.name, profile?.nickname) || 'me'})</option>
                         {children.map(c => (
@@ -471,12 +471,12 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                 </li>
               ))}
               {cart.length === 0 && (
-                <li className="text-sm text-blue-950 font-medium italic">
+                <li className="text-sm text-brand-950 font-medium italic">
                   No events left. Close this and pick at least one to continue.
                 </li>
               )}
             </ul>
-            <p className="text-xs text-blue-950 font-medium">
+            <p className="text-xs text-brand-950 font-medium">
               Rooms and add-ons aren't selectable in the multi-event flow yet.
               For events that need them, register individually.
             </p>
@@ -485,8 +485,8 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
 
         {step === 2 && (
           <section className="space-y-4">
-            <h2 className="text-lg font-bold text-blue-900">About you</h2>
-            <p className="text-xs text-blue-900 font-medium">
+            <h2 className="text-lg font-bold text-brand-900">About you</h2>
+            <p className="text-xs text-brand-900 font-medium">
               Pre-filled from your profile. Edits save back when you submit.
             </p>
             <div className="space-y-3">
@@ -494,11 +494,11 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <TextField label="Nationality *" value={nationality} onChange={setNationality} required />
                 <label className="block">
-                  <span className="block text-xs text-blue-900 font-medium mb-1">Gender *</span>
+                  <span className="block text-xs text-brand-900 font-medium mb-1">Gender *</span>
                   <select
                     value={gender}
                     onChange={e => setGender(e.target.value)}
-                    className="w-full bg-white border border-sky-300 rounded-lg px-2 py-2 text-sm text-blue-900"
+                    className="w-full bg-white border border-surface-300 rounded-lg px-2 py-2 text-sm text-brand-900"
                   >
                     <option value="">—</option>
                     <option value="female">Female</option>
@@ -510,11 +510,11 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label className="block">
-                  <span className="block text-xs text-blue-900 font-medium mb-1">Preferred contact</span>
+                  <span className="block text-xs text-brand-900 font-medium mb-1">Preferred contact</span>
                   <select
                     value={contactMethod}
                     onChange={e => setContactMethod(e.target.value as ContactMethod | '')}
-                    className="w-full bg-white border border-sky-300 rounded-lg px-2 py-2 text-sm text-blue-900"
+                    className="w-full bg-white border border-surface-300 rounded-lg px-2 py-2 text-sm text-brand-900"
                   >
                     <option value="">—</option>
                     <option value="line">LINE</option>
@@ -532,17 +532,17 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                 <TextField label="Cert level" placeholder="OW, AOW…" value={certLevel} onChange={setCertLevel} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <label className="flex items-center gap-2 text-sm text-blue-950 font-medium">
-                  <input type="checkbox" checked={nitroxCertified} onChange={e => setNitroxCertified(e.target.checked)} className="accent-blue-900" />
+                <label className="flex items-center gap-2 text-sm text-brand-950 font-medium">
+                  <input type="checkbox" checked={nitroxCertified} onChange={e => setNitroxCertified(e.target.checked)} className="accent-brand-900" />
                   Nitrox certified
                 </label>
-                <label className="flex items-center gap-2 text-sm text-blue-950 font-medium">
-                  <input type="checkbox" checked={deepCertified} onChange={e => setDeepCertified(e.target.checked)} className="accent-blue-900" />
+                <label className="flex items-center gap-2 text-sm text-brand-950 font-medium">
+                  <input type="checkbox" checked={deepCertified} onChange={e => setDeepCertified(e.target.checked)} className="accent-brand-900" />
                   Deep certified (40m)
                 </label>
               </div>
-              <div className="border-t border-sky-200 pt-3 space-y-3">
-                <p className="text-xs text-blue-900 font-medium uppercase tracking-wider">Emergency contact</p>
+              <div className="border-t border-surface-200 pt-3 space-y-3">
+                <p className="text-xs text-brand-900 font-medium uppercase tracking-wider">Emergency contact</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <TextField label="Name" value={emergencyName} onChange={setEmergencyName} />
                   <TextField label="Phone" type="tel" value={emergencyPhone} onChange={setEmergencyPhone} />
@@ -554,8 +554,8 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
 
         {step === 3 && (
           <section className="space-y-4">
-            <h2 className="text-lg font-bold text-blue-900">Extras per event</h2>
-            <p className="text-xs text-blue-900 font-medium">
+            <h2 className="text-lg font-bold text-brand-900">Extras per event</h2>
+            <p className="text-xs text-brand-900 font-medium">
               Pick gear / transport / nitrox course for each event below. Transport choice is required.
             </p>
             <div className="space-y-3">
@@ -580,35 +580,35 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                   ? (personName(targetProfile?.name, targetProfile?.nickname) || '(child)')
                   : null
                 return (
-                  <div key={ev.id} className="bg-sky-50 border border-sky-200 rounded-lg p-3 space-y-2">
-                    <p className="text-sm font-semibold text-blue-900">
+                  <div key={ev.id} className="bg-surface-50 border border-surface-200 rounded-lg p-3 space-y-2">
+                    <p className="text-sm font-semibold text-brand-900">
                       {ev.title}
                       {targetLabel && (
-                        <span className="ml-2 text-xs text-blue-700">· for {targetLabel}</span>
+                        <span className="ml-2 text-xs text-brand-700">· for {targetLabel}</span>
                       )}
                     </p>
                     {gearIncluded && (
-                      <p className="text-xs text-blue-950 font-medium">Gear is included with this course.</p>
+                      <p className="text-xs text-brand-950 font-medium">Gear is included with this course.</p>
                     )}
                     {showGearRentChoice && (
                       <div className="space-y-1">
-                        <label className="flex items-center gap-2 text-sm text-blue-950 font-medium">
+                        <label className="flex items-center gap-2 text-sm text-brand-950 font-medium">
                           <input
                             type="checkbox"
                             checked={c.rentGear}
                             onChange={e => updateChoice(ev.id, e.target.checked
                               ? { rentGear: true, gearItems: GEAR_ITEMS.filter(i => !(targetProfile?.gear_owned ?? []).includes(i)) }
                               : { rentGear: false })}
-                            className="accent-blue-900"
+                            className="accent-brand-900"
                           />
                           Rent gear
                         </label>
                         {c.rentGear && (
                           <div className="pl-6 space-y-1">
-                            <p className="text-xs text-blue-950 font-medium">Check the items you need us to prepare for you:</p>
+                            <p className="text-xs text-brand-950 font-medium">Check the items you need us to prepare for you:</p>
                             <div className="grid grid-cols-2 gap-1">
                               {GEAR_ITEMS.map(item => (
-                                <label key={item} className="flex items-center gap-1 text-xs text-blue-950 font-medium">
+                                <label key={item} className="flex items-center gap-1 text-xs text-brand-950 font-medium">
                                   <input
                                     type="checkbox"
                                     checked={c.gearItems.includes(item)}
@@ -617,7 +617,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                                         ? c.gearItems.filter(i => i !== item)
                                         : [...c.gearItems, item],
                                     })}
-                                    className="accent-blue-900"
+                                    className="accent-brand-900"
                                   />
                                   {item} ({GEAR_ALACARTE_PRICES[item]})
                                 </label>
@@ -628,33 +628,33 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                       </div>
                     )}
                     <fieldset className="space-y-1">
-                      <legend className="text-xs font-semibold text-blue-900">Transportation *</legend>
-                      <label className={`flex items-start gap-2 text-sm font-medium ${rideAllowed ? 'text-blue-950' : 'text-blue-950/40'}`}>
-                        <input type="radio" name={`t-${ev.id}`} checked={c.needsTransport === true} disabled={!rideAllowed} onChange={() => updateChoice(ev.id, { needsTransport: true })} className="accent-blue-900 mt-1" />
+                      <legend className="text-xs font-semibold text-brand-900">Transportation *</legend>
+                      <label className={`flex items-start gap-2 text-sm font-medium ${rideAllowed ? 'text-brand-950' : 'text-brand-950/40'}`}>
+                        <input type="radio" name={`t-${ev.id}`} checked={c.needsTransport === true} disabled={!rideAllowed} onChange={() => updateChoice(ev.id, { needsTransport: true })} className="accent-brand-900 mt-1" />
                         <span className="flex-1">
                           Yes, ride with the shop
                           {!transportIncluded && transportSurcharge > 0 && (
-                            <span className="block text-xs text-blue-950 font-medium">+{transportSurcharge.toLocaleString()} {ev.currency}</span>
+                            <span className="block text-xs text-brand-950 font-medium">+{transportSurcharge.toLocaleString()} {ev.currency}</span>
                           )}
                           {transportIncluded && rideAllowed && (
-                            <span className="block text-xs text-blue-950 font-medium">Included in base price</span>
+                            <span className="block text-xs text-brand-950 font-medium">Included in base price</span>
                           )}
                           {!rideAllowed && (
                             <span className="block text-xs text-red-600 font-semibold">Shop ride is full for this dive.</span>
                           )}
                           {rideAllowed && evSeats && evSeats.capacity > 0 && (
-                            <span className="block text-xs text-blue-950/70 font-medium">{evSeats.available} ride seat{evSeats.available === 1 ? '' : 's'} left</span>
+                            <span className="block text-xs text-brand-950/70 font-medium">{evSeats.available} ride seat{evSeats.available === 1 ? '' : 's'} left</span>
                           )}
                         </span>
                       </label>
-                      <label className="flex items-start gap-2 text-sm text-blue-950 font-medium">
-                        <input type="radio" name={`t-${ev.id}`} checked={c.needsTransport === false} onChange={() => updateChoice(ev.id, { needsTransport: false })} className="accent-blue-900 mt-1" />
+                      <label className="flex items-start gap-2 text-sm text-brand-950 font-medium">
+                        <input type="radio" name={`t-${ev.id}`} checked={c.needsTransport === false} onChange={() => updateChoice(ev.id, { needsTransport: false })} className="accent-brand-900 mt-1" />
                         <span className="flex-1">No, I'll get there myself</span>
                       </label>
                     </fieldset>
                     {showNitroxAddon && (
-                      <label className="flex items-start gap-2 text-sm text-blue-950 font-medium">
-                        <input type="checkbox" checked={c.addNitroxCourse} onChange={e => updateChoice(ev.id, { addNitroxCourse: e.target.checked })} className="accent-blue-900 mt-1" />
+                      <label className="flex items-start gap-2 text-sm text-brand-950 font-medium">
+                        <input type="checkbox" checked={c.addNitroxCourse} onChange={e => updateChoice(ev.id, { addNitroxCourse: e.target.checked })} className="accent-brand-900 mt-1" />
                         <span className="flex-1">Add Nitrox course (+{NITROX_COURSE_FEE.toLocaleString()})</span>
                       </label>
                     )}
@@ -667,11 +667,11 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
 
         {step === 4 && (
           <section className="space-y-3">
-            <h2 className="text-lg font-bold text-blue-900">Payment</h2>
+            <h2 className="text-lg font-bold text-brand-900">Payment</h2>
             <div className="space-y-2">
               {(['bank_transfer', 'paypal', 'credit_card', 'cash'] as const).map(method => (
-                <label key={method} className="flex gap-2 text-sm text-blue-950 font-medium items-start">
-                  <input type="radio" name="payment" checked={payment === method} onChange={() => setPayment(method)} className="accent-blue-900 mt-1" />
+                <label key={method} className="flex gap-2 text-sm text-brand-950 font-medium items-start">
+                  <input type="radio" name="payment" checked={payment === method} onChange={() => setPayment(method)} className="accent-brand-900 mt-1" />
                   <span className="flex-1">
                     {method === 'bank_transfer' && 'Bank transfer'}
                     {method === 'paypal' && 'PayPal (+5%)'}
@@ -684,28 +684,28 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
 
             {payment === 'credit_card' && (
               <label className="block">
-                <span className="block text-xs text-blue-900 font-medium mb-1">Invoice email (optional)</span>
+                <span className="block text-xs text-brand-900 font-medium mb-1">Invoice email (optional)</span>
                 <input
                   type="email"
                   value={creditCardInvoiceEmail}
                   onChange={e => setCreditCardInvoiceEmail(e.target.value)}
                   placeholder="Defaults to your registered email"
-                  className="w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-sm text-blue-900"
+                  className="w-full bg-white border border-surface-300 rounded-lg px-3 py-2 text-sm text-brand-900"
                 />
               </label>
             )}
 
             {anyChildTargeted && (
-              <label className="flex items-start gap-2 text-sm text-blue-950 font-medium bg-sky-50 border border-sky-200 rounded-lg p-3">
+              <label className="flex items-start gap-2 text-sm text-brand-950 font-medium bg-surface-50 border border-surface-200 rounded-lg p-3">
                 <input
                   type="checkbox"
                   checked={payForEveryone}
                   onChange={e => setPayForEveryone(e.target.checked)}
-                  className="accent-blue-900 mt-1"
+                  className="accent-brand-900 mt-1"
                 />
                 <span className="flex-1">
                   I'll pay for everyone in this group
-                  <span className="block text-xs text-blue-900/80">
+                  <span className="block text-xs text-brand-900/80">
                     The whole group's balance sits on your account; the other divers
                     won't be billed separately. Uncheck to have each diver pay their own.
                   </span>
@@ -715,17 +715,17 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
 
             <PaymentInstructionsBlock method={payment} />
 
-            <div className="text-sm text-blue-950 font-medium bg-sky-50 rounded-lg p-3 space-y-2">
+            <div className="text-sm text-brand-950 font-medium bg-surface-50 rounded-lg p-3 space-y-2">
               {cart.map((ev, i) => {
                 const b = eventBreakdowns[i]
                 return (
                   <div key={ev.id} className="space-y-0.5">
-                    <div className="flex justify-between font-semibold text-blue-900">
+                    <div className="flex justify-between font-semibold text-brand-900">
                       <span className="truncate pr-2">{ev.title}</span>
                       <span className="shrink-0">{ev.currency} {b?.total.toLocaleString() ?? '0'}</span>
                     </div>
                     {b && (
-                      <div className="pl-3 space-y-0.5 text-xs text-blue-900/80">
+                      <div className="pl-3 space-y-0.5 text-xs text-brand-900/80">
                         {b.charges.map((cl, ci) => (
                           <Row key={`${cl.kind}-${ci}`} label={cl.kind === 'base' ? 'Event' : cl.label} value={cl.amount} currency={ev.currency} />
                         ))}
@@ -734,18 +734,18 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                   </div>
                 )
               })}
-              <div className="border-t border-sky-200 pt-1 mt-1 flex justify-between font-bold text-blue-900">
+              <div className="border-t border-surface-200 pt-1 mt-1 flex justify-between font-bold text-brand-900">
                 <span>Grand total</span>
                 <span>{cart[0]?.currency ?? siteConfig.locale.currency} {grandTotal.toLocaleString()}</span>
               </div>
             </div>
 
-            <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded p-2">
+            <p className="text-xs text-red-700 bg-red-50 border border-accent rounded p-2">
               Reservations are confirmed once deposit (or full payment) is received.
             </p>
 
             {leadMissingW.length > 0 && (
-              <div className="text-xs text-blue-950 font-medium bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2" aria-label="Outstanding waivers">
+              <div className="text-xs text-brand-950 font-medium bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2" aria-label="Outstanding waivers">
                 <p className="font-semibold text-amber-800">Waivers to sign before these events</p>
                 <p>You can still book now — sign these now or any time from your profile.</p>
                 <ul className="space-y-1">
@@ -753,12 +753,12 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                     <li key={`${entry.def.code}:${entry.event?.id ?? 'annual'}`} className="flex items-center justify-between gap-2">
                       <span className="min-w-0 truncate">
                         {entry.def.title}
-                        {entry.event && <span className="text-blue-900/70"> · {entry.event.title}</span>}
+                        {entry.event && <span className="text-brand-900/70"> · {entry.event.title}</span>}
                       </span>
                       <button
                         type="button"
                         onClick={() => setSigningW(entry)}
-                        className="shrink-0 px-2.5 py-1 rounded-lg bg-blue-900 hover:bg-blue-950 text-white text-xs font-semibold"
+                        className="shrink-0 px-2.5 py-1 rounded-lg bg-brand-900 hover:bg-brand-950 text-white text-xs font-semibold"
                       >
                         Sign now
                       </button>
@@ -790,7 +790,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
           <button
             onClick={() => setStep((step - 1) as Step)}
             disabled={step === 1}
-            className="text-sm text-blue-900 font-medium hover:text-blue-900 disabled:opacity-40"
+            className="text-sm text-brand-900 font-medium hover:text-brand-900 disabled:opacity-40"
           >
             ‹ Back
           </button>
@@ -802,7 +802,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                 (step === 2 && step2Blocked) ||
                 (step === 3 && step3Blocked)
               }
-              className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
+              className="bg-brand-900 hover:bg-brand-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
             >
               Next ›
             </button>
@@ -810,7 +810,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
             <button
               onClick={submit}
               disabled={saving || submitBlocked}
-              className="bg-blue-900 hover:bg-blue-950 disabled:opacity-60 disabled:cursor-wait text-white text-sm font-semibold py-2 px-4 rounded-lg inline-flex items-center gap-2"
+              className="bg-brand-900 hover:bg-brand-950 disabled:opacity-60 disabled:cursor-wait text-white text-sm font-semibold py-2 px-4 rounded-lg inline-flex items-center gap-2"
             >
               {saving && (
                 <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" />
@@ -842,12 +842,12 @@ function PaymentInstructionsBlock({ method }: { method: PaymentMethod }) {
   const reminder = paymentConfirmationReminder()
   return (
     <>
-      <div className="text-xs text-blue-950 font-medium bg-white/70 border border-sky-200 rounded-lg p-3 space-y-1">
-        <p className="font-semibold text-blue-900">{instr.title}</p>
+      <div className="text-xs text-brand-950 font-medium bg-white/70 border border-surface-200 rounded-lg p-3 space-y-1">
+        <p className="font-semibold text-brand-900">{instr.title}</p>
         {instr.lines.map((line, i) => <p key={i}>{line}</p>)}
       </div>
-      <div className="text-xs text-blue-950 font-medium bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-1">
-        <p className="font-semibold text-blue-900">{reminder.title}</p>
+      <div className="text-xs text-brand-950 font-medium bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-1">
+        <p className="font-semibold text-brand-900">{reminder.title}</p>
         {reminder.lines.map((line, i) => <p key={i}>{line}</p>)}
       </div>
     </>
@@ -875,14 +875,14 @@ function TextField({
 }) {
   return (
     <label className="block">
-      <span className="block text-xs text-blue-900 font-medium mb-1">{label}</span>
+      <span className="block text-xs text-brand-900 font-medium mb-1">{label}</span>
       <input
         type={type}
         value={value}
         onChange={e => onChange(e.target.value)}
         required={required}
         placeholder={placeholder}
-        className="w-full bg-white border border-sky-300 rounded-lg px-2 py-2 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
+        className="w-full bg-white border border-surface-300 rounded-lg px-2 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
       />
     </label>
   )

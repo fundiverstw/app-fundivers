@@ -105,10 +105,10 @@ export function AdminDutyPage() {
             <Link
               key={ev.id}
               to={`/admin/events/${ev.type}/${ev.id}`}
-              className="block bg-white hover:bg-sky-100 rounded-xl p-3 border border-red-500 transition-colors"
+              className="block bg-white hover:bg-surface-100 rounded-xl p-3 border border-accent transition-colors"
             >
-              <p className="text-sm font-medium text-blue-900">{ev.title}</p>
-              <p className="text-xs text-blue-900 font-medium mt-0.5">
+              <p className="text-sm font-medium text-brand-900">{ev.title}</p>
+              <p className="text-xs text-brand-900 font-medium mt-0.5">
                 {formatEventSpan(ev)}
                 {' · '}
                 <span className="capitalize">{ev.type}</span>
@@ -120,7 +120,7 @@ export function AdminDutyPage() {
 
       <Section title="All upcoming duties" subtitle="Across the whole team.">
         {upcoming.length === 0
-          ? <p className="text-blue-950 font-medium text-sm">No duties assigned.</p>
+          ? <p className="text-brand-950 font-medium text-sm">No duties assigned.</p>
           : upcoming.map(e => <DutyRow key={e.duty.id} enriched={e} />)
         }
       </Section>
@@ -141,9 +141,9 @@ function Section({ title, subtitle, children }: { title: string; subtitle?: stri
 }
 
 const ROLE_STYLES: Record<string, string> = {
-  instructor: 'bg-blue-900 text-white',
-  guide:      'bg-blue-700 text-white',
-  support:    'bg-sky-500 text-white',
+  instructor: 'bg-brand-900 text-white',
+  guide:      'bg-brand-700 text-white',
+  support:    'bg-surface-500 text-white',
 }
 
 function DutyRow({ enriched, highlight }: { enriched: Enriched; highlight?: boolean }) {
@@ -153,27 +153,27 @@ function DutyRow({ enriched, highlight }: { enriched: Enriched; highlight?: bool
     : format(parseISO(duty.start_date), 'EEE, MMM d')
 
   return (
-    <div className={`bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-3 space-y-1 ${highlight ? 'border border-red-500' : ''}`}>
+    <div className={`bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 space-y-1 ${highlight ? 'border border-accent' : ''}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-blue-900 truncate">
+          <p className="text-sm font-medium text-brand-900 truncate">
             {personName(assignee?.name, assignee?.nickname) || '(unknown admin)'}
           </p>
-          <p className="text-xs text-blue-900 font-medium">{dateSpan}</p>
+          <p className="text-xs text-brand-900 font-medium">{dateSpan}</p>
         </div>
         <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize shrink-0 ${ROLE_STYLES[duty.role] ?? ROLE_STYLES.support}`}>
           {duty.role}
         </span>
       </div>
       {event
-        ? <Link to={`/admin/events/${event.type}/${event.id}`} className="block text-xs font-medium text-blue-900 hover:text-blue-700 underline truncate">
+        ? <Link to={`/admin/events/${event.type}/${event.id}`} className="block text-xs font-medium text-brand-900 hover:text-brand-700 underline truncate">
             {event.title}
           </Link>
         : (duty.eo_dive_id || duty.eo_course_id)
-          ? <p className="text-xs text-blue-950 font-medium">(event outside visible range)</p>
-          : <p className="text-xs text-blue-950 font-medium">Standalone duty</p>
+          ? <p className="text-xs text-brand-950 font-medium">(event outside visible range)</p>
+          : <p className="text-xs text-brand-950 font-medium">Standalone duty</p>
       }
-      {duty.notes && <p className="text-xs text-blue-900 font-medium bg-sky-50 rounded p-2 mt-1">📝 {duty.notes}</p>}
+      {duty.notes && <p className="text-xs text-brand-900 font-medium bg-surface-50 rounded p-2 mt-1">📝 {duty.notes}</p>}
     </div>
   )
 }

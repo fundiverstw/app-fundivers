@@ -54,7 +54,7 @@ export function NotificationsPage() {
       </div>
 
       {error && (
-        <p className="text-sm text-red-200 bg-red-900/50 border border-red-500 rounded-md p-2">{error}</p>
+        <p className="text-sm text-red-200 bg-red-900/50 border border-accent rounded-md p-2">{error}</p>
       )}
 
       {loading && items.length === 0 && (
@@ -74,8 +74,8 @@ export function NotificationsPage() {
               <div
                 className={`rounded-xl border transition-colors overflow-hidden ${
                   unread
-                    ? 'bg-white/85 border-sky-300'
-                    : 'bg-white/55 border-sky-200/60'
+                    ? 'bg-white/85 border-surface-300'
+                    : 'bg-white/55 border-surface-200/60'
                 }`}
               >
                 <button
@@ -85,17 +85,17 @@ export function NotificationsPage() {
                   className={`w-full text-left p-3 ${unread ? 'hover:bg-white' : 'hover:bg-white/70'} transition-colors`}
                 >
                   <div className="flex items-baseline gap-2">
-                    {unread && <span aria-hidden className="w-2 h-2 rounded-full bg-red-500 shrink-0 translate-y-1" />}
-                    <p className={`flex-1 text-sm ${unread ? 'font-semibold' : 'font-medium'} text-blue-900`}>{n.title}</p>
-                    <span className="text-[11px] text-blue-900/60 shrink-0">{relativeTime(n.created_at)}</span>
+                    {unread && <span aria-hidden className="w-2 h-2 rounded-full bg-accent shrink-0 translate-y-1" />}
+                    <p className={`flex-1 text-sm ${unread ? 'font-semibold' : 'font-medium'} text-brand-900`}>{n.title}</p>
+                    <span className="text-[11px] text-brand-900/60 shrink-0">{relativeTime(n.created_at)}</span>
                   </div>
                 </button>
 
                 {expanded && (
-                  <div className="border-t border-sky-200/60 bg-sky-50 px-3 pb-3 pt-2">
+                  <div className="border-t border-surface-200/60 bg-surface-50 px-3 pb-3 pt-2">
                     {n.body
-                      ? <p className="text-sm text-blue-950 whitespace-pre-wrap break-words">{n.body}</p>
-                      : <p className="text-xs italic text-blue-900/70">No additional details.</p>}
+                      ? <p className="text-sm text-brand-950 whitespace-pre-wrap break-words">{n.body}</p>
+                      : <p className="text-xs italic text-brand-900/70">No additional details.</p>}
                   </div>
                 )}
               </div>

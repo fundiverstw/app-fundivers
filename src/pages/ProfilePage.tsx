@@ -73,7 +73,7 @@ function strOrNull(v: unknown): string | null {
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs text-blue-900 font-medium mb-1 uppercase tracking-wide">
+      <label className="block text-xs text-brand-900 font-medium mb-1 uppercase tracking-wide">
         {label}
         {required && <span className="text-red-600 ml-0.5" aria-label="required">*</span>}
       </label>
@@ -82,7 +82,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
   )
 }
 
-const inputClass = 'w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-blue-900 text-sm focus:outline-none focus:border-blue-900'
+const inputClass = 'w-full bg-white border border-surface-300 rounded-lg px-3 py-2 text-brand-900 text-sm focus:outline-none focus:border-brand-900'
 
 export function ProfilePage() {
   const { user, profile } = useAuth()
@@ -297,11 +297,11 @@ export function ProfileForm({ user, profile, onSaved }: {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Personal Info</h2>
+        <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
+          <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Personal Info</h2>
           <Field label="Name" required>
             <input {...register('name')} className={inputClass} />
-            <p className="text-xs text-blue-900/70 mt-1">
+            <p className="text-xs text-brand-900/70 mt-1">
               First and last name, exactly as it appears on your passport / ID.
             </p>
             {errors.name && <p className="text-red-600 text-xs mt-1">{errors.name.message}</p>}
@@ -341,8 +341,8 @@ export function ProfileForm({ user, profile, onSaved }: {
           </Field>
         </section>
 
-        <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Preferred contact</h2>
+        <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
+          <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Preferred contact</h2>
           <Field label="Method" required>
             <select
               {...register('contact_method', { onChange: () => setDirtyExtras(true) })}
@@ -366,12 +366,12 @@ export function ProfileForm({ user, profile, onSaved }: {
           </Field>
         </section>
 
-        <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Sizing</h2>
+        <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
+          <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Sizing</h2>
           <Field label="Height (cm)"><input {...register('height_cm')} type="number" step="0.1" className={inputClass} /></Field>
           <Field label="Weight (kg)"><input {...register('weight_kg')} type="number" step="0.1" className={inputClass} /></Field>
           <div>
-            <label className="block text-xs text-blue-900 font-medium mb-1 uppercase tracking-wide">Shoe size</label>
+            <label className="block text-xs text-brand-900 font-medium mb-1 uppercase tracking-wide">Shoe size</label>
             <ShoeSizeField
               initial={profile.shoe_size}
               onChange={c => { setShoeSize(c); setDirtyExtras(true) }}
@@ -379,19 +379,19 @@ export function ProfileForm({ user, profile, onSaved }: {
           </div>
         </section>
 
-        <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Gear I own</h2>
-          <p className="text-xs text-blue-900 font-medium">
+        <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
+          <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Gear I own</h2>
+          <p className="text-xs text-brand-900 font-medium">
             Checked items will be skipped when you choose à-la-carte rental at registration.
           </p>
           <div className="grid grid-cols-2 gap-2">
             {GEAR_ITEMS.map(item => (
-              <label key={item} className="flex items-center gap-2 text-sm text-blue-900">
+              <label key={item} className="flex items-center gap-2 text-sm text-brand-900">
                 <input
                   type="checkbox"
                   checked={gearOwned.includes(item)}
                   onChange={() => toggleGearOwned(item)}
-                  className="accent-blue-900"
+                  className="accent-brand-900"
                 />
                 {item}
               </label>
@@ -399,22 +399,22 @@ export function ProfileForm({ user, profile, onSaved }: {
           </div>
         </section>
 
-        <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Emergency Contact</h2>
+        <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
+          <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Emergency Contact</h2>
           <Field label="Name"><input {...register('emergency_contact_name')} className={inputClass} /></Field>
           <Field label="Phone"><input {...register('emergency_contact_phone')} type="tel" className={inputClass} /></Field>
         </section>
 
-        <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Certification</h2>
+        <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
+          <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Certification</h2>
           <Field label="Certification status" required>
             <div className="flex flex-col gap-2">
-              <label className="flex items-center gap-2 text-sm text-blue-900">
-                <input type="radio" value="certified" {...register('cert_status')} className="accent-blue-900" />
+              <label className="flex items-center gap-2 text-sm text-brand-900">
+                <input type="radio" value="certified" {...register('cert_status')} className="accent-brand-900" />
                 I have a certification
               </label>
-              <label className="flex items-center gap-2 text-sm text-blue-900">
-                <input type="radio" value="uncertified" {...register('cert_status')} className="accent-blue-900" />
+              <label className="flex items-center gap-2 text-sm text-brand-900">
+                <input type="radio" value="uncertified" {...register('cert_status')} className="accent-brand-900" />
                 I am uncertified
               </label>
             </div>
@@ -470,12 +470,12 @@ export function ProfileForm({ user, profile, onSaved }: {
               )}
             />
           </Field>
-          <label className="flex items-center gap-2 text-sm text-blue-900">
-            <input type="checkbox" {...register('nitrox_certified')} className="accent-blue-900" />
+          <label className="flex items-center gap-2 text-sm text-brand-900">
+            <input type="checkbox" {...register('nitrox_certified')} className="accent-brand-900" />
             Nitrox certified
           </label>
-          <label className="flex items-center gap-2 text-sm text-blue-900">
-            <input type="checkbox" {...register('deep_certified')} className="accent-blue-900" />
+          <label className="flex items-center gap-2 text-sm text-brand-900">
+            <input type="checkbox" {...register('deep_certified')} className="accent-brand-900" />
             Deep certified (40m)
           </label>
         </section>
@@ -492,8 +492,8 @@ export function ProfileForm({ user, profile, onSaved }: {
           <CertCardSection userId={profile.id} onPathChange={setCertCardPath} />
         )}
 
-        <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Medical Notes</h2>
+        <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
+          <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Medical Notes</h2>
           <textarea
             {...register('medical_notes')}
             rows={3}
@@ -503,19 +503,19 @@ export function ProfileForm({ user, profile, onSaved }: {
         </section>
 
         {certCardMissing && (
-          <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded p-2">
+          <p className="text-xs text-red-700 bg-red-50 border border-accent rounded p-2">
             Upload a photo of your highest certification card to save your profile.
           </p>
         )}
 
         {nitroxCardMissing && (
-          <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded p-2">
+          <p className="text-xs text-red-700 bg-red-50 border border-accent rounded p-2">
             Upload a photo of your nitrox certification card to save your profile.
           </p>
         )}
 
         {deepCardMissing && (
-          <p className="text-xs text-red-700 bg-red-50 border border-red-500 rounded p-2">
+          <p className="text-xs text-red-700 bg-red-50 border border-accent rounded p-2">
             Upload a photo of your Deep certification card to save your profile.
           </p>
         )}
@@ -523,7 +523,7 @@ export function ProfileForm({ user, profile, onSaved }: {
         <button
           type="submit"
           disabled={isSubmitting || !certStatus || certCardMissing || nitroxCardMissing || deepCardMissing || (!isDirty && !dirtyExtras)}
-          className="w-full bg-emerald-400 hover:bg-emerald-300 text-blue-950 font-semibold py-2 rounded-lg transition-colors disabled:opacity-50"
+          className="w-full bg-emerald-400 hover:bg-emerald-300 text-brand-950 font-semibold py-2 rounded-lg transition-colors disabled:opacity-50"
         >
           {isSubmitting ? 'Saving…' : 'Save changes'}
         </button>
@@ -565,9 +565,9 @@ export function NotificationsToggle() {
 
   if (state === 'unsupported') {
     return (
-      <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-2" aria-label="Push Notifications">
-        <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Push Notifications</h2>
-        <p className="text-sm text-blue-900 font-medium">
+      <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-2" aria-label="Push Notifications">
+        <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Push Notifications</h2>
+        <p className="text-sm text-brand-900 font-medium">
           Your device doesn't support push notifications in this browser.
           On iPhone/iPad, install {siteConfig.identity.shortName} to your Home Screen
           (Share → Add to Home Screen), open the app from there, and the toggle will appear.
@@ -577,20 +577,20 @@ export function NotificationsToggle() {
   }
 
   return (
-    <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3" aria-label="Push Notifications">
-      <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Push Notifications</h2>
+    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3" aria-label="Push Notifications">
+      <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Push Notifications</h2>
       <label className="flex items-center justify-between gap-3">
-        <span className="text-sm text-blue-900">Event &amp; payment reminders</span>
+        <span className="text-sm text-brand-900">Event &amp; payment reminders</span>
         <input
           type="checkbox"
           aria-label="Enable push notifications"
-          className="accent-blue-900 scale-125"
+          className="accent-brand-900 scale-125"
           disabled={busy}
           checked={state === 'on'}
           onChange={(e) => toggle(e.target.checked)}
         />
       </label>
-      <p className="text-xs text-blue-950 font-medium">
+      <p className="text-xs text-brand-950 font-medium">
         Reminders fire 1 week and 1 day before each event, plus payment nudges
         at 3 / 2 / 1 weeks and 3 / 1 days before. iOS requires installing the
         app to your Home Screen.
@@ -678,9 +678,9 @@ export function CertCardSection({ userId, onPathChange }: {
   }
 
   return (
-    <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3" aria-label="Certification Card">
-      <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Highest Cert Photo</h2>
-      <p className="text-xs text-blue-900 font-medium">
+    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3" aria-label="Certification Card">
+      <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Highest Cert Photo</h2>
+      <p className="text-xs text-brand-900 font-medium">
         Photo of your certification card. Images are compressed before upload
         so they take up minimal space while keeping the key details readable.
       </p>
@@ -688,11 +688,11 @@ export function CertCardSection({ userId, onPathChange }: {
         <img
           src={signedUrl}
           alt="Your certification card"
-          className="w-full rounded-lg border border-sky-300"
+          className="w-full rounded-lg border border-surface-300"
         />
       )}
       <div className="flex gap-2">
-        <label className="flex-1 cursor-pointer bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 rounded-lg text-center transition-colors">
+        <label className="flex-1 cursor-pointer bg-brand-900 hover:bg-brand-950 disabled:opacity-40 text-white text-sm font-semibold py-2 rounded-lg text-center transition-colors">
           <input
             type="file"
             accept="image/*,.heic,.heif"
@@ -708,7 +708,7 @@ export function CertCardSection({ userId, onPathChange }: {
             type="button"
             onClick={onRemove}
             disabled={busy}
-            className="bg-sky-100 hover:bg-red-100 disabled:opacity-40 text-red-700 border border-red-500 text-sm font-semibold py-2 px-3 rounded-lg transition-colors"
+            className="bg-surface-100 hover:bg-red-100 disabled:opacity-40 text-red-700 border border-accent text-sm font-semibold py-2 px-3 rounded-lg transition-colors"
           >
             Remove
           </button>
@@ -795,9 +795,9 @@ export function NitroxCardSection({ userId, onPathChange }: {
   }
 
   return (
-    <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3" aria-label="Nitrox Certification Card">
-      <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Nitrox card photo</h2>
-      <p className="text-xs text-blue-900 font-medium">
+    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3" aria-label="Nitrox Certification Card">
+      <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Nitrox card photo</h2>
+      <p className="text-xs text-brand-900 font-medium">
         Required because you marked yourself as nitrox certified. Same
         compression + private-storage handling as your main cert card.
       </p>
@@ -805,11 +805,11 @@ export function NitroxCardSection({ userId, onPathChange }: {
         <img
           src={signedUrl}
           alt="Your nitrox certification card"
-          className="w-full rounded-lg border border-sky-300"
+          className="w-full rounded-lg border border-surface-300"
         />
       )}
       <div className="flex gap-2">
-        <label className="flex-1 cursor-pointer bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 rounded-lg text-center transition-colors">
+        <label className="flex-1 cursor-pointer bg-brand-900 hover:bg-brand-950 disabled:opacity-40 text-white text-sm font-semibold py-2 rounded-lg text-center transition-colors">
           <input
             type="file"
             accept="image/*,.heic,.heif"
@@ -825,7 +825,7 @@ export function NitroxCardSection({ userId, onPathChange }: {
             type="button"
             onClick={onRemove}
             disabled={busy}
-            className="bg-sky-100 hover:bg-red-100 disabled:opacity-40 text-red-700 border border-red-500 text-sm font-semibold py-2 px-3 rounded-lg transition-colors"
+            className="bg-surface-100 hover:bg-red-100 disabled:opacity-40 text-red-700 border border-accent text-sm font-semibold py-2 px-3 rounded-lg transition-colors"
           >
             Remove
           </button>
@@ -908,9 +908,9 @@ export function DeepCardSection({ userId, onPathChange }: {
   }
 
   return (
-    <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3" aria-label="Deep Certification Card">
-      <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Deep card photo</h2>
-      <p className="text-xs text-blue-900 font-medium">
+    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3" aria-label="Deep Certification Card">
+      <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Deep card photo</h2>
+      <p className="text-xs text-brand-900 font-medium">
         Required because you marked yourself as Deep (40m) certified. Same
         compression + private-storage handling as your main cert card.
       </p>
@@ -918,11 +918,11 @@ export function DeepCardSection({ userId, onPathChange }: {
         <img
           src={signedUrl}
           alt="Your deep certification card"
-          className="w-full rounded-lg border border-sky-300"
+          className="w-full rounded-lg border border-surface-300"
         />
       )}
       <div className="flex gap-2">
-        <label className="flex-1 cursor-pointer bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-sm font-semibold py-2 rounded-lg text-center transition-colors">
+        <label className="flex-1 cursor-pointer bg-brand-900 hover:bg-brand-950 disabled:opacity-40 text-white text-sm font-semibold py-2 rounded-lg text-center transition-colors">
           <input
             type="file"
             accept="image/*,.heic,.heif"
@@ -938,7 +938,7 @@ export function DeepCardSection({ userId, onPathChange }: {
             type="button"
             onClick={onRemove}
             disabled={busy}
-            className="bg-sky-100 hover:bg-red-100 disabled:opacity-40 text-red-700 border border-red-500 text-sm font-semibold py-2 px-3 rounded-lg transition-colors"
+            className="bg-surface-100 hover:bg-red-100 disabled:opacity-40 text-red-700 border border-accent text-sm font-semibold py-2 px-3 rounded-lg transition-colors"
           >
             Remove
           </button>

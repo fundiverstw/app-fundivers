@@ -5,8 +5,8 @@
 // actually matters, instead of wading through it while filling the form.
 export function WhatHappensNext({ waitlisted = false }: { waitlisted?: boolean }) {
   return (
-    <div className="text-sm text-blue-950 font-medium bg-sky-50 border border-sky-200 rounded-lg p-3 space-y-2 text-left">
-      <p className="font-semibold text-blue-900">What happens next</p>
+    <div className="text-sm text-brand-950 font-medium bg-surface-50 border border-surface-200 rounded-lg p-3 space-y-2 text-left">
+      <p className="font-semibold text-brand-900">What happens next</p>
       <ul className="list-disc list-outside pl-5 space-y-1">
         {waitlisted ? (
           <li>If a spot opens up we'll email and notify you — you'll have 24 hours to claim it. No payment is needed until then.</li>

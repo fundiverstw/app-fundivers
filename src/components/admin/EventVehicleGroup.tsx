@@ -64,22 +64,22 @@ export function EventVehicleGroup({
   }
 
   return (
-    <div role="group" aria-label="Assigned cars" className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-2">
+    <div role="group" aria-label="Assigned cars" className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-2">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-bold text-blue-900">Cars</h2>
-        <span className="text-xs text-blue-900 font-semibold">
+        <h2 className="text-sm font-bold text-brand-900">Cars</h2>
+        <span className="text-xs text-brand-900 font-semibold">
           {assignedSeats} seat{assignedSeats === 1 ? '' : 's'} · {riders} to transport
         </span>
       </div>
 
       {allocations.length === 0 ? (
-        <p className="text-xs text-blue-950/70 font-medium italic">No car assigned yet.</p>
+        <p className="text-xs text-brand-950/70 font-medium italic">No car assigned yet.</p>
       ) : (
         <ul className="flex flex-wrap gap-1.5">
           {allocations.map(a => {
             const v = vehicleMap.get(a.vehicle_id)
             return (
-              <li key={a.id} className="flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full border border-blue-900 text-blue-900 font-medium">
+              <li key={a.id} className="flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full border border-brand-900 text-brand-900 font-medium">
                 <span>{v?.name ?? '(unknown car)'}{v ? ` (${v.passenger_seats})` : ''}</span>
                 {isAdmin && (
                   <button
@@ -87,7 +87,7 @@ export function EventVehicleGroup({
                     aria-label={`Unassign ${v?.name ?? 'car'}`}
                     disabled={busy}
                     onClick={() => remove(a.id)}
-                    className="text-blue-900 hover:text-red-600 disabled:opacity-50 leading-none"
+                    className="text-brand-900 hover:text-red-600 disabled:opacity-50 leading-none"
                   >
                     ×
                   </button>
@@ -100,14 +100,14 @@ export function EventVehicleGroup({
 
       {isAdmin && (
         available.length > 0 ? (
-          <label className="flex items-center gap-2 text-xs text-blue-900 font-medium">
+          <label className="flex items-center gap-2 text-xs text-brand-900 font-medium">
             <span className="uppercase tracking-wide">Assign a car</span>
             <select
               aria-label="Assign a car"
               disabled={busy}
               value=""
               onChange={e => assign(e.target.value)}
-              className="px-2 py-1 rounded-full text-xs bg-sky-100 text-blue-900 border border-sky-200 disabled:opacity-50"
+              className="px-2 py-1 rounded-full text-xs bg-surface-100 text-brand-900 border border-surface-200 disabled:opacity-50"
             >
               <option value="">Select a car…</option>
               {available.map(v => (
@@ -116,7 +116,7 @@ export function EventVehicleGroup({
             </select>
           </label>
         ) : (
-          <p className="text-xs text-blue-950/70 font-medium italic">
+          <p className="text-xs text-brand-950/70 font-medium italic">
             No cars free for {dayKey} — all are assigned to other events.
           </p>
         )

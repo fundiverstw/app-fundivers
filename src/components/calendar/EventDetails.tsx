@@ -20,29 +20,29 @@ export function EventDetails({ details }: { details: EventDetailsData }) {
     Boolean(details.prerequisites)
 
   return (
-    <div className="space-y-3 text-sm text-blue-900 max-h-80 overflow-y-auto pr-1">
+    <div className="space-y-3 text-sm text-brand-900 max-h-80 overflow-y-auto pr-1">
       {TEXT_SECTIONS.map(({ key, label }) => {
         const value = details[key] as string | null
         if (!value) return null
         return (
           <section key={key}>
-            <h3 className="font-semibold text-blue-950">{label}</h3>
-            <p className="whitespace-pre-line text-blue-900/90">{value}</p>
+            <h3 className="font-semibold text-brand-950">{label}</h3>
+            <p className="whitespace-pre-line text-brand-900/90">{value}</p>
           </section>
         )
       })}
 
       {hasPrereqs && (
         <section>
-          <h3 className="font-semibold text-blue-950">Prerequisites</h3>
+          <h3 className="font-semibold text-brand-950">Prerequisites</h3>
           {details.required_cert && (
-            <p className="text-blue-900/90">Minimum certification: {details.required_cert}</p>
+            <p className="text-brand-900/90">Minimum certification: {details.required_cert}</p>
           )}
           {details.required_dives != null && (
-            <p className="text-blue-900/90">Logged dives: {details.required_dives}+</p>
+            <p className="text-brand-900/90">Logged dives: {details.required_dives}+</p>
           )}
           {details.prerequisites && (
-            <p className="whitespace-pre-line text-blue-900/90">{details.prerequisites}</p>
+            <p className="whitespace-pre-line text-brand-900/90">{details.prerequisites}</p>
           )}
         </section>
       )}

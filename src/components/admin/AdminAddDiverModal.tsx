@@ -68,12 +68,12 @@ export function AdminAddDiverModal({
       onClick={onClose}
     >
       <div
-        className="bg-white/80 backdrop-blur-md border border-red-500 rounded-2xl w-full max-w-lg p-5 space-y-4 max-h-[90vh] overflow-y-auto"
+        className="bg-white/80 backdrop-blur-md border border-accent rounded-2xl w-full max-w-lg p-5 space-y-4 max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <header className="flex items-center justify-between">
           <h2 id="add-diver-title" className={`text-lg ${TEXT_HEADING}`}>{title}</h2>
-          <button onClick={onClose} className="text-blue-900 font-medium text-xl leading-none" aria-label="Close">×</button>
+          <button onClick={onClose} className="text-brand-900 font-medium text-xl leading-none" aria-label="Close">×</button>
         </header>
 
         {target ? (
@@ -81,7 +81,7 @@ export function AdminAddDiverModal({
             <button
               type="button"
               onClick={() => setTarget(null)}
-              className="text-xs text-blue-900 hover:underline"
+              className="text-xs text-brand-900 hover:underline"
             >
               ‹ pick a different diver
             </button>
@@ -131,13 +131,13 @@ export function AdminAddDiverModal({
                   <button
                     type="button"
                     onClick={() => setTarget(p)}
-                    className="w-full text-left bg-white/70 hover:bg-sky-100 border border-sky-200 rounded-lg px-3 py-2"
+                    className="w-full text-left bg-white/70 hover:bg-surface-100 border border-surface-200 rounded-lg px-3 py-2"
                   >
-                    <p className="text-sm font-medium text-blue-900">
+                    <p className="text-sm font-medium text-brand-900">
                       {p.name ?? '(no name)'}
-                      {p.nickname && <span className="text-blue-900/80"> ({p.nickname})</span>}
+                      {p.nickname && <span className="text-brand-900/80"> ({p.nickname})</span>}
                     </p>
-                    <p className="text-xs text-blue-900/70">
+                    <p className="text-xs text-brand-900/70">
                       {p.cert_agency && p.cert_level && `${p.cert_agency} ${p.cert_level}`}
                       {(p.cert_agency || p.cert_level) && p.contact_id && ' · '}
                       {p.contact_id ?? ''}
@@ -149,7 +149,7 @@ export function AdminAddDiverModal({
                 </li>
               ))}
               {visible.length === 0 && (
-                <li className="text-sm text-blue-900/80 italic px-1">No matching divers.</li>
+                <li className="text-sm text-brand-900/80 italic px-1">No matching divers.</li>
               )}
             </ul>
           </>
@@ -222,7 +222,7 @@ function CreateNewDiverForm({
       <button
         type="button"
         onClick={onCancel}
-        className="text-xs text-blue-900 hover:underline"
+        className="text-xs text-brand-900 hover:underline"
       >
         ‹ back to diver list
       </button>
@@ -247,7 +247,7 @@ function CreateNewDiverForm({
           value={fullName} onChange={e => setFullName(e.target.value)}
           className={`${INPUT} text-sm`}
         />
-        <span className="block text-xs text-blue-900/70 mt-1">
+        <span className="block text-xs text-brand-900/70 mt-1">
           First and last name, exactly as on their passport / ID.
         </span>
       </label>
@@ -261,7 +261,7 @@ function CreateNewDiverForm({
         />
       </label>
 
-      {error && <p className="text-sm text-red-700 bg-red-50 border border-red-500 rounded px-2 py-1">{error}</p>}
+      {error && <p className="text-sm text-red-700 bg-red-50 border border-accent rounded px-2 py-1">{error}</p>}
 
       <div className="flex gap-2 pt-1">
         <button

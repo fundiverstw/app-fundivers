@@ -39,28 +39,28 @@ export function WaiverSignDialog({ def, event, onSigned, onClose }: {
   // overlay is trapped under later siblings (e.g. the Family section).
   return createPortal(
     <div
-      className="fixed inset-0 bg-blue-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-brand-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       role="dialog" aria-modal="true" aria-labelledby="waiver-title"
     >
-      <div className="bg-white/90 backdrop-blur-md rounded-2xl max-w-lg w-full p-6 space-y-4 border border-sky-300 shadow-2xl max-h-[90vh] flex flex-col">
-        <h2 id="waiver-title" className="text-lg font-bold text-blue-900">{def.title}</h2>
-        <div className="text-xs text-blue-950 whitespace-pre-wrap overflow-y-auto border border-sky-200 rounded-lg p-3 bg-white/70 grow">
+      <div className="bg-white/90 backdrop-blur-md rounded-2xl max-w-lg w-full p-6 space-y-4 border border-surface-300 shadow-2xl max-h-[90vh] flex flex-col">
+        <h2 id="waiver-title" className="text-lg font-bold text-brand-900">{def.title}</h2>
+        <div className="text-xs text-brand-950 whitespace-pre-wrap overflow-y-auto border border-surface-200 rounded-lg p-3 bg-white/70 grow">
           {def.body}
         </div>
         <div className="space-y-2">
           <label className="block">
-            <span className="block text-xs text-blue-900 font-medium mb-1 uppercase tracking-wide">Type your full name to sign</span>
+            <span className="block text-xs text-brand-900 font-medium mb-1 uppercase tracking-wide">Type your full name to sign</span>
             <input
               type="text"
               aria-label="Full name"
               value={name}
               disabled={busy}
               onChange={e => setName(e.target.value)}
-              className="w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-blue-900 text-sm focus:outline-none focus:border-blue-900 disabled:opacity-50"
+              className="w-full bg-white border border-surface-300 rounded-lg px-3 py-2 text-brand-900 text-sm focus:outline-none focus:border-brand-900 disabled:opacity-50"
               placeholder="Your full legal name"
             />
           </label>
-          <label className="flex items-start gap-2 text-sm text-blue-900">
+          <label className="flex items-start gap-2 text-sm text-brand-900">
             <input
               type="checkbox"
               checked={agreed}
@@ -77,7 +77,7 @@ export function WaiverSignDialog({ def, event, onSigned, onClose }: {
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="px-4 py-2 rounded-lg border border-sky-300 text-blue-900 text-sm font-semibold disabled:opacity-50 hover:bg-sky-50"
+            className="px-4 py-2 rounded-lg border border-surface-300 text-brand-900 text-sm font-semibold disabled:opacity-50 hover:bg-surface-50"
           >
             Cancel
           </button>
@@ -85,7 +85,7 @@ export function WaiverSignDialog({ def, event, onSigned, onClose }: {
             type="button"
             onClick={sign}
             disabled={!canSign}
-            className="px-4 py-2 rounded-lg bg-blue-900 hover:bg-blue-950 text-white text-sm font-semibold disabled:opacity-50"
+            className="px-4 py-2 rounded-lg bg-brand-900 hover:bg-brand-950 text-white text-sm font-semibold disabled:opacity-50"
           >
             {busy ? 'Signing…' : 'Sign'}
           </button>

@@ -164,7 +164,7 @@ export function EelPage() {
     const g = gameRef.current
 
     // Deep-water background.
-    ctx.fillStyle = '#082f49' // sky-950-ish
+    ctx.fillStyle = '#082f49' // surface-950-ish
     ctx.fillRect(0, 0, cell * GRID_SIZE, cell * GRID_SIZE)
 
     // Subtle grid.
@@ -325,7 +325,7 @@ export function EelPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center p-4">
       <header className="w-full max-w-md flex items-center justify-between mb-3">
         <Link to={backTo} className="text-sm text-slate-400 hover:text-slate-100">‹ back</Link>
-        <p className="text-base font-mono font-semibold text-sky-300">
+        <p className="text-base font-mono font-semibold text-surface-300">
           {score} <span className="text-slate-500 text-xs">fish</span>
         </p>
         <p className="text-xs text-slate-500 font-mono">best {high}</p>
@@ -336,7 +336,7 @@ export function EelPage() {
       </h1>
 
       <div className="relative">
-        <canvas ref={canvasRef} className="rounded-lg border border-sky-900/60" />
+        <canvas ref={canvasRef} className="rounded-lg border border-surface-900/60" />
         {phase !== 'playing' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 rounded-lg gap-3">
             {phase === 'gameover' && (
@@ -347,7 +347,7 @@ export function EelPage() {
             )}
             <button
               onClick={start}
-              className="mt-2 bg-sky-600 hover:bg-sky-500 text-white font-semibold px-5 py-2 rounded-lg"
+              className="mt-2 bg-surface-600 hover:bg-surface-500 text-white font-semibold px-5 py-2 rounded-lg"
             >
               {phase === 'idle' ? 'Start' : 'Play again'}
             </button>
@@ -368,7 +368,7 @@ function DPad({ onDir }: { onDir: (d: Dir) => void }) {
   // which waits for pointerup and can be swallowed by 300ms tap-delay heuristics
   // on some mobile browsers. touch-action: manipulation prevents the long-press
   // context menu and double-tap zoom interference.
-  const btn = 'w-16 h-16 bg-slate-800 active:bg-sky-700 text-sky-200 text-2xl rounded-xl border border-slate-700 flex items-center justify-center select-none'
+  const btn = 'w-16 h-16 bg-slate-800 active:bg-surface-700 text-surface-200 text-2xl rounded-xl border border-slate-700 flex items-center justify-center select-none'
   return (
     <div
       className="mt-8 grid grid-cols-3 grid-rows-3 gap-2 touch-manipulation"

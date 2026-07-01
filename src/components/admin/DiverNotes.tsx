@@ -102,15 +102,15 @@ export function DiverNotes({ profileId, title = 'Diver notes (staff only)' }: Pr
   }
 
   return (
-    <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3">
+    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
       <h2 className="text-sm font-semibold text-red-600 uppercase tracking-wider">{title}</h2>
 
       <div className="space-y-2">
         {notes.length === 0 && (
-          <p className="text-xs text-blue-950 font-medium">No diver notes yet.</p>
+          <p className="text-xs text-brand-950 font-medium">No diver notes yet.</p>
         )}
         {notes.map(n => (
-          <div key={n.id} className="bg-sky-50 rounded-lg p-3 text-sm space-y-1">
+          <div key={n.id} className="bg-surface-50 rounded-lg p-3 text-sm space-y-1">
             {editingId === n.id ? (
               <div className="space-y-2">
                 <textarea
@@ -119,19 +119,19 @@ export function DiverNotes({ profileId, title = 'Diver notes (staff only)' }: Pr
                   rows={2}
                   maxLength={2000}
                   aria-label="Edit note"
-                  className="w-full bg-white border border-sky-300 rounded-lg px-3 py-1.5 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
+                  className="w-full bg-white border border-surface-300 rounded-lg px-3 py-1.5 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
                 />
                 <div className="flex gap-2 justify-end">
                   <button
                     onClick={cancelEdit}
-                    className="text-xs text-blue-900 font-medium hover:text-blue-900"
+                    className="text-xs text-brand-900 font-medium hover:text-brand-900"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={saveEdit}
                     disabled={!editingContent.trim()}
-                    className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-xs font-semibold py-1 px-3 rounded-lg"
+                    className="bg-brand-900 hover:bg-brand-950 disabled:opacity-40 text-white text-xs font-semibold py-1 px-3 rounded-lg"
                   >
                     Save
                   </button>
@@ -140,13 +140,13 @@ export function DiverNotes({ profileId, title = 'Diver notes (staff only)' }: Pr
             ) : (
               <>
                 <div className="flex items-start gap-2">
-                  <p className="flex-1 text-blue-900 whitespace-pre-wrap">{n.content}</p>
+                  <p className="flex-1 text-brand-900 whitespace-pre-wrap">{n.content}</p>
                   {canMutate(n) && (
                     <div className="flex gap-2 shrink-0">
                       <button
                         onClick={() => startEdit(n)}
                         aria-label={`Edit note from ${personName(n.author?.name, n.author?.nickname) || 'unknown'}`}
-                        className="text-xs text-blue-900 font-semibold hover:text-blue-700"
+                        className="text-xs text-brand-900 font-semibold hover:text-brand-700"
                       >
                         Edit
                       </button>
@@ -160,7 +160,7 @@ export function DiverNotes({ profileId, title = 'Diver notes (staff only)' }: Pr
                     </div>
                   )}
                 </div>
-                <p className="text-xs text-blue-950 font-medium">
+                <p className="text-xs text-brand-950 font-medium">
                   {personName(n.author?.name, n.author?.nickname) || 'unknown'} · {format(new Date(n.created_at), 'MMM d, yyyy · HH:mm')}
                   {n.edited_at && (
                     <> · edited{n.editor && ` by ${personName(n.editor.name, n.editor.nickname)}`} {format(new Date(n.edited_at), 'MMM d')}</>
@@ -172,7 +172,7 @@ export function DiverNotes({ profileId, title = 'Diver notes (staff only)' }: Pr
         ))}
       </div>
 
-      <div className="pt-2 border-t border-sky-200 space-y-2">
+      <div className="pt-2 border-t border-surface-200 space-y-2">
         <textarea
           value={content}
           onChange={e => setContent(e.target.value)}
@@ -180,13 +180,13 @@ export function DiverNotes({ profileId, title = 'Diver notes (staff only)' }: Pr
           rows={2}
           maxLength={2000}
           aria-label="New diver note"
-          className="w-full bg-white border border-sky-300 rounded-lg px-3 py-1.5 text-sm text-blue-900 focus:outline-none focus:border-blue-900"
+          className="w-full bg-white border border-surface-300 rounded-lg px-3 py-1.5 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
         />
         <div className="flex justify-end">
           <button
             onClick={addNote}
             disabled={saving || !content.trim()}
-            className="bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-xs font-semibold py-1 px-3 rounded-lg"
+            className="bg-brand-900 hover:bg-brand-950 disabled:opacity-40 text-white text-xs font-semibold py-1 px-3 rounded-lg"
           >
             Add note
           </button>

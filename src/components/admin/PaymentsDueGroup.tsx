@@ -25,7 +25,7 @@ export function PaymentsDueGroup({ rows, currency }: { rows: PaymentDueRow[]; cu
       <ul className="space-y-1">
         {rows.map(r => (
           <li key={r.bookingId} className="flex items-baseline justify-between gap-3">
-            <span className="text-sm text-blue-900 font-medium min-w-0">
+            <span className="text-sm text-brand-900 font-medium min-w-0">
               {r.name}
               {r.payerName && (
                 <span className="text-xs text-violet-700 font-semibold"> · paid by {r.payerName}</span>

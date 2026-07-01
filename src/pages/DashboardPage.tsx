@@ -89,7 +89,7 @@ export function DashboardPage() {
 
       // Hard navy fill each frame — no trail wash, otherwise the random
       // x positions blur into a uniform haze instead of distinct bubbles.
-      ctx.fillStyle = '#1e3a8a' // blue-900
+      ctx.fillStyle = '#1e3a8a' // brand-900
       ctx.fillRect(0, 0, width, height)
 
       for (const b of bubbles) {
@@ -142,7 +142,7 @@ export function DashboardPage() {
   return (
     <div
       ref={containerRef}
-      className="relative -m-4 -mb-24 h-[calc(100vh-3rem)] bg-blue-900 overflow-hidden"
+      className="relative -m-4 -mb-24 h-[calc(100vh-3rem)] bg-brand-900 overflow-hidden"
     >
       <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0" />
       {user && (

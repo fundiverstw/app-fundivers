@@ -19,8 +19,8 @@ import { TermsContent } from '../config/terms'
 
 export function TermsPage() {
   return (
-    <div className="min-h-screen bg-sky-50 text-blue-900">
-      <header className="bg-blue-950 border-b border-red-500 px-4 py-3">
+    <div className="min-h-screen bg-surface-50 text-brand-900">
+      <header className="bg-brand-950 border-b border-accent px-4 py-3">
         <Link to="/" aria-label={`${siteConfig.identity.logoAlt} home`}><Logo size="sm" /></Link>
       </header>
 
@@ -29,7 +29,7 @@ export function TermsPage() {
         <TermsContent />
 
         <div className="text-center pt-6">
-          <Link to="/" className="text-sm text-blue-700 hover:underline">‹ back</Link>
+          <Link to="/" className="text-sm text-brand-700 hover:underline">‹ back</Link>
         </div>
       </main>
     </div>
@@ -71,10 +71,10 @@ function ReacceptBanner() {
   return (
     <section
       role="alert"
-      className="rounded-lg border-2 border-red-500 bg-red-50 p-4 space-y-3"
+      className="rounded-lg border-2 border-accent bg-red-50 p-4 space-y-3"
     >
       <p className="font-bold text-red-700">Our Terms of Use have been updated</p>
-      <p className="text-blue-950">
+      <p className="text-brand-950">
         Please read the updated terms below. You'll need to accept them to
         continue using the app.
       </p>
@@ -82,7 +82,7 @@ function ReacceptBanner() {
         type="button"
         onClick={onAccept}
         disabled={submitting}
-        className="px-4 py-2 rounded bg-blue-700 hover:bg-blue-800 disabled:bg-slate-400 text-white font-semibold"
+        className="px-4 py-2 rounded bg-brand-700 hover:bg-brand-800 disabled:bg-slate-400 text-white font-semibold"
       >
         {submitting ? 'Saving…' : 'I agree to the updated Terms'}
       </button>

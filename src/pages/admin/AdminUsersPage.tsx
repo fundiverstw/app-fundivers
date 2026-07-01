@@ -391,7 +391,7 @@ export function AdminUsersPage() {
         value={filter}
         onChange={e => setFilter(e.target.value)}
         placeholder="Search by name, contact, cert…"
-        className="w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-blue-900 text-sm focus:outline-none focus:border-blue-900"
+        className="w-full bg-white border border-surface-300 rounded-lg px-3 py-2 text-brand-900 text-sm focus:outline-none focus:border-brand-900"
       />
 
       <div className="space-y-2">
@@ -422,7 +422,7 @@ export function AdminUsersPage() {
           />
         ))}
         {visible.length === 0 && (
-          <p className="text-blue-950 font-medium text-sm">No matches.</p>
+          <p className="text-brand-950 font-medium text-sm">No matches.</p>
         )}
       </div>
     </div>
@@ -457,7 +457,7 @@ function UserCard({
 }) {
   const { user: authUser } = useAuth()
   return (
-    <div className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl">
+    <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl">
       {/* role="button", not a real <button>: text inside a <button> can't be
           selected by click-drag on desktop, so admins couldn't copy a diver's
           name/cert. A div keeps the whole row tappable while leaving the text
@@ -469,14 +469,14 @@ function UserCard({
         aria-expanded={open}
         onClick={() => { if (!window.getSelection()?.toString()) onToggle() }}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle() } }}
-        className="w-full text-left p-3 flex items-start justify-between hover:bg-sky-100 rounded-xl transition-colors cursor-pointer"
+        className="w-full text-left p-3 flex items-start justify-between hover:bg-surface-100 rounded-xl transition-colors cursor-pointer"
       >
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-blue-900 text-sm">
+          <p className="font-medium text-brand-900 text-sm">
             {user.name ?? '(unnamed)'}
-            {user.nickname && <span className="text-blue-900 font-medium"> ({user.nickname})</span>}
+            {user.nickname && <span className="text-brand-900 font-medium"> ({user.nickname})</span>}
           </p>
-          <p className="text-xs text-blue-900 font-medium">
+          <p className="text-xs text-brand-900 font-medium">
             {user.cert_agency && user.cert_level ? `${user.cert_agency} ${user.cert_level}` : 'Uncertified'}
             {user.logged_dives > 0 && ` · ${user.logged_dives} logged`}
             {user.nitrox_certified && ' · Nitrox'}
@@ -485,18 +485,18 @@ function UserCard({
         </div>
         <div className="flex items-center gap-2 shrink-0 ml-3">
           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full select-none ${
-            user.role === 'admin' ? 'bg-red-500 text-white'
+            user.role === 'admin' ? 'bg-accent text-white'
             : user.role === 'staff' ? 'bg-amber-500 text-white'
-            : 'bg-blue-900 text-white'
+            : 'bg-brand-900 text-white'
           }`}>
             {user.role}
           </span>
-          <span className="text-xs text-blue-950 font-medium select-none">{open ? '▲' : '▼'}</span>
+          <span className="text-xs text-brand-950 font-medium select-none">{open ? '▲' : '▼'}</span>
         </div>
       </div>
 
       {open && (
-        <div className="px-4 pb-4 border-t border-sky-200 pt-3 space-y-4 text-sm">
+        <div className="px-4 pb-4 border-t border-surface-200 pt-3 space-y-4 text-sm">
           {editing && authUser && isAdmin ? (
             // Reuses the diver-facing form so field validation / save logic /
             // gates (cert + nitrox card requirements) stay in one place. The
@@ -504,11 +504,11 @@ function UserCard({
             // RLS policy is in place, this writes through to the target row.
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Editing profile</p>
+                <p className="text-xs font-semibold text-brand-700 uppercase tracking-wider">Editing profile</p>
                 <button
                   type="button"
                   onClick={onCancelEdit}
-                  className="text-xs text-blue-700 hover:text-blue-900 underline"
+                  className="text-xs text-brand-700 hover:text-brand-900 underline"
                 >
                   Done
                 </button>
@@ -536,7 +536,7 @@ function UserCard({
                   <button
                     type="button"
                     onClick={onEdit}
-                    className="text-xs text-blue-700 hover:text-blue-900 underline"
+                    className="text-xs text-brand-700 hover:text-brand-900 underline"
                   >
                     Edit profile
                   </button>
@@ -548,7 +548,7 @@ function UserCard({
                 <AdminFamilyPanel user={user} allUsers={allUsers} onChanged={onFamilyChanged} />
               )}
               {loading && (
-                <div className="flex justify-center py-2"><Spinner className="w-5 h-5 border-2 border-blue-900" /></div>
+                <div className="flex justify-center py-2"><Spinner className="w-5 h-5 border-2 border-brand-900" /></div>
               )}
               {extras && (
                 <ExtrasBlock
@@ -612,7 +612,7 @@ function ProfileDetails({ user }: { user: Profile }) {
 
       {user.medical_notes && (
         <Section title="Medical notes">
-          <p className="text-blue-950 font-medium bg-sky-50 rounded p-2 text-xs whitespace-pre-wrap">{user.medical_notes}</p>
+          <p className="text-brand-950 font-medium bg-surface-50 rounded p-2 text-xs whitespace-pre-wrap">{user.medical_notes}</p>
         </Section>
       )}
     </div>
@@ -639,10 +639,10 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
     return { id: b.id, label: b.event?.title ?? '(event)', due }
   }).filter(t => t.due > 0)
   return (
-    <div className="space-y-3 pt-2 border-t border-sky-200">
+    <div className="space-y-3 pt-2 border-t border-surface-200">
       <Section title="Bookings" defaultOpen>
         {activeBookings.length === 0 ? (
-          <p className="text-blue-950 font-medium text-xs">None active.</p>
+          <p className="text-brand-950 font-medium text-xs">None active.</p>
         ) : (
           <div className="space-y-3">
             {activeBookings.map(b => {
@@ -655,9 +655,9 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
                 <div key={b.id} className="space-y-1">
                   <div className="flex items-start justify-between text-xs">
                     <div className="min-w-0">
-                      <p className="text-blue-900 truncate">{b.event?.title ?? '(event)'}</p>
+                      <p className="text-brand-900 truncate">{b.event?.title ?? '(event)'}</p>
                       {b.event && (
-                        <p className="text-blue-950 font-medium">{formatEventSpan(b.event, { style: 'compact', withYear: true })}</p>
+                        <p className="text-brand-950 font-medium">{formatEventSpan(b.event, { style: 'compact', withYear: true })}</p>
                       )}
                     </div>
                     <span className={`capitalize shrink-0 ml-2 ${statusColor(b.status)}`}>{b.status}</span>
@@ -700,18 +700,18 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
 
       <Section title="Totals across all bookings" defaultOpen>
         <div className="flex justify-between text-xs">
-          <span className="text-blue-900 font-medium">Paid</span>
-          <span className="text-blue-900 font-semibold">{extras.paidSum.toLocaleString()}</span>
+          <span className="text-brand-900 font-medium">Paid</span>
+          <span className="text-brand-900 font-semibold">{extras.paidSum.toLocaleString()}</span>
         </div>
         {extras.pendingSum > 0 && (
           <div className="flex justify-between text-xs">
-            <span className="text-blue-900 font-medium">Pending</span>
+            <span className="text-brand-900 font-medium">Pending</span>
             <span className="text-red-600">{extras.pendingSum.toLocaleString()}</span>
           </div>
         )}
         {extras.openCreditBalance > 0 && (
           <div className="flex justify-between text-xs">
-            <span className="text-blue-900 font-medium">Open credit (owed to diver)</span>
+            <span className="text-brand-900 font-medium">Open credit (owed to diver)</span>
             <span className="text-emerald-700 font-semibold">{extras.openCreditBalance.toLocaleString()}</span>
           </div>
         )}
@@ -782,21 +782,21 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
   return (
     <div className="text-xs space-y-2">
       <div className="flex justify-between">
-        <span className="text-blue-900 font-medium">Credit owed (incl. overpayments)</span>
-        <span className={`font-semibold ${openBalance > 0 ? 'text-emerald-700' : 'text-blue-900'}`}>
+        <span className="text-brand-900 font-medium">Credit owed (incl. overpayments)</span>
+        <span className={`font-semibold ${openBalance > 0 ? 'text-emerald-700' : 'text-brand-900'}`}>
           {openBalance.toLocaleString()}
         </span>
       </div>
 
       {credits.length === 0 ? (
-        <p className="text-blue-950 font-medium italic">No credits on record.</p>
+        <p className="text-brand-950 font-medium italic">No credits on record.</p>
       ) : (
-        <ul className="space-y-1 pt-1 border-t border-sky-200">
+        <ul className="space-y-1 pt-1 border-t border-surface-200">
           {credits.map(c => {
             const linked = c.booking_id ? bookings.find(b => b.id === c.booking_id) : null
             return (
               <li key={c.id} className="flex items-baseline justify-between gap-2">
-                <span className="text-blue-950 font-medium flex-1">
+                <span className="text-brand-950 font-medium flex-1">
                   {format(new Date(c.created_at), 'MMM d')} · {c.reason}
                   {linked?.event && <span className="opacity-70"> (re: {linked.event.title})</span>}
                   {c.status === 'settled' && c.settled_note && (
@@ -811,7 +811,7 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
                     type="button"
                     disabled={settlingId === c.id}
                     onClick={() => handleSettle(c)}
-                    className="shrink-0 text-[10px] text-blue-700 hover:text-blue-900 underline disabled:opacity-50"
+                    className="shrink-0 text-[10px] text-brand-700 hover:text-brand-900 underline disabled:opacity-50"
                   >
                     {settlingId === c.id ? '…' : 'Settle'}
                   </button>
@@ -821,12 +821,12 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
                     type="button"
                     disabled={settlingId === c.id}
                     onClick={() => handleReopen(c)}
-                    className="shrink-0 text-[10px] text-blue-700 hover:text-blue-900 underline disabled:opacity-50"
+                    className="shrink-0 text-[10px] text-brand-700 hover:text-brand-900 underline disabled:opacity-50"
                   >
                     {settlingId === c.id ? '…' : 'Re-open'}
                   </button>
                 )}
-                <span className={`shrink-0 font-semibold ${c.status === 'settled' ? 'text-blue-950 line-through' : 'text-emerald-700'}`}>
+                <span className={`shrink-0 font-semibold ${c.status === 'settled' ? 'text-brand-950 line-through' : 'text-emerald-700'}`}>
                   {Number(c.amount).toLocaleString()}
                 </span>
               </li>
@@ -845,12 +845,12 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
       )}
 
       {!readOnly && (
-        <div className="pt-1 border-t border-sky-200">
+        <div className="pt-1 border-t border-surface-200">
           {!showForm ? (
             <button
               type="button"
               onClick={() => setShowForm(true)}
-              className="text-xs text-blue-700 hover:text-blue-900 underline"
+              className="text-xs text-brand-700 hover:text-brand-900 underline"
             >
               + Issue credit
             </button>
@@ -862,12 +862,12 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
                   value={amountStr}
                   onChange={e => setAmountStr(e.target.value)}
                   placeholder="Amount"
-                  className="w-24 bg-white border border-sky-300 rounded px-2 py-1 text-xs text-blue-900"
+                  className="w-24 bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
                 />
                 <select
                   value={linkedBooking}
                   onChange={e => setLinkedBooking(e.target.value)}
-                  className="flex-1 bg-white border border-sky-300 rounded px-2 py-1 text-xs text-blue-900"
+                  className="flex-1 bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
                 >
                   <option value="">— no linked booking —</option>
                   {bookings.map(b => (
@@ -883,20 +883,20 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
                 onChange={e => setReason(e.target.value)}
                 placeholder="Reason (e.g. weather-cancelled Kenting May 15)"
                 maxLength={500}
-                className="w-full bg-white border border-sky-300 rounded px-2 py-1 text-xs text-blue-900"
+                className="w-full bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
               />
               <div className="flex gap-2">
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="text-xs bg-blue-900 hover:bg-blue-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded"
+                  className="text-xs bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded"
                 >
                   {submitting ? 'Issuing…' : 'Issue credit'}
                 </button>
                 <button
                   type="button"
                   onClick={() => { setShowForm(false); setError(null); setAmountStr(''); setReason(''); setLinkedBooking('') }}
-                  className="text-xs text-blue-700 hover:text-blue-900 underline"
+                  className="text-xs text-brand-700 hover:text-brand-900 underline"
                 >
                   Cancel
                 </button>
@@ -938,13 +938,13 @@ function ApplyToBookingForm({ spendable, targets, tiedCredit, onApply }: {
   }
 
   return (
-    <form onSubmit={submit} className="pt-1 border-t border-sky-200 space-y-1.5">
-      <p className="text-blue-900 font-medium">Apply credit to a booking</p>
+    <form onSubmit={submit} className="pt-1 border-t border-surface-200 space-y-1.5">
+      <p className="text-brand-900 font-medium">Apply credit to a booking</p>
       <div className="flex items-center gap-2">
         <select
           value={bookingId}
           onChange={e => { setBookingId(e.target.value); setAmountStr('') }}
-          className="flex-1 bg-white border border-sky-300 rounded px-2 py-1 text-xs text-blue-900"
+          className="flex-1 bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
         >
           {targets.map(t => (
             <option key={t.id} value={t.id}>{t.label} · {t.due.toLocaleString()} due</option>
@@ -955,17 +955,17 @@ function ApplyToBookingForm({ spendable, targets, tiedCredit, onApply }: {
           value={amountStr}
           onChange={e => setAmountStr(e.target.value)}
           placeholder={cap.toLocaleString()}
-          className="w-24 bg-white border border-sky-300 rounded px-2 py-1 text-xs text-blue-900"
+          className="w-24 bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
         />
         <button
           type="submit"
           disabled={busy || amount <= 0}
-          className="text-xs bg-blue-900 hover:bg-blue-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded"
+          className="text-xs bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded"
         >
           {busy ? 'Applying…' : 'Apply'}
         </button>
       </div>
-      <p className="text-blue-950">Up to {cap.toLocaleString()} of {spendable.toLocaleString()} available credit.</p>
+      <p className="text-brand-950">Up to {cap.toLocaleString()} of {spendable.toLocaleString()} available credit.</p>
     </form>
   )
 }
@@ -973,8 +973,8 @@ function ApplyToBookingForm({ spendable, targets, tiedCredit, onApply }: {
 function Section({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
   return (
     <details open={defaultOpen} className="group space-y-1">
-      <summary className="flex items-center gap-1 cursor-pointer select-none list-none text-xs font-semibold text-blue-700 uppercase tracking-wider [&::-webkit-details-marker]:hidden">
-        <span className="text-blue-400 transition-transform group-open:rotate-90">&#9656;</span>
+      <summary className="flex items-center gap-1 cursor-pointer select-none list-none text-xs font-semibold text-brand-700 uppercase tracking-wider [&::-webkit-details-marker]:hidden">
+        <span className="text-brand-400 transition-transform group-open:rotate-90">&#9656;</span>
         {title}
       </summary>
       <div className="pl-1 pt-1 space-y-0.5">{children}</div>
@@ -986,8 +986,8 @@ function Row({ k, v }: { k: string; v: string | null | undefined }) {
   if (!v) return null
   return (
     <div className="flex justify-between text-xs">
-      <span className="text-blue-900 font-medium">{k}</span>
-      <span className="text-blue-900 text-right">{v}</span>
+      <span className="text-brand-900 font-medium">{k}</span>
+      <span className="text-brand-900 text-right">{v}</span>
     </div>
   )
 }
@@ -997,10 +997,10 @@ function labelForMethod(m: NonNullable<Profile['contact_method']>) {
 }
 
 function statusColor(s: Booking['status']) {
-  return s === 'confirmed' ? 'text-blue-900 font-semibold'
+  return s === 'confirmed' ? 'text-brand-900 font-semibold'
     : s === 'pending'    ? 'text-red-600'
     : s === 'waitlisted' ? 'text-violet-400'
-    :                      'text-blue-950 font-medium'
+    :                      'text-brand-950 font-medium'
 }
 
 function CertCardPreview({ path }: { path: string }) {
@@ -1016,7 +1016,7 @@ function CertCardPreview({ path }: { path: string }) {
       <img
         src={url}
         alt="Certification card"
-        className="w-full rounded-lg border border-sky-200"
+        className="w-full rounded-lg border border-surface-200"
       />
     </a>
   )

@@ -270,7 +270,7 @@ function Card({
       <button
         type="button"
         onClick={onToggle}
-        className="w-full text-left p-4 flex items-start justify-between hover:bg-sky-50 rounded-xl transition-colors"
+        className="w-full text-left p-4 flex items-start justify-between hover:bg-surface-50 rounded-xl transition-colors"
       >
         <div className="flex-1 min-w-0">
           <p className={`font-medium ${TEXT_HEADING} text-sm`}>
@@ -294,7 +294,7 @@ function Card({
       </button>
 
       {open && (
-        <div className="px-4 pb-4 border-t border-sky-200 pt-3 space-y-3 text-sm">
+        <div className="px-4 pb-4 border-t border-surface-200 pt-3 space-y-3 text-sm">
           {(row.charges.length > 0 || amendmentLines.length > 0)
             ? <ChargeBreakdown lines={row.charges} amendments={amendmentLines} currency={currency} total={owed} />
             : total > 0 && (
@@ -306,7 +306,7 @@ function Card({
           {deposit > 0 && (
             <div className={`flex justify-between ${TEXT_BODY}`}>
               <span>Deposit</span>
-              <span className={row.paidSum >= deposit ? 'text-blue-900 font-semibold' : TEXT_ERROR}>
+              <span className={row.paidSum >= deposit ? 'text-brand-900 font-semibold' : TEXT_ERROR}>
                 {currency} {deposit.toLocaleString()} {row.paidSum >= deposit ? '✓' : 'due'}
               </span>
             </div>
@@ -315,7 +315,7 @@ function Card({
           {row.paidSum > 0 && (
             <div className={`flex justify-between ${TEXT_BODY}`}>
               <span>Paid so far</span>
-              <span className="text-blue-900 font-semibold">{currency} {row.paidSum.toLocaleString()}</span>
+              <span className="text-brand-900 font-semibold">{currency} {row.paidSum.toLocaleString()}</span>
             </div>
           )}
           {row.credit > 0 && (
@@ -325,18 +325,18 @@ function Card({
             </div>
           )}
           {total > 0 && (
-            <div className={`flex justify-between font-semibold pt-1 border-t border-sky-200 ${TEXT_BODY}`}>
+            <div className={`flex justify-between font-semibold pt-1 border-t border-surface-200 ${TEXT_BODY}`}>
               <span>Balance</span>
               {bal.state === 'due' && <span className={TEXT_ERROR}>{currency} {bal.amount.toLocaleString()} due</span>}
               {bal.state === 'credit' && <span className="text-emerald-700">{currency} {bal.amount.toLocaleString()} credit</span>}
-              {bal.state === 'settled' && <span className="text-blue-900">Settled ✓</span>}
+              {bal.state === 'settled' && <span className="text-brand-900">Settled ✓</span>}
             </div>
           )}
 
           <Breakdown details={details} addonNames={addonNames} />
 
           {row.notes && (
-            <p className={`text-xs ${TEXT_MUTED} bg-sky-50 rounded p-2`}>📝 {row.notes}</p>
+            <p className={`text-xs ${TEXT_MUTED} bg-surface-50 rounded p-2`}>📝 {row.notes}</p>
           )}
           <p className={`text-xs ${TEXT_SUBTLE}`}>
             Booked {format(new Date(row.created_at), 'MMM d, yyyy')}
@@ -356,7 +356,7 @@ function Card({
             {row.event && (
               <ShareEventButton
                 event={row.event}
-                className="flex-1 text-xs py-2 px-3 rounded-lg bg-sky-700 hover:bg-sky-800 text-white font-medium"
+                className="flex-1 text-xs py-2 px-3 rounded-lg bg-surface-700 hover:bg-surface-800 text-white font-medium"
               />
             )}
           </div>
@@ -374,7 +374,7 @@ function WaitlistOfferBanner({
   accepting: boolean
 }) {
   return (
-    <div className="bg-red-500 text-white px-4 py-3 rounded-t-xl flex items-center justify-between gap-3">
+    <div className="bg-accent text-white px-4 py-3 rounded-t-xl flex items-center justify-between gap-3">
       <div className="min-w-0">
         <p className="font-semibold text-sm">A spot just opened up.</p>
         <p className="text-xs text-white/90">{remainingLabel} — accept before it rolls to the next person.</p>
@@ -383,7 +383,7 @@ function WaitlistOfferBanner({
         type="button"
         onClick={onAccept}
         disabled={accepting}
-        className="bg-white text-red-700 font-semibold text-xs rounded-lg px-3 py-1.5 hover:bg-sky-100 transition-colors disabled:opacity-50 shrink-0"
+        className="bg-white text-red-700 font-semibold text-xs rounded-lg px-3 py-1.5 hover:bg-surface-100 transition-colors disabled:opacity-50 shrink-0"
       >
         {accepting ? 'Accepting…' : 'Accept'}
       </button>

@@ -120,12 +120,12 @@ export function AdminDashboardPage() {
   }, [])
 
   if (error) {
-    return <div className="max-w-5xl mx-auto"><p className="text-sm text-red-200 bg-red-900/40 border border-red-500 rounded-lg p-3">{error}</p></div>
+    return <div className="max-w-5xl mx-auto"><p className="text-sm text-red-200 bg-red-900/40 border border-accent rounded-lg p-3">{error}</p></div>
   }
   if (!dash) {
     return (
       <div className="max-w-5xl mx-auto flex justify-center py-16">
-        <Spinner className="w-6 h-6 border-2 border-sky-300" />
+        <Spinner className="w-6 h-6 border-2 border-surface-300" />
       </div>
     )
   }
@@ -187,8 +187,8 @@ export function AdminDashboardPage() {
 
       <ChartCard title="Upcoming events — fill" empty={!dash.upcomingFill.length}>
         <div className="max-h-80 overflow-y-auto -mx-1 px-1">
-          <table className="w-full text-xs text-blue-900">
-            <thead className="text-blue-900/60 text-left">
+          <table className="w-full text-xs text-brand-900">
+            <thead className="text-brand-900/60 text-left">
               <tr>
                 <th className="font-medium pb-1">Event</th>
                 <th className="font-medium pb-1">Date</th>
@@ -199,7 +199,7 @@ export function AdminDashboardPage() {
             </thead>
             <tbody>
               {dash.upcomingFill.map(r => (
-                <tr key={`${r.type}:${r.id}`} className="border-t border-sky-100">
+                <tr key={`${r.type}:${r.id}`} className="border-t border-surface-100">
                   <td className="py-1 pr-2 truncate max-w-[14rem]">{r.title}</td>
                   <td className="py-1 pr-2 tabular-nums">{r.date ?? '—'}</td>
                   <td className="py-1 text-right tabular-nums">{r.confirmed}</td>

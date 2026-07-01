@@ -44,9 +44,9 @@ interface BookingLine {
 
 const PAYMENT_STATUS_STYLES: Record<Payment['status'], string> = {
   pending: 'text-red-600',
-  paid: 'text-blue-900 font-semibold',
-  refunded: 'text-blue-950 font-medium',
-  voided: 'text-blue-950 font-medium line-through',
+  paid: 'text-brand-900 font-semibold',
+  refunded: 'text-brand-950 font-medium',
+  voided: 'text-brand-950 font-medium line-through',
 }
 
 
@@ -274,7 +274,7 @@ export function PaymentsPage() {
       <div className="grid grid-cols-3 gap-2">
         <Summary label="Deposits due" value={totalDepositDue} currency={currency} accent="text-red-600" />
         <Summary label="Balance due"  value={totalOwed}       currency={currency} accent="text-red-600" />
-        <Summary label="Total paid"   value={totalPaid}       currency={currency} accent="text-blue-900" />
+        <Summary label="Total paid"   value={totalPaid}       currency={currency} accent="text-brand-900" />
       </div>
 
       {active.length === 0 ? (
@@ -370,7 +370,7 @@ function ApplyCreditControl({
           max={max}
           value={amount}
           onChange={e => setAmount(Number(e.target.value))}
-          className="flex-1 min-w-0 rounded-md border border-emerald-400 px-2 py-1 text-sm text-blue-950"
+          className="flex-1 min-w-0 rounded-md border border-emerald-400 px-2 py-1 text-sm text-brand-950"
         />
         <button
           type="button"
@@ -423,7 +423,7 @@ function LineCard({
       <button
         type="button"
         onClick={onToggle}
-        className="w-full text-left p-4 flex items-start justify-between hover:bg-sky-50 rounded-xl transition-colors"
+        className="w-full text-left p-4 flex items-start justify-between hover:bg-surface-50 rounded-xl transition-colors"
       >
         <div className="flex-1 min-w-0">
           <p className={`font-medium ${TEXT_HEADING} text-sm`}>{label}</p>
@@ -441,7 +441,7 @@ function LineCard({
               <p className={`text-sm font-semibold ${TEXT_HEADING}`}>{currency} {total.toLocaleString()}</p>
               {bal.state === 'due' && <p className={`text-xs ${TEXT_ERROR}`}>{currency} {bal.amount.toLocaleString()} due</p>}
               {bal.state === 'credit' && <p className="text-xs text-emerald-700 font-semibold">{currency} {bal.amount.toLocaleString()} credit</p>}
-              {bal.state === 'settled' && <p className="text-xs text-blue-900 font-semibold">Paid in full</p>}
+              {bal.state === 'settled' && <p className="text-xs text-brand-900 font-semibold">Paid in full</p>}
             </>
           ) : <p className={`text-xs ${TEXT_SUBTLE}`}>—</p>}
           <p className={`text-xs ${TEXT_SUBTLE} mt-0.5`}>{open ? '▲' : '▼'}</p>
@@ -449,7 +449,7 @@ function LineCard({
       </button>
 
       {open && (
-        <div className="px-4 pb-4 border-t border-sky-200 pt-3 space-y-3 text-sm">
+        <div className="px-4 pb-4 border-t border-surface-200 pt-3 space-y-3 text-sm">
           {(charges.length > 0 || amendments.length > 0)
             ? <ChargeBreakdown lines={charges} amendments={amendments} currency={currency} total={owed} />
             : total > 0 && (
@@ -461,7 +461,7 @@ function LineCard({
           {deposit > 0 && (
             <div className="flex justify-between">
               <span className={TEXT_BODY}>Deposit</span>
-              <span className={depositDue > 0 ? `${TEXT_ERROR} font-medium` : 'text-blue-900 font-semibold'}>
+              <span className={depositDue > 0 ? `${TEXT_ERROR} font-medium` : 'text-brand-900 font-semibold'}>
                 {depositDue > 0
                   ? `${currency} ${depositDue.toLocaleString()} due`
                   : `${currency} ${deposit.toLocaleString()} paid ✓`}
@@ -471,7 +471,7 @@ function LineCard({
           {paid > 0 && (
             <div className={`flex justify-between ${TEXT_BODY}`}>
               <span>Paid</span>
-              <span className="text-blue-900 font-semibold">{currency} {paid.toLocaleString()}</span>
+              <span className="text-brand-900 font-semibold">{currency} {paid.toLocaleString()}</span>
             </div>
           )}
           {credit > 0 && (
@@ -481,15 +481,15 @@ function LineCard({
             </div>
           )}
           {total > 0 && (
-            <div className={`flex justify-between font-semibold pt-1 border-t border-sky-200 ${TEXT_BODY}`}>
+            <div className={`flex justify-between font-semibold pt-1 border-t border-surface-200 ${TEXT_BODY}`}>
               <span>Balance</span>
               {bal.state === 'due' && <span className={TEXT_ERROR}>{currency} {bal.amount.toLocaleString()} due</span>}
               {bal.state === 'credit' && <span className="text-emerald-700">{currency} {bal.amount.toLocaleString()} credit</span>}
-              {bal.state === 'settled' && <span className="text-blue-900">Settled ✓</span>}
+              {bal.state === 'settled' && <span className="text-brand-900">Settled ✓</span>}
             </div>
           )}
 
-          <div className={`text-xs ${TEXT_SUBTLE} pt-2 border-t border-sky-200`}>
+          <div className={`text-xs ${TEXT_SUBTLE} pt-2 border-t border-surface-200`}>
             Booked {format(new Date(booking.created_at), 'MMM d, yyyy')}
           </div>
 
@@ -553,7 +553,7 @@ function GroupCard({
       <button
         type="button"
         onClick={onToggle}
-        className="w-full text-left p-4 flex items-start justify-between hover:bg-sky-50 rounded-xl transition-colors"
+        className="w-full text-left p-4 flex items-start justify-between hover:bg-surface-50 rounded-xl transition-colors"
       >
         <div className="flex-1 min-w-0">
           <p className={`font-medium ${TEXT_HEADING} text-sm`}>Group of {lines.length} booking{lines.length === 1 ? '' : 's'}</p>
@@ -563,13 +563,13 @@ function GroupCard({
           <p className={`text-sm font-semibold ${TEXT_HEADING}`}>{currency} {owed.toLocaleString()}</p>
           {bal.state === 'due' && <p className={`text-xs ${TEXT_ERROR}`}>{currency} {bal.amount.toLocaleString()} due</p>}
           {bal.state === 'credit' && <p className="text-xs text-emerald-700 font-semibold">{currency} {bal.amount.toLocaleString()} credit</p>}
-          {bal.state === 'settled' && <p className="text-xs text-blue-900 font-semibold">Paid in full</p>}
+          {bal.state === 'settled' && <p className="text-xs text-brand-900 font-semibold">Paid in full</p>}
           <p className={`text-xs ${TEXT_SUBTLE} mt-0.5`}>{open ? '▲' : '▼'}</p>
         </div>
       </button>
 
       {open && (
-        <div className="px-4 pb-4 border-t border-sky-200 pt-3 space-y-2 text-sm">
+        <div className="px-4 pb-4 border-t border-surface-200 pt-3 space-y-2 text-sm">
           {lines.map(l => {
             const lb = bookingBalance(l.owed, l.paid, l.credit)
             return (
@@ -580,17 +580,17 @@ function GroupCard({
                 </span>
                 <span className="shrink-0 text-xs">
                   {lb.state === 'due' && <span className={TEXT_ERROR}>{currency} {lb.amount.toLocaleString()} due</span>}
-                  {lb.state === 'settled' && <span className="text-blue-900 font-semibold">Paid ✓</span>}
+                  {lb.state === 'settled' && <span className="text-brand-900 font-semibold">Paid ✓</span>}
                   {lb.state === 'credit' && <span className="text-emerald-700 font-semibold">{currency} {lb.amount.toLocaleString()} credit</span>}
                 </span>
               </div>
             )
           })}
-          <div className={`flex justify-between font-semibold pt-2 border-t border-sky-200 ${TEXT_BODY}`}>
+          <div className={`flex justify-between font-semibold pt-2 border-t border-surface-200 ${TEXT_BODY}`}>
             <span>Group balance</span>
             {bal.state === 'due' && <span className={TEXT_ERROR}>{currency} {bal.amount.toLocaleString()} due</span>}
             {bal.state === 'credit' && <span className="text-emerald-700">{currency} {bal.amount.toLocaleString()} credit</span>}
-            {bal.state === 'settled' && <span className="text-blue-900">Settled ✓</span>}
+            {bal.state === 'settled' && <span className="text-brand-900">Settled ✓</span>}
           </div>
           <p className={`text-xs ${TEXT_SUBTLE}`}>
             Pay the group balance in one transfer; the shop records it against everyone.
@@ -614,7 +614,7 @@ function CoveredCard({ line, currency }: { line: BookingLine; currency: string }
       </div>
       <div className="text-right shrink-0">
         {total > 0 && <p className={`text-sm ${TEXT_SUBTLE} line-through`}>{currency} {total.toLocaleString()}</p>}
-        <p className="text-xs text-blue-900 font-semibold">Nothing due</p>
+        <p className="text-xs text-brand-900 font-semibold">Nothing due</p>
       </div>
     </div>
   )

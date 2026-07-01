@@ -17,8 +17,8 @@ const staffName = siteConfig.identity.shortName
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-2">
-      <h2 className="text-lg font-bold text-blue-900">{title}</h2>
-      <div className="text-blue-950 font-medium space-y-2">{children}</div>
+      <h2 className="text-lg font-bold text-brand-900">{title}</h2>
+      <div className="text-brand-950 font-medium space-y-2">{children}</div>
     </section>
   )
 }
@@ -28,8 +28,8 @@ export function TermsContent() {
     <>
       <div className="space-y-2">
         <p className="text-xs uppercase tracking-[0.25em] text-red-600">Terms of Use & Privacy</p>
-        <h1 className="text-2xl font-bold text-blue-900">The short version</h1>
-        <p className="text-blue-900 font-medium">
+        <h1 className="text-2xl font-bold text-brand-900">The short version</h1>
+        <p className="text-brand-900 font-medium">
           We ask for the information we need to plan your dives safely and to
           handle permits, insurance, and emergency contact. Nothing we collect
           is sold or shared beyond what's required to run the trip you signed
@@ -52,7 +52,7 @@ export function TermsContent() {
         <p>
           <strong>Don't want to upload something through the app?</strong>{' '}
           Message us at{' '}
-          <a className="text-blue-700 hover:underline" href={`mailto:${email}`}>
+          <a className="text-brand-700 hover:underline" href={`mailto:${email}`}>
             {email}
           </a>{' '}
           and we'll handle it offline — bring your ID, cert card, or
@@ -114,7 +114,7 @@ export function TermsContent() {
 
       <Section title="Deletion and access">
         <p>
-          Email <a className="text-blue-700 hover:underline" href={`mailto:${email}`}>{email}</a> to
+          Email <a className="text-brand-700 hover:underline" href={`mailto:${email}`}>{email}</a> to
           request a full export or deletion of your account. We'll honor it
           within a reasonable turnaround.
         </p>

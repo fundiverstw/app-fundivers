@@ -68,10 +68,10 @@ export function AdminGearMapPage() {
         ‹ back to event
       </Link>
 
-      <header className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4">
-        <h1 className="text-xl font-bold text-blue-900">Gear map</h1>
+      <header className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4">
+        <h1 className="text-xl font-bold text-brand-900">Gear map</h1>
         {event && (
-          <p className="text-sm text-blue-900 font-medium mt-1">
+          <p className="text-sm text-brand-900 font-medium mt-1">
             {event.title} · {formatEventSpan(event, { style: 'compact' })}
           </p>
         )}
@@ -81,7 +81,7 @@ export function AdminGearMapPage() {
       </header>
 
       {rows.length === 0 ? (
-        <p className="text-blue-950 font-medium text-sm">No registrants yet.</p>
+        <p className="text-brand-950 font-medium text-sm">No registrants yet.</p>
       ) : (
         <section className="space-y-3">
           {rows.map(r => <DiverGearCard key={r.booking.id} row={r} onProfilePatched={patchProfile} />)}

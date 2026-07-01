@@ -15,9 +15,9 @@ interface Enriched {
 }
 
 const ROLE_STYLES: Record<string, string> = {
-  instructor: 'bg-blue-900 text-white',
-  guide:      'bg-blue-700 text-white',
-  support:    'bg-sky-500 text-white',
+  instructor: 'bg-brand-900 text-white',
+  guide:      'bg-brand-700 text-white',
+  support:    'bg-surface-500 text-white',
 }
 
 // "My duties" — visible to authenticated users who have any assigned
@@ -107,24 +107,24 @@ function Row({ e, eventLinkBase, dim }: { e: Enriched; eventLinkBase: string | n
     : format(parseISO(duty.start_date), 'EEE, MMM d')
 
   return (
-    <div className={`bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-3 space-y-1 ${dim ? 'opacity-60' : ''}`}>
+    <div className={`bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 space-y-1 ${dim ? 'opacity-60' : ''}`}>
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs text-blue-900 font-medium">{dateSpan}</p>
+        <p className="text-xs text-brand-900 font-medium">{dateSpan}</p>
         <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize shrink-0 ${ROLE_STYLES[duty.role] ?? ROLE_STYLES.support}`}>
           {duty.role}
         </span>
       </div>
       {event && eventLinkBase
-        ? <Link to={`${eventLinkBase}/${event.type}/${event.id}`} className="block text-sm font-medium text-blue-900 hover:text-blue-950 truncate">
-            {event.title} <span className="text-xs text-blue-900/70 font-normal">· {formatEventSpan(event)}</span>
+        ? <Link to={`${eventLinkBase}/${event.type}/${event.id}`} className="block text-sm font-medium text-brand-900 hover:text-brand-950 truncate">
+            {event.title} <span className="text-xs text-brand-900/70 font-normal">· {formatEventSpan(event)}</span>
           </Link>
         : event
-          ? <p className="text-sm font-medium text-blue-900 truncate">{event.title}</p>
+          ? <p className="text-sm font-medium text-brand-900 truncate">{event.title}</p>
           : (duty.eo_dive_id || duty.eo_course_id)
-            ? <p className="text-xs text-blue-950 font-medium">(event outside visible range)</p>
-            : <p className="text-xs text-blue-950 font-medium">Standalone duty</p>
+            ? <p className="text-xs text-brand-950 font-medium">(event outside visible range)</p>
+            : <p className="text-xs text-brand-950 font-medium">Standalone duty</p>
       }
-      {duty.notes && <p className="text-xs text-blue-900 font-medium bg-sky-50 rounded p-2 mt-1">📝 {duty.notes}</p>}
+      {duty.notes && <p className="text-xs text-brand-900 font-medium bg-surface-50 rounded p-2 mt-1">📝 {duty.notes}</p>}
     </div>
   )
 }

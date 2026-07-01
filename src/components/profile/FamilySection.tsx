@@ -48,32 +48,32 @@ function FamilyPanel({ parent }: { parent: Profile }) {
   }, [parent.id, refreshKey])
 
   return (
-    <section className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-4 space-y-3" aria-label="Family">
+    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3" aria-label="Family">
       <header className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-blue-900">Family</h2>
+        <h2 className="text-lg font-bold text-brand-900">Family</h2>
       </header>
-      <p className="text-xs text-blue-900 font-medium">
+      <p className="text-xs text-brand-900 font-medium">
         Manage diver accounts you've added on behalf of family members or guests. You can
         register them for events together with you in a single booking.
       </p>
 
       {loading ? (
         <div className="flex justify-center py-2">
-          <div className="w-5 h-5 border-2 border-blue-900 border-t-transparent rounded-full animate-spin" />
+          <div className="w-5 h-5 border-2 border-brand-900 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : children.length === 0 ? (
-        <p className="text-sm text-blue-950 font-medium italic">No child accounts yet.</p>
+        <p className="text-sm text-brand-950 font-medium italic">No child accounts yet.</p>
       ) : (
         <ul className="space-y-1">
           {children.map(c => (
-            <li key={c.id} className="bg-sky-50 border border-sky-200 rounded-lg px-3 py-2 space-y-2">
+            <li key={c.id} className="bg-surface-50 border border-surface-200 rounded-lg px-3 py-2 space-y-2">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-blue-900">
+                  <p className="text-sm font-medium text-brand-900">
                     {c.name ?? '(no name)'}
-                    {c.nickname && <span className="text-blue-900/80"> ({c.nickname})</span>}
+                    {c.nickname && <span className="text-brand-900/80"> ({c.nickname})</span>}
                   </p>
-                  <p className="text-xs text-blue-900/70">
+                  <p className="text-xs text-brand-900/70">
                     {c.cert_agency && c.cert_level ? `${c.cert_agency} ${c.cert_level}` : 'Uncertified'}
                     {c.status && c.status !== 'active' && (
                       <span className="ml-2 uppercase tracking-wider text-red-700">{c.status}</span>
@@ -84,13 +84,13 @@ function FamilyPanel({ parent }: { parent: Profile }) {
                   type="button"
                   onClick={() => setEditingId(prev => prev === c.id ? null : c.id)}
                   aria-expanded={editingId === c.id}
-                  className="shrink-0 text-xs font-semibold text-blue-900 border border-sky-300 rounded-lg px-3 py-1 hover:bg-sky-100"
+                  className="shrink-0 text-xs font-semibold text-brand-900 border border-surface-300 rounded-lg px-3 py-1 hover:bg-surface-100"
                 >
                   {editingId === c.id ? 'Close' : 'Edit'}
                 </button>
               </div>
               {editingId === c.id && (
-                <div className="border-t border-sky-200 pt-2">
+                <div className="border-t border-surface-200 pt-2">
                   {/* Full profile editor — parent updates the child's row
                       directly (RLS + storage policies scope it to children). */}
                   <ProfileForm
@@ -173,41 +173,41 @@ function CreateChildForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-2 border-t border-sky-200 pt-3">
-      <p className="text-xs text-blue-900 font-medium">
+    <form onSubmit={handleSubmit} className="space-y-2 border-t border-surface-200 pt-3">
+      <p className="text-xs text-brand-900 font-medium">
         We'll create an account for them and send a courtesy email letting them know — no
         login link, no password. If they ever want app access they can reach out.
       </p>
       <label className="block">
-        <span className="text-xs font-medium text-blue-900">Email *</span>
+        <span className="text-xs font-medium text-brand-900">Email *</span>
         <input
           type="email" required autoFocus
           value={email} onChange={e => setEmail(e.target.value)}
-          className="w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-blue-900 text-sm focus:outline-none focus:border-blue-900"
+          className="w-full bg-white border border-surface-300 rounded-lg px-3 py-2 text-brand-900 text-sm focus:outline-none focus:border-brand-900"
         />
       </label>
       <label className="block">
-        <span className="text-xs font-medium text-blue-900">Name *</span>
+        <span className="text-xs font-medium text-brand-900">Name *</span>
         <input
           type="text" required
           value={fullName} onChange={e => setFullName(e.target.value)}
-          className="w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-blue-900 text-sm focus:outline-none focus:border-blue-900"
+          className="w-full bg-white border border-surface-300 rounded-lg px-3 py-2 text-brand-900 text-sm focus:outline-none focus:border-brand-900"
         />
-        <span className="block text-xs text-blue-900/70 mt-1">
+        <span className="block text-xs text-brand-900/70 mt-1">
           First and last name, exactly as on their passport / ID.
         </span>
       </label>
       <label className="block">
-        <span className="text-xs font-medium text-blue-900">Nickname</span>
+        <span className="text-xs font-medium text-brand-900">Nickname</span>
         <input
           type="text"
           value={nickname} onChange={e => setNickname(e.target.value)}
           placeholder="English name, alias, or what you call them (optional)"
-          className="w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-blue-900 text-sm focus:outline-none focus:border-blue-900"
+          className="w-full bg-white border border-surface-300 rounded-lg px-3 py-2 text-brand-900 text-sm focus:outline-none focus:border-brand-900"
         />
       </label>
 
-      {error && <p className="text-sm text-red-700 bg-red-50 border border-red-500 rounded px-2 py-1">{error}</p>}
+      {error && <p className="text-sm text-red-700 bg-red-50 border border-accent rounded px-2 py-1">{error}</p>}
 
       <div className="flex gap-2 pt-1">
         <button
@@ -221,7 +221,7 @@ function CreateChildForm({
         <button
           type="submit"
           disabled={submitting}
-          className="flex-1 py-2 rounded-lg text-sm font-semibold bg-blue-900 hover:bg-blue-950 text-white disabled:opacity-50"
+          className="flex-1 py-2 rounded-lg text-sm font-semibold bg-brand-900 hover:bg-brand-950 text-white disabled:opacity-50"
         >
           {submitting ? 'Creating…' : 'Create account'}
         </button>

@@ -70,16 +70,16 @@ export function DiverGearCard({
   }
 
   return (
-    <article className="bg-white/70 backdrop-blur-md border border-sky-200 rounded-xl p-3 space-y-2">
+    <article className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 space-y-2">
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-blue-900">
+          <h2 className="text-sm font-semibold text-brand-900">
             {personName(profile?.name, profile?.nickname) || '(unknown)'}
           </h2>
-          {sizing && <p className="text-xs text-blue-900 font-medium">{sizing}</p>}
+          {sizing && <p className="text-xs text-brand-900 font-medium">{sizing}</p>}
         </div>
         <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
-          pack.items.length > 0 || pack.note ? 'bg-red-100 text-red-700 border border-red-500' : 'bg-sky-100 text-blue-950 font-medium'
+          pack.items.length > 0 || pack.note ? 'bg-red-100 text-red-700 border border-accent' : 'bg-surface-100 text-brand-950 font-medium'
         }`}>
           {pack.summary}
         </span>
@@ -98,8 +98,8 @@ export function DiverGearCard({
               key={item}
               className={`text-xs px-2 py-0.5 rounded-full border ${
                 owned.has(item)
-                  ? 'border-blue-900/40 text-blue-950 font-medium line-through'
-                  : 'border-blue-900 text-blue-900'
+                  ? 'border-brand-900/40 text-brand-950 font-medium line-through'
+                  : 'border-brand-900 text-brand-900'
               }`}
               title={owned.has(item) ? 'Diver owns this item' : 'Needs packing'}
             >
@@ -110,7 +110,7 @@ export function DiverGearCard({
       )}
 
       {profile && (
-        <div className="border-t border-sky-200 pt-2 space-y-2">
+        <div className="border-t border-surface-200 pt-2 space-y-2">
           <div className="flex items-end gap-2">
             <SizeField label="Fin"     value={finSize}     onChange={setFinSize} />
             <SizeField label="BCD"     value={bcdSize}     onChange={setBcdSize} />
@@ -119,7 +119,7 @@ export function DiverGearCard({
               type="button"
               onClick={saveSizes}
               disabled={!sizesDirty || savingSizes}
-              className="shrink-0 bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white text-xs font-semibold py-1 px-2.5 rounded-md"
+              className="shrink-0 bg-brand-900 hover:bg-brand-950 disabled:opacity-40 text-white text-xs font-semibold py-1 px-2.5 rounded-md"
             >
               {savingSizes ? '…' : 'Save'}
             </button>
@@ -136,11 +136,11 @@ export function DiverGearCard({
 function SizeField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }): ReactNode {
   return (
     <label className="block">
-      <span className="block text-[10px] text-blue-900 font-medium mb-0.5 uppercase tracking-wide">{label}</span>
+      <span className="block text-[10px] text-brand-900 font-medium mb-0.5 uppercase tracking-wide">{label}</span>
       <input
         value={value}
         onChange={e => onChange(e.target.value)}
-        className="w-full bg-white border border-sky-300 rounded-md px-2 py-1 text-blue-900 text-xs focus:outline-none focus:border-blue-900"
+        className="w-full bg-white border border-surface-300 rounded-md px-2 py-1 text-brand-900 text-xs focus:outline-none focus:border-brand-900"
         placeholder="—"
       />
     </label>

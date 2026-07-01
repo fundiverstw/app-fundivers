@@ -59,7 +59,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-blue-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-brand-900 flex items-center justify-center p-4">
       <div className={`w-full max-w-sm ${CARD_ELEVATED} p-6`}>
         <div className="flex justify-center mb-3"><Logo size="lg" /></div>
         <p className={`${TEXT_MUTED} text-center mb-8 text-sm`}>Sign in to your account</p>
@@ -71,7 +71,7 @@ export function LoginPage() {
                 key={acc.email}
                 type="button"
                 onClick={() => fill(acc)}
-                className={`border border-dashed border-blue-900/40 ${TEXT_MUTED} text-xs py-1.5 rounded-lg hover:border-blue-900 hover:text-blue-900 transition-colors`}
+                className={`border border-dashed border-brand-900/40 ${TEXT_MUTED} text-xs py-1.5 rounded-lg hover:border-brand-900 hover:text-brand-900 transition-colors`}
               >
                 {acc.label}
               </button>
