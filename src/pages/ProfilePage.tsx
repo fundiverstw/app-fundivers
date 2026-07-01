@@ -14,6 +14,7 @@ import { isHeicFile } from '../lib/image-compress'
 import { fetchDiverCreditBalance } from '../lib/credits'
 import { FamilySection } from '../components/profile/FamilySection'
 import { MyWaivers } from '../components/profile/MyWaivers'
+import { siteConfig } from '../config/site'
 import { DateField } from '../components/DateField'
 import type { Profile, CertLevel } from '../types/database'
 import { ShoeSizeField } from '../components/ShoeSizeField'
@@ -127,7 +128,7 @@ function CreditBalanceLine({ userId }: { userId: string }) {
   if (balance <= 0) return null
   return (
     <div className="bg-emerald-50 border border-emerald-400 rounded-lg p-3 text-sm text-emerald-900">
-      Account credit (all events): <strong>NTD {balance.toLocaleString()}</strong> — see Payments for details.
+      Account credit (all events): <strong>{siteConfig.locale.currencyLabel} {balance.toLocaleString()}</strong> — see Payments for details.
     </div>
   )
 }
@@ -568,7 +569,7 @@ export function NotificationsToggle() {
         <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Push Notifications</h2>
         <p className="text-sm text-blue-900 font-medium">
           Your device doesn't support push notifications in this browser.
-          On iPhone/iPad, install FunDivers to your Home Screen
+          On iPhone/iPad, install {siteConfig.identity.shortName} to your Home Screen
           (Share → Add to Home Screen), open the app from there, and the toggle will appear.
         </p>
       </section>

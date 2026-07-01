@@ -1,11 +1,12 @@
 import type { AppEvent } from '../types/database'
+import { siteConfig } from '../config/site'
 
 // Admins set full_payment_deadline per event. When missing on a legacy
-// event we fall back to "7 days before start_date" so the registration
-// form + emailed PDF always render a concrete date. Deposit payment is
-// always "ASAP" — no per-event deadline.
+// event we fall back to "N days before start_date" (N from fundive.config.ts)
+// so the registration form + emailed PDF always render a concrete date.
+// Deposit payment is always "ASAP" — no per-event deadline.
 
-const FALLBACK_DAYS_BEFORE_START = 7
+const FALLBACK_DAYS_BEFORE_START = siteConfig.business.paymentDeadlineFallbackDays
 
 /** YYYY-MM-DD math via UTC arithmetic — avoids timezone drift on the date string. */
 function shiftDays(yyyyMmDd: string, deltaDays: number): string {

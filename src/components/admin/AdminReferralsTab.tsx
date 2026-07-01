@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode, type FormEvent } from 'react'
+import { siteConfig } from '../../config/site'
 import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
 import { personName } from '../../lib/names'
@@ -226,7 +227,7 @@ function RecordBookingModal({
   onError: (m: string) => void
 }) {
   const [amount, setAmount] = useState(referral.booked_amount?.toString() ?? trip?.price?.toString() ?? '')
-  const [currency, setCurrency] = useState(referral.booked_currency ?? trip?.currency ?? 'TWD')
+  const [currency, setCurrency] = useState(referral.booked_currency ?? trip?.currency ?? siteConfig.locale.currency)
   const [rate, setRate] = useState((((referral.kickback_rate ?? trip?.kickback_rate ?? 0.05)) * 100).toString())
   const [submitting, setSubmitting] = useState(false)
 
@@ -239,7 +240,7 @@ function RecordBookingModal({
       await recordReferralBooking({
         id: referral.id,
         bookedAmount: amt,
-        bookedCurrency: currency.trim() || 'TWD',
+        bookedCurrency: currency.trim() || siteConfig.locale.currency,
         kickbackRate: Number(rate) / 100,
       })
       await onSaved()

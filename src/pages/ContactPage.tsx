@@ -3,10 +3,11 @@ import {
   CARD, BTN_PRIMARY, INPUT, INPUT_LABEL,
   PAGE_HEADING, PAGE_BODY, TEXT_HEADING, TEXT_BODY,
 } from '../styles/tokens'
+import { siteConfig } from '../config/site'
 
-const LINE_URL = 'https://line.me/R/ti/p/%40lga0216c'
-const WHATSAPP_URL = 'https://wa.me/886909083683'
-const SUPPORT_EMAIL = 'fundiverstw@gmail.com'
+const LINE_URL = siteConfig.contact.lineUrl
+const WHATSAPP_URL = siteConfig.contact.whatsappUrl
+const SUPPORT_EMAIL = siteConfig.contact.email
 
 // Contact tab — entry points to reach the shop. LINE / WhatsApp are
 // straight handoffs to the respective apps; the email "form" composes

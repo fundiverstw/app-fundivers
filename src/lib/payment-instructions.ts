@@ -1,14 +1,18 @@
 // Per-method "How to pay" copy shown on the registration form's step 4 and
-// embedded in the emailed PDF. Lives in src/lib so the SPA can import it
-// directly; the edge function has a parallel copy under
-// supabase/functions/_shared/payment-instructions.ts (Deno can't reach
-// across into src/), so when copy changes here, mirror it there too.
+// embedded in the emailed PDF. Shop values come from fundive.config.ts. The
+// edge function keeps a parallel copy of the *logic* under
+// supabase/functions/_shared/payment-instructions.ts — it reads the same config,
+// so the shop values never drift; mirror any COPY changes there too.
 
-export const SHOP_PHONE    = '+886 909-083-683'
-export const SHOP_ADDRESS  = 'No. 8, Heping St, Yonghe District, New Taipei City, 23446'
-export const SHOP_MAPS_URL = 'https://maps.app.goo.gl/tDgtMirMrNX9QEjAA'
+import { siteConfig } from '../config/site'
 
-export const PAYPAL_LINK = 'https://paypal.me/fundiverstw'
+export const SHOP_PHONE    = siteConfig.contact.phone
+export const SHOP_ADDRESS  = siteConfig.contact.address
+export const SHOP_MAPS_URL = siteConfig.contact.mapsUrl
+
+export const PAYPAL_LINK = siteConfig.contact.paypalLink
+
+const CARD_SURCHARGE = `+${siteConfig.business.cardSurchargePercent}%`
 
 export type PaymentMethod = 'bank_transfer' | 'credit_card' | 'paypal' | 'cash'
 
@@ -46,7 +50,7 @@ export function paymentInstructionsFor(
       }
     case 'paypal':
       return {
-        title: 'How to pay — PayPal (+5%)',
+        title: `How to pay — PayPal (${CARD_SURCHARGE})`,
         lines: [
           'Send your payment via PayPal:',
           PAYPAL_LINK,
@@ -56,7 +60,7 @@ export function paymentInstructionsFor(
     case 'credit_card': {
       const target = (opts.invoiceEmail && opts.invoiceEmail.trim()) || 'your registered email'
       return {
-        title: 'How to pay — Credit card (+5%)',
+        title: `How to pay — Credit card (${CARD_SURCHARGE})`,
         lines: [
           "We'll email you an invoice with a credit-card payment link.",
           `Invoice will be sent to: ${target}`,
@@ -76,8 +80,8 @@ export function paymentConfirmationReminder(): PaymentInstructions {
   return {
     title: 'After you pay',
     lines: [
-      'Once you send your payment, please contact FunDivers by email, LINE, or WhatsApp so we can confirm receipt.',
-      'Keep an eye on the FunDivers TW app for updates to your registration status, payment confirmations, and event reminders.',
+      `Once you send your payment, please contact ${siteConfig.identity.shortName} by email, LINE, or WhatsApp so we can confirm receipt.`,
+      `Keep an eye on the ${siteConfig.identity.shopName} app for updates to your registration status, payment confirmations, and event reminders.`,
     ],
   }
 }

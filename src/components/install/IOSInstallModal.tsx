@@ -1,4 +1,5 @@
 import { MODAL_BACKDROP, MODAL_PANEL, BTN_PRIMARY, TEXT_HEADING, TEXT_BODY } from '../../styles/tokens'
+import { siteConfig } from '../../config/site'
 
 // iOS Safari can't trigger an install programmatically — the user has
 // to tap the Share button in Safari's toolbar and pick "Add to Home
@@ -60,7 +61,7 @@ export function IOSInstallModal({ onDismiss }: { onDismiss: () => void }) {
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="ios-install-title" className={`text-xl text-center ${TEXT_HEADING}`}>
-          Install FunDivers on iPhone
+          Install {siteConfig.identity.shortName} on iPhone
         </h2>
         <ol className={`text-sm space-y-3 ${TEXT_BODY}`}>
           <li>

@@ -1,8 +1,9 @@
-// Brand logo — wraps /imgs/fd_logo.png with size presets so every
-// surface that uses it picks a consistent height. The image is the
-// dive-mask-shaped FUN DIVERS TAIWAN mark (red/white/black on a
-// transparent background), so it works on dark and light surfaces
-// without modification.
+import { siteConfig } from '../config/site'
+
+// Brand logo — wraps the shop logo (fundive.config.ts `assets.logo`) with size
+// presets so every surface that uses it picks a consistent height. FunDivers'
+// image is the dive-mask-shaped mark (red/white/black on a transparent
+// background), so it works on dark and light surfaces without modification.
 //
 // Sizes (height in px): xs 24, sm 36, md 56, lg 88, xl 128.
 //
@@ -31,8 +32,8 @@ export function Logo({
   return (
     <span className="inline-flex items-start gap-1">
       <img
-        src="/imgs/fd_logo.png"
-        alt="FunDivers Taiwan"
+        src={siteConfig.assets.logo}
+        alt={siteConfig.identity.logoAlt}
         className={`${SIZE_CLASS[size]} w-auto ${className}`}
       />
       {beta && (

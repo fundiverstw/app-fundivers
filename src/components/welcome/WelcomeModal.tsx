@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
+import { siteConfig } from '../../config/site'
 
 // One-time welcome popup for new divers — shown the first time they
 // land in the AppShell after creating their account. Dismissed by
@@ -31,14 +32,14 @@ export function WelcomeModal({ user, onDismiss }: { user: User; onDismiss: () =>
     >
       <div className="bg-white/75 backdrop-blur-md rounded-2xl max-w-md w-full p-6 space-y-4 border border-red-500 shadow-2xl">
         <div className="flex justify-center">
-          <img src="/imgs/fd_logo.png" alt="FunDivers Taiwan" className="w-32 h-auto" />
+          <img src={siteConfig.assets.logo} alt={siteConfig.identity.logoAlt} className="w-32 h-auto" />
         </div>
         <h2 id="welcome-title" className="text-xl font-bold text-blue-900 text-center">
           Welcome{firstName ? `, ${firstName}` : ''}!
         </h2>
         <div className="text-sm text-blue-900 space-y-2">
           <p>
-            You're all set up with a FunDivers account. From here you can:
+            You're all set up with a {siteConfig.identity.shortName} account. From here you can:
           </p>
           <ul className="list-disc list-inside text-blue-950 font-medium space-y-1">
             <li>Browse upcoming dives and courses on the calendar</li>
@@ -46,8 +47,8 @@ export function WelcomeModal({ user, onDismiss }: { user: User; onDismiss: () =>
             <li>Keep your profile, cert card, and gear preferences up to date</li>
           </ul>
           <p className="text-blue-950 font-medium">
-            Questions about a registration? Reach the FunDivers staff at{' '}
-            <a href="mailto:fundiverstw@gmail.com" className="text-blue-700 underline hover:text-blue-900">fundiverstw@gmail.com</a>.
+            Questions about a registration? Reach the {siteConfig.identity.shortName} staff at{' '}
+            <a href={`mailto:${siteConfig.contact.email}`} className="text-blue-700 underline hover:text-blue-900">{siteConfig.contact.email}</a>.
           </p>
         </div>
         <button

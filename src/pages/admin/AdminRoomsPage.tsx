@@ -1,4 +1,5 @@
 import { CatalogManager, type CatalogField } from '../../components/admin/CatalogManager'
+import { siteConfig } from '../../config/site'
 import type { EORoom } from '../../types/database'
 
 const fields: CatalogField<EORoom>[] = [
@@ -17,7 +18,7 @@ export function AdminRoomsPage() {
       orderBy="display_title"
       fields={fields}
       rowLabel={r => r.display_title || r.admin_title || r._id}
-      rowDetail={r => r.added_price != null ? `+${r.added_price.toLocaleString()} ${r.currency || 'TWD'}` : null}
+      rowDetail={r => r.added_price != null ? `+${r.added_price.toLocaleString()} ${r.currency || siteConfig.locale.currency}` : null}
     />
   )
 }

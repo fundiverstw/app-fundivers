@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { CountPoint, MoneyPoint } from '../../lib/admin-dashboard'
+import { siteConfig } from '../../config/site'
 
 // Dependency-free dashboard visuals: a KPI tile, a horizontal bar list (for
 // distributions), and a column chart (for monthly time series). All sizing is
@@ -25,7 +26,7 @@ export function ChartCard({ title, children, empty }: { title: string; children:
   )
 }
 
-const TWD = (n: number) => `TWD ${Math.round(n).toLocaleString()}`
+const TWD = (n: number) => `${siteConfig.locale.currency} ${Math.round(n).toLocaleString()}`
 
 /** Horizontal bars sized against the largest absolute value in the series. */
 export function BarList({

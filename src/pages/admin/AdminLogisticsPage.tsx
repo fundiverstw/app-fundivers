@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { PageLoading } from '../../components/ui/Spinner'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
+import { siteConfig } from '../../config/site'
 import { fetchEventsInRange, fetchUpcomingEventDays, formatEventSpan } from '../../lib/events'
 import { gearTotals, splitByTransport, dayKeyOffset, careTotals, isCareGearItem, addonTotals } from '../../lib/logistics'
 import { bookingBalance, type BookingBalance } from '../../lib/booking-balance'
@@ -58,7 +59,7 @@ export function AdminLogisticsPage() {
   const [allocReload, setAllocReload] = useState(0)
 
   const todayKey = useMemo(
-    () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }),
+    () => new Date().toLocaleDateString('en-CA', { timeZone: siteConfig.locale.timezone }),
     [],
   )
   const tomorrowKey = useMemo(() => dayKeyOffset(todayKey, 1), [todayKey])
@@ -285,7 +286,7 @@ export function AdminLogisticsPage() {
   }
   const onDutyStaffCount = staffRiders.length
   // Divers who still owe — for the whole-day summary and each event's list.
-  const currency = (groups ?? [])[0]?.event.currency ?? 'TWD'
+  const currency = (groups ?? [])[0]?.event.currency ?? siteConfig.locale.currency
   const dueRowsFor = (rows: DiverGearRow[]) => rows.flatMap(r => {
     const e = balances.get(r.booking.id)
     if (!e || e.bal.state !== 'due') return []

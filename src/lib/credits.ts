@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { fetchAmendmentsForBookings, amendmentsDelta } from './booking-amendments'
+import { siteConfig } from '../config/site'
 import type { AppEvent, Credit, CreditInsert } from '../types/database'
 
 /**
@@ -111,7 +112,7 @@ export async function createCredit(input: {
     user_id:    input.user_id,
     booking_id: input.booking_id ?? null,
     amount:     input.amount,
-    currency:   input.currency ?? 'TWD',
+    currency:   input.currency ?? siteConfig.locale.currency,
     reason:     input.reason,
     created_by: input.created_by,
     status:     'open',
@@ -191,11 +192,11 @@ export async function issueCancellationCredits(args: {
   if (eErr) throw eErr
   const alreadyCredited = new Set((existing ?? []).map(c => c.booking_id))
 
-  // Format in the shop's timezone (Taiwan) so the date in the reason matches
-  // the event's calendar day regardless of where this runs — start_time is a
-  // UTC instant, and a naive local format shifts the day in non-+08 runtimes.
+  // Format in the shop's timezone so the date in the reason matches the event's
+  // calendar day regardless of where this runs — start_time is a UTC instant,
+  // and a naive local format shifts the day in other runtimes.
   const eventDate = new Date(event.start_time).toLocaleDateString('en-US', {
-    year: 'numeric', month: 'short', day: 'numeric', timeZone: 'Asia/Taipei',
+    year: 'numeric', month: 'short', day: 'numeric', timeZone: siteConfig.locale.timezone,
   })
   const reason = `Refund credit for cancelled event: ${event.title} (${eventDate})`
 

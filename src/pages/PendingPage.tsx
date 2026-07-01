@@ -4,6 +4,7 @@ import { Logo } from '../components/Logo'
 import { ProfileForm } from './ProfilePage'
 import type { Profile } from '../types/database'
 import { CARD_ELEVATED, BTN_PRIMARY, TEXT_MUTED } from '../styles/tokens'
+import { siteConfig } from '../config/site'
 
 // Holding screen for pending / rejected divers. RequireActive routes
 // every non-active diver here; the only way out is admin approval (then
@@ -56,8 +57,8 @@ export function PendingPage() {
             <p className={`${TEXT_MUTED} text-sm mb-5`}>
               Your application was reviewed and not approved at this time. If
               you believe this is a mistake, please contact us at{' '}
-              <a href="mailto:fundiverstw@gmail.com" className="underline">
-                fundiverstw@gmail.com
+              <a href={`mailto:${siteConfig.contact.email}`} className="underline">
+                {siteConfig.contact.email}
               </a>.
             </p>
             <button onClick={signOut} className={`w-full ${BTN_PRIMARY}`}>

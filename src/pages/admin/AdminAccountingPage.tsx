@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { zipSync, strToU8 } from 'fflate'
 import { supabase } from '../../lib/supabase'
+import { siteConfig } from '../../config/site'
 import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
 import {
@@ -18,7 +19,7 @@ import type { Payment } from '../../types/database'
 // already restricts payments/bookings to admins.
 
 function taipeiYear(): number {
-  return Number(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric' }).slice(0, 4))
+  return Number(new Date().toLocaleDateString('en-CA', { timeZone: siteConfig.locale.timezone, year: 'numeric' }).slice(0, 4))
 }
 
 async function fetchTransactions(year: number): Promise<AccountingTransaction[]> {
@@ -96,7 +97,7 @@ export function AdminAccountingPage() {
         return
       }
       const files = buildAccountingCsvs(txns, year)
-      downloadZip(`fundivers-accounting-${year}.zip`, files)
+      downloadZip(`${siteConfig.identity.shortName.toLowerCase()}-accounting-${year}.zip`, files)
       const paid = txns.filter(t => t.status === 'paid').length
       toast.success(`Exported ${txns.length} transaction${txns.length === 1 ? '' : 's'} (${paid} paid) for ${year}.`)
     } catch (err) {
@@ -110,7 +111,7 @@ export function AdminAccountingPage() {
     <div className="max-w-2xl mx-auto space-y-4">
       <h1 className="text-2xl font-bold text-white">Accounting export</h1>
       <p className="text-sm text-white/80">
-        Download a fiscal-year (Jan–Dec, Asia/Taipei) bookkeeping ZIP. Includes
+        Download a fiscal-year (Jan–Dec, {siteConfig.locale.timezone}) bookkeeping ZIP. Includes
         every payment marked in the year — paid, refunded, and voided — with who
         paid, who marked it, when, the method, and the linked event.
       </p>

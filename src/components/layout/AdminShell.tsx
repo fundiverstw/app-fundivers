@@ -10,6 +10,7 @@ import { CrosshairIcon } from '../icons/CrosshairIcon'
 import { PeopleIcon } from '../icons/PeopleIcon'
 import { PlusCircleIcon } from '../icons/PlusCircleIcon'
 import { LogisticsIcon } from '../icons/LogisticsIcon'
+import { siteConfig } from '../../config/site'
 import {
   PAGE, NAV_BAR, NAV_BOTTOM,
   ON_DEEP_MUTED, ON_DEEP_SUBTLE,
@@ -57,14 +58,16 @@ export function AdminShell() {
     <div className={`min-h-screen ${PAGE} flex flex-col`}>
       <header className={NAV_BAR}>
         <div className="flex-1 flex items-center justify-start gap-4">
-          <a
-            href="https://radio.fundiverstw.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="FunDivers Radio"
-          >
-            <img src="/imgs/broadcast.png" alt="" className="h-8 w-auto" />
-          </a>
+          {siteConfig.features.radio && (
+            <a
+              href={siteConfig.urls.radio}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`${siteConfig.identity.shortName} Radio`}
+            >
+              <img src={siteConfig.assets.broadcast} alt="" className="h-8 w-auto" />
+            </a>
+          )}
         </div>
         <Link to="/admin" aria-label="Admin home" className="shrink-0">
           <Logo size="sm" />

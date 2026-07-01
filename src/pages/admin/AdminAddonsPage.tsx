@@ -1,4 +1,5 @@
 import { CatalogManager, type CatalogField } from '../../components/admin/CatalogManager'
+import { siteConfig } from '../../config/site'
 import type { EOAddon } from '../../types/database'
 
 const fields: CatalogField<EOAddon>[] = [
@@ -17,7 +18,7 @@ export function AdminAddonsPage() {
       orderBy="display_title"
       fields={fields}
       rowLabel={r => r.display_title || r.admin_title || r._id}
-      rowDetail={r => r.price != null ? `${r.price.toLocaleString()} ${r.currency || 'TWD'}` : null}
+      rowDetail={r => r.price != null ? `${r.price.toLocaleString()} ${r.currency || siteConfig.locale.currency}` : null}
     />
   )
 }

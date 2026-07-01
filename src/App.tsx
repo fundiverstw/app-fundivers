@@ -8,6 +8,7 @@ import { RequireCurrentTerms } from './components/layout/RequireCurrentTerms'
 import { HomeRedirect } from './components/layout/HomeRedirect'
 import { PendingPage } from './pages/PendingPage'
 import { Logo } from './components/Logo'
+import { siteConfig } from './config/site'
 import { ToastProvider } from './components/Toast'
 import { AuthProvider } from './hooks/AuthProvider'
 import { UpdateBannerHost } from './components/install/UpdateBannerHost'
@@ -101,7 +102,7 @@ export default function App() {
             <Route element={<AppShell />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/calendar" element={<CalendarPage />} />
-              <Route path="/map" element={<MapPage />} />
+              {siteConfig.features.map && <Route path="/map" element={<MapPage />} />}
               <Route path="/records" element={<RecordsPage />}>
                 <Route index element={<Navigate to="bookings" replace />} />
                 <Route path="bookings" element={<BookingsPage />} />
