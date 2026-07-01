@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ShareEventButton } from './ShareEventButton'
 import { ToastProvider } from './Toast'
+import { siteConfig } from '../config/site'
 
 // happy-dom rejects clipboard writes by default (no secure context).
 // Stub the entire navigator.clipboard via stubGlobal so the component
@@ -31,7 +32,7 @@ describe('ShareEventButton', () => {
 
     await user.click(screen.getByRole('button', { name: /share link/i }))
 
-    expect(writeText).toHaveBeenCalledWith('https://www.fundiverstw.com/dives/abc-123')
+    expect(writeText).toHaveBeenCalledWith(`${siteConfig.urls.site}/dives/abc-123`)
     await waitFor(() => {
       expect(screen.getByText(/copied to clipboard/i)).toBeInTheDocument()
     })

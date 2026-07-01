@@ -21,8 +21,9 @@
 import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
 import { corsOk, jsonResponse, safeError, bearerToken } from "../_shared/responses.ts"
+import { siteConfig } from "../../../fundive.config.ts"
 
-const COMPANY_EMAIL = "fundiverstw@gmail.com"
+const COMPANY_EMAIL = siteConfig.contact.email
 
 interface Body {
   email:         string
@@ -118,23 +119,23 @@ Deno.serve(async (req) => {
         ? `your registration for ${eventTitle}`
         : `your event registration`
       await transporter.sendMail({
-        from: { name: "FunDivers TW", address: GMAIL_USER },
+        from: { name: siteConfig.identity.shopName, address: GMAIL_USER },
         to:      email,
         bcc:     COMPANY_EMAIL,
-        subject: "FunDivers TW — account created for you",
+        subject: `${siteConfig.identity.shopName} — account created for you`,
         text:
           `Hi ${fullName},\n\n` +
-          `We have created a FunDivers TW app diver account on your behalf.\n\n` +
+          `We have created a ${siteConfig.identity.shopName} app diver account on your behalf.\n\n` +
           `If you would like to access this account for all the great features on the app ` +
           `(dive logs, easy event registration, push notifications, fun games, etc.), you can ` +
           `set your own password and take it over in a minute:\n\n` +
-          `  1. Go to https://app.fundiverstw.com/forgot-password\n` +
+          `  1. Go to ${siteConfig.urls.app}/forgot-password\n` +
           `  2. Enter this email address: ${email}\n` +
           `  3. Open the reset link we send you and choose a password\n\n` +
           `That's it — you'll be signed in. If the link gives you any trouble, just reply to ` +
           `this email and we'll help you out.\n\n` +
           `Otherwise no further action is required for ${eventClause}.\n\n` +
-          `— FunDivers TW`,
+          `— ${siteConfig.identity.shopName}`,
       })
       emailSent = true
     } catch (e) {

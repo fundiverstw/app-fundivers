@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { MapPage } from './MapPage'
 import { mockQueryBuilder } from '../../tests/test-utils'
+import { siteConfig } from '../config/site'
 
 const { from } = vi.hoisted(() => ({ from: vi.fn() }))
 vi.mock('../lib/supabase', () => ({
@@ -73,7 +74,7 @@ describe('MapPage', () => {
     // The name links out from both the map marker and the panel list.
     await waitFor(() => expect(screen.getAllByRole('link', { name: 'Wan An Jian Navy Wreck' }).length).toBe(2))
     for (const link of screen.getAllByRole('link', { name: 'Wan An Jian Navy Wreck' })) {
-      expect(link).toHaveAttribute('href', 'https://www.fundiverstw.com/traveldestinations/wan-an-jian-navy-wreck')
+      expect(link).toHaveAttribute('href', `${siteConfig.urls.travelDestinationsBase}wan-an-jian-navy-wreck`)
       expect(link).toHaveAttribute('target', '_blank')
       expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'))
     }

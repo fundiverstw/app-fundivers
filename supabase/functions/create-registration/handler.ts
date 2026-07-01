@@ -17,6 +17,7 @@
 import { Buffer } from "node:buffer"
 import { sanitizeProfilePatch } from "../_shared/profile-patch.ts"
 import { corsHeaders, safeError } from "../_shared/responses.ts"
+import { siteConfig } from "../../../fundive.config.ts"
 import type { RegistrationPdfPayload } from "../_shared/pdf.ts"
 
 // Matches RegisterForm.tsx's payment_method enum verbatim.
@@ -164,7 +165,7 @@ async function eventHasPassed(admin: SupabaseAdminClient, eventType: string, eve
     lastDay = days.length ? days[days.length - 1] : null
   }
   if (!lastDay) return false
-  const todayTaipei = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" })
+  const todayTaipei = new Date().toLocaleDateString("en-CA", { timeZone: siteConfig.locale.timezone })
   return String(lastDay).slice(0, 10) < todayTaipei
 }
 
@@ -554,7 +555,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
         const diverText =
           `Thanks for signing up — ${payload.eventTitle} is currently full, so we've added you to the waitlist. ` +
           `If a spot opens up, you'll receive a notification with 24 hours to claim it. No payment is needed unless and until that happens.\n\n` +
-          `Keep an eye on the FunDivers TW app for waitlist updates and event reminders.\n\n— FunDivers TW`
+          `Keep an eye on the ${siteConfig.identity.shopName} app for waitlist updates and event reminders.\n\n— ${siteConfig.identity.shopName}`
         await deps.transporter.sendMail({ from: fromHeader, subject, to: deps.env.companyEmail, text: companyText })
         if (registrantEmail.toLowerCase().trim() !== deps.env.companyEmail) {
           await deps.transporter.sendMail({ from: fromHeader, subject, to: registrantEmail, text: diverText })
@@ -575,7 +576,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
             text:
               "Thanks for registering — your registration summary is attached.\n\n" +
               "Once you've sent your payment, please let us know via email, LINE, or WhatsApp so we can confirm receipt — contact details are in the attached PDF. We don't always see bank or PayPal transfers in real time, and a quick heads-up keeps your spot from falling through the cracks.\n\n" +
-              "Keep an eye on the FunDivers TW app for updates to your registration status, payment confirmations, and event reminders.\n\n— FunDivers TW",
+              `Keep an eye on the ${siteConfig.identity.shopName} app for updates to your registration status, payment confirmations, and event reminders.\n\n— ${siteConfig.identity.shopName}`,
             attachments: [attach],
           })
         }

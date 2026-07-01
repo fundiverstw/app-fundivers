@@ -8,8 +8,9 @@ import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
 import { buildPdfBase64 } from "../_shared/pdf.ts"
 import { handleRegistration, type Deps } from "./handler.ts"
+import { siteConfig } from "../../../fundive.config.ts"
 
-const COMPANY_EMAIL = "fundiverstw@gmail.com"
+const COMPANY_EMAIL = siteConfig.contact.email
 
 // Verifies a Cloudflare Turnstile token. Called from the handler's
 // guest path. Hard fail on missing env in production is enforced
@@ -80,7 +81,7 @@ Deno.serve(async (req) => {
     buildPdfBase64,
     env: {
       companyEmail:    COMPANY_EMAIL,
-      mailFromName:    "FunDivers TW",
+      mailFromName:    siteConfig.identity.shopName,
       mailFromAddress: GMAIL_USER ?? "",
     },
     verifyTurnstile: (token, remoteIp) =>

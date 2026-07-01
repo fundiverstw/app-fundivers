@@ -2,6 +2,8 @@
 // so it's vitest-importable (index.ts uses jsr:/npm: specifiers). See
 // create-registration/handler.ts for the same split.
 
+import { siteConfig } from "../../../fundive.config.ts"
+
 export function buildCancellationEmail(eventTitle: string): { subject: string; text: string } {
   const title = eventTitle.trim() || 'your dive'
   return {
@@ -13,7 +15,7 @@ export function buildCancellationEmail(eventTitle: string): { subject: string; t
       '',
       'If you paid a deposit or the full amount, the shop will be in touch about a refund or rebooking. Reply to this email or contact us on LINE / WhatsApp with any questions.',
       '',
-      '— FunDivers TW',
+      `— ${siteConfig.identity.shopName}`,
     ].join('\n'),
   }
 }

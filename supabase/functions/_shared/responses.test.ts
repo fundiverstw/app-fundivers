@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { corsHeaders, jsonResponse, safeError, bearerToken } from './responses'
+import { siteConfig } from '../../../fundive.config.ts'
 
 // happy-dom strips the `Origin` header on Request construction (it's
 // a forbidden request-header in browser contexts), so we hand the
@@ -15,8 +16,8 @@ function reqFrom(origin: string | null): Request {
 
 describe('corsHeaders (audit M4)', () => {
   it('echoes the production origin when it matches the allowlist', () => {
-    const h = corsHeaders(reqFrom('https://app.fundiverstw.com'))
-    expect(h['Access-Control-Allow-Origin']).toBe('https://app.fundiverstw.com')
+    const h = corsHeaders(reqFrom(siteConfig.urls.app))
+    expect(h['Access-Control-Allow-Origin']).toBe(siteConfig.urls.app)
   })
 
   it('echoes localhost dev origins', () => {
@@ -37,12 +38,12 @@ describe('corsHeaders (audit M4)', () => {
   })
 
   it('always sets Vary: Origin so caches do not reuse one origin\'s response for another', () => {
-    expect(corsHeaders(reqFrom('https://app.fundiverstw.com')).Vary).toBe('Origin')
+    expect(corsHeaders(reqFrom(siteConfig.urls.app)).Vary).toBe('Origin')
     expect(corsHeaders(reqFrom('https://evil.example')).Vary).toBe('Origin')
   })
 
   it('declares the standard Allow-Headers and Allow-Methods', () => {
-    const h = corsHeaders(reqFrom('https://app.fundiverstw.com'))
+    const h = corsHeaders(reqFrom(siteConfig.urls.app))
     expect(h['Access-Control-Allow-Headers']).toMatch(/authorization/)
     expect(h['Access-Control-Allow-Headers']).toMatch(/apikey/)
     expect(h['Access-Control-Allow-Methods']).toBe('POST, OPTIONS')
@@ -51,10 +52,10 @@ describe('corsHeaders (audit M4)', () => {
 
 describe('jsonResponse (audit M4)', () => {
   it('sets content-type + CORS headers + status', async () => {
-    const r = jsonResponse(reqFrom('https://app.fundiverstw.com'), { ok: true }, 201)
+    const r = jsonResponse(reqFrom(siteConfig.urls.app), { ok: true }, 201)
     expect(r.status).toBe(201)
     expect(r.headers.get('content-type')).toBe('application/json')
-    expect(r.headers.get('access-control-allow-origin')).toBe('https://app.fundiverstw.com')
+    expect(r.headers.get('access-control-allow-origin')).toBe(siteConfig.urls.app)
     expect(await r.json()).toEqual({ ok: true })
   })
 })

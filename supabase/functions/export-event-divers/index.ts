@@ -33,6 +33,7 @@ import { Buffer } from "node:buffer"
 import { buildEventDiversXlsxBase64, type EventDiverRow } from "../_shared/event-divers-xlsx.ts"
 import { roleToZh } from "../_shared/event-divers-manifest.ts"
 import { corsOk, jsonResponse, safeError, bearerToken } from "../_shared/responses.ts"
+import { siteConfig } from "../../../fundive.config.ts"
 
 // Profile columns the manifest reads, shared by the booked-diver and
 // on-duty-staff fetches.
@@ -68,7 +69,7 @@ function toManifestRow(p: ManifestProfile, remark: string | null = null): EventD
 
 const XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
-const COMPANY_EMAIL = "fundiverstw@gmail.com"
+const COMPANY_EMAIL = siteConfig.contact.email
 
 Deno.serve(async (req) => {
   const json = (body: unknown, status = 200) => jsonResponse(req, body, status)
@@ -232,7 +233,7 @@ Deno.serve(async (req) => {
     const text = `Boat manifest for ${eventTitle} (${stamp}). ${divers.length} diver${divers.length === 1 ? "" : "s"}${staffPart}.`
 
     await transporter.sendMail({
-      from:    { name: "FunDivers TW", address: GMAIL_USER },
+      from:    { name: siteConfig.identity.shopName, address: GMAIL_USER },
       to:      COMPANY_EMAIL,
       // BCC the requesting admin (if they have an email on file and it's
       // not the company address itself) so they get a copy in their inbox.

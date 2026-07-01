@@ -3,6 +3,7 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ContactPage } from './ContactPage'
 import { renderWithRouter } from '../../tests/test-utils'
+import { siteConfig } from '../config/site'
 
 describe('ContactPage', () => {
   beforeEach(() => {
@@ -18,10 +19,10 @@ describe('ContactPage', () => {
     renderWithRouter(<ContactPage />)
     const line = screen.getByRole('link', { name: /add us on line/i })
     const wa = screen.getByRole('link', { name: /message us on whatsapp/i })
-    expect(line).toHaveAttribute('href', 'https://line.me/R/ti/p/%40lga0216c')
+    expect(line).toHaveAttribute('href', siteConfig.contact.lineUrl)
     expect(line).toHaveAttribute('target', '_blank')
     expect(line).toHaveAttribute('rel', expect.stringContaining('noopener'))
-    expect(wa).toHaveAttribute('href', 'https://wa.me/886909083683')
+    expect(wa).toHaveAttribute('href', siteConfig.contact.whatsappUrl)
     expect(wa).toHaveAttribute('target', '_blank')
     expect(wa).toHaveAttribute('rel', expect.stringContaining('noopener'))
   })
@@ -33,7 +34,7 @@ describe('ContactPage', () => {
     await user.type(screen.getByLabelText(/message/i), 'Hi there\nthanks')
     await user.click(screen.getByRole('button', { name: /send email/i }))
     expect(window.location.href).toBe(
-      'mailto:fundiverstw@gmail.com?subject=Trip+question&body=Hi+there%0Athanks',
+      `mailto:${siteConfig.contact.email}?subject=Trip+question&body=Hi+there%0Athanks`,
     )
   })
 
@@ -41,6 +42,6 @@ describe('ContactPage', () => {
     const user = userEvent.setup()
     renderWithRouter(<ContactPage />)
     await user.click(screen.getByRole('button', { name: /send email/i }))
-    expect(window.location.href).toBe('mailto:fundiverstw@gmail.com')
+    expect(window.location.href).toBe(`mailto:${siteConfig.contact.email}`)
   })
 })
