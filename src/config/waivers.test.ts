@@ -3,7 +3,7 @@ import { WAIVERS, waiverByCode, ANNUAL_WAIVER_VALID_DAYS } from './waivers'
 
 const COURSE_COLORS = ['ow', 'aow', 'dsd', 'rescue', 'specialty']
 const CADENCES = ['annual', 'per_event']
-const APPLIES = ['dives', 'courses', 'all']
+const APPLIES = ['dives', 'courses', 'all', 'none']
 
 describe('waiver config', () => {
   it('has unique, non-empty stable codes', () => {
@@ -37,7 +37,7 @@ describe('waiver config', () => {
     expect(liability).toMatchObject({ cadence: 'annual', appliesTo: 'dives' })
 
     const medical = waiverByCode('diver_medical')
-    expect(medical).toMatchObject({ cadence: 'annual', appliesTo: 'all' })
+    expect(medical).toMatchObject({ cadence: 'annual', appliesTo: 'none' })
 
     const ce = waiverByCode('continuing_education')
     expect(ce).toMatchObject({ cadence: 'per_event', appliesTo: 'courses' })

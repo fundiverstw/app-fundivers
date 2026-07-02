@@ -14,7 +14,8 @@ describe('EventWaiverOverrides', () => {
     vi.spyOn(waivers, 'fetchEventWaiverOverrides').mockResolvedValue([])
     render(<EventWaiverOverrides event={owCourse} isAdmin createdBy="admin1" />)
 
-    // Continuing-ed + medical apply to an OW course; dive-liability does not.
+    // The list shows every catalog waiver so any can be required/exempted here,
+    // regardless of whether its global rule applies to an OW course.
     expect(await screen.findByText(/continuing education liability release/i)).toBeInTheDocument()
     expect(screen.getByText(/diver medical questionnaire/i)).toBeInTheDocument()
     expect(screen.getByText(/boat travel & scuba diving liability release/i)).toBeInTheDocument()
