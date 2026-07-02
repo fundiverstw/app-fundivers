@@ -1,10 +1,11 @@
 // Integration coverage for `event_vehicles` — per-event car allocation.
 // Runs against the live local Supabase stack.
 //
-// Contract (20260627000000_event_vehicles.sql):
+// Contract (20260702000000_event_vehicles_event_level.sql):
 //   - exactly one of eo_dive_id / eo_course_id (XOR check)
-//   - a vehicle is allocated to at most one event per date
-//     (unique vehicle_id + event_date) — the exclusivity rule
+//   - a vehicle is assigned to a whole EVENT and may serve any number of events,
+//     but at most once per event (unique (eo_dive_id, vehicle_id) /
+//     (eo_course_id, vehicle_id))
 //   - staff + admin can READ; only admins can INSERT / UPDATE / DELETE;
 //     divers and anon see nothing and cannot write
 //   - deleting a vehicle (or its event) cascades the allocation away
@@ -17,8 +18,6 @@ import {
 } from './helpers'
 
 const admin = adminClient()
-const DAY = '2031-03-15'
-const OTHER_DAY = '2031-03-16'
 
 let adminUser: TestUser
 let staff: TestUser
@@ -53,48 +52,48 @@ afterAll(async () => {
   for (const id of cleanupUsers) await deleteTestUser(admin, id)
 })
 
-describe('event_vehicles XOR + exclusivity', () => {
+describe('event_vehicles XOR + per-event uniqueness', () => {
   it('accepts a dive-only and a course-only allocation', async () => {
     const v = await createVehicle('XOR Van')
     const { error: diveErr } = await admin.from('event_vehicles')
-      .insert({ vehicle_id: v, event_date: DAY, eo_dive_id: diveId } as never)
+      .insert({ vehicle_id: v, eo_dive_id: diveId } as never)
     expect(diveErr).toBeNull()
 
     const v2 = await createVehicle('XOR Bus')
     const { error: courseErr } = await admin.from('event_vehicles')
-      .insert({ vehicle_id: v2, event_date: DAY, eo_course_id: courseId } as never)
+      .insert({ vehicle_id: v2, eo_course_id: courseId } as never)
     expect(courseErr).toBeNull()
   })
 
   it('rejects an allocation that targets neither event', async () => {
     const v = await createVehicle('Orphan Van')
     const { error } = await admin.from('event_vehicles')
-      .insert({ vehicle_id: v, event_date: DAY } as never)
+      .insert({ vehicle_id: v } as never)
     expect(error).not.toBeNull()
   })
 
   it('rejects an allocation that targets both events', async () => {
     const v = await createVehicle('Both Van')
     const { error } = await admin.from('event_vehicles')
-      .insert({ vehicle_id: v, event_date: DAY, eo_dive_id: diveId, eo_course_id: courseId } as never)
+      .insert({ vehicle_id: v, eo_dive_id: diveId, eo_course_id: courseId } as never)
     expect(error).not.toBeNull()
   })
 
-  it('rejects the same car on a second event the same day, but allows it on another day', async () => {
-    const v = await createVehicle('Exclusive Van')
+  it('lets one car serve several events but rejects a duplicate on the same event', async () => {
+    const v = await createVehicle('Shared Van')
     const first = await admin.from('event_vehicles')
-      .insert({ vehicle_id: v, event_date: DAY, eo_dive_id: diveId } as never)
+      .insert({ vehicle_id: v, eo_dive_id: diveId } as never)
     expect(first.error).toBeNull()
 
-    // Same car, same day, different event → blocked by the unique index.
-    const clash = await admin.from('event_vehicles')
-      .insert({ vehicle_id: v, event_date: DAY, eo_course_id: courseId } as never)
-    expect(clash.error).not.toBeNull()
+    // Same car on a different event → fine (a vehicle can serve many events).
+    const otherEvent = await admin.from('event_vehicles')
+      .insert({ vehicle_id: v, eo_course_id: courseId } as never)
+    expect(otherEvent.error).toBeNull()
 
-    // Same car, different day → fine.
-    const nextDay = await admin.from('event_vehicles')
-      .insert({ vehicle_id: v, event_date: OTHER_DAY, eo_course_id: courseId } as never)
-    expect(nextDay.error).toBeNull()
+    // Same car on the SAME event again → blocked by the unique index.
+    const dup = await admin.from('event_vehicles')
+      .insert({ vehicle_id: v, eo_dive_id: diveId } as never)
+    expect(dup.error).not.toBeNull()
   })
 })
 
@@ -102,7 +101,7 @@ describe('event_vehicles RLS', () => {
   it('lets staff and admin read allocations, but not divers or anon', async () => {
     const v = await createVehicle('Read Van')
     const { data: row } = await admin.from('event_vehicles')
-      .insert({ vehicle_id: v, event_date: DAY, eo_dive_id: diveId } as never).select('id').single()
+      .insert({ vehicle_id: v, eo_dive_id: diveId } as never).select('id').single()
     const id = (row as { id: string }).id
 
     const staffC = await userClient(staff.email, staff.password)
@@ -122,18 +121,18 @@ describe('event_vehicles RLS', () => {
 
     const adminC = await userClient(adminUser.email, adminUser.password)
     const { error: adminErr } = await adminC.from('event_vehicles')
-      .insert({ vehicle_id: v, event_date: DAY, eo_dive_id: diveId } as never)
+      .insert({ vehicle_id: v, eo_dive_id: diveId } as never)
     expect(adminErr).toBeNull()
 
     const v2 = await createVehicle('Staff-Write Van')
     const staffC = await userClient(staff.email, staff.password)
     const { error: staffErr } = await staffC.from('event_vehicles')
-      .insert({ vehicle_id: v2, event_date: OTHER_DAY, eo_dive_id: diveId } as never)
+      .insert({ vehicle_id: v2, eo_course_id: courseId } as never)
     expect(staffErr).not.toBeNull()
 
     const diverC = await userClient(diver.email, diver.password)
     const { error: diverErr } = await diverC.from('event_vehicles')
-      .insert({ vehicle_id: v2, event_date: OTHER_DAY, eo_dive_id: diveId } as never)
+      .insert({ vehicle_id: v2, eo_course_id: courseId } as never)
     expect(diverErr).not.toBeNull()
   })
 })
@@ -142,7 +141,7 @@ describe('event_vehicles cascade', () => {
   it('deleting a vehicle removes its allocations', async () => {
     const v = await createVehicle('Doomed Van')
     const { data: row } = await admin.from('event_vehicles')
-      .insert({ vehicle_id: v, event_date: DAY, eo_dive_id: diveId } as never).select('id').single()
+      .insert({ vehicle_id: v, eo_dive_id: diveId } as never).select('id').single()
     const id = (row as { id: string }).id
 
     await admin.from('vehicles').delete().eq('id', v)

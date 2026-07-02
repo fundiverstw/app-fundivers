@@ -614,7 +614,6 @@ export interface Database {
           created_at: string
           created_by: string | null
           vehicle_id: string
-          event_date: string
           eo_dive_id: string | null
           eo_course_id: string | null
           notes: string | null
@@ -624,7 +623,6 @@ export interface Database {
           created_at?: string
           created_by?: string | null
           vehicle_id: string
-          event_date: string
           eo_dive_id?: string | null
           eo_course_id?: string | null
           notes?: string | null

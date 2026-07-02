@@ -24,7 +24,7 @@ const vehicle = (id: string, name: string, seats: number): Vehicle => ({
   id, name, passenger_seats: seats, active: true, created_at: '', created_by: null,
 })
 const alloc = (id: string, vehicleId: string): EventVehicle => ({
-  id, created_at: '', created_by: null, vehicle_id: vehicleId, event_date: '2031-01-01',
+  id, created_at: '', created_by: null, vehicle_id: vehicleId,
   eo_dive_id: 'D1', eo_course_id: null, notes: null,
 })
 
@@ -36,7 +36,6 @@ function setup(over: Partial<React.ComponentProps<typeof EventVehicleGroup>> = {
   render(
     <EventVehicleGroup
       event={{ id: 'D1', type: 'dive' }}
-      dayKey="2031-01-01"
       allocations={[]}
       available={[delica, bus]}
       vehicleMap={new Map([[delica.id, delica], [bus.id, bus]])}
@@ -63,7 +62,7 @@ describe('EventVehicleGroup', () => {
     const { onChanged } = setup()
     await userEvent.selectOptions(screen.getByLabelText('Assign a car'), 'v2')
     await waitFor(() => expect(assignVehicleToEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ vehicleId: 'v2', date: '2031-01-01', createdBy: 'admin-1' }),
+      expect.objectContaining({ vehicleId: 'v2', createdBy: 'admin-1' }),
     ))
     expect(onChanged).toHaveBeenCalled()
   })
@@ -75,9 +74,9 @@ describe('EventVehicleGroup', () => {
     expect(onChanged).toHaveBeenCalled()
   })
 
-  it('warns when no cars are free that day', () => {
+  it('notes when every active car is already on the event', () => {
     setup({ available: [] })
-    expect(screen.getByText(/No cars free/)).toBeInTheDocument()
+    expect(screen.getByText(/already assigned to this event/)).toBeInTheDocument()
     expect(screen.queryByLabelText('Assign a car')).not.toBeInTheDocument()
   })
 
@@ -92,7 +91,6 @@ describe('EventVehicleGroup', () => {
     const { container } = render(
       <EventVehicleGroup
         event={{ id: 'D1', type: 'dive' }}
-        dayKey="2031-01-01"
         allocations={[]}
         available={[delica]}
         vehicleMap={new Map([[delica.id, delica]])}

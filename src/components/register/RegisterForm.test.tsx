@@ -123,7 +123,12 @@ function setupFrom(updated: unknown = { id: 'b-existing' }) {
 beforeEach(() => {
   from.mockReset(); update.mockReset()
   invoke.mockReset(); setSession.mockReset(); rpc.mockReset()
-  rpc.mockResolvedValue({ data: 0, error: null })
+  // Default: the event has assigned cars with free ride seats, so the ride
+  // opt-in is offered. Ride-specific tests override this per event_ride_seats.
+  rpc.mockImplementation((name: string) =>
+    Promise.resolve(name === 'event_ride_seats'
+      ? { data: [{ capacity: 7, claimed: 0 }], error: null }
+      : { data: 0, error: null }))
   invoke.mockResolvedValue({ data: { booking_id: 'b-new', session: null }, error: null })
   setSession.mockResolvedValue({ data: null, error: null })
   // Default: a site key is present so the captcha widget renders. Individual

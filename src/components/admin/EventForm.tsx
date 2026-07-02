@@ -73,9 +73,13 @@ export interface EventFormProps {
   onCancel: () => void
   /** Override the submit button text (defaults to "Create dive/course" or "Save changes"). */
   submitLabel?: string
+  /** Extra create-mode section (e.g. car assignment) rendered above the submit
+   *  buttons. Receives the current event type so it can show only for dives.
+   *  Edit mode has its own persisted sections, so this is ignored there. */
+  renderCreateExtras?: (type: FormState['type']) => React.ReactNode
 }
 
-export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: EventFormProps) {
+export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, renderCreateExtras }: EventFormProps) {
   const [form, setForm] = useState<FormState>(initial ?? EMPTY_FORM)
   const [prices, setPrices] = useState<EOPrice[]>([])
   const [rooms, setRooms] = useState<EORoom[]>([])
@@ -819,6 +823,8 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel }: Ev
           </div>
         )}
       </Section>
+
+      {mode === 'create' && renderCreateExtras?.(form.type)}
 
       {error && (
         <p className="text-sm text-red-200 bg-red-900/50 border border-accent rounded-md p-2">{error}</p>

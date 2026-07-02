@@ -56,7 +56,7 @@ export function EventTransportPanel({ event, registrants, isAdmin, createdBy, on
         <>
           <TransportTextEditor event={event} isAdmin={isAdmin} />
           <EventCarAssignment
-            eventId={event.id}
+            event={{ id: event.id, type: event.type }}
             isAdmin={isAdmin}
             createdBy={createdBy}
             riders={needsRideCount}

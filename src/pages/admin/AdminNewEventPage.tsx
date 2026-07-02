@@ -1,6 +1,10 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { EventForm } from '../../components/admin/EventForm'
+import { CreateEventVehiclePicker } from '../../components/admin/CreateEventVehiclePicker'
+import { assignVehiclesToEvent } from '../../lib/event-vehicles'
+import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
 import {
   divePayloadFromForm,
@@ -14,6 +18,9 @@ import {
 export function AdminNewEventPage() {
   const navigate = useNavigate()
   const toast = useToast()
+  const { profile } = useAuth()
+  // Cars picked in the form; assigned to the dive right after it's inserted.
+  const [vehicleIds, setVehicleIds] = useState<string[]>([])
 
   async function handleSubmit(form: FormState) {
     const id = crypto.randomUUID()
@@ -22,6 +29,13 @@ export function AdminNewEventPage() {
         .from('EO_dives')
         .insert({ _id: id, ...divePayloadFromForm(form) } as never)
       if (error) throw error
+      if (vehicleIds.length > 0) {
+        try {
+          await assignVehiclesToEvent({
+            vehicleIds, event: { id, type: 'dive' }, createdBy: profile?.id ?? null,
+          })
+        } catch { toast.error('Dive created, but its car assignments could not be saved — add them on the edit page.') }
+      }
       toast.success('Dive created')
       navigate(`/admin/events/dive/${id}`)
     } else {
@@ -41,6 +55,8 @@ export function AdminNewEventPage() {
         mode="create"
         onSubmit={handleSubmit}
         onCancel={() => navigate('/admin/events')}
+        renderCreateExtras={type =>
+          type === 'dive' ? <CreateEventVehiclePicker onChange={setVehicleIds} /> : null}
       />
     </div>
   )
