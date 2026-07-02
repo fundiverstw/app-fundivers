@@ -230,7 +230,7 @@ describe('MultiRegisterForm parent diver picker', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
 
     expect(await screen.findByText(/waivers to sign before these events/i)).toBeInTheDocument()
-    expect(screen.getByText(/diver medical questionnaire/i)).toBeInTheDocument()
+    expect(screen.getByText(/boat travel & scuba diving liability release/i)).toBeInTheDocument()
     // Advisory — submit stays enabled.
     expect(screen.getByRole('button', { name: /confirm 1 booking/i })).toBeEnabled()
   })

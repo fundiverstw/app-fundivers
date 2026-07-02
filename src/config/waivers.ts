@@ -25,7 +25,10 @@ export type WaiverCadence =
   /** A fresh signature is required for each event (tied to that dive/course). */
   | 'per_event'
 
-export type WaiverAppliesTo = 'dives' | 'courses' | 'all'
+// 'none' keeps a waiver in the catalog — voluntarily signable, and requirable on
+// individual events via an event_waivers 'require' override — without any global
+// rule auto-requiring it. Use it for forms a shop offers but doesn't mandate.
+export type WaiverAppliesTo = 'dives' | 'courses' | 'all' | 'none'
 
 export interface WaiverDef {
   /** Stable identifier stored on signatures/overrides — never reuse for a
@@ -90,11 +93,14 @@ export const WAIVERS: WaiverDef[] = [
     body: PADI_LIABILITY_BODY,
   },
   {
+    // Not required by default — the shop opts individual events into it with a
+    // per-event 'require' override. Divers may still sign it proactively (it
+    // stays in the annual My Waivers panel).
     code: 'diver_medical',
     title: 'Diver Medical Questionnaire',
     cadence: 'annual',
     version: 1,
-    appliesTo: 'all',
+    appliesTo: 'none',
     body: DIVER_MEDICAL_BODY,
   },
   {

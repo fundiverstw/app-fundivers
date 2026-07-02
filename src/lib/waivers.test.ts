@@ -34,10 +34,10 @@ describe('globalRuleMatches', () => {
     expect(globalRuleMatches(PADI, dive)).toBe(true)
     expect(globalRuleMatches(PADI, owCourse)).toBe(false)
   })
-  it('applies the medical waiver to every event', () => {
-    expect(globalRuleMatches(MEDICAL, dive)).toBe(true)
-    expect(globalRuleMatches(MEDICAL, owCourse)).toBe(true)
-    expect(globalRuleMatches(MEDICAL, tryDive)).toBe(true)
+  it('never auto-applies the medical waiver (opt-in per event)', () => {
+    expect(globalRuleMatches(MEDICAL, dive)).toBe(false)
+    expect(globalRuleMatches(MEDICAL, owCourse)).toBe(false)
+    expect(globalRuleMatches(MEDICAL, tryDive)).toBe(false)
   })
   it('applies continuing-ed to real courses but not Try-Dive/DSD', () => {
     expect(globalRuleMatches(CE, owCourse)).toBe(true)
@@ -48,18 +48,18 @@ describe('globalRuleMatches', () => {
 
 describe('requiredWaiversForEvent', () => {
   it('combines matching global rules', () => {
-    expect(requiredWaiversForEvent(dive, []).map(w => w.code)).toEqual(['padi_liability', 'diver_medical'])
-    expect(requiredWaiversForEvent(owCourse, []).map(w => w.code)).toEqual(['diver_medical', 'continuing_education'])
-    expect(requiredWaiversForEvent(tryDive, []).map(w => w.code)).toEqual(['diver_medical'])
+    expect(requiredWaiversForEvent(dive, []).map(w => w.code)).toEqual(['padi_liability'])
+    expect(requiredWaiversForEvent(owCourse, []).map(w => w.code)).toEqual(['continuing_education'])
+    expect(requiredWaiversForEvent(tryDive, []).map(w => w.code)).toEqual([])
   })
   it('drops an exempted waiver', () => {
     const ov: WaiverOverride[] = [{ waiver_code: 'continuing_education', mode: 'exempt' }]
-    expect(requiredWaiversForEvent(owCourse, ov).map(w => w.code)).toEqual(['diver_medical'])
+    expect(requiredWaiversForEvent(owCourse, ov).map(w => w.code)).toEqual([])
   })
   it('adds a required waiver the rule would not include', () => {
-    const ov: WaiverOverride[] = [{ waiver_code: 'continuing_education', mode: 'require' }]
+    const ov: WaiverOverride[] = [{ waiver_code: 'diver_medical', mode: 'require' }]
     expect(requiredWaiversForEvent(tryDive, ov).map(w => w.code))
-      .toEqual(['diver_medical', 'continuing_education'])
+      .toEqual(['diver_medical'])
   })
 })
 
@@ -88,14 +88,14 @@ describe('isSignatureCurrent', () => {
 
 describe('missingWaivers', () => {
   it('returns only the unsatisfied required waivers', () => {
+    // Medical is opt-in, so requiring it per-event gives a dive two required
+    // waivers; signing only liability leaves medical outstanding.
+    const ov: WaiverOverride[] = [{ waiver_code: 'diver_medical', mode: 'require' }]
     const signatures = [sig({ waiver_code: 'padi_liability', signed_at: '2026-06-01T00:00:00Z' })]
-    expect(missingWaivers(dive, [], signatures, now).map(w => w.code)).toEqual(['diver_medical'])
+    expect(missingWaivers(dive, ov, signatures, now).map(w => w.code)).toEqual(['diver_medical'])
   })
   it('is empty when all required waivers are current', () => {
-    const signatures = [
-      sig({ waiver_code: 'padi_liability', signed_at: '2026-06-01T00:00:00Z' }),
-      sig({ waiver_code: 'diver_medical', signed_at: '2026-06-01T00:00:00Z' }),
-    ]
+    const signatures = [sig({ waiver_code: 'padi_liability', signed_at: '2026-06-01T00:00:00Z' })]
     expect(missingWaivers(dive, [], signatures, now)).toEqual([])
   })
 })
