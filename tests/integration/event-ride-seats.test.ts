@@ -31,9 +31,9 @@ async function createVehicle(name: string, seats: number): Promise<string> {
   return id
 }
 
-async function allocate(vehicleId: string, date: string): Promise<void> {
+async function allocate(vehicleId: string): Promise<void> {
   const { error } = await admin.from('event_vehicles')
-    .insert({ vehicle_id: vehicleId, event_date: date, eo_dive_id: diveId } as never)
+    .insert({ vehicle_id: vehicleId, eo_dive_id: diveId } as never)
   if (error) throw new Error(`allocate: ${error.message}`)
 }
 
@@ -72,15 +72,19 @@ describe('event_ride_seats', () => {
   })
 
   it('sums passenger seats over assigned vehicles for capacity', async () => {
-    await allocate(await createVehicle('Delica', 7), '2031-05-01')
-    await allocate(await createVehicle('Veryca', 4), '2031-05-01')
+    await allocate(await createVehicle('Delica', 7))
+    await allocate(await createVehicle('Veryca', 4))
     expect((await seats()).capacity).toBe(11)
   })
 
-  it('counts a van assigned to several days of the event only once', async () => {
+  it('counts a van assigned to the event once and rejects a duplicate', async () => {
     const bus = await createVehicle('Bus', 12)
-    await allocate(bus, '2031-05-02')
-    await allocate(bus, '2031-05-03') // same van, another day → still +12, not +24
+    await allocate(bus)
+    // Same van on the same event again → blocked by the unique index, so the
+    // seat total can't be inflated by a duplicate row.
+    const dup = await admin.from('event_vehicles')
+      .insert({ vehicle_id: bus, eo_dive_id: diveId } as never)
+    expect(dup.error).not.toBeNull()
     // 7 + 4 (from previous test) + 12 = 23
     expect((await seats()).capacity).toBe(23)
   })

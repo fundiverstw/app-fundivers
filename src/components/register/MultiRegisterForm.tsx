@@ -640,7 +640,11 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                             <span className="block text-xs text-brand-950 font-medium">Included in base price</span>
                           )}
                           {!rideAllowed && (
-                            <span className="block text-xs text-red-600 font-semibold">Shop ride is full for this dive.</span>
+                            <span className="block text-xs text-red-600 font-semibold">
+                              {evSeats && evSeats.capacity > 0
+                                ? 'Shop ride is full for this dive.'
+                                : 'No shop ride is available for this dive.'}
+                            </span>
                           )}
                           {rideAllowed && evSeats && evSeats.capacity > 0 && (
                             <span className="block text-xs text-brand-950/70 font-medium">{evSeats.available} ride seat{evSeats.available === 1 ? '' : 's'} left</span>

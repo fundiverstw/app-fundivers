@@ -5,7 +5,6 @@ import { useAuth } from '../../hooks/useAuth'
 import { EventForm } from '../../components/admin/EventForm'
 import { EventCarAssignment } from '../../components/admin/EventCarAssignment'
 import { EventWaiverOverrides } from '../../components/admin/EventWaiverOverrides'
-import { moveDiveCarAllocations } from '../../lib/event-vehicles'
 import {
   divePayloadFromForm,
   coursePayloadFromForm,
@@ -92,15 +91,6 @@ export function AdminEditEventPage() {
         .eq('_id', id)
       if (error) throw error
       if (dateChange) notifyEventScheduleChanged(id, 'dive').catch(() => { /* best-effort */ })
-      // Car allocations are keyed by the dive's start_date — carry them to the
-      // new day when it moves so they don't strand on the old date.
-      if (initial && initial.start_date !== form.start_date && initial.start_date && form.start_date) {
-        try {
-          const { moved, dropped } = await moveDiveCarAllocations(id, initial.start_date, form.start_date)
-          if (dropped > 0) toast.info(`Moved ${moved} car${moved === 1 ? '' : 's'} to the new date; ${dropped} couldn't move (already booked elsewhere that day) and were unassigned.`)
-          else if (moved > 0) toast.success(`Moved ${moved} assigned car${moved === 1 ? '' : 's'} to the new date.`)
-        } catch { toast.error('The dive date changed but its car assignments could not be moved — check them on the Transportation tab.') }
-      }
       toast.success('Dive updated')
       navigate(`/admin/events/dive/${id}`)
     } else {
@@ -144,10 +134,10 @@ export function AdminEditEventPage() {
         <div className="mt-6 space-y-2">
           <h2 className="text-sm font-bold text-white uppercase tracking-wider">Cars for this dive</h2>
           <p className="text-xs text-white/60">
-            Allocations are tied to the dive's start date and feed the ride-seat limit on the
-            registration form. Changing the date above moves them to the new day on save.
+            Cars assigned to this dive feed the ride-seat limit on the registration form — a
+            diver can only request a ride when a seat is free in one of them.
           </p>
-          <EventCarAssignment eventId={id} isAdmin createdBy={profile?.id ?? null} />
+          <EventCarAssignment event={{ id, type: 'dive' }} isAdmin createdBy={profile?.id ?? null} />
         </div>
       )}
       {id && type && (

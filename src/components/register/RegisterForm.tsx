@@ -1538,7 +1538,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 )}
                 {!rideAllowed && (
                   <span className="block text-xs text-red-600 font-semibold">
-                    The shop ride is full for this dive — please arrange your own transport or contact the shop.
+                    {rideSeats != null && rideSeats.capacity > 0
+                      ? 'The shop ride is full for this dive — please arrange your own transport or contact the shop.'
+                      : 'No shop ride is available for this dive — please arrange your own transport or contact the shop.'}
                   </span>
                 )}
                 {rideAllowed && rideSeats != null && rideSeats.capacity > 0 && (

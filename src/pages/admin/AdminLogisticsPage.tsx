@@ -17,7 +17,7 @@ import { PaymentsDueGroup } from '../../components/admin/PaymentsDueGroup'
 import { TransportFleetPlan } from '../../components/admin/TransportFleetPlan'
 import { EventVehicleGroup } from '../../components/admin/EventVehicleGroup'
 import { fetchVehicles } from '../../lib/vehicles'
-import { fetchVehicleAllocationsForDate, availableVehicles, allocationEventId } from '../../lib/event-vehicles'
+import { fetchVehiclesForEvents, availableVehicles, allocationEventId } from '../../lib/event-vehicles'
 import { planFleet, type Rider } from '../../lib/vehicle-planning'
 import { useAuth } from '../../hooks/useAuth'
 import type { AppEvent, Booking, BookingDetails, Credit, Duty, EventVehicle, Payment, Profile, Vehicle } from '../../types/database'
@@ -53,9 +53,9 @@ export function AdminLogisticsPage() {
   // The whole transport fleet — loaded once. Active vehicles plan rides; the
   // full list (incl. retired) names cars in existing allocations.
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
-  // Car-to-event allocations for the selected day (one row per car per event).
+  // Car-to-event allocations for the day's events (one row per car per event).
   const [allocations, setAllocations] = useState<EventVehicle[]>([])
-  // Bumped after an assign/unassign to refetch the day's allocations.
+  // Bumped after an assign/unassign to refetch the allocations.
   const [allocReload, setAllocReload] = useState(0)
 
   const todayKey = useMemo(
@@ -81,23 +81,26 @@ export function AdminLogisticsPage() {
     return () => { cancelled = true }
   }, [])
 
-  // Car allocations for the selected day — refetched when the day changes or
-  // after an assign/unassign (allocReload).
+  // Car allocations for the day's events — refetched when the events change or
+  // after an assign/unassign (allocReload). Allocations are keyed by event now,
+  // so we ask for exactly the events shown.
   useEffect(() => {
-    if (!dayKey) {
+    if (!groups || groups.length === 0) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setAllocations([])
       return
     }
+    const diveIds = groups.filter(g => g.event.type === 'dive').map(g => g.event.id)
+    const courseIds = groups.filter(g => g.event.type === 'course').map(g => g.event.id)
     let cancelled = false
     ;(async () => {
       try {
-        const rows = await fetchVehicleAllocationsForDate(dayKey)
+        const rows = await fetchVehiclesForEvents(diveIds, courseIds)
         if (!cancelled) setAllocations(rows)
       } catch { if (!cancelled) setAllocations([]) }
     })()
     return () => { cancelled = true }
-  }, [dayKey, allocReload])
+  }, [groups, allocReload])
 
   // Populate the "Other day" dropdown with upcoming days that actually have
   // events, so the admin never picks a dead day.
@@ -303,10 +306,6 @@ export function AdminLogisticsPage() {
   // `vehicles` only to name existing allocations.
   const activeVehicles = vehicles.filter(v => v.active)
   const vehicleMap = new Map(vehicles.map(v => [v.id, v]))
-  // Every car already on some event that day — exclusivity removes these from
-  // every event's "assign a car" picker.
-  const allocatedVehicleIds = new Set(allocations.map(a => a.vehicle_id))
-  const availableCars = availableVehicles(activeVehicles, allocatedVehicleIds)
   // Allocations grouped by the event they're on, for the per-event car block.
   const allocByEvent = new Map<string, EventVehicle[]>()
   for (const a of allocations) {
@@ -450,9 +449,11 @@ export function AdminLogisticsPage() {
               <StaffDutyGroup rows={g.staff} />
               <EventVehicleGroup
                 event={g.event}
-                dayKey={dayKey}
                 allocations={allocByEvent.get(g.event.id) ?? []}
-                available={availableCars}
+                available={availableVehicles(
+                  activeVehicles,
+                  new Set((allocByEvent.get(g.event.id) ?? []).map(a => a.vehicle_id)),
+                )}
                 vehicleMap={vehicleMap}
                 riders={splitByTransport(g.rows).needsRide.length
                   + new Set(g.staff.map(s => s.profile?.id ?? s.dutyId)).size}

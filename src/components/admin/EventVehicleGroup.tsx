@@ -4,9 +4,8 @@ import type { AppEvent, EventVehicle, Vehicle } from '../../types/database'
 
 interface Props {
   event: Pick<AppEvent, 'id' | 'type'>
-  dayKey: string
-  // This event's allocations for the day, and the active cars still free that
-  // day (already excludes cars allocated to any event, incl. this one).
+  // This event's allocations, and the active cars not yet on this event (a car
+  // may serve several events, so it only drops from its own event's picker).
   allocations: EventVehicle[]
   available: Vehicle[]
   vehicleMap: Map<string, Vehicle>
@@ -20,13 +19,13 @@ interface Props {
 
 /**
  * Per-event car allocation, shown inside the Logistics day view under each
- * event. Lists the cars assigned to this event on the selected day (with their
- * passenger-seat totals) and, for admins, a picker of the day's still-available
- * cars. A car is exclusive per date, so assigning it here drops it from every
- * other event's picker that day.
+ * event and on the event forms. Lists the cars assigned to this event (with
+ * their passenger-seat totals) and, for admins, a picker of the active cars not
+ * already on it. A car can serve any number of events, so assigning it here
+ * does not remove it from other events.
  */
 export function EventVehicleGroup({
-  event, dayKey, allocations, available, vehicleMap, riders, isAdmin, createdBy, onChanged,
+  event, allocations, available, vehicleMap, riders, isAdmin, createdBy, onChanged,
 }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -42,10 +41,10 @@ export function EventVehicleGroup({
     if (!vehicleId || !createdBy) return
     setBusy(true); setError(null)
     try {
-      await assignVehicleToEvent({ vehicleId, date: dayKey, event, createdBy })
+      await assignVehicleToEvent({ vehicleId, event, createdBy })
       onChanged()
     } catch {
-      setError('Could not assign that car — it may already be taken for this day.')
+      setError('Could not assign that car — it may already be on this event.')
     } finally {
       setBusy(false)
     }
@@ -117,7 +116,7 @@ export function EventVehicleGroup({
           </label>
         ) : (
           <p className="text-xs text-brand-950/70 font-medium italic">
-            No cars free for {dayKey} — all are assigned to other events.
+            Every active car is already assigned to this event.
           </p>
         )
       )}
