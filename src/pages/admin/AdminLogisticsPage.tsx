@@ -276,16 +276,21 @@ export function AdminLogisticsPage() {
   // ...and each on-duty staff member once, regardless of how many of the day's
   // events they cover, so the ride count isn't double-counted.
   const staffRiders: Rider[] = []
-  const seenStaff = new Set<string>()
+  // Day-wide on-duty staff for the overall board — one entry per person even
+  // when they cover several of the day's events, with all the roles they hold.
+  const dayStaff: { key: string; name: string; roles: string[] }[] = []
+  const staffIndex = new Map<string, number>()
   for (const s of (groups ?? []).flatMap(g => g.staff)) {
     const key = s.profile?.id ?? s.dutyId
-    if (seenStaff.has(key)) continue
-    seenStaff.add(key)
-    staffRiders.push({
-      id: key,
-      name: personName(s.profile?.name, s.profile?.nickname) || '(staff)',
-      kind: 'staff',
-    })
+    let i = staffIndex.get(key)
+    if (i === undefined) {
+      i = dayStaff.length
+      staffIndex.set(key, i)
+      const name = personName(s.profile?.name, s.profile?.nickname) || '(staff)'
+      dayStaff.push({ key, name, roles: [] })
+      staffRiders.push({ id: key, name, kind: 'staff' })
+    }
+    if (!dayStaff[i].roles.includes(s.role)) dayStaff[i].roles.push(s.role)
   }
   const onDutyStaffCount = staffRiders.length
   // Divers who still owe — for the whole-day summary and each event's list.
@@ -369,6 +374,19 @@ export function AdminLogisticsPage() {
             <p className="text-sm text-brand-900 font-medium">
               {groups.length} event{groups.length === 1 ? '' : 's'} · {allRows.length} diver{allRows.length === 1 ? '' : 's'}
             </p>
+            {dayStaff.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-brand-900 uppercase tracking-wide">On-duty staff</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {dayStaff.map(s => (
+                    <span key={s.key} className="text-xs px-2 py-0.5 rounded-full border border-brand-900 text-brand-900 font-medium">
+                      {s.name}
+                      {s.roles.length > 0 && <span className="font-normal text-brand-950"> · {s.roles.join(', ')}</span>}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
             {allRows.length > 0 && (
               <div className="space-y-1">
                 <p className="text-xs font-semibold text-brand-900 uppercase tracking-wide">Payments</p>
@@ -468,7 +486,7 @@ export function AdminLogisticsPage() {
                 <p className="text-xs text-brand-950/70 font-medium italic pl-1">No active registrants.</p>
               ) : (
                 g.rows.map(r => (
-                  <DiverGearCard key={r.booking.id} row={r} onProfilePatched={patchProfile} />
+                  <DiverGearCard key={r.booking.id} row={r} onProfilePatched={patchProfile} linkToProfile={isAdmin} />
                 ))
               )}
             </section>

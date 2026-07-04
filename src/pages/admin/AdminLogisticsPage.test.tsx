@@ -141,9 +141,10 @@ describe('AdminLogisticsPage', () => {
     // 1 diver rides + the lone staff drives → one Delica covers it, named.
     const overall = screen.getByText(/^overall/i).closest('section')!
     expect(within(overall).getByText(/Take 1 vehicle — 7 seats for 2 riders/i)).toBeInTheDocument()
-    // Dana drives the Delica; Ada rides in it; nobody is ride-less.
+    // Dana drives the Delica; Ada rides in it; nobody is ride-less. Dana also
+    // shows in the board's on-duty staff line, so match may be non-unique.
     expect(within(overall).getByText(/Delica/)).toBeInTheDocument()
-    expect(within(overall).getByText(/Dana/)).toBeInTheDocument()
+    expect(within(overall).getAllByText(/Dana/).length).toBeGreaterThan(0)
     expect(within(overall).getByText('Ada')).toBeInTheDocument()
     expect(within(overall).queryByText(/No seat/i)).not.toBeInTheDocument()
   })
@@ -230,10 +231,31 @@ describe('AdminLogisticsPage', () => {
     const summary = screen.getByText(/need a ride/i)
     expect(summary).toHaveTextContent(/1 on-duty staff/i)
 
+    // Overall board names the on-duty staff and their role(s).
+    const overall = screen.getByText(/^overall/i).closest('section')!
+    const boardStaff = within(overall).getByText('On-duty staff').closest('div')!
+    expect(within(boardStaff).getByText(/Dana/)).toBeInTheDocument()
+    expect(within(boardStaff).getByText(/guide/)).toBeInTheDocument()
+
     // Per-event group lists the staff member with their role.
     const group = screen.getByRole('group', { name: /on-duty staff/i })
     expect(within(group).getByText(/Dana/)).toBeInTheDocument()
     expect(within(group).getByText(/guide/)).toBeInTheDocument()
+  })
+
+  it('links each diver gear card to their People profile for admins', async () => {
+    renderPage()
+    await screen.findByText(/1 event · 2 divers/i)
+    // Only the gear-card name is a link; the ride-plan mention of Ada is plain text.
+    expect(screen.getByRole('link', { name: 'Ada' })).toHaveAttribute('href', '/admin/users?diver=u1')
+    expect(screen.getByRole('link', { name: 'Bo' })).toHaveAttribute('href', '/admin/users?diver=u2')
+  })
+
+  it('does not link diver cards for staff (People is admin-only)', async () => {
+    useAuthMock.mockReturnValue({ profile: { id: 's-1', role: 'staff' } })
+    renderPage()
+    await screen.findByText(/1 event · 2 divers/i)
+    expect(screen.queryByRole('link', { name: 'Ada' })).not.toBeInTheDocument()
   })
 
   it('shows delicate rentals in a separate "Handle with care" inventory, out of the gear chips', async () => {
