@@ -30,7 +30,6 @@ export const siteConfigSchema = z.object({
   urls: z.object({
     site: url,
     app: url,
-    radio: url,
   }),
   locale: z.object({
     timezone: z.string().min(1),
@@ -47,10 +46,8 @@ export const siteConfigSchema = z.object({
     icon192: z.string().min(1),
     icon512: z.string().min(1),
     appleTouchIcon: z.string().min(1),
-    broadcast: z.string().min(1),
   }),
   features: z.object({
-    radio: z.boolean(),
     push: z.boolean(),
     broadcast: z.boolean(),
   }),

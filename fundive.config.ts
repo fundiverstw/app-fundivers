@@ -20,7 +20,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const siteConfig = {
-  configVersion: 2,
+  configVersion: 3,
 
   identity: {
     appName: 'FunDive',
@@ -44,7 +44,6 @@ export const siteConfig = {
   urls: {
     site: 'https://www.fundiverstw.com',
     app: 'https://app.fundiverstw.com',
-    radio: 'https://radio.fundiverstw.com',
   },
 
   locale: {
@@ -66,11 +65,9 @@ export const siteConfig = {
     icon192: '/icons/icon-192.png',
     icon512: '/icons/icon-512.png',
     appleTouchIcon: '/apple-touch-icon.png',
-    broadcast: '/imgs/broadcast.png',
   },
 
   features: {
-    radio: true,
     push: true,
     broadcast: true,
   },

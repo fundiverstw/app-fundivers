@@ -36,8 +36,6 @@ export interface SiteUrls {
   site: string
   /** The deployed app origin, no trailing slash. */
   app: string
-  /** External radio stream, no trailing slash. */
-  radio: string
 }
 
 export interface SiteLocale {
@@ -62,12 +60,9 @@ export interface SiteAssets {
   icon192: string
   icon512: string
   appleTouchIcon: string
-  broadcast: string
 }
 
 export interface SiteFeatures {
-  /** External radio links in the app shells. */
-  radio: boolean
   /** Web-push notifications (also gated by VAPID env). */
   push: boolean
   /** Admin broadcast relay (also gated by BROADCAST_WEBHOOK_URL). */
@@ -113,6 +108,6 @@ export interface SiteConfig {
 // Bump when the SiteConfig contract changes in a way that requires forks to
 // migrate their fundive.config.ts. The build compares this against
 // siteConfig.configVersion and fails loudly on a mismatch.
-export const CONFIG_CONTRACT_VERSION = 2
+export const CONFIG_CONTRACT_VERSION = 3
 
 export const siteConfig: SiteConfig = raw

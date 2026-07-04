@@ -15,7 +15,7 @@ never touch it — that's what keeps upstream updates conflict-free.
 | `fundive.config.ts` | Shop name, contact details, URLs, locale (timezone/currency), PWA manifest colors, asset paths, feature toggles, gear list/prices, calendar trip keywords, weather-baseline region. Copy `fundive.config.example.ts` to start. |
 | `src/index.css` (`@theme` block) | Your **brand colors** — see [Colors](#colors) below. |
 | `src/config/terms.tsx` | Your Terms of Use / privacy text (`TermsContent`). |
-| `public/…` (the paths in `assets`) | Your logo, favicon, PWA icons, broadcast glyph. |
+| `public/…` (the paths in `assets`) | Your logo, favicon, PWA icons. |
 | `.env.local` / `.env.production` / GitHub Actions secrets | Supabase URL + keys, Turnstile keys, VAPID keys — see [deployment.md](./deployment.md). |
 | `wrangler.toml` + `workers/push/wrangler.toml` | The two Worker `name`s (globally unique on Cloudflare), and the push worker's `[vars]` (`VAPID_SUBJECT`, `ALLOWED_ORIGINS`, `TIMEZONE`, `CURRENCY`). |
 
@@ -73,7 +73,6 @@ separate mechanism (baked into the manifest + `index.html` at build).
 
 `fundive.config.ts` → `features` gates optional surfaces:
 
-- `radio` — the external radio links in the app shells.
 - `push` / `broadcast` — refine the push + admin-broadcast features (also gated by
   the VAPID / webhook env).
 
