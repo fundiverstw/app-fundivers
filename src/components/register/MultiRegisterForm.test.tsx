@@ -235,7 +235,7 @@ describe('MultiRegisterForm parent diver picker', () => {
     expect(screen.getByRole('button', { name: /confirm 1 booking/i })).toBeEnabled()
   })
 
-  it('disables a dive\'s ride option when its assigned cars are full', async () => {
+  it('lets a diver waitlist for a dive\'s ride when its cars are full — selectable with a warning', async () => {
     setupFrom([])
     rpc.mockImplementation((name: string) =>
       Promise.resolve(name === 'event_ride_seats'
@@ -254,8 +254,10 @@ describe('MultiRegisterForm parent diver picker', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
 
     expect(await screen.findByText(/shop ride is full for this dive/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/yes, ride with the shop/i)).toBeDisabled()
-    expect(screen.getByLabelText(/no, i'll get there myself/i)).not.toBeDisabled()
+    const ride = screen.getByLabelText(/yes, ride with the shop/i)
+    expect(ride).not.toBeDisabled()
+    await user.click(ride)
+    expect(screen.getByText(/on the ride waitlist/i)).toBeInTheDocument()
   })
 
   it('shows a disabled "Submitting…" state while the booking round-trip is pending', async () => {
