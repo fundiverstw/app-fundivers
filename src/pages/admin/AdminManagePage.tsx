@@ -18,6 +18,7 @@ interface ManageCard {
 
 const CARDS: ManageCard[] = [
   { to: '/admin/applications', title: 'Applications', blurb: 'Approve or reject pending diver applications.' },
+  { to: '/admin/dashboard', title: 'Dashboard',      blurb: 'Bookings, revenue and activity charts across the shop.' },
   { to: '/admin/new/event', title: 'New event',     blurb: 'Create a dive or course. Edit existing events from the calendar.' },
   { to: '/admin/rooms',     title: 'Room options',  blurb: 'Add, rename, reprice or delete room types offered with multi-day dives.' },
   { to: '/admin/addons',    title: 'Add-ons',       blurb: 'Add, rename, reprice or delete optional items (gear, courses, transport).' },
