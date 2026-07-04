@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { personName } from '../../lib/names'
 import { supabase } from '../../lib/supabase'
 import { gearPackList } from '../../lib/gear'
@@ -20,12 +21,17 @@ export interface DiverGearRow {
  * StaffOrAdminRoute and the RPC rechecks the role server-side.
  */
 export function DiverGearCard({
-  row, onProfilePatched,
+  row, onProfilePatched, linkToProfile = false,
 }: {
   row: DiverGearRow
   onProfilePatched: (diverId: string, patch: Partial<Profile>) => void
+  // When true, the diver's name links to their admin People card. Gated by the
+  // caller because that page is admin-only, while this card also renders on the
+  // staff-accessible gear map.
+  linkToProfile?: boolean
 }) {
   const { profile, booking } = row
+  const diverName = personName(profile?.name, profile?.nickname) || '(unknown)'
   const pack = gearPackList(booking)
   const toast = useToast()
   const owned = new Set(profile?.gear_owned ?? [])
@@ -74,7 +80,13 @@ export function DiverGearCard({
       <header className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-brand-900">
-            {personName(profile?.name, profile?.nickname) || '(unknown)'}
+            {linkToProfile && profile ? (
+              <Link to={`/admin/users?diver=${profile.id}`} className="hover:underline">
+                {diverName}
+              </Link>
+            ) : (
+              diverName
+            )}
           </h2>
           {sizing && <p className="text-xs text-brand-900 font-medium">{sizing}</p>}
         </div>

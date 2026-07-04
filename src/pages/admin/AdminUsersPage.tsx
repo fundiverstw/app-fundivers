@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { siteConfig } from '../../config/site'
 import { Spinner } from '../../components/ui/Spinner'
 import { format } from 'date-fns'
@@ -75,6 +76,27 @@ export function AdminUsersPage() {
       .order('name', { ascending: true })
       .then(({ data }) => setUsers((data ?? []) as Profile[]))
   }, [])
+
+  // Deep link: /admin/users?diver=<id> opens (and scrolls to) that diver's
+  // card. Used by the logistics gear cards so an admin can jump from the
+  // day-of view straight to a diver's full account. Runs once the roster has
+  // loaded so the target card is in the DOM.
+  const [searchParams] = useSearchParams()
+  const deepLinkId = searchParams.get('diver')
+  useEffect(() => {
+    if (!deepLinkId || !users.some(u => u.id === deepLinkId)) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setExpanded(deepLinkId)
+    if (!extrasCache.has(deepLinkId)) {
+      setExtrasLoading(deepLinkId)
+      fetchExtras(deepLinkId).then(extras => {
+        setExtrasCache(prev => new Map(prev).set(deepLinkId, extras))
+        setExtrasLoading(null)
+      })
+    }
+    document.getElementById(`diver-${deepLinkId}`)?.scrollIntoView({ block: 'start' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkId, users])
 
   async function toggle(userId: string) {
     if (expanded === userId) {
@@ -396,8 +418,8 @@ export function AdminUsersPage() {
 
       <div className="space-y-2">
         {visible.map(u => (
+          <div key={u.id} id={`diver-${u.id}`}>
           <UserCard
-            key={u.id}
             user={u}
             allUsers={users}
             onFamilyChanged={refetchAllUsers}
@@ -420,6 +442,7 @@ export function AdminUsersPage() {
             isAdmin={isAdmin}
             isSelf={profile?.id === u.id}
           />
+          </div>
         ))}
         {visible.length === 0 && (
           <p className="text-brand-950 font-medium text-sm">No matches.</p>
