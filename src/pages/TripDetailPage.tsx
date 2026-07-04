@@ -171,5 +171,5 @@ function InterestedCard({ trip, referral }: { trip: TripBoardItem; referral: MyT
 }
 
 function BackLink() {
-  return <Link to="/trips" className={`text-sm ${ON_DEEP_LINK}`}>← Trip Board</Link>
+  return <Link to="/trips" className={`text-sm ${ON_DEEP_LINK}`}>← Packages</Link>
 }

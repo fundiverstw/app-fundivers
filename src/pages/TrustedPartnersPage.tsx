@@ -9,10 +9,10 @@ import {
   PAGE_HEADING, PAGE_BODY, TEXT_BODY,
 } from '../styles/tokens'
 
-// Partner Connect (PX) — a diver tells us where they're headed and we
-// reply with a dive shop we've personally vetted there. The form emails
-// the shop inbox via the partner-connect edge function.
-export function PartnerConnectPage() {
+// Trusted Partners — a diver tells us where they're headed and we reply
+// with a dive shop we've personally vetted there. The form emails the shop
+// inbox via the partner-connect edge function.
+export function TrustedPartnersPage() {
   const { profile } = useAuth()
   const toast = useToast()
   const [destination, setDestination] = useState('')
@@ -40,7 +40,7 @@ export function PartnerConnectPage() {
   return (
     <div className="max-w-xl mx-auto space-y-4">
       <div className="space-y-1">
-        <h1 className={`text-xl ${PAGE_HEADING} font-bold`}>Partner Connect <span className="opacity-70">(PX)</span></h1>
+        <h1 className={`text-xl ${PAGE_HEADING} font-bold`}>Trusted Partners</h1>
         <p className={`text-sm ${PAGE_BODY}`}>
           Heading somewhere to dive? Tell us where and we'll point you to a
           dive shop we've personally vetted there.

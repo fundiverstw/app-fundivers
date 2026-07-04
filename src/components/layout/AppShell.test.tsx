@@ -137,10 +137,10 @@ describe('AppShell', () => {
     expect(screen.getByText('Alice')).toBeInTheDocument()
   })
 
-  it('renders the Partner Connect (PX) shortcut linking to /partner-connect', () => {
+  it('renders the Trusted Partners shortcut linking to /trusted-partners', () => {
     useAuthMock.mockReturnValue({ profile: null, signOut })
     routedRender()
-    expect(screen.getByRole('link', { name: /partner connect/i })).toHaveAttribute('href', '/partner-connect')
+    expect(screen.getByRole('link', { name: /trusted partners/i })).toHaveAttribute('href', '/trusted-partners')
   })
 
   // The update banner moved to UpdateBannerHost (mounted at App root so it

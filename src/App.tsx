@@ -25,9 +25,10 @@ import { RecordsPage } from './pages/RecordsPage'
 import { DiveLogsPage } from './pages/DiveLogsPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { ContactPage } from './pages/ContactPage'
-import { PartnerConnectPage } from './pages/PartnerConnectPage'
+import { TrustedPartnersPage } from './pages/TrustedPartnersPage'
 import { TripBoardPage } from './pages/TripBoardPage'
 import { TripDetailPage } from './pages/TripDetailPage'
+import { ScheduledTripsPage } from './pages/ScheduledTripsPage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { DutiesPage } from './pages/DutiesPage'
@@ -105,9 +106,10 @@ export default function App() {
               </Route>
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/contact" element={<ContactPage />} />
-              <Route path="/partner-connect" element={<PartnerConnectPage />} />
+              <Route path="/trusted-partners" element={<TrustedPartnersPage />} />
               <Route path="/trips" element={<TripBoardPage />} />
               <Route path="/trips/:id" element={<TripDetailPage />} />
+              <Route path="/scheduled-trips" element={<ScheduledTripsPage />} />
               <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/duties" element={<DutiesPage />} />
             </Route>

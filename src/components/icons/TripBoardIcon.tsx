@@ -1,6 +1,6 @@
 // Lucide "plane" glyph for the Trip Board header shortcut — the curated trips
 // abroad we vouch for. currentColor so the parent sets the tint (red on the
-// diver header), matching the map / Partner Connect affordances beside it.
+// diver header), matching the map / Trusted Partners affordances beside it.
 export function TripBoardIcon() {
   return (
     <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none"
