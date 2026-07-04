@@ -177,6 +177,8 @@ function diveToEvent(d: EODive, priceIndex: Map<string, EOPrice>, addonIds: stri
     dive_days: d.dive_days ?? null,
     cancelled_at: d.cancelled_at ?? null,
     is_private: d.is_private ?? false,
+    is_boat_dive: d.is_boat_dive ?? false,
+    is_trip: d.is_trip ?? false,
     full_payment_deadline: d.full_payment_deadline ?? null,
     cancel_policy: d.cancel_policy ?? null,
     cancel_date: d.cancel_date ?? null,
@@ -475,7 +477,7 @@ async function attachPrices(dives: EODive[], courses: EOCourse[]): Promise<Map<s
 // Core columns only — every one is guaranteed to exist in the EO_* schema.
 // The descriptive detail columns are deliberately excluded and fetched
 // best-effort by attachEventDetails, so schema drift can't break the calendar.
-const DIVE_COLS = '_id, admin_title, display_title, calendar_title, start_date, time, end_date, featured, fully_booked, capacity, price, has_rooms, room_types, hasotheraddons, other_addons, gear_rental, nitrox_required, dive_days, cancelled_at, full_payment_deadline, cancel_policy, cancel_date, is_private'
+const DIVE_COLS = '_id, admin_title, display_title, calendar_title, start_date, time, end_date, featured, fully_booked, capacity, price, has_rooms, room_types, hasotheraddons, other_addons, gear_rental, nitrox_required, dive_days, cancelled_at, full_payment_deadline, cancel_policy, cancel_date, is_private, is_boat_dive, is_trip'
 const COURSE_COLS = '_id, admin_title, display_title, calendar_title, start_time, price, other_addons, dive_days, course_days, cancelled_at, full_payment_deadline, cancel_policy, cancel_date, fully_booked, capacity'
 
 // Every 'YYYY-MM-DD' from `fromDate` to `toDate` inclusive. Used to ask

@@ -33,6 +33,8 @@ export interface FormState {
   featured: boolean
   fully_booked: boolean
   is_private: boolean    // dive-only: hidden from diver-facing calendars
+  is_boat_dive: boolean  // dive-only, independent of is_trip
+  is_trip: boolean       // dive-only, independent of is_boat_dive; drives Scheduled Trips
   has_rooms: boolean
   roomIds: string[]      // FK multi → EO_rooms (CSV-encoded)
   nitrox_required: boolean
@@ -63,7 +65,7 @@ export const EMPTY_FORM: FormState = {
   req_dives: '', dive_days: '',
   addonIds: [],
   featured_image: '', second_image: '',
-  notes: '', featured: false, fully_booked: false, is_private: false,
+  notes: '', featured: false, fully_booked: false, is_private: false, is_boat_dive: false, is_trip: false,
   has_rooms: false, roomIds: [],
   nitrox_required: false, gear_rental: '',
   cancel_date: '', cancel_policy: '',
@@ -132,6 +134,8 @@ export function formStateFromDive(d: EODive): FormState {
     featured: !!d.featured,
     fully_booked: !!d.fully_booked,
     is_private: !!d.is_private,
+    is_boat_dive: !!d.is_boat_dive,
+    is_trip: !!d.is_trip,
     has_rooms: !!d.has_rooms,
     roomIds: parseCsvIds(d.room_types),
     nitrox_required: d.nitrox_required ?? false,
@@ -176,7 +180,7 @@ export function formStateFromCourse(c: EOCourse): FormState {
     cancel_policy: c.cancel_policy ?? '',
     featured_image: c.featured_image ?? '',
     second_image: '',
-    notes: '', featured: false, fully_booked: false, is_private: false,
+    notes: '', featured: false, fully_booked: false, is_private: false, is_boat_dive: false, is_trip: false,
     has_rooms: false, roomIds: [],
     nitrox_required: false, gear_rental: '',
     destinationIds: [], divetravel_reference: '',
@@ -204,6 +208,8 @@ export function divePayloadFromForm(form: FormState): Record<string, unknown> {
     featured: form.featured,
     fully_booked: form.fully_booked,
     is_private: form.is_private,
+    is_boat_dive: form.is_boat_dive,
+    is_trip: form.is_trip,
     prereq_cert_id: form.prereq_cert_id || null,
     req_dives: form.req_dives ? Number(form.req_dives) : null,
     dive_days: form.dive_days ? Number(form.dive_days) : null,
