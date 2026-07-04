@@ -133,6 +133,10 @@ describe('AdminLogisticsPage', () => {
       if (table === 'vehicles') return mockQueryBuilder({ data: [
         { id: 'v1', created_at: '', name: 'Delica', passenger_seats: 7, active: true, created_by: null },
       ] })
+      // The Delica is assigned to the event — divers ride only in assigned cars.
+      if (table === 'event_vehicles') return mockQueryBuilder({ data: [
+        { id: 'ev1', vehicle_id: 'v1', eo_dive_id: 'e1', eo_course_id: null },
+      ] })
       return mockQueryBuilder({ data: [] })
     })
     renderPage()
@@ -140,7 +144,7 @@ describe('AdminLogisticsPage', () => {
 
     // 1 diver rides + the lone staff drives → one Delica covers it, named.
     const overall = screen.getByText(/^overall/i).closest('section')!
-    expect(within(overall).getByText(/Take 1 vehicle — 7 seats for 2 riders/i)).toBeInTheDocument()
+    expect(await within(overall).findByText(/Take 1 vehicle — 7 seats for 2 riders/i)).toBeInTheDocument()
     // Dana drives the Delica; Ada rides in it; nobody is ride-less. Dana also
     // shows in the board's on-duty staff line, so match may be non-unique.
     expect(within(overall).getByText(/Delica/)).toBeInTheDocument()
@@ -156,6 +160,9 @@ describe('AdminLogisticsPage', () => {
       if (table === 'vehicles') return mockQueryBuilder({ data: [
         { id: 'v1', created_at: '', name: 'Delica', passenger_seats: 7, active: true, created_by: null },
       ] })
+      if (table === 'event_vehicles') return mockQueryBuilder({ data: [
+        { id: 'ev1', vehicle_id: 'v1', eo_dive_id: 'e1', eo_course_id: null },
+      ] })
       return mockQueryBuilder({ data: [] })
     })
     renderPage()
@@ -163,10 +170,30 @@ describe('AdminLogisticsPage', () => {
 
     const overall = screen.getByText(/^overall/i).closest('section')!
     // Ada is still seated in the Delica; the car just has no one to drive it.
-    expect(within(overall).getByText(/still needs a driver/i)).toBeInTheDocument()
+    expect(await within(overall).findByText(/still needs a driver/i)).toBeInTheDocument()
     expect(within(overall).getByText(/Delica/)).toBeInTheDocument()
     expect(within(overall).getByText('Ada')).toBeInTheDocument()
     expect(within(overall).queryByText(/No seat/i)).not.toBeInTheDocument()
+  })
+
+  it('does not seat divers in a fleet car that is not assigned to their event', async () => {
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: bookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      // The Delica is active but assigned to NO event → off-limits to riders.
+      if (table === 'vehicles') return mockQueryBuilder({ data: [
+        { id: 'v1', created_at: '', name: 'Delica', passenger_seats: 7, active: true, created_by: null },
+      ] })
+      return mockQueryBuilder({ data: [] })
+    })
+    renderPage()
+    await screen.findByText(/1 event · 2 divers/i)
+
+    const overall = screen.getByText(/^overall/i).closest('section')!
+    // Ada needs a ride but no car is on her event, so she stays unseated and the
+    // unassigned Delica is not used to carry her.
+    expect(await within(overall).findByText(/No seat/i)).toBeInTheDocument()
+    expect(within(overall).queryByText(/Delica/)).not.toBeInTheDocument()
   })
 
   it('prompts to add vehicles when riders need a ride but the fleet is empty', async () => {
