@@ -26,6 +26,7 @@ const CARDS: ManageCard[] = [
   { to: '/admin/prices',    title: 'Price tiers',   blurb: 'Total / deposit / transport for each event price tier.' },
   { to: '/admin/vehicles',  title: 'Vehicles',      blurb: 'The shop transport fleet (passenger seats per vehicle) used to plan rides on the logistics view.' },
   { to: '/admin/trip-board', title: 'Trip Board',   blurb: 'Curate partner dive shops and the trips abroad we publish to divers; track referrals and kickbacks.' },
+  { to: '/admin/trusted-partners', title: 'Trusted Partners', blurb: 'Dive shops abroad divers can message directly from the Trusted Partners tab; the email stays admin-only.' },
   { to: '/admin/notifications', title: 'One-off notification', blurb: 'Send an immediate push (and optional LINE relay) to every opted-in device.' },
   { to: '/admin/accounting', title: 'Accounting export', blurb: 'Download a fiscal-year bookkeeping ZIP: per-transaction, by-event, and summary CSVs.' },
 ]
