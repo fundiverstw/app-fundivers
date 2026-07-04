@@ -123,6 +123,13 @@ export interface Database {
         }
         Returns: Array<{ capacity: number; claimed: number }>
       }
+      // Defined in 20260703010000_trusted_partners.sql. Public projection of the
+      // trusted-partner catalog (active rows, no email) so divers can list them
+      // without direct table access — the email stays server-side.
+      list_trusted_partners: {
+        Args: Record<string, never>
+        Returns: Array<{ id: string; name: string; region: string | null; blurb: string | null }>
+      }
       // Defined in 20260603000000_terms_consent_versioning.sql.
       // Server-stamps both agreed_to_terms_at (now()) and
       // agreed_to_terms_version (caller-supplied) on the caller's
@@ -611,6 +618,30 @@ export interface Database {
           created_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['vehicles']['Insert']>
+        Relationships: []
+      }
+      trusted_partners: {
+        Row: {
+          id: string
+          name: string
+          region: string | null
+          blurb: string | null
+          email: string
+          active: boolean
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          region?: string | null
+          blurb?: string | null
+          email: string
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['trusted_partners']['Insert']>
         Relationships: []
       }
       event_vehicles: {
@@ -1420,6 +1451,10 @@ export type DiveLogInsert = Database['public']['Tables']['dive_logs']['Insert']
 // Transport fleet — shop vehicles for logistics ride planning
 export type Vehicle = Database['public']['Tables']['vehicles']['Row']
 export type VehicleInsert = Database['public']['Tables']['vehicles']['Insert']
+export type TrustedPartnerRow = Database['public']['Tables']['trusted_partners']['Row']
+export type TrustedPartnerInsert = Database['public']['Tables']['trusted_partners']['Insert']
+// The diver-facing projection — no email (see list_trusted_partners()).
+export type TrustedPartner = Database['public']['Functions']['list_trusted_partners']['Returns'][number]
 export type EventVehicle = Database['public']['Tables']['event_vehicles']['Row']
 export type EventVehicleInsert = Database['public']['Tables']['event_vehicles']['Insert']
 export type WaiverSignature = Database['public']['Tables']['waiver_signatures']['Row']
