@@ -258,6 +258,20 @@ describe('AdminLogisticsPage', () => {
     expect(screen.queryByRole('link', { name: 'Ada' })).not.toBeInTheDocument()
   })
 
+  it('links each event banner to its edit page for admins', async () => {
+    renderPage()
+    await screen.findByText(/1 event · 2 divers/i)
+    expect(screen.getByRole('link', { name: /edit/i }))
+      .toHaveAttribute('href', '/admin/events/dive/e1/edit')
+  })
+
+  it('hides the event edit link from staff (editing is admin-only)', async () => {
+    useAuthMock.mockReturnValue({ profile: { id: 's-1', role: 'staff' } })
+    renderPage()
+    await screen.findByText(/1 event · 2 divers/i)
+    expect(screen.queryByRole('link', { name: /edit/i })).not.toBeInTheDocument()
+  })
+
   it('shows delicate rentals in a separate "Handle with care" inventory, out of the gear chips', async () => {
     const careBookings = [
       // Ada: rents a dive computer (gear) — care item, NOT a dive-bag chip.
