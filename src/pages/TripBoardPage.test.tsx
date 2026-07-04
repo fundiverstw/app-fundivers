@@ -39,7 +39,7 @@ describe('TripBoardPage', () => {
     expect(await screen.findByText('Raja Ampat Liveaboard')).toBeInTheDocument()
     expect(screen.getByText(/Vouched by Blue Manta Divers/)).toBeInTheDocument()
     expect(screen.getByText(/60,000 TWD/)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Partner Connect/ })).toHaveAttribute('href', '/partner-connect')
+    expect(screen.getByRole('link', { name: /Trusted Partners/ })).toHaveAttribute('href', '/trusted-partners')
   })
 
   it('shows the diver’s existing referral state on a trip card', async () => {

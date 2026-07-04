@@ -10,7 +10,7 @@ import {
 
 // Trip Board (diver-facing) — the curated trips abroad we vouch for. Booking
 // happens at the partner shop; expressing interest here mints a referral code
-// and we broker the intro. Complements Partner Connect (the pull side: a diver
+// and we broker the intro. Complements Trusted Partners (the pull side: a diver
 // names a destination and we suggest a shop).
 export function TripBoardPage() {
   const [trips, setTrips] = useState<TripBoardItem[]>([])
@@ -40,14 +40,14 @@ export function TripBoardPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <div className="space-y-1">
-        <h1 className={`text-xl ${PAGE_HEADING} font-bold`}>Trip Board</h1>
+        <h1 className={`text-xl ${PAGE_HEADING} font-bold`}>Packages</h1>
         <p className={`text-sm ${PAGE_BODY}`}>
           Dive trips abroad we've personally vetted. Tap one you like — we'll
           give you a reference code and connect you with the shop directly.
         </p>
         <p className="text-sm">
-          <Link to="/partner-connect" className={ON_DEEP_LINK}>
-            Headed somewhere not listed? Try Partner Connect →
+          <Link to="/trusted-partners" className={ON_DEEP_LINK}>
+            Headed somewhere not listed? Try Trusted Partners →
           </Link>
         </p>
       </div>

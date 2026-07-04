@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { PartnerConnectPage } from './PartnerConnectPage'
+import { TrustedPartnersPage } from './TrustedPartnersPage'
 
 const useAuthMock = vi.fn()
 vi.mock('../hooks/useAuth', () => ({ useAuth: () => useAuthMock() }))
@@ -19,10 +19,10 @@ beforeEach(() => {
 })
 
 function renderPage() {
-  return render(<MemoryRouter><PartnerConnectPage /></MemoryRouter>)
+  return render(<MemoryRouter><TrustedPartnersPage /></MemoryRouter>)
 }
 
-describe('PartnerConnectPage', () => {
+describe('TrustedPartnersPage', () => {
   it('keeps the submit button disabled until a destination is entered', async () => {
     const user = userEvent.setup()
     renderPage()

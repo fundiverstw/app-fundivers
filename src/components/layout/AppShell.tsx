@@ -9,8 +9,9 @@ import { Logo } from '../Logo'
 import { CalendarIcon } from '../icons/CalendarIcon'
 import { ChatIcon } from '../icons/ChatIcon'
 import { CrosshairIcon } from '../icons/CrosshairIcon'
-import { PartnerConnectIcon } from '../icons/PartnerConnectIcon'
+import { TrustedPartnersIcon } from '../icons/TrustedPartnersIcon'
 import { TripBoardIcon } from '../icons/TripBoardIcon'
+import { ScheduledTripsIcon } from '../icons/ScheduledTripsIcon'
 import { PersonIcon } from '../icons/PersonIcon'
 import { NotificationBell } from '../NotificationBell'
 import {
@@ -78,18 +79,25 @@ export function AppShell() {
       <header className={NAV_BAR}>
         <div className="flex-1 flex items-center justify-start gap-4">
           <Link
-            to="/partner-connect"
-            aria-label="Partner Connect (PX)"
+            to="/trusted-partners"
+            aria-label="Trusted Partners"
             className="text-accent hover:text-red-400 transition-colors"
           >
-            <PartnerConnectIcon />
+            <TrustedPartnersIcon />
           </Link>
           <Link
             to="/trips"
-            aria-label="Trip Board"
+            aria-label="Packages"
             className="text-accent hover:text-red-400 transition-colors"
           >
             <TripBoardIcon />
+          </Link>
+          <Link
+            to="/scheduled-trips"
+            aria-label="Scheduled Trips"
+            className="text-accent hover:text-red-400 transition-colors"
+          >
+            <ScheduledTripsIcon />
           </Link>
         </div>
         <Link to="/dashboard" aria-label="Home" className="shrink-0">
