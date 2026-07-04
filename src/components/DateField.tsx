@@ -68,7 +68,11 @@ export function DateField({
     })
     document.body.appendChild(native)
     const cleanup = () => native.remove()
-    native.addEventListener('change', () => { onChange(native.value); cleanup() })
+    // A picked date is an explicit set: mirror it into the visible text right
+    // away. Clicking the calendar span doesn't blur the text input, so the
+    // mirror effect's focus guard would otherwise hold the display stale until
+    // the user clicked away.
+    native.addEventListener('change', () => { onChange(native.value); setText(native.value); cleanup() })
     native.addEventListener('cancel', cleanup)
     native.addEventListener('blur', () => setTimeout(cleanup, 100))
     try { native.showPicker() } catch { cleanup() }
