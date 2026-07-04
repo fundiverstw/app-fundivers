@@ -35,11 +35,11 @@ function renderPage() {
 }
 
 describe('AdminVehiclesPage', () => {
-  it('lists vehicles with passenger seats and flags retired ones', async () => {
+  it('lists vehicles with physical seats and flags retired ones', async () => {
     renderPage()
     expect(await screen.findByText('Delica')).toBeInTheDocument()
-    expect(screen.getByText(/7 passenger seats \(\+ driver\)/i)).toBeInTheDocument()
-    expect(screen.getByText(/1 passenger seat \(\+ driver\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/7 physical seats/i)).toBeInTheDocument()
+    expect(screen.getByText(/1 physical seat/i)).toBeInTheDocument()
     expect(screen.getByText(/\(retired\)/i)).toBeInTheDocument()
   })
 
@@ -50,7 +50,7 @@ describe('AdminVehiclesPage', () => {
     await user.click(screen.getByRole('button', { name: /new vehicle/i }))
 
     await user.type(screen.getByLabelText(/^name/i), 'Sigi\'s Car')
-    const seats = screen.getByLabelText(/passenger seats/i)
+    const seats = screen.getByLabelText(/physical seats/i)
     await user.clear(seats)
     await user.type(seats, '4')
     await user.click(screen.getByRole('button', { name: /^save$/i }))
@@ -67,7 +67,7 @@ describe('AdminVehiclesPage', () => {
     await screen.findByText('Delica')
     await user.click(screen.getByRole('button', { name: /new vehicle/i }))
     await user.type(screen.getByLabelText(/^name/i), 'Bad')
-    const seats = screen.getByLabelText(/passenger seats/i)
+    const seats = screen.getByLabelText(/physical seats/i)
     await user.clear(seats)
     await user.type(seats, '0')
     await user.click(screen.getByRole('button', { name: /^save$/i }))

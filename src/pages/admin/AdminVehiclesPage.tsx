@@ -86,7 +86,7 @@ export function AdminVehiclesPage() {
                   {v.name}{!v.active && <span className="ml-2 text-xs text-brand-900/60">(retired)</span>}
                 </p>
                 <p className="text-xs text-brand-900/80">
-                  {v.passenger_seats} passenger seat{v.passenger_seats === 1 ? '' : 's'} (+ driver)
+                  {v.passenger_seats} physical seat{v.passenger_seats === 1 ? '' : 's'}
                 </p>
               </div>
               <div className="flex gap-2 shrink-0">
@@ -159,7 +159,7 @@ function VehicleForm({
         <Labelled label="Name *">
           <input className={FIELD} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Delica" />
         </Labelled>
-        <Labelled label="Passenger seats * (excluding driver)">
+        <Labelled label="Physical seats *">
           <input className={FIELD} type="number" min={1} step={1} value={seats} onChange={e => setSeats(e.target.value)} />
         </Labelled>
         <label className="flex items-center gap-2 text-sm text-brand-900">
