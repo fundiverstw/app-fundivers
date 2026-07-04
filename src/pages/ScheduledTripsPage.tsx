@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchEventsInRange, formatEventSpan } from '../lib/events'
-import { diveIsTripOrBoat } from '../lib/event-colors'
 import { dayKeyOffset } from '../lib/logistics'
 import { siteConfig } from '../config/site'
 import { errorMessage } from '../lib/errors'
@@ -29,10 +28,11 @@ export function ScheduledTripsPage() {
       try {
         const events = await fetchEventsInRange(today, dayKeyOffset(today, LOOKAHEAD_DAYS))
         if (cancelled) return
+        // Only events explicitly flagged as trips — a boat dive is not a trip.
         // A course can yield several segments; keep the first per event id.
         const seen = new Set<string>()
         const list = events
-          .filter(e => diveIsTripOrBoat(e))
+          .filter(e => e.is_trip)
           .filter(e => (seen.has(e.id) ? false : (seen.add(e.id), true)))
         setTrips(list)
       } catch (err) {

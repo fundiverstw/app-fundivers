@@ -796,6 +796,8 @@ export interface Database {
           full_payment_deadline: string | null
           capacity: number | null
           is_private: boolean | null
+          is_boat_dive: boolean | null
+          is_trip: boolean | null
         }
         Insert: {
           _id: string
@@ -820,6 +822,8 @@ export interface Database {
           full_payment_deadline?: string | null
           capacity?: number | null
           is_private?: boolean | null
+          is_boat_dive?: boolean | null
+          is_trip?: boolean | null
         }
         Update: Partial<Database['public']['Tables']['EO_dives']['Insert']>
         Relationships: []
@@ -1529,6 +1533,12 @@ export interface AppEvent {
    *  (→ green); null/absent when no destination is tagged, so the calendar
    *  falls back to matching the title. Always absent for courses. */
   dive_outing?: 'local' | 'trip' | null
+  /** Dive-only, admin-set, and INDEPENDENT of each other: a Kenting boat trip
+   *  is both, a local day boat dive is only `is_boat_dive`, a Palau liveaboard
+   *  is only `is_trip`. `is_trip` drives the Scheduled Trips list. Absent for
+   *  courses; optional so lighter event literals can omit them (default false). */
+  is_boat_dive?: boolean
+  is_trip?: boolean
   /** Human-readable event detail surfaced to divers in the calendar modal.
    *  Assembled in src/lib/events.ts from the descriptive columns admins fill
    *  in (a dive's `notes` + linked DiveTravel row; a course's `included` /
