@@ -49,3 +49,24 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Cross-device overflow net. Phone widths vary (~320px iPhone SE → ~430px Pro
+ * Max, plus every Android in between); a single wide element would otherwise
+ * force the whole page wider than the viewport, making everything look
+ * scrunched and pushing text/fields off-screen. The bottom nav is `fixed`
+ * (viewport-anchored) and nothing uses `position: sticky`, so clipping the
+ * page's horizontal overflow here is safe. Legitimately-wide content (data
+ * tables) opts back in with its own `overflow-x-auto` scroll container. */
+html, body {
+  overflow-x: hidden;
+}
+
+body {
+  /* Long unbreakable tokens (emails, URLs, IDs) wrap instead of overrunning. */
+  overflow-wrap: break-word;
+}
+
+/* Media never forces the page wider than its column. */
+img, video, canvas {
+  max-width: 100%;
+}
