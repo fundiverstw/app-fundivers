@@ -196,7 +196,7 @@ describe('RegisterForm', () => {
     expect(onBooked.mock.calls[0][0]).toEqual({ id: 'b-new', status: 'pending' })
   })
 
-  it('disables the "I need a ride" option when the assigned cars are full', async () => {
+  it('lets the diver join the ride waitlist when the cars are full — warns and flags the booking', async () => {
     setupFrom()
     // event_ride_seats reports 7 capacity / 7 claimed → no seats left.
     rpc.mockImplementation((name: string) =>
@@ -211,9 +211,24 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i })) // step 1 → 2
     await user.click(screen.getByRole('button', { name: /next/i })) // step 2 → 3
 
-    expect(await screen.findByText(/the shop ride is full/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/yes, i'll ride with the shop/i)).toBeDisabled()
-    expect(screen.getByLabelText(/no, i don't need a ride/i)).not.toBeDisabled()
+    // The ride is full but still selectable; only the message flags it.
+    const ride = await screen.findByLabelText(/yes, i'll ride with the shop/i)
+    expect(ride).not.toBeDisabled()
+    expect(screen.getByText(/the shop ride is full/i)).toBeInTheDocument()
+
+    // Selecting it warns the diver they've joined the ride waitlist.
+    await user.click(ride)
+    expect(screen.getByText(/added to the ride waitlist/i)).toBeInTheDocument()
+
+    // Completing the booking stamps the ride-waitlist flag on the details.
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))   // step 3 → 4
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+    const [, opts] = invoke.mock.calls[0] as [string, { body: { details: Record<string, unknown> } }]
+    expect(opts.body.details.transportation).toBe(true)
+    expect(opts.body.details.ride_waitlisted).toBe(true)
   })
 
   it('shows remaining ride seats when the assigned cars still have room', async () => {

@@ -35,6 +35,11 @@ export interface BookingDetails {
   }
   add_ons?: string[]
   transportation?: boolean
+  /** True when the diver opted into a ride that had no free seat at submission
+   *  time — a ride-waitlist request. The booking stands; the shop is notified
+   *  to add a car or arrange transport. Distinct from the event-capacity
+   *  waitlist (booking.status). */
+  ride_waitlisted?: boolean
   payment_method?: 'bank_transfer' | 'credit_card' | 'paypal' | 'cash'
   /** Optional billing email when the diver picks credit_card — they receive
    *  the invoice with the card-payment link at this address. Empty / undefined
