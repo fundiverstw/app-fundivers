@@ -478,7 +478,18 @@ export function AdminLogisticsPage() {
                   scrolling a tall phone screen. */}
               <div className="bg-brand-900 text-white rounded-xl px-4 py-2.5 space-y-0.5">
                 <div className="flex items-start justify-between gap-3">
-                  <h2 className="text-base font-semibold break-words">{g.event.title}</h2>
+                  <h2 className="text-base font-semibold break-words">
+                    {isAdmin ? (
+                      <Link
+                        to={`/admin/events/${g.event.type}/${g.event.id}/edit`}
+                        className="hover:underline"
+                      >
+                        {g.event.title}
+                      </Link>
+                    ) : (
+                      g.event.title
+                    )}
+                  </h2>
                   {isAdmin && (
                     <Link
                       to={`/admin/events/${g.event.type}/${g.event.id}/edit`}

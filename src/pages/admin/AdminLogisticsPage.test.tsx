@@ -285,18 +285,21 @@ describe('AdminLogisticsPage', () => {
     expect(screen.queryByRole('link', { name: 'Ada' })).not.toBeInTheDocument()
   })
 
-  it('links each event banner to its edit page for admins', async () => {
+  it('links each event banner — title and Edit button — to its edit page for admins', async () => {
     renderPage()
     await screen.findByText(/1 event · 2 divers/i)
-    expect(screen.getByRole('link', { name: /edit/i }))
-      .toHaveAttribute('href', '/admin/events/dive/e1/edit')
+    const href = '/admin/events/dive/e1/edit'
+    expect(screen.getByRole('link', { name: /edit/i })).toHaveAttribute('href', href)
+    expect(screen.getByRole('link', { name: 'Kenting fun dive' })).toHaveAttribute('href', href)
   })
 
-  it('hides the event edit link from staff (editing is admin-only)', async () => {
+  it('shows the event title as plain text (no edit link) for staff', async () => {
     useAuthMock.mockReturnValue({ profile: { id: 's-1', role: 'staff' } })
     renderPage()
     await screen.findByText(/1 event · 2 divers/i)
     expect(screen.queryByRole('link', { name: /edit/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Kenting fun dive' })).not.toBeInTheDocument()
+    expect(screen.getByText('Kenting fun dive')).toBeInTheDocument()
   })
 
   it('shows delicate rentals in a separate "Handle with care" inventory, out of the gear chips', async () => {
