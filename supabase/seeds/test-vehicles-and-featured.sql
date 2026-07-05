@@ -11,11 +11,11 @@
 -- runs. Deterministic ids + ON CONFLICT DO NOTHING keep this safe to rerun.
 
 -- Transport fleet --------------------------------------------------------
--- passenger_seats EXCLUDES the staff driver (the planner reserves one driver
--- per vehicle). Matches the real shop: a 7-seat Delica and a 1-seat Veryca.
+-- passenger_seats is each vehicle's total physical seats, all available for
+-- riders. A Delica and a smaller Veryca.
 insert into public.vehicles (id, name, passenger_seats, active) values
-  ('d0000000-0000-4000-8000-000000000001', 'Delica', 7, true),
-  ('d0000000-0000-4000-8000-000000000002', 'Veryca', 1, true)
+  ('d0000000-0000-4000-8000-000000000001', 'Delica', 8, true),
+  ('d0000000-0000-4000-8000-000000000002', 'Veryca', 2, true)
 on conflict (id) do nothing;
 
 -- Price row shared by the featured test dives ----------------------------

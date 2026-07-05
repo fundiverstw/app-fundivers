@@ -121,7 +121,7 @@ describe('AdminLogisticsPage', () => {
   })
 
   it('plans which vehicles carry the divers who need a ride', async () => {
-    // One on-duty staff member drives; Ada needs a ride, Bo self-transports.
+    // One on-duty staff rides along; Ada needs a ride, Bo self-transports.
     const duties = [
       { id: 'd1', assignee_id: 's1', role: 'guide', eo_dive_id: 'e1', eo_course_id: null, start_date: '2026-06-18', end_date: null },
     ]
@@ -142,18 +142,18 @@ describe('AdminLogisticsPage', () => {
     renderPage()
     await screen.findByText(/1 event · 2 divers/i)
 
-    // 1 diver rides + the lone staff drives → one Delica covers it, named.
+    // Ada rides + the on-duty staff rides too → one Delica covers both, named.
     const overall = screen.getByText(/^overall/i).closest('section')!
     expect(await within(overall).findByText(/Take 1 vehicle — 7 seats for 2 riders/i)).toBeInTheDocument()
-    // Dana drives the Delica; Ada rides in it; nobody is ride-less. Dana also
-    // shows in the board's on-duty staff line, so match may be non-unique.
+    // The Delica carries Ada and Dana; nobody is ride-less. Dana also shows in
+    // the board's on-duty staff line, so match may be non-unique.
     expect(within(overall).getByText(/Delica/)).toBeInTheDocument()
     expect(within(overall).getAllByText(/Dana/).length).toBeGreaterThan(0)
-    expect(within(overall).getByText('Ada')).toBeInTheDocument()
+    expect(within(overall).getAllByText(/Ada/).length).toBeGreaterThan(0)
     expect(within(overall).queryByText(/No seat/i)).not.toBeInTheDocument()
   })
 
-  it('buckets riders into a vehicle but flags it when no staff can drive', async () => {
+  it('seats a rider even when no staff are on duty, with no driver concept', async () => {
     from.mockImplementation((table: string) => {
       if (table === 'bookings') return mockQueryBuilder({ data: bookings })
       if (table === 'profiles') return mockQueryBuilder({ data: profiles })
@@ -169,10 +169,10 @@ describe('AdminLogisticsPage', () => {
     await screen.findByText(/1 event · 2 divers/i)
 
     const overall = screen.getByText(/^overall/i).closest('section')!
-    // Ada is still seated in the Delica; the car just has no one to drive it.
-    expect(await within(overall).findByText(/still needs a driver/i)).toBeInTheDocument()
-    expect(within(overall).getByText(/Delica/)).toBeInTheDocument()
+    // Ada is seated in the Delica; there's no driver assignment / warning at all.
+    expect(await within(overall).findByText(/Delica/)).toBeInTheDocument()
     expect(within(overall).getByText('Ada')).toBeInTheDocument()
+    expect(within(overall).queryByText(/driver/i)).not.toBeInTheDocument()
     expect(within(overall).queryByText(/No seat/i)).not.toBeInTheDocument()
   })
 

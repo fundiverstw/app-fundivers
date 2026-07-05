@@ -5,8 +5,8 @@ import { fetchVehicles, saveVehicle, deleteVehicle } from '../../lib/vehicles'
 import type { Vehicle, VehicleInsert } from '../../types/database'
 
 // Admin catalog for the shop's transport fleet. Each vehicle carries
-// `passenger_seats` passengers excluding the driver (a staff member drives).
-// The logistics day view plans rides against the active vehicles here.
+// `passenger_seats` physical seats. The logistics day view plans rides against
+// the active vehicles here.
 
 const FIELD = 'w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900'
 
@@ -64,9 +64,9 @@ export function AdminVehiclesPage() {
         </button>
       </div>
       <p className="text-sm text-white/80">
-        The shop's transport fleet. Passenger seats exclude the driver — one
-        staff member drives each vehicle. Retire a sold vehicle to drop it from
-        ride planning without losing it from records.
+        The shop's transport fleet. Enter each vehicle's total physical seats.
+        Retire a sold vehicle to drop it from ride planning without losing it
+        from records.
       </p>
 
       {loadError && (
@@ -139,7 +139,7 @@ function VehicleForm({
     e.preventDefault()
     const seatCount = Number(seats)
     if (!name.trim()) { onError('Name is required.'); return }
-    if (!Number.isInteger(seatCount) || seatCount < 1) { onError('Passenger seats must be a whole number of at least 1.'); return }
+    if (!Number.isInteger(seatCount) || seatCount < 1) { onError('Physical seats must be a whole number of at least 1.'); return }
     setSubmitting(true)
     try {
       const values: VehicleInsert = { name: name.trim(), passenger_seats: seatCount, active }
