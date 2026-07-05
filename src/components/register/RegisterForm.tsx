@@ -11,6 +11,7 @@ import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../li
 import { siteConfig } from '../../config/site'
 import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
 import { fetchCreditsForUser, openCreditBalance, applyCreditToBooking } from '../../lib/credits'
+import { invokeWithRetry } from '../../lib/edge-invoke'
 import { fetchRideSeats, canRequestRide, type RideSeats } from '../../lib/event-vehicles'
 import { missingWaivers, fetchEventWaiverOverrides, fetchDiverSignatures } from '../../lib/waivers'
 import { WaiverSignDialog } from '../waivers/WaiverSignDialog'
@@ -97,6 +98,24 @@ async function readFunctionsError(error: { message: string; context?: unknown },
     return 'An account with that email already exists. Use "Sign in" at the top of the page to continue with this email.'
   }
   return msg
+}
+
+// Read back a diver's own active booking for an event — used to recover from a
+// lost create-registration response, where the booking actually landed but the
+// network dropped before the reply reached the form.
+async function fetchOwnBooking(
+  userId: string,
+  event: AppEvent,
+): Promise<{ id: string; status: string } | null> {
+  const col = event.type === 'dive' ? 'eo_dive_id' : 'eo_course_id'
+  const { data } = await supabase
+    .from('bookings')
+    .select('id, status')
+    .eq('user_id', userId)
+    .eq(col, event.id)
+    .neq('status', 'cancelled')
+    .maybeSingle()
+  return (data as { id: string; status: string } | null) ?? null
 }
 
 type Step = 1 | 2 | 3 | 4
@@ -1092,7 +1111,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     // are provided; authed callers' Bearer JWT identifies the user.
     // When actingOnBehalfOf is set, the caller (admin or parent) JWT is
     // used to authorise, but the booking lands on target_user_id.
-    const { data, error } = await supabase.functions.invoke<{ booking_id: string; status?: string; session: { access_token: string; refresh_token: string } | null }>(
+    const { data, error } = await invokeWithRetry<{ booking_id: string; status?: string; session: { access_token: string; refresh_token: string } | null }>(
       'create-registration',
       {
         body: {
@@ -1114,7 +1133,25 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         },
       },
     )
-    if (error) { setSaving(false); setErr(await readFunctionsError(error, isGuest)); return }
+    if (error) {
+      const msg = await readFunctionsError(error, isGuest)
+      // Lost-response recovery: a retried request may have actually landed the
+      // first time, so the server now reports a duplicate. For a diver booking
+      // themselves we can confirm by reading the booking back and treating it
+      // as success rather than a scary error. (Guests fall through to the
+      // existing "already registered → sign in" hint.)
+      if (!isGuest && !actingOnBehalfOf && userId && /already .*active booking|already registered/i.test(msg)) {
+        const recovered = await fetchOwnBooking(userId, event)
+        if (recovered) {
+          if (draftKey) clearRegistrationDraft(draftKey)
+          setSaving(false)
+          const result = { id: recovered.id, status: recovered.status }
+          if (inlineConfirmation) setDoneInline(result); else onSubmitSuccess(result)
+          return
+        }
+      }
+      setSaving(false); setErr(msg); return
+    }
     if (!data?.booking_id) { setSaving(false); setErr('Registration failed — please try again.'); return }
 
     // Guest path returns the session so we can sign the diver in
@@ -1167,7 +1204,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     let allOk = true
     if (additionalTargets.length > 0) {
       const calls = additionalTargets.map(async (target) => {
-        const { data: d, error: e } = await supabase.functions.invoke<{ booking_id: string; status?: string }>(
+        const { data: d, error: e } = await invokeWithRetry<{ booking_id: string; status?: string }>(
           'create-registration',
           {
             body: {
@@ -2043,6 +2080,13 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
           {err && <p className="text-red-600 text-sm">{err}</p>}
         </section>
+      )}
+
+      {saving && !isEdit && (
+        <p className="text-xs text-brand-900 font-medium" role="status">
+          Submitting your registration — please keep this page open. We'll retry
+          automatically if your connection drops.
+        </p>
       )}
 
       <footer className="flex items-center justify-between gap-2 pt-2">
