@@ -23,7 +23,9 @@ its destination(s).
 | --- | :-: | :-: | :-: | :-: | :-: |
 | `VITE_SUPABASE_URL`         | yes | yes |     |     | yes |
 | `VITE_SUPABASE_ANON_KEY`    | yes | yes |     |     | yes |
+| `VITE_TURNSTILE_SITE_KEY`   | yes | yes |     |     | yes |
 | `VITE_VAPID_PUBLIC_KEY`     | yes | yes |     |     | yes |
+| `VITE_PUSH_WORKER_URL`      | yes | yes |     |     | yes |
 | `SUPABASE_PROJECT_REF`      | yes |     |     |     |     |
 | `SUPABASE_DB_PASSWORD`      | yes |     |     |     |     |
 | `SUPABASE_POOLER_HOST`      | yes |     |     |     |     |
@@ -45,7 +47,9 @@ linked Supabase project.
 | --- | --- | --- |
 | `VITE_SUPABASE_URL`      | `src/lib/supabase.ts` | Cloud project URL; local is `http://127.0.0.1:64321` |
 | `VITE_SUPABASE_ANON_KEY` | `src/lib/supabase.ts` | Public; ships to the browser |
+| `VITE_TURNSTILE_SITE_KEY`| `src/components/register/TurnstileWidget.tsx` | **REQUIRED** — the prod build fails if unset (guest-registration captcha) |
 | `VITE_VAPID_PUBLIC_KEY`  | `src/lib/push.ts`     | Push toggle is hidden if unset |
+| `VITE_PUSH_WORKER_URL`   | `src/pages/admin/*`, `src/lib/{duties,reschedule,event-cancellation}.ts` | Push worker origin for admin push actions; degrades off if unset |
 | `SUPABASE_PROJECT_REF`   | `make link`, `make push`     | e.g. `abcdefghij` |
 | `SUPABASE_DB_PASSWORD`   | `make push`, `make pull`     | DB password for migrations |
 | `SUPABASE_POOLER_HOST`   | `make verify` (`scripts/verify-sync.sh`) | e.g. `aws-0-ap-east-1.pooler.supabase.com` |
@@ -93,7 +97,9 @@ Set under **Settings → Secrets and variables → Actions**.
 | `CLOUDFLARE_ACCOUNT_ID`    | Visible in the Cloudflare dashboard sidebar |
 | `VITE_SUPABASE_URL`        | Same value as `.env.production`; baked into the SPA bundle at build |
 | `VITE_SUPABASE_ANON_KEY`   | Same value as `.env.production`; baked into the SPA bundle at build |
+| `VITE_TURNSTILE_SITE_KEY`  | Cloudflare Turnstile site key; **required** — the build fails without it |
 | `VITE_VAPID_PUBLIC_KEY`    | Same public key as `VAPID_PUBLIC_KEY` in `.env.push` — only the public half goes here |
+| `VITE_PUSH_WORKER_URL`     | Push worker origin baked into the SPA (admin push actions) |
 
 Do **not** put `VAPID_PRIVATE_KEY`, service-role keys, or any push
 worker secret in GitHub. Those stay on Cloudflare via `wrangler secret
