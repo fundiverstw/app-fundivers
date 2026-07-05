@@ -1,9 +1,10 @@
-// Integration coverage for the event_ride_seats RPC (20260628000000).
-// Runs against the live local Supabase stack.
+// Integration coverage for the event_ride_seats RPC (20260628000000, capacity
+// clause superseded by 20260705000000). Runs against the live local stack.
 //
 // Contract:
 //   - capacity = sum of passenger_seats over the DISTINCT vehicles assigned to
-//     the event (a van on several days of a multi-day event counts once)
+//     the event, MINUS one seat per vehicle reserved for whoever drives it
+//     (a van on several days of a multi-day event counts once)
 //   - claimed  = non-cancelled bookings with details.transportation = true
 //   - callable by a plain diver (SECURITY DEFINER bypasses the event_vehicles /
 //     bookings RLS that would otherwise hide the inputs)
@@ -71,10 +72,11 @@ describe('event_ride_seats', () => {
     expect(await seats()).toEqual({ capacity: 0, claimed: 0 })
   })
 
-  it('sums passenger seats over assigned vehicles for capacity', async () => {
+  it('sums passenger seats over assigned vehicles, reserving one driver seat each', async () => {
     await allocate(await createVehicle('Delica', 7))
     await allocate(await createVehicle('Veryca', 4))
-    expect((await seats()).capacity).toBe(11)
+    // (7 - 1) + (4 - 1) = 9 rideable seats after the two drivers.
+    expect((await seats()).capacity).toBe(9)
   })
 
   it('counts a van assigned to the event once and rejects a duplicate', async () => {
@@ -85,8 +87,8 @@ describe('event_ride_seats', () => {
     const dup = await admin.from('event_vehicles')
       .insert({ vehicle_id: bus, eo_dive_id: diveId } as never)
     expect(dup.error).not.toBeNull()
-    // 7 + 4 (from previous test) + 12 = 23
-    expect((await seats()).capacity).toBe(23)
+    // (7 + 4 + 12) physical − 3 drivers = 20 rideable seats.
+    expect((await seats()).capacity).toBe(20)
   })
 
   it('counts only non-cancelled transportation=true bookings as claimed', async () => {
@@ -101,7 +103,7 @@ describe('event_ride_seats', () => {
     const asDiver = await seats(diverClient)
     const asAdmin = await seats(admin)
     expect(asDiver).toEqual(asAdmin)
-    expect(asDiver.capacity).toBe(23)
+    expect(asDiver.capacity).toBe(20)
     expect(asDiver.claimed).toBe(1)
   })
 })

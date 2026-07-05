@@ -58,7 +58,8 @@ function Headline({ plan }: { plan: SeatingPlan }) {
   return (
     <p className="text-sm font-medium text-brand-900">
       Take {plan.vehiclesNeeded} vehicle{plural(plan.vehiclesNeeded)} — {plan.seats} seat{plural(plan.seats)} for{' '}
-      {plan.riders} rider{plural(plan.riders)} ({plan.divers} diver{plural(plan.divers)} + {plan.staff} staff).
+      {plan.riders} rider{plural(plan.riders)} ({plan.divers} diver{plural(plan.divers)}
+      {plan.staff > 0 ? ` + ${plan.staff} staff` : ''}).
     </p>
   )
 }
