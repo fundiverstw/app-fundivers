@@ -1,10 +1,11 @@
 import { GEAR_ALACARTE_PRICES } from './gear'
+import { siteConfig } from '../config/site'
 import type { AppEvent, BookingDetails } from '../types/database'
 
-// Flat fee for adding a Nitrox course to a dive registration (NTD). Shared by
-// both register forms and the display-time recompute so the figure lives in
-// exactly one place.
-export const NITROX_COURSE_FEE = 6000
+// Flat fee for adding a Nitrox course to a dive registration, from shop config.
+// Shared by both register forms and the display-time recompute so the figure
+// lives in exactly one place.
+export const NITROX_COURSE_FEE = siteConfig.business.nitroxCourseFee
 
 export type ChargeKind =
   | 'base'

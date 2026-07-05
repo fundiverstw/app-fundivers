@@ -13,8 +13,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const siteConfig = {
-  // Leave at 1 for a new fork. Only bump when core's CHANGELOG tells you to.
-  configVersion: 2,
+  // Must equal core's current CONFIG_CONTRACT_VERSION (src/config/site.ts) or
+  // the build fails. Bump it whenever core's CHANGELOG.md tells you to migrate.
+  configVersion: 4,
 
   identity: {
     appName: 'FunDive',
@@ -38,7 +39,6 @@ export const siteConfig = {
   urls: {
     site: 'https://www.example.com',
     app: 'https://app.example.com',
-    radio: 'https://radio.example.com',
   },
 
   locale: {
@@ -59,12 +59,10 @@ export const siteConfig = {
     icon192: '/icons/icon-192.png',
     icon512: '/icons/icon-512.png',
     appleTouchIcon: '/apple-touch-icon.png',
-    broadcast: '/imgs/broadcast.png',
   },
 
   // Turn off what you don't run.
   features: {
-    radio: false,
     push: true,
     broadcast: false,
   },
@@ -76,6 +74,7 @@ export const siteConfig = {
     },
     paymentDeadlineFallbackDays: 7,
     cardSurchargePercent: 5,
+    nitroxCourseFee: 300,
     // Case-insensitive regex fragments that mark a dive as a "trip" by title
     // (destination names, "\\bboat\\b", …). Empty = never classify by title.
     tripKeywords: ['\\bboat\\b'],

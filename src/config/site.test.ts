@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { siteConfig, CONFIG_CONTRACT_VERSION } from './site'
 import { siteConfigSchema, assertValidSiteConfig } from './site.schema'
+import { siteConfig as exampleConfig } from '../../fundive.config.example'
 
 // Guards the fork's fundive.config.ts against the SiteConfig contract. If a shop
 // mistypes or omits a field, or ships a stale configVersion, this fails in CI
@@ -40,5 +41,13 @@ describe('siteConfig', () => {
   it('rejects a config with an out-of-range configVersion', () => {
     expect(() => assertValidSiteConfig({ ...siteConfig, configVersion: CONFIG_CONTRACT_VERSION - 1 }))
       .toThrow(/configVersion/)
+  })
+
+  // The example is the fork onboarding path (`cp fundive.config.example.ts
+  // fundive.config.ts`), so it must stay valid at the current contract — a
+  // stale example would fail a fresh fork's very first build.
+  it('ships an example config valid at the current contract version', () => {
+    expect(() => assertValidSiteConfig(exampleConfig)).not.toThrow()
+    expect(exampleConfig.configVersion).toBe(CONFIG_CONTRACT_VERSION)
   })
 })

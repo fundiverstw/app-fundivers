@@ -78,6 +78,8 @@ export interface SiteBusiness {
   paymentDeadlineFallbackDays: number
   /** Surcharge shown for card / PayPal payment methods, as a whole percent. */
   cardSurchargePercent: number
+  /** Flat fee to add a Nitrox course to a dive registration, in shop currency. */
+  nitroxCourseFee: number
   /** Case-insensitive regex-alternation fragments that mark a dive as a "trip"
    *  (vs a local shore dive) by title — destination names, "\\bboat\\b", etc.
    *  Empty = never match by title. Used for calendar coloring. */
@@ -108,6 +110,6 @@ export interface SiteConfig {
 // Bump when the SiteConfig contract changes in a way that requires forks to
 // migrate their fundive.config.ts. The build compares this against
 // siteConfig.configVersion and fails loudly on a mismatch.
-export const CONFIG_CONTRACT_VERSION = 3
+export const CONFIG_CONTRACT_VERSION = 4
 
 export const siteConfig: SiteConfig = raw

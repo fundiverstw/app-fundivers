@@ -5,7 +5,7 @@ import type { EOAddon } from '../../types/database'
 const fields: CatalogField<EOAddon>[] = [
   { key: 'display_title', label: 'Display title', type: 'text', required: true, placeholder: 'e.g. SMB Rental' },
   { key: 'admin_title',   label: 'Admin title',   type: 'text', placeholder: 'e.g. smb' },
-  { key: 'price',        label: 'Price (TWD)', type: 'number', placeholder: '0' },
+  { key: 'price',        label: `Price (${siteConfig.locale.currencyLabel})`, type: 'number', placeholder: '0' },
   { key: 'currency',     label: 'Currency', type: 'text', placeholder: siteConfig.locale.currency },
 ]
 

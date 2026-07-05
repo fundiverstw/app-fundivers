@@ -20,7 +20,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const siteConfig = {
-  configVersion: 3,
+  configVersion: 4,
 
   identity: {
     appName: 'FunDive',
@@ -79,6 +79,7 @@ export const siteConfig = {
     },
     paymentDeadlineFallbackDays: 7,
     cardSurchargePercent: 5,
+    nitroxCourseFee: 6000,
     // Regex-alternation fragments (case-insensitive) that flag a dive as a
     // "trip" by title when it has no tagged destination — boat dives and
     // anywhere beyond the usual Taipei→Keelung shore drive.
