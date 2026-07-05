@@ -552,8 +552,7 @@ function combinePlans(plans: SeatingPlan[]): SeatingPlan {
     staff,
     riders: divers + staff,
     seats: plans.reduce((s, p) => s + p.seats, 0),
-    driversNeeded: cars.length,
-    driversShort: plans.reduce((s, p) => s + p.driversShort, 0),
+    vehiclesNeeded: cars.length,
     fits: unseated.length === 0,
     shortfall: unseated.length,
   }
