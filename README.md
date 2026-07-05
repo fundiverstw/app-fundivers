@@ -1,84 +1,57 @@
-# React + TypeScript + Vite
+# FunDive
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**FunDive** is a free, open-source, self-hostable platform for running a dive
+center — bookings, courses, payments, dive logs, fleet ride logistics, trusted-
+partner referrals, and staff operations. It's packaged to be **forked**: point
+the config at your shop and deploy your own instance. *FunDivers TW* is the shop
+it was built for and its first deployment.
 
-Currently, two official plugins are available:
+- **Stack:** React 19 + Vite + Tailwind, Supabase (Postgres + PostgREST + Deno
+  edge functions), Cloudflare Workers (SPA + a push-notification cron worker).
+- **License:** [AGPL-3.0-or-later](LICENSE) — if you run a modified FunDive as a
+  hosted service, you must publish your modifications.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Quick start
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```sh
+make start     # boot the local Supabase stack (Docker)
+make dev       # Vite dev server against the local stack
+make test      # full test suite (unit + integration)
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+You'll need a `fundive.config.ts` and a `.env.local`. To stand up a fresh
+instance:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```sh
+cp fundive.config.example.ts fundive.config.ts   # then edit for your shop
 ```
+
+See **[docs/forking.md](docs/forking.md)** for the full fork walkthrough
+(config fields, env vars, Supabase + Cloudflare setup) and
+**[docs/deployment.md](docs/deployment.md)** for the deploy commands and their
+required environment variables.
+
+## Configuration
+
+All shop-specific values — name, contact, URLs, timezone, currency, theme
+colors, asset paths, gear list, prices, and feature toggles — live in the root
+`fundive.config.ts` (pure data), read through the typed handle in
+`src/config/site.ts` and validated by `src/config/site.schema.ts`. Nothing
+shop-specific is hardcoded in the app. Bumping the config contract is recorded
+in [CHANGELOG.md](CHANGELOG.md).
+
+## Documentation
+
+Start at **[docs/README.md](docs/README.md)** — an index into focused per-topic
+docs (architecture, data model, auth, bookings, payments, admin, push
+notifications, testing, deployment, forking). Contributors should read it before
+changing code; `CLAUDE.md` captures the load-bearing conventions.
 
 ## Compared to competitors
 
-**FunDive** is a free, open-source, self-hostable platform for running a dive
-center — bookings, courses, payments, dive logs, fleet logistics, and staff
-operations. (FunDivers TW is the shop it was built for and its first
-deployment.) Every commercial alternative below is paid, closed-source SaaS;
-each is scored against FunDive on the capabilities that most separate them.
+FunDive is a free, open-source, self-hostable platform for running a dive
+center. Every commercial alternative below is paid, closed-source SaaS; each is
+scored against FunDive on the capabilities that most separate them.
 
 Legend: ✓ yes · ~ partial/limited · ✗ no · ? not documented
 
