@@ -16,6 +16,7 @@
 
 import { Buffer } from "node:buffer"
 import { sanitizeProfilePatch } from "../_shared/profile-patch.ts"
+import { eligibilityError } from "../_shared/registration-eligibility.ts"
 import { corsHeaders, safeError } from "../_shared/responses.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 import type { RegistrationPdfPayload } from "../_shared/pdf.ts"
@@ -312,7 +313,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     session = si?.session ?? null
   }
 
-  async function rollback(reason: string): Promise<Response> {
+  async function rollback(reason: string, status = 500): Promise<Response> {
     if (createdGuest) {
       // Best-effort delete. If it fails we still leak an auth.users
       // row — log it to orphan_auth_users so a janitor can reap it.
@@ -338,7 +339,30 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
         }).catch(() => { /* log path itself failed; nothing more to do */ })
       }
     }
-    return json({ error: reason }, 500)
+    return json({ error: reason }, status)
+  }
+
+  // Reads the effective (post-patch) profile + event prereqs and defers to the
+  // shared eligibilityError rules. Returns a user-facing message or null.
+  async function checkEligibility(uid: string): Promise<string | null> {
+    const { data: prof } = await admin
+      .from("profiles")
+      .select("cert_level, uncertified, logged_dives")
+      .eq("id", uid)
+      .single()
+    let ev: Record<string, unknown> | null
+    if (body.event_type === "dive") {
+      const { data } = await admin.from("EO_dives").select("prereq_cert_id, req_dives").eq("_id", body.event_id).maybeSingle()
+      ev = data as Record<string, unknown> | null
+    } else {
+      const { data } = await admin.from("EO_courses").select("prereq_cert_id, req_dives").eq("_id", body.event_id).maybeSingle()
+      ev = data as Record<string, unknown> | null
+    }
+    return eligibilityError(
+      prof as { cert_level: string | null; uncertified: boolean | null; logged_dives: number | null } | null,
+      ev as { prereq_cert_id: string | null; req_dives: number | string | null } | null,
+      body.details as Record<string, unknown> | undefined,
+    )
   }
 
   // 1. Profile update — column allowlist (security audit C2).
@@ -354,6 +378,16 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
   // path already checked before createUser). Admins/staff bypass.
   if (!callerIsPrivileged && await eventHasPassed(admin, body.event_type, body.event_id)) {
     return json({ error: "Registration is closed — this event has already taken place." }, 403)
+  }
+
+  // 1b. Eligibility gate — a diver registering themselves (or via guest) must
+  //     have declared a certification (level or uncertified) and acknowledged
+  //     any event prerequisite they don't meet on their own profile. Mirrors
+  //     the form gates so a crafted request can't slip past them. On-behalf-of
+  //     bookings (target_user_id) relax the same way the form does.
+  if (!body.target_user_id) {
+    const gate = await checkEligibility(userId)
+    if (gate) return rollback(gate, 422)
   }
 
   // 2. Booking insert — pre-check for active booking; partial unique

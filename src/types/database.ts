@@ -62,6 +62,15 @@ export interface BookingDetails {
    *  policy" box on the registration form. Required when the event has a
    *  cancel_policy set — gates the form's submit button. */
   cancellation_policy_acked_at?: string
+  /** ISO timestamp of when the diver deferred the certification-card photo and
+   *  accepted the "bring your physical card on the day or be denied
+   *  participation, no refund" terms. Set only when a cert level was named but
+   *  no card was uploaded / on file. */
+  cert_card_ack_at?: string
+  /** ISO timestamp of when the diver acknowledged an event prerequisite they
+   *  don't yet meet on their self-reported profile (e.g. a boat dive requiring
+   *  a higher cert or more logged dives). Gates submit + server-verified. */
+  prereq_acked_at?: string
 }
 
 /**

@@ -24,6 +24,7 @@ export interface RegistrationDraft {
   contactId: string
   certAgency: string
   certLevel: string
+  uncertified: boolean
   loggedDives: number
   nitroxCertified: boolean
   deepCertified: boolean
@@ -153,6 +154,7 @@ function normalizeDraft(v: Partial<RegistrationDraft>): RegistrationDraft {
     contactId: str(v.contactId),
     certAgency: str(v.certAgency),
     certLevel: str(v.certLevel),
+    uncertified: bool(v.uncertified),
     loggedDives: typeof v.loggedDives === 'number' && Number.isFinite(v.loggedDives) ? v.loggedDives : 0,
     nitroxCertified: bool(v.nitroxCertified),
     deepCertified: bool(v.deepCertified),

@@ -557,8 +557,33 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // can still register, e.g. for an entry-level course).
   const [certFile, setCertFile] = useState<File | null>(null)
   const [certFileErr, setCertFileErr] = useState<string | null>(null)
+  // Diver explicitly holds no certification (Discover / trial diver). Mutually
+  // exclusive with naming a cert level — one of the two is mandatory below.
+  const [uncertified, setUncertified] = useState(profile?.uncertified ?? false)
+  // Acknowledgment that the diver will bring their physical card when they
+  // choose to defer the photo upload (see the disclaimer on step 2).
+  const [certCardAck, setCertCardAck] = useState(false)
   const hasCertCardOnFile = !!profile?.cert_card_path
-  const certBlocked = certLevel.trim() !== '' && !hasCertCardOnFile && !certFile
+  // Certification is mandatory for a diver's own registration: they must
+  // either name a level or declare themselves uncertified. The photo is
+  // deferrable — a named level with no card on file can proceed once the
+  // diver either picks a photo or acknowledges they'll bring the physical
+  // card (or be turned away, no refund).
+  const certDeclarationBlocked = !isOnBehalfOf && !uncertified && certLevel.trim() === ''
+  const needsCertPhoto = !uncertified && certLevel.trim() !== '' && !hasCertCardOnFile && !certFile
+  const certPhotoBlocked = !isOnBehalfOf && needsCertPhoto && !certCardAck
+
+  // Event prerequisites resolved from the catalog row (a required cert and/or a
+  // minimum logged-dive count). When the diver's self-reported profile falls
+  // short we warn and let them acknowledge (bring proof) rather than hard-block
+  // — the server applies the same rule via the prereq_acked_at stamp.
+  const [prereqCertName, setPrereqCertName] = useState<string | null>(null)
+  const [prereqReqDives, setPrereqReqDives] = useState<number | null>(null)
+  const [prereqAck, setPrereqAck] = useState(false)
+  const prereqCertMismatch = !isOnBehalfOf && !!prereqCertName && uncertified
+  const prereqDivesMismatch = !isOnBehalfOf && prereqReqDives != null && loggedDives < prereqReqDives
+  const prereqMismatch = prereqCertMismatch || prereqDivesMismatch
+  const prereqBlocked = prereqMismatch && !prereqAck
 
   // Size requirements for the gear being rented (Fins/Boots → shoe size;
   // Wetsuit/BCD → height + weight). We only prompt for sizes the profile is
@@ -615,7 +640,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       savedAt: Date.now(),
       step,
       fullName, nickname, dob, nationality, gender, idNumber,
-      contactMethod, contactId, certAgency, certLevel, loggedDives,
+      contactMethod, contactId, certAgency, certLevel, uncertified, loggedDives,
       nitroxCertified, deepCertified, emergencyName, emergencyPhone,
       guestEmail, guestAgreedTerms,
       gearChoice, gearHelpNote, editedGearItems,
@@ -629,7 +654,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     return () => clearTimeout(t)
   }, [
     draftKey, step, fullName, nickname, dob, nationality, gender, idNumber,
-    contactMethod, contactId, certAgency, certLevel, loggedDives,
+    contactMethod, contactId, certAgency, certLevel, uncertified, loggedDives,
     nitroxCertified, deepCertified, emergencyName, emergencyPhone,
     guestEmail, guestAgreedTerms, gearChoice, gearHelpNote, editedGearItems,
     shoeSize, heightCm, weightKg, roomId, roomNotes, addonIds,
@@ -649,6 +674,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     setContactId(d.contactId)
     setCertAgency(d.certAgency)
     setCertLevel(d.certLevel)
+    setUncertified(d.uncertified)
     setLoggedDives(d.loggedDives)
     setNitroxCertified(d.nitroxCertified)
     setDeepCertified(d.deepCertified)
@@ -732,6 +758,42 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       .catch(() => { /* fail open — no gate */ })
     return () => { cancelled = true }
   }, [event.type, event.id])
+
+  // Resolve the event's prerequisites (required cert name + minimum logged
+  // dives) so step 2 can warn a diver who doesn't meet them. Best-effort: on
+  // failure no warning shows (the server still enforces the ack).
+  useEffect(() => {
+    if (isOnBehalfOf) return
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from((event.type === 'dive' ? 'EO_dives' : 'EO_courses') as never)
+        .select('prereq_cert_id, req_dives')
+        .eq('_id', event.id)
+        .maybeSingle()
+      if (cancelled || !data) return
+      const row = data as { prereq_cert_id: string | null; req_dives: number | string | null }
+      let certName: string | null = null
+      if (row.prereq_cert_id) {
+        const { data: cl } = await supabase
+          .from('cert_levels' as never)
+          .select('name')
+          .eq('id', row.prereq_cert_id)
+          .maybeSingle()
+        certName = (cl as { name?: string } | null)?.name ?? 'a higher certification'
+      }
+      const digits = typeof row.req_dives === 'number'
+        ? row.req_dives
+        : (typeof row.req_dives === 'string' && row.req_dives.replace(/\D/g, '') !== ''
+            ? Number(row.req_dives.replace(/\D/g, ''))
+            : null)
+      if (!cancelled) {
+        setPrereqCertName(certName)
+        setPrereqReqDives(digits != null && Number.isFinite(digits) ? digits : null)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [event.type, event.id, isOnBehalfOf])
 
   // Waivers the diver still needs for this event. Only computed for a diver
   // registering themselves (the e-signature is signed as auth.uid(), so it
@@ -942,8 +1004,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       id_number:               nullish(idNumber),
       contact_method:          (contactMethod || null) as ContactMethod | null,
       contact_id:              nullish(contactId),
-      cert_agency:             nullish(certAgency),
-      cert_level:              nullish(certLevel),
+      cert_agency:             uncertified ? null : nullish(certAgency),
+      cert_level:              uncertified ? null : nullish(certLevel),
+      uncertified,
       logged_dives:            Number.isFinite(loggedDives) ? loggedDives : 0,
       nitrox_certified:        nitroxCertified,
       ...(nitroxCardPath !== undefined ? { nitrox_card_path: nitroxCardPath } : {}),
@@ -993,6 +1056,14 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       cancellation_policy_acked_at: cancelPolicy && policyAcked
         ? (initialDetails?.cancellation_policy_acked_at ?? new Date().toISOString())
         : initialDetails?.cancellation_policy_acked_at,
+      // Diver deferred the cert photo and accepted the bring-your-card terms.
+      cert_card_ack_at: (needsCertPhoto && certCardAck)
+        ? new Date().toISOString()
+        : initialDetails?.cert_card_ack_at,
+      // Diver acknowledged an event prerequisite they don't currently meet.
+      prereq_acked_at: (prereqMismatch && prereqAck)
+        ? new Date().toISOString()
+        : initialDetails?.prereq_acked_at,
     }
 
     if (existingBooking) {
@@ -1365,18 +1436,42 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
             <div className="border-t border-surface-200 pt-3 space-y-3">
               <p className="text-xs text-brand-900 font-medium uppercase tracking-wider">Diving</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <TextField label="Cert agency" placeholder="PADI, SSI…" value={certAgency} onChange={setCertAgency} />
-                <TextField label="Cert level" placeholder="OW, AOW…" value={certLevel} onChange={setCertLevel} />
-              </div>
-              {certLevel.trim() !== '' && !hasCertCardOnFile && !isOnBehalfOf && (
+              {!isOnBehalfOf && (
+                <label className="flex items-center gap-2 text-sm text-brand-950 font-medium">
+                  <input
+                    type="checkbox"
+                    checked={uncertified}
+                    onChange={e => {
+                      const v = e.target.checked
+                      setUncertified(v)
+                      if (v) { setCertAgency(''); setCertLevel(''); setCertFile(null); setCertCardAck(false) }
+                    }}
+                    className="accent-brand-900"
+                  />
+                  I'm not certified yet (Discover / trial diver)
+                </label>
+              )}
+              {!uncertified && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <TextField label="Cert agency" placeholder="PADI, SSI…" value={certAgency} onChange={setCertAgency} />
+                    <TextField label="Cert level" placeholder="OW, AOW…" value={certLevel} onChange={setCertLevel} />
+                  </div>
+                  {certDeclarationBlocked && (
+                    <p className="text-xs text-red-700 font-medium">
+                      Enter your certification level, or tick "I'm not certified yet" above.
+                    </p>
+                  )}
+                </>
+              )}
+              {!uncertified && certLevel.trim() !== '' && !hasCertCardOnFile && !isOnBehalfOf && (
                 <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
                   <p className="text-xs font-semibold text-brand-900">
-                    Upload a photo of your highest certification card *
+                    Add proof of your certification
                   </p>
                   <p className="text-xs text-brand-950 font-medium">
-                    Required because you've filled in a cert level. The photo is
-                    stored privately and only visible to {siteConfig.identity.shortName} staff.
+                    Upload a photo of your highest certification card. It's stored
+                    privately and only visible to {siteConfig.identity.shortName} staff.
                   </p>
                   <label className="block cursor-pointer bg-brand-900 hover:bg-brand-950 text-white text-sm font-semibold py-2 px-3 rounded-lg text-center">
                     <input
@@ -1393,14 +1488,30 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                           return
                         }
                         setCertFile(file)
+                        if (file) setCertCardAck(false)
                       }}
                     />
                     {certFile ? `Replace photo (${certFile.name})` : 'Choose photo'}
                   </label>
                   {certFileErr && <p className="text-xs text-red-700">{certFileErr}</p>}
+                  {!certFile && (
+                    <label className="flex items-start gap-2 text-xs text-brand-950 font-medium border-t border-amber-300 pt-2">
+                      <input
+                        type="checkbox"
+                        checked={certCardAck}
+                        onChange={e => setCertCardAck(e.target.checked)}
+                        className="accent-brand-900 mt-0.5"
+                      />
+                      <span>
+                        Can't upload now? I'll bring my physical certification card
+                        on the day of the event. I understand that without proof of
+                        certification I may be denied participation, with no refund.
+                      </span>
+                    </label>
+                  )}
                 </div>
               )}
-              {certLevel.trim() !== '' && hasCertCardOnFile && (
+              {!uncertified && certLevel.trim() !== '' && hasCertCardOnFile && (
                 <p className="text-xs text-brand-950 font-medium">
                   Certification card on file. (Update it from your profile if
                   it's changed.)
@@ -1496,6 +1607,29 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 </p>
               )}
             </div>
+
+            {prereqMismatch && (
+              <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
+                <p className="text-xs font-semibold text-brand-900">This event has a prerequisite</p>
+                <ul className="text-xs text-brand-950 font-medium list-disc pl-4 space-y-0.5">
+                  {prereqCertMismatch && <li>Requires {prereqCertName}, but you've marked yourself as not certified.</li>}
+                  {prereqDivesMismatch && <li>Requires at least {prereqReqDives} logged dives (you've entered {loggedDives}).</li>}
+                </ul>
+                <label className="flex items-start gap-2 text-xs text-brand-950 font-medium border-t border-amber-300 pt-2">
+                  <input
+                    type="checkbox"
+                    checked={prereqAck}
+                    onChange={e => setPrereqAck(e.target.checked)}
+                    className="accent-brand-900 mt-0.5"
+                  />
+                  <span>
+                    I understand this requirement. I'll bring proof on the day, or
+                    contact {siteConfig.identity.shortName} first. Without meeting the
+                    prerequisite I may be denied participation, with no refund.
+                  </span>
+                </label>
+              </div>
+            )}
 
             <div className="border-t border-surface-200 pt-3 space-y-3">
               <p className="text-xs text-brand-900 font-medium uppercase tracking-wider">Emergency contact</p>
@@ -1930,7 +2064,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               (step === 2 && (
                 (!isOnBehalfOf && fullName.trim() === '') ||
                 profileFieldsBlocked ||
-                (!isOnBehalfOf && certBlocked) ||
+                certDeclarationBlocked ||
+                certPhotoBlocked ||
+                prereqBlocked ||
                 (!isOnBehalfOf && nitroxBlocked) ||
                 (!isOnBehalfOf && deepBlocked) ||
                 (isGuest && (guestEmail.trim() === '' || guestPassword.length < 8 || !guestAgreedTerms || !turnstileToken))
