@@ -173,6 +173,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   const [contactId, setContactId]             = useState(profile?.contact_id ?? '')
   const [certAgency, setCertAgency]           = useState(profile?.cert_agency ?? '')
   const [certLevel, setCertLevel]             = useState(profile?.cert_level ?? '')
+  const [uncertified, setUncertified]         = useState(profile?.uncertified ?? false)
   const [nitroxCertified, setNitroxCertified] = useState(profile?.nitrox_certified ?? false)
   const [deepCertified, setDeepCertified]     = useState(profile?.deep_certified ?? false)
   const [emergencyName, setEmergencyName]     = useState(profile?.emergency_contact_name ?? '')
@@ -242,7 +243,11 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   // Step gates — same spirit as solo flow, only the multi-applicable ones.
   // Gender + nationality are mandatory on the diver's profile, same as the
   // solo flow.
-  const step2Blocked = fullName.trim() === '' || nationality.trim() === '' || gender.trim() === '' || hasBlockedPast
+  // Certification is mandatory: name a level or declare uncertified. (Card
+  // photos aren't collected in the cart flow — the diver uploads from /profile
+  // or brings the physical card; the solo flow carries the photo disclaimer.)
+  const certDeclarationBlocked = !uncertified && certLevel.trim() === ''
+  const step2Blocked = fullName.trim() === '' || nationality.trim() === '' || gender.trim() === '' || certDeclarationBlocked || hasBlockedPast
   const step3Blocked = cart.some(ev => choicesById[ev.id]?.needsTransport === null)
   const submitBlocked = cart.length === 0 || hasBlockedPast
 
@@ -257,8 +262,9 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
       gender:                  nullish(gender),
       contact_method:          (contactMethod || null) as ContactMethod | null,
       contact_id:              nullish(contactId),
-      cert_agency:             nullish(certAgency),
-      cert_level:              nullish(certLevel),
+      cert_agency:             uncertified ? null : nullish(certAgency),
+      cert_level:              uncertified ? null : nullish(certLevel),
+      uncertified,
       nitrox_certified:        nitroxCertified,
       deep_certified:          deepCertified,
       emergency_contact_name:  nullish(emergencyName),
@@ -534,10 +540,32 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
               {contactMethod && (
                 <TextField label={contactMethod === 'email' ? 'Email' : 'ID / number'} value={contactId} onChange={setContactId} />
               )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <TextField label="Cert agency" placeholder="PADI, SSI…" value={certAgency} onChange={setCertAgency} />
-                <TextField label="Cert level" placeholder="OW, AOW…" value={certLevel} onChange={setCertLevel} />
-              </div>
+              <label className="flex items-center gap-2 text-sm text-brand-950 font-medium">
+                <input
+                  type="checkbox"
+                  checked={uncertified}
+                  onChange={e => {
+                    const v = e.target.checked
+                    setUncertified(v)
+                    if (v) { setCertAgency(''); setCertLevel('') }
+                  }}
+                  className="accent-brand-900"
+                />
+                I'm not certified yet (Discover / trial diver)
+              </label>
+              {!uncertified && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <TextField label="Cert agency" placeholder="PADI, SSI…" value={certAgency} onChange={setCertAgency} />
+                    <TextField label="Cert level" placeholder="OW, AOW…" value={certLevel} onChange={setCertLevel} />
+                  </div>
+                  {certDeclarationBlocked && (
+                    <p className="text-xs text-red-700 font-medium">
+                      Enter your certification level, or tick "I'm not certified yet" above.
+                    </p>
+                  )}
+                </>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <label className="flex items-center gap-2 text-sm text-brand-950 font-medium">
                   <input type="checkbox" checked={nitroxCertified} onChange={e => setNitroxCertified(e.target.checked)} className="accent-brand-900" />

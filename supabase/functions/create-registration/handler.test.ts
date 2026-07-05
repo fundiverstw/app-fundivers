@@ -45,6 +45,12 @@ interface MockOpts {
   eventNotFound?:  boolean
   eventPast?:      boolean
   deleteUserError?: string
+  // Eligibility-gate inputs (effective profile + event prereqs).
+  profileCertLevel?: string | null
+  profileUncertified?: boolean
+  profileLoggedDives?: number
+  prereqCertId?: string | null
+  reqDives?: number | string | null
 }
 
 function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites } {
@@ -62,13 +68,23 @@ function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites }
         case 'profiles':
           // Caller-profile fetch (target_user_id path) returns role;
           // target-profile fetch returns parent_account; readback for
-          // PDF returns a minimal profile.
-          return { role: opts.callerRole ?? 'diver', parent_account: opts.targetParentAccount ?? null, name: 'Test' }
+          // PDF returns a minimal profile. Cert fields feed the eligibility
+          // gate — default to a declared cert so success-path tests pass.
+          return {
+            role: opts.callerRole ?? 'diver',
+            parent_account: opts.targetParentAccount ?? null,
+            name: 'Test',
+            cert_level: opts.profileCertLevel === undefined ? 'AOW' : opts.profileCertLevel,
+            uncertified: opts.profileUncertified ?? false,
+            logged_dives: opts.profileLoggedDives ?? 25,
+          }
         case 'bookings':
           return { id: 'b1', status: opts.bookingStatus ?? 'pending', notes: null }
         case 'EO_dives':
           return opts.eventNotFound ? null : {
             _id: 'd1', display_title: 'Test Dive',
+            prereq_cert_id: opts.prereqCertId ?? null,
+            req_dives: opts.reqDives ?? null,
             ...(opts.eventPast
               ? { start_date: '2020-01-01', end_date: '2020-01-03' }
               : { start_date: '2030-06-01', end_date: '2030-06-03' }),
@@ -76,6 +92,8 @@ function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites }
         case 'EO_courses':
           return opts.eventNotFound ? null : {
             _id: 'c1', display_title: 'Test Course',
+            prereq_cert_id: opts.prereqCertId ?? null,
+            req_dives: opts.reqDives ?? null,
             course_days: opts.eventPast ? ['2020-01-01', '2020-01-02'] : ['2030-06-01', '2030-06-02', '2030-06-03'],
           }
         default:           return null
@@ -312,6 +330,65 @@ describe('handleRegistration — guest path security (audit C2)', () => {
     }), deps)
     const written = captured.profileUpdate[0]
     expect(written).toEqual({ status: 'pending' }) // status forced; everything else dropped
+  })
+})
+
+describe('handleRegistration — eligibility gate', () => {
+  const authedSelf = { Authorization: 'Bearer self-jwt' }
+
+  it('blocks a self registration with neither a cert level nor the uncertified flag (422)', async () => {
+    const { deps, captured } = makeDeps({ profileCertLevel: null, profileUncertified: false })
+    const res = await handleRegistration(postJson({ ...goodBody }, authedSelf), deps)
+    expect(res.status).toBe(422)
+    expect((await res.json()).error).toMatch(/certification level|not certified/i)
+    // Gate runs before the booking insert.
+    expect(captured.bookingInsert).toHaveLength(0)
+  })
+
+  it('allows a self registration once the diver is marked uncertified', async () => {
+    const { deps } = makeDeps({ profileCertLevel: null, profileUncertified: true })
+    const res = await handleRegistration(postJson({ ...goodBody }, authedSelf), deps)
+    expect(res.status).toBe(200)
+  })
+
+  it('blocks an uncertified diver from a prereq-cert dive unless acknowledged', async () => {
+    const optsUncertPrereq = { profileCertLevel: null as string | null, profileUncertified: true, prereqCertId: 'cl-aow' }
+    const blocked = await handleRegistration(
+      postJson({ ...goodBody, details: {} }, authedSelf),
+      makeDeps(optsUncertPrereq).deps,
+    )
+    expect(blocked.status).toBe(422)
+    expect((await blocked.json()).error).toMatch(/prerequisite/i)
+
+    const acked = await handleRegistration(
+      postJson({ ...goodBody, details: { prereq_acked_at: '2026-07-05T00:00:00Z' } }, authedSelf),
+      makeDeps(optsUncertPrereq).deps,
+    )
+    expect(acked.status).toBe(200)
+  })
+
+  it('blocks when logged dives fall short of req_dives unless acknowledged', async () => {
+    const shortDives = { profileCertLevel: 'OW', profileLoggedDives: 3, reqDives: 20 }
+    const blocked = await handleRegistration(
+      postJson({ ...goodBody, details: {} }, authedSelf),
+      makeDeps(shortDives).deps,
+    )
+    expect(blocked.status).toBe(422)
+
+    const acked = await handleRegistration(
+      postJson({ ...goodBody, details: { prereq_acked_at: '2026-07-05T00:00:00Z' } }, authedSelf),
+      makeDeps(shortDives).deps,
+    )
+    expect(acked.status).toBe(200)
+  })
+
+  it('skips the gate for on-behalf-of bookings (admin can register an uncertified, undeclared diver)', async () => {
+    const { deps } = makeDeps({ callerRole: 'admin', profileCertLevel: null, profileUncertified: false })
+    const res = await handleRegistration(postJson({
+      ...goodBody,
+      target_user_id: 'some-target-uid',
+    }, { Authorization: 'Bearer admin-jwt' }), deps)
+    expect(res.status).toBe(200)
   })
 })
 

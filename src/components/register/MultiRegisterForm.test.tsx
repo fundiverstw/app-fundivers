@@ -82,6 +82,26 @@ describe('MultiRegisterForm parent diver picker', () => {
     expect(screen.queryByLabelText(/diver for kenting/i)).not.toBeInTheDocument()
   })
 
+  it('blocks step 2 until the diver names a cert level or declares uncertified', async () => {
+    setupFrom([])
+    const blankCert: Profile = { ...parentProfile, cert_level: null, cert_agency: null }
+    const user = userEvent.setup()
+    render(
+      <MultiRegisterForm
+        events={[sampleEvent('e1', 'Kenting')]}
+        profile={blankCert} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
+    await user.click(screen.getByRole('button', { name: /next/i }))  // 1→2
+    expect(screen.getByText(/enter your certification level, or tick/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+
+    await user.click(screen.getByLabelText(/not certified yet/i))
+    expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
+  })
+
   it('shows per-event diver dropdown including each linked child', async () => {
     setupFrom([childProfile])
     render(

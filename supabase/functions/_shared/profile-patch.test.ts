@@ -79,6 +79,7 @@ describe('sanitizeProfilePatch — allowed keys (SPA registration-form contract)
     'contact_id',
     'cert_agency',
     'cert_level',
+    'uncertified',
     'logged_dives',
     'nitrox_certified',
     'nitrox_card_path',

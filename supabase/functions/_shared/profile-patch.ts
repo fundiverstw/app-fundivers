@@ -28,6 +28,7 @@ export const PROFILE_PATCH_ALLOW: ReadonlySet<string> = new Set<string>([
   'contact_id',
   'cert_agency',
   'cert_level',
+  'uncertified',
   'logged_dives',
   'nitrox_certified',
   'nitrox_card_path',
