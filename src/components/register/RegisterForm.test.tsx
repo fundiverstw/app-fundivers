@@ -4,6 +4,10 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { RegisterForm, RegisterFormBody } from './RegisterForm'
 import { mockQueryBuilder } from '../../../tests/test-utils'
+import {
+  registrationDraftKey, saveRegistrationDraft, loadRegistrationDraft,
+  type RegistrationDraft,
+} from '../../lib/registration-draft'
 import { siteConfig } from '../../config/site'
 import type { AppEvent, EOAddon, EORoom, Profile } from '../../types/database'
 
@@ -121,6 +125,7 @@ function setupFrom(updated: unknown = { id: 'b-existing' }) {
 }
 
 beforeEach(() => {
+  localStorage.clear()
   from.mockReset(); update.mockReset()
   invoke.mockReset(); setSession.mockReset(); rpc.mockReset()
   // Default: the event has assigned cars with free ride seats, so the ride
@@ -1527,6 +1532,67 @@ describe('RegisterForm', () => {
       )
       expect(screen.getByText(/step 1 of 4/i)).toBeInTheDocument()
       expect(screen.queryByText(/who is this booking for/i)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('resume draft', () => {
+    function seedDraft(over: Partial<RegistrationDraft> = {}) {
+      const key = registrationDraftKey('dive', sampleEvent.id, 'u1')
+      const draft: RegistrationDraft = {
+        savedAt: Date.now(), step: 2,
+        fullName: 'Restored Diver', nickname: '', dob: '', nationality: 'Testland',
+        gender: 'other', idNumber: '', contactMethod: 'line', contactId: 'restored-id',
+        certAgency: '', certLevel: '', loggedDives: 7,
+        nitroxCertified: false, deepCertified: false,
+        emergencyName: '', emergencyPhone: '', guestEmail: '', guestAgreedTerms: false,
+        gearChoice: null, gearHelpNote: '', editedGearItems: null,
+        shoeSize: '', heightCm: '', weightKg: '',
+        roomId: '', roomNotes: '', addonIds: [], needsTransport: null, addNitroxCourse: false,
+        payment: 'bank_transfer', creditCardInvoiceEmail: '',
+        payForEveryone: true, useAccountCredit: true, payDepositOnly: false, notes: '',
+        ...over,
+      }
+      saveRegistrationDraft(key, draft)
+      return key
+    }
+
+    it('offers to resume a saved draft and restores the answers on Resume', async () => {
+      seedDraft()
+      setupFrom()
+      const user = userEvent.setup()
+      render(
+        <MemoryRouter>
+          <RegisterFormBody event={sampleEvent} profile={sampleProfile} userId="u1" onSubmitSuccess={() => {}} />
+        </MemoryRouter>
+      )
+      await user.click(await screen.findByRole('button', { name: /^resume$/i }))
+      // Draft jumped to step 2 and restored the (draft) full name over the profile value.
+      expect(await screen.findByDisplayValue('Restored Diver')).toBeInTheDocument()
+    })
+
+    it('clears the draft and hides the banner on Start fresh', async () => {
+      const key = seedDraft()
+      setupFrom()
+      const user = userEvent.setup()
+      render(
+        <MemoryRouter>
+          <RegisterFormBody event={sampleEvent} profile={sampleProfile} userId="u1" onSubmitSuccess={() => {}} />
+        </MemoryRouter>
+      )
+      await user.click(await screen.findByRole('button', { name: /start fresh/i }))
+      await waitFor(() => expect(loadRegistrationDraft(key)).toBeNull())
+      expect(screen.queryByText(/pick up where you left off/i)).not.toBeInTheDocument()
+    })
+
+    it('shows no banner when there is no saved draft', async () => {
+      setupFrom()
+      render(
+        <MemoryRouter>
+          <RegisterFormBody event={sampleEvent} profile={sampleProfile} userId="u1" onSubmitSuccess={() => {}} />
+        </MemoryRouter>
+      )
+      await screen.findByText(/step 1 of 4/i)
+      expect(screen.queryByText(/pick up where you left off/i)).not.toBeInTheDocument()
     })
   })
 })

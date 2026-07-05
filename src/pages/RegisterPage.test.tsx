@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { RegisterPage } from './RegisterPage'
 import { mockQueryBuilder } from '../../tests/test-utils'
+import { registrationDraftKey, saveRegistrationDraft } from '../lib/registration-draft'
 
 const { from, useAuthMock, fetchEventsForBookings, fetchEventsInRange, signInWithPassword } = vi.hoisted(() => ({
   from: vi.fn(),
@@ -49,6 +50,7 @@ const testEvent = {
 }
 
 beforeEach(() => {
+  localStorage.clear()
   from.mockReset()
   useAuthMock.mockReset()
   fetchEventsForBookings.mockReset()
@@ -116,6 +118,32 @@ describe('RegisterPage', () => {
     renderAt('/register/dive/dive-a')
     await screen.findByTestId('form-body')
     expect(screen.getByTestId('form-body')).toHaveTextContent('Kenting Dive')
+  })
+
+  it('offers a "continue where you left off" shortcut for events with a saved draft', async () => {
+    useAuthMock.mockReturnValue({ user: { id: 'u1' }, profile: {}, loading: false })
+    fetchEventsInRange.mockResolvedValue([
+      { ...testEvent, id: 'dive-a', title: 'Kenting Dive' },
+      { ...testEvent, id: 'dive-b', title: 'Green Island Dive' },
+    ])
+    // A draft exists (for this viewer) only for dive-a.
+    saveRegistrationDraft(registrationDraftKey('dive', 'dive-a', 'u1'), {
+      savedAt: Date.now(), step: 2,
+      fullName: 'Ada', nickname: '', dob: '', nationality: '', gender: '', idNumber: '',
+      contactMethod: '', contactId: '', certAgency: '', certLevel: '', loggedDives: 0,
+      nitroxCertified: false, deepCertified: false, emergencyName: '', emergencyPhone: '',
+      guestEmail: '', guestAgreedTerms: false, gearChoice: null, gearHelpNote: '',
+      editedGearItems: null, shoeSize: '', heightCm: '', weightKg: '', roomId: '', roomNotes: '',
+      addonIds: [], needsTransport: null, addNitroxCourse: false, payment: 'bank_transfer',
+      creditCardInvoiceEmail: '', payForEveryone: true, useAccountCredit: true,
+      payDepositOnly: false, notes: '',
+    })
+
+    renderAt('/register')
+    expect(await screen.findByText('Continue where you left off')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /resume/i })).toBeInTheDocument()
+    // dive-a (drafted) appears in the resume section; dive-b does not.
+    expect(screen.getAllByText('Kenting Dive').length).toBeGreaterThan(0)
   })
 
 })

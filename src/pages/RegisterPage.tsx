@@ -10,6 +10,7 @@ import { WhatHappensNext } from '../components/register/WhatHappensNext'
 import { Logo } from '../components/Logo'
 import { PasswordInput } from '../components/PasswordInput'
 import { siteConfig } from '../config/site'
+import { registrationDraftKey, loadRegistrationDraft } from '../lib/registration-draft'
 import type { AppEvent, Booking } from '../types/database'
 
 // Public standalone registration page. Two entry paths:
@@ -196,6 +197,7 @@ function LockedConfirmation({ event, booking, alreadyExisting = false }: { event
 // continuous progress rather than feeling handed off between screens.
 function EventPickerStep() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [events, setEvents] = useState<AppEvent[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -213,11 +215,40 @@ function EventPickerStep() {
     return () => { cancelled = true }
   }, [])
 
+  // Upcoming events this device has an in-progress draft for (keyed to the
+  // current viewer, so a guest's draft never surfaces for a signed-in diver).
+  const resumable = events.filter(
+    e => !!loadRegistrationDraft(registrationDraftKey(e.type, e.id, user?.id ?? null)),
+  )
+
   return (
     <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-5 space-y-4">
       <header className="flex items-center justify-between">
         <span className="text-xs text-brand-900 font-medium">Step 1 of 3</span>
       </header>
+
+      {resumable.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-bold text-brand-900">Continue where you left off</h2>
+          <ul className="space-y-2">
+            {resumable.map(ev => (
+              <li key={`resume_${ev.type}_${ev.id}`}>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/register/${ev.type}/${ev.id}`)}
+                  className="w-full text-left bg-accent/15 border border-accent hover:border-brand-700 rounded-lg p-3 transition-colors flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <span className="font-medium text-brand-900 text-sm truncate block">{ev.title}</span>
+                    <span className="text-xs text-brand-900 font-medium">{formatEventSpan(ev)}</span>
+                  </div>
+                  <span className="text-xs text-brand-700 font-semibold shrink-0">Resume →</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <section className="space-y-2">
         <h2 className="text-lg font-bold text-brand-900">Which event?</h2>
         <p className="text-sm text-brand-900 font-medium">
