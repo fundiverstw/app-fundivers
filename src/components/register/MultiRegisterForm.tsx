@@ -4,6 +4,7 @@ import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../li
 import { siteConfig } from '../../config/site'
 import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
 import { supabase } from '../../lib/supabase'
+import { invokeWithRetry } from '../../lib/edge-invoke'
 import { formatEventSpan, isPastEvent } from '../../lib/events'
 import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/payment-instructions'
 import { fetchRideSeats, canRequestRide, type RideSeats } from '../../lib/event-vehicles'
@@ -320,7 +321,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
       // profile untouched (the parent's typed values would otherwise
       // overwrite it).
       const patchForCall = targetForDiverId ? {} : profilePatch
-      const { data, error } = await supabase.functions.invoke<{ booking_id: string; status?: string }>(
+      const { data, error } = await invokeWithRetry<{ booking_id: string; status?: string }>(
         'create-registration',
         {
           body: {

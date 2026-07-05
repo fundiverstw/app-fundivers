@@ -956,6 +956,40 @@ describe('RegisterForm', () => {
     expect(screen.getByText(/sign in/i)).toBeInTheDocument()
   })
 
+  it('authed path: recovers a lost-response submit by reading back the landed booking', async () => {
+    // The server reports its duplicate-booking guard (HTTP 500 with a message)
+    // — as happens when a first attempt landed but its response was lost and
+    // the request was retried. The form should confirm via a booking read-back
+    // instead of showing a scary error.
+    const dedupe = { error: 'This diver already has an active booking for this event (status: pending).' }
+    const ctx = new Response(JSON.stringify(dedupe), { status: 500, headers: { 'content-type': 'application/json' } })
+    invoke.mockResolvedValue({
+      data: null,
+      error: Object.assign(new Error('Edge Function returned a non-2xx status code'), { name: 'FunctionsHttpError', context: ctx }),
+    })
+    from.mockImplementation((table: string) => {
+      if (table === 'EO_rooms')     return mockQueryBuilder({ data: sampleRooms })
+      if (table === 'Other_Addons') return mockQueryBuilder({ data: sampleAddons })
+      if (table === 'bookings')     return mockQueryBuilder({ data: { id: 'b-existing', status: 'pending' } })
+      return mockQueryBuilder()
+    })
+    const onBooked = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={onBooked} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))  // 1 → 2
+    await user.click(screen.getByRole('button', { name: /next/i }))  // 2 → 3
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))  // 3 → 4
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+    await waitFor(() => expect(onBooked).toHaveBeenCalledWith({ id: 'b-existing', status: 'pending' }))
+    expect(screen.queryByText(/already has an active booking/i)).not.toBeInTheDocument()
+  })
+
   it('guest path: with no Turnstile site key, shows an unavailable notice and blocks advancing past step 2', async () => {
     setupFrom()
     vi.stubEnv('VITE_TURNSTILE_SITE_KEY', '')
