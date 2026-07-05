@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { personName } from '../../lib/names'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
@@ -24,6 +24,13 @@ import { TurnstileWidget } from './TurnstileWidget'
 import { WhatHappensNext } from './WhatHappensNext'
 import { DateField } from '../DateField'
 import { ShoeSizeField } from '../ShoeSizeField'
+import {
+  registrationDraftKey,
+  loadRegistrationDraft,
+  saveRegistrationDraft,
+  clearRegistrationDraft,
+  type RegistrationDraft,
+} from '../../lib/registration-draft'
 import type { AppEvent, Booking, BookingDetails, CancellationPolicy, Database, EOAddon, EORoom, Profile } from '../../types/database'
 
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
@@ -585,6 +592,95 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const [guestAgreedTerms, setGuestAgreedTerms] = useState(false)
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
 
+  // Local resume: autosave the diver's in-progress answers to localStorage so a
+  // dropped connection or closed tab doesn't force a restart of the four-step
+  // form. Only the diver's own fresh registration is drafted — admin edits and
+  // on-behalf-of / multi-target flows target someone else and stay ephemeral.
+  const draftEnabled = !isEdit && !isOnBehalfOf && additionalTargets.length === 0
+  const draftKey = draftEnabled ? registrationDraftKey(event.type, event.id, userId ?? null) : null
+  // Snapshot any saved draft once, at mount, before the autosave effect can
+  // overwrite storage — this powers the "resume?" banner from memory.
+  const [savedDraft] = useState<RegistrationDraft | null>(() => (draftKey ? loadRegistrationDraft(draftKey) : null))
+  const [resumeResolved, setResumeResolved] = useState(false)
+  const showResumeBanner = !!savedDraft && !resumeResolved
+
+  // Skip the very first render so mounting (form pre-filled from profile
+  // defaults) doesn't overwrite a saved draft before the diver resumes it.
+  // After that, every change re-saves (debounced) the serializable answers.
+  const firstAutosave = useRef(true)
+  useEffect(() => {
+    if (!draftKey) return
+    if (firstAutosave.current) { firstAutosave.current = false; return }
+    const draft: RegistrationDraft = {
+      savedAt: Date.now(),
+      step,
+      fullName, nickname, dob, nationality, gender, idNumber,
+      contactMethod, contactId, certAgency, certLevel, loggedDives,
+      nitroxCertified, deepCertified, emergencyName, emergencyPhone,
+      guestEmail, guestAgreedTerms,
+      gearChoice, gearHelpNote, editedGearItems,
+      shoeSize, heightCm, weightKg,
+      roomId, roomNotes, addonIds: Array.from(addonIds),
+      needsTransport, addNitroxCourse,
+      payment, creditCardInvoiceEmail, payForEveryone, useAccountCredit, payDepositOnly,
+      notes,
+    }
+    const t = setTimeout(() => saveRegistrationDraft(draftKey, draft), 400)
+    return () => clearTimeout(t)
+  }, [
+    draftKey, step, fullName, nickname, dob, nationality, gender, idNumber,
+    contactMethod, contactId, certAgency, certLevel, loggedDives,
+    nitroxCertified, deepCertified, emergencyName, emergencyPhone,
+    guestEmail, guestAgreedTerms, gearChoice, gearHelpNote, editedGearItems,
+    shoeSize, heightCm, weightKg, roomId, roomNotes, addonIds,
+    needsTransport, addNitroxCourse, payment, creditCardInvoiceEmail,
+    payForEveryone, useAccountCredit, payDepositOnly, notes,
+  ])
+
+  function applyDraft(d: RegistrationDraft) {
+    setStep(Math.min(4, Math.max(1, d.step)) as Step)
+    setFullName(d.fullName)
+    setNickname(d.nickname)
+    setDob(d.dob)
+    setNationality(d.nationality)
+    setGender(d.gender)
+    setIdNumber(d.idNumber)
+    setContactMethod(d.contactMethod as ContactMethod | '')
+    setContactId(d.contactId)
+    setCertAgency(d.certAgency)
+    setCertLevel(d.certLevel)
+    setLoggedDives(d.loggedDives)
+    setNitroxCertified(d.nitroxCertified)
+    setDeepCertified(d.deepCertified)
+    setEmergencyName(d.emergencyName)
+    setEmergencyPhone(d.emergencyPhone)
+    setGuestEmail(d.guestEmail)
+    setGuestAgreedTerms(d.guestAgreedTerms)
+    setGearChoice(d.gearChoice as GearChoice | null)
+    setGearHelpNote(d.gearHelpNote)
+    setEditedGearItems(d.editedGearItems)
+    setShoeSize(d.shoeSize)
+    setHeightCm(d.heightCm)
+    setWeightKg(d.weightKg)
+    setRoomId(d.roomId)
+    setRoomNotes(d.roomNotes)
+    setAddonIds(new Set(d.addonIds))
+    setNeedsTransport(d.needsTransport)
+    setAddNitroxCourse(d.addNitroxCourse)
+    setPayment(d.payment as 'bank_transfer' | 'credit_card' | 'paypal' | 'cash')
+    setCreditCardInvoiceEmail(d.creditCardInvoiceEmail)
+    setPayForEveryone(d.payForEveryone)
+    setUseAccountCredit(d.useAccountCredit)
+    setPayDepositOnly(d.payDepositOnly)
+    setNotes(d.notes)
+    setResumeResolved(true)
+  }
+
+  function discardDraft() {
+    if (draftKey) clearRegistrationDraft(draftKey)
+    setResumeResolved(true)
+  }
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -1055,6 +1151,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
     setSaving(false)
     if (!allOk) { setErr('Some divers could not be registered — see details below.'); return }
+    // Booking landed — the resume draft has served its purpose; drop it so a
+    // return visit doesn't re-offer a stale in-progress form.
+    if (draftKey) clearRegistrationDraft(draftKey)
     // Pass status through so the parent can render a different success
     // toast when the booking landed as 'waitlisted' rather than 'pending'.
     const result = { id: data.booking_id, status: data.status ?? 'pending' }
@@ -1123,6 +1222,31 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           </div>
         )}
       </header>
+
+      {showResumeBanner && savedDraft && (
+        <div className="bg-accent/15 border border-accent rounded-lg p-3 space-y-2">
+          <p className="text-sm text-brand-900 font-semibold">Pick up where you left off?</p>
+          <p className="text-xs text-brand-900">
+            We saved your answers on this device. Resume to skip re-entering them.
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => applyDraft(savedDraft)}
+              className="bg-brand-900 hover:bg-brand-950 text-white text-xs font-semibold py-1.5 px-3 rounded-lg"
+            >
+              Resume
+            </button>
+            <button
+              type="button"
+              onClick={discardDraft}
+              className="text-brand-700 hover:underline text-xs font-semibold py-1.5 px-2"
+            >
+              Start fresh
+            </button>
+          </div>
+        </div>
+      )}
 
       {step === 1 && (
         <section className="space-y-3">
