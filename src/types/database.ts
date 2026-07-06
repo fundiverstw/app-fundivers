@@ -945,34 +945,6 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['events']['Insert']>
         Relationships: []
       }
-      dive_sites: {
-        Row: {
-          id: string
-          name: string
-          tagline: string | null
-          latitude: number
-          longitude: number
-          region: 'keelung' | 'longdong' | 'yilan' | 'greenisland' | 'lanyu' | 'xiaoliuqiu' | 'kenting' | 'penghu'
-          dive_type: 'shore' | 'boat' | null
-          wix_slug: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          tagline?: string | null
-          latitude: number
-          longitude: number
-          region: 'keelung' | 'longdong' | 'yilan' | 'greenisland' | 'lanyu' | 'xiaoliuqiu' | 'kenting' | 'penghu'
-          dive_type?: 'shore' | 'boat' | null
-          wix_slug?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: Partial<Database['public']['Tables']['dive_sites']['Insert']>
-        Relationships: []
-      }
       cert_levels: {
         Row: {
           id: string
@@ -1453,7 +1425,6 @@ export type EOAddon = Database['public']['Tables']['addons']['Row']
 export type DiveTravelEntry = Database['public']['Tables']['dive_travel']['Row']
 export type TravelDestination = Database['public']['Tables']['travel_destinations']['Row']
 export type CancellationPolicy = Database['public']['Tables']['cancellation_policies']['Row']
-export type DiveSite = Database['public']['Tables']['dive_sites']['Row']
 export type CertLevel = Database['public']['Tables']['cert_levels']['Row']
 export type AdminNote = Database['public']['Tables']['admin_notes']['Row']
 export type DiverNote = Database['public']['Tables']['diver_notes']['Row']
