@@ -19,28 +19,28 @@ insert into public.vehicles (id, name, passenger_seats, active) values
 on conflict (id) do nothing;
 
 -- Price row shared by the featured test dives ----------------------------
-insert into public."EO_prices" ("_id", "admin_title", "price", "starting_at", "deposit_amount", "transport")
+insert into public.prices ("id", "admin_title", "price", "starting_at", "deposit_amount", "transport")
 values ('fee00000-0000-4000-8000-000000000001', 'Featured Test Dive', 'NTD 2,800', 2800, 1000, 1300)
-on conflict ("_id") do nothing;
+on conflict ("id") do nothing;
 
 -- Featured upcoming dives ------------------------------------------------
 -- Three variants so the panel and calendar show range: a single-day trip, a
 -- multi-day trip, and a fully-booked one (renders the "waitlist" flag).
-insert into public."EO_dives"
-  ("_id", "admin_title", "display_title", "calendar_title", "notes",
-   "start_date", "time", "end_date",
+insert into public.events
+  ("id", "kind", "admin_title", "display_title", "calendar_title", "notes",
+   "start_date", "start_time", "end_date",
    "featured", "fully_booked", "price", "nitrox_required", "dive_days", "is_private")
 values
-  ('fdd00000-0000-4000-8000-000000000001',
+  ('fdd00000-0000-4000-8000-000000000001', 'dive',
    'Green Island Boat Dives', 'Green Island Boat Dives', 'Green Island', '2 Boat Dives',
    CURRENT_DATE + 10, '08:00:00', NULL,
    true, false, 'fee00000-0000-4000-8000-000000000001', false, 2, false),
-  ('fdd00000-0000-4000-8000-000000000002',
+  ('fdd00000-0000-4000-8000-000000000002', 'dive',
    'Kenting Weekend Getaway', 'Kenting Weekend Getaway', 'Kenting', '3D2N 5 Boat Dives',
    CURRENT_DATE + 24, '07:30:00', CURRENT_DATE + 26,
    true, false, 'fee00000-0000-4000-8000-000000000001', false, 3, false),
-  ('fdd00000-0000-4000-8000-000000000003',
+  ('fdd00000-0000-4000-8000-000000000003', 'dive',
    'Orchid Island Liveaboard', 'Orchid Island Liveaboard', 'Orchid Island', '4D3N 8 Boat Dives',
    CURRENT_DATE + 40, '06:30:00', CURRENT_DATE + 43,
    true, true, 'fee00000-0000-4000-8000-000000000001', false, 4, false)
-on conflict ("_id") do nothing;
+on conflict ("id") do nothing;
