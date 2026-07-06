@@ -5,6 +5,7 @@ import {
   fetchGearModelsWithSizes, saveGearModel, deleteGearModel, replaceModelSizes,
 } from '../../lib/gear-models'
 import type { GearModelWithSizes } from '../../lib/gear-sizing'
+import { numOrNull } from '../../lib/num'
 import type { GearType, GearModelSizeInsert } from '../../types/database'
 
 // Admin editor for the shop's wetsuit / BCD / fins sizing charts. Each model
@@ -18,12 +19,6 @@ const TABS: { type: GearType; label: string }[] = [
   { type: 'fins', label: 'Fins' },
 ]
 
-const numOrNull = (s: string): number | null => {
-  const t = s.trim()
-  if (t === '') return null
-  const n = Number(t)
-  return Number.isFinite(n) ? n : null
-}
 const str = (n: number | null): string => (n == null ? '' : String(n))
 
 export function AdminGearSizingPage() {
@@ -43,18 +38,10 @@ export function AdminGearSizingPage() {
   }
 
   useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const m = await fetchGearModelsWithSizes()
-        if (!cancelled) setModels(m)
-      } catch (err) {
-        if (!cancelled) setLoadError(errorMessage(err))
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
+    void (async () => {
+      await reload()
+      setLoading(false)
     })()
-    return () => { cancelled = true }
   }, [])
 
   const shown = useMemo(() => models.filter(m => m.gear_type === tab), [models, tab])

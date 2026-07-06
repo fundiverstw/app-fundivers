@@ -7,6 +7,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
 import { pushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
 import { GEAR_ITEMS } from '../lib/gear'
+import { numOrNull } from '../lib/num'
 import { uploadCertCard, getCertCardSignedUrl, deleteCertCard } from '../lib/cert-card'
 import { uploadNitroxCard, getNitroxCardSignedUrl, deleteNitroxCard } from '../lib/nitrox-card'
 import { uploadDeepCard, getDeepCardSignedUrl, deleteDeepCard } from '../lib/deep-card'
@@ -60,11 +61,6 @@ const schema = z.object({
 })
 type FormData = z.infer<typeof schema>
 
-function numOrNull(v: unknown): number | null {
-  if (v === '' || v === null || v === undefined) return null
-  const n = typeof v === 'number' ? v : parseFloat(String(v))
-  return Number.isFinite(n) ? n : null
-}
 function strOrNull(v: unknown): string | null {
   if (v === '' || v === null || v === undefined) return null
   return String(v)
