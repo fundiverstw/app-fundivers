@@ -36,23 +36,23 @@ describe('expressTripInterest', () => {
 })
 
 describe('fetchTripBoard', () => {
-  it('reads the trip_board view and returns rows', async () => {
+  it('calls list_trip_board and returns rows', async () => {
     const rows = [{ id: 't1', title: 'Raja Ampat', partner_name: 'Blue Manta' }]
-    from.mockReturnValue(mockQueryBuilder({ data: rows }))
+    rpc.mockReturnValue(mockQueryBuilder({ data: rows }))
     const { fetchTripBoard } = await import('./trip-board')
 
     expect(await fetchTripBoard()).toEqual(rows)
-    expect(from).toHaveBeenCalledWith('trip_board')
+    expect(rpc).toHaveBeenCalledWith('list_trip_board')
   })
 
   it('coerces a null payload to an empty list', async () => {
-    from.mockReturnValue(mockQueryBuilder({ data: null }))
+    rpc.mockReturnValue(mockQueryBuilder({ data: null }))
     const { fetchTripBoard } = await import('./trip-board')
     expect(await fetchTripBoard()).toEqual([])
   })
 
-  it('throws when the view read errors', async () => {
-    from.mockReturnValue(mockQueryBuilder({ data: null, error: { message: 'boom' } }))
+  it('throws when the rpc errors', async () => {
+    rpc.mockReturnValue(mockQueryBuilder({ data: null, error: { message: 'boom' } }))
     const { fetchTripBoard } = await import('./trip-board')
     await expect(fetchTripBoard()).rejects.toBeTruthy()
   })
@@ -60,26 +60,26 @@ describe('fetchTripBoard', () => {
 
 describe('fetchTripBoardItem', () => {
   it('returns the single board item', async () => {
-    from.mockReturnValue(mockQueryBuilder({ data: { id: 't1', title: 'Raja Ampat' } }))
+    rpc.mockReturnValue(mockQueryBuilder({ data: { id: 't1', title: 'Raja Ampat' } }))
     const { fetchTripBoardItem } = await import('./trip-board')
     expect(await fetchTripBoardItem('t1')).toEqual({ id: 't1', title: 'Raja Ampat' })
-    expect(from).toHaveBeenCalledWith('trip_board')
+    expect(rpc).toHaveBeenCalledWith('list_trip_board')
   })
 
   it('returns null when the trip is not on the board', async () => {
-    from.mockReturnValue(mockQueryBuilder({ data: null }))
+    rpc.mockReturnValue(mockQueryBuilder({ data: null }))
     const { fetchTripBoardItem } = await import('./trip-board')
     expect(await fetchTripBoardItem('missing')).toBeNull()
   })
 })
 
 describe('fetchMyTripReferrals', () => {
-  it('reads the my_trip_referrals view and returns rows', async () => {
+  it('calls list_my_trip_referrals and returns rows', async () => {
     const rows = [{ id: 'r1', referral_code: 'FD-7K2MQ4', status: 'interested' }]
-    from.mockReturnValue(mockQueryBuilder({ data: rows }))
+    rpc.mockReturnValue(mockQueryBuilder({ data: rows }))
     const { fetchMyTripReferrals } = await import('./trip-board')
 
     expect(await fetchMyTripReferrals()).toEqual(rows)
-    expect(from).toHaveBeenCalledWith('my_trip_referrals')
+    expect(rpc).toHaveBeenCalledWith('list_my_trip_referrals')
   })
 })

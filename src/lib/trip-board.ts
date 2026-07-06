@@ -23,8 +23,7 @@ export async function expressTripInterest(tripId: string): Promise<string> {
  */
 export async function fetchTripBoard(): Promise<TripBoardItem[]> {
   const { data, error } = await supabase
-    .from('trip_board')
-    .select('*')
+    .rpc('list_trip_board')
     .order('published_at', { ascending: false })
   if (error) throw error
   return (data ?? []) as TripBoardItem[]
@@ -34,8 +33,7 @@ export async function fetchTripBoard(): Promise<TripBoardItem[]> {
  *  isn't on the board. Same diver-safe projection as fetchTripBoard. */
 export async function fetchTripBoardItem(id: string): Promise<TripBoardItem | null> {
   const { data, error } = await supabase
-    .from('trip_board')
-    .select('*')
+    .rpc('list_trip_board')
     .eq('id', id)
     .maybeSingle()
   if (error) throw error
@@ -49,8 +47,7 @@ export async function fetchTripBoardItem(id: string): Promise<TripBoardItem | nu
  */
 export async function fetchMyTripReferrals(): Promise<MyTripReferral[]> {
   const { data, error } = await supabase
-    .from('my_trip_referrals')
-    .select('*')
+    .rpc('list_my_trip_referrals')
     .order('created_at', { ascending: false })
   if (error) throw error
   return (data ?? []) as MyTripReferral[]
