@@ -653,6 +653,70 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['trusted_partners']['Insert']>
         Relationships: []
       }
+      gear_models: {
+        Row: {
+          id: string
+          gear_type: string
+          name: string
+          brand: string | null
+          gender: string | null
+          size_unit: string | null
+          notes: string | null
+          active: boolean
+          sort_order: number
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          gear_type: string
+          name: string
+          brand?: string | null
+          gender?: string | null
+          size_unit?: string | null
+          notes?: string | null
+          active?: boolean
+          sort_order?: number
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['gear_models']['Insert']>
+        Relationships: []
+      }
+      gear_model_sizes: {
+        Row: {
+          id: string
+          model_id: string
+          label: string
+          height_min: number | null
+          height_max: number | null
+          weight_min: number | null
+          weight_max: number | null
+          shoe_min: number | null
+          shoe_max: number | null
+          chest: string | null
+          waist: string | null
+          hip: string | null
+          sort_order: number
+        }
+        Insert: {
+          id?: string
+          model_id: string
+          label: string
+          height_min?: number | null
+          height_max?: number | null
+          weight_min?: number | null
+          weight_max?: number | null
+          shoe_min?: number | null
+          shoe_max?: number | null
+          chest?: string | null
+          waist?: string | null
+          hip?: string | null
+          sort_order?: number
+        }
+        Update: Partial<Database['public']['Tables']['gear_model_sizes']['Insert']>
+        Relationships: []
+      }
       event_vehicles: {
         Row: {
           id: string
@@ -1466,6 +1530,13 @@ export type TrustedPartnerInsert = Database['public']['Tables']['trusted_partner
 export type TrustedPartner = Database['public']['Functions']['list_trusted_partners']['Returns'][number]
 export type EventVehicle = Database['public']['Tables']['event_vehicles']['Row']
 export type EventVehicleInsert = Database['public']['Tables']['event_vehicles']['Insert']
+// Gear sizing charts — per-shop wetsuit/BCD/fins models + size bands
+export const GEAR_TYPES = ['wetsuit', 'bcd', 'fins'] as const
+export type GearType = typeof GEAR_TYPES[number]
+export type GearModel = Database['public']['Tables']['gear_models']['Row']
+export type GearModelInsert = Database['public']['Tables']['gear_models']['Insert']
+export type GearModelSize = Database['public']['Tables']['gear_model_sizes']['Row']
+export type GearModelSizeInsert = Database['public']['Tables']['gear_model_sizes']['Insert']
 export type WaiverSignature = Database['public']['Tables']['waiver_signatures']['Row']
 export type WaiverSignatureInsert = Database['public']['Tables']['waiver_signatures']['Insert']
 export type EventWaiver = Database['public']['Tables']['event_waivers']['Row']
