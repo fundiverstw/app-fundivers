@@ -338,10 +338,25 @@ INSERT INTO "auth"."refresh_tokens" ("instance_id", "id", "token", "user_id", "r
 
 
 --
--- Data for Name: EO_prices; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: prices/events/rooms/addons/bookings/... (reshaped)
 --
+-- The legacy pg_dump below is in the OLD EO_* shape; the DB is now on the
+-- unified events model. We load each dump block into a plain staging table,
+-- then reshape it with INSERT ... SELECT into the real base tables. All of
+-- this runs inside ONE do-block: `supabase db reset` streams the seed in
+-- batches across separate connections, so a bare CREATE ... / INSERT ... SELECT
+-- pair would lose the staging table between statements — the do-block keeps
+-- the whole reshape atomic on one connection. session_replication_role=replica
+-- skips triggers + FK checks for the bulk load (matches the dump's intent).
+-- The _s_* staging tables are dropped again after the block.
 
-INSERT INTO "public"."EO_prices" ("admin_title", "price", "starting_at", "deposit_amount", "transport", "_id", "Created Date", "Updated Date", "Owner", "EO_dives_price") VALUES
+do $SEED$
+begin
+
+drop table if exists public._s_prices, public._s_courses, public._s_dives, public._s_rooms, public._s_addons, public._s_bookings, public._s_admin_notes, public._s_duties;
+
+create table public._s_prices ("admin_title" text, "price" text, "starting_at" bigint, "deposit_amount" bigint, "transport" bigint, "_id" uuid, "Created Date" timestamptz, "Updated Date" timestamptz, "Owner" text, "EO_dives_price" text);
+INSERT INTO public._s_prices ("admin_title", "price", "starting_at", "deposit_amount", "transport", "_id", "Created Date", "Updated Date", "Owner", "EO_dives_price") VALUES
 	('Rescue Course', '1 Person - NTD 10,500
 2 People - NTD 9,600/ea
 3 People - NTD 9,200/ea', 10500, 6000, NULL, '938685ab-435f-4911-82d7-348e89343ea3', '2026-04-16 03:45:02+00', '2026-04-16 03:45:44+00', 'b37fefa3-09b1-4e00-a824-f6b884e43572', NULL),
@@ -375,11 +390,15 @@ Get a discount if you sign up with a friend!</p>', 4900, 4900, NULL, 'eafed2d9-7
 	('XLQ 4 BD trip', NULL, 11800, 8000, 1300, '06e87c1b-6f32-4126-9b84-9fb383c1bae7', '2026-01-16 06:26:35+00', '2026-04-09 11:14:10+00', '9f20fab4-5faf-4978-94de-a146afe4af9d', '["153e1d6c-9c96-4f02-b48a-092c2298c532"]');
 
 
+insert into public.prices ("admin_title", "price", "starting_at", "deposit_amount", "transport", "id")
+select "admin_title", "price", "starting_at", "deposit_amount", "transport", "_id" from public._s_prices;
+
 --
--- Data for Name: EO_courses; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: events (staged from legacy EO_courses)
 --
 
-INSERT INTO "public"."EO_courses" ("display_title", "calendar_title", "_id", "link-eo-courses-course_title", "Created Date", "price", "Updated Date", "course_days", "start_time", "course_name", "featured_image", "URL", "prereqs", "req_dives", "included", "schedule", "dive_days", "other_addons", "google_calendar_event_id", "Owner", "starting_at", "prereq_cert_id", "cancelled_at", "cancel_policy", "admin_title", "full_payment_deadline", "cancel_date") VALUES
+create table public._s_courses ("display_title" text, "calendar_title" text, "_id" uuid, "link-eo-courses-course_title" text, "Created Date" timestamptz, "price" uuid, "Updated Date" timestamptz, "course_days" date[], "start_time" time, "course_name" text, "featured_image" text, "URL" text, "prereqs" text, "req_dives" integer, "included" text, "schedule" text, "dive_days" bigint, "other_addons" text, "google_calendar_event_id" text, "Owner" text, "starting_at" integer, "prereq_cert_id" uuid, "cancelled_at" timestamptz, "cancel_policy" uuid, "admin_title" text, "full_payment_deadline" date, "cancel_date" date);
+INSERT INTO public._s_courses ("display_title", "calendar_title", "_id", "link-eo-courses-course_title", "Created Date", "price", "Updated Date", "course_days", "start_time", "course_name", "featured_image", "URL", "prereqs", "req_dives", "included", "schedule", "dive_days", "other_addons", "google_calendar_event_id", "Owner", "starting_at", "prereq_cert_id", "cancelled_at", "cancel_policy", "admin_title", "full_payment_deadline", "cancel_date") VALUES
 	('Advanced Open Water', 'AOW 2', '2a0df7ef-b9df-42f6-a347-0aa53a24667f', '/course-schedule/advance-open-water/2a0df7ef-b9df-42f6-a347-0aa53a24667f', '2026-04-07 04:07:29+00', '1f81cbc7-0999-4f9e-998f-a23eaafb8e72', '2026-04-16 06:12:02+00', '{2026-04-11,2026-04-12}', NULL, 'f7b34c84-6214-42fd-bcf3-c102510f6a3b', 'wix:image://v1/b37fef_6eb87d93e40440a4a89da1e22382275f~mv2.jpg/guillermo%20SMB.jpg#originWidth=3008&originHeight=4026', NULL, NULL, NULL, 'This course includes 5 dives, tanks, weights, round trip transportation from Fun Divers Taiwan, and full coverage local dive insurance.', NULL, 2, NULL, NULL, 'b37fefa3-09b1-4e00-a824-f6b884e43572', 12500, '1fcbad63-2e9b-4029-a22b-993fcbd84c1c', NULL, '8ed8bb2a-abf8-482c-8a34-bf532232b5ce', 'AOW', NULL, NULL),
 	('EFR Course', 'EFR Course', '2e8163d0-f34a-42f8-a2f0-b32148524f88', '/course-schedule/efr-course/2e8163d0-f34a-42f8-a2f0-b32148524f88', '2026-02-25 02:34:12+00', 'eafed2d9-7ad0-43ef-9bc2-950431c5058a', '2026-04-16 05:42:08+00', '{2026-04-11}', '09:00:00.000', '48eb4223-236c-41e2-acd9-0d2855161dd1', 'wix:image://v1/b37fef_bfee03e4ce2b4615b2d514e36ad31807~mv2.png/IMG_0251.HEIC#originWidth=3024&originHeight=4032', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '9f20fab4-5faf-4978-94de-a146afe4af9d', 4900, NULL, NULL, '8ed8bb2a-abf8-482c-8a34-bf532232b5ce', 'EFR', NULL, NULL),
 	('Deep Specialty', 'Deep 1', '5f472d80-d246-4730-bff5-093d6c055d0c', '/course-schedule/deep-specialty-course/5f472d80-d246-4730-bff5-093d6c055d0c', '2026-04-09 11:16:21+00', '95493cbc-5aa3-4251-a6b3-43ebce9c0e1d', '2026-04-16 06:13:03+00', '{2026-04-27,2026-04-28}', NULL, 'd4b64ee1-057f-4e77-ac87-d03a90450393', 'wix:image://v1/b37fef_747f3aa77dcd403f8f9f09f19e5705d3~mv2.jpg/P1010168.jpg#originWidth=1883&originHeight=1062', NULL, NULL, NULL, 'This course includes 4 dives, tanks, weights, round trip transportation from Fun Divers Taiwan, and full coverage local dive insurance.', NULL, 2, '["889c458a-f046-470e-b624-e3267cdca9ea","b12da045-7328-499b-98e5-24173d87f02c"]', NULL, 'b37fefa3-09b1-4e00-a824-f6b884e43572', 6800, 'ae3c4872-b50a-4d1a-a651-dce6e8b382b3', NULL, '8ed8bb2a-abf8-482c-8a34-bf532232b5ce', 'Deep', NULL, NULL),
@@ -402,11 +421,15 @@ Apr 12 - Ocean Dives', NULL, NULL, NULL, 'b37fefa3-09b1-4e00-a824-f6b884e43572',
 May 12 - 3 Dive Day', 2, '["0e299749-8b3d-4d0b-9655-cf2b146c3570","5165524d-4b81-4614-88f4-cff472951ea9"]', NULL, NULL, 12500, '1fcbad63-2e9b-4029-a22b-993fcbd84c1c', NULL, '8ed8bb2a-abf8-482c-8a34-bf532232b5ce', 'AOW', NULL, NULL),
 	('Advanced Open Water', 'AOW 3', 'd00c7a8f-d98d-499f-bd4a-9b2f00ced954', '/course-schedule/advance-open-water/d00c7a8f-d98d-499f-bd4a-9b2f00ced954', '2026-04-09 10:34:16+00', '1f81cbc7-0999-4f9e-998f-a23eaafb8e72', '2026-04-16 06:12:45+00', '{2026-04-25,2026-04-27}', NULL, 'f7b34c84-6214-42fd-bcf3-c102510f6a3b', 'https://pcauozfljgmelxnguqiz.supabase.co/storage/v1/object/public/Featured%20Pictures/P1010397-2.jpg', NULL, NULL, NULL, 'This course includes 5 dives, tanks, weights, round trip transportation from Fun Divers Taiwan, and full coverage local dive insurance.', 'Apr 25 - 3 Dive Day w/Night Dive
 Apr 27 - 2 Dive Day', 2, '0e299749-8b3d-4d0b-9655-cf2b146c3570', NULL, 'b37fefa3-09b1-4e00-a824-f6b884e43572', 12500, '1fcbad63-2e9b-4029-a22b-993fcbd84c1c', NULL, '8ed8bb2a-abf8-482c-8a34-bf532232b5ce', 'AOW', NULL, NULL);
+insert into public.events (id, kind, display_title, calendar_title, admin_title, price, course_days, start_time, course_name, featured_image, prereqs, req_dives, included, schedule, dive_days, starting_at, prereq_cert_id, cancelled_at, cancel_policy, full_payment_deadline, cancel_date)
+select "_id", 'course', "display_title", "calendar_title", "admin_title", "price", "course_days", "start_time", "course_name", "featured_image", "prereqs", "req_dives", "included", "schedule", "dive_days", "starting_at", NULL::uuid, "cancelled_at", "cancel_policy", "full_payment_deadline", "cancel_date" from public._s_courses;
+
 --
--- Data for Name: EO_dives; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: events (staged from legacy EO_dives)
 --
 
-INSERT INTO "public"."EO_dives" ("admin_title", "display_title", "DiveTravel_reference", "price", "destination_reference", "start_date", "time", "end_date", "cancel_date", "featured", "featured_image", "second_image", "link-eo-dives-dive_title", "_id", "notes", "fully_booked", "prereqs", "nitrox_required", "req_dives", "gear_rental", "cancel_policy", "room_types", "has_rooms", "hasotheraddons", "other_addons", "dive_days", "google_calendar_event_id", "Created Date", "Updated Date", "Owner", "EO_price_reference", "prereq_cert_id", "cancelled_at", "calendar_title", "full_payment_deadline") VALUES
+create table public._s_dives ("admin_title" text, "display_title" text, "DiveTravel_reference" uuid, "price" uuid, "destination_reference" text, "start_date" date, "time" time, "end_date" date, "cancel_date" date, "featured" boolean, "featured_image" text, "second_image" text, "link-eo-dives-dive_title" text, "_id" uuid, "notes" text, "fully_booked" boolean, "prereqs" text, "nitrox_required" boolean, "req_dives" integer, "gear_rental" text, "cancel_policy" uuid, "room_types" text, "has_rooms" boolean, "hasotheraddons" boolean, "other_addons" text, "dive_days" bigint, "google_calendar_event_id" text, "Created Date" timestamptz, "Updated Date" timestamptz, "Owner" text, "EO_price_reference" uuid, "prereq_cert_id" uuid, "cancelled_at" timestamptz, "calendar_title" text, "full_payment_deadline" date);
+INSERT INTO public._s_dives ("admin_title", "display_title", "DiveTravel_reference", "price", "destination_reference", "start_date", "time", "end_date", "cancel_date", "featured", "featured_image", "second_image", "link-eo-dives-dive_title", "_id", "notes", "fully_booked", "prereqs", "nitrox_required", "req_dives", "gear_rental", "cancel_policy", "room_types", "has_rooms", "hasotheraddons", "other_addons", "dive_days", "google_calendar_event_id", "Created Date", "Updated Date", "Owner", "EO_price_reference", "prereq_cert_id", "cancelled_at", "calendar_title", "full_payment_deadline") VALUES
 	('Badouzi Bay', 'Badouzi Bay', '5c7687aa-1f95-4124-9eba-50692ed29764', '9fd90874-cd94-470c-b07c-c7655b558741', '["8e938f1a-6a40-442b-97e7-bfbb624e04cf", "71077d4f-2d3a-4696-9207-761b81522965"]', '2026-03-07', '06:30:00.000', NULL, NULL, NULL, 'wix:image://v1/b37fef_4e079eae041d4143913dd5844d1f3659~mv2.jpg/P1010096.jpg#originWidth=1883&originHeight=1062', NULL, '/dives/badouzi-bay/0db714bb-baca-4399-bf50-94a3c3877fb4', '0db714bb-baca-4399-bf50-94a3c3877fb4', '2 Boat dives', NULL, NULL, true, NULL, NULL, '652b34df-4cb7-48ab-91dc-41ae9e2d1f29', NULL, NULL, NULL, NULL, NULL, NULL, '2026-03-02 03:27:11+00', '2026-04-10 14:06:15+00', '9f20fab4-5faf-4978-94de-a146afe4af9d', '9fd90874-cd94-470c-b07c-c7655b558741', 'ae3c4872-b50a-4d1a-a651-dce6e8b382b3', NULL, 'Boat Dives', NULL),
 	('Lambai', 'Lambai', '07785aa1-a9fb-4778-af07-48762b03feaf', '06e87c1b-6f32-4126-9b84-9fb383c1bae7', '["b718703b-b6d6-43ff-b56e-f886ed67d9c5"]', '2026-02-19', NULL, '2026-02-21', '2026-02-04', NULL, 'wix:image://v1/b37fef_19a97da40a9b4784b65260a954b59585~mv2.jpg/PC310265.jpg#originWidth=1883&originHeight=1062', 'wix:image://v1/0e65aa_855f1065a5d24c7bae5b8feedeed8ae0~mv2.jpg/P7040691-Butterflyfish-Green%20Island%201.jpg#originWidth=2143&originHeight=3000', '/dives/lambai/153e1d6c-9c96-4f02-b48a-092c2298c532', '153e1d6c-9c96-4f02-b48a-092c2298c532', 'Lunar New Year''s Trip
 3D2N 4 Boat Dives', NULL, NULL, false, NULL, '3200ntd for full set including dive computer and SMB (2 Days)', '1b76813a-c57c-4c1c-ae87-45a6ed389e47', '9d4c6161-5077-43a9-b5a6-4d2dd7eabdce,d927d758-e4af-4ee7-b6bd-bd67e52eb4df', true, NULL, NULL, NULL, NULL, '2026-01-16 06:20:51+00', '2026-04-10 14:06:25+00', '9f20fab4-5faf-4978-94de-a146afe4af9d', 'f1837f27-3dee-4ab2-a160-916e74ae0918', '1fcbad63-2e9b-4029-a22b-993fcbd84c1c', NULL, 'Lambai', NULL),
@@ -423,22 +446,42 @@ Turtle Island and Wan An Jian Wreck', '6b55bb0b-afb6-4a2d-a732-54df212103a9', '7
 	('Boat Dives Rainbow Reef & Crystal Temple + 1 Shore Dive at Batcave', 'Boat Dives Rainbow Reef & Crystal Temple + 1 Shore Dive at Batcave', '42f2ba4a-0b9f-4ef5-a9f3-e0e6c8e508d5', '8c141f6d-38ae-4a5b-88ea-67d9edb12146', '["f2ed912b-71f5-4b24-9122-eb00f6a206ae", "b2627255-fb70-4193-a686-bc251f0d6340", "8e938f1a-6a40-442b-97e7-bfbb624e04cf"]', '2026-06-27', NULL, NULL, '2026-06-13', NULL, 'wix:image://v1/b37fef_6cbdfe09ae2e41eb869ce0e29dcc21ce~mv2.jpg/P1010154.jpg#originWidth=1331&originHeight=751', 'wix:image://v1/b37fef_47ae5c5d39cb4212a3a21532c4311514~mv2.jpg/PA058129.jpg#originWidth=4026&originHeight=3008', '/dives/boat-dives-rainbow-reef/196e5bce-99a9-466b-b83a-fdc60c3b05fd', '196e5bce-99a9-466b-b83a-fdc60c3b05fd', '2 Boat Dives 1 Shore Dive', NULL, NULL, true, NULL, 'NTD 1600 for full set including Dive Computer and SMB (both required for boat diving).', '652b34df-4cb7-48ab-91dc-41ae9e2d1f29', NULL, NULL, true, '["0e299749-8b3d-4d0b-9655-cf2b146c3570","45d529b9-c16d-40e5-b4f1-fe7590c29d64","22e83bc5-3fa4-4b4d-98be-6f69e9314df9"]', NULL, NULL, '2026-04-09 09:03:25+00', '2026-04-10 14:05:31+00', 'b37fefa3-09b1-4e00-a824-f6b884e43572', '8c141f6d-38ae-4a5b-88ea-67d9edb12146', 'ae3c4872-b50a-4d1a-a651-dce6e8b382b3', NULL, 'Boat Dives', NULL),
 	('Batcave', 'Fun Diving at Batcave', 'a9edd94c-31ae-48f2-87ff-759dc73852a2', 'f4fb3eab-097a-420b-bb2a-dfe45bcf8ad2', NULL, '2026-05-02', '08:15:00', NULL, '2026-05-01', false, 'wix:image://v1/b37fef_c87b97bb853645a1872b99fc080d7932~mv2.jpg/P1010176.jpg#originWidth=1882&originHeight=1061', NULL, NULL, '3c3221d0-ec4c-4ac9-ac0c-0345e3057c87', '2 Shore Dives', false, NULL, false, NULL, 'NTD 1500 for a full set with dive computer', '652b34df-4cb7-48ab-91dc-41ae9e2d1f29', '', false, true, '["5165524d-4b81-4614-88f4-cff472951ea9","3417a5cb-1757-42eb-ae5a-0288a20457b4","8154bbc3-f5bb-49ce-b934-61cb2eb308a7","0e299749-8b3d-4d0b-9655-cf2b146c3570"]', NULL, NULL, NULL, NULL, NULL, 'f4fb3eab-097a-420b-bb2a-dfe45bcf8ad2', '1fcbad63-2e9b-4029-a22b-993fcbd84c1c', NULL, 'Batcave', NULL),
 	('Long Dong Bay', '3 Day Dives at Long Dong Bay', 'cce8aeba-4981-41f3-a22c-1d381f77b36a', '394741fc-f4c7-4a7a-b178-a323dc3e7e84', NULL, '2026-05-03', '08:15:00', NULL, '2026-05-02', false, 'wix:image://v1/b37fef_bf3a6e799829427fb4f2b57eb9346869~mv2.jpg/PA040510.jpg#originWidth=1731&originHeight=1154', NULL, NULL, '618d010e-2c66-4c7f-ad05-9af1ee3acfe1', '3 Shore Dives', false, NULL, false, NULL, NULL, '652b34df-4cb7-48ab-91dc-41ae9e2d1f29', '', false, true, '["5165524d-4b81-4614-88f4-cff472951ea9","3417a5cb-1757-42eb-ae5a-0288a20457b4","22e83bc5-3fa4-4b4d-98be-6f69e9314df9","8154bbc3-f5bb-49ce-b934-61cb2eb308a7","0e299749-8b3d-4d0b-9655-cf2b146c3570"]', NULL, NULL, NULL, NULL, NULL, '394741fc-f4c7-4a7a-b178-a323dc3e7e84', '1fcbad63-2e9b-4029-a22b-993fcbd84c1c', NULL, 'Long Dong Bay', NULL);
+insert into public.events (id, kind, admin_title, display_title, calendar_title, divetravel_id, price, start_date, start_time, end_date, cancel_date, featured, featured_image, second_image, notes, fully_booked, prereqs, nitrox_required, req_dives, gear_rental, cancel_policy, dive_days, prereq_cert_id, cancelled_at, full_payment_deadline)
+select "_id", 'dive', "admin_title", "display_title", "calendar_title", "DiveTravel_reference", "price", "start_date", "time", "end_date", "cancel_date", coalesce("featured", false), "featured_image", "second_image", "notes", coalesce("fully_booked", false), "prereqs", coalesce("nitrox_required", false), "req_dives", "gear_rental", "cancel_policy", "dive_days", NULL::uuid, "cancelled_at", "full_payment_deadline" from public._s_dives;
+
+-- event_destinations: parse the legacy destination_reference (JSON array / bare / CSV)
+insert into public.event_destinations (event_id, destination_id)
+select d."_id", x.val::uuid
+from public._s_dives d
+cross join lateral (
+  select trim(both '"' from trim(t)) as val
+  from regexp_split_to_table(regexp_replace(coalesce(d."destination_reference", ''), '[\[\]]', '', 'g'), ',') t
+) x
+where x.val <> ''
+  and exists (select 1 from public.travel_destinations td where td.id = x.val::uuid)
+on conflict do nothing;
+
 --
--- Data for Name: EO_rooms; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: rooms (staged from legacy EO_rooms)
 --
 
-INSERT INTO "public"."EO_rooms" ("admin_title", "display_title", "added_price", "added_price_display", "per_night", "EO_prices_room_options", "_id", "Created Date", "Updated Date", "Owner", "EO_dives_room_types", "currency") VALUES
+create table public._s_rooms ("admin_title" text, "display_title" text, "added_price" bigint, "added_price_display" text, "per_night" bigint, "EO_prices_room_options" text, "_id" uuid, "Created Date" timestamptz, "Updated Date" timestamptz, "Owner" text, "EO_dives_room_types" text, "currency" text);
+INSERT INTO public._s_rooms ("admin_title", "display_title", "added_price", "added_price_display", "per_night", "EO_prices_room_options", "_id", "Created Date", "Updated Date", "Owner", "EO_dives_room_types", "currency") VALUES
 	('penghu_ensuite', 'Ensuite Room (Dbl Occupancy)', 3000, '3000NTD', NULL, '["737618b5-037a-4195-8032-1f3b1d1e21c3"]', '8b6f57f5-88b5-479f-9bd3-807e0cefed3b', '2026-03-10 03:52:35+00', '2026-03-25 08:14:12+00', '9f20fab4-5faf-4978-94de-a146afe4af9d', '["08ae6dd9-e926-4ae3-b6a3-490d25acc4f9"]', 'NTD'),
 	('kenting_private', 'Ensuite Room (Sgl Occupancy)', 2400, '2400NTD', NULL, '["a6def8c2-c040-4373-a646-46ab059156e1", "06e87c1b-6f32-4126-9b84-9fb383c1bae7"]', '9754f07e-5b47-4dcb-b207-5ead4c11899e', '2026-03-10 03:51:47+00', '2026-03-27 03:34:21+00', '9f20fab4-5faf-4978-94de-a146afe4af9d', '["829d3ca3-6b4a-4d4d-b74a-51fea5cf0287"]', 'NTD'),
 	('xlq_double', 'Shared Double Ensuite (Dbl Occupancy)', 1500, '1500NTD', NULL, '["06e87c1b-6f32-4126-9b84-9fb383c1bae7"]', '9d4c6161-5077-43a9-b5a6-4d2dd7eabdce', '2026-03-10 03:51:36+00', '2026-03-27 03:34:59+00', '9f20fab4-5faf-4978-94de-a146afe4af9d', '["153e1d6c-9c96-4f02-b48a-092c2298c532"]', 'NTD'),
 	('kenting_double', 'Shared Double Ensuite (Dbl Occupancy)', 1700, '1700NTD', NULL, '["a6def8c2-c040-4373-a646-46ab059156e1", "6098fde5-8530-4886-8ad8-c8357586c86b"]', 'd927d758-e4af-4ee7-b6bd-bd67e52eb4df', '2026-03-10 03:51:58+00', '2026-03-25 08:14:18+00', '9f20fab4-5faf-4978-94de-a146afe4af9d', '["829d3ca3-6b4a-4d4d-b74a-51fea5cf0287", "153e1d6c-9c96-4f02-b48a-092c2298c532"]', 'NTD');
 
 
+insert into public.rooms ("admin_title", "display_title", "added_price", "id", "currency")
+select "admin_title", "display_title", "added_price", "_id", "currency" from public._s_rooms;
+
 --
--- Data for Name: Other_Addons; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: addons (staged from legacy Other_Addons)
 --
 
-INSERT INTO "public"."Other_Addons" ("admin_title", "price", "display_title", "currency", "EO_dives_other_addons", "EO_courses_other_addons", "_id", "Created Date", "Updated Date", "Owner") VALUES
+create table public._s_addons ("admin_title" text, "price" bigint, "display_title" text, "currency" text, "EO_dives_other_addons" text, "EO_courses_other_addons" text, "_id" uuid, "Created Date" timestamptz, "Updated Date" timestamptz, "Owner" text);
+INSERT INTO public._s_addons ("admin_title", "price", "display_title", "currency", "EO_dives_other_addons", "EO_courses_other_addons", "_id", "Created Date", "Updated Date", "Owner") VALUES
 	('Light Rental 1 Day', 200, 'Light Rental (1 Day)', 'NTD', '["7ae1c2c2-f939-46e5-b021-4623861b26b6","8b721a55-2f2b-4ae9-9a56-656c75239cfe","41fd5cbd-e3ff-4c29-9d8b-34f80f194134","196e5bce-99a9-466b-b83a-fdc60c3b05fd","f849f633-42f0-4407-93d4-2e1662200075"]', '["d00c7a8f-d98d-499f-bd4a-9b2f00ced954","846989e2-dd1b-47d5-a919-d44079115637"]', '0e299749-8b3d-4d0b-9655-cf2b146c3570', '2026-04-07 06:24:00+00', '2026-04-09 08:41:01+00', 'b37fefa3-09b1-4e00-a824-f6b884e43572'),
 	('Camera Rental 3 dive', 1000, 'Camera Rental (3 Dives)', 'NTD', '["41fd5cbd-e3ff-4c29-9d8b-34f80f194134","196e5bce-99a9-466b-b83a-fdc60c3b05fd"]', NULL, '22e83bc5-3fa4-4b4d-98be-6f69e9314df9', '2026-04-07 06:23:14+00', '2026-04-09 08:41:01+00', 'b37fefa3-09b1-4e00-a824-f6b884e43572'),
 	('Camera Rental 2 dive', 800, 'Camera Rental (2 Dives)', 'NTD', '["8b721a55-2f2b-4ae9-9a56-656c75239cfe"]', NULL, '3417a5cb-1757-42eb-ae5a-0288a20457b4', '2026-04-07 06:22:51+00', '2026-04-09 08:41:01+00', 'b37fefa3-09b1-4e00-a824-f6b884e43572'),
@@ -457,6 +500,9 @@ INSERT INTO "public"."Other_Addons" ("admin_title", "price", "display_title", "c
 	('2 Eanx 200ea', 400, '2 Nitrox Tanks', 'NTD', NULL, NULL, '18409345-04b7-4455-9bf5-e5c7c124783d', NULL, NULL, NULL),
 	('2 Eanx 300ea', 600, '2 Nitrox Tanks', 'NTD', NULL, NULL, '5965b590-2e75-4eab-b40d-82dd0ef54607', NULL, NULL, NULL);
 
+
+insert into public.addons ("admin_title", "price", "display_title", "currency", "id")
+select "admin_title", "price", "display_title", "currency", "_id" from public._s_addons;
 
 --
 -- Data for Name: profiles; Type: TABLE DATA; Schema: public; Owner: postgres
@@ -491,10 +537,11 @@ INSERT INTO "public"."admin_audit_log" ("id", "created_at", "actor_id", "action"
 
 
 --
--- Data for Name: bookings; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: bookings (staged; eo_dive_id/eo_course_id -> event_id)
 --
 
-INSERT INTO "public"."bookings" ("id", "created_at", "user_id", "status", "notes", "eo_dive_id", "eo_course_id", "details", "refund_requested_at") VALUES
+create table public._s_bookings ("id" uuid, "created_at" timestamptz, "user_id" uuid, "status" text, "notes" text, "eo_dive_id" uuid, "eo_course_id" uuid, "details" jsonb, "refund_requested_at" timestamptz);
+INSERT INTO public._s_bookings ("id", "created_at", "user_id", "status", "notes", "eo_dive_id", "eo_course_id", "details", "refund_requested_at") VALUES
 	('3dfb13bf-3823-43a1-b41c-d71acd7f2360', '2026-04-21 19:55:50.060589+00', '11111111-1111-1111-1111-111111111111', 'pending', NULL, '196e5bce-99a9-466b-b83a-fdc60c3b05fd', NULL, '{"gear": {"mode": "full", "rent": true, "size_overrides": {"height_cm": 180, "shoe_size": "US11", "weight_kg": 80}}, "total": 9620, "add_ons": ["bd523b91-080b-4f0a-b747-dff6f7d724f1"], "payment_method": "bank_transfer", "transportation": false, "nitrox_course_addon": false}', NULL),
 	('23e551cb-8968-46d8-b0e4-722046220564', '2026-04-22 11:35:45.033872+00', 'fa62c391-ea03-46c8-8d5a-cb21497ee619', 'cancelled', NULL, NULL, 'd00c7a8f-d98d-499f-bd4a-9b2f00ced954', '{"gear": {"mode": "full", "rent": true, "size_overrides": {"height_cm": 175, "shoe_size": "US 9 M", "weight_kg": 70}}, "total": 17000, "add_ons": ["0e299749-8b3d-4d0b-9655-cf2b146c3570"], "deposit": 6000, "payment_method": "cash", "transportation": true, "nitrox_course_addon": false}', NULL),
 	('8a17e123-db7d-4dbd-9ee6-cf3d5df66ce2', '2026-04-21 19:55:14.563034+00', '11111111-1111-1111-1111-111111111111', 'cancelled', NULL, NULL, 'd00c7a8f-d98d-499f-bd4a-9b2f00ced954', '{"gear": {"mode": "full", "rent": true, "size_overrides": {"height_cm": 180, "shoe_size": "US11", "weight_kg": 80}}, "total": 15645, "add_ons": ["0e299749-8b3d-4d0b-9655-cf2b146c3570", "5165524d-4b81-4614-88f4-cff472951ea9", "b12da045-7328-499b-98e5-24173d87f02c"], "payment_method": "credit_card", "transportation": false, "nitrox_course_addon": false}', NULL),
@@ -504,19 +551,27 @@ INSERT INTO "public"."bookings" ("id", "created_at", "user_id", "status", "notes
 	('a3e1b88f-08b4-415d-b183-8f1ae1a4683b', '2026-04-30 13:09:36.642743+00', 'c68501a7-fde7-439b-ba5f-abfee198af11', 'pending', NULL, '3c3221d0-ec4c-4ac9-ac0c-0345e3057c87', NULL, '{"gear": {"mode": "a-la-carte", "rent": true, "items": [], "size_overrides": {"height_cm": 190, "shoe_size": "EU 29 M", "weight_kg": 100}}, "total": 1500, "add_ons": [], "deposit": 1500, "payment_method": "cash", "transportation": false, "pay_deposit_only": false, "nitrox_course_addon": false, "cancellation_policy_acked_at": "2026-04-30T13:09:29.522Z"}', NULL);
 
 
+insert into public.bookings ("id", "created_at", "user_id", "status", "notes", "event_id", "details", "refund_requested_at")
+select "id", "created_at", "user_id", "status", "notes", coalesce("eo_dive_id", "eo_course_id"), "details", "refund_requested_at" from public._s_bookings;
+
 --
--- Data for Name: admin_notes; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: admin_notes (staged; eo_dive_id/eo_course_id -> event_id)
 --
 
-INSERT INTO "public"."admin_notes" ("id", "created_at", "created_by", "eo_dive_id", "eo_course_id", "booking_id", "tag", "content", "resolved", "resolved_by", "resolved_at") VALUES
+create table public._s_admin_notes ("id" uuid, "created_at" timestamptz, "created_by" uuid, "eo_dive_id" uuid, "eo_course_id" uuid, "booking_id" uuid, "tag" text, "content" text, "resolved" boolean, "resolved_by" uuid, "resolved_at" timestamptz);
+INSERT INTO public._s_admin_notes ("id", "created_at", "created_by", "eo_dive_id", "eo_course_id", "booking_id", "tag", "content", "resolved", "resolved_by", "resolved_at") VALUES
 	('722ee691-c5cf-4fe5-8bf5-bfbad340bd6d', '2026-04-24 07:46:30.81927+00', 'c68501a7-fde7-439b-ba5f-abfee198af11', NULL, '616c33ea-a91e-4e96-994b-a2665e841fd5', NULL, 'note', 'remember rescue slate', false, NULL, NULL);
 
 
+insert into public.admin_notes ("id", "created_at", "created_by", "event_id", "booking_id", "tag", "content", "resolved", "resolved_by", "resolved_at")
+select "id", "created_at", "created_by", coalesce("eo_dive_id", "eo_course_id"), "booking_id", "tag", "content", "resolved", "resolved_by", "resolved_at" from public._s_admin_notes;
+
 --
--- Data for Name: duties; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: duties (staged; eo_dive_id/eo_course_id -> event_id)
 --
 
-INSERT INTO "public"."duties" ("id", "created_at", "created_by", "assignee_id", "role", "start_date", "end_date", "eo_dive_id", "eo_course_id", "notes") VALUES
+create table public._s_duties ("id" uuid, "created_at" timestamptz, "created_by" uuid, "assignee_id" uuid, "role" text, "start_date" date, "end_date" date, "eo_dive_id" uuid, "eo_course_id" uuid, "notes" text);
+INSERT INTO public._s_duties ("id", "created_at", "created_by", "assignee_id", "role", "start_date", "end_date", "eo_dive_id", "eo_course_id", "notes") VALUES
 	('42bda0fd-a339-4c8e-a0e4-d345201e2220', '2026-04-23 10:46:59.204067+00', 'fa62c391-ea03-46c8-8d5a-cb21497ee619', 'c68501a7-fde7-439b-ba5f-abfee198af11', 'instructor', '2026-04-25', '2026-04-25', NULL, 'd00c7a8f-d98d-499f-bd4a-9b2f00ced954', NULL),
 	('cd6eae7e-15ca-4d34-851e-5c14613250a7', '2026-04-23 10:47:13.327148+00', 'fa62c391-ea03-46c8-8d5a-cb21497ee619', 'fa62c391-ea03-46c8-8d5a-cb21497ee619', 'guide', '2026-04-25', '2026-04-25', NULL, 'd00c7a8f-d98d-499f-bd4a-9b2f00ced954', NULL),
 	('65b33390-f4d8-47ce-960e-e198651da759', '2026-04-23 10:48:06.182417+00', 'fa62c391-ea03-46c8-8d5a-cb21497ee619', 'c68501a7-fde7-439b-ba5f-abfee198af11', 'instructor', '2026-04-27', '2026-04-28', NULL, '5f472d80-d246-4730-bff5-093d6c055d0c', NULL),
@@ -528,11 +583,14 @@ INSERT INTO "public"."duties" ("id", "created_at", "created_by", "assignee_id", 
 	('1bb6ae1c-ff05-4589-9594-e4e57fcc2448', '2026-04-29 09:15:33.048729+00', 'fa62c391-ea03-46c8-8d5a-cb21497ee619', 'fa62c391-ea03-46c8-8d5a-cb21497ee619', 'guide', '2026-05-03', NULL, '618d010e-2c66-4c7f-ad05-9af1ee3acfe1', NULL, NULL);
 
 
+insert into public.duties ("id", "created_at", "created_by", "assignee_id", "role", "start_date", "end_date", "event_id", "notes")
+select "id", "created_at", "created_by", "assignee_id", "role", "start_date", "end_date", coalesce("eo_dive_id", "eo_course_id"), "notes" from public._s_duties;
+
 --
--- Data for Name: eo_course_addons; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: event_addons (from legacy eo_course_addons)
 --
 
-INSERT INTO "public"."eo_course_addons" ("eo_course_id", "addon_id") VALUES
+INSERT INTO "public"."event_addons" ("event_id", "addon_id") VALUES
 	('846989e2-dd1b-47d5-a919-d44079115637', '0e299749-8b3d-4d0b-9655-cf2b146c3570'),
 	('146c37ea-dd58-46cf-b146-c88afa78b683', 'bd523b91-080b-4f0a-b747-dff6f7d724f1'),
 	('5f472d80-d246-4730-bff5-093d6c055d0c', '889c458a-f046-470e-b624-e3267cdca9ea'),
@@ -544,10 +602,10 @@ INSERT INTO "public"."eo_course_addons" ("eo_course_id", "addon_id") VALUES
 
 
 --
--- Data for Name: eo_dive_addons; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: event_addons (from legacy eo_dive_addons)
 --
 
-INSERT INTO "public"."eo_dive_addons" ("eo_dive_id", "addon_id") VALUES
+INSERT INTO "public"."event_addons" ("event_id", "addon_id") VALUES
 	('829d3ca3-6b4a-4d4d-b74a-51fea5cf0287', '75a877da-1931-4cb6-b669-84d5b7071ed4'),
 	('829d3ca3-6b4a-4d4d-b74a-51fea5cf0287', '8250698a-41ae-4ba9-b7cf-4bdc5516b224'),
 	('41fd5cbd-e3ff-4c29-9d8b-34f80f194134', '0e299749-8b3d-4d0b-9655-cf2b146c3570'),
@@ -578,10 +636,10 @@ INSERT INTO "public"."eo_dive_addons" ("eo_dive_id", "addon_id") VALUES
 
 
 --
--- Data for Name: eo_dive_rooms; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: event_rooms (from legacy eo_dive_rooms)
 --
 
-INSERT INTO "public"."eo_dive_rooms" ("eo_dive_id", "room_id") VALUES
+INSERT INTO "public"."event_rooms" ("event_id", "room_id") VALUES
 	('153e1d6c-9c96-4f02-b48a-092c2298c532', '9d4c6161-5077-43a9-b5a6-4d2dd7eabdce'),
 	('153e1d6c-9c96-4f02-b48a-092c2298c532', 'd927d758-e4af-4ee7-b6bd-bd67e52eb4df'),
 	('829d3ca3-6b4a-4d4d-b74a-51fea5cf0287', '9754f07e-5b47-4dcb-b207-5ead4c11899e'),
@@ -611,10 +669,16 @@ INSERT INTO "public"."push_subscriptions" ("id", "user_id", "endpoint", "p256dh"
 	('720786ab-23c7-4965-9b51-df86f788d648', 'b9df844e-95f5-40e0-96c0-0dfc5733a6f4', 'https://fcm.googleapis.com/fcm/send/c0JEFBbwHgY:APA91bHbr--MN2Slkki_XQ94rt9BU0-MiRjm4_62ERgNCRiOGdEFtwvkiTD2YLzjrNpHbFeNvmYgrYKOC-8iEbwTlsdqo8hF8sLTZpV6ZaDckz394h9ANgAT35d6wZCmT4W5DYp50ED3', 'BOfTvAPvz_BplaO8AJBWK3cMFo9EKkJgvrjfG2CaW-OYoH9lnO3KHcBnt54nesTjHxXc5sYIeFbmy3Quv-3TAhs', 'kaPdWGl0YCLdw6IDAvi2wQ', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Mobile Safari/537.36', '2026-04-25 01:46:26.194979+00', '2026-04-25 01:46:24.807+00'),
 	('3b01dee8-f0a7-4fe5-81d4-c74432367af8', 'c68501a7-fde7-439b-ba5f-abfee198af11', 'https://updates.push.services.mozilla.com/wpush/v2/gAAAAABp81TaAY3ezMUMAWNmBdNG3LSzRNed0AxxPvvRly6LS5ohm3itW-OoPzx0aThaFzEmwuS4odIHllc48gS--nz_IBfJWxEmGSdIvirL-7qYShig1P01AqcvRegYXNfswiIunIVP17pK3gRX7HLN5AYkabRo6G3JdufESUd7f_c0S0VzSpg', 'BEaOBfO0jxBd0bkPMd4FkosWxfHjH75W_EIRbP5dHmkZGlWCRtr8IssOaxIRIcbYVy5MAb2iFgOTEd4SanZJEc8', 'iPqkQncNy7Lx1DoHuPz7vQ', 'Mozilla/5.0 (Android 16; Mobile; rv:150.0) Gecko/150.0 Firefox/150.0', '2026-04-30 13:10:51.348077+00', '2026-04-30 13:10:51.573+00');
 
+drop table if exists public._s_prices, public._s_courses, public._s_dives, public._s_rooms, public._s_addons, public._s_bookings, public._s_admin_notes, public._s_duties;
+
+end
+$SEED$;
+
 
 --
 -- Name: refresh_tokens_id_seq; Type: SEQUENCE SET; Schema: auth; Owner: supabase_auth_admin
 --
+
 
 SELECT pg_catalog.setval('"auth"."refresh_tokens_id_seq"', 141, true);
 

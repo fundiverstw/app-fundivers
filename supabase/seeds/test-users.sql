@@ -99,8 +99,8 @@ where id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 --
 -- ID conventions for grep-ability:
 --   d0000000-…-XX → bulk diver auth.users.id (XX = 01..25)
---   e0000000-…-01 → crowded EO_dives row
---   e0000000-…-02 → crowded EO_courses row
+--   e0000000-…-01 → crowded events row (kind='dive')
+--   e0000000-…-02 → crowded events row (kind='course')
 --   b0000001-…-XX → bookings on the crowded dive
 --   b0000002-…-XX → bookings on the crowded course
 
@@ -177,14 +177,13 @@ end$$;
 
 -- Crowded dive: 14 days out. capacity set high so seeded pending rows
 -- don't get auto-flipped to waitlisted by the BEFORE INSERT trigger.
-insert into public."EO_dives" (
-  _id, admin_title, display_title, calendar_title,
-  start_date, "time", end_date,
+insert into public.events (
+  id, kind, admin_title, display_title, calendar_title,
+  start_date, start_time, end_date,
   notes, featured, fully_booked, capacity,
-  has_rooms, hasotheraddons, dive_days,
-  price, "EO_price_reference"
+  dive_days, price
 ) values (
-  'e0000000-0000-0000-0000-000000000001'::uuid,
+  'e0000000-0000-0000-0000-000000000001'::uuid, 'dive',
   'Crowded test dive',
   'Crowded test dive',
   'Crowded test dive',
@@ -193,19 +192,18 @@ insert into public."EO_dives" (
   current_date + 14,
   'Local dev fixture: 25+ registrants for stressing the admin event detail page.',
   false, false, 60,
-  false, false, 1,
-  '9fd90874-cd94-470c-b07c-c7655b558741'::uuid,
+  1,
   '9fd90874-cd94-470c-b07c-c7655b558741'::uuid
-) on conflict (_id) do nothing;
+) on conflict (id) do nothing;
 
 -- Crowded course: 28 days out, 4-day OW (course_days is the date source).
-insert into public."EO_courses" (
-  _id, admin_title, display_title, calendar_title,
+insert into public.events (
+  id, kind, admin_title, display_title, calendar_title,
   course_days, start_time,
   course_name, schedule, dive_days, capacity,
   price, starting_at
 ) values (
-  'e0000000-0000-0000-0000-000000000002'::uuid,
+  'e0000000-0000-0000-0000-000000000002'::uuid, 'course',
   'Crowded test course',
   'Crowded test course',
   'Crowded test course',
@@ -216,7 +214,7 @@ insert into public."EO_courses" (
   4, 40,
   '7eca095c-6bc6-4adf-9e48-d8b70b59fb9f'::uuid,
   15400
-) on conflict (_id) do nothing;
+) on conflict (id) do nothing;
 
 -- 25 bookings on the crowded dive — mixed statuses so the cards
 -- render the full status / payment colour palette in dev.
@@ -229,7 +227,7 @@ declare
 begin
   for i in 1..25 loop
     insert into public.bookings (
-      id, user_id, eo_dive_id, status, notes, details, created_at
+      id, user_id, event_id, status, notes, details, created_at
     ) values (
       ('b0000001-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid,
       ('d0000000-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid,
@@ -269,7 +267,7 @@ declare
 begin
   for i in 1..22 loop
     insert into public.bookings (
-      id, user_id, eo_course_id, status, notes, details, created_at
+      id, user_id, event_id, status, notes, details, created_at
     ) values (
       ('b0000002-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid,
       ('d0000000-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid,
