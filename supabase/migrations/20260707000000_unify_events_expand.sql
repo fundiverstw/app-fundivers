@@ -60,13 +60,13 @@ create index if not exists events_kind_start_idx on public.events (kind, start_d
 insert into public.events (
   legacy_id, kind, admin_title, display_title, calendar_title, price, dive_days,
   prereq_cert_id, cancel_date, cancel_policy, fully_booked, capacity,
-  full_payment_deadline, cancelled_at, featured_image, prereqs, featured, req_dives,
+  full_payment_deadline, cancelled_at, featured_image, featured, req_dives,
   start_date, end_date, start_time, is_private, nitrox_required, second_image,
   gear_rental, notes, divetravel_id, is_boat_dive, is_trip)
 select
   d._id, 'dive', d.admin_title, d.display_title, d.calendar_title, d.price, d.dive_days,
   d.prereq_cert_id, d.cancel_date, d.cancel_policy, coalesce(d.fully_booked, false), d.capacity,
-  d.full_payment_deadline, d.cancelled_at, d.featured_image, d.prereqs, coalesce(d.featured, false),
+  d.full_payment_deadline, d.cancelled_at, d.featured_image, coalesce(d.featured, false),
   d.req_dives::int,
   d.start_date, d.end_date, d."time", coalesce(d.is_private, false), coalesce(d.nitrox_required, false),
   d.second_image, d.gear_rental, d.notes, d."DiveTravel_reference",
@@ -79,12 +79,12 @@ on conflict (legacy_id) do nothing;
 insert into public.events (
   legacy_id, kind, admin_title, display_title, calendar_title, price, dive_days,
   prereq_cert_id, cancel_date, cancel_policy, fully_booked, capacity,
-  full_payment_deadline, cancelled_at, featured_image, prereqs, featured, req_dives,
+  full_payment_deadline, cancelled_at, featured_image, featured, req_dives,
   start_time, course_days, course_name, included, schedule, starting_at)
 select
   c._id, 'course', c.admin_title, c.display_title, c.calendar_title, c.price, c.dive_days,
   c.prereq_cert_id, c.cancel_date, c.cancel_policy, coalesce(c.fully_booked, false), c.capacity,
-  c.full_payment_deadline, c.cancelled_at, c.featured_image, c.prereqs, false,
+  c.full_payment_deadline, c.cancelled_at, c.featured_image, false,
   nullif(regexp_replace(coalesce(c.req_dives, ''), '\D', '', 'g'), '')::int,
   c.start_time, c.course_days, c.course_name, c.included, c.schedule, c.starting_at
 from public."EO_courses" c
