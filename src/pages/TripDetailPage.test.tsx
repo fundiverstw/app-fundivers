@@ -55,7 +55,7 @@ describe('TripDetailPage', () => {
     expect(await screen.findByRole('heading', { name: 'Raja Ampat Liveaboard' })).toBeInTheDocument()
     expect(screen.getByText('Manta cleaning stations')).toBeInTheDocument()
     expect(screen.getByText(/We have dived with them for years/)).toBeInTheDocument()
-    expect(screen.getByText(/Vouched by Blue Manta Divers/)).toBeInTheDocument()
+    expect(screen.getByText(/In cooperation with Blue Manta Divers/)).toBeInTheDocument()
   })
 
   it('expresses interest and surfaces the returned referral code', async () => {

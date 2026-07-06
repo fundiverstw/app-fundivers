@@ -88,7 +88,7 @@ function TripCard({ trip, referral }: { trip: TripBoardItem; referral: MyTripRef
         {dates && <p className={`text-xs ${TEXT_SUBTLE}`}>{dates}</p>}
         <div className="flex items-center justify-between pt-1 gap-2">
           <span className="text-xs px-2 py-0.5 rounded-full border border-emerald-400 bg-emerald-50 text-emerald-800 font-medium truncate">
-            Vouched by {trip.partner_name}
+            In cooperation with {trip.partner_name}
           </span>
           {trip.price != null && (
             <span className={`text-xs ${TEXT_HEADING} shrink-0`}>{trip.price.toLocaleString()} {trip.currency}</span>

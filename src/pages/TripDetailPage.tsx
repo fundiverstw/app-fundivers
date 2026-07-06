@@ -92,7 +92,7 @@ export function TripDetailPage() {
             {trip.destination}{dates ? ` · ${dates}` : ''}
           </p>
           <span className="inline-block text-xs px-2 py-0.5 rounded-full border border-emerald-400 bg-emerald-50 text-emerald-800 font-medium">
-            Vouched by {trip.partner_name}
+            In cooperation with {trip.partner_name}
           </span>
           {trip.price != null && (
             <p className={`text-sm ${TEXT_HEADING}`}>{trip.price.toLocaleString()} {trip.currency}</p>
