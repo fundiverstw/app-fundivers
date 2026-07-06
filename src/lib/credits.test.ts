@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { siteConfig } from '../config/site'
 import type { AppEvent } from '../types/database'
 
 const { from, rpc, creditsInsert } = vi.hoisted(() => ({
@@ -172,7 +173,7 @@ describe('issueCancellationCredits', () => {
     await expect(issueCancellationCredits({ event, createdBy: 'admin1' })).rejects.toEqual({ message: 'boom' })
   })
 
-  it('targets eo_course_id for course events', async () => {
+  it('filters bookings by event_id for course events', async () => {
     const eqSpy = vi.fn()
     from.mockImplementation((table: string) => {
       if (table === 'bookings') {
@@ -190,7 +191,7 @@ describe('issueCancellationCredits', () => {
     const courseEvent = { ...event, type: 'course', id: 'crs9' } as unknown as AppEvent
     const { issueCancellationCredits } = await import('./credits')
     await issueCancellationCredits({ event: courseEvent, createdBy: 'admin1' })
-    expect(eqSpy).toHaveBeenCalledWith('eo_course_id', 'crs9')
+    expect(eqSpy).toHaveBeenCalledWith('event_id', 'crs9')
   })
 })
 
@@ -254,12 +255,12 @@ function setupCreditWrite(result: { data: unknown; error?: unknown }) {
 const settledRow = { id: 'c9', status: 'open', amount: 1000 } as unknown as import('../types/database').Credit
 
 describe('createCredit', () => {
-  it('inserts an open credit, defaulting currency to TWD and booking_id to null', async () => {
+  it('inserts an open credit, defaulting currency to the shop default and booking_id to null', async () => {
     const { insert } = setupCreditWrite({ data: settledRow })
     const { createCredit } = await import('./credits')
     await createCredit({ user_id: 'u1', amount: 1500, reason: 'Goodwill', created_by: 'admin' })
     expect(insert).toHaveBeenCalledWith({
-      user_id: 'u1', booking_id: null, amount: 1500, currency: 'TWD',
+      user_id: 'u1', booking_id: null, amount: 1500, currency: siteConfig.locale.currency,
       reason: 'Goodwill', created_by: 'admin', status: 'open',
     })
   })

@@ -35,8 +35,7 @@ describe('duties table', () => {
     }).select().single()
     expect(error).toBeNull()
     expect(data?.role).toBe('support')
-    expect(data?.eo_dive_id).toBeNull()
-    expect(data?.eo_course_id).toBeNull()
+    expect(data?.event_id).toBeNull()
     await admin.from('duties').delete().eq('id', data!.id)
   })
 
@@ -71,17 +70,18 @@ describe('duties table', () => {
     expect(error?.message.toLowerCase()).toMatch(/date/i)
   })
 
-  it('allows both eo_dive_id and eo_course_id to be set (no XOR)', async () => {
+  // Duties formerly carried an eo_dive_id + eo_course_id pair (no XOR — both
+  // could be set). Under the unified schema that collapses to a single event_id
+  // FK; this pins that a duty can reference one event.
+  it('allows event_id to be set to an event', async () => {
     const { data, error } = await admin.from('duties').insert({
-      assignee_id:   adminUser.id,
-      role:          'guide',
-      start_date:    '2030-01-04',
-      eo_dive_id:    diveId,
-      eo_course_id:  courseId,
+      assignee_id: adminUser.id,
+      role:        'guide',
+      start_date:  '2030-01-04',
+      event_id:    diveId,
     }).select().single()
     expect(error).toBeNull()
-    expect(data?.eo_dive_id).toBe(diveId)
-    expect(data?.eo_course_id).toBe(courseId)
+    expect(data?.event_id).toBe(diveId)
     await admin.from('duties').delete().eq('id', data!.id)
   })
 

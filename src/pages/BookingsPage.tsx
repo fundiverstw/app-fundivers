@@ -84,11 +84,10 @@ export function BookingsPage() {
       offersByBooking = new Map((offers ?? []).map(o => [o.booking_id, o as WaitlistOffer]))
     }
 
-    const diveIds = bookings.map(b => b.eo_dive_id).filter((x): x is string => !!x)
-    const courseIds = bookings.map(b => b.eo_course_id).filter((x): x is string => !!x)
+    const eventIds = bookings.map(b => b.event_id).filter((x): x is string => !!x)
     const [eventMap, catalog] = await Promise.all([
-      (diveIds.length || courseIds.length)
-        ? fetchEventsForBookings(diveIds, courseIds)
+      eventIds.length
+        ? fetchEventsForBookings(eventIds)
         : Promise.resolve(new Map<string, AppEvent>()),
       fetchChargeCatalog(bookings.map(b => b.details as BookingDetails)),
     ])
@@ -108,7 +107,7 @@ export function BookingsPage() {
       const bookingPayments = paymentsByBooking.get(b.id) ?? []
       const paidSum = bookingPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
       const offer = offersByBooking.get(b.id) ?? null
-      const event = eventMap.get((b.eo_dive_id ?? b.eo_course_id)!) ?? null
+      const event = b.event_id ? eventMap.get(b.event_id) ?? null : null
       return {
         ...b,
         event,
@@ -126,10 +125,10 @@ export function BookingsPage() {
     const addonIds = uniqueUuids(bookings.flatMap(b => (b.details as Booking['details'])?.add_ons ?? []))
     if (addonIds.length) {
       const { data } = await supabase
-        .from('Other_Addons')
-        .select('_id, display_title, admin_title')
-        .in('_id', addonIds)
-      setAddonNames(new Map((data ?? []).map(a => [a._id, a.display_title || a.admin_title || a._id])))
+        .from('addons')
+        .select('id, display_title, admin_title')
+        .in('id', addonIds)
+      setAddonNames(new Map((data ?? []).map(a => [a.id, a.display_title || a.admin_title || a.id])))
     } else {
       setAddonNames(new Map())
     }

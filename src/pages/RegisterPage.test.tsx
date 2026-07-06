@@ -100,7 +100,7 @@ describe('RegisterPage', () => {
     fetchEventsForBookings.mockResolvedValue(new Map([['dive-a', testEvent]]))
     from.mockImplementation((table: string) => {
       if (table === 'bookings') return mockQueryBuilder({
-        data: { id: 'b1', status: 'confirmed', user_id: 'u1', eo_dive_id: 'dive-a' },
+        data: { id: 'b1', status: 'confirmed', user_id: 'u1', event_id: 'dive-a' },
       })
       return mockQueryBuilder({ data: null })
     })

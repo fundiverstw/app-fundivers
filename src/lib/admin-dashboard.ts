@@ -46,7 +46,7 @@ export interface Dashboard {
 }
 
 export type PaymentLite = Pick<Payment, 'user_id' | 'booking_id' | 'amount' | 'status' | 'method' | 'created_at'>
-export type BookingLite = Pick<Booking, 'id' | 'user_id' | 'eo_dive_id' | 'eo_course_id' | 'status' | 'created_at' | 'details'>
+export type BookingLite = Pick<Booking, 'id' | 'user_id' | 'event_id' | 'status' | 'created_at' | 'details'>
 export interface ProfileLite { id: string; role: string; status: string; created_at: string; nationality: string | null; cert_level: string | null }
 export interface EventLite { id: string; type: 'dive' | 'course'; title: string; capacity: number | null; dateKey: string | null }
 export interface ConfirmedCount { eventId: string; count: number }
@@ -121,8 +121,7 @@ export function computeDashboard(input: DashboardInput): Dashboard {
   const eventOfPayment = (p: PaymentLite): EventLite | null => {
     const b = p.booking_id ? bookingById.get(p.booking_id) : undefined
     if (!b) return null
-    const id = b.eo_dive_id ?? b.eo_course_id
-    return id ? eventById.get(id) ?? null : null
+    return b.event_id ? eventById.get(b.event_id) ?? null : null
   }
 
   // --- Revenue ---

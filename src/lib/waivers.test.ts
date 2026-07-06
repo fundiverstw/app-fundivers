@@ -26,7 +26,7 @@ const tryDive: WaiverEventRef = { id: 'C2', type: 'course', title: 'Discover Scu
 const now = new Date('2026-06-30T00:00:00Z')
 const sig = (over: Partial<WaiverSignature>): WaiverSignature => ({
   id: 's', created_at: '', diver_id: 'u1', waiver_code: 'x', waiver_version: 1,
-  signed_name: 'Jane', signed_at: now.toISOString(), eo_dive_id: null, eo_course_id: null, ...over,
+  signed_name: 'Jane', signed_at: now.toISOString(), event_id: null, ...over,
 })
 
 describe('globalRuleMatches', () => {
@@ -75,13 +75,13 @@ describe('isSignatureCurrent', () => {
     expect(isSignatureCurrent(MEDICAL, v0, dive, now)).toBe(false)
   })
   it('ties a per-event signature to its exact event', () => {
-    const forC1 = sig({ waiver_code: 'continuing_education', eo_course_id: 'C1' })
-    const forOther = sig({ waiver_code: 'continuing_education', eo_course_id: 'C9' })
+    const forC1 = sig({ waiver_code: 'continuing_education', event_id: 'C1' })
+    const forOther = sig({ waiver_code: 'continuing_education', event_id: 'C9' })
     expect(isSignatureCurrent(CE, forC1, owCourse, now)).toBe(true)
     expect(isSignatureCurrent(CE, forOther, owCourse, now)).toBe(false)
   })
   it('ignores the annual time window for per-event waivers', () => {
-    const old = sig({ waiver_code: 'continuing_education', eo_course_id: 'C1', signed_at: '2020-01-01T00:00:00Z' })
+    const old = sig({ waiver_code: 'continuing_education', event_id: 'C1', signed_at: '2020-01-01T00:00:00Z' })
     expect(isSignatureCurrent(CE, old, owCourse, now)).toBe(true)
   })
 })
@@ -126,7 +126,7 @@ describe('data layer', () => {
     const eq = vi.fn(() => b); b.eq = eq
     from.mockReturnValue(b)
     const rows = await fetchEventWaiverOverrides({ course_id: 'C1' })
-    expect(eq).toHaveBeenCalledWith('eo_course_id', 'C1')
+    expect(eq).toHaveBeenCalledWith('event_id', 'C1')
     expect(rows).toHaveLength(1)
   })
 
@@ -143,13 +143,13 @@ describe('data layer', () => {
     expect(from).not.toHaveBeenCalled()
   })
 
-  it('signWaiver calls the RPC with the course id for a per-event waiver', async () => {
+  it('signWaiver calls the RPC with the event id for a per-event waiver', async () => {
     rpc.mockResolvedValue({ data: 'sig-1', error: null })
     const id = await signWaiver({ def: CE, signedName: ' Jane Doe ', event: owCourse })
     expect(id).toBe('sig-1')
     expect(rpc).toHaveBeenCalledWith('sign_waiver', expect.objectContaining({
       p_code: 'continuing_education', p_version: CE.version,
-      p_signed_name: ' Jane Doe ', p_dive_id: null, p_course_id: 'C1',
+      p_signed_name: ' Jane Doe ', p_event_id: 'C1',
     }))
   })
 
@@ -157,7 +157,7 @@ describe('data layer', () => {
     rpc.mockResolvedValue({ data: 'sig-2', error: null })
     await signWaiver({ def: MEDICAL, signedName: 'Jane', event: dive })
     expect(rpc).toHaveBeenCalledWith('sign_waiver', expect.objectContaining({
-      p_dive_id: null, p_course_id: null,
+      p_event_id: null,
     }))
   })
 
@@ -172,7 +172,7 @@ describe('data layer', () => {
 
     await setEventWaiverOverride({ event: owCourse, code: 'continuing_education', mode: 'exempt', createdBy: 'admin1' })
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({
-      eo_course_id: 'C1', eo_dive_id: null, waiver_code: 'continuing_education', mode: 'exempt',
+      event_id: 'C1', waiver_code: 'continuing_education', mode: 'exempt',
     }))
   })
 

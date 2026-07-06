@@ -50,19 +50,15 @@ Deno.serve(async (req) => {
   if (!GMAIL_USER || !GMAIL_PASS) return json({ error: "GMAIL_USER and GMAIL_APP_PASSWORD must be set" }, 500)
 
   let eventTitle = "Event"
-  if (eventType === "dive") {
-    const { data } = await admin.from("EO_dives").select("display_title, admin_title").eq("_id", eventId).maybeSingle()
-    eventTitle = (data?.display_title ?? data?.admin_title ?? eventTitle) as string
-  } else {
-    const { data } = await admin.from("EO_courses").select("display_title, admin_title").eq("_id", eventId).maybeSingle()
+  {
+    const { data } = await admin.from("events").select("display_title, admin_title").eq("id", eventId).maybeSingle()
     eventTitle = (data?.display_title ?? data?.admin_title ?? eventTitle) as string
   }
 
-  const column = eventType === "dive" ? "eo_dive_id" : "eo_course_id"
   const { data: bookings, error: bErr } = await admin
     .from("bookings")
     .select("user_id")
-    .eq(column, eventId)
+    .eq("event_id", eventId)
     .neq("status", "cancelled")
   if (bErr) return json({ error: safeError(bErr, "bookings lookup failed") }, 500)
 

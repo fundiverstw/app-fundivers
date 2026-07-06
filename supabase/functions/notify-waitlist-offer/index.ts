@@ -71,26 +71,22 @@ Deno.serve(async (req) => {
 
   const { data: booking } = await admin
     .from("bookings")
-    .select("user_id, eo_dive_id, eo_course_id")
+    .select("user_id, event_id")
     .eq("id", offer.booking_id)
     .maybeSingle()
   if (!booking) return json({ error: "booking not found" }, 404)
 
   let eventTitle = "Event"
   let startDate: string | null = null
-  if (booking.eo_dive_id) {
-    const { data } = await admin.from("EO_dives")
-      .select("display_title, admin_title, start_date")
-      .eq("_id", booking.eo_dive_id).maybeSingle()
+  if (booking.event_id) {
+    const { data } = await admin.from("events")
+      .select("kind, display_title, admin_title, start_date, course_days")
+      .eq("id", booking.event_id).maybeSingle()
     eventTitle = (data?.display_title ?? data?.admin_title ?? eventTitle) as string
-    startDate  = (data?.start_date ?? null) as string | null
-  } else if (booking.eo_course_id) {
-    const { data } = await admin.from("EO_courses")
-      .select("display_title, admin_title, course_days")
-      .eq("_id", booking.eo_course_id).maybeSingle()
-    eventTitle = (data?.display_title ?? data?.admin_title ?? eventTitle) as string
-    // Courses have no start_date — use the earliest course day.
-    startDate  = [...((data?.course_days ?? []) as string[])].sort()[0] ?? null
+    // Dives carry start_date; courses derive it from the earliest course day.
+    startDate = data?.kind === "dive"
+      ? ((data?.start_date ?? null) as string | null)
+      : ([...((data?.course_days ?? []) as string[])].sort()[0] ?? null)
   }
 
   const { data: target } = await admin.auth.admin.getUserById(booking.user_id)

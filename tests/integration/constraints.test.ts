@@ -30,7 +30,7 @@ describe('bookings.details JSONB', () => {
     const freshDive = await createTestDive(admin)
     const { data, error } = await admin
       .from('bookings')
-      .insert({ user_id: user.id, eo_dive_id: freshDive, status: 'pending' })
+      .insert({ user_id: user.id, event_id: freshDive, status: 'pending' })
       .select().single()
     expect(error).toBeNull()
     expect(data!.details).toEqual({})
@@ -45,7 +45,7 @@ describe('bookings.details JSONB', () => {
         .from('bookings')
         .insert({
           user_id: user.id,
-          eo_dive_id: diveId,
+          event_id: diveId,
           status: 'pending',
           // @ts-expect-error — testing invalid shape
           details: bad,
@@ -69,7 +69,7 @@ describe('bookings.details JSONB', () => {
       .from('bookings')
       .insert({
         user_id: user.id,
-        eo_dive_id: freshDive,
+        event_id: freshDive,
         status: 'confirmed',
         details: payload,
       })
@@ -83,48 +83,42 @@ describe('bookings.details JSONB', () => {
 })
 
 describe('bookings constraints', () => {
-  it('requires exactly one of eo_dive_id or eo_course_id (XOR check)', async () => {
-    // both null → rejected
+  it('requires event_id (event_present NOT NULL check)', async () => {
+    // No event_id → rejected. Post-unification there is a single event_id
+    // column (NOT NULL) instead of the old eo_dive_id/eo_course_id XOR.
     const neither = await admin
       .from('bookings')
       .insert({ user_id: user.id, status: 'pending' })
     expect(neither.error).toBeTruthy()
-    expect(String(neither.error?.message ?? '')).toMatch(/bookings_event_xor|check/i)
-
-    // both set → rejected
-    const both = await admin
-      .from('bookings')
-      .insert({ user_id: user.id, eo_dive_id: diveId, eo_course_id: courseId, status: 'pending' })
-    expect(both.error).toBeTruthy()
+    expect(String(neither.error?.message ?? '')).toMatch(/event_present|event_id|null|check/i)
   })
 
-  it('accepts a dive-only booking', async () => {
+  it('accepts a dive booking', async () => {
     const { data, error } = await admin
       .from('bookings')
-      .insert({ user_id: user.id, eo_dive_id: diveId, status: 'pending' })
+      .insert({ user_id: user.id, event_id: diveId, status: 'pending' })
       .select().single()
     expect(error).toBeNull()
-    expect(data!.eo_dive_id).toBe(diveId)
-    expect(data!.eo_course_id).toBeNull()
+    expect(data!.event_id).toBe(diveId)
     if (data) bookingIds.push(data.id)
   })
 
-  it('accepts a course-only booking', async () => {
+  it('accepts a course booking', async () => {
     const { data, error } = await admin
       .from('bookings')
-      .insert({ user_id: user.id, eo_course_id: courseId, status: 'pending' })
+      .insert({ user_id: user.id, event_id: courseId, status: 'pending' })
       .select().single()
     expect(error).toBeNull()
-    expect(data!.eo_course_id).toBe(courseId)
-    expect(data!.eo_dive_id).toBeNull()
+    expect(data!.event_id).toBe(courseId)
     if (data) bookingIds.push(data.id)
   })
 
-  it('rejects a duplicate (user, dive) booking', async () => {
-    // The partial unique index fires only for a second dive booking from the same user.
+  it('rejects a duplicate (user, event) booking', async () => {
+    // The partial unique index fires only for a second booking from the same
+    // user against the same event.
     const dup = await admin
       .from('bookings')
-      .insert({ user_id: user.id, eo_dive_id: diveId, status: 'pending' })
+      .insert({ user_id: user.id, event_id: diveId, status: 'pending' })
     expect(dup.error).toBeTruthy()
     expect(String(dup.error?.message ?? '')).toMatch(/duplicate|unique/i)
   })
@@ -133,30 +127,23 @@ describe('bookings constraints', () => {
     const { error } = await admin
       .from('bookings')
       // @ts-expect-error — intentionally bad status
-      .insert({ user_id: user.id, eo_dive_id: diveId, status: 'made-up' })
+      .insert({ user_id: user.id, event_id: diveId, status: 'made-up' })
     expect(error).toBeTruthy()
   })
 
-  it('rejects a non-existent eo_dive_id (FK)', async () => {
+  it('rejects a non-existent event_id (FK)', async () => {
     const { error } = await admin
       .from('bookings')
       // Valid uuid format, but no row with this id exists.
-      .insert({ user_id: user.id, eo_dive_id: '00000000-0000-0000-0000-000000000001', status: 'pending' })
+      .insert({ user_id: user.id, event_id: '00000000-0000-0000-0000-000000000001', status: 'pending' })
     expect(error).toBeTruthy()
     expect(String(error?.message ?? '')).toMatch(/foreign|violat/i)
-  })
-
-  it('rejects a non-existent eo_course_id (FK)', async () => {
-    const { error } = await admin
-      .from('bookings')
-      .insert({ user_id: user.id, eo_course_id: '00000000-0000-0000-0000-000000000002', status: 'pending' })
-    expect(error).toBeTruthy()
   })
 
   it('rejects a non-existent user (FK)', async () => {
     const { error } = await admin.from('bookings').insert({
       user_id: '00000000-0000-0000-0000-000000000000',
-      eo_dive_id: diveId,
+      event_id: diveId,
       status: 'pending',
     })
     expect(error).toBeTruthy()

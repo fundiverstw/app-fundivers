@@ -166,7 +166,7 @@ export async function handleNotifyDuty(req: Request, env: Env): Promise<Response
   })
   const { data: duty } = await userClient
     .from('duties')
-    .select('id, assignee_id, role, start_date, end_date, eo_dive_id, eo_course_id')
+    .select('id, assignee_id, role, start_date, end_date, event_id')
     .eq('id', dutyId)
     .maybeSingle()
   if (!duty) return new Response('not found', { status: 404 })
@@ -178,12 +178,8 @@ export async function handleNotifyDuty(req: Request, env: Env): Promise<Response
   // Resolve event title (best-effort; no event = standalone duty, push still goes out).
   let eventTitle: string | null = null
   let eventTimeHhmm: string | null = null
-  if (duty.eo_dive_id) {
-    const { data } = await service.from('EO_dives').select('admin_title, display_title, time').eq('_id', duty.eo_dive_id).maybeSingle()
-    eventTitle = data?.display_title || data?.admin_title || null
-    eventTimeHhmm = toHhmm(data?.time)
-  } else if (duty.eo_course_id) {
-    const { data } = await service.from('EO_courses').select('display_title, admin_title, start_time').eq('_id', duty.eo_course_id).maybeSingle()
+  if (duty.event_id) {
+    const { data } = await service.from('events').select('admin_title, display_title, start_time').eq('id', duty.event_id).maybeSingle()
     eventTitle = data?.display_title || data?.admin_title || null
     eventTimeHhmm = toHhmm(data?.start_time)
   }
@@ -219,7 +215,7 @@ export async function handleNotifyDuty(req: Request, env: Env): Promise<Response
     body:     dutyBody,
     url:      dutyUrl,
     kind:     'duty',
-    event_id: duty.eo_dive_id ?? duty.eo_course_id ?? null,
+    event_id: duty.event_id ?? null,
   })
 
   let sent = 0
@@ -427,11 +423,8 @@ export async function handleAdminEventBroadcast(req: Request, env: Env): Promise
 
   // Resolve event title.
   let eventTitle = 'Event'
-  if (eventType === 'dive') {
-    const { data } = await service.from('EO_dives').select('display_title, admin_title').eq('_id', eventId).maybeSingle()
-    eventTitle = data?.display_title || data?.admin_title || eventTitle
-  } else {
-    const { data } = await service.from('EO_courses').select('display_title, admin_title').eq('_id', eventId).maybeSingle()
+  {
+    const { data } = await service.from('events').select('display_title, admin_title').eq('id', eventId).maybeSingle()
     eventTitle = data?.display_title || data?.admin_title || eventTitle
   }
 
@@ -441,11 +434,10 @@ export async function handleAdminEventBroadcast(req: Request, env: Env): Promise
 
   // Confirmed bookings only — pending/waitlisted/cancelled divers don't
   // get the message.
-  const column = eventType === 'dive' ? 'eo_dive_id' : 'eo_course_id'
   const { data: bookings } = await service
     .from('bookings')
     .select('user_id')
-    .eq(column, eventId)
+    .eq('event_id', eventId)
     .eq('status', 'confirmed')
   const recipientIds = unique((bookings ?? []).map(b => b.user_id))
   if (!recipientIds.length) return Response.json({ sent: 0, skipped: 0, recipients: 0 })
@@ -545,11 +537,8 @@ export async function handleAdminEventReschedule(req: Request, env: Env): Promis
 
   // Resolve event title.
   let eventTitle = 'Event'
-  if (eventType === 'dive') {
-    const { data } = await service.from('EO_dives').select('display_title, admin_title').eq('_id', eventId).maybeSingle()
-    eventTitle = data?.display_title || data?.admin_title || eventTitle
-  } else {
-    const { data } = await service.from('EO_courses').select('display_title, admin_title').eq('_id', eventId).maybeSingle()
+  {
+    const { data } = await service.from('events').select('display_title, admin_title').eq('id', eventId).maybeSingle()
     eventTitle = data?.display_title || data?.admin_title || eventTitle
   }
 
@@ -557,11 +546,10 @@ export async function handleAdminEventReschedule(req: Request, env: Env): Promis
 
   // Every non-cancelled registrant — pending/waitlisted included, since
   // they're holding a spot and need to know the date moved.
-  const column = eventType === 'dive' ? 'eo_dive_id' : 'eo_course_id'
   const { data: bookings } = await service
     .from('bookings')
     .select('user_id')
-    .eq(column, eventId)
+    .eq('event_id', eventId)
     .neq('status', 'cancelled')
   const recipientIds = unique((bookings ?? []).map(b => b.user_id))
   if (!recipientIds.length) return Response.json({ sent: 0, skipped: 0, recipients: 0 })
@@ -652,21 +640,17 @@ export async function handleAdminEventCancellation(req: Request, env: Env): Prom
   })
 
   let eventTitle = 'Event'
-  if (eventType === 'dive') {
-    const { data } = await service.from('EO_dives').select('display_title, admin_title').eq('_id', eventId).maybeSingle()
-    eventTitle = data?.display_title || data?.admin_title || eventTitle
-  } else {
-    const { data } = await service.from('EO_courses').select('display_title, admin_title').eq('_id', eventId).maybeSingle()
+  {
+    const { data } = await service.from('events').select('display_title, admin_title').eq('id', eventId).maybeSingle()
     eventTitle = data?.display_title || data?.admin_title || eventTitle
   }
 
   const { title, body: text } = cancellationNotificationText(eventTitle)
 
-  const column = eventType === 'dive' ? 'eo_dive_id' : 'eo_course_id'
   const { data: bookings } = await service
     .from('bookings')
     .select('user_id')
-    .eq(column, eventId)
+    .eq('event_id', eventId)
     .neq('status', 'cancelled')
   const recipientIds = unique((bookings ?? []).map(b => b.user_id))
   if (!recipientIds.length) return Response.json({ sent: 0, skipped: 0, recipients: 0 })
@@ -729,11 +713,11 @@ export async function runDailyReminders(env: Env): Promise<{ sent: number; skipp
 
   const targetSet = new Set(targetDates)
   const [divesResp, coursesResp] = await Promise.all([
-    sb.from('EO_dives').select('_id, admin_title, display_title, start_date, time').in('start_date', targetDates).is('cancelled_at', null),
+    sb.from('events').select('id, kind, admin_title, display_title, start_date, start_time').eq('kind', 'dive').in('start_date', targetDates).is('cancelled_at', null),
     // Courses have no start_date — fetch any course with a day on a target
     // date, then anchor the reminder to its first day so behavior matches
     // the old start_date-keyed reminder (one reminder, before day 1).
-    sb.from('EO_courses').select('_id, admin_title, display_title, course_days, start_time').overlaps('course_days', targetDates).is('cancelled_at', null),
+    sb.from('events').select('id, kind, admin_title, display_title, course_days, start_time').eq('kind', 'course').overlaps('course_days', targetDates).is('cancelled_at', null),
   ])
   const dives   = divesResp.data   ?? []
   const courses = (coursesResp.data ?? [])
@@ -741,16 +725,16 @@ export async function runDailyReminders(env: Env): Promise<{ sent: number; skipp
     .filter((c) => c.start_date && targetSet.has(c.start_date))
   if (!dives.length && !courses.length) return { sent: 0, skipped: 0 }
 
-  const diveIds   = dives.map((d) => d._id)
-  const courseIds = courses.map((c) => c._id)
+  const diveIds   = dives.map((d) => d.id)
+  const courseIds = courses.map((c) => c.id)
 
   // Two explicit queries rather than a PostgREST `.or()` string.
   const [diveBookingsResp, courseBookingsResp] = await Promise.all([
     diveIds.length
-      ? sb.from('bookings').select('id, user_id, status, eo_dive_id, eo_course_id, details').in('eo_dive_id', diveIds)
+      ? sb.from('bookings').select('id, user_id, status, event_id, details').in('event_id', diveIds)
       : Promise.resolve({ data: [] as Booking[] }),
     courseIds.length
-      ? sb.from('bookings').select('id, user_id, status, eo_dive_id, eo_course_id, details').in('eo_course_id', courseIds)
+      ? sb.from('bookings').select('id, user_id, status, event_id, details').in('event_id', courseIds)
       : Promise.resolve({ data: [] as Booking[] }),
   ])
   const bookings: Booking[] = [...(diveBookingsResp.data ?? []), ...(courseBookingsResp.data ?? [])]
@@ -771,7 +755,7 @@ export async function runDailyReminders(env: Env): Promise<{ sent: number; skipp
 
   // Idempotency ledger for this slice of (user, event).
   const uniqUserIds  = unique(bookings.map((b) => b.user_id))
-  const uniqEventIds = unique(bookings.map((b) => b.eo_dive_id ?? b.eo_course_id ?? ''))
+  const uniqEventIds = unique(bookings.map((b) => b.event_id ?? ''))
   const { data: sentRows } = await sb
     .from('push_notifications_sent')
     .select('user_id, event_id, kind')
@@ -786,7 +770,7 @@ export async function runDailyReminders(env: Env): Promise<{ sent: number; skipp
     sentMap.set(key, set)
   }
 
-  const inputs = buildReminderInputs({ dives, courses, bookings, paidByBooking, sentMap, currency: env.CURRENCY ?? 'TWD' })
+  const inputs = buildReminderInputs({ events: [...dives, ...courses], bookings, paidByBooking, sentMap, currency: env.CURRENCY ?? 'TWD' })
   const reminders = selectReminders(today, inputs)
   if (!reminders.length) return { sent: 0, skipped: 0 }
 
@@ -911,16 +895,15 @@ export async function processWaitlistOffers(env: Env): Promise<{ sent: number; e
 
       const { data: b } = await sb
         .from('bookings')
-        .select('eo_dive_id, eo_course_id')
+        .select('event_id')
         .eq('id', offer.booking_id)
         .maybeSingle()
       if (b) {
-        const eventId = b.eo_dive_id ?? b.eo_course_id
-        const eventType = b.eo_dive_id ? 'dive' : 'course'
+        const eventId = b.event_id
         if (eventId) {
           // Fire-and-forget; failure here just means no chain — the next
           // upstream cancellation will offer the spot anew.
-          await sb.rpc('offer_next_waitlist_spot', { p_event_id: eventId, p_event_type: eventType })
+          await sb.rpc('offer_next_waitlist_spot', { p_event_id: eventId })
         }
       }
       expired++
@@ -931,20 +914,16 @@ export async function processWaitlistOffers(env: Env): Promise<{ sent: number; e
 
     const { data: booking } = await sb
       .from('bookings')
-      .select('user_id, eo_dive_id, eo_course_id')
+      .select('user_id, event_id')
       .eq('id', offer.booking_id)
       .maybeSingle()
     if (!booking) continue
 
     let eventTitle = 'Event'
-    const eventId = booking.eo_dive_id ?? booking.eo_course_id
-    if (booking.eo_dive_id) {
-      const { data } = await sb.from('EO_dives')
-        .select('display_title, admin_title').eq('_id', booking.eo_dive_id).maybeSingle()
-      eventTitle = (data?.display_title ?? data?.admin_title ?? eventTitle) as string
-    } else if (booking.eo_course_id) {
-      const { data } = await sb.from('EO_courses')
-        .select('display_title, admin_title').eq('_id', booking.eo_course_id).maybeSingle()
+    const eventId = booking.event_id
+    if (eventId) {
+      const { data } = await sb.from('events')
+        .select('display_title, admin_title').eq('id', eventId).maybeSingle()
       eventTitle = (data?.display_title ?? data?.admin_title ?? eventTitle) as string
     }
 

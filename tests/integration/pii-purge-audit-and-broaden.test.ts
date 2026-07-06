@@ -96,8 +96,7 @@ describe('purge_stale_pii: broadened columns + bookings.notes', () => {
         status:       'confirmed',
         notes:        'private medical history note',
         details:      {},
-        eo_dive_id:   diveId,
-        eo_course_id: null,
+        event_id:     diveId,
       } as never).select().single()
       expect(booking?.notes).toBe('private medical history note')
 

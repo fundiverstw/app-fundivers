@@ -4,7 +4,7 @@ import type { EOPrice } from '../../types/database'
 
 const CUR = siteConfig.locale.currencyLabel
 
-// EO_prices CRUD. Skips room_options (multi-FK; admins still manage that
+// prices CRUD. Skips room_options (multi-FK; admins still manage that
 // from the inline price-tier sub-form on the new/edit event page).
 const fields: CatalogField<EOPrice>[] = [
   { key: 'admin_title',    label: 'Admin title',    type: 'text',   required: true, placeholder: 'e.g. Standard fun dive' },
@@ -17,11 +17,11 @@ export function AdminPricesPage() {
   return (
     <CatalogManager<EOPrice>
       title="Price tiers"
-      table="EO_prices"
+      table="prices"
       noun="price tier"
       orderBy="admin_title"
       fields={fields}
-      rowLabel={r => r.admin_title || r._id}
+      rowLabel={r => r.admin_title || r.id}
       rowDetail={r => {
         const parts: string[] = []
         if (r.starting_at != null)    parts.push(`total: ${r.starting_at} ${CUR}`)

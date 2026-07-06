@@ -41,9 +41,9 @@ function makeDeps(opts: Opts = {}) {
   const sendMail = vi.fn().mockResolvedValue(undefined)
   const buildGroupPdfBase64 = vi.fn().mockResolvedValue('UERG')
   const bookings = opts.bookings ?? [
-    { id: 'b1', user_id: 'u1', status: 'pending', eo_dive_id: 'd1', eo_course_id: null, group_id: 'g1', payer_id: 'u1', created_at: '2030-01-01',
+    { id: 'b1', user_id: 'u1', status: 'pending', event_id: 'd1', group_id: 'g1', payer_id: 'u1', created_at: '2030-01-01',
       details: { total: 2800, deposit: 1000, payment_method: 'bank_transfer', transportation: false, gear: { rent: false } } },
-    { id: 'b2', user_id: 'c1', status: 'pending', eo_dive_id: 'd1', eo_course_id: null, group_id: 'g1', payer_id: 'u1', created_at: '2030-01-02',
+    { id: 'b2', user_id: 'c1', status: 'pending', event_id: 'd1', group_id: 'g1', payer_id: 'u1', created_at: '2030-01-02',
       details: { total: 2800, deposit: 1000, payment_method: 'bank_transfer', transportation: false, gear: { rent: false } } },
   ]
   const tables: Record<string, TableSpec> = {
@@ -52,8 +52,8 @@ function makeDeps(opts: Opts = {}) {
       { id: 'u1', name: 'Ada', nickname: null, date_of_birth: '1990-01-01', nationality: 'TW', cert_level: 'AOW', cert_agency: 'PADI', nitrox_certified: true },
       { id: 'c1', name: 'Bee Jr', nickname: 'Bee', date_of_birth: '2012-05-05', nationality: 'TW', cert_level: null, cert_agency: null, nitrox_certified: false },
     ] },
-    EO_dives: { rows: [
-      { _id: 'd1', display_title: 'Green Island', admin_title: null, calendar_title: null, start_date: '2030-06-12', end_date: null, course_days: null },
+    events: { rows: [
+      { id: 'd1', kind: 'dive', display_title: 'Green Island', admin_title: null, calendar_title: null, start_date: '2030-06-12', end_date: null, course_days: null },
     ] },
   }
   const admin = { from: opts.bookingsError

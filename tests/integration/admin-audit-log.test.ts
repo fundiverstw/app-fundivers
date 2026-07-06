@@ -9,7 +9,7 @@ import {
 const admin = adminClient()
 let adminUser: TestUser
 let diver: TestUser
-// Each test uses a fresh dive to avoid the (user_id, eo_dive_id) uniqueness
+// Each test uses a fresh dive to avoid the (user_id, event_id) uniqueness
 // trouble that shows up once you try to insert multiple bookings for the
 // same diver × dive combination.
 const diveIds: string[] = []
@@ -36,7 +36,7 @@ describe('admin_audit_log', () => {
     // Set up a booking owned by the diver.
     const dive = await freshDive()
     const { data: inserted } = await admin.from('bookings').insert({
-      user_id: diver.id, eo_dive_id: dive, status: 'pending', details: {},
+      user_id: diver.id, event_id: dive, status: 'pending', details: {},
     }).select().single()
     const bookingId = inserted!.id
 
@@ -63,7 +63,7 @@ describe('admin_audit_log', () => {
   it('does NOT log when a diver updates their own booking', async () => {
     const dive = await freshDive()
     const { data: inserted } = await admin.from('bookings').insert({
-      user_id: diver.id, eo_dive_id: dive, status: 'pending', details: {},
+      user_id: diver.id, event_id: dive, status: 'pending', details: {},
     }).select().single()
     const bookingId = inserted!.id
 
@@ -81,7 +81,7 @@ describe('admin_audit_log', () => {
   it('does NOT log service-role (migrations, workers) writes', async () => {
     const dive = await freshDive()
     const { data: inserted } = await admin.from('bookings').insert({
-      user_id: diver.id, eo_dive_id: dive, status: 'pending', details: {},
+      user_id: diver.id, event_id: dive, status: 'pending', details: {},
     }).select().single()
     const { data: audit } = await admin
       .from('admin_audit_log')

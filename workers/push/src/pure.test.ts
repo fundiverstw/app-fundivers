@@ -9,8 +9,7 @@ import {
   rescheduleNotificationText,
   cancellationNotificationText,
   type Booking,
-  type DiveRow,
-  type CourseRow,
+  type EventRow,
 } from './pure'
 
 describe('formatDayLabel', () => {
@@ -73,19 +72,18 @@ describe('addDays', () => {
   })
 })
 
-function dive(id: string, start: string, title = 'Green Island'): DiveRow {
-  return { _id: id, admin_title: title, display_title: null, start_date: start }
+function dive(id: string, start: string, title = 'Green Island'): EventRow {
+  return { id, kind: 'dive', admin_title: title, display_title: null, start_date: start }
 }
-function course(id: string, start: string, title = 'Open Water'): CourseRow {
-  return { _id: id, display_title: title, admin_title: null, start_date: start }
+function course(id: string, start: string, title = 'Open Water'): EventRow {
+  return { id, kind: 'course', display_title: title, admin_title: null, start_date: start }
 }
 function booking(overrides: Partial<Booking> = {}): Booking {
   return {
     id: 'b1',
     user_id: 'u1',
     status: 'confirmed',
-    eo_dive_id: 'd1',
-    eo_course_id: null,
+    event_id: 'd1',
     details: { total: 3000, deposit: 1000 },
     ...overrides,
   }
@@ -96,8 +94,7 @@ describe('buildReminderInputs', () => {
     const paid = new Map<string, number>([['b1', 500]])
     const sent = new Map<string, Set<ReminderKind>>()
     const [input] = buildReminderInputs({ currency: 'TWD',
-      dives: [dive('d1', '2026-05-08')],
-      courses: [],
+      events: [dive('d1', '2026-05-08')],
       bookings: [booking()],
       paidByBooking: paid,
       sentMap: sent,
@@ -115,9 +112,8 @@ describe('buildReminderInputs', () => {
 
   it('routes course bookings to the course map', () => {
     const [input] = buildReminderInputs({ currency: 'TWD',
-      dives: [],
-      courses: [course('c1', '2026-06-01', 'Advanced')],
-      bookings: [booking({ eo_dive_id: null, eo_course_id: 'c1' })],
+      events: [course('c1', '2026-06-01', 'Advanced')],
+      bookings: [booking({ event_id: 'c1' })],
       paidByBooking: new Map(),
       sentMap: new Map(),
     })
@@ -128,11 +124,10 @@ describe('buildReminderInputs', () => {
 
   it('skips bookings whose event was not fetched or lacks a start_date', () => {
     const out = buildReminderInputs({ currency: 'TWD',
-      dives:  [dive('d1', '2026-05-08')],
-      courses: [],
+      events: [dive('d1', '2026-05-08')],
       bookings: [
-        booking({ id: 'b-missing', eo_dive_id: 'd-unknown' }),
-        booking({ id: 'b-nostart', eo_dive_id: 'd2' }),
+        booking({ id: 'b-missing', event_id: 'd-unknown' }),
+        booking({ id: 'b-nostart', event_id: 'd2' }),
       ],
       paidByBooking: new Map(),
       sentMap: new Map(),
@@ -146,8 +141,7 @@ describe('buildReminderInputs', () => {
       ['u1:d1', new Set<ReminderKind>(['event_7d'])],
     ])
     const [input] = buildReminderInputs({ currency: 'TWD',
-      dives: [dive('d1', '2026-05-08')],
-      courses: [],
+      events: [dive('d1', '2026-05-08')],
       bookings: [booking()],
       paidByBooking: new Map(),
       sentMap: sent,
@@ -158,8 +152,7 @@ describe('buildReminderInputs', () => {
 
   it('defaults missing total/deposit in details to zero', () => {
     const [input] = buildReminderInputs({ currency: 'TWD',
-      dives: [dive('d1', '2026-05-08')],
-      courses: [],
+      events: [dive('d1', '2026-05-08')],
       bookings: [booking({ details: null })],
       paidByBooking: new Map(),
       sentMap: new Map(),
@@ -170,8 +163,7 @@ describe('buildReminderInputs', () => {
 
   it('carries dive time through as eventStartTimeHhmm when set', () => {
     const [input] = buildReminderInputs({ currency: 'TWD',
-      dives: [{ ...dive('d1', '2026-05-08'), time: '09:00:00.000' }],
-      courses: [],
+      events: [{ ...dive('d1', '2026-05-08'), start_time: '09:00:00.000' }],
       bookings: [booking()],
       paidByBooking: new Map(),
       sentMap: new Map(),
@@ -181,9 +173,8 @@ describe('buildReminderInputs', () => {
 
   it('carries course start_time through as eventStartTimeHhmm when set', () => {
     const [input] = buildReminderInputs({ currency: 'TWD',
-      dives: [],
-      courses: [{ ...course('c1', '2026-06-01'), start_time: '14:30:00' }],
-      bookings: [booking({ eo_dive_id: null, eo_course_id: 'c1' })],
+      events: [{ ...course('c1', '2026-06-01'), start_time: '14:30:00' }],
+      bookings: [booking({ event_id: 'c1' })],
       paidByBooking: new Map(),
       sentMap: new Map(),
     })
@@ -192,8 +183,7 @@ describe('buildReminderInputs', () => {
 
   it('emits null eventStartTimeHhmm when source row has no time', () => {
     const [input] = buildReminderInputs({ currency: 'TWD',
-      dives: [dive('d1', '2026-05-08')],
-      courses: [],
+      events: [dive('d1', '2026-05-08')],
       bookings: [booking()],
       paidByBooking: new Map(),
       sentMap: new Map(),

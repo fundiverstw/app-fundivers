@@ -8,15 +8,13 @@ export type Booking = {
   id: string
   user_id: string
   status: string
-  eo_dive_id: string | null
-  eo_course_id: string | null
+  event_id: string | null
   details: { total?: number; deposit?: number } | null
 }
-export type DiveRow   = { _id: string; admin_title?: string | null; display_title?: string | null; start_date: string | null; time?: string | null }
-export type CourseRow = { _id: string; admin_title?: string | null; display_title?: string | null; start_date: string | null; start_time?: string | null }
+export type EventRow = { id: string; kind: 'dive' | 'course'; admin_title?: string | null; display_title?: string | null; start_date: string | null; start_time?: string | null }
 
-function titleOf(ev: DiveRow | CourseRow, isDive: boolean): string {
-  return ev.display_title || ev.admin_title || (isDive ? 'Dive' : 'Course')
+function titleOf(ev: EventRow): string {
+  return ev.display_title || ev.admin_title || (ev.kind === 'dive' ? 'Dive' : 'Course')
 }
 
 /** 'HH:MM:SS.SSS' / 'HH:MM:SS' / 'HH:MM' / empty → 'HH:mm' or null. */
@@ -32,35 +30,31 @@ export function toHhmm(raw: string | null | undefined): string | null {
  * ReminderInput[] that selectReminders() can chew on.
  */
 export function buildReminderInputs(args: {
-  dives: DiveRow[]
-  courses: CourseRow[]
+  events: EventRow[]
   bookings: Booking[]
   paidByBooking: Map<string, number>
   sentMap: Map<string, Set<ReminderKind>>
   /** Shop currency label shown in the money line of a reminder. */
   currency: string
 }): ReminderInput[] {
-  const { dives, courses, bookings, paidByBooking, sentMap, currency } = args
-  const diveMap   = new Map(dives.map((d) => [d._id, d]))
-  const courseMap = new Map(courses.map((c) => [c._id, c]))
+  const { events, bookings, paidByBooking, sentMap, currency } = args
+  const eventMap = new Map(events.map((e) => [e.id, e]))
 
   const inputs: ReminderInput[] = []
   for (const b of bookings) {
-    const isDive = !!b.eo_dive_id
-    const eventId = b.eo_dive_id ?? b.eo_course_id
+    const eventId = b.event_id
     if (!eventId) continue
-    const ev = isDive ? diveMap.get(eventId) : courseMap.get(eventId)
+    const ev = eventMap.get(eventId)
     if (!ev || !ev.start_date) continue
 
     const details = b.details ?? {}
-    const rawTime = isDive ? (ev as DiveRow).time : (ev as CourseRow).start_time
     inputs.push({
       userId:             b.user_id,
       eventId,
-      eventType:          isDive ? 'dive' : 'course',
-      eventTitle:         titleOf(ev, isDive),
+      eventType:          ev.kind,
+      eventTitle:         titleOf(ev),
       eventStartDate:     ev.start_date,
-      eventStartTimeHhmm: toHhmm(rawTime),
+      eventStartTimeHhmm: toHhmm(ev.start_time),
       bookingStatus:      b.status,
       totalAmount:        Number(details.total   ?? 0),
       depositAmount:      Number(details.deposit ?? 0),

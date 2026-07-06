@@ -24,8 +24,8 @@ const details = (d: Partial<BookingDetails>): BookingDetails => d as BookingDeta
 describe('fetchChargeCatalog', () => {
   it('resolves known room and add-on ids to their label + amount', async () => {
     tableMock({
-      EO_rooms: { data: [{ _id: 'r1', display_title: 'Deluxe', admin_title: 'deluxe-admin', added_price: 1500 }] },
-      Other_Addons: { data: [{ _id: 'a1', display_title: 'Camera', admin_title: 'cam-admin', price: 300 }] },
+      rooms: { data: [{ id: 'r1', display_title: 'Deluxe', admin_title: 'deluxe-admin', added_price: 1500 }] },
+      addons: { data: [{ id: 'a1', display_title: 'Camera', admin_title: 'cam-admin', price: 300 }] },
     })
     const { fetchChargeCatalog } = await import('./booking-charge-catalog')
 
@@ -37,15 +37,15 @@ describe('fetchChargeCatalog', () => {
     expect(catalog.addonPrices.get('a1')).toEqual({ label: 'Camera', amount: 300 })
   })
 
-  it('falls back to admin_title then _id when display_title is null/empty', async () => {
+  it('falls back to admin_title then id when display_title is null/empty', async () => {
     tableMock({
-      EO_rooms: {
+      rooms: {
         data: [
-          { _id: 'r1', display_title: null, admin_title: 'Admin Room', added_price: 100 },
-          { _id: 'r2', display_title: '', admin_title: null, added_price: 200 },
+          { id: 'r1', display_title: null, admin_title: 'Admin Room', added_price: 100 },
+          { id: 'r2', display_title: '', admin_title: null, added_price: 200 },
         ],
       },
-      Other_Addons: { data: [] },
+      addons: { data: [] },
     })
     const { fetchChargeCatalog } = await import('./booking-charge-catalog')
 
@@ -57,8 +57,8 @@ describe('fetchChargeCatalog', () => {
 
   it('treats a null price/added_price as amount 0', async () => {
     tableMock({
-      EO_rooms: { data: [{ _id: 'r1', display_title: 'Free Room', admin_title: null, added_price: null }] },
-      Other_Addons: { data: [{ _id: 'a1', display_title: 'Free Addon', admin_title: null, price: null }] },
+      rooms: { data: [{ id: 'r1', display_title: 'Free Room', admin_title: null, added_price: null }] },
+      addons: { data: [{ id: 'a1', display_title: 'Free Addon', admin_title: null, price: null }] },
     })
     const { fetchChargeCatalog } = await import('./booking-charge-catalog')
 
@@ -70,8 +70,8 @@ describe('fetchChargeCatalog', () => {
 
   it('drops ids that are referenced but absent from the fetched rows (no fallback entry)', async () => {
     tableMock({
-      EO_rooms: { data: [] },
-      Other_Addons: { data: [] },
+      rooms: { data: [] },
+      addons: { data: [] },
     })
     const { fetchChargeCatalog } = await import('./booking-charge-catalog')
 
@@ -97,20 +97,20 @@ describe('fetchChargeCatalog', () => {
       details({ room: { option_id: 'r1' }, add_ons: ['a1'] }),
     ])
 
-    expect(inSpies.EO_rooms).toHaveBeenCalledWith('_id', ['r1'])
-    expect(inSpies.Other_Addons).toHaveBeenCalledWith('_id', ['a1', 'a2'])
+    expect(inSpies.rooms).toHaveBeenCalledWith('id', ['r1'])
+    expect(inSpies.addons).toHaveBeenCalledWith('id', ['a1', 'a2'])
   })
 
   it('does not query a table when no ids of that kind are referenced', async () => {
     tableMock({
-      Other_Addons: { data: [{ _id: 'a1', display_title: 'Camera', admin_title: null, price: 300 }] },
+      addons: { data: [{ id: 'a1', display_title: 'Camera', admin_title: null, price: 300 }] },
     })
     const { fetchChargeCatalog } = await import('./booking-charge-catalog')
 
     const catalog = await fetchChargeCatalog([details({ add_ons: ['a1'] })])
 
     expect(from).toHaveBeenCalledTimes(1)
-    expect(from).toHaveBeenCalledWith('Other_Addons')
+    expect(from).toHaveBeenCalledWith('addons')
     expect(catalog.roomPrices.size).toBe(0)
     expect(catalog.addonPrices.get('a1')).toEqual({ label: 'Camera', amount: 300 })
   })
@@ -127,8 +127,8 @@ describe('fetchChargeCatalog', () => {
 
   it('ignores null/undefined details and falsy ids when collecting', async () => {
     tableMock({
-      EO_rooms: { data: [{ _id: 'r1', display_title: 'Deluxe', admin_title: null, added_price: 1500 }] },
-      Other_Addons: { data: [{ _id: 'a1', display_title: 'Camera', admin_title: null, price: 300 }] },
+      rooms: { data: [{ id: 'r1', display_title: 'Deluxe', admin_title: null, added_price: 1500 }] },
+      addons: { data: [{ id: 'a1', display_title: 'Camera', admin_title: null, price: 300 }] },
     })
     const { fetchChargeCatalog } = await import('./booking-charge-catalog')
 
@@ -147,8 +147,8 @@ describe('fetchChargeCatalog', () => {
 
   it('yields empty maps when supabase returns null data (e.g. an error response)', async () => {
     tableMock({
-      EO_rooms: { data: null, error: { message: 'boom' } },
-      Other_Addons: { data: null, error: { message: 'boom' } },
+      rooms: { data: null, error: { message: 'boom' } },
+      addons: { data: null, error: { message: 'boom' } },
     })
     const { fetchChargeCatalog } = await import('./booking-charge-catalog')
 

@@ -46,9 +46,7 @@ export function DutiesPage() {
       const eventIndex = new Map(events.map(e => [e.id, e]))
       setEnriched((dutiesRes.data ?? []).map(d => ({
         duty: d,
-        event: (d.eo_dive_id && eventIndex.get(d.eo_dive_id))
-          || (d.eo_course_id && eventIndex.get(d.eo_course_id))
-          || null,
+        event: (d.event_id && eventIndex.get(d.event_id)) || null,
       })))
       setLoading(false)
     })()
@@ -120,7 +118,7 @@ function Row({ e, eventLinkBase, dim }: { e: Enriched; eventLinkBase: string | n
           </Link>
         : event
           ? <p className="text-sm font-medium text-brand-900 truncate">{event.title}</p>
-          : (duty.eo_dive_id || duty.eo_course_id)
+          : duty.event_id
             ? <p className="text-xs text-brand-950 font-medium">(event outside visible range)</p>
             : <p className="text-xs text-brand-950 font-medium">Standalone duty</p>
       }

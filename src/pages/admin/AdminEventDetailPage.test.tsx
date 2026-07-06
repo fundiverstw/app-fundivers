@@ -73,7 +73,7 @@ describe('AdminEventDetailPage', () => {
 
     const bookings = [{
       id: 'b1', user_id: 'u1', status: 'confirmed', created_at: '2026-04-20',
-      eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null,
+      event_id: 'dive_x', notes: null, refund_requested_at: null,
       details: { add_ons: ['11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222'], gear: { rent: false } },
     }]
     const profiles = [{
@@ -84,16 +84,16 @@ describe('AdminEventDetailPage', () => {
     }]
     const payments: unknown[] = []
     const addons = [
-      { _id: '11111111-1111-4111-8111-111111111111', display_title: 'SMB Rental', admin_title: 'SMB' },
-      { _id: '22222222-2222-4222-8222-222222222222', display_title: 'Camera Rental (1 Dive)', admin_title: 'Cam' },
+      { id: '11111111-1111-4111-8111-111111111111', display_title: 'SMB Rental', admin_title: 'SMB' },
+      { id: '22222222-2222-4222-8222-222222222222', display_title: 'Camera Rental (1 Dive)', admin_title: 'Cam' },
     ]
 
     from.mockImplementation((table: string) => {
       if (table === 'bookings')     return mockQueryBuilder({ data: bookings })
       if (table === 'profiles')     return mockQueryBuilder({ data: profiles })
       if (table === 'payments')     return mockQueryBuilder({ data: payments })
-      if (table === 'Other_Addons') return mockQueryBuilder({ data: addons })
-      if (table === 'EO_rooms')     return mockQueryBuilder({ data: [] })
+      if (table === 'addons') return mockQueryBuilder({ data: addons })
+      if (table === 'rooms')     return mockQueryBuilder({ data: [] })
       return mockQueryBuilder({ data: [] })
     })
 
@@ -127,7 +127,7 @@ describe('AdminEventDetailPage', () => {
     ]))
     const bookings = [{
       id: 'b1', user_id: 'u1', status: 'confirmed', created_at: '2026-04-20',
-      eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null,
+      event_id: 'dive_x', notes: null, refund_requested_at: null,
       details: { gear: { rent: false } },
     }]
     const profiles = [{ id: 'u1', name: 'Ada Lovelace', nickname: 'Ada', contact_method: null, contact_id: null }]
@@ -145,8 +145,8 @@ describe('AdminEventDetailPage', () => {
 
     // Both annual waivers signed + current → the flag becomes "Waivers OK".
     const sigs = [
-      { id: 's1', diver_id: 'u1', waiver_code: 'padi_liability', waiver_version: 1, signed_at: new Date().toISOString(), signed_name: 'Ada', eo_dive_id: null, eo_course_id: null, created_at: '' },
-      { id: 's2', diver_id: 'u1', waiver_code: 'diver_medical',  waiver_version: 1, signed_at: new Date().toISOString(), signed_name: 'Ada', eo_dive_id: null, eo_course_id: null, created_at: '' },
+      { id: 's1', diver_id: 'u1', waiver_code: 'padi_liability', waiver_version: 1, signed_at: new Date().toISOString(), signed_name: 'Ada', event_id: null, created_at: '' },
+      { id: 's2', diver_id: 'u1', waiver_code: 'diver_medical',  waiver_version: 1, signed_at: new Date().toISOString(), signed_name: 'Ada', event_id: null, created_at: '' },
     ]
     from.mockImplementation((table: string) => {
       if (table === 'bookings') return mockQueryBuilder({ data: bookings })
@@ -165,7 +165,7 @@ describe('AdminEventDetailPage', () => {
     ]))
     const bookings = [{
       id: 'b1', user_id: 'u1', status: 'confirmed', created_at: '2026-04-20',
-      eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null,
+      event_id: 'dive_x', notes: null, refund_requested_at: null,
       details: { gear: { rent: false } },
     }]
     const profiles = [{ id: 'u1', name: 'Ada Lovelace', nickname: 'Ada', contact_method: null, contact_id: null }]
@@ -190,7 +190,7 @@ describe('AdminEventDetailPage', () => {
 
     const bookings = [{
       id: 'b1', user_id: 'u1', status: 'confirmed', created_at: '2026-04-20',
-      eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null,
+      event_id: 'dive_x', notes: null, refund_requested_at: null,
       details: { add_ons: ['11111111-1111-4111-8111-111111111111', 'legacy-bubble-id'], gear: { rent: false } },
     }]
     const profiles = [{
@@ -200,15 +200,15 @@ describe('AdminEventDetailPage', () => {
       contact_method: null, contact_id: null,
     }]
     const addons = [
-      { _id: '11111111-1111-4111-8111-111111111111', display_title: 'SMB Rental', admin_title: 'SMB' },
+      { id: '11111111-1111-4111-8111-111111111111', display_title: 'SMB Rental', admin_title: 'SMB' },
     ]
 
     from.mockImplementation((table: string) => {
       if (table === 'bookings')     return mockQueryBuilder({ data: bookings })
       if (table === 'profiles')     return mockQueryBuilder({ data: profiles })
       if (table === 'payments')     return mockQueryBuilder({ data: [] })
-      if (table === 'Other_Addons') return mockQueryBuilder({ data: addons })
-      if (table === 'EO_rooms')     return mockQueryBuilder({ data: [] })
+      if (table === 'addons') return mockQueryBuilder({ data: addons })
+      if (table === 'rooms')     return mockQueryBuilder({ data: [] })
       return mockQueryBuilder({ data: [] })
     })
 
@@ -220,7 +220,7 @@ describe('AdminEventDetailPage', () => {
     expect(screen.queryByText(/11111111-1111/)).not.toBeInTheDocument()
   })
 
-  it('cancels an event via the confirmation modal and updates EO_dives.cancelled_at', async () => {
+  it('cancels an event via the confirmation modal and updates events.cancelled_at', async () => {
     fetchEventsForBookings.mockResolvedValue(new Map([
       ['dive_x', {
         id: 'dive_x', type: 'dive', title: 'Kenting',
@@ -233,7 +233,7 @@ describe('AdminEventDetailPage', () => {
       eq: () => Promise.resolve({ error: null }),
     })
     from.mockImplementation((table: string) => {
-      if (table === 'EO_dives') {
+      if (table === 'events') {
         const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
         b.update = updateSpy
         return b
@@ -273,7 +273,7 @@ describe('AdminEventDetailPage', () => {
       eq: () => Promise.resolve({ error: null }),
     })
     from.mockImplementation((table: string) => {
-      if (table === 'EO_dives') {
+      if (table === 'events') {
         const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
         b.update = updateSpy
         return b
@@ -321,7 +321,7 @@ describe('AdminEventDetailPage', () => {
       eq: (col: string, val: string) => Promise.resolve({ error: null, data: { col, val } }),
     })
     from.mockImplementation((table: string) => {
-      if (table === 'EO_dives') {
+      if (table === 'events') {
         const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
         b.delete = deleteSpy
         return b
@@ -371,7 +371,7 @@ describe('AdminEventDetailPage', () => {
 
     const bookings = [{
       id: 'b1', user_id: 'u1', status: 'pending', created_at: '2026-04-20',
-      eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null,
+      event_id: 'dive_x', notes: null, refund_requested_at: null,
       details: {},
     }]
     const profiles = [{
@@ -462,7 +462,7 @@ describe('AdminEventDetailPage', () => {
 
     const bookings = [{
       id: 'b1', user_id: 'u1', status: 'pending', created_at: '2026-04-20',
-      eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null,
+      event_id: 'dive_x', notes: null, refund_requested_at: null,
       details: { total: 4900, deposit: 4900, payment_method: 'cash' },
     }]
     const profiles = [{
@@ -523,7 +523,7 @@ describe('AdminEventDetailPage', () => {
     // confirmed booking with deposit already paid; admin records partial balance.
     const bookings = [{
       id: 'b1', user_id: 'u1', status: 'confirmed', created_at: '2026-04-20',
-      eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null,
+      event_id: 'dive_x', notes: null, refund_requested_at: null,
       details: { total: 12000, deposit: 2000, payment_method: 'bank_transfer' },
     }]
     const profiles = [{
@@ -695,7 +695,7 @@ describe('AdminEventDetailPage', () => {
 
     const bookings = [{
       id: 'b1', user_id: 'u1', status: 'confirmed', created_at: '2026-04-20',
-      eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null,
+      event_id: 'dive_x', notes: null, refund_requested_at: null,
       details: {},
     }]
     const profiles = [{
@@ -760,19 +760,19 @@ describe('AdminEventDetailPage', () => {
 
     const bookings = [
       { id: 'b-needs-1', user_id: 'u1', status: 'confirmed', created_at: '2026-04-20',
-        eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null,
+        event_id: 'dive_x', notes: null, refund_requested_at: null,
         details: { transportation: true } },
       { id: 'b-needs-2', user_id: 'u2', status: 'pending', created_at: '2026-04-20',
-        eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null,
+        event_id: 'dive_x', notes: null, refund_requested_at: null,
         details: { transportation: true } },
       { id: 'b-self',    user_id: 'u3', status: 'confirmed', created_at: '2026-04-20',
-        eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null,
+        event_id: 'dive_x', notes: null, refund_requested_at: null,
         details: { transportation: false } },
       { id: 'b-legacy',  user_id: 'u4', status: 'confirmed', created_at: '2026-04-20',
-        eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null,
+        event_id: 'dive_x', notes: null, refund_requested_at: null,
         details: {} },
       { id: 'b-cancel',  user_id: 'u5', status: 'cancelled', created_at: '2026-04-20',
-        eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null,
+        event_id: 'dive_x', notes: null, refund_requested_at: null,
         details: { transportation: true } },
     ]
     const profiles = [
@@ -838,9 +838,9 @@ describe('AdminEventDetailPage', () => {
     ]))
     const bookings = [
       { id: 'b-lead', user_id: 'u1', payer_id: 'u1', group_id: 'g1', status: 'confirmed', created_at: '2026-04-20',
-        eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null, details: { total: 3000, deposit: 1000 } },
+        event_id: 'dive_x', notes: null, refund_requested_at: null, details: { total: 3000, deposit: 1000 } },
       { id: 'b-kid',  user_id: 'u2', payer_id: 'u1', group_id: 'g1', status: 'pending', created_at: '2026-04-20',
-        eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null, details: { total: 3000, deposit: 1000 } },
+        event_id: 'dive_x', notes: null, refund_requested_at: null, details: { total: 3000, deposit: 1000 } },
     ]
     const profiles = [
       { id: 'u1', name: 'Parent Pat', nickname: null, cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, contact_method: null, contact_id: null },
@@ -886,9 +886,9 @@ describe('AdminEventDetailPage', () => {
     ]))
     const bookings = [
       { id: 'b1', user_id: 'u1', status: 'confirmed', created_at: '2026-04-20',
-        eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null, details: { total: 3000 } },
+        event_id: 'dive_x', notes: null, refund_requested_at: null, details: { total: 3000 } },
       { id: 'b2', user_id: 'u2', status: 'pending', created_at: '2026-04-20',
-        eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null, details: { total: 3000 } },
+        event_id: 'dive_x', notes: null, refund_requested_at: null, details: { total: 3000 } },
     ]
     const profiles = [
       { id: 'u1', name: 'Ada Lovelace', nickname: null, cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, contact_method: null, contact_id: null },
@@ -928,13 +928,13 @@ describe('AdminEventDetailPage', () => {
     // stale cancelled row alongside a fresh confirmed one. Eve simply cancelled.
     const bookings = [
       { id: 'b-bob-old', user_id: 'u2', status: 'cancelled', created_at: '2026-04-19',
-        eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null, details: {} },
+        event_id: 'dive_x', notes: null, refund_requested_at: null, details: {} },
       { id: 'b-ada',     user_id: 'u1', status: 'confirmed', created_at: '2026-04-20',
-        eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null, details: {} },
+        event_id: 'dive_x', notes: null, refund_requested_at: null, details: {} },
       { id: 'b-bob-new', user_id: 'u2', status: 'confirmed', created_at: '2026-04-21',
-        eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null, details: {} },
+        event_id: 'dive_x', notes: null, refund_requested_at: null, details: {} },
       { id: 'b-eve',     user_id: 'u5', status: 'cancelled', created_at: '2026-04-20',
-        eo_dive_id: 'dive_x', eo_course_id: null, notes: null, refund_requested_at: null, details: {} },
+        event_id: 'dive_x', notes: null, refund_requested_at: null, details: {} },
     ]
     const profiles = [
       { id: 'u1', name: 'Ada Lovelace', nickname: null, cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, contact_method: null, contact_id: null },

@@ -111,7 +111,7 @@ describe('CalendarPage', () => {
   it('tags events the current user has booked', async () => {
     const ev = buildEvent({ id: 'dive_a1', type: 'dive' })
     fetchEventsInRange.mockResolvedValue([ev])
-    setupBookings([{ id: 'b1', user_id: 'u1', eo_dive_id: 'dive_a1', eo_course_id: null, status: 'confirmed' }])
+    setupBookings([{ id: 'b1', user_id: 'u1', event_id: 'dive_a1', status: 'confirmed' }])
     renderWithRouter(<CalendarPage />)
     await screen.findAllByText(ev.title)
     expect(screen.getByText(/^booked$/i)).toBeInTheDocument()
@@ -150,7 +150,7 @@ describe('CalendarPage', () => {
   it('Cancel booking updates status to cancelled', async () => {
     const ev = buildEvent({ id: 'dive_xyz', type: 'dive' })
     fetchEventsInRange.mockResolvedValue([ev])
-    setupBookings([{ id: 'b1', user_id: 'u1', eo_dive_id: 'dive_xyz', eo_course_id: null, status: 'confirmed' }])
+    setupBookings([{ id: 'b1', user_id: 'u1', event_id: 'dive_xyz', status: 'confirmed' }])
 
     const user = userEvent.setup()
     renderWithRouter(<CalendarPage />)

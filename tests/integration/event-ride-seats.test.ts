@@ -36,13 +36,13 @@ async function createVehicle(name: string, seats: number): Promise<string> {
 
 async function allocate(vehicleId: string): Promise<void> {
   const { error } = await admin.from('event_vehicles')
-    .insert({ vehicle_id: vehicleId, eo_dive_id: diveId } as never)
+    .insert({ vehicle_id: vehicleId, event_id: diveId } as never)
   if (error) throw new Error(`allocate: ${error.message}`)
 }
 
 async function book(userId: string, transportation: boolean, status = 'pending'): Promise<void> {
   const { data, error } = await admin.from('bookings').insert({
-    user_id: userId, eo_dive_id: diveId, eo_course_id: null,
+    user_id: userId, event_id: diveId,
     details: { transportation }, status,
   } as never).select('id').single()
   if (error) throw new Error(`book: ${error.message}`)
@@ -50,7 +50,7 @@ async function book(userId: string, transportation: boolean, status = 'pending')
 }
 
 async function seats(client = admin): Promise<{ capacity: number; claimed: number }> {
-  const { data, error } = await client.rpc('event_ride_seats', { p_dive_id: diveId, p_course_id: null })
+  const { data, error } = await client.rpc('event_ride_seats', { p_event_id: diveId })
   if (error) throw new Error(`rpc: ${error.message}`)
   return (data as { capacity: number; claimed: number }[])[0]
 }
@@ -90,7 +90,7 @@ describe('event_ride_seats', () => {
     // Same van on the same event again → blocked by the unique index, so the
     // seat total can't be inflated by a duplicate row.
     const dup = await admin.from('event_vehicles')
-      .insert({ vehicle_id: bus, eo_dive_id: diveId } as never)
+      .insert({ vehicle_id: bus, event_id: diveId } as never)
     expect(dup.error).not.toBeNull()
     // (7 + 4 + 12) physical − 3 drivers = 20 rideable seats.
     expect((await seats()).capacity).toBe(20)
@@ -117,16 +117,16 @@ describe('event_ride_seats', () => {
     staffDive = await createTestDive(admin)
     const van = await createVehicle('Hiace', 8)
     const va = await admin.from('event_vehicles')
-      .insert({ vehicle_id: van, eo_dive_id: staffDive } as never)
+      .insert({ vehicle_id: van, event_id: staffDive } as never)
     if (va.error) throw new Error(`allocate: ${va.error.message}`)
     for (let i = 0; i < 3; i++) {
       const st = await createTestUser(admin, { role: 'staff' })
       cleanupUsers.push(st)
       const du = await admin.from('duties')
-        .insert({ assignee_id: st.id, role: 'guide', start_date: '2030-06-01', eo_dive_id: staffDive } as never)
+        .insert({ assignee_id: st.id, role: 'guide', start_date: '2030-06-01', event_id: staffDive } as never)
       if (du.error) throw new Error(`duty: ${du.error.message}`)
     }
-    const { data, error } = await admin.rpc('event_ride_seats', { p_dive_id: staffDive, p_course_id: null })
+    const { data, error } = await admin.rpc('event_ride_seats', { p_event_id: staffDive })
     if (error) throw new Error(`rpc: ${error.message}`)
     // 8 physical seats − max(1 van, 3 staff) = 8 − 3 = 5 rideable for divers.
     expect((data as { capacity: number }[])[0].capacity).toBe(5)

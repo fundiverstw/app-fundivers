@@ -52,8 +52,8 @@ describe('AdminAccountingPage', () => {
         id: 'p1', created_at: '2026-03-01T08:00:00.000Z', user_id: 'd1', booking_id: 'b1',
         amount: 1000, currency: 'TWD', status: 'paid', method: 'cash', note: null, recorded_by: 'a1',
       }],
-      bookings: [{ id: 'b1', user_id: 'd1', eo_dive_id: 'dive1', eo_course_id: null, status: 'confirmed', details: { total: 1000 } }],
-      EO_dives: [{ _id: 'dive1', display_title: 'Long Dong Bay', admin_title: null, start_date: '2026-03-14' }],
+      bookings: [{ id: 'b1', user_id: 'd1', event_id: 'dive1', status: 'confirmed', details: { total: 1000 } }],
+      events: [{ id: 'dive1', kind: 'dive', display_title: 'Long Dong Bay', admin_title: null, start_date: '2026-03-14', course_days: null }],
       profiles: [{ id: 'd1', name: 'Dana', email: 'd@x.com' }, { id: 'a1', name: 'Avi', email: null }],
     })
     renderPage()

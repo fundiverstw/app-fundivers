@@ -19,14 +19,8 @@ const TYPE_LABELS: Record<AppEvent['type'], string> = {
   course: 'Course',
 }
 
-function fkFor(ev: AppEvent) {
-  return ev.type === 'dive'
-    ? { col: 'eo_dive_id' as const }
-    : { col: 'eo_course_id' as const }
-}
-
 function bookingMatches(b: Booking, ev: AppEvent) {
-  return ev.type === 'dive' ? b.eo_dive_id === ev.id : b.eo_course_id === ev.id
+  return b.event_id === ev.id
 }
 
 export function CalendarPage() {
@@ -69,12 +63,11 @@ export function CalendarPage() {
   async function cancelBooking() {
     if (!user || !selected) return
     setBookingLoading(true)
-    const { col } = fkFor(selected)
     await supabase
       .from('bookings')
       .update({ status: 'cancelled' })
       .eq('user_id', user.id)
-      .eq(col, selected.id)
+      .eq('event_id', selected.id)
     setBookings(prev => prev.map(b =>
       bookingMatches(b, selected) ? { ...b, status: 'cancelled' } : b
     ))

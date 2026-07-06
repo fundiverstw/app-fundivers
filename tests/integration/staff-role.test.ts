@@ -9,9 +9,9 @@ import {
 // Pins the staff role's RLS contract end-to-end:
 //   - Staff can SELECT events, bookings, payments, profiles, admin_notes,
 //     and their own duty rows.
-//   - Staff CANNOT write to any catalog/admin table (EO_dives, EO_courses,
-//     EO_rooms, Other_Addons, EO_prices, dive_sites, cert_levels,
-//     DiveTravel, cancellation_policies, eo_dive_addons, eo_course_addons).
+//   - Staff CANNOT write to any catalog/admin table (events,
+//     rooms, addons, prices, cert_levels,
+//     dive_travel, cancellation_policies, event_addons).
 //   - Staff CANNOT write to bookings, payments, profiles (other than self),
 //     duties, or update/delete admin_notes.
 //   - Staff CAN insert admin_notes attributed to themselves.
@@ -42,9 +42,9 @@ afterAll(async () => {
 })
 
 describe('staff role: read access', () => {
-  it('can SELECT EO_dives', async () => {
+  it('can SELECT events', async () => {
     const sb = await userClient(staff.email, staff.password)
-    const { data, error } = await sb.from('EO_dives' as never).select('_id').limit(1)
+    const { data, error } = await sb.from('events' as never).select('id').limit(1)
     expect(error).toBeNull()
     expect(Array.isArray(data)).toBe(true)
   })
@@ -52,13 +52,13 @@ describe('staff role: read access', () => {
   it('can SELECT all bookings (not just their own)', async () => {
     // Seed a booking for the diver — staff must be able to see it.
     await admin.from('bookings').insert({
-      user_id: diver.id, eo_dive_id: diveId, status: 'pending', details: {},
+      user_id: diver.id, event_id: diveId, status: 'pending', details: {},
     })
     const sb = await userClient(staff.email, staff.password)
-    const { data, error } = await sb.from('bookings').select('id, user_id').eq('eo_dive_id', diveId)
+    const { data, error } = await sb.from('bookings').select('id, user_id').eq('event_id', diveId)
     expect(error).toBeNull()
     expect((data ?? []).some(b => b.user_id === diver.id)).toBe(true)
-    await admin.from('bookings').delete().eq('eo_dive_id', diveId)
+    await admin.from('bookings').delete().eq('event_id', diveId)
   })
 
   it('can SELECT all profiles (PII visibility for event ops)', async () => {
@@ -81,52 +81,52 @@ describe('staff role: blocked writes on catalog tables', () => {
   // write is filtered out by the RLS WITH CHECK. Either an error OR an
   // affected-row check is sufficient evidence the write didn't take.
 
-  it('cannot INSERT into EO_dives', async () => {
+  it('cannot INSERT into events', async () => {
     const sb = await userClient(staff.email, staff.password)
     const id = crypto.randomUUID()
-    const { error } = await sb.from('EO_dives' as never).insert({
-      _id: id, admin_title: 'staff-attempted', notes: '', start_date: '2026-12-01', time: '09:00:00', end_date: '2026-12-01',
+    const { error } = await sb.from('events' as never).insert({
+      id, kind: 'dive', admin_title: 'staff-attempted', notes: '', start_date: '2026-12-01', start_time: '09:00:00', end_date: '2026-12-01',
     } as never)
     expect(error).not.toBeNull()
-    const { data } = await admin.from('EO_dives' as never).select('_id').eq('_id', id).maybeSingle()
+    const { data } = await admin.from('events' as never).select('id').eq('id', id).maybeSingle()
     expect(data).toBeNull()
   })
 
-  it('cannot UPDATE an EO_dive', async () => {
+  it('cannot UPDATE an event', async () => {
     const sb = await userClient(staff.email, staff.password)
-    const { count } = await sb.from('EO_dives' as never)
+    const { count } = await sb.from('events' as never)
       .update({ admin_title: 'staff-overwrote' } as never, { count: 'exact' })
-      .eq('_id', diveId)
+      .eq('id', diveId)
     expect(count).toBe(0)
   })
 
-  it('cannot DELETE an EO_dive', async () => {
+  it('cannot DELETE an event', async () => {
     const sb = await userClient(staff.email, staff.password)
-    const { count } = await sb.from('EO_dives' as never).delete({ count: 'exact' }).eq('_id', diveId)
+    const { count } = await sb.from('events' as never).delete({ count: 'exact' }).eq('id', diveId)
     expect(count).toBe(0)
-    const { data } = await admin.from('EO_dives' as never).select('_id').eq('_id', diveId).single()
+    const { data } = await admin.from('events' as never).select('id').eq('id', diveId).single()
     expect(data).not.toBeNull()
   })
 
-  it('cannot INSERT into Other_Addons', async () => {
+  it('cannot INSERT into addons', async () => {
     const sb = await userClient(staff.email, staff.password)
     const id = crypto.randomUUID()
-    const { error } = await sb.from('Other_Addons' as never).insert({
-      _id: id, display_title: 'staff-tried', admin_title: 'x',
+    const { error } = await sb.from('addons' as never).insert({
+      id: id, display_title: 'staff-tried', admin_title: 'x',
     } as never)
     expect(error).not.toBeNull()
   })
 
-  it('cannot INSERT into EO_rooms', async () => {
+  it('cannot INSERT into rooms', async () => {
     const sb = await userClient(staff.email, staff.password)
     const id = crypto.randomUUID()
-    const { error } = await sb.from('EO_rooms' as never).insert({ _id: id, display_title: 'no' } as never)
+    const { error } = await sb.from('rooms' as never).insert({ id: id, display_title: 'no' } as never)
     expect(error).not.toBeNull()
   })
 
-  it('cannot INSERT into eo_dive_addons junction', async () => {
+  it('cannot INSERT into event_addons junction', async () => {
     const sb = await userClient(staff.email, staff.password)
-    const { error } = await sb.from('eo_dive_addons').insert({ eo_dive_id: diveId, addon_id: crypto.randomUUID() })
+    const { error } = await sb.from('event_addons').insert({ event_id: diveId, addon_id: crypto.randomUUID() })
     expect(error).not.toBeNull()
   })
 })
@@ -134,7 +134,7 @@ describe('staff role: blocked writes on catalog tables', () => {
 describe('staff role: blocked writes on operational tables', () => {
   it('cannot UPDATE booking status', async () => {
     const { data: ins } = await admin.from('bookings').insert({
-      user_id: diver.id, eo_dive_id: diveId, status: 'pending', details: {},
+      user_id: diver.id, event_id: diveId, status: 'pending', details: {},
     }).select('id').single()
     const bookingId = ins!.id
 
@@ -160,7 +160,7 @@ describe('staff role: blocked writes on operational tables', () => {
   it('cannot INSERT into duties', async () => {
     const sb = await userClient(staff.email, staff.password)
     const { error } = await sb.from('duties').insert({
-      assignee_id: staff.id, role: 'guide', start_date: '2026-12-01', eo_dive_id: diveId,
+      assignee_id: staff.id, role: 'guide', start_date: '2026-12-01', event_id: diveId,
     })
     expect(error).not.toBeNull()
   })
@@ -170,7 +170,7 @@ describe('staff role: admin_notes write surface', () => {
   it('can INSERT a memo attributed to self', async () => {
     const sb = await userClient(staff.email, staff.password)
     const { data, error } = await sb.from('admin_notes').insert({
-      created_by: staff.id, eo_dive_id: diveId, tag: 'note', content: 'staff memo',
+      created_by: staff.id, event_id: diveId, tag: 'note', content: 'staff memo',
     }).select('id').single()
     expect(error).toBeNull()
     expect(data?.id).toBeTruthy()
@@ -180,14 +180,14 @@ describe('staff role: admin_notes write surface', () => {
   it('cannot INSERT a memo attributed to a different user', async () => {
     const sb = await userClient(staff.email, staff.password)
     const { error } = await sb.from('admin_notes').insert({
-      created_by: adminUser.id, eo_dive_id: diveId, tag: 'note', content: 'spoofed author',
+      created_by: adminUser.id, event_id: diveId, tag: 'note', content: 'spoofed author',
     })
     expect(error).not.toBeNull()
   })
 
   it('cannot UPDATE a memo (resolve/unresolve is admin-only)', async () => {
     const { data: ins } = await admin.from('admin_notes').insert({
-      created_by: staff.id, eo_dive_id: diveId, tag: 'note', content: 'will not resolve',
+      created_by: staff.id, event_id: diveId, tag: 'note', content: 'will not resolve',
     }).select('id').single()
     const noteId = ins!.id
 
@@ -202,7 +202,7 @@ describe('staff role: admin_notes write surface', () => {
 
   it('cannot DELETE a memo', async () => {
     const { data: ins } = await admin.from('admin_notes').insert({
-      created_by: staff.id, eo_dive_id: diveId, tag: 'note', content: 'will not delete',
+      created_by: staff.id, event_id: diveId, tag: 'note', content: 'will not delete',
     }).select('id').single()
     const noteId = ins!.id
 
@@ -220,14 +220,14 @@ describe('staff role: duties visibility', () => {
   it('can SELECT only their own duty rows', async () => {
     // Admin assigns one duty to staff and one to another staff member.
     const { data: mine } = await admin.from('duties').insert({
-      assignee_id: staff.id, role: 'guide', start_date: '2026-12-01', eo_dive_id: diveId,
+      assignee_id: staff.id, role: 'guide', start_date: '2026-12-01', event_id: diveId,
     }).select('id').single()
     const { data: theirs } = await admin.from('duties').insert({
-      assignee_id: otherStaff.id, role: 'guide', start_date: '2026-12-01', eo_dive_id: diveId,
+      assignee_id: otherStaff.id, role: 'guide', start_date: '2026-12-01', event_id: diveId,
     }).select('id').single()
 
     const sb = await userClient(staff.email, staff.password)
-    const { data, error } = await sb.from('duties').select('id, assignee_id').eq('eo_dive_id', diveId)
+    const { data, error } = await sb.from('duties').select('id, assignee_id').eq('event_id', diveId)
     expect(error).toBeNull()
     const ids = (data ?? []).map(d => d.id)
     expect(ids).toContain(mine!.id)
@@ -240,7 +240,7 @@ describe('staff role: duties visibility', () => {
 describe('duties trigger: admin AND staff are valid assignees', () => {
   it('admin assignee still works', async () => {
     const { data, error } = await admin.from('duties').insert({
-      assignee_id: adminUser.id, role: 'guide', start_date: '2026-12-01', eo_dive_id: diveId,
+      assignee_id: adminUser.id, role: 'guide', start_date: '2026-12-01', event_id: diveId,
     }).select('id').single()
     expect(error).toBeNull()
     if (data) await admin.from('duties').delete().eq('id', data.id)
@@ -248,7 +248,7 @@ describe('duties trigger: admin AND staff are valid assignees', () => {
 
   it('staff assignee is now accepted (was rejected pre-staff-role)', async () => {
     const { data, error } = await admin.from('duties').insert({
-      assignee_id: staff.id, role: 'guide', start_date: '2026-12-01', eo_dive_id: diveId,
+      assignee_id: staff.id, role: 'guide', start_date: '2026-12-01', event_id: diveId,
     }).select('id').single()
     expect(error).toBeNull()
     if (data) await admin.from('duties').delete().eq('id', data.id)
@@ -256,7 +256,7 @@ describe('duties trigger: admin AND staff are valid assignees', () => {
 
   it('diver assignee still rejected', async () => {
     const { error } = await admin.from('duties').insert({
-      assignee_id: diver.id, role: 'guide', start_date: '2026-12-01', eo_dive_id: diveId,
+      assignee_id: diver.id, role: 'guide', start_date: '2026-12-01', event_id: diveId,
     })
     expect(error).not.toBeNull()
     expect(error?.message).toMatch(/admin|staff/i)

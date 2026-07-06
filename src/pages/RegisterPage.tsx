@@ -51,20 +51,16 @@ export function RegisterPage() {
         return
       }
 
-      const eventMap = await fetchEventsForBookings(
-        type === 'dive'   ? [id] : [],
-        type === 'course' ? [id] : [],
-      )
+      const eventMap = await fetchEventsForBookings([id])
       if (cancelled) return
       setEvent(eventMap.get(id) ?? null)
 
       if (user) {
-        const col = type === 'dive' ? 'eo_dive_id' : 'eo_course_id'
         const { data } = await supabase
           .from('bookings')
           .select('*')
           .eq('user_id', user.id)
-          .eq(col, id)
+          .eq('event_id', id)
           .neq('status', 'cancelled')
           .maybeSingle()
         if (!cancelled) setExisting(data)

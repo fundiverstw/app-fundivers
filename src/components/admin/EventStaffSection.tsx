@@ -44,7 +44,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
-  const fkColumn = eventType === 'dive' ? 'eo_dive_id' : 'eo_course_id'
+  const fkColumn = 'event_id'
 
   useEffect(() => {
     let cancelled = false
@@ -53,7 +53,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
         supabase.from('duties').select('*').eq(fkColumn, eventId).order('role'),
         supabase.from('profiles').select('*').in('role', ['admin', 'staff']).order('name'),
         eventType === 'course'
-          ? supabase.from('EO_courses').select('course_days').eq('_id', eventId).single()
+          ? supabase.from('events').select('course_days').eq('id', eventId).single()
           : Promise.resolve({ data: null }),
       ])
       if (cancelled) return

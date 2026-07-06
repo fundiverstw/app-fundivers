@@ -25,7 +25,7 @@ const vehicle = (id: string, name: string, seats: number): Vehicle => ({
 })
 const alloc = (id: string, vehicleId: string): EventVehicle => ({
   id, created_at: '', created_by: null, vehicle_id: vehicleId,
-  eo_dive_id: 'D1', eo_course_id: null, notes: null,
+  event_id: 'D1', notes: null,
 })
 
 const delica = vehicle('v1', 'Delica', 7)

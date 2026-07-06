@@ -58,8 +58,7 @@ export function isSignatureCurrent(
     const ageMs = now.getTime() - new Date(sig.signed_at).getTime()
     return ageMs <= ANNUAL_WAIVER_VALID_DAYS * DAY_MS
   }
-  const eventId = event.type === 'dive' ? sig.eo_dive_id : sig.eo_course_id
-  return eventId === event.id
+  return sig.event_id === event.id
 }
 
 // Required waivers this diver has NOT satisfied for the event.
@@ -110,10 +109,9 @@ export function annualWaivers(): WaiverDef[] {
 export async function fetchEventWaiverOverrides(
   event: { dive_id?: string | null; course_id?: string | null },
 ): Promise<EventWaiver[]> {
-  const col = event.dive_id ? 'eo_dive_id' : 'eo_course_id'
   const val = event.dive_id ?? event.course_id
   if (!val) return []
-  const { data, error } = await supabase.from('event_waivers').select('*').eq(col, val)
+  const { data, error } = await supabase.from('event_waivers').select('*').eq('event_id', val)
   if (error) throw error
   return (Array.isArray(data) ? data : []) as EventWaiver[]
 }
@@ -146,8 +144,7 @@ export async function signWaiver(args: {
     p_code: def.code,
     p_version: def.version,
     p_signed_name: signedName,
-    p_dive_id: perEvent?.type === 'dive' ? perEvent.id : null,
-    p_course_id: perEvent?.type === 'course' ? perEvent.id : null,
+    p_event_id: perEvent ? perEvent.id : null,
   })
   if (error) throw error
   return data as string
@@ -162,13 +159,11 @@ export async function setEventWaiverOverride(args: {
   createdBy: string | null
 }): Promise<void> {
   const { event, code, mode, createdBy } = args
-  const col = event.type === 'dive' ? 'eo_dive_id' : 'eo_course_id'
-  const del = await supabase.from('event_waivers').delete().eq(col, event.id).eq('waiver_code', code)
+  const del = await supabase.from('event_waivers').delete().eq('event_id', event.id).eq('waiver_code', code)
   if (del.error) throw del.error
   if (mode === null) return
   const { error } = await supabase.from('event_waivers').insert({
-    eo_dive_id: event.type === 'dive' ? event.id : null,
-    eo_course_id: event.type === 'course' ? event.id : null,
+    event_id: event.id,
     waiver_code: code,
     mode,
     created_by: createdBy,

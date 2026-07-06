@@ -29,9 +29,9 @@ vi.mock('../../components/admin/AdminNotes', () => ({ AdminNotes: () => null }))
 
 const diveEvent = { id: 'e1', type: 'dive', title: 'Kenting fun dive', start_time: '2026-06-18T00:00:00Z', end_time: null }
 const bookings = [
-  { id: 'b1', user_id: 'u1', eo_dive_id: 'e1', eo_course_id: null, status: 'pending',
+  { id: 'b1', user_id: 'u1', event_id: 'e1', status: 'pending',
     details: { transportation: true,  gear: { rent: true, items: ['BCD'] } } },
-  { id: 'b2', user_id: 'u2', eo_dive_id: 'e1', eo_course_id: null, status: 'pending',
+  { id: 'b2', user_id: 'u2', event_id: 'e1', status: 'pending',
     details: { transportation: false, gear: { rent: true, items: ['Wetsuit'] } } },
 ]
 const profiles = [
@@ -89,10 +89,10 @@ describe('AdminLogisticsPage', () => {
   it('shows who still owes for the day — overall total plus a per-event list, covered divers flagged', async () => {
     const payBookings = [
       // Ada owes her full 3,200 (no payments); pays for herself.
-      { id: 'b1', user_id: 'u1', payer_id: 'u1', eo_dive_id: 'e1', eo_course_id: null, status: 'pending',
+      { id: 'b1', user_id: 'u1', payer_id: 'u1', event_id: 'e1', status: 'pending',
         details: { transportation: false, gear: { rent: false }, total: 3200 } },
       // Bo's 2,800 is covered by the lead (Ada); 1,000 paid → 1,800 still due.
-      { id: 'b2', user_id: 'u2', payer_id: 'u1', eo_dive_id: 'e1', eo_course_id: null, status: 'pending',
+      { id: 'b2', user_id: 'u2', payer_id: 'u1', event_id: 'e1', status: 'pending',
         details: { transportation: false, gear: { rent: false }, total: 2800 } },
     ]
     const payments = [{ id: 'p1', booking_id: 'b2', amount: 1000, status: 'paid' }]
@@ -123,7 +123,7 @@ describe('AdminLogisticsPage', () => {
   it('plans which vehicles carry the divers who need a ride', async () => {
     // One on-duty staff rides along; Ada needs a ride, Bo self-transports.
     const duties = [
-      { id: 'd1', assignee_id: 's1', role: 'guide', eo_dive_id: 'e1', eo_course_id: null, start_date: '2026-06-18', end_date: null },
+      { id: 'd1', assignee_id: 's1', role: 'guide', event_id: 'e1', start_date: '2026-06-18', end_date: null },
     ]
     const withStaff = [...profiles, { id: 's1', name: 'Dana', nickname: 'Dana', contact_id: '0999', gear_owned: [] }]
     from.mockImplementation((table: string) => {
@@ -135,7 +135,7 @@ describe('AdminLogisticsPage', () => {
       ] })
       // The Delica is assigned to the event — divers ride only in assigned cars.
       if (table === 'event_vehicles') return mockQueryBuilder({ data: [
-        { id: 'ev1', vehicle_id: 'v1', eo_dive_id: 'e1', eo_course_id: null },
+        { id: 'ev1', vehicle_id: 'v1', event_id: 'e1' },
       ] })
       return mockQueryBuilder({ data: [] })
     })
@@ -161,7 +161,7 @@ describe('AdminLogisticsPage', () => {
         { id: 'v1', created_at: '', name: 'Delica', passenger_seats: 7, active: true, created_by: null },
       ] })
       if (table === 'event_vehicles') return mockQueryBuilder({ data: [
-        { id: 'ev1', vehicle_id: 'v1', eo_dive_id: 'e1', eo_course_id: null },
+        { id: 'ev1', vehicle_id: 'v1', event_id: 'e1' },
       ] })
       return mockQueryBuilder({ data: [] })
     })
@@ -241,7 +241,7 @@ describe('AdminLogisticsPage', () => {
 
   it('counts on-duty staff distinctly in the summary and lists them per event', async () => {
     const duties = [
-      { id: 'd1', assignee_id: 's1', role: 'guide', eo_dive_id: 'e1', eo_course_id: null, start_date: '2026-06-18', end_date: null },
+      { id: 'd1', assignee_id: 's1', role: 'guide', event_id: 'e1', start_date: '2026-06-18', end_date: null },
     ]
     const withStaff = [...profiles, { id: 's1', name: 'Dana', nickname: 'Dana', contact_id: '0999', gear_owned: [] }]
     from.mockImplementation((table: string) => {
@@ -305,20 +305,20 @@ describe('AdminLogisticsPage', () => {
   it('shows delicate rentals in a separate "Handle with care" inventory, out of the gear chips', async () => {
     const careBookings = [
       // Ada: rents a dive computer (gear) — care item, NOT a dive-bag chip.
-      { id: 'b1', user_id: 'u1', eo_dive_id: 'e1', eo_course_id: null, status: 'pending',
+      { id: 'b1', user_id: 'u1', event_id: 'e1', status: 'pending',
         details: { transportation: true, gear: { rent: true, items: ['BCD', 'Dive computer'] }, add_ons: [] } },
       // Bo: rents a dive light (add-on) + an SMB (dive-bag add-on, ignored).
-      { id: 'b2', user_id: 'u2', eo_dive_id: 'e1', eo_course_id: null, status: 'pending',
+      { id: 'b2', user_id: 'u2', event_id: 'e1', status: 'pending',
         details: { transportation: false, gear: { rent: false }, add_ons: ['light2', 'smb'] } },
     ]
     const addons = [
-      { _id: 'light2', display_title: 'Light Rental (2 Days)', admin_title: 'Light 2' },
-      { _id: 'smb',    display_title: 'SMB Rental',            admin_title: 'SMB' },
+      { id: 'light2', display_title: 'Light Rental (2 Days)', admin_title: 'Light 2' },
+      { id: 'smb',    display_title: 'SMB Rental',            admin_title: 'SMB' },
     ]
     from.mockImplementation((table: string) => {
       if (table === 'bookings') return mockQueryBuilder({ data: careBookings })
       if (table === 'profiles') return mockQueryBuilder({ data: profiles })
-      if (table === 'Other_Addons') return mockQueryBuilder({ data: addons })
+      if (table === 'addons') return mockQueryBuilder({ data: addons })
       return mockQueryBuilder({ data: [] })
     })
 

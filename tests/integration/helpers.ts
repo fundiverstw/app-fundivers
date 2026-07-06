@@ -80,12 +80,13 @@ export async function deleteTestUser(admin: DB, userId: string) {
 export async function createTestDive(admin: DB = adminClient()): Promise<string> {
   const id = crypto.randomUUID()
   const startDate = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10)
-  const { error } = await admin.from('EO_dives' as never).insert({
-    _id: id,
+  const { error } = await admin.from('events' as never).insert({
+    id,
+    kind: 'dive',
     admin_title: 'Test Dive',
     notes: '',
     start_date: startDate,
-    time: '09:00:00',
+    start_time: '09:00:00',
     end_date: startDate,
   } as never)
   if (error) throw new Error(`createTestDive failed: ${error.message}`)
@@ -95,8 +96,9 @@ export async function createTestDive(admin: DB = adminClient()): Promise<string>
 export async function createTestCourse(admin: DB = adminClient()): Promise<string> {
   const id = crypto.randomUUID()
   const startDate = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10)
-  const { error } = await admin.from('EO_courses' as never).insert({
-    _id: id,
+  const { error } = await admin.from('events' as never).insert({
+    id,
+    kind: 'course',
     display_title: 'Test Course',
     start_time: '09:00:00',
     course_days: [startDate],
@@ -106,9 +108,9 @@ export async function createTestCourse(admin: DB = adminClient()): Promise<strin
 }
 
 export async function deleteTestDive(admin: DB, id: string) {
-  await admin.from('EO_dives' as never).delete().eq('_id', id)
+  await admin.from('events' as never).delete().eq('id', id)
 }
 
 export async function deleteTestCourse(admin: DB, id: string) {
-  await admin.from('EO_courses' as never).delete().eq('_id', id)
+  await admin.from('events' as never).delete().eq('id', id)
 }

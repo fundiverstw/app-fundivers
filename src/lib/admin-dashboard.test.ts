@@ -24,8 +24,8 @@ const input: DashboardInput = {
     { user_id: 'd1', booking_id: 'b1', amount: 9999, status: 'voided', method: 'bank_transfer', created_at: '2026-06-11T00:00:00+08:00' },
   ],
   bookings: [
-    { id: 'b1', user_id: 'd1', eo_dive_id: 'dive1', eo_course_id: null, status: 'confirmed', created_at: '2026-06-09T00:00:00+08:00', details: { total: 1000 } },
-    { id: 'b2', user_id: 'd2', eo_dive_id: null, eo_course_id: 'course1', status: 'pending', created_at: '2026-06-04T00:00:00+08:00', details: { total: 500 } },
+    { id: 'b1', user_id: 'd1', event_id: 'dive1', status: 'confirmed', created_at: '2026-06-09T00:00:00+08:00', details: { total: 1000 } },
+    { id: 'b2', user_id: 'd2', event_id: 'course1', status: 'pending', created_at: '2026-06-04T00:00:00+08:00', details: { total: 500 } },
   ],
   profiles: [
     { id: 'd1', role: 'diver', status: 'active', created_at: '2026-06-02T00:00:00+08:00', nationality: 'Taiwan', cert_level: 'AOW' },

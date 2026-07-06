@@ -1,13 +1,13 @@
 // Integration coverage for the notify_admins_ride_waitlist trigger
-// (20260703000000). Runs against the live local Supabase stack.
+// (20260707010000). Runs against the live local Supabase stack.
 //
 // Contract: an INSERT/UPDATE on bookings that lands details.ride_waitlisted =
 // true on a non-cancelled row fans an in-app 'ride_waitlist' notification out
 // to every admin. Ordinary ride bookings and cancelled ones don't notify, and
 // a booking already-waitlisted doesn't re-notify on a later update.
 //
-// One diver per scenario: bookings_one_active_dive_per_user_idx forbids two
-// non-cancelled bookings for the same diver on one dive.
+// One diver per scenario: the one-active-booking-per-user index forbids two
+// non-cancelled bookings for the same diver on one event.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import {
   adminClient, createTestUser, deleteTestUser, createTestDive, deleteTestDive,
@@ -24,7 +24,7 @@ async function insertBooking(
   userId: string, details: Record<string, unknown>, status = 'pending',
 ): Promise<string> {
   const { data, error } = await admin.from('bookings').insert({
-    user_id: userId, eo_dive_id: diveId, eo_course_id: null, details, status,
+    user_id: userId, event_id: diveId, details, status,
   } as never).select('id').single()
   if (error) throw new Error(`insertBooking: ${error.message}`)
   const id = (data as { id: string }).id
@@ -47,8 +47,8 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (cleanupBookings.length) await admin.from('bookings').delete().in('id', cleanupBookings)
-  // Clears rows for our admin AND any pre-existing seed admins, since all are
-  // notified. Scoped to this test's dive so no other run's rows are touched.
+  // Scoped to this test's event so no other run's rows are touched. (event_id
+  // is text in notifications; the trigger stores the event uuid as text.)
   await admin.from('notifications').delete().eq('kind', 'ride_waitlist').eq('event_id', diveId)
   if (diveId) await deleteTestDive(admin, diveId)
   for (const u of [adminUser, ...divers]) if (u) await deleteTestUser(admin, u.id)

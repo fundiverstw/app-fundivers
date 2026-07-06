@@ -10,17 +10,17 @@ vi.mock('../../lib/supabase', () => ({ supabase: { from: (...a: unknown[]) => fr
 
 const vehicleRows = [{ id: 'v1', name: 'Delica', passenger_seats: 7, active: true, created_at: '', created_by: null }]
 const allocationRows = [
-  { id: 'al1', vehicle_id: 'v1', event_date: '2031-05-01', eo_dive_id: 'dive_x', eo_course_id: null,
+  { id: 'al1', vehicle_id: 'v1', event_date: '2031-05-01', event_id: 'dive_x',
     created_at: '', created_by: null, notes: null },
 ]
 
 beforeEach(() => {
   from.mockReset()
   from.mockImplementation((table: string) => {
-    if (table === 'EO_dives') return mockQueryBuilder({ data: { DiveTravel_reference: 'T1', start_date: '2031-05-01' } })
+    if (table === 'events') return mockQueryBuilder({ data: { divetravel_id: 'T1', start_date: '2031-05-01' } })
     if (table === 'vehicles') return mockQueryBuilder({ data: vehicleRows })
     if (table === 'event_vehicles') return mockQueryBuilder({ data: allocationRows })
-    return mockQueryBuilder({ data: [] }) // bookings update, DiveTravel update
+    return mockQueryBuilder({ data: [] }) // bookings update, dive_travel update
   })
 })
 
@@ -30,7 +30,7 @@ const event = {
 } as unknown as AppEvent
 
 const booking = (id: string, transportation: boolean | undefined, status = 'confirmed'): Booking => ({
-  id, user_id: id, status, eo_dive_id: 'dive_x', eo_course_id: null,
+  id, user_id: id, status, event_id: 'dive_x',
   details: transportation === undefined ? {} : { transportation },
 } as unknown as Booking)
 const profile = (id: string, name: string): Profile => ({ id, name, nickname: name } as unknown as Profile)

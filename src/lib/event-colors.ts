@@ -36,7 +36,7 @@ export function courseColor(title: string): CourseColor {
   return 'specialty'
 }
 
-// Structured dive classification from a dive's linked TravelDestinations.
+// Structured dive classification from a dive's linked travel_destinations.
 // 'trip' (→ yellow) when ANY linked destination is a boat-diving site or
 // sits outside the Northeast coast; 'local' (→ green) when every linked
 // destination is a Northeast shore site; null when the dive has no

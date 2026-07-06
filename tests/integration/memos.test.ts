@@ -24,7 +24,7 @@ beforeAll(async () => {
     .from('bookings')
     .insert({
       user_id: author.id,
-      eo_dive_id: diveId,
+      event_id: diveId,
       status: 'confirmed',
       details: { gear: { rent: true, mode: 'a-la-carte', items: ['Wetsuit'] } },
     })
@@ -42,33 +42,29 @@ afterAll(async () => {
 })
 
 describe('admin_notes constraints', () => {
-  it('XOR target — exactly one of dive/course/booking must be set', async () => {
+  it('target present — exactly one of event/booking must be set', async () => {
+    // Post-unification the 3-way XOR (dive/course/booking) collapses to a
+    // 2-way admin_notes_target_present check: exactly one of event_id /
+    // booking_id is non-null.
     const none = await admin.from('admin_notes').insert({
       created_by: author.id, tag: 'note', content: 'x',
     })
     expect(none.error).toBeTruthy()
 
-    const two = await admin.from('admin_notes').insert({
+    const both = await admin.from('admin_notes').insert({
       created_by: author.id, tag: 'note', content: 'x',
-      eo_dive_id: diveId, eo_course_id: courseId,
+      event_id: diveId, booking_id: bookingId,
     })
-    expect(two.error).toBeTruthy()
-
-    const three = await admin.from('admin_notes').insert({
-      created_by: author.id, tag: 'note', content: 'x',
-      eo_dive_id: diveId, eo_course_id: courseId, booking_id: bookingId,
-    })
-    expect(three.error).toBeTruthy()
+    expect(both.error).toBeTruthy()
   })
 
   it('accepts and round-trips a dive note', async () => {
     const { data, error } = await admin.from('admin_notes').insert({
-      created_by: author.id, eo_dive_id: diveId, tag: 'gear', content: 'Need extra wetsuits',
+      created_by: author.id, event_id: diveId, tag: 'gear', content: 'Need extra wetsuits',
     }).select().single()
     expect(error).toBeNull()
     expect(data!.tag).toBe('gear')
-    expect(data!.eo_dive_id).toBe(diveId)
-    expect(data!.eo_course_id).toBeNull()
+    expect(data!.event_id).toBe(diveId)
     expect(data!.booking_id).toBeNull()
     expect(data!.resolved).toBe(false)
     if (data) noteIds.push(data.id)
@@ -81,13 +77,13 @@ describe('admin_notes constraints', () => {
     }).select().single()
     expect(error).toBeNull()
     expect(data!.booking_id).toBe(bookingId)
-    expect(data!.eo_dive_id).toBeNull()
+    expect(data!.event_id).toBeNull()
     if (data) noteIds.push(data.id)
   })
 
   it('rejects an unknown tag', async () => {
     const { error } = await admin.from('admin_notes').insert({
-      created_by: author.id, eo_dive_id: diveId,
+      created_by: author.id, event_id: diveId,
       // @ts-expect-error — not in the tag enum
       tag: 'zomg', content: 'x',
     })
@@ -96,19 +92,19 @@ describe('admin_notes constraints', () => {
 
   it('rejects empty content and overly long content', async () => {
     const empty = await admin.from('admin_notes').insert({
-      created_by: author.id, eo_dive_id: diveId, tag: 'note', content: '',
+      created_by: author.id, event_id: diveId, tag: 'note', content: '',
     })
     expect(empty.error).toBeTruthy()
 
     const huge = await admin.from('admin_notes').insert({
-      created_by: author.id, eo_dive_id: diveId, tag: 'note', content: 'x'.repeat(2001),
+      created_by: author.id, event_id: diveId, tag: 'note', content: 'x'.repeat(2001),
     })
     expect(huge.error).toBeTruthy()
   })
 
   it('rejects resolved=true without resolved_by/resolved_at', async () => {
     const { error } = await admin.from('admin_notes').insert({
-      created_by: author.id, eo_dive_id: diveId, tag: 'note', content: 'x',
+      created_by: author.id, event_id: diveId, tag: 'note', content: 'x',
       resolved: true,
     })
     expect(error).toBeTruthy()
@@ -116,7 +112,7 @@ describe('admin_notes constraints', () => {
 
   it('accepts the full resolved state (resolved + resolver + time)', async () => {
     const { data, error } = await admin.from('admin_notes').insert({
-      created_by: author.id, eo_course_id: courseId,
+      created_by: author.id, event_id: courseId,
       tag: 'payment', content: 'Bank transfer not yet received',
       resolved: true, resolved_by: resolver.id, resolved_at: new Date().toISOString(),
     }).select().single()
@@ -129,7 +125,7 @@ describe('admin_notes constraints', () => {
 
   it('resolving an open note updates all three fields atomically', async () => {
     const ins = await admin.from('admin_notes').insert({
-      created_by: author.id, eo_dive_id: diveId, tag: 'urgent', content: 'Check tanks',
+      created_by: author.id, event_id: diveId, tag: 'urgent', content: 'Check tanks',
     }).select().single()
     if (ins.data) noteIds.push(ins.data.id)
 
@@ -147,7 +143,7 @@ describe('admin_notes constraints', () => {
   it('deleting a dive cascades to remove its notes', async () => {
     const tempDive = await createTestDive(admin)
     const ins = await admin.from('admin_notes').insert({
-      created_by: author.id, eo_dive_id: tempDive, tag: 'note', content: 'to be orphaned',
+      created_by: author.id, event_id: tempDive, tag: 'note', content: 'to be orphaned',
     }).select().single()
     expect(ins.error).toBeNull()
 
@@ -158,11 +154,11 @@ describe('admin_notes constraints', () => {
   })
 
   it('deleting a booking cascades to remove its notes', async () => {
-    // Use a fresh dive so the (user_id, eo_dive_id) unique index doesn't
+    // Use a fresh dive so the (user_id, event_id) unique index doesn't
     // collide with the suite-level booking made in beforeAll.
     const tempDive = await createTestDive(admin)
     const { data: b, error: bErr } = await admin.from('bookings').insert({
-      user_id: author.id, eo_dive_id: tempDive, status: 'pending',
+      user_id: author.id, event_id: tempDive, status: 'pending',
     }).select().single()
     expect(bErr).toBeNull()
 

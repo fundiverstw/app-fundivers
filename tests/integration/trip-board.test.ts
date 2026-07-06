@@ -98,17 +98,17 @@ describe('trip_board view', () => {
     await createTrip({ shopId: shop, status: 'archived', overrides: { title: 'Archived Trip' } })
 
     const asDiver = await userClient(diver.email, diver.password)
-    const { data, error } = await asDiver.from('trip_board').select('*').eq('id', published)
+    const { data: board, error } = await asDiver.rpc('list_trip_board')
     expect(error).toBeNull()
-    expect(data).toHaveLength(1)
-    const row = data![0] as Record<string, unknown>
+    const matches = (board ?? []).filter(r => (r as { id: string }).id === published)
+    expect(matches).toHaveLength(1)
+    const row = matches[0] as Record<string, unknown>
     expect(row.title).toBe('Published Trip')
     expect(row.partner_name).toBe('Blue Manta Divers')
     expect('kickback_rate' in row).toBe(false)
 
     // Draft + archived never appear on the board.
-    const { data: all } = await asDiver.from('trip_board').select('id, title')
-    const titles = (all ?? []).map(r => (r as { title: string }).title)
+    const titles = (board ?? []).map(r => (r as { title: string }).title)
     expect(titles).not.toContain('Draft Trip')
     expect(titles).not.toContain('Archived Trip')
   })
@@ -164,19 +164,21 @@ describe('my_trip_referrals view', () => {
     await asDiver.rpc('express_trip_interest', { p_trip_id: trip })
     await asOther.rpc('express_trip_interest', { p_trip_id: trip })
 
-    const { data: mine, error } = await asDiver.from('my_trip_referrals').select('*').eq('trip_id', trip)
+    const { data: mineAll, error } = await asDiver.rpc('list_my_trip_referrals')
     expect(error).toBeNull()
+    const mine = (mineAll ?? []).filter(r => (r as { trip_id: string }).trip_id === trip)
     expect(mine).toHaveLength(1)
-    const row = mine![0] as Record<string, unknown>
+    const row = mine[0] as Record<string, unknown>
     expect(row.trip_title).toBe('Raja Ampat Liveaboard')
     expect(row.partner_name).toBe('Blue Manta Divers')
     expect('booked_amount' in row).toBe(false)
     expect('kickback_amount' in row).toBe(false)
 
     // The other diver's interest is not visible here.
-    const { data: other } = await asOther.from('my_trip_referrals').select('*').eq('trip_id', trip)
+    const { data: otherAll } = await asOther.rpc('list_my_trip_referrals')
+    const other = (otherAll ?? []).filter(r => (r as { trip_id: string }).trip_id === trip)
     expect(other).toHaveLength(1)
-    expect((other![0] as { id: string }).id).not.toBe(row.id)
+    expect((other[0] as { id: string }).id).not.toBe(row.id)
   })
 })
 

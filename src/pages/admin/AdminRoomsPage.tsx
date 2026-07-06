@@ -13,11 +13,11 @@ export function AdminRoomsPage() {
   return (
     <CatalogManager<EORoom>
       title="Room options"
-      table="EO_rooms"
+      table="rooms"
       noun="room option"
       orderBy="display_title"
       fields={fields}
-      rowLabel={r => r.display_title || r.admin_title || r._id}
+      rowLabel={r => r.display_title || r.admin_title || r.id}
       rowDetail={r => r.added_price != null ? `+${r.added_price.toLocaleString()} ${r.currency || siteConfig.locale.currency}` : null}
     />
   )

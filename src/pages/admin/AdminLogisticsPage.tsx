@@ -98,12 +98,11 @@ export function AdminLogisticsPage() {
       setAllocations([])
       return
     }
-    const diveIds = groups.filter(g => g.event.type === 'dive').map(g => g.event.id)
-    const courseIds = groups.filter(g => g.event.type === 'course').map(g => g.event.id)
+    const eventIds = groups.map(g => g.event.id)
     let cancelled = false
     ;(async () => {
       try {
-        const rows = await fetchVehiclesForEvents(diveIds, courseIds)
+        const rows = await fetchVehiclesForEvents(eventIds)
         if (!cancelled) setAllocations(rows)
       } catch { if (!cancelled) setAllocations([]) }
     })()
@@ -146,28 +145,21 @@ export function AdminLogisticsPage() {
       const uniqueEvents = events.filter(e => (seen.has(e.id) ? false : (seen.add(e.id), true)))
       if (!uniqueEvents.length) { setGroups([]); return }
 
-      const diveIds = uniqueEvents.filter(e => e.type === 'dive').map(e => e.id)
-      const courseIds = uniqueEvents.filter(e => e.type === 'course').map(e => e.id)
+      const eventIds = uniqueEvents.map(e => e.id)
       // Duties whose date range covers this day, for the day's events. Staff
       // have no transport preference, so each on-duty assignment is surfaced
       // in the ride planning below. A null end_date is a single-day duty.
       const dayCovered = `end_date.gte.${dayKey},end_date.is.null`
-      const [divesB, coursesB, dutyDivesB, dutyCoursesB] = await Promise.all([
-        diveIds.length
-          ? supabase.from('bookings').select('*').in('eo_dive_id', diveIds).neq('status', 'cancelled')
+      const [bookingsB, dutiesB] = await Promise.all([
+        eventIds.length
+          ? supabase.from('bookings').select('*').in('event_id', eventIds).neq('status', 'cancelled')
           : Promise.resolve({ data: [] as Booking[] }),
-        courseIds.length
-          ? supabase.from('bookings').select('*').in('eo_course_id', courseIds).neq('status', 'cancelled')
-          : Promise.resolve({ data: [] as Booking[] }),
-        diveIds.length
-          ? supabase.from('duties').select('*').in('eo_dive_id', diveIds).lte('start_date', dayKey).or(dayCovered)
-          : Promise.resolve({ data: [] as Duty[] }),
-        courseIds.length
-          ? supabase.from('duties').select('*').in('eo_course_id', courseIds).lte('start_date', dayKey).or(dayCovered)
+        eventIds.length
+          ? supabase.from('duties').select('*').in('event_id', eventIds).lte('start_date', dayKey).or(dayCovered)
           : Promise.resolve({ data: [] as Duty[] }),
       ])
-      const bookings = [...(divesB.data ?? []), ...(coursesB.data ?? [])] as Booking[]
-      const duties = [...(dutyDivesB.data ?? []), ...(dutyCoursesB.data ?? [])] as Duty[]
+      const bookings = (bookingsB.data ?? []) as Booking[]
+      const duties = (dutiesB.data ?? []) as Duty[]
 
       // Resolve catalog titles for the day's add-ons so we can pick out the
       // delicate ones (lights, cameras) for the care inventory.
@@ -175,11 +167,11 @@ export function AdminLogisticsPage() {
         bookings.flatMap(b => (b.details as BookingDetails | undefined)?.add_ons ?? []),
       )]
       const addonsRes = addonIds.length
-        ? await supabase.from('Other_Addons').select('_id, display_title, admin_title').in('_id', addonIds)
-        : { data: [] as Array<{ _id: string; display_title: string | null; admin_title: string | null }> }
+        ? await supabase.from('addons').select('id, display_title, admin_title').in('id', addonIds)
+        : { data: [] as Array<{ id: string; display_title: string | null; admin_title: string | null }> }
       if (cancelled) return
       setAddonTitles(new Map(
-        (addonsRes.data ?? []).map(a => [a._id, a.display_title || a.admin_title || a._id]),
+        (addonsRes.data ?? []).map(a => [a.id, a.display_title || a.admin_title || a.id]),
       ))
 
       const userIds = [...new Set([
@@ -228,7 +220,7 @@ export function AdminLogisticsPage() {
 
       const byEvent = new Map<string, DiverGearRow[]>()
       for (const b of bookings) {
-        const eid = b.eo_dive_id ?? b.eo_course_id
+        const eid = b.event_id
         if (!eid) continue
         const arr = byEvent.get(eid) ?? []
         arr.push({ booking: b, profile: profMap.get(b.user_id) ?? null })
@@ -237,7 +229,7 @@ export function AdminLogisticsPage() {
 
       const staffByEvent = new Map<string, StaffDutyRow[]>()
       for (const d of duties) {
-        const eid = d.eo_dive_id ?? d.eo_course_id
+        const eid = d.event_id
         if (!eid) continue
         const arr = staffByEvent.get(eid) ?? []
         arr.push({ dutyId: d.id, role: d.role, profile: profMap.get(d.assignee_id) ?? null })

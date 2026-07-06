@@ -1,27 +1,26 @@
 import { describe, it, expect } from 'vitest'
 import { adminClient, createTestUser, createTestDive, deleteTestUser } from './helpers'
 
-// Pins the cascade-delete contract on EO_dives. Every FK pointing at an
-// EO event already uses ON DELETE CASCADE; this test ensures that contract
+// Pins the cascade-delete contract on events. Every FK pointing at an
+// event already uses ON DELETE CASCADE; this test ensures that contract
 // stays intact so the AdminEventDetailPage delete flow keeps working
 // without orphan rows. Booking → payments / amendments / waitlist_offers
 // are transitive cascades and exercised through the booking that gets
-// removed when the parent dive is deleted.
+// removed when the parent event is deleted.
 
 const admin = adminClient()
 
-describe('deleting an EO_dive cascades to its dependents', () => {
-  it('removes bookings, payments, amendments, and memos linked to the deleted dive', async () => {
+describe('deleting an event cascades to its dependents', () => {
+  it('removes bookings, payments, amendments, and notes linked to the deleted event', async () => {
     const diver = await createTestUser(admin)
-    const diveId = await createTestDive(admin)
+    const eventId = await createTestDive(admin)
     try {
       const { data: booking, error: bErr } = await admin
         .from('bookings')
         .insert({
           user_id: diver.id,
           status: 'pending',
-          eo_dive_id: diveId,
-          eo_course_id: null,
+          event_id: eventId,
           details: {},
         } as never)
         .select().single()
@@ -46,8 +45,7 @@ describe('deleting an EO_dive cascades to its dependents', () => {
       expect(aErr).toBeNull()
 
       const { error: mErr } = await admin.from('admin_notes' as never).insert({
-        eo_dive_id: diveId,
-        eo_course_id: null,
+        event_id: eventId,
         booking_id: null,
         tag: 'note',
         content: 'briefing note',
@@ -56,7 +54,7 @@ describe('deleting an EO_dive cascades to its dependents', () => {
       expect(mErr).toBeNull()
 
       // Drop the parent — cascade should sweep everything tied to it.
-      const { error: dErr } = await admin.from('EO_dives' as never).delete().eq('_id', diveId)
+      const { error: dErr } = await admin.from('events' as never).delete().eq('id', eventId)
       expect(dErr).toBeNull()
 
       const { data: bookingsLeft } = await admin
@@ -72,12 +70,12 @@ describe('deleting an EO_dive cascades to its dependents', () => {
       expect(amendmentsLeft ?? []).toEqual([])
 
       const { data: notesLeft } = await admin
-        .from('admin_notes' as never).select('id').eq('eo_dive_id', diveId)
+        .from('admin_notes' as never).select('id').eq('event_id', eventId)
       expect(notesLeft ?? []).toEqual([])
     } finally {
-      // Dive is already gone if the test passed; this is just belt-and-braces
+      // Event is already gone if the test passed; this is just belt-and-braces
       // for the failure path.
-      await admin.from('EO_dives' as never).delete().eq('_id', diveId)
+      await admin.from('events' as never).delete().eq('id', eventId)
       await deleteTestUser(admin, diver.id)
     }
   })

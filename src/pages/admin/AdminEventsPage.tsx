@@ -71,26 +71,16 @@ export function AdminEventsPage() {
       setBusyEntries(busy)
       setMyDutyDays(dutyDays)
 
-      const diveIds = evs.filter(e => e.type === 'dive').map(e => e.id)
-      const courseIds = evs.filter(e => e.type === 'course').map(e => e.id)
-      if (diveIds.length === 0 && courseIds.length === 0) { setCounts(new Map()); return }
+      const eventIds = evs.map(e => e.id)
+      if (eventIds.length === 0) { setCounts(new Map()); return }
 
-      const [divesRes, coursesRes] = await Promise.all([
-        diveIds.length
-          ? supabase.from('bookings').select('eo_dive_id').in('eo_dive_id', diveIds).neq('status', 'cancelled')
-          : Promise.resolve({ data: [] }),
-        courseIds.length
-          ? supabase.from('bookings').select('eo_course_id').in('eo_course_id', courseIds).neq('status', 'cancelled')
-          : Promise.resolve({ data: [] }),
-      ])
+      const { data } = await supabase
+        .from('bookings').select('event_id').in('event_id', eventIds).neq('status', 'cancelled')
       if (cancelled) return
 
       const next = new Map<string, number>()
-      for (const r of (divesRes.data ?? []) as Array<{ eo_dive_id: string | null }>) {
-        if (r.eo_dive_id) next.set(r.eo_dive_id, (next.get(r.eo_dive_id) ?? 0) + 1)
-      }
-      for (const r of (coursesRes.data ?? []) as Array<{ eo_course_id: string | null }>) {
-        if (r.eo_course_id) next.set(r.eo_course_id, (next.get(r.eo_course_id) ?? 0) + 1)
+      for (const r of (data ?? []) as Array<{ event_id: string | null }>) {
+        if (r.event_id) next.set(r.event_id, (next.get(r.event_id) ?? 0) + 1)
       }
       setCounts(next)
     })()

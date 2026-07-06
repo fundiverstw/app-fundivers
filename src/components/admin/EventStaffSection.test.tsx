@@ -43,7 +43,7 @@ describe('EventStaffSection course day selection', () => {
         { id: 'admin-1', role: 'admin', nickname: 'Ada',   name: 'Ada Lovelace' },
         { id: 'admin-2', role: 'admin', nickname: 'Grace', name: 'Grace Hopper' },
       ] })
-      if (table === 'EO_courses') return mockQueryBuilder({
+      if (table === 'events') return mockQueryBuilder({
         data: { course_days: ['2030-02-10', '2030-02-12', '2030-02-15'] },
       })
       return mockQueryBuilder({ data: [] })
@@ -53,7 +53,7 @@ describe('EventStaffSection course day selection', () => {
       duty: {
         id: `d${++n}`, created_at: '', created_by: 'admin-1', assignee_id: 'admin-2',
         role: 'instructor', start_date: payload.start_date, end_date: null,
-        eo_dive_id: null, eo_course_id: 'course-x', notes: null,
+        event_id: 'course-x', notes: null,
       },
       error: null,
     }))
@@ -85,7 +85,7 @@ describe('EventStaffSection course day selection', () => {
     const days = createDutyWithNotify.mock.calls.map(c => c[0].start_date).sort()
     expect(days).toEqual(['2030-02-12', '2030-02-15'])
     for (const [payload] of createDutyWithNotify.mock.calls) {
-      expect(payload).toMatchObject({ assignee_id: 'admin-2', role: 'instructor', end_date: null, eo_course_id: 'course-x' })
+      expect(payload).toMatchObject({ assignee_id: 'admin-2', role: 'instructor', end_date: null, event_id: 'course-x' })
     }
   })
 
@@ -134,7 +134,7 @@ describe('EventStaffSection course day selection', () => {
       duty: {
         id: 'd2', created_at: '', created_by: 'admin-1', assignee_id: 'admin-1',
         role: 'guide', start_date: '2030-03-05', end_date: null,
-        eo_dive_id: 'dive-y', eo_course_id: null, notes: null,
+        event_id: 'dive-y', notes: null,
       },
       error: null,
     })

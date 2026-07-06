@@ -95,7 +95,7 @@ describe('processWaitlistOffers', () => {
           return b
         }
         if (table === 'bookings') {
-          return builder({ data: { eo_dive_id: 'd-fully', eo_course_id: null }, error: null })
+          return builder({ data: { event_id: 'd-fully' }, error: null })
         }
         return builder({ data: [], error: null })
       },
@@ -111,7 +111,7 @@ describe('processWaitlistOffers', () => {
     expect(expireUpdate?.eqArgs).toEqual(['id', 'o-stale'])
     expect(rpcMock).toHaveBeenCalledWith(
       'offer_next_waitlist_spot',
-      { p_event_id: 'd-fully', p_event_type: 'dive' },
+      { p_event_id: 'd-fully' },
     )
   })
 
@@ -172,9 +172,9 @@ describe('processWaitlistOffers', () => {
           return b
         }
         if (table === 'bookings') {
-          return builder({ data: { user_id: 'u1', eo_dive_id: 'd-full', eo_course_id: null }, error: null })
+          return builder({ data: { user_id: 'u1', event_id: 'd-full' }, error: null })
         }
-        if (table === 'EO_dives') {
+        if (table === 'events') {
           return builder({ data: { display_title: 'Green Island Fun Dive', admin_title: null }, error: null })
         }
         if (table === 'notifications') {

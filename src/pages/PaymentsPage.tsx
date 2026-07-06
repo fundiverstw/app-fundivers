@@ -76,15 +76,14 @@ export function PaymentsPage() {
     const bookingIds = bookings.map(b => b.id)
     const personIds = [...new Set(bookings.flatMap(b => [b.user_id, b.payer_id]).filter((x): x is string => !!x))]
 
-    const diveIds = bookings.map(b => b.eo_dive_id).filter((x): x is string => !!x)
-    const courseIds = bookings.map(b => b.eo_course_id).filter((x): x is string => !!x)
+    const eventIds = bookings.map(b => b.event_id).filter((x): x is string => !!x)
     const [paymentsRes, profilesRes, eventMap, catalog, amendmentsByBooking] = await Promise.all([
       bookingIds.length
         ? supabase.from('payments').select('*').in('booking_id', bookingIds)
         : Promise.resolve({ data: [] as Payment[] }),
       supabase.from('profiles').select('id, name, nickname').in('id', personIds),
-      (diveIds.length || courseIds.length)
-        ? fetchEventsForBookings(diveIds, courseIds)
+      eventIds.length
+        ? fetchEventsForBookings(eventIds)
         : Promise.resolve(new Map<string, AppEvent>()),
       fetchChargeCatalog(bookings.map(b => b.details as BookingDetails)),
       fetchAmendmentsForBookings(bookings.map(b => b.id)),
@@ -103,8 +102,7 @@ export function PaymentsPage() {
     }
 
     const lineData: BookingLine[] = bookings.map(b => {
-      const eventId = b.eo_dive_id ?? b.eo_course_id ?? ''
-      const event = eventMap.get(eventId) ?? null
+      const event = b.event_id ? eventMap.get(b.event_id) ?? null : null
       const d = (b.details ?? {}) as { total?: number; deposit?: number }
       const total = Number(d.total ?? 0)
       const deposit = Number(d.deposit ?? 0)

@@ -125,18 +125,17 @@ export function AdminUsersPage() {
     const bookings = bookingsRes.data ?? []
     const payments = (paymentsRes.data ?? []) as Payment[]
 
-    const diveIds = bookings.map(b => b.eo_dive_id).filter((x): x is string => !!x)
-    const courseIds = bookings.map(b => b.eo_course_id).filter((x): x is string => !!x)
+    const eventIds = bookings.map(b => b.event_id).filter((x): x is string => !!x)
     const [eventMap, amendments, catalog] = await Promise.all([
-      diveIds.length || courseIds.length
-        ? fetchEventsForBookings(diveIds, courseIds)
+      eventIds.length
+        ? fetchEventsForBookings(eventIds)
         : Promise.resolve(new Map<string, AppEvent>()),
       fetchAmendmentsForBookings(bookings.map(b => b.id)),
       fetchChargeCatalog(bookings.map(b => b.details as BookingDetails)),
     ])
 
     const hydrated = bookings.map(b => {
-      const event = eventMap.get((b.eo_dive_id ?? b.eo_course_id)!) ?? null
+      const event = b.event_id ? eventMap.get(b.event_id) ?? null : null
       return {
         ...b,
         event,
