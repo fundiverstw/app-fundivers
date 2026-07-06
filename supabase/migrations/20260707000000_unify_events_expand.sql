@@ -13,15 +13,15 @@ begin;
 
 create table if not exists public.events (
   id            uuid primary key default gen_random_uuid(),
-  legacy_id     text unique,                 -- source EO_dives/EO_courses _id, for FK remap
+  legacy_id     uuid unique,                  -- source EO_dives/EO_courses _id (uuid), for FK remap
   kind          text not null check (kind in ('dive', 'course')),
   -- shared identity / catalog
   admin_title   text,
   display_title text,
   calendar_title text,
-  price         text,                         -- → EO_prices._id (text for now)
+  price         uuid,                          -- → EO_prices._id (already uuid)
   dive_days     bigint,
-  prereq_cert_id text,                        -- → cert_levels._id
+  prereq_cert_id uuid,                         -- → cert_levels._id (already uuid)
   cancel_date   date,
   cancel_policy text,                         -- → cancellation_policies._id
   fully_booked  boolean not null default false,
