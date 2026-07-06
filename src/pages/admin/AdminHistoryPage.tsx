@@ -46,8 +46,8 @@ async function loadHistory(): Promise<HistoryData> {
   const [weatherByYear, bookingsRes, divesRes, coursesRes] = await Promise.all([
     Promise.all(years.map(y => fetchYearWeather(y, today))),
     supabase.from('bookings').select('created_at').gte('created_at', bookingsStart).lt('created_at', bookingsEnd),
-    supabase.from('EO_dives').select('start_date').is('cancelled_at', null).gte('start_date', `${Y}-01-01`).lte('start_date', `${Y}-12-31`),
-    supabase.from('EO_courses').select('course_days').is('cancelled_at', null),
+    supabase.from('events').select('start_date').eq('kind', 'dive').is('cancelled_at', null).gte('start_date', `${Y}-01-01`).lte('start_date', `${Y}-12-31`),
+    supabase.from('events').select('course_days').eq('kind', 'course').is('cancelled_at', null),
   ])
   if (bookingsRes.error) throw bookingsRes.error
 

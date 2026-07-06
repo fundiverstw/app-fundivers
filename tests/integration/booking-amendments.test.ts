@@ -22,7 +22,7 @@ async function freshDive(): Promise<string> {
 async function bookingFor(userId: string): Promise<string> {
   const dive = await freshDive()
   const { data, error } = await admin.from('bookings').insert({
-    user_id: userId, eo_dive_id: dive, status: 'pending', details: {},
+    user_id: userId, event_id: dive, status: 'pending', details: {},
   }).select('id').single()
   if (error) throw error
   return data.id

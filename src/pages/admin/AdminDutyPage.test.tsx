@@ -45,12 +45,12 @@ describe('AdminDutyPage', () => {
       {
         id: 'd1', created_at: '', created_by: 'admin-1', assignee_id: 'admin-1',
         role: 'guide', start_date: '2099-01-10', end_date: null,
-        eo_dive_id: 'dive-a', eo_course_id: null, notes: null,
+        event_id: 'dive-a', notes: null,
       },
       {
         id: 'd2', created_at: '', created_by: 'admin-1', assignee_id: 'admin-2',
         role: 'instructor', start_date: '2099-02-01', end_date: '2099-02-03',
-        eo_dive_id: null, eo_course_id: 'course-a', notes: 'Teaching OW batch',
+        event_id: 'course-a', notes: 'Teaching OW batch',
       },
     ]
     const admins = [

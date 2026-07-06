@@ -59,7 +59,7 @@ async function makeBooking(args: {
 }): Promise<string> {
   const row: Record<string, unknown> = {
     user_id: args.userId,
-    eo_dive_id: args.diveId,
+    event_id: args.diveId,
     status: args.status ?? 'pending',
     details: args.details,
   }
@@ -81,7 +81,7 @@ describe('bookings_validate_payer', () => {
   it('rejects a payer_id that is neither the diver nor their parent (under service role)', async () => {
     const dive = await freshDive()
     const { error } = await admin.from('bookings').insert({
-      user_id: childA.id, eo_dive_id: dive, status: 'pending', details: {}, payer_id: unrelated.id,
+      user_id: childA.id, event_id: dive, status: 'pending', details: {}, payer_id: unrelated.id,
     } as never)
     expect(error).not.toBeNull()
     expect(error?.message).toMatch(/payer_id must be/i)

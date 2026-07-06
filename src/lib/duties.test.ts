@@ -12,13 +12,13 @@ describe('fetchMyDutyDays', () => {
     from.mockReturnValue(mockQueryBuilder({
       data: [
         // Single-day duty (null end_date → same as start_date).
-        { eo_dive_id: 'D1', eo_course_id: null, start_date: '2030-01-05', end_date: null },
+        { event_id: 'D1', start_date: '2030-01-05', end_date: null },
         // Multi-day duty.
-        { eo_dive_id: 'D1', eo_course_id: null, start_date: '2030-01-10', end_date: '2030-01-12' },
+        { event_id: 'D1', start_date: '2030-01-10', end_date: '2030-01-12' },
         // Course duty.
-        { eo_dive_id: null, eo_course_id: 'C1', start_date: '2030-01-08', end_date: '2030-01-08' },
+        { event_id: 'C1', start_date: '2030-01-08', end_date: '2030-01-08' },
         // No event link → skipped entirely.
-        { eo_dive_id: null, eo_course_id: null, start_date: '2030-01-20', end_date: null },
+        { event_id: null, start_date: '2030-01-20', end_date: null },
       ],
     }))
     const map = await fetchMyDutyDays('u1', '2030-01-01', '2030-01-31')

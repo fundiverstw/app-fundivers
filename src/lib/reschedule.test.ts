@@ -82,7 +82,7 @@ describe('rescheduleEventDay', () => {
     const { rescheduleEventDay } = await import('./reschedule')
     await rescheduleEventDay(ev({ id: 'c1', type: 'course' }), '2026-05-16', '2026-05-18')
     expect(updates).toEqual([{
-      table: 'EO_courses',
+      table: 'events',
       payload: { course_days: ['2026-05-09', '2026-05-10', '2026-05-18'] },
     }])
   })
@@ -106,7 +106,7 @@ describe('rescheduleEventDay', () => {
   it('single-day dive: moves start_date and end_date to the new day', async () => {
     const { rescheduleEventDay } = await import('./reschedule')
     await rescheduleEventDay(ev({ id: 'd1', type: 'dive', end_time: null }), '2026-05-10', '2026-05-12')
-    expect(updates).toEqual([{ table: 'EO_dives', payload: { start_date: '2026-05-12', end_date: '2026-05-12' } }])
+    expect(updates).toEqual([{ table: 'events', payload: { start_date: '2026-05-12', end_date: '2026-05-12' } }])
   })
 
   it('no-op when from === to (no DB call at all)', async () => {

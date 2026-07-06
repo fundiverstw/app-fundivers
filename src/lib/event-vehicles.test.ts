@@ -18,7 +18,7 @@ const vehicle = (id: string, name: string, seats = 7, active = true): Vehicle =>
 })
 const alloc = (over: Partial<EventVehicle>): EventVehicle => ({
   id: 'a', created_at: '', created_by: null, vehicle_id: 'v',
-  eo_dive_id: null, eo_course_id: null, notes: null, ...over,
+  event_id: null, notes: null, ...over,
 })
 
 describe('availableVehicles', () => {
@@ -40,29 +40,29 @@ describe('availableVehicles', () => {
 })
 
 describe('allocationEventId', () => {
-  it('returns the dive id for a dive allocation', () => {
-    expect(allocationEventId(alloc({ eo_dive_id: 'D1' }))).toBe('D1')
+  it('returns the event id for a dive allocation', () => {
+    expect(allocationEventId(alloc({ event_id: 'D1' }))).toBe('D1')
   })
-  it('returns the course id for a course allocation', () => {
-    expect(allocationEventId(alloc({ eo_course_id: 'C1' }))).toBe('C1')
+  it('returns the event id for a course allocation', () => {
+    expect(allocationEventId(alloc({ event_id: 'C1' }))).toBe('C1')
   })
 })
 
 describe('fetchVehiclesForEvent', () => {
   it('queries by the dive key and returns the rows', async () => {
-    const rows = [alloc({ id: 'a1', eo_dive_id: 'D1' })]
+    const rows = [alloc({ id: 'a1', event_id: 'D1' })]
     const b = mockQueryBuilder({ data: rows })
     const eq = vi.fn(() => b); b.eq = eq
     from.mockReturnValue(b)
     expect(await fetchVehiclesForEvent({ dive_id: 'D1' })).toEqual(rows)
-    expect(eq).toHaveBeenCalledWith('eo_dive_id', 'D1')
+    expect(eq).toHaveBeenCalledWith('event_id', 'D1')
   })
   it('queries by the course key for a course', async () => {
     const b = mockQueryBuilder({ data: [] })
     const eq = vi.fn(() => b); b.eq = eq
     from.mockReturnValue(b)
     await fetchVehiclesForEvent({ course_id: 'C1' })
-    expect(eq).toHaveBeenCalledWith('eo_course_id', 'C1')
+    expect(eq).toHaveBeenCalledWith('event_id', 'C1')
   })
   it('short-circuits with no event key', async () => {
     expect(await fetchVehiclesForEvent({})).toEqual([])
@@ -77,22 +77,15 @@ describe('fetchVehiclesForEvent', () => {
 })
 
 describe('fetchVehiclesForEvents', () => {
-  it('gathers dive and course allocations across the day', async () => {
-    const diveRows = [alloc({ id: 'a1', eo_dive_id: 'D1' })]
-    const courseRows = [alloc({ id: 'a2', eo_course_id: 'C1' })]
-    const diveB = mockQueryBuilder({ data: diveRows }); diveB.in = vi.fn(() => diveB)
-    const courseB = mockQueryBuilder({ data: courseRows }); courseB.in = vi.fn(() => courseB)
-    from.mockReturnValueOnce(diveB).mockReturnValueOnce(courseB)
-    expect(await fetchVehiclesForEvents(['D1'], ['C1'])).toEqual([...diveRows, ...courseRows])
-  })
-  it('skips a query for an empty id list', async () => {
-    const b = mockQueryBuilder({ data: [alloc({ eo_dive_id: 'D1' })] }); b.in = vi.fn(() => b)
+  it('gathers allocations for the given events in one query', async () => {
+    const rows = [alloc({ id: 'a1', event_id: 'D1' }), alloc({ id: 'a2', event_id: 'C1' })]
+    const b = mockQueryBuilder({ data: rows }); const inSpy = vi.fn(() => b); b.in = inSpy
     from.mockReturnValue(b)
-    await fetchVehiclesForEvents(['D1'], [])
-    expect(from).toHaveBeenCalledTimes(1)
+    expect(await fetchVehiclesForEvents(['D1', 'C1'])).toEqual(rows)
+    expect(inSpy).toHaveBeenCalledWith('event_id', ['D1', 'C1'])
   })
-  it('returns empty when both lists are empty', async () => {
-    expect(await fetchVehiclesForEvents([], [])).toEqual([])
+  it('returns empty for an empty id list without querying', async () => {
+    expect(await fetchVehiclesForEvents([])).toEqual([])
     expect(from).not.toHaveBeenCalled()
   })
 })
@@ -108,11 +101,11 @@ describe('assignVehicleToEvent', () => {
       vehicleId: 'v1', event: { id: 'D1', type: 'dive' }, createdBy: 'admin1',
     })
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({
-      vehicle_id: 'v1', eo_dive_id: 'D1', eo_course_id: null, created_by: 'admin1',
+      vehicle_id: 'v1', event_id: 'D1', created_by: 'admin1',
     }))
   })
 
-  it('writes a course-keyed row (dive key null) for a course event', async () => {
+  it('writes an event-keyed row for a course event', async () => {
     const builder = mockQueryBuilder({ error: null })
     const insert = vi.fn(() => builder)
     builder.insert = insert
@@ -122,7 +115,7 @@ describe('assignVehicleToEvent', () => {
       vehicleId: 'v1', event: { id: 'C1', type: 'course' }, createdBy: 'admin1',
     })
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({
-      eo_dive_id: null, eo_course_id: 'C1',
+      vehicle_id: 'v1', event_id: 'C1',
     }))
   })
 
@@ -145,8 +138,8 @@ describe('assignVehiclesToEvent', () => {
       vehicleIds: ['v1', 'v2'], event: { id: 'D1', type: 'dive' }, createdBy: 'admin1',
     })
     expect(insert).toHaveBeenCalledWith([
-      expect.objectContaining({ vehicle_id: 'v1', eo_dive_id: 'D1', eo_course_id: null }),
-      expect.objectContaining({ vehicle_id: 'v2', eo_dive_id: 'D1', eo_course_id: null }),
+      expect.objectContaining({ vehicle_id: 'v1', event_id: 'D1' }),
+      expect.objectContaining({ vehicle_id: 'v2', event_id: 'D1' }),
     ])
   })
   it('is a no-op for an empty list', async () => {
@@ -166,7 +159,7 @@ describe('fetchRideSeats', () => {
   it('derives available from the RPC capacity/claimed', async () => {
     rpc.mockResolvedValue({ data: [{ capacity: 7, claimed: 2 }], error: null })
     expect(await fetchRideSeats({ dive_id: 'D1' })).toEqual({ capacity: 7, claimed: 2, available: 5 })
-    expect(rpc).toHaveBeenCalledWith('event_ride_seats', { p_dive_id: 'D1', p_course_id: null })
+    expect(rpc).toHaveBeenCalledWith('event_ride_seats', { p_event_id: 'D1' })
   })
 
   it('never reports negative availability', async () => {

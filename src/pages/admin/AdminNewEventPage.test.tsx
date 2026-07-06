@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { siteConfig } from '../../config/site'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { AdminNewEventPage } from './AdminNewEventPage'
 import { mockQueryBuilder } from '../../../tests/test-utils'
 
-const { from } = vi.hoisted(() => ({ from: vi.fn() }))
+const { from, rpc } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }))
 vi.mock('../../lib/supabase', () => ({
-  supabase: { from: (...a: unknown[]) => from(...a) },
+  supabase: { from: (...a: unknown[]) => from(...a), rpc: (...a: unknown[]) => rpc(...a) },
 }))
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({ profile: { id: 'admin-1', role: 'admin' } }),
@@ -15,15 +16,18 @@ vi.mock('../../hooks/useAuth', () => ({
 
 beforeEach(() => {
   from.mockReset()
+  rpc.mockReset()
+  // set_event_relations writes the junctions after the row insert.
+  rpc.mockResolvedValue({ error: null })
 })
 
 function fakeCatalog() {
   // The page fetches three catalog tables on mount before submit is enabled.
   // Hand each lookup a tiny fixture so the FK pickers actually render rows.
   from.mockImplementation((table: string) => {
-    if (table === 'EO_prices') return mockQueryBuilder({ data: [{ _id: 'price-1', title: 'Standard',  starting_at: 5000 }] })
-    if (table === 'EO_rooms')  return mockQueryBuilder({ data: [{ _id: 'room-1',  display_title: 'Twin', admin_title: 'Twin' }] })
-    if (table === 'Other_Addons') return mockQueryBuilder({ data: [{ _id: 'addon-1', display_title: 'Nitrox', admin_title: 'Nitrox' }] })
+    if (table === 'prices') return mockQueryBuilder({ data: [{ id: 'price-1', title: 'Standard',  starting_at: 5000 }] })
+    if (table === 'rooms')  return mockQueryBuilder({ data: [{ id: 'room-1',  display_title: 'Twin', admin_title: 'Twin' }] })
+    if (table === 'addons') return mockQueryBuilder({ data: [{ id: 'addon-1', display_title: 'Nitrox', admin_title: 'Nitrox' }] })
     return mockQueryBuilder({ data: [] })
   })
 }
@@ -75,27 +79,25 @@ describe('AdminNewEventPage', () => {
 
   it('preloads form fields when a past dive is picked', async () => {
     const pastDive = {
-      _id: 'past-1',
+      id: 'past-1',
+      kind: 'dive',
       admin_title: 'Green Island Day Trip',
-      title: 'GI',
       start_date: '2026-01-15',
-      time: '09:00:00',
+      start_time: '09:00:00',
       end_date: '2026-01-15',
       notes: 'Bring fins',
       featured: true,
       fully_booked: false,
       nitrox_required: true,
-      has_rooms: false,
-      room_types: '',
-      other_addons: '',
       price: 'price-1',
     }
     from.mockImplementation((table: string) => {
-      if (table === 'EO_prices')    return mockQueryBuilder({ data: [{ _id: 'price-1', title: 'Standard' }] })
-      if (table === 'EO_rooms')     return mockQueryBuilder({ data: [] })
-      if (table === 'Other_Addons') return mockQueryBuilder({ data: [] })
-      if (table === 'EO_dives')     return mockQueryBuilder({ data: [pastDive] })
-      if (table === 'EO_courses')   return mockQueryBuilder({ data: [] })
+      if (table === 'prices')    return mockQueryBuilder({ data: [{ id: 'price-1', title: 'Standard' }] })
+      if (table === 'rooms')     return mockQueryBuilder({ data: [] })
+      if (table === 'addons') return mockQueryBuilder({ data: [] })
+      // Dives + courses are one `events` table now, queried twice by kind; the
+      // course-kind read maps the same row but drops it (no course_days).
+      if (table === 'events')       return mockQueryBuilder({ data: [pastDive] })
       return mockQueryBuilder({ data: [] })
     })
     const user = userEvent.setup()
@@ -115,13 +117,13 @@ describe('AdminNewEventPage', () => {
       then: (cb: (r: { error: null }) => void) => Promise.resolve({ error: null }).then(cb),
     })
     from.mockImplementation((table: string) => {
-      if (table === 'EO_prices') {
+      if (table === 'prices') {
         const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
         b.insert = priceInsert
         return b
       }
-      if (table === 'EO_rooms')     return mockQueryBuilder({ data: [{ _id: 'room-1', display_title: 'Twin', admin_title: 'Twin' }] })
-      if (table === 'Other_Addons') return mockQueryBuilder({ data: [] })
+      if (table === 'rooms')     return mockQueryBuilder({ data: [{ id: 'room-1', display_title: 'Twin', admin_title: 'Twin' }] })
+      if (table === 'addons') return mockQueryBuilder({ data: [] })
       return mockQueryBuilder({ data: [] })
     })
     const user = userEvent.setup()
@@ -138,30 +140,28 @@ describe('AdminNewEventPage', () => {
     // Newly created tier becomes the selected option in the price dropdown.
     await waitFor(() => {
       const select = screen.getByLabelText(/price tier/i) as HTMLSelectElement
-      expect(select.value).toBe(payload._id as string)
+      expect(select.value).toBe(payload.id as string)
       expect(select.options[select.selectedIndex].textContent).toMatch(/Premium/)
     })
   })
 
-  it('inserts a new room option from the sub-form, auto-ticks it, and enables has_rooms', async () => {
+  it('inserts a new room option from the sub-form and auto-ticks it', async () => {
     const roomInsert = vi.fn().mockReturnValue({
       then: (cb: (r: { error: null }) => void) => Promise.resolve({ error: null }).then(cb),
     })
     from.mockImplementation((table: string) => {
-      if (table === 'EO_rooms') {
+      if (table === 'rooms') {
         const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
         b.insert = roomInsert
         return b
       }
-      if (table === 'EO_prices')    return mockQueryBuilder({ data: [] })
-      if (table === 'Other_Addons') return mockQueryBuilder({ data: [] })
+      if (table === 'prices')    return mockQueryBuilder({ data: [] })
+      if (table === 'addons') return mockQueryBuilder({ data: [] })
       return mockQueryBuilder({ data: [] })
     })
     const user = userEvent.setup()
     renderPage()
     await screen.findByLabelText(/admin title \(required, internal\)/i)
-    // has_rooms starts false; the sub-form should flip it on save.
-    expect((screen.getByLabelText(/^offers rooms$/i) as HTMLInputElement).checked).toBe(false)
 
     await user.click(screen.getByRole('button', { name: /new room option/i }))
     await user.type(screen.getByLabelText('Title (required)'), 'Premium Room')
@@ -175,9 +175,9 @@ describe('AdminNewEventPage', () => {
     expect(payload.display_title).toBe('Premium Suite')
     expect(payload.added_price).toBe(2000)
 
-    // has_rooms toggle flipped on, and the new room is checked in the list.
+    // The new room is ticked in the list (selecting rooms is now the sole
+    // signal — there's no separate "offers rooms" flag).
     await waitFor(() => {
-      expect((screen.getByLabelText(/^offers rooms$/i) as HTMLInputElement).checked).toBe(true)
       expect((screen.getByLabelText(/Premium Room/) as HTMLInputElement).checked).toBe(true)
     })
   })
@@ -187,13 +187,13 @@ describe('AdminNewEventPage', () => {
       then: (cb: (r: { error: null }) => void) => Promise.resolve({ error: null }).then(cb),
     })
     from.mockImplementation((table: string) => {
-      if (table === 'Other_Addons') {
+      if (table === 'addons') {
         const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
         b.insert = addonInsert
         return b
       }
-      if (table === 'EO_prices') return mockQueryBuilder({ data: [] })
-      if (table === 'EO_rooms')  return mockQueryBuilder({ data: [] })
+      if (table === 'prices') return mockQueryBuilder({ data: [] })
+      if (table === 'rooms')  return mockQueryBuilder({ data: [] })
       return mockQueryBuilder({ data: [] })
     })
     const user = userEvent.setup()
@@ -203,7 +203,7 @@ describe('AdminNewEventPage', () => {
     await user.click(screen.getByRole('button', { name: /new add-on/i }))
     await user.type(screen.getByLabelText('Title (required)'), 'SMB')
     await user.type(screen.getByLabelText(/display name/i), 'Surface Marker Buoy')
-    await user.type(screen.getByLabelText(/price \(NTD\)/i), '100')
+    await user.type(screen.getByLabelText(new RegExp(`price \\(${siteConfig.locale.currencyLabel}\\)`, 'i')), '100')
     await user.click(screen.getByRole('button', { name: /save add-on/i }))
 
     await waitFor(() => expect(addonInsert).toHaveBeenCalled())
@@ -222,14 +222,14 @@ describe('AdminNewEventPage', () => {
       then: (cb: (r: { error: null }) => void) => Promise.resolve({ error: null }).then(cb),
     })
     from.mockImplementation((table: string) => {
-      if (table === 'DiveTravel') {
+      if (table === 'dive_travel') {
         const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
         b.insert = travelInsert
         return b
       }
-      if (table === 'EO_prices')    return mockQueryBuilder({ data: [] })
-      if (table === 'EO_rooms')     return mockQueryBuilder({ data: [] })
-      if (table === 'Other_Addons') return mockQueryBuilder({ data: [] })
+      if (table === 'prices')    return mockQueryBuilder({ data: [] })
+      if (table === 'rooms')     return mockQueryBuilder({ data: [] })
+      if (table === 'addons') return mockQueryBuilder({ data: [] })
       return mockQueryBuilder({ data: [] })
     })
     const user = userEvent.setup()
@@ -246,22 +246,22 @@ describe('AdminNewEventPage', () => {
     expect(payload.admin_title).toBe('Green Island')
     expect(payload.included).toBe('Tanks, weights, transport')
 
-    // Newly created entry becomes the selected option in the DiveTravel dropdown.
+    // Newly created entry becomes the selected option in the dive_travel dropdown.
     await waitFor(() => {
       const select = screen.getByLabelText(/DiveTravel reference/i) as HTMLSelectElement
-      expect(select.value).toBe(payload._id as string)
+      expect(select.value).toBe(payload.id as string)
       expect(select.options[select.selectedIndex].textContent).toMatch(/Green Island/)
     })
   })
 
-  it('encodes selected TravelDestinations into destination_reference as a JSON array', async () => {
+  it('writes selected travel_destinations to the junctions via set_event_relations', async () => {
     const insert = vi.fn().mockReturnValue({ then: (cb: (r: { error: null }) => void) => Promise.resolve({ error: null }).then(cb) })
     from.mockImplementation((table: string) => {
-      if (table === 'TravelDestinations') return mockQueryBuilder({ data: [
-        { _id: 'dest-1', admin_title: 'Green Island',  country: 'Taiwan',          sort_order: 1 },
-        { _id: 'dest-2', admin_title: 'Puerto Galera', country: 'The Philippines', sort_order: 2 },
+      if (table === 'travel_destinations') return mockQueryBuilder({ data: [
+        { id: 'dest-1', admin_title: 'Green Island',  country: 'Taiwan',          sort_order: 1 },
+        { id: 'dest-2', admin_title: 'Puerto Galera', country: 'The Philippines', sort_order: 2 },
       ] })
-      if (table === 'EO_dives') {
+      if (table === 'events') {
         const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
         b.insert = insert
         return b
@@ -280,17 +280,22 @@ describe('AdminNewEventPage', () => {
     await user.click(screen.getByRole('button', { name: /create dive/i }))
 
     await waitFor(() => expect(insert).toHaveBeenCalled())
+    // destination_reference is no longer on the row — it goes to the junction
+    // tables through the RPC (keyed by event id, no per-kind arg).
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('set_event_relations', expect.anything()))
+    const relArgs = (rpc.mock.calls.find(c => c[0] === 'set_event_relations')?.[1] ?? {}) as Record<string, unknown>
+    expect(relArgs.p_destination_ids).toEqual(['dest-1', 'dest-2'])
     const payload = (insert.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
-    expect(payload.destination_reference).toBe(JSON.stringify(['dest-1', 'dest-2']))
+    expect(payload).not.toHaveProperty('destination_reference')
   })
 
   it('inserts a dive with minimum required fields and navigates to its detail page', async () => {
     const insert = vi.fn().mockReturnValue({ then: (cb: (r: { error: null }) => void) => Promise.resolve({ error: null }).then(cb) })
     from.mockImplementation((table: string) => {
-      if (table === 'EO_prices')    return mockQueryBuilder({ data: [] })
-      if (table === 'EO_rooms')     return mockQueryBuilder({ data: [] })
-      if (table === 'Other_Addons') return mockQueryBuilder({ data: [] })
-      if (table === 'EO_dives') {
+      if (table === 'prices')    return mockQueryBuilder({ data: [] })
+      if (table === 'rooms')     return mockQueryBuilder({ data: [] })
+      if (table === 'addons') return mockQueryBuilder({ data: [] })
+      if (table === 'events') {
         // Hybrid: select() chain (past-event fetch) returns empty,
         // insert() routes through the spy so we can assert payload.
         const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
@@ -309,7 +314,7 @@ describe('AdminNewEventPage', () => {
     const payload = (insert.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
     expect(payload.admin_title).toBe('Green Island Day Trip')
     expect(payload.start_date).toBe('2026-06-01')
-    expect(typeof payload._id).toBe('string')
+    expect(typeof payload.id).toBe('string')
     expect(await screen.findByText('DIVE_DETAIL')).toBeInTheDocument()
   })
 })

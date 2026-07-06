@@ -15,11 +15,11 @@ export function AdminTravelPage() {
   return (
     <CatalogManager<DiveTravelEntry>
       title="DiveTravel"
-      table="DiveTravel"
+      table="dive_travel"
       noun="DiveTravel entry"
       orderBy="admin_title"
       fields={fields}
-      rowLabel={r => r.admin_title || r._id}
+      rowLabel={r => r.admin_title || r.id}
     />
   )
 }

@@ -76,7 +76,7 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked, existi
   )
 }
 
-// Per-event transport surcharge now lives on the linked EO_prices row
+// Per-event transport surcharge now lives on the linked prices row
 // (see event.transport_price). NULL or 0 = transportation bundled into
 // the base price.
 
@@ -107,12 +107,11 @@ async function fetchOwnBooking(
   userId: string,
   event: AppEvent,
 ): Promise<{ id: string; status: string } | null> {
-  const col = event.type === 'dive' ? 'eo_dive_id' : 'eo_course_id'
   const { data } = await supabase
     .from('bookings')
     .select('id, status')
     .eq('user_id', userId)
-    .eq(col, event.id)
+    .eq('event_id', event.id)
     .neq('status', 'cancelled')
     .maybeSingle()
   return (data as { id: string; status: string } | null) ?? null
@@ -438,7 +437,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // Open Water / DSD courses bundle gear into the fee — we record the fact
   // in the booking but don't prompt. Every other course (AOW, EANx, Deep,
   // Rescue, ...) lets the diver rent, same as a dive. Dives expose the rent
-  // toggle when the admin filled in gear_rental_info on EO_dives.
+  // toggle when the admin filled in gear_rental_info on the dive event.
   const gearIncluded = event.type === 'course' && isGearIncludedCourse(event.title)
   const showGearRentChoice =
     (event.type === 'dive' && !!event.gear_rental_info) ||
@@ -731,23 +730,23 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     ;(async () => {
       if (showRooms && event.room_type_ids.length > 0) {
         const { data } = await supabase
-          .from('EO_rooms' as never)
-          .select('_id, admin_title, display_title, added_price, currency')
-          .in('_id', event.room_type_ids)
+          .from('rooms' as never)
+          .select('id, admin_title, display_title, added_price, currency')
+          .in('id', event.room_type_ids)
         if (!cancelled) setRooms((data ?? []) as EORoom[])
       }
       if (showAddons && event.addon_ids.length > 0) {
         const { data } = await supabase
-          .from('Other_Addons' as never)
-          .select('_id, admin_title, display_title, price, currency')
-          .in('_id', event.addon_ids)
+          .from('addons' as never)
+          .select('id, admin_title, display_title, price, currency')
+          .in('id', event.addon_ids)
         if (!cancelled) setAddons((data ?? []) as EOAddon[])
       }
       if (event.cancel_policy) {
         const { data } = await supabase
           .from('cancellation_policies' as never)
-          .select('_id, title, cancelation_policy')
-          .eq('_id', event.cancel_policy)
+          .select('id, title, cancellation_policy')
+          .eq('id', event.cancel_policy)
           .maybeSingle()
         if (!cancelled) setCancelPolicy((data ?? null) as CancellationPolicy | null)
       }
@@ -786,9 +785,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     let cancelled = false
     ;(async () => {
       const { data } = await supabase
-        .from((event.type === 'dive' ? 'EO_dives' : 'EO_courses') as never)
+        .from('events' as never)
         .select('prereq_cert_id, req_dives')
-        .eq('_id', event.id)
+        .eq('id', event.id)
         .maybeSingle()
       if (cancelled || !data) return
       const row = data as { prereq_cert_id: string | null; req_dives: number | string | null }
@@ -854,10 +853,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     return gearItems.reduce((s, item) => s + (GEAR_ALACARTE_PRICES[item] ?? 0) * diveDays, 0)
   }, [showGearRentChoice, gearChoice, gearItems, diveDays])
 
-  const roomCost = useMemo(() => rooms.find(r => r._id === roomId)?.added_price ?? 0, [rooms, roomId])
+  const roomCost = useMemo(() => rooms.find(r => r.id === roomId)?.added_price ?? 0, [rooms, roomId])
   const addonsCost = useMemo(() => {
     let total = 0
-    for (const a of addons) if (addonIds.has(a._id)) total += a.price ?? 0
+    for (const a of addons) if (addonIds.has(a.id)) total += a.price ?? 0
     return total
   }, [addons, addonIds])
   // Both PayPal and credit card incur a 5% surcharge (PayPal absorbs ~3% on
@@ -865,7 +864,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // local bank transfer pass through at face value.
   const paymentSurcharge = payment === 'credit_card' || payment === 'paypal' ? 0.05 : 0
   const base = event.price ?? 0
-  // Transport pricing comes from the linked EO_prices row. NULL or 0 means
+  // Transport pricing comes from the linked prices row. NULL or 0 means
   // it's bundled into the base price — the form hides the opt-in checkbox
   // and the cost calc skips the surcharge entirely.
   const transportSurcharge = event.transport_price ?? 0
@@ -927,7 +926,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // on-screen summary and the snapshot written into details.charges, so what
   // the diver sees is exactly what gets frozen onto the booking.
   const charges = useMemo(() => {
-    const room = (showRooms && roomId) ? rooms.find(r => r._id === roomId) ?? null : null
+    const room = (showRooms && roomId) ? rooms.find(r => r.id === roomId) ?? null : null
     return buildCharges({
       base,
       gear: (showGearRentChoice && gearChoice === 'rent')
@@ -937,7 +936,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       room: room ? { label: room.display_title ?? room.admin_title ?? 'Room', amount: roomCost } : null,
       addons: showAddons
         ? [...addonIds].map(id => {
-            const a = addons.find(x => x._id === id)
+            const a = addons.find(x => x.id === id)
             return { label: a?.display_title ?? a?.admin_title ?? id, amount: a?.price ?? 0 }
           })
         : [],
@@ -1797,7 +1796,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               <select value={roomId} onChange={e => setRoomId(e.target.value)} className="w-full bg-white border border-surface-300 rounded-lg px-2 py-1 text-sm text-brand-900">
                 <option value="">— keep included room —</option>
                 {rooms.map(r => (
-                  <option key={r._id} value={r._id}>
+                  <option key={r.id} value={r.id}>
                     {r.display_title ?? r.admin_title} {r.added_price != null && `(+${r.added_price.toLocaleString()})`}
                   </option>
                 ))}
@@ -1813,8 +1812,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               <p className="text-sm text-brand-950 font-medium font-semibold">Add-ons</p>
               <div className="max-h-40 overflow-y-auto grid grid-cols-1 gap-1 pr-1">
                 {addons.map(a => (
-                  <label key={a._id} className="flex items-center gap-2 text-xs text-brand-950 font-medium">
-                    <input type="checkbox" checked={addonIds.has(a._id)} onChange={() => toggleAddon(a._id)} className="accent-brand-900" />
+                  <label key={a.id} className="flex items-center gap-2 text-xs text-brand-950 font-medium">
+                    <input type="checkbox" checked={addonIds.has(a.id)} onChange={() => toggleAddon(a.id)} className="accent-brand-900" />
                     <span className="flex-1">{a.display_title ?? a.admin_title}</span>
                     {a.price != null && <span className="text-brand-900 font-medium">+{a.price.toLocaleString()}</span>}
                   </label>
@@ -2021,7 +2020,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             )}
           </div>
 
-          {cancelPolicy && cancelPolicy.cancelation_policy && (
+          {cancelPolicy && cancelPolicy.cancellation_policy && (
             <div className="text-xs text-brand-950 font-medium bg-white/70 border border-surface-300 rounded-lg p-3 space-y-2">
               <p className="font-semibold text-brand-900">
                 Cancellation policy{cancelPolicy.title ? ` — ${cancelPolicy.title}` : ''}
@@ -2030,7 +2029,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 <p>Cancel-by date: <strong>{formatDeadline(event.cancel_date)}</strong></p>
               )}
               <p className="whitespace-pre-line max-h-40 overflow-y-auto pr-1">
-                {cancelPolicy.cancelation_policy}
+                {cancelPolicy.cancellation_policy}
               </p>
               <label className="flex items-start gap-2 pt-1">
                 <input

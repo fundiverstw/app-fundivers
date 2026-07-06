@@ -69,9 +69,9 @@ describe('BookingsPage', () => {
   it('joins bookings to events and groups them upcoming vs past/cancelled', async () => {
     useAuthMock.mockReturnValue({ user: { id: 'u1' } })
     const bookings = [
-      { id: 'b1', user_id: 'u1', eo_dive_id: 'd1', eo_course_id: null, status: 'confirmed', notes: null, created_at: new Date().toISOString(), details: {} },
-      { id: 'b2', user_id: 'u1', eo_dive_id: 'd2', eo_course_id: null, status: 'cancelled', notes: null, created_at: new Date().toISOString(), details: {} },
-      { id: 'b3', user_id: 'u1', eo_dive_id: null, eo_course_id: 'c3', status: 'confirmed', notes: null, created_at: new Date().toISOString(), details: {} },
+      { id: 'b1', user_id: 'u1', event_id: 'd1', status: 'confirmed', notes: null, created_at: new Date().toISOString(), details: {} },
+      { id: 'b2', user_id: 'u1', event_id: 'd2', status: 'cancelled', notes: null, created_at: new Date().toISOString(), details: {} },
+      { id: 'b3', user_id: 'u1', event_id: 'c3', status: 'confirmed', notes: null, created_at: new Date().toISOString(), details: {} },
     ]
     from.mockReturnValue(mockQueryBuilder({ data: bookings }))
     fetchEventsForBookings.mockResolvedValue(new Map<string, AppEvent>([
@@ -115,7 +115,7 @@ describe('BookingsPage', () => {
       if (table === 'bookings') {
         return {
           ...mockQueryBuilder({
-            data: [{ id: 'b1', user_id: 'u1', eo_dive_id: 'd1', eo_course_id: null, status: 'pending', notes: null, created_at: new Date().toISOString(), details: { total: 2800 }, refund_requested_at: null }],
+            data: [{ id: 'b1', user_id: 'u1', event_id: 'd1', status: 'pending', notes: null, created_at: new Date().toISOString(), details: { total: 2800 }, refund_requested_at: null }],
           }),
           update: (...a: unknown[]) => { update(...a); return mockQueryBuilder() },
         }
@@ -141,7 +141,7 @@ describe('BookingsPage', () => {
       if (table === 'bookings') {
         return {
           ...mockQueryBuilder({
-            data: [{ id: 'b1', user_id: 'u1', eo_dive_id: 'd1', eo_course_id: null, status: 'pending', notes: null, created_at: new Date().toISOString(), details: { total: 2800, deposit: 800 }, refund_requested_at: null }],
+            data: [{ id: 'b1', user_id: 'u1', event_id: 'd1', status: 'pending', notes: null, created_at: new Date().toISOString(), details: { total: 2800, deposit: 800 }, refund_requested_at: null }],
           }),
           update: (...a: unknown[]) => { update(...a); return mockQueryBuilder() },
         }
@@ -171,7 +171,7 @@ describe('BookingsPage', () => {
     from.mockImplementation((table: string) => {
       if (table === 'bookings') {
         return mockQueryBuilder({
-          data: [{ id: 'b1', user_id: 'u1', eo_dive_id: 'd1', eo_course_id: null, status: 'pending', notes: null, created_at: new Date().toISOString(), details: { total: 2800 }, refund_requested_at: new Date().toISOString() }],
+          data: [{ id: 'b1', user_id: 'u1', event_id: 'd1', status: 'pending', notes: null, created_at: new Date().toISOString(), details: { total: 2800 }, refund_requested_at: new Date().toISOString() }],
         })
       }
       return mockQueryBuilder({ data: [{ id: 'p1', user_id: 'u1', booking_id: 'b1', amount: 800, status: 'paid', currency: 'TWD', method: null, note: null, created_at: new Date().toISOString(), recorded_by: null }] })
@@ -190,7 +190,7 @@ describe('BookingsPage', () => {
   it('renders a fallback label when the event no longer exists', async () => {
     useAuthMock.mockReturnValue({ user: { id: 'u1' } })
     from.mockReturnValue(mockQueryBuilder({
-      data: [{ id: 'b1', user_id: 'u1', eo_dive_id: 'missing', eo_course_id: null, status: 'confirmed', notes: null, created_at: new Date().toISOString(), details: {}, refund_requested_at: null }]
+      data: [{ id: 'b1', user_id: 'u1', event_id: 'missing', status: 'confirmed', notes: null, created_at: new Date().toISOString(), details: {}, refund_requested_at: null }]
     }))
     fetchEventsForBookings.mockResolvedValue(new Map())
     renderWithRouter(<BookingsPage />)
@@ -204,7 +204,7 @@ describe('BookingsPage waitlist offers', () => {
   function setupWithOffer(offerExpiresAt: string | null = future24h()) {
     useAuthMock.mockReturnValue({ user: { id: 'u1' } })
     const booking = {
-      id: 'b-wait', user_id: 'u1', eo_dive_id: 'd1', eo_course_id: null,
+      id: 'b-wait', user_id: 'u1', event_id: 'd1',
       status: 'waitlisted', notes: null, created_at: new Date().toISOString(),
       details: {}, refund_requested_at: null,
     }

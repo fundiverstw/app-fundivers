@@ -17,7 +17,7 @@ beforeAll(async () => {
   diverB = await createTestUser(admin, { role: 'diver' })
   diverC = await createTestUser(admin, { role: 'diver' })
   diveId = await createTestDive(admin)
-  await admin.from('EO_dives').update({ capacity: 2 } as never).eq('_id', diveId)
+  await admin.from('events' as never).update({ capacity: 2 } as never).eq('id', diveId)
 })
 
 afterAll(async () => {
@@ -30,8 +30,7 @@ afterAll(async () => {
 async function insertBooking(userId: string, statusOverride?: 'pending' | 'confirmed' | 'waitlisted') {
   const { data, error } = await admin.from('bookings').insert({
     user_id: userId,
-    eo_dive_id: diveId,
-    eo_course_id: null,
+    event_id: diveId,
     details: {},
     ...(statusOverride ? { status: statusOverride } : {}),
   } as never).select('id, status').single<{ id: string; status: string }>()
@@ -71,11 +70,10 @@ describe('event capacity + waitlist trigger', () => {
     const b = await insertBooking(diverB.id, 'confirmed')
 
     const { data, error } = await admin.rpc('event_confirmed_counts' as never, {
-      p_dive_ids:   [diveId],
-      p_course_ids: [],
+      p_event_ids: [diveId],
     } as never)
     expect(error).toBeNull()
-    const rows = (data ?? []) as Array<{ event_id: string; event_type: string; n: number }>
+    const rows = (data ?? []) as Array<{ event_id: string; n: number }>
     const row = rows.find(r => r.event_id === diveId)
     expect(row?.n).toBe(2)
 

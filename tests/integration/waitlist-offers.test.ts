@@ -14,10 +14,10 @@ beforeAll(async () => {
   diverC = await createTestUser(admin, { role: 'diver' })
 
   // Two dives — one we mark fully_booked, one we leave open. Helpers create
-  // EO_dives with default fully_booked=false; flip via a follow-up update.
+  // events with default fully_booked=false; flip via a follow-up update.
   fullDiveId = await createTestDive(admin)
   openDiveId = await createTestDive(admin)
-  await admin.from('EO_dives').update({ fully_booked: true } as never).eq('_id', fullDiveId)
+  await admin.from('events' as never).update({ fully_booked: true } as never).eq('id', fullDiveId)
 })
 
 afterAll(async () => {
@@ -31,8 +31,7 @@ afterAll(async () => {
 async function insertBooking(userId: string, diveId: string, statusOverride?: 'pending' | 'confirmed' | 'waitlisted') {
   const { data, error } = await admin.from('bookings').insert({
     user_id: userId,
-    eo_dive_id: diveId,
-    eo_course_id: null,
+    event_id: diveId,
     details: {},
     ...(statusOverride ? { status: statusOverride } : {}),
   } as never).select('id, status').single<{ id: string; status: string }>()

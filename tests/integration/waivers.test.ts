@@ -8,8 +8,8 @@
 //   - divers never INSERT signatures directly (only via the RPC)
 //   - event_waivers is readable by any authenticated user but writable by
 //     admins only
-//   - a signature targets at most one event; an event_waivers override targets
-//     exactly one (XOR)
+//   - a signature has a single nullable event_id (annual waivers leave it null);
+//     an event_waivers override requires event_id (event_waivers_event_present)
 //   - deleting the event (or the diver) cascades the rows away
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import {
@@ -52,7 +52,7 @@ describe('sign_waiver RPC', () => {
     const before = Date.now()
     const { data: id, error } = await a.rpc('sign_waiver', {
       p_code: 'diver_medical', p_version: 1, p_signed_name: '  Diver A  ',
-      p_dive_id: null, p_course_id: null,
+      p_event_id: null,
     })
     expect(error).toBeNull()
     expect(typeof id).toBe('string')
@@ -70,7 +70,7 @@ describe('sign_waiver RPC', () => {
     const anon = (await import('./helpers')).anonClient()
     const { error } = await anon.rpc('sign_waiver', {
       p_code: 'diver_medical', p_version: 1, p_signed_name: 'Nobody',
-      p_dive_id: null, p_course_id: null,
+      p_event_id: null,
     })
     expect(error).not.toBeNull()
   })
@@ -79,7 +79,7 @@ describe('sign_waiver RPC', () => {
     const a = await userClient(diverA.email, diverA.password)
     const { error } = await a.rpc('sign_waiver', {
       p_code: 'diver_medical', p_version: 1, p_signed_name: '   ',
-      p_dive_id: null, p_course_id: null,
+      p_event_id: null,
     })
     expect(error).not.toBeNull()
   })
@@ -88,18 +88,18 @@ describe('sign_waiver RPC', () => {
     const a = await userClient(diverA.email, diverA.password)
     const { data: id, error } = await a.rpc('sign_waiver', {
       p_code: 'continuing_education', p_version: 1, p_signed_name: 'Diver A',
-      p_dive_id: null, p_course_id: courseId,
+      p_event_id: courseId,
     })
     expect(error).toBeNull()
-    const { data: row } = await a.from('waiver_signatures').select('eo_course_id').eq('id', id as string).single()
-    expect((row as { eo_course_id: string }).eo_course_id).toBe(courseId)
+    const { data: row } = await a.from('waiver_signatures').select('event_id').eq('id', id as string).single()
+    expect((row as { event_id: string }).event_id).toBe(courseId)
   })
 })
 
 describe('waiver_signatures RLS', () => {
   it('lets a diver read only their own signatures', async () => {
     const a = await userClient(diverA.email, diverA.password)
-    await a.rpc('sign_waiver', { p_code: 'padi_liability', p_version: 1, p_signed_name: 'Diver A', p_dive_id: null, p_course_id: null })
+    await a.rpc('sign_waiver', { p_code: 'padi_liability', p_version: 1, p_signed_name: 'Diver A', p_event_id: null })
 
     const b = await userClient(diverB.email, diverB.password)
     const { data: bSeesA } = await b.from('waiver_signatures').select('*').eq('diver_id', diverA.id)
@@ -123,36 +123,32 @@ describe('waiver_signatures RLS', () => {
     expect(error).not.toBeNull()
   })
 
-  it('rejects a signature that targets two events (at-most-one check)', async () => {
-    const { error } = await admin.from('waiver_signatures').insert({
-      diver_id: diverA.id, waiver_code: 'continuing_education', waiver_version: 1,
-      signed_name: 'Both', eo_dive_id: diveId, eo_course_id: courseId,
-    } as never)
-    expect(error).not.toBeNull()
-  })
+  // The old "targets two events" at-most-one check is obsolete: waiver_signatures
+  // now has a single nullable event_id (annual waivers leave it null), so there is
+  // no two-column XOR to violate. Test dropped rather than skipped.
 })
 
 describe('event_waivers RLS + constraints', () => {
   it('lets an admin set an override and any diver read it', async () => {
     const { error: insErr } = await admin.from('event_waivers').insert({
-      eo_course_id: courseId, waiver_code: 'continuing_education', mode: 'exempt', created_by: adminUser.id,
+      event_id: courseId, waiver_code: 'continuing_education', mode: 'exempt', created_by: adminUser.id,
     } as never)
     expect(insErr).toBeNull()
 
     const b = await userClient(diverB.email, diverB.password)
-    const { data } = await b.from('event_waivers').select('*').eq('eo_course_id', courseId)
+    const { data } = await b.from('event_waivers').select('*').eq('event_id', courseId)
     expect((data ?? []).length).toBeGreaterThan(0)
   })
 
   it('blocks a diver from writing an override', async () => {
     const b = await userClient(diverB.email, diverB.password)
     const { error } = await b.from('event_waivers').insert({
-      eo_dive_id: diveId, waiver_code: 'padi_liability', mode: 'exempt',
+      event_id: diveId, waiver_code: 'padi_liability', mode: 'exempt',
     } as never)
     expect(error).not.toBeNull()
   })
 
-  it('rejects an override that targets neither event (XOR)', async () => {
+  it('rejects an override with no event_id (event_id required)', async () => {
     const { error } = await admin.from('event_waivers').insert({
       waiver_code: 'padi_liability', mode: 'require', created_by: adminUser.id,
     } as never)
@@ -161,10 +157,10 @@ describe('event_waivers RLS + constraints', () => {
 
   it('enforces one override per waiver per event', async () => {
     await admin.from('event_waivers').insert({
-      eo_dive_id: diveId, waiver_code: 'diver_medical', mode: 'exempt', created_by: adminUser.id,
+      event_id: diveId, waiver_code: 'diver_medical', mode: 'exempt', created_by: adminUser.id,
     } as never)
     const { error } = await admin.from('event_waivers').insert({
-      eo_dive_id: diveId, waiver_code: 'diver_medical', mode: 'require', created_by: adminUser.id,
+      event_id: diveId, waiver_code: 'diver_medical', mode: 'require', created_by: adminUser.id,
     } as never)
     expect(error).not.toBeNull()
   })
@@ -176,17 +172,17 @@ describe('cascade on event delete', () => {
     const a = await userClient(diverA.email, diverA.password)
     await a.rpc('sign_waiver', {
       p_code: 'continuing_education', p_version: 1, p_signed_name: 'Diver A',
-      p_dive_id: null, p_course_id: throwawayCourse,
+      p_event_id: throwawayCourse,
     })
     await admin.from('event_waivers').insert({
-      eo_course_id: throwawayCourse, waiver_code: 'continuing_education', mode: 'require', created_by: adminUser.id,
+      event_id: throwawayCourse, waiver_code: 'continuing_education', mode: 'require', created_by: adminUser.id,
     } as never)
 
     await deleteTestCourse(admin, throwawayCourse)
 
-    const { data: sigs } = await admin.from('waiver_signatures').select('id').eq('eo_course_id', throwawayCourse)
+    const { data: sigs } = await admin.from('waiver_signatures').select('id').eq('event_id', throwawayCourse)
     expect(sigs ?? []).toHaveLength(0)
-    const { data: ovs } = await admin.from('event_waivers').select('id').eq('eo_course_id', throwawayCourse)
+    const { data: ovs } = await admin.from('event_waivers').select('id').eq('event_id', throwawayCourse)
     expect(ovs ?? []).toHaveLength(0)
   })
 })

@@ -125,13 +125,12 @@ Deno.serve(async (req) => {
   // Pull the event row. Dives carry a start_date/end_date envelope;
   // courses only carry course_days, so the manifest's date stamp comes
   // from the earliest course day instead.
-  const table = eventType === "dive" ? "EO_dives" : "EO_courses"
   const titleCols = "display_title, admin_title, calendar_title"
   const dateCols = eventType === "dive" ? "start_date, end_date" : "course_days"
   const { data: event, error: eErr } = await admin
-    .from(table)
-    .select(`_id, ${dateCols}, ${titleCols}`)
-    .eq("_id", eventId)
+    .from("events")
+    .select(`id, ${dateCols}, ${titleCols}`)
+    .eq("id", eventId)
     .single()
   if (eErr || !event) return json({ error: safeError(eErr, "event not found") }, 404)
 
@@ -142,11 +141,10 @@ Deno.serve(async (req) => {
     : ([...((event.course_days as string[] | null) ?? [])].sort()[0] ?? null)
 
   // Bookings for this event whose divers are expected to attend.
-  const fkCol = eventType === "dive" ? "eo_dive_id" : "eo_course_id"
   const { data: bookings, error: bErr } = await admin
     .from("bookings")
     .select("user_id, status")
-    .eq(fkCol, eventId)
+    .eq("event_id", eventId)
     .in("status", ["pending", "confirmed"])
   if (bErr) return json({ error: safeError(bErr, "bookings fetch failed") }, 500)
 
@@ -170,11 +168,10 @@ Deno.serve(async (req) => {
   // Staff on duty for this event also board the boat, so they belong on the
   // manifest. A staffer may hold several duty rows (one per course day) and
   // cover more than one role — dedupe by person, collecting distinct roles.
-  // The duty FK column matches the booking FK column (eo_dive_id / eo_course_id).
   const { data: dutyRows, error: dErr } = await admin
     .from("duties")
     .select("assignee_id, role")
-    .eq(fkCol, eventId)
+    .eq("event_id", eventId)
   if (dErr) return json({ error: safeError(dErr, "duties fetch failed") }, 500)
 
   // Don't list anyone twice: a person already on the diver manifest (a booked

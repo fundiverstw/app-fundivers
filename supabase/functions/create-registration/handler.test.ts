@@ -80,21 +80,14 @@ function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites }
           }
         case 'bookings':
           return { id: 'b1', status: opts.bookingStatus ?? 'pending', notes: null }
-        case 'EO_dives':
+        case 'events':
           return opts.eventNotFound ? null : {
-            _id: 'd1', display_title: 'Test Dive',
+            id: 'd1', kind: 'dive', display_title: 'Test Dive',
             prereq_cert_id: opts.prereqCertId ?? null,
             req_dives: opts.reqDives ?? null,
             ...(opts.eventPast
-              ? { start_date: '2020-01-01', end_date: '2020-01-03' }
-              : { start_date: '2030-06-01', end_date: '2030-06-03' }),
-          }
-        case 'EO_courses':
-          return opts.eventNotFound ? null : {
-            _id: 'c1', display_title: 'Test Course',
-            prereq_cert_id: opts.prereqCertId ?? null,
-            req_dives: opts.reqDives ?? null,
-            course_days: opts.eventPast ? ['2020-01-01', '2020-01-02'] : ['2030-06-01', '2030-06-02', '2030-06-03'],
+              ? { start_date: '2020-01-01', end_date: '2020-01-03', course_days: ['2020-01-01', '2020-01-02'] }
+              : { start_date: '2030-06-01', end_date: '2030-06-03', course_days: ['2030-06-01', '2030-06-02', '2030-06-03'] }),
           }
         default:           return null
       }

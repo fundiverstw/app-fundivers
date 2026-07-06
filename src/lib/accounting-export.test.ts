@@ -29,8 +29,8 @@ function payment(over: Partial<Payment>): Payment {
 
 const diver = { id: 'diver-1', name: 'Dana Diver', email: 'dana@example.com' }
 const admin = { id: 'admin-1', name: 'Avi Admin', email: 'avi@example.com' }
-const diveBooking = { id: 'bk-1', user_id: 'diver-1', eo_dive_id: 'dive-1', eo_course_id: null, status: 'confirmed', details: { total: 1000 } }
-const dive = { _id: 'dive-1', display_title: 'Long Dong Bay', admin_title: null, start_date: '2026-03-14' }
+const diveBooking = { id: 'bk-1', user_id: 'diver-1', event_id: 'dive-1', status: 'confirmed', details: { total: 1000 } }
+const dive = { id: 'dive-1', kind: 'dive' as const, display_title: 'Long Dong Bay', admin_title: null, start_date: '2026-03-14', course_days: null }
 
 describe('fiscalYearRange', () => {
   it('covers Jan 1 to next Jan 1 in Asia/Taipei', () => {
@@ -46,8 +46,7 @@ describe('normalizeTransactions', () => {
     const [t] = normalizeTransactions({
       payments: [payment({})],
       bookings: [diveBooking],
-      dives: [dive],
-      courses: [],
+      events: [dive],
       profiles: [diver, admin],
     })
     expect(t.diverName).toBe('Dana Diver')
@@ -62,7 +61,7 @@ describe('normalizeTransactions', () => {
   it('keeps a payment whose booking/event is unresolved, with null event fields', () => {
     const [t] = normalizeTransactions({
       payments: [payment({ booking_id: 'missing', recorded_by: null })],
-      bookings: [], dives: [], courses: [], profiles: [diver],
+      bookings: [], events: [], profiles: [diver],
     })
     expect(t.eventType).toBeNull()
     expect(t.eventTitle).toBeNull()
@@ -73,7 +72,7 @@ describe('normalizeTransactions', () => {
   it('falls back to the raw id when a profile is missing', () => {
     const [t] = normalizeTransactions({
       payments: [payment({ user_id: 'ghost', recorded_by: 'ghost-admin' })],
-      bookings: [diveBooking], dives: [dive], courses: [], profiles: [],
+      bookings: [diveBooking], events: [dive], profiles: [],
     })
     expect(t.diverName).toBe('ghost')
     expect(t.adminName).toBe('ghost-admin')
@@ -82,9 +81,8 @@ describe('normalizeTransactions', () => {
   it('uses the earliest course day as the course event date', () => {
     const [t] = normalizeTransactions({
       payments: [payment({})],
-      bookings: [{ ...diveBooking, eo_dive_id: null, eo_course_id: 'c-1' }],
-      dives: [],
-      courses: [{ _id: 'c-1', display_title: 'OW', admin_title: null, course_days: ['2026-05-10', '2026-05-09'] }],
+      bookings: [{ ...diveBooking, event_id: 'c-1' }],
+      events: [{ id: 'c-1', kind: 'course' as const, display_title: 'OW', admin_title: null, start_date: null, course_days: ['2026-05-10', '2026-05-09'] }],
       profiles: [diver, admin],
     })
     expect(t.eventType).toBe('course')

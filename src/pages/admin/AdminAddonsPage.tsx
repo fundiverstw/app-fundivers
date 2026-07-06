@@ -13,11 +13,11 @@ export function AdminAddonsPage() {
   return (
     <CatalogManager<EOAddon>
       title="Add-ons"
-      table="Other_Addons"
+      table="addons"
       noun="add-on"
       orderBy="display_title"
       fields={fields}
-      rowLabel={r => r.display_title || r.admin_title || r._id}
+      rowLabel={r => r.display_title || r.admin_title || r.id}
       rowDetail={r => r.price != null ? `${r.price.toLocaleString()} ${r.currency || siteConfig.locale.currency}` : null}
     />
   )

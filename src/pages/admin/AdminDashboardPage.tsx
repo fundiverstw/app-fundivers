@@ -30,8 +30,9 @@ function taipeiYear(iso: string): number {
   return Number(taipeiDate(iso).slice(0, 4))
 }
 
-type DiveRow = { _id: string; display_title: string | null; admin_title: string | null; capacity: number | null; start_date: string | null }
-type CourseRow = { _id: string; display_title: string | null; admin_title: string | null; capacity: number | null; course_days: string[] | null }
+type DiveRow = { id: string; display_title: string | null; admin_title: string | null; capacity: number | null; start_date: string | null }
+type CourseRow = { id: string; display_title: string | null; admin_title: string | null; capacity: number | null; course_days: string[] | null }
+type EventRowLite = DiveRow & CourseRow & { kind: 'dive' | 'course' }
 
 const titleOf = (r: { display_title: string | null; admin_title: string | null }, fallback: string) =>
   r.display_title || r.admin_title || fallback
@@ -49,11 +50,11 @@ async function loadDashboard(): Promise<Dashboard> {
 
   const [paymentsRes, bookingsRes, profilesRes, pendingRes, divesRes, coursesRes] = await Promise.all([
     supabase.from('payments').select('user_id, booking_id, amount, status, method, created_at').gte('created_at', startIso).lt('created_at', endIso),
-    supabase.from('bookings').select('id, user_id, eo_dive_id, eo_course_id, status, created_at, details').gte('created_at', startIso).lt('created_at', endIso),
+    supabase.from('bookings').select('id, user_id, event_id, status, created_at, details').gte('created_at', startIso).lt('created_at', endIso),
     supabase.from('profiles').select('id, role, status, created_at, nationality, cert_level'),
     supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'pending').not('application_submitted_at', 'is', null),
-    supabase.from('EO_dives').select('_id, display_title, admin_title, capacity, start_date').is('cancelled_at', null).gte('start_date', today),
-    supabase.from('EO_courses').select('_id, display_title, admin_title, capacity, course_days').is('cancelled_at', null),
+    supabase.from('events').select('id, display_title, admin_title, capacity, start_date').eq('kind', 'dive').is('cancelled_at', null).gte('start_date', today),
+    supabase.from('events').select('id, display_title, admin_title, capacity, course_days').eq('kind', 'course').is('cancelled_at', null),
   ])
   if (paymentsRes.error) throw paymentsRes.error
   if (bookingsRes.error) throw bookingsRes.error
@@ -68,38 +69,35 @@ async function loadDashboard(): Promise<Dashboard> {
 
   // Event rows we still need titles for: events referenced by bookings that
   // aren't already in the upcoming-dives / all-courses sets we loaded.
-  const haveDiveIds = new Set(upcomingDives.map(d => d._id))
-  const refDiveIds = [...new Set(bookings.map(b => b.eo_dive_id).filter((x): x is string => !!x && !haveDiveIds.has(x)))]
-  const extraDives = refDiveIds.length
-    ? (await supabase.from('EO_dives').select('_id, display_title, admin_title, capacity, start_date').in('_id', refDiveIds)).data as DiveRow[] ?? []
+  const knownIds = new Set([...upcomingDives.map(d => d.id), ...allCourses.map(c => c.id)])
+  const refIds = [...new Set(bookings.map(b => b.event_id).filter((x): x is string => !!x && !knownIds.has(x)))]
+  const extra = refIds.length
+    ? (await supabase.from('events').select('id, kind, display_title, admin_title, capacity, start_date, course_days').in('id', refIds)).data as EventRowLite[] ?? []
     : []
 
   const events: EventLite[] = [
-    ...[...upcomingDives, ...extraDives].map((d): EventLite => ({
-      id: d._id, type: 'dive', title: titleOf(d, 'Dive'), capacity: d.capacity,
+    ...upcomingDives.map((d): EventLite => ({
+      id: d.id, type: 'dive', title: titleOf(d, 'Dive'), capacity: d.capacity,
       dateKey: d.start_date ? d.start_date.slice(0, 10) : null,
     })),
     ...allCourses.map((c): EventLite => ({
-      id: c._id, type: 'course', title: titleOf(c, 'Course'), capacity: c.capacity,
+      id: c.id, type: 'course', title: titleOf(c, 'Course'), capacity: c.capacity,
       dateKey: courseDateKey(c.course_days, today),
+    })),
+    ...extra.map((e): EventLite => ({
+      id: e.id, type: e.kind, title: titleOf(e, e.kind === 'dive' ? 'Dive' : 'Course'), capacity: e.capacity,
+      dateKey: e.kind === 'course' ? courseDateKey(e.course_days, today) : (e.start_date ? e.start_date.slice(0, 10) : null),
     })),
   ]
 
   // Confirmed counts for the genuinely-upcoming events (any-time bookings, not
   // just the trailing window) so fill rates are accurate.
-  const upcomingDiveIds = events.filter(e => e.type === 'dive' && e.dateKey && e.dateKey >= today).map(e => e.id)
-  const upcomingCourseIds = events.filter(e => e.type === 'course' && e.dateKey && e.dateKey >= today).map(e => e.id)
-  const [confDivesRes, confCoursesRes] = await Promise.all([
-    upcomingDiveIds.length
-      ? supabase.from('bookings').select('eo_dive_id').eq('status', 'confirmed').in('eo_dive_id', upcomingDiveIds)
-      : Promise.resolve({ data: [] as Array<{ eo_dive_id: string | null }> }),
-    upcomingCourseIds.length
-      ? supabase.from('bookings').select('eo_course_id').eq('status', 'confirmed').in('eo_course_id', upcomingCourseIds)
-      : Promise.resolve({ data: [] as Array<{ eo_course_id: string | null }> }),
-  ])
+  const upcomingIds = events.filter(e => e.dateKey && e.dateKey >= today).map(e => e.id)
+  const confRes = upcomingIds.length
+    ? await supabase.from('bookings').select('event_id').eq('status', 'confirmed').in('event_id', upcomingIds)
+    : { data: [] as Array<{ event_id: string | null }> }
   const counts = new Map<string, number>()
-  for (const r of confDivesRes.data ?? []) if (r.eo_dive_id) counts.set(r.eo_dive_id, (counts.get(r.eo_dive_id) ?? 0) + 1)
-  for (const r of confCoursesRes.data ?? []) if (r.eo_course_id) counts.set(r.eo_course_id, (counts.get(r.eo_course_id) ?? 0) + 1)
+  for (const r of confRes.data ?? []) if (r.event_id) counts.set(r.event_id, (counts.get(r.event_id) ?? 0) + 1)
   const confirmed: ConfirmedCount[] = [...counts.entries()].map(([eventId, count]) => ({ eventId, count }))
 
   return computeDashboard({ nowIso, payments, bookings, profiles, events, confirmed, pendingApplications })

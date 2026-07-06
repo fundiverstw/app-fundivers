@@ -111,7 +111,7 @@ describe('parent ↔ child RLS', () => {
   })
 
   it('parent can SELECT bookings belonging to their child', async () => {
-    // Seed a booking for the child via admin (need an EO_dive _id; helpers
+    // Seed a booking for the child via admin (need an event id; helpers
     // for this exist but we'd need to clean up afterward — skip and just
     // assert that the SELECT path works by counting rows after admin insert).
     const { createTestDive, deleteTestDive } = await import('./helpers')
@@ -120,7 +120,7 @@ describe('parent ↔ child RLS', () => {
       const { data: b, error: bErr } = await admin
         .from('bookings')
         .insert({
-          user_id: child.id, eo_dive_id: diveId, eo_course_id: null, details: {} as never,
+          user_id: child.id, event_id: diveId, details: {} as never,
         } as never)
         .select('id')
         .single<{ id: string }>()

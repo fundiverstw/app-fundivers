@@ -26,36 +26,36 @@ afterAll(async () => {
 })
 
 describe('bookings: one active booking per (user, event)', () => {
-  it('blocks a second active booking for the same dive', async () => {
+  it('blocks a second active booking for the same dive event', async () => {
     const first = await admin
       .from('bookings')
-      .insert({ user_id: user.id, eo_dive_id: diveId, status: 'pending' })
+      .insert({ user_id: user.id, event_id: diveId, status: 'pending' })
       .select().single()
     expect(first.error).toBeNull()
     if (first.data) bookingIds.push(first.data.id)
 
     const dup = await admin
       .from('bookings')
-      .insert({ user_id: user.id, eo_dive_id: diveId, status: 'pending' })
+      .insert({ user_id: user.id, event_id: diveId, status: 'pending' })
     expect(dup.error).not.toBeNull()
-    expect(String(dup.error?.message ?? '')).toMatch(/bookings_one_active_dive_per_user_idx|duplicate key/i)
+    expect(String(dup.error?.message ?? '')).toMatch(/bookings_one_active_per_user_idx|duplicate key/i)
 
     await admin.from('bookings').delete().eq('id', first.data!.id)
   })
 
-  it('blocks a second active booking for the same course', async () => {
+  it('blocks a second active booking for the same course event', async () => {
     const first = await admin
       .from('bookings')
-      .insert({ user_id: user.id, eo_course_id: courseId, status: 'pending' })
+      .insert({ user_id: user.id, event_id: courseId, status: 'pending' })
       .select().single()
     expect(first.error).toBeNull()
     if (first.data) bookingIds.push(first.data.id)
 
     const dup = await admin
       .from('bookings')
-      .insert({ user_id: user.id, eo_course_id: courseId, status: 'pending' })
+      .insert({ user_id: user.id, event_id: courseId, status: 'pending' })
     expect(dup.error).not.toBeNull()
-    expect(String(dup.error?.message ?? '')).toMatch(/bookings_one_active_course_per_user_idx|duplicate key/i)
+    expect(String(dup.error?.message ?? '')).toMatch(/bookings_one_active_per_user_idx|duplicate key/i)
 
     await admin.from('bookings').delete().eq('id', first.data!.id)
   })
@@ -63,7 +63,7 @@ describe('bookings: one active booking per (user, event)', () => {
   it('allows a new booking after the prior one was cancelled — keeps audit row', async () => {
     const first = await admin
       .from('bookings')
-      .insert({ user_id: user.id, eo_dive_id: diveId, status: 'pending' })
+      .insert({ user_id: user.id, event_id: diveId, status: 'pending' })
       .select().single()
     expect(first.error).toBeNull()
     if (first.data) bookingIds.push(first.data.id)
@@ -72,13 +72,13 @@ describe('bookings: one active booking per (user, event)', () => {
 
     const second = await admin
       .from('bookings')
-      .insert({ user_id: user.id, eo_dive_id: diveId, status: 'pending' })
+      .insert({ user_id: user.id, event_id: diveId, status: 'pending' })
       .select().single()
     expect(second.error).toBeNull()
     if (second.data) bookingIds.push(second.data.id)
 
     const { data: rows } = await admin
-      .from('bookings').select('id, status').eq('user_id', user.id).eq('eo_dive_id', diveId)
+      .from('bookings').select('id, status').eq('user_id', user.id).eq('event_id', diveId)
     expect(rows?.length).toBe(2)
     expect(rows?.filter(r => r.status === 'cancelled').length).toBe(1)
     expect(rows?.filter(r => r.status === 'pending').length).toBe(1)
@@ -89,18 +89,18 @@ describe('bookings: one active booking per (user, event)', () => {
     try {
       const a = await admin
         .from('bookings')
-        .insert({ user_id: user.id, eo_dive_id: fresh, status: 'cancelled' })
+        .insert({ user_id: user.id, event_id: fresh, status: 'cancelled' })
         .select().single()
       const b = await admin
         .from('bookings')
-        .insert({ user_id: user.id, eo_dive_id: fresh, status: 'cancelled' })
+        .insert({ user_id: user.id, event_id: fresh, status: 'cancelled' })
         .select().single()
       expect(a.error).toBeNull()
       expect(b.error).toBeNull()
       if (a.data) bookingIds.push(a.data.id)
       if (b.data) bookingIds.push(b.data.id)
     } finally {
-      await admin.from('bookings').delete().eq('eo_dive_id', fresh)
+      await admin.from('bookings').delete().eq('event_id', fresh)
       await deleteTestDive(admin, fresh)
     }
   })

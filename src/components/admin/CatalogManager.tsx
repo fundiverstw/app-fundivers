@@ -16,7 +16,7 @@ function capitalize(s: string) {
 }
 
 // Generic list+create+edit+delete UI for the simple catalog tables backing
-// /admin/rooms, /admin/addons, /admin/travel. Each row's _id is an
+// /admin/rooms, /admin/addons, /admin/travel. Each row's id is an
 // auto-generated uuid (text PK on the Wix-legacy tables); the rest of the
 // columns are user-editable strings or numbers per the field spec.
 //
@@ -36,12 +36,12 @@ export interface CatalogField<Row> {
   placeholder?: string
 }
 
-export interface CatalogManagerProps<Row extends { _id: string }> {
+export interface CatalogManagerProps<Row extends { id: string }> {
   /** Page heading. */
   title: string
   /** Supabase table name (case-sensitive — the "EO_*" tables are quoted). */
   table: CatalogTableName
-  /** Editable fields. _id is auto-generated and never appears here. */
+  /** Editable fields. id is auto-generated and never appears here. */
   fields: CatalogField<Row>[]
   /** Column to sort by when listing (defaults to the first field's key). */
   orderBy?: keyof Row & string
@@ -83,7 +83,7 @@ function formToPayload<Row>(form: FormValues, fields: CatalogField<Row>[]): Reco
   return out
 }
 
-export function CatalogManager<Row extends { _id: string }>({
+export function CatalogManager<Row extends { id: string }>({
   title, table, fields, orderBy, rowLabel, rowDetail, noun,
 }: CatalogManagerProps<Row>) {
   const toast = useToast()
@@ -101,7 +101,7 @@ export function CatalogManager<Row extends { _id: string }>({
   const [deleteInFlight, setDeleteInFlight] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
-  const sortKey: string = orderBy ?? fields[0]?.key ?? '_id'
+  const sortKey: string = orderBy ?? fields[0]?.key ?? 'id'
 
   useEffect(() => {
     let cancelled = false
@@ -161,13 +161,13 @@ export function CatalogManager<Row extends { _id: string }>({
           // Column name cast for the same reason `payload as never` is
           // needed: from(table) returns the union of all catalog table
           // builders, so .eq's column-key parameter narrows to `never`.
-          .eq('_id' as never, editing._id)
+          .eq('id' as never, editing.id)
         if (error) throw error
-        setRows(prev => prev.map(r => r._id === editing._id ? { ...r, ...payload } as Row : r))
+        setRows(prev => prev.map(r => r.id === editing.id ? { ...r, ...payload } as Row : r))
         toast.success(`${capitalize(noun)} updated`)
       } else {
         const id = crypto.randomUUID()
-        const insertPayload = { _id: id, ...payload }
+        const insertPayload = { id: id, ...payload }
         const { error } = await supabase.from(table).insert(insertPayload as never)
         if (error) throw error
         setRows(prev => [...prev, insertPayload as unknown as Row])
@@ -187,9 +187,9 @@ export function CatalogManager<Row extends { _id: string }>({
     setDeleteInFlight(true)
     setDeleteError(null)
     try {
-      const { error } = await supabase.from(table).delete().eq('_id' as never, row._id)
+      const { error } = await supabase.from(table).delete().eq('id' as never, row.id)
       if (error) throw error
-      setRows(prev => prev.filter(r => r._id !== row._id))
+      setRows(prev => prev.filter(r => r.id !== row.id))
       setConfirmDelete(null)
       toast.success(`${capitalize(noun)} deleted`)
     } catch (err) {
@@ -229,7 +229,7 @@ export function CatalogManager<Row extends { _id: string }>({
         <ul className="space-y-2">
           {rows.map(row => (
             <li
-              key={row._id}
+              key={row.id}
               className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 flex items-start justify-between gap-3"
             >
               <div className="min-w-0">

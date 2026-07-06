@@ -50,9 +50,9 @@ export async function rescheduleEventDay(ev: AppEvent, fromKey: string, toKey: s
 
   if (ev.type === 'course') {
     const { data, error } = await supabase
-      .from('EO_courses')
+      .from('events')
       .select('course_days')
-      .eq('_id', ev.id)
+      .eq('id', ev.id)
       .single()
     if (error) throw error
     const current = ((data as { course_days: string[] | null } | null)?.course_days ?? [])
@@ -61,9 +61,9 @@ export async function rescheduleEventDay(ev: AppEvent, fromKey: string, toKey: s
     if (!current.includes(fromKey)) return
     const days = replaceDayInList(current, fromKey, toKey)
     const { error: updErr } = await supabase
-      .from('EO_courses')
+      .from('events')
       .update({ course_days: days } as never)
-      .eq('_id', ev.id)
+      .eq('id', ev.id)
     if (updErr) throw updErr
     return
   }
@@ -79,9 +79,9 @@ export async function rescheduleEventDay(ev: AppEvent, fromKey: string, toKey: s
   const patch: Record<string, string> = { start_date: toKey }
   if (endKey === null || endKey === startKey) patch.end_date = toKey
   const { error } = await supabase
-    .from('EO_dives')
+    .from('events')
     .update(patch as never)
-    .eq('_id', ev.id)
+    .eq('id', ev.id)
   if (error) throw error
 }
 

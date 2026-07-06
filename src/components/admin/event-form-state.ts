@@ -1,4 +1,4 @@
-import type { EOCourse, EODive } from '../../types/database'
+import type { EventRow } from '../../types/database'
 
 // Form-state shape, defaults, prefill helpers, and the FormState→DB-payload
 // converters used by the create + edit pages. Lives in its own file so the
@@ -9,7 +9,7 @@ export type EventType = 'dive' | 'course'
 export interface FormState {
   // common
   type: EventType
-  admin_title: string    // internal label admins see (NOT NULL on EO_dives, nullable on EO_courses)
+  admin_title: string    // internal label admins see (trimmed+required for dives, optional for courses)
   display_title: string  // diver-facing title; falls back to admin_title on public surfaces
   calendar_title: string // short label for the calendar widget; optional
   start_date: string
@@ -17,31 +17,28 @@ export interface FormState {
   end_date: string
   /** Max confirmed bookings before the trigger forces waitlist. Empty = uncapped. */
   capacity: string
-  price: string          // FK → EO_prices._id; empty = no price linked
+  price: string          // FK → prices.id; empty = no price linked
   prereq_cert_id: string // FK → cert_levels.id; empty = no cert required
   req_dives: string      // dives store bigint, courses store text — keep as string here
   dive_days: string      // bigint or empty
-  addonIds: string[]     // FK multi → Other_Addons
-  // Wix media references — paste from the Wix Media Manager (URI looks
-  // like `wix:image://v1/<id>/<filename>#originWidth=…&originHeight=…`).
-  // The Wix site reads these directly for hero / gallery rendering; the
-  // SPA only stores and round-trips the text.
-  featured_image: string // EO_dives + EO_courses
-  second_image: string   // EO_dives only — left empty for courses
+  addonIds: string[]     // FK multi → addons
+  // Plain image URLs the shop hosts itself; the SPA stores and round-trips
+  // the text (no upload/resolve).
+  featured_image: string // both kinds
+  second_image: string   // dive-only — left empty for courses
   // dive
   notes: string          // dive-only NOT NULL
   featured: boolean
   fully_booked: boolean
   is_private: boolean    // dive-only: hidden from diver-facing calendars
   is_boat_dive: boolean  // dive-only, independent of is_trip
-  is_trip: boolean       // dive-only, independent of is_boat_dive; drives Scheduled Trips
-  has_rooms: boolean
-  roomIds: string[]      // FK multi → EO_rooms (CSV-encoded)
+  is_trip: boolean       // dive-only: surfaced under Scheduled Trips
+  roomIds: string[]      // FK multi → rooms
   nitrox_required: boolean
   gear_rental: string
   cancel_date: string
   cancel_policy: string
-  destinationIds: string[]   // FK multi → TravelDestinations (JSON-encoded into destination_reference)
+  destinationIds: string[]   // FK multi → travel_destinations
   divetravel_reference: string
   // full-payment deadline (both event types) — empty string = unset, falls
   // back client-side to "7 days before start_date". The deposit is always
@@ -66,7 +63,7 @@ export const EMPTY_FORM: FormState = {
   addonIds: [],
   featured_image: '', second_image: '',
   notes: '', featured: false, fully_booked: false, is_private: false, is_boat_dive: false, is_trip: false,
-  has_rooms: false, roomIds: [],
+  roomIds: [],
   nitrox_required: false, gear_rental: '',
   cancel_date: '', cancel_policy: '',
   destinationIds: [], divetravel_reference: '',
@@ -74,6 +71,19 @@ export const EMPTY_FORM: FormState = {
   courseDays: [], course_name: '',
   included: '', schedule: '',
 }
+
+/**
+ * An event's related catalog ids, held in the junction tables (the single
+ * source of truth). Loaded alongside an event for editing/preload, and written
+ * back via the set_event_relations RPC. See src/lib/event-relations.ts.
+ */
+export interface EventRelations {
+  roomIds: string[]
+  addonIds: string[]
+  destinationIds: string[]
+}
+
+const NO_RELATIONS: EventRelations = { roomIds: [], addonIds: [], destinationIds: [] }
 
 function toHhmm(raw: string | null | undefined): string {
   if (!raw) return ''
@@ -93,169 +103,114 @@ function stripCapacitySuffix(raw: string | null | undefined): string {
   return raw.replace(/\s*\((?:\d+\s*spots?\s*open|fully booked\s*[-–—]+\s*register for waitlist)\)\s*$/i, '')
 }
 
-// other_addons can be a JSON array string, a CSV string, or empty (Bubble
-// legacy). Try JSON first, fall back to CSV — same shape as the DB-side
-// parse_addon_ids() function.
-export function parseAddonIds(raw: string | null | undefined): string[] {
-  if (!raw) return []
-  const trimmed = raw.trim()
-  if (!trimmed) return []
-  if (trimmed.startsWith('[')) {
-    try {
-      const parsed = JSON.parse(trimmed)
-      if (Array.isArray(parsed)) return parsed.map(String).map(s => s.trim()).filter(Boolean)
-    } catch { /* fall through to CSV */ }
+/**
+ * Build a FormState from an existing events row (edit page + preload picker).
+ * Branches on `kind` for the per-kind fields. Room/add-on/destination ids come
+ * from the junction tables via `rels`, not the row.
+ */
+export function formStateFromEvent(e: EventRow, rels: EventRelations = NO_RELATIONS): FormState {
+  const common = {
+    admin_title: e.admin_title ?? '',
+    display_title: stripCapacitySuffix(e.display_title),
+    calendar_title: e.calendar_title ?? '',
+    start_time: toHhmm(e.start_time),
+    capacity: e.capacity != null ? String(e.capacity) : '',
+    price: e.price ?? '',
+    prereq_cert_id: e.prereq_cert_id ?? '',
+    req_dives: e.req_dives != null ? String(e.req_dives) : '',
+    dive_days: e.dive_days != null ? String(e.dive_days) : '',
+    addonIds: rels.addonIds,
+    fully_booked: !!e.fully_booked,
+    cancel_date: e.cancel_date ?? '',
+    cancel_policy: e.cancel_policy ?? '',
+    full_payment_deadline: e.full_payment_deadline ?? '',
+    featured_image: e.featured_image ?? '',
   }
-  return trimmed.split(',').map(s => s.trim()).filter(Boolean)
-}
 
-export function parseCsvIds(raw: string | null | undefined): string[] {
-  if (!raw) return []
-  return raw.split(',').map(s => s.trim()).filter(Boolean)
-}
+  if (e.kind === 'course') {
+    const courseDays = [...new Set((e.course_days ?? []).filter(Boolean))].sort()
+    return {
+      ...common,
+      type: 'course',
+      // The form's start/end are derived from courseDays (courses have no envelope).
+      start_date: courseDays[0] ?? '',
+      end_date: courseDays[courseDays.length - 1] ?? '',
+      courseDays,
+      course_name: e.course_name ?? '',
+      included: e.included ?? '',
+      schedule: e.schedule ?? '',
+      second_image: '',
+      notes: '', featured: false, is_private: false, is_boat_dive: false, is_trip: false,
+      roomIds: [],
+      nitrox_required: false, gear_rental: '',
+      destinationIds: [], divetravel_reference: '',
+    }
+  }
 
-/** Build a FormState from an existing EO_dives row (used by edit page). */
-export function formStateFromDive(d: EODive): FormState {
   return {
+    ...common,
     type: 'dive',
-    admin_title: d.admin_title ?? '',
-    display_title: stripCapacitySuffix(d.display_title),
-    calendar_title: d.calendar_title ?? '',
-    start_date: d.start_date ?? '',
-    start_time: toHhmm(d.time),
-    end_date: d.end_date ?? '',
-    capacity: d.capacity != null ? String(d.capacity) : '',
-    price: d.price ?? '',
-    prereq_cert_id: d.prereq_cert_id ?? '',
-    req_dives: d.req_dives != null ? String(d.req_dives) : '',
-    dive_days: d.dive_days != null ? String(d.dive_days) : '',
-    addonIds: parseAddonIds(d.other_addons),
-    notes: d.notes ?? '',
-    featured: !!d.featured,
-    fully_booked: !!d.fully_booked,
-    is_private: !!d.is_private,
-    is_boat_dive: !!d.is_boat_dive,
-    is_trip: !!d.is_trip,
-    has_rooms: !!d.has_rooms,
-    roomIds: parseCsvIds(d.room_types),
-    nitrox_required: d.nitrox_required ?? false,
-    gear_rental: d.gear_rental ?? '',
-    cancel_date: d.cancel_date ?? '',
-    cancel_policy: d.cancel_policy ?? '',
-    destinationIds: parseAddonIds(d.destination_reference),
-    divetravel_reference: d.DiveTravel_reference ?? '',
-    full_payment_deadline: d.full_payment_deadline ?? '',
-    featured_image: d.featured_image ?? '',
-    second_image: d.second_image ?? '',
+    start_date: e.start_date ?? '',
+    end_date: e.end_date ?? '',
+    notes: e.notes ?? '',
+    featured: !!e.featured,
+    is_private: !!e.is_private,
+    is_boat_dive: !!e.is_boat_dive,
+    is_trip: !!e.is_trip,
+    roomIds: rels.roomIds,
+    nitrox_required: e.nitrox_required ?? false,
+    gear_rental: e.gear_rental ?? '',
+    destinationIds: rels.destinationIds,
+    divetravel_reference: e.divetravel_id ?? '',
+    second_image: e.second_image ?? '',
     courseDays: [], course_name: '',
     included: '', schedule: '',
   }
 }
 
-/** Build a FormState from an existing EO_courses row (used by edit page). */
-export function formStateFromCourse(c: EOCourse): FormState {
-  const courseDays = [...new Set((c.course_days ?? []).filter(Boolean))].sort()
-  return {
-    type: 'course',
-    admin_title: c.admin_title ?? '',
-    display_title: stripCapacitySuffix(c.display_title),
-    calendar_title: c.calendar_title ?? '',
-    course_name: c.course_name ?? '',
-    // The form's start_date/end_date are derived from courseDays (the
-    // course itself has no envelope columns); the form edits courseDays.
-    start_date: courseDays[0] ?? '',
-    start_time: toHhmm(c.start_time),
-    end_date: courseDays[courseDays.length - 1] ?? '',
-    capacity: c.capacity != null ? String(c.capacity) : '',
-    courseDays,
-    price: c.price ?? '',
-    prereq_cert_id: c.prereq_cert_id ?? '',
-    req_dives: c.req_dives ?? '',
-    dive_days: c.dive_days != null ? String(c.dive_days) : '',
-    included: c.included ?? '',
-    schedule: c.schedule ?? '',
-    addonIds: parseAddonIds(c.other_addons),
-    full_payment_deadline: c.full_payment_deadline ?? '',
-    cancel_date: c.cancel_date ?? '',
-    cancel_policy: c.cancel_policy ?? '',
-    featured_image: c.featured_image ?? '',
-    second_image: '',
-    notes: '', featured: false, fully_booked: false, is_private: false, is_boat_dive: false, is_trip: false,
-    has_rooms: false, roomIds: [],
-    nitrox_required: false, gear_rental: '',
-    destinationIds: [], divetravel_reference: '',
-  }
-}
-
 /**
- * Convert a FormState into the row shape for `EO_dives` insert/update.
- * Used by both create and edit pages so both stay in sync forever.
+ * Convert a FormState into the row shape for `events` insert/update — one
+ * builder, setting `kind` and nulling the columns that don't apply to the kind.
+ * Rooms/add-ons/destinations are written separately to the junction tables via
+ * the set_event_relations RPC.
  */
-export function divePayloadFromForm(form: FormState): Record<string, unknown> {
-  // Bubble's time format includes seconds; pad if the input was 'HH:mm'.
+export function eventPayloadFromForm(form: FormState): Record<string, unknown> {
+  const isDive = form.type === 'dive'
   const timeText = form.start_time ? `${form.start_time}:00` : ''
-  const addonsJson = form.addonIds.length ? JSON.stringify(form.addonIds) : ''
+  const days = [...new Set(form.courseDays.filter(Boolean))].sort()
   return {
-    admin_title: form.admin_title.trim(),
-    display_title: form.display_title || null,
+    kind: form.type,
+    admin_title: isDive ? form.admin_title.trim() : (form.admin_title || null),
+    display_title: form.display_title.trim() || null,
     calendar_title: form.calendar_title || null,
-    start_date: form.start_date || null,
-    time: timeText || null,
-    end_date: form.end_date || null,
-    capacity: form.capacity ? Number(form.capacity) : null,
     price: form.price || null,
-    notes: form.notes,                   // NOT NULL — empty string OK
-    featured: form.featured,
-    fully_booked: form.fully_booked,
-    is_private: form.is_private,
-    is_boat_dive: form.is_boat_dive,
-    is_trip: form.is_trip,
+    capacity: form.capacity ? Number(form.capacity) : null,
     prereq_cert_id: form.prereq_cert_id || null,
     req_dives: form.req_dives ? Number(form.req_dives) : null,
     dive_days: form.dive_days ? Number(form.dive_days) : null,
-    gear_rental: form.gear_rental || null,
-    nitrox_required: form.nitrox_required,
-    has_rooms: form.has_rooms,
-    room_types: form.roomIds.join(','),
-    hasotheraddons: form.addonIds.length > 0,
-    other_addons: addonsJson,
     cancel_date: form.cancel_date || null,
     cancel_policy: form.cancel_policy || null,
-    destination_reference: form.destinationIds.length ? JSON.stringify(form.destinationIds) : null,
-    DiveTravel_reference: form.divetravel_reference || null,
+    fully_booked: form.fully_booked,
     full_payment_deadline: form.full_payment_deadline || null,
     featured_image: form.featured_image.trim() || null,
-    second_image: form.second_image.trim() || null,
-  }
-}
-
-/**
- * Convert a FormState into the row shape for `EO_courses` insert/update.
- */
-export function coursePayloadFromForm(form: FormState): Record<string, unknown> {
-  const timeText = form.start_time ? `${form.start_time}:00` : ''
-  const addonsJson = form.addonIds.length ? JSON.stringify(form.addonIds) : ''
-  // Sort + dedupe the entered days. course_days is the sole date source —
-  // there's no start_date/end_date envelope on EO_courses anymore.
-  const days = [...new Set(form.courseDays.filter(Boolean))].sort()
-  return {
-    admin_title: form.admin_title || null,
-    display_title: form.display_title.trim() || null,
-    calendar_title: form.calendar_title || null,
-    course_name: form.course_name || null,
     start_time: timeText || null,
-    capacity: form.capacity ? Number(form.capacity) : null,
-    course_days: days.length ? days : null,
-    price: form.price || null,
-    prereq_cert_id: form.prereq_cert_id || null,
-    req_dives: form.req_dives || null,    // text on courses
-    dive_days: form.dive_days ? Number(form.dive_days) : null,
-    included: form.included || null,
-    schedule: form.schedule || null,
-    other_addons: addonsJson,
-    full_payment_deadline: form.full_payment_deadline || null,
-    cancel_date: form.cancel_date || null,
-    cancel_policy: form.cancel_policy || null,
-    featured_image: form.featured_image.trim() || null,
+    // temporal — dive envelope vs course day-list
+    start_date: isDive ? (form.start_date || null) : null,
+    end_date: isDive ? (form.end_date || null) : null,
+    course_days: isDive ? null : (days.length ? days : null),
+    // dive-only
+    featured: isDive ? form.featured : false,
+    is_private: isDive ? form.is_private : false,
+    is_boat_dive: isDive ? form.is_boat_dive : false,
+    is_trip: isDive ? form.is_trip : false,
+    notes: isDive ? form.notes : null,
+    nitrox_required: isDive ? form.nitrox_required : false,
+    gear_rental: isDive ? (form.gear_rental || null) : null,
+    second_image: isDive ? (form.second_image.trim() || null) : null,
+    divetravel_id: isDive ? (form.divetravel_reference || null) : null,
+    // course-only
+    course_name: isDive ? null : (form.course_name || null),
+    included: isDive ? null : (form.included || null),
+    schedule: isDive ? null : (form.schedule || null),
   }
 }

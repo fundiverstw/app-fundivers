@@ -160,12 +160,11 @@ export async function issueCancellationCredits(args: {
   createdBy: string
 }): Promise<{ issued: number; totalAmount: number }> {
   const { event, createdBy } = args
-  const column = event.type === 'dive' ? 'eo_dive_id' : 'eo_course_id'
 
   const { data: bookings, error: bErr } = await supabase
     .from('bookings')
     .select('id, user_id')
-    .eq(column, event.id)
+    .eq('event_id', event.id)
     .neq('status', 'cancelled')
   if (bErr) throw bErr
   if (!bookings?.length) return { issued: 0, totalAmount: 0 }

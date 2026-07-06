@@ -69,7 +69,7 @@ export interface RegistrationPdfPayload {
   weight: number | string | null
   shoeSize: string | null
   needsRide: boolean
-  /** True when the linked EO_prices tier had no transport surcharge — the PDF
+  /** True when the linked prices tier had no transport surcharge — the PDF
    *  renders "Included with base price" instead of yes/no. */
   transportIncluded: boolean
   notes: string | null

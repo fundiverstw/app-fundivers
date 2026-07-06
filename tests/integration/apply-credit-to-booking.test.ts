@@ -47,7 +47,7 @@ async function makeBooking(
   details: Record<string, unknown>, status: 'pending' | 'confirmed' = 'pending',
 ): Promise<string> {
   const { data, error } = await admin.from('bookings').insert({
-    user_id: userId, eo_dive_id: diveId, status, details,
+    user_id: userId, event_id: diveId, status, details,
   } as never).select('id').single()
   if (error) throw new Error(`makeBooking failed: ${error.message}`)
   return (data as { id: string }).id

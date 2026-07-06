@@ -49,12 +49,12 @@ describe('DutiesPage', () => {
       {
         id: 'd-future', created_at: '', created_by: 'admin-1', assignee_id: 'staff-1',
         role: 'guide', start_date: '2099-06-15', end_date: null,
-        eo_dive_id: 'dive-a', eo_course_id: null, notes: null,
+        event_id: 'dive-a', notes: null,
       },
       {
         id: 'd-past', created_at: '', created_by: 'admin-1', assignee_id: 'staff-1',
         role: 'support', start_date: '2020-01-05', end_date: null,
-        eo_dive_id: 'dive-b', eo_course_id: null, notes: 'Old gig',
+        event_id: 'dive-b', notes: 'Old gig',
       },
     ]
     const events = [

@@ -65,7 +65,7 @@ describe('bookings RLS — is_active_user() gate', () => {
   it('pending user cannot insert a booking under their own JWT', async () => {
     const sb = await userClient(pendingUser.email, pendingUser.password)
     const { error } = await sb.from('bookings').insert({
-      user_id: pendingUser.id, eo_dive_id: diveId, status: 'pending', details: {},
+      user_id: pendingUser.id, event_id: diveId, status: 'pending', details: {},
     })
     expect(error).not.toBeNull()
   })
@@ -73,7 +73,7 @@ describe('bookings RLS — is_active_user() gate', () => {
   it('active user can insert a booking under their own JWT', async () => {
     const sb = await userClient(activeUser.email, activeUser.password)
     const ins = await sb.from('bookings').insert({
-      user_id: activeUser.id, eo_dive_id: diveId, status: 'pending', details: {},
+      user_id: activeUser.id, event_id: diveId, status: 'pending', details: {},
     }).select().single()
     expect(ins.error).toBeNull()
     expect(ins.data?.user_id).toBe(activeUser.id)
@@ -86,14 +86,14 @@ describe('bookings RLS — is_active_user() gate', () => {
     try {
       const sb = await userClient(u.email, u.password)
       const blocked = await sb.from('bookings').insert({
-        user_id: u.id, eo_dive_id: diveId, status: 'pending', details: {},
+        user_id: u.id, event_id: diveId, status: 'pending', details: {},
       })
       expect(blocked.error).not.toBeNull()
 
       await admin.from('profiles').update({ status: 'active' }).eq('id', u.id)
 
       const ok = await sb.from('bookings').insert({
-        user_id: u.id, eo_dive_id: diveId, status: 'pending', details: {},
+        user_id: u.id, event_id: diveId, status: 'pending', details: {},
       }).select().single()
       expect(ok.error).toBeNull()
     } finally {

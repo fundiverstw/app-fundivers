@@ -81,9 +81,9 @@ describe('PaymentsPage', () => {
 
   it('computes Balance due from booking.details.total and Total paid from matching payments', async () => {
     const bookings = [
-      { id: 'b1', user_id: 'u1', eo_dive_id: 'd1', eo_course_id: null, status: 'pending',   notes: null, created_at: new Date().toISOString(), details: { total: 3000 } },
-      { id: 'b2', user_id: 'u1', eo_dive_id: 'd2', eo_course_id: null, status: 'confirmed', notes: null, created_at: new Date().toISOString(), details: { total: 5000 } },
-      { id: 'b3', user_id: 'u1', eo_dive_id: 'd3', eo_course_id: null, status: 'cancelled', notes: null, created_at: new Date().toISOString(), details: { total: 9999 } },
+      { id: 'b1', user_id: 'u1', event_id: 'd1', status: 'pending',   notes: null, created_at: new Date().toISOString(), details: { total: 3000 } },
+      { id: 'b2', user_id: 'u1', event_id: 'd2', status: 'confirmed', notes: null, created_at: new Date().toISOString(), details: { total: 5000 } },
+      { id: 'b3', user_id: 'u1', event_id: 'd3', status: 'cancelled', notes: null, created_at: new Date().toISOString(), details: { total: 9999 } },
     ]
     const payments = [
       { id: 'p1', user_id: 'u1', booking_id: 'b2', amount: 5000, currency: 'TWD', status: 'paid',    method: 'Bank', note: 'Paid in full',  created_at: new Date().toISOString(), recorded_by: null },
@@ -110,7 +110,7 @@ describe('PaymentsPage', () => {
 
   it('lets a diver apply available account credit to a booking with a balance due', async () => {
     const bookings = [
-      { id: 'b1', user_id: 'u1', eo_dive_id: 'd1', eo_course_id: null, status: 'pending', notes: null, created_at: new Date().toISOString(), details: { total: 3000 } },
+      { id: 'b1', user_id: 'u1', event_id: 'd1', status: 'pending', notes: null, created_at: new Date().toISOString(), details: { total: 3000 } },
     ]
     const credits = [
       { id: 'c1', user_id: 'u1', booking_id: null, amount: 2000, currency: 'TWD', reason: 'Cancelled trip', status: 'open', created_by: null, created_at: new Date().toISOString(), settled_at: null, settled_note: null },
@@ -135,7 +135,7 @@ describe('PaymentsPage', () => {
 
   it('offers a top-level button to apply account credit across due balances', async () => {
     const bookings = [
-      { id: 'b1', user_id: 'u1', eo_dive_id: 'd1', eo_course_id: null, status: 'pending', notes: null, created_at: new Date(Date.now() - 2000).toISOString(), details: { total: 3000 } },
+      { id: 'b1', user_id: 'u1', event_id: 'd1', status: 'pending', notes: null, created_at: new Date(Date.now() - 2000).toISOString(), details: { total: 3000 } },
     ]
     const credits = [
       { id: 'c1', user_id: 'u1', booking_id: null, amount: 2000, currency: 'TWD', reason: 'Cancelled trip', status: 'open', created_by: null, created_at: new Date().toISOString(), settled_at: null, settled_note: null },
@@ -160,8 +160,8 @@ describe('PaymentsPage', () => {
   it('rolls a lead booker\'s family group into one consolidated balance', async () => {
     // u1 (parent) pays for their own booking + their child's; both payer_id=u1.
     const bookings = [
-      { id: 'b1', user_id: 'u1', payer_id: 'u1', group_id: 'g1', eo_dive_id: 'd1', eo_course_id: null, status: 'confirmed', notes: null, created_at: new Date().toISOString(), details: { total: 3000 } },
-      { id: 'b2', user_id: 'c1', payer_id: 'u1', group_id: 'g1', eo_dive_id: 'd1', eo_course_id: null, status: 'pending',   notes: null, created_at: new Date().toISOString(), details: { total: 3000 } },
+      { id: 'b1', user_id: 'u1', payer_id: 'u1', group_id: 'g1', event_id: 'd1', status: 'confirmed', notes: null, created_at: new Date().toISOString(), details: { total: 3000 } },
+      { id: 'b2', user_id: 'c1', payer_id: 'u1', group_id: 'g1', event_id: 'd1', status: 'pending',   notes: null, created_at: new Date().toISOString(), details: { total: 3000 } },
     ]
     const payments = [
       { id: 'p1', user_id: 'u1', booking_id: 'b1', amount: 3000, currency: 'TWD', status: 'paid', method: 'Bank', note: null, created_at: new Date().toISOString(), recorded_by: null },
@@ -193,7 +193,7 @@ describe('PaymentsPage', () => {
     // Viewer is the child c1; their booking is paid by parent u1.
     useAuthMock.mockReturnValue({ user: { id: 'c1' } })
     const bookings = [
-      { id: 'b1', user_id: 'c1', payer_id: 'u1', group_id: 'g1', eo_dive_id: 'd1', eo_course_id: null, status: 'confirmed', notes: null, created_at: new Date().toISOString(), details: { total: 3000 } },
+      { id: 'b1', user_id: 'c1', payer_id: 'u1', group_id: 'g1', event_id: 'd1', status: 'confirmed', notes: null, created_at: new Date().toISOString(), details: { total: 3000 } },
     ]
     const profiles = [
       { id: 'c1', name: 'Kid Casey', nickname: null },
@@ -215,7 +215,7 @@ describe('PaymentsPage', () => {
 
   it('handles bookings with no details.total gracefully (shows dash, no error)', async () => {
     const bookings = [
-      { id: 'b1', user_id: 'u1', eo_dive_id: 'd1', eo_course_id: null, status: 'pending', notes: null, created_at: new Date().toISOString(), details: {} },
+      { id: 'b1', user_id: 'u1', event_id: 'd1', status: 'pending', notes: null, created_at: new Date().toISOString(), details: {} },
     ]
     setupFrom(bookings, [])
     fetchEventsForBookings.mockResolvedValue(new Map([

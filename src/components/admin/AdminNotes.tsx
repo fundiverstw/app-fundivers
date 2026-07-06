@@ -38,17 +38,14 @@ interface Props {
   compact?: boolean
 }
 
-function columnFor(target: NoteTarget): 'eo_dive_id' | 'eo_course_id' | 'booking_id' {
-  return target.kind === 'dive' ? 'eo_dive_id'
-       : target.kind === 'course' ? 'eo_course_id'
-       : 'booking_id'
+function columnFor(target: NoteTarget): 'event_id' | 'booking_id' {
+  return target.kind === 'booking' ? 'booking_id' : 'event_id'
 }
 
 function fkPayload(target: NoteTarget) {
   return {
-    eo_dive_id:   target.kind === 'dive'   ? target.id : null,
-    eo_course_id: target.kind === 'course' ? target.id : null,
-    booking_id:   target.kind === 'booking' ? target.id : null,
+    event_id:   target.kind === 'booking' ? null : target.id,
+    booking_id: target.kind === 'booking' ? target.id : null,
   }
 }
 

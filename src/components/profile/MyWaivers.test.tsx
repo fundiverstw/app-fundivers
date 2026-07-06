@@ -7,7 +7,7 @@ import type { WaiverSignature } from '../../types/database'
 
 const sig = (over: Partial<WaiverSignature>): WaiverSignature => ({
   id: 's', created_at: '', diver_id: 'u1', waiver_code: 'diver_medical', waiver_version: 1,
-  signed_name: 'Jane', signed_at: new Date().toISOString(), eo_dive_id: null, eo_course_id: null, ...over,
+  signed_name: 'Jane', signed_at: new Date().toISOString(), event_id: null, ...over,
 })
 
 beforeEach(() => vi.restoreAllMocks())

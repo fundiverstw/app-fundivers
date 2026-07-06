@@ -52,15 +52,13 @@ export function AdminDutyPage() {
       const enriched: Enriched[] = (dutiesRes.data ?? []).map(d => ({
         duty: d,
         assignee: adminMap.get(d.assignee_id) ?? null,
-        event: (d.eo_dive_id && eventIndex.get(d.eo_dive_id))
-          || (d.eo_course_id && eventIndex.get(d.eo_course_id))
-          || null,
+        event: (d.event_id && eventIndex.get(d.event_id)) || null,
       }))
       setDuties(enriched)
 
       // Unstaffed = upcoming events (today or later) with no duty pointing at them.
       const coveredEventIds = new Set(
-        (dutiesRes.data ?? []).flatMap(d => [d.eo_dive_id, d.eo_course_id].filter((x): x is string => !!x))
+        (dutiesRes.data ?? []).map(d => d.event_id).filter((x): x is string => !!x)
       )
       const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
       setUnstaffed(events.filter(e =>
@@ -169,7 +167,7 @@ function DutyRow({ enriched, highlight }: { enriched: Enriched; highlight?: bool
         ? <Link to={`/admin/events/${event.type}/${event.id}`} className="block text-xs font-medium text-brand-900 hover:text-brand-700 underline truncate">
             {event.title}
           </Link>
-        : (duty.eo_dive_id || duty.eo_course_id)
+        : duty.event_id
           ? <p className="text-xs text-brand-950 font-medium">(event outside visible range)</p>
           : <p className="text-xs text-brand-950 font-medium">Standalone duty</p>
       }

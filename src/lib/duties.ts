@@ -11,8 +11,7 @@ export interface CreateDutyInput {
   role: DutyRole
   start_date: string
   end_date?: string | null
-  eo_dive_id?: string | null
-  eo_course_id?: string | null
+  event_id?: string | null
   notes?: string | null
 }
 
@@ -49,7 +48,7 @@ export async function notifyDutyAssigned(dutyId: string): Promise<void> {
   })
 }
 
-// Map of EO_dives._id / EO_courses._id → set of YYYY-MM-DD day-strings the
+// Map of events.id → set of YYYY-MM-DD day-strings the
 // current user is on duty for within the given inclusive date window. The
 // admin calendar uses this to stripe the specific days the viewer is
 // working — multi-day events get stripes only on the days they're on duty.
@@ -63,7 +62,7 @@ export async function fetchMyDutyDays(
 ): Promise<Map<string, Set<string>>> {
   const { data, error } = await supabase
     .from('duties')
-    .select('eo_dive_id, eo_course_id, start_date, end_date')
+    .select('event_id, start_date, end_date')
     .eq('assignee_id', userId)
     .lte('start_date', to)
     .or(`end_date.gte.${from},end_date.is.null`)
@@ -71,12 +70,11 @@ export async function fetchMyDutyDays(
   const out = new Map<string, Set<string>>()
   for (const row of data ?? []) {
     const days = expandDateRange(row.start_date, row.end_date)
-    for (const eventId of [row.eo_dive_id, row.eo_course_id]) {
-      if (!eventId) continue
-      let bucket = out.get(eventId)
-      if (!bucket) { bucket = new Set(); out.set(eventId, bucket) }
-      for (const d of days) bucket.add(d)
-    }
+    const eventId = row.event_id
+    if (!eventId) continue
+    let bucket = out.get(eventId)
+    if (!bucket) { bucket = new Set(); out.set(eventId, bucket) }
+    for (const d of days) bucket.add(d)
   }
   return out
 }

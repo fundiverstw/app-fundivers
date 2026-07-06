@@ -79,7 +79,7 @@ describe('bookings RLS', () => {
   it('diver inserts + reads own booking, not another diver', async () => {
     const sb = await userClient(diverA.email, diverA.password)
     const ins = await sb.from('bookings').insert({
-      user_id: diverA.id, eo_dive_id: diveId, status: 'pending', details: { gear: { rent: false } },
+      user_id: diverA.id, event_id: diveId, status: 'pending', details: { gear: { rent: false } },
     }).select().single()
     expect(ins.error).toBeNull()
 
@@ -91,7 +91,7 @@ describe('bookings RLS', () => {
   it('diver cannot insert a booking for a different user_id', async () => {
     const sb = await userClient(diverB.email, diverB.password)
     const { error } = await sb.from('bookings').insert({
-      user_id: diverA.id, eo_dive_id: diveId, status: 'pending', details: {},
+      user_id: diverA.id, event_id: diveId, status: 'pending', details: {},
     })
     expect(error).not.toBeNull()
   })

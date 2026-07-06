@@ -37,29 +37,25 @@ async function fetchTransactions(year: number): Promise<AccountingTransaction[]>
 
   const bookingIds = [...new Set(payments.map(p => p.booking_id).filter((x): x is string => !!x))]
   const bookings = bookingIds.length
-    ? (await supabase.from('bookings').select('id, user_id, eo_dive_id, eo_course_id, status, details').in('id', bookingIds)).data ?? []
+    ? (await supabase.from('bookings').select('id, user_id, event_id, status, details').in('id', bookingIds)).data ?? []
     : []
 
-  const diveIds = [...new Set(bookings.map(b => b.eo_dive_id).filter((x): x is string => !!x))]
-  const courseIds = [...new Set(bookings.map(b => b.eo_course_id).filter((x): x is string => !!x))]
+  const eventIds = [...new Set(bookings.map(b => b.event_id).filter((x): x is string => !!x))]
   const personIds = [...new Set([
     ...payments.map(p => p.user_id),
     ...payments.map(p => p.recorded_by).filter((x): x is string => !!x),
   ])]
 
-  const [dives, courses, profiles] = await Promise.all([
-    diveIds.length
-      ? supabase.from('EO_dives').select('_id, display_title, admin_title, start_date').in('_id', diveIds).then(r => r.data ?? [])
-      : Promise.resolve([]),
-    courseIds.length
-      ? supabase.from('EO_courses').select('_id, display_title, admin_title, course_days').in('_id', courseIds).then(r => r.data ?? [])
+  const [events, profiles] = await Promise.all([
+    eventIds.length
+      ? supabase.from('events').select('id, kind, display_title, admin_title, start_date, course_days').in('id', eventIds).then(r => r.data ?? [])
       : Promise.resolve([]),
     personIds.length
       ? supabase.from('profiles').select('id, name, email').in('id', personIds).then(r => r.data ?? [])
       : Promise.resolve([]),
   ])
 
-  return normalizeTransactions({ payments, bookings, dives, courses, profiles })
+  return normalizeTransactions({ payments, bookings, events, profiles })
 }
 
 function downloadZip(filename: string, files: Record<string, string>): void {

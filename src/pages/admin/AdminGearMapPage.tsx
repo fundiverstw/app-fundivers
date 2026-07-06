@@ -25,18 +25,14 @@ export function AdminGearMapPage() {
     if (!type || !id) return
     let cancelled = false
     ;(async () => {
-      const eventMap = await fetchEventsForBookings(
-        type === 'dive' ? [id] : [],
-        type === 'course' ? [id] : [],
-      )
+      const eventMap = await fetchEventsForBookings([id])
       if (cancelled) return
       setEvent(eventMap.get(id) ?? null)
 
-      const column = type === 'dive' ? 'eo_dive_id' : 'eo_course_id'
       const { data: bookings } = await supabase
         .from('bookings')
         .select('*')
-        .eq(column, id)
+        .eq('event_id', id)
         .neq('status', 'cancelled')
         .order('created_at')
 

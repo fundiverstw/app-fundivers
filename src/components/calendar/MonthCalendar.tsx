@@ -172,7 +172,7 @@ export interface MonthCalendarProps {
   /** Current viewer's user id — used to mark "own" rows for tap routing. */
   currentUserId?: string | null
   /** Per-event map of YYYY-MM-DD day-strings the viewer is on duty for.
-   *  Key = EO_dives._id / EO_courses._id; value = set of days. Each
+   *  Key = events.id; value = set of days. Each
    *  day-segment whose date is in the set renders an amber stripe
    *  overlay so the viewer sees which specific days are theirs to
    *  work, not just which events touch their duty list. */

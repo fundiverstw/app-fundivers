@@ -1,12 +1,12 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
+import { fetchEventRelations } from '../../lib/event-relations'
 import { siteConfig } from '../../config/site'
-import type { CancellationPolicy, CertLevel, DiveTravelEntry, EOAddon, EOCourse, EODive, EOPrice, EORoom, TravelDestination } from '../../types/database'
+import type { CancellationPolicy, CertLevel, DiveTravelEntry, EOAddon, EventRow, EOPrice, EORoom, TravelDestination } from '../../types/database'
 import {
   EMPTY_FORM,
-  formStateFromCourse,
-  formStateFromDive,
+  formStateFromEvent,
   type FormState,
 } from './event-form-state'
 import { DateField } from '../DateField'
@@ -18,11 +18,9 @@ import { ERROR_NOTE } from '../../styles/tokens'
 // AdminEditEventPage) is responsible for the actual DB write + post-
 // submit navigation; the form just hands back the validated FormState.
 
-// Discriminated union so the picker can drive both the type pill and the
-// row → form mapping from a single selection.
-type PastEvent =
-  | { kind: 'dive';   id: string; startDate: string; title: string; row: EODive }
-  | { kind: 'course'; id: string; startDate: string; title: string; row: EOCourse }
+// The picker drives both the type pill and the row → form mapping from a
+// single selection; the events row carries its own `kind`.
+type PastEvent = { kind: 'dive' | 'course'; id: string; startDate: string; title: string; row: EventRow }
 
 const CUR = siteConfig.locale.currencyLabel
 
@@ -36,16 +34,15 @@ function priceOptionLabel(p: EOPrice): string {
   return parts.length ? `${p.admin_title} (${parts.join(' / ')})` : p.admin_title
 }
 
-// Sub-form state for creating a brand-new EO_prices row inline (so admins
+// Sub-form state for creating a brand-new prices row inline (so admins
 // don't have to leave the form just to define a price tier).
 interface PriceFormState {
   admin_title: string
   price: string             // human label, e.g. "NT$10,000"
   starting_at: string       // bigint or empty
   deposit_amount: string    // bigint or empty
-  // Per-event room options now live solely on EO_dives.room_types — see
-  // 20260430040000_eo_dive_rooms_junction.sql. EO_prices no longer carries
-  // a room_options column.
+  // Per-event room options live in the event_rooms junction table. prices
+  // no longer carries a room_options column.
   transport: string
 }
 
@@ -53,7 +50,7 @@ const EMPTY_PRICE_FORM: PriceFormState = {
   admin_title: '', price: '', starting_at: '', deposit_amount: '', transport: '',
 }
 
-// Sub-form state for inline EO_rooms / Other_Addons / DiveTravel inserts.
+// Sub-form state for inline rooms / addons / dive_travel inserts.
 // Only the most-used fields — admins can edit the rest from the Manage page.
 interface RoomFormState   { admin_title: string; display_title: string; added_price: string }
 interface AddonFormState  { admin_title: string; display_title: string; price: string }
@@ -129,21 +126,21 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
       // Skip the past-event lookup in edit mode — preloading from a
       // different past event would clobber the row being edited.
       const settled = await Promise.allSettled([
-        supabase.from('EO_prices').select('*').order('admin_title'),
-        supabase.from('EO_rooms').select('*').order('admin_title'),
-        supabase.from('Other_Addons').select('*').order('admin_title'),
+        supabase.from('prices').select('*').order('admin_title'),
+        supabase.from('rooms').select('*').order('admin_title'),
+        supabase.from('addons').select('*').order('admin_title'),
         mode === 'create'
-          ? supabase.from('EO_dives').select('*').lt('start_date', todayStr).order('start_date', { ascending: false }).limit(50)
-          : Promise.resolve({ data: [] as EODive[] }),
+          ? supabase.from('events').select('*').eq('kind', 'dive').lt('start_date', todayStr).order('start_date', { ascending: false }).limit(50)
+          : Promise.resolve({ data: [] as EventRow[] }),
         // Courses have no scalar date column to filter/order on — fetch a
         // bounded set and narrow to "past" client-side via course_days.
         mode === 'create'
-          ? supabase.from('EO_courses').select('*').limit(200)
-          : Promise.resolve({ data: [] as EOCourse[] }),
+          ? supabase.from('events').select('*').eq('kind', 'course').limit(200)
+          : Promise.resolve({ data: [] as EventRow[] }),
         supabase.from('cert_levels').select('*').order('rank'),
         supabase.from('cancellation_policies').select('*').order('title'),
-        supabase.from('DiveTravel').select('*').order('admin_title'),
-        supabase.from('TravelDestinations').select('*').order('sort_order', { nullsFirst: false }),
+        supabase.from('dive_travel').select('*').order('admin_title'),
+        supabase.from('travel_destinations').select('*').order('sort_order', { nullsFirst: false }),
       ])
       if (cancelled) return
       const dataOf = <T,>(i: number): T[] => {
@@ -160,13 +157,13 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
       setDiveTravels(dataOf<DiveTravelEntry>(7))
       setDestinations(dataOf<TravelDestination>(8))
 
-      const pastDives = dataOf<EODive>(3).map<PastEvent>(d => ({
-        kind: 'dive', id: d._id, startDate: d.start_date ?? '', title: d.display_title ?? d.admin_title ?? '(untitled dive)', row: d,
+      const pastDives = dataOf<EventRow>(3).map<PastEvent>(d => ({
+        kind: 'dive', id: d.id, startDate: d.start_date ?? '', title: d.display_title ?? d.admin_title ?? '(untitled dive)', row: d,
       }))
-      const pastCourses = dataOf<EOCourse>(4)
+      const pastCourses = dataOf<EventRow>(4)
         .map<PastEvent>(c => ({
           kind: 'course',
-          id: c._id,
+          id: c.id,
           startDate: [...(c.course_days ?? [])].filter(Boolean).sort()[0] ?? '',
           title: c.display_title ?? c.admin_title ?? '(untitled course)',
           row: c,
@@ -190,26 +187,25 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
   function sanitizeStaleRefs(f: FormState): FormState {
     const next = { ...f }
     if (certLevels.length && next.prereq_cert_id && !certLevels.some(c => c.id === next.prereq_cert_id)) next.prereq_cert_id = ''
-    if (prices.length && next.price && !prices.some(p => p._id === next.price)) next.price = ''
-    if (cancelPolicies.length && next.cancel_policy && !cancelPolicies.some(p => p._id === next.cancel_policy)) next.cancel_policy = ''
+    if (prices.length && next.price && !prices.some(p => p.id === next.price)) next.price = ''
+    if (cancelPolicies.length && next.cancel_policy && !cancelPolicies.some(p => p.id === next.cancel_policy)) next.cancel_policy = ''
     return next
   }
 
   const filteredPastEvents = pastEvents.filter(p => p.kind === form.type)
 
-  function applyPreload(p: PastEvent) {
-    if (p.kind === 'dive') {
-      setForm(formStateFromDive(p.row))
-    } else {
-      setForm(formStateFromCourse(p.row))
-    }
+  async function applyPreload(p: PastEvent) {
+    // Rooms/add-ons/destinations live in the junction tables, so fetch them
+    // for the picked event to clone the full config.
+    const rels = await fetchEventRelations(p.id)
+    setForm(formStateFromEvent(p.row, rels))
   }
 
   function handlePreload(id: string) {
     setPreloadId(id)
     if (!id) return
     const found = pastEvents.find(p => p.id === id)
-    if (found) applyPreload(found)
+    if (found) void applyPreload(found)
   }
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -250,14 +246,14 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
     try {
       const id = crypto.randomUUID()
       const payload = {
-        _id: id,
+        id,
         admin_title: priceForm.admin_title.trim(),
         price: priceForm.price || null,
         starting_at: priceForm.starting_at ? Number(priceForm.starting_at) : null,
         deposit_amount: priceForm.deposit_amount ? Number(priceForm.deposit_amount) : null,
         transport: priceForm.transport ? Number(priceForm.transport) : null,
       }
-      const { error: insErr } = await supabase.from('EO_prices').insert(payload as never)
+      const { error: insErr } = await supabase.from('prices').insert(payload as never)
       if (insErr) throw insErr
       // Optimistically inject so the user can pick the new tier immediately.
       const newRow = {
@@ -283,18 +279,18 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
     try {
       const id = crypto.randomUUID()
       const payload = {
-        _id: id,
+        id,
         admin_title: roomForm.admin_title.trim(),
         display_title: roomForm.display_title.trim() || null,
         added_price: roomForm.added_price ? Number(roomForm.added_price) : null,
       }
-      const { error: insErr } = await supabase.from('EO_rooms').insert(payload as never)
+      const { error: insErr } = await supabase.from('rooms').insert(payload as never)
       if (insErr) throw insErr
       setRooms(rs => [...rs, payload as unknown as EORoom].sort(
         (a, b) => (a.admin_title ?? a.display_title ?? '').localeCompare(b.admin_title ?? b.display_title ?? '')
       ))
       // Auto-tick the new room so admins don't have to scroll back.
-      setForm(f => ({ ...f, has_rooms: true, roomIds: [...f.roomIds, id] }))
+      setForm(f => ({ ...f, roomIds: [...f.roomIds, id] }))
       setRoomForm(EMPTY_ROOM_FORM)
       setShowNewRoom(false)
     } catch (err) {
@@ -311,12 +307,12 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
     try {
       const id = crypto.randomUUID()
       const payload = {
-        _id: id,
+        id,
         admin_title: addonForm.admin_title.trim(),
         display_title: addonForm.display_title.trim() || null,
         price: addonForm.price ? Number(addonForm.price) : null,
       }
-      const { error: insErr } = await supabase.from('Other_Addons').insert(payload as never)
+      const { error: insErr } = await supabase.from('addons').insert(payload as never)
       if (insErr) throw insErr
       setAddons(as => [...as, payload as unknown as EOAddon].sort(
         (a, b) => (a.admin_title ?? a.display_title ?? '').localeCompare(b.admin_title ?? b.display_title ?? '')
@@ -338,13 +334,13 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
     try {
       const id = crypto.randomUUID()
       const payload = {
-        _id: id,
+        id,
         admin_title: travelForm.admin_title.trim(),
         included: travelForm.included || null,
         not_included: travelForm.not_included || null,
         transportation: travelForm.transportation || null,
       }
-      const { error: insErr } = await supabase.from('DiveTravel').insert(payload as never)
+      const { error: insErr } = await supabase.from('dive_travel').insert(payload as never)
       if (insErr) throw insErr
       setDiveTravels(ts => [...ts, payload as unknown as DiveTravelEntry].sort(
         (a, b) => (a.admin_title ?? '').localeCompare(b.admin_title ?? '')
@@ -488,7 +484,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
           <Select value={form.price} onChange={v => set('price', v)}>
             <option value="">— None —</option>
             {prices.map(p => (
-              <option key={p._id} value={p._id}>{priceOptionLabel(p)}</option>
+              <option key={p.id} value={p.id}>{priceOptionLabel(p)}</option>
             ))}
           </Select>
         </Field>
@@ -600,10 +596,10 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
                 <div className="space-y-1 max-h-56 overflow-y-auto bg-white/70 backdrop-blur-md border border-surface-200 rounded-md p-2">
                   {destinations.map(d => (
                     <Checkbox
-                      key={d._id}
-                      checked={form.destinationIds.includes(d._id)}
-                      onChange={() => toggleId('destinationIds', d._id)}
-                      label={d.country ? `${d.admin_title ?? d._id} — ${d.country}` : (d.admin_title ?? d._id)}
+                      key={d.id}
+                      checked={form.destinationIds.includes(d.id)}
+                      onChange={() => toggleId('destinationIds', d.id)}
+                      label={d.country ? `${d.admin_title ?? d.id} — ${d.country}` : (d.admin_title ?? d.id)}
                     />
                   ))}
                 </div>
@@ -613,7 +609,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
               <Select value={form.divetravel_reference} onChange={v => set('divetravel_reference', v)}>
                 <option value="">— None —</option>
                 {diveTravels.map(t => (
-                  <option key={t._id} value={t._id}>{t.admin_title ?? t._id}</option>
+                  <option key={t.id} value={t.id}>{t.admin_title ?? t.id}</option>
                 ))}
               </Select>
             </Field>
@@ -664,15 +660,15 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
           </Section>
 
           <Section title="Rooms">
-            <Checkbox checked={form.has_rooms} onChange={v => set('has_rooms', v)} label="Offers rooms" />
-            {form.has_rooms && rooms.length > 0 && (
+            <p className="text-xs text-white/60">Tick any room options this dive offers. Leave all unticked for none.</p>
+            {rooms.length > 0 && (
               <div className="space-y-1 max-h-48 overflow-y-auto bg-white/70 backdrop-blur-md border border-surface-200 rounded-md p-2">
                 {rooms.map(r => (
                   <Checkbox
-                    key={r._id}
-                    checked={form.roomIds.includes(r._id)}
-                    onChange={() => toggleId('roomIds', r._id)}
-                    label={r.admin_title || r.display_title || r._id}
+                    key={r.id}
+                    checked={form.roomIds.includes(r.id)}
+                    onChange={() => toggleId('roomIds', r.id)}
+                    label={r.admin_title || r.display_title || r.id}
                   />
                 ))}
               </div>
@@ -751,7 +747,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
             <Select value={form.cancel_policy} onChange={v => set('cancel_policy', v)}>
               <option value="">— None —</option>
               {cancelPolicies.map(p => (
-                <option key={p._id} value={p._id}>{p.title ?? p._id}</option>
+                <option key={p.id} value={p.id}>{p.title ?? p.id}</option>
               ))}
             </Select>
           </Field>
@@ -775,10 +771,10 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
           <div className="space-y-1 max-h-56 overflow-y-auto bg-white/70 backdrop-blur-md border border-surface-200 rounded-md p-2">
             {addons.map(a => (
               <Checkbox
-                key={a._id}
-                checked={form.addonIds.includes(a._id)}
-                onChange={() => toggleId('addonIds', a._id)}
-                label={a.admin_title || a.display_title || a._id}
+                key={a.id}
+                checked={form.addonIds.includes(a.id)}
+                onChange={() => toggleId('addonIds', a.id)}
+                label={a.admin_title || a.display_title || a.id}
               />
             ))}
           </div>
