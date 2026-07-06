@@ -139,6 +139,52 @@ export interface Database {
         Args: Record<string, never>
         Returns: Array<{ id: string; name: string; region: string | null; blurb: string | null }>
       }
+      // Defined in 20260707030000_trip_board_definer_functions.sql. Owner-
+      // privileged projection of published trips joined to the vouched partner
+      // shop — diver-safe columns only (no kickback rate). Replaced the
+      // trip_board SECURITY DEFINER view; divers have no access to base `trips`.
+      list_trip_board: {
+        Args: Record<string, never>
+        Returns: Array<{
+          id: string
+          title: string
+          destination: string
+          summary: string | null
+          description: string | null
+          start_date: string | null
+          end_date: string | null
+          price: number | null
+          currency: string
+          hero_image_url: string | null
+          highlights: string[]
+          booking_url: string | null
+          published_at: string | null
+          partner_shop_id: string
+          partner_name: string
+          partner_country: string
+          partner_location: string | null
+          partner_website: string | null
+          partner_logo_url: string | null
+          partner_vouch_notes: string | null
+        }>
+      }
+      // Defined in 20260707030000_trip_board_definer_functions.sql. The caller's
+      // own referrals (scoped to auth.uid()) with trip/partner labels — the
+      // kickback ledger columns are intentionally absent. Replaced the
+      // my_trip_referrals SECURITY DEFINER view.
+      list_my_trip_referrals: {
+        Args: Record<string, never>
+        Returns: Array<{
+          id: string
+          trip_id: string
+          referral_code: string
+          status: 'interested' | 'introduced' | 'booked' | 'completed' | 'cancelled'
+          created_at: string
+          trip_title: string
+          trip_destination: string
+          partner_name: string
+        }>
+      }
       // Defined in 20260706010000_replace_gear_model_sizes_rpc.sql.
       // Admin-only. Atomically replaces a gear model's size rows (delete +
       // insert in one transaction) from a JSON array of size objects.
@@ -250,54 +296,9 @@ export interface Database {
         Update: never
         Relationships: []
       }
-      // Defined in 20260623000000_trip_board.sql. Owner-privileged projection
-      // of published trips joined to the partner shop we vouch for — diver-safe
-      // columns only (no kickback rate). Divers have no access to base `trips`.
-      trip_board: {
-        Row: {
-          id: string
-          title: string
-          destination: string
-          summary: string | null
-          description: string | null
-          start_date: string | null
-          end_date: string | null
-          price: number | null
-          currency: string
-          hero_image_url: string | null
-          highlights: string[]
-          booking_url: string | null
-          published_at: string | null
-          partner_shop_id: string
-          partner_name: string
-          partner_country: string
-          partner_location: string | null
-          partner_website: string | null
-          partner_logo_url: string | null
-          partner_vouch_notes: string | null
-        }
-        Insert: never
-        Update: never
-        Relationships: []
-      }
-      // Defined in 20260623000000_trip_board.sql. The caller's own referrals
-      // (scoped to auth.uid()) with trip/partner labels — the kickback ledger
-      // columns are intentionally absent.
-      my_trip_referrals: {
-        Row: {
-          id: string
-          trip_id: string
-          referral_code: string
-          status: 'interested' | 'introduced' | 'booked' | 'completed' | 'cancelled'
-          created_at: string
-          trip_title: string
-          trip_destination: string
-          partner_name: string
-        }
-        Insert: never
-        Update: never
-        Relationships: []
-      }
+      // trip_board / my_trip_referrals were SECURITY DEFINER views; they became
+      // the list_trip_board() / list_my_trip_referrals() functions in
+      // 20260707030000_trip_board_definer_functions.sql (see Functions above).
     }
     Tables: {
       profiles: {
@@ -1555,8 +1556,8 @@ export type PartnerShopInsert = Database['public']['Tables']['partner_shops']['I
 export type Trip = Database['public']['Tables']['trips']['Row']
 export type TripInsert = Database['public']['Tables']['trips']['Insert']
 export type TripReferral = Database['public']['Tables']['trip_referrals']['Row']
-export type TripBoardItem = Database['public']['Views']['trip_board']['Row']
-export type MyTripReferral = Database['public']['Views']['my_trip_referrals']['Row']
+export type TripBoardItem = Database['public']['Functions']['list_trip_board']['Returns'][number]
+export type MyTripReferral = Database['public']['Functions']['list_my_trip_referrals']['Returns'][number]
 export const TRIP_STATUSES = ['draft','published','archived'] as const
 export type TripStatus = typeof TRIP_STATUSES[number]
 export const REFERRAL_STATUSES = ['interested','introduced','booked','completed','cancelled'] as const
