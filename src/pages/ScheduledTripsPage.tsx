@@ -50,7 +50,7 @@ export function ScheduledTripsPage() {
           Our upcoming shop trips. Tap one to register.
         </p>
         <p className="text-sm">
-          <Link to="/trips" className={ON_DEEP_LINK}>
+          <Link to="/packages" className={ON_DEEP_LINK}>
             After an open-ended travel package instead? See Packages →
           </Link>
         </p>

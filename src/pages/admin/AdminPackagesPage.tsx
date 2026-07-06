@@ -4,33 +4,33 @@ import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
 import {
   fetchPartnerShops, savePartnerShop, deletePartnerShop,
-  fetchTrips, saveTrip, setTripStatus, deleteTrip,
-} from '../../lib/trip-admin'
-import { countInterestedReferrals } from '../../lib/trip-referrals'
+  fetchPackages, savePackage, setPackageStatus, deletePackage,
+} from '../../lib/package-admin'
+import { countInterestedReferrals } from '../../lib/package-referrals'
 import { AdminReferralsTab } from '../../components/admin/AdminReferralsTab'
 import type {
-  PartnerShop, PartnerShopInsert, Trip, TripInsert, TripStatus,
+  PartnerShop, PartnerShopInsert, Package, PackageInsert, PackageStatus,
 } from '../../types/database'
 import { BTN_SECONDARY } from '../../styles/tokens'
 
-// Admin home for the Trip Board referral network. Two tabs:
-//   - Shops: the registry of partner dive shops we vouch for (+ default
-//     kickback rate, internal contact for brokering intros).
-//   - Trips: the curated trips published to divers, with the publish lifecycle
-//     (draft → published → archived) and a per-trip kickback rate.
-// The Referrals pipeline (diver interest + kickback ledger) is a third tab
-// added in a later phase.
+// Admin home for Packages — the partner referral network (open-ended travel
+// packages abroad). Three tabs:
+//   - Packages: the curated packages published to divers, with the publish
+//     lifecycle (draft → published → archived) and a per-package kickback rate.
+//   - Partner shops: the registry of shops we vouch for (+ default kickback
+//     rate, internal contact for brokering intros).
+//   - Referrals: the diver-interest pipeline + kickback ledger.
 
-type Tab = 'shops' | 'trips' | 'referrals'
+type Tab = 'shops' | 'packages' | 'referrals'
 
 const PILL = 'px-3 py-1.5 rounded-lg text-sm font-semibold'
 const FIELD = 'w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900'
 
-export function AdminTripBoardPage() {
+export function AdminPackagesPage() {
   const toast = useToast()
-  const [tab, setTab] = useState<Tab>('trips')
+  const [tab, setTab] = useState<Tab>('packages')
   const [shops, setShops] = useState<PartnerShop[]>([])
-  const [trips, setTrips] = useState<Trip[]>([])
+  const [packages, setPackages] = useState<Package[]>([])
   const [newInterest, setNewInterest] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -39,9 +39,9 @@ export function AdminTripBoardPage() {
   // lists without the full-screen spinner.
   async function reload() {
     try {
-      const [s, t] = await Promise.all([fetchPartnerShops(), fetchTrips()])
+      const [s, p] = await Promise.all([fetchPartnerShops(), fetchPackages()])
       setShops(s)
-      setTrips(t)
+      setPackages(p)
       setLoadError(null)
     } catch (err) {
       setLoadError(errorMessage(err))
@@ -52,10 +52,10 @@ export function AdminTripBoardPage() {
     let cancelled = false
     ;(async () => {
       try {
-        const [s, t, n] = await Promise.all([fetchPartnerShops(), fetchTrips(), countInterestedReferrals()])
+        const [s, p, n] = await Promise.all([fetchPartnerShops(), fetchPackages(), countInterestedReferrals()])
         if (cancelled) return
         setShops(s)
-        setTrips(t)
+        setPackages(p)
         setNewInterest(n)
       } catch (err) {
         if (!cancelled) setLoadError(errorMessage(err))
@@ -70,10 +70,10 @@ export function AdminTripBoardPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
-      <h1 className="text-2xl font-bold text-white">Trip Board</h1>
+      <h1 className="text-2xl font-bold text-white">Packages</h1>
 
-      <div className="flex gap-2" role="tablist" aria-label="Trip Board sections">
-        <TabButton active={tab === 'trips'} onClick={() => setTab('trips')}>Trips ({trips.length})</TabButton>
+      <div className="flex gap-2" role="tablist" aria-label="Packages sections">
+        <TabButton active={tab === 'packages'} onClick={() => setTab('packages')}>Packages ({packages.length})</TabButton>
         <TabButton active={tab === 'shops'} onClick={() => setTab('shops')}>Partner shops ({shops.length})</TabButton>
         <TabButton active={tab === 'referrals'} onClick={() => setTab('referrals')}>
           Referrals{newInterest > 0 && <span className="ml-1.5 inline-block bg-red-600 text-white rounded-full px-1.5 text-xs">{newInterest} new</span>}
@@ -89,10 +89,10 @@ export function AdminTripBoardPage() {
       ) : tab === 'shops' ? (
         <ShopsTab shops={shops} onChanged={reload} onError={m => toast.error(m)} onOk={m => toast.success(m)} />
       ) : tab === 'referrals' ? (
-        <AdminReferralsTab trips={trips} />
+        <AdminReferralsTab packages={packages} />
       ) : (
-        <TripsTab
-          trips={trips} shops={shops} shopName={shopName}
+        <PackagesTab
+          packages={packages} shops={shops} shopName={shopName}
           onChanged={reload} onError={m => toast.error(m)} onOk={m => toast.success(m)}
         />
       )}
@@ -187,7 +187,7 @@ function ShopsTab({
       {confirmDelete && (
         <ConfirmModal
           title="Delete partner shop?"
-          body={`"${confirmDelete.name}" will be removed. Trips that reference it must be deleted first.`}
+          body={`"${confirmDelete.name}" will be removed. Packages that reference it must be deleted first.`}
           confirmLabel="Delete"
           onClose={() => setConfirmDelete(null)}
           onConfirm={() => handleDelete(confirmDelete)}
@@ -274,37 +274,37 @@ function ShopForm({
 }
 
 // ============================================================
-// Trips
+// Packages
 // ============================================================
 
-function TripsTab({
-  trips, shops, shopName, onChanged, onError, onOk,
+function PackagesTab({
+  packages, shops, shopName, onChanged, onError, onOk,
 }: {
-  trips: Trip[]
+  packages: Package[]
   shops: PartnerShop[]
   shopName: (id: string) => string
   onChanged: () => Promise<void>
   onError: (m: string) => void
   onOk: (m: string) => void
 }) {
-  const [editing, setEditing] = useState<Trip | null>(null)
+  const [editing, setEditing] = useState<Package | null>(null)
   const [creating, setCreating] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState<Trip | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<Package | null>(null)
 
-  async function changeStatus(trip: Trip, status: TripStatus) {
+  async function changeStatus(pkg: Package, status: PackageStatus) {
     try {
-      await setTripStatus(trip, status)
-      onOk(`Trip ${status}`)
+      await setPackageStatus(pkg, status)
+      onOk(`Package ${status}`)
       await onChanged()
     } catch (err) {
       onError(errorMessage(err))
     }
   }
 
-  async function handleDelete(trip: Trip) {
+  async function handleDelete(pkg: Package) {
     try {
-      await deleteTrip(trip.id)
-      onOk('Trip deleted')
+      await deletePackage(pkg.id)
+      onOk('Package deleted')
       setConfirmDelete(null)
       await onChanged()
     } catch (err) {
@@ -322,45 +322,45 @@ function TripsTab({
           title={shops.length === 0 ? 'Add a partner shop first' : undefined}
           className="text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg disabled:opacity-50"
         >
-          + New trip
+          + New package
         </button>
       </div>
 
       {shops.length === 0 && (
-        <p className="text-sm text-white/70">Add a partner shop before creating a trip.</p>
+        <p className="text-sm text-white/70">Add a partner shop before creating a package.</p>
       )}
 
-      {trips.length === 0 ? (
-        <p className="text-sm text-white/70">No trips yet.</p>
+      {packages.length === 0 ? (
+        <p className="text-sm text-white/70">No packages yet.</p>
       ) : (
         <ul className="space-y-2">
-          {trips.map(trip => (
-            <li key={trip.id} className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 space-y-2">
+          {packages.map(pkg => (
+            <li key={pkg.id} className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 space-y-2">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-medium text-brand-900 text-sm truncate">{trip.title}</p>
+                  <p className="font-medium text-brand-900 text-sm truncate">{pkg.title}</p>
                   <p className="text-xs text-brand-900/80 truncate">
-                    {trip.destination} · {shopName(trip.partner_shop_id)} · {(trip.kickback_rate * 100).toFixed(1)}%
+                    {pkg.destination} · {shopName(pkg.partner_shop_id)} · {(pkg.kickback_rate * 100).toFixed(1)}%
                   </p>
                 </div>
-                <StatusBadge status={trip.status} />
+                <StatusBadge status={pkg.status} />
               </div>
               <div className="flex flex-wrap gap-2">
-                {trip.status !== 'published' && (
-                  <button type="button" onClick={() => changeStatus(trip, 'published')}
+                {pkg.status !== 'published' && (
+                  <button type="button" onClick={() => changeStatus(pkg, 'published')}
                     className="text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white px-2.5 py-1 rounded-lg">Publish</button>
                 )}
-                {trip.status === 'published' && (
-                  <button type="button" onClick={() => changeStatus(trip, 'draft')}
+                {pkg.status === 'published' && (
+                  <button type="button" onClick={() => changeStatus(pkg, 'draft')}
                     className="text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1 rounded-lg">Unpublish</button>
                 )}
-                {trip.status !== 'archived' && (
-                  <button type="button" onClick={() => changeStatus(trip, 'archived')}
+                {pkg.status !== 'archived' && (
+                  <button type="button" onClick={() => changeStatus(pkg, 'archived')}
                     className="text-xs font-semibold bg-slate-600 hover:bg-slate-700 text-white px-2.5 py-1 rounded-lg">Archive</button>
                 )}
-                <button type="button" onClick={() => setEditing(trip)}
+                <button type="button" onClick={() => setEditing(pkg)}
                   className="text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-2.5 py-1 rounded-lg">Edit</button>
-                <button type="button" onClick={() => setConfirmDelete(trip)}
+                <button type="button" onClick={() => setConfirmDelete(pkg)}
                   className="text-xs font-semibold bg-red-700 hover:bg-red-800 text-white px-2.5 py-1 rounded-lg">Delete</button>
               </div>
             </li>
@@ -369,17 +369,17 @@ function TripsTab({
       )}
 
       {(creating || editing) && (
-        <TripForm
-          trip={editing} shops={shops}
+        <PackageForm
+          pkg={editing} shops={shops}
           onClose={() => { setCreating(false); setEditing(null) }}
-          onSaved={async () => { setCreating(false); setEditing(null); onOk('Trip saved'); await onChanged() }}
+          onSaved={async () => { setCreating(false); setEditing(null); onOk('Package saved'); await onChanged() }}
           onError={onError}
         />
       )}
 
       {confirmDelete && (
         <ConfirmModal
-          title="Delete trip?"
+          title="Delete package?"
           body={`"${confirmDelete.title}" and any referrals for it will be permanently deleted.`}
           confirmLabel="Delete"
           onClose={() => setConfirmDelete(null)}
@@ -390,7 +390,7 @@ function TripsTab({
   )
 }
 
-function StatusBadge({ status }: { status: TripStatus }) {
+function StatusBadge({ status }: { status: PackageStatus }) {
   const cls = status === 'published'
     ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
     : status === 'draft'
@@ -399,30 +399,30 @@ function StatusBadge({ status }: { status: TripStatus }) {
   return <span className={`text-xs px-2 py-0.5 rounded-full border shrink-0 ${cls}`}>{status}</span>
 }
 
-function TripForm({
-  trip, shops, onClose, onSaved, onError,
+function PackageForm({
+  pkg, shops, onClose, onSaved, onError,
 }: {
-  trip: Trip | null
+  pkg: Package | null
   shops: PartnerShop[]
   onClose: () => void
   onSaved: () => Promise<void>
   onError: (m: string) => void
 }) {
-  const [partnerId, setPartnerId] = useState(trip?.partner_shop_id ?? shops[0]?.id ?? '')
-  const [title, setTitle] = useState(trip?.title ?? '')
-  const [destination, setDestination] = useState(trip?.destination ?? '')
-  const [summary, setSummary] = useState(trip?.summary ?? '')
-  const [description, setDescription] = useState(trip?.description ?? '')
-  const [startDate, setStartDate] = useState(trip?.start_date ?? '')
-  const [endDate, setEndDate] = useState(trip?.end_date ?? '')
-  const [price, setPrice] = useState(trip?.price?.toString() ?? '')
-  const [currency, setCurrency] = useState(trip?.currency ?? siteConfig.locale.currency)
-  const [heroImageUrl, setHeroImageUrl] = useState(trip?.hero_image_url ?? '')
-  const [bookingUrl, setBookingUrl] = useState(trip?.booking_url ?? '')
-  const [highlights, setHighlights] = useState((trip?.highlights ?? []).join('\n'))
+  const [partnerId, setPartnerId] = useState(pkg?.partner_shop_id ?? shops[0]?.id ?? '')
+  const [title, setTitle] = useState(pkg?.title ?? '')
+  const [destination, setDestination] = useState(pkg?.destination ?? '')
+  const [summary, setSummary] = useState(pkg?.summary ?? '')
+  const [description, setDescription] = useState(pkg?.description ?? '')
+  const [startDate, setStartDate] = useState(pkg?.start_date ?? '')
+  const [endDate, setEndDate] = useState(pkg?.end_date ?? '')
+  const [price, setPrice] = useState(pkg?.price?.toString() ?? '')
+  const [currency, setCurrency] = useState(pkg?.currency ?? siteConfig.locale.currency)
+  const [heroImageUrl, setHeroImageUrl] = useState(pkg?.hero_image_url ?? '')
+  const [bookingUrl, setBookingUrl] = useState(pkg?.booking_url ?? '')
+  const [highlights, setHighlights] = useState((pkg?.highlights ?? []).join('\n'))
   const selectedShop = shops.find(s => s.id === partnerId)
-  const [rate, setRate] = useState((((trip?.kickback_rate ?? selectedShop?.default_kickback_rate ?? 0.05)) * 100).toString())
-  const [status, setStatus] = useState<TripStatus>(trip?.status ?? 'draft')
+  const [rate, setRate] = useState((((pkg?.kickback_rate ?? selectedShop?.default_kickback_rate ?? 0.05)) * 100).toString())
+  const [status, setStatus] = useState<PackageStatus>(pkg?.status ?? 'draft')
   const [submitting, setSubmitting] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
@@ -432,7 +432,7 @@ function TripForm({
     if (startDate && endDate && endDate < startDate) { onError('End date is before the start date.'); return }
     setSubmitting(true)
     try {
-      const values: TripInsert = {
+      const values: PackageInsert = {
         partner_shop_id: partnerId,
         title: title.trim(),
         destination: destination.trim(),
@@ -448,7 +448,7 @@ function TripForm({
         kickback_rate: Number(rate) / 100,
         status,
       }
-      await saveTrip(values, trip ?? undefined)
+      await savePackage(values, pkg ?? undefined)
       await onSaved()
     } catch (err) {
       onError(errorMessage(err))
@@ -458,9 +458,9 @@ function TripForm({
   }
 
   return (
-    <Modal labelledBy="trip-form-title" onClose={onClose}>
+    <Modal labelledBy="package-form-title" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-3 max-h-[80vh] overflow-y-auto">
-        <h2 id="trip-form-title" className="text-lg font-bold text-brand-900">{trip ? 'Edit trip' : 'New trip'}</h2>
+        <h2 id="package-form-title" className="text-lg font-bold text-brand-900">{pkg ? 'Edit package' : 'New package'}</h2>
         <Labelled label="Partner shop *">
           <select className={FIELD} value={partnerId} onChange={e => setPartnerId(e.target.value)} aria-label="Partner shop">
             {shops.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -490,14 +490,14 @@ function TripForm({
         <div className="grid grid-cols-2 gap-2">
           <Labelled label="Kickback %"><input className={FIELD} type="number" step="any" value={rate} onChange={e => setRate(e.target.value)} /></Labelled>
           <Labelled label="Status">
-            <select className={FIELD} value={status} onChange={e => setStatus(e.target.value as TripStatus)} aria-label="Status">
+            <select className={FIELD} value={status} onChange={e => setStatus(e.target.value as PackageStatus)} aria-label="Status">
               <option value="draft">draft</option>
               <option value="published">published</option>
               <option value="archived">archived</option>
             </select>
           </Labelled>
         </div>
-        <FormButtons submitting={submitting} submitLabel={trip ? 'Save changes' : 'Create trip'} onClose={onClose} />
+        <FormButtons submitting={submitting} submitLabel={pkg ? 'Save changes' : 'Create package'} onClose={onClose} />
       </form>
     </Modal>
   )

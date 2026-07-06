@@ -2,30 +2,30 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { AdminTripBoardPage } from './AdminTripBoardPage'
-import type { PartnerShop, Trip } from '../../types/database'
+import { AdminPackagesPage } from './AdminPackagesPage'
+import type { PartnerShop, Package } from '../../types/database'
 
 const {
   fetchPartnerShops, savePartnerShop, deletePartnerShop,
-  fetchTrips, saveTrip, setTripStatus, deleteTrip,
+  fetchPackages, savePackage, setPackageStatus, deletePackage,
 } = vi.hoisted(() => ({
   fetchPartnerShops: vi.fn(),
   savePartnerShop: vi.fn(),
   deletePartnerShop: vi.fn(),
-  fetchTrips: vi.fn(),
-  saveTrip: vi.fn(),
-  setTripStatus: vi.fn(),
-  deleteTrip: vi.fn(),
+  fetchPackages: vi.fn(),
+  savePackage: vi.fn(),
+  setPackageStatus: vi.fn(),
+  deletePackage: vi.fn(),
 }))
 
-vi.mock('../../lib/trip-admin', () => ({
+vi.mock('../../lib/package-admin', () => ({
   fetchPartnerShops: (...a: unknown[]) => fetchPartnerShops(...a),
   savePartnerShop: (...a: unknown[]) => savePartnerShop(...a),
   deletePartnerShop: (...a: unknown[]) => deletePartnerShop(...a),
-  fetchTrips: (...a: unknown[]) => fetchTrips(...a),
-  saveTrip: (...a: unknown[]) => saveTrip(...a),
-  setTripStatus: (...a: unknown[]) => setTripStatus(...a),
-  deleteTrip: (...a: unknown[]) => deleteTrip(...a),
+  fetchPackages: (...a: unknown[]) => fetchPackages(...a),
+  savePackage: (...a: unknown[]) => savePackage(...a),
+  setPackageStatus: (...a: unknown[]) => setPackageStatus(...a),
+  deletePackage: (...a: unknown[]) => deletePackage(...a),
 }))
 
 vi.mock('../../hooks/useToast', () => ({
@@ -34,7 +34,7 @@ vi.mock('../../hooks/useToast', () => ({
 
 // The page loads a new-interest count on mount; the Referrals tab itself is
 // covered in AdminReferralsTab.test.tsx.
-vi.mock('../../lib/trip-referrals', () => ({
+vi.mock('../../lib/package-referrals', () => ({
   countInterestedReferrals: vi.fn().mockResolvedValue(0),
   fetchReferralsWithDivers: vi.fn().mockResolvedValue([]),
 }))
@@ -44,42 +44,42 @@ const shop: PartnerShop = {
   location: 'Raja Ampat', website: null, contact_name: null, contact_email: null,
   vouch_notes: null, logo_url: null, default_kickback_rate: 0.05, active: true, created_by: null,
 }
-const trip: Trip = {
-  id: 't1', created_at: '2026-06-02T00:00:00Z', partner_shop_id: 's1',
+const pkg: Package = {
+  id: 'p1', created_at: '2026-06-02T00:00:00Z', partner_shop_id: 's1',
   title: 'Raja Ampat Liveaboard', destination: 'Raja Ampat, Indonesia', summary: null, description: null,
   start_date: null, end_date: null, price: 60000, currency: 'TWD', hero_image_url: null,
   highlights: [], booking_url: null, kickback_rate: 0.05, status: 'draft', published_at: null, created_by: null,
 }
 
 beforeEach(() => {
-  for (const m of [fetchPartnerShops, savePartnerShop, deletePartnerShop, fetchTrips, saveTrip, setTripStatus, deleteTrip]) m.mockReset()
+  for (const m of [fetchPartnerShops, savePartnerShop, deletePartnerShop, fetchPackages, savePackage, setPackageStatus, deletePackage]) m.mockReset()
   fetchPartnerShops.mockResolvedValue([shop])
-  fetchTrips.mockResolvedValue([trip])
+  fetchPackages.mockResolvedValue([pkg])
   savePartnerShop.mockResolvedValue(undefined)
-  saveTrip.mockResolvedValue(undefined)
-  setTripStatus.mockResolvedValue(undefined)
+  savePackage.mockResolvedValue(undefined)
+  setPackageStatus.mockResolvedValue(undefined)
   deletePartnerShop.mockResolvedValue(undefined)
-  deleteTrip.mockResolvedValue(undefined)
+  deletePackage.mockResolvedValue(undefined)
 })
 
 function renderPage() {
-  return render(<MemoryRouter><AdminTripBoardPage /></MemoryRouter>)
+  return render(<MemoryRouter><AdminPackagesPage /></MemoryRouter>)
 }
 
-describe('AdminTripBoardPage', () => {
-  it('lists trips by default with their partner + status', async () => {
+describe('AdminPackagesPage', () => {
+  it('lists packages by default with their partner + status', async () => {
     renderPage()
     expect(await screen.findByText('Raja Ampat Liveaboard')).toBeInTheDocument()
     expect(screen.getByText(/Blue Manta Divers/)).toBeInTheDocument()
     expect(screen.getByText('draft')).toBeInTheDocument()
   })
 
-  it('publishes a draft trip', async () => {
+  it('publishes a draft package', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Raja Ampat Liveaboard')
     await user.click(screen.getByRole('button', { name: 'Publish' }))
-    await waitFor(() => expect(setTripStatus).toHaveBeenCalledWith(trip, 'published'))
+    await waitFor(() => expect(setPackageStatus).toHaveBeenCalledWith(pkg, 'published'))
   })
 
   it('switches to the shops tab and lists partner shops', async () => {
@@ -108,19 +108,19 @@ describe('AdminTripBoardPage', () => {
     expect(values).toMatchObject({ name: 'Sea Explorers', country: 'Philippines', default_kickback_rate: 0.05 })
   })
 
-  it('creates a trip, converting the kickback percent to a fraction', async () => {
+  it('creates a package, converting the kickback percent to a fraction', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Raja Ampat Liveaboard')
-    await user.click(screen.getByRole('button', { name: /New trip/ }))
+    await user.click(screen.getByRole('button', { name: /New package/ }))
 
     const dialog = await screen.findByRole('dialog')
     await user.type(within(dialog).getByLabelText('Title *'), 'Anilao Macro Week')
     await user.type(within(dialog).getByLabelText('Destination *'), 'Anilao, Philippines')
-    await user.click(within(dialog).getByRole('button', { name: /Create trip/ }))
+    await user.click(within(dialog).getByRole('button', { name: /Create package/ }))
 
-    await waitFor(() => expect(saveTrip).toHaveBeenCalled())
-    const [values] = saveTrip.mock.calls[0]
+    await waitFor(() => expect(savePackage).toHaveBeenCalled())
+    const [values] = savePackage.mock.calls[0]
     expect(values).toMatchObject({
       partner_shop_id: 's1', title: 'Anilao Macro Week',
       destination: 'Anilao, Philippines', kickback_rate: 0.05, status: 'draft',
