@@ -5,6 +5,8 @@ import { supabase } from '../../lib/supabase'
 import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
 import { gearPackList } from '../../lib/gear'
 import { DiverGearCard, type DiverGearRow } from '../../components/admin/DiverGearCard'
+import { fetchGearModelsWithSizes } from '../../lib/gear-models'
+import type { GearModelWithSizes } from '../../lib/gear-sizing'
 import type { AppEvent, Profile } from '../../types/database'
 
 type Row = DiverGearRow
@@ -14,6 +16,10 @@ export function AdminGearMapPage() {
   const [event, setEvent] = useState<AppEvent | null>(null)
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
+  const [gearModels, setGearModels] = useState<GearModelWithSizes[]>([])
+  useEffect(() => {
+    fetchGearModelsWithSizes().then(setGearModels).catch(() => { /* charts are optional */ })
+  }, [])
 
   useEffect(() => {
     if (!type || !id) return
@@ -84,7 +90,7 @@ export function AdminGearMapPage() {
         <p className="text-brand-950 font-medium text-sm">No registrants yet.</p>
       ) : (
         <section className="space-y-3">
-          {rows.map(r => <DiverGearCard key={r.booking.id} row={r} onProfilePatched={patchProfile} />)}
+          {rows.map(r => <DiverGearCard key={r.booking.id} row={r} onProfilePatched={patchProfile} gearModels={gearModels} />)}
         </section>
       )}
     </div>

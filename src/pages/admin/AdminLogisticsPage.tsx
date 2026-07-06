@@ -18,6 +18,8 @@ import { PaymentsDueGroup } from '../../components/admin/PaymentsDueGroup'
 import { TransportFleetPlan } from '../../components/admin/TransportFleetPlan'
 import { EventVehicleGroup } from '../../components/admin/EventVehicleGroup'
 import { fetchVehicles } from '../../lib/vehicles'
+import { fetchGearModelsWithSizes } from '../../lib/gear-models'
+import type { GearModelWithSizes } from '../../lib/gear-sizing'
 import { fetchVehiclesForEvents, availableVehicles, allocationEventId } from '../../lib/event-vehicles'
 import { planFleet, type Rider, type SeatingPlan, type FleetVehicle } from '../../lib/vehicle-planning'
 import { useAuth } from '../../hooks/useAuth'
@@ -42,6 +44,11 @@ export function AdminLogisticsPage() {
   const isAdmin = profile?.role === 'admin'
   const [tab, setTab] = useState<Tab>('today')
   const [otherDay, setOtherDay] = useState('')
+  // The shop's gear sizing charts, loaded once for the rental fit lookup.
+  const [gearModels, setGearModels] = useState<GearModelWithSizes[]>([])
+  useEffect(() => {
+    fetchGearModelsWithSizes().then(setGearModels).catch(() => { /* charts are optional */ })
+  }, [])
   // null = not loaded yet; [] = loaded, no event-days in range.
   const [upcomingDays, setUpcomingDays] = useState<string[] | null>(null)
   // null = loading; [] = loaded, no events that day.
@@ -526,7 +533,7 @@ export function AdminLogisticsPage() {
                 <p className="text-xs text-brand-950/70 font-medium italic pl-1">No active registrants.</p>
               ) : (
                 g.rows.map(r => (
-                  <DiverGearCard key={r.booking.id} row={r} onProfilePatched={patchProfile} linkToProfile={isAdmin} />
+                  <DiverGearCard key={r.booking.id} row={r} onProfilePatched={patchProfile} linkToProfile={isAdmin} gearModels={gearModels} />
                 ))
               )}
             </section>

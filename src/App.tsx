@@ -52,6 +52,7 @@ import { AdminDashboardPage } from './pages/admin/AdminDashboardPage'
 import { AdminHistoryPage } from './pages/admin/AdminHistoryPage'
 import { AdminTripBoardPage } from './pages/admin/AdminTripBoardPage'
 import { AdminTrustedPartnersPage } from './pages/admin/AdminTrustedPartnersPage'
+import { AdminGearSizingPage } from './pages/admin/AdminGearSizingPage'
 import { AdminVehiclesPage } from './pages/admin/AdminVehiclesPage'
 
 // Public registration flow — /register (pick an event) and /register/:type/:id
@@ -141,6 +142,7 @@ export default function App() {
                 <Route path="/admin/accounting" element={<AdminAccountingPage />} />
                 <Route path="/admin/trip-board" element={<AdminTripBoardPage />} />
                 <Route path="/admin/trusted-partners" element={<AdminTrustedPartnersPage />} />
+                <Route path="/admin/gear-sizing" element={<AdminGearSizingPage />} />
                 <Route path="/admin/vehicles" element={<AdminVehiclesPage />} />
                 <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
                 <Route path="/admin/history" element={<AdminHistoryPage />} />
