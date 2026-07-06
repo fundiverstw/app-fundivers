@@ -32,7 +32,7 @@ export interface FormState {
   fully_booked: boolean
   is_private: boolean    // dive-only: hidden from diver-facing calendars
   is_boat_dive: boolean  // dive-only, independent of is_trip
-  is_trip: boolean       // dive-only: surfaced under Scheduled Trips
+  is_trip: boolean       // dive-only: multi-day/liveaboard classification (mirrored to Wix)
   roomIds: string[]      // FK multi → rooms
   nitrox_required: boolean
   gear_rental: string

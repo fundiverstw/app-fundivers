@@ -2,39 +2,43 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { ScheduledTripsPage } from './ScheduledTripsPage'
+import type { ScheduledTripItem } from '../types/database'
 
-const { fetchEventsInRange } = vi.hoisted(() => ({ fetchEventsInRange: vi.fn() }))
-vi.mock('../lib/events', () => ({
-  fetchEventsInRange: (...a: unknown[]) => fetchEventsInRange(...a),
-  formatEventSpan: () => 'Jun 18, 2026',
+const { fetchScheduledTrips } = vi.hoisted(() => ({ fetchScheduledTrips: vi.fn() }))
+vi.mock('../lib/scheduled-trips', () => ({
+  fetchScheduledTrips: (...a: unknown[]) => fetchScheduledTrips(...a),
 }))
 
-const ev = (id: string, title: string, flags: { is_trip?: boolean; is_boat_dive?: boolean }) => ({
-  id, type: 'dive', title,
-  start_time: '2026-06-18T00:00:00Z', end_time: null,
-  is_trip: !!flags.is_trip, is_boat_dive: !!flags.is_boat_dive,
+const trip = (over: Partial<ScheduledTripItem> = {}): ScheduledTripItem => ({
+  id: 's1', title: 'Palau Liveaboard', destination: 'Palau', summary: null, description: null,
+  start_date: '2026-09-01', end_date: '2026-09-07', price: 80000, currency: 'TWD',
+  hero_image_url: null, highlights: [], published_at: '2026-06-01T00:00:00Z',
+  event_id: null, event_kind: null, ...over,
 })
 
-beforeEach(() => { fetchEventsInRange.mockReset() })
+beforeEach(() => { fetchScheduledTrips.mockReset() })
 
 describe('ScheduledTripsPage', () => {
-  it('lists only events flagged is_trip, and links each into registration', async () => {
-    fetchEventsInRange.mockResolvedValue([
-      ev('t1', 'Palau Liveaboard', { is_trip: true }),
-      // A boat dive is NOT a trip — must be excluded even though it's a boat dive.
-      ev('b1', 'Longdong Boat Dive', { is_boat_dive: true, is_trip: false }),
-      ev('l1', 'House Reef Dive', {}),
-    ])
+  it('links a trip with a linked event into registration', async () => {
+    fetchScheduledTrips.mockResolvedValue([trip({ event_id: 'e1', event_kind: 'dive' })])
     render(<MemoryRouter><ScheduledTripsPage /></MemoryRouter>)
 
     const link = await screen.findByRole('link', { name: /Palau Liveaboard/ })
-    expect(link).toHaveAttribute('href', '/register/dive/t1')
-    expect(screen.queryByText('Longdong Boat Dive')).not.toBeInTheDocument()
-    expect(screen.queryByText('House Reef Dive')).not.toBeInTheDocument()
+    expect(link).toHaveAttribute('href', '/register/dive/e1')
+    expect(screen.getByText('Tap to register')).toBeInTheDocument()
   })
 
-  it('shows an empty state when nothing upcoming is flagged a trip', async () => {
-    fetchEventsInRange.mockResolvedValue([ev('b1', 'Longdong Boat Dive', { is_boat_dive: true })])
+  it('points an unlinked trip at Contact', async () => {
+    fetchScheduledTrips.mockResolvedValue([trip({ event_id: null, event_kind: null })])
+    render(<MemoryRouter><ScheduledTripsPage /></MemoryRouter>)
+
+    const link = await screen.findByRole('link', { name: /Palau Liveaboard/ })
+    expect(link).toHaveAttribute('href', '/contact')
+    expect(screen.getByText('Contact us to join')).toBeInTheDocument()
+  })
+
+  it('shows an empty state when nothing is scheduled', async () => {
+    fetchScheduledTrips.mockResolvedValue([])
     render(<MemoryRouter><ScheduledTripsPage /></MemoryRouter>)
     expect(await screen.findByText(/no trips scheduled/i)).toBeInTheDocument()
   })
