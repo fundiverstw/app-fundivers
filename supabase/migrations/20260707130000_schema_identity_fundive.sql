@@ -182,7 +182,11 @@ grant execute on function public.sign_waiver(text, integer, text, uuid) to anon,
 -- ── 5. drop orphaned Bubble-era functions ────────────────────────────────────
 drop function if exists public.parse_addon_ids(text);
 drop function if exists public.parse_room_ids(text);
-drop function if exists public.wix_sync_notify();
+-- wix_sync_notify() is intentionally KEPT: it is app-fundivers' custom Wix-sync
+-- trigger function (defined in 20260603030000) with 6 live triggers on the
+-- reference tables that push changes to the Wix site. fundive has no equivalent,
+-- so this is an accepted app-specific divergence (like the compat views + the
+-- Wix Book bridge), not an orphan. Dropping it would break the live Wix sync.
 
 commit;
 
