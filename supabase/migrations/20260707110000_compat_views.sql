@@ -97,18 +97,23 @@ create view public."Other_Addons" as
 select id as _id, admin_title, price, display_title, currency
 from public.addons;
 
+-- Columns limited to those that actually exist on prod dive_travel (dev had
+-- extra Bubble columns — event_type/picture/description/tagline/details/
+-- event_date/price/sort_order/local/trip — that prod never had). External
+-- readers (Wix) access these tolerantly (JS undefined → ''), so absent columns
+-- are a no-op rather than a break.
 create view public."DiveTravel" as
 select
   id as _id, admin_title, included, not_included, transportation, slug,
-  event_type, picture, description, tagline, tagline_text, details,
-  prerequisites, itinerary, event_date, price, sort_order, local, trip,
+  tagline_text, prerequisites, itinerary,
   trip_link, planned_trip, details_document, local_event_link
 from public.dive_travel;
 
+-- prod travel_destinations has longitude but no latitude (dev drift) — omit it.
 create view public."TravelDestinations" as
 select
   id as _id, admin_title, slug, tagline, country, divetype, sort_order,
-  latitude, longitude, international, northeast_diving, location_picture,
+  longitude, international, northeast_diving, location_picture,
   background_picture, diver_requirements
 from public.travel_destinations;
 
