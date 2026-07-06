@@ -51,8 +51,12 @@ $$;
 grant execute on function public.list_trip_board()        to authenticated;
 grant execute on function public.list_my_trip_referrals() to authenticated;
 
-drop view if exists public.trip_board;
-drop view if exists public.my_trip_referrals;
+-- NOTE: the trip_board / my_trip_referrals views are intentionally NOT dropped
+-- here. The deployed app still reads them via .from('trip_board'); dropping them
+-- now would break it. This is the additive (expand) step — safe to push anytime.
+-- A follow-up contract migration drops the views AFTER the app deploy that
+-- switches to the list_trip_board()/list_my_trip_referrals() RPCs, which is what
+-- finally clears the SECURITY DEFINER-view linter warning.
 
 commit;
 
