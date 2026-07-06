@@ -10,9 +10,10 @@ import { GearFitLookup } from './GearFitLookup'
 import type { GearModelWithSizes } from '../../lib/gear-sizing'
 import { GEAR_TYPES, type GearType, type Booking, type Profile } from '../../types/database'
 
-// Which config gear item stands for a sizing-chart gear type.
+// Which config gear item stands for a sizing-chart gear type. Substring match so
+// a fork's relabelled item ("Wetsuit 5mm", "Full wetsuit") still resolves.
 function gearTypeItem(type: GearType): string | undefined {
-  return GEAR_ITEMS.find(i => i.toLowerCase() === type)
+  return GEAR_ITEMS.find(i => i.toLowerCase().includes(type))
 }
 
 // Route under-13s (by date of birth) to kids' gear charts; otherwise use the
@@ -20,12 +21,15 @@ function gearTypeItem(type: GearType): string | undefined {
 function resolveGearGender(profile: Profile): string | null {
   const dob = profile.date_of_birth
   if (dob) {
-    const birth = new Date(dob)
-    if (!Number.isNaN(birth.getTime())) {
+    // Parse the 'YYYY-MM-DD' as a LOCAL date (new Date(str) is UTC midnight),
+    // so the age comparison against local "now" doesn't slip a day at the
+    // timezone boundary.
+    const [y, m, d] = dob.split('-').map(Number)
+    if (Number.isFinite(y) && Number.isFinite(m) && Number.isFinite(d)) {
       const now = new Date()
-      let age = now.getFullYear() - birth.getFullYear()
-      const m = now.getMonth() - birth.getMonth()
-      if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--
+      let age = now.getFullYear() - y
+      const mo = now.getMonth() - (m - 1)
+      if (mo < 0 || (mo === 0 && now.getDate() < d)) age--
       if (age < 13) return 'kids'
     }
   }
