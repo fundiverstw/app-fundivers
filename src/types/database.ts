@@ -186,6 +186,29 @@ export interface Database {
           partner_name: string
         }>
       }
+      // Defined in 20260707160000_scheduled_trips.sql. Owner-privileged
+      // projection of the shop's PUBLISHED scheduled trips, carrying the linked
+      // event's kind so the client can build the /register/<kind>/<id> link.
+      // Divers have no access to the admin-only scheduled_trips base table.
+      list_scheduled_trips: {
+        Args: Record<string, never>
+        Returns: Array<{
+          id: string
+          title: string
+          destination: string
+          summary: string | null
+          description: string | null
+          start_date: string | null
+          end_date: string | null
+          price: number | null
+          currency: string
+          hero_image_url: string | null
+          highlights: string[]
+          published_at: string | null
+          event_id: string | null
+          event_kind: 'dive' | 'course' | null
+        }>
+      }
       // Defined in 20260706010000_replace_gear_model_sizes_rpc.sql.
       // Admin-only. Atomically replaces a gear model's size rows (delete +
       // insert in one transaction) from a JSON array of size objects.
@@ -866,6 +889,49 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['package_referrals']['Insert']>
         Relationships: []
       }
+      // Scheduled Trips — the shop's own curated, dated trips. Admin-managed
+      // (base table admin-only); divers read published rows via
+      // list_scheduled_trips(). See 20260707160000_scheduled_trips.sql.
+      scheduled_trips: {
+        Row: {
+          id: string
+          created_at: string
+          title: string
+          destination: string
+          summary: string | null
+          description: string | null
+          start_date: string | null
+          end_date: string | null
+          price: number | null
+          currency: string
+          hero_image_url: string | null
+          highlights: string[]
+          status: 'draft' | 'published' | 'archived'
+          published_at: string | null
+          event_id: string | null
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          title: string
+          destination: string
+          summary?: string | null
+          description?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          price?: number | null
+          currency?: string
+          hero_image_url?: string | null
+          highlights?: string[]
+          status?: 'draft' | 'published' | 'archived'
+          published_at?: string | null
+          event_id?: string | null
+          created_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['scheduled_trips']['Insert']>
+        Relationships: []
+      }
       // Unified dive+course catalog (kind discriminates). Replaced the split
       // EO_dives / EO_courses tables. A dive uses the start_date/end_date
       // envelope; a course uses course_days (the two temporal models coexist).
@@ -1473,6 +1539,13 @@ export type PackageBoardItem = Database['public']['Functions']['list_package_boa
 export type MyPackageReferral = Database['public']['Functions']['list_my_package_referrals']['Returns'][number]
 export const PACKAGE_STATUSES = ['draft','published','archived'] as const
 export type PackageStatus = typeof PACKAGE_STATUSES[number]
+
+// Scheduled Trips — the shop's own curated, dated trips
+export type ScheduledTrip = Database['public']['Tables']['scheduled_trips']['Row']
+export type ScheduledTripInsert = Database['public']['Tables']['scheduled_trips']['Insert']
+export type ScheduledTripItem = Database['public']['Functions']['list_scheduled_trips']['Returns'][number]
+export const SCHEDULED_TRIP_STATUSES = ['draft','published','archived'] as const
+export type ScheduledTripStatus = typeof SCHEDULED_TRIP_STATUSES[number]
 export const REFERRAL_STATUSES = ['interested','introduced','booked','completed','cancelled'] as const
 export type ReferralStatus = typeof REFERRAL_STATUSES[number]
 export const KICKBACK_STATUSES = ['pending','invoiced','received'] as const
@@ -1571,7 +1644,9 @@ export interface AppEvent {
   dive_outing?: 'local' | 'trip' | null
   /** Dive-only, admin-set, and INDEPENDENT of each other: a Kenting boat trip
    *  is both, a local day boat dive is only `is_boat_dive`, a Palau liveaboard
-   *  is only `is_trip`. `is_trip` drives the Scheduled Trips list. Absent for
+   *  is only `is_trip`. `is_trip` is a multi-day/liveaboard classification
+   *  mirrored to the Wix `EO_dives` compat view; the diver Scheduled Trips tab
+   *  now reads the curated `scheduled_trips` table, not this flag. Absent for
    *  courses; optional so lighter event literals can omit them (default false). */
   is_boat_dive?: boolean
   is_trip?: boolean

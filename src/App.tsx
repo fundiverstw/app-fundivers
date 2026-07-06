@@ -51,6 +51,7 @@ import { AdminAccountingPage } from './pages/admin/AdminAccountingPage'
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage'
 import { AdminHistoryPage } from './pages/admin/AdminHistoryPage'
 import { AdminPackagesPage } from './pages/admin/AdminPackagesPage'
+import { AdminScheduledTripsPage } from './pages/admin/AdminScheduledTripsPage'
 import { AdminTrustedPartnersPage } from './pages/admin/AdminTrustedPartnersPage'
 import { AdminGearSizingPage } from './pages/admin/AdminGearSizingPage'
 import { AdminVehiclesPage } from './pages/admin/AdminVehiclesPage'
@@ -141,6 +142,7 @@ export default function App() {
                 <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
                 <Route path="/admin/accounting" element={<AdminAccountingPage />} />
                 <Route path="/admin/packages" element={<AdminPackagesPage />} />
+                <Route path="/admin/scheduled-trips" element={<AdminScheduledTripsPage />} />
                 <Route path="/admin/trusted-partners" element={<AdminTrustedPartnersPage />} />
                 <Route path="/admin/gear-sizing" element={<AdminGearSizingPage />} />
                 <Route path="/admin/vehicles" element={<AdminVehiclesPage />} />
