@@ -8,10 +8,13 @@ import { GEAR_TYPES, type GearType } from '../../types/database'
 
 const LABEL: Record<GearType, string> = { wetsuit: 'Wetsuit', bcd: 'BCD', fins: 'Fins' }
 
-// Does the diver carry the measurements this gear type matches on? Lets the
-// empty state tell "profile incomplete" apart from "no model fits this diver".
+// Does the diver carry the measurements this gear type matches on? Mirrors the
+// matcher's expected axes (BCD is weight-only), so the empty state tells
+// "profile incomplete" apart from "no model fits this diver".
 function hasMeasures(type: GearType, m: DiverMeasures): boolean {
-  return type === 'fins' ? !!m.shoe_size : m.height_cm != null && m.weight_kg != null
+  if (type === 'fins') return !!m.shoe_size
+  if (type === 'bcd') return m.weight_kg != null
+  return m.height_cm != null && m.weight_kg != null
 }
 
 export function GearFitLookup({ measures, models, rentalTypes }: {

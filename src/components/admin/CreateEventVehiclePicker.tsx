@@ -11,12 +11,14 @@ interface Props {
 /**
  * Car assignment for the New-event form. The event row doesn't exist yet, so
  * this holds the picked vehicles in local state and hands the ids up; the page
- * persists them (event_vehicles) right after inserting the event. Edit uses the
- * DB-backed EventCarAssignment instead.
+ * persists them (event_vehicles) right after inserting the event. Cars serve any
+ * number of events here (event-level allocation), so no date filtering. Edit
+ * uses the DB-backed EventCarAssignment instead.
  */
 export function CreateEventVehiclePicker({ onChange }: Props) {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
@@ -24,16 +26,23 @@ export function CreateEventVehiclePicker({ onChange }: Props) {
       try {
         const v = await fetchVehicles()
         if (!cancelled) setVehicles(v.filter(x => x.active))
-      } catch { /* no fleet loaded — section just stays empty */ }
+      } catch { /* no fleet loaded — section stays empty */ }
+      finally { if (!cancelled) setLoading(false) }
     })()
     return () => { cancelled = true }
   }, [])
+
+  // Report the current selection up in an effect (not inside the state updater),
+  // so it re-syncs to empty on remount (dive→course→dive type switch).
+  useEffect(() => {
+    onChange([...selected])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected])
 
   function toggle(id: string) {
     setSelected(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id); else next.add(id)
-      onChange([...next])
       return next
     })
   }
@@ -54,7 +63,9 @@ export function CreateEventVehiclePicker({ onChange }: Props) {
         Cars assigned here set the ride-seat limit on the registration form — a diver can only
         request a ride when a seat is free in one of them. You can change these later.
       </p>
-      {vehicles.length === 0 ? (
+      {loading ? (
+        <p className="text-sm text-white/60">Loading cars…</p>
+      ) : vehicles.length === 0 ? (
         <p className="text-sm text-brand-950 font-medium bg-white/70 rounded-md p-2">No active cars in the fleet.</p>
       ) : (
         <div className="space-y-1 max-h-56 overflow-y-auto bg-white/70 backdrop-blur-md border border-surface-200 rounded-md p-2">
