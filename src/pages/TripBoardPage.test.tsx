@@ -34,10 +34,10 @@ function renderPage() {
 }
 
 describe('TripBoardPage', () => {
-  it('lists published trips with the vouched-by badge and price', async () => {
+  it('lists published trips with the in-cooperation badge and price', async () => {
     renderPage()
     expect(await screen.findByText('Raja Ampat Liveaboard')).toBeInTheDocument()
-    expect(screen.getByText(/Vouched by Blue Manta Divers/)).toBeInTheDocument()
+    expect(screen.getByText(/In cooperation with Blue Manta Divers/)).toBeInTheDocument()
     expect(screen.getByText(/60,000 TWD/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Trusted Partners/ })).toHaveAttribute('href', '/trusted-partners')
   })
