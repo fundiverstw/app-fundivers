@@ -11,6 +11,7 @@ import {
 const admin = adminClient()
 let diver: TestUser
 let staff: TestUser
+let adminUser: TestUser
 const cleanupModels: string[] = []
 
 async function createModel(name: string): Promise<string> {
@@ -25,11 +26,12 @@ async function createModel(name: string): Promise<string> {
 beforeAll(async () => {
   diver = await createTestUser(admin, { role: 'diver' })
   staff = await createTestUser(admin, { role: 'staff' })
+  adminUser = await createTestUser(admin, { role: 'admin' })
 })
 
 afterAll(async () => {
   for (const id of cleanupModels) await admin.from('gear_models').delete().eq('id', id)
-  for (const u of [diver, staff]) if (u) await deleteTestUser(admin, u.id)
+  for (const u of [diver, staff, adminUser]) if (u) await deleteTestUser(admin, u.id)
 })
 
 describe('gear sizing charts access', () => {
@@ -69,5 +71,34 @@ describe('gear sizing charts access', () => {
     const res = await diverClient.from('gear_models')
       .insert({ gear_type: 'fins', name: 'Diver should not add' } as never)
     expect(res.error).not.toBeNull()
+  })
+
+  it('replace_gear_model_sizes atomically swaps a model\'s sizes for admins', async () => {
+    const modelId = await createModel('Replace Test')
+    const seed = await admin.from('gear_model_sizes')
+      .insert({ model_id: modelId, label: 'Old', weight_min: 40, weight_max: 50 } as never)
+    expect(seed.error).toBeNull()
+
+    const adminClientAuthed = await userClient(adminUser.email, adminUser.password)
+    const { error } = await adminClientAuthed.rpc('replace_gear_model_sizes', {
+      p_model_id: modelId,
+      p_sizes: [
+        { label: 'S', weight_min: 50, weight_max: 64 },
+        { label: 'M', weight_min: 65, weight_max: 80 },
+      ],
+    } as never)
+    expect(error).toBeNull()
+
+    const rows = await admin.from('gear_model_sizes').select('label').eq('model_id', modelId)
+    expect((rows.data ?? []).map(r => (r as { label: string }).label).sort()).toEqual(['M', 'S'])
+  })
+
+  it('blocks non-admins from replace_gear_model_sizes', async () => {
+    const modelId = await createModel('Replace Guard')
+    const staffClient = await userClient(staff.email, staff.password)
+    const { error } = await staffClient.rpc('replace_gear_model_sizes', {
+      p_model_id: modelId, p_sizes: [{ label: 'X' }],
+    } as never)
+    expect(error).not.toBeNull()
   })
 })

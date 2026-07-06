@@ -37,12 +37,13 @@ export async function deleteGearModel(id: string): Promise<void> {
   if (error) throw error
 }
 
-// Replace a model's size rows wholesale — simplest fit for the grid editor.
+// Replace a model's size rows wholesale, atomically. The replace_gear_model_sizes
+// RPC does the delete + insert in one transaction, so a mid-save failure can't
+// leave the chart empty.
 export async function replaceModelSizes(modelId: string, sizes: GearModelSizeInsert[]): Promise<void> {
-  const { error: delErr } = await supabase.from('gear_model_sizes').delete().eq('model_id', modelId)
-  if (delErr) throw delErr
-  if (sizes.length === 0) return
-  const rows = sizes.map((s, i) => ({ ...s, model_id: modelId, sort_order: s.sort_order ?? i }))
-  const { error: insErr } = await supabase.from('gear_model_sizes').insert(rows as never)
-  if (insErr) throw insErr
+  const { error } = await supabase.rpc('replace_gear_model_sizes', {
+    p_model_id: modelId,
+    p_sizes: sizes.map((s, i) => ({ ...s, sort_order: s.sort_order ?? i })),
+  } as never)
+  if (error) throw error
 }

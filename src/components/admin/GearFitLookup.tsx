@@ -8,6 +8,12 @@ import { GEAR_TYPES, type GearType } from '../../types/database'
 
 const LABEL: Record<GearType, string> = { wetsuit: 'Wetsuit', bcd: 'BCD', fins: 'Fins' }
 
+// Does the diver carry the measurements this gear type matches on? Lets the
+// empty state tell "profile incomplete" apart from "no model fits this diver".
+function hasMeasures(type: GearType, m: DiverMeasures): boolean {
+  return type === 'fins' ? !!m.shoe_size : m.height_cm != null && m.weight_kg != null
+}
+
 export function GearFitLookup({ measures, models, rentalTypes }: {
   measures: DiverMeasures
   models: GearModelWithSizes[]
@@ -40,7 +46,9 @@ export function GearFitLookup({ measures, models, rentalTypes }: {
         <div className="bg-white/70 border border-surface-200 rounded-md p-2 space-y-1">
           {fits.length === 0 ? (
             <p className="text-xs text-brand-900/70">
-              No match — needs {open === 'fins' ? 'a shoe size' : 'height & weight'} on the diver's profile.
+              {hasMeasures(open, measures)
+                ? 'No matching model stocked for this diver.'
+                : `No match — needs ${open === 'fins' ? 'a shoe size' : 'height & weight'} on the diver's profile.`}
             </p>
           ) : (
             fits.map(f => <FitRow key={f.model.id} fit={f} />)

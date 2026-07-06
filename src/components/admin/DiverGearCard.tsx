@@ -10,11 +10,26 @@ import { GearFitLookup } from './GearFitLookup'
 import type { GearModelWithSizes } from '../../lib/gear-sizing'
 import { GEAR_TYPES, type GearType, type Booking, type Profile } from '../../types/database'
 
-// Which config gear item stands for a sizing-chart gear type, so we can tell
-// whether the diver already owns it (→ no rental lookup needed).
-function ownsGearType(type: GearType, owned: Set<string>): boolean {
-  const item = GEAR_ITEMS.find(i => i.toLowerCase() === type)
-  return item ? owned.has(item) : false
+// Which config gear item stands for a sizing-chart gear type.
+function gearTypeItem(type: GearType): string | undefined {
+  return GEAR_ITEMS.find(i => i.toLowerCase() === type)
+}
+
+// Route under-13s (by date of birth) to kids' gear charts; otherwise use the
+// profile's gender as-is. Keeps the pure matcher free of date handling.
+function resolveGearGender(profile: Profile): string | null {
+  const dob = profile.date_of_birth
+  if (dob) {
+    const birth = new Date(dob)
+    if (!Number.isNaN(birth.getTime())) {
+      const now = new Date()
+      let age = now.getFullYear() - birth.getFullYear()
+      const m = now.getMonth() - birth.getMonth()
+      if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--
+      if (age < 13) return 'kids'
+    }
+  }
+  return profile.gender ?? null
 }
 
 export interface DiverGearRow {
@@ -155,10 +170,12 @@ export function DiverGearCard({
                 height_cm: profile.height_cm ?? null,
                 weight_kg: profile.weight_kg ?? null,
                 shoe_size: profile.shoe_size ?? null,
-                gender: profile.gender ?? null,
+                gender: resolveGearGender(profile),
               }}
               models={gearModels}
-              rentalTypes={GEAR_TYPES.filter(t => !ownsGearType(t, owned))}
+              // Rentals come from the booking's pack list (the packing source of
+              // truth), not profile.gear_owned.
+              rentalTypes={GEAR_TYPES.filter(t => { const item = gearTypeItem(t); return !!item && pack.items.includes(item) })}
             />
           )}
         </div>

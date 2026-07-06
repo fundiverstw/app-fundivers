@@ -102,12 +102,34 @@ describe('matchGear — wetsuits', () => {
     expect(saeko.fit).toBe('exact')             // 80 ≥ 68, no upper bound
   })
 
-  it('lets a kids model self-select by its small size ranges', () => {
-    const fits = matchGear(diver({ height_cm: 120, weight_kg: 20, gender: 'female' }), wetsuits, 'wetsuit')
-    // Kids "S" is the exact fit and ranks first (exact before closest).
-    expect(fits[0].model.name).toBe("Kid's FD")
-    expect(fits[0].fit).toBe('exact')
-    expect(fits[0].size.label).toBe('S')
+  it('shows a kids model to a resolved kid, and hides it from adults', () => {
+    // Caller resolves a minor to gender 'kids'; then the kids model applies.
+    const kid = matchGear(diver({ height_cm: 120, weight_kg: 20, gender: 'kids' }), wetsuits, 'wetsuit')
+    expect(kid[0].model.name).toBe("Kid's FD")
+    expect(kid[0].fit).toBe('exact')
+    expect(kid[0].size.label).toBe('S')
+    // A known adult never sees the kids model cluttering the list.
+    const adult = matchGear(diver({ height_cm: 178, weight_kg: 74, gender: 'male' }), wetsuits, 'wetsuit')
+    expect(adult.some(f => f.model.name === "Kid's FD")).toBe(false)
+  })
+
+  it('does not call a single-axis match "exact" on a two-axis chart', () => {
+    // A size that fills height but leaves weight blank must not read as a green
+    // "fits" for a diver who is only in the height band.
+    const partial = model({ gear_type: 'wetsuit', name: 'Partial', gender: 'female' }, [
+      { label: 'M', height_min: 160, height_max: 170, weight_min: null, weight_max: null },
+    ])
+    const fits = matchGear(diver({ height_cm: 165, weight_kg: 90, gender: 'female' }), [partial], 'wetsuit')
+    expect(fits[0].fit).toBe('closest')   // weight never confirmed → not exact
+  })
+
+  it('flags off-the-end instead of a misleading "between" range', () => {
+    // Diver smaller than the smallest stocked size — not "between 1 and 3".
+    const fits = matchGear(diver({ height_cm: 140, weight_kg: 35, gender: 'female' }), [womensSaeko], 'wetsuit')
+    const saeko = fits[0]
+    expect(saeko.fit).toBe('closest')
+    expect(saeko.between).toBeUndefined()
+    expect(saeko.notes.join()).toMatch(/below smallest/)
   })
 })
 

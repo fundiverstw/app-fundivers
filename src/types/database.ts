@@ -139,6 +139,13 @@ export interface Database {
         Args: Record<string, never>
         Returns: Array<{ id: string; name: string; region: string | null; blurb: string | null }>
       }
+      // Defined in 20260706010000_replace_gear_model_sizes_rpc.sql.
+      // Admin-only. Atomically replaces a gear model's size rows (delete +
+      // insert in one transaction) from a JSON array of size objects.
+      replace_gear_model_sizes: {
+        Args: { p_model_id: string; p_sizes: Json }
+        Returns: void
+      }
       // Defined in 20260603000000_terms_consent_versioning.sql.
       // Server-stamps both agreed_to_terms_at (now()) and
       // agreed_to_terms_version (caller-supplied) on the caller's
