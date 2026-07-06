@@ -26,8 +26,8 @@ import { DiveLogsPage } from './pages/DiveLogsPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { ContactPage } from './pages/ContactPage'
 import { TrustedPartnersPage } from './pages/TrustedPartnersPage'
-import { TripBoardPage } from './pages/TripBoardPage'
-import { TripDetailPage } from './pages/TripDetailPage'
+import { PackagesPage } from './pages/PackagesPage'
+import { PackageDetailPage } from './pages/PackageDetailPage'
 import { ScheduledTripsPage } from './pages/ScheduledTripsPage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { DashboardPage } from './pages/DashboardPage'
@@ -50,7 +50,7 @@ import { AdminNotificationsPage } from './pages/admin/AdminNotificationsPage'
 import { AdminAccountingPage } from './pages/admin/AdminAccountingPage'
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage'
 import { AdminHistoryPage } from './pages/admin/AdminHistoryPage'
-import { AdminTripBoardPage } from './pages/admin/AdminTripBoardPage'
+import { AdminPackagesPage } from './pages/admin/AdminPackagesPage'
 import { AdminTrustedPartnersPage } from './pages/admin/AdminTrustedPartnersPage'
 import { AdminGearSizingPage } from './pages/admin/AdminGearSizingPage'
 import { AdminVehiclesPage } from './pages/admin/AdminVehiclesPage'
@@ -109,8 +109,8 @@ export default function App() {
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/trusted-partners" element={<TrustedPartnersPage />} />
-              <Route path="/trips" element={<TripBoardPage />} />
-              <Route path="/trips/:id" element={<TripDetailPage />} />
+              <Route path="/packages" element={<PackagesPage />} />
+              <Route path="/packages/:id" element={<PackageDetailPage />} />
               <Route path="/scheduled-trips" element={<ScheduledTripsPage />} />
               <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/duties" element={<DutiesPage />} />
@@ -140,7 +140,7 @@ export default function App() {
                 <Route path="/admin/duty" element={<AdminDutyPage />} />
                 <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
                 <Route path="/admin/accounting" element={<AdminAccountingPage />} />
-                <Route path="/admin/trip-board" element={<AdminTripBoardPage />} />
+                <Route path="/admin/packages" element={<AdminPackagesPage />} />
                 <Route path="/admin/trusted-partners" element={<AdminTrustedPartnersPage />} />
                 <Route path="/admin/gear-sizing" element={<AdminGearSizingPage />} />
                 <Route path="/admin/vehicles" element={<AdminVehiclesPage />} />

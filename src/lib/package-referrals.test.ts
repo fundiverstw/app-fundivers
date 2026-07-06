@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mockQueryBuilder } from '../../tests/test-utils'
-import type { TripReferral } from '../types/database'
+import type { PackageReferral } from '../types/database'
 
 const { from } = vi.hoisted(() => ({ from: vi.fn() }))
 vi.mock('./supabase', () => ({ supabase: { from: (...a: unknown[]) => from(...a) } }))
@@ -8,9 +8,9 @@ vi.mock('./supabase', () => ({ supabase: { from: (...a: unknown[]) => from(...a)
 let lastUpdate: Record<string, unknown> | null
 beforeEach(() => { from.mockReset(); lastUpdate = null })
 
-function ref(over: Partial<TripReferral> = {}): TripReferral {
+function ref(over: Partial<PackageReferral> = {}): PackageReferral {
   return {
-    id: 'r1', created_at: '2026-06-10T00:00:00Z', trip_id: 't1', diver_id: 'u1',
+    id: 'r1', created_at: '2026-06-10T00:00:00Z', package_id: 'p1', diver_id: 'u1',
     referral_code: 'FD-7K2MQ4', status: 'interested', booked_amount: null, booked_currency: null,
     kickback_rate: null, kickback_amount: null, kickback_status: 'pending', received_at: null,
     admin_notes: null, ...over,
@@ -25,11 +25,11 @@ describe('fetchReferralsWithDivers', () => {
       { id: 'u2', name: 'Bo', nickname: 'Bo', email: 'bo@x.test', contact_id: '0901' },
     ]
     from.mockImplementation((table: string) => {
-      if (table === 'trip_referrals') return mockQueryBuilder({ data: refs })
+      if (table === 'package_referrals') return mockQueryBuilder({ data: refs })
       if (table === 'profiles') return mockQueryBuilder({ data: profiles })
       throw new Error(`unexpected table ${table}`)
     })
-    const { fetchReferralsWithDivers } = await import('./trip-referrals')
+    const { fetchReferralsWithDivers } = await import('./package-referrals')
     const out = await fetchReferralsWithDivers()
     expect(out).toHaveLength(2)
     expect(out[0].diver?.name).toBe('Ada')
@@ -38,17 +38,17 @@ describe('fetchReferralsWithDivers', () => {
 
   it('skips the profile lookup entirely when there are no referrals', async () => {
     from.mockImplementation((table: string) => {
-      if (table === 'trip_referrals') return mockQueryBuilder({ data: [] })
+      if (table === 'package_referrals') return mockQueryBuilder({ data: [] })
       throw new Error(`should not query ${table}`)
     })
-    const { fetchReferralsWithDivers } = await import('./trip-referrals')
+    const { fetchReferralsWithDivers } = await import('./package-referrals')
     expect(await fetchReferralsWithDivers()).toEqual([])
   })
 })
 
 describe('summarizeKickbacks', () => {
   it('splits received vs outstanding kickback per currency, ignoring unconverted referrals', async () => {
-    const { summarizeKickbacks } = await import('./trip-referrals')
+    const { summarizeKickbacks } = await import('./package-referrals')
     const rows = [
       // received TWD 3000
       { ...ref({ status: 'completed', kickback_status: 'received', booked_currency: 'TWD', kickback_amount: 3000 }), diver: null },
@@ -66,7 +66,7 @@ describe('summarizeKickbacks', () => {
   })
 
   it('returns an empty list when nothing has converted', async () => {
-    const { summarizeKickbacks } = await import('./trip-referrals')
+    const { summarizeKickbacks } = await import('./package-referrals')
     expect(summarizeKickbacks([{ ...ref(), diver: null }])).toEqual([])
   })
 })
@@ -76,7 +76,7 @@ describe('recordReferralBooking', () => {
     from.mockImplementation(() => ({
       update: (p: Record<string, unknown>) => { lastUpdate = p; return { eq: () => Promise.resolve({ error: null }) } },
     }))
-    const { recordReferralBooking } = await import('./trip-referrals')
+    const { recordReferralBooking } = await import('./package-referrals')
     await recordReferralBooking({ id: 'r1', bookedAmount: 60000, bookedCurrency: 'TWD', kickbackRate: 0.05 })
     expect(lastUpdate).toMatchObject({ status: 'booked', booked_amount: 60000, booked_currency: 'TWD', kickback_rate: 0.05 })
   })
@@ -90,14 +90,14 @@ describe('setKickbackStatus', () => {
   })
 
   it('stamps received_at when marking received', async () => {
-    const { setKickbackStatus } = await import('./trip-referrals')
+    const { setKickbackStatus } = await import('./package-referrals')
     await setKickbackStatus('r1', 'received')
     expect(lastUpdate?.kickback_status).toBe('received')
     expect(lastUpdate?.received_at).toBeTruthy()
   })
 
   it('clears received_at for non-received states', async () => {
-    const { setKickbackStatus } = await import('./trip-referrals')
+    const { setKickbackStatus } = await import('./package-referrals')
     await setKickbackStatus('r1', 'invoiced')
     expect(lastUpdate?.kickback_status).toBe('invoiced')
     expect(lastUpdate?.received_at).toBeNull()

@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AdminReferralsTab } from './AdminReferralsTab'
-import type { Trip } from '../../types/database'
-import type { AdminReferral } from '../../lib/trip-referrals'
+import type { Package } from '../../types/database'
+import type { AdminReferral } from '../../lib/package-referrals'
 
 const {
   fetchReferralsWithDivers, updateReferral, recordReferralBooking, setKickbackStatus,
@@ -14,8 +14,8 @@ const {
   setKickbackStatus: vi.fn(),
 }))
 
-vi.mock('../../lib/trip-referrals', async (importActual) => {
-  const actual = await importActual<typeof import('../../lib/trip-referrals')>()
+vi.mock('../../lib/package-referrals', async (importActual) => {
+  const actual = await importActual<typeof import('../../lib/package-referrals')>()
   return {
     // summarizeKickbacks is a pure helper — keep the real one.
     summarizeKickbacks: actual.summarizeKickbacks,
@@ -30,8 +30,8 @@ vi.mock('../../hooks/useToast', () => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }),
 }))
 
-const trip: Trip = {
-  id: 't1', created_at: '2026-06-01T00:00:00Z', partner_shop_id: 's1',
+const pkg: Package = {
+  id: 'p1', created_at: '2026-06-01T00:00:00Z', partner_shop_id: 's1',
   title: 'Raja Ampat Liveaboard', destination: 'Indonesia', summary: null, description: null,
   start_date: null, end_date: null, price: 60000, currency: 'TWD', hero_image_url: null,
   highlights: [], booking_url: null, kickback_rate: 0.05, status: 'published', published_at: null, created_by: null,
@@ -39,7 +39,7 @@ const trip: Trip = {
 
 function referral(over: Partial<AdminReferral> = {}): AdminReferral {
   return {
-    id: 'r1', created_at: '2026-06-10T00:00:00Z', trip_id: 't1', diver_id: 'u1',
+    id: 'r1', created_at: '2026-06-10T00:00:00Z', package_id: 'p1', diver_id: 'u1',
     referral_code: 'FD-7K2MQ4', status: 'interested', booked_amount: null, booked_currency: null,
     kickback_rate: null, kickback_amount: null, kickback_status: 'pending', received_at: null, admin_notes: null,
     diver: { id: 'u1', name: 'Ada Lovelace', nickname: 'Ada', email: 'ada@x.test', contact_id: '0900111222' },
@@ -56,11 +56,11 @@ beforeEach(() => {
 })
 
 function renderTab() {
-  return render(<AdminReferralsTab trips={[trip]} />)
+  return render(<AdminReferralsTab packages={[pkg]} />)
 }
 
 describe('AdminReferralsTab', () => {
-  it('lists a referral with its trip, diver and code', async () => {
+  it('lists a referral with its package, diver and code', async () => {
     renderTab()
     expect(await screen.findByText('Raja Ampat Liveaboard')).toBeInTheDocument()
     expect(screen.getByText(/Ada/)).toBeInTheDocument()
@@ -85,14 +85,14 @@ describe('AdminReferralsTab', () => {
     await waitFor(() => expect(updateReferral).toHaveBeenCalledWith('r1', { status: 'introduced' }))
   })
 
-  it('records a booking, defaulting amount and rate from the trip', async () => {
+  it('records a booking, defaulting amount and rate from the package', async () => {
     const user = userEvent.setup()
     renderTab()
     await screen.findByText('Raja Ampat Liveaboard')
     await user.click(screen.getByRole('button', { name: 'Record booking' }))
 
     const dialog = await screen.findByRole('dialog')
-    // Defaults pre-filled from the trip: 60000 / 5%.
+    // Defaults pre-filled from the package: 60000 / 5%.
     expect(within(dialog).getByLabelText('Booked amount')).toHaveValue(60000)
     expect(within(dialog).getByLabelText('Kickback percent')).toHaveValue(5)
     await user.click(within(dialog).getByRole('button', { name: 'Record booking' }))

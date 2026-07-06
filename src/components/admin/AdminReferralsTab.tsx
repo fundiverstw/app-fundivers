@@ -6,8 +6,8 @@ import { personName } from '../../lib/names'
 import {
   fetchReferralsWithDivers, updateReferral, recordReferralBooking, setKickbackStatus,
   summarizeKickbacks, type AdminReferral,
-} from '../../lib/trip-referrals'
-import type { Trip, ReferralStatus, KickbackStatus } from '../../types/database'
+} from '../../lib/package-referrals'
+import type { Package, ReferralStatus, KickbackStatus } from '../../types/database'
 import { BTN_SECONDARY } from '../../styles/tokens'
 
 // Referrals pipeline + kickback ledger. Each row is one diver-interest; the
@@ -18,7 +18,7 @@ import { BTN_SECONDARY } from '../../styles/tokens'
 
 const FIELD = 'w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900'
 
-export function AdminReferralsTab({ trips }: { trips: Trip[] }) {
+export function AdminReferralsTab({ packages }: { packages: Package[] }) {
   const toast = useToast()
   const [referrals, setReferrals] = useState<AdminReferral[]>([])
   const [loading, setLoading] = useState(true)
@@ -26,7 +26,7 @@ export function AdminReferralsTab({ trips }: { trips: Trip[] }) {
   const [query, setQuery] = useState('')
   const [booking, setBooking] = useState<AdminReferral | null>(null)
 
-  const tripById = new Map(trips.map(t => [t.id, t]))
+  const packageById = new Map(packages.map(p => [p.id, p]))
 
   async function reload() {
     try {
@@ -67,7 +67,7 @@ export function AdminReferralsTab({ trips }: { trips: Trip[] }) {
     ? referrals.filter(r =>
         r.referral_code.toLowerCase().includes(q) ||
         (r.diver && personName(r.diver.name, r.diver.nickname).toLowerCase().includes(q)) ||
-        (tripById.get(r.trip_id)?.title.toLowerCase().includes(q) ?? false))
+        (packageById.get(r.package_id)?.title.toLowerCase().includes(q) ?? false))
     : referrals
 
   if (loading) return <p className="text-sm text-white/70">Loading…</p>
@@ -94,7 +94,7 @@ export function AdminReferralsTab({ trips }: { trips: Trip[] }) {
         type="search"
         value={query}
         onChange={e => setQuery(e.target.value)}
-        placeholder="Search by code, diver or trip…"
+        placeholder="Search by code, diver or package…"
         aria-label="Search referrals"
         className={FIELD}
       />
@@ -107,7 +107,7 @@ export function AdminReferralsTab({ trips }: { trips: Trip[] }) {
             <li key={r.id}>
               <ReferralCard
                 referral={r}
-                trip={tripById.get(r.trip_id) ?? null}
+                pkg={packageById.get(r.package_id) ?? null}
                 onSetStatus={(s) => act(() => updateReferral(r.id, { status: s }), `Marked ${s}`)}
                 onRecordBooking={() => setBooking(r)}
                 onSetKickback={(s) => act(() => setKickbackStatus(r.id, s), `Kickback ${s}`)}
@@ -120,7 +120,7 @@ export function AdminReferralsTab({ trips }: { trips: Trip[] }) {
       {booking && (
         <RecordBookingModal
           referral={booking}
-          trip={tripById.get(booking.trip_id) ?? null}
+          pkg={packageById.get(booking.package_id) ?? null}
           onClose={() => setBooking(null)}
           onSaved={async () => { setBooking(null); await reload(); toast.success('Booking recorded') }}
           onError={m => toast.error(m)}
@@ -131,10 +131,10 @@ export function AdminReferralsTab({ trips }: { trips: Trip[] }) {
 }
 
 function ReferralCard({
-  referral, trip, onSetStatus, onRecordBooking, onSetKickback,
+  referral, pkg, onSetStatus, onRecordBooking, onSetKickback,
 }: {
   referral: AdminReferral
-  trip: Trip | null
+  pkg: Package | null
   onSetStatus: (s: ReferralStatus) => void
   onRecordBooking: () => void
   onSetKickback: (s: KickbackStatus) => void
@@ -147,7 +147,7 @@ function ReferralCard({
     <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 space-y-2">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-medium text-brand-900 text-sm truncate">{trip?.title ?? '(trip removed)'}</p>
+          <p className="font-medium text-brand-900 text-sm truncate">{pkg?.title ?? '(package removed)'}</p>
           <p className="text-xs text-brand-900/80 truncate">
             {diverName} · <span className="font-mono">{referral.referral_code}</span>
           </p>
@@ -218,17 +218,17 @@ function ReferralStatusBadge({ status }: { status: ReferralStatus }) {
 }
 
 function RecordBookingModal({
-  referral, trip, onClose, onSaved, onError,
+  referral, pkg, onClose, onSaved, onError,
 }: {
   referral: AdminReferral
-  trip: Trip | null
+  pkg: Package | null
   onClose: () => void
   onSaved: () => Promise<void>
   onError: (m: string) => void
 }) {
-  const [amount, setAmount] = useState(referral.booked_amount?.toString() ?? trip?.price?.toString() ?? '')
-  const [currency, setCurrency] = useState(referral.booked_currency ?? trip?.currency ?? siteConfig.locale.currency)
-  const [rate, setRate] = useState((((referral.kickback_rate ?? trip?.kickback_rate ?? 0.05)) * 100).toString())
+  const [amount, setAmount] = useState(referral.booked_amount?.toString() ?? pkg?.price?.toString() ?? '')
+  const [currency, setCurrency] = useState(referral.booked_currency ?? pkg?.currency ?? siteConfig.locale.currency)
+  const [rate, setRate] = useState((((referral.kickback_rate ?? pkg?.kickback_rate ?? 0.05)) * 100).toString())
   const [submitting, setSubmitting] = useState(false)
 
   async function handleSubmit(e: FormEvent) {

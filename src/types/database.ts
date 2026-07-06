@@ -141,11 +141,11 @@ export interface Database {
         Args: Record<string, never>
         Returns: Array<{ id: string; name: string; region: string | null; blurb: string | null }>
       }
-      // Defined in 20260707030000_trip_board_definer_functions.sql. Owner-
-      // privileged projection of published trips joined to the vouched partner
-      // shop — diver-safe columns only (no kickback rate). Replaced the
-      // trip_board SECURITY DEFINER view; divers have no access to base `trips`.
-      list_trip_board: {
+      // Renamed from list_trip_board in 20260707150000_rename_trip_board_to_packages.sql.
+      // Owner-privileged projection of published packages joined to the vouched
+      // partner shop — diver-safe columns only (no kickback rate). Divers have
+      // no access to the base `packages` table.
+      list_package_board: {
         Args: Record<string, never>
         Returns: Array<{
           id: string
@@ -170,20 +170,19 @@ export interface Database {
           partner_vouch_notes: string | null
         }>
       }
-      // Defined in 20260707030000_trip_board_definer_functions.sql. The caller's
-      // own referrals (scoped to auth.uid()) with trip/partner labels — the
-      // kickback ledger columns are intentionally absent. Replaced the
-      // my_trip_referrals SECURITY DEFINER view.
-      list_my_trip_referrals: {
+      // Renamed from list_my_trip_referrals in 20260707150000_rename_trip_board_to_packages.sql.
+      // The caller's own referrals (scoped to auth.uid()) with package/partner
+      // labels — the kickback ledger columns are intentionally absent.
+      list_my_package_referrals: {
         Args: Record<string, never>
         Returns: Array<{
           id: string
-          trip_id: string
+          package_id: string
           referral_code: string
           status: 'interested' | 'introduced' | 'booked' | 'completed' | 'cancelled'
           created_at: string
-          trip_title: string
-          trip_destination: string
+          package_title: string
+          package_destination: string
           partner_name: string
         }>
       }
@@ -232,11 +231,12 @@ export interface Database {
         Args: { p_lead: string; p_amount: number; p_group_id?: string | null }
         Returns: number
       }
-      // Defined in 20260623000000_trip_board.sql. A diver expresses interest
-      // in a published trip; mints (or returns the existing live) referral and
-      // returns just the FD-XXXXXX code. Idempotent. authenticated-only.
-      express_trip_interest: {
-        Args: { p_trip_id: string }
+      // Renamed from express_trip_interest in 20260707150000_rename_trip_board_to_packages.sql.
+      // A diver expresses interest in a published package; mints (or returns the
+      // existing live) referral and returns just the FD-XXXXXX code. Idempotent.
+      // authenticated-only.
+      express_package_interest: {
+        Args: { p_package_id: string }
         Returns: string
       }
       // Defined in 20260603040000_signup_throttling_and_orphan_log.sql.
@@ -297,9 +297,9 @@ export interface Database {
         Update: never
         Relationships: []
       }
-      // trip_board / my_trip_referrals were SECURITY DEFINER views; they became
-      // the list_trip_board() / list_my_trip_referrals() functions in
-      // 20260707030000_trip_board_definer_functions.sql (see Functions above).
+      // The packages feature exposes diver-safe data through the
+      // list_package_board() / list_my_package_referrals() functions (see
+      // Functions above); there are no packages-related views.
     }
     Tables: {
       profiles: {
@@ -789,7 +789,7 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['event_waivers']['Insert']>
         Relationships: []
       }
-      trips: {
+      packages: {
         Row: {
           id: string
           created_at: string
@@ -830,14 +830,14 @@ export interface Database {
           published_at?: string | null
           created_by?: string | null
         }
-        Update: Partial<Database['public']['Tables']['trips']['Insert']>
+        Update: Partial<Database['public']['Tables']['packages']['Insert']>
         Relationships: []
       }
-      trip_referrals: {
+      package_referrals: {
         Row: {
           id: string
           created_at: string
-          trip_id: string
+          package_id: string
           diver_id: string
           referral_code: string
           status: 'interested' | 'introduced' | 'booked' | 'completed' | 'cancelled'
@@ -852,7 +852,7 @@ export interface Database {
         Insert: {
           id?: string
           created_at?: string
-          trip_id: string
+          package_id: string
           diver_id: string
           referral_code?: string
           status?: 'interested' | 'introduced' | 'booked' | 'completed' | 'cancelled'
@@ -863,7 +863,7 @@ export interface Database {
           received_at?: string | null
           admin_notes?: string | null
         }
-        Update: Partial<Database['public']['Tables']['trip_referrals']['Insert']>
+        Update: Partial<Database['public']['Tables']['package_referrals']['Insert']>
         Relationships: []
       }
       // Unified dive+course catalog (kind discriminates). Replaced the split
@@ -1463,16 +1463,16 @@ export type WaiverSignatureInsert = Database['public']['Tables']['waiver_signatu
 export type EventWaiver = Database['public']['Tables']['event_waivers']['Row']
 export type EventWaiverInsert = Database['public']['Tables']['event_waivers']['Insert']
 
-// Trip Board — partner referral network
+// Packages — partner referral network (open-ended travel packages abroad)
 export type PartnerShop = Database['public']['Tables']['partner_shops']['Row']
 export type PartnerShopInsert = Database['public']['Tables']['partner_shops']['Insert']
-export type Trip = Database['public']['Tables']['trips']['Row']
-export type TripInsert = Database['public']['Tables']['trips']['Insert']
-export type TripReferral = Database['public']['Tables']['trip_referrals']['Row']
-export type TripBoardItem = Database['public']['Functions']['list_trip_board']['Returns'][number]
-export type MyTripReferral = Database['public']['Functions']['list_my_trip_referrals']['Returns'][number]
-export const TRIP_STATUSES = ['draft','published','archived'] as const
-export type TripStatus = typeof TRIP_STATUSES[number]
+export type Package = Database['public']['Tables']['packages']['Row']
+export type PackageInsert = Database['public']['Tables']['packages']['Insert']
+export type PackageReferral = Database['public']['Tables']['package_referrals']['Row']
+export type PackageBoardItem = Database['public']['Functions']['list_package_board']['Returns'][number]
+export type MyPackageReferral = Database['public']['Functions']['list_my_package_referrals']['Returns'][number]
+export const PACKAGE_STATUSES = ['draft','published','archived'] as const
+export type PackageStatus = typeof PACKAGE_STATUSES[number]
 export const REFERRAL_STATUSES = ['interested','introduced','booked','completed','cancelled'] as const
 export type ReferralStatus = typeof REFERRAL_STATUSES[number]
 export const KICKBACK_STATUSES = ['pending','invoiced','received'] as const
