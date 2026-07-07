@@ -437,7 +437,7 @@ function Modal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3"
+        className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3 max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         {children}
