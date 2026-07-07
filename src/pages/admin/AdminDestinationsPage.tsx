@@ -3,13 +3,13 @@ import type { TravelDestination } from '../../types/database'
 
 // The dive-location catalog (Green Island, Palau, Kenting…). Dives link to
 // these via the event_destinations junction (the EventForm "Destinations"
-// picker). `divetype` ("Boat Diving") and `northeast_diving` drive the
-// calendar's local-vs-trip colour bucket — see src/lib/event-colors.ts.
+// picker). `divetype` drives the calendar's local-vs-trip colour bucket:
+// only 'Shore Diving' destinations colour a dive local (green) — see
+// src/lib/event-colors.ts.
 const fields: CatalogField<TravelDestination>[] = [
   { key: 'admin_title',        label: 'Admin title', type: 'text', required: true, placeholder: 'e.g. Green Island' },
   { key: 'country',            label: 'Country', type: 'text', placeholder: 'e.g. Taiwan' },
-  { key: 'divetype',           label: 'Dive type', type: 'text', placeholder: 'e.g. Boat Diving (marks dives here as a trip)' },
-  { key: 'northeast_diving',   label: 'Northeast-coast shore site (local dives)', type: 'boolean' },
+  { key: 'divetype',           label: 'Dive type', type: 'text', placeholder: "'Shore Diving' = local (green); anything else = trip (yellow)" },
   { key: 'international',       label: 'International', type: 'boolean' },
   { key: 'tagline',            label: 'Tagline', type: 'textarea', placeholder: 'Short one-line hook…' },
   { key: 'diver_requirements', label: 'Diver requirements', type: 'textarea', placeholder: 'Certification level, experience…' },

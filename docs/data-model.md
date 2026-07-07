@@ -50,7 +50,7 @@ public.push_subscriptions / push_notifications_sent  (cron infra)
 | `cert_levels` | `id`, `agency`, `name`, `prereq_cert_id` | Reference data for the certification picker. Self-referential prerequisite chain. |
 | `cancellation_policies` | `_id`, `title`, `cancelation_policy` | Bubble-imported reference data linked from EO event rows via `cancel_policy`. |
 | `trip_templates` | catalog | Reusable "what's included" / not-included / transportation / itinerary / prerequisites copy a dive links to via `events.trip_template_id`; surfaces in the booking form. Renamed from Bubble `DiveTravel`. |
-| `travel_destinations` | catalog | Dive-location catalog (Green Island, Palau…). Dives are tagged with these via the `event_destinations` junction (EventForm picker); `divetype`/`northeast_diving` drive calendar local-vs-trip colouring. Admin-managed at `/admin/destinations`. |
+| `travel_destinations` | catalog | Dive-location catalog (Green Island, Palau…). Dives are tagged with these via the `event_destinations` junction (EventForm picker); `divetype` drives calendar local-vs-trip colouring ('Shore Diving' = local/green). Admin-managed at `/admin/destinations`. |
 | `eo_dive_rooms` / `eo_dive_addons` / `eo_course_addons` | junctions | Modern FK junctions replacing the legacy CSV/JSON-string columns on `EO_dives` / `EO_courses` (those columns still exist for back-compat). |
 | `push_subscriptions` | `endpoint` (unique), `user_id`, `p256dh`, `auth` | One row per device. Diver owns their rows (RLS). |
 | `push_notifications_sent` | `(user_id, event_id, kind)` composite PK | Idempotency ledger for the push cron. Service-role-only. |

@@ -1244,7 +1244,6 @@ export interface Database {
           divetype: string | null
           sort_order: number | null
           international: boolean | null
-          northeast_diving: boolean | null
           location_picture: string | null
           background_picture: string | null
           diver_requirements: string | null
@@ -1258,7 +1257,6 @@ export interface Database {
           divetype?: string | null
           sort_order?: number | null
           international?: boolean | null
-          northeast_diving?: boolean | null
           location_picture?: string | null
           background_picture?: string | null
           diver_requirements?: string | null
