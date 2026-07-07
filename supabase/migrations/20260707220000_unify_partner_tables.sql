@@ -68,8 +68,11 @@ grant execute on function public.list_trusted_partners() to authenticated, anon,
 -- ── 6. Repoint the Packages definer functions to the renamed table/column ───
 -- Diver-facing projection aliases stay `partner_*` (that's how a hosting shop
 -- reads to divers on the board — "In cooperation with …"); only the id alias
--- becomes trusted_partner_id to match the column.
-create or replace function public.list_package_board()
+-- becomes trusted_partner_id to match the column. Dropped + recreated (not
+-- `create or replace`) because renaming the partner_shop_id OUT column changes
+-- the function's return row type, which replace can't do (SQLSTATE 42P13).
+drop function if exists public.list_package_board();
+create function public.list_package_board()
 returns table (
   id uuid, title text, destination text, summary text, description text,
   start_date date, end_date date, price numeric, currency text,
