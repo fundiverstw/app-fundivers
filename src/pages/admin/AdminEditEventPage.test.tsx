@@ -53,7 +53,7 @@ describe('AdminEditEventPage', () => {
       notes: 'Bring fins',
       cancel_date: null,
       cancel_policy: null,
-      divetravel_id: null,
+      trip_template_id: null,
       prereq_cert_id: null,
       cancelled_at: null,
     }
@@ -106,7 +106,7 @@ describe('AdminEditEventPage', () => {
       gear_rental: null, nitrox_required: false, dive_days: 1,
       featured_image: null, second_image: null, prereqs: null, req_dives: null,
       notes: '', cancel_date: null, cancel_policy: null,
-      divetravel_id: null,
+      trip_template_id: null,
       prereq_cert_id: null, cancelled_at: null,
     }
     from.mockImplementation((table: string) => {
@@ -144,7 +144,7 @@ describe('AdminEditEventPage', () => {
       prereqs: null, req_dives: null,
       notes: '',
       cancel_date: null, cancel_policy: null,
-      divetravel_id: null,
+      trip_template_id: null,
       prereq_cert_id: null, cancelled_at: null,
     }
     const updateSpy = vi.fn().mockReturnValue({ eq: () => Promise.resolve({ error: null }) })

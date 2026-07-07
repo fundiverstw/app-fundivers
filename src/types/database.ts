@@ -966,7 +966,7 @@ export interface Database {
           second_image: string | null
           gear_rental: string | null
           notes: string | null
-          divetravel_id: string | null
+          trip_template_id: string | null
           course_name: string | null
           included: string | null
           schedule: string | null
@@ -1002,7 +1002,7 @@ export interface Database {
           second_image?: string | null
           gear_rental?: string | null
           notes?: string | null
-          divetravel_id?: string | null
+          trip_template_id?: string | null
           course_name?: string | null
           included?: string | null
           schedule?: string | null
@@ -1196,7 +1196,7 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['addons']['Insert']>
         Relationships: []
       }
-      dive_travel: {
+      trip_templates: {
         Row: {
           id: string
           admin_title: string | null
@@ -1217,7 +1217,7 @@ export interface Database {
           prerequisites?: string | null
           tagline_text?: string | null
         }
-        Update: Partial<Database['public']['Tables']['dive_travel']['Insert']>
+        Update: Partial<Database['public']['Tables']['trip_templates']['Insert']>
         Relationships: []
       }
       cancellation_policies: {
@@ -1488,7 +1488,7 @@ export type EventRow = Database['public']['Tables']['events']['Row']
 export type EOPrice = Database['public']['Tables']['prices']['Row']
 export type EORoom = Database['public']['Tables']['rooms']['Row']
 export type EOAddon = Database['public']['Tables']['addons']['Row']
-export type DiveTravelEntry = Database['public']['Tables']['dive_travel']['Row']
+export type TripTemplateEntry = Database['public']['Tables']['trip_templates']['Row']
 export type TravelDestination = Database['public']['Tables']['travel_destinations']['Row']
 export type CancellationPolicy = Database['public']['Tables']['cancellation_policies']['Row']
 export type CertLevel = Database['public']['Tables']['cert_levels']['Row']
@@ -1652,7 +1652,7 @@ export interface AppEvent {
   is_trip?: boolean
   /** Human-readable event detail surfaced to divers in the calendar modal.
    *  Assembled in src/lib/events.ts from the descriptive columns admins fill
-   *  in (a dive's `notes` + linked DiveTravel row; a course's `included` /
+   *  in (a dive's `notes` + linked trip_templates row; a course's `included` /
    *  `schedule`) plus the prereq cert/dive requirements. Null when the event
    *  has no descriptive content at all. Always populated by fetchEventsInRange
    *  / fetchEventsForBookings; optional so lighter event literals can omit it. */
@@ -1664,16 +1664,16 @@ export interface AppEvent {
 export interface EventDetails {
   /** Free-text overview — a dive's `notes`. Courses have no equivalent. */
   description: string | null
-  /** What the price covers — a course's `included` or a dive's DiveTravel.included. */
+  /** What the price covers — a course's `included` or a dive's trip_templates.included. */
   included: string | null
-  /** What the price excludes — dive DiveTravel.not_included. Null for courses. */
+  /** What the price excludes — dive trip_templates.not_included. Null for courses. */
   not_included: string | null
-  /** Day-by-day plan — a course's `schedule` or a dive's DiveTravel.itinerary. */
+  /** Day-by-day plan — a course's `schedule` or a dive's trip_templates.itinerary. */
   schedule: string | null
-  /** Transport arrangements — dive DiveTravel.transportation. Null for courses. */
+  /** Transport arrangements — dive trip_templates.transportation. Null for courses. */
   transportation: string | null
   /** Free-text prerequisites — the event's `prereqs` (dive falls back to
-   *  DiveTravel.prerequisites). */
+   *  trip_templates.prerequisites). */
   prerequisites: string | null
   /** Minimum certification level name, resolved from `prereq_cert_id`. */
   required_cert: string | null

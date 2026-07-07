@@ -17,10 +17,10 @@ const allocationRows = [
 beforeEach(() => {
   from.mockReset()
   from.mockImplementation((table: string) => {
-    if (table === 'events') return mockQueryBuilder({ data: { divetravel_id: 'T1', start_date: '2031-05-01' } })
+    if (table === 'events') return mockQueryBuilder({ data: { trip_template_id: 'T1', start_date: '2031-05-01' } })
     if (table === 'vehicles') return mockQueryBuilder({ data: vehicleRows })
     if (table === 'event_vehicles') return mockQueryBuilder({ data: allocationRows })
-    return mockQueryBuilder({ data: [] }) // bookings update, dive_travel update
+    return mockQueryBuilder({ data: [] }) // bookings update, trip_templates update
   })
 })
 

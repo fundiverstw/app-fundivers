@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
 import { fetchEventRelations } from '../../lib/event-relations'
 import { siteConfig } from '../../config/site'
-import type { CancellationPolicy, CertLevel, DiveTravelEntry, EOAddon, EventRow, EOPrice, EORoom, TravelDestination } from '../../types/database'
+import type { CancellationPolicy, CertLevel, TripTemplateEntry, EOAddon, EventRow, EOPrice, EORoom, TravelDestination } from '../../types/database'
 import {
   EMPTY_FORM,
   formStateFromEvent,
@@ -50,7 +50,7 @@ const EMPTY_PRICE_FORM: PriceFormState = {
   admin_title: '', price: '', starting_at: '', deposit_amount: '', transport: '',
 }
 
-// Sub-form state for inline rooms / addons / dive_travel inserts.
+// Sub-form state for inline rooms / addons / trip_templates inserts.
 // Only the most-used fields — admins can edit the rest from the Manage page.
 interface RoomFormState   { admin_title: string; display_title: string; added_price: string }
 interface AddonFormState  { admin_title: string; display_title: string; price: string }
@@ -83,7 +83,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
   const [addons, setAddons] = useState<EOAddon[]>([])
   const [certLevels, setCertLevels] = useState<CertLevel[]>([])
   const [cancelPolicies, setCancelPolicies] = useState<CancellationPolicy[]>([])
-  const [diveTravels, setDiveTravels] = useState<DiveTravelEntry[]>([])
+  const [tripTemplates, setTripTemplates] = useState<TripTemplateEntry[]>([])
   const [destinations, setDestinations] = useState<TravelDestination[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -139,7 +139,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
           : Promise.resolve({ data: [] as EventRow[] }),
         supabase.from('cert_levels').select('*').order('rank'),
         supabase.from('cancellation_policies').select('*').order('title'),
-        supabase.from('dive_travel').select('*').order('admin_title'),
+        supabase.from('trip_templates').select('*').order('admin_title'),
         supabase.from('travel_destinations').select('*').order('sort_order', { nullsFirst: false }),
       ])
       if (cancelled) return
@@ -154,7 +154,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
       setAddons(dataOf<EOAddon>(2))
       setCertLevels(dataOf<CertLevel>(5))
       setCancelPolicies(dataOf<CancellationPolicy>(6))
-      setDiveTravels(dataOf<DiveTravelEntry>(7))
+      setTripTemplates(dataOf<TripTemplateEntry>(7))
       setDestinations(dataOf<TravelDestination>(8))
 
       const pastDives = dataOf<EventRow>(3).map<PastEvent>(d => ({
@@ -340,12 +340,12 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
         not_included: travelForm.not_included || null,
         transportation: travelForm.transportation || null,
       }
-      const { error: insErr } = await supabase.from('dive_travel').insert(payload as never)
+      const { error: insErr } = await supabase.from('trip_templates').insert(payload as never)
       if (insErr) throw insErr
-      setDiveTravels(ts => [...ts, payload as unknown as DiveTravelEntry].sort(
+      setTripTemplates(ts => [...ts, payload as unknown as TripTemplateEntry].sort(
         (a, b) => (a.admin_title ?? '').localeCompare(b.admin_title ?? '')
       ))
-      set('divetravel_reference', id)
+      set('trip_template_reference', id)
       setTravelForm(EMPTY_TRAVEL_FORM)
       setShowNewTravel(false)
     } catch (err) {
@@ -605,10 +605,10 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
                 </div>
               )}
             </div>
-            <Field label="DiveTravel reference">
-              <Select value={form.divetravel_reference} onChange={v => set('divetravel_reference', v)}>
+            <Field label="Trip template reference">
+              <Select value={form.trip_template_reference} onChange={v => set('trip_template_reference', v)}>
                 <option value="">— None —</option>
-                {diveTravels.map(t => (
+                {tripTemplates.map(t => (
                   <option key={t.id} value={t.id}>{t.admin_title ?? t.id}</option>
                 ))}
               </Select>
@@ -618,11 +618,11 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
               onClick={() => setShowNewTravel(s => !s)}
               className="-mt-2 self-start text-xs font-medium text-amber-300 hover:text-amber-200"
             >
-              {showNewTravel ? '− Cancel new entry' : '+ New DiveTravel entry'}
+              {showNewTravel ? '− Cancel new entry' : '+ New trip template'}
             </button>
             {showNewTravel && (
               <div className="space-y-3 rounded-lg border border-amber-300/40 bg-white/5 p-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-200">New DiveTravel entry</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-200">New trip template</h3>
                 <Field label="Title (required)">
                   <Input value={travelForm.admin_title} onChange={v => setTravelForm(f => ({ ...f, admin_title: v }))} />
                 </Field>
@@ -645,7 +645,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
                     disabled={travelSubmitting}
                     className="flex-1 py-2 rounded-lg text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-50 transition-colors"
                   >
-                    {travelSubmitting ? 'Saving…' : 'Save DiveTravel entry'}
+                    {travelSubmitting ? 'Saving…' : 'Save trip template'}
                   </button>
                   <button
                     type="button"

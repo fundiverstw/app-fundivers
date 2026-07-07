@@ -39,7 +39,7 @@ export interface FormState {
   cancel_date: string
   cancel_policy: string
   destinationIds: string[]   // FK multi → travel_destinations
-  divetravel_reference: string
+  trip_template_reference: string
   // full-payment deadline (both event types) — empty string = unset, falls
   // back client-side to "7 days before start_date". The deposit is always
   // "ASAP" and has no per-event deadline.
@@ -66,7 +66,7 @@ export const EMPTY_FORM: FormState = {
   roomIds: [],
   nitrox_required: false, gear_rental: '',
   cancel_date: '', cancel_policy: '',
-  destinationIds: [], divetravel_reference: '',
+  destinationIds: [], trip_template_reference: '',
   full_payment_deadline: '',
   courseDays: [], course_name: '',
   included: '', schedule: '',
@@ -143,7 +143,7 @@ export function formStateFromEvent(e: EventRow, rels: EventRelations = NO_RELATI
       notes: '', featured: false, is_private: false, is_boat_dive: false, is_trip: false,
       roomIds: [],
       nitrox_required: false, gear_rental: '',
-      destinationIds: [], divetravel_reference: '',
+      destinationIds: [], trip_template_reference: '',
     }
   }
 
@@ -161,7 +161,7 @@ export function formStateFromEvent(e: EventRow, rels: EventRelations = NO_RELATI
     nitrox_required: e.nitrox_required ?? false,
     gear_rental: e.gear_rental ?? '',
     destinationIds: rels.destinationIds,
-    divetravel_reference: e.divetravel_id ?? '',
+    trip_template_reference: e.trip_template_id ?? '',
     second_image: e.second_image ?? '',
     courseDays: [], course_name: '',
     included: '', schedule: '',
@@ -207,7 +207,7 @@ export function eventPayloadFromForm(form: FormState): Record<string, unknown> {
     nitrox_required: isDive ? form.nitrox_required : false,
     gear_rental: isDive ? (form.gear_rental || null) : null,
     second_image: isDive ? (form.second_image.trim() || null) : null,
-    divetravel_id: isDive ? (form.divetravel_reference || null) : null,
+    trip_template_id: isDive ? (form.trip_template_reference || null) : null,
     // course-only
     course_name: isDive ? null : (form.course_name || null),
     included: isDive ? null : (form.included || null),

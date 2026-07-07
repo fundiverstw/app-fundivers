@@ -217,12 +217,12 @@ describe('AdminNewEventPage', () => {
     )
   })
 
-  it('inserts a new DiveTravel entry from the sub-form and selects it as the reference', async () => {
+  it('inserts a new trip template from the sub-form and selects it as the reference', async () => {
     const travelInsert = vi.fn().mockReturnValue({
       then: (cb: (r: { error: null }) => void) => Promise.resolve({ error: null }).then(cb),
     })
     from.mockImplementation((table: string) => {
-      if (table === 'dive_travel') {
+      if (table === 'trip_templates') {
         const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
         b.insert = travelInsert
         return b
@@ -236,19 +236,19 @@ describe('AdminNewEventPage', () => {
     renderPage()
     await screen.findByLabelText(/admin title \(required, internal\)/i)
 
-    await user.click(screen.getByRole('button', { name: /new DiveTravel entry/i }))
+    await user.click(screen.getByRole('button', { name: /new trip template/i }))
     await user.type(screen.getByLabelText('Title (required)'), 'Green Island')
     await user.type(screen.getByLabelText(/^Included$/i), 'Tanks, weights, transport')
-    await user.click(screen.getByRole('button', { name: /save DiveTravel entry/i }))
+    await user.click(screen.getByRole('button', { name: /save trip template/i }))
 
     await waitFor(() => expect(travelInsert).toHaveBeenCalled())
     const payload = (travelInsert.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
     expect(payload.admin_title).toBe('Green Island')
     expect(payload.included).toBe('Tanks, weights, transport')
 
-    // Newly created entry becomes the selected option in the dive_travel dropdown.
+    // Newly created entry becomes the selected option in the trip_templates dropdown.
     await waitFor(() => {
-      const select = screen.getByLabelText(/DiveTravel reference/i) as HTMLSelectElement
+      const select = screen.getByLabelText(/Trip template reference/i) as HTMLSelectElement
       expect(select.value).toBe(payload.id as string)
       expect(select.options[select.selectedIndex].textContent).toMatch(/Green Island/)
     })

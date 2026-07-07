@@ -18,7 +18,7 @@ public.bookings ──── eo_dive_id XOR eo_course_id (text FK)
 public.payments          │                    eo_dive_addons /
     (staff ledger)       │                    eo_course_addons junctions)
                          │── cancellation_policies
-                         │── DiveTravel      (transport options)
+                         │── trip_templates  (reusable trip copy)
                          └── cert_levels
 
 public.event_memos ────── eo_dive_id XOR eo_course_id  (admin flags)
@@ -49,7 +49,7 @@ public.push_subscriptions / push_notifications_sent  (cron infra)
 | `scheduled_trips` | `id`, `title`, `destination`, `status`, `event_id` | The shop's own curated, dated trips shown on the diver Scheduled Trips tab. Admin-managed base table (admin-only RLS); divers read published rows via `list_scheduled_trips()`. Optional `event_id` → `events(id)` (on delete set null) links a trip to a bookable catalog event for in-app registration. Distinct from `packages` (travel abroad) and the `events.is_trip` Wix flag. See [packages.md](./packages.md). |
 | `cert_levels` | `id`, `agency`, `name`, `prereq_cert_id` | Reference data for the certification picker. Self-referential prerequisite chain. |
 | `cancellation_policies` | `_id`, `title`, `cancelation_policy` | Bubble-imported reference data linked from EO event rows via `cancel_policy`. |
-| `DiveTravel` | catalog | Transport options surface in the booking form. Bubble-imported, capitalised name preserved. |
+| `trip_templates` | catalog | Reusable "what's included" / not-included / transportation / itinerary / prerequisites copy a dive links to via `events.trip_template_id`; surfaces in the booking form. Renamed from Bubble `DiveTravel`. |
 | `eo_dive_rooms` / `eo_dive_addons` / `eo_course_addons` | junctions | Modern FK junctions replacing the legacy CSV/JSON-string columns on `EO_dives` / `EO_courses` (those columns still exist for back-compat). |
 | `push_subscriptions` | `endpoint` (unique), `user_id`, `p256dh`, `auth` | One row per device. Diver owns their rows (RLS). |
 | `push_notifications_sent` | `(user_id, event_id, kind)` composite PK | Idempotency ledger for the push cron. Service-role-only. |
