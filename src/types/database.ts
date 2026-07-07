@@ -134,12 +134,14 @@ export interface Database {
         }
         Returns: undefined
       }
-      // Defined in 20260703010000_trusted_partners.sql. Public projection of the
-      // trusted-partner catalog (active rows, no email) so divers can list them
-      // without direct table access — the email stays server-side.
+      // Defined in 20260703010000_trusted_partners.sql; widened by
+      // 20260707200000 (also lists active Packages partner_shops) and
+      // 20260707210000 (adds website). Public projection of the trusted-partner
+      // catalog (active rows, no email) so divers can list them without direct
+      // table access — the email stays server-side.
       list_trusted_partners: {
         Args: Record<string, never>
-        Returns: Array<{ id: string; name: string; region: string | null; blurb: string | null }>
+        Returns: Array<{ id: string; name: string; region: string | null; blurb: string | null; website: string | null }>
       }
       // Renamed from list_trip_board in 20260707150000_rename_trip_board_to_packages.sql.
       // Owner-privileged projection of published packages joined to the vouched
@@ -664,6 +666,7 @@ export interface Database {
           name: string
           region: string | null
           blurb: string | null
+          website: string | null
           email: string
           active: boolean
           created_at: string
@@ -674,6 +677,7 @@ export interface Database {
           name: string
           region?: string | null
           blurb?: string | null
+          website?: string | null
           email: string
           active?: boolean
           created_at?: string

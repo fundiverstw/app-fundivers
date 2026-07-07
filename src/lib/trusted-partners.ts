@@ -7,7 +7,9 @@ import type { TrustedPartner, TrustedPartnerRow, TrustedPartnerInsert } from '..
 // reaches the client). Contacting a partner goes through the
 // contact-trusted-partner edge function, which resolves the email server-side.
 
-// Diver-facing: the active partners, name/region/blurb only (no email).
+// Diver-facing: the active partners, name/region/blurb only (no email). The RPC
+// unions the trusted_partners directory with the Packages partner_shops (see
+// 20260707200000), so a shop added for Packages also shows up here.
 export async function fetchTrustedPartners(): Promise<TrustedPartner[]> {
   const { data, error } = await supabase.rpc('list_trusted_partners')
   if (error) throw error

@@ -74,6 +74,19 @@ describe('TrustedPartnersPage', () => {
     expect(await screen.findByText(/will reply straight to your email/i)).toBeInTheDocument()
   })
 
+  it('links to a partner website when one is set', async () => {
+    fetchPartnersMock.mockResolvedValue([
+      { id: 'p1', name: 'Blue Manta', region: 'Anilao', blurb: null, website: 'https://bluemanta.example' },
+      { id: 'p2', name: 'No Site Co', region: 'Bali', blurb: null, website: null },
+    ])
+    renderPage()
+
+    const link = await screen.findByRole('link', { name: /visit their site/i })
+    expect(link).toHaveAttribute('href', 'https://bluemanta.example')
+    // The partner without a website shows no link.
+    expect(screen.getAllByRole('link', { name: /visit their site/i })).toHaveLength(1)
+  })
+
   it('stays on the form when the request fails', async () => {
     sendMock.mockRejectedValue(new Error('email failed'))
     const user = userEvent.setup()

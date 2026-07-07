@@ -134,6 +134,7 @@ function PartnerForm({
   const [name, setName] = useState(partner?.name ?? '')
   const [region, setRegion] = useState(partner?.region ?? '')
   const [blurb, setBlurb] = useState(partner?.blurb ?? '')
+  const [website, setWebsite] = useState(partner?.website ?? '')
   const [email, setEmail] = useState(partner?.email ?? '')
   const [active, setActive] = useState(partner?.active ?? true)
   const [submitting, setSubmitting] = useState(false)
@@ -148,6 +149,7 @@ function PartnerForm({
         name: name.trim(),
         region: region.trim() || null,
         blurb: blurb.trim() || null,
+        website: website.trim() || null,
         email: email.trim(),
         active,
       }
@@ -172,6 +174,9 @@ function PartnerForm({
         </Labelled>
         <Labelled label="Blurb (shown to divers)">
           <textarea className={`${FIELD} resize-y`} rows={2} value={blurb} onChange={e => setBlurb(e.target.value)} placeholder="What makes them worth vouching for" />
+        </Labelled>
+        <Labelled label="Website (shown to divers)">
+          <input className={FIELD} type="url" value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://partner.example" />
         </Labelled>
         <Labelled label="Email * (never shown to divers)">
           <input className={FIELD} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="hello@partner.example" />

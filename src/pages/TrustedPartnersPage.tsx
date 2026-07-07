@@ -8,7 +8,7 @@ import { errorMessage } from '../lib/errors'
 import type { TrustedPartner } from '../types/database'
 import {
   CARD, BTN_PRIMARY, INPUT, INPUT_LABEL,
-  PAGE_HEADING, PAGE_BODY, TEXT_BODY, TEXT_HEADING, TEXT_SUBTLE,
+  PAGE_HEADING, PAGE_BODY, TEXT_BODY, TEXT_HEADING, TEXT_SUBTLE, TEXT_LINK,
 } from '../styles/tokens'
 
 // Trusted Partners — dive shops abroad the shop vouches for. A diver can
@@ -159,6 +159,16 @@ function PartnerRow({ partner }: { partner: TrustedPartner }) {
           <p className={`text-sm ${TEXT_HEADING}`}>{partner.name}</p>
           {partner.region && <p className={`text-xs ${TEXT_SUBTLE}`}>{partner.region}</p>}
           {partner.blurb && <p className={`text-sm ${TEXT_BODY} mt-1`}>{partner.blurb}</p>}
+          {partner.website && (
+            <a
+              href={partner.website}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`inline-block text-xs mt-1 ${TEXT_LINK}`}
+            >
+              Visit their site →
+            </a>
+          )}
         </div>
         {!sent && (
           <button

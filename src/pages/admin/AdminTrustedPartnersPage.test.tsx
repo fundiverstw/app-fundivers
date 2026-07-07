@@ -16,7 +16,7 @@ vi.mock('../../hooks/useToast', () => ({
 }))
 
 const partners: TrustedPartnerRow[] = [
-  { id: 'p1', name: 'Blue Manta', region: 'Anilao', blurb: null, email: 'bm@x.io', active: true, created_at: '', created_by: null },
+  { id: 'p1', name: 'Blue Manta', region: 'Anilao', blurb: null, website: null, email: 'bm@x.io', active: true, created_at: '', created_by: null },
 ]
 
 beforeEach(() => {
@@ -48,9 +48,12 @@ describe('AdminTrustedPartnersPage', () => {
     expect(save).not.toHaveBeenCalled()
 
     await user.type(screen.getByLabelText(/^email/i), 'hello@deepblue.io')
+    await user.type(screen.getByLabelText(/^website/i), 'https://deepblue.example')
     await user.click(screen.getByRole('button', { name: /^save$/i }))
     await waitFor(() => expect(save).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Deep Blue', email: 'hello@deepblue.io', active: true }),
+      expect.objectContaining({
+        name: 'Deep Blue', email: 'hello@deepblue.io', website: 'https://deepblue.example', active: true,
+      }),
       undefined,
     ))
   })

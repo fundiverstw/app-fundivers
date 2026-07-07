@@ -7,6 +7,12 @@
 // it is never exposed to the client (RLS hides the trusted_partners rows from
 // divers; they only see name/region/blurb via list_trusted_partners()).
 //
+// list_trusted_partners() lists two catalogs a diver can message: the
+// standalone trusted_partners directory and the Packages partner_shops (whose
+// contact_email is the reachable address). ids don't collide (both random
+// uuids), so we resolve partner_id against trusted_partners first, then fall
+// back to partner_shops.
+//
 // Flow:
 //   1. Verify caller via Bearer JWT.
 //   2. Validate { partner_id, message }.
@@ -57,13 +63,34 @@ Deno.serve(async (req) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } })
 
-  const { data: partner, error: pErr } = await admin
+  // Resolve the partner across both catalogs the diver sees on the Trusted
+  // Partners page. trusted_partners first; then partner_shops (Packages), where
+  // contact_email is the reachable address. Only active rows count.
+  let partnerName: string | null = null
+  let partnerEmail: string | null = null
+
+  const { data: tp, error: tpErr } = await admin
     .from("trusted_partners")
     .select("name, email, active")
     .eq("id", parsed.request.partnerId)
     .maybeSingle()
-  if (pErr) return json({ error: safeError(pErr, "partner lookup failed") }, 500)
-  if (!partner || !partner.active) return json({ error: "partner not found" }, 404)
+  if (tpErr) return json({ error: safeError(tpErr, "partner lookup failed") }, 500)
+  if (tp && tp.active) { partnerName = tp.name; partnerEmail = tp.email }
+
+  if (!partnerEmail) {
+    const { data: shop, error: shopErr } = await admin
+      .from("partner_shops")
+      .select("name, contact_email, active")
+      .eq("id", parsed.request.partnerId)
+      .maybeSingle()
+    if (shopErr) return json({ error: safeError(shopErr, "partner lookup failed") }, 500)
+    if (shop && shop.active && shop.contact_email) {
+      partnerName = shop.name
+      partnerEmail = shop.contact_email
+    }
+  }
+
+  if (!partnerName || !partnerEmail) return json({ error: "partner not found" }, 404)
 
   const { data: profile } = await admin
     .from("profiles").select("name, nickname").eq("id", userId).maybeSingle()
@@ -77,7 +104,7 @@ Deno.serve(async (req) => {
 
   const { subject, text } = buildTrustedPartnerEmail({
     shopName:    siteConfig.identity.shopName,
-    partnerName: partner.name,
+    partnerName: partnerName,
     diverName,
     diverEmail:  userEmail,
     message:     parsed.request.message,
@@ -90,7 +117,7 @@ Deno.serve(async (req) => {
     })
     await transporter.sendMail({
       from:    { name: siteConfig.identity.shopName, address: GMAIL_USER },
-      to:      partner.email,
+      to:      partnerEmail,
       cc:      COMPANY_EMAIL,
       replyTo: userEmail,
       subject,
