@@ -318,16 +318,16 @@ async function attachDiveOutings(eventIds: string[]): Promise<Map<string, DiveOu
   const destIds = [...new Set(links.map(l => l.destination_id))]
   const { data: dests } = await supabase
     .from('travel_destinations')
-    .select('id, divetype, northeast_diving')
+    .select('id, divetype')
     .in('id', destIds)
   const destById = new Map((dests ?? []).map(d => [d.id, d]))
 
-  const byEvent = new Map<string, Array<{ divetype: string | null; northeast_diving: boolean | null }>>()
+  const byEvent = new Map<string, Array<{ divetype: string | null }>>()
   for (const l of links) {
     const d = destById.get(l.destination_id)
     if (!d) continue
     const arr = byEvent.get(l.event_id) ?? []
-    arr.push({ divetype: d.divetype, northeast_diving: d.northeast_diving })
+    arr.push({ divetype: d.divetype })
     byEvent.set(l.event_id, arr)
   }
   for (const [id, ds] of byEvent) {

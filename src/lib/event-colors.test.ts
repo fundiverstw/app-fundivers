@@ -45,28 +45,28 @@ describe('diveOutingFromDestinations', () => {
     expect(diveOutingFromDestinations([])).toBeNull()
   })
 
-  it('is local when every destination is a Northeast shore site', () => {
+  it('is local when every destination is a shore-diving site', () => {
     expect(diveOutingFromDestinations([
-      { divetype: 'Shore Diving', northeast_diving: true },
+      { divetype: 'Shore Diving' },
     ])).toBe('local')
   })
 
   it('is a trip when any destination is a boat dive', () => {
     expect(diveOutingFromDestinations([
-      { divetype: 'Boat Diving', northeast_diving: true },
+      { divetype: 'Boat Diving' },
     ])).toBe('trip')
   })
 
-  it('is a trip when any destination is outside the Northeast coast', () => {
+  it('is a trip when any destination has no divetype set', () => {
     expect(diveOutingFromDestinations([
-      { divetype: null, northeast_diving: null },   // e.g. Green Island / Kenting
+      { divetype: null },   // e.g. Green Island / Kenting
     ])).toBe('trip')
   })
 
-  it('is a trip if any one of several destinations qualifies', () => {
+  it('is a trip if any one of several destinations is not shore diving', () => {
     expect(diveOutingFromDestinations([
-      { divetype: 'Shore Diving', northeast_diving: true },
-      { divetype: null, northeast_diving: null },
+      { divetype: 'Shore Diving' },
+      { divetype: null },
     ])).toBe('trip')
   })
 })

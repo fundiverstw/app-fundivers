@@ -37,15 +37,16 @@ export function courseColor(title: string): CourseColor {
 }
 
 // Structured dive classification from a dive's linked travel_destinations.
-// 'trip' (→ yellow) when ANY linked destination is a boat-diving site or
-// sits outside the Northeast coast; 'local' (→ green) when every linked
-// destination is a Northeast shore site; null when the dive has no
-// destination tagged, so the caller falls back to title matching.
+// 'local' (→ green) only when EVERY linked destination is a shore-diving site
+// (divetype 'Shore Diving'); 'trip' (→ yellow) as soon as any destination is
+// anything else — a boat dive, or an unclassified/abroad site (Green Island,
+// Kenting, …); null when the dive has no destination tagged, so the caller
+// falls back to title matching.
 export function diveOutingFromDestinations(
-  dests: Array<{ divetype: string | null; northeast_diving: boolean | null }>,
+  dests: Array<{ divetype: string | null }>,
 ): DiveOuting | null {
   if (!dests.length) return null
-  const trip = dests.some(d => d.divetype === 'Boat Diving' || d.northeast_diving !== true)
+  const trip = dests.some(d => d.divetype !== 'Shore Diving')
   return trip ? 'trip' : 'local'
 }
 
