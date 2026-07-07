@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { isoDate } from '../lib/dates'
 import { PageLoading } from '../components/ui/Spinner'
 import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { fetchEventsInRange, formatEventSpan } from '../lib/events'
+import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
+import { EventStatusTags } from '../components/EventStatusTags'
 import type { AppEvent, Duty } from '../types/database'
 import { PAGE_BODY } from '../styles/tokens'
 
@@ -33,18 +33,21 @@ export function DutiesPage() {
     if (!user) return
     let cancelled = false
     ;(async () => {
-      const today = new Date()
-      const start = new Date(today); start.setMonth(start.getMonth() - 1)
-      const end = new Date(today); end.setMonth(end.getMonth() + 3)
+      const dutiesRes = await supabase.from('duties').select('*')
+        .eq('assignee_id', user.id).order('start_date', { ascending: true })
+      if (cancelled) return
+      const duties = dutiesRes.data ?? []
 
-      const [dutiesRes, events] = await Promise.all([
-        supabase.from('duties').select('*').eq('assignee_id', user.id).order('start_date', { ascending: true }),
-        fetchEventsInRange(isoDate(start), isoDate(end)),
-      ])
+      // Resolve each duty's event by id (not from a date-bounded calendar
+      // slice), so a private, cancelled, or long-past/future event still shows
+      // its title. An event_id that resolves to nothing means the event was
+      // deleted.
+      const eventIndex = await fetchEventsForBookings(
+        duties.map(d => d.event_id).filter((x): x is string => !!x)
+      )
       if (cancelled) return
 
-      const eventIndex = new Map(events.map(e => [e.id, e]))
-      setEnriched((dutiesRes.data ?? []).map(d => ({
+      setEnriched(duties.map(d => ({
         duty: d,
         event: (d.event_id && eventIndex.get(d.event_id)) || null,
       })))
@@ -114,12 +117,12 @@ function Row({ e, eventLinkBase, dim }: { e: Enriched; eventLinkBase: string | n
       </div>
       {event && eventLinkBase
         ? <Link to={`${eventLinkBase}/${event.type}/${event.id}`} className="block text-sm font-medium text-brand-900 hover:text-brand-950 truncate">
-            {event.title} <span className="text-xs text-brand-900/70 font-normal">· {formatEventSpan(event)}</span>
+            {event.title}<EventStatusTags event={event} /> <span className="text-xs text-brand-900/70 font-normal">· {formatEventSpan(event)}</span>
           </Link>
         : event
-          ? <p className="text-sm font-medium text-brand-900 truncate">{event.title}</p>
+          ? <p className="text-sm font-medium text-brand-900 truncate">{event.title}<EventStatusTags event={event} /></p>
           : duty.event_id
-            ? <p className="text-xs text-brand-950 font-medium">(event outside visible range)</p>
+            ? <p className="text-xs text-brand-950 font-medium">Event no longer exists</p>
             : <p className="text-xs text-brand-950 font-medium">Standalone duty</p>
       }
       {duty.notes && <p className="text-xs text-brand-900 font-medium bg-surface-50 rounded p-2 mt-1">📝 {duty.notes}</p>}

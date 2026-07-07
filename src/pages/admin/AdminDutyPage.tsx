@@ -6,7 +6,8 @@ import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
-import { fetchEventsInRange, formatEventSpan } from '../../lib/events'
+import { fetchEventsInRange, fetchEventsForBookings, formatEventSpan } from '../../lib/events'
+import { EventStatusTags } from '../../components/EventStatusTags'
 import type { AppEvent, Duty, Profile } from '../../types/database'
 
 type AdminMap = Map<string, Profile>
@@ -48,11 +49,18 @@ export function AdminDutyPage() {
       const adminMap = new Map((adminsRes.data ?? []).map(p => [p.id, p]))
       setAdmins(adminMap)
 
-      const eventIndex = new Map(events.map(e => [e.id, e]))
+      // Resolve each duty's own event by id so a private, cancelled, or
+      // out-of-window event still shows its title (the date-bounded `events`
+      // slice below is only for the "unstaffed" scan). Unresolved = deleted.
+      const dutyEventIndex = await fetchEventsForBookings(
+        (dutiesRes.data ?? []).map(d => d.event_id).filter((x): x is string => !!x)
+      )
+      if (cancelled) return
+
       const enriched: Enriched[] = (dutiesRes.data ?? []).map(d => ({
         duty: d,
         assignee: adminMap.get(d.assignee_id) ?? null,
-        event: (d.event_id && eventIndex.get(d.event_id)) || null,
+        event: (d.event_id && dutyEventIndex.get(d.event_id)) || null,
       }))
       setDuties(enriched)
 
@@ -165,10 +173,10 @@ function DutyRow({ enriched, highlight }: { enriched: Enriched; highlight?: bool
       </div>
       {event
         ? <Link to={`/admin/events/${event.type}/${event.id}`} className="block text-xs font-medium text-brand-900 hover:text-brand-700 underline truncate">
-            {event.title}
+            {event.title}<EventStatusTags event={event} />
           </Link>
         : duty.event_id
-          ? <p className="text-xs text-brand-950 font-medium">(event outside visible range)</p>
+          ? <p className="text-xs text-brand-950 font-medium">Event no longer exists</p>
           : <p className="text-xs text-brand-950 font-medium">Standalone duty</p>
       }
       {duty.notes && <p className="text-xs text-brand-900 font-medium bg-surface-50 rounded p-2 mt-1">📝 {duty.notes}</p>}

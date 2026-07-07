@@ -4,10 +4,10 @@ import { MemoryRouter } from 'react-router-dom'
 import { DutiesPage } from './DutiesPage'
 import { mockQueryBuilder } from '../../tests/test-utils'
 
-const { from, useAuthMock, fetchEventsInRange } = vi.hoisted(() => ({
+const { from, useAuthMock, fetchEventsForBookings } = vi.hoisted(() => ({
   from: vi.fn(),
   useAuthMock: vi.fn(),
-  fetchEventsInRange: vi.fn(),
+  fetchEventsForBookings: vi.fn(),
 }))
 
 vi.mock('../lib/supabase', () => ({
@@ -17,7 +17,7 @@ vi.mock('../lib/events', async () => {
   const actual = await vi.importActual<typeof import('../lib/events')>('../lib/events')
   return {
     ...actual,
-    fetchEventsInRange: (...a: unknown[]) => fetchEventsInRange(...a),
+    fetchEventsForBookings: (...a: unknown[]) => fetchEventsForBookings(...a),
   }
 })
 vi.mock('../hooks/useAuth', () => ({ useAuth: () => useAuthMock() }))
@@ -25,7 +25,7 @@ vi.mock('../hooks/useAuth', () => ({ useAuth: () => useAuthMock() }))
 beforeEach(() => {
   from.mockReset()
   useAuthMock.mockReset()
-  fetchEventsInRange.mockReset()
+  fetchEventsForBookings.mockReset()
 })
 
 function renderPage() {
@@ -57,16 +57,16 @@ describe('DutiesPage', () => {
         event_id: 'dive-b', notes: 'Old gig',
       },
     ]
-    const events = [
-      { id: 'dive-a', type: 'dive', title: 'Future Dive', start_time: '2099-06-15T09:00:00Z', end_time: null, fully_booked: false, price: null, deposit_amount: null, currency: 'TWD', featured: false },
-      { id: 'dive-b', type: 'dive', title: 'Past Dive',   start_time: '2020-01-05T09:00:00Z', end_time: null, fully_booked: false, price: null, deposit_amount: null, currency: 'TWD', featured: false },
-    ]
+    const events = new Map([
+      ['dive-a', { id: 'dive-a', type: 'dive', title: 'Future Dive', start_time: '2099-06-15T09:00:00Z', end_time: null, fully_booked: false, price: null, deposit_amount: null, currency: 'TWD', featured: false }],
+      ['dive-b', { id: 'dive-b', type: 'dive', title: 'Past Dive',   start_time: '2020-01-05T09:00:00Z', end_time: null, fully_booked: false, price: null, deposit_amount: null, currency: 'TWD', featured: false }],
+    ])
 
     from.mockImplementation((table: string) => {
       if (table === 'duties') return mockQueryBuilder({ data: myDuties })
       return mockQueryBuilder({ data: [] })
     })
-    fetchEventsInRange.mockResolvedValue(events)
+    fetchEventsForBookings.mockResolvedValue(events)
 
     renderPage()
 
@@ -87,11 +87,37 @@ describe('DutiesPage', () => {
       profile: { id: 'staff-1', role: 'staff' },
     })
     from.mockImplementation(() => mockQueryBuilder({ data: [] }))
-    fetchEventsInRange.mockResolvedValue([])
+    fetchEventsForBookings.mockResolvedValue(new Map())
 
     renderPage()
 
     await screen.findByText('Upcoming')
     expect(screen.getByText(/Nothing scheduled/)).toBeInTheDocument()
+  })
+
+  it('says the event no longer exists when a duty points at a deleted event', async () => {
+    useAuthMock.mockReturnValue({
+      user: { id: 'staff-1' },
+      profile: { id: 'staff-1', role: 'staff' },
+    })
+    const myDuties = [
+      {
+        id: 'd-orphan', created_at: '', created_by: 'admin-1', assignee_id: 'staff-1',
+        role: 'guide', start_date: '2099-06-15', end_date: null,
+        event_id: 'dive-gone', notes: null,
+      },
+    ]
+    from.mockImplementation((table: string) => {
+      if (table === 'duties') return mockQueryBuilder({ data: myDuties })
+      return mockQueryBuilder({ data: [] })
+    })
+    // The referenced event id resolves to nothing → it was deleted.
+    fetchEventsForBookings.mockResolvedValue(new Map())
+
+    renderPage()
+
+    await screen.findByText('Upcoming')
+    expect(screen.getByText('Event no longer exists')).toBeInTheDocument()
+    expect(screen.queryByText(/outside visible range/i)).not.toBeInTheDocument()
   })
 })
