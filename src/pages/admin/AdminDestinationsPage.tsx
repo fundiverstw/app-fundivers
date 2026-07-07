@@ -14,8 +14,6 @@ const fields: CatalogField<TravelDestination>[] = [
   { key: 'tagline',            label: 'Tagline', type: 'textarea', placeholder: 'Short one-line hook…' },
   { key: 'diver_requirements', label: 'Diver requirements', type: 'textarea', placeholder: 'Certification level, experience…' },
   { key: 'sort_order',         label: 'Sort order', type: 'number', placeholder: 'Lower shows first' },
-  { key: 'latitude',           label: 'Latitude', type: 'number', placeholder: 'e.g. 22.6567' },
-  { key: 'longitude',          label: 'Longitude', type: 'number', placeholder: 'e.g. 121.4900' },
   { key: 'slug',               label: 'Slug', type: 'text', placeholder: 'URL slug used by the public site' },
   { key: 'location_picture',   label: 'Location picture (URL)', type: 'text', placeholder: 'wix:image://… or https://…' },
   { key: 'background_picture', label: 'Background picture (URL)', type: 'text', placeholder: 'wix:image://… or https://…' },
