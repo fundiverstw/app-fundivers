@@ -23,7 +23,7 @@ beforeEach(() => {
 })
 
 const basePackage: Package = {
-  id: 'p1', created_at: '2026-06-01T00:00:00Z', partner_shop_id: 's1',
+  id: 'p1', created_at: '2026-06-01T00:00:00Z', trusted_partner_id: 's1',
   title: 'Raja Ampat', destination: 'Indonesia', summary: null, description: null,
   start_date: null, end_date: null, price: 60000, currency: 'TWD',
   hero_image_url: null, highlights: [], booking_url: null, kickback_rate: 0.05,
@@ -33,13 +33,13 @@ const basePackage: Package = {
 describe('savePackage publish stamp', () => {
   it('stamps published_at when a new package is created already published', async () => {
     const { savePackage } = await import('./package-admin')
-    await savePackage({ partner_shop_id: 's1', title: 'X', destination: 'Y', status: 'published' })
+    await savePackage({ trusted_partner_id: 's1', title: 'X', destination: 'Y', status: 'published' })
     expect(lastInsert?.published_at).toBeTruthy()
   })
 
   it('does not stamp a draft package', async () => {
     const { savePackage } = await import('./package-admin')
-    await savePackage({ partner_shop_id: 's1', title: 'X', destination: 'Y', status: 'draft' })
+    await savePackage({ trusted_partner_id: 's1', title: 'X', destination: 'Y', status: 'draft' })
     expect(lastInsert?.published_at).toBeFalsy()
   })
 
@@ -71,15 +71,5 @@ describe('setPackageStatus', () => {
     await setPackageStatus(live, 'archived')
     expect(lastUpdate?.status).toBe('archived')
     expect(lastUpdate?.published_at).toBe('2026-05-01T00:00:00Z')
-  })
-})
-
-describe('savePartnerShop', () => {
-  it('inserts when no id is given and updates when one is', async () => {
-    const { savePartnerShop } = await import('./package-admin')
-    await savePartnerShop({ name: 'New', country: 'PH' })
-    expect(lastInsert?.name).toBe('New')
-    await savePartnerShop({ name: 'Edit', country: 'PH' }, 's1')
-    expect(lastUpdate?.name).toBe('Edit')
   })
 })

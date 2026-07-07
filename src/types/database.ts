@@ -134,11 +134,11 @@ export interface Database {
         }
         Returns: undefined
       }
-      // Defined in 20260703010000_trusted_partners.sql; widened by
-      // 20260707200000 (also lists active Packages partner_shops) and
-      // 20260707210000 (adds website). Public projection of the trusted-partner
-      // catalog (active rows, no email) so divers can list them without direct
-      // table access — the email stays server-side.
+      // Public projection of the unified trusted_partners table (20260707220000):
+      // active partners that have a contact email, mapped to region =
+      // coalesce(location, country), blurb = vouch_notes. No email/kickback —
+      // divers list them without direct table access; the email stays
+      // server-side (resolved by the contact-trusted-partner edge fn).
       list_trusted_partners: {
         Args: Record<string, never>
         Returns: Array<{ id: string; name: string; region: string | null; blurb: string | null; website: string | null }>
@@ -163,9 +163,9 @@ export interface Database {
           highlights: string[]
           booking_url: string | null
           published_at: string | null
-          partner_shop_id: string
+          trusted_partner_id: string
           partner_name: string
-          partner_country: string
+          partner_country: string | null
           partner_location: string | null
           partner_website: string | null
           partner_logo_url: string | null
@@ -606,12 +606,18 @@ export interface Database {
         }
         Relationships: []
       }
-      partner_shops: {
+      // The single "dive shops abroad we vouch for" table (unified from the old
+      // partner_shops + trusted_partners in 20260707220000). Hosts Packages
+      // (country/location, logo, kickback, internal contact) AND powers the
+      // diver Trusted Partners directory (name/region/blurb/website + contact
+      // email for messaging). country is nullable — directory-only partners may
+      // not have one.
+      trusted_partners: {
         Row: {
           id: string
           created_at: string
           name: string
-          country: string
+          country: string | null
           location: string | null
           website: string | null
           contact_name: string | null
@@ -626,7 +632,7 @@ export interface Database {
           id?: string
           created_at?: string
           name: string
-          country: string
+          country?: string | null
           location?: string | null
           website?: string | null
           contact_name?: string | null
@@ -637,7 +643,7 @@ export interface Database {
           active?: boolean
           created_by?: string | null
         }
-        Update: Partial<Database['public']['Tables']['partner_shops']['Insert']>
+        Update: Partial<Database['public']['Tables']['trusted_partners']['Insert']>
         Relationships: []
       }
       vehicles: {
@@ -658,32 +664,6 @@ export interface Database {
           created_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['vehicles']['Insert']>
-        Relationships: []
-      }
-      trusted_partners: {
-        Row: {
-          id: string
-          name: string
-          region: string | null
-          blurb: string | null
-          website: string | null
-          email: string
-          active: boolean
-          created_at: string
-          created_by: string | null
-        }
-        Insert: {
-          id?: string
-          name: string
-          region?: string | null
-          blurb?: string | null
-          website?: string | null
-          email: string
-          active?: boolean
-          created_at?: string
-          created_by?: string | null
-        }
-        Update: Partial<Database['public']['Tables']['trusted_partners']['Insert']>
         Relationships: []
       }
       gear_models: {
@@ -820,7 +800,7 @@ export interface Database {
         Row: {
           id: string
           created_at: string
-          partner_shop_id: string
+          trusted_partner_id: string
           title: string
           destination: string
           summary: string | null
@@ -840,7 +820,7 @@ export interface Database {
         Insert: {
           id?: string
           created_at?: string
-          partner_shop_id: string
+          trusted_partner_id: string
           title: string
           destination: string
           summary?: string | null
@@ -1509,6 +1489,9 @@ export type DiveLogInsert = Database['public']['Tables']['dive_logs']['Insert']
 // Transport fleet — shop vehicles for logistics ride planning
 export type Vehicle = Database['public']['Tables']['vehicles']['Row']
 export type VehicleInsert = Database['public']['Tables']['vehicles']['Insert']
+// Trusted partners — the unified "dive shops abroad we vouch for" table. The
+// admin/full row (incl. contact email + kickback) and its Insert; also hosts
+// Packages via packages.trusted_partner_id.
 export type TrustedPartnerRow = Database['public']['Tables']['trusted_partners']['Row']
 export type TrustedPartnerInsert = Database['public']['Tables']['trusted_partners']['Insert']
 // The diver-facing projection — no email (see list_trusted_partners()).
@@ -1527,9 +1510,8 @@ export type WaiverSignatureInsert = Database['public']['Tables']['waiver_signatu
 export type EventWaiver = Database['public']['Tables']['event_waivers']['Row']
 export type EventWaiverInsert = Database['public']['Tables']['event_waivers']['Insert']
 
-// Packages — partner referral network (open-ended travel packages abroad)
-export type PartnerShop = Database['public']['Tables']['partner_shops']['Row']
-export type PartnerShopInsert = Database['public']['Tables']['partner_shops']['Insert']
+// Packages — partner referral network (open-ended travel packages abroad).
+// The hosting partner is a trusted_partners row (TrustedPartnerRow, above).
 export type Package = Database['public']['Tables']['packages']['Row']
 export type PackageInsert = Database['public']['Tables']['packages']['Insert']
 export type PackageReferral = Database['public']['Tables']['package_referrals']['Row']

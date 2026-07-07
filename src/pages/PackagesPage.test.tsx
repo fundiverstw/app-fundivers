@@ -18,7 +18,7 @@ const pkg: PackageBoardItem = {
   id: 'p1', title: 'Raja Ampat Liveaboard', destination: 'Raja Ampat, Indonesia',
   summary: null, description: null, start_date: '2026-09-01', end_date: '2026-09-08',
   price: 60000, currency: 'TWD', hero_image_url: null, highlights: [], booking_url: null,
-  published_at: '2026-06-01T00:00:00Z', partner_shop_id: 's1', partner_name: 'Blue Manta Divers',
+  published_at: '2026-06-01T00:00:00Z', trusted_partner_id: 's1', partner_name: 'Blue Manta Divers',
   partner_country: 'Indonesia', partner_location: 'Raja Ampat', partner_website: null, partner_vouch_notes: null,
 }
 

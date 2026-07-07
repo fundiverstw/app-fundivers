@@ -1,34 +1,11 @@
 import { supabase } from './supabase'
-import type { PartnerShop, PartnerShopInsert, Package, PackageInsert, PackageStatus } from '../types/database'
+import type { Package, PackageInsert, PackageStatus } from '../types/database'
 
-// Admin data layer for Packages (partner shops + packages). The diver-facing
-// reads go through the definer functions in packages.ts; this module is the
-// admin CRUD against the base tables (gated by the "admin manage" RLS policies
-// in 20260623000000_trip_board.sql / 20260707150000_rename_trip_board_to_packages.sql).
-
-export async function fetchPartnerShops(): Promise<PartnerShop[]> {
-  const { data, error } = await supabase
-    .from('partner_shops')
-    .select('*')
-    .order('name')
-  if (error) throw error
-  return (data ?? []) as PartnerShop[]
-}
-
-export async function savePartnerShop(values: PartnerShopInsert, id?: string): Promise<void> {
-  if (id) {
-    const { error } = await supabase.from('partner_shops').update(values).eq('id', id)
-    if (error) throw error
-  } else {
-    const { error } = await supabase.from('partner_shops').insert(values)
-    if (error) throw error
-  }
-}
-
-export async function deletePartnerShop(id: string): Promise<void> {
-  const { error } = await supabase.from('partner_shops').delete().eq('id', id)
-  if (error) throw error
-}
+// Admin data layer for the packages themselves. The hosting partner is a
+// trusted_partners row — its CRUD lives in trusted-partners.ts (the single
+// partner editor). The diver-facing reads go through the definer functions in
+// packages.ts; this module is the admin CRUD against the base `packages` table
+// (gated by its "packages: admin manage" RLS policy).
 
 export async function fetchPackages(): Promise<Package[]> {
   const { data, error } = await supabase

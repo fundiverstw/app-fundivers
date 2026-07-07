@@ -1,15 +1,15 @@
 import { supabase } from './supabase'
 import type { TrustedPartner, TrustedPartnerRow, TrustedPartnerInsert } from '../types/database'
 
-// Data layer for the trusted-partner catalog (table `trusted_partners`, gated
-// by 20260703010000_trusted_partners.sql: admin-only direct access; divers read
-// the public columns via the list_trusted_partners() RPC — the email never
-// reaches the client). Contacting a partner goes through the
-// contact-trusted-partner edge function, which resolves the email server-side.
+// Data layer for the unified trusted_partners table (20260707220000 — one table
+// for "dive shops abroad we vouch for", also the host of Packages). Admin-only
+// direct access; divers read the public columns via the list_trusted_partners()
+// RPC — the contact email never reaches the client. Contacting a partner goes
+// through the contact-trusted-partner edge function, which resolves the email
+// server-side.
 
-// Diver-facing: the active partners, name/region/blurb only (no email). The RPC
-// unions the trusted_partners directory with the Packages partner_shops (see
-// 20260707200000), so a shop added for Packages also shows up here.
+// Diver-facing: the active, reachable partners — name/region/blurb/website only
+// (no email/kickback). Every active partner that has a contact email appears.
 export async function fetchTrustedPartners(): Promise<TrustedPartner[]> {
   const { data, error } = await supabase.rpc('list_trusted_partners')
   if (error) throw error

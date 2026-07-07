@@ -2,7 +2,7 @@
 // + 20260707150000_rename_trip_board_to_packages.sql). What we lock in against
 // the live stack:
 //   1. Base tables are admin-only — a diver reads nothing from packages /
-//      partner_shops / package_referrals directly (kickback columns unreachable).
+//      trusted_partners / package_referrals directly (kickback columns unreachable).
 //   2. list_package_board(): divers see only PUBLISHED packages, and the kickback
 //      rate is absent from the shape.
 //   3. list_my_package_referrals(): a diver sees only their OWN referrals, scoped
@@ -27,7 +27,7 @@ const cleanupPackages: string[] = []
 const cleanupShops: string[] = []
 
 async function createShop(overrides: Record<string, unknown> = {}): Promise<string> {
-  const { data, error } = await admin.from('partner_shops').insert({
+  const { data, error } = await admin.from('trusted_partners').insert({
     name: 'Blue Manta Divers', country: 'Indonesia', ...overrides,
   } as never).select('id').single()
   if (error) throw new Error(`createShop failed: ${error.message}`)
@@ -42,7 +42,7 @@ async function createPackage(args: {
   overrides?: Record<string, unknown>
 }): Promise<string> {
   const { data, error } = await admin.from('packages').insert({
-    partner_shop_id: args.shopId,
+    trusted_partner_id: args.shopId,
     title: 'Raja Ampat Liveaboard',
     destination: 'Raja Ampat, Indonesia',
     status: args.status ?? 'published',
@@ -67,26 +67,26 @@ beforeAll(async () => {
 
 afterAll(async () => {
   for (const id of cleanupPackages) await admin.from('packages').delete().eq('id', id)
-  for (const id of cleanupShops) await admin.from('partner_shops').delete().eq('id', id)
+  for (const id of cleanupShops) await admin.from('trusted_partners').delete().eq('id', id)
   for (const id of cleanupUsers) await deleteTestUser(admin, id)
 })
 
 describe('base tables are admin-only', () => {
-  it('a diver reads nothing from packages / partner_shops / package_referrals directly', async () => {
+  it('a diver reads nothing from packages / trusted_partners / package_referrals directly', async () => {
     const shop = await createShop()
     await createPackage({ shopId: shop, status: 'published' })
     const asDiver = await userClient(diver.email, diver.password)
 
-    for (const table of ['packages', 'partner_shops', 'package_referrals'] as const) {
+    for (const table of ['packages', 'trusted_partners', 'package_referrals'] as const) {
       const { data, error } = await asDiver.from(table).select('*')
       expect(error).toBeNull()           // RLS filters rows, it doesn't error
       expect(data ?? []).toHaveLength(0)
     }
   })
 
-  it('a non-admin cannot insert a partner shop or package', async () => {
+  it('a non-admin cannot insert a trusted partner or package', async () => {
     const asDiver = await userClient(diver.email, diver.password)
-    const { error: e1 } = await asDiver.from('partner_shops').insert({ name: 'Rogue', country: 'X' } as never)
+    const { error: e1 } = await asDiver.from('trusted_partners').insert({ name: 'Rogue', country: 'X' } as never)
     expect(e1).not.toBeNull()
   })
 })

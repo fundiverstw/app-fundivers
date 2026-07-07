@@ -1,27 +1,28 @@
 import { useEffect, useState, type ReactNode, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { siteConfig } from '../../config/site'
 import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
 import {
-  fetchPartnerShops, savePartnerShop, deletePartnerShop,
   fetchPackages, savePackage, setPackageStatus, deletePackage,
 } from '../../lib/package-admin'
+import { fetchAllTrustedPartners } from '../../lib/trusted-partners'
 import { countInterestedReferrals } from '../../lib/package-referrals'
 import { AdminReferralsTab } from '../../components/admin/AdminReferralsTab'
 import type {
-  PartnerShop, PartnerShopInsert, Package, PackageInsert, PackageStatus,
+  TrustedPartnerRow, Package, PackageInsert, PackageStatus,
 } from '../../types/database'
 import { BTN_SECONDARY } from '../../styles/tokens'
 
 // Admin home for Packages — the partner referral network (open-ended travel
-// packages abroad). Three tabs:
+// packages abroad). Two tabs:
 //   - Packages: the curated packages published to divers, with the publish
 //     lifecycle (draft → published → archived) and a per-package kickback rate.
-//   - Partner shops: the registry of shops we vouch for (+ default kickback
-//     rate, internal contact for brokering intros).
 //   - Referrals: the diver-interest pipeline + kickback ledger.
+// The hosting shops are trusted partners — managed on the Trusted Partners
+// admin page; here they're just picked from a dropdown when creating a package.
 
-type Tab = 'shops' | 'packages' | 'referrals'
+type Tab = 'packages' | 'referrals'
 
 const PILL = 'px-3 py-1.5 rounded-lg text-sm font-semibold'
 const FIELD = 'w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900'
@@ -29,18 +30,18 @@ const FIELD = 'w-full bg-white border border-surface-300 rounded-md px-3 py-2 te
 export function AdminPackagesPage() {
   const toast = useToast()
   const [tab, setTab] = useState<Tab>('packages')
-  const [shops, setShops] = useState<PartnerShop[]>([])
+  const [partners, setPartners] = useState<TrustedPartnerRow[]>([])
   const [packages, setPackages] = useState<Package[]>([])
   const [newInterest, setNewInterest] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 
-  // Post-mutation refresh, called from the tab handlers; re-populates both
-  // lists without the full-screen spinner.
+  // Post-mutation refresh, called from the tab handlers; re-populates the
+  // partner + package lists without the full-screen spinner.
   async function reload() {
     try {
-      const [s, p] = await Promise.all([fetchPartnerShops(), fetchPackages()])
-      setShops(s)
+      const [tp, p] = await Promise.all([fetchAllTrustedPartners(), fetchPackages()])
+      setPartners(tp)
       setPackages(p)
       setLoadError(null)
     } catch (err) {
@@ -52,9 +53,9 @@ export function AdminPackagesPage() {
     let cancelled = false
     ;(async () => {
       try {
-        const [s, p, n] = await Promise.all([fetchPartnerShops(), fetchPackages(), countInterestedReferrals()])
+        const [tp, p, n] = await Promise.all([fetchAllTrustedPartners(), fetchPackages(), countInterestedReferrals()])
         if (cancelled) return
-        setShops(s)
+        setPartners(tp)
         setPackages(p)
         setNewInterest(n)
       } catch (err) {
@@ -66,7 +67,7 @@ export function AdminPackagesPage() {
     return () => { cancelled = true }
   }, [])
 
-  const shopName = (id: string) => shops.find(s => s.id === id)?.name ?? '(unknown shop)'
+  const partnerName = (id: string) => partners.find(p => p.id === id)?.name ?? '(unknown partner)'
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
@@ -74,7 +75,6 @@ export function AdminPackagesPage() {
 
       <div className="flex gap-2" role="tablist" aria-label="Packages sections">
         <TabButton active={tab === 'packages'} onClick={() => setTab('packages')}>Packages ({packages.length})</TabButton>
-        <TabButton active={tab === 'shops'} onClick={() => setTab('shops')}>Partner shops ({shops.length})</TabButton>
         <TabButton active={tab === 'referrals'} onClick={() => setTab('referrals')}>
           Referrals{newInterest > 0 && <span className="ml-1.5 inline-block bg-red-600 text-white rounded-full px-1.5 text-xs">{newInterest} new</span>}
         </TabButton>
@@ -86,13 +86,11 @@ export function AdminPackagesPage() {
 
       {loading ? (
         <p className="text-sm text-white/70">Loading…</p>
-      ) : tab === 'shops' ? (
-        <ShopsTab shops={shops} onChanged={reload} onError={m => toast.error(m)} onOk={m => toast.success(m)} />
       ) : tab === 'referrals' ? (
         <AdminReferralsTab packages={packages} />
       ) : (
         <PackagesTab
-          packages={packages} shops={shops} shopName={shopName}
+          packages={packages} partners={partners} partnerName={partnerName}
           onChanged={reload} onError={m => toast.error(m)} onOk={m => toast.success(m)}
         />
       )}
@@ -115,174 +113,15 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 }
 
 // ============================================================
-// Shops
-// ============================================================
-
-function ShopsTab({
-  shops, onChanged, onError, onOk,
-}: {
-  shops: PartnerShop[]
-  onChanged: () => Promise<void>
-  onError: (m: string) => void
-  onOk: (m: string) => void
-}) {
-  const [editing, setEditing] = useState<PartnerShop | null>(null)
-  const [creating, setCreating] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState<PartnerShop | null>(null)
-
-  async function handleDelete(shop: PartnerShop) {
-    try {
-      await deletePartnerShop(shop.id)
-      onOk('Partner shop deleted')
-      setConfirmDelete(null)
-      await onChanged()
-    } catch (err) {
-      onError(errorMessage(err))
-    }
-  }
-
-  return (
-    <div className="space-y-3">
-      <div className="flex justify-end">
-        <button type="button" onClick={() => setCreating(true)}
-          className="text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg">
-          + New partner shop
-        </button>
-      </div>
-
-      {shops.length === 0 ? (
-        <p className="text-sm text-white/70">No partner shops yet.</p>
-      ) : (
-        <ul className="space-y-2">
-          {shops.map(shop => (
-            <li key={shop.id} className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-medium text-brand-900 text-sm truncate">
-                  {shop.name}{!shop.active && <span className="ml-2 text-xs text-brand-900/60">(inactive)</span>}
-                </p>
-                <p className="text-xs text-brand-900/80 truncate">
-                  {[shop.location, shop.country].filter(Boolean).join(', ')} · {(shop.default_kickback_rate * 100).toFixed(1)}% default
-                </p>
-              </div>
-              <div className="flex gap-2 shrink-0">
-                <button type="button" onClick={() => setEditing(shop)}
-                  className="text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-3 py-1 rounded-lg">Edit</button>
-                <button type="button" onClick={() => setConfirmDelete(shop)}
-                  className="text-xs font-semibold bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded-lg">Delete</button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {(creating || editing) && (
-        <ShopForm
-          shop={editing}
-          onClose={() => { setCreating(false); setEditing(null) }}
-          onSaved={async () => { setCreating(false); setEditing(null); onOk('Partner shop saved'); await onChanged() }}
-          onError={onError}
-        />
-      )}
-
-      {confirmDelete && (
-        <ConfirmModal
-          title="Delete partner shop?"
-          body={`"${confirmDelete.name}" will be removed. Packages that reference it must be deleted first.`}
-          confirmLabel="Delete"
-          onClose={() => setConfirmDelete(null)}
-          onConfirm={() => handleDelete(confirmDelete)}
-        />
-      )}
-    </div>
-  )
-}
-
-function ShopForm({
-  shop, onClose, onSaved, onError,
-}: {
-  shop: PartnerShop | null
-  onClose: () => void
-  onSaved: () => Promise<void>
-  onError: (m: string) => void
-}) {
-  const [name, setName] = useState(shop?.name ?? '')
-  const [country, setCountry] = useState(shop?.country ?? '')
-  const [location, setLocation] = useState(shop?.location ?? '')
-  const [website, setWebsite] = useState(shop?.website ?? '')
-  const [contactName, setContactName] = useState(shop?.contact_name ?? '')
-  const [contactEmail, setContactEmail] = useState(shop?.contact_email ?? '')
-  const [logoUrl, setLogoUrl] = useState(shop?.logo_url ?? '')
-  const [vouchNotes, setVouchNotes] = useState(shop?.vouch_notes ?? '')
-  const [rate, setRate] = useState(((shop?.default_kickback_rate ?? 0.05) * 100).toString())
-  const [active, setActive] = useState(shop?.active ?? true)
-  const [submitting, setSubmitting] = useState(false)
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    if (!name.trim() || !country.trim()) { onError('Name and country are required.'); return }
-    setSubmitting(true)
-    try {
-      const values: PartnerShopInsert = {
-        name: name.trim(),
-        country: country.trim(),
-        location: location.trim() || null,
-        website: website.trim() || null,
-        contact_name: contactName.trim() || null,
-        contact_email: contactEmail.trim() || null,
-        logo_url: logoUrl.trim() || null,
-        vouch_notes: vouchNotes.trim() || null,
-        default_kickback_rate: Number(rate) / 100,
-        active,
-      }
-      await savePartnerShop(values, shop?.id)
-      await onSaved()
-    } catch (err) {
-      onError(errorMessage(err))
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <Modal labelledBy="shop-form-title" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <h2 id="shop-form-title" className="text-lg font-bold text-brand-900">{shop ? 'Edit partner shop' : 'New partner shop'}</h2>
-        <Labelled label="Name *"><input className={FIELD} value={name} onChange={e => setName(e.target.value)} /></Labelled>
-        <Labelled label="Country *"><input className={FIELD} value={country} onChange={e => setCountry(e.target.value)} /></Labelled>
-        <Labelled label="Location"><input className={FIELD} value={location} onChange={e => setLocation(e.target.value)} placeholder="City / region" /></Labelled>
-        <Labelled label="Website"><input className={FIELD} value={website} onChange={e => setWebsite(e.target.value)} /></Labelled>
-        <Labelled label="Logo URL"><input className={FIELD} value={logoUrl} onChange={e => setLogoUrl(e.target.value)} /></Labelled>
-        <Labelled label="Why we vouch (shown to divers)">
-          <textarea className={`${FIELD} resize-none`} rows={2} value={vouchNotes} onChange={e => setVouchNotes(e.target.value)} />
-        </Labelled>
-        <div className="grid grid-cols-2 gap-2">
-          <Labelled label="Contact name (internal)"><input className={FIELD} value={contactName} onChange={e => setContactName(e.target.value)} /></Labelled>
-          <Labelled label="Contact email (internal)"><input className={FIELD} value={contactEmail} onChange={e => setContactEmail(e.target.value)} /></Labelled>
-        </div>
-        <div className="grid grid-cols-2 gap-2 items-end">
-          <Labelled label="Default kickback %">
-            <input className={FIELD} type="number" step="any" value={rate} onChange={e => setRate(e.target.value)} />
-          </Labelled>
-          <label className="flex items-center gap-2 text-sm text-brand-900 pb-2">
-            <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} /> Active
-          </label>
-        </div>
-        <FormButtons submitting={submitting} submitLabel={shop ? 'Save changes' : 'Create shop'} onClose={onClose} />
-      </form>
-    </Modal>
-  )
-}
-
-// ============================================================
 // Packages
 // ============================================================
 
 function PackagesTab({
-  packages, shops, shopName, onChanged, onError, onOk,
+  packages, partners, partnerName, onChanged, onError, onOk,
 }: {
   packages: Package[]
-  shops: PartnerShop[]
-  shopName: (id: string) => string
+  partners: TrustedPartnerRow[]
+  partnerName: (id: string) => string
   onChanged: () => Promise<void>
   onError: (m: string) => void
   onOk: (m: string) => void
@@ -318,16 +157,18 @@ function PackagesTab({
         <button
           type="button"
           onClick={() => setCreating(true)}
-          disabled={shops.length === 0}
-          title={shops.length === 0 ? 'Add a partner shop first' : undefined}
+          disabled={partners.length === 0}
+          title={partners.length === 0 ? 'Add a trusted partner first' : undefined}
           className="text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg disabled:opacity-50"
         >
           + New package
         </button>
       </div>
 
-      {shops.length === 0 && (
-        <p className="text-sm text-white/70">Add a partner shop before creating a package.</p>
+      {partners.length === 0 && (
+        <p className="text-sm text-white/70">
+          Add a <Link to="/admin/trusted-partners" className="underline">trusted partner</Link> before creating a package.
+        </p>
       )}
 
       {packages.length === 0 ? (
@@ -340,7 +181,7 @@ function PackagesTab({
                 <div className="min-w-0">
                   <p className="font-medium text-brand-900 text-sm truncate">{pkg.title}</p>
                   <p className="text-xs text-brand-900/80 truncate">
-                    {pkg.destination} · {shopName(pkg.partner_shop_id)} · {(pkg.kickback_rate * 100).toFixed(1)}%
+                    {pkg.destination} · {partnerName(pkg.trusted_partner_id)} · {(pkg.kickback_rate * 100).toFixed(1)}%
                   </p>
                 </div>
                 <StatusBadge status={pkg.status} />
@@ -370,7 +211,7 @@ function PackagesTab({
 
       {(creating || editing) && (
         <PackageForm
-          pkg={editing} shops={shops}
+          pkg={editing} partners={partners}
           onClose={() => { setCreating(false); setEditing(null) }}
           onSaved={async () => { setCreating(false); setEditing(null); onOk('Package saved'); await onChanged() }}
           onError={onError}
@@ -400,15 +241,15 @@ function StatusBadge({ status }: { status: PackageStatus }) {
 }
 
 function PackageForm({
-  pkg, shops, onClose, onSaved, onError,
+  pkg, partners, onClose, onSaved, onError,
 }: {
   pkg: Package | null
-  shops: PartnerShop[]
+  partners: TrustedPartnerRow[]
   onClose: () => void
   onSaved: () => Promise<void>
   onError: (m: string) => void
 }) {
-  const [partnerId, setPartnerId] = useState(pkg?.partner_shop_id ?? shops[0]?.id ?? '')
+  const [partnerId, setPartnerId] = useState(pkg?.trusted_partner_id ?? partners[0]?.id ?? '')
   const [title, setTitle] = useState(pkg?.title ?? '')
   const [destination, setDestination] = useState(pkg?.destination ?? '')
   const [summary, setSummary] = useState(pkg?.summary ?? '')
@@ -420,20 +261,20 @@ function PackageForm({
   const [heroImageUrl, setHeroImageUrl] = useState(pkg?.hero_image_url ?? '')
   const [bookingUrl, setBookingUrl] = useState(pkg?.booking_url ?? '')
   const [highlights, setHighlights] = useState((pkg?.highlights ?? []).join('\n'))
-  const selectedShop = shops.find(s => s.id === partnerId)
-  const [rate, setRate] = useState((((pkg?.kickback_rate ?? selectedShop?.default_kickback_rate ?? 0.05)) * 100).toString())
+  const selectedPartner = partners.find(p => p.id === partnerId)
+  const [rate, setRate] = useState((((pkg?.kickback_rate ?? selectedPartner?.default_kickback_rate ?? 0.05)) * 100).toString())
   const [status, setStatus] = useState<PackageStatus>(pkg?.status ?? 'draft')
   const [submitting, setSubmitting] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!partnerId) { onError('Pick a partner shop.'); return }
+    if (!partnerId) { onError('Pick a trusted partner.'); return }
     if (!title.trim() || !destination.trim()) { onError('Title and destination are required.'); return }
     if (startDate && endDate && endDate < startDate) { onError('End date is before the start date.'); return }
     setSubmitting(true)
     try {
       const values: PackageInsert = {
-        partner_shop_id: partnerId,
+        trusted_partner_id: partnerId,
         title: title.trim(),
         destination: destination.trim(),
         summary: summary.trim() || null,
@@ -461,9 +302,9 @@ function PackageForm({
     <Modal labelledBy="package-form-title" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-3 max-h-[80vh] overflow-y-auto">
         <h2 id="package-form-title" className="text-lg font-bold text-brand-900">{pkg ? 'Edit package' : 'New package'}</h2>
-        <Labelled label="Partner shop *">
-          <select className={FIELD} value={partnerId} onChange={e => setPartnerId(e.target.value)} aria-label="Partner shop">
-            {shops.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+        <Labelled label="Trusted partner *">
+          <select className={FIELD} value={partnerId} onChange={e => setPartnerId(e.target.value)} aria-label="Trusted partner">
+            {partners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </Labelled>
         <Labelled label="Title *"><input className={FIELD} value={title} onChange={e => setTitle(e.target.value)} /></Labelled>

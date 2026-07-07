@@ -3,15 +3,10 @@
 // (so they know the business brokered it), CC's the shop inbox, and sets
 // reply-to to the diver so the partner answers them directly. No DB write.
 //
-// The partner's email is resolved server-side (service role) from partner_id —
-// it is never exposed to the client (RLS hides the trusted_partners rows from
-// divers; they only see name/region/blurb via list_trusted_partners()).
-//
-// list_trusted_partners() lists two catalogs a diver can message: the
-// standalone trusted_partners directory and the Packages partner_shops (whose
-// contact_email is the reachable address). ids don't collide (both random
-// uuids), so we resolve partner_id against trusted_partners first, then fall
-// back to partner_shops.
+// The partner's contact email is resolved server-side (service role) from
+// partner_id against the unified trusted_partners table — it is never exposed
+// to the client (RLS hides the rows from divers; they only see name/region/
+// blurb/website via list_trusted_partners()).
 //
 // Flow:
 //   1. Verify caller via Bearer JWT.
@@ -63,34 +58,19 @@ Deno.serve(async (req) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } })
 
-  // Resolve the partner across both catalogs the diver sees on the Trusted
-  // Partners page. trusted_partners first; then partner_shops (Packages), where
-  // contact_email is the reachable address. Only active rows count.
-  let partnerName: string | null = null
-  let partnerEmail: string | null = null
-
-  const { data: tp, error: tpErr } = await admin
+  // Resolve the partner from the unified trusted_partners table. Must be active
+  // and have a contact email (that's the gate for appearing in the directory).
+  const { data: partner, error: pErr } = await admin
     .from("trusted_partners")
-    .select("name, email, active")
+    .select("name, contact_email, active")
     .eq("id", parsed.request.partnerId)
     .maybeSingle()
-  if (tpErr) return json({ error: safeError(tpErr, "partner lookup failed") }, 500)
-  if (tp && tp.active) { partnerName = tp.name; partnerEmail = tp.email }
-
-  if (!partnerEmail) {
-    const { data: shop, error: shopErr } = await admin
-      .from("partner_shops")
-      .select("name, contact_email, active")
-      .eq("id", parsed.request.partnerId)
-      .maybeSingle()
-    if (shopErr) return json({ error: safeError(shopErr, "partner lookup failed") }, 500)
-    if (shop && shop.active && shop.contact_email) {
-      partnerName = shop.name
-      partnerEmail = shop.contact_email
-    }
+  if (pErr) return json({ error: safeError(pErr, "partner lookup failed") }, 500)
+  if (!partner || !partner.active || !partner.contact_email) {
+    return json({ error: "partner not found" }, 404)
   }
-
-  if (!partnerName || !partnerEmail) return json({ error: "partner not found" }, 404)
+  const partnerName = partner.name
+  const partnerEmail = partner.contact_email
 
   const { data: profile } = await admin
     .from("profiles").select("name, nickname").eq("id", userId).maybeSingle()

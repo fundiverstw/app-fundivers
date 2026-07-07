@@ -4,9 +4,12 @@ import { errorMessage } from '../../lib/errors'
 import { fetchAllTrustedPartners, saveTrustedPartner, deleteTrustedPartner } from '../../lib/trusted-partners'
 import type { TrustedPartnerRow, TrustedPartnerInsert } from '../../types/database'
 
-// Admin catalog for the shop's trusted partner dive shops abroad. These surface
-// only on the diver-facing Trusted Partners tab, where a diver can message one;
-// the partner's email lives here (admin-only) and never reaches the client.
+// Admin catalog for trusted partners — the single "dive shops abroad we vouch
+// for" table (20260707220000). One record does double duty: it powers the
+// diver-facing Trusted Partners tab (name / region / blurb / website, plus a
+// contact email divers message through the edge function) AND it hosts Packages
+// (country / location / logo / default kickback / internal contact). The contact
+// email is admin-only and never reaches the client.
 
 const FIELD = 'w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900'
 
@@ -64,10 +67,11 @@ export function AdminTrustedPartnersPage() {
         </button>
       </div>
       <p className="text-sm text-white/80">
-        Dive shops abroad the shop vouches for. Divers see the name, region and
-        blurb and can message a partner from the Trusted Partners tab; the email
-        stays here and is never shown to divers. Retire a partner (untick Active)
-        to hide it without deleting the record.
+        Dive shops abroad the shop vouches for. Divers see the name, region,
+        blurb and website on the Trusted Partners tab, and can message any
+        partner that has a contact email; the email stays here and is never
+        shown to divers. These are also the shops that host Packages. Retire a
+        partner (untick Active) to hide it without deleting the record.
       </p>
 
       {loadError && (
@@ -87,7 +91,7 @@ export function AdminTrustedPartnersPage() {
                   {p.name}{!p.active && <span className="ml-2 text-xs text-brand-900/60">(retired)</span>}
                 </p>
                 <p className="text-xs text-brand-900/80 truncate">
-                  {[p.region, p.email].filter(Boolean).join(' · ')}
+                  {[p.location ?? p.country, p.contact_email].filter(Boolean).join(' · ') || '—'}
                 </p>
               </div>
               <div className="flex gap-2 shrink-0">
@@ -113,7 +117,7 @@ export function AdminTrustedPartnersPage() {
       {confirmDelete && (
         <ConfirmModal
           title="Delete partner?"
-          body={`"${confirmDelete.name}" will be removed. To keep it on record but hidden from divers, edit it and untick "Active" instead.`}
+          body={`"${confirmDelete.name}" will be removed. Packages that reference it must be deleted first. To keep it on record but hidden from divers, edit it and untick "Active" instead.`}
           confirmLabel="Delete"
           onClose={() => setConfirmDelete(null)}
           onConfirm={() => handleDelete(confirmDelete)}
@@ -132,25 +136,37 @@ function PartnerForm({
   onError: (m: string) => void
 }) {
   const [name, setName] = useState(partner?.name ?? '')
-  const [region, setRegion] = useState(partner?.region ?? '')
-  const [blurb, setBlurb] = useState(partner?.blurb ?? '')
+  const [country, setCountry] = useState(partner?.country ?? '')
+  const [location, setLocation] = useState(partner?.location ?? '')
   const [website, setWebsite] = useState(partner?.website ?? '')
-  const [email, setEmail] = useState(partner?.email ?? '')
+  const [blurb, setBlurb] = useState(partner?.vouch_notes ?? '')
+  const [logoUrl, setLogoUrl] = useState(partner?.logo_url ?? '')
+  const [contactName, setContactName] = useState(partner?.contact_name ?? '')
+  const [contactEmail, setContactEmail] = useState(partner?.contact_email ?? '')
+  const [rate, setRate] = useState(((partner?.default_kickback_rate ?? 0.05) * 100).toString())
   const [active, setActive] = useState(partner?.active ?? true)
   const [submitting, setSubmitting] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!name.trim()) { onError('Name is required.'); return }
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) { onError('A valid partner email is required.'); return }
+    // Email is optional (a package-only partner may not have one), but if given
+    // it must be valid — it's how divers reach the partner from the directory.
+    if (contactEmail.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmail.trim())) {
+      onError('That contact email is not valid.'); return
+    }
     setSubmitting(true)
     try {
       const values: TrustedPartnerInsert = {
         name: name.trim(),
-        region: region.trim() || null,
-        blurb: blurb.trim() || null,
+        country: country.trim() || null,
+        location: location.trim() || null,
         website: website.trim() || null,
-        email: email.trim(),
+        vouch_notes: blurb.trim() || null,
+        logo_url: logoUrl.trim() || null,
+        contact_name: contactName.trim() || null,
+        contact_email: contactEmail.trim() || null,
+        default_kickback_rate: Number(rate) / 100,
         active,
       }
       await saveTrustedPartner(values, partner?.id)
@@ -164,27 +180,37 @@ function PartnerForm({
 
   return (
     <Modal labelledBy="partner-form-title" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <form onSubmit={handleSubmit} className="space-y-3 max-h-[80vh] overflow-y-auto">
         <h2 id="partner-form-title" className="text-lg font-bold text-brand-900">{partner ? 'Edit partner' : 'New partner'}</h2>
         <Labelled label="Shop name *">
           <input className={FIELD} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Blue Manta Divers" />
         </Labelled>
-        <Labelled label="Region">
-          <input className={FIELD} value={region} onChange={e => setRegion(e.target.value)} placeholder="e.g. Anilao, Philippines" />
+        <div className="grid grid-cols-2 gap-2">
+          <Labelled label="Country"><input className={FIELD} value={country} onChange={e => setCountry(e.target.value)} placeholder="e.g. Philippines" /></Labelled>
+          <Labelled label="Location"><input className={FIELD} value={location} onChange={e => setLocation(e.target.value)} placeholder="City / region" /></Labelled>
+        </div>
+        <Labelled label="Website (shown to divers)">
+          <input className={FIELD} type="url" value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://partner.example" />
         </Labelled>
         <Labelled label="Blurb (shown to divers)">
           <textarea className={`${FIELD} resize-y`} rows={2} value={blurb} onChange={e => setBlurb(e.target.value)} placeholder="What makes them worth vouching for" />
         </Labelled>
-        <Labelled label="Website (shown to divers)">
-          <input className={FIELD} type="url" value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://partner.example" />
-        </Labelled>
-        <Labelled label="Email * (never shown to divers)">
-          <input className={FIELD} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="hello@partner.example" />
-        </Labelled>
-        <label className="flex items-center gap-2 text-sm text-brand-900">
-          <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} className="accent-brand-900" />
-          Active (shown to divers)
-        </label>
+        <Labelled label="Logo URL"><input className={FIELD} value={logoUrl} onChange={e => setLogoUrl(e.target.value)} /></Labelled>
+        <div className="grid grid-cols-2 gap-2">
+          <Labelled label="Contact name (internal)"><input className={FIELD} value={contactName} onChange={e => setContactName(e.target.value)} /></Labelled>
+          <Labelled label="Contact email (never shown to divers)">
+            <input className={FIELD} type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="hello@partner.example" />
+          </Labelled>
+        </div>
+        <div className="grid grid-cols-2 gap-2 items-end">
+          <Labelled label="Default kickback %">
+            <input className={FIELD} type="number" step="any" value={rate} onChange={e => setRate(e.target.value)} />
+          </Labelled>
+          <label className="flex items-center gap-2 text-sm text-brand-900 pb-2">
+            <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} className="accent-brand-900" />
+            Active (shown to divers)
+          </label>
+        </div>
         <div className="flex justify-end gap-2 pt-1">
           <button type="button" onClick={onClose} className="text-sm font-semibold text-brand-900 px-3 py-1.5">Cancel</button>
           <button type="submit" disabled={submitting}

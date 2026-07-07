@@ -26,7 +26,7 @@ const pkg: PackageBoardItem = {
   summary: 'Eight days of world-class reefs.', description: 'Full liveaboard itinerary.',
   start_date: '2026-09-01', end_date: '2026-09-08', price: 60000, currency: 'TWD',
   hero_image_url: null, highlights: ['Manta cleaning stations', 'Macro heaven'], booking_url: 'https://partner.example/book',
-  published_at: '2026-06-01T00:00:00Z', partner_shop_id: 's1', partner_name: 'Blue Manta Divers',
+  published_at: '2026-06-01T00:00:00Z', trusted_partner_id: 's1', partner_name: 'Blue Manta Divers',
   partner_country: 'Indonesia', partner_location: 'Raja Ampat', partner_website: 'https://partner.example',
   partner_vouch_notes: 'We have dived with them for years.',
 }

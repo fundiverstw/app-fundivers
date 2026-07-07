@@ -16,7 +16,11 @@ vi.mock('../../hooks/useToast', () => ({
 }))
 
 const partners: TrustedPartnerRow[] = [
-  { id: 'p1', name: 'Blue Manta', region: 'Anilao', blurb: null, website: null, email: 'bm@x.io', active: true, created_at: '', created_by: null },
+  {
+    id: 'p1', created_at: '', name: 'Blue Manta', country: 'Philippines', location: 'Anilao',
+    website: null, contact_name: null, contact_email: 'bm@x.io', vouch_notes: null,
+    logo_url: null, default_kickback_rate: 0.05, active: true, created_by: null,
+  },
 ]
 
 beforeEach(() => {
@@ -30,30 +34,50 @@ function renderPage() {
 }
 
 describe('AdminTrustedPartnersPage', () => {
-  it('lists partners with region + email (admin sees the email)', async () => {
+  it('lists partners with location + contact email (admin sees the email)', async () => {
     renderPage()
     expect(await screen.findByText('Blue Manta')).toBeInTheDocument()
     expect(screen.getByText(/Anilao · bm@x\.io/)).toBeInTheDocument()
   })
 
-  it('creates a partner, requiring a valid email', async () => {
+  it('requires a name, rejects an invalid email, and saves the unified fields', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Blue Manta')
     await user.click(screen.getByRole('button', { name: /new partner/i }))
 
-    await user.type(screen.getByLabelText(/shop name/i), 'Deep Blue')
-    // Save is blocked without a valid email.
+    // Save is blocked without a name.
     await user.click(screen.getByRole('button', { name: /^save$/i }))
     expect(save).not.toHaveBeenCalled()
 
-    await user.type(screen.getByLabelText(/^email/i), 'hello@deepblue.io')
+    await user.type(screen.getByLabelText(/shop name/i), 'Deep Blue')
+    // A malformed contact email is rejected (email is optional but must be valid).
+    await user.type(screen.getByLabelText(/contact email/i), 'not-an-email')
+    await user.click(screen.getByRole('button', { name: /^save$/i }))
+    expect(save).not.toHaveBeenCalled()
+
+    await user.clear(screen.getByLabelText(/contact email/i))
+    await user.type(screen.getByLabelText(/contact email/i), 'hello@deepblue.io')
     await user.type(screen.getByLabelText(/^website/i), 'https://deepblue.example')
     await user.click(screen.getByRole('button', { name: /^save$/i }))
     await waitFor(() => expect(save).toHaveBeenCalledWith(
       expect.objectContaining({
-        name: 'Deep Blue', email: 'hello@deepblue.io', website: 'https://deepblue.example', active: true,
+        name: 'Deep Blue', contact_email: 'hello@deepblue.io',
+        website: 'https://deepblue.example', active: true,
       }),
+      undefined,
+    ))
+  })
+
+  it('creates a partner with just a name (contact email optional)', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Blue Manta')
+    await user.click(screen.getByRole('button', { name: /new partner/i }))
+    await user.type(screen.getByLabelText(/shop name/i), 'Nameless Reef')
+    await user.click(screen.getByRole('button', { name: /^save$/i }))
+    await waitFor(() => expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Nameless Reef', contact_email: null }),
       undefined,
     ))
   })

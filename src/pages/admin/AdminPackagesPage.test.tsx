@@ -3,15 +3,11 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { AdminPackagesPage } from './AdminPackagesPage'
-import type { PartnerShop, Package } from '../../types/database'
+import type { TrustedPartnerRow, Package } from '../../types/database'
 
 const {
-  fetchPartnerShops, savePartnerShop, deletePartnerShop,
   fetchPackages, savePackage, setPackageStatus, deletePackage,
 } = vi.hoisted(() => ({
-  fetchPartnerShops: vi.fn(),
-  savePartnerShop: vi.fn(),
-  deletePartnerShop: vi.fn(),
   fetchPackages: vi.fn(),
   savePackage: vi.fn(),
   setPackageStatus: vi.fn(),
@@ -19,13 +15,16 @@ const {
 }))
 
 vi.mock('../../lib/package-admin', () => ({
-  fetchPartnerShops: (...a: unknown[]) => fetchPartnerShops(...a),
-  savePartnerShop: (...a: unknown[]) => savePartnerShop(...a),
-  deletePartnerShop: (...a: unknown[]) => deletePartnerShop(...a),
   fetchPackages: (...a: unknown[]) => fetchPackages(...a),
   savePackage: (...a: unknown[]) => savePackage(...a),
   setPackageStatus: (...a: unknown[]) => setPackageStatus(...a),
   deletePackage: (...a: unknown[]) => deletePackage(...a),
+}))
+
+// The hosting partners are loaded from the unified trusted-partner data layer.
+const { fetchAllTrustedPartners } = vi.hoisted(() => ({ fetchAllTrustedPartners: vi.fn() }))
+vi.mock('../../lib/trusted-partners', () => ({
+  fetchAllTrustedPartners: (...a: unknown[]) => fetchAllTrustedPartners(...a),
 }))
 
 vi.mock('../../hooks/useToast', () => ({
@@ -39,26 +38,24 @@ vi.mock('../../lib/package-referrals', () => ({
   fetchReferralsWithDivers: vi.fn().mockResolvedValue([]),
 }))
 
-const shop: PartnerShop = {
+const partner: TrustedPartnerRow = {
   id: 's1', created_at: '2026-06-01T00:00:00Z', name: 'Blue Manta Divers', country: 'Indonesia',
   location: 'Raja Ampat', website: null, contact_name: null, contact_email: null,
   vouch_notes: null, logo_url: null, default_kickback_rate: 0.05, active: true, created_by: null,
 }
 const pkg: Package = {
-  id: 'p1', created_at: '2026-06-02T00:00:00Z', partner_shop_id: 's1',
+  id: 'p1', created_at: '2026-06-02T00:00:00Z', trusted_partner_id: 's1',
   title: 'Raja Ampat Liveaboard', destination: 'Raja Ampat, Indonesia', summary: null, description: null,
   start_date: null, end_date: null, price: 60000, currency: 'TWD', hero_image_url: null,
   highlights: [], booking_url: null, kickback_rate: 0.05, status: 'draft', published_at: null, created_by: null,
 }
 
 beforeEach(() => {
-  for (const m of [fetchPartnerShops, savePartnerShop, deletePartnerShop, fetchPackages, savePackage, setPackageStatus, deletePackage]) m.mockReset()
-  fetchPartnerShops.mockResolvedValue([shop])
+  for (const m of [fetchAllTrustedPartners, fetchPackages, savePackage, setPackageStatus, deletePackage]) m.mockReset()
+  fetchAllTrustedPartners.mockResolvedValue([partner])
   fetchPackages.mockResolvedValue([pkg])
-  savePartnerShop.mockResolvedValue(undefined)
   savePackage.mockResolvedValue(undefined)
   setPackageStatus.mockResolvedValue(undefined)
-  deletePartnerShop.mockResolvedValue(undefined)
   deletePackage.mockResolvedValue(undefined)
 })
 
@@ -82,33 +79,7 @@ describe('AdminPackagesPage', () => {
     await waitFor(() => expect(setPackageStatus).toHaveBeenCalledWith(pkg, 'published'))
   })
 
-  it('switches to the shops tab and lists partner shops', async () => {
-    const user = userEvent.setup()
-    renderPage()
-    await screen.findByText('Raja Ampat Liveaboard')
-    await user.click(screen.getByRole('tab', { name: /Partner shops/ }))
-    expect(await screen.findByText('Blue Manta Divers')).toBeInTheDocument()
-    expect(screen.getByText(/5.0% default/)).toBeInTheDocument()
-  })
-
-  it('creates a partner shop through the modal', async () => {
-    const user = userEvent.setup()
-    renderPage()
-    await screen.findByText('Raja Ampat Liveaboard')
-    await user.click(screen.getByRole('tab', { name: /Partner shops/ }))
-    await user.click(await screen.findByRole('button', { name: /New partner shop/ }))
-
-    const dialog = await screen.findByRole('dialog')
-    await user.type(within(dialog).getByLabelText('Name *'), 'Sea Explorers')
-    await user.type(within(dialog).getByLabelText('Country *'), 'Philippines')
-    await user.click(within(dialog).getByRole('button', { name: /Create shop/ }))
-
-    await waitFor(() => expect(savePartnerShop).toHaveBeenCalled())
-    const [values] = savePartnerShop.mock.calls[0]
-    expect(values).toMatchObject({ name: 'Sea Explorers', country: 'Philippines', default_kickback_rate: 0.05 })
-  })
-
-  it('creates a package, converting the kickback percent to a fraction', async () => {
+  it('creates a package against the selected trusted partner, converting the kickback percent to a fraction', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Raja Ampat Liveaboard')
@@ -122,7 +93,7 @@ describe('AdminPackagesPage', () => {
     await waitFor(() => expect(savePackage).toHaveBeenCalled())
     const [values] = savePackage.mock.calls[0]
     expect(values).toMatchObject({
-      partner_shop_id: 's1', title: 'Anilao Macro Week',
+      trusted_partner_id: 's1', title: 'Anilao Macro Week',
       destination: 'Anilao, Philippines', kickback_rate: 0.05, status: 'draft',
     })
   })

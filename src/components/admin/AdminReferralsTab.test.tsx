@@ -31,7 +31,7 @@ vi.mock('../../hooks/useToast', () => ({
 }))
 
 const pkg: Package = {
-  id: 'p1', created_at: '2026-06-01T00:00:00Z', partner_shop_id: 's1',
+  id: 'p1', created_at: '2026-06-01T00:00:00Z', trusted_partner_id: 's1',
   title: 'Raja Ampat Liveaboard', destination: 'Indonesia', summary: null, description: null,
   start_date: null, end_date: null, price: 60000, currency: 'TWD', hero_image_url: null,
   highlights: [], booking_url: null, kickback_rate: 0.05, status: 'published', published_at: null, created_by: null,
