@@ -16,15 +16,15 @@ function capitalize(s: string) {
 }
 
 // Generic list+create+edit+delete UI for the simple catalog tables backing
-// /admin/rooms, /admin/addons, /admin/travel. Each row's id is an
-// auto-generated uuid (text PK on the Wix-legacy tables); the rest of the
-// columns are user-editable strings or numbers per the field spec.
+// /admin/rooms, /admin/addons, /admin/travel, /admin/destinations. Each row's
+// id is an auto-generated uuid; the rest of the columns are user-editable
+// strings, numbers, or booleans per the field spec.
 //
-// One reusable shell instead of three near-identical pages so the create
-// and edit flows always behave the same regardless of which catalog the
-// admin is editing.
+// One reusable shell instead of near-identical pages so the create and edit
+// flows always behave the same regardless of which catalog the admin is
+// editing.
 
-export type CatalogFieldType = 'text' | 'textarea' | 'number'
+export type CatalogFieldType = 'text' | 'textarea' | 'number' | 'boolean'
 
 export interface CatalogField<Row> {
   key: keyof Row & string
@@ -76,6 +76,10 @@ function formToPayload<Row>(form: FormValues, fields: CatalogField<Row>[]): Reco
     const raw = form[f.key]?.trim() ?? ''
     if (f.type === 'number') {
       out[f.key] = raw === '' ? null : Number(raw)
+    } else if (f.type === 'boolean') {
+      // A checkbox is binary — an unchecked box (raw '' or 'false') is stored
+      // as false, never null, so the flag columns always carry a value.
+      out[f.key] = raw === 'true'
     } else {
       out[f.key] = raw === '' ? null : raw
     }
@@ -336,6 +340,19 @@ function FieldRow<Row>({
   field, value, onChange,
 }: { field: CatalogField<Row>; value: string; onChange: (v: string) => void }) {
   const inputClass = 'w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900'
+  if (field.type === 'boolean') {
+    return (
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={value === 'true'}
+          onChange={e => onChange(e.target.checked ? 'true' : 'false')}
+          className="accent-brand-900 w-4 h-4"
+        />
+        <span className="text-xs font-medium text-brand-900">{field.label}</span>
+      </label>
+    )
+  }
   return (
     <label className="block space-y-1">
       <span className="text-xs font-medium text-brand-900">{field.label}{field.required && ' *'}</span>

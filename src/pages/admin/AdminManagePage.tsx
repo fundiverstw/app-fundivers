@@ -23,6 +23,7 @@ const CARDS: ManageCard[] = [
   { to: '/admin/rooms',     title: 'Room options',  blurb: 'Add, rename, reprice or delete room types offered with multi-day dives.' },
   { to: '/admin/addons',    title: 'Add-ons',       blurb: 'Add, rename, reprice or delete optional items (gear, courses, transport).' },
   { to: '/admin/travel',    title: 'Trip Templates', blurb: 'Add or edit reusable "what’s included" / transportation / itinerary copy that dives link to.' },
+  { to: '/admin/destinations', title: 'Destinations', blurb: 'The dive-location catalog (Green Island, Palau…) dives are tagged with; drives calendar local-vs-trip colouring.' },
   { to: '/admin/prices',    title: 'Price tiers',   blurb: 'Total / deposit / transport for each event price tier.' },
   { to: '/admin/vehicles',  title: 'Vehicles',      blurb: 'The shop transport fleet (passenger seats per vehicle) used to plan rides on the logistics view.' },
   { to: '/admin/gear-sizing', title: 'Gear sizing', blurb: 'Wetsuit, BCD and fin models with the body ranges each size fits — powers the logistics packing lookup.' },
