@@ -3,7 +3,7 @@
 -- The migrations install AFTER INSERT/UPDATE/DELETE wix_sync_* triggers on
 -- the reference tables (after the events unification these live on the
 -- RENAMED tables: public.prices, public.rooms, public.addons,
--- public.dive_travel). Each one calls supabase_functions.http_request()
+-- public.trip_templates). Each one calls supabase_functions.http_request()
 -- against the LIVE production WIX webhook
 -- (https://fundiverstw.com/_functions/supabaseWebhook), because that's where
 -- they were originally defined and how they got captured by `supabase pull`.
@@ -20,7 +20,7 @@
 -- migration -- we drop them locally on every reset instead. Cloud keeps
 -- the triggers; local does not. The wix_sync_notify() function is kept.
 
-drop trigger if exists wix_sync_dive_travel  on public.dive_travel;
+drop trigger if exists wix_sync_trip_templates on public.trip_templates;
 drop trigger if exists wix_sync_eo_prices    on public.prices;
 drop trigger if exists wix_sync_eo_rooms     on public.rooms;
 drop trigger if exists wix_sync_other_addons on public.addons;

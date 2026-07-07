@@ -4,7 +4,7 @@ import { diveOutingFromDestinations, type DiveOuting } from './event-colors'
 import { siteConfig } from '../config/site'
 import type { AppEvent, EventDetails, EventRow, EOPrice } from '../types/database'
 
-type DiveTravelDetail = {
+type TripTemplateDetail = {
   id: string
   included: string | null
   not_included: string | null
@@ -22,7 +22,7 @@ type EventDetailRow = {
   notes: string | null
   prereqs: string | null
   req_dives: number | null
-  divetravel_id: string | null
+  trip_template_id: string | null
   prereq_cert_id: string | null
   included: string | null
   schedule: string | null
@@ -41,7 +41,7 @@ function nonEmptyDetails(d: EventDetails): EventDetails | null {
   return hasContent ? d : null
 }
 
-function diveDetails(d: EventDetailRow, travel: DiveTravelDetail | null, requiredCert: string | null): EventDetails | null {
+function diveDetails(d: EventDetailRow, travel: TripTemplateDetail | null, requiredCert: string | null): EventDetails | null {
   return nonEmptyDetails({
     description: cleanText(d.notes),
     included: cleanText(travel?.included),
@@ -338,18 +338,18 @@ async function attachDiveOutings(eventIds: string[]): Promise<Map<string, DiveOu
 }
 
 /**
- * Fetch the dive_travel rows referenced by a batch of events (via
- * events.divetravel_id, a single id). Returns a map keyed by dive_travel.id.
+ * Fetch the trip_templates rows referenced by a batch of events (via
+ * events.trip_template_id, a single id). Returns a map keyed by trip_templates.id.
  */
-async function attachDiveTravel(refs: Array<string | null>): Promise<Map<string, DiveTravelDetail>> {
-  const out = new Map<string, DiveTravelDetail>()
+async function attachTripTemplate(refs: Array<string | null>): Promise<Map<string, TripTemplateDetail>> {
+  const out = new Map<string, TripTemplateDetail>()
   const ids = [...new Set(refs.filter((x): x is string => !!x))]
   if (!ids.length) return out
   const { data } = await supabase
-    .from('dive_travel')
+    .from('trip_templates')
     .select('id, included, not_included, transportation, itinerary, prerequisites')
     .in('id', ids)
-  for (const row of data ?? []) out.set(row.id, row as DiveTravelDetail)
+  for (const row of data ?? []) out.set(row.id, row as TripTemplateDetail)
   return out
 }
 
@@ -397,13 +397,13 @@ async function attachEventDetails(eventIds: string[]): Promise<Map<string, Event
   if (!eventIds.length) return out
 
   const rows = await selectDetailCols<EventDetailRow>(
-    ['id', 'kind', 'notes', 'prereqs', 'req_dives', 'divetravel_id', 'prereq_cert_id', 'included', 'schedule'],
+    ['id', 'kind', 'notes', 'prereqs', 'req_dives', 'trip_template_id', 'prereq_cert_id', 'included', 'schedule'],
     eventIds,
   )
   if (!rows.length) return out
 
   const [travel, certNames] = await Promise.all([
-    attachDiveTravel(rows.map(r => r.divetravel_id)),
+    attachTripTemplate(rows.map(r => r.trip_template_id)),
     attachCertNames(rows.map(r => r.prereq_cert_id)),
   ])
 
@@ -411,7 +411,7 @@ async function attachEventDetails(eventIds: string[]): Promise<Map<string, Event
     const cert = r.prereq_cert_id ? certNames.get(r.prereq_cert_id) ?? null : null
     const det = r.kind === 'course'
       ? courseDetails(r, cert)
-      : diveDetails(r, r.divetravel_id ? travel.get(r.divetravel_id) ?? null : null, cert)
+      : diveDetails(r, r.trip_template_id ? travel.get(r.trip_template_id) ?? null : null, cert)
     if (det) out.set(r.id, det)
   }
   return out

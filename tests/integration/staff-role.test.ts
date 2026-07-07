@@ -11,7 +11,7 @@ import {
 //     and their own duty rows.
 //   - Staff CANNOT write to any catalog/admin table (events,
 //     rooms, addons, prices, cert_levels,
-//     dive_travel, cancellation_policies, event_addons).
+//     trip_templates, cancellation_policies, event_addons).
 //   - Staff CANNOT write to bookings, payments, profiles (other than self),
 //     duties, or update/delete admin_notes.
 //   - Staff CAN insert admin_notes attributed to themselves.

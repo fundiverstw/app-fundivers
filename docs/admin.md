@@ -28,7 +28,7 @@ Write/manage routes — gated by `AdminRoute` (admin only):
 | `/admin/events/:type/:id/edit`          | `AdminEditEventPage`    | Edit event details |
 | `/admin/rooms`                          | `AdminRoomsPage`        | Manage `EO_rooms` rows |
 | `/admin/addons`                         | `AdminAddonsPage`       | Manage `Other_Addons` rows |
-| `/admin/travel`                         | `AdminTravelPage`       | Manage `DiveTravel` rows |
+| `/admin/travel`                         | `AdminTravelPage`       | Manage `trip_templates` rows |
 | `/admin/prices`                         | `AdminPricesPage`       | Manage `EO_prices` rows |
 | `/admin/users`                          | `AdminUsersPage`        | Searchable diver directory with full profile cards |
 | `/admin/duty`                           | `AdminDutyPage`         | Assign staff/admin to events; fires push to assignee |

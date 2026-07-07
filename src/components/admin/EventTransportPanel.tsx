@@ -29,7 +29,7 @@ const transportOf = (b: Booking): boolean | undefined =>
  *  1. Per-diver ride choice (admin flips Needs ride / Self-transport; this is
  *     logistics-only — it never touches the frozen charge snapshot). Staff see
  *     the read-only buckets.
- *  2. The dive's transport blurb (dive_travel.transportation) — a shared catalog
+ *  2. The dive's transport blurb (trip_templates.transportation) — a shared catalog
  *     field, editable inline. Dives only.
  *  3. The cars assigned to the dive on its date + the resulting ride seats,
  *     reusing the logistics allocation UI. Dives only.
@@ -165,7 +165,7 @@ function ReadOnlyBuckets({ active }: { active: TransportRegistrant[] }) {
   )
 }
 
-// ── 2. Event transport blurb (dive_travel.transportation) ─────────────────────
+// ── 2. Event transport blurb (trip_templates.transportation) ──────────────────
 function TransportTextEditor({ event, isAdmin }: { event: AppEvent; isAdmin: boolean }) {
   const [ref, setRef] = useState<string | null | undefined>(undefined) // undefined = loading
   const [text, setText] = useState(event.details?.transportation ?? '')
@@ -177,8 +177,8 @@ function TransportTextEditor({ event, isAdmin }: { event: AppEvent; isAdmin: boo
     let cancelled = false
     ;(async () => {
       const { data } = await supabase
-        .from('events').select('divetravel_id').eq('id', event.id).maybeSingle()
-      if (!cancelled) setRef((data as { divetravel_id: string | null } | null)?.divetravel_id ?? null)
+        .from('events').select('trip_template_id').eq('id', event.id).maybeSingle()
+      if (!cancelled) setRef((data as { trip_template_id: string | null } | null)?.trip_template_id ?? null)
     })()
     return () => { cancelled = true }
   }, [event.id])
@@ -188,7 +188,7 @@ function TransportTextEditor({ event, isAdmin }: { event: AppEvent; isAdmin: boo
     setSaving(true); setError(null); setSaved(false)
     try {
       const { error: e } = await supabase
-        .from('dive_travel').update({ transportation: text.trim() || null }).eq('id', ref)
+        .from('trip_templates').update({ transportation: text.trim() || null }).eq('id', ref)
       if (e) throw e
       setSaved(true)
     } catch {
@@ -213,7 +213,7 @@ function TransportTextEditor({ event, isAdmin }: { event: AppEvent; isAdmin: boo
       <h2 className="text-sm font-bold text-brand-900">Transport info</h2>
       {ref === null ? (
         <p className="text-xs text-brand-950/70 font-medium italic">
-          No travel entry is linked to this dive — manage transport copy from the dive_travel catalog.
+          No trip template is linked to this dive — manage transport copy from the trip template catalog.
         </p>
       ) : (
         <>
