@@ -15,9 +15,9 @@ export function AdminRoomsPage() {
       title="Room options"
       table="rooms"
       noun="room option"
-      orderBy="display_title"
+      orderBy="admin_title"
       fields={fields}
-      rowLabel={r => r.display_title || r.admin_title || r.id}
+      rowLabel={r => r.admin_title || r.display_title || r.id}
       rowDetail={r => r.added_price != null ? `+${r.added_price.toLocaleString()} ${r.currency || siteConfig.locale.currency}` : null}
     />
   )

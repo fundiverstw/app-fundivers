@@ -4,10 +4,11 @@ import { MemoryRouter } from 'react-router-dom'
 import { AdminDutyPage } from './AdminDutyPage'
 import { mockQueryBuilder } from '../../../tests/test-utils'
 
-const { from, useAuthMock, fetchEventsInRange } = vi.hoisted(() => ({
+const { from, useAuthMock, fetchEventsInRange, fetchEventsForBookings } = vi.hoisted(() => ({
   from: vi.fn(),
   useAuthMock: vi.fn(),
   fetchEventsInRange: vi.fn(),
+  fetchEventsForBookings: vi.fn(),
 }))
 
 vi.mock('../../lib/supabase', () => ({
@@ -18,6 +19,7 @@ vi.mock('../../lib/events', async () => {
   return {
     ...actual,
     fetchEventsInRange: (...a: unknown[]) => fetchEventsInRange(...a),
+    fetchEventsForBookings: (...a: unknown[]) => fetchEventsForBookings(...a),
   }
 })
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => useAuthMock() }))
@@ -26,6 +28,7 @@ beforeEach(() => {
   from.mockReset()
   useAuthMock.mockReset()
   fetchEventsInRange.mockReset()
+  fetchEventsForBookings.mockReset()
 })
 
 function renderPage() {
@@ -68,7 +71,10 @@ describe('AdminDutyPage', () => {
       if (table === 'profiles') return mockQueryBuilder({ data: admins })
       return mockQueryBuilder({ data: [] })
     })
+    // Range slice powers the "unstaffed" scan; duty rows resolve their own
+    // event by id.
     fetchEventsInRange.mockResolvedValue(events)
+    fetchEventsForBookings.mockResolvedValue(new Map(events.map(e => [e.id, e])))
 
     renderPage()
 
@@ -95,6 +101,7 @@ describe('AdminDutyPage', () => {
       return mockQueryBuilder({ data: [] })
     })
     fetchEventsInRange.mockResolvedValue([])
+    fetchEventsForBookings.mockResolvedValue(new Map())
 
     renderPage()
 
