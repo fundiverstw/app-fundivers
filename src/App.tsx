@@ -45,6 +45,7 @@ import { AdminManagePage } from './pages/admin/AdminManagePage'
 import { AdminRoomsPage } from './pages/admin/AdminRoomsPage'
 import { AdminAddonsPage } from './pages/admin/AdminAddonsPage'
 import { AdminTravelPage } from './pages/admin/AdminTravelPage'
+import { AdminDestinationsPage } from './pages/admin/AdminDestinationsPage'
 import { AdminPricesPage } from './pages/admin/AdminPricesPage'
 import { AdminNotificationsPage } from './pages/admin/AdminNotificationsPage'
 import { AdminAccountingPage } from './pages/admin/AdminAccountingPage'
@@ -134,6 +135,7 @@ export default function App() {
                 <Route path="/admin/rooms" element={<AdminRoomsPage />} />
                 <Route path="/admin/addons" element={<AdminAddonsPage />} />
                 <Route path="/admin/travel" element={<AdminTravelPage />} />
+                <Route path="/admin/destinations" element={<AdminDestinationsPage />} />
                 <Route path="/admin/prices" element={<AdminPricesPage />} />
                 <Route path="/admin/events/:type/:id/edit" element={<AdminEditEventPage />} />
                 <Route path="/admin/users" element={<AdminUsersPage />} />

@@ -137,3 +137,59 @@ describe('CatalogManager', () => {
     await waitFor(() => expect(screen.queryByText('Twin')).not.toBeInTheDocument())
   })
 })
+
+describe('CatalogManager — boolean fields', () => {
+  interface FlagRow { id: string; name: string | null; active: boolean | null }
+  const FLAG_FIELDS: CatalogField<FlagRow>[] = [
+    { key: 'name', label: 'Name', type: 'text', required: true },
+    { key: 'active', label: 'Active', type: 'boolean' },
+  ]
+
+  function renderFlags(seed: FlagRow[]) {
+    const inserts: unknown[] = []
+    const updates: { payload: unknown }[] = []
+    from.mockImplementation(() => {
+      const builder = mockQueryBuilder({ data: seed }) as Record<string, unknown>
+      builder.insert = (payload: unknown) => { inserts.push(payload); return Promise.resolve({ error: null }) }
+      builder.update = (payload: unknown) => ({
+        eq: () => { updates.push({ payload }); return Promise.resolve({ error: null }) },
+      })
+      return builder
+    })
+    render(
+      <CatalogManager<FlagRow>
+        title="Flags" table="things" noun="flag"
+        fields={FLAG_FIELDS} rowLabel={r => r.name ?? r.id}
+      />
+    )
+    return { inserts, updates }
+  }
+
+  it('serialises an unchecked box as false and a ticked one as true', async () => {
+    const { inserts } = renderFlags([])
+    const user = userEvent.setup()
+
+    // First row: leave Active unchecked → false.
+    await user.click(await screen.findByRole('button', { name: /new flag/i }))
+    await user.type(screen.getByLabelText(/name/i), 'One')
+    await user.click(screen.getByRole('button', { name: /create flag/i }))
+    await waitFor(() => expect(inserts).toHaveLength(1))
+    expect((inserts[0] as Record<string, unknown>).active).toBe(false)
+
+    // Second row: tick Active → true.
+    await user.click(screen.getByRole('button', { name: /new flag/i }))
+    await user.type(screen.getByLabelText(/name/i), 'Two')
+    await user.click(screen.getByLabelText('Active'))
+    await user.click(screen.getByRole('button', { name: /create flag/i }))
+    await waitFor(() => expect(inserts).toHaveLength(2))
+    expect((inserts[1] as Record<string, unknown>).active).toBe(true)
+  })
+
+  it('prefills the checkbox state from an existing row on edit', async () => {
+    renderFlags([{ id: 'r1', name: 'On', active: true }])
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: /edit/i }))
+    expect((screen.getByLabelText('Active') as HTMLInputElement).checked).toBe(true)
+  })
+})

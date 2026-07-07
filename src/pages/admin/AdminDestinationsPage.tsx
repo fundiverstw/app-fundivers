@@ -1,0 +1,36 @@
+import { CatalogManager, type CatalogField } from '../../components/admin/CatalogManager'
+import type { TravelDestination } from '../../types/database'
+
+// The dive-location catalog (Green Island, Palau, Kenting…). Dives link to
+// these via the event_destinations junction (the EventForm "Destinations"
+// picker). `divetype` ("Boat Diving") and `northeast_diving` drive the
+// calendar's local-vs-trip colour bucket — see src/lib/event-colors.ts.
+const fields: CatalogField<TravelDestination>[] = [
+  { key: 'admin_title',        label: 'Admin title', type: 'text', required: true, placeholder: 'e.g. Green Island' },
+  { key: 'country',            label: 'Country', type: 'text', placeholder: 'e.g. Taiwan' },
+  { key: 'divetype',           label: 'Dive type', type: 'text', placeholder: 'e.g. Boat Diving (marks dives here as a trip)' },
+  { key: 'northeast_diving',   label: 'Northeast-coast shore site (local dives)', type: 'boolean' },
+  { key: 'international',       label: 'International', type: 'boolean' },
+  { key: 'tagline',            label: 'Tagline', type: 'textarea', placeholder: 'Short one-line hook…' },
+  { key: 'diver_requirements', label: 'Diver requirements', type: 'textarea', placeholder: 'Certification level, experience…' },
+  { key: 'sort_order',         label: 'Sort order', type: 'number', placeholder: 'Lower shows first' },
+  { key: 'latitude',           label: 'Latitude', type: 'number', placeholder: 'e.g. 22.6567' },
+  { key: 'longitude',          label: 'Longitude', type: 'number', placeholder: 'e.g. 121.4900' },
+  { key: 'slug',               label: 'Slug', type: 'text', placeholder: 'URL slug used by the public site' },
+  { key: 'location_picture',   label: 'Location picture (URL)', type: 'text', placeholder: 'wix:image://… or https://…' },
+  { key: 'background_picture', label: 'Background picture (URL)', type: 'text', placeholder: 'wix:image://… or https://…' },
+]
+
+export function AdminDestinationsPage() {
+  return (
+    <CatalogManager<TravelDestination>
+      title="Destinations"
+      table="travel_destinations"
+      noun="destination"
+      orderBy="sort_order"
+      fields={fields}
+      rowLabel={r => r.admin_title || r.country || r.id}
+      rowDetail={r => [r.country, r.divetype].filter(Boolean).join(' · ') || null}
+    />
+  )
+}
