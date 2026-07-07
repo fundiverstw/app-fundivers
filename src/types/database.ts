@@ -1243,8 +1243,6 @@ export interface Database {
           country: string | null
           divetype: string | null
           sort_order: number | null
-          latitude: number | null
-          longitude: number | null
           international: boolean | null
           northeast_diving: boolean | null
           location_picture: string | null
@@ -1259,8 +1257,6 @@ export interface Database {
           country?: string | null
           divetype?: string | null
           sort_order?: number | null
-          latitude?: number | null
-          longitude?: number | null
           international?: boolean | null
           northeast_diving?: boolean | null
           location_picture?: string | null
