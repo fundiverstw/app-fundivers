@@ -14,7 +14,7 @@ function makeRequest(opts: { method?: string; headers?: Record<string, string> }
 
 describe('isSupabaseCacheable', () => {
   it('caches anon-keyed GETs to /rest/v1/* (no Authorization header)', () => {
-    const url = new URL('https://abc.supabase.co/rest/v1/EO_dives?select=*')
+    const url = new URL('https://abc.supabase.co/rest/v1/events?select=*')
     expect(isSupabaseCacheable(url, makeRequest({ headers: { apikey: 'anon-xxx' } }))).toBe(true)
   })
 
@@ -36,14 +36,14 @@ describe('isSupabaseCacheable', () => {
   })
 
   it('does NOT cache non-GETs even to safe paths (POSTs/PATCHes are mutations)', () => {
-    const url = new URL('https://abc.supabase.co/rest/v1/EO_dives')
+    const url = new URL('https://abc.supabase.co/rest/v1/events')
     expect(isSupabaseCacheable(url, makeRequest({ method: 'POST' }))).toBe(false)
     expect(isSupabaseCacheable(url, makeRequest({ method: 'PATCH' }))).toBe(false)
     expect(isSupabaseCacheable(url, makeRequest({ method: 'DELETE' }))).toBe(false)
   })
 
   it('does NOT cache cross-origin GETs (must be a *.supabase.co host)', () => {
-    const url = new URL('https://random.example.com/rest/v1/EO_dives')
+    const url = new URL('https://random.example.com/rest/v1/events')
     expect(isSupabaseCacheable(url, makeRequest())).toBe(false)
   })
 

@@ -27,7 +27,7 @@ const SQLSTATE_FRIENDLY: Record<string, string> = {
 
 // Field-specific translations. Postgres names the offending constraint /
 // column in its `message` / `details` (e.g. "violates foreign key
-// constraint \"EO_courses_prereq_cert_id_fkey\""). We match on that name
+// constraint \"events_prereq_cert_id_fkey\""). We match on that name
 // and return our OWN authored copy that tells the user which field to fix
 // — we never echo the raw Postgres text (audit L3 still holds). The
 // generic SQLSTATE string is the fallback when nothing matches.

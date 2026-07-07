@@ -24,18 +24,18 @@ describe('errorMessage', () => {
     // Postgres text — so the admin knows exactly which entry to fix.
     expect(errorMessage({
       code: '23503',
-      message: 'insert or update on table "EO_courses" violates foreign key constraint "EO_courses_prereq_cert_id_fkey"',
+      message: 'insert or update on table "events" violates foreign key constraint "events_prereq_cert_id_fkey"',
       details: 'Key is not present in table "cert_levels".',
     })).toMatch(/required certification/i)
 
     expect(errorMessage({
       code: '23503',
-      message: 'violates foreign key constraint "EO_courses_price_fkey"',
+      message: 'violates foreign key constraint "events_price_fkey"',
     })).toMatch(/price tier/i)
 
     expect(errorMessage({
       code: '23503',
-      message: 'violates foreign key constraint "EO_dives_cancel_policy_fkey"',
+      message: 'violates foreign key constraint "events_cancel_policy_fkey"',
     })).toMatch(/cancellation policy/i)
 
     expect(errorMessage({

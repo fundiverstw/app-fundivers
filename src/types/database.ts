@@ -1557,7 +1557,7 @@ export interface AppEvent {
   /** Short label for the calendar grid pill — falls back to `title` at the
    *  call site when blank. Null when the source row has no calendar_title set. */
   calendar_title: string | null
-  /** Course-only administrative category (EO_courses.admin_title), e.g.
+  /** Course-only administrative category (events.admin_title, kind=course), e.g.
    *  "OW" / "AOW" / "EFR". Groups courses by type for the calendar's course
    *  filter — the diver-facing `title` varies per offering (and carries a
    *  capacity suffix), so it makes a noisy filter key. Null/absent for dives. */
@@ -1583,12 +1583,12 @@ export interface AppEvent {
   confirmed_count: number | null
   price: number | null
   deposit_amount: number | null
-  /** Per-tier transport surcharge from EO_prices.transport (NTD). NULL or
+  /** Per-tier transport surcharge from prices.transport (NTD). NULL or
    *  0 means transportation is bundled into the base price; the registration
    *  form hides the opt-in checkbox in that case. */
   transport_price: number | null
   currency: string
-  /** Source table gating flags — parsed from EO_dives/EO_courses columns. */
+  /** Gating flags computed from the event_rooms / event_addons junctions. */
   has_rooms: boolean
   room_type_ids: string[]
   has_addons: boolean
@@ -1617,7 +1617,7 @@ export interface AppEvent {
   /** YYYY-MM-DD — the cancel-by date the policy text references. */
   cancel_date: string | null
   /** Dive-only calendar classification derived from the dive's linked
-   *  TravelDestinations: 'trip' = a boat dive or a destination beyond the
+   *  travel_destinations: 'trip' = a boat dive or a destination beyond the
    *  local Northeast shore (→ yellow); 'local' = a Northeast shore dive
    *  (→ green); null/absent when no destination is tagged, so the calendar
    *  falls back to matching the title. Always absent for courses. */
@@ -1625,7 +1625,7 @@ export interface AppEvent {
   /** Dive-only, admin-set, and INDEPENDENT of each other: a Kenting boat trip
    *  is both, a local day boat dive is only `is_boat_dive`, a Palau liveaboard
    *  is only `is_trip`. `is_trip` is a multi-day/liveaboard classification
-   *  mirrored to the Wix `EO_dives` compat view; the diver Scheduled Trips tab
+   *  synced to the Wix `events` collection; the diver Scheduled Trips tab
    *  now reads the curated `scheduled_trips` table, not this flag. Absent for
    *  courses; optional so lighter event literals can omit them (default false). */
   is_boat_dive?: boolean

@@ -20,6 +20,18 @@ function builder(result: Record<string, unknown>) {
   return b
 }
 
+// Dives and courses are both `from('events')`, distinguished only by
+// .eq('kind', …) — so resolve the result off the kind the query filters on.
+function eventsBuilder(byKind: Record<string, Record<string, unknown>>) {
+  let kind = ''
+  const b: Record<string, unknown> = {}
+  for (const m of ['select', 'gte', 'lt', 'lte', 'is', 'in', 'order']) b[m] = () => b
+  b.eq = (col: string, val: string) => { if (col === 'kind') kind = val; return b }
+  b.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+    Promise.resolve(byKind[kind] ?? { data: [], error: null }).then(res, rej)
+  return b
+}
+
 beforeEach(() => {
   from.mockReset()
   fetchYearWeather.mockReset()
@@ -30,8 +42,10 @@ beforeEach(() => {
   from.mockImplementation((table: string) => {
     switch (table) {
       case 'bookings': return builder({ data: [{ created_at: '2026-07-10T00:00:00+08:00' }], error: null })
-      case 'EO_dives': return builder({ data: [{ start_date: '2026-07-15' }], error: null })
-      case 'EO_courses': return builder({ data: [], error: null })
+      case 'events': return eventsBuilder({
+        dive:   { data: [{ start_date: '2026-07-15' }], error: null },
+        course: { data: [], error: null },
+      })
       default: return builder({ data: [], error: null })
     }
   })
