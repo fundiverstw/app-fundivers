@@ -18,21 +18,9 @@ drop table if exists public.package_referrals cascade;
 drop function if exists public.package_referrals_set_code();
 drop function if exists public.gen_referral_code();
 
--- 3. Reshape `packages` into the parent product. Dates are diver-picked now,
---    price lives on tiers, booking happens through us (no partner link). Add
---    the catalog references (mirroring how events carry addon/room id arrays).
-drop index if exists public.packages_published_idx;
-alter table public.packages
-  drop column if exists start_date,
-  drop column if exists end_date,
-  drop column if exists price,
-  drop column if exists booking_url,
-  add column addon_ids uuid[] not null default '{}'::uuid[],
-  add column room_type_ids uuid[] not null default '{}'::uuid[];
-create index packages_published_idx on public.packages using btree ("status")
-  where ("status" = 'published'::text);
-
--- 4. Price tiers (Package A/B/C). One product has many tiers.
+-- 3. Price tiers (Package A/B/C). One product has many tiers. Created before the
+--    packages reshape so an existing package's single price can be preserved as
+--    a default tier before the price column is dropped.
 create table public.package_tiers (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
@@ -47,6 +35,26 @@ create index package_tiers_package_idx on public.package_tiers using btree (pack
 alter table public.package_tiers enable row level security;
 create policy "package_tiers: admin manage" on public.package_tiers
   to authenticated using (public.is_admin()) with check (public.is_admin());
+
+-- Preserve any pre-existing package's single price as a "Standard" tier so it
+-- stays registerable after the price column is dropped below.
+insert into public.package_tiers (package_id, name, price, currency)
+  select id, 'Standard', price, coalesce(currency, 'TWD')
+  from public.packages where price is not null;
+
+-- 4. Reshape `packages` into the parent product. Dates are diver-picked now,
+--    price lives on tiers, booking happens through us (no partner link). Add
+--    the catalog references (mirroring how events carry addon/room id arrays).
+drop index if exists public.packages_published_idx;
+alter table public.packages
+  drop column if exists start_date,
+  drop column if exists end_date,
+  drop column if exists price,
+  drop column if exists booking_url,
+  add column addon_ids uuid[] not null default '{}'::uuid[],
+  add column room_type_ids uuid[] not null default '{}'::uuid[];
+create index packages_published_idx on public.packages using btree ("status")
+  where ("status" = 'published'::text);
 
 -- 5. Registrations. One row per diver-interest; carries the frozen estimate
 --    snapshot and doubles as the kickback ledger. kickback_amount is generated
