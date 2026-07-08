@@ -81,21 +81,21 @@ export function AppShell() {
           <Link
             to="/trusted-partners"
             aria-label="Trusted Partners"
-            className="text-accent hover:text-red-400 transition-colors"
+            className="text-brand-100/70 hover:text-reef-300 transition-colors"
           >
             <TrustedPartnersIcon />
           </Link>
           <Link
             to="/packages"
             aria-label="Packages"
-            className="text-accent hover:text-red-400 transition-colors"
+            className="text-brand-100/70 hover:text-reef-300 transition-colors"
           >
             <PackagesIcon />
           </Link>
           <Link
             to="/scheduled-trips"
             aria-label="Scheduled Trips"
-            className="text-accent hover:text-red-400 transition-colors"
+            className="text-brand-100/70 hover:text-reef-300 transition-colors"
           >
             <ScheduledTripsIcon />
           </Link>
@@ -140,7 +140,7 @@ export function AppShell() {
             to={to}
             className={({ isActive }) =>
               `flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg text-xs transition-colors ${
-                isActive ? 'text-white font-semibold' : `${ON_DEEP_SUBTLE} hover:text-white`
+                isActive ? 'text-reef-300 font-semibold' : `${ON_DEEP_SUBTLE} hover:text-white`
               }`
             }
           >

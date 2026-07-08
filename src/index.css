@@ -2,29 +2,52 @@
 
 /* ─────────────────────────────────────────────────────────────────────────
  * Brand color seam (fundive Stage 2). This is the one place a fork re-skins
- * the app. Tokens alias Tailwind's default palette, so FunDivers looks
- * identical; override the values (any hex/oklch) to change the whole app.
- *   --color-brand-*   the primary "navy" identity (page, nav, buttons, ink)
- *   --color-surface-* the light "shallows" (cards, inputs, subtle fills)
- *   --color-accent    the signature hairline / badge
- * Status colors (emerald=success, amber=warning, red-600+=danger) stay
- * conventional Tailwind. The PWA manifest colors live separately in
- * fundive.config.ts (theme/backgroundColor) — keep them in sync. See
+ * the app. Override these values (any hex/oklch) to change the whole app.
+ *   --color-brand-*   the primary ocean identity (page, nav, buttons, ink)
+ *   --color-surface-* the light "shallows" (legacy light fills, inputs)
+ *   --color-reef-*    the teal reef accent (glass hover, glows, active nav)
+ *   --color-mauve/... catppuccin-flavoured neon accents for the riced glow
+ *   --color-accent    the red signature hairline / Beta badge / danger
+ * Status colors (emerald=success, amber=warning, red-600+=danger) and the
+ * categorical event-type rainbow stay conventional Tailwind. The PWA manifest
+ * colors live separately in fundive.config.ts — keep them in sync. See
  * docs/forking.md.
  * ───────────────────────────────────────────────────────────────────────── */
 @theme {
-  --color-brand-50:  var(--color-blue-50);
-  --color-brand-100: var(--color-blue-100);
-  --color-brand-200: var(--color-blue-200);
-  --color-brand-300: var(--color-blue-300);
-  --color-brand-400: var(--color-blue-400);
-  --color-brand-500: var(--color-blue-500);
-  --color-brand-600: var(--color-blue-600);
-  --color-brand-700: var(--color-blue-700);
-  --color-brand-800: var(--color-blue-800);
-  --color-brand-900: var(--color-blue-900);
-  --color-brand-950: var(--color-blue-950);
+  /* Ocean brand — deep sea blues, matching site-fundivers. */
+  --color-brand-50:  #eff8ff;
+  --color-brand-100: #dbeefe;
+  --color-brand-200: #bfe1fe;
+  --color-brand-300: #93cefd;
+  --color-brand-400: #60b0fa;
+  --color-brand-500: #3b91f6;
+  --color-brand-600: #2474eb;
+  --color-brand-700: #1d5dd8;
+  --color-brand-800: #1e4daf;
+  --color-brand-900: #0c2f6b;
+  --color-brand-950: #0a1f47;
 
+  /* Reef teal — the signature accent (glass hover borders, glows, active nav). */
+  --color-reef-50:  #ecfdfb;
+  --color-reef-100: #cffaf3;
+  --color-reef-200: #a0f3e9;
+  --color-reef-300: #66e6da;
+  --color-reef-400: #2cd0c5;
+  --color-reef-500: #14b3aa;
+  --color-reef-600: #0d908b;
+  --color-reef-700: #107370;
+  --color-reef-800: #135b59;
+  --color-reef-900: #144b4a;
+
+  /* Catppuccin-flavoured neon accents for the riced look — glows and highlights. */
+  --color-mauve: #cba6f7;
+  --color-lav:   #b4befe;
+  --color-pink:  #f5c2e7;
+  --color-sky:   #89dceb;
+  --color-peach: #fab387;
+  --color-green: #a6e3a1;
+
+  /* Legacy light surface tokens — kept for inputs and pages not yet swept dark. */
   --color-surface-50:  var(--color-sky-50);
   --color-surface-100: var(--color-sky-100);
   --color-surface-200: var(--color-sky-200);
@@ -37,7 +60,24 @@
   --color-surface-900: var(--color-sky-900);
   --color-surface-950: var(--color-sky-950);
 
+  /* Red stays the app's status/urgent + Beta-badge signature. */
   --color-accent: var(--color-red-500);
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Monospace for the terminal/waybar flavour — dates, prices, labels. */
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, "SF Mono",
+    "Cascadia Code", Menlo, Consolas, monospace;
+
+  /* Aggressive squircle-style rounding site-wide — every rounded-* utility gets
+     larger so cards/panels read as soft squares, not rectangles.
+     (rounded-full pills are unaffected.) */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.7rem;
+  --radius-lg: 1.1rem;
+  --radius-xl: 1.6rem;
+  --radius-2xl: 2.2rem;
+  --radius-3xl: 3rem;
 }
 
 *, *::before, *::after {
@@ -46,8 +86,20 @@
 
 body {
   margin: 0;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  color: var(--color-brand-50);
+  /* Riced dark base: a deep ocean-night (catppuccin-crust meets midnight sea)
+     with two soft neon spotlights bleeding in from the corners — the tell-tale
+     "unixporn wallpaper" glow. Fixed so it stays put while content scrolls. */
+  background-color: #0a1120;
+  background-image:
+    radial-gradient(120% 90% at 12% -10%, rgba(203, 166, 247, 0.20) 0%, transparent 55%),
+    radial-gradient(120% 90% at 92% 8%, rgba(44, 208, 197, 0.18) 0%, transparent 55%),
+    radial-gradient(140% 120% at 50% 120%, rgba(29, 93, 216, 0.26) 0%, transparent 60%),
+    linear-gradient(180deg, #0b1426 0%, #0a1120 45%, #070b16 100%);
+  background-attachment: fixed;
 }
 
 /* Cross-device overflow net. Phone widths vary (~320px iPhone SE → ~430px Pro
@@ -69,4 +121,149 @@ body {
 /* Media never forces the page wider than its column. */
 img, video, canvas {
   max-width: 100%;
+}
+
+/* Mobile / touch performance. The fixed body gradient forces repaints on
+ * scroll and backdrop-blur is costly — both rough on phone GPUs. On
+ * touch/narrow devices: use a plain non-fixed gradient and swap glass blur for
+ * a near-opaque fill. */
+@media (hover: none) and (pointer: coarse), (max-width: 820px) {
+  body {
+    background-image: linear-gradient(180deg, #0e1b31 0%, #0a1120 50%, #070b16 100%);
+    background-attachment: scroll;
+  }
+  .glass,
+  .waybar {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: color-mix(in oklab, #0d1a2e 92%, transparent);
+  }
+}
+
+::selection {
+  background: rgba(203, 166, 247, 0.35);
+  color: #fff;
+}
+
+/* Riced scrollbar — thin, dark trough, accent-gradient thumb. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2cd0c5 transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #cba6f7, #2cd0c5);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+@layer components {
+  /* Frosted "window" surface — the riced glassmorphism: blurred translucent
+     fill + hairline top highlight, like a Hyprland floating window. */
+  .glass {
+    background: color-mix(in oklab, #0d1a2e 62%, transparent);
+    border: 1px solid color-mix(in oklab, #ffffff 12%, transparent);
+    backdrop-filter: blur(12px) saturate(1.2);
+    -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  }
+  .glass-hover:hover {
+    background: color-mix(in oklab, #0d1a2e 72%, transparent);
+    border-color: color-mix(in oklab, var(--color-reef-400) 55%, transparent);
+  }
+
+  /* Neon-glow accent border — the "active window" look. Pair with a card. */
+  .glow-teal {
+    box-shadow: 0 0 0 1px rgba(44, 208, 197, 0.35),
+      0 0 22px -4px rgba(44, 208, 197, 0.5);
+  }
+  .glow-mauve {
+    box-shadow: 0 0 0 1px rgba(203, 166, 247, 0.35),
+      0 0 22px -4px rgba(203, 166, 247, 0.5);
+  }
+
+  /* Terminal-style metadata: monospace + faint tracking. */
+  .mono {
+    font-family: var(--font-mono);
+    letter-spacing: -0.01em;
+  }
+
+  /* Waybar surface — the nav chrome: blurred translucent fill + hairline. */
+  .waybar {
+    background: color-mix(in oklab, #0d1a2e 55%, transparent);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  /* Waybar module — a nav item that lights up with an accent underglow when
+     active. */
+  .module {
+    border: 1px solid transparent;
+    transition: color 0.15s, background-color 0.15s, border-color 0.15s,
+      box-shadow 0.15s;
+  }
+  .module:hover {
+    background: color-mix(in oklab, #ffffff 8%, transparent);
+    border-color: color-mix(in oklab, #ffffff 12%, transparent);
+  }
+  .module-active {
+    color: var(--color-reef-300);
+    background: color-mix(in oklab, var(--color-reef-400) 14%, transparent);
+    border-color: color-mix(in oklab, var(--color-reef-400) 45%, transparent);
+    box-shadow: 0 0 18px -6px rgba(44, 208, 197, 0.7);
+  }
+}
+
+/* Animated water caustics — two SVG fractal-noise layers (different scale,
+   speed and direction) drifting and pulsing to mimic sunlight refracting
+   through the surface. On the dark ocean base the bright "screen"-blended
+   layers read as faint neon light veins. Scoped to a `position: relative`
+   host (the dashboard container) rather than fixed to the viewport. */
+.caustics {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.caustics-layer {
+  position: absolute;
+  inset: -25%;
+  width: 150%;
+  height: 150%;
+  mix-blend-mode: screen;
+  will-change: transform, opacity;
+}
+.cl-a { animation: caustic-a 20s ease-in-out infinite; }
+/* Second layer (mauve) rolls the other way, slower, for interference shimmer. */
+.cl-b { animation: caustic-b 28s ease-in-out infinite; }
+
+/* Predominantly horizontal drift — waves rolling sideways — with a small
+   vertical sway and gentle opacity pulse; combined with the in-place noise
+   morph (baseFrequency animation in Caustics.tsx) this reads as flowing water.
+   0% and 100% match so the loop is seamless. */
+@keyframes caustic-a {
+  0%, 100% { transform: translate3d(-9%, -2%, 0) scale(1.08); opacity: 0.6; }
+  50%      { transform: translate3d(9%, 3%, 0) scale(1.16); opacity: 0.9; }
+}
+@keyframes caustic-b {
+  0%, 100% { transform: translate3d(9%, 3%, 0) scale(1.14); opacity: 0.38; }
+  50%      { transform: translate3d(-9%, -2%, 0) scale(1.05); opacity: 0.72; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caustics-layer { animation: none; }
+}
+
+/* The caustics recompute full-screen fractal noise every frame — fine on
+   desktop, far too heavy for phone GPUs. On touch/narrow devices drop them
+   entirely; the fixed body ocean gradient still shows through the transparent
+   dashboard behind them. */
+@media (hover: none) and (pointer: coarse), (max-width: 820px) {
+  .caustics { display: none; }
 }

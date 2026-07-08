@@ -79,7 +79,7 @@ function eventBarClass(ev: AppEvent, hovered: boolean): string {
 
 // Closed-eye (eye-off) marker for private dives — admin-only, since private
 // events are filtered out of every diver-facing fetch before they'd render.
-function PrivateIcon({ className = 'w-3.5 h-3.5 text-brand-900/70 shrink-0' }: { className?: string }) {
+function PrivateIcon({ className = 'w-3.5 h-3.5 text-brand-100/70 shrink-0' }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
          className={className} role="img" aria-label="Private">
@@ -356,16 +356,16 @@ export function MonthCalendar({
       <div className="space-y-2">
         <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider">{listTitle}</h2>
         {inMonthEvents.length === 0 && (
-          <p className="text-brand-950 font-medium text-sm">No events scheduled.</p>
+          <p className="text-brand-100/70 font-medium text-sm">No events scheduled.</p>
         )}
         {inMonthEvents.map(ev => (
           <button
             key={ev.id}
             onClick={() => onPickEvent(ev)}
-            className={`w-full text-left backdrop-blur-md rounded-xl p-3 transition-colors ${
+            className={`w-full text-left rounded-2xl p-3 transition-colors ${
               highlightedIds?.has(ev.id)
-                ? 'bg-amber-100 border-2 border-amber-400 hover:border-amber-500'
-                : 'bg-white/70 border border-surface-200 hover:border-accent'
+                ? 'bg-amber-400/15 border border-amber-400/60 hover:border-amber-400'
+                : 'glass glass-hover'
             } ${ev.is_private ? 'opacity-60' : ''}`}
           >
             <div className="flex items-start justify-between">
@@ -375,10 +375,10 @@ export function MonthCalendar({
                     {TYPE_LABELS[ev.type]}
                   </span>
                   {ev.is_private && <PrivateIcon />}
-                  <span className="font-medium text-brand-900 text-sm">{ev.title}</span>
-                  {ev.featured && <span className="text-xs text-red-600">★</span>}
+                  <span className="font-medium text-brand-50 text-sm">{ev.title}</span>
+                  {ev.featured && <span className="text-xs text-amber-300">★</span>}
                 </div>
-                <p className="text-xs text-brand-900 font-medium mt-1">
+                <p className="mono text-xs text-brand-100/70 mt-1">
                   {formatEventSpan(ev)}
                 </p>
               </div>
@@ -427,14 +427,14 @@ function MonthGrid({
   const cellMinHeight = 22 + totalRows * (TRACK_HEIGHT + TRACK_GAP) + 6
 
   return (
-    <div className="grid grid-cols-7 bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl overflow-hidden text-sm">
+    <div className="grid grid-cols-7 glass rounded-2xl overflow-hidden text-sm">
       {['S','M','T','W','T','F','S'].map((d, i) => (
-        <div key={i} className="bg-surface-100 text-center text-xs text-brand-900 font-semibold py-1 border-b border-surface-200">{d}</div>
+        <div key={i} className="bg-white/5 text-center text-xs text-brand-100/80 font-semibold py-1 border-b border-white/10">{d}</div>
       ))}
       {Array.from({ length: leading }).map((_, i) => (
         <div
           key={`empty-${i}`}
-          className="bg-surface-50/50 border-b border-surface-200/60"
+          className="bg-white/[0.02] border-b border-white/5"
           style={{ minHeight: cellMinHeight }}
         />
       ))}
@@ -513,15 +513,15 @@ function DayCell({
     <div
       data-day={dayKey}
       onClick={handleCellClick}
-      className={`relative pt-1 border-b border-surface-200/60 ${
-        isToday ? 'bg-red-50' : ''
-      } ${!inMonth ? 'opacity-40' : ''} ${cellClickable ? 'cursor-pointer hover:bg-amber-50/60' : ''} ${
-        isDropTarget ? 'ring-2 ring-inset ring-amber-400 bg-amber-50/70' : ''
+      className={`relative pt-1 border-b border-white/5 ${
+        isToday ? 'bg-reef-400/10' : ''
+      } ${!inMonth ? 'opacity-40' : ''} ${cellClickable ? 'cursor-pointer hover:bg-white/5' : ''} ${
+        isDropTarget ? 'ring-2 ring-inset ring-amber-400 bg-amber-400/15' : ''
       }`}
       style={{ minHeight }}
     >
       <span className={`text-[10px] block text-center w-5 h-5 flex items-center justify-center mx-auto ${
-        isToday ? 'text-red-700 font-bold' : 'text-brand-900'
+        isToday ? 'text-reef-300 font-bold' : 'text-brand-100/80'
       }`}>
         {format(day, 'd')}
       </span>
@@ -807,8 +807,8 @@ function FilterLegend({
         aria-label="Toggle dives"
         className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors ${
           diveShown
-            ? 'bg-white border-brand-900 text-brand-900'
-            : 'bg-surface-100 border-surface-200 text-brand-950 font-medium line-through'
+            ? 'bg-white/10 border-reef-400/50 text-reef-200'
+            : 'bg-white/5 border-white/10 text-brand-100/50 font-medium line-through'
         }`}
       >
         <span className="w-2 h-2 rounded-full overflow-hidden flex" aria-hidden="true">
@@ -827,8 +827,8 @@ function FilterLegend({
           aria-label="Filter courses"
           className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors ${
             allCoursesHidden
-              ? 'bg-surface-100 border-surface-200 text-brand-950 font-medium line-through'
-              : 'bg-white border-brand-900 text-brand-900'
+              ? 'bg-white/5 border-white/10 text-brand-100/50 font-medium line-through'
+              : 'bg-white/10 border-reef-400/50 text-reef-200'
           }`}
         >
           <span className="w-2 h-2 rounded-full overflow-hidden flex" aria-hidden="true">
@@ -840,7 +840,7 @@ function FilterLegend({
           </span>
           Courses
           {hiddenCourses.size > 0 && !allCoursesHidden && (
-            <span className="ml-0.5 text-[10px] text-brand-900 font-medium">({visibleCourses}/{courseCategories.length})</span>
+            <span className="ml-0.5 text-[10px] text-brand-100/60 font-medium">({visibleCourses}/{courseCategories.length})</span>
           )}
           <span aria-hidden="true">▾</span>
         </button>
@@ -848,26 +848,26 @@ function FilterLegend({
         {open && (
           <div
             role="menu"
-            className="absolute left-0 top-full mt-1 z-20 min-w-[180px] bg-white border border-accent rounded-lg shadow-lg p-2 space-y-1"
+            className="absolute left-0 top-full mt-1 z-20 min-w-[180px] glass rounded-lg shadow-lg p-2 space-y-1"
           >
             {courseCategories.length === 0 && (
-              <p className="text-brand-900 font-medium text-xs px-2 py-1">No courses in this range.</p>
+              <p className="text-brand-100/70 font-medium text-xs px-2 py-1">No courses in this range.</p>
             )}
             {courseCategories.map(({ category, color }) => {
               const shown = !hiddenCourses.has(category)
               return (
                 <label
                   key={category}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface-50 cursor-pointer"
+                  className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-white/10 cursor-pointer"
                 >
                   <input
                     type="checkbox"
                     checked={shown}
                     onChange={() => onToggleCategory(category)}
-                    className="accent-brand-900"
+                    className="accent-reef-500"
                   />
                   <span className={`w-2 h-2 rounded-full ${COURSE_DOT[color]}`} aria-hidden="true" />
-                  <span className="text-brand-900 text-xs font-semibold">{category}</span>
+                  <span className="text-brand-100 text-xs font-semibold">{category}</span>
                 </label>
               )
             })}
@@ -883,8 +883,8 @@ function FilterLegend({
           aria-label="Toggle staff availability"
           className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors ${
             busyToggle.shown
-              ? 'bg-white border-brand-900 text-brand-900'
-              : 'bg-surface-100 border-surface-200 text-brand-950 font-medium line-through'
+              ? 'bg-white/10 border-reef-400/50 text-reef-200'
+              : 'bg-white/5 border-white/10 text-brand-100/50 font-medium line-through'
           }`}
         >
           <span className={`w-2 h-2 rounded-full ${BUSY_DOT}`} />

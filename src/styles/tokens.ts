@@ -1,86 +1,80 @@
-// Palette tokens — single source of truth for the FunDivers brand
-// surface styles. Components should compose these instead of hard-
-// coding Tailwind class strings, so re-skinning means editing one
-// file rather than chasing every component.
+// Palette tokens — single source of truth for the FunDivers surface styles.
+// Components compose these instead of hard-coding class strings, so re-skinning
+// means editing one file rather than chasing every component.
 //
-// Colour language (matches the Wix site):
-//   • Light blue (surface-50/100/200) — page surfaces and subtle accents
-//   • Navy / dark blue (brand-900/950) — nav chrome, primary action,
-//     headings, and the "deep water" splash on /dashboard
-//   • Red (accent/600/700) — the 1px accent border the brand uses on
-//     emphasised elements; also urgent / pending status text
-//   • White, often translucent, for floated cards / modals (the
-//     "underwater glass" feel)
+// Colour language (riced dark ocean — matches site-fundivers):
+//   • Deep ocean-night — the fixed body gradient behind everything (index.css).
+//     Pages are transparent so the water + corner glows show through.
+//   • Frosted glass (`.glass`) — translucent blurred panels floating on the
+//     water; the "Hyprland window" look. Text on them is light.
+//   • Reef teal (reef-300/400/500) — the signature accent: glass hover borders,
+//     neon glows, active nav modules, primary action.
+//   • Red (accent) — the 1px hairline the brand uses on emphasised elements;
+//     also urgent / pending status text and the Beta badge.
 
 // ── Page surfaces ──────────────────────────────────────────────────
-// Page bg is deep navy (the "water") so every tab feels like the home
-// dashboard. Cards stack on top in translucent white so their contents
-// still read as navy-on-white; loose text on the page itself (page
-// headings, section labels, empty states) must use the light hierarchy.
-export const PAGE         = 'bg-brand-900 text-white'
+// Pages are transparent — the fixed deep-ocean body gradient (index.css) is the
+// page background, so every tab sits on the same water. Loose text on the page
+// itself (headings, section labels, empty states) uses the light hierarchy.
+export const PAGE         = 'text-brand-50'
 
-// Light hierarchy for loose text directly on the navy page — use this
-// instead of text-brand-900 for headings/body that aren't inside a card.
+// Light hierarchy for loose text directly on the ocean page.
 export const PAGE_HEADING = 'text-white'
-export const PAGE_BODY    = 'text-white/80'
+export const PAGE_BODY    = 'text-brand-100/80'
 
 // ── Cards & panels ─────────────────────────────────────────────────
-// All card surfaces are translucent so the navy water shows through —
-// keeps the "glass panel floating above the water" feel consistent
-// across the app rather than flat white squares on a coloured bg.
-export const CARD          = 'bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl'
-export const CARD_ELEVATED = 'bg-white/65 backdrop-blur-md border border-accent rounded-2xl shadow-lg'
+// Frosted glass panels floating above the water — blurred translucent fill +
+// hairline highlight. CARD_ELEVATED adds the reef neon glow (the "active
+// window").
+export const CARD          = 'glass glass-hover rounded-2xl'
+export const CARD_ELEVATED = 'glass glow-teal rounded-2xl'
 
 // ── Modals ─────────────────────────────────────────────────────────
-export const MODAL_BACKDROP = 'fixed inset-0 bg-brand-900/60 backdrop-blur-sm z-50'
-export const MODAL_PANEL    = 'bg-white/75 backdrop-blur-md border border-accent rounded-2xl shadow-2xl'
+export const MODAL_BACKDROP = 'fixed inset-0 bg-brand-950/70 backdrop-blur-sm z-50'
+export const MODAL_PANEL    = 'glass glow-mauve rounded-2xl shadow-2xl'
 
-// ── Text hierarchy on the light (translucent white) surface ────────
-// Cards are semi-transparent over navy water, so text needs to be
-// darker + heavier than the baseline Tailwind slate to stay legible
-// against the blue showing through. brand-950 for headings, font-medium
-// on body text by default; muted/subtle tiers don't drop below /70
-// or legibility falls off the cliff on transparent panels.
-export const TEXT_HEADING = 'text-brand-950 font-bold'
-export const TEXT_BODY    = 'text-brand-950 font-medium'
-export const TEXT_MUTED   = 'text-brand-900 font-medium'
-export const TEXT_SUBTLE  = 'text-brand-900/80 font-medium'
-export const TEXT_LINK    = 'text-brand-800 font-semibold hover:underline'
-export const TEXT_ERROR   = 'text-red-700 font-semibold'
+// ── Text hierarchy on the glass (translucent dark) surface ─────────
+// Glass panels are dark and translucent over the ocean, so text is light.
+// Headings near-white; body a touch dimmer; muted/subtle tiers don't drop
+// below /60 or legibility falls off on the transparent panels.
+export const TEXT_HEADING = 'text-white font-bold'
+export const TEXT_BODY    = 'text-brand-50/90 font-medium'
+export const TEXT_MUTED   = 'text-brand-100/70'
+export const TEXT_SUBTLE  = 'text-brand-100/55'
+export const TEXT_LINK    = 'text-reef-300 font-semibold hover:text-reef-200 hover:underline'
+export const TEXT_ERROR   = 'text-red-300 font-semibold'
 
 // ── Text hierarchy on the deep navy chrome ─────────────────────────
 export const ON_DEEP_BODY    = 'text-white/80'
 export const ON_DEEP_MUTED   = 'text-white/70'
 export const ON_DEEP_SUBTLE  = 'text-white/60'
-export const ON_DEEP_LINK    = 'text-amber-300 font-semibold hover:text-amber-200 hover:underline'
+export const ON_DEEP_LINK    = 'text-reef-300 font-semibold hover:text-reef-200 hover:underline'
 
 // ── Buttons ────────────────────────────────────────────────────────
 const BUTTON_BASE = 'font-semibold py-2 rounded-lg transition-colors disabled:opacity-50'
-export const BTN_PRIMARY = `${BUTTON_BASE} bg-brand-900 hover:bg-brand-950 text-white`
-export const BTN_GHOST   = `${BUTTON_BASE} border border-brand-900 text-brand-900 hover:bg-surface-100`
-export const BTN_DANGER  = `${BUTTON_BASE} bg-surface-100 hover:bg-red-100 text-red-700 border border-accent`
-export const BTN_LIGHT   = `${BUTTON_BASE} bg-white text-brand-900 hover:bg-surface-100`
+// Primary = reef teal on dark ink — the signature CTA (reads on the glow).
+export const BTN_PRIMARY = `${BUTTON_BASE} bg-reef-500 hover:bg-reef-400 text-brand-950`
+export const BTN_GHOST   = `${BUTTON_BASE} border border-white/20 text-brand-50 hover:bg-white/10`
+export const BTN_DANGER  = `${BUTTON_BASE} bg-red-500/15 hover:bg-red-500/25 text-red-200 border border-red-400/40`
+export const BTN_LIGHT   = `${BUTTON_BASE} bg-white/10 hover:bg-white/20 text-brand-50 border border-white/15`
 
-// Outline "cancel / dismiss" button used in modal + form footers. Sky
-// outline on a transparent fill so it reads as the secondary action next
-// to a solid BTN_PRIMARY. Layout width (e.g. flex-1) stays at the call
-// site — this token is just the button identity.
-export const BTN_SECONDARY = 'py-2 rounded-lg text-sm font-medium text-brand-900 border border-surface-300 hover:bg-surface-50 disabled:opacity-50'
+// Outline "cancel / dismiss" button used in modal + form footers. Hairline
+// outline on a transparent fill so it reads as the secondary action next to a
+// solid BTN_PRIMARY. Layout width (e.g. flex-1) stays at the call site.
+export const BTN_SECONDARY = 'py-2 rounded-lg text-sm font-medium text-brand-50 border border-white/20 hover:bg-white/10 disabled:opacity-50'
 
 // ── Inputs ─────────────────────────────────────────────────────────
-export const INPUT       = 'w-full bg-white border border-surface-300 rounded-lg px-3 py-2 text-brand-900 focus:outline-none focus:border-brand-900'
-export const INPUT_LABEL = 'block text-sm text-brand-900 mb-1'
+export const INPUT       = 'w-full bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-brand-50 placeholder:text-brand-100/40 focus:outline-none focus:border-reef-400'
+export const INPUT_LABEL = 'block text-sm text-brand-100 mb-1'
 
 // ── Inline error notes ─────────────────────────────────────────────
-// Small validation / load-failure <p> banners. Two variants: the dark
-// one sits on navy chrome (light-red text on a translucent red wash);
-// the light one sits inside a white card (dark-red text on a pale red
-// fill). Both use the brand accent hairline border.
-export const ERROR_NOTE       = 'text-xs text-red-200 bg-red-900/50 border border-accent rounded-md p-2'
-export const ERROR_NOTE_LIGHT = 'text-xs text-red-700 bg-red-50 border border-accent rounded px-2 py-1'
+// Small validation / load-failure <p> banners. Both variants sit on the dark
+// glass now — light-red text on a translucent red wash with a red hairline.
+export const ERROR_NOTE       = 'text-xs text-red-200 bg-red-900/40 border border-accent rounded-md p-2'
+export const ERROR_NOTE_LIGHT = 'text-xs text-red-200 bg-red-900/30 border border-red-400/40 rounded px-2 py-1'
 
 // ── Navigation chrome ──────────────────────────────────────────────
-// Darker than PAGE so the top/bottom bars sit visibly above the water
-// even on pages that already have a navy background.
-export const NAV_BAR    = 'bg-brand-950 border-b border-accent px-4 py-3 flex items-center justify-between'
-export const NAV_BOTTOM = 'fixed bottom-0 left-0 right-0 bg-brand-950 border-t border-accent flex justify-around py-2'
+// Waybar glass — the blurred translucent bars floating above the water, set off
+// from the page by a hairline highlight.
+export const NAV_BAR    = 'waybar border-b border-white/10 px-4 py-3 flex items-center justify-between'
+export const NAV_BOTTOM = 'fixed bottom-0 left-0 right-0 waybar border-t border-white/10 flex justify-around py-2 z-40'
