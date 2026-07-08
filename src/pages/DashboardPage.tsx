@@ -32,7 +32,7 @@ export function DashboardPage() {
           aria-label="fundive on GitHub"
           className="opacity-80 transition-opacity hover:opacity-100"
         >
-          <img src="/fundive-logo-light.svg" alt="fundive" className="h-9 w-auto drop-shadow-lg" />
+          <img src="/fundive-logo-light.svg" alt="fundive" className="h-14 w-auto drop-shadow-lg" />
         </a>
         <a
           href="https://github.com/fundive/fundive/releases/tag/v0.0.1"
