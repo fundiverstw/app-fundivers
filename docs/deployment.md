@@ -10,8 +10,9 @@ Three things get deployed:
    server code (PDF emailer, etc.), deployed via `supabase functions
    deploy`.
 
-Database changes deploy via `supabase db push` — a separate workflow
-described below.
+Database changes deploy via the Supabase CLI (`make push`) — the
+**Supabase schema workflow** section below. Migrations are pushed from a
+developer's machine only; there is no CI/GitHub Actions migration job.
 
 ## Environment variables
 

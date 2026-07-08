@@ -13,7 +13,7 @@
 # (No DB password needed; this only talks to the Functions platform API.)
 #
 # H7 hardening (2026-06-03):
-#   * Job only runs when dispatched from main, same as supabase-push.
+#   * Job only runs when dispatched from main.
 #   * environment: production for protection rules in Settings.
 #   * Actions SHA-pinned with version comments.
 name: Deploy Supabase edge functions
