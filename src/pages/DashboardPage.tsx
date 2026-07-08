@@ -21,24 +21,29 @@ export function DashboardPage() {
         <FeaturedEvents />
       </div>
 
-      {/* Powered-by mark — bottom-right, clear of the bottom nav. The whole
-          fundive logo links to the open-source project on GitHub, with the
-          version / "beta" tag on its bottom-right corner. The light-ink variant
-          reads on the dark ocean background. */}
-      <a
-        href="https://github.com/fundive"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Built with fundive — view on GitHub"
-        className="group fixed bottom-20 right-4 z-40 transition-opacity hover:opacity-100 opacity-80"
-      >
-        <span className="relative inline-block">
-          <img src="/fundive-logo-light.svg" alt="fundive" className="h-7 w-auto drop-shadow-lg" />
-          <span className="absolute -bottom-2 -right-1 rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none tracking-wide text-white shadow">
-            beta
-          </span>
-        </span>
-      </a>
+      {/* Powered-by mark — bottom-right, clear of the bottom nav, on one row: the
+          light-ink fundive logo (links to the open-source org) beside the version
+          / "beta" chip (links to the release notes). */}
+      <div className="fixed bottom-20 right-4 z-40 flex items-center gap-2">
+        <a
+          href="https://github.com/fundive"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="fundive on GitHub"
+          className="opacity-80 transition-opacity hover:opacity-100"
+        >
+          <img src="/fundive-logo-light.svg" alt="fundive" className="h-9 w-auto drop-shadow-lg" />
+        </a>
+        <a
+          href="https://github.com/fundive/fundive/releases"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="fundive release notes"
+          className="rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none tracking-wide text-white shadow transition-colors hover:bg-red-400"
+        >
+          beta
+        </a>
+      </div>
     </div>
   )
 }
