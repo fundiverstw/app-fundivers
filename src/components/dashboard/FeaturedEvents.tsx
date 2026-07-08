@@ -35,20 +35,18 @@ export function FeaturedEvents() {
   if (events.length === 0) return null
 
   return (
-    <div className="absolute inset-x-4 bottom-24 sm:inset-x-auto sm:left-6 sm:bottom-6 sm:w-[24rem] z-10">
-      <section aria-label="Featured trips" className="space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-[0.15em] text-reef-300 flex items-center gap-2 drop-shadow">
-          <span aria-hidden>★</span> Featured trips
-        </h2>
-        <ul className="space-y-3">
-          {events.map(e => (
-            <li key={`${e.type}-${e.id}`}>
-              <FeaturedCard event={e} />
-            </li>
-          ))}
-        </ul>
-      </section>
-    </div>
+    <section aria-label="Featured trips" className="space-y-3">
+      <h2 className="text-sm font-bold uppercase tracking-[0.15em] text-reef-300 flex items-center gap-2 drop-shadow">
+        <span aria-hidden>★</span> Featured trips
+      </h2>
+      <ul className="space-y-3">
+        {events.map(e => (
+          <li key={`${e.type}-${e.id}`}>
+            <FeaturedCard event={e} />
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 

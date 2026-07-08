@@ -101,7 +101,7 @@ export function AppShell() {
           </Link>
         </div>
         <Link to="/dashboard" aria-label="Home" className="shrink-0">
-          <Logo size="sm" />
+          <Logo size="sm" beta={false} />
         </Link>
         <div className="flex-1 flex items-center justify-end gap-3">
           {showInstallButton && (
