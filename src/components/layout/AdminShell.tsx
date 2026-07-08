@@ -56,7 +56,7 @@ export function AdminShell() {
       <header className={NAV_BAR}>
         <div className="flex-1 flex items-center justify-start gap-4" />
         <Link to="/admin" aria-label="Admin home" className="shrink-0">
-          <Logo size="sm" beta={false} />
+          <Logo size="sm" />
         </Link>
         <div className="flex-1 flex items-center justify-end gap-3">
           {displayPendingCount != null && displayPendingCount > 0 && (

@@ -102,7 +102,7 @@ export function AppShell() {
           <NotificationBell />
         </div>
         <Link to="/dashboard" aria-label="Home" className="shrink-0">
-          <Logo size="sm" beta={false} />
+          <Logo size="sm" />
         </Link>
         <div className="flex-1 flex items-center justify-end gap-3">
           {showInstallButton && (
