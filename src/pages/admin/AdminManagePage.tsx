@@ -27,7 +27,7 @@ const CARDS: ManageCard[] = [
   { to: '/admin/prices',    title: 'Price tiers',   blurb: 'Total / deposit / transport for each event price tier.' },
   { to: '/admin/vehicles',  title: 'Vehicles',      blurb: 'The shop transport fleet (passenger seats per vehicle) used to plan rides on the logistics view.' },
   { to: '/admin/gear-sizing', title: 'Gear sizing', blurb: 'Wetsuit, BCD and fin models with the body ranges each size fits — powers the logistics packing lookup.' },
-  { to: '/admin/packages', title: 'Packages',   blurb: 'Curate partner dive shops and the travel packages abroad we publish to divers; track referrals and kickbacks.' },
+  { to: '/admin/packages', title: 'Packages',   blurb: 'Publish partner-shop packages (price tiers + add-ons) divers register for; track registrations and expected-vs-paid kickbacks.' },
   { to: '/admin/scheduled-trips', title: 'Scheduled Trips', blurb: 'The shop’s own dated trips shown on the diver Scheduled Trips tab; link one to a catalog event for in-app registration.' },
   { to: '/admin/trusted-partners', title: 'Trusted Partners', blurb: 'Dive shops abroad divers can message directly from the Trusted Partners tab; the email stays admin-only.' },
   { to: '/admin/notifications', title: 'One-off notification', blurb: 'Send an immediate push (and optional LINE relay) to every opted-in device.' },

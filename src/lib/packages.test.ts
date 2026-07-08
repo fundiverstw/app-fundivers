@@ -1,43 +1,51 @@
-// packages lib: the express-interest RPC wrapper and the two diver-facing
-// definer-function fetchers. The RPC/function contracts themselves are locked
-// by the integration tests; here we only verify the wrapper shapes (rpc args,
-// error propagation, empty-data coercion).
+// packages lib: the register-package edge-fn wrapper, the diver-facing
+// definer-function fetchers, and the diver-owned cancel RPC. The RPC/function
+// contracts themselves are locked by the integration tests; here we only verify
+// the wrapper shapes (invoke/rpc args, error propagation, empty-data coercion).
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mockQueryBuilder } from '../../tests/test-utils'
 
-const { from, rpc } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }))
+const { rpc, invoke } = vi.hoisted(() => ({ rpc: vi.fn(), invoke: vi.fn() }))
 
 vi.mock('./supabase', () => ({
-  supabase: { from: (...a: unknown[]) => from(...a), rpc: (...a: unknown[]) => rpc(...a) },
+  supabase: {
+    rpc: (...a: unknown[]) => rpc(...a),
+    functions: { invoke: (...a: unknown[]) => invoke(...a) },
+  },
 }))
 
-beforeEach(() => { from.mockReset(); rpc.mockReset() })
+beforeEach(() => { rpc.mockReset(); invoke.mockReset() })
 
-describe('expressPackageInterest', () => {
-  it('calls express_package_interest with the package id and returns the code', async () => {
-    rpc.mockResolvedValue({ data: 'FD-7K2MQ4', error: null })
-    const { expressPackageInterest } = await import('./packages')
+describe('registerForPackage', () => {
+  const input = {
+    packageId: 'pkg-1', tierId: 't1', preferredStart: '2026-08-01', preferredEnd: '2026-08-05',
+    addonIds: ['a1', 'a2'], roomId: 'r1', notes: 'window seat',
+  }
 
-    expect(await expressPackageInterest('pkg-1')).toBe('FD-7K2MQ4')
-    expect(rpc).toHaveBeenCalledWith('express_package_interest', { p_package_id: 'pkg-1' })
+  it('invokes register-package with the snake_cased body and returns the result', async () => {
+    invoke.mockResolvedValue({ data: { registration_id: 'reg-1', estimated_cost: 12000, estimated_currency: 'TWD' }, error: null })
+    const { registerForPackage } = await import('./packages')
+
+    const res = await registerForPackage(input)
+    expect(res).toEqual({ registration_id: 'reg-1', estimated_cost: 12000, estimated_currency: 'TWD' })
+    expect(invoke).toHaveBeenCalledWith('register-package', {
+      body: {
+        package_id: 'pkg-1', tier_id: 't1', preferred_start: '2026-08-01', preferred_end: '2026-08-05',
+        addon_ids: ['a1', 'a2'], room_id: 'r1', notes: 'window seat',
+      },
+    })
   })
 
-  it('throws when the RPC errors', async () => {
-    rpc.mockResolvedValue({ data: null, error: { message: 'package is not open for interest' } })
-    const { expressPackageInterest } = await import('./packages')
-    await expect(expressPackageInterest('pkg-1')).rejects.toBeTruthy()
-  })
-
-  it('throws when the RPC returns no code', async () => {
-    rpc.mockResolvedValue({ data: null, error: null })
-    const { expressPackageInterest } = await import('./packages')
-    await expect(expressPackageInterest('pkg-1')).rejects.toThrow(/no code/i)
+  it('throws when the edge function errors', async () => {
+    invoke.mockResolvedValue({ data: null, error: { message: 'package is not open for registration' } })
+    const { registerForPackage } = await import('./packages')
+    await expect(registerForPackage(input)).rejects.toBeTruthy()
   })
 })
 
 describe('fetchPackageBoard', () => {
   it('calls list_package_board and returns rows', async () => {
-    const rows = [{ id: 'p1', title: 'Raja Ampat', partner_name: 'Blue Manta' }]
+    const rows = [{ id: 'p1', title: 'Raja Ampat', partner_name: 'Blue Manta', min_price: 60000 }]
     rpc.mockReturnValue(mockQueryBuilder({ data: rows }))
     const { fetchPackageBoard } = await import('./packages')
 
@@ -49,12 +57,6 @@ describe('fetchPackageBoard', () => {
     rpc.mockReturnValue(mockQueryBuilder({ data: null }))
     const { fetchPackageBoard } = await import('./packages')
     expect(await fetchPackageBoard()).toEqual([])
-  })
-
-  it('throws when the rpc errors', async () => {
-    rpc.mockReturnValue(mockQueryBuilder({ data: null, error: { message: 'boom' } }))
-    const { fetchPackageBoard } = await import('./packages')
-    await expect(fetchPackageBoard()).rejects.toBeTruthy()
   })
 })
 
@@ -73,13 +75,38 @@ describe('fetchPackageBoardItem', () => {
   })
 })
 
-describe('fetchMyPackageReferrals', () => {
-  it('calls list_my_package_referrals and returns rows', async () => {
-    const rows = [{ id: 'r1', referral_code: 'FD-7K2MQ4', status: 'interested' }]
-    rpc.mockReturnValue(mockQueryBuilder({ data: rows }))
-    const { fetchMyPackageReferrals } = await import('./packages')
+describe('fetchPackageTiers', () => {
+  it('calls list_package_tiers with the package id', async () => {
+    const rows = [{ id: 't1', name: 'A', price: 1000, currency: 'TWD' }]
+    rpc.mockResolvedValue({ data: rows, error: null })
+    const { fetchPackageTiers } = await import('./packages')
+    expect(await fetchPackageTiers('pkg-1')).toEqual(rows)
+    expect(rpc).toHaveBeenCalledWith('list_package_tiers', { p_package_id: 'pkg-1' })
+  })
+})
 
-    expect(await fetchMyPackageReferrals()).toEqual(rows)
-    expect(rpc).toHaveBeenCalledWith('list_my_package_referrals')
+describe('fetchMyPackageRegistrations', () => {
+  it('calls list_my_package_registrations and returns rows', async () => {
+    const rows = [{ id: 'reg1', package_id: 'p1', status: 'registered', estimated_cost: 5000 }]
+    rpc.mockReturnValue(mockQueryBuilder({ data: rows }))
+    const { fetchMyPackageRegistrations } = await import('./packages')
+
+    expect(await fetchMyPackageRegistrations()).toEqual(rows)
+    expect(rpc).toHaveBeenCalledWith('list_my_package_registrations')
+  })
+})
+
+describe('cancelMyPackageRegistration', () => {
+  it('calls the definer RPC with the registration id', async () => {
+    rpc.mockResolvedValue({ data: null, error: null })
+    const { cancelMyPackageRegistration } = await import('./packages')
+    await cancelMyPackageRegistration('reg-1')
+    expect(rpc).toHaveBeenCalledWith('cancel_my_package_registration', { p_id: 'reg-1' })
+  })
+
+  it('throws when the RPC errors', async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: 'boom' } })
+    const { cancelMyPackageRegistration } = await import('./packages')
+    await expect(cancelMyPackageRegistration('reg-1')).rejects.toBeTruthy()
   })
 })

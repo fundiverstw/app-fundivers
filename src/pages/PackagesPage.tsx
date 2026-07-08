@@ -1,20 +1,20 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { fetchPackageBoard, fetchMyPackageReferrals } from '../lib/packages'
-import { packageDateLabel } from '../lib/package-format'
+import { fetchPackageBoard, fetchMyPackageRegistrations } from '../lib/packages'
 import { errorMessage } from '../lib/errors'
-import type { PackageBoardItem, MyPackageReferral } from '../types/database'
+import { siteConfig } from '../config/site'
+import type { PackageBoardItem, MyPackageRegistration } from '../types/database'
 import {
   CARD, PAGE_HEADING, PAGE_BODY, ON_DEEP_LINK, TEXT_HEADING, TEXT_SUBTLE,
 } from '../styles/tokens'
 
-// Packages (diver-facing) — the curated travel packages abroad we vouch for.
-// Booking happens at the partner shop; expressing interest here mints a referral
-// code and we broker the intro. Complements Trusted Partners (the pull side: a
-// diver names a destination and we suggest a shop).
+// Packages (diver-facing) — partner-shop dive trips we vouch for. Booking is at
+// the partner shop; registering here builds an order (tier + dates + extras),
+// emails a recommendation to the shop and to you, and shows an estimate.
+// Complements Trusted Partners (the pull side: name a destination, we suggest a shop).
 export function PackagesPage() {
   const [packages, setPackages] = useState<PackageBoardItem[]>([])
-  const [referrals, setReferrals] = useState<MyPackageReferral[]>([])
+  const [registrations, setRegistrations] = useState<MyPackageRegistration[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -22,10 +22,10 @@ export function PackagesPage() {
     let cancelled = false
     ;(async () => {
       try {
-        const [p, r] = await Promise.all([fetchPackageBoard(), fetchMyPackageReferrals()])
+        const [p, r] = await Promise.all([fetchPackageBoard(), fetchMyPackageRegistrations()])
         if (cancelled) return
         setPackages(p)
-        setReferrals(r)
+        setRegistrations(r)
       } catch (err) {
         if (!cancelled) setError(errorMessage(err))
       } finally {
@@ -35,15 +35,18 @@ export function PackagesPage() {
     return () => { cancelled = true }
   }, [])
 
-  const referralByPackage = new Map(referrals.map(r => [r.package_id, r]))
+  // A diver has one live registration per package at most (the one-live index).
+  const liveByPackage = new Map(
+    registrations.filter(r => r.status !== 'cancelled').map(r => [r.package_id, r]),
+  )
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <div className="space-y-1">
         <h1 className={`text-xl ${PAGE_HEADING} font-bold`}>Packages</h1>
         <p className={`text-sm ${PAGE_BODY}`}>
-          Dive trips abroad we've personally vetted. Tap one you like — we'll
-          give you a reference code and connect you with the shop directly.
+          Dive trips abroad we've personally vetted. Tap one you like, pick your
+          dates and extras, and we'll recommend you to the shop with a cost estimate.
         </p>
         <p className="text-sm">
           <Link to="/trusted-partners" className={ON_DEEP_LINK}>
@@ -64,7 +67,7 @@ export function PackagesPage() {
         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {packages.map(pkg => (
             <li key={pkg.id}>
-              <PackageCard pkg={pkg} referral={referralByPackage.get(pkg.id) ?? null} />
+              <PackageCard pkg={pkg} registration={liveByPackage.get(pkg.id) ?? null} />
             </li>
           ))}
         </ul>
@@ -73,8 +76,7 @@ export function PackagesPage() {
   )
 }
 
-function PackageCard({ pkg, referral }: { pkg: PackageBoardItem; referral: MyPackageReferral | null }) {
-  const dates = packageDateLabel(pkg.start_date, pkg.end_date)
+function PackageCard({ pkg, registration }: { pkg: PackageBoardItem; registration: MyPackageRegistration | null }) {
   return (
     <Link to={`/packages/${pkg.id}`} className={`${CARD} block overflow-hidden hover:bg-white/90 transition-colors h-full`}>
       {pkg.hero_image_url ? (
@@ -85,18 +87,21 @@ function PackageCard({ pkg, referral }: { pkg: PackageBoardItem; referral: MyPac
       <div className="p-3 space-y-1">
         <p className={`text-sm ${TEXT_HEADING} truncate`}>{pkg.title}</p>
         <p className={`text-xs ${TEXT_SUBTLE} truncate`}>{pkg.destination}</p>
-        {dates && <p className={`text-xs ${TEXT_SUBTLE}`}>{dates}</p>}
         <div className="flex items-center justify-between pt-1 gap-2">
           <span className="text-xs px-2 py-0.5 rounded-full border border-emerald-400 bg-emerald-50 text-emerald-800 font-medium truncate">
             In cooperation with {pkg.partner_name}
           </span>
-          {pkg.price != null && (
-            <span className={`text-xs ${TEXT_HEADING} shrink-0`}>{pkg.price.toLocaleString()} {pkg.currency}</span>
+          {pkg.min_price != null && (
+            <span className={`text-xs ${TEXT_HEADING} shrink-0`}>
+              from {pkg.min_price.toLocaleString()} {pkg.currency}
+            </span>
           )}
         </div>
-        {referral && (
+        {registration && (
           <p className="text-xs text-brand-800 font-semibold pt-1">
-            {referral.status === 'interested' ? 'You’re interested' : `Referral: ${referral.status}`} · {referral.referral_code}
+            {registration.status === 'registered' ? 'You’re registered' : `Registration: ${registration.status}`}
+            {registration.estimated_cost != null &&
+              ` · est. ${registration.estimated_cost.toLocaleString()} ${registration.estimated_currency ?? siteConfig.locale.currency}`}
           </p>
         )}
       </div>

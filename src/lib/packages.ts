@@ -1,25 +1,51 @@
 import { supabase } from './supabase'
-import type { PackageBoardItem, MyPackageReferral } from '../types/database'
+import type { PackageBoardItem, PackageTierItem, MyPackageRegistration } from '../types/database'
+
+export interface RegisterForPackageInput {
+  packageId: string
+  tierId: string
+  preferredStart: string
+  preferredEnd: string
+  addonIds: string[]
+  roomId: string | null
+  notes: string
+}
+
+export interface RegisterForPackageResult {
+  registration_id: string
+  estimated_cost: number | null
+  estimated_currency: string | null
+  already_registered?: boolean
+}
 
 /**
- * Record that the signed-in diver is interested in a published package and
- * return their referral code (FD-XXXXXX). Runs inside the
- * express_package_interest SECURITY DEFINER RPC: it mints a referral on first
- * interest and is idempotent — tapping again returns the same code rather than
- * erroring on the one-live-referral-per-package index. The RPC returns only the
- * code, so the diver never reads their referral's kickback columns.
+ * Register the signed-in diver for a partner-shop package. Runs through the
+ * register-package edge function, which recomputes the estimate authoritatively,
+ * snapshots the kickback rate, inserts the registration, and emails the partner
+ * shop + the diver. Idempotent against the one-live index: tapping again returns
+ * the diver's existing registration rather than erroring.
  */
-export async function expressPackageInterest(packageId: string): Promise<string> {
-  const { data, error } = await supabase.rpc('express_package_interest', { p_package_id: packageId })
+export async function registerForPackage(input: RegisterForPackageInput): Promise<RegisterForPackageResult> {
+  const { data, error } = await supabase.functions.invoke('register-package', {
+    body: {
+      package_id: input.packageId,
+      tier_id: input.tierId,
+      preferred_start: input.preferredStart,
+      preferred_end: input.preferredEnd,
+      addon_ids: input.addonIds,
+      room_id: input.roomId,
+      notes: input.notes,
+    },
+  })
   if (error) throw error
-  if (!data) throw new Error('express_package_interest returned no code')
-  return data as string
+  return data as RegisterForPackageResult
 }
 
 /**
  * The published Packages board, newest-published first. Reads the
  * list_package_board() definer function, which exposes only diver-safe columns
- * (no kickback rate) and joins in the partner shop we vouch for.
+ * (no kickback rate), the catalog id arrays, a "from" price and the vouched
+ * partner shop.
  */
 export async function fetchPackageBoard(): Promise<PackageBoardItem[]> {
   const { data, error } = await supabase
@@ -40,15 +66,30 @@ export async function fetchPackageBoardItem(id: string): Promise<PackageBoardIte
   return (data ?? null) as PackageBoardItem | null
 }
 
+/** The price tiers of a published package, cheapest first. Reads the
+ *  list_package_tiers() definer function (diver-safe). */
+export async function fetchPackageTiers(packageId: string): Promise<PackageTierItem[]> {
+  const { data, error } = await supabase.rpc('list_package_tiers', { p_package_id: packageId })
+  if (error) throw error
+  return (data ?? []) as PackageTierItem[]
+}
+
+/** Cancel the diver's own registration (frees a retry). Runs the
+ *  cancel_my_package_registration() definer function, scoped to auth.uid(). */
+export async function cancelMyPackageRegistration(id: string): Promise<void> {
+  const { error } = await supabase.rpc('cancel_my_package_registration', { p_id: id })
+  if (error) throw error
+}
+
 /**
- * The signed-in diver's own package referrals (code + status + package/partner
- * labels), newest first. Reads list_my_package_referrals(), which is scoped to
- * auth.uid() and carries none of the kickback ledger.
+ * The signed-in diver's own package registrations (labels + estimate + status),
+ * newest first. Reads list_my_package_registrations(), scoped to auth.uid() and
+ * carrying none of the kickback ledger.
  */
-export async function fetchMyPackageReferrals(): Promise<MyPackageReferral[]> {
+export async function fetchMyPackageRegistrations(): Promise<MyPackageRegistration[]> {
   const { data, error } = await supabase
-    .rpc('list_my_package_referrals')
+    .rpc('list_my_package_registrations')
     .order('created_at', { ascending: false })
   if (error) throw error
-  return (data ?? []) as MyPackageReferral[]
+  return (data ?? []) as MyPackageRegistration[]
 }

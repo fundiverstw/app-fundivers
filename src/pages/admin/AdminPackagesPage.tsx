@@ -3,26 +3,27 @@ import { Link } from 'react-router-dom'
 import { siteConfig } from '../../config/site'
 import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
+import { supabase } from '../../lib/supabase'
 import {
-  fetchPackages, savePackage, setPackageStatus, deletePackage,
+  fetchPackages, fetchPackageTiers, savePackage, setPackageStatus, deletePackage, type TierDraft,
 } from '../../lib/package-admin'
 import { fetchAllTrustedPartners } from '../../lib/trusted-partners'
-import { countInterestedReferrals } from '../../lib/package-referrals'
-import { AdminReferralsTab } from '../../components/admin/AdminReferralsTab'
+import { countNewRegistrations } from '../../lib/package-registrations'
+import { AdminRegistrationsTab } from '../../components/admin/AdminRegistrationsTab'
 import type {
-  TrustedPartnerRow, Package, PackageInsert, PackageStatus,
+  TrustedPartnerRow, Package, PackageInsert, PackageStatus, PackageTier, EOAddon, EORoom,
 } from '../../types/database'
 import { BTN_SECONDARY } from '../../styles/tokens'
 
-// Admin home for Packages — the partner referral network (open-ended travel
-// packages abroad). Two tabs:
-//   - Packages: the curated packages published to divers, with the publish
-//     lifecycle (draft → published → archived) and a per-package kickback rate.
-//   - Referrals: the diver-interest pipeline + kickback ledger.
+// Admin home for Packages — the partner-shop registration network. Two tabs:
+//   - Packages: the products published to divers, each with price tiers,
+//     catalog add-ons/rooms, a kickback rate, and the draft→published→archived
+//     lifecycle.
+//   - Registrations: who registered (the Manage roster) + the kickback ledger.
 // The hosting shops are trusted partners — managed on the Trusted Partners
 // admin page; here they're just picked from a dropdown when creating a package.
 
-type Tab = 'packages' | 'referrals'
+type Tab = 'packages' | 'registrations'
 
 const PILL = 'px-3 py-1.5 rounded-lg text-sm font-semibold'
 const FIELD = 'w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900'
@@ -32,12 +33,10 @@ export function AdminPackagesPage() {
   const [tab, setTab] = useState<Tab>('packages')
   const [partners, setPartners] = useState<TrustedPartnerRow[]>([])
   const [packages, setPackages] = useState<Package[]>([])
-  const [newInterest, setNewInterest] = useState(0)
+  const [newRegistrations, setNewRegistrations] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 
-  // Post-mutation refresh, called from the tab handlers; re-populates the
-  // partner + package lists without the full-screen spinner.
   async function reload() {
     try {
       const [tp, p] = await Promise.all([fetchAllTrustedPartners(), fetchPackages()])
@@ -53,11 +52,11 @@ export function AdminPackagesPage() {
     let cancelled = false
     ;(async () => {
       try {
-        const [tp, p, n] = await Promise.all([fetchAllTrustedPartners(), fetchPackages(), countInterestedReferrals()])
+        const [tp, p, n] = await Promise.all([fetchAllTrustedPartners(), fetchPackages(), countNewRegistrations()])
         if (cancelled) return
         setPartners(tp)
         setPackages(p)
-        setNewInterest(n)
+        setNewRegistrations(n)
       } catch (err) {
         if (!cancelled) setLoadError(errorMessage(err))
       } finally {
@@ -75,8 +74,8 @@ export function AdminPackagesPage() {
 
       <div className="flex gap-2" role="tablist" aria-label="Packages sections">
         <TabButton active={tab === 'packages'} onClick={() => setTab('packages')}>Packages ({packages.length})</TabButton>
-        <TabButton active={tab === 'referrals'} onClick={() => setTab('referrals')}>
-          Referrals{newInterest > 0 && <span className="ml-1.5 inline-block bg-red-600 text-white rounded-full px-1.5 text-xs">{newInterest} new</span>}
+        <TabButton active={tab === 'registrations'} onClick={() => setTab('registrations')}>
+          Registrations{newRegistrations > 0 && <span className="ml-1.5 inline-block bg-red-600 text-white rounded-full px-1.5 text-xs">{newRegistrations}</span>}
         </TabButton>
       </div>
 
@@ -86,8 +85,8 @@ export function AdminPackagesPage() {
 
       {loading ? (
         <p className="text-sm text-white/70">Loading…</p>
-      ) : tab === 'referrals' ? (
-        <AdminReferralsTab packages={packages} />
+      ) : tab === 'registrations' ? (
+        <AdminRegistrationsTab />
       ) : (
         <PackagesTab
           packages={packages} partners={partners} partnerName={partnerName}
@@ -221,7 +220,7 @@ function PackagesTab({
       {confirmDelete && (
         <ConfirmModal
           title="Delete package?"
-          body={`"${confirmDelete.title}" and any referrals for it will be permanently deleted.`}
+          body={`"${confirmDelete.title}", its tiers and any registrations for it will be permanently deleted.`}
           confirmLabel="Delete"
           onClose={() => setConfirmDelete(null)}
           onConfirm={() => handleDelete(confirmDelete)}
@@ -240,6 +239,9 @@ function StatusBadge({ status }: { status: PackageStatus }) {
   return <span className={`text-xs px-2 py-0.5 rounded-full border shrink-0 ${cls}`}>{status}</span>
 }
 
+const catalogLabel = (r: { display_title: string | null; admin_title: string | null }) =>
+  r.display_title || r.admin_title || '(untitled)'
+
 function PackageForm({
   pkg, partners, onClose, onSaved, onError,
 }: {
@@ -254,23 +256,73 @@ function PackageForm({
   const [destination, setDestination] = useState(pkg?.destination ?? '')
   const [summary, setSummary] = useState(pkg?.summary ?? '')
   const [description, setDescription] = useState(pkg?.description ?? '')
-  const [startDate, setStartDate] = useState(pkg?.start_date ?? '')
-  const [endDate, setEndDate] = useState(pkg?.end_date ?? '')
-  const [price, setPrice] = useState(pkg?.price?.toString() ?? '')
   const [currency, setCurrency] = useState(pkg?.currency ?? siteConfig.locale.currency)
   const [heroImageUrl, setHeroImageUrl] = useState(pkg?.hero_image_url ?? '')
-  const [bookingUrl, setBookingUrl] = useState(pkg?.booking_url ?? '')
   const [highlights, setHighlights] = useState((pkg?.highlights ?? []).join('\n'))
   const selectedPartner = partners.find(p => p.id === partnerId)
   const [rate, setRate] = useState((((pkg?.kickback_rate ?? selectedPartner?.default_kickback_rate ?? 0.05)) * 100).toString())
   const [status, setStatus] = useState<PackageStatus>(pkg?.status ?? 'draft')
+  const [addonIds, setAddonIds] = useState<string[]>(pkg?.addon_ids ?? [])
+  const [roomIds, setRoomIds] = useState<string[]>(pkg?.room_type_ids ?? [])
+  const [tiers, setTiers] = useState<TierDraft[]>([{ name: '', price: 0 }])
+  const [tierPrices, setTierPrices] = useState<string[]>([''])
+
+  const [allAddons, setAllAddons] = useState<EOAddon[]>([])
+  const [allRooms, setAllRooms] = useState<EORoom[]>([])
   const [submitting, setSubmitting] = useState(false)
+
+  // Load the catalog for the selectors, and (editing) the package's tiers.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const [aRes, rRes] = await Promise.all([
+          supabase.from('addons').select('*').order('admin_title'),
+          supabase.from('rooms').select('*').order('admin_title'),
+        ])
+        if (cancelled) return
+        setAllAddons((aRes.data ?? []) as EOAddon[])
+        setAllRooms((rRes.data ?? []) as EORoom[])
+        if (pkg) {
+          const existing: PackageTier[] = await fetchPackageTiers(pkg.id)
+          if (cancelled) return
+          if (existing.length) {
+            setTiers(existing.map(t => ({ id: t.id, name: t.name, price: t.price })))
+            setTierPrices(existing.map(t => t.price.toString()))
+          }
+        }
+      } catch (err) {
+        if (!cancelled) onError(errorMessage(err))
+      }
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pkg])
+
+  const toggle = (list: string[], set: (v: string[]) => void, id: string) =>
+    set(list.includes(id) ? list.filter(x => x !== id) : [...list, id])
+
+  const setTierName = (i: number, name: string) =>
+    setTiers(ts => ts.map((t, j) => (j === i ? { ...t, name } : t)))
+  const setTierPrice = (i: number, priceStr: string) => {
+    setTierPrices(ps => ps.map((p, j) => (j === i ? priceStr : p)))
+    setTiers(ts => ts.map((t, j) => (j === i ? { ...t, price: Number(priceStr) || 0 } : t)))
+  }
+  const addTier = () => { setTiers(ts => [...ts, { name: '', price: 0 }]); setTierPrices(ps => [...ps, '']) }
+  const removeTier = (i: number) => {
+    setTiers(ts => ts.filter((_, j) => j !== i))
+    setTierPrices(ps => ps.filter((_, j) => j !== i))
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!partnerId) { onError('Pick a trusted partner.'); return }
     if (!title.trim() || !destination.trim()) { onError('Title and destination are required.'); return }
-    if (startDate && endDate && endDate < startDate) { onError('End date is before the start date.'); return }
+    const cleanTiers = tiers
+      .map((t, i) => ({ ...t, name: t.name.trim(), price: Number(tierPrices[i]) || 0 }))
+      .filter(t => t.name)
+    if (cleanTiers.length === 0) { onError('Add at least one package tier with a name.'); return }
+    if (cleanTiers.some(t => !(t.price >= 0))) { onError('Every tier needs a price.'); return }
     setSubmitting(true)
     try {
       const values: PackageInsert = {
@@ -279,17 +331,15 @@ function PackageForm({
         destination: destination.trim(),
         summary: summary.trim() || null,
         description: description.trim() || null,
-        start_date: startDate || null,
-        end_date: endDate || null,
-        price: price.trim() === '' ? null : Number(price),
         currency: currency.trim() || siteConfig.locale.currency,
         hero_image_url: heroImageUrl.trim() || null,
-        booking_url: bookingUrl.trim() || null,
         highlights: highlights.split('\n').map(h => h.trim()).filter(Boolean),
+        addon_ids: addonIds,
+        room_type_ids: roomIds,
         kickback_rate: Number(rate) / 100,
         status,
       }
-      await savePackage(values, pkg ?? undefined)
+      await savePackage(values, cleanTiers, pkg ?? undefined)
       await onSaved()
     } catch (err) {
       onError(errorMessage(err))
@@ -315,16 +365,34 @@ function PackageForm({
         <Labelled label="Description">
           <textarea className={`${FIELD} resize-none`} rows={3} value={description} onChange={e => setDescription(e.target.value)} />
         </Labelled>
-        <div className="grid grid-cols-2 gap-2">
-          <Labelled label="Start date"><input className={FIELD} type="date" value={startDate} onChange={e => setStartDate(e.target.value)} /></Labelled>
-          <Labelled label="End date"><input className={FIELD} type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /></Labelled>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <Labelled label="Price"><input className={FIELD} type="number" step="any" value={price} onChange={e => setPrice(e.target.value)} /></Labelled>
-          <Labelled label="Currency"><input className={FIELD} value={currency} onChange={e => setCurrency(e.target.value)} /></Labelled>
-        </div>
+
+        {/* Price tiers (Package A/B/C) */}
+        <fieldset className="space-y-2 border border-surface-300 rounded-md p-2">
+          <legend className="text-xs font-semibold text-brand-900 px-1">Packages / price tiers *</legend>
+          {tiers.map((t, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input className={FIELD} placeholder={`Package ${String.fromCharCode(65 + i)}`} value={t.name}
+                onChange={e => setTierName(i, e.target.value)} aria-label={`Tier ${i + 1} name`} />
+              <input className={`${FIELD} w-28`} type="number" step="any" min="0" placeholder="Price" value={tierPrices[i] ?? ''}
+                onChange={e => setTierPrice(i, e.target.value)} aria-label={`Tier ${i + 1} price`} />
+              {tiers.length > 1 && (
+                <button type="button" onClick={() => removeTier(i)} aria-label={`Remove tier ${i + 1}`}
+                  className="text-red-700 hover:text-red-900 text-lg leading-none px-1">×</button>
+              )}
+            </div>
+          ))}
+          <button type="button" onClick={addTier} className="text-xs font-semibold text-brand-900 underline">+ Add tier</button>
+        </fieldset>
+
+        <Labelled label="Currency"><input className={FIELD} value={currency} onChange={e => setCurrency(e.target.value)} /></Labelled>
+
+        {/* Catalog add-ons/rooms available to registrants */}
+        <CatalogPicker label="Add-ons offered" items={allAddons.map(a => ({ id: a.id, label: catalogLabel(a) }))}
+          selected={addonIds} onToggle={id => toggle(addonIds, setAddonIds, id)} empty="No add-ons in the catalog." />
+        <CatalogPicker label="Room options offered" items={allRooms.map(r => ({ id: r.id, label: catalogLabel(r) }))}
+          selected={roomIds} onToggle={id => toggle(roomIds, setRoomIds, id)} empty="No rooms in the catalog." />
+
         <Labelled label="Hero image URL"><input className={FIELD} value={heroImageUrl} onChange={e => setHeroImageUrl(e.target.value)} /></Labelled>
-        <Labelled label="Booking URL (partner site)"><input className={FIELD} value={bookingUrl} onChange={e => setBookingUrl(e.target.value)} /></Labelled>
         <Labelled label="Highlights (one per line)">
           <textarea className={`${FIELD} resize-none`} rows={3} value={highlights} onChange={e => setHighlights(e.target.value)} />
         </Labelled>
@@ -341,6 +409,34 @@ function PackageForm({
         <FormButtons submitting={submitting} submitLabel={pkg ? 'Save changes' : 'Create package'} onClose={onClose} />
       </form>
     </Modal>
+  )
+}
+
+function CatalogPicker({
+  label, items, selected, onToggle, empty,
+}: {
+  label: string
+  items: Array<{ id: string; label: string }>
+  selected: string[]
+  onToggle: (id: string) => void
+  empty: string
+}) {
+  return (
+    <fieldset className="space-y-1 border border-surface-300 rounded-md p-2">
+      <legend className="text-xs font-semibold text-brand-900 px-1">{label}</legend>
+      {items.length === 0 ? (
+        <p className="text-xs text-brand-900/70">{empty}</p>
+      ) : (
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          {items.map(it => (
+            <label key={it.id} className="flex items-center gap-1.5 text-xs text-brand-900">
+              <input type="checkbox" checked={selected.includes(it.id)} onChange={() => onToggle(it.id)} />
+              {it.label}
+            </label>
+          ))}
+        </div>
+      )}
+    </fieldset>
   )
 }
 
