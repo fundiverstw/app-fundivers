@@ -22,10 +22,17 @@ export function DashboardPage() {
       </div>
 
       {/* Version slot — bottom-right, clear of the bottom nav. Shows "Beta" today;
-          eventually holds the running fundive version. */}
-      <span className="fixed bottom-20 right-4 z-40 rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold uppercase leading-none tracking-wide text-white shadow-lg">
+          eventually holds the running fundive version. Links to the fundive
+          (open-source) project on GitHub. */}
+      <a
+        href="https://github.com/fundive"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="fundive on GitHub"
+        className="fixed bottom-20 right-4 z-40 rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold uppercase leading-none tracking-wide text-white shadow-lg transition-colors hover:bg-red-400"
+      >
         Beta
-      </span>
+      </a>
     </div>
   )
 }
