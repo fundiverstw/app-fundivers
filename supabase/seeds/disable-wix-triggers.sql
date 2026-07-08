@@ -24,3 +24,6 @@ drop trigger if exists wix_sync_trip_templates on public.trip_templates;
 drop trigger if exists wix_sync_eo_prices    on public.prices;
 drop trigger if exists wix_sync_eo_rooms     on public.rooms;
 drop trigger if exists wix_sync_other_addons on public.addons;
+drop trigger if exists wix_sync_event_rooms        on public.event_rooms;
+drop trigger if exists wix_sync_event_addons       on public.event_addons;
+drop trigger if exists wix_sync_event_destinations on public.event_destinations;
