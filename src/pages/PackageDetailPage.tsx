@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   fetchPackageBoardItem, fetchPackageTiers, fetchMyPackageRegistrations, cancelMyPackageRegistration,
+  registerForPackage,
 } from '../lib/packages'
 import { errorMessage } from '../lib/errors'
 import { useToast } from '../hooks/useToast'
 import { packageDateLabel } from '../lib/package-format'
 import { siteConfig } from '../config/site'
-import { PackageRegisterForm } from '../components/register/PackageRegisterForm'
+import { RegisterWizard } from '../components/register/RegisterWizard'
 import type { PackageBoardItem, PackageTierItem, MyPackageRegistration } from '../types/database'
 import {
   CARD, BTN_PRIMARY, BTN_DANGER, PAGE_BODY, TEXT_LINK, ON_DEEP_LINK, TEXT_HEADING, TEXT_BODY, TEXT_SUBTLE,
@@ -166,9 +167,25 @@ export function PackageDetailPage() {
       )}
 
       {formOpen && (
-        <PackageRegisterForm
-          pkg={pkg}
+        <RegisterWizard
+          title={pkg.title}
+          subtitle={`with ${pkg.partner_name}`}
+          currency={pkg.currency}
           tiers={tiers}
+          baseLabel="Package"
+          dateMode="pick"
+          addonIds={pkg.addon_ids}
+          roomTypeIds={pkg.room_type_ids}
+          disclaimer="This is an estimate only — the final cost will be determined by the partner shop."
+          onSubmit={(sel) => registerForPackage({
+            packageId: pkg.id,
+            tierId: sel.tierId ?? tiers[0]?.id ?? '',
+            preferredStart: sel.start,
+            preferredEnd: sel.end,
+            addonIds: sel.addonIds,
+            roomId: sel.roomId,
+            notes: sel.notes,
+          })}
           onClose={() => setFormOpen(false)}
           onRegistered={async (result) => {
             setFormOpen(false)

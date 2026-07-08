@@ -26,10 +26,10 @@ import {
 } from "../_shared/package-registration-email.ts"
 import {
   rangeDaysNights,
-  buildPackageCharges,
+  buildRegistrationCharges,
   estimateTotal,
-  type PackageEstimateItem,
-} from "../_shared/package-estimate.ts"
+  type EstimateItem,
+} from "../_shared/registration-estimate.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 
 const COMPANY_EMAIL = siteConfig.contact.email
@@ -112,14 +112,14 @@ Deno.serve(async (req) => {
   }
 
   const { days, nights } = rangeDaysNights(reqData.preferredStart, reqData.preferredEnd)
-  const addonItems: PackageEstimateItem[] = addonRows.map((a) => ({
+  const addonItems: EstimateItem[] = addonRows.map((a) => ({
     label: labelOf(a, "Add-on"), price: a.price ?? 0,
   }))
-  const roomItem: PackageEstimateItem | null = roomRow
+  const roomItem: EstimateItem | null = roomRow
     ? { label: labelOf(roomRow, "Room"), price: roomRow.added_price ?? 0 }
     : null
-  const charges = buildPackageCharges({
-    tierName: tier.name, tierPrice: tier.price ?? 0, addons: addonItems, room: roomItem, days, nights,
+  const charges = buildRegistrationCharges({
+    baseLabel: `Package: ${tier.name}`, basePrice: tier.price ?? 0, addons: addonItems, room: roomItem, days, nights,
   })
   const total = estimateTotal(charges)
   const currency = tier.currency ?? siteConfig.locale.currency

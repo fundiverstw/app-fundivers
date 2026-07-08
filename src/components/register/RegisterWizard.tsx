@@ -1,38 +1,79 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { registerForPackage, type RegisterForPackageResult } from '../../lib/packages'
-import { buildPackageCharges, estimateTotal, rangeDaysNights } from '../../lib/package-estimate'
+import { buildRegistrationCharges, estimateTotal, rangeDaysNights } from '../../lib/registration-estimate'
 import { errorMessage } from '../../lib/errors'
 import { DateField } from '../DateField'
 import { siteConfig } from '../../config/site'
-import type { PackageBoardItem, PackageTierItem, EOAddon, EORoom } from '../../types/database'
+import type { PackageTierItem, EOAddon, EORoom } from '../../types/database'
 import {
   MODAL_BACKDROP, MODAL_PANEL, INPUT, INPUT_LABEL,
   BTN_PRIMARY, BTN_SECONDARY, TEXT_HEADING, TEXT_BODY, TEXT_SUBTLE, ERROR_NOTE,
 } from '../../styles/tokens'
 
-// Registration wizard for a partner-shop package. Unlike the shop's own event
-// register form there's no gear/deposit/payment — a partner package is a
-// non-binding recommendation with a cost estimate. Steps: tier → dates →
-// extras → review. Add-ons are charged per day, the room per night, over the
-// diver's preferred range (see package-estimate.ts). Submit runs the
-// register-package edge function, which recomputes the estimate authoritatively.
+// Shared registration wizard for the two estimate-and-notify flows: partner-shop
+// Packages (tiers + a diver-picked date range) and the shop's own Scheduled Trips
+// (single price + fixed trip dates). No gear/deposit/payment — the outcome is a
+// cost estimate emailed to the shop/partner + the diver. Steps are computed from
+// the config: a tier step when `tiers` is given, a date step when
+// dateMode === 'pick'; always an extras step + a review step. Add-ons are charged
+// per day, the room per night (see registration-estimate.ts). `onSubmit` runs the
+// relevant edge function, which recomputes the estimate authoritatively.
 
-type Step = 1 | 2 | 3 | 4
+type StepKind = 'tier' | 'dates' | 'extras' | 'review'
+
+export interface RegisterSelection {
+  tierId: string | null
+  start: string
+  end: string
+  addonIds: string[]
+  roomId: string | null
+  notes: string
+}
+
+export interface RegisterWizardResult {
+  already_registered?: boolean
+  emailed?: boolean
+}
 
 interface Props {
-  pkg: PackageBoardItem
-  tiers: PackageTierItem[]
+  title: string
+  subtitle?: string
+  currency: string
+  /** Present → show a tier-choice step (Packages). Absent → single `basePrice` (Trips). */
+  tiers?: PackageTierItem[]
+  basePrice?: number
+  /** Prefix for the estimate base line — "Package" (tier name appended) or "Trip". */
+  baseLabel: string
+  /** 'pick' → diver chooses a date range; 'fixed' → derive days/nights from fixed dates. */
+  dateMode: 'pick' | 'fixed'
+  fixedStart?: string | null
+  fixedEnd?: string | null
+  addonIds: string[]
+  roomTypeIds: string[]
+  /** Disclaimer under the estimate (partner-cost vs shop-confirms copy). */
+  disclaimer: string
   onClose: () => void
-  onRegistered: (result: RegisterForPackageResult) => void
+  onSubmit: (sel: RegisterSelection) => Promise<RegisterWizardResult>
+  onRegistered: (result: RegisterWizardResult) => void
 }
 
 const roomLabel = (r: EORoom) => r.display_title || r.admin_title || 'Room'
 const addonLabel = (a: EOAddon) => a.display_title || a.admin_title || 'Add-on'
 
-export function PackageRegisterForm({ pkg, tiers, onClose, onRegistered }: Props) {
-  const [step, setStep] = useState<Step>(1)
-  const [tierId, setTierId] = useState(tiers[0]?.id ?? '')
+export function RegisterWizard(props: Props) {
+  const {
+    title, subtitle, tiers, basePrice, baseLabel, dateMode,
+    fixedStart, fixedEnd, addonIds: allowedAddonIds, roomTypeIds, disclaimer, onClose, onSubmit, onRegistered,
+  } = props
+
+  const stepKinds = useMemo<StepKind[]>(() => [
+    ...(tiers && tiers.length ? (['tier'] as StepKind[]) : []),
+    ...(dateMode === 'pick' ? (['dates'] as StepKind[]) : []),
+    'extras', 'review',
+  ], [tiers, dateMode])
+
+  const [stepIdx, setStepIdx] = useState(0)
+  const [tierId, setTierId] = useState(tiers?.[0]?.id ?? '')
   const [start, setStart] = useState('')
   const [end, setEnd] = useState('')
   const [addonIds, setAddonIds] = useState<Set<string>>(new Set())
@@ -44,18 +85,20 @@ export function PackageRegisterForm({ pkg, tiers, onClose, onRegistered }: Props
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Pull the package's allowed catalog add-ons/rooms (same source + query shape
+  const kind = stepKinds[stepIdx]
+
+  // Pull the listing's allowed catalog add-ons/rooms (same source + query shape
   // as the event register form).
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
         const [aRes, rRes] = await Promise.all([
-          pkg.addon_ids.length
-            ? supabase.from('addons').select('id, admin_title, display_title, price, currency').in('id', pkg.addon_ids)
+          allowedAddonIds.length
+            ? supabase.from('addons').select('id, admin_title, display_title, price, currency').in('id', allowedAddonIds)
             : Promise.resolve({ data: [], error: null }),
-          pkg.room_type_ids.length
-            ? supabase.from('rooms').select('id, admin_title, display_title, added_price, currency').in('id', pkg.room_type_ids)
+          roomTypeIds.length
+            ? supabase.from('rooms').select('id, admin_title, display_title, added_price, currency').in('id', roomTypeIds)
             : Promise.resolve({ data: [], error: null }),
         ])
         if (cancelled) return
@@ -68,27 +111,30 @@ export function PackageRegisterForm({ pkg, tiers, onClose, onRegistered }: Props
       }
     })()
     return () => { cancelled = true }
-  }, [pkg.addon_ids, pkg.room_type_ids])
+  }, [allowedAddonIds, roomTypeIds])
 
-  const tier = tiers.find(t => t.id === tierId) ?? null
-  const { days, nights } = rangeDaysNights(start, end)
-  const currency = tier?.currency ?? pkg.currency ?? siteConfig.locale.currency
+  const tier = tiers?.find(t => t.id === tierId) ?? null
+  const { days, nights } = dateMode === 'pick'
+    ? rangeDaysNights(start, end)
+    : rangeDaysNights(fixedStart, fixedEnd)
+  const currency = (tiers && tier?.currency) || props.currency || siteConfig.locale.currency
+  const effectiveBasePrice = tiers ? (tier?.price ?? 0) : (basePrice ?? 0)
+  const estimateBaseLabel = tiers && tier ? `${baseLabel}: ${tier.name}` : baseLabel
 
   const charges = useMemo(() => {
-    if (!tier) return []
     const selAddons = addons
       .filter(a => addonIds.has(a.id))
       .map(a => ({ label: addonLabel(a), price: a.price ?? 0 }))
     const room = roomId ? rooms.find(r => r.id === roomId) ?? null : null
-    return buildPackageCharges({
-      tierName: tier.name,
-      tierPrice: tier.price,
+    return buildRegistrationCharges({
+      baseLabel: estimateBaseLabel,
+      basePrice: effectiveBasePrice,
       addons: selAddons,
       room: room ? { label: roomLabel(room), price: room.added_price ?? 0 } : null,
       days,
       nights,
     })
-  }, [tier, addons, addonIds, rooms, roomId, days, nights])
+  }, [addons, addonIds, rooms, roomId, days, nights, estimateBaseLabel, effectiveBasePrice])
   const total = estimateTotal(charges)
 
   const toggleAddon = (id: string) => {
@@ -99,21 +145,22 @@ export function PackageRegisterForm({ pkg, tiers, onClose, onRegistered }: Props
     })
   }
 
-  const canNext =
-    (step === 1 && !!tierId) ||
-    (step === 2 && !!start && !!end && end > start) ||
-    step === 3
+  const canProceed =
+    (kind === 'tier' && !!tierId) ||
+    (kind === 'dates' && !!start && !!end && end > start) ||
+    kind === 'extras'
+
+  const tierOk = !tiers || !!tier
 
   async function submit() {
-    if (!tier) return
+    if (!tierOk) return
     setSubmitting(true)
     setError(null)
     try {
-      const result = await registerForPackage({
-        packageId: pkg.id,
-        tierId,
-        preferredStart: start,
-        preferredEnd: end,
+      const result = await onSubmit({
+        tierId: tiers ? tierId : null,
+        start: dateMode === 'pick' ? start : (fixedStart ?? ''),
+        end: dateMode === 'pick' ? end : (fixedEnd ?? ''),
         addonIds: [...addonIds],
         roomId,
         notes: notes.trim(),
@@ -133,8 +180,10 @@ export function PackageRegisterForm({ pkg, tiers, onClose, onRegistered }: Props
         <div onClick={e => e.stopPropagation()} className={`${MODAL_PANEL} w-full max-w-md p-6 space-y-4`}>
           <div className="flex items-start justify-between">
             <div>
-              <h2 className={`${TEXT_HEADING} text-lg`}>Register — {pkg.title}</h2>
-              <p className={`${TEXT_SUBTLE} text-xs`}>with {pkg.partner_name} · step {step} of 4</p>
+              <h2 className={`${TEXT_HEADING} text-lg`}>Register — {title}</h2>
+              <p className={`${TEXT_SUBTLE} text-xs`}>
+                {subtitle ? `${subtitle} · ` : ''}step {stepIdx + 1} of {stepKinds.length}
+              </p>
             </div>
             <button type="button" onClick={onClose} aria-label="Close"
               className="text-brand-50 hover:text-red-300 text-xl leading-none">×</button>
@@ -142,7 +191,7 @@ export function PackageRegisterForm({ pkg, tiers, onClose, onRegistered }: Props
 
           {error && <p className={ERROR_NOTE}>{error}</p>}
 
-          {step === 1 && (
+          {kind === 'tier' && tiers && (
             <fieldset className="space-y-2">
               <legend className={`${INPUT_LABEL} mb-0`}>Choose a package</legend>
               {tiers.map(t => (
@@ -158,16 +207,16 @@ export function PackageRegisterForm({ pkg, tiers, onClose, onRegistered }: Props
             </fieldset>
           )}
 
-          {step === 2 && (
+          {kind === 'dates' && (
             <div className="space-y-3">
               <p className={`text-sm ${TEXT_BODY}`}>Which dates would you like to do this trip?</p>
               <div>
-                <label htmlFor="pkg-start" className={INPUT_LABEL}>Preferred start</label>
-                <DateField id="pkg-start" value={start} onChange={setStart} className={INPUT} aria-label="Preferred start date" />
+                <label htmlFor="rw-start" className={INPUT_LABEL}>Preferred start</label>
+                <DateField id="rw-start" value={start} onChange={setStart} className={INPUT} aria-label="Preferred start date" />
               </div>
               <div>
-                <label htmlFor="pkg-end" className={INPUT_LABEL}>Preferred end</label>
-                <DateField id="pkg-end" value={end} onChange={setEnd} min={start || undefined} className={INPUT} aria-label="Preferred end date" />
+                <label htmlFor="rw-end" className={INPUT_LABEL}>Preferred end</label>
+                <DateField id="rw-end" value={end} onChange={setEnd} min={start || undefined} className={INPUT} aria-label="Preferred end date" />
               </div>
               {start && end && end > start && (
                 <p className={`text-xs ${TEXT_SUBTLE}`}>{nights} night{nights === 1 ? '' : 's'} · {days} day{days === 1 ? '' : 's'}</p>
@@ -178,8 +227,13 @@ export function PackageRegisterForm({ pkg, tiers, onClose, onRegistered }: Props
             </div>
           )}
 
-          {step === 3 && (
+          {kind === 'extras' && (
             <div className="space-y-3">
+              {dateMode === 'fixed' && (fixedStart || fixedEnd) && (
+                <p className={`text-xs ${TEXT_SUBTLE}`}>
+                  {nights > 0 ? `${nights} night${nights === 1 ? '' : 's'} · ` : ''}{days} day{days === 1 ? '' : 's'}
+                </p>
+              )}
               {addons.length > 0 && (
                 <fieldset className="space-y-1">
                   <legend className={`${INPUT_LABEL} mb-0`}>Add-ons <span className={TEXT_SUBTLE}>(per day)</span></legend>
@@ -213,16 +267,16 @@ export function PackageRegisterForm({ pkg, tiers, onClose, onRegistered }: Props
                 </fieldset>
               )}
               {addons.length === 0 && rooms.length === 0 && (
-                <p className={`text-sm ${TEXT_SUBTLE}`}>No add-ons or room options for this package.</p>
+                <p className={`text-sm ${TEXT_SUBTLE}`}>No add-ons or room options for this trip.</p>
               )}
             </div>
           )}
 
-          {step === 4 && (
+          {kind === 'review' && (
             <div className="space-y-3">
               <div>
-                <label htmlFor="pkg-notes" className={INPUT_LABEL}>Anything to tell the shop? (optional)</label>
-                <textarea id="pkg-notes" rows={3} value={notes} onChange={e => setNotes(e.target.value)}
+                <label htmlFor="rw-notes" className={INPUT_LABEL}>Anything to tell the shop? (optional)</label>
+                <textarea id="rw-notes" rows={3} value={notes} onChange={e => setNotes(e.target.value)}
                   className={INPUT} placeholder="Dietary needs, experience level, questions…" />
               </div>
               <div className="bg-white/5 border border-white/15 rounded-lg p-3 space-y-1">
@@ -238,22 +292,20 @@ export function PackageRegisterForm({ pkg, tiers, onClose, onRegistered }: Props
                   <span className={TEXT_HEADING}>{money(total)}</span>
                 </div>
               </div>
-              <p className={`text-xs ${TEXT_SUBTLE}`}>
-                This is an estimate only — the final cost will be determined by the partner shop.
-              </p>
+              <p className={`text-xs ${TEXT_SUBTLE}`}>{disclaimer}</p>
             </div>
           )}
 
           <div className="flex gap-2 pt-1">
-            {step > 1 && (
+            {stepIdx > 0 && (
               <button type="button" className={`${BTN_SECONDARY} flex-1 px-4`} disabled={submitting}
-                onClick={() => setStep((step - 1) as Step)}>Back</button>
+                onClick={() => setStepIdx(stepIdx - 1)}>Back</button>
             )}
-            {step < 4 ? (
-              <button type="button" className={`${BTN_PRIMARY} flex-1 disabled:opacity-50`} disabled={!canNext}
-                onClick={() => setStep((step + 1) as Step)}>Next</button>
+            {kind !== 'review' ? (
+              <button type="button" className={`${BTN_PRIMARY} flex-1 disabled:opacity-50`} disabled={!canProceed}
+                onClick={() => setStepIdx(stepIdx + 1)}>Next</button>
             ) : (
-              <button type="button" className={`${BTN_PRIMARY} flex-1 disabled:opacity-50`} disabled={submitting || !tier}
+              <button type="button" className={`${BTN_PRIMARY} flex-1 disabled:opacity-50`} disabled={submitting || !tierOk}
                 onClick={submit}>{submitting ? 'Sending…' : 'Register'}</button>
             )}
           </div>

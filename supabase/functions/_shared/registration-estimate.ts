@@ -1,8 +1,9 @@
-// Authoritative server-side estimate math for package registrations. Duplicates
-// src/lib/package-estimate.ts (which the register form uses for its live
-// preview) because the client bundle and the Deno runtime can't share a module
-// cleanly; src/lib/package-estimate.test.ts asserts the two produce identical
-// output. Kept dependency-free so the edge function's vitest suite can import it.
+// Authoritative server-side estimate math shared by register-package and
+// register-scheduled-trip. Duplicates src/lib/registration-estimate.ts (used by
+// the register wizard for its live preview) because the client bundle and the
+// Deno runtime can't share a module cleanly; src/lib/registration-estimate.test.ts
+// asserts the two produce identical output. Dependency-free so the edge
+// functions' vitest suites can import it.
 
 export type ChargeKind = 'base' | 'addon' | 'room'
 
@@ -12,16 +13,16 @@ export interface ChargeLine {
   amount: number
 }
 
-export interface PackageEstimateItem {
+export interface EstimateItem {
   label: string
   price: number
 }
 
-export interface PackageEstimateInput {
-  tierName: string
-  tierPrice: number
-  addons: PackageEstimateItem[]
-  room: PackageEstimateItem | null
+export interface RegistrationEstimateInput {
+  baseLabel: string
+  basePrice: number
+  addons: EstimateItem[]
+  room: EstimateItem | null
   days: number
   nights: number
 }
@@ -37,13 +38,11 @@ export function rangeDaysNights(
   return { days: nights + 1, nights }
 }
 
-export function buildPackageCharges(input: PackageEstimateInput): ChargeLine[] {
-  const { tierName, tierPrice, addons, room, days, nights } = input
+export function buildRegistrationCharges(input: RegistrationEstimateInput): ChargeLine[] {
+  const { baseLabel, basePrice, addons, room, days, nights } = input
   const dayMult = Math.max(0, days)
   const nightMult = Math.max(0, nights)
-  const lines: ChargeLine[] = [
-    { kind: 'base', label: tierName ? `Package: ${tierName}` : 'Package', amount: tierPrice },
-  ]
+  const lines: ChargeLine[] = [{ kind: 'base', label: baseLabel, amount: basePrice }]
   const daySuffix = dayMult > 1 ? ` (x${dayMult} days)` : ''
   for (const a of addons) {
     const amount = (a.price || 0) * dayMult

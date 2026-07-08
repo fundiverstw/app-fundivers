@@ -22,8 +22,8 @@ vi.mock('../lib/packages', () => ({
 }))
 
 // The register wizard has its own test; stub it here to keep the page focused.
-vi.mock('../components/register/PackageRegisterForm', () => ({
-  PackageRegisterForm: () => null,
+vi.mock('../components/register/RegisterWizard', () => ({
+  RegisterWizard: () => null,
 }))
 
 vi.mock('../hooks/useToast', () => ({

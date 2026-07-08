@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { siteConfig } from '../config/site'
+import { withPublishStamp } from './publish-stamp'
 import type { Package, PackageInsert, PackageStatus, PackageTier } from '../types/database'
 
 // Admin data layer for packages + their price tiers. The hosting partner is a
@@ -32,17 +33,6 @@ export async function fetchPackageTiers(packageId: string): Promise<PackageTier[
     .order('sort_order', { ascending: true })
   if (error) throw error
   return (data ?? []) as PackageTier[]
-}
-
-/**
- * Stamp published_at the first time a package goes live so the board can order
- * by "newest published". Re-publishing keeps the original stamp.
- */
-function withPublishStamp(values: PackageInsert, existing?: Package): PackageInsert {
-  if (values.status === 'published' && !values.published_at && !existing?.published_at) {
-    return { ...values, published_at: new Date().toISOString() }
-  }
-  return values
 }
 
 /**

@@ -1,34 +1,38 @@
 import type { ChargeLine } from './booking-charges'
 import { chargesTotal } from './booking-charges'
 
-// Cost-estimate math for partner-shop package registrations. The estimate is a
-// non-binding quote — the final cost is set by the partner shop. Add-ons are
-// charged per day, the room per night, over the diver's preferred date range.
+// Cost-estimate math shared by the registration flows that quote a non-binding
+// price: partner-shop Packages and the shop's own Scheduled Trips. Add-ons are
+// charged per day, the room per night, over the relevant date range. The
+// estimate is a quote — the final cost is confirmed by the shop / partner.
 //
-// This mirrors supabase/functions/_shared/package-estimate.ts (the authoritative
-// server-side recompute); package-estimate.test.ts asserts the two stay in sync.
+// This mirrors supabase/functions/_shared/registration-estimate.ts (the
+// authoritative server-side recompute); registration-estimate.test.ts asserts
+// the two stay in sync.
 
-export interface PackageEstimateItem {
+export interface EstimateItem {
   label: string
   /** Single-day (add-on) / single-night (room) catalog price. */
   price: number
 }
 
-export interface PackageEstimateInput {
-  tierName: string
-  tierPrice: number
+export interface RegistrationEstimateInput {
+  /** The base line label, e.g. "Package: Deluxe" or "Trip". */
+  baseLabel: string
+  /** The base price (a package tier's price, or a trip's single price). */
+  basePrice: number
   /** Selected add-ons at their per-day catalog price. */
-  addons: PackageEstimateItem[]
+  addons: EstimateItem[]
   /** Selected room at its per-night price, or null when none is chosen. */
-  room: PackageEstimateItem | null
+  room: EstimateItem | null
   days: number
   nights: number
 }
 
 /**
- * Derive nights (the span of the range) and days (nights + 1) from a preferred
- * date range. A same-day range is 0 nights / 1 day. An absent or invalid range
- * yields 0 / 0 so the estimate shows the tier price alone until dates are set.
+ * Derive nights (the span of the range) and days (nights + 1) from a date range.
+ * A same-day range is 0 nights / 1 day. An absent or invalid range yields 0 / 0
+ * so the estimate shows the base price alone until dates are known.
  */
 export function rangeDaysNights(
   start: string | null | undefined,
@@ -42,17 +46,15 @@ export function rangeDaysNights(
 }
 
 /**
- * Itemized estimate lines in the shared ChargeLine shape: the tier base, each
- * selected add-on × days, then the room × nights. Zero-amount lines are dropped
- * (so add-ons before a date range is picked don't appear).
+ * Itemized estimate lines in the shared ChargeLine shape: the base, each selected
+ * add-on × days, then the room × nights. Zero-amount lines are dropped (so add-ons
+ * before a date range is known don't appear).
  */
-export function buildPackageCharges(input: PackageEstimateInput): ChargeLine[] {
-  const { tierName, tierPrice, addons, room, days, nights } = input
+export function buildRegistrationCharges(input: RegistrationEstimateInput): ChargeLine[] {
+  const { baseLabel, basePrice, addons, room, days, nights } = input
   const dayMult = Math.max(0, days)
   const nightMult = Math.max(0, nights)
-  const lines: ChargeLine[] = [
-    { kind: 'base', label: tierName ? `Package: ${tierName}` : 'Package', amount: tierPrice },
-  ]
+  const lines: ChargeLine[] = [{ kind: 'base', label: baseLabel, amount: basePrice }]
   const daySuffix = dayMult > 1 ? ` (x${dayMult} days)` : ''
   for (const a of addons) {
     const amount = (a.price || 0) * dayMult
