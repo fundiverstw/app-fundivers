@@ -1,6 +1,6 @@
-// Lucide "umbrella" (beach parasol) glyph for the Scheduled Trips header
-// shortcut. currentColor so the parent picks the tint — red on the diver
-// header — matching the outline icons beside it.
+// Lucide "parasol" glyph for the Scheduled Trips header shortcut. currentColor
+// so the parent picks the tint — red on the diver header — matching the
+// outline icons beside it.
 export function ScheduledTripsIcon() {
   return (
     <svg
@@ -14,9 +14,9 @@ export function ScheduledTripsIcon() {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M22 12a10.06 10.06 0 0 0-20 0Z" />
-      <path d="M12 12v8a2 2 0 0 0 4 0" />
-      <path d="M12 2v1" />
+      <path d="M12.5 11.134 18.196 21" />
+      <path d="M20.425 5.299a10 10 0 0 0-16.941 9.78c.183.563.843.774 1.355.478L20.16 6.711c.512-.296.66-.973.264-1.413" />
+      <path d="M21 21H3" />
     </svg>
   )
 }
