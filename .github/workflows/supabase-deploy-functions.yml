@@ -45,7 +45,7 @@ jobs:
           # GitHub Releases API, which is rate-limited on shared runners
           # ("Failed to resolve latest Supabase CLI release: rate limit
           # exceeded"). Matches the supabase devDependency in package.json.
-          version: 2.91.3
+          version: 2.109.1
 
       - name: Deploy all edge functions
         run: supabase functions deploy --project-ref "$PROJECT_REF"
