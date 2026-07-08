@@ -267,3 +267,50 @@ img, video, canvas {
 @media (hover: none) and (pointer: coarse), (max-width: 820px) {
   .caustics { display: none; }
 }
+
+/* ── Dark retrofit for untokenized surfaces ──────────────────────────────────
+ * The token seam + reskinned screens cover the main surfaces; many pages (esp.
+ * admin) still compose raw light utilities (white cards, dark brand ink, sky
+ * fills) and would render dark-on-dark. This block flips exactly those family
+ * utilities to the dark look. Left UNLAYERED so it beats Tailwind's (layered)
+ * utilities without !important. The whole app is the dark theme, so no
+ * data-theme guard is needed. Intentional dark-ink-on-bright-accent spots use
+ * text-slate-950 (not brand) so they are NOT flipped here. Status/rainbow colors
+ * and the riced-native bg-white/5–15 fills are deliberately absent. */
+
+/* Dark brand ink → light. */
+.text-brand-950,
+.text-brand-900 { color: var(--color-brand-50); }
+[class*="text-brand-900/"],
+[class*="text-brand-950/"] { color: color-mix(in oklab, var(--color-brand-100) 85%, transparent); }
+.text-brand-800 { color: var(--color-reef-300); }
+.placeholder\:text-brand-900::placeholder { color: color-mix(in oklab, var(--color-brand-100) 45%, transparent); }
+
+/* Translucent-white cards → frosted dark glass. Opaque + the family card alphas
+   only; the riced-native bg-white/5–15 fills are intentionally NOT listed. */
+.bg-white,
+.bg-white\/55,
+.bg-white\/65,
+.bg-white\/70,
+.bg-white\/75,
+.bg-white\/80,
+.bg-white\/85,
+.bg-white\/90 {
+  background-color: color-mix(in oklab, #0d1a2e 62%, transparent);
+}
+.hover\:bg-white\/70:hover,
+.hover\:bg-white\/90:hover {
+  background-color: color-mix(in oklab, #0d1a2e 72%, transparent);
+}
+
+/* Light sky fills → subtle light-on-dark washes. */
+.bg-surface-50  { background-color: color-mix(in oklab, #ffffff 3%, transparent); }
+.bg-surface-100 { background-color: color-mix(in oklab, #ffffff 6%, transparent); }
+.hover\:bg-surface-50:hover,
+.hover\:bg-surface-100:hover { background-color: color-mix(in oklab, #ffffff 10%, transparent); }
+
+/* Light hairlines → faint white hairlines. */
+.border-surface-100,
+.border-surface-200,
+.border-surface-300 { border-color: color-mix(in oklab, #ffffff 12%, transparent); }
+.divide-surface-200 > :not([hidden]) ~ :not([hidden]) { border-color: color-mix(in oklab, #ffffff 12%, transparent); }

@@ -53,7 +53,7 @@ export const ON_DEEP_LINK    = 'text-reef-300 font-semibold hover:text-reef-200 
 // ── Buttons ────────────────────────────────────────────────────────
 const BUTTON_BASE = 'font-semibold py-2 rounded-lg transition-colors disabled:opacity-50'
 // Primary = reef teal on dark ink — the signature CTA (reads on the glow).
-export const BTN_PRIMARY = `${BUTTON_BASE} bg-reef-500 hover:bg-reef-400 text-brand-950`
+export const BTN_PRIMARY = `${BUTTON_BASE} bg-reef-500 hover:bg-reef-400 text-slate-950`
 export const BTN_GHOST   = `${BUTTON_BASE} border border-white/20 text-brand-50 hover:bg-white/10`
 export const BTN_DANGER  = `${BUTTON_BASE} bg-red-500/15 hover:bg-red-500/25 text-red-200 border border-red-400/40`
 export const BTN_LIGHT   = `${BUTTON_BASE} bg-white/10 hover:bg-white/20 text-brand-50 border border-white/15`

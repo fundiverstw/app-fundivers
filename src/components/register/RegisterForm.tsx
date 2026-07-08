@@ -1958,7 +1958,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           </div>
 
           {creditEligible && availableCredit > 0 && (
-            <label className="flex items-start gap-2 text-sm text-brand-950 font-medium bg-emerald-50 border border-emerald-400 rounded-lg p-3">
+            <label className="flex items-start gap-2 text-sm text-brand-950 font-medium bg-emerald-400/10 border border-emerald-400/40 rounded-lg p-3">
               <input
                 type="checkbox"
                 checked={useAccountCredit}
@@ -2044,7 +2044,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           )}
 
           {waiverEligible && missingW && missingW.length > 0 && (
-            <div className="text-xs text-brand-950 font-medium bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2" aria-label="Outstanding waivers">
+            <div className="text-xs text-brand-950 font-medium bg-amber-400/10 border border-amber-400/40 rounded-lg p-3 space-y-2" aria-label="Outstanding waivers">
               <p className="font-semibold text-amber-800">
                 Waivers to sign before this {event.type}
               </p>

@@ -33,8 +33,8 @@ import type { AppEvent, StaffBusyEntry } from '../../types/database'
 const DIVE_LOCAL_BAR       = 'bg-emerald-600 text-white'
 const DIVE_LOCAL_BAR_HOVER = 'bg-emerald-500 text-white'
 const DIVE_LOCAL_DOT       = 'bg-emerald-600'
-const DIVE_TRIP_BAR        = 'bg-yellow-400 text-brand-950'
-const DIVE_TRIP_BAR_HOVER  = 'bg-yellow-300 text-brand-950'
+const DIVE_TRIP_BAR        = 'bg-yellow-400 text-slate-950'
+const DIVE_TRIP_BAR_HOVER  = 'bg-yellow-300 text-slate-950'
 const DIVE_TRIP_DOT        = 'bg-yellow-400'
 
 // Categorical event-type palette — a fixed rainbow (blue/orange/pink/red/purple)

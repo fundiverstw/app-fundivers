@@ -108,7 +108,7 @@ export function CalendarPage() {
         <button
           type="button"
           onClick={() => setMode('multi')}
-          className="w-full mb-3 flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-300 text-brand-950 font-bold py-2.5 px-4 rounded-xl shadow-md border-2 border-amber-500 transition-colors"
+          className="w-full mb-3 flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold py-2.5 px-4 rounded-xl shadow-md border-2 border-amber-500 transition-colors"
         >
           <span className="text-lg leading-none">+</span>
           Register for multiple events
@@ -178,7 +178,7 @@ export function CalendarPage() {
                 type="button"
                 onClick={() => setMultiRegistering(cart)}
                 disabled={cart.length === 0}
-                className="text-sm bg-reef-500 text-brand-950 hover:bg-reef-400 disabled:opacity-50 font-semibold px-3 py-1.5 rounded-lg"
+                className="text-sm bg-reef-500 text-slate-950 hover:bg-reef-400 disabled:opacity-50 font-semibold px-3 py-1.5 rounded-lg"
               >
                 Continue →
               </button>
@@ -212,7 +212,7 @@ export function CalendarPage() {
               className={`w-full py-3 rounded-xl font-semibold transition-colors disabled:opacity-50 ${
                 isBooked(selected)
                   ? 'bg-red-500/15 hover:bg-red-500/25 text-red-200 border border-red-400/40'
-                  : 'bg-reef-500 hover:bg-reef-400 text-brand-950'
+                  : 'bg-reef-500 hover:bg-reef-400 text-slate-950'
               }`}
             >
               {bookingLoading ? '…' : isBooked(selected) ? 'Cancel booking' : 'Register'}
