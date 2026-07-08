@@ -15,9 +15,11 @@ booking system — the booking and the money happen at the partner shop. The app
 It's the *push* complement to **Trusted Partners** (`TrustedPartnersPage`), the
 *pull* side — a diver names a destination and we email them a vetted shop.
 
-> Not to be confused with **Scheduled Trips** (`ScheduledTripsPage` /
-> `scheduled_trips`), the shop's own dated, in-app-bookable trips. Packages are
-> open-ended and registered-for, then booked at the partner shop.
+> Sibling feature: **Scheduled Trips** (`ScheduledTripsPage` / `scheduled_trips`)
+> are the shop's own dated trips. They share this exact registration flow (the
+> generalized `RegisterWizard` + `registration-estimate` + the `listing-ui` admin
+> bits) but are single-price, fixed-date, and email the shop (no partner/kickback).
+> Packages are the partner-shop, tiered, diver-picks-dates variant.
 
 ## Model (`20260708200000_packages_registration.sql`)
 

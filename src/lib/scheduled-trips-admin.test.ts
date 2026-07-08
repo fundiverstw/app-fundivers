@@ -24,7 +24,8 @@ beforeEach(() => {
 const base: ScheduledTrip = {
   id: 's1', created_at: '2026-06-01T00:00:00Z', title: 'Palau Liveaboard', destination: 'Palau',
   summary: null, description: null, start_date: null, end_date: null, price: 80000, currency: 'TWD',
-  hero_image_url: null, highlights: [], status: 'draft', published_at: null, event_id: null, created_by: null,
+  hero_image_url: null, highlights: [], addon_ids: [], room_type_ids: [],
+  status: 'draft', published_at: null, created_by: null,
 }
 
 describe('saveScheduledTrip publish stamp', () => {
@@ -38,6 +39,13 @@ describe('saveScheduledTrip publish stamp', () => {
     const { saveScheduledTrip } = await import('./scheduled-trips-admin')
     await saveScheduledTrip({ title: 'X', destination: 'Y', status: 'draft' })
     expect(lastInsert?.published_at).toBeFalsy()
+  })
+
+  it('passes the catalog add-on/room ids straight through on insert', async () => {
+    const { saveScheduledTrip } = await import('./scheduled-trips-admin')
+    await saveScheduledTrip({ title: 'X', destination: 'Y', status: 'draft', addon_ids: ['a1'], room_type_ids: ['r1'] })
+    expect(lastInsert?.addon_ids).toEqual(['a1'])
+    expect(lastInsert?.room_type_ids).toEqual(['r1'])
   })
 
   it('preserves the original stamp when re-saving an already-published trip', async () => {

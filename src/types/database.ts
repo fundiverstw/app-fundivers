@@ -74,12 +74,13 @@ export interface BookingDetails {
 }
 
 /**
- * Frozen snapshot of a package registration's chosen tier + extras + estimate.
+ * Frozen snapshot of a Package or Scheduled-Trip registration's extras + estimate.
  * Mirrors BookingDetails' `charges` snapshot idea (frozen against later catalog
- * price changes) but is package-shaped: the estimate is a non-binding quote,
- * the final cost is set by the partner shop.
+ * price changes). The estimate is a non-binding quote — the final cost is
+ * confirmed by the partner shop (packages) or the shop (trips). `tier` is set for
+ * packages only.
  */
-export interface PackageRegistrationDetails {
+export interface RegistrationDetails {
   tier?: { id: string; name: string; price: number } | null
   /** Days the range spans (nights + 1); add-ons are charged per day. */
   days?: number
@@ -230,10 +231,9 @@ export interface Database {
           tier_name: string | null
         }>
       }
-      // Defined in 20260707160000_scheduled_trips.sql. Owner-privileged
-      // projection of the shop's PUBLISHED scheduled trips, carrying the linked
-      // event's kind so the client can build the /register/<kind>/<id> link.
-      // Divers have no access to the admin-only scheduled_trips base table.
+      // Owner-privileged projection of the shop's PUBLISHED scheduled trips,
+      // carrying the catalog add-on/room ids the register form needs. Divers have
+      // no access to the admin-only scheduled_trips base table.
       list_scheduled_trips: {
         Args: Record<string, never>
         Returns: Array<{
@@ -248,10 +248,31 @@ export interface Database {
           currency: string
           hero_image_url: string | null
           highlights: string[]
+          addon_ids: string[]
+          room_type_ids: string[]
           published_at: string | null
-          event_id: string | null
-          event_kind: 'dive' | 'course' | null
         }>
+      }
+      // The caller's own scheduled-trip registrations with trip labels + estimate.
+      list_my_scheduled_trip_registrations: {
+        Args: Record<string, never>
+        Returns: Array<{
+          id: string
+          scheduled_trip_id: string
+          status: 'registered' | 'completed' | 'cancelled'
+          created_at: string
+          estimated_cost: number | null
+          estimated_currency: string | null
+          trip_title: string
+          trip_destination: string
+          trip_start_date: string | null
+          trip_end_date: string | null
+        }>
+      }
+      // Diver-owned cancel of their own scheduled-trip registration.
+      cancel_my_scheduled_trip_registration: {
+        Args: { p_id: string }
+        Returns: void
       }
       // Defined in 20260706010000_replace_gear_model_sizes_rpc.sql.
       // Admin-only. Atomically replaces a gear model's size rows (delete +
@@ -911,7 +932,7 @@ export interface Database {
           preferred_end: string | null
           estimated_cost: number | null
           estimated_currency: string | null
-          details: PackageRegistrationDetails
+          details: RegistrationDetails
           notes: string | null
           status: 'registered' | 'completed' | 'cancelled'
           kickback_rate: number | null
@@ -930,7 +951,7 @@ export interface Database {
           preferred_end?: string | null
           estimated_cost?: number | null
           estimated_currency?: string | null
-          details?: PackageRegistrationDetails
+          details?: RegistrationDetails
           notes?: string | null
           status?: 'registered' | 'completed' | 'cancelled'
           kickback_rate?: number | null
@@ -941,9 +962,10 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['package_registrations']['Insert']>
         Relationships: []
       }
-      // Scheduled Trips — the shop's own curated, dated trips. Admin-managed
-      // (base table admin-only); divers read published rows via
-      // list_scheduled_trips(). See 20260707160000_scheduled_trips.sql.
+      // Scheduled Trips — the shop's own curated, dated trips. Self-contained
+      // registration: the trip carries catalog add-on/room ids and divers register
+      // directly (estimate + notify). Admin-managed (base table admin-only); divers
+      // read published rows via list_scheduled_trips().
       scheduled_trips: {
         Row: {
           id: string
@@ -958,9 +980,10 @@ export interface Database {
           currency: string
           hero_image_url: string | null
           highlights: string[]
+          addon_ids: string[]
+          room_type_ids: string[]
           status: 'draft' | 'published' | 'archived'
           published_at: string | null
-          event_id: string | null
           created_by: string | null
         }
         Insert: {
@@ -976,12 +999,43 @@ export interface Database {
           currency?: string
           hero_image_url?: string | null
           highlights?: string[]
+          addon_ids?: string[]
+          room_type_ids?: string[]
           status?: 'draft' | 'published' | 'archived'
           published_at?: string | null
-          event_id?: string | null
           created_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['scheduled_trips']['Insert']>
+        Relationships: []
+      }
+      // One row per diver-registration for a scheduled trip; carries the frozen
+      // estimate snapshot. No kickback (the shop's own trip). Base table admin-only.
+      scheduled_trip_registrations: {
+        Row: {
+          id: string
+          created_at: string
+          scheduled_trip_id: string
+          diver_id: string
+          estimated_cost: number | null
+          estimated_currency: string | null
+          details: RegistrationDetails
+          notes: string | null
+          status: 'registered' | 'completed' | 'cancelled'
+          admin_notes: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          scheduled_trip_id: string
+          diver_id: string
+          estimated_cost?: number | null
+          estimated_currency?: string | null
+          details?: RegistrationDetails
+          notes?: string | null
+          status?: 'registered' | 'completed' | 'cancelled'
+          admin_notes?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['scheduled_trip_registrations']['Insert']>
         Relationships: []
       }
       // Unified dive+course catalog (kind discriminates). Replaced the split
@@ -1602,6 +1656,9 @@ export type KickbackStatus = typeof KICKBACK_STATUSES[number]
 export type ScheduledTrip = Database['public']['Tables']['scheduled_trips']['Row']
 export type ScheduledTripInsert = Database['public']['Tables']['scheduled_trips']['Insert']
 export type ScheduledTripItem = Database['public']['Functions']['list_scheduled_trips']['Returns'][number]
+export type ScheduledTripRegistration = Database['public']['Tables']['scheduled_trip_registrations']['Row']
+export type ScheduledTripRegistrationInsert = Database['public']['Tables']['scheduled_trip_registrations']['Insert']
+export type MyScheduledTripRegistration = Database['public']['Functions']['list_my_scheduled_trip_registrations']['Returns'][number]
 export const SCHEDULED_TRIP_STATUSES = ['draft','published','archived'] as const
 export type ScheduledTripStatus = typeof SCHEDULED_TRIP_STATUSES[number]
 

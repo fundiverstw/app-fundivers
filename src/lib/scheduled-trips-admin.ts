@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { withPublishStamp } from './publish-stamp'
 import type { ScheduledTrip, ScheduledTripInsert, ScheduledTripStatus } from '../types/database'
 
 // Admin data layer for Scheduled Trips. The diver-facing read goes through the
@@ -13,18 +14,6 @@ export async function fetchAllScheduledTrips(): Promise<ScheduledTrip[]> {
     .order('start_date', { ascending: true, nullsFirst: false })
   if (error) throw error
   return (data ?? []) as ScheduledTrip[]
-}
-
-/**
- * Stamp published_at the first time a trip goes live so the board can order by
- * "newest published". Re-publishing keeps the original stamp; we only set it
- * when it's still null.
- */
-function withPublishStamp(values: ScheduledTripInsert, existing?: ScheduledTrip): ScheduledTripInsert {
-  if (values.status === 'published' && !values.published_at && !existing?.published_at) {
-    return { ...values, published_at: new Date().toISOString() }
-  }
-  return values
 }
 
 export async function saveScheduledTrip(values: ScheduledTripInsert, existing?: ScheduledTrip): Promise<void> {

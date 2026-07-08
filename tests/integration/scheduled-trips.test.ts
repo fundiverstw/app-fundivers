@@ -1,35 +1,37 @@
-// Integration tests for Scheduled Trips (20260707160000_scheduled_trips.sql).
+// Integration tests for Scheduled Trips (20260708210000_scheduled_trip_registration.sql).
 // What we lock in against the live stack:
-//   1. The base table is admin-only — a diver reads nothing from scheduled_trips
-//      directly, and a non-admin cannot insert.
-//   2. list_scheduled_trips() returns only PUBLISHED rows and carries the linked
-//      event's kind (null when unlinked) so the client can build a register link.
-//   3. Deleting a linked event sets scheduled_trips.event_id to null (the trip
-//      survives as an informational listing).
+//   1. Base tables are admin-only — a diver reads nothing from scheduled_trips /
+//      scheduled_trip_registrations directly, and a non-admin cannot insert.
+//   2. list_scheduled_trips() returns only PUBLISHED rows and carries the catalog
+//      add-on/room ids (no event columns anymore).
+//   3. list_my_scheduled_trip_registrations() is caller-scoped; the one-live index
+//      blocks a duplicate live registration; a diver cancels their own via the RPC.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import {
   adminClient, userClient,
-  createTestUser, deleteTestUser, createTestDive, deleteTestDive,
+  createTestUser, deleteTestUser,
   type TestUser,
 } from './helpers'
 
 const admin = adminClient()
 let adminUser: TestUser
 let diver: TestUser
+let otherDiver: TestUser
 const cleanupUsers: string[] = []
 const cleanupTrips: string[] = []
-const cleanupEvents: string[] = []
 
 async function createTrip(args: {
   status?: 'draft' | 'published' | 'archived'
-  eventId?: string | null
   overrides?: Record<string, unknown>
-}): Promise<string> {
+} = {}): Promise<string> {
   const { data, error } = await admin.from('scheduled_trips').insert({
     title: 'Green Island Weekend',
     destination: 'Green Island',
     status: args.status ?? 'published',
-    event_id: args.eventId ?? null,
+    price: 12000,
+    currency: 'TWD',
+    start_date: '2026-09-01',
+    end_date: '2026-09-03',
     published_at: args.status === 'published' || args.status === undefined ? new Date().toISOString() : null,
     ...args.overrides,
   } as never).select('id').single()
@@ -39,25 +41,39 @@ async function createTrip(args: {
   return id
 }
 
+/** Insert a registration the way the register-scheduled-trip edge function does. */
+async function createRegistration(tripId: string, diverId: string, estimatedCost = 12000) {
+  return admin.from('scheduled_trip_registrations').insert({
+    scheduled_trip_id: tripId,
+    diver_id: diverId,
+    estimated_cost: estimatedCost,
+    estimated_currency: 'TWD',
+  } as never).select('id').single()
+}
+
 beforeAll(async () => {
-  adminUser = await createTestUser(admin, { role: 'admin' })
-  diver     = await createTestUser(admin, { role: 'diver' })
-  cleanupUsers.push(adminUser.id, diver.id)
+  adminUser  = await createTestUser(admin, { role: 'admin' })
+  diver      = await createTestUser(admin, { role: 'diver' })
+  otherDiver = await createTestUser(admin, { role: 'diver' })
+  cleanupUsers.push(adminUser.id, diver.id, otherDiver.id)
 })
 
 afterAll(async () => {
   for (const id of cleanupTrips) await admin.from('scheduled_trips').delete().eq('id', id)
-  for (const id of cleanupEvents) await deleteTestDive(admin, id)
   for (const id of cleanupUsers) await deleteTestUser(admin, id)
 })
 
-describe('base table is admin-only', () => {
-  it('a diver reads nothing from scheduled_trips directly', async () => {
-    await createTrip({ status: 'published' })
+describe('base tables are admin-only', () => {
+  it('a diver reads nothing from scheduled_trips / scheduled_trip_registrations directly', async () => {
+    const trip = await createTrip({ status: 'published' })
+    await createRegistration(trip, diver.id)
     const asDiver = await userClient(diver.email, diver.password)
-    const { data, error } = await asDiver.from('scheduled_trips').select('*')
-    expect(error).toBeNull()          // RLS filters rows, it doesn't error
-    expect(data ?? []).toHaveLength(0)
+
+    for (const table of ['scheduled_trips', 'scheduled_trip_registrations'] as const) {
+      const { data, error } = await asDiver.from(table).select('*')
+      expect(error).toBeNull()          // RLS filters rows, it doesn't error
+      expect(data ?? []).toHaveLength(0)
+    }
   })
 
   it('a non-admin cannot insert a scheduled trip', async () => {
@@ -69,48 +85,70 @@ describe('base table is admin-only', () => {
 })
 
 describe('list_scheduled_trips()', () => {
-  it('shows only published trips and carries the linked event kind', async () => {
-    const eventId = await createTestDive(admin)
-    cleanupEvents.push(eventId)
-    const published = await createTrip({ status: 'published', eventId, overrides: { title: 'Published Trip' } })
+  it('shows only published trips and carries the catalog ids', async () => {
+    const published = await createTrip({ status: 'published', overrides: { title: 'Published Trip' } })
     await createTrip({ status: 'draft', overrides: { title: 'Draft Trip' } })
-    await createTrip({ status: 'archived', overrides: { title: 'Archived Trip' } })
 
     const asDiver = await userClient(diver.email, diver.password)
     const { data: list, error } = await asDiver.rpc('list_scheduled_trips')
     expect(error).toBeNull()
 
-    const match = (list ?? []).filter(r => (r as { id: string }).id === published)
-    expect(match).toHaveLength(1)
-    const row = match[0] as Record<string, unknown>
+    const row = (list ?? []).find(r => (r as { id: string }).id === published) as Record<string, unknown>
     expect(row.title).toBe('Published Trip')
-    expect(row.event_id).toBe(eventId)
-    expect(row.event_kind).toBe('dive')
+    expect(Array.isArray(row.addon_ids)).toBe(true)
+    expect(Array.isArray(row.room_type_ids)).toBe(true)
+    expect('event_id' in row).toBe(false)
 
     const titles = (list ?? []).map(r => (r as { title: string }).title)
     expect(titles).not.toContain('Draft Trip')
-    expect(titles).not.toContain('Archived Trip')
-  })
-
-  it('returns a null event_kind for an unlinked trip', async () => {
-    const id = await createTrip({ status: 'published', eventId: null, overrides: { title: 'Unlinked Trip' } })
-    const asDiver = await userClient(diver.email, diver.password)
-    const { data: list } = await asDiver.rpc('list_scheduled_trips')
-    const row = (list ?? []).find(r => (r as { id: string }).id === id) as Record<string, unknown>
-    expect(row.event_id).toBeNull()
-    expect(row.event_kind).toBeNull()
   })
 })
 
-describe('event link lifecycle', () => {
-  it('nulls event_id when the linked event is deleted, keeping the trip', async () => {
-    const eventId = await createTestDive(admin)
-    const tripId = await createTrip({ status: 'published', eventId })
+describe('list_my_scheduled_trip_registrations()', () => {
+  it('scopes to the caller with trip labels + estimate', async () => {
+    const trip = await createTrip({ status: 'published' })
+    await createRegistration(trip, diver.id, 15400)
+    await createRegistration(trip, otherDiver.id)
 
-    await deleteTestDive(admin, eventId)
+    const asDiver = await userClient(diver.email, diver.password)
+    const { data: mineAll, error } = await asDiver.rpc('list_my_scheduled_trip_registrations')
+    expect(error).toBeNull()
+    const mine = (mineAll ?? []).filter(r => (r as { scheduled_trip_id: string }).scheduled_trip_id === trip)
+    expect(mine).toHaveLength(1)
+    const row = mine[0] as Record<string, unknown>
+    expect(row.trip_title).toBe('Green Island Weekend')
+    expect(Number(row.estimated_cost)).toBe(15400)
+  })
+})
 
-    const { data } = await admin.from('scheduled_trips').select('id, event_id').eq('id', tripId).single()
-    expect((data as { id: string }).id).toBe(tripId)
-    expect((data as { event_id: string | null }).event_id).toBeNull()
+describe('cancel_my_scheduled_trip_registration()', () => {
+  it('cancels the caller’s own row and frees the one-live index', async () => {
+    const trip = await createTrip({ status: 'published' })
+    const ins = await createRegistration(trip, diver.id)
+    const id = (ins.data as { id: string }).id
+
+    const dup = await createRegistration(trip, diver.id)
+    expect(dup.error).not.toBeNull()
+
+    const asDiver = await userClient(diver.email, diver.password)
+    const { error } = await asDiver.rpc('cancel_my_scheduled_trip_registration', { p_id: id })
+    expect(error).toBeNull()
+
+    const { data: after } = await admin.from('scheduled_trip_registrations').select('status').eq('id', id).single()
+    expect((after as { status: string }).status).toBe('cancelled')
+
+    const retry = await createRegistration(trip, diver.id)
+    expect(retry.error).toBeNull()
+  })
+
+  it('cannot cancel another diver’s registration', async () => {
+    const trip = await createTrip({ status: 'published' })
+    const ins = await createRegistration(trip, otherDiver.id)
+    const id = (ins.data as { id: string }).id
+
+    const asDiver = await userClient(diver.email, diver.password)
+    await asDiver.rpc('cancel_my_scheduled_trip_registration', { p_id: id })
+    const { data: after } = await admin.from('scheduled_trip_registrations').select('status').eq('id', id).single()
+    expect((after as { status: string }).status).toBe('registered')
   })
 })

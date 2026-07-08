@@ -2,8 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
+import { mockQueryBuilder } from '../../../tests/test-utils'
 import { AdminScheduledTripsPage } from './AdminScheduledTripsPage'
-import type { ScheduledTrip, AppEvent } from '../../types/database'
+import type { ScheduledTrip } from '../../types/database'
 
 const {
   fetchAllScheduledTrips, saveScheduledTrip, setScheduledTripStatus, deleteScheduledTrip,
@@ -21,28 +22,34 @@ vi.mock('../../lib/scheduled-trips-admin', () => ({
   deleteScheduledTrip: (...a: unknown[]) => deleteScheduledTrip(...a),
 }))
 
-const { fetchEventsInRange } = vi.hoisted(() => ({ fetchEventsInRange: vi.fn() }))
-vi.mock('../../lib/events', () => ({
-  fetchEventsInRange: (...a: unknown[]) => fetchEventsInRange(...a),
-  formatEventSpan: () => 'Sep 1, 2026',
+// The page counts new registrations on mount; the Registrations tab itself is
+// covered in AdminScheduledTripRegistrationsTab.test.tsx, so stub it here.
+vi.mock('../../lib/scheduled-trip-registrations', () => ({
+  countNewRegistrations: vi.fn().mockResolvedValue(0),
 }))
-vi.mock('../../lib/logistics', () => ({ dayKeyOffset: () => '2027-01-01' }))
+vi.mock('../../components/admin/AdminScheduledTripRegistrationsTab', () => ({
+  AdminScheduledTripRegistrationsTab: () => <div>registrations tab</div>,
+}))
+
+// The trip form loads the add-on/room catalog straight from supabase.
+vi.mock('../../lib/supabase', () => ({
+  supabase: { from: () => mockQueryBuilder({ data: [] }) },
+}))
 
 vi.mock('../../hooks/useToast', () => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }),
 }))
 
 const trip: ScheduledTrip = {
-  id: 's1', created_at: '2026-06-01T00:00:00Z', title: 'Palau Liveaboard', destination: 'Palau',
-  summary: null, description: null, start_date: '2026-09-01', end_date: '2026-09-07', price: 80000, currency: 'TWD',
-  hero_image_url: null, highlights: [], status: 'draft', published_at: null, event_id: null, created_by: null,
+  id: 's1', created_at: '2026-06-02T00:00:00Z', title: 'Palau Liveaboard', destination: 'Palau',
+  summary: null, description: null, start_date: null, end_date: null, price: 80000, currency: 'TWD',
+  hero_image_url: null, highlights: [], addon_ids: [], room_type_ids: [],
+  status: 'draft', published_at: null, created_by: null,
 }
-const event = { id: 'e1', type: 'dive', title: 'Palau Boat Day', start_time: '2026-09-01T00:00:00Z', end_time: null, start_time_hhmm: null } as unknown as AppEvent
 
 beforeEach(() => {
   for (const m of [fetchAllScheduledTrips, saveScheduledTrip, setScheduledTripStatus, deleteScheduledTrip]) m.mockReset()
   fetchAllScheduledTrips.mockResolvedValue([trip])
-  fetchEventsInRange.mockResolvedValue([event])
   saveScheduledTrip.mockResolvedValue(undefined)
   setScheduledTripStatus.mockResolvedValue(undefined)
   deleteScheduledTrip.mockResolvedValue(undefined)
@@ -53,11 +60,19 @@ function renderPage() {
 }
 
 describe('AdminScheduledTripsPage', () => {
-  it('lists scheduled trips with status and unlinked marker', async () => {
+  it('lists trips by default with their destination and status', async () => {
     renderPage()
     expect(await screen.findByText('Palau Liveaboard')).toBeInTheDocument()
-    expect(screen.getByText(/not linked \(informational\)/)).toBeInTheDocument()
+    expect(screen.getByText('Palau')).toBeInTheDocument()
     expect(screen.getByText('draft')).toBeInTheDocument()
+  })
+
+  it('switches to the Registrations tab', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Palau Liveaboard')
+    await user.click(screen.getByRole('tab', { name: /Registrations/ }))
+    expect(await screen.findByText('registrations tab')).toBeInTheDocument()
   })
 
   it('publishes a draft trip', async () => {
@@ -68,7 +83,18 @@ describe('AdminScheduledTripsPage', () => {
     await waitFor(() => expect(setScheduledTripStatus).toHaveBeenCalledWith(trip, 'published'))
   })
 
-  it('creates a trip linked to a catalog event', async () => {
+  it('opens the new-trip form', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Palau Liveaboard')
+    await user.click(screen.getByRole('button', { name: /New trip/ }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: 'New trip' })).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Title *')).toBeInTheDocument()
+  })
+
+  it('creates a trip carrying its catalog add-on/room ids', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Palau Liveaboard')
@@ -77,13 +103,14 @@ describe('AdminScheduledTripsPage', () => {
     const dialog = await screen.findByRole('dialog')
     await user.type(within(dialog).getByLabelText('Title *'), 'Green Island Weekend')
     await user.type(within(dialog).getByLabelText('Destination *'), 'Green Island')
-    await user.selectOptions(within(dialog).getByLabelText('Register via event'), 'e1')
     await user.click(within(dialog).getByRole('button', { name: /Create trip/ }))
 
     await waitFor(() => expect(saveScheduledTrip).toHaveBeenCalled())
-    const [values] = saveScheduledTrip.mock.calls[0]
+    const [values, existing] = saveScheduledTrip.mock.calls[0]
     expect(values).toMatchObject({
-      title: 'Green Island Weekend', destination: 'Green Island', event_id: 'e1', status: 'draft',
+      title: 'Green Island Weekend', destination: 'Green Island',
+      status: 'draft', addon_ids: [], room_type_ids: [],
     })
+    expect(existing).toBeUndefined()
   })
 })
