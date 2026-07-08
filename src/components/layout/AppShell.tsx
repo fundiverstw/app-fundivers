@@ -99,6 +99,7 @@ export function AppShell() {
           >
             <ScheduledTripsIcon />
           </Link>
+          <NotificationBell />
         </div>
         <Link to="/dashboard" aria-label="Home" className="shrink-0">
           <Logo size="sm" beta={false} />
@@ -109,7 +110,6 @@ export function AppShell() {
               Install app
             </button>
           )}
-          <NotificationBell />
           {profile?.role === 'admin' || profile?.role === 'staff' ? (
             <Link to={profile.role === 'admin' ? '/admin' : '/admin/events'} className={`text-sm ${ON_DEEP_BODY} hover:text-white`}>
               {personName(profile.name, profile.nickname)}
