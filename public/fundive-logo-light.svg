@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 260" width="780" height="260" role="img" aria-label="FunDive — dive shop management software">
+  <defs>
+    <linearGradient id="glass" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#89c2d9"/>
+      <stop offset="0.5" stop-color="#2a6f97"/>
+      <stop offset="1" stop-color="#013a63"/>
+    </linearGradient>
+    <clipPath id="frameClip"><rect x="20" y="64" width="200" height="112" rx="44"/></clipPath>
+    <style>
+      .word { font: 800 88px "Segoe UI", Helvetica, Arial, sans-serif; letter-spacing: -2px; }
+      .kick { font: 700 19px "Segoe UI", Helvetica, Arial, sans-serif; letter-spacing: 6px; }
+    </style>
+  </defs>
+
+  <!-- ===== dive-mask mark ===== -->
+  <g transform="translate(14,20) scale(0.86)">
+    <!-- strap buckles -->
+    <rect x="2" y="104" width="26" height="34" rx="8" fill="#cbd5e1"/>
+    <rect x="212" y="104" width="26" height="34" rx="8" fill="#cbd5e1"/>
+
+    <!-- dive-flag fill (white field + bold red diagonal), clipped to frame -->
+    <g clip-path="url(#frameClip)">
+      <rect x="20" y="64" width="200" height="112" fill="#ffffff"/>
+      <line x1="0" y1="44" x2="240" y2="196" stroke="#e63329" stroke-width="52"/>
+    </g>
+
+    <!-- frame outline -->
+    <rect x="20" y="64" width="200" height="112" rx="44" fill="none" stroke="#0b1324" stroke-width="12"/>
+
+    <!-- glass lenses (the "app screens") -->
+    <rect x="44" y="102" width="66" height="62" rx="20" fill="url(#glass)" stroke="#0b1324" stroke-width="8"/>
+    <rect x="130" y="102" width="66" height="62" rx="20" fill="url(#glass)" stroke="#0b1324" stroke-width="8"/>
+    <ellipse cx="64" cy="120" rx="12" ry="7" fill="#ffffff" opacity="0.5"/>
+    <ellipse cx="150" cy="120" rx="12" ry="7" fill="#ffffff" opacity="0.5"/>
+
+    <!-- bubbles -->
+    <circle cx="204" cy="58" r="10" fill="#89c2d9"/>
+    <circle cx="224" cy="36" r="6" fill="#a9d6e5"/>
+  </g>
+
+  <!-- ===== wordmark ===== -->
+  <text x="252" y="138" class="word"><tspan fill="#ffffff">Fun</tspan><tspan fill="#7dd3fc">Dive</tspan></text>
+  <rect x="254" y="158" width="34" height="8" rx="2" fill="#e63329"/>
+  <text x="298" y="181" class="kick" fill="#9fd3e8">DIVE SHOP MANAGEMENT</text>
+</svg>

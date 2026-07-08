@@ -21,17 +21,23 @@ export function DashboardPage() {
         <FeaturedEvents />
       </div>
 
-      {/* Version slot — bottom-right, clear of the bottom nav. Shows "Beta" today;
-          eventually holds the running fundive version. Links to the fundive
-          (open-source) project on GitHub. */}
+      {/* Powered-by mark — bottom-right, clear of the bottom nav. The whole
+          fundive logo links to the open-source project on GitHub, with the
+          version / "beta" tag on its bottom-right corner. The light-ink variant
+          reads on the dark ocean background. */}
       <a
         href="https://github.com/fundive"
         target="_blank"
         rel="noopener noreferrer"
-        aria-label="fundive on GitHub"
-        className="fixed bottom-20 right-4 z-40 rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold uppercase leading-none tracking-wide text-white shadow-lg transition-colors hover:bg-red-400"
+        aria-label="Built with fundive — view on GitHub"
+        className="group fixed bottom-20 right-4 z-40 transition-opacity hover:opacity-100 opacity-80"
       >
-        Beta
+        <span className="relative inline-block">
+          <img src="/fundive-logo-light.svg" alt="fundive" className="h-7 w-auto drop-shadow-lg" />
+          <span className="absolute -bottom-2 -right-1 rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none tracking-wide text-white shadow">
+            beta
+          </span>
+        </span>
       </a>
     </div>
   )
