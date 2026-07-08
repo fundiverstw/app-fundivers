@@ -25,22 +25,28 @@ on conflict ("id") do nothing;
 
 -- Featured upcoming dives ------------------------------------------------
 -- Three variants so the panel and calendar show range: a single-day trip, a
--- multi-day trip, and a fully-booked one (renders the "waitlist" flag).
+-- multi-day trip, and a fully-booked one (renders the "waitlist" flag). Two
+-- carry a featured_image (wix ref → self-hosted /imgs/media copy) so the
+-- image-led hero cards are exercised; the third has none, exercising the
+-- gradient fallback.
 insert into public.events
-  ("id", "kind", "admin_title", "display_title", "calendar_title", "notes",
+  ("id", "kind", "admin_title", "display_title", "calendar_title", "notes", "featured_image",
    "start_date", "start_time", "end_date",
    "featured", "fully_booked", "price", "nitrox_required", "dive_days", "is_private")
 values
   ('fdd00000-0000-4000-8000-000000000001', 'dive',
    'Green Island Boat Dives', 'Green Island Boat Dives', 'Green Island', '2 Boat Dives',
+   'wix:image://v1/b37fef_336fa72d68ae4cd19dcf205ba6cc555a~mv2.jpg/P1010608.jpg#originWidth=1883&originHeight=1062',
    CURRENT_DATE + 10, '08:00:00', NULL,
    true, false, 'fee00000-0000-4000-8000-000000000001', false, 2, false),
   ('fdd00000-0000-4000-8000-000000000002', 'dive',
    'Kenting Weekend Getaway', 'Kenting Weekend Getaway', 'Kenting', '3D2N 5 Boat Dives',
+   'wix:image://v1/b37fef_a4be3af87a29488185d944aee75ffda9~mv2.jpg/P2080453-Giant%20Trevally-Similan-Surin%20Islands.jpg#originWidth=3684&originHeight=2078',
    CURRENT_DATE + 24, '07:30:00', CURRENT_DATE + 26,
    true, false, 'fee00000-0000-4000-8000-000000000001', false, 3, false),
   ('fdd00000-0000-4000-8000-000000000003', 'dive',
    'Orchid Island Liveaboard', 'Orchid Island Liveaboard', 'Orchid Island', '4D3N 8 Boat Dives',
+   NULL,
    CURRENT_DATE + 40, '06:30:00', CURRENT_DATE + 43,
    true, true, 'fee00000-0000-4000-8000-000000000001', false, 4, false)
 on conflict ("id") do nothing;
