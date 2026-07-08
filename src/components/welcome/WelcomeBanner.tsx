@@ -23,11 +23,11 @@ export function WelcomeBanner({ user }: { user: User }) {
   if (!shouldShow) return null
 
   return (
-    <div className="bg-white/65 backdrop-blur-md border border-accent rounded-xl p-4 flex items-center gap-3 shadow-lg">
+    <div className="glass glow-teal rounded-2xl p-4 flex items-center gap-3 shadow-lg">
       <img src={siteConfig.assets.logo} alt="" aria-hidden="true" className="w-12 h-auto shrink-0" />
-      <div className="text-sm text-brand-900">
-        <p className="font-semibold">Welcome to {siteConfig.identity.shortName}!</p>
-        <p className="text-brand-900 font-medium text-xs mt-0.5">
+      <div className="text-sm text-brand-50">
+        <p className="font-semibold text-white">Welcome to {siteConfig.identity.shortName}!</p>
+        <p className="text-brand-100/80 font-medium text-xs mt-0.5">
           Your account is ready. Browse upcoming events on the Calendar tab, or jump into your registrations on Bookings.
         </p>
       </div>

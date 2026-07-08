@@ -6,29 +6,12 @@ import { DashboardPage } from './DashboardPage'
 const { useAuthMock } = vi.hoisted(() => ({ useAuthMock: vi.fn() }))
 vi.mock('../hooks/useAuth', () => ({ useAuth: () => useAuthMock() }))
 // FeaturedEvents fetches on mount; it has its own test. Stub it here so these
-// tests stay focused on the bubble overlay and welcome banner.
+// tests stay focused on the caustics background and welcome banner.
 vi.mock('../components/dashboard/FeaturedEvents', () => ({
   FeaturedEvents: () => null,
 }))
 
-// happy-dom provides a Canvas stub but getContext returns null by default.
-// We replace it with a minimal 2d-context stand-in so the effect can complete
-// without throwing. The actual rAF loop is not inspected.
 beforeEach(() => {
-  vi.stubGlobal('ResizeObserver', class {
-    observe() {}
-    disconnect() {}
-    unobserve() {}
-  })
-  HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
-    setTransform: vi.fn(),
-    fillRect:     vi.fn(),
-    beginPath:    vi.fn(),
-    arc:          vi.fn(),
-    fill:         vi.fn(),
-    scale:        vi.fn(),
-    fillStyle:    '',
-  })) as unknown as HTMLCanvasElement['getContext']
   useAuthMock.mockReset()
 })
 
@@ -37,10 +20,12 @@ function renderPage() {
 }
 
 describe('DashboardPage', () => {
-  it('renders the bubbles canvas', () => {
+  it('renders the animated caustics background', () => {
     useAuthMock.mockReturnValue({ user: null, profile: null })
     renderPage()
-    expect(document.querySelector('canvas')).not.toBeNull()
+    expect(document.querySelector('.caustics')).not.toBeNull()
+    // Two fractal-noise layers.
+    expect(document.querySelectorAll('.caustics-layer')).toHaveLength(2)
   })
 
   it('shows the WelcomeBanner for a user welcomed within the last 24h', () => {
