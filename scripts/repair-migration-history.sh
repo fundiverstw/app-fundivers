@@ -4,25 +4,38 @@
 # pre-squash version, so `supabase db push` errors with:
 #   "Remote migration versions not found in local migrations directory."
 #
-# This marks all 137 pre-squash versions as "reverted" in the remote registry.
-# It touches ONLY supabase_migrations.schema_migrations (the registry table) --
-# NOT your schema or data. The 20260707230000 baseline stays applied and matches
-# the current prod schema (it is a faithful squash), so nothing re-runs.
+# This marks all 137 pre-squash versions as "reverted" in the remote registry,
+# then refreshes the 20260707230000 entry (recorded remotely under its old name
+# drop_compat_views) to the squashed_baseline file. It touches ONLY
+# supabase_migrations.schema_migrations (the registry table) -- NOT your schema
+# or data. The baseline is a faithful squash of prod, so nothing re-runs.
 #
+# Run via `make repair-history`, `npm run db:repair-history`, or this file directly.
 # PREREQ: run `make backup-prod` first. Run on a networked machine, project linked.
 # AFTER:  run `make push` to apply the post-baseline migrations (Wix junction
 #         triggers) -- future pushes then work normally.
 set -euo pipefail
+
 cd "$(dirname "$0")/.."
+export PATH="$PWD/node_modules/.bin:$PATH"   # resolve dotenv/supabase when run via bash, not just npm
+export DO_NOT_TRACK=1                        # skip PostHog telemetry (its shutdown timeout returns a spurious non-zero)
 
 VERSIONS="20260416111642 20260421130941 20260421150000 20260421160000 20260421170000 20260422100000 20260422110000 20260422160000 20260422170000 20260422180000 20260422190000 20260422200000 20260422210000 20260422220000 20260423000000 20260423120000 20260423130000 20260423140000 20260423150000 20260425000000 20260426000000 20260426010000 20260427000000 20260427100000 20260427110000 20260427120000 20260428000000 20260428100000 20260428200000 20260429000000 20260429100000 20260429200000 20260429210000 20260429220000 20260429230000 20260429240000 20260430000000 20260430010000 20260430020000 20260430030000 20260430040000 20260430153210 20260501000000 20260501100000 20260504010000 20260505000000 20260505010000 20260505020000 20260505030000 20260505040000 20260505050000 20260506000000 20260507000000 20260507010000 20260508000000 20260509000000 20260510000000 20260510020000 20260514000000 20260514010000 20260514020000 20260514030000 20260514040000 20260518000000 20260518010000 20260519000000 20260519010000 20260519020000 20260520000000 20260521000000 20260521010000 20260521020000 20260528000000 20260528010000 20260602000000 20260603000000 20260603010000 20260603020000 20260603030000 20260603040000 20260603050000 20260603060000 20260603070000 20260603080000 20260607000000 20260608000000 20260608010000 20260609000000 20260609010000 20260609020000 20260614000000 20260614010000 20260616000000 20260617000000 20260618150000 20260619000000 20260620000000 20260622000000 20260623000000 20260624000000 20260626000000 20260627000000 20260628000000 20260629000000 20260629010000 20260702000000 20260703000000 20260703010000 20260703020000 20260705000000 20260706000000 20260706010000 20260706020000 20260707000000 20260707010000 20260707020000 20260707030000 20260707040000 20260707045000 20260707050000 20260707060000 20260707070000 20260707080000 20260707090000 20260707100000 20260707110000 20260707120000 20260707130000 20260707140000 20260707150000 20260707160000 20260707170000 20260707180000 20260707190000 20260707200000 20260707210000 20260707220000"
 
+repair() {  # $* = repair args (everything after `migration repair`)
+  local rc=0
+  dotenv -e .env.local -- sh -c \
+    "supabase migration repair $* --password \"\$SUPABASE_DB_PASSWORD\"" || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    echo "  note: supabase exited $rc — if that was only the telemetry-shutdown timeout the change applied." >&2
+    echo "        Verify afterwards with: dotenv -e .env.local -- sh -c 'supabase migration list --linked --password \"\$SUPABASE_DB_PASSWORD\"'" >&2
+  fi
+}
+
 echo "Marking 137 pre-squash migration versions as reverted on the linked prod registry..."
-dotenv -e .env.local -- sh -c "supabase migration repair --status reverted $VERSIONS --password \"\$SUPABASE_DB_PASSWORD\""
+repair --status reverted $VERSIONS
 
-# The remote recorded 20260707230000 under its old name (drop_compat_views); refresh
-# that registry row to the squashed_baseline file so push sees no name/checksum drift.
 echo "Aligning the 20260707230000 baseline entry to the squashed_baseline file..."
-dotenv -e .env.local -- sh -c "supabase migration repair --status applied 20260707230000 --password \"\$SUPABASE_DB_PASSWORD\""
+repair --status applied 20260707230000
 
-echo "Done. Registry now lists only 20260707230000 (applied). Next: make push"
+echo "Done. Registry should now list only 20260707230000 (applied). Next: make push"
