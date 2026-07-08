@@ -142,6 +142,16 @@ describe('list_package_board()', () => {
     const titles = (board ?? []).map(r => (r as { title: string }).title)
     expect(titles).not.toContain('Draft Package')
   })
+
+  it('hides a published product whose partner is inactive', async () => {
+    const shop = await createShop({ active: false })
+    const hidden = await createPackage({ shopId: shop, status: 'published', overrides: { title: 'Inactive Partner Package' } })
+    await createTier(hidden, 'A', 40000)
+
+    const asDiver = await userClient(diver.email, diver.password)
+    const { data: board } = await asDiver.rpc('list_package_board')
+    expect((board ?? []).some(r => (r as { id: string }).id === hidden)).toBe(false)
+  })
 })
 
 describe('list_package_tiers()', () => {

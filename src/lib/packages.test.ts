@@ -41,6 +41,15 @@ describe('registerForPackage', () => {
     const { registerForPackage } = await import('./packages')
     await expect(registerForPackage(input)).rejects.toBeTruthy()
   })
+
+  it('surfaces the server error body from the FunctionsHttpError context', async () => {
+    invoke.mockResolvedValue({
+      data: null,
+      error: { message: 'Edge Function returned a non-2xx status code', context: { json: async () => ({ error: 'tier not found for this package' }) } },
+    })
+    const { registerForPackage } = await import('./packages')
+    await expect(registerForPackage(input)).rejects.toThrow(/tier not found for this package/)
+  })
 })
 
 describe('fetchPackageBoard', () => {

@@ -22,10 +22,12 @@ describe('parseRegisterPackageInput', () => {
     expect('request' in res && res.request.addonIds).toEqual([])
   })
 
-  it('rejects missing tier, missing dates, and a reversed range', () => {
+  it('rejects missing tier, missing dates, a reversed range, and a same-day range', () => {
     expect(parseRegisterPackageInput({ ...ok, tier_id: '' })).toHaveProperty('error')
     expect(parseRegisterPackageInput({ ...ok, preferred_start: '' })).toHaveProperty('error')
     expect(parseRegisterPackageInput({ ...ok, preferred_start: '2026-08-09' })).toHaveProperty('error')
+    // A same-day range would zero out per-night room pricing, so require >= 1 night.
+    expect(parseRegisterPackageInput({ ...ok, preferred_end: ok.preferred_start })).toHaveProperty('error')
   })
 
   it('rejects a non-YYYY-MM-DD date', () => {

@@ -45,7 +45,7 @@ export function parseRegisterPackageInput(
   if (!packageId) return { error: 'Pick a package first.' }
   if (!tierId) return { error: 'Choose a package tier.' }
   if (!preferredStart || !preferredEnd) return { error: 'Pick your preferred dates.' }
-  if (preferredEnd < preferredStart) return { error: 'The end date must be on or after the start date.' }
+  if (preferredEnd <= preferredStart) return { error: 'The end date must be at least one night after the start date.' }
   if (notes.length > PACKAGE_NOTES_MAX) return { error: 'Notes are too long.' }
 
   return {

@@ -113,7 +113,7 @@ create or replace function public.list_package_board() returns table(
     p.published_at, tp.id, tp.name, tp.country, tp.location, tp.website, tp.logo_url, tp.vouch_notes
   from public.packages p
   join public.trusted_partners tp on tp.id = p.trusted_partner_id
-  where p.status = 'published'
+  where p.status = 'published' and tp.active
 $$;
 alter function public.list_package_board() owner to postgres;
 

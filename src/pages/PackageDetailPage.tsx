@@ -170,10 +170,16 @@ export function PackageDetailPage() {
           pkg={pkg}
           tiers={tiers}
           onClose={() => setFormOpen(false)}
-          onRegistered={async () => {
+          onRegistered={async (result) => {
             setFormOpen(false)
             await refreshRegistration()
-            toast.success('You’re registered — we’ve emailed the shop and you a summary.')
+            if (result.already_registered) {
+              toast.success('You already have a live registration for this package.')
+            } else if (result.emailed) {
+              toast.success('You’re registered — we’ve emailed the shop and you a summary.')
+            } else {
+              toast.success('You’re registered — we’ll pass your details to the shop.')
+            }
           }}
         />
       )}

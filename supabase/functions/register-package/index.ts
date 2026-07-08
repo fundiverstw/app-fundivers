@@ -162,6 +162,7 @@ Deno.serve(async (req) => {
           estimated_cost: existing.estimated_cost,
           estimated_currency: existing.estimated_currency,
           already_registered: true,
+          emailed: false,
         })
       }
     }
@@ -176,6 +177,7 @@ Deno.serve(async (req) => {
     .from("profiles").select("name, nickname").eq("id", diverId).maybeSingle()
   const diverName = [profile?.name, profile?.nickname ? `(${profile.nickname})` : null].filter(Boolean).join(" ")
 
+  let emailed = false
   if (GMAIL_USER && GMAIL_PASS && partner?.active && partner.contact_email) {
     const { subject, partnerText, diverText } = buildPackageRegistrationEmail({
       shopName: siteConfig.identity.shopName,
@@ -209,11 +211,12 @@ Deno.serve(async (req) => {
           to: diverEmail, subject, text: diverText,
         })
       }
+      emailed = true
     } catch (e) {
       // Email is best-effort; the registration already landed.
       console.error("register-package email failed:", (e as Error).message)
     }
   }
 
-  return json({ registration_id: registrationId, estimated_cost: total, estimated_currency: currency })
+  return json({ registration_id: registrationId, estimated_cost: total, estimated_currency: currency, emailed })
 })

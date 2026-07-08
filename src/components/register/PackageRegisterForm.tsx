@@ -101,7 +101,7 @@ export function PackageRegisterForm({ pkg, tiers, onClose, onRegistered }: Props
 
   const canNext =
     (step === 1 && !!tierId) ||
-    (step === 2 && !!start && !!end && end >= start) ||
+    (step === 2 && !!start && !!end && end > start) ||
     step === 3
 
   async function submit() {
@@ -169,8 +169,11 @@ export function PackageRegisterForm({ pkg, tiers, onClose, onRegistered }: Props
                 <label htmlFor="pkg-end" className={INPUT_LABEL}>Preferred end</label>
                 <DateField id="pkg-end" value={end} onChange={setEnd} min={start || undefined} className={INPUT} aria-label="Preferred end date" />
               </div>
-              {start && end && end >= start && (
+              {start && end && end > start && (
                 <p className={`text-xs ${TEXT_SUBTLE}`}>{nights} night{nights === 1 ? '' : 's'} · {days} day{days === 1 ? '' : 's'}</p>
+              )}
+              {start && end && end <= start && (
+                <p className={`text-xs ${TEXT_SUBTLE}`}>Pick an end date at least one night after the start.</p>
               )}
             </div>
           )}

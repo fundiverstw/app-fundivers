@@ -16,6 +16,8 @@ export interface RegisterForPackageResult {
   estimated_cost: number | null
   estimated_currency: string | null
   already_registered?: boolean
+  /** Whether the partner + diver recommendation emails actually went out. */
+  emailed?: boolean
 }
 
 /**
@@ -37,7 +39,21 @@ export async function registerForPackage(input: RegisterForPackageInput): Promis
       notes: input.notes,
     },
   })
-  if (error) throw error
+  if (error) {
+    // supabase-js wraps a non-2xx as FunctionsHttpError; the human-readable
+    // reason lives in .context (the Response). Surface it so the diver sees
+    // "tier not found" etc. rather than the generic transport message.
+    const ctx = (error as { context?: unknown }).context
+    if (ctx && typeof (ctx as Response).json === 'function') {
+      try {
+        const body = await (ctx as Response).json() as { error?: string }
+        if (body?.error) throw new Error(body.error)
+      } catch (e) {
+        if (e instanceof Error) throw e
+      }
+    }
+    throw new Error(error.message)
+  }
   return data as RegisterForPackageResult
 }
 

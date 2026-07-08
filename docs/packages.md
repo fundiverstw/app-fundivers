@@ -88,8 +88,9 @@ Divers must never see the kickback columns, so **base tables are admin-only**
 (`is_admin()` "admin manage" policies) and diver reads go through **SECURITY
 DEFINER functions** (pinned `search_path`, owned by `postgres`):
 
-- **`list_package_board()`** — published products + partner, plus `min_price`,
-  `tier_count` and the catalog id arrays. No `kickback_rate`.
+- **`list_package_board()`** — published products whose partner is **active**,
+  joined to the partner, plus `min_price`, `tier_count` and the catalog id
+  arrays. No `kickback_rate`.
 - **`list_package_tiers(p_package_id)`** — a published product's tiers.
 - **`list_my_package_registrations()`** — the caller's own rows (`diver_id =
   auth.uid()`) with labels + estimate, none of the kickback ledger.

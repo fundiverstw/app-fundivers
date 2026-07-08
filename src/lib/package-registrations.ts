@@ -35,27 +35,28 @@ export async function fetchRegistrationsWithDivers(): Promise<AdminRegistration[
   const packageIds = [...new Set(rows.map(r => r.package_id))]
   const tierIds = [...new Set(rows.map(r => r.tier_id).filter(Boolean) as string[])]
 
+  // The three label lookups are independent — run them in one round-trip.
+  const [diversRes, packagesRes, tiersRes] = await Promise.all([
+    diverIds.length
+      ? supabase.from('profiles').select('id, name, nickname, email, contact_id').in('id', diverIds)
+      : Promise.resolve({ data: [], error: null }),
+    packageIds.length
+      ? supabase.from('packages').select('id, title').in('id', packageIds)
+      : Promise.resolve({ data: [], error: null }),
+    tierIds.length
+      ? supabase.from('package_tiers').select('id, name').in('id', tierIds)
+      : Promise.resolve({ data: [], error: null }),
+  ])
+  if (diversRes.error) throw diversRes.error
+  if (packagesRes.error) throw packagesRes.error
+  if (tiersRes.error) throw tiersRes.error
+
   const byDiver = new Map<string, RegistrationDiver>()
-  if (diverIds.length) {
-    const { data, error: e } = await supabase
-      .from('profiles').select('id, name, nickname, email, contact_id').in('id', diverIds)
-    if (e) throw e
-    for (const p of data ?? []) byDiver.set((p as RegistrationDiver).id, p as RegistrationDiver)
-  }
-
+  for (const p of diversRes.data ?? []) byDiver.set((p as RegistrationDiver).id, p as RegistrationDiver)
   const titleById = new Map<string, string>()
-  if (packageIds.length) {
-    const { data, error: e } = await supabase.from('packages').select('id, title').in('id', packageIds)
-    if (e) throw e
-    for (const p of data ?? []) titleById.set((p as { id: string }).id, (p as { title: string }).title)
-  }
-
+  for (const p of packagesRes.data ?? []) titleById.set((p as { id: string }).id, (p as { title: string }).title)
   const tierById = new Map<string, string>()
-  if (tierIds.length) {
-    const { data, error: e } = await supabase.from('package_tiers').select('id, name').in('id', tierIds)
-    if (e) throw e
-    for (const t of data ?? []) tierById.set((t as { id: string }).id, (t as { name: string }).name)
-  }
+  for (const t of tiersRes.data ?? []) tierById.set((t as { id: string }).id, (t as { name: string }).name)
 
   return rows.map(r => ({
     ...r,
