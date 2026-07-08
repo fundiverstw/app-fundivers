@@ -74,6 +74,25 @@ export interface BookingDetails {
 }
 
 /**
+ * Frozen snapshot of a package registration's chosen tier + extras + estimate.
+ * Mirrors BookingDetails' `charges` snapshot idea (frozen against later catalog
+ * price changes) but is package-shaped: the estimate is a non-binding quote,
+ * the final cost is set by the partner shop.
+ */
+export interface PackageRegistrationDetails {
+  tier?: { id: string; name: string; price: number } | null
+  /** Days the range spans (nights + 1); add-ons are charged per day. */
+  days?: number
+  /** Nights in the range; the room is charged per night. */
+  nights?: number
+  add_ons?: string[]
+  room?: { option_id?: string | null }
+  charges?: ChargeLine[]
+  total?: number
+  currency?: string
+}
+
+/**
  * EO_* table Row shapes are minimal here — only the columns the app
  * actually reads. Those tables carry dozens of legacy columns from the
  * Wix import; if the app ever needs more, add them.
@@ -143,10 +162,10 @@ export interface Database {
         Args: Record<string, never>
         Returns: Array<{ id: string; name: string; region: string | null; blurb: string | null; website: string | null }>
       }
-      // Renamed from list_trip_board in 20260707150000_rename_trip_board_to_packages.sql.
       // Owner-privileged projection of published packages joined to the vouched
       // partner shop — diver-safe columns only (no kickback rate). Divers have
-      // no access to the base `packages` table.
+      // no access to the base `packages` table. Carries the catalog id arrays the
+      // register form needs plus a "from" price (min tier) and tier count.
       list_package_board: {
         Args: Record<string, never>
         Returns: Array<{
@@ -155,13 +174,13 @@ export interface Database {
           destination: string
           summary: string | null
           description: string | null
-          start_date: string | null
-          end_date: string | null
-          price: number | null
           currency: string
           hero_image_url: string | null
           highlights: string[]
-          booking_url: string | null
+          addon_ids: string[]
+          room_type_ids: string[]
+          min_price: number | null
+          tier_count: number
           published_at: string | null
           trusted_partner_id: string
           partner_name: string
@@ -172,20 +191,43 @@ export interface Database {
           partner_vouch_notes: string | null
         }>
       }
-      // Renamed from list_my_trip_referrals in 20260707150000_rename_trip_board_to_packages.sql.
-      // The caller's own referrals (scoped to auth.uid()) with package/partner
-      // labels — the kickback ledger columns are intentionally absent.
-      list_my_package_referrals: {
+      // The tiers of a published package (detail page / register form). Diver-safe.
+      list_package_tiers: {
+        Args: { p_package_id: string }
+        Returns: Array<{
+          id: string
+          package_id: string
+          name: string
+          price: number
+          currency: string
+          sort_order: number
+        }>
+      }
+      // Diver-owned cancel of their own package registration (base table is
+      // admin-only). Idempotent; scoped to auth.uid().
+      cancel_my_package_registration: {
+        Args: { p_id: string }
+        Returns: void
+      }
+      // The caller's own package registrations (scoped to auth.uid()) with
+      // package/partner/tier labels + the estimate — the kickback ledger columns
+      // are intentionally absent.
+      list_my_package_registrations: {
         Args: Record<string, never>
         Returns: Array<{
           id: string
           package_id: string
-          referral_code: string
-          status: 'interested' | 'introduced' | 'booked' | 'completed' | 'cancelled'
+          tier_id: string | null
+          status: 'registered' | 'completed' | 'cancelled'
           created_at: string
+          preferred_start: string | null
+          preferred_end: string | null
+          estimated_cost: number | null
+          estimated_currency: string | null
           package_title: string
           package_destination: string
           partner_name: string
+          tier_name: string | null
         }>
       }
       // Defined in 20260707160000_scheduled_trips.sql. Owner-privileged
@@ -256,14 +298,6 @@ export interface Database {
         Args: { p_lead: string; p_amount: number; p_group_id?: string | null }
         Returns: number
       }
-      // Renamed from express_trip_interest in 20260707150000_rename_trip_board_to_packages.sql.
-      // A diver expresses interest in a published package; mints (or returns the
-      // existing live) referral and returns just the FD-XXXXXX code. Idempotent.
-      // authenticated-only.
-      express_package_interest: {
-        Args: { p_package_id: string }
-        Returns: string
-      }
       // Defined in 20260603040000_signup_throttling_and_orphan_log.sql.
       // Service-role only. Inserts a signup_attempts row and returns
       // count of attempts within the trailing 60s + 24h windows
@@ -323,8 +357,8 @@ export interface Database {
         Relationships: []
       }
       // The packages feature exposes diver-safe data through the
-      // list_package_board() / list_my_package_referrals() functions (see
-      // Functions above); there are no packages-related views.
+      // list_package_board() / list_package_tiers() / list_my_package_registrations()
+      // functions (see Functions above); there are no packages-related views.
     }
     Tables: {
       profiles: {
@@ -796,6 +830,10 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['event_waivers']['Insert']>
         Relationships: []
       }
+      // The parent "product": a partner-hosted package with one or more price
+      // tiers (package_tiers) and references into our add-on/room catalog. Dates
+      // are diver-picked at registration, so no start/end here. kickback_rate is
+      // internal (never exposed to divers via the definer functions).
       packages: {
         Row: {
           id: string
@@ -805,13 +843,11 @@ export interface Database {
           destination: string
           summary: string | null
           description: string | null
-          start_date: string | null
-          end_date: string | null
-          price: number | null
           currency: string
           hero_image_url: string | null
           highlights: string[]
-          booking_url: string | null
+          addon_ids: string[]
+          room_type_ids: string[]
           kickback_rate: number
           status: 'draft' | 'published' | 'archived'
           published_at: string | null
@@ -825,13 +861,11 @@ export interface Database {
           destination: string
           summary?: string | null
           description?: string | null
-          start_date?: string | null
-          end_date?: string | null
-          price?: number | null
           currency?: string
           hero_image_url?: string | null
           highlights?: string[]
-          booking_url?: string | null
+          addon_ids?: string[]
+          room_type_ids?: string[]
           kickback_rate?: number
           status?: 'draft' | 'published' | 'archived'
           published_at?: string | null
@@ -840,37 +874,71 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['packages']['Insert']>
         Relationships: []
       }
-      package_referrals: {
+      // Price tiers for a package (Package A/B/C). Increasing price, admin-managed.
+      package_tiers: {
         Row: {
           id: string
           created_at: string
           package_id: string
+          name: string
+          price: number
+          currency: string
+          sort_order: number
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          package_id: string
+          name: string
+          price: number
+          currency?: string
+          sort_order?: number
+        }
+        Update: Partial<Database['public']['Tables']['package_tiers']['Insert']>
+        Relationships: []
+      }
+      // One row per diver-registration; carries the frozen estimate snapshot and
+      // doubles as the kickback ledger (kickback_amount generated from
+      // estimated_cost * kickback_rate). Base table is admin-only.
+      package_registrations: {
+        Row: {
+          id: string
+          created_at: string
+          package_id: string
+          tier_id: string | null
           diver_id: string
-          referral_code: string
-          status: 'interested' | 'introduced' | 'booked' | 'completed' | 'cancelled'
-          booked_amount: number | null
-          booked_currency: string | null
+          preferred_start: string | null
+          preferred_end: string | null
+          estimated_cost: number | null
+          estimated_currency: string | null
+          details: PackageRegistrationDetails
+          notes: string | null
+          status: 'registered' | 'completed' | 'cancelled'
           kickback_rate: number | null
           kickback_amount: number | null
-          kickback_status: 'pending' | 'invoiced' | 'received'
-          received_at: string | null
+          kickback_status: 'expected' | 'paid'
+          paid_at: string | null
           admin_notes: string | null
         }
         Insert: {
           id?: string
           created_at?: string
           package_id: string
+          tier_id?: string | null
           diver_id: string
-          referral_code?: string
-          status?: 'interested' | 'introduced' | 'booked' | 'completed' | 'cancelled'
-          booked_amount?: number | null
-          booked_currency?: string | null
+          preferred_start?: string | null
+          preferred_end?: string | null
+          estimated_cost?: number | null
+          estimated_currency?: string | null
+          details?: PackageRegistrationDetails
+          notes?: string | null
+          status?: 'registered' | 'completed' | 'cancelled'
           kickback_rate?: number | null
-          kickback_status?: 'pending' | 'invoiced' | 'received'
-          received_at?: string | null
+          kickback_status?: 'expected' | 'paid'
+          paid_at?: string | null
           admin_notes?: string | null
         }
-        Update: Partial<Database['public']['Tables']['package_referrals']['Insert']>
+        Update: Partial<Database['public']['Tables']['package_registrations']['Insert']>
         Relationships: []
       }
       // Scheduled Trips — the shop's own curated, dated trips. Admin-managed
@@ -1510,15 +1578,25 @@ export type WaiverSignatureInsert = Database['public']['Tables']['waiver_signatu
 export type EventWaiver = Database['public']['Tables']['event_waivers']['Row']
 export type EventWaiverInsert = Database['public']['Tables']['event_waivers']['Insert']
 
-// Packages — partner referral network (open-ended travel packages abroad).
-// The hosting partner is a trusted_partners row (TrustedPartnerRow, above).
+// Packages — partner-shop registration network. A parent "product" (Package)
+// holds price tiers (PackageTier) and references our add-on/room catalog; divers
+// register (PackageRegistration) picking a tier, a date range and extras. The
+// hosting partner is a trusted_partners row (TrustedPartnerRow, above).
 export type Package = Database['public']['Tables']['packages']['Row']
 export type PackageInsert = Database['public']['Tables']['packages']['Insert']
-export type PackageReferral = Database['public']['Tables']['package_referrals']['Row']
+export type PackageTier = Database['public']['Tables']['package_tiers']['Row']
+export type PackageTierInsert = Database['public']['Tables']['package_tiers']['Insert']
+export type PackageRegistration = Database['public']['Tables']['package_registrations']['Row']
+export type PackageRegistrationInsert = Database['public']['Tables']['package_registrations']['Insert']
 export type PackageBoardItem = Database['public']['Functions']['list_package_board']['Returns'][number]
-export type MyPackageReferral = Database['public']['Functions']['list_my_package_referrals']['Returns'][number]
+export type PackageTierItem = Database['public']['Functions']['list_package_tiers']['Returns'][number]
+export type MyPackageRegistration = Database['public']['Functions']['list_my_package_registrations']['Returns'][number]
 export const PACKAGE_STATUSES = ['draft','published','archived'] as const
 export type PackageStatus = typeof PACKAGE_STATUSES[number]
+export const REGISTRATION_STATUSES = ['registered','completed','cancelled'] as const
+export type RegistrationStatus = typeof REGISTRATION_STATUSES[number]
+export const KICKBACK_STATUSES = ['expected','paid'] as const
+export type KickbackStatus = typeof KICKBACK_STATUSES[number]
 
 // Scheduled Trips — the shop's own curated, dated trips
 export type ScheduledTrip = Database['public']['Tables']['scheduled_trips']['Row']
@@ -1526,10 +1604,6 @@ export type ScheduledTripInsert = Database['public']['Tables']['scheduled_trips'
 export type ScheduledTripItem = Database['public']['Functions']['list_scheduled_trips']['Returns'][number]
 export const SCHEDULED_TRIP_STATUSES = ['draft','published','archived'] as const
 export type ScheduledTripStatus = typeof SCHEDULED_TRIP_STATUSES[number]
-export const REFERRAL_STATUSES = ['interested','introduced','booked','completed','cancelled'] as const
-export type ReferralStatus = typeof REFERRAL_STATUSES[number]
-export const KICKBACK_STATUSES = ['pending','invoiced','received'] as const
-export type KickbackStatus = typeof KICKBACK_STATUSES[number]
 
 export const WAITLIST_OFFER_STATUSES = ['pending', 'accepted', 'expired'] as const
 export type WaitlistOfferStatus = typeof WAITLIST_OFFER_STATUSES[number]
