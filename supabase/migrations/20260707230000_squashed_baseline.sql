@@ -1477,6 +1477,53 @@ $$;
 ALTER FUNCTION "public"."update_diver_gear_sizes"("diver_id" "uuid", "fin_size" "text", "bcd_size" "text", "wetsuit_size" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."wix_sync_notify"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  tok       text;
+  payload   jsonb;
+begin
+  select decrypted_secret into tok
+    from vault.decrypted_secrets
+   where name = 'wix_sync_token'
+   limit 1;
+
+  if tok is null then
+    raise warning 'wix_sync_token missing from vault; skipping Wix sync for %.% (tg_op=%)',
+      tg_table_schema, tg_table_name, tg_op;
+    return coalesce(new, old);
+  end if;
+
+  -- Mirrors the Supabase database-webhook payload shape that
+  -- supabase_functions.http_request produced. wix/backend/
+  -- http-functions.js → post_supabaseWebhook reads
+  -- type / table / record / old_record off this body.
+  payload := jsonb_build_object(
+    'type',       tg_op,
+    'table',      tg_table_name,
+    'schema',     tg_table_schema,
+    'record',     case when tg_op <> 'DELETE' then to_jsonb(new) end,
+    'old_record', case when tg_op <> 'INSERT' then to_jsonb(old) end
+  );
+
+  perform net.http_post(
+    url := 'https://fundiverstw.com/_functions/supabaseWebhook',
+    body := payload,
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'x-sync-token', tok
+    ),
+    timeout_milliseconds := 5000
+  );
+
+  return coalesce(new, old);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."wix_sync_notify"() OWNER TO "postgres";
 
 SET default_tablespace = '';
 
@@ -1581,6 +1628,7 @@ CREATE TABLE IF NOT EXISTS "public"."cert_levels" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "code" "text" NOT NULL,
     "name" "text" NOT NULL,
+    "name_zh" "text",
     "rank" integer NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
@@ -1753,6 +1801,7 @@ ALTER TABLE "public"."event_waivers" OWNER TO "postgres";
 
 CREATE TABLE IF NOT EXISTS "public"."events" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "legacy_id" "uuid",
     "kind" "text" NOT NULL,
     "admin_title" "text",
     "display_title" "text",
@@ -2372,6 +2421,8 @@ ALTER TABLE ONLY "public"."event_waivers"
 
 
 
+ALTER TABLE ONLY "public"."events"
+    ADD CONSTRAINT "events_legacy_id_key" UNIQUE ("legacy_id");
 
 
 
@@ -2784,21 +2835,27 @@ CREATE OR REPLACE TRIGGER "trg_staff_availability_touch_updated_at" BEFORE UPDAT
 
 
 
+CREATE OR REPLACE TRIGGER "wix_sync_cancellation_policies" AFTER INSERT OR DELETE OR UPDATE ON "public"."cancellation_policies" FOR EACH ROW EXECUTE FUNCTION "public"."wix_sync_notify"();
 
 
 
+CREATE OR REPLACE TRIGGER "wix_sync_cert_levels" AFTER INSERT OR DELETE OR UPDATE ON "public"."cert_levels" FOR EACH ROW EXECUTE FUNCTION "public"."wix_sync_notify"();
 
 
 
+CREATE OR REPLACE TRIGGER "wix_sync_eo_prices" AFTER INSERT OR DELETE OR UPDATE ON "public"."prices" FOR EACH ROW EXECUTE FUNCTION "public"."wix_sync_notify"();
 
 
 
+CREATE OR REPLACE TRIGGER "wix_sync_eo_rooms" AFTER INSERT OR DELETE OR UPDATE ON "public"."rooms" FOR EACH ROW EXECUTE FUNCTION "public"."wix_sync_notify"();
 
 
 
+CREATE OR REPLACE TRIGGER "wix_sync_other_addons" AFTER INSERT OR DELETE OR UPDATE ON "public"."addons" FOR EACH ROW EXECUTE FUNCTION "public"."wix_sync_notify"();
 
 
 
+CREATE OR REPLACE TRIGGER "wix_sync_trip_templates" AFTER INSERT OR DELETE OR UPDATE ON "public"."trip_templates" FOR EACH ROW EXECUTE FUNCTION "public"."wix_sync_notify"();
 
 
 
@@ -4020,6 +4077,7 @@ GRANT ALL ON FUNCTION "public"."update_diver_gear_sizes"("diver_id" "uuid", "fin
 
 
 
+REVOKE ALL ON FUNCTION "public"."wix_sync_notify"() FROM PUBLIC;
 
 
 
@@ -4533,60 +4591,60 @@ INSERT INTO public.cancellation_policies VALUES ('465f1e26-17d5-4784-b9bd-2c5dd8
 INSERT INTO public.cancellation_policies VALUES ('652b34df-4cb7-48ab-91dc-41ae9e2d1f29', 'Local Day Trip', 'If diver cancels by the date above, they can get a full refund (minus transfer/bank/PayPal fees). If the dives are canceled by Fun Divers Taiwan for any reason, the diver can choose to reschedule or get a full refund (minus transfer/bank/PayPal fees).') ON CONFLICT DO NOTHING;
 INSERT INTO public.cancellation_policies VALUES ('7409de8f-dbfd-403d-9db8-3c84721c7717', 'Course without Elearning', 'If student cancels by the date above, they can get a full refund (minus transfer/bank/PayPal fees). If the course is canceled by Fun Divers Taiwan for any reason, the diver can choose to reschedule or get a full refund (minus transfer/bank/PayPal fees).') ON CONFLICT DO NOTHING;
 INSERT INTO public.cancellation_policies VALUES ('8ed8bb2a-abf8-482c-8a34-bf532232b5ce', 'Course with Elearning', 'If diver cancels by the date above, they can get a full refund (minus transfer/bank/PayPal fees) of any payment made above the deposit amount. The deposit, however, is non-refundable. If the course is fully or partially canceled by Fun Divers Taiwan for any reason, and can''t be rescheduled, then the diver can use the PADI E-learning at any PADI shop around the world.  If any course dives were finished, student will also receive a PADI Referral Form which can also be used at any PADI Shop around the world.') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('a1ec2a90-5006-4617-bb52-25eb80a54860', 'instructor', 'Instructor', 5, '2026-07-08 04:10:21.38215+00', '2026-07-08 04:10:21.38215+00', 'PADI', 'a1ec2a90-5006-4617-bb52-25eb80a54860') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('36585bcc-f349-4f73-a10f-f0bff178c87b', 'sdi_open_water', 'Open Water Scuba Diver', 1, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'SDI', '54a2c864-36df-4d2d-b0d2-c0d3bedaa483') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('c698e2d2-5c48-4464-9c04-1418fff9357d', 'sdi_advanced_adventure', 'Advanced Adventure Diver', 2, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'SDI', '81805010-6edc-4fc1-9bbc-4b27c8f972f3') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('ba43f7b8-283d-4dd3-9aec-265010fe26fc', 'sdi_rescue', 'Rescue Diver', 3, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'SDI', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('7967754e-db8c-4fb7-a8c5-e68c122e0ccd', 'sdi_master_scuba_diver', 'Master Scuba Diver', 4, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'SDI', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('9c476ef8-d4a2-457c-adf1-81f406b3e660', 'rescue', 'Rescue', 3, '2026-07-08 04:10:21.38215+00', '2026-07-08 04:10:21.38215+00', 'PADI', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('a54be39a-f3a4-4645-820a-ecf0d24ed113', 'sdi_divemaster', 'Divemaster', 5, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'SDI', '5498be7b-a4d2-4b32-8630-f984beee5ba2') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('93876c2d-30f8-46ed-941f-9c5dc1354569', 'bsac_ocean_diver', 'Ocean Diver / Club Diver', 1, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'BSAC', '54a2c864-36df-4d2d-b0d2-c0d3bedaa483') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('f485804f-2566-49d0-968d-c89dcae5e93d', 'bsac_sport_diver', 'Sport Diver', 2, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'BSAC', '54a2c864-36df-4d2d-b0d2-c0d3bedaa483') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('942b0f0b-ff80-4e6a-9b84-ebe89cbfc760', 'bsac_sport_diver_20', 'Sport Diver (20+ logged dives)', 3, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'BSAC', '81805010-6edc-4fc1-9bbc-4b27c8f972f3') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('21655982-d4a3-4cb2-a257-7d6618a56027', 'bsac_dive_leader', 'Dive Leader', 4, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'BSAC', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('600d6a6a-a71d-4512-819d-c92cf11814f4', 'bsac_advanced_diver', 'Advanced Diver', 5, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'BSAC', '5498be7b-a4d2-4b32-8630-f984beee5ba2') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('55650d73-ecef-47dc-be48-5fa14878ad31', 'cmas_1_star_diver', '1-Star Diver', 1, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'CMAS', '54a2c864-36df-4d2d-b0d2-c0d3bedaa483') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('e797114f-6972-4007-813f-346448511eb1', 'cmas_2_star_diver', '2-Star Diver (Night & Navigation)', 2, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'CMAS', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('a953e190-d3b1-4fe6-afe5-af5274d7a14e', 'cmas_3_star_diver', '3-Star Diver', 3, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'CMAS', '5498be7b-a4d2-4b32-8630-f984beee5ba2') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('0a16131e-b807-430f-b3c1-b7a7e8057853', 'ssi_open_water', 'Open Water Diver', 1, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SSI', '54a2c864-36df-4d2d-b0d2-c0d3bedaa483') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('5bf03e19-af86-4d7a-ba52-6f598b7fb7dd', 'ssi_advanced_open_water', 'Advanced Open Water Diver', 2, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SSI', '81805010-6edc-4fc1-9bbc-4b27c8f972f3') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('f7f27b06-526d-4514-a00c-d0a18a72530e', 'ssi_stress_rescue', 'Stress & Rescue Techniques', 3, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SSI', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('2014384b-da1e-4065-8ca4-6fdd9c690627', 'ssi_master_diver', 'Master Diver', 4, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SSI', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('040b4aae-2dcc-4a27-b706-1dd4690fe2cc', 'ssi_dive_con', 'Dive Con', 5, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SSI', '5498be7b-a4d2-4b32-8630-f984beee5ba2') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('89e1cc61-d334-43d4-a642-dac5a2eff0eb', 'naui_scuba_diver', 'Scuba Diver', 1, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'NAUI', '54a2c864-36df-4d2d-b0d2-c0d3bedaa483') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('c06fb92d-b01f-43ad-834a-60fe3807a20c', 'naui_advanced_scuba_diver', 'Advanced Scuba Diver', 2, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'NAUI', '81805010-6edc-4fc1-9bbc-4b27c8f972f3') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('adab20d5-5b9b-4ccd-978c-26a78dbe1e1b', 'naui_master_scuba_diver', 'Master Scuba Diver', 3, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'NAUI', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('5562c5b3-d178-4885-a98c-719ae759f501', 'naui_divemaster', 'Divemaster', 4, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'NAUI', '5498be7b-a4d2-4b32-8630-f984beee5ba2') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('0c2e3e52-aaf8-4d12-b1ca-6b1a7ae7ae81', 'saa_club_diver', 'Club Diver', 1, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SAA', '54a2c864-36df-4d2d-b0d2-c0d3bedaa483') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('1ca5792b-65d1-4018-9bd4-085fe7dd96a2', 'saa_club_diver_20_deep_nav', 'Club Diver (20+ dives, Deep & Navigation)', 2, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SAA', '81805010-6edc-4fc1-9bbc-4b27c8f972f3') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('44a47359-e6a0-4d6f-87ed-5bb3d86ea66c', 'saa_dive_leader_20', 'Dive Leader (20+ dives)', 3, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SAA', '81805010-6edc-4fc1-9bbc-4b27c8f972f3') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('eceda706-bafa-4113-ae01-7911ce2e212d', 'saa_dive_leader_rescue', 'Dive Leader (with Diver Rescue)', 4, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SAA', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('7a7de0f7-2400-44f1-b02a-7987dfe41206', 'saa_dive_supervisor_rescue', 'Dive Supervisor (with Diver Rescue)', 5, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SAA', '5498be7b-a4d2-4b32-8630-f984beee5ba2') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('0c039ada-d8a0-41ce-87e4-49b3078f4cbf', 'bsac_club_instructor', 'Club Instructor', 6, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'BSAC', 'a1ec2a90-5006-4617-bb52-25eb80a54860') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('c530c96c-3623-41e7-abb1-ab266822b3c4', 'bsac_open_water_instructor', 'Open Water Instructor', 7, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'BSAC', 'a1ec2a90-5006-4617-bb52-25eb80a54860') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('c5e76680-d89b-40e0-8cda-7a35cfe94ff0', 'bsac_advanced_instructor', 'Advanced Instructor', 8, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'BSAC', 'a1ec2a90-5006-4617-bb52-25eb80a54860') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('0224839e-d500-4c9c-9580-5ea701937dd5', 'cmas_1_star_instructor', '1-Star Instructor', 4, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'CMAS', 'a1ec2a90-5006-4617-bb52-25eb80a54860') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('370bfc81-c63e-4761-a700-e5eab7e4af43', 'cmas_2_star_instructor', '2-Star Instructor', 5, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'CMAS', 'a1ec2a90-5006-4617-bb52-25eb80a54860') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('9e250411-b80b-49ff-8a6f-7fb96c05244d', 'ssi_dive_con_instructor', 'Open Water / Dive Con Instructor', 6, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SSI', 'a1ec2a90-5006-4617-bb52-25eb80a54860') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('170bfa35-f0c6-4c82-9c62-500244c9416f', 'naui_scuba_instructor', 'Scuba Instructor', 5, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'NAUI', 'a1ec2a90-5006-4617-bb52-25eb80a54860') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('8d6b1527-4cda-4624-b7d6-31f6bdab05f8', 'saa_assistant_club_instructor_rescue', 'Assistant / Club Instructor (with Diver Rescue)', 6, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SAA', 'a1ec2a90-5006-4617-bb52-25eb80a54860') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('14788f47-437c-4668-bc74-5ece8e66a737', 'saa_regional_instructor', 'Regional Instructor', 7, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SAA', 'a1ec2a90-5006-4617-bb52-25eb80a54860') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('aac73ed2-f764-44c3-8a0a-b22aaa41777e', 'sdi_assistant_instructor', 'Assistant Instructor', 6, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'SDI', '5498be7b-a4d2-4b32-8630-f984beee5ba2') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('a122600b-79d7-4912-a8a0-c37eb6765c80', 'sdi_instructor', 'Open Water Scuba Diver Instructor', 7, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'SDI', 'a1ec2a90-5006-4617-bb52-25eb80a54860') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('90fbbf12-398d-4f23-91c8-5e7642b2106d', 'tdi_nitrox', 'Nitrox Diver', 1, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'TDI', '54a2c864-36df-4d2d-b0d2-c0d3bedaa483') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('da0a7319-d766-4f79-a6d3-88a076836ed6', 'tdi_intro_to_tech', 'Intro to Tech', 2, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'TDI', '81805010-6edc-4fc1-9bbc-4b27c8f972f3') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('54a2c864-36df-4d2d-b0d2-c0d3bedaa483', 'open_water', 'OW', 1, '2026-07-08 04:10:21.38215+00', '2026-07-08 04:10:21.38215+00', 'PADI', '54a2c864-36df-4d2d-b0d2-c0d3bedaa483') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('c1120406-0361-4b5e-9a88-01578c7bafef', 'tdi_advanced_nitrox', 'Advanced Nitrox Diver', 3, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'TDI', '81805010-6edc-4fc1-9bbc-4b27c8f972f3') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('7cca8010-696a-4ce7-bc85-6fcc42f50bd8', 'tdi_decompression', 'Decompression Procedures Diver', 4, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'TDI', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('08506887-6771-40a8-a41c-83517e836bac', 'tdi_helitrox', 'Helitrox Diver', 5, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'TDI', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('0509d31f-a9f3-4c98-a48f-f38b8ec3339a', 'tdi_extended_range', 'Extended Range Diver', 6, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'TDI', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('8ed86e21-81dc-48f8-8311-16dcfe46f9e7', 'tdi_trimix', 'Trimix Diver', 7, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'TDI', '5498be7b-a4d2-4b32-8630-f984beee5ba2') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('1cb27825-a8e8-4099-81dc-5772c5b33c69', 'tdi_advanced_trimix', 'Advanced Trimix Diver', 8, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'TDI', '5498be7b-a4d2-4b32-8630-f984beee5ba2') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('81805010-6edc-4fc1-9bbc-4b27c8f972f3', 'advanced_open_water', 'AOW', 2, '2026-07-08 04:10:21.38215+00', '2026-07-08 04:10:21.38215+00', 'PADI', '81805010-6edc-4fc1-9bbc-4b27c8f972f3') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('5498be7b-a4d2-4b32-8630-f984beee5ba2', 'divemaster', 'DM', 4, '2026-07-08 04:10:21.38215+00', '2026-07-08 04:10:21.38215+00', 'PADI', '5498be7b-a4d2-4b32-8630-f984beee5ba2') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('1e084a3f-39cf-42bd-9037-8d02991b3051', 'msdt', 'MSDT', 6, '2026-07-08 04:10:21.72622+00', '2026-07-08 04:10:21.72622+00', 'PADI', '1e084a3f-39cf-42bd-9037-8d02991b3051') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('0c4ccb78-e28e-4cb5-b060-920d2144feb7', 'idc_staff', 'IDC Staff', 7, '2026-07-08 04:10:21.72622+00', '2026-07-08 04:10:21.72622+00', 'PADI', '0c4ccb78-e28e-4cb5-b060-920d2144feb7') ON CONFLICT DO NOTHING;
-INSERT INTO public.cert_levels VALUES ('a6345ec9-b599-45ea-ae51-0379e568a238', 'course_director', 'Course Director', 8, '2026-07-08 04:10:21.72622+00', '2026-07-08 04:10:21.72622+00', 'PADI', 'a6345ec9-b599-45ea-ae51-0379e568a238') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('a1ec2a90-5006-4617-bb52-25eb80a54860', 'instructor', 'Instructor', '教練', 5, '2026-07-08 04:10:21.38215+00', '2026-07-08 04:10:21.38215+00', 'PADI', 'a1ec2a90-5006-4617-bb52-25eb80a54860') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('36585bcc-f349-4f73-a10f-f0bff178c87b', 'sdi_open_water', 'Open Water Scuba Diver', NULL, 1, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'SDI', '54a2c864-36df-4d2d-b0d2-c0d3bedaa483') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('c698e2d2-5c48-4464-9c04-1418fff9357d', 'sdi_advanced_adventure', 'Advanced Adventure Diver', NULL, 2, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'SDI', '81805010-6edc-4fc1-9bbc-4b27c8f972f3') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('ba43f7b8-283d-4dd3-9aec-265010fe26fc', 'sdi_rescue', 'Rescue Diver', NULL, 3, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'SDI', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('7967754e-db8c-4fb7-a8c5-e68c122e0ccd', 'sdi_master_scuba_diver', 'Master Scuba Diver', NULL, 4, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'SDI', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('9c476ef8-d4a2-457c-adf1-81f406b3e660', 'rescue', 'Rescue', '救援潛水員', 3, '2026-07-08 04:10:21.38215+00', '2026-07-08 04:10:21.38215+00', 'PADI', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('a54be39a-f3a4-4645-820a-ecf0d24ed113', 'sdi_divemaster', 'Divemaster', NULL, 5, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'SDI', '5498be7b-a4d2-4b32-8630-f984beee5ba2') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('93876c2d-30f8-46ed-941f-9c5dc1354569', 'bsac_ocean_diver', 'Ocean Diver / Club Diver', NULL, 1, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'BSAC', '54a2c864-36df-4d2d-b0d2-c0d3bedaa483') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('f485804f-2566-49d0-968d-c89dcae5e93d', 'bsac_sport_diver', 'Sport Diver', NULL, 2, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'BSAC', '54a2c864-36df-4d2d-b0d2-c0d3bedaa483') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('942b0f0b-ff80-4e6a-9b84-ebe89cbfc760', 'bsac_sport_diver_20', 'Sport Diver (20+ logged dives)', NULL, 3, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'BSAC', '81805010-6edc-4fc1-9bbc-4b27c8f972f3') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('21655982-d4a3-4cb2-a257-7d6618a56027', 'bsac_dive_leader', 'Dive Leader', NULL, 4, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'BSAC', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('600d6a6a-a71d-4512-819d-c92cf11814f4', 'bsac_advanced_diver', 'Advanced Diver', NULL, 5, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'BSAC', '5498be7b-a4d2-4b32-8630-f984beee5ba2') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('55650d73-ecef-47dc-be48-5fa14878ad31', 'cmas_1_star_diver', '1-Star Diver', NULL, 1, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'CMAS', '54a2c864-36df-4d2d-b0d2-c0d3bedaa483') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('e797114f-6972-4007-813f-346448511eb1', 'cmas_2_star_diver', '2-Star Diver (Night & Navigation)', NULL, 2, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'CMAS', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('a953e190-d3b1-4fe6-afe5-af5274d7a14e', 'cmas_3_star_diver', '3-Star Diver', NULL, 3, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'CMAS', '5498be7b-a4d2-4b32-8630-f984beee5ba2') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('0a16131e-b807-430f-b3c1-b7a7e8057853', 'ssi_open_water', 'Open Water Diver', NULL, 1, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SSI', '54a2c864-36df-4d2d-b0d2-c0d3bedaa483') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('5bf03e19-af86-4d7a-ba52-6f598b7fb7dd', 'ssi_advanced_open_water', 'Advanced Open Water Diver', NULL, 2, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SSI', '81805010-6edc-4fc1-9bbc-4b27c8f972f3') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('f7f27b06-526d-4514-a00c-d0a18a72530e', 'ssi_stress_rescue', 'Stress & Rescue Techniques', NULL, 3, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SSI', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('2014384b-da1e-4065-8ca4-6fdd9c690627', 'ssi_master_diver', 'Master Diver', NULL, 4, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SSI', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('040b4aae-2dcc-4a27-b706-1dd4690fe2cc', 'ssi_dive_con', 'Dive Con', NULL, 5, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SSI', '5498be7b-a4d2-4b32-8630-f984beee5ba2') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('89e1cc61-d334-43d4-a642-dac5a2eff0eb', 'naui_scuba_diver', 'Scuba Diver', NULL, 1, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'NAUI', '54a2c864-36df-4d2d-b0d2-c0d3bedaa483') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('c06fb92d-b01f-43ad-834a-60fe3807a20c', 'naui_advanced_scuba_diver', 'Advanced Scuba Diver', NULL, 2, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'NAUI', '81805010-6edc-4fc1-9bbc-4b27c8f972f3') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('adab20d5-5b9b-4ccd-978c-26a78dbe1e1b', 'naui_master_scuba_diver', 'Master Scuba Diver', NULL, 3, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'NAUI', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('5562c5b3-d178-4885-a98c-719ae759f501', 'naui_divemaster', 'Divemaster', NULL, 4, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'NAUI', '5498be7b-a4d2-4b32-8630-f984beee5ba2') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('0c2e3e52-aaf8-4d12-b1ca-6b1a7ae7ae81', 'saa_club_diver', 'Club Diver', NULL, 1, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SAA', '54a2c864-36df-4d2d-b0d2-c0d3bedaa483') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('1ca5792b-65d1-4018-9bd4-085fe7dd96a2', 'saa_club_diver_20_deep_nav', 'Club Diver (20+ dives, Deep & Navigation)', NULL, 2, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SAA', '81805010-6edc-4fc1-9bbc-4b27c8f972f3') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('44a47359-e6a0-4d6f-87ed-5bb3d86ea66c', 'saa_dive_leader_20', 'Dive Leader (20+ dives)', NULL, 3, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SAA', '81805010-6edc-4fc1-9bbc-4b27c8f972f3') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('eceda706-bafa-4113-ae01-7911ce2e212d', 'saa_dive_leader_rescue', 'Dive Leader (with Diver Rescue)', NULL, 4, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SAA', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('7a7de0f7-2400-44f1-b02a-7987dfe41206', 'saa_dive_supervisor_rescue', 'Dive Supervisor (with Diver Rescue)', NULL, 5, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SAA', '5498be7b-a4d2-4b32-8630-f984beee5ba2') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('0c039ada-d8a0-41ce-87e4-49b3078f4cbf', 'bsac_club_instructor', 'Club Instructor', NULL, 6, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'BSAC', 'a1ec2a90-5006-4617-bb52-25eb80a54860') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('c530c96c-3623-41e7-abb1-ab266822b3c4', 'bsac_open_water_instructor', 'Open Water Instructor', NULL, 7, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'BSAC', 'a1ec2a90-5006-4617-bb52-25eb80a54860') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('c5e76680-d89b-40e0-8cda-7a35cfe94ff0', 'bsac_advanced_instructor', 'Advanced Instructor', NULL, 8, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'BSAC', 'a1ec2a90-5006-4617-bb52-25eb80a54860') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('0224839e-d500-4c9c-9580-5ea701937dd5', 'cmas_1_star_instructor', '1-Star Instructor', NULL, 4, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'CMAS', 'a1ec2a90-5006-4617-bb52-25eb80a54860') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('370bfc81-c63e-4761-a700-e5eab7e4af43', 'cmas_2_star_instructor', '2-Star Instructor', NULL, 5, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'CMAS', 'a1ec2a90-5006-4617-bb52-25eb80a54860') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('9e250411-b80b-49ff-8a6f-7fb96c05244d', 'ssi_dive_con_instructor', 'Open Water / Dive Con Instructor', NULL, 6, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SSI', 'a1ec2a90-5006-4617-bb52-25eb80a54860') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('170bfa35-f0c6-4c82-9c62-500244c9416f', 'naui_scuba_instructor', 'Scuba Instructor', NULL, 5, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'NAUI', 'a1ec2a90-5006-4617-bb52-25eb80a54860') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('8d6b1527-4cda-4624-b7d6-31f6bdab05f8', 'saa_assistant_club_instructor_rescue', 'Assistant / Club Instructor (with Diver Rescue)', NULL, 6, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SAA', 'a1ec2a90-5006-4617-bb52-25eb80a54860') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('14788f47-437c-4668-bc74-5ece8e66a737', 'saa_regional_instructor', 'Regional Instructor', NULL, 7, '2026-07-08 04:10:21.506238+00', '2026-07-08 04:10:21.506238+00', 'SAA', 'a1ec2a90-5006-4617-bb52-25eb80a54860') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('aac73ed2-f764-44c3-8a0a-b22aaa41777e', 'sdi_assistant_instructor', 'Assistant Instructor', NULL, 6, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'SDI', '5498be7b-a4d2-4b32-8630-f984beee5ba2') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('a122600b-79d7-4912-a8a0-c37eb6765c80', 'sdi_instructor', 'Open Water Scuba Diver Instructor', NULL, 7, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'SDI', 'a1ec2a90-5006-4617-bb52-25eb80a54860') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('90fbbf12-398d-4f23-91c8-5e7642b2106d', 'tdi_nitrox', 'Nitrox Diver', NULL, 1, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'TDI', '54a2c864-36df-4d2d-b0d2-c0d3bedaa483') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('da0a7319-d766-4f79-a6d3-88a076836ed6', 'tdi_intro_to_tech', 'Intro to Tech', NULL, 2, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'TDI', '81805010-6edc-4fc1-9bbc-4b27c8f972f3') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('54a2c864-36df-4d2d-b0d2-c0d3bedaa483', 'open_water', 'OW', '開放水域', 1, '2026-07-08 04:10:21.38215+00', '2026-07-08 04:10:21.38215+00', 'PADI', '54a2c864-36df-4d2d-b0d2-c0d3bedaa483') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('c1120406-0361-4b5e-9a88-01578c7bafef', 'tdi_advanced_nitrox', 'Advanced Nitrox Diver', NULL, 3, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'TDI', '81805010-6edc-4fc1-9bbc-4b27c8f972f3') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('7cca8010-696a-4ce7-bc85-6fcc42f50bd8', 'tdi_decompression', 'Decompression Procedures Diver', NULL, 4, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'TDI', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('08506887-6771-40a8-a41c-83517e836bac', 'tdi_helitrox', 'Helitrox Diver', NULL, 5, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'TDI', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('0509d31f-a9f3-4c98-a48f-f38b8ec3339a', 'tdi_extended_range', 'Extended Range Diver', NULL, 6, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'TDI', '9c476ef8-d4a2-457c-adf1-81f406b3e660') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('8ed86e21-81dc-48f8-8311-16dcfe46f9e7', 'tdi_trimix', 'Trimix Diver', NULL, 7, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'TDI', '5498be7b-a4d2-4b32-8630-f984beee5ba2') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('1cb27825-a8e8-4099-81dc-5772c5b33c69', 'tdi_advanced_trimix', 'Advanced Trimix Diver', NULL, 8, '2026-07-08 04:10:21.706593+00', '2026-07-08 04:10:21.706593+00', 'TDI', '5498be7b-a4d2-4b32-8630-f984beee5ba2') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('81805010-6edc-4fc1-9bbc-4b27c8f972f3', 'advanced_open_water', 'AOW', '進階開放水域', 2, '2026-07-08 04:10:21.38215+00', '2026-07-08 04:10:21.38215+00', 'PADI', '81805010-6edc-4fc1-9bbc-4b27c8f972f3') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('5498be7b-a4d2-4b32-8630-f984beee5ba2', 'divemaster', 'DM', '潛水長', 4, '2026-07-08 04:10:21.38215+00', '2026-07-08 04:10:21.38215+00', 'PADI', '5498be7b-a4d2-4b32-8630-f984beee5ba2') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('1e084a3f-39cf-42bd-9037-8d02991b3051', 'msdt', 'MSDT', NULL, 6, '2026-07-08 04:10:21.72622+00', '2026-07-08 04:10:21.72622+00', 'PADI', '1e084a3f-39cf-42bd-9037-8d02991b3051') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('0c4ccb78-e28e-4cb5-b060-920d2144feb7', 'idc_staff', 'IDC Staff', NULL, 7, '2026-07-08 04:10:21.72622+00', '2026-07-08 04:10:21.72622+00', 'PADI', '0c4ccb78-e28e-4cb5-b060-920d2144feb7') ON CONFLICT DO NOTHING;
+INSERT INTO public.cert_levels VALUES ('a6345ec9-b599-45ea-ae51-0379e568a238', 'course_director', 'Course Director', NULL, 8, '2026-07-08 04:10:21.72622+00', '2026-07-08 04:10:21.72622+00', 'PADI', 'a6345ec9-b599-45ea-ae51-0379e568a238') ON CONFLICT DO NOTHING;
 INSERT INTO storage.buckets VALUES ('cert-cards', 'cert-cards', NULL, '2026-07-08 04:10:21.249908+00', '2026-07-08 04:10:21.249908+00', false, false, NULL, NULL, NULL, 'STANDARD') ON CONFLICT DO NOTHING;
 INSERT INTO storage.buckets VALUES ('nitrox-cards', 'nitrox-cards', NULL, '2026-07-08 04:10:21.605817+00', '2026-07-08 04:10:21.605817+00', false, false, NULL, NULL, NULL, 'STANDARD') ON CONFLICT DO NOTHING;
 INSERT INTO storage.buckets VALUES ('deep-cards', 'deep-cards', NULL, '2026-07-08 04:10:21.627711+00', '2026-07-08 04:10:21.627711+00', false, false, NULL, NULL, NULL, 'STANDARD') ON CONFLICT DO NOTHING;

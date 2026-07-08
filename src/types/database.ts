@@ -1000,6 +1000,7 @@ export interface Database {
           id: string
           code: string
           name: string
+          name_zh: string | null
           rank: number
           /** 'PADI' / 'BSAC' / 'CMAS' / 'SSI' / 'NAUI' / 'SAA' / 'SDI' / 'TDI'. */
           organization: string
@@ -1013,6 +1014,7 @@ export interface Database {
           id?: string
           code: string
           name: string
+          name_zh?: string | null
           rank: number
           organization: string
           padi_equivalent_id?: string | null
