@@ -16,7 +16,7 @@ never touch it — that's what keeps upstream updates conflict-free.
 | `src/index.css` (`@theme` block) | Your **brand colors** — see [Colors](#colors) below. |
 | `src/config/terms.tsx` | Your Terms of Use / privacy text (`TermsContent`). |
 | `public/…` (the paths in `assets`) | Your logo, favicon, PWA icons. |
-| `.env.local` / `.env.production` / GitHub Actions secrets | Supabase URL + keys, Turnstile keys, VAPID keys — see [deployment.md](./deployment.md). |
+| `.env.local` / `.env.production` | Supabase URL + keys, Turnstile keys, VAPID keys, Cloudflare deploy creds — see [deployment.md](./deployment.md). |
 | `wrangler.toml` + `workers/push/wrangler.toml` | The two Worker `name`s (globally unique on Cloudflare), and the push worker's `[vars]` (`VAPID_SUBJECT`, `ALLOWED_ORIGINS`, `TIMEZONE`, `CURRENCY`). |
 
 `fundive.config.ts` is **pure data** — no imports — so it's read identically by

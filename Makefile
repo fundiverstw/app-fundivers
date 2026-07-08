@@ -64,16 +64,34 @@ lint-fix:   ; @npm run lint:fix
 typecheck:  ; @npx tsc -b
 check:      typecheck lint test
 
+# Cloudflare Worker deploys read their creds (CLOUDFLARE_API_TOKEN,
+# CLOUDFLARE_ACCOUNT_ID) and the cloud VITE_* build vars from .env.production,
+# so a deploy is non-interactive and reproducible — no `wrangler login`, no
+# GitHub Actions secrets needed. REQUIRE_CF fails fast with a clear message when
+# those creds are missing; it sources .env.production in its own sub-shell so
+# nothing leaks into the vite build (which loads .env.production itself).
+REQUIRE_CF = if [ ! -f .env.production ]; then echo "ERROR: .env.production not found — see docs/deployment.md"; exit 1; fi; \
+	set -a; . ./.env.production; set +a; \
+	if [ -z "$$CLOUDFLARE_API_TOKEN" ] || [ -z "$$CLOUDFLARE_ACCOUNT_ID" ]; then \
+	  echo "ERROR: set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in .env.production"; \
+	  echo "  Token (Edit Cloudflare Workers template): https://dash.cloudflare.com/profile/api-tokens"; \
+	  exit 1; \
+	fi
+
 deploy: deploy-app deploy-push
 
-deploy-app: ; @npm run deploy
+deploy-app:
+	@$(REQUIRE_CF)
+	@npm run build
+	@set -a; . ./.env.production; set +a; npx wrangler deploy
 
 deploy-push:
+	@$(REQUIRE_CF)
 	@if [ ! -d workers/push/node_modules ]; then \
 	  echo "Installing workers/push deps…"; \
-	  cd workers/push && npm install; \
+	  (cd workers/push && npm install); \
 	fi
-	@cd workers/push && npm run deploy
+	@set -a; . ./.env.production; set +a; cd workers/push && npx wrangler deploy
 
 deploy-functions: ; @npm run functions:deploy
 

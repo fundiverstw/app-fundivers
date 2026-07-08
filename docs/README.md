@@ -15,7 +15,7 @@ into source.
 | [packages.md](./packages.md)                           | Partner-shop registration network: product tiers, add-on/room estimate, recommendation email, kickback ledger |
 | [push-notifications.md](./push-notifications.md)       | Web Push: VAPID, service worker, Cloudflare cron sender, `/admin-broadcast`, `/notify-duty`, CORS |
 | [testing.md](./testing.md)                             | Unit vs integration conventions, `mockQueryBuilder`, Makefile surface |
-| [deployment.md](./deployment.md)                       | Env vars (which secret lives where), Cloudflare deploy (CLI + GitHub Actions), Supabase link / push / pull / verify, edge functions |
+| [deployment.md](./deployment.md)                       | Env vars (which secret lives where), Cloudflare deploy (local `make deploy` via `.env.production`), Supabase link / push / pull / verify, edge functions |
 | [forking.md](./forking.md)                             | Running your own shop: the `fundive.config.ts` seam, brand assets, feature gates, and how to pull core updates without conflicts |
 | [security-audit.md](./security-audit.md)               | Point-in-time audit (2026-06-02): findings by severity, fix priority |
 | [legal-brief.md](./legal-brief.md)                     | Brief for the Terms-of-Use / Privacy lawyer review: data inventory, flows, code-text alignment, open questions |

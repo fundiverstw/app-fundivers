@@ -20,24 +20,24 @@ Secrets live in five distinct places. Putting one in the wrong place is
 the most common deploy footgun, so the table below maps each value to
 its destination(s).
 
-| Value | Local dev (`.env.local`) | Local build (`.env.production`) | Push worker stash (`.env.push`) | Cloudflare Worker secret (`wrangler secret put`) | GitHub Actions repo secret |
-| --- | :-: | :-: | :-: | :-: | :-: |
-| `VITE_SUPABASE_URL`         | yes | yes |     |     | yes |
-| `VITE_SUPABASE_ANON_KEY`    | yes | yes |     |     | yes |
-| `VITE_TURNSTILE_SITE_KEY`   | yes | yes |     |     | yes |
-| `VITE_VAPID_PUBLIC_KEY`     | yes | yes |     |     | yes |
-| `VITE_PUSH_WORKER_URL`      | yes | yes |     |     | yes |
-| `SUPABASE_PROJECT_REF`      | yes |     |     |     |     |
-| `SUPABASE_DB_PASSWORD`      | yes |     |     |     |     |
-| `SUPABASE_POOLER_HOST`      | yes |     |     |     |     |
-| `VAPID_PUBLIC_KEY` *(push worker — same value as `VITE_VAPID_PUBLIC_KEY`, just a different name)*  |     |     | yes | yes (push worker) |     |
-| `VAPID_PRIVATE_KEY`         |     |     | yes | yes (push worker) |     |
-| `VAPID_SUBJECT`             |     |     | yes | set in `workers/push/wrangler.toml [vars]` |     |
-| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_ANON_KEY` *(push worker)* |     |     |     | yes (push worker) |     |
-| `ADMIN_TRIGGER_SECRET` / `BROADCAST_WEBHOOK_URL` |     |     |     | yes (push worker) |     |
-| `GMAIL_USER` / `GMAIL_APP_PASSWORD` |     |     |     | `supabase secrets set` (edge function) |     |
-| `CLOUDFLARE_API_TOKEN`      |     |     |     |     | yes |
-| `CLOUDFLARE_ACCOUNT_ID`     |     |     |     |     | yes |
+| Value | Local dev (`.env.local`) | Local build + deploy (`.env.production`) | Push worker stash (`.env.push`) | Cloudflare Worker secret (`wrangler secret put`) |
+| --- | :-: | :-: | :-: | :-: |
+| `VITE_SUPABASE_URL`         | yes | yes |     |     |
+| `VITE_SUPABASE_ANON_KEY`    | yes | yes |     |     |
+| `VITE_TURNSTILE_SITE_KEY`   | yes | yes |     |     |
+| `VITE_VAPID_PUBLIC_KEY`     | yes | yes |     |     |
+| `VITE_PUSH_WORKER_URL`      | yes | yes |     |     |
+| `SUPABASE_PROJECT_REF`      | yes |     |     |     |
+| `SUPABASE_DB_PASSWORD`      | yes |     |     |     |
+| `SUPABASE_POOLER_HOST`      | yes |     |     |     |
+| `VAPID_PUBLIC_KEY` *(push worker — same value as `VITE_VAPID_PUBLIC_KEY`, just a different name)*  |     |     | yes | yes (push worker) |
+| `VAPID_PRIVATE_KEY`         |     |     | yes | yes (push worker) |
+| `VAPID_SUBJECT`             |     |     | yes | set in `workers/push/wrangler.toml [vars]` |
+| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_ANON_KEY` *(push worker)* |     |     |     | yes (push worker) |
+| `ADMIN_TRIGGER_SECRET` / `BROADCAST_WEBHOOK_URL` |     |     |     | yes (push worker) |
+| `GMAIL_USER` / `GMAIL_APP_PASSWORD` |     |     |     | `supabase secrets set` (edge function) |
+| `CLOUDFLARE_API_TOKEN`      |     | yes |     |     |
+| `CLOUDFLARE_ACCOUNT_ID`     |     | yes |     |     |
 
 ### `.env.local` — local dev
 
@@ -55,13 +55,16 @@ linked Supabase project.
 | `SUPABASE_DB_PASSWORD`   | `make push`, `make pull`     | DB password for migrations |
 | `SUPABASE_POOLER_HOST`   | `make verify` (`scripts/verify-sync.sh`) | e.g. `aws-0-ap-east-1.pooler.supabase.com` |
 
-### `.env.production` — local `make deploy` build
+### `.env.production` — local `make deploy` build + deploy creds
 
 Vite auto-loads this file when `vite build` runs in production mode.
 The same `VITE_*` values from `.env.local` go here so a hand-run
 `make deploy` produces a bundle that points at the cloud Supabase
-project. Not used by the GitHub Actions deploy (Actions sources its
-values from repo secrets instead).
+project. It also holds the Cloudflare deploy creds
+(`CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`) that `make deploy-app`
+/ `make deploy-push` use to authenticate `wrangler` non-interactively —
+so a local deploy needs no `wrangler login`. Not used by the GitHub
+Actions deploy (Actions sources its values from repo secrets instead).
 
 ### `.env.push` — push worker secret stash
 
@@ -87,21 +90,6 @@ Set via `supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" …`.
 Currently only `create-registration` uses these (`GMAIL_USER`,
 `GMAIL_APP_PASSWORD`). See [§ Supabase Edge Functions](#supabase-edge-functions).
 
-### GitHub Actions repo secrets
-
-Used by `.github/workflows/deploy.yml` for browser-triggered deploys.
-Set under **Settings → Secrets and variables → Actions**.
-
-| Secret | Purpose |
-| --- | --- |
-| `CLOUDFLARE_API_TOKEN`     | Token with the "Edit Cloudflare Workers" template permission |
-| `CLOUDFLARE_ACCOUNT_ID`    | Visible in the Cloudflare dashboard sidebar |
-| `VITE_SUPABASE_URL`        | Same value as `.env.production`; baked into the SPA bundle at build |
-| `VITE_SUPABASE_ANON_KEY`   | Same value as `.env.production`; baked into the SPA bundle at build |
-| `VITE_TURNSTILE_SITE_KEY`  | Cloudflare Turnstile site key; **required** — the build fails without it |
-| `VITE_VAPID_PUBLIC_KEY`    | Same public key as `VAPID_PUBLIC_KEY` in `.env.push` — only the public half goes here |
-| `VITE_PUSH_WORKER_URL`     | Push worker origin baked into the SPA (admin push actions) |
-
 Do **not** put `VAPID_PRIVATE_KEY`, service-role keys, or any push
 worker secret in GitHub. Those stay on Cloudflare via `wrangler secret
 put`; the workflow only deploys code, it doesn't rotate worker secrets.
@@ -115,17 +103,16 @@ Two Cloudflare Workers are deployed separately:
 | `app-fundiverstw`  | `./wrangler.toml`              | `make deploy-app` |
 | `fundivers-push`   | `./workers/push/wrangler.toml` | `make deploy-push` |
 
-`make deploy` runs both in sequence. The same two workers can also be
-deployed from the GitHub Actions UI — see [§ Browser-triggered deploy
-(GitHub Actions)](#browser-triggered-deploy-github-actions).
+`make deploy` runs both in sequence. Deploys are local-only (driven by
+`.env.production`); there is no GitHub Actions deploy.
 
 ### `app-fundiverstw` (SPA)
 
-`make deploy-app` runs `npm run deploy`, which expands to:
+`make deploy-app` first checks the Cloudflare creds are present, then:
 
 ```sh
-npm run build                                       # tsc -b && vite build
-dotenv -e .env.local -- wrangler deploy             # pushes dist/ to the Worker
+npm run build                                       # tsc -b && vite build (cloud VITE_* from .env.production)
+. ./.env.production && npx wrangler deploy           # CLOUDFLARE_API_TOKEN/ACCOUNT_ID authenticate wrangler
 ```
 
 `wrangler.toml` at the repo root is minimal:
@@ -137,27 +124,16 @@ compatibility_date = "2025-04-16"
 directory = "./dist"
 ```
 
-No custom fetch handler — it's a pure static-asset Worker. On first
-deploy you may need `wrangler login` to authenticate.
+No custom fetch handler — it's a pure static-asset Worker. Auth is the
+`CLOUDFLARE_API_TOKEN` from `.env.production` — no `wrangler login` needed.
 
 ### `fundivers-push` (cron sender)
 
-`make deploy-push` runs `wrangler deploy` from `workers/push/`. The
-target installs deps on first run. Secrets are set separately via
-`wrangler secret put` — see
+`make deploy-push` runs `wrangler deploy` from `workers/push/`, sourcing
+the same `.env.production` creds so it authenticates non-interactively.
+The target installs deps on first run. The worker's own runtime secrets
+are set separately via `wrangler secret put` — see
 [push-notifications.md § Configure the worker](./push-notifications.md#4-configure-the-worker).
-
-### Browser-triggered deploy (GitHub Actions)
-
-`.github/workflows/deploy.yml` exposes the same two deploys to the
-GitHub Actions UI. **Actions → Deploy to Cloudflare → Run workflow**,
-pick a target (`spa`, `push`, or `both`), and the chosen jobs run in
-parallel.
-
-The workflow needs the repo secrets listed in
-[§ GitHub Actions repo secrets](#github-actions-repo-secrets). It does
-not push migrations, deploy edge functions, or rotate worker secrets —
-treat it as a remote `make deploy`, nothing more.
 
 ## Supabase Edge Functions
 
