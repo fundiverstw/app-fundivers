@@ -1571,6 +1571,11 @@ export interface AppEvent {
    */
   start_time_hhmm: string | null
   featured: boolean
+  /** Stored image ref for the event's featured photo (a `wix:image://…` ref or
+   *  a plain URL). Resolve to a displayable URL with resolveImageUrl() from
+   *  src/lib/images.ts. Null/absent when the event has no image. Optional so
+   *  lighter event literals can omit it. */
+  featured_image?: string | null
   /** Admin-set manual "no more registrations" flag. Independent of capacity:
    *  set it to force an event onto the waitlist regardless of capacity. */
   fully_booked: boolean

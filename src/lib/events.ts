@@ -152,6 +152,7 @@ function diveToEvent(e: EventRow, priceIndex: Map<string, EOPrice>, addonIds: st
     end_time: toIso(e.end_date, e.start_time),
     start_time_hhmm: toHhmm(e.start_time),
     featured: e.featured ?? false,
+    featured_image: e.featured_image ?? null,
     fully_booked: e.fully_booked ?? false,
     capacity: e.capacity ?? null,
     confirmed_count: null,
@@ -228,6 +229,7 @@ function courseToEvents(c: EventRow, priceIndex: Map<string, EOPrice>, addonIds:
     course_category: c.admin_title ?? null,
     start_time_hhmm: toHhmm(c.start_time),
     featured: false,
+    featured_image: c.featured_image ?? null,
     fully_booked: c.fully_booked ?? false,
     capacity: c.capacity ?? null,
     confirmed_count: null,
@@ -429,7 +431,7 @@ async function attachPrices(events: EventRow[]): Promise<Map<string, EOPrice>> {
 
 // Core columns only — the descriptive detail columns are fetched best-effort by
 // attachEventDetails so schema drift can't break the calendar.
-const EVENT_COLS = 'id, kind, admin_title, display_title, calendar_title, start_date, start_time, end_date, course_days, featured, fully_booked, capacity, price, gear_rental, nitrox_required, dive_days, cancelled_at, full_payment_deadline, cancel_policy, cancel_date, is_private, is_boat_dive, is_trip'
+const EVENT_COLS = 'id, kind, admin_title, display_title, calendar_title, start_date, start_time, end_date, course_days, featured, featured_image, fully_booked, capacity, price, gear_rental, nitrox_required, dive_days, cancelled_at, full_payment_deadline, cancel_policy, cancel_date, is_private, is_boat_dive, is_trip'
 
 // Every 'YYYY-MM-DD' from `fromDate` to `toDate` inclusive. Used to ask
 // PostgREST for courses whose course_days array shares at least one day
