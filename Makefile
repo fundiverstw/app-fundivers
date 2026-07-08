@@ -88,10 +88,10 @@ wix-sync:
 	  exit 1; \
 	fi; \
 	echo "Triggering Wix re-sync of every collection in SYNC_TABLES…"; \
-	curl -fsSL -X POST \
+	curl -sS --fail-with-body -X POST \
 	  -H 'Content-Type: application/json' \
 	  -H "x-sync-token: $$WIX_SYNC_TOKEN" \
-	  -w '\n' \
+	  -w '\nHTTP %{http_code}\n' \
 	  https://fundiverstw.com/_functions/syncSupabase
 
 dev:
