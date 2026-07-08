@@ -1,4 +1,4 @@
-.PHONY: help dev studio mail start stop status reset diff link pull push dump-data verify test lint lint-fix typecheck check deploy deploy-app deploy-push deploy-functions wix-sync
+.PHONY: help dev studio mail start stop status reset diff link pull push dump-data backup-prod verify test lint lint-fix typecheck check deploy deploy-app deploy-push deploy-functions wix-sync
 
 help:
 	@echo "Local dev:"
@@ -16,6 +16,7 @@ help:
 	@echo "  make pull        — pull cloud schema into a new migration"
 	@echo "  make push        — push local migrations to cloud"
 	@echo "  make dump-data   — dump cloud data into supabase/seed.sql"
+	@echo "  make backup-prod — snapshot the linked PROD db (schema+data+roles) to backups/ — run on a networked machine, before a risky migration"
 	@echo "  make verify      — check local is in sync with cloud (schema + row counts)"
 	@echo ""
 	@echo "Testing:"
@@ -52,6 +53,7 @@ link:       ; @npm run db:link
 pull:       ; @npm run db:pull
 push:       ; @npm run db:push
 dump-data:  ; @npm run db:dump-data
+backup-prod: ; @npm run db:backup-prod
 verify:     ; @bash scripts/verify-sync.sh
 test:       ; @npm run test:all
 security:   ; @npx vitest run --project security

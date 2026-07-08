@@ -32,3 +32,4 @@ CLAUDE.md
 *.njsproj
 *.sln
 *.sw?
+backups/

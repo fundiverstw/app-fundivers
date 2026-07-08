@@ -21,6 +21,7 @@
     "db:pull": "dotenv -e .env.local -- sh -c 'supabase db pull --password \"$SUPABASE_DB_PASSWORD\"'",
     "db:push": "dotenv -e .env.local -- sh -c 'supabase db push --password \"$SUPABASE_DB_PASSWORD\"'",
     "db:dump-data": "dotenv -e .env.local -- sh -c 'supabase db dump --data-only --schema auth,public --exclude public.cancellation_policies --exclude public.cert_levels --exclude public.dive_sites --password \"$SUPABASE_DB_PASSWORD\" -f supabase/seed.sql'",
+    "db:backup-prod": "bash scripts/backup-prod.sh",
     "functions:deploy": "dotenv -e .env.local -- sh -c 'supabase functions deploy --project-ref \"$SUPABASE_PROJECT_REF\"'"
   },
   "dependencies": {
