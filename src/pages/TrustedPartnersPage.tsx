@@ -56,8 +56,8 @@ export function TrustedPartnersPage() {
       <div className="space-y-1">
         <h1 className={`text-xl ${PAGE_HEADING} font-bold`}>Trusted Partners</h1>
         <p className={`text-sm ${PAGE_BODY}`}>
-          Dive shops abroad we've personally vetted. Message one directly — we'll
-          be cc'd and help set things up.
+          Explore our network of personally vetted dive operators around the
+          world. We want to help ensure you have a safe, smooth, and fun trip.
         </p>
       </div>
 
@@ -68,13 +68,6 @@ export function TrustedPartnersPage() {
           ))}
         </ul>
       )}
-
-      <div className="space-y-1">
-        <h2 className={`text-base ${PAGE_HEADING} font-semibold`}>Headed somewhere not listed?</h2>
-        <p className={`text-sm ${PAGE_BODY}`}>
-          Tell us where and we'll point you to a shop we've vetted there.
-        </p>
-      </div>
 
       {sent ? (
         <div className={`${CARD} p-4 space-y-3`}>
