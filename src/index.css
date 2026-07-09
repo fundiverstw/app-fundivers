@@ -286,6 +286,17 @@ img, video, canvas {
 .text-brand-800 { color: var(--color-reef-300); }
 .placeholder\:text-brand-900::placeholder { color: color-mix(in oklab, var(--color-brand-100) 45%, transparent); }
 
+/* Native <select> dropdowns render their options in an OS popup with a white
+   background, but the option text inherits the select's `color` — which the
+   brand-ink flip above turns near-white, giving white-on-white options in every
+   native dropdown. Pin options to dark ink on a white sheet so the open list
+   stays legible everywhere, regardless of the closed control's (light) text. */
+option,
+optgroup {
+  color: var(--color-brand-950);
+  background-color: #ffffff;
+}
+
 /* Translucent-white cards → frosted dark glass. Opaque + the family card alphas
    only; the riced-native bg-white/5–15 fills are intentionally NOT listed. */
 .bg-white,
