@@ -8,6 +8,9 @@ import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
 import { EventStatusTags } from '../components/EventStatusTags'
 import type { AppEvent, Duty } from '../types/database'
 import { PAGE_BODY } from '../styles/tokens'
+import { t } from '../i18n'
+
+const du = t.duties
 
 interface Enriched {
   duty: Duty
@@ -70,21 +73,19 @@ export function DutiesPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <header className="space-y-1">
-        <h1 className="text-xl font-bold text-white">My duties</h1>
-        <p className="text-xs text-white/70">
-          {upcoming.length} upcoming · {past.length} past
-        </p>
+        <h1 className="text-xl font-bold text-white">{du.title}</h1>
+        <p className="text-xs text-white/70">{du.counts(upcoming.length, past.length)}</p>
       </header>
 
-      <Section title="Upcoming">
+      <Section title={du.upcoming}>
         {upcoming.length === 0
-          ? <p className={`${PAGE_BODY} text-sm`}>Nothing scheduled.</p>
+          ? <p className={`${PAGE_BODY} text-sm`}>{du.nothingScheduled}</p>
           : upcoming.map(e => <Row key={e.duty.id} e={e} eventLinkBase={eventLinkBase} />)
         }
       </Section>
 
       {past.length > 0 && (
-        <Section title="Past">
+        <Section title={du.past}>
           {past.map(e => <Row key={e.duty.id} e={e} eventLinkBase={eventLinkBase} dim />)}
         </Section>
       )}
@@ -122,8 +123,8 @@ function Row({ e, eventLinkBase, dim }: { e: Enriched; eventLinkBase: string | n
         : event
           ? <p className="text-sm font-medium text-brand-900 truncate">{event.title}<EventStatusTags event={event} /></p>
           : duty.event_id
-            ? <p className="text-xs text-brand-950 font-medium">Event no longer exists</p>
-            : <p className="text-xs text-brand-950 font-medium">Standalone duty</p>
+            ? <p className="text-xs text-brand-950 font-medium">{du.eventGone}</p>
+            : <p className="text-xs text-brand-950 font-medium">{du.standalone}</p>
       }
       {duty.notes && <p className="text-xs text-brand-900 font-medium bg-surface-50 rounded p-2 mt-1">📝 {duty.notes}</p>}
     </div>

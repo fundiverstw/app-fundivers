@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { fetchNotifications, markRead, markAllRead } from '../lib/notifications'
 import type { Notification } from '../types/database'
 import { ON_DEEP_MUTED } from '../styles/tokens'
+import { t } from '../i18n'
+
+const nt = t.notifications
 
 export function NotificationsPage() {
   const [items, setItems] = useState<Notification[]>([])
@@ -42,13 +45,13 @@ export function NotificationsPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-4">
       <div className="flex items-baseline justify-between gap-3">
-        <h1 className="text-xl font-bold text-white">Notifications</h1>
+        <h1 className="text-xl font-bold text-white">{nt.title}</h1>
         {unreadCount > 0 && (
           <button
             onClick={handleMarkAll}
             className="text-xs px-2 py-1 rounded-md bg-white/15 hover:bg-white/25 text-white transition-colors"
           >
-            Mark all read
+            {nt.markAllRead}
           </button>
         )}
       </div>
@@ -58,11 +61,11 @@ export function NotificationsPage() {
       )}
 
       {loading && items.length === 0 && (
-        <p className={`text-sm ${ON_DEEP_MUTED}`}>Loading…</p>
+        <p className={`text-sm ${ON_DEEP_MUTED}`}>{nt.loading}</p>
       )}
 
       {!loading && items.length === 0 && (
-        <p className={`text-sm ${ON_DEEP_MUTED}`}>No notifications yet.</p>
+        <p className={`text-sm ${ON_DEEP_MUTED}`}>{nt.empty}</p>
       )}
 
       <ul className="space-y-2">
@@ -95,7 +98,7 @@ export function NotificationsPage() {
                   <div className="border-t border-surface-200/60 bg-surface-50 px-3 pb-3 pt-2">
                     {n.body
                       ? <p className="text-sm text-brand-950 whitespace-pre-wrap break-words">{n.body}</p>
-                      : <p className="text-xs italic text-brand-900/70">No additional details.</p>}
+                      : <p className="text-xs italic text-brand-900/70">{nt.noDetails}</p>}
                   </div>
                 )}
               </div>
@@ -111,12 +114,12 @@ function relativeTime(iso: string): string {
   const then = new Date(iso).getTime()
   const now = Date.now()
   const sec = Math.round((now - then) / 1000)
-  if (sec < 60) return 'just now'
+  if (sec < 60) return nt.justNow
   const min = Math.round(sec / 60)
-  if (min < 60) return `${min}m ago`
+  if (min < 60) return nt.minutesAgo(min)
   const hr = Math.round(min / 60)
-  if (hr < 24) return `${hr}h ago`
+  if (hr < 24) return nt.hoursAgo(hr)
   const d = Math.round(hr / 24)
-  if (d < 7) return `${d}d ago`
+  if (d < 7) return nt.daysAgo(d)
   return new Date(iso).toLocaleDateString()
 }

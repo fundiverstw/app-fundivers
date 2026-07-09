@@ -3,6 +3,9 @@ import { createPortal } from 'react-dom'
 import { signWaiver, type WaiverEventRef } from '../../lib/waivers'
 import { getWaiverPdfSignedUrl } from '../../lib/waiver-pdf'
 import type { WaiverDef } from '../../config/waivers'
+import { t } from '../../i18n'
+
+const ws = t.waiverSign
 
 // E-signature dialog reused by the profile page and the registration form. The
 // diver reads the form text, types their full name and ticks the acknowledgment;
@@ -39,7 +42,7 @@ export function WaiverSignDialog({ def, event, onSigned, onClose }: {
       await signWaiver({ def, signedName: name.trim(), event })
       onSigned()
     } catch {
-      setError('Could not record your signature. Please try again.')
+      setError(ws.signFailed)
       setBusy(false)
     }
   }
@@ -60,12 +63,12 @@ export function WaiverSignDialog({ def, event, onSigned, onClose }: {
             {pdfUrl ? (
               <object data={pdfUrl} type="application/pdf" aria-label={def.title} className="w-full grow min-h-[320px]">
                 <p className="text-xs text-brand-950 p-3">
-                  Your browser can't show the PDF inline.{' '}
-                  <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="underline font-semibold">Open it in a new tab</a> to read it before signing.
+                  {ws.pdfFallbackPrefix}{' '}
+                  <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="underline font-semibold">{ws.pdfOpenNewTab}</a> {ws.pdfFallbackSuffix}
                 </p>
               </object>
             ) : (
-              <p className="text-xs text-brand-950 p-3">Loading the document…</p>
+              <p className="text-xs text-brand-950 p-3">{ws.loadingDocument}</p>
             )}
           </div>
         ) : (
@@ -75,15 +78,15 @@ export function WaiverSignDialog({ def, event, onSigned, onClose }: {
         )}
         <div className="space-y-2">
           <label className="block">
-            <span className="block text-xs text-brand-900 font-medium mb-1 uppercase tracking-wide">Type your full name to sign</span>
+            <span className="block text-xs text-brand-900 font-medium mb-1 uppercase tracking-wide">{ws.typeFullName}</span>
             <input
               type="text"
-              aria-label="Full name"
+              aria-label={ws.fullNameAria}
               value={name}
               disabled={busy}
               onChange={e => setName(e.target.value)}
               className="w-full bg-white border border-surface-300 rounded-lg px-3 py-2 text-brand-900 text-sm focus:outline-none focus:border-brand-900 disabled:opacity-50"
-              placeholder="Your full legal name"
+              placeholder={ws.fullNamePlaceholder}
             />
           </label>
           <label className="flex items-start gap-2 text-sm text-brand-900">
@@ -94,7 +97,7 @@ export function WaiverSignDialog({ def, event, onSigned, onClose }: {
               onChange={e => setAgreed(e.target.checked)}
               className="mt-0.5"
             />
-            <span>I have read this form and agree to it, and I am signing it of my own free act.</span>
+            <span>{ws.agree}</span>
           </label>
           {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
         </div>
@@ -105,7 +108,7 @@ export function WaiverSignDialog({ def, event, onSigned, onClose }: {
             disabled={busy}
             className="px-4 py-2 rounded-lg border border-surface-300 text-brand-900 text-sm font-semibold disabled:opacity-50 hover:bg-surface-50"
           >
-            Cancel
+            {ws.cancel}
           </button>
           <button
             type="button"
@@ -113,7 +116,7 @@ export function WaiverSignDialog({ def, event, onSigned, onClose }: {
             disabled={!canSign}
             className="px-4 py-2 rounded-lg bg-brand-900 hover:bg-brand-950 text-white text-sm font-semibold disabled:opacity-50"
           >
-            {busy ? 'Signing…' : 'Sign'}
+            {busy ? ws.signing : ws.sign}
           </button>
         </div>
       </div>

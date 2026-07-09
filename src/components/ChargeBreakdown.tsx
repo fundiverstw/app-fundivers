@@ -1,6 +1,7 @@
 import type { ChargeLine } from '../lib/booking-charges'
 import { chargesTotal } from '../lib/booking-charges'
 import { TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE } from '../styles/tokens'
+import { t } from '../i18n'
 
 export interface AmendmentLine {
   label: string
@@ -52,12 +53,12 @@ export function ChargeBreakdown({
         </div>
       ))}
       <div className={`flex justify-between gap-3 pt-1 mt-1 border-t border-surface-200 ${TEXT_BODY}`}>
-        <span>Total</span>
+        <span>{t.bookings.total}</span>
         <span className="shrink-0 tabular-nums font-semibold">{currency} {shownTotal.toLocaleString()}</span>
       </div>
       {deposit != null && deposit > 0 && (
         <div className={`flex justify-between gap-3 ${TEXT_SUBTLE}`}>
-          <span>Deposit to hold spot</span>
+          <span>{t.charges.depositToHold}</span>
           <span className="shrink-0 tabular-nums">{currency} {deposit.toLocaleString()}</span>
         </div>
       )}
