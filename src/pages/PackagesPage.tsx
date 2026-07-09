@@ -7,6 +7,9 @@ import type { PackageBoardItem, MyPackageRegistration } from '../types/database'
 import {
   CARD, PAGE_HEADING, PAGE_BODY, ON_DEEP_LINK, TEXT_HEADING, TEXT_SUBTLE,
 } from '../styles/tokens'
+import { t } from '../i18n'
+
+const pk = t.packages
 
 // Packages (diver-facing) — partner-shop dive trips we vouch for. Booking is at
 // the partner shop; registering here builds an order (tier + dates + extras),
@@ -43,14 +46,11 @@ export function PackagesPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <div className="space-y-1">
-        <h1 className={`text-xl ${PAGE_HEADING} font-bold`}>Packages</h1>
-        <p className={`text-sm ${PAGE_BODY}`}>
-          Dive trips abroad we've personally vetted. Tap one you like, pick your
-          dates and extras, and we'll recommend you to the shop with a cost estimate.
-        </p>
+        <h1 className={`text-xl ${PAGE_HEADING} font-bold`}>{pk.title}</h1>
+        <p className={`text-sm ${PAGE_BODY}`}>{pk.intro}</p>
         <p className="text-sm">
           <Link to="/trusted-partners" className={ON_DEEP_LINK}>
-            Headed somewhere not listed? Try Trusted Partners →
+            {pk.trustedPartnersLink}
           </Link>
         </p>
       </div>
@@ -60,9 +60,9 @@ export function PackagesPage() {
       )}
 
       {loading ? (
-        <p className={`text-sm ${PAGE_BODY}`}>Loading…</p>
+        <p className={`text-sm ${PAGE_BODY}`}>{pk.loading}</p>
       ) : packages.length === 0 ? (
-        <p className={`text-sm ${PAGE_BODY}`}>No packages on the board right now — check back soon.</p>
+        <p className={`text-sm ${PAGE_BODY}`}>{pk.none}</p>
       ) : (
         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {packages.map(pkg => (
@@ -89,19 +89,21 @@ function PackageCard({ pkg, registration }: { pkg: PackageBoardItem; registratio
         <p className={`text-xs ${TEXT_SUBTLE} truncate`}>{pkg.destination}</p>
         <div className="flex items-center justify-between pt-1 gap-2">
           <span className="text-xs px-2 py-0.5 rounded-full border border-emerald-400 bg-emerald-50 text-emerald-800 font-medium truncate">
-            In cooperation with {pkg.partner_name}
+            {pk.inCooperationWith(pkg.partner_name)}
           </span>
           {pkg.min_price != null && (
             <span className={`text-xs ${TEXT_HEADING} shrink-0`}>
-              from {pkg.min_price.toLocaleString()} {pkg.currency}
+              {pk.fromPrice(pkg.min_price.toLocaleString(), pkg.currency)}
             </span>
           )}
         </div>
         {registration && (
           <p className="text-xs text-brand-800 font-semibold pt-1">
-            {registration.status === 'registered' ? 'You’re registered' : `Registration: ${registration.status}`}
-            {registration.estimated_cost != null &&
-              ` · est. ${registration.estimated_cost.toLocaleString()} ${registration.estimated_currency ?? siteConfig.locale.currency}`}
+            {registration.status === 'registered' ? pk.youreRegistered : pk.registrationStatus(registration.status)}
+            {registration.estimated_cost != null && pk.estShort(
+              registration.estimated_cost.toLocaleString(),
+              registration.estimated_currency ?? siteConfig.locale.currency,
+            )}
           </p>
         )}
       </div>

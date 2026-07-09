@@ -13,6 +13,9 @@ import type { PackageBoardItem, PackageTierItem, MyPackageRegistration } from '.
 import {
   CARD, BTN_PRIMARY, BTN_DANGER, PAGE_BODY, TEXT_LINK, ON_DEEP_LINK, TEXT_HEADING, TEXT_BODY, TEXT_SUBTLE,
 } from '../styles/tokens'
+import { t } from '../i18n'
+
+const pk = t.packages
 
 // Package detail — full pitch for one partner package, its price tiers, and the
 // registration flow. Registering builds an order (tier + dates + extras) and
@@ -61,7 +64,7 @@ export function PackageDetailPage() {
     try {
       await cancelMyPackageRegistration(registration.id)
       await refreshRegistration()
-      toast.success('Registration cancelled.')
+      toast.success(pk.cancelled)
     } catch (err) {
       toast.error(errorMessage(err))
     } finally {
@@ -69,7 +72,7 @@ export function PackageDetailPage() {
     }
   }
 
-  if (loading) return <p className={`text-sm ${PAGE_BODY} max-w-2xl mx-auto`}>Loading…</p>
+  if (loading) return <p className={`text-sm ${PAGE_BODY} max-w-2xl mx-auto`}>{pk.loading}</p>
   if (error) {
     return (
       <div className="max-w-2xl mx-auto space-y-3">
@@ -82,7 +85,7 @@ export function PackageDetailPage() {
     return (
       <div className="max-w-2xl mx-auto space-y-3">
         <BackLink />
-        <p className={`text-sm ${PAGE_BODY}`}>This package isn’t on the board anymore.</p>
+        <p className={`text-sm ${PAGE_BODY}`}>{pk.gone}</p>
       </div>
     )
   }
@@ -101,7 +104,7 @@ export function PackageDetailPage() {
           <h1 className={`text-xl ${TEXT_HEADING}`}>{pkg.title}</h1>
           <p className={`text-sm ${TEXT_SUBTLE}`}>{pkg.destination}</p>
           <span className="inline-block text-xs px-2 py-0.5 rounded-full border border-emerald-400 bg-emerald-50 text-emerald-800 font-medium">
-            In cooperation with {pkg.partner_name}
+            {pk.inCooperationWith(pkg.partner_name)}
           </span>
           {pkg.summary && <p className={`text-sm ${TEXT_BODY}`}>{pkg.summary}</p>}
         </div>
@@ -109,12 +112,12 @@ export function PackageDetailPage() {
 
       {tiers.length > 0 && (
         <section className={`${CARD} p-4 space-y-1`}>
-          <h2 className={`text-sm ${TEXT_HEADING}`}>Packages</h2>
+          <h2 className={`text-sm ${TEXT_HEADING}`}>{pk.tiersHeading}</h2>
           <ul className="space-y-1">
-            {tiers.map(t => (
-              <li key={t.id} className="flex justify-between text-sm">
-                <span className={TEXT_BODY}>{t.name}</span>
-                <span className={TEXT_HEADING}>{t.price.toLocaleString()} {t.currency}</span>
+            {tiers.map(tier => (
+              <li key={tier.id} className="flex justify-between text-sm">
+                <span className={TEXT_BODY}>{tier.name}</span>
+                <span className={TEXT_HEADING}>{tier.price.toLocaleString()} {tier.currency}</span>
               </li>
             ))}
           </ul>
@@ -123,14 +126,14 @@ export function PackageDetailPage() {
 
       {pkg.description && (
         <section className={`${CARD} p-4 space-y-1`}>
-          <h2 className={`text-sm ${TEXT_HEADING}`}>About this package</h2>
+          <h2 className={`text-sm ${TEXT_HEADING}`}>{pk.aboutHeading}</h2>
           <p className={`text-sm ${TEXT_BODY} whitespace-pre-wrap`}>{pkg.description}</p>
         </section>
       )}
 
       {pkg.highlights.length > 0 && (
         <section className={`${CARD} p-4 space-y-1`}>
-          <h2 className={`text-sm ${TEXT_HEADING}`}>Highlights</h2>
+          <h2 className={`text-sm ${TEXT_HEADING}`}>{pk.highlightsHeading}</h2>
           <ul className="list-disc list-inside space-y-0.5">
             {pkg.highlights.map((h, i) => <li key={i} className={`text-sm ${TEXT_BODY}`}>{h}</li>)}
           </ul>
@@ -138,14 +141,14 @@ export function PackageDetailPage() {
       )}
 
       <section className={`${CARD} p-4 space-y-1`}>
-        <h2 className={`text-sm ${TEXT_HEADING}`}>The shop we vouch for</h2>
+        <h2 className={`text-sm ${TEXT_HEADING}`}>{pk.vouchHeading}</h2>
         <p className={`text-sm ${TEXT_BODY}`}>
           {pkg.partner_name} · {[pkg.partner_location, pkg.partner_country].filter(Boolean).join(', ')}
         </p>
         {pkg.partner_vouch_notes && <p className={`text-sm ${TEXT_SUBTLE}`}>{pkg.partner_vouch_notes}</p>}
         {pkg.partner_website && (
           <a href={pkg.partner_website} target="_blank" rel="noopener noreferrer" className={`text-sm ${TEXT_LINK}`}>
-            Visit their site →
+            {pk.visitSite}
           </a>
         )}
       </section>
@@ -154,14 +157,11 @@ export function PackageDetailPage() {
         <RegisteredCard registration={registration} onCancel={handleCancel} cancelling={cancelling} />
       ) : (
         <section className={`${CARD} p-4 space-y-2`}>
-          <h2 className={`text-sm ${TEXT_HEADING}`}>Interested?</h2>
-          <p className={`text-sm ${TEXT_BODY}`}>
-            Pick a package and your dates and we’ll recommend you to {pkg.partner_name} with a
-            cost estimate. No payment here — the final cost is set by the shop.
-          </p>
+          <h2 className={`text-sm ${TEXT_HEADING}`}>{pk.interestedHeading}</h2>
+          <p className={`text-sm ${TEXT_BODY}`}>{pk.interestedBody(pkg.partner_name)}</p>
           <button type="button" onClick={() => setFormOpen(true)} disabled={tiers.length === 0}
             className={`${BTN_PRIMARY} disabled:opacity-50`}>
-            {tiers.length === 0 ? 'No packages available' : 'Register'}
+            {tiers.length === 0 ? pk.noneAvailable : pk.register}
           </button>
         </section>
       )}
@@ -169,14 +169,14 @@ export function PackageDetailPage() {
       {formOpen && (
         <RegisterWizard
           title={pkg.title}
-          subtitle={`with ${pkg.partner_name}`}
+          subtitle={pk.withPartner(pkg.partner_name)}
           currency={pkg.currency}
           tiers={tiers}
-          baseLabel="Package"
+          baseLabel={pk.baseLabel}
           dateMode="pick"
           addonIds={pkg.addon_ids}
           roomTypeIds={pkg.room_type_ids}
-          disclaimer="This is an estimate only — the final cost will be determined by the partner shop."
+          disclaimer={pk.disclaimer}
           onSubmit={(sel) => registerForPackage({
             packageId: pkg.id,
             tierId: sel.tierId ?? tiers[0]?.id ?? '',
@@ -191,11 +191,11 @@ export function PackageDetailPage() {
             setFormOpen(false)
             await refreshRegistration()
             if (result.already_registered) {
-              toast.success('You already have a live registration for this package.')
+              toast.success(pk.alreadyRegistered)
             } else if (result.emailed) {
-              toast.success('You’re registered — we’ve emailed the shop and you a summary.')
+              toast.success(pk.registeredEmailed)
             } else {
-              toast.success('You’re registered — we’ll pass your details to the shop.')
+              toast.success(pk.registeredNoEmail)
             }
           }}
         />
@@ -212,26 +212,26 @@ function RegisteredCard({ registration, onCancel, cancelling }: {
   const dates = packageDateLabel(registration.preferred_start, registration.preferred_end)
   return (
     <section className={`${CARD} p-4 space-y-2`}>
-      <h2 className={`text-sm ${TEXT_HEADING}`}>You’re registered</h2>
+      <h2 className={`text-sm ${TEXT_HEADING}`}>{pk.youreRegistered}</h2>
       <p className={`text-sm ${TEXT_BODY}`}>
-        {registration.tier_name ?? 'Package'}{dates ? ` · ${dates}` : ''}
+        {registration.tier_name ?? pk.baseLabel}{dates ? ` · ${dates}` : ''}
       </p>
       {registration.estimated_cost != null && (
         <p className={`text-sm ${TEXT_HEADING}`}>
-          Estimated cost: {registration.estimated_cost.toLocaleString()}{' '}
-          {registration.estimated_currency ?? siteConfig.locale.currency}
+          {pk.estimatedCost(
+            registration.estimated_cost.toLocaleString(),
+            registration.estimated_currency ?? siteConfig.locale.currency,
+          )}
         </p>
       )}
-      <p className={`text-xs ${TEXT_SUBTLE}`}>
-        The final cost is determined by the partner shop. Status: {registration.status}
-      </p>
+      <p className={`text-xs ${TEXT_SUBTLE}`}>{pk.finalCostNote(registration.status)}</p>
       <button type="button" onClick={onCancel} disabled={cancelling} className={`${BTN_DANGER} disabled:opacity-50`}>
-        {cancelling ? 'Cancelling…' : 'Cancel registration'}
+        {cancelling ? pk.cancelling : pk.cancelRegistration}
       </button>
     </section>
   )
 }
 
 function BackLink() {
-  return <Link to="/packages" className={`text-sm ${ON_DEEP_LINK}`}>← Packages</Link>
+  return <Link to="/packages" className={`text-sm ${ON_DEEP_LINK}`}>{pk.back}</Link>
 }
