@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
 import type { SeatingPlan, CarSeating } from '../../lib/vehicle-planning'
+import { t } from '../../i18n'
 
-const plural = (n: number) => (n === 1 ? '' : 's')
+const tp = t.admin.transport
 
 /**
  * The day's ride plan: the divers who need a ride plus all on-duty staff,
@@ -18,8 +19,8 @@ export function TransportFleetPlan({
   if (fleetSize === 0) {
     return (
       <p className="text-sm font-medium text-amber-800">
-        No vehicles in the fleet yet — add them under{' '}
-        <Link to="/admin/vehicles" className="underline">Manage → Vehicles</Link> to plan rides.
+        {tp.noFleetPrefix}{' '}
+        <Link to="/admin/vehicles" className="underline">{tp.manageVehiclesLink}</Link> {tp.noFleetSuffix}
       </p>
     )
   }
@@ -34,8 +35,7 @@ export function TransportFleetPlan({
       )}
       {plan.unseated.length > 0 && (
         <p className="text-sm font-semibold text-red-600">
-          No seat ({plan.unseated.length}):{' '}
-          <span className="font-medium">{plan.unseated.map(r => r.name).join(' · ')}</span>
+          {tp.noSeat(plan.unseated.length, plan.unseated.map(r => r.name).join(' · '))}
         </p>
       )}
     </div>
@@ -48,18 +48,14 @@ function Headline({ plan }: { plan: SeatingPlan }) {
   if (!plan.fits) {
     return (
       <p className="text-sm font-semibold text-red-600">
-        Fleet short by {plan.shortfall} seat{plural(plan.shortfall)} — {plan.seats} seat{plural(plan.seats)} across{' '}
-        {plan.vehiclesNeeded} vehicle{plural(plan.vehiclesNeeded)} for {plan.riders} rider{plural(plan.riders)}{' '}
-        ({plan.divers} diver{plural(plan.divers)} + {plan.staff} staff). Add a vehicle or run a second trip.
+        {tp.fleetShort(plan.shortfall, plan.seats, plan.vehiclesNeeded, plan.riders, plan.divers, plan.staff)}
       </p>
     )
   }
 
   return (
     <p className="text-sm font-medium text-brand-900">
-      Take {plan.vehiclesNeeded} vehicle{plural(plan.vehiclesNeeded)} — {plan.seats} seat{plural(plan.seats)} for{' '}
-      {plan.riders} rider{plural(plan.riders)} ({plan.divers} diver{plural(plan.divers)}
-      {plan.staff > 0 ? ` + ${plan.staff} staff` : ''}).
+      {tp.fleetFits(plan.vehiclesNeeded, plan.seats, plan.riders, plan.divers, plan.staff)}
     </p>
   )
 }
@@ -75,7 +71,7 @@ function CarRow({ car }: { car: CarSeating }) {
           {car.passengers.map((p, i) => (
             <span key={p.id}>
               {i > 0 && ' · '}
-              {p.name}{p.kind === 'staff' && <span className="text-xs text-brand-950/60"> (staff)</span>}
+              {p.name}{p.kind === 'staff' && <span className="text-xs text-brand-950/60">{tp.staffSuffix}</span>}
             </span>
           ))}
         </div>

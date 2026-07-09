@@ -1145,6 +1145,29 @@ export const en = {
     charts: {
       noData: 'No data in range.',
     },
+    transport: {
+      noFleetPrefix: 'No vehicles in the fleet yet — add them under',
+      manageVehiclesLink: 'Manage → Vehicles',
+      noFleetSuffix: 'to plan rides.',
+      noSeat: (n: number, names: string) => `No seat (${n}): ${names}`,
+      fleetShort: (shortfall: number, seats: number, vehicles: number, riders: number, divers: number, staff: number) =>
+        `Fleet short by ${shortfall} seat${shortfall === 1 ? '' : 's'} — ${seats} seat${seats === 1 ? '' : 's'} across ${vehicles} vehicle${vehicles === 1 ? '' : 's'} for ${riders} rider${riders === 1 ? '' : 's'} (${divers} diver${divers === 1 ? '' : 's'} + ${staff} staff). Add a vehicle or run a second trip.`,
+      fleetFits: (vehicles: number, seats: number, riders: number, divers: number, staff: number) =>
+        `Take ${vehicles} vehicle${vehicles === 1 ? '' : 's'} — ${seats} seat${seats === 1 ? '' : 's'} for ${riders} rider${riders === 1 ? '' : 's'} (${divers} diver${divers === 1 ? '' : 's'}${staff > 0 ? ` + ${staff} staff` : ''}).`,
+      staffSuffix: ' (staff)',
+      carsForDive: 'Cars for this dive',
+      loadingCars: 'Loading cars…',
+      noActiveCars: 'No active cars in the fleet.',
+      assignFailed: 'Could not assign that car — it may already be on this event.',
+      removeFailed: 'Could not remove that car.',
+      assignedCarsAria: 'Assigned cars',
+      cars: 'Cars',
+      noCarAssigned: 'No car assigned yet.',
+      unassignAria: (name: string) => `Unassign ${name}`,
+      carFallback: 'car',
+      assignACar: 'Assign a car',
+      selectACar: 'Select a car…',
+    },
     gearFit: {
       wetsuit: 'Wetsuit',
       bcd: 'BCD',

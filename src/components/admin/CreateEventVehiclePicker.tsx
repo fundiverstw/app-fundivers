@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { fetchVehicles } from '../../lib/vehicles'
 import type { Vehicle } from '../../types/database'
+import { t } from '../../i18n'
+
+const tp = t.admin.transport
 
 interface Props {
   /** Reports the picked vehicle ids up so the create page can assign them to
@@ -54,7 +57,7 @@ export function CreateEventVehiclePicker({ onChange }: Props) {
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-bold text-white uppercase tracking-wider">Cars for this dive</h2>
+        <h2 className="text-sm font-bold text-white uppercase tracking-wider">{tp.carsForDive}</h2>
         {selected.size > 0 && (
           <span className="text-xs text-white/70 font-semibold">{seats} passenger seat{seats === 1 ? '' : 's'}</span>
         )}
@@ -64,9 +67,9 @@ export function CreateEventVehiclePicker({ onChange }: Props) {
         request a ride when a seat is free in one of them. You can change these later.
       </p>
       {loading ? (
-        <p className="text-sm text-white/60">Loading cars…</p>
+        <p className="text-sm text-white/60">{tp.loadingCars}</p>
       ) : vehicles.length === 0 ? (
-        <p className="text-sm text-brand-950 font-medium bg-white/70 rounded-md p-2">No active cars in the fleet.</p>
+        <p className="text-sm text-brand-950 font-medium bg-white/70 rounded-md p-2">{tp.noActiveCars}</p>
       ) : (
         <div className="space-y-1 max-h-56 overflow-y-auto bg-white/70 backdrop-blur-md border border-surface-200 rounded-md p-2">
           {vehicles.map(v => (

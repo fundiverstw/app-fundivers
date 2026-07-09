@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { assignVehicleToEvent, unassignVehicle } from '../../lib/event-vehicles'
 import type { AppEvent, EventVehicle, Vehicle } from '../../types/database'
+import { t } from '../../i18n'
+
+const tp = t.admin.transport
 
 interface Props {
   event: Pick<AppEvent, 'id' | 'type'>
@@ -44,7 +47,7 @@ export function EventVehicleGroup({
       await assignVehicleToEvent({ vehicleId, event, createdBy })
       onChanged()
     } catch {
-      setError('Could not assign that car — it may already be on this event.')
+      setError(tp.assignFailed)
     } finally {
       setBusy(false)
     }
@@ -56,23 +59,23 @@ export function EventVehicleGroup({
       await unassignVehicle(id)
       onChanged()
     } catch {
-      setError('Could not remove that car.')
+      setError(tp.removeFailed)
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <div role="group" aria-label="Assigned cars" className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-2">
+    <div role="group" aria-label={tp.assignedCarsAria} className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-2">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-bold text-brand-900">Cars</h2>
+        <h2 className="text-sm font-bold text-brand-900">{tp.cars}</h2>
         <span className="text-xs text-brand-900 font-semibold">
           {assignedSeats} seat{assignedSeats === 1 ? '' : 's'} · {riders} to transport
         </span>
       </div>
 
       {allocations.length === 0 ? (
-        <p className="text-xs text-brand-950/70 font-medium italic">No car assigned yet.</p>
+        <p className="text-xs text-brand-950/70 font-medium italic">{tp.noCarAssigned}</p>
       ) : (
         <ul className="flex flex-wrap gap-1.5">
           {allocations.map(a => {
@@ -83,7 +86,7 @@ export function EventVehicleGroup({
                 {isAdmin && (
                   <button
                     type="button"
-                    aria-label={`Unassign ${v?.name ?? 'car'}`}
+                    aria-label={tp.unassignAria(v?.name ?? tp.carFallback)}
                     disabled={busy}
                     onClick={() => remove(a.id)}
                     className="text-brand-900 hover:text-red-600 disabled:opacity-50 leading-none"
@@ -100,15 +103,15 @@ export function EventVehicleGroup({
       {isAdmin && (
         available.length > 0 ? (
           <label className="flex items-center gap-2 text-xs text-brand-900 font-medium">
-            <span className="uppercase tracking-wide">Assign a car</span>
+            <span className="uppercase tracking-wide">{tp.assignACar}</span>
             <select
-              aria-label="Assign a car"
+              aria-label={tp.assignACar}
               disabled={busy}
               value=""
               onChange={e => assign(e.target.value)}
               className="px-2 py-1 rounded-full text-xs bg-surface-100 text-brand-900 border border-surface-200 disabled:opacity-50"
             >
-              <option value="">Select a car…</option>
+              <option value="">{tp.selectACar}</option>
               {available.map(v => (
                 <option key={v.id} value={v.id}>{v.name} ({v.passenger_seats})</option>
               ))}

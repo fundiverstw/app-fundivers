@@ -1138,6 +1138,29 @@ export const zhTW: Messages = {
     charts: {
       noData: '此區間內沒有資料。',
     },
+    transport: {
+      noFleetPrefix: '車隊中尚無車輛 — 請至',
+      manageVehiclesLink: '管理 → 車輛',
+      noFleetSuffix: '新增後即可安排共乘。',
+      noSeat: (n: number, names: string) => `無座位（${n} 人）：${names}`,
+      fleetShort: (shortfall: number, seats: number, vehicles: number, riders: number, divers: number, staff: number) =>
+        `座位不足 ${shortfall} 個 — ${vehicles} 輛車共 ${seats} 個座位，需載 ${riders} 人（潛水員 ${divers} 人 + 工作人員 ${staff} 人）。請增加車輛或分兩趟。`,
+      fleetFits: (vehicles: number, seats: number, riders: number, divers: number, staff: number) =>
+        `出動 ${vehicles} 輛車 — ${seats} 個座位可載 ${riders} 人（潛水員 ${divers} 人${staff > 0 ? ` + 工作人員 ${staff} 人` : ''}）。`,
+      staffSuffix: '（工作人員）',
+      carsForDive: '此次潛水的車輛',
+      loadingCars: '車輛載入中…',
+      noActiveCars: '車隊中沒有啟用的車輛。',
+      assignFailed: '無法指派此車輛 — 可能已指派給此活動。',
+      removeFailed: '無法移除此車輛。',
+      assignedCarsAria: '已指派的車輛',
+      cars: '車輛',
+      noCarAssigned: '尚未指派車輛。',
+      unassignAria: (name: string) => `取消指派 ${name}`,
+      carFallback: '車輛',
+      assignACar: '指派車輛',
+      selectACar: '請選擇車輛…',
+    },
     gearFit: {
       wetsuit: '防寒衣',
       bcd: 'BCD',

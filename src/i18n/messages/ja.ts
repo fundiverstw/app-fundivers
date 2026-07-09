@@ -1137,6 +1137,29 @@ export const ja: Messages = {
     charts: {
       noData: 'この期間のデータはありません。',
     },
+    transport: {
+      noFleetPrefix: '車両が登録されていません — ',
+      manageVehiclesLink: '管理 → 車両',
+      noFleetSuffix: 'から追加すると送迎を計画できます。',
+      noSeat: (n: number, names: string) => `座席なし（${n} 名）：${names}`,
+      fleetShort: (shortfall: number, seats: number, vehicles: number, riders: number, divers: number, staff: number) =>
+        `座席が ${shortfall} 席不足しています — 車両 ${vehicles} 台で計 ${seats} 席、乗車は ${riders} 名（ダイバー ${divers} 名 + スタッフ ${staff} 名）。車両を追加するか、2 便に分けてください。`,
+      fleetFits: (vehicles: number, seats: number, riders: number, divers: number, staff: number) =>
+        `車両 ${vehicles} 台を使用 — ${seats} 席で ${riders} 名（ダイバー ${divers} 名${staff > 0 ? ` + スタッフ ${staff} 名` : ''}）。`,
+      staffSuffix: '（スタッフ）',
+      carsForDive: 'このダイブの車両',
+      loadingCars: '車両を読み込んでいます…',
+      noActiveCars: '有効な車両がありません。',
+      assignFailed: 'この車両を割り当てられませんでした — 既にこのイベントに割り当て済みの可能性があります。',
+      removeFailed: 'この車両を解除できませんでした。',
+      assignedCarsAria: '割り当て済みの車両',
+      cars: '車両',
+      noCarAssigned: 'まだ車両が割り当てられていません。',
+      unassignAria: (name: string) => `${name} の割り当てを解除`,
+      carFallback: '車両',
+      assignACar: '車両を割り当てる',
+      selectACar: '車両を選択…',
+    },
     gearFit: {
       wetsuit: 'ウェットスーツ',
       bcd: 'BCD',
