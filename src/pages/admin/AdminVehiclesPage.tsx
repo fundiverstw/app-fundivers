@@ -3,6 +3,10 @@ import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
 import { fetchVehicles, saveVehicle, deleteVehicle } from '../../lib/vehicles'
 import type { Vehicle, VehicleInsert } from '../../types/database'
+import { t } from '../../i18n'
+
+const ve = t.admin.vehicles
+const wv = t.admin.waivers
 
 // Admin catalog for the shop's transport fleet. Each vehicle carries
 // `passenger_seats` physical seats. The logistics day view plans rides against
@@ -46,7 +50,7 @@ export function AdminVehiclesPage() {
   async function handleDelete(v: Vehicle) {
     try {
       await deleteVehicle(v.id)
-      toast.success('Vehicle deleted')
+      toast.success(ve.deleted)
       setConfirmDelete(null)
       await reload()
     } catch (err) {
@@ -57,16 +61,14 @@ export function AdminVehiclesPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-4">
       <div className="flex items-baseline justify-between gap-3">
-        <h1 className="text-2xl font-bold text-white">Vehicles</h1>
+        <h1 className="text-2xl font-bold text-white">{ve.title}</h1>
         <button type="button" onClick={() => setCreating(true)}
           className="text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg">
-          + New vehicle
+          {ve.newVehicle}
         </button>
       </div>
       <p className="text-sm text-white/80">
-        The shop's transport fleet. Enter each vehicle's total physical seats.
-        Retire a sold vehicle to drop it from ride planning without losing it
-        from records.
+        {ve.intro}
       </p>
 
       {loadError && (
@@ -74,26 +76,26 @@ export function AdminVehiclesPage() {
       )}
 
       {loading ? (
-        <p className="text-sm text-white/70">Loading…</p>
+        <p className="text-sm text-white/70">{wv.loading}</p>
       ) : vehicles.length === 0 ? (
-        <p className="text-sm text-white/70">No vehicles yet — add the shop's first one.</p>
+        <p className="text-sm text-white/70">{ve.none}</p>
       ) : (
         <ul className="space-y-2">
           {vehicles.map(v => (
             <li key={v.id} className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="font-medium text-brand-900 text-sm truncate">
-                  {v.name}{!v.active && <span className="ml-2 text-xs text-brand-900/60">(retired)</span>}
+                  {v.name}{!v.active && <span className="ml-2 text-xs text-brand-900/60">{ve.retired}</span>}
                 </p>
                 <p className="text-xs text-brand-900/80">
-                  {v.passenger_seats} physical seat{v.passenger_seats === 1 ? '' : 's'}
+                  {ve.seats(v.passenger_seats)}
                 </p>
               </div>
               <div className="flex gap-2 shrink-0">
                 <button type="button" onClick={() => setEditing(v)}
-                  className="text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-3 py-1 rounded-lg">Edit</button>
+                  className="text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-3 py-1 rounded-lg">{wv.edit}</button>
                 <button type="button" onClick={() => setConfirmDelete(v)}
-                  className="text-xs font-semibold bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded-lg">Delete</button>
+                  className="text-xs font-semibold bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded-lg">{wv.delete}</button>
               </div>
             </li>
           ))}
@@ -104,16 +106,16 @@ export function AdminVehiclesPage() {
         <VehicleForm
           vehicle={editing}
           onClose={() => { setCreating(false); setEditing(null) }}
-          onSaved={async () => { setCreating(false); setEditing(null); toast.success('Vehicle saved'); await reload() }}
+          onSaved={async () => { setCreating(false); setEditing(null); toast.success(ve.saved); await reload() }}
           onError={m => toast.error(m)}
         />
       )}
 
       {confirmDelete && (
         <ConfirmModal
-          title="Delete vehicle?"
-          body={`"${confirmDelete.name}" will be removed from the fleet. To keep it on record but out of planning, edit it and untick "In service" instead.`}
-          confirmLabel="Delete"
+          title={ve.deleteTitle}
+          body={ve.deleteBody(confirmDelete.name)}
+          confirmLabel={wv.delete}
           onClose={() => setConfirmDelete(null)}
           onConfirm={() => handleDelete(confirmDelete)}
         />
@@ -138,8 +140,8 @@ function VehicleForm({
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     const seatCount = Number(seats)
-    if (!name.trim()) { onError('Name is required.'); return }
-    if (!Number.isInteger(seatCount) || seatCount < 1) { onError('Physical seats must be a whole number of at least 1.'); return }
+    if (!name.trim()) { onError(ve.nameRequired); return }
+    if (!Number.isInteger(seatCount) || seatCount < 1) { onError(ve.seatsInvalid); return }
     setSubmitting(true)
     try {
       const values: VehicleInsert = { name: name.trim(), passenger_seats: seatCount, active }
@@ -155,22 +157,22 @@ function VehicleForm({
   return (
     <Modal labelledBy="vehicle-form-title" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-3">
-        <h2 id="vehicle-form-title" className="text-lg font-bold text-brand-900">{vehicle ? 'Edit vehicle' : 'New vehicle'}</h2>
-        <Labelled label="Name *">
-          <input className={FIELD} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Delica" />
+        <h2 id="vehicle-form-title" className="text-lg font-bold text-brand-900">{vehicle ? ve.editVehicle : ve.newVehicleTitle}</h2>
+        <Labelled label={ve.nameLabel}>
+          <input className={FIELD} value={name} onChange={e => setName(e.target.value)} placeholder={ve.namePh} />
         </Labelled>
-        <Labelled label="Physical seats *">
+        <Labelled label={ve.seatsLabel}>
           <input className={FIELD} type="number" min={1} step={1} value={seats} onChange={e => setSeats(e.target.value)} />
         </Labelled>
         <label className="flex items-center gap-2 text-sm text-brand-900">
           <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} className="accent-brand-900" />
-          In service (counts toward ride planning)
+          {ve.inService}
         </label>
         <div className="flex justify-end gap-2 pt-1">
-          <button type="button" onClick={onClose} className="text-sm font-semibold text-brand-900 px-3 py-1.5">Cancel</button>
+          <button type="button" onClick={onClose} className="text-sm font-semibold text-brand-900 px-3 py-1.5">{wv.cancel}</button>
           <button type="submit" disabled={submitting}
             className="text-sm font-semibold bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white px-4 py-1.5 rounded-lg">
-            {submitting ? 'Saving…' : 'Save'}
+            {submitting ? wv.saving : wv.save}
           </button>
         </div>
       </form>
