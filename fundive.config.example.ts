@@ -15,7 +15,7 @@
 export const siteConfig = {
   // Must equal core's current CONFIG_CONTRACT_VERSION (src/config/site.ts) or
   // the build fails. Bump it whenever core's CHANGELOG.md tells you to migrate.
-  configVersion: 4,
+  configVersion: 5,
 
   identity: {
     appName: 'FunDive',
@@ -45,6 +45,9 @@ export const siteConfig = {
     timezone: 'Asia/Taipei',
     currency: 'USD',
     currencyLabel: 'USD',
+    // The one language the whole app renders in. 'en' | 'zh-TW' | 'ja'.
+    // Keep `as const` — it narrows the literal to the SupportedLanguage union.
+    language: 'en' as const,
   },
 
   theme: {

@@ -9,6 +9,7 @@ import { CrosshairIcon } from '../icons/CrosshairIcon'
 import { PeopleIcon } from '../icons/PeopleIcon'
 import { PlusCircleIcon } from '../icons/PlusCircleIcon'
 import { LogisticsIcon } from '../icons/LogisticsIcon'
+import { t } from '../../i18n'
 import {
   PAGE, NAV_BAR, NAV_BOTTOM,
   ON_DEEP_MUTED, ON_DEEP_SUBTLE,
@@ -16,11 +17,11 @@ import {
 
 type NavItem = { to: string; label: string; icon: React.ReactNode; adminOnly?: boolean }
 const adminNav: NavItem[] = [
-  { to: '/admin/events',    label: 'Calendar',  icon: <CalendarIcon /> },
-  { to: '/admin/logistics', label: 'Logistics', icon: <LogisticsIcon /> },
-  { to: '/admin/users',     label: 'Divers',    icon: <PeopleIcon />,     adminOnly: true },
-  { to: '/admin/duty',      label: 'Duty',      icon: <CrosshairIcon />,  adminOnly: true },
-  { to: '/admin/new',       label: 'Manage',    icon: <PlusCircleIcon />, adminOnly: true },
+  { to: '/admin/events',    label: t.nav.calendar,  icon: <CalendarIcon /> },
+  { to: '/admin/logistics', label: t.nav.logistics, icon: <LogisticsIcon /> },
+  { to: '/admin/users',     label: t.nav.divers,    icon: <PeopleIcon />,     adminOnly: true },
+  { to: '/admin/duty',      label: t.nav.duty,      icon: <CrosshairIcon />,  adminOnly: true },
+  { to: '/admin/new',       label: t.nav.manage,    icon: <PlusCircleIcon />, adminOnly: true },
 ]
 
 export function AdminShell() {
@@ -55,7 +56,7 @@ export function AdminShell() {
     <div className={`min-h-screen ${PAGE} flex flex-col`}>
       <header className={NAV_BAR}>
         <div className="flex-1 flex items-center justify-start gap-4" />
-        <Link to="/admin" aria-label="Admin home" className="shrink-0">
+        <Link to="/admin" aria-label={t.shell.adminHome} className="shrink-0">
           <Logo size="sm" />
         </Link>
         <div className="flex-1 flex items-center justify-end gap-3">
@@ -63,16 +64,16 @@ export function AdminShell() {
             <Link
               to="/admin/applications"
               className="text-xs font-semibold bg-accent text-white px-2 py-0.5 rounded-full hover:bg-red-400"
-              aria-label={`${displayPendingCount} pending applications`}
+              aria-label={t.shell.pendingApplications(displayPendingCount)}
             >
-              {displayPendingCount} pending
+              {t.shell.pending(displayPendingCount)}
             </Link>
           )}
           <Link to="/calendar" className="text-sm font-semibold text-amber-300 hover:text-amber-200">
             {personName(profile?.name, profile?.nickname)}
           </Link>
           <button onClick={handleSignOut} className={`text-xs ${ON_DEEP_MUTED} hover:text-white`}>
-            Sign out
+            {t.common.signOut}
           </button>
         </div>
       </header>

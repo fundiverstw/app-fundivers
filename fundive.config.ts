@@ -20,7 +20,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const siteConfig = {
-  configVersion: 4,
+  configVersion: 5,
 
   identity: {
     appName: 'FunDive',
@@ -50,6 +50,10 @@ export const siteConfig = {
     timezone: 'Asia/Taipei',
     currency: 'TWD',
     currencyLabel: 'NTD',
+    // The one language the whole app renders in. 'en' | 'zh-TW' | 'ja'.
+    // `as const` narrows the literal to the SupportedLanguage union (this file
+    // is type-checked against SiteConfig via src/config/site.ts).
+    language: 'en' as const,
   },
 
   // Used by the PWA manifest (vite.config.ts) and the index.html theme-color.

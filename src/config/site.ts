@@ -38,6 +38,14 @@ export interface SiteUrls {
   app: string
 }
 
+/**
+ * Languages the app ships translations for. Core-owned: a fork picks one via
+ * `locale.language`, it does not add its own. Extend this union (and the zod
+ * enum in site.schema.ts, plus a catalog under src/i18n/messages) to add a
+ * language. See docs/i18n.md.
+ */
+export type SupportedLanguage = 'en' | 'zh-TW' | 'ja'
+
 export interface SiteLocale {
   /** IANA timezone, e.g. "Asia/Taipei". */
   timezone: string
@@ -45,6 +53,8 @@ export interface SiteLocale {
   currency: string
   /** Human-facing currency label, e.g. "NTD". */
   currencyLabel: string
+  /** The single language the whole app renders in for this deployment. */
+  language: SupportedLanguage
 }
 
 export interface SiteTheme {
@@ -110,6 +120,6 @@ export interface SiteConfig {
 // Bump when the SiteConfig contract changes in a way that requires forks to
 // migrate their fundive.config.ts. The build compares this against
 // siteConfig.configVersion and fails loudly on a mismatch.
-export const CONFIG_CONTRACT_VERSION = 4
+export const CONFIG_CONTRACT_VERSION = 5
 
 export const siteConfig: SiteConfig = raw

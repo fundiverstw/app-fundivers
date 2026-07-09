@@ -17,6 +17,7 @@ into source.
 | [testing.md](./testing.md)                             | Unit vs integration conventions, `mockQueryBuilder`, Makefile surface |
 | [deployment.md](./deployment.md)                       | Env vars (which secret lives where), Cloudflare deploy (local `make deploy` via `.env.production`), Supabase link / push / pull / verify, edge functions |
 | [forking.md](./forking.md)                             | Running your own shop: the `fundive.config.ts` seam, brand assets, feature gates, and how to pull core updates without conflicts |
+| [i18n.md](./i18n.md)                                   | Shop-facing language: `locale.language`, the `src/i18n` message catalogs, adding strings and languages |
 | [security-audit.md](./security-audit.md)               | Point-in-time audit (2026-06-02): findings by severity, fix priority |
 | [legal-brief.md](./legal-brief.md)                     | Brief for the Terms-of-Use / Privacy lawyer review: data inventory, flows, code-text alignment, open questions |
 
@@ -25,7 +26,9 @@ into source.
 - **Migrations are immutable once pushed.** Add a forward migration; never
   edit a file already applied to cloud. See
   [data-model.md](./data-model.md#migrations).
-- **No i18n.** The app is English-only.
+- **One language per deployment.** Shop-facing UI text is chosen by
+  `locale.language` in `fundive.config.ts` and lives in the `src/i18n`
+  message catalogs, not as inline literals. See [i18n.md](./i18n.md).
 - **No emojis in code or commits** unless explicitly requested.
 - **XOR FKs** appear in `bookings` and `event_memos`: exactly one of
   `eo_dive_id` / `eo_course_id` is set. Don't "fix" one side.

@@ -35,6 +35,7 @@ export const siteConfigSchema = z.object({
     timezone: z.string().min(1),
     currency: z.string().min(1),
     currencyLabel: z.string().min(1),
+    language: z.enum(['en', 'zh-TW', 'ja']),
   }),
   theme: z.object({
     themeColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'must be a #rrggbb hex color'),
