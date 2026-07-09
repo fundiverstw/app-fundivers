@@ -13,6 +13,10 @@ import type { ScheduledTripItem, MyScheduledTripRegistration } from '../types/da
 import {
   CARD, BTN_PRIMARY, BTN_DANGER, PAGE_BODY, ON_DEEP_LINK, TEXT_HEADING, TEXT_BODY, TEXT_SUBTLE,
 } from '../styles/tokens'
+import { t } from '../i18n'
+
+const tr = t.trips
+const pk = t.packages
 
 // Scheduled Trip detail — the shop's own trip pitch + the self-contained
 // registration. Registering builds an order (add-ons per day, room per night over
@@ -58,7 +62,7 @@ export function ScheduledTripDetailPage() {
     try {
       await cancelMyScheduledTripRegistration(registration.id)
       await refreshRegistration()
-      toast.success('Registration cancelled.')
+      toast.success(pk.cancelled)
     } catch (err) {
       toast.error(errorMessage(err))
     } finally {
@@ -66,7 +70,7 @@ export function ScheduledTripDetailPage() {
     }
   }
 
-  if (loading) return <p className={`text-sm ${PAGE_BODY} max-w-2xl mx-auto`}>Loading…</p>
+  if (loading) return <p className={`text-sm ${PAGE_BODY} max-w-2xl mx-auto`}>{pk.loading}</p>
   if (error) {
     return (
       <div className="max-w-2xl mx-auto space-y-3">
@@ -79,7 +83,7 @@ export function ScheduledTripDetailPage() {
     return (
       <div className="max-w-2xl mx-auto space-y-3">
         <BackLink />
-        <p className={`text-sm ${PAGE_BODY}`}>This trip isn’t on the board anymore.</p>
+        <p className={`text-sm ${PAGE_BODY}`}>{tr.gone}</p>
       </div>
     )
   }
@@ -100,7 +104,7 @@ export function ScheduledTripDetailPage() {
           <h1 className={`text-xl ${TEXT_HEADING}`}>{trip.title}</h1>
           <p className={`text-sm ${TEXT_SUBTLE}`}>{trip.destination}{dates ? ` · ${dates}` : ''}</p>
           {trip.price != null && (
-            <p className={`text-sm ${TEXT_HEADING}`}>from {trip.price.toLocaleString()} {trip.currency}</p>
+            <p className={`text-sm ${TEXT_HEADING}`}>{pk.fromPrice(trip.price.toLocaleString(), trip.currency)}</p>
           )}
           {trip.summary && <p className={`text-sm ${TEXT_BODY}`}>{trip.summary}</p>}
         </div>
@@ -108,14 +112,14 @@ export function ScheduledTripDetailPage() {
 
       {trip.description && (
         <section className={`${CARD} p-4 space-y-1`}>
-          <h2 className={`text-sm ${TEXT_HEADING}`}>About this trip</h2>
+          <h2 className={`text-sm ${TEXT_HEADING}`}>{tr.aboutHeading}</h2>
           <p className={`text-sm ${TEXT_BODY} whitespace-pre-wrap`}>{trip.description}</p>
         </section>
       )}
 
       {trip.highlights.length > 0 && (
         <section className={`${CARD} p-4 space-y-1`}>
-          <h2 className={`text-sm ${TEXT_HEADING}`}>Highlights</h2>
+          <h2 className={`text-sm ${TEXT_HEADING}`}>{pk.highlightsHeading}</h2>
           <ul className="list-disc list-inside space-y-0.5">
             {trip.highlights.map((h, i) => <li key={i} className={`text-sm ${TEXT_BODY}`}>{h}</li>)}
           </ul>
@@ -126,12 +130,9 @@ export function ScheduledTripDetailPage() {
         <RegisteredCard registration={registration} onCancel={handleCancel} cancelling={cancelling} />
       ) : (
         <section className={`${CARD} p-4 space-y-2`}>
-          <h2 className={`text-sm ${TEXT_HEADING}`}>Join this trip</h2>
-          <p className={`text-sm ${TEXT_BODY}`}>
-            Register below — pick any add-ons and a room, and we’ll send you and the shop a
-            cost estimate. No payment here; the shop confirms the final cost.
-          </p>
-          <button type="button" onClick={() => setFormOpen(true)} className={BTN_PRIMARY}>Register</button>
+          <h2 className={`text-sm ${TEXT_HEADING}`}>{tr.joinHeading}</h2>
+          <p className={`text-sm ${TEXT_BODY}`}>{tr.joinBody}</p>
+          <button type="button" onClick={() => setFormOpen(true)} className={BTN_PRIMARY}>{pk.register}</button>
         </section>
       )}
 
@@ -141,13 +142,13 @@ export function ScheduledTripDetailPage() {
           subtitle={dates ?? undefined}
           currency={trip.currency}
           basePrice={trip.price ?? 0}
-          baseLabel="Trip"
+          baseLabel={tr.baseLabel}
           dateMode="fixed"
           fixedStart={trip.start_date}
           fixedEnd={trip.end_date}
           addonIds={trip.addon_ids}
           roomTypeIds={trip.room_type_ids}
-          disclaimer="This is an estimate only — the shop will confirm the final cost and payment details."
+          disclaimer={tr.disclaimer}
           onSubmit={(sel) => registerForScheduledTrip({
             scheduledTripId: trip.id,
             addonIds: sel.addonIds,
@@ -159,11 +160,11 @@ export function ScheduledTripDetailPage() {
             setFormOpen(false)
             await refreshRegistration()
             if (result.already_registered) {
-              toast.success('You already have a live registration for this trip.')
+              toast.success(tr.alreadyRegistered)
             } else if (result.emailed) {
-              toast.success('You’re registered — we’ve emailed you and the shop a summary.')
+              toast.success(tr.registeredEmailed)
             } else {
-              toast.success('You’re registered — we’ll pass your details to the shop.')
+              toast.success(pk.registeredNoEmail)
             }
           }}
         />
@@ -179,23 +180,23 @@ function RegisteredCard({ registration, onCancel, cancelling }: {
 }) {
   return (
     <section className={`${CARD} p-4 space-y-2`}>
-      <h2 className={`text-sm ${TEXT_HEADING}`}>You’re registered</h2>
+      <h2 className={`text-sm ${TEXT_HEADING}`}>{pk.youreRegistered}</h2>
       {registration.estimated_cost != null && (
         <p className={`text-sm ${TEXT_HEADING}`}>
-          Estimated cost: {registration.estimated_cost.toLocaleString()}{' '}
-          {registration.estimated_currency ?? siteConfig.locale.currency}
+          {pk.estimatedCost(
+            registration.estimated_cost.toLocaleString(),
+            registration.estimated_currency ?? siteConfig.locale.currency,
+          )}
         </p>
       )}
-      <p className={`text-xs ${TEXT_SUBTLE}`}>
-        The shop will confirm the final cost and payment. Status: {registration.status}
-      </p>
+      <p className={`text-xs ${TEXT_SUBTLE}`}>{tr.finalCostNote(registration.status)}</p>
       <button type="button" onClick={onCancel} disabled={cancelling} className={`${BTN_DANGER} disabled:opacity-50`}>
-        {cancelling ? 'Cancelling…' : 'Cancel registration'}
+        {cancelling ? pk.cancelling : pk.cancelRegistration}
       </button>
     </section>
   )
 }
 
 function BackLink() {
-  return <Link to="/scheduled-trips" className={`text-sm ${ON_DEEP_LINK}`}>← Scheduled Trips</Link>
+  return <Link to="/scheduled-trips" className={`text-sm ${ON_DEEP_LINK}`}>{tr.back}</Link>
 }

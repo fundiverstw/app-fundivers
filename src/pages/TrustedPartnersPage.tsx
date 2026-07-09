@@ -10,6 +10,9 @@ import {
   CARD, BTN_PRIMARY, INPUT, INPUT_LABEL,
   PAGE_HEADING, PAGE_BODY, TEXT_BODY, TEXT_HEADING, TEXT_SUBTLE, TEXT_LINK,
 } from '../styles/tokens'
+import { t } from '../i18n'
+
+const tp = t.partners
 
 // Trusted Partners — dive shops abroad the shop vouches for. A diver can
 // message one directly (the contact-trusted-partner edge function emails the
@@ -43,7 +46,7 @@ export function TrustedPartnersPage() {
     try {
       await sendPartnerConnectRequest({ destination: destination.trim(), note: note.trim() })
       setSent(true)
-      toast.success('Request sent — we\'ll be in touch.')
+      toast.success(tp.requestSent)
     } catch (err) {
       toast.error(errorMessage(err))
     } finally {
@@ -54,11 +57,8 @@ export function TrustedPartnersPage() {
   return (
     <div className="max-w-xl mx-auto space-y-6">
       <div className="space-y-1">
-        <h1 className={`text-xl ${PAGE_HEADING} font-bold`}>Trusted Partners</h1>
-        <p className={`text-sm ${PAGE_BODY}`}>
-          Explore our network of personally vetted dive operators around the
-          world. We want to help ensure you have a safe, smooth, and fun trip.
-        </p>
+        <h1 className={`text-xl ${PAGE_HEADING} font-bold`}>{tp.title}</h1>
+        <p className={`text-sm ${PAGE_BODY}`}>{tp.intro}</p>
       </div>
 
       {partners && partners.length > 0 && (
@@ -71,50 +71,46 @@ export function TrustedPartnersPage() {
 
       {sent ? (
         <div className={`${CARD} p-4 space-y-3`}>
-          <p className={`${TEXT_BODY}`}>
-            Thanks{diverName ? `, ${diverName}` : ''}! We got your request for{' '}
-            <span className="font-semibold">{destination.trim()}</span> and will
-            get back to you with a recommendation.
-          </p>
+          <p className={`${TEXT_BODY}`}>{tp.thanks(diverName ?? '', destination.trim())}</p>
           <button
             type="button"
             onClick={() => { setSent(false); setDestination(''); setNote('') }}
             className={`w-full ${BTN_PRIMARY}`}
           >
-            Send another
+            {tp.sendAnother}
           </button>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className={`${CARD} p-4 space-y-3`}>
           <div>
-            <label htmlFor="px-destination" className={INPUT_LABEL}>Where do you want to go?</label>
+            <label htmlFor="px-destination" className={INPUT_LABEL}>{tp.destinationLabel}</label>
             <input
               id="px-destination"
               type="text"
               value={destination}
               onChange={e => setDestination(e.target.value)}
               className={INPUT}
-              placeholder="e.g. Cebu, Philippines"
+              placeholder={tp.destinationPlaceholder}
               maxLength={200}
               required
             />
           </div>
 
           <div>
-            <label htmlFor="px-note" className={INPUT_LABEL}>Anything else? <span className="font-normal opacity-70">(optional)</span></label>
+            <label htmlFor="px-note" className={INPUT_LABEL}>{tp.noteLabel} <span className="font-normal opacity-70">{tp.noteOptional}</span></label>
             <textarea
               id="px-note"
               value={note}
               onChange={e => setNote(e.target.value)}
               rows={4}
               className={`${INPUT} resize-y`}
-              placeholder="Travel dates, what kind of diving you're after, group size…"
+              placeholder={tp.notePlaceholder}
               maxLength={2000}
             />
           </div>
 
           <button type="submit" disabled={!destination.trim() || submitting} className={`w-full ${BTN_PRIMARY} disabled:opacity-50`}>
-            {submitting ? 'Sending…' : 'Send request'}
+            {submitting ? tp.sending : tp.sendRequest}
           </button>
         </form>
       )}
@@ -137,7 +133,7 @@ function PartnerRow({ partner }: { partner: TrustedPartner }) {
     try {
       await contactTrustedPartner({ partnerId: partner.id, message: message.trim() })
       setSent(true)
-      toast.success(`Message sent to ${partner.name}.`)
+      toast.success(tp.messageSent(partner.name))
     } catch (err) {
       toast.error(errorMessage(err))
     } finally {
@@ -159,7 +155,7 @@ function PartnerRow({ partner }: { partner: TrustedPartner }) {
               rel="noopener noreferrer"
               className={`inline-block text-xs mt-1 ${TEXT_LINK}`}
             >
-              Visit their site →
+              {tp.visitSite}
             </a>
           )}
         </div>
@@ -169,23 +165,23 @@ function PartnerRow({ partner }: { partner: TrustedPartner }) {
             onClick={() => setOpen(o => !o)}
             className="shrink-0 text-xs font-semibold px-3 py-1 rounded-lg bg-brand-900 hover:bg-brand-950 text-white"
           >
-            {open ? 'Cancel' : 'Message'}
+            {open ? tp.cancel : tp.message}
           </button>
         )}
       </div>
 
       {sent ? (
-        <p className="text-sm text-emerald-700 font-medium">Sent — {partner.name} will reply straight to your email.</p>
+        <p className="text-sm text-emerald-700 font-medium">{tp.sentReply(partner.name)}</p>
       ) : open && (
         <div className="space-y-2">
           <textarea
-            aria-label={`Message to ${partner.name}`}
+            aria-label={tp.messageToAria(partner.name)}
             value={message}
             onChange={e => setMessage(e.target.value)}
             rows={3}
             maxLength={3000}
             className={`${INPUT} resize-y`}
-            placeholder={`Introduce yourself to ${partner.name} — travel dates, what you're after…`}
+            placeholder={tp.messagePlaceholder(partner.name)}
           />
           <button
             type="button"
@@ -193,7 +189,7 @@ function PartnerRow({ partner }: { partner: TrustedPartner }) {
             disabled={!message.trim() || sending}
             className={`w-full ${BTN_PRIMARY} disabled:opacity-50`}
           >
-            {sending ? 'Sending…' : `Send to ${partner.name}`}
+            {sending ? tp.sending : tp.sendTo(partner.name)}
           </button>
         </div>
       )}

@@ -12,6 +12,9 @@ import { PasswordInput } from '../components/PasswordInput'
 import { siteConfig } from '../config/site'
 import { registrationDraftKey, loadRegistrationDraft } from '../lib/registration-draft'
 import type { AppEvent, Booking } from '../types/database'
+import { t } from '../i18n'
+
+const rp = t.registerPage
 
 // Public standalone registration page. Two entry paths:
 //   /register                 → event picker (Wix home link, direct URL)
@@ -94,9 +97,9 @@ export function RegisterPage() {
 
         {phase === 'event-missing' && (
           <EmptyState
-            title="Event not found"
-            body="That event isn't available anymore. Pick another from the list."
-            action={{ label: 'Back to events', href: '/register' }}
+            title={rp.eventNotFound}
+            body={rp.eventNotFoundBody}
+            action={{ label: rp.backToEvents, href: '/register' }}
           />
         )}
 
@@ -145,13 +148,13 @@ function EmptyState({ title, body, action }: { title: string; body: string; acti
 function EventHeader({ event }: { event: AppEvent }) {
   return (
     <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-5 space-y-1">
-      <p className="text-xs uppercase tracking-[0.25em] text-red-600">Register for</p>
+      <p className="text-xs uppercase tracking-[0.25em] text-red-600">{rp.registerFor}</p>
       <h1 className="text-xl font-bold text-brand-900">{event.title}</h1>
       <p className="text-sm text-brand-900 font-medium">
         {formatEventSpan(event, { style: 'long' })}
       </p>
       {event.price != null && (
-        <p className="text-sm text-brand-900">From {event.currency} {event.price.toLocaleString()}</p>
+        <p className="text-sm text-brand-900">{rp.fromPrice(event.currency, event.price.toLocaleString())}</p>
       )}
     </div>
   )
@@ -160,10 +163,10 @@ function EventHeader({ event }: { event: AppEvent }) {
 function LockedConfirmation({ event, booking, alreadyExisting = false }: { event: AppEvent; booking: Booking; alreadyExisting?: boolean }) {
   const isWaitlisted = booking.status === 'waitlisted'
   const heading = alreadyExisting
-    ? "You're already registered"
+    ? rp.alreadyRegistered
     : isWaitlisted
-      ? "You've been added to the waitlist"
-      : 'Your registration has been submitted'
+      ? rp.addedToWaitlist
+      : rp.submitted
   return (
     <div className="bg-white border border-accent rounded-xl p-6 space-y-4 text-center shadow-lg">
       <h1 className="text-xl font-bold text-brand-900">{heading}</h1>
@@ -171,18 +174,18 @@ function LockedConfirmation({ event, booking, alreadyExisting = false }: { event
         {event.title} · {formatEventSpan(event, { style: 'compact' })}
       </p>
       <div className="bg-surface-50 rounded-lg p-3 text-sm text-brand-900 text-left">
-        <p className="text-xs text-brand-950 font-medium uppercase tracking-wider mb-1">Status</p>
+        <p className="text-xs text-brand-950 font-medium uppercase tracking-wider mb-1">{rp.statusLabel}</p>
         <p className="capitalize">{booking.status}</p>
       </div>
       {alreadyExisting ? (
         <p className="text-xs text-brand-950 font-medium">
-          Sign in any time at <a href={siteConfig.urls.app} className="text-brand-700 hover:underline">{siteConfig.urls.app.replace(/^https?:\/\//, '')}</a> to track your booking and payment status.
+          {rp.signInAnyTime(siteConfig.urls.app.replace(/^https?:\/\//, ''))}
         </p>
       ) : (
         <WhatHappensNext waitlisted={isWaitlisted} />
       )}
       <Link to="/records/bookings" className="inline-block bg-brand-900 hover:bg-brand-950 text-white font-semibold px-5 py-2 rounded-lg">
-        View my bookings
+        {rp.viewMyBookings}
       </Link>
     </div>
   )
@@ -220,12 +223,12 @@ function EventPickerStep() {
   return (
     <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-5 space-y-4">
       <header className="flex items-center justify-between">
-        <span className="text-xs text-brand-900 font-medium">Step 1 of 3</span>
+        <span className="text-xs text-brand-900 font-medium">{rp.stepOf}</span>
       </header>
 
       {resumable.length > 0 && (
         <section className="space-y-2">
-          <h2 className="text-sm font-bold text-brand-900">Continue where you left off</h2>
+          <h2 className="text-sm font-bold text-brand-900">{rp.continueWhereLeftOff}</h2>
           <ul className="space-y-2">
             {resumable.map(ev => (
               <li key={`resume_${ev.type}_${ev.id}`}>
@@ -238,7 +241,7 @@ function EventPickerStep() {
                     <span className="font-medium text-brand-900 text-sm truncate block">{ev.title}</span>
                     <span className="text-xs text-brand-900 font-medium">{formatEventSpan(ev)}</span>
                   </div>
-                  <span className="text-xs text-brand-700 font-semibold shrink-0">Resume →</span>
+                  <span className="text-xs text-brand-700 font-semibold shrink-0">{rp.resume}</span>
                 </button>
               </li>
             ))}
@@ -246,10 +249,8 @@ function EventPickerStep() {
         </section>
       )}
       <section className="space-y-2">
-        <h2 className="text-lg font-bold text-brand-900">Which event?</h2>
-        <p className="text-sm text-brand-900 font-medium">
-          Pick the dive or course you'd like to register for.
-        </p>
+        <h2 className="text-lg font-bold text-brand-900">{rp.whichEvent}</h2>
+        <p className="text-sm text-brand-900 font-medium">{rp.whichEventBody}</p>
       </section>
 
       {loading ? (
@@ -257,7 +258,7 @@ function EventPickerStep() {
           <Spinner />
         </div>
       ) : events.length === 0 ? (
-        <p className="text-brand-950 font-medium text-sm">No upcoming events available right now.</p>
+        <p className="text-brand-950 font-medium text-sm">{rp.noUpcoming}</p>
       ) : (
         <ul className="space-y-2 max-h-[60vh] overflow-y-auto">
           {events.map(ev => (
@@ -271,7 +272,7 @@ function EventPickerStep() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={`text-xs px-1.5 py-0.5 rounded-full text-white ${ev.type === 'dive' ? 'bg-emerald-600' : 'bg-surface-500'}`}>
-                        {ev.type === 'dive' ? 'Dive' : 'Course'}
+                        {ev.type === 'dive' ? t.calendar.typeDive : t.calendar.typeCourse}
                       </span>
                       <span className="font-medium text-brand-900 text-sm truncate">{ev.title}</span>
                       {ev.featured && <span className="text-xs text-red-600">★</span>}
@@ -282,7 +283,7 @@ function EventPickerStep() {
                   </div>
                   {ev.price != null && (
                     <div className="text-right shrink-0 text-xs text-brand-900">
-                      From {ev.currency} {ev.price.toLocaleString()}
+                      {rp.fromPrice(ev.currency, ev.price.toLocaleString())}
                     </div>
                   )}
                 </div>
@@ -319,38 +320,38 @@ function SignInBanner() {
     <div className="bg-white/65 backdrop-blur-md border border-accent rounded-xl p-3 text-sm">
       {!open ? (
         <div className="flex items-center justify-between gap-3">
-          <span className="text-brand-900">Already have a {siteConfig.identity.shortName} account?</span>
+          <span className="text-brand-900">{rp.alreadyHaveAccount(siteConfig.identity.shortName)}</span>
           <button
             onClick={() => setOpen(true)}
             className="text-brand-700 font-semibold hover:underline"
           >
-            Sign in
+            {t.auth.signIn}
           </button>
         </div>
       ) : (
         <form onSubmit={submit} className="space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-brand-900 font-semibold">Sign in</span>
+            <span className="text-brand-900 font-semibold">{t.auth.signIn}</span>
             <button type="button" onClick={() => setOpen(false)} className="text-brand-900 font-medium text-xs hover:text-brand-900">
-              Cancel
+              {t.common.cancel}
             </button>
           </div>
           <input
-            type="email" required placeholder="Email" value={email}
+            type="email" required placeholder={t.auth.email} value={email}
             onChange={e => setEmail(e.target.value)}
             className="w-full bg-white border border-surface-300 rounded-lg px-3 py-2 text-brand-900 focus:outline-none focus:border-brand-900"
           />
           <PasswordInput
-            required placeholder="Password" value={password}
+            required placeholder={t.auth.password} value={password}
             onChange={e => setPassword(e.target.value)}
             className="w-full bg-white border border-surface-300 rounded-lg px-3 py-2 text-brand-900 focus:outline-none focus:border-brand-900"
           />
           {err && <p className="text-red-600 text-xs">{err}</p>}
           <button type="submit" disabled={busy} className="w-full bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white font-semibold py-2 rounded-lg">
-            {busy ? '…' : 'Sign in'}
+            {busy ? rp.signingIn : t.auth.signIn}
           </button>
           <p className="text-center text-xs">
-            <Link to="/forgot-password" className="text-brand-700 hover:underline">Forgot password?</Link>
+            <Link to="/forgot-password" className="text-brand-700 hover:underline">{t.auth.forgotPassword}</Link>
           </p>
         </form>
       )}

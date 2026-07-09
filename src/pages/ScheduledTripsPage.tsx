@@ -8,6 +8,10 @@ import type { ScheduledTripItem, MyScheduledTripRegistration } from '../types/da
 import {
   CARD, PAGE_HEADING, PAGE_BODY, ON_DEEP_LINK, TEXT_HEADING, TEXT_SUBTLE,
 } from '../styles/tokens'
+import { t } from '../i18n'
+
+const tr = t.trips
+const pk = t.packages
 
 // Scheduled Trips (diver-facing) — the shop's own curated, dated trips (boat
 // trips, liveaboards, away weekends). Reads list_scheduled_trips(); tapping a
@@ -41,13 +45,11 @@ export function ScheduledTripsPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <div className="space-y-1">
-        <h1 className={`text-xl ${PAGE_HEADING} font-bold`}>Scheduled Trips</h1>
-        <p className={`text-sm ${PAGE_BODY}`}>
-          Our upcoming shop trips. Tap one to register — pick your extras and see an estimate.
-        </p>
+        <h1 className={`text-xl ${PAGE_HEADING} font-bold`}>{tr.title}</h1>
+        <p className={`text-sm ${PAGE_BODY}`}>{tr.intro}</p>
         <p className="text-sm">
           <Link to="/packages" className={ON_DEEP_LINK}>
-            After an open-ended travel package instead? See Packages →
+            {tr.packagesLink}
           </Link>
         </p>
       </div>
@@ -57,9 +59,9 @@ export function ScheduledTripsPage() {
       )}
 
       {trips === null ? (
-        <p className={`text-sm ${PAGE_BODY}`}>Loading…</p>
+        <p className={`text-sm ${PAGE_BODY}`}>{pk.loading}</p>
       ) : trips.length === 0 ? (
-        <p className={`text-sm ${PAGE_BODY}`}>No trips scheduled right now — check back soon.</p>
+        <p className={`text-sm ${PAGE_BODY}`}>{tr.none}</p>
       ) : (
         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {trips.map(trip => (
@@ -85,16 +87,18 @@ function TripCard({ trip, registration }: { trip: ScheduledTripItem; registratio
         <p className={`text-xs ${TEXT_SUBTLE} truncate`}>{trip.destination}</p>
         {dates && <p className={`text-xs ${TEXT_SUBTLE}`}>{dates}</p>}
         <div className="flex items-center justify-between pt-1 gap-2">
-          <span className={`text-xs ${TEXT_SUBTLE}`}>Tap to register</span>
+          <span className={`text-xs ${TEXT_SUBTLE}`}>{tr.tapToRegister}</span>
           {trip.price != null && (
-            <span className={`text-xs ${TEXT_HEADING} shrink-0`}>from {trip.price.toLocaleString()} {trip.currency}</span>
+            <span className={`text-xs ${TEXT_HEADING} shrink-0`}>{pk.fromPrice(trip.price.toLocaleString(), trip.currency)}</span>
           )}
         </div>
         {registration && (
           <p className="text-xs text-brand-800 font-semibold pt-1">
-            {registration.status === 'registered' ? 'You’re registered' : `Registration: ${registration.status}`}
-            {registration.estimated_cost != null &&
-              ` · est. ${registration.estimated_cost.toLocaleString()} ${registration.estimated_currency ?? siteConfig.locale.currency}`}
+            {registration.status === 'registered' ? pk.youreRegistered : pk.registrationStatus(registration.status)}
+            {registration.estimated_cost != null && pk.estShort(
+              registration.estimated_cost.toLocaleString(),
+              registration.estimated_currency ?? siteConfig.locale.currency,
+            )}
           </p>
         )}
       </div>
