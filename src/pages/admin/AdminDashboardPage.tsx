@@ -3,6 +3,9 @@ import { Spinner } from '../../components/ui/Spinner'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
+import { t } from '../../i18n'
+
+const db = t.admin.dashboard
 import { siteConfig } from '../../config/site'
 import {
   computeDashboard,
@@ -77,15 +80,15 @@ async function loadDashboard(): Promise<Dashboard> {
 
   const events: EventLite[] = [
     ...upcomingDives.map((d): EventLite => ({
-      id: d.id, type: 'dive', title: titleOf(d, 'Dive'), capacity: d.capacity,
+      id: d.id, type: 'dive', title: titleOf(d, t.calendar.typeDive), capacity: d.capacity,
       dateKey: d.start_date ? d.start_date.slice(0, 10) : null,
     })),
     ...allCourses.map((c): EventLite => ({
-      id: c.id, type: 'course', title: titleOf(c, 'Course'), capacity: c.capacity,
+      id: c.id, type: 'course', title: titleOf(c, t.calendar.typeCourse), capacity: c.capacity,
       dateKey: courseDateKey(c.course_days, today),
     })),
     ...extra.map((e): EventLite => ({
-      id: e.id, type: e.kind, title: titleOf(e, e.kind === 'dive' ? 'Dive' : 'Course'), capacity: e.capacity,
+      id: e.id, type: e.kind, title: titleOf(e, e.kind === 'dive' ? t.calendar.typeDive : t.calendar.typeCourse), capacity: e.capacity,
       dateKey: e.kind === 'course' ? courseDateKey(e.course_days, today) : (e.start_date ? e.start_date.slice(0, 10) : null),
     })),
   ]
@@ -134,65 +137,65 @@ export function AdminDashboardPage() {
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-          <p className="text-sm text-white/70">{year} · peak season (Jun–Aug) centred · revenue netted (paid − refunded), {siteConfig.locale.timezone}.</p>
+          <h1 className="text-2xl font-bold text-white">{db.title}</h1>
+          <p className="text-sm text-white/70">{db.subtitle(year, siteConfig.locale.timezone)}</p>
         </div>
-        <Link to="/admin/history" className="text-sm text-amber-300 hover:text-amber-200 shrink-0 mt-1">Historical perspective →</Link>
+        <Link to="/admin/history" className="text-sm text-amber-300 hover:text-amber-200 shrink-0 mt-1">{db.historyLink}</Link>
       </div>
 
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="Revenue this month" value={TWD(k.netRevenueThisMonth)} />
-        <StatCard label={`Revenue ${year}`} value={TWD(k.netRevenueYear)} />
-        <StatCard label="Bookings this month" value={k.bookingsThisMonth} sub={`${k.confirmedBookingsThisMonth} confirmed`} />
-        <StatCard label="Active divers" value={k.activeDivers} />
-        <StatCard label="Pending applications" value={k.pendingApplications} />
-        <StatCard label="Upcoming events" value={k.upcomingEvents} />
-        <StatCard label="Avg fill (upcoming)" value={k.avgFillPct == null ? '—' : `${k.avgFillPct}%`} />
+        <StatCard label={db.revenueThisMonth} value={TWD(k.netRevenueThisMonth)} />
+        <StatCard label={db.revenueYear(year)} value={TWD(k.netRevenueYear)} />
+        <StatCard label={db.bookingsThisMonth} value={k.bookingsThisMonth} sub={db.confirmedSub(k.confirmedBookingsThisMonth)} />
+        <StatCard label={db.activeDivers} value={k.activeDivers} />
+        <StatCard label={db.pendingApplications} value={k.pendingApplications} />
+        <StatCard label={db.upcomingEvents} value={k.upcomingEvents} />
+        <StatCard label={db.avgFill} value={k.avgFillPct == null ? '—' : `${k.avgFillPct}%`} />
       </section>
 
       <section className="grid lg:grid-cols-2 gap-4">
-        <ChartCard title="Net revenue by month" empty={dash.revenueByMonth.every(p => p.value === 0)}>
+        <ChartCard title={db.netRevenueByMonth} empty={dash.revenueByMonth.every(p => p.value === 0)}>
           <ColumnChart items={dash.revenueByMonth} kind="money" />
         </ChartCard>
-        <ChartCard title="Bookings by month" empty={dash.bookingsByMonth.every(p => p.value === 0)}>
+        <ChartCard title={db.bookingsByMonth} empty={dash.bookingsByMonth.every(p => p.value === 0)}>
           <ColumnChart items={dash.bookingsByMonth} />
         </ChartCard>
-        <ChartCard title="New divers by month" empty={dash.signupsByMonth.every(p => p.value === 0)}>
+        <ChartCard title={db.newDiversByMonth} empty={dash.signupsByMonth.every(p => p.value === 0)}>
           <ColumnChart items={dash.signupsByMonth} />
         </ChartCard>
-        <ChartCard title="Bookings by status" empty={dash.bookingsByStatus.every(p => p.value === 0)}>
+        <ChartCard title={db.bookingsByStatus} empty={dash.bookingsByStatus.every(p => p.value === 0)}>
           <BarList items={dash.bookingsByStatus} />
         </ChartCard>
-        <ChartCard title="Revenue by payment method" empty={!dash.revenueByMethod.length}>
+        <ChartCard title={db.revenueByMethod} empty={!dash.revenueByMethod.length}>
           <BarList items={dash.revenueByMethod} kind="money" />
         </ChartCard>
-        <ChartCard title="Revenue by event type" empty={!dash.revenueByEventType.length}>
+        <ChartCard title={db.revenueByEventType} empty={!dash.revenueByEventType.length}>
           <BarList items={dash.revenueByEventType} kind="money" />
         </ChartCard>
-        <ChartCard title="Revenue by nationality" empty={!dash.revenueByNationality.length}>
+        <ChartCard title={db.revenueByNationality} empty={!dash.revenueByNationality.length}>
           <BarList items={dash.revenueByNationality} kind="money" />
         </ChartCard>
-        <ChartCard title="Revenue by certification" empty={!dash.revenueByCertLevel.length}>
+        <ChartCard title={db.revenueByCert} empty={!dash.revenueByCertLevel.length}>
           <BarList items={dash.revenueByCertLevel} kind="money" />
         </ChartCard>
-        <ChartCard title="Active divers by certification" empty={!dash.certLevelMix.length}>
+        <ChartCard title={db.diversByCert} empty={!dash.certLevelMix.length}>
           <BarList items={dash.certLevelMix} />
         </ChartCard>
-        <ChartCard title="Top events by revenue" empty={!dash.topEventsByRevenue.length}>
+        <ChartCard title={db.topEventsByRevenue} empty={!dash.topEventsByRevenue.length}>
           <BarList items={dash.topEventsByRevenue} kind="money" />
         </ChartCard>
       </section>
 
-      <ChartCard title="Upcoming events — fill" empty={!dash.upcomingFill.length}>
+      <ChartCard title={db.upcomingFill} empty={!dash.upcomingFill.length}>
         <div className="max-h-80 overflow-y-auto -mx-1 px-1">
           <table className="w-full text-xs text-brand-900">
             <thead className="text-brand-900/60 text-left">
               <tr>
-                <th className="font-medium pb-1">Event</th>
-                <th className="font-medium pb-1">Date</th>
-                <th className="font-medium pb-1 text-right">Confirmed</th>
-                <th className="font-medium pb-1 text-right">Capacity</th>
-                <th className="font-medium pb-1 text-right">Fill</th>
+                <th className="font-medium pb-1">{db.colEvent}</th>
+                <th className="font-medium pb-1">{db.colDate}</th>
+                <th className="font-medium pb-1 text-right">{db.colConfirmed}</th>
+                <th className="font-medium pb-1 text-right">{db.colCapacity}</th>
+                <th className="font-medium pb-1 text-right">{db.colFill}</th>
               </tr>
             </thead>
             <tbody>

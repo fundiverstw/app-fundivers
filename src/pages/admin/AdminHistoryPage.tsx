@@ -3,6 +3,9 @@ import { Spinner } from '../../components/ui/Spinner'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
+import { t } from '../../i18n'
+
+const hi = t.admin.history
 import { siteConfig } from '../../config/site'
 import { fiscalYearRange } from '../../lib/accounting-export'
 import { fetchYearWeather, HOME_REGION, type DailyWeather } from '../../lib/weather'
@@ -64,9 +67,9 @@ const fmtM = (n: number) => `${n} m`
 const fmtDeg = (n: number) => `${n}°C`
 
 function Delta({ curr, prev, fmt, betterWhenHigher }: { curr: number | null; prev: number | null; fmt: (n: number) => string; betterWhenHigher?: boolean }) {
-  if (curr == null || prev == null) return <span className="text-brand-900/50">vs prior year: —</span>
+  if (curr == null || prev == null) return <span className="text-brand-900/50">{hi.vsPriorYearUnknown}</span>
   const diff = Math.round((curr - prev) * 10) / 10
-  if (diff === 0) return <span className="text-brand-900/60">same as prior year</span>
+  if (diff === 0) return <span className="text-brand-900/60">{hi.sameAsPriorYear}</span>
   const up = diff > 0
   const good = betterWhenHigher == null ? null : up === betterWhenHigher
   const cls = good == null ? 'text-brand-900/60' : good ? 'text-emerald-700' : 'text-red-600'
@@ -121,22 +124,20 @@ export function AdminHistoryPage() {
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white">Historical perspective</h1>
-          <p className="text-sm text-white/70">
-            Weather vs. bookings, {years[0]}–{Y} · {HOME_REGION.label} · peak season (Jun–Aug) centred.
-          </p>
+          <h1 className="text-2xl font-bold text-white">{hi.title}</h1>
+          <p className="text-sm text-white/70">{hi.subtitle(years[0], Y, HOME_REGION.label)}</p>
         </div>
-        <Link to="/admin/dashboard" className="text-sm text-amber-300 hover:text-amber-200 shrink-0 mt-1">← Dashboard</Link>
+        <Link to="/admin/dashboard" className="text-sm text-amber-300 hover:text-amber-200 shrink-0 mt-1">{hi.dashboardLink}</Link>
       </div>
 
       <section>
-        <h2 className="text-sm font-semibold text-white/80 mb-2">Peak season {Y} vs {Y - 1}</h2>
+        <h2 className="text-sm font-semibold text-white/80 mb-2">{hi.peakSeasonCompare(Y, Y - 1)}</h2>
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-          <StatCard label="Bookings (Jun–Aug)" value={peakBookingsNow} sub={undefined} />
-          <StatCard label="Avg rain" value={`${num(peakNow.precipitation)} mm/d`} sub={undefined} />
-          <StatCard label="Avg wave" value={`${num(peakNow.waveMax)} m`} sub={undefined} />
-          <StatCard label="Avg air max" value={`${num(peakNow.tempMax)}°C`} sub={undefined} />
-          <StatCard label="Avg sea temp" value={`${num(peakNow.seaTemp)}°C`} sub={undefined} />
+          <StatCard label={hi.peakBookings} value={peakBookingsNow} sub={undefined} />
+          <StatCard label={hi.avgRain} value={`${num(peakNow.precipitation)} mm/d`} sub={undefined} />
+          <StatCard label={hi.avgWave} value={`${num(peakNow.waveMax)} m`} sub={undefined} />
+          <StatCard label={hi.avgAirMax} value={`${num(peakNow.tempMax)}°C`} sub={undefined} />
+          <StatCard label={hi.avgSeaTemp} value={`${num(peakNow.seaTemp)}°C`} sub={undefined} />
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-1 text-[11px] px-1">
           <div><Delta curr={peakBookingsNow} prev={peakBookingsPrev} fmt={n => String(n)} betterWhenHigher /></div>
@@ -148,45 +149,45 @@ export function AdminHistoryPage() {
       </section>
 
       <section className="grid lg:grid-cols-2 gap-4">
-        <ChartCard title="Bookings by month">
+        <ChartCard title={hi.bookingsByMonth}>
           <GroupedColumnChart months={months} series={bookingSeries} />
         </ChartCard>
-        <ChartCard title="Rainfall by month (avg mm/day)">
+        <ChartCard title={hi.rainfallByMonth}>
           <GroupedColumnChart months={months} series={weatherSeries(m => m.precipitation)} fmt={fmtMm} />
         </ChartCard>
-        <ChartCard title="Wave height by month (avg max, m)">
+        <ChartCard title={hi.waveByMonth}>
           <GroupedColumnChart months={months} series={weatherSeries(m => m.waveMax)} fmt={fmtM} />
         </ChartCard>
-        <ChartCard title="Air temperature by month (avg max, °C)">
+        <ChartCard title={hi.airTempByMonth}>
           <GroupedColumnChart months={months} series={weatherSeries(m => m.tempMax)} fmt={fmtDeg} />
         </ChartCard>
-        <ChartCard title="Sea temperature by month (avg, °C)">
+        <ChartCard title={hi.seaTempByMonth}>
           <GroupedColumnChart months={months} series={weatherSeries(m => m.seaTemp)} fmt={fmtDeg} />
         </ChartCard>
-        <ChartCard title="Wind by month (avg max, km/h)">
+        <ChartCard title={hi.windByMonth}>
           <GroupedColumnChart months={months} series={weatherSeries(m => m.windMax)} fmt={n => `${n} km/h`} />
         </ChartCard>
       </section>
 
-      <ChartCard title={`Weather on event days vs all days — ${Y}`} empty={ev.eventDayCount === 0}>
+      <ChartCard title={hi.eventDaysVsAll(Y)} empty={ev.eventDayCount === 0}>
         <table className="w-full text-xs text-brand-900">
           <thead className="text-brand-900/60 text-left">
             <tr>
-              <th className="font-medium pb-1">Metric</th>
-              <th className="font-medium pb-1 text-right">On event days</th>
-              <th className="font-medium pb-1 text-right">All days</th>
+              <th className="font-medium pb-1">{hi.colMetric}</th>
+              <th className="font-medium pb-1 text-right">{hi.colOnEventDays}</th>
+              <th className="font-medium pb-1 text-right">{hi.colAllDays}</th>
             </tr>
           </thead>
           <tbody>
-            <tr className="border-t border-surface-100"><td className="py-1">Rain (mm/day)</td><td className="py-1 text-right tabular-nums">{num(ev.onEventDays.precipitation)}</td><td className="py-1 text-right tabular-nums">{num(ev.allDays.precipitation)}</td></tr>
-            <tr className="border-t border-surface-100"><td className="py-1">Wave (m)</td><td className="py-1 text-right tabular-nums">{num(ev.onEventDays.waveMax)}</td><td className="py-1 text-right tabular-nums">{num(ev.allDays.waveMax)}</td></tr>
-            <tr className="border-t border-surface-100"><td className="py-1">Wind (km/h)</td><td className="py-1 text-right tabular-nums">{num(ev.onEventDays.windMax)}</td><td className="py-1 text-right tabular-nums">{num(ev.allDays.windMax)}</td></tr>
+            <tr className="border-t border-surface-100"><td className="py-1">{hi.rowRain}</td><td className="py-1 text-right tabular-nums">{num(ev.onEventDays.precipitation)}</td><td className="py-1 text-right tabular-nums">{num(ev.allDays.precipitation)}</td></tr>
+            <tr className="border-t border-surface-100"><td className="py-1">{hi.rowWave}</td><td className="py-1 text-right tabular-nums">{num(ev.onEventDays.waveMax)}</td><td className="py-1 text-right tabular-nums">{num(ev.allDays.waveMax)}</td></tr>
+            <tr className="border-t border-surface-100"><td className="py-1">{hi.rowWind}</td><td className="py-1 text-right tabular-nums">{num(ev.onEventDays.windMax)}</td><td className="py-1 text-right tabular-nums">{num(ev.allDays.windMax)}</td></tr>
           </tbody>
         </table>
-        <p className="text-[11px] text-brand-900/60 mt-2">Across {ev.eventDayCount} event day{ev.eventDayCount === 1 ? '' : 's'} in {Y}.</p>
+        <p className="text-[11px] text-brand-900/60 mt-2">{hi.acrossEventDays(ev.eventDayCount, Y)}</p>
       </ChartCard>
 
-      <p className="text-[11px] text-white/50">Weather: Open-Meteo, {HOME_REGION.label} ({HOME_REGION.latitude}, {HOME_REGION.longitude}).</p>
+      <p className="text-[11px] text-white/50">{hi.weatherSource(HOME_REGION.label, HOME_REGION.latitude, HOME_REGION.longitude)}</p>
     </div>
   )
 }

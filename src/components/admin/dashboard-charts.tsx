@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { CountPoint, MoneyPoint } from '../../lib/admin-dashboard'
 import { siteConfig } from '../../config/site'
+import { t } from '../../i18n'
 
 // Dependency-free dashboard visuals: a KPI tile, a horizontal bar list (for
 // distributions), and a column chart (for monthly time series). All sizing is
@@ -21,7 +22,7 @@ export function ChartCard({ title, children, empty }: { title: string; children:
   return (
     <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
       <h2 className="text-sm font-semibold text-brand-900">{title}</h2>
-      {empty ? <p className="text-xs text-brand-900/60">No data in range.</p> : children}
+      {empty ? <p className="text-xs text-brand-900/60">{t.admin.charts.noData}</p> : children}
     </div>
   )
 }

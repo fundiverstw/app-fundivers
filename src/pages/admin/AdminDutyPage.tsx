@@ -9,6 +9,9 @@ import { useAuth } from '../../hooks/useAuth'
 import { fetchEventsInRange, fetchEventsForBookings, formatEventSpan } from '../../lib/events'
 import { EventStatusTags } from '../../components/EventStatusTags'
 import type { AppEvent, Duty, Profile } from '../../types/database'
+import { t } from '../../i18n'
+
+const dy = t.admin.duty
 
 type AdminMap = Map<string, Profile>
 
@@ -89,23 +92,23 @@ export function AdminDutyPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <header className="space-y-1">
-        <h1 className="text-xl font-bold text-white">Duty roster</h1>
+        <h1 className="text-xl font-bold text-white">{dy.title}</h1>
         <p className="text-xs text-white/70">
-          {admins.size} assignable · {upcoming.length} upcoming
-          {mine.length > 0 && <span className="text-red-300"> · {mine.length} for you</span>}
+          {dy.counts(admins.size, upcoming.length)}
+          {mine.length > 0 && <span className="text-red-300">{dy.forYou(mine.length)}</span>}
         </p>
       </header>
 
       {mine.length > 0 && (
-        <Section title="Your upcoming duties" subtitle="You are on duty for these.">
+        <Section title={dy.yourDuties} subtitle={dy.yourDutiesSub}>
           {mine.map(e => <DutyRow key={e.duty.id} enriched={e} highlight />)}
         </Section>
       )}
 
       {unstaffed.length > 0 && (
         <Section
-          title="Unstaffed events"
-          subtitle="Every event should have at least one admin assigned. Click an event to assign staff."
+          title={dy.unstaffed}
+          subtitle={dy.unstaffedSub}
         >
           {unstaffed.map(ev => (
             <Link
@@ -124,9 +127,9 @@ export function AdminDutyPage() {
         </Section>
       )}
 
-      <Section title="All upcoming duties" subtitle="Across the whole team.">
+      <Section title={dy.allDuties} subtitle={dy.allDutiesSub}>
         {upcoming.length === 0
-          ? <p className="text-brand-950 font-medium text-sm">No duties assigned.</p>
+          ? <p className="text-brand-950 font-medium text-sm">{dy.noDuties}</p>
           : upcoming.map(e => <DutyRow key={e.duty.id} enriched={e} />)
         }
       </Section>
@@ -163,7 +166,7 @@ function DutyRow({ enriched, highlight }: { enriched: Enriched; highlight?: bool
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium text-brand-900 truncate">
-            {personName(assignee?.name, assignee?.nickname) || '(unknown admin)'}
+            {personName(assignee?.name, assignee?.nickname) || dy.unknownAdmin}
           </p>
           <p className="text-xs text-brand-900 font-medium">{dateSpan}</p>
         </div>
@@ -176,8 +179,8 @@ function DutyRow({ enriched, highlight }: { enriched: Enriched; highlight?: bool
             {event.title}<EventStatusTags event={event} />
           </Link>
         : duty.event_id
-          ? <p className="text-xs text-brand-950 font-medium">Event no longer exists</p>
-          : <p className="text-xs text-brand-950 font-medium">Standalone duty</p>
+          ? <p className="text-xs text-brand-950 font-medium">{dy.eventGone}</p>
+          : <p className="text-xs text-brand-950 font-medium">{dy.standalone}</p>
       }
       {duty.notes && <p className="text-xs text-brand-900 font-medium bg-surface-50 rounded p-2 mt-1">📝 {duty.notes}</p>}
     </div>
