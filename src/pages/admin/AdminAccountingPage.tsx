@@ -11,6 +11,9 @@ import {
   type AccountingTransaction,
 } from '../../lib/accounting-export'
 import type { Payment } from '../../types/database'
+import { t } from '../../i18n'
+
+const ac = t.admin.accounting
 
 // Admin-only fiscal-year (calendar-year, Asia/Taipei) bookkeeping export.
 // Pulls every payment marked in the year, joins booking / event / diver /
@@ -89,13 +92,13 @@ export function AdminAccountingPage() {
     try {
       const txns = await fetchTransactions(year)
       if (!txns.length) {
-        toast.error(`No payments recorded in ${year}.`)
+        toast.error(ac.noPayments(year))
         return
       }
       const files = buildAccountingCsvs(txns, year)
       downloadZip(`${siteConfig.identity.shortName.toLowerCase()}-accounting-${year}.zip`, files)
-      const paid = txns.filter(t => t.status === 'paid').length
-      toast.success(`Exported ${txns.length} transaction${txns.length === 1 ? '' : 's'} (${paid} paid) for ${year}.`)
+      const paid = txns.filter(tx => tx.status === 'paid').length
+      toast.success(ac.exported(txns.length, paid, year))
     } catch (err) {
       toast.error(errorMessage(err))
     } finally {
@@ -105,16 +108,12 @@ export function AdminAccountingPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
-      <h1 className="text-2xl font-bold text-white">Accounting export</h1>
-      <p className="text-sm text-white/80">
-        Download a fiscal-year (Jan–Dec, {siteConfig.locale.timezone}) bookkeeping ZIP. Includes
-        every payment marked in the year — paid, refunded, and voided — with who
-        paid, who marked it, when, the method, and the linked event.
-      </p>
+      <h1 className="text-2xl font-bold text-white">{ac.title}</h1>
+      <p className="text-sm text-white/80">{ac.blurb(siteConfig.locale.timezone)}</p>
 
       <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-4">
         <label className="block space-y-1">
-          <span className="text-xs font-medium text-brand-900">Fiscal year</span>
+          <span className="text-xs font-medium text-brand-900">{ac.fiscalYear}</span>
           <select
             value={year}
             onChange={e => setYear(Number(e.target.value))}
@@ -125,14 +124,11 @@ export function AdminAccountingPage() {
         </label>
 
         <ul className="text-xs text-brand-900/80 list-disc pl-5 space-y-0.5">
-          <li><strong>transactions-{year}.csv</strong> — one row per payment.</li>
-          <li><strong>by-event-{year}.csv</strong> — paid / refunded / net per event.</li>
-          <li><strong>summary-{year}.csv</strong> — totals by method, event type, and month.</li>
+          <li><strong>{ac.transactionsCsv(year)}</strong> — {ac.transactionsDesc}</li>
+          <li><strong>{ac.byEventCsv(year)}</strong> — {ac.byEventDesc}</li>
+          <li><strong>{ac.summaryCsv(year)}</strong> — {ac.summaryDesc}</li>
         </ul>
-        <p className="text-[11px] text-brand-900/70">
-          Money totals count paid as positive and refunded as negative; voided
-          rows are listed but excluded from every sum.
-        </p>
+        <p className="text-[11px] text-brand-900/70">{ac.moneyNote}</p>
 
         <div className="flex justify-end">
           <button
@@ -141,7 +137,7 @@ export function AdminAccountingPage() {
             disabled={busy}
             className="py-2 px-4 rounded-lg text-sm font-semibold bg-brand-900 hover:bg-brand-950 text-white disabled:opacity-50"
           >
-            {busy ? 'Preparing…' : 'Download ZIP'}
+            {busy ? ac.preparing : ac.downloadZip}
           </button>
         </div>
       </div>

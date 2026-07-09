@@ -7,6 +7,9 @@ import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
 import {
   CARD_ELEVATED, BTN_PRIMARY, BTN_DANGER, TEXT_MUTED, INPUT,
 } from '../../styles/tokens'
+import { t } from '../../i18n'
+
+const ap = t.admin.applications
 import type { AppEvent, Booking, Profile } from '../../types/database'
 
 // Admin queue for the manual-verification gate. Lists every profile in
@@ -90,13 +93,13 @@ export function AdminApplicationsPage() {
       if (error) throw new Error(error.message)
       if (!data?.ok) throw new Error('decision failed')
 
-      const verb = decision === 'approve' ? 'Approved' : 'Rejected'
-      const tail = data.email_sent ? ' · email sent' : ' · email skipped'
+      const verb = decision === 'approve' ? ap.approved : ap.rejected
+      const tail = data.email_sent ? ap.emailSent : ap.emailSkipped
       toast.success(`${verb}${tail}`)
       setUsers(prev => prev.filter(u => u.id !== userId))
       setExpanded(null)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Decision failed')
+      toast.error(err instanceof Error ? err.message : ap.decisionFailed)
     } finally {
       setActing(null)
     }
@@ -105,15 +108,13 @@ export function AdminApplicationsPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <header className="flex items-baseline justify-between">
-        <h1 className="text-xl font-bold text-white">Applications</h1>
-        <span className={`text-sm ${TEXT_MUTED}`}>
-          {users.length} pending
-        </span>
+        <h1 className="text-xl font-bold text-white">{ap.title}</h1>
+        <span className={`text-sm ${TEXT_MUTED}`}>{ap.pendingCount(users.length)}</span>
       </header>
 
       {users.length === 0 && (
         <div className={`${CARD_ELEVATED} p-6 text-center`}>
-          <p className={TEXT_MUTED}>No pending applications.</p>
+          <p className={TEXT_MUTED}>{ap.none}</p>
         </div>
       )}
 
@@ -131,10 +132,10 @@ export function AdminApplicationsPage() {
               >
                 <div className="min-w-0">
                   <div className="font-semibold text-brand-950 truncate">
-                    {personName(u.name, u.nickname) || '(no name yet)'}
+                    {personName(u.name, u.nickname) || ap.noNameYet}
                   </div>
                   <div className={`text-xs ${TEXT_MUTED}`}>
-                    submitted {format(new Date(u.created_at), 'PP')}
+                    {ap.submittedOn(format(new Date(u.created_at), 'PP'))}
                   </div>
                 </div>
                 <span className={`text-xs ${TEXT_MUTED}`}>{isExpanded ? '−' : '+'}</span>
@@ -149,7 +150,7 @@ export function AdminApplicationsPage() {
                     <textarea
                       className={`${INPUT} text-sm`}
                       rows={2}
-                      placeholder="Optional rejection reason (included in the email)"
+                      placeholder={ap.rejectReasonPlaceholder}
                       value={rejectReasons.get(u.id) ?? ''}
                       onChange={e => {
                         const v = e.target.value
@@ -167,7 +168,7 @@ export function AdminApplicationsPage() {
                         disabled={isActing}
                         className={`flex-1 ${BTN_PRIMARY}`}
                       >
-                        {isActing ? '…' : 'Approve'}
+                        {isActing ? ap.acting : ap.approve}
                       </button>
                       <button
                         type="button"
@@ -175,7 +176,7 @@ export function AdminApplicationsPage() {
                         disabled={isActing}
                         className={`flex-1 ${BTN_DANGER}`}
                       >
-                        {isActing ? '…' : 'Reject'}
+                        {isActing ? ap.acting : ap.reject}
                       </button>
                     </div>
                   </div>
@@ -192,31 +193,31 @@ export function AdminApplicationsPage() {
 function ApplicantSummary({ profile }: { profile: Profile }) {
   return (
     <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
-      <Row k="Email" v={profile.contact_id ?? '—'} />
-      <Row k="Cert"  v={profile.cert_level ? `${profile.cert_agency ?? ''} ${profile.cert_level}`.trim() : '—'} />
-      <Row k="Logged dives" v={String(profile.logged_dives ?? 0)} />
-      <Row k="Nationality" v={profile.nationality ?? '—'} />
-      <Row k="DOB" v={profile.date_of_birth ?? '—'} />
-      <Row k="Emergency" v={profile.emergency_contact_name ? `${profile.emergency_contact_name} · ${profile.emergency_contact_phone ?? ''}`.trim() : '—'} />
-      <Row k="Medical" v={profile.medical_notes || '—'} />
+      <Row k={ap.email} v={profile.contact_id ?? '—'} />
+      <Row k={ap.cert}  v={profile.cert_level ? `${profile.cert_agency ?? ''} ${profile.cert_level}`.trim() : '—'} />
+      <Row k={ap.loggedDives} v={String(profile.logged_dives ?? 0)} />
+      <Row k={ap.nationality} v={profile.nationality ?? '—'} />
+      <Row k={ap.dob} v={profile.date_of_birth ?? '—'} />
+      <Row k={ap.emergency} v={profile.emergency_contact_name ? `${profile.emergency_contact_name} · ${profile.emergency_contact_phone ?? ''}`.trim() : '—'} />
+      <Row k={ap.medical} v={profile.medical_notes || '—'} />
     </dl>
   )
 }
 
 function FirstBooking({ booking }: { booking: (Booking & { event: AppEvent | null }) | null }) {
   if (!booking) {
-    return <p className={`${TEXT_MUTED} italic`}>No booking submitted with this application.</p>
+    return <p className={`${TEXT_MUTED} italic`}>{ap.noBooking}</p>
   }
   return (
     <div className="border-t border-surface-200 pt-3 space-y-1">
-      <div className="font-semibold text-brand-950">First booking</div>
-      <div>{booking.event?.title ?? '(unknown event)'}</div>
+      <div className="font-semibold text-brand-950">{ap.firstBooking}</div>
+      <div>{booking.event?.title ?? ap.unknownEvent}</div>
       {booking.event && (
         <div className={`text-xs ${TEXT_MUTED}`}>
           {formatEventSpan(booking.event)}
         </div>
       )}
-      {booking.notes && <div className="text-xs">Notes: {booking.notes}</div>}
+      {booking.notes && <div className="text-xs">{ap.notes(booking.notes)}</div>}
     </div>
   )
 }
