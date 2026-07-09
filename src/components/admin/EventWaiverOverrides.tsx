@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
-import { WAIVERS } from '../../config/waivers'
 import {
-  globalRuleMatches, fetchEventWaiverOverrides, setEventWaiverOverride, type WaiverEventRef,
+  globalRuleMatches, fetchEventWaiverOverrides, fetchWaivers, setEventWaiverOverride, type WaiverEventRef,
 } from '../../lib/waivers'
 import type { WaiverDef } from '../../config/waivers'
 import type { EventWaiver } from '../../types/database'
@@ -16,6 +15,7 @@ export function EventWaiverOverrides({ event, isAdmin, createdBy }: {
   createdBy: string | null
 }) {
   const [overrides, setOverrides] = useState<EventWaiver[] | null>(null)
+  const [catalog, setCatalog] = useState<WaiverDef[]>([])
   const [busyCode, setBusyCode] = useState<string | null>(null)
   const [error, setError] = useState(false)
 
@@ -34,10 +34,13 @@ export function EventWaiverOverrides({ event, isAdmin, createdBy }: {
     let cancelled = false
     ;(async () => {
       try {
-        const rows = await fetchEventWaiverOverrides(
-          event.type === 'dive' ? { dive_id: event.id } : { course_id: event.id },
-        )
-        if (!cancelled) setOverrides(rows)
+        const [rows, waivers] = await Promise.all([
+          fetchEventWaiverOverrides(
+            event.type === 'dive' ? { dive_id: event.id } : { course_id: event.id },
+          ),
+          fetchWaivers(),
+        ])
+        if (!cancelled) { setOverrides(rows); setCatalog(waivers) }
       } catch {
         if (!cancelled) setOverrides([])
       }
@@ -81,7 +84,7 @@ export function EventWaiverOverrides({ event, isAdmin, createdBy }: {
         <p className="text-xs text-white/60 italic">Loading…</p>
       ) : (
         <ul className="divide-y divide-white/10 rounded-lg border border-white/10 bg-white/5">
-          {WAIVERS.map(def => {
+          {catalog.map(def => {
             const required = effectiveRequired(def)
             const overridden = overrideMode(def) !== undefined
             return (

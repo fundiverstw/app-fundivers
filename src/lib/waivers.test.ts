@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mockQueryBuilder } from '../../tests/test-utils'
 import {
   globalRuleMatches, requiredWaiversForEvent, isSignatureCurrent, missingWaivers,
-  annualWaiverStatus, annualWaivers,
+  annualWaiverStatus, annualWaivers, fetchWaivers,
   fetchEventWaiverOverrides, fetchDiverSignatures, fetchSignaturesForDivers,
   signWaiver, setEventWaiverOverride, type WaiverEventRef, type WaiverOverride,
 } from './waivers'
-import { waiverByCode } from '../config/waivers'
+import type { WaiverDef } from '../config/waivers'
 import { supabase } from './supabase'
 import type { WaiverSignature } from '../types/database'
 
@@ -15,9 +15,12 @@ const from = supabase.from as unknown as ReturnType<typeof vi.fn>
 const rpc = supabase.rpc as unknown as ReturnType<typeof vi.fn>
 beforeEach(() => { from.mockReset(); rpc.mockReset() })
 
-const PADI = waiverByCode('padi_liability')!
-const MEDICAL = waiverByCode('diver_medical')!
-const CE = waiverByCode('continuing_education')!
+// The catalog (formerly src/config/waivers.ts, now the `waivers` DB table); the
+// pure rule helpers take it as a parameter. Bodies are irrelevant to the rules.
+const PADI: WaiverDef = { code: 'padi_liability', title: 'Boat Travel & Scuba Diving Liability Release', cadence: 'annual', version: 1, appliesTo: 'dives', body: 'x' }
+const MEDICAL: WaiverDef = { code: 'diver_medical', title: 'Diver Medical Questionnaire', cadence: 'annual', version: 1, appliesTo: 'none', body: 'x' }
+const CE: WaiverDef = { code: 'continuing_education', title: 'Continuing Education Liability Release', cadence: 'per_event', version: 1, appliesTo: 'courses', courseColors: ['ow', 'aow', 'rescue', 'specialty'], body: 'x' }
+const CATALOG: WaiverDef[] = [PADI, MEDICAL, CE]
 
 const dive: WaiverEventRef = { id: 'D1', type: 'dive', title: 'Longdong shore dive' }
 const owCourse: WaiverEventRef = { id: 'C1', type: 'course', title: 'Open Water Course' }
@@ -48,17 +51,17 @@ describe('globalRuleMatches', () => {
 
 describe('requiredWaiversForEvent', () => {
   it('combines matching global rules', () => {
-    expect(requiredWaiversForEvent(dive, []).map(w => w.code)).toEqual(['padi_liability'])
-    expect(requiredWaiversForEvent(owCourse, []).map(w => w.code)).toEqual(['continuing_education'])
-    expect(requiredWaiversForEvent(tryDive, []).map(w => w.code)).toEqual([])
+    expect(requiredWaiversForEvent(dive, [], CATALOG).map(w => w.code)).toEqual(['padi_liability'])
+    expect(requiredWaiversForEvent(owCourse, [], CATALOG).map(w => w.code)).toEqual(['continuing_education'])
+    expect(requiredWaiversForEvent(tryDive, [], CATALOG).map(w => w.code)).toEqual([])
   })
   it('drops an exempted waiver', () => {
     const ov: WaiverOverride[] = [{ waiver_code: 'continuing_education', mode: 'exempt' }]
-    expect(requiredWaiversForEvent(owCourse, ov).map(w => w.code)).toEqual([])
+    expect(requiredWaiversForEvent(owCourse, ov, CATALOG).map(w => w.code)).toEqual([])
   })
   it('adds a required waiver the rule would not include', () => {
     const ov: WaiverOverride[] = [{ waiver_code: 'diver_medical', mode: 'require' }]
-    expect(requiredWaiversForEvent(tryDive, ov).map(w => w.code))
+    expect(requiredWaiversForEvent(tryDive, ov, CATALOG).map(w => w.code))
       .toEqual(['diver_medical'])
   })
 })
@@ -92,11 +95,11 @@ describe('missingWaivers', () => {
     // waivers; signing only liability leaves medical outstanding.
     const ov: WaiverOverride[] = [{ waiver_code: 'diver_medical', mode: 'require' }]
     const signatures = [sig({ waiver_code: 'padi_liability', signed_at: '2026-06-01T00:00:00Z' })]
-    expect(missingWaivers(dive, ov, signatures, now).map(w => w.code)).toEqual(['diver_medical'])
+    expect(missingWaivers(dive, ov, signatures, now, CATALOG).map(w => w.code)).toEqual(['diver_medical'])
   })
   it('is empty when all required waivers are current', () => {
     const signatures = [sig({ waiver_code: 'padi_liability', signed_at: '2026-06-01T00:00:00Z' })]
-    expect(missingWaivers(dive, [], signatures, now)).toEqual([])
+    expect(missingWaivers(dive, [], signatures, now, CATALOG)).toEqual([])
   })
 })
 
@@ -116,11 +119,23 @@ describe('annualWaiverStatus', () => {
     expect(annualWaiverStatus(MEDICAL, [sig({ waiver_code: 'diver_medical', waiver_version: 0 })], now).state).toBe('outdated')
   })
   it('lists exactly the annual waivers', () => {
-    expect(annualWaivers().map(w => w.code).sort()).toEqual(['diver_medical', 'padi_liability'])
+    expect(annualWaivers(CATALOG).map(w => w.code).sort()).toEqual(['diver_medical', 'padi_liability'])
   })
 })
 
 describe('data layer', () => {
+  it('fetchWaivers maps active waiver rows to the domain shape', async () => {
+    from.mockReturnValue(mockQueryBuilder({ data: [{
+      id: '1', created_at: '', created_by: null, code: 'padi_liability',
+      title: 'Boat Liability', language: null, body: 'text', pdf_path: null,
+      cadence: 'annual', version: 1, applies_to: 'dives', course_colors: null, active: true,
+    }] }))
+    const out = await fetchWaivers()
+    expect(out).toEqual([expect.objectContaining({
+      code: 'padi_liability', appliesTo: 'dives', body: 'text', pdfPath: null,
+    })])
+  })
+
   it('fetchEventWaiverOverrides queries by the right event column', async () => {
     const b = mockQueryBuilder({ data: [{ waiver_code: 'continuing_education', mode: 'exempt' }] })
     const eq = vi.fn(() => b); b.eq = eq

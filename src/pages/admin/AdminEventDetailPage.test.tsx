@@ -65,6 +65,13 @@ beforeEach(() => {
   useAuthMock.mockReturnValue({ user: { id: 'admin-1' }, profile: { id: 'admin-1', role: 'admin' } })
 })
 
+// The waiver catalog the page fetches (was src/config/waivers.ts). padi_liability
+// auto-applies to dives; diver_medical is opt-in only.
+const WAIVER_ROWS = [
+  { id: '1', created_at: '', created_by: null, code: 'padi_liability', title: 'Boat Travel & Scuba Diving Liability Release', language: null, body: 'x', pdf_path: null, cadence: 'annual', version: 1, applies_to: 'dives', course_colors: null, active: true },
+  { id: '2', created_at: '', created_by: null, code: 'diver_medical', title: 'Diver Medical Questionnaire', language: null, body: 'x', pdf_path: null, cadence: 'annual', version: 1, applies_to: 'none', course_colors: null, active: true },
+]
+
 describe('AdminEventDetailPage', () => {
   it('renders compact diver cards and expands to show add-ons by display_title', async () => {
     fetchEventsForBookings.mockResolvedValue(new Map([
@@ -136,6 +143,7 @@ describe('AdminEventDetailPage', () => {
     from.mockImplementation((table: string) => {
       if (table === 'bookings') return mockQueryBuilder({ data: bookings })
       if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      if (table === 'waivers') return mockQueryBuilder({ data: WAIVER_ROWS })
       return mockQueryBuilder({ data: [] })
     })
     const { unmount } = renderAt('/admin/events/dive/dive_x')
@@ -152,6 +160,7 @@ describe('AdminEventDetailPage', () => {
       if (table === 'bookings') return mockQueryBuilder({ data: bookings })
       if (table === 'profiles') return mockQueryBuilder({ data: profiles })
       if (table === 'waiver_signatures') return mockQueryBuilder({ data: sigs })
+      if (table === 'waivers') return mockQueryBuilder({ data: WAIVER_ROWS })
       return mockQueryBuilder({ data: [] })
     })
     renderAt('/admin/events/dive/dive_x')

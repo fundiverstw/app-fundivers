@@ -99,10 +99,20 @@ const sampleAddons: EOAddon[] = [
   { id: 'addon-a', admin_title: 'SMB 1 Day', display_title: null, price: 100, currency: 'NTD' },
 ]
 
+// The waiver catalog rows the app fetches from the `waivers` table (was
+// src/config/waivers.ts). event_waivers / waiver_signatures stay empty (default
+// builder) so every applicable waiver reads as missing.
+const WAIVER_ROWS = [
+  { id: '1', created_at: '', created_by: null, code: 'padi_liability', title: 'Boat Travel & Scuba Diving Liability Release', language: null, body: 'x', pdf_path: null, cadence: 'annual', version: 1, applies_to: 'dives', course_colors: null, active: true },
+  { id: '2', created_at: '', created_by: null, code: 'diver_medical', title: 'Diver Medical Questionnaire', language: null, body: 'x', pdf_path: null, cadence: 'annual', version: 1, applies_to: 'none', course_colors: null, active: true },
+  { id: '3', created_at: '', created_by: null, code: 'continuing_education', title: 'Continuing Education Liability Release', language: null, body: 'x', pdf_path: null, cadence: 'per_event', version: 1, applies_to: 'courses', course_colors: ['ow', 'aow', 'rescue', 'specialty'], active: true },
+]
+
 function setupFrom(updated: unknown = { id: 'b-existing' }) {
   from.mockImplementation((table: string) => {
     if (table === 'rooms')     return mockQueryBuilder({ data: sampleRooms })
     if (table === 'addons') return mockQueryBuilder({ data: sampleAddons })
+    if (table === 'waivers') return mockQueryBuilder({ data: WAIVER_ROWS })
     if (table === 'bookings') {
       // New bookings now go through the create-registration edge function;
       // only the admin-edit path still hits bookings.update directly.

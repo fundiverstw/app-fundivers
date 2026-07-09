@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { WaiverSignDialog } from './WaiverSignDialog'
-import { waiverByCode } from '../../config/waivers'
+import type { WaiverDef } from '../../config/waivers'
 import * as waivers from '../../lib/waivers'
 
-const CE = waiverByCode('continuing_education')!
-const MEDICAL = waiverByCode('diver_medical')!
+const CE: WaiverDef = { code: 'continuing_education', title: 'Continuing Education Liability Release', cadence: 'per_event', version: 1, appliesTo: 'courses', body: 'Continuing-ed release text.' }
+const MEDICAL: WaiverDef = { code: 'diver_medical', title: 'Diver Medical Questionnaire', cadence: 'annual', version: 1, appliesTo: 'none', body: 'Medical questionnaire text.' }
 
 beforeEach(() => vi.restoreAllMocks())
 

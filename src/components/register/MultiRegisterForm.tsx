@@ -9,7 +9,7 @@ import { invokeWithRetry } from '../../lib/edge-invoke'
 import { formatEventSpan, isPastEvent } from '../../lib/events'
 import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/payment-instructions'
 import { fetchRideSeats, canRequestRide, type RideSeats } from '../../lib/event-vehicles'
-import { missingWaivers, fetchEventWaiverOverrides, fetchDiverSignatures, type WaiverEventRef } from '../../lib/waivers'
+import { missingWaivers, fetchEventWaiverOverrides, fetchDiverSignatures, fetchWaivers, type WaiverEventRef } from '../../lib/waivers'
 import { WaiverSignDialog } from '../waivers/WaiverSignDialog'
 import type { WaiverDef } from '../../config/waivers'
 import type { AppEvent, Booking, BookingDetails, Database, Profile } from '../../types/database'
@@ -117,7 +117,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   async function refreshLeadWaivers() {
     try {
       const leadEvts = cart.filter(ev => (forDiverByEvent[ev.id] ?? null) === null)
-      const sigs = await fetchDiverSignatures(userId)
+      const [sigs, waivers] = await Promise.all([fetchDiverSignatures(userId), fetchWaivers()])
       const entries: Array<{ def: WaiverDef; event?: WaiverEventRef }> = []
       const seenAnnual = new Set<string>()
       for (const ev of leadEvts) {
@@ -125,7 +125,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
         const overrides = await fetchEventWaiverOverrides(
           ev.type === 'dive' ? { dive_id: ev.id } : { course_id: ev.id },
         )
-        for (const def of missingWaivers(ref, overrides, sigs, new Date())) {
+        for (const def of missingWaivers(ref, overrides, sigs, new Date(), waivers)) {
           if (def.cadence === 'annual') {
             if (seenAnnual.has(def.code)) continue
             seenAnnual.add(def.code)

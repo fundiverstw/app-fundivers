@@ -25,7 +25,7 @@ import { resolveCharges, type ChargeLine } from '../../lib/booking-charges'
 import { openCreditForBooking } from '../../lib/credits'
 import { bookingBalance } from '../../lib/booking-balance'
 import { EventTransportPanel } from '../../components/admin/EventTransportPanel'
-import { missingWaivers, fetchEventWaiverOverrides, fetchSignaturesForDivers } from '../../lib/waivers'
+import { missingWaivers, fetchEventWaiverOverrides, fetchSignaturesForDivers, fetchWaivers } from '../../lib/waivers'
 import type { WaiverDef } from '../../config/waivers'
 import { ShareEventButton } from '../../components/ShareEventButton'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Credit, DiverNote, Payment, Profile } from '../../types/database'
@@ -190,15 +190,16 @@ export function AdminEventDetailPage() {
     ;(async () => {
       try {
         const diverIds = [...new Set(diverIdsKey.split(','))]
-        const [overrides, sigs] = await Promise.all([
+        const [overrides, sigs, waivers] = await Promise.all([
           fetchEventWaiverOverrides(event.type === 'dive' ? { dive_id: event.id } : { course_id: event.id }),
           fetchSignaturesForDivers(diverIds),
+          fetchWaivers(),
         ])
         const now = new Date()
         const ref = { id: event.id, type: event.type, title: event.title }
         const map: Record<string, WaiverDef[]> = {}
         for (const did of diverIds) {
-          map[did] = missingWaivers(ref, overrides, sigs.filter(s => s.diver_id === did), now)
+          map[did] = missingWaivers(ref, overrides, sigs.filter(s => s.diver_id === did), now, waivers)
         }
         if (!cancelled) { setMissingByDiver(map); setWaiverState('ready') }
       } catch {

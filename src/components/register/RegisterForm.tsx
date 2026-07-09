@@ -14,7 +14,7 @@ import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
 import { fetchCreditsForUser, openCreditBalance, applyCreditToBooking } from '../../lib/credits'
 import { invokeWithRetry } from '../../lib/edge-invoke'
 import { fetchRideSeats, canRequestRide, type RideSeats } from '../../lib/event-vehicles'
-import { missingWaivers, fetchEventWaiverOverrides, fetchDiverSignatures } from '../../lib/waivers'
+import { missingWaivers, fetchEventWaiverOverrides, fetchDiverSignatures, fetchWaivers } from '../../lib/waivers'
 import { WaiverSignDialog } from '../waivers/WaiverSignDialog'
 import type { WaiverDef } from '../../config/waivers'
 import { PasswordInput } from '../PasswordInput'
@@ -824,11 +824,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   async function refreshMissingWaivers() {
     if (!userId) return
     try {
-      const [overrides, sigs] = await Promise.all([
+      const [overrides, sigs, waivers] = await Promise.all([
         fetchEventWaiverOverrides(event.type === 'dive' ? { dive_id: event.id } : { course_id: event.id }),
         fetchDiverSignatures(userId),
+        fetchWaivers(),
       ])
-      setMissingW(missingWaivers(eventRef, overrides, sigs, new Date()))
+      setMissingW(missingWaivers(eventRef, overrides, sigs, new Date(), waivers))
     } catch { /* keep the current list on a refresh failure */ }
   }
 
@@ -837,12 +838,13 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     let cancelled = false
     ;(async () => {
       try {
-        const [overrides, sigs] = await Promise.all([
+        const [overrides, sigs, waivers] = await Promise.all([
           fetchEventWaiverOverrides(event.type === 'dive' ? { dive_id: event.id } : { course_id: event.id }),
           fetchDiverSignatures(userId),
+          fetchWaivers(),
         ])
         if (!cancelled) {
-          setMissingW(missingWaivers({ id: event.id, type: event.type, title: event.title }, overrides, sigs, new Date()))
+          setMissingW(missingWaivers({ id: event.id, type: event.type, title: event.title }, overrides, sigs, new Date(), waivers))
         }
       } catch { /* fail open — no warning shown on error */ }
     })()

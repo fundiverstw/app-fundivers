@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { courseColor } from './event-colors'
-import { WAIVERS, ANNUAL_WAIVER_VALID_DAYS, type WaiverDef } from '../config/waivers'
+import { ANNUAL_WAIVER_VALID_DAYS, rowToWaiverDef, type WaiverDef } from '../config/waivers'
 import type { EventWaiver, WaiverSignature } from '../types/database'
 
 // Waiver logic — combines the config catalog/global rules (src/config/waivers.ts)
@@ -33,12 +33,12 @@ export function globalRuleMatches(def: WaiverDef, event: WaiverEventRef): boolea
 
 // The waivers an event actually requires: start from the global rule, then apply
 // per-event overrides — 'exempt' drops a waiver, 'require' adds one the rule
-// wouldn't have. Order follows the config (stable display order).
+// wouldn't have. Order follows the given catalog (stable display order).
 export function requiredWaiversForEvent(
-  event: WaiverEventRef, overrides: WaiverOverride[],
+  event: WaiverEventRef, overrides: WaiverOverride[], waivers: WaiverDef[],
 ): WaiverDef[] {
   const mode = new Map(overrides.map(o => [o.waiver_code, o.mode]))
-  return WAIVERS.filter(def => {
+  return waivers.filter(def => {
     const ov = mode.get(def.code)
     if (ov === 'exempt') return false
     return ov === 'require' || globalRuleMatches(def, event)
@@ -64,8 +64,9 @@ export function isSignatureCurrent(
 // Required waivers this diver has NOT satisfied for the event.
 export function missingWaivers(
   event: WaiverEventRef, overrides: WaiverOverride[], signatures: WaiverSignature[], now: Date,
+  waivers: WaiverDef[],
 ): WaiverDef[] {
-  return requiredWaiversForEvent(event, overrides).filter(
+  return requiredWaiversForEvent(event, overrides, waivers).filter(
     def => !signatures.some(sig => isSignatureCurrent(def, sig, event, now)),
   )
 }
@@ -100,11 +101,20 @@ export function annualWaiverStatus(
 }
 
 /** The annual, diver-level waivers (the ones the profile page manages). */
-export function annualWaivers(): WaiverDef[] {
-  return WAIVERS.filter(w => w.cadence === 'annual')
+export function annualWaivers(waivers: WaiverDef[]): WaiverDef[] {
+  return waivers.filter(w => w.cadence === 'annual')
 }
 
 // ── Data layer ───────────────────────────────────────────────────────────────
+
+/** The active waiver catalog, mapped to the domain type. Reference data —
+ *  publicly readable, admin-written (see the waivers RLS). */
+export async function fetchWaivers(): Promise<WaiverDef[]> {
+  const { data, error } = await supabase
+    .from('waivers').select('*').eq('active', true).order('code')
+  if (error) throw error
+  return (Array.isArray(data) ? data : []).map(rowToWaiverDef)
+}
 
 export async function fetchEventWaiverOverrides(
   event: { dive_id?: string | null; course_id?: string | null },

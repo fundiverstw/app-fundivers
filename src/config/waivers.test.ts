@@ -1,55 +1,39 @@
 import { describe, it, expect } from 'vitest'
-import { WAIVERS, waiverByCode, ANNUAL_WAIVER_VALID_DAYS } from './waivers'
+import { rowToWaiverDef, ANNUAL_WAIVER_VALID_DAYS } from './waivers'
+import type { WaiverRow } from '../types/database'
 
-const COURSE_COLORS = ['ow', 'aow', 'dsd', 'rescue', 'specialty']
-const CADENCES = ['annual', 'per_event']
-const APPLIES = ['dives', 'courses', 'all', 'none']
+// The waiver catalog + its validation now live in the DB (see the `waivers`
+// table CHECK constraints, exercised in tests/integration/waivers.test.ts). Here
+// we only cover the row → domain mapper the app reads through.
 
-describe('waiver config', () => {
-  it('has unique, non-empty stable codes', () => {
-    const codes = WAIVERS.map(w => w.code)
-    expect(codes.every(c => c.trim().length > 0)).toBe(true)
-    expect(new Set(codes).size).toBe(codes.length)
+const row = (over: Partial<WaiverRow>): WaiverRow => ({
+  id: '1', created_at: '', created_by: null, code: 'c', title: 'T',
+  language: null, body: 'b', pdf_path: null, cadence: 'annual', version: 1,
+  applies_to: 'none', course_colors: null, active: true, ...over,
+})
+
+describe('rowToWaiverDef', () => {
+  it('maps snake_case columns to the camelCase domain shape', () => {
+    const def = rowToWaiverDef(row({
+      code: 'padi_liability', applies_to: 'dives', course_colors: ['ow'], body: 'text',
+    }))
+    expect(def).toMatchObject({
+      code: 'padi_liability', appliesTo: 'dives', courseColors: ['ow'], body: 'text', pdfPath: null,
+    })
   })
 
-  it('uses valid cadence / appliesTo and positive integer versions', () => {
-    for (const w of WAIVERS) {
-      expect(CADENCES).toContain(w.cadence)
-      expect(APPLIES).toContain(w.appliesTo)
-      expect(Number.isInteger(w.version)).toBe(true)
-      expect(w.version).toBeGreaterThan(0)
-      expect(w.title.trim().length).toBeGreaterThan(0)
-      expect(w.body.trim().length).toBeGreaterThan(0)
-    }
+  it('carries a PDF waiver through with a null body', () => {
+    const def = rowToWaiverDef(row({ body: null, pdf_path: 'w/1.pdf' }))
+    expect(def.pdfPath).toBe('w/1.pdf')
+    expect(def.body).toBeNull()
   })
 
-  it('only restricts courseColors to known classifier buckets', () => {
-    for (const w of WAIVERS) {
-      if (!w.courseColors) continue
-      expect(w.appliesTo).not.toBe('dives') // a course filter on a dives-only waiver is meaningless
-      expect(w.courseColors.length).toBeGreaterThan(0)
-      for (const c of w.courseColors) expect(COURSE_COLORS).toContain(c)
-    }
+  it('leaves courseColors undefined when the column is null', () => {
+    expect(rowToWaiverDef(row({ course_colors: null })).courseColors).toBeUndefined()
   })
+})
 
-  it('ships the three PADI forms with their intended rules', () => {
-    const liability = waiverByCode('padi_liability')
-    expect(liability).toMatchObject({ cadence: 'annual', appliesTo: 'dives' })
-
-    const medical = waiverByCode('diver_medical')
-    expect(medical).toMatchObject({ cadence: 'annual', appliesTo: 'none' })
-
-    const ce = waiverByCode('continuing_education')
-    expect(ce).toMatchObject({ cadence: 'per_event', appliesTo: 'courses' })
-    // Continuing-Ed covers real courses but excludes Discover Scuba / Try Dive.
-    expect(ce?.courseColors).toEqual(expect.arrayContaining(['ow', 'aow', 'rescue', 'specialty']))
-    expect(ce?.courseColors).not.toContain('dsd')
-  })
-
-  it('returns undefined for an unknown code', () => {
-    expect(waiverByCode('nope')).toBeUndefined()
-  })
-
+describe('waiver constants', () => {
   it('keeps the annual validity window at one year', () => {
     expect(ANNUAL_WAIVER_VALID_DAYS).toBe(365)
   })

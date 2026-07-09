@@ -4,10 +4,21 @@ import userEvent from '@testing-library/user-event'
 import { EventWaiverOverrides } from './EventWaiverOverrides'
 import * as waivers from '../../lib/waivers'
 import type { WaiverEventRef } from '../../lib/waivers'
+import type { WaiverDef } from '../../config/waivers'
 
 const owCourse: WaiverEventRef = { id: 'C1', type: 'course', title: 'Open Water Course' }
 
-beforeEach(() => vi.restoreAllMocks())
+// The DB catalog the component now fetches (was src/config/waivers.ts).
+const CATALOG: WaiverDef[] = [
+  { code: 'padi_liability', title: 'Boat Travel & Scuba Diving Liability Release', cadence: 'annual', version: 1, appliesTo: 'dives', body: 'x' },
+  { code: 'diver_medical', title: 'Diver Medical Questionnaire', cadence: 'annual', version: 1, appliesTo: 'none', body: 'x' },
+  { code: 'continuing_education', title: 'Continuing Education Liability Release', cadence: 'per_event', version: 1, appliesTo: 'courses', courseColors: ['ow', 'aow', 'rescue', 'specialty'], body: 'x' },
+]
+
+beforeEach(() => {
+  vi.restoreAllMocks()
+  vi.spyOn(waivers, 'fetchWaivers').mockResolvedValue(CATALOG)
+})
 
 describe('EventWaiverOverrides', () => {
   it('shows each waiver with its effective required state from the global rule', async () => {

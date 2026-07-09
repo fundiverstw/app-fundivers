@@ -4,13 +4,23 @@ import userEvent from '@testing-library/user-event'
 import { MyWaivers } from './MyWaivers'
 import * as waivers from '../../lib/waivers'
 import type { WaiverSignature } from '../../types/database'
+import type { WaiverDef } from '../../config/waivers'
 
 const sig = (over: Partial<WaiverSignature>): WaiverSignature => ({
   id: 's', created_at: '', diver_id: 'u1', waiver_code: 'diver_medical', waiver_version: 1,
   signed_name: 'Jane', signed_at: new Date().toISOString(), event_id: null, ...over,
 })
 
-beforeEach(() => vi.restoreAllMocks())
+// The annual catalog the panel fetches (was src/config/waivers.ts).
+const CATALOG: WaiverDef[] = [
+  { code: 'padi_liability', title: 'Boat Travel & Scuba Diving Liability Release', cadence: 'annual', version: 1, appliesTo: 'dives', body: 'x' },
+  { code: 'diver_medical', title: 'Diver Medical Questionnaire', cadence: 'annual', version: 1, appliesTo: 'none', body: 'x' },
+]
+
+beforeEach(() => {
+  vi.restoreAllMocks()
+  vi.spyOn(waivers, 'fetchWaivers').mockResolvedValue(CATALOG)
+})
 
 describe('MyWaivers', () => {
   it('lists the annual waivers with their status', async () => {

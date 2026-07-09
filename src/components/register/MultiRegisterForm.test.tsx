@@ -53,9 +53,17 @@ const childProfile: Profile = {
   cert_level: null, cert_card_path: null,
 }
 
+// The waiver catalog rows the app fetches (was src/config/waivers.ts).
+const WAIVER_ROWS = [
+  { id: '1', created_at: '', created_by: null, code: 'padi_liability', title: 'Boat Travel & Scuba Diving Liability Release', language: null, body: 'x', pdf_path: null, cadence: 'annual', version: 1, applies_to: 'dives', course_colors: null, active: true },
+  { id: '2', created_at: '', created_by: null, code: 'diver_medical', title: 'Diver Medical Questionnaire', language: null, body: 'x', pdf_path: null, cadence: 'annual', version: 1, applies_to: 'none', course_colors: null, active: true },
+  { id: '3', created_at: '', created_by: null, code: 'continuing_education', title: 'Continuing Education Liability Release', language: null, body: 'x', pdf_path: null, cadence: 'per_event', version: 1, applies_to: 'courses', course_colors: ['ow', 'aow', 'rescue', 'specialty'], active: true },
+]
+
 function setupFrom(children: Profile[]) {
   from.mockImplementation((table: string) => {
     if (table === 'profiles') return mockQueryBuilder({ data: children })
+    if (table === 'waivers') return mockQueryBuilder({ data: WAIVER_ROWS })
     return mockQueryBuilder()
   })
 }
