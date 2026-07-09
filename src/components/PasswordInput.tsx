@@ -1,6 +1,7 @@
 import { forwardRef, useState } from 'react'
 import { EyeIcon } from './icons/EyeIcon'
 import { EyeOffIcon } from './icons/EyeOffIcon'
+import { t } from '../i18n'
 
 // A password <input> with a built-in show/hide eye toggle. Forwards its ref
 // and every native input prop, so it drops into both controlled inputs
@@ -25,7 +26,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
           // tabbing should jump straight from the password to the submit button.
           tabIndex={-1}
           onClick={() => setVisible(v => !v)}
-          aria-label={visible ? 'Hide password' : 'Show password'}
+          aria-label={visible ? t.a11y.hidePassword : t.a11y.showPassword}
           aria-pressed={visible}
           className="absolute inset-y-0 right-0 flex items-center px-3 text-brand-900/60 hover:text-brand-900"
         >

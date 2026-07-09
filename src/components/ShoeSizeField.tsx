@@ -3,6 +3,7 @@ import {
   SHOE_UNITS, SHOE_GENDERS, shoeSizesFor, convertShoeSize, formatShoeSize, parseShoeSize,
   type ShoeUnit, type ShoeGender,
 } from '../lib/shoe-size'
+import { t } from '../i18n'
 
 const SELECT = 'bg-white border border-surface-300 rounded-lg px-1.5 py-2 text-brand-900 text-sm focus:outline-none focus:border-brand-900'
 
@@ -62,13 +63,13 @@ export function ShoeSizeField({ initial, onChange }: {
   return (
     <div>
       <div className="flex gap-1.5">
-        <select aria-label="Shoe size unit" value={unit} onChange={e => changeUnit(e.target.value as ShoeUnit)} className={`shrink-0 w-16 ${SELECT}`}>
+        <select aria-label={t.a11y.shoeSizeUnit} value={unit} onChange={e => changeUnit(e.target.value as ShoeUnit)} className={`shrink-0 w-16 ${SELECT}`}>
           {SHOE_UNITS.map(u => <option key={u} value={u}>{u.toUpperCase()}</option>)}
         </select>
-        <select aria-label="Shoe size gender" value={gender} onChange={e => changeGender(e.target.value as ShoeGender)} className={`shrink-0 w-14 ${SELECT}`}>
+        <select aria-label={t.a11y.shoeSizeGender} value={gender} onChange={e => changeGender(e.target.value as ShoeGender)} className={`shrink-0 w-14 ${SELECT}`}>
           {SHOE_GENDERS.map(g => <option key={g} value={g}>{g.toUpperCase()}</option>)}
         </select>
-        <select aria-label="Shoe size value" value={value} onChange={e => changeValue(e.target.value)} className={`flex-1 min-w-0 ${SELECT}`}>
+        <select aria-label={t.a11y.shoeSizeValue} value={value} onChange={e => changeValue(e.target.value)} className={`flex-1 min-w-0 ${SELECT}`}>
           <option value="">—</option>
           {options.map(s => <option key={s} value={s}>{s}</option>)}
         </select>

@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import { CURRENT_TERMS_VERSION } from '../lib/terms-version'
 import { siteConfig } from '../config/site'
 import { TermsContent } from '../config/terms'
+import { t } from '../i18n'
 
 // Terms of Use + retention policy shown to divers at signup. Intentionally
 // plain: a small shop + a small user base deserves a summary a normal person
@@ -21,7 +22,7 @@ export function TermsPage() {
   return (
     <div className="min-h-screen bg-surface-50 text-brand-900">
       <header className="bg-brand-950 border-b border-accent px-4 py-3">
-        <Link to="/" aria-label={`${siteConfig.identity.logoAlt} home`}><Logo size="sm" /></Link>
+        <Link to="/" aria-label={t.a11y.homeLink(siteConfig.identity.logoAlt)}><Logo size="sm" /></Link>
       </header>
 
       <main className="max-w-2xl mx-auto p-6 space-y-6 text-sm leading-relaxed">
@@ -29,7 +30,7 @@ export function TermsPage() {
         <TermsContent />
 
         <div className="text-center pt-6">
-          <Link to="/" className="text-sm text-brand-700 hover:underline">‹ back</Link>
+          <Link to="/" className="text-sm text-brand-700 hover:underline">{t.terms.back}</Link>
         </div>
       </main>
     </div>
@@ -73,18 +74,15 @@ function ReacceptBanner() {
       role="alert"
       className="rounded-lg border-2 border-accent bg-red-50 p-4 space-y-3"
     >
-      <p className="font-bold text-red-700">Our Terms of Use have been updated</p>
-      <p className="text-brand-950">
-        Please read the updated terms below. You'll need to accept them to
-        continue using the app.
-      </p>
+      <p className="font-bold text-red-700">{t.terms.updatedTitle}</p>
+      <p className="text-brand-950">{t.terms.updatedBody}</p>
       <button
         type="button"
         onClick={onAccept}
         disabled={submitting}
         className="px-4 py-2 rounded bg-brand-700 hover:bg-brand-800 disabled:bg-slate-400 text-white font-semibold"
       >
-        {submitting ? 'Saving…' : 'I agree to the updated Terms'}
+        {submitting ? t.terms.saving : t.terms.agreeUpdated}
       </button>
       {err && <p className="text-red-700 text-xs">{err}</p>}
     </section>

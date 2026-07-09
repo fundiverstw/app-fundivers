@@ -689,6 +689,26 @@ export const en = {
   charges: {
     depositToHold: 'Deposit to hold spot',
   },
+  a11y: {
+    openCalendar: 'Open calendar',
+    hidePassword: 'Hide password',
+    showPassword: 'Show password',
+    shoeSizeUnit: 'Shoe size unit',
+    shoeSizeGender: 'Shoe size gender',
+    shoeSizeValue: 'Shoe size value',
+    recordsSections: 'Records sections',
+    homeLink: (shop: string) => `${shop} home`,
+  },
+  records: {
+    bookingsTab: 'Bookings',
+  },
+  terms: {
+    back: '‹ back',
+    updatedTitle: 'Our Terms of Use have been updated',
+    updatedBody: "Please read the updated terms below. You'll need to accept them to continue using the app.",
+    saving: 'Saving…',
+    agreeUpdated: 'I agree to the updated Terms',
+  },
   share: {
     shareLink: 'Share link',
     copied: 'Link copied to clipboard',

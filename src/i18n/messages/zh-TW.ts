@@ -682,6 +682,26 @@ export const zhTW: Messages = {
   charges: {
     depositToHold: '保留名額訂金',
   },
+  a11y: {
+    openCalendar: '開啟日曆',
+    hidePassword: '隱藏密碼',
+    showPassword: '顯示密碼',
+    shoeSizeUnit: '鞋碼單位',
+    shoeSizeGender: '鞋碼性別',
+    shoeSizeValue: '鞋碼尺寸',
+    recordsSections: '紀錄分類',
+    homeLink: (shop: string) => `${shop} 首頁`,
+  },
+  records: {
+    bookingsTab: '報名紀錄',
+  },
+  terms: {
+    back: '‹ 返回',
+    updatedTitle: '我們的使用條款已更新',
+    updatedBody: '請閱讀以下更新後的條款。您需要同意後才能繼續使用本應用程式。',
+    saving: '儲存中…',
+    agreeUpdated: '我同意更新後的使用條款',
+  },
   share: {
     shareLink: '分享連結',
     copied: '連結已複製到剪貼簿',

@@ -681,6 +681,26 @@ export const ja: Messages = {
   charges: {
     depositToHold: '予約確保のためのデポジット',
   },
+  a11y: {
+    openCalendar: 'カレンダーを開く',
+    hidePassword: 'パスワードを隠す',
+    showPassword: 'パスワードを表示',
+    shoeSizeUnit: '靴のサイズ表記',
+    shoeSizeGender: '靴のサイズ区分',
+    shoeSizeValue: '靴のサイズ',
+    recordsSections: '記録のセクション',
+    homeLink: (shop: string) => `${shop} ホーム`,
+  },
+  records: {
+    bookingsTab: '予約',
+  },
+  terms: {
+    back: '‹ 戻る',
+    updatedTitle: '利用規約を更新しました',
+    updatedBody: '更新後の規約を以下でご確認ください。アプリのご利用を続けるには同意が必要です。',
+    saving: '保存中…',
+    agreeUpdated: '更新後の利用規約に同意する',
+  },
   share: {
     shareLink: 'リンクを共有',
     copied: 'リンクをクリップボードにコピーしました',
