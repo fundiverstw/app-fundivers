@@ -1145,6 +1145,12 @@ export const en = {
     charts: {
       noData: 'No data in range.',
     },
+    groups: {
+      paymentsDue: 'Payments due',
+      onDutyStaff: 'On-duty staff',
+      handleWithCare: 'Handle with care',
+      addons: 'Add-ons',
+    },
     family: {
       heading: 'Family',
       linked: 'Child account linked',

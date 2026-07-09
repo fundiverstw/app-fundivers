@@ -1138,6 +1138,12 @@ export const zhTW: Messages = {
     charts: {
       noData: '此區間內沒有資料。',
     },
+    groups: {
+      paymentsDue: '待收款項',
+      onDutyStaff: '值班人員',
+      handleWithCare: '特別留意',
+      addons: '附加項目',
+    },
     family: {
       heading: '家庭成員',
       linked: '已連結子帳號',

@@ -1,4 +1,7 @@
 import type { DutyRole, Profile } from '../../types/database'
+import { t } from '../../i18n'
+
+const gr = t.admin.groups
 
 export interface StaffDutyRow {
   dutyId: string
@@ -15,9 +18,9 @@ export interface StaffDutyRow {
 export function StaffDutyGroup({ rows }: { rows: StaffDutyRow[] }) {
   if (rows.length === 0) return null
   return (
-    <div role="group" aria-label="On-duty staff" className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-2">
+    <div role="group" aria-label={gr.onDutyStaff} className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-2">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-bold text-brand-900">On-duty staff</h2>
+        <h2 className="text-sm font-bold text-brand-900">{gr.onDutyStaff}</h2>
         <span className="text-xs text-brand-900 font-semibold">{rows.length}</span>
       </div>
       <ul className="divide-y divide-surface-200">

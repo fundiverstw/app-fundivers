@@ -1,3 +1,7 @@
+import { t } from '../../i18n'
+
+const gr = t.admin.groups
+
 export interface CareItemRow {
   item: string
   divers: Array<{ bookingId: string; name: string }>
@@ -12,8 +16,8 @@ export interface CareItemRow {
 export function CareGearGroup({ rows }: { rows: CareItemRow[] }) {
   if (rows.length === 0) return null
   return (
-    <div role="group" aria-label="Handle with care" className="bg-amber-50/80 backdrop-blur-md border border-amber-300 rounded-xl p-4 space-y-2">
-      <h2 className="text-sm font-bold text-amber-900">Handle with care</h2>
+    <div role="group" aria-label={gr.handleWithCare} className="bg-amber-50/80 backdrop-blur-md border border-amber-300 rounded-xl p-4 space-y-2">
+      <h2 className="text-sm font-bold text-amber-900">{gr.handleWithCare}</h2>
       <ul className="space-y-2">
         {rows.map(r => (
           <li key={r.item} className="space-y-0.5">

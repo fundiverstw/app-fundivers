@@ -1137,6 +1137,12 @@ export const ja: Messages = {
     charts: {
       noData: 'この期間のデータはありません。',
     },
+    groups: {
+      paymentsDue: '未収の支払い',
+      onDutyStaff: '当番スタッフ',
+      handleWithCare: '要注意',
+      addons: 'オプション',
+    },
     family: {
       heading: '家族',
       linked: '子アカウントを連携しました',
