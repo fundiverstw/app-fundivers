@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { t } from '../../i18n'
 
 // Hub for the admin "Manage" tab. Each card links to a focused
 // create/edit/delete page for one catalog entity:
@@ -16,30 +17,31 @@ interface ManageCard {
   blurb: string
 }
 
+const m = t.admin.manage
 const CARDS: ManageCard[] = [
-  { to: '/admin/applications', title: 'Applications', blurb: 'Approve or reject pending diver applications.' },
-  { to: '/admin/dashboard', title: 'Dashboard',      blurb: 'Bookings, revenue and activity charts across the shop.' },
-  { to: '/admin/new/event', title: 'New event',     blurb: 'Create a dive or course. Edit existing events from the calendar.' },
-  { to: '/admin/rooms',     title: 'Room options',  blurb: 'Add, rename, reprice or delete room types offered with multi-day dives.' },
-  { to: '/admin/addons',    title: 'Add-ons',       blurb: 'Add, rename, reprice or delete optional items (gear, courses, transport).' },
-  { to: '/admin/travel',    title: 'Trip Templates', blurb: 'Add or edit reusable "what’s included" / transportation / itinerary copy that dives link to.' },
-  { to: '/admin/destinations', title: 'Destinations', blurb: 'The dive-location catalog (Green Island, Palau…) dives are tagged with; drives calendar local-vs-trip colouring.' },
-  { to: '/admin/prices',    title: 'Price tiers',   blurb: 'Total / deposit / transport for each event price tier.' },
-  { to: '/admin/vehicles',  title: 'Vehicles',      blurb: 'The shop transport fleet (passenger seats per vehicle) used to plan rides on the logistics view.' },
-  { to: '/admin/gear-sizing', title: 'Gear sizing', blurb: 'Wetsuit, BCD and fin models with the body ranges each size fits — powers the logistics packing lookup.' },
-  { to: '/admin/packages', title: 'Packages',   blurb: 'Publish partner-shop packages (price tiers + add-ons) divers register for; track registrations and expected-vs-paid kickbacks.' },
-  { to: '/admin/scheduled-trips', title: 'Scheduled Trips', blurb: 'The shop’s own dated trips (price + catalog add-ons/rooms) divers register for; track registrations.' },
-  { to: '/admin/trusted-partners', title: 'Trusted Partners', blurb: 'Dive shops abroad divers can message directly from the Trusted Partners tab; the email stays admin-only.' },
-  { to: '/admin/notifications', title: 'One-off notification', blurb: 'Send an immediate push (and optional LINE relay) to every opted-in device.' },
-  { to: '/admin/accounting', title: 'Accounting export', blurb: 'Download a fiscal-year bookkeeping ZIP: per-transaction, by-event, and summary CSVs.' },
-  { to: '/admin/waivers', title: 'Waivers', blurb: 'Author the forms divers e-sign — as text or your own uploaded PDF, in any language. Attach or exempt them per-event from an event’s edit form.' },
-  { to: '/admin/cancellation-policies', title: 'Cancellation policies', blurb: 'Write the cancellation terms divers acknowledge at registration; pick one per event.' },
+  { to: '/admin/applications', ...m.applications },
+  { to: '/admin/dashboard', ...m.dashboard },
+  { to: '/admin/new/event', ...m.newEvent },
+  { to: '/admin/rooms', ...m.rooms },
+  { to: '/admin/addons', ...m.addons },
+  { to: '/admin/travel', ...m.travel },
+  { to: '/admin/destinations', ...m.destinations },
+  { to: '/admin/prices', ...m.prices },
+  { to: '/admin/vehicles', ...m.vehicles },
+  { to: '/admin/gear-sizing', ...m.gearSizing },
+  { to: '/admin/packages', ...m.packages },
+  { to: '/admin/scheduled-trips', ...m.scheduledTrips },
+  { to: '/admin/trusted-partners', ...m.trustedPartners },
+  { to: '/admin/notifications', ...m.notifications },
+  { to: '/admin/accounting', ...m.accounting },
+  { to: '/admin/waivers', ...m.waivers },
+  { to: '/admin/cancellation-policies', ...m.cancellationPolicies },
 ]
 
 export function AdminManagePage() {
   return (
     <div className="max-w-2xl mx-auto space-y-4">
-      <h1 className="text-2xl font-bold text-white">Manage</h1>
+      <h1 className="text-2xl font-bold text-white">{t.admin.manage.title}</h1>
       <ul className="space-y-3">
         {CARDS.map(c => (
           <li key={c.to}>

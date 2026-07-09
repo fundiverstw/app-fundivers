@@ -662,6 +662,28 @@ export const en = {
     setNewPassword: 'Set new password',
     backToSignIn: 'Back to sign in',
   },
+  admin: {
+    manage: {
+      title: 'Manage',
+      applications: { title: 'Applications', blurb: 'Approve or reject pending diver applications.' },
+      dashboard: { title: 'Dashboard', blurb: 'Bookings, revenue and activity charts across the shop.' },
+      newEvent: { title: 'New event', blurb: 'Create a dive or course. Edit existing events from the calendar.' },
+      rooms: { title: 'Room options', blurb: 'Add, rename, reprice or delete room types offered with multi-day dives.' },
+      addons: { title: 'Add-ons', blurb: 'Add, rename, reprice or delete optional items (gear, courses, transport).' },
+      travel: { title: 'Trip Templates', blurb: 'Add or edit reusable "what’s included" / transportation / itinerary copy that dives link to.' },
+      destinations: { title: 'Destinations', blurb: 'The dive-location catalog (Green Island, Palau…) dives are tagged with; drives calendar local-vs-trip colouring.' },
+      prices: { title: 'Price tiers', blurb: 'Total / deposit / transport for each event price tier.' },
+      vehicles: { title: 'Vehicles', blurb: 'The shop transport fleet (passenger seats per vehicle) used to plan rides on the logistics view.' },
+      gearSizing: { title: 'Gear sizing', blurb: 'Wetsuit, BCD and fin models with the body ranges each size fits — powers the logistics packing lookup.' },
+      packages: { title: 'Packages', blurb: 'Publish partner-shop packages (price tiers + add-ons) divers register for; track registrations and expected-vs-paid kickbacks.' },
+      scheduledTrips: { title: 'Scheduled Trips', blurb: 'The shop’s own dated trips (price + catalog add-ons/rooms) divers register for; track registrations.' },
+      trustedPartners: { title: 'Trusted Partners', blurb: 'Dive shops abroad divers can message directly from the Trusted Partners tab; the email stays admin-only.' },
+      notifications: { title: 'One-off notification', blurb: 'Send an immediate push (and optional LINE relay) to every opted-in device.' },
+      accounting: { title: 'Accounting export', blurb: 'Download a fiscal-year bookkeeping ZIP: per-transaction, by-event, and summary CSVs.' },
+      waivers: { title: 'Waivers', blurb: 'Author the forms divers e-sign — as text or your own uploaded PDF, in any language. Attach or exempt them per-event from an event’s edit form.' },
+      cancellationPolicies: { title: 'Cancellation policies', blurb: 'Write the cancellation terms divers acknowledge at registration; pick one per event.' },
+    },
+  },
 }
 
 /** The shape every locale catalog must satisfy, inferred from English. */
