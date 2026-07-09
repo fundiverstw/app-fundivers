@@ -4,6 +4,9 @@ import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import type { DiverNote, Profile } from '../../types/database'
+import { t } from '../../i18n'
+
+const dn = t.admin.diverNotes
 
 type NoteWithAuthor = DiverNote & {
   author: Pick<Profile, 'id' | 'nickname' | 'name'> | null
@@ -15,7 +18,7 @@ interface Props {
   title?: string
 }
 
-export function DiverNotes({ profileId, title = 'Diver notes (staff only)' }: Props) {
+export function DiverNotes({ profileId, title = dn.title }: Props) {
   const { user, profile } = useAuth()
   const isAdmin = profile?.role === 'admin'
   const [notes, setNotes] = useState<NoteWithAuthor[]>([])
@@ -107,7 +110,7 @@ export function DiverNotes({ profileId, title = 'Diver notes (staff only)' }: Pr
 
       <div className="space-y-2">
         {notes.length === 0 && (
-          <p className="text-xs text-brand-950 font-medium">No diver notes yet.</p>
+          <p className="text-xs text-brand-950 font-medium">{dn.none}</p>
         )}
         {notes.map(n => (
           <div key={n.id} className="bg-surface-50 rounded-lg p-3 text-sm space-y-1">
@@ -118,7 +121,7 @@ export function DiverNotes({ profileId, title = 'Diver notes (staff only)' }: Pr
                   onChange={e => setEditingContent(e.target.value)}
                   rows={2}
                   maxLength={2000}
-                  aria-label="Edit note"
+                  aria-label={dn.editNoteAria}
                   className="w-full bg-white border border-surface-300 rounded-lg px-3 py-1.5 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
                 />
                 <div className="flex gap-2 justify-end">
@@ -126,14 +129,14 @@ export function DiverNotes({ profileId, title = 'Diver notes (staff only)' }: Pr
                     onClick={cancelEdit}
                     className="text-xs text-brand-900 font-medium hover:text-brand-900"
                   >
-                    Cancel
+                    {dn.cancel}
                   </button>
                   <button
                     onClick={saveEdit}
                     disabled={!editingContent.trim()}
                     className="bg-brand-900 hover:bg-brand-950 disabled:opacity-40 text-white text-xs font-semibold py-1 px-3 rounded-lg"
                   >
-                    Save
+                    {dn.save}
                   </button>
                 </div>
               </div>
@@ -145,25 +148,25 @@ export function DiverNotes({ profileId, title = 'Diver notes (staff only)' }: Pr
                     <div className="flex gap-2 shrink-0">
                       <button
                         onClick={() => startEdit(n)}
-                        aria-label={`Edit note from ${personName(n.author?.name, n.author?.nickname) || 'unknown'}`}
+                        aria-label={dn.editNoteFromAria(personName(n.author?.name, n.author?.nickname) || t.admin.notes.unknownAuthor)}
                         className="text-xs text-brand-900 font-semibold hover:text-brand-700"
                       >
-                        Edit
+                        {dn.edit}
                       </button>
                       <button
                         onClick={() => deleteNote(n.id)}
-                        aria-label={`Delete note from ${personName(n.author?.name, n.author?.nickname) || 'unknown'}`}
+                        aria-label={dn.deleteNoteFromAria(personName(n.author?.name, n.author?.nickname) || t.admin.notes.unknownAuthor)}
                         className="text-xs text-red-700 font-semibold hover:text-red-800"
                       >
-                        Delete
+                        {dn.delete}
                       </button>
                     </div>
                   )}
                 </div>
                 <p className="text-xs text-brand-950 font-medium">
-                  {personName(n.author?.name, n.author?.nickname) || 'unknown'} · {format(new Date(n.created_at), 'MMM d, yyyy · HH:mm')}
+                  {personName(n.author?.name, n.author?.nickname) || t.admin.notes.unknownAuthor} · {format(new Date(n.created_at), 'MMM d, yyyy · HH:mm')}
                   {n.edited_at && (
-                    <> · edited{n.editor && ` by ${personName(n.editor.name, n.editor.nickname)}`} {format(new Date(n.edited_at), 'MMM d')}</>
+                    <>{dn.edited}{n.editor && dn.editedBy(personName(n.editor.name, n.editor.nickname))} {format(new Date(n.edited_at), 'MMM d')}</>
                   )}
                 </p>
               </>
@@ -176,10 +179,10 @@ export function DiverNotes({ profileId, title = 'Diver notes (staff only)' }: Pr
         <textarea
           value={content}
           onChange={e => setContent(e.target.value)}
-          placeholder="Allergies, accommodations, anything the team should know…"
+          placeholder={dn.newNotePlaceholder}
           rows={2}
           maxLength={2000}
-          aria-label="New diver note"
+          aria-label={dn.newNoteAria}
           className="w-full bg-white border border-surface-300 rounded-lg px-3 py-1.5 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
         />
         <div className="flex justify-end">
@@ -188,7 +191,7 @@ export function DiverNotes({ profileId, title = 'Diver notes (staff only)' }: Pr
             disabled={saving || !content.trim()}
             className="bg-brand-900 hover:bg-brand-950 disabled:opacity-40 text-white text-xs font-semibold py-1 px-3 rounded-lg"
           >
-            Add note
+            {dn.addNote}
           </button>
         </div>
       </div>

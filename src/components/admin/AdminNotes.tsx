@@ -4,6 +4,9 @@ import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { NOTE_TAGS, type AdminNote, type NoteTag, type Profile } from '../../types/database'
+import { t } from '../../i18n'
+
+const nt = t.admin.notes
 
 const TAG_STYLES: Record<NoteTag, string> = {
   urgent:    'bg-rose-700 text-rose-100',
@@ -49,7 +52,7 @@ function fkPayload(target: NoteTarget) {
   }
 }
 
-export function AdminNotes({ target, tagFilter, title = 'Notes', compact = false }: Props) {
+export function AdminNotes({ target, tagFilter, title = nt.title, compact = false }: Props) {
   const { user, profile } = useAuth()
   const isAdmin = profile?.role === 'admin'
   const [notes, setNotes] = useState<NoteWithAuthors[]>([])
@@ -159,7 +162,7 @@ export function AdminNotes({ target, tagFilter, title = 'Notes', compact = false
               onClick={() => setShowResolved(v => !v)}
               className="text-xs text-brand-900 font-medium hover:text-brand-900"
             >
-              {showResolved ? 'Hide resolved' : `Show resolved (${resolved.length})`}
+              {showResolved ? nt.hideResolved : nt.showResolved(resolved.length)}
             </button>
           )}
           {compact && (
@@ -167,7 +170,7 @@ export function AdminNotes({ target, tagFilter, title = 'Notes', compact = false
               onClick={() => setAdding(a => !a)}
               className="text-xs text-brand-900 font-semibold hover:text-brand-950 shrink-0"
             >
-              {adding ? 'Cancel' : '+ Add'}
+              {adding ? nt.cancel : nt.add}
             </button>
           )}
         </div>
@@ -184,7 +187,7 @@ export function AdminNotes({ target, tagFilter, title = 'Notes', compact = false
         </div>
       )}
       {!compact && open.length === 0 && (
-        <p className="text-xs text-brand-950 font-medium">No open notes.</p>
+        <p className="text-xs text-brand-950 font-medium">{nt.noOpenNotes}</p>
       )}
 
       {showForm && (
@@ -203,7 +206,7 @@ export function AdminNotes({ target, tagFilter, title = 'Notes', compact = false
               type="text"
               value={content}
               onChange={e => setContent(e.target.value)}
-              placeholder="New note…"
+              placeholder={nt.newNotePlaceholder}
               className="sm:flex-1 min-w-0 bg-white border border-surface-300 rounded-lg px-3 py-1.5 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
               onKeyDown={e => { if (e.key === 'Enter') addNote() }}
             />
@@ -212,7 +215,7 @@ export function AdminNotes({ target, tagFilter, title = 'Notes', compact = false
               disabled={saving || !content.trim()}
               className="sm:shrink-0 bg-brand-900 hover:bg-brand-950 disabled:opacity-40 text-white text-xs font-semibold py-1.5 sm:py-1 px-3 rounded-lg"
             >
-              Add
+              {nt.addShort}
             </button>
           </div>
         </div>
@@ -226,7 +229,7 @@ function NoteCard({ note, onResolve, onUnresolve }: {
   onResolve?: () => void
   onUnresolve?: () => void
 }) {
-  const author = personName(note.author?.name, note.author?.nickname) || 'unknown'
+  const author = personName(note.author?.name, note.author?.nickname) || nt.unknownAuthor
   return (
     <div className={`bg-surface-50 rounded-lg p-3 text-sm ${note.resolved ? 'opacity-60' : ''}`}>
       <div className="flex items-start gap-2">
@@ -235,10 +238,10 @@ function NoteCard({ note, onResolve, onUnresolve }: {
         </span>
         <p className={`flex-1 text-brand-900 ${note.resolved ? 'line-through' : ''}`}>{note.content}</p>
         {onResolve && (
-          <button onClick={onResolve} className="text-xs text-brand-900 font-medium hover:text-brand-900 font-semibold shrink-0">✓ resolve</button>
+          <button onClick={onResolve} className="text-xs text-brand-900 font-medium hover:text-brand-900 font-semibold shrink-0">{nt.resolve}</button>
         )}
         {onUnresolve && (
-          <button onClick={onUnresolve} className="text-xs text-brand-900 font-medium hover:text-brand-700 shrink-0">↺ reopen</button>
+          <button onClick={onUnresolve} className="text-xs text-brand-900 font-medium hover:text-brand-700 shrink-0">{nt.reopen}</button>
         )}
       </div>
       <p className="text-xs text-brand-950 font-medium mt-1">
