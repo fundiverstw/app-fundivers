@@ -863,5 +863,11 @@ export const ja: Messages = {
       seatsLabel: '物理座席 *',
       inService: '稼働中（相乗り計画に含める）',
     },
+    gearMap: {
+      backToEvent: '‹ イベントに戻る',
+      title: '器材一覧',
+      summary: (divers: number, toPack: number) => `ダイバー${divers}名 · ${toPack}件を準備`,
+      noRegistrants: 'まだ登録者がいません。',
+    },
   },
 }

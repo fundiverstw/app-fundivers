@@ -871,6 +871,12 @@ export const en = {
       seatsLabel: 'Physical seats *',
       inService: 'In service (counts toward ride planning)',
     },
+    gearMap: {
+      backToEvent: '‹ back to event',
+      title: 'Gear map',
+      summary: (divers: number, toPack: number) => `${divers} diver${divers === 1 ? '' : 's'} · ${toPack} to pack`,
+      noRegistrants: 'No registrants yet.',
+    },
   },
 }
 

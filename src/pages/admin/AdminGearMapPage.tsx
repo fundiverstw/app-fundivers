@@ -8,6 +8,9 @@ import { DiverGearCard, type DiverGearRow } from '../../components/admin/DiverGe
 import { fetchGearModelsWithSizes } from '../../lib/gear-models'
 import type { GearModelWithSizes } from '../../lib/gear-sizing'
 import type { AppEvent, Profile } from '../../types/database'
+import { t } from '../../i18n'
+
+const gm = t.admin.gearMap
 
 type Row = DiverGearRow
 
@@ -67,23 +70,23 @@ export function AdminGearMapPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <Link to={`/admin/events/${type}/${id}`} className="text-sm text-white/70 hover:text-white">
-        ‹ back to event
+        {gm.backToEvent}
       </Link>
 
       <header className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4">
-        <h1 className="text-xl font-bold text-brand-900">Gear map</h1>
+        <h1 className="text-xl font-bold text-brand-900">{gm.title}</h1>
         {event && (
           <p className="text-sm text-brand-900 font-medium mt-1">
             {event.title} · {formatEventSpan(event, { style: 'compact' })}
           </p>
         )}
         <p className="text-sm text-red-600 mt-2">
-          {rows.length} diver{rows.length === 1 ? '' : 's'} · {rows.filter(r => gearPackList(r.booking).items.length > 0).length} to pack
+          {gm.summary(rows.length, rows.filter(r => gearPackList(r.booking).items.length > 0).length)}
         </p>
       </header>
 
       {rows.length === 0 ? (
-        <p className="text-brand-950 font-medium text-sm">No registrants yet.</p>
+        <p className="text-brand-950 font-medium text-sm">{gm.noRegistrants}</p>
       ) : (
         <section className="space-y-3">
           {rows.map(r => <DiverGearCard key={r.booking.id} row={r} onProfilePatched={patchProfile} gearModels={gearModels} />)}

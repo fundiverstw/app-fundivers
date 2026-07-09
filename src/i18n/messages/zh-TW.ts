@@ -864,5 +864,11 @@ export const zhTW: Messages = {
       seatsLabel: '實體座位 *',
       inService: '服役中（納入共乘規劃）',
     },
+    gearMap: {
+      backToEvent: '‹ 返回活動',
+      title: '器材總覽',
+      summary: (divers: number, toPack: number) => `${divers} 位潛水員 · ${toPack} 項待打包`,
+      noRegistrants: '尚無報名者。',
+    },
   },
 }
