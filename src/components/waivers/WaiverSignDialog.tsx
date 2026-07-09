@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { signWaiver, type WaiverEventRef } from '../../lib/waivers'
+import { getWaiverPdfSignedUrl } from '../../lib/waiver-pdf'
 import type { WaiverDef } from '../../config/waivers'
 
 // E-signature dialog reused by the profile page and the registration form. The
@@ -18,6 +19,16 @@ export function WaiverSignDialog({ def, event, onSigned, onClose }: {
   const [agreed, setAgreed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // PDF waivers show the uploaded document instead of a text body.
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    if (def.pdfPath) {
+      getWaiverPdfSignedUrl(def.pdfPath).then(u => { if (!cancelled) setPdfUrl(u) })
+    }
+    return () => { cancelled = true }
+  }, [def.pdfPath])
 
   const canSign = name.trim().length > 0 && agreed && !busy
 
@@ -44,9 +55,24 @@ export function WaiverSignDialog({ def, event, onSigned, onClose }: {
     >
       <div className="bg-white/90 backdrop-blur-md rounded-2xl max-w-lg w-full p-6 space-y-4 border border-surface-300 shadow-2xl max-h-[90vh] flex flex-col">
         <h2 id="waiver-title" className="text-lg font-bold text-brand-900">{def.title}</h2>
-        <div className="text-xs text-brand-950 whitespace-pre-wrap overflow-y-auto border border-surface-200 rounded-lg p-3 bg-white/70 grow">
-          {def.body}
-        </div>
+        {def.pdfPath ? (
+          <div className="overflow-hidden border border-surface-200 rounded-lg bg-white/70 grow min-h-[320px] flex flex-col">
+            {pdfUrl ? (
+              <object data={pdfUrl} type="application/pdf" aria-label={def.title} className="w-full grow min-h-[320px]">
+                <p className="text-xs text-brand-950 p-3">
+                  Your browser can't show the PDF inline.{' '}
+                  <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="underline font-semibold">Open it in a new tab</a> to read it before signing.
+                </p>
+              </object>
+            ) : (
+              <p className="text-xs text-brand-950 p-3">Loading the document…</p>
+            )}
+          </div>
+        ) : (
+          <div className="text-xs text-brand-950 whitespace-pre-wrap overflow-y-auto border border-surface-200 rounded-lg p-3 bg-white/70 grow">
+            {def.body}
+          </div>
+        )}
         <div className="space-y-2">
           <label className="block">
             <span className="block text-xs text-brand-900 font-medium mb-1 uppercase tracking-wide">Type your full name to sign</span>
