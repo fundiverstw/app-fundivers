@@ -2,6 +2,7 @@ import { useAuth } from '../hooks/useAuth'
 import { Caustics } from '../components/dashboard/Caustics'
 import { FeaturedEvents } from '../components/dashboard/FeaturedEvents'
 import { WelcomeBanner } from '../components/welcome/WelcomeBanner'
+import { t } from '../i18n'
 
 // Diver + admin landing. The container is transparent so the fixed deep-ocean
 // body gradient (src/index.css) shows through, with the animated water caustics
@@ -29,7 +30,7 @@ export function DashboardPage() {
           href="https://github.com/fundive"
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="fundive on GitHub"
+          aria-label={t.dashboard.poweredByGithub}
           className="opacity-80 transition-opacity hover:opacity-100"
         >
           <img src="/fundive-logo-light.svg" alt="fundive" className="h-14 w-auto drop-shadow-lg" />
@@ -38,7 +39,7 @@ export function DashboardPage() {
           href="https://github.com/fundive/fundive/releases/tag/v0.0.1"
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="fundive v0.0.1 release notes"
+          aria-label={t.dashboard.releaseNotes('v0.0.1')}
           className="rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none tracking-wide text-white shadow transition-colors hover:bg-red-400"
         >
           v0.0.1

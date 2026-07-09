@@ -1,11 +1,12 @@
+import { t } from '../../i18n'
 import type { EventDetails as EventDetailsData } from '../../types/database'
 
 const TEXT_SECTIONS: Array<{ key: keyof EventDetailsData; label: string }> = [
-  { key: 'description',    label: 'About this event' },
-  { key: 'included',       label: "What's included" },
-  { key: 'not_included',   label: 'Not included' },
-  { key: 'schedule',       label: 'Schedule / itinerary' },
-  { key: 'transportation', label: 'Transportation' },
+  { key: 'description',    label: t.calendar.eventDetails.description },
+  { key: 'included',       label: t.calendar.eventDetails.included },
+  { key: 'not_included',   label: t.calendar.eventDetails.notIncluded },
+  { key: 'schedule',       label: t.calendar.eventDetails.schedule },
+  { key: 'transportation', label: t.calendar.eventDetails.transportation },
 ]
 
 /**
@@ -34,12 +35,12 @@ export function EventDetails({ details }: { details: EventDetailsData }) {
 
       {hasPrereqs && (
         <section>
-          <h3 className="font-semibold text-white">Prerequisites</h3>
+          <h3 className="font-semibold text-white">{t.calendar.eventDetails.prerequisites}</h3>
           {details.required_cert && (
-            <p className="text-brand-100/85">Minimum certification: {details.required_cert}</p>
+            <p className="text-brand-100/85">{t.calendar.eventDetails.minCert(details.required_cert)}</p>
           )}
           {details.required_dives != null && (
-            <p className="text-brand-100/85">Logged dives: {details.required_dives}+</p>
+            <p className="text-brand-100/85">{t.calendar.eventDetails.loggedDives(details.required_dives)}</p>
           )}
           {details.prerequisites && (
             <p className="whitespace-pre-line text-brand-100/85">{details.prerequisites}</p>

@@ -11,6 +11,7 @@ import { formatEventSpan, isPastEvent } from '../../lib/events'
 import { courseColor, diveIsTripOrBoat, type CourseColor } from '../../lib/event-colors'
 import { isReschedulable } from '../../lib/reschedule'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
+import { t } from '../../i18n'
 import type { AppEvent, StaffBusyEntry } from '../../types/database'
 
 // Shared by CalendarPage (diver) and AdminEventsPage (admin). The only
@@ -64,8 +65,8 @@ const COURSE_DOT: Record<CourseColor, string> = {
 }
 
 const TYPE_LABELS: Record<AppEvent['type'], string> = {
-  dive:   'Dive',
-  course: 'Course',
+  dive:   t.calendar.typeDive,
+  course: t.calendar.typeCourse,
 }
 
 function eventBarClass(ev: AppEvent, hovered: boolean): string {
@@ -82,7 +83,7 @@ function eventBarClass(ev: AppEvent, hovered: boolean): string {
 function PrivateIcon({ className = 'w-3.5 h-3.5 text-brand-100/70 shrink-0' }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-         className={className} role="img" aria-label="Private">
+         className={className} role="img" aria-label={t.calendar.private}>
       <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
       <line x1="1" y1="1" x2="23" y2="23" />
     </svg>
@@ -135,8 +136,8 @@ function toBusyLayoutEvent(b: StaffBusyEntry, currentUserId: string | null): Bus
 }
 
 function busyDisplayLabel(entry: StaffBusyEntry, isOwn: boolean): string {
-  if (isOwn) return entry.title ?? entry.owner_display_name ?? 'Busy'
-  return entry.owner_display_name ?? 'Busy'
+  if (isOwn) return entry.title ?? entry.owner_display_name ?? t.calendar.busy
+  return entry.owner_display_name ?? t.calendar.busy
 }
 
 export interface MonthCalendarProps {
@@ -189,7 +190,7 @@ export interface MonthCalendarProps {
 }
 
 export function MonthCalendar({
-  month, onMonthChange, events, onPickEvent, renderListBadge, hidePastInList, listTitle = 'This month',
+  month, onMonthChange, events, onPickEvent, renderListBadge, hidePastInList, listTitle = t.calendar.thisMonth,
   highlightedIds, disablePastEvents,
   busyEntries, busyShown, onToggleBusy, currentUserId, ownDutyDays, onCreateBusy, onPickBusy,
   onRescheduleDay,
@@ -298,7 +299,7 @@ export function MonthCalendar({
       <div className="flex items-center justify-between gap-2">
         <button
           onClick={() => onMonthChange(subMonths(month, 1))}
-          aria-label="Previous month"
+          aria-label={t.calendar.prevMonth}
           className="flex-1 flex items-center justify-center px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/30 text-white text-2xl leading-none transition-colors"
         >
           ‹
@@ -306,7 +307,7 @@ export function MonthCalendar({
         <h1 className="text-lg font-bold text-white shrink-0">{format(month, 'MMMM yyyy')}</h1>
         <button
           onClick={() => onMonthChange(addMonths(month, 1))}
-          aria-label="Next month"
+          aria-label={t.calendar.nextMonth}
           className="flex-1 flex items-center justify-center px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/30 text-white text-2xl leading-none transition-colors"
         >
           ›
@@ -336,15 +337,13 @@ export function MonthCalendar({
 
       {pending && onRescheduleDay && (
         <ConfirmDialog
-          title="Move event day"
-          confirmLabel="Move it"
-          message={
-            <>
-              Change <span className="font-semibold">{pending.event.calendar_title || pending.event.title}</span>{' '}
-              from <span className="font-semibold">{format(parseISO(pending.fromKey), 'EEE, MMM d')}</span>{' '}
-              to <span className="font-semibold">{format(parseISO(pending.toKey), 'EEE, MMM d')}</span>?
-            </>
-          }
+          title={t.calendar.moveEventDay}
+          confirmLabel={t.calendar.moveIt}
+          message={t.calendar.rescheduleConfirm(
+            pending.event.calendar_title || pending.event.title,
+            format(parseISO(pending.fromKey), 'EEE, MMM d'),
+            format(parseISO(pending.toKey), 'EEE, MMM d'),
+          )}
           onConfirm={async () => {
             await onRescheduleDay(pending.event, pending.fromKey, pending.toKey)
             setPending(null)
@@ -356,7 +355,7 @@ export function MonthCalendar({
       <div className="space-y-2">
         <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider">{listTitle}</h2>
         {inMonthEvents.length === 0 && (
-          <p className="text-brand-100/70 font-medium text-sm">No events scheduled.</p>
+          <p className="text-brand-100/70 font-medium text-sm">{t.calendar.noEvents}</p>
         )}
         {inMonthEvents.map(ev => (
           <button
@@ -428,7 +427,7 @@ function MonthGrid({
 
   return (
     <div className="grid grid-cols-7 glass rounded-2xl overflow-hidden text-sm">
-      {['S','M','T','W','T','F','S'].map((d, i) => (
+      {t.calendar.weekdays.map((d, i) => (
         <div key={i} className="bg-white/5 text-center text-xs text-brand-100/80 font-semibold py-1 border-b border-white/10">{d}</div>
       ))}
       {Array.from({ length: leading }).map((_, i) => (
@@ -705,7 +704,7 @@ function EventBar({
       onPointerCancel={draggable && !disabled ? reset : undefined}
       onMouseEnter={() => onHoverEvent(seg.event.id)}
       onMouseLeave={() => onHoverEvent(null)}
-      title={disabled ? `${seg.event.title} — already happened` : seg.event.title}
+      title={disabled ? t.calendar.alreadyHappened(seg.event.title) : seg.event.title}
       className={`absolute text-[10px] font-semibold truncate text-left px-1 transition-all ${baseClass} ${leftRadius} ${rightRadius} ${
         disabled ? 'opacity-40 cursor-default saturate-50' : lifted ? 'z-30 scale-105 opacity-90 shadow-lg' : seg.event.is_private ? 'opacity-50' : ''
       }`}
@@ -804,7 +803,7 @@ function FilterLegend({
         type="button"
         onClick={onToggleDive}
         aria-pressed={diveShown}
-        aria-label="Toggle dives"
+        aria-label={t.calendar.toggleDives}
         className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors ${
           diveShown
             ? 'bg-white/10 border-reef-400/50 text-reef-200'
@@ -824,7 +823,7 @@ function FilterLegend({
           onClick={() => setOpen(v => !v)}
           aria-expanded={open}
           aria-haspopup="menu"
-          aria-label="Filter courses"
+          aria-label={t.calendar.filterCourses}
           className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors ${
             allCoursesHidden
               ? 'bg-white/5 border-white/10 text-brand-100/50 font-medium line-through'
@@ -838,7 +837,7 @@ function FilterLegend({
             <span className={`flex-1 ${COURSE_DOT.rescue}`} />
             <span className={`flex-1 ${COURSE_DOT.specialty}`} />
           </span>
-          Courses
+          {t.calendar.courses}
           {hiddenCourses.size > 0 && !allCoursesHidden && (
             <span className="ml-0.5 text-[10px] text-brand-100/60 font-medium">({visibleCourses}/{courseCategories.length})</span>
           )}
@@ -851,7 +850,7 @@ function FilterLegend({
             className="absolute left-0 top-full mt-1 z-20 min-w-[180px] glass rounded-lg shadow-lg p-2 space-y-1"
           >
             {courseCategories.length === 0 && (
-              <p className="text-brand-100/70 font-medium text-xs px-2 py-1">No courses in this range.</p>
+              <p className="text-brand-100/70 font-medium text-xs px-2 py-1">{t.calendar.noCoursesInRange}</p>
             )}
             {courseCategories.map(({ category, color }) => {
               const shown = !hiddenCourses.has(category)
@@ -880,7 +879,7 @@ function FilterLegend({
           type="button"
           onClick={busyToggle.onToggle}
           aria-pressed={busyToggle.shown}
-          aria-label="Toggle staff availability"
+          aria-label={t.calendar.toggleAvailability}
           className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors ${
             busyToggle.shown
               ? 'bg-white/10 border-reef-400/50 text-reef-200'
@@ -888,7 +887,7 @@ function FilterLegend({
           }`}
         >
           <span className={`w-2 h-2 rounded-full ${BUSY_DOT}`} />
-          Busy
+          {t.calendar.busy}
         </button>
       )}
     </div>
