@@ -851,6 +851,45 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['event_waivers']['Insert']>
         Relationships: []
       }
+      // Shop-authored waiver catalog (moved out of src/config/waivers.ts). Stable
+      // `code` + integer `version` are what waiver_signatures / event_waivers
+      // reference. Exactly one of `body` / `pdf_path` is set — a text form, or an
+      // uploaded PDF in the waiver-pdfs bucket. `language` is a free-form label
+      // for the shop's own organisation, not tied to the app locale.
+      waivers: {
+        Row: {
+          id: string
+          created_at: string
+          created_by: string | null
+          code: string
+          title: string
+          language: string | null
+          body: string | null
+          pdf_path: string | null
+          cadence: 'annual' | 'per_event'
+          version: number
+          applies_to: 'dives' | 'courses' | 'all' | 'none'
+          course_colors: string[] | null
+          active: boolean
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          created_by?: string | null
+          code: string
+          title: string
+          language?: string | null
+          body?: string | null
+          pdf_path?: string | null
+          cadence?: 'annual' | 'per_event'
+          version?: number
+          applies_to?: 'dives' | 'courses' | 'all' | 'none'
+          course_colors?: string[] | null
+          active?: boolean
+        }
+        Update: Partial<Database['public']['Tables']['waivers']['Insert']>
+        Relationships: []
+      }
       // The parent "product": a partner-hosted package with one or more price
       // tiers (package_tiers) and references into our add-on/room catalog. Dates
       // are diver-picked at registration, so no start/end here. kickback_rate is
@@ -1331,11 +1370,16 @@ export interface Database {
           id: string
           title: string | null
           cancellation_policy: string | null
+          // Free-form label for the shop's own organisation (e.g. 'en', 'zh-TW').
+          language: string | null
+          active: boolean
         }
         Insert: {
-          id: string
+          id?: string
           title?: string | null
           cancellation_policy?: string | null
+          language?: string | null
+          active?: boolean
         }
         Update: Partial<Database['public']['Tables']['cancellation_policies']['Insert']>
         Relationships: []
@@ -1631,6 +1675,9 @@ export type WaiverSignature = Database['public']['Tables']['waiver_signatures'][
 export type WaiverSignatureInsert = Database['public']['Tables']['waiver_signatures']['Insert']
 export type EventWaiver = Database['public']['Tables']['event_waivers']['Row']
 export type EventWaiverInsert = Database['public']['Tables']['event_waivers']['Insert']
+export type WaiverRow = Database['public']['Tables']['waivers']['Row']
+export type WaiverInsert = Database['public']['Tables']['waivers']['Insert']
+export type WaiverUpdate = Database['public']['Tables']['waivers']['Update']
 
 // Packages — partner-shop registration network. A parent "product" (Package)
 // holds price tiers (PackageTier) and references our add-on/room catalog; divers
