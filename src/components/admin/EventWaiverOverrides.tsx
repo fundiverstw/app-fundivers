@@ -4,6 +4,9 @@ import {
 } from '../../lib/waivers'
 import type { WaiverDef } from '../../config/waivers'
 import type { EventWaiver } from '../../types/database'
+import { t } from '../../i18n'
+
+const ew = t.admin.eventWaivers
 
 // Per-event waiver requirements on the admin Edit-event form. Each waiver in the
 // catalog shows whether it's required for THIS event; the admin can flip it. We
@@ -75,13 +78,13 @@ export function EventWaiverOverrides({ event, isAdmin, createdBy }: {
 
   return (
     <div className="space-y-2">
-      <h2 className="text-sm font-bold text-white uppercase tracking-wider">Waiver requirements</h2>
+      <h2 className="text-sm font-bold text-white uppercase tracking-wider">{ew.heading}</h2>
       <p className="text-xs text-white/60">
         Which waivers this {event.type} requires. Defaults come from the shop's waiver rules; change one
         here to require or exempt it for just this event.
       </p>
       {overrides === null ? (
-        <p className="text-xs text-white/60 italic">Loading…</p>
+        <p className="text-xs text-white/60 italic">{ew.loading}</p>
       ) : (
         <ul className="divide-y divide-white/10 rounded-lg border border-white/10 bg-white/5">
           {catalog.map(def => {
@@ -92,14 +95,14 @@ export function EventWaiverOverrides({ event, isAdmin, createdBy }: {
                 <span className="min-w-0">
                   <span className="block text-sm text-white font-medium truncate">{def.title}</span>
                   <span className="block text-xs text-white/50">
-                    {required ? 'Required' : 'Not required'}
-                    {overridden ? ' · overridden for this event' : ' · default rule'}
+                    {required ? ew.required : ew.notRequired}
+                    {overridden ? ew.overridden : ew.defaultRule}
                   </span>
                 </span>
                 {isAdmin && (
                   <span className="shrink-0 inline-flex rounded-lg overflow-hidden border border-white/20">
-                    <SegBtn active={required} disabled={busyCode === def.code} onClick={() => setRequired(def, true)}>Required</SegBtn>
-                    <SegBtn active={!required} disabled={busyCode === def.code} onClick={() => setRequired(def, false)}>Exempt</SegBtn>
+                    <SegBtn active={required} disabled={busyCode === def.code} onClick={() => setRequired(def, true)}>{ew.required}</SegBtn>
+                    <SegBtn active={!required} disabled={busyCode === def.code} onClick={() => setRequired(def, false)}>{ew.exempt}</SegBtn>
                   </span>
                 )}
               </li>
@@ -107,7 +110,7 @@ export function EventWaiverOverrides({ event, isAdmin, createdBy }: {
           })}
         </ul>
       )}
-      {error && <p className="text-xs text-red-300 font-medium">Couldn't save that change.</p>}
+      {error && <p className="text-xs text-red-300 font-medium">{ew.saveFailed}</p>}
     </div>
   )
 }

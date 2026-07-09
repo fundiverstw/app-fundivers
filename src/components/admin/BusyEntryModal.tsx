@@ -8,6 +8,9 @@ import {
   MODAL_BACKDROP, MODAL_PANEL, INPUT, INPUT_LABEL,
   BTN_PRIMARY, BTN_DANGER, TEXT_HEADING, TEXT_BODY, TEXT_ERROR,
 } from '../../styles/tokens'
+import { t } from '../../i18n'
+
+const bz = t.admin.busy
 
 interface CreateProps {
   mode: 'create'
@@ -47,8 +50,8 @@ export function BusyEntryModal(props: BusyEntryModalProps) {
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError(null)
-    if (!title.trim()) { setError('Title is required.'); return }
-    if (endDate < startDate) { setError('End date must be on or after start date.'); return }
+    if (!title.trim()) { setError(bz.titleRequired); return }
+    if (endDate < startDate) { setError(bz.endBeforeStart); return }
     setSubmitting(true)
     try {
       if (props.mode === 'create') {
@@ -72,7 +75,7 @@ export function BusyEntryModal(props: BusyEntryModalProps) {
         props.onSaved(row)
       }
     } catch (err) {
-      setError((err as Error).message ?? 'Could not save.')
+      setError((err as Error).message ?? bz.couldNotSave)
     } finally {
       setSubmitting(false)
     }
@@ -80,13 +83,13 @@ export function BusyEntryModal(props: BusyEntryModalProps) {
 
   async function handleDelete() {
     if (props.mode !== 'edit') return
-    if (!window.confirm('Delete this busy entry?')) return
+    if (!window.confirm(bz.confirmDelete)) return
     setSubmitting(true)
     try {
       await deleteStaffAvailability(props.entry.id)
       props.onDeleted(props.entry.id)
     } catch (err) {
-      setError((err as Error).message ?? 'Could not delete.')
+      setError((err as Error).message ?? bz.couldNotDelete)
       setSubmitting(false)
     }
   }
@@ -101,7 +104,7 @@ export function BusyEntryModal(props: BusyEntryModalProps) {
         >
           <div className="flex items-start justify-between">
             <div>
-              <h2 className={`${TEXT_HEADING} text-lg`}>{editing ? 'Edit busy entry' : 'Mark busy'}</h2>
+              <h2 className={`${TEXT_HEADING} text-lg`}>{editing ? bz.editTitle : bz.createTitle}</h2>
               <p className={`${TEXT_BODY} text-xs`}>
                 Periods you're not available for duties.
               </p>
@@ -110,13 +113,13 @@ export function BusyEntryModal(props: BusyEntryModalProps) {
               type="button"
               onClick={props.onClose}
               className="text-brand-900 hover:text-red-700 text-xl leading-none"
-              aria-label="Close"
+              aria-label={bz.close}
             >×</button>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="busy-start-date" className={INPUT_LABEL}>Start date</label>
+              <label htmlFor="busy-start-date" className={INPUT_LABEL}>{bz.startDate}</label>
               <DateField
                 id="busy-start-date" required
                 value={startDate} onChange={setStartDate}
@@ -124,7 +127,7 @@ export function BusyEntryModal(props: BusyEntryModalProps) {
               />
             </div>
             <div>
-              <label htmlFor="busy-start-time" className={INPUT_LABEL}>Start time</label>
+              <label htmlFor="busy-start-time" className={INPUT_LABEL}>{bz.startTime}</label>
               <input
                 id="busy-start-time" type="time" required
                 value={startTime} onChange={e => setStartTime(e.target.value)}
@@ -134,7 +137,7 @@ export function BusyEntryModal(props: BusyEntryModalProps) {
           </div>
 
           <div>
-            <label htmlFor="busy-end-date" className={INPUT_LABEL}>End date (inclusive)</label>
+            <label htmlFor="busy-end-date" className={INPUT_LABEL}>{bz.endDate}</label>
             <DateField
               id="busy-end-date" required
               value={endDate} onChange={setEndDate}
@@ -144,17 +147,17 @@ export function BusyEntryModal(props: BusyEntryModalProps) {
           </div>
 
           <div>
-            <label htmlFor="busy-title" className={INPUT_LABEL}>Title</label>
+            <label htmlFor="busy-title" className={INPUT_LABEL}>{bz.titleLabel}</label>
             <input
               id="busy-title" type="text" required maxLength={200}
               value={title} onChange={e => setTitle(e.target.value)}
-              placeholder="e.g. Vacation, Conference"
+              placeholder={bz.titlePlaceholder}
               className={INPUT}
             />
           </div>
 
           <div>
-            <label htmlFor="busy-details" className={INPUT_LABEL}>Details (optional)</label>
+            <label htmlFor="busy-details" className={INPUT_LABEL}>{bz.details}</label>
             <textarea
               id="busy-details" rows={4} maxLength={2000}
               value={details} onChange={e => setDetails(e.target.value)}
@@ -171,12 +174,12 @@ export function BusyEntryModal(props: BusyEntryModalProps) {
                 onClick={handleDelete}
                 disabled={submitting}
                 className={`px-3 ${BTN_DANGER}`}
-              >Delete</button>
+              >{bz.delete}</button>
             )}
             <button
               type="submit" disabled={submitting}
               className={`flex-1 ${BTN_PRIMARY}`}
-            >{submitting ? '…' : editing ? 'Save changes' : 'Mark busy'}</button>
+            >{submitting ? bz.submitting : editing ? bz.saveChanges : bz.markBusy}</button>
           </div>
         </form>
       </div>
