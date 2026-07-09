@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
 import { siteConfig } from '../../config/site'
+import { t } from '../../i18n'
 
 // One-time welcome popup for new divers — shown the first time they
 // land in the AppShell after creating their account. Dismissed by
@@ -35,19 +36,19 @@ export function WelcomeModal({ user, onDismiss }: { user: User; onDismiss: () =>
           <img src={siteConfig.assets.logo} alt={siteConfig.identity.logoAlt} className="w-32 h-auto" />
         </div>
         <h2 id="welcome-title" className="text-xl font-bold text-brand-900 text-center">
-          Welcome{firstName ? `, ${firstName}` : ''}!
+          {t.welcome.greeting(firstName ?? '')}
         </h2>
         <div className="text-sm text-brand-900 space-y-2">
           <p>
-            You're all set up with a {siteConfig.identity.shortName} account. From here you can:
+            {t.welcome.intro(siteConfig.identity.shortName)}
           </p>
           <ul className="list-disc list-inside text-brand-950 font-medium space-y-1">
-            <li>Browse upcoming dives and courses on the calendar</li>
-            <li>Track your bookings and payment status</li>
-            <li>Keep your profile, cert card, and gear preferences up to date</li>
+            <li>{t.welcome.bullet1}</li>
+            <li>{t.welcome.bullet2}</li>
+            <li>{t.welcome.bullet3}</li>
           </ul>
           <p className="text-brand-950 font-medium">
-            Questions about a registration? Reach the {siteConfig.identity.shortName} staff at{' '}
+            {t.welcome.contactPrefix(siteConfig.identity.shortName)}{' '}
             <a href={`mailto:${siteConfig.contact.email}`} className="text-brand-700 underline hover:text-brand-900">{siteConfig.contact.email}</a>.
           </p>
         </div>
@@ -56,7 +57,7 @@ export function WelcomeModal({ user, onDismiss }: { user: User; onDismiss: () =>
           disabled={busy}
           className="w-full bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white font-semibold py-2 rounded-lg transition-colors"
         >
-          {busy ? '…' : 'Get started'}
+          {busy ? '…' : t.welcome.getStarted}
         </button>
       </div>
     </div>

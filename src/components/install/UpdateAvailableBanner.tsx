@@ -9,6 +9,8 @@
 // out-of-date PWA can hit a backend API the deploy already migrated past,
 // so we want the banner to stay loud until the reload happens.
 
+import { t } from '../../i18n'
+
 interface Props {
   onUpdate: () => void
 }
@@ -20,13 +22,13 @@ export function UpdateAvailableBanner({ onUpdate }: Props) {
       aria-live="polite"
       className="fixed top-0 inset-x-0 z-[110] bg-brand-700 text-white px-4 py-2 flex items-center justify-between gap-3 text-sm shadow-md"
     >
-      <span className="font-semibold">A new version is available.</span>
+      <span className="font-semibold">{t.install.updateAvailable}</span>
       <button
         type="button"
         onClick={onUpdate}
         className="bg-reef-500 text-slate-950 font-semibold px-3 py-1 rounded-md hover:bg-reef-400 transition-colors"
       >
-        Update
+        {t.install.update}
       </button>
     </div>
   )

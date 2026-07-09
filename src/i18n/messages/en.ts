@@ -584,6 +584,31 @@ export const en = {
     coveredBy: (name: string) => `Covered by ${name}`,
     nothingDue: 'Nothing due',
   },
+  welcome: {
+    greeting: (name: string) => `Welcome${name ? `, ${name}` : ''}!`,
+    intro: (shop: string) => `You're all set up with a ${shop} account. From here you can:`,
+    bullet1: 'Browse upcoming dives and courses on the calendar',
+    bullet2: 'Track your bookings and payment status',
+    bullet3: 'Keep your profile, cert card, and gear preferences up to date',
+    contactPrefix: (shop: string) => `Questions about a registration? Reach the ${shop} staff at`,
+    getStarted: 'Get started',
+    bannerTitle: (shop: string) => `Welcome to ${shop}!`,
+    bannerBody: 'Your account is ready. Browse upcoming events on the Calendar tab, or jump into your registrations on Bookings.',
+  },
+  install: {
+    iosTitle: (shop: string) => `Install ${shop} on iPhone`,
+    iosStep1a: 'Tap the Share button',
+    iosStep1b: 'at the bottom of Safari.',
+    iosStep2a: 'Scroll and choose',
+    iosStep2bold: 'Add to Home Screen',
+    iosStep3a: 'Tap',
+    iosStep3bold: 'Add',
+    iosStep3b: 'in the top-right corner.',
+    iosNote: "This only works in Safari — Chrome, Firefox, and in-app browsers on iOS can't add to the home screen.",
+    gotIt: 'Got it',
+    updateAvailable: 'A new version is available.',
+    update: 'Update',
+  },
 }
 
 /** The shape every locale catalog must satisfy, inferred from English. */

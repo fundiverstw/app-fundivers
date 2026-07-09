@@ -1,5 +1,6 @@
 import { MODAL_BACKDROP, MODAL_PANEL, BTN_PRIMARY, TEXT_HEADING, TEXT_BODY } from '../../styles/tokens'
 import { siteConfig } from '../../config/site'
+import { t } from '../../i18n'
 
 // iOS Safari can't trigger an install programmatically — the user has
 // to tap the Share button in Safari's toolbar and pick "Add to Home
@@ -61,25 +62,24 @@ export function IOSInstallModal({ onDismiss }: { onDismiss: () => void }) {
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="ios-install-title" className={`text-xl text-center ${TEXT_HEADING}`}>
-          Install {siteConfig.identity.shortName} on iPhone
+          {t.install.iosTitle(siteConfig.identity.shortName)}
         </h2>
         <ol className={`text-sm space-y-3 ${TEXT_BODY}`}>
           <li>
-            Tap the Share button <ShareGlyph /> at the bottom of Safari.
+            {t.install.iosStep1a} <ShareGlyph /> {t.install.iosStep1b}
           </li>
           <li>
-            Scroll and choose <strong>Add to Home Screen</strong> <PlusBoxGlyph />.
+            {t.install.iosStep2a} <strong>{t.install.iosStep2bold}</strong> <PlusBoxGlyph />.
           </li>
           <li>
-            Tap <strong>Add</strong> in the top-right corner.
+            {t.install.iosStep3a} <strong>{t.install.iosStep3bold}</strong> {t.install.iosStep3b}
           </li>
         </ol>
         <p className="text-xs text-brand-900/80">
-          This only works in Safari — Chrome, Firefox, and in-app browsers
-          on iOS can't add to the home screen.
+          {t.install.iosNote}
         </p>
         <button onClick={onDismiss} className={`w-full ${BTN_PRIMARY}`}>
-          Got it
+          {t.install.gotIt}
         </button>
       </div>
     </div>
