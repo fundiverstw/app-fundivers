@@ -1137,6 +1137,18 @@ export const ja: Messages = {
     charts: {
       noData: 'この期間のデータはありません。',
     },
+    gearFit: {
+      wetsuit: 'ウェットスーツ',
+      bcd: 'BCD',
+      fins: 'フィン',
+      fitQuestion: (gear: string) => `${gear}のサイズは？`,
+      noModelStocked: 'このダイバーに合う在庫モデルがありません。',
+      needsShoeSize: '該当なし — ダイバーのプロフィールに足のサイズが必要です。',
+      needsHeightWeight: '該当なし — ダイバーのプロフィールに身長と体重が必要です。',
+      fits: '適合',
+      closest: '最も近い',
+      closestWithNotes: (notes: string) => `最も近い · ${notes}`,
+    },
     dashboard: {
       title: 'ダッシュボード',
       subtitle: (year: number, timezone: string) => `${year}年 · ハイシーズン（6〜8月）を中心に表示 · 売上は純額（入金 − 返金）、${timezone}。`,

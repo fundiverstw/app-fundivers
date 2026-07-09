@@ -1,5 +1,8 @@
 import type { ReactNode } from 'react'
 import { BTN_SECONDARY } from '../../styles/tokens'
+import { t } from '../../i18n'
+
+const c = t.admin.catalog
 
 // Shared admin form/modal bits for the curated-listing editors (Packages,
 // Scheduled Trips). Both admin pages render the same modal shell, labelled
@@ -20,10 +23,10 @@ export function FormButtons({ submitting, submitLabel, onClose }: {
 }) {
   return (
     <div className="flex gap-2 pt-1">
-      <button type="button" onClick={onClose} disabled={submitting} className={`flex-1 ${BTN_SECONDARY}`}>Cancel</button>
+      <button type="button" onClick={onClose} disabled={submitting} className={`flex-1 ${BTN_SECONDARY}`}>{c.cancel}</button>
       <button type="submit" disabled={submitting}
         className="flex-1 py-2 rounded-lg text-sm font-semibold bg-brand-900 hover:bg-brand-950 text-white disabled:opacity-50">
-        {submitting ? 'Saving…' : submitLabel}
+        {submitting ? c.saving : submitLabel}
       </button>
     </div>
   )
@@ -75,7 +78,7 @@ export function ConfirmModal({ title, body, confirmLabel, onClose, onConfirm }: 
       <p className="text-sm text-brand-900">{body}</p>
       <div className="flex gap-2 pt-1">
         <button type="button" onClick={onClose}
-          className="flex-1 py-2 rounded-lg text-sm font-medium text-brand-900 border border-surface-300 hover:bg-surface-50">Cancel</button>
+          className="flex-1 py-2 rounded-lg text-sm font-medium text-brand-900 border border-surface-300 hover:bg-surface-50">{c.cancel}</button>
         <button type="button" onClick={onConfirm}
           className="flex-1 py-2 rounded-lg text-sm font-semibold text-white bg-red-700 hover:bg-red-800">{confirmLabel}</button>
       </div>

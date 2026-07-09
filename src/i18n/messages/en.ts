@@ -1145,6 +1145,18 @@ export const en = {
     charts: {
       noData: 'No data in range.',
     },
+    gearFit: {
+      wetsuit: 'Wetsuit',
+      bcd: 'BCD',
+      fins: 'Fins',
+      fitQuestion: (gear: string) => `${gear} fit?`,
+      noModelStocked: 'No matching model stocked for this diver.',
+      needsShoeSize: "No match — needs a shoe size on the diver's profile.",
+      needsHeightWeight: "No match — needs height & weight on the diver's profile.",
+      fits: 'fits',
+      closest: 'closest',
+      closestWithNotes: (notes: string) => `closest · ${notes}`,
+    },
     dashboard: {
       title: 'Dashboard',
       subtitle: (year: number, timezone: string) => `${year} · peak season (Jun–Aug) centred · revenue netted (paid − refunded), ${timezone}.`,

@@ -1138,6 +1138,18 @@ export const zhTW: Messages = {
     charts: {
       noData: '此區間內沒有資料。',
     },
+    gearFit: {
+      wetsuit: '防寒衣',
+      bcd: 'BCD',
+      fins: '蛙鞋',
+      fitQuestion: (gear: string) => `${gear}尺寸？`,
+      noModelStocked: '沒有適合這位潛水員的庫存型號。',
+      needsShoeSize: '無法比對 — 需要潛水員個人資料中的鞋號。',
+      needsHeightWeight: '無法比對 — 需要潛水員個人資料中的身高與體重。',
+      fits: '合身',
+      closest: '最接近',
+      closestWithNotes: (notes: string) => `最接近 · ${notes}`,
+    },
     dashboard: {
       title: '儀表板',
       subtitle: (year: number, timezone: string) => `${year} 年 · 以旺季（6 至 8 月）為中心 · 營收為淨額（已付款 − 已退款），${timezone}。`,
