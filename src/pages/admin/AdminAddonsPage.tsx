@@ -1,20 +1,22 @@
 import { CatalogManager, type CatalogField } from '../../components/admin/CatalogManager'
 import { siteConfig } from '../../config/site'
+import { t } from '../../i18n'
 import type { EOAddon } from '../../types/database'
 
+const c = t.admin.catalog
 const fields: CatalogField<EOAddon>[] = [
-  { key: 'display_title', label: 'Display title', type: 'text', required: true, placeholder: 'e.g. SMB Rental' },
-  { key: 'admin_title',   label: 'Admin title',   type: 'text', placeholder: 'e.g. smb' },
-  { key: 'price',        label: `Price (${siteConfig.locale.currencyLabel})`, type: 'number', placeholder: '0' },
-  { key: 'currency',     label: 'Currency', type: 'text', placeholder: siteConfig.locale.currency },
+  { key: 'display_title', label: c.displayTitle, type: 'text', required: true, placeholder: c.addons.displayTitlePh },
+  { key: 'admin_title',   label: c.adminTitle,   type: 'text', placeholder: c.addons.adminTitlePh },
+  { key: 'price',        label: c.addons.price(siteConfig.locale.currencyLabel), type: 'number', placeholder: c.addons.zeroPh },
+  { key: 'currency',     label: c.currency, type: 'text', placeholder: siteConfig.locale.currency },
 ]
 
 export function AdminAddonsPage() {
   return (
     <CatalogManager<EOAddon>
-      title="Add-ons"
+      title={c.addons.title}
       table="addons"
-      noun="add-on"
+      noun={c.addons.noun}
       orderBy="display_title"
       fields={fields}
       rowLabel={r => r.display_title || r.admin_title || r.id}

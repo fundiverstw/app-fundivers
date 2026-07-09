@@ -4,6 +4,9 @@ import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
 import type { Database } from '../../types/database'
 import { BTN_SECONDARY, ERROR_NOTE_LIGHT } from '../../styles/tokens'
+import { t } from '../../i18n'
+
+const c = t.admin.catalog
 
 // Tables CatalogManager can drive. Constraining to the real Database
 // keys (rather than `string`) is what lets supabase-js's from() overload
@@ -151,7 +154,7 @@ export function CatalogManager<Row extends { id: string }>({
     setSubmitError(null)
     for (const f of fields) {
       if (f.required && !form[f.key]?.trim()) {
-        setSubmitError(`${f.label} is required.`)
+        setSubmitError(c.fieldRequired(f.label))
         return
       }
     }
@@ -168,20 +171,20 @@ export function CatalogManager<Row extends { id: string }>({
           .eq('id' as never, editing.id)
         if (error) throw error
         setRows(prev => prev.map(r => r.id === editing.id ? { ...r, ...payload } as Row : r))
-        toast.success(`${capitalize(noun)} updated`)
+        toast.success(c.updated(capitalize(noun)))
       } else {
         const id = crypto.randomUUID()
         const insertPayload = { id: id, ...payload }
         const { error } = await supabase.from(table).insert(insertPayload as never)
         if (error) throw error
         setRows(prev => [...prev, insertPayload as unknown as Row])
-        toast.success(`${capitalize(noun)} created`)
+        toast.success(c.created(capitalize(noun)))
       }
       closeForm()
     } catch (err) {
       const msg = errorMessage(err)
       setSubmitError(msg)
-      toast.error(`Could not save ${noun}: ${msg}`)
+      toast.error(c.couldNotSave(noun, msg))
     } finally {
       setSubmitting(false)
     }
@@ -195,11 +198,11 @@ export function CatalogManager<Row extends { id: string }>({
       if (error) throw error
       setRows(prev => prev.filter(r => r.id !== row.id))
       setConfirmDelete(null)
-      toast.success(`${capitalize(noun)} deleted`)
+      toast.success(c.deleted(capitalize(noun)))
     } catch (err) {
       const msg = errorMessage(err)
       setDeleteError(msg)
-      toast.error(`Could not delete ${noun}: ${msg}`)
+      toast.error(c.couldNotDelete(noun, msg))
     } finally {
       setDeleteInFlight(false)
     }
@@ -215,7 +218,7 @@ export function CatalogManager<Row extends { id: string }>({
           onClick={openCreate}
           className="text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg"
         >
-          + New {noun}
+          {c.newItem(noun)}
         </button>
       </div>
 
@@ -226,9 +229,9 @@ export function CatalogManager<Row extends { id: string }>({
       )}
 
       {loading ? (
-        <p className="text-sm text-white/70">Loading…</p>
+        <p className="text-sm text-white/70">{c.loading}</p>
       ) : rows.length === 0 ? (
-        <p className="text-sm text-white/70">No {noun}s yet.</p>
+        <p className="text-sm text-white/70">{c.noneYet(noun)}</p>
       ) : (
         <ul className="space-y-2">
           {rows.map(row => (
@@ -248,14 +251,14 @@ export function CatalogManager<Row extends { id: string }>({
                   onClick={() => openEdit(row)}
                   className="text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-3 py-1 rounded-lg"
                 >
-                  Edit
+                  {c.edit}
                 </button>
                 <button
                   type="button"
                   onClick={() => { setDeleteError(null); setConfirmDelete(row) }}
                   className="text-xs font-semibold bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded-lg"
                 >
-                  Delete
+                  {c.delete}
                 </button>
               </div>
             </li>
@@ -265,13 +268,13 @@ export function CatalogManager<Row extends { id: string }>({
 
       {(creating || editing) && (
         <CatalogFormModal
-          title={editing ? `Edit ${noun}` : `New ${noun}`}
+          title={editing ? c.editItem(noun) : c.newItemTitle(noun)}
           fields={fields}
           form={form}
           onChange={(key, value) => setForm(f => ({ ...f, [key]: value }))}
           submitting={submitting}
           submitError={submitError}
-          submitLabel={editing ? 'Save changes' : `Create ${noun}`}
+          submitLabel={editing ? c.saveChanges : c.createItem(noun)}
           onClose={closeForm}
           onSubmit={handleSubmit}
         />
@@ -321,14 +324,14 @@ function CatalogFormModal<Row>({
             disabled={submitting}
             className={`flex-1 ${BTN_SECONDARY}`}
           >
-            Cancel
+            {c.cancel}
           </button>
           <button
             type="submit"
             disabled={submitting}
             className="flex-1 py-2 rounded-lg text-sm font-semibold bg-brand-900 hover:bg-brand-950 text-white disabled:opacity-50"
           >
-            {submitting ? 'Saving…' : submitLabel}
+            {submitting ? c.saving : submitLabel}
           </button>
         </div>
       </form>
@@ -390,11 +393,9 @@ function ConfirmDeleteModal({
 }) {
   return (
     <Modal labelledBy="catalog-delete-title" onClose={onClose}>
-      <h2 id="catalog-delete-title" className="text-lg font-bold text-brand-900">Delete {noun}?</h2>
+      <h2 id="catalog-delete-title" className="text-lg font-bold text-brand-900">{c.deleteItem(noun)}</h2>
       <p className="text-sm text-brand-900">
-        “{label}” will be permanently deleted. Existing bookings that reference
-        this {noun} retain a record of the choice but the catalog entry will no
-        longer appear in pickers.
+        {c.deleteBody(label, noun)}
       </p>
       {error && (
         <p className={ERROR_NOTE_LIGHT}>{error}</p>
@@ -414,7 +415,7 @@ function ConfirmDeleteModal({
           disabled={inFlight}
           className="flex-1 py-2 rounded-lg text-sm font-semibold text-white bg-red-700 hover:bg-red-800 disabled:opacity-50"
         >
-          {inFlight ? 'Deleting…' : 'Delete'}
+          {inFlight ? c.deleting : c.delete}
         </button>
       </div>
     </Modal>
