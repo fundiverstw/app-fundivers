@@ -5,6 +5,7 @@ import { errorMessage } from '../../lib/errors'
 import { ProfileForm } from '../../pages/ProfilePage'
 import type { Profile } from '../../types/database'
 import { BTN_SECONDARY } from '../../styles/tokens'
+import { t } from '../../i18n'
 
 // Diver-facing "Family" panel on /profile. Lets a top-level diver (one
 // whose own parent_account is null) see + create child accounts they
@@ -48,13 +49,12 @@ function FamilyPanel({ parent }: { parent: Profile }) {
   }, [parent.id, refreshKey])
 
   return (
-    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3" aria-label="Family">
+    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3" aria-label={t.profile.family.title}>
       <header className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-brand-900">Family</h2>
+        <h2 className="text-lg font-bold text-brand-900">{t.profile.family.title}</h2>
       </header>
       <p className="text-xs text-brand-900 font-medium">
-        Manage diver accounts you've added on behalf of family members or guests. You can
-        register them for events together with you in a single booking.
+        {t.profile.family.intro}
       </p>
 
       {loading ? (
@@ -62,7 +62,7 @@ function FamilyPanel({ parent }: { parent: Profile }) {
           <div className="w-5 h-5 border-2 border-brand-900 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : children.length === 0 ? (
-        <p className="text-sm text-brand-950 font-medium italic">No child accounts yet.</p>
+        <p className="text-sm text-brand-950 font-medium italic">{t.profile.family.noChildren}</p>
       ) : (
         <ul className="space-y-1">
           {children.map(c => (
@@ -70,11 +70,11 @@ function FamilyPanel({ parent }: { parent: Profile }) {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-brand-900">
-                    {c.name ?? '(no name)'}
+                    {c.name ?? t.profile.family.noName}
                     {c.nickname && <span className="text-brand-900/80"> ({c.nickname})</span>}
                   </p>
                   <p className="text-xs text-brand-900/70">
-                    {c.cert_agency && c.cert_level ? `${c.cert_agency} ${c.cert_level}` : 'Uncertified'}
+                    {c.cert_agency && c.cert_level ? `${c.cert_agency} ${c.cert_level}` : t.profile.family.uncertified}
                     {c.status && c.status !== 'active' && (
                       <span className="ml-2 uppercase tracking-wider text-red-700">{c.status}</span>
                     )}
@@ -86,7 +86,7 @@ function FamilyPanel({ parent }: { parent: Profile }) {
                   aria-expanded={editingId === c.id}
                   className="shrink-0 text-xs font-semibold text-brand-900 border border-surface-300 rounded-lg px-3 py-1 hover:bg-surface-100"
                 >
-                  {editingId === c.id ? 'Close' : 'Edit'}
+                  {editingId === c.id ? t.profile.family.close : t.profile.family.edit}
                 </button>
               </div>
               {editingId === c.id && (
@@ -117,7 +117,7 @@ function FamilyPanel({ parent }: { parent: Profile }) {
           onClick={() => setCreating(true)}
           className="w-full text-sm bg-emerald-900/80 hover:bg-emerald-900 text-white font-semibold px-3 py-2 rounded-lg"
         >
-          + Create new diver account
+          {t.profile.family.createAccount}
         </button>
       )}
     </section>
@@ -143,7 +143,7 @@ function CreateChildForm({
     const trimmedEmail = email.trim().toLowerCase()
     const trimmedName  = fullName.trim()
     if (!trimmedEmail || !trimmedName) {
-      setError('Email and name are required.')
+      setError(t.profile.family.emailNameRequired)
       return
     }
     setSubmitting(true)
@@ -160,10 +160,10 @@ function CreateChildForm({
         },
       })
       if (invokeErr) throw new Error(invokeErr.message)
-      if (!data?.ok || !data.user_id) throw new Error('child account creation failed')
+      if (!data?.ok || !data.user_id) throw new Error(t.profile.family.createFailed)
 
-      const tail = data.email_sent ? ' · courtesy email sent' : ' · email skipped'
-      toast.success(`Child account created${tail}`)
+      const tail = data.email_sent ? t.profile.family.emailSent : t.profile.family.emailSkipped
+      toast.success(t.profile.family.created(tail))
       onCreated()
     } catch (err) {
       setError(errorMessage(err))
@@ -175,11 +175,10 @@ function CreateChildForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-2 border-t border-surface-200 pt-3">
       <p className="text-xs text-brand-900 font-medium">
-        We'll create an account for them and send a courtesy email letting them know — no
-        login link, no password. If they ever want app access they can reach out.
+        {t.profile.family.createIntro}
       </p>
       <label className="block">
-        <span className="text-xs font-medium text-brand-900">Email *</span>
+        <span className="text-xs font-medium text-brand-900">{t.profile.family.emailLabel}</span>
         <input
           type="email" required autoFocus
           value={email} onChange={e => setEmail(e.target.value)}
@@ -187,22 +186,22 @@ function CreateChildForm({
         />
       </label>
       <label className="block">
-        <span className="text-xs font-medium text-brand-900">Name *</span>
+        <span className="text-xs font-medium text-brand-900">{t.profile.family.nameLabel}</span>
         <input
           type="text" required
           value={fullName} onChange={e => setFullName(e.target.value)}
           className="w-full bg-white border border-surface-300 rounded-lg px-3 py-2 text-brand-900 text-sm focus:outline-none focus:border-brand-900"
         />
         <span className="block text-xs text-brand-900/70 mt-1">
-          First and last name, exactly as on their passport / ID.
+          {t.profile.family.nameHint}
         </span>
       </label>
       <label className="block">
-        <span className="text-xs font-medium text-brand-900">Nickname</span>
+        <span className="text-xs font-medium text-brand-900">{t.profile.family.nicknameLabel}</span>
         <input
           type="text"
           value={nickname} onChange={e => setNickname(e.target.value)}
-          placeholder="English name, alias, or what you call them (optional)"
+          placeholder={t.profile.family.nicknamePlaceholder}
           className="w-full bg-white border border-surface-300 rounded-lg px-3 py-2 text-brand-900 text-sm focus:outline-none focus:border-brand-900"
         />
       </label>
@@ -216,14 +215,14 @@ function CreateChildForm({
           disabled={submitting}
           className={`flex-1 ${BTN_SECONDARY}`}
         >
-          Cancel
+          {t.common.cancel}
         </button>
         <button
           type="submit"
           disabled={submitting}
           className="flex-1 py-2 rounded-lg text-sm font-semibold bg-brand-900 hover:bg-brand-950 text-white disabled:opacity-50"
         >
-          {submitting ? 'Creating…' : 'Create account'}
+          {submitting ? t.profile.family.creating : t.profile.family.createSubmit}
         </button>
       </div>
     </form>

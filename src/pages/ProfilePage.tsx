@@ -19,6 +19,7 @@ import { siteConfig } from '../config/site'
 import { DateField } from '../components/DateField'
 import type { Profile, CertLevel } from '../types/database'
 import { ShoeSizeField } from '../components/ShoeSizeField'
+import { t } from '../i18n'
 
 // Schema intentionally matches what the HTML form emits (strings for text +
 // number inputs, booleans for checkboxes). Numeric/enum coercion happens in
@@ -31,32 +32,32 @@ import { ShoeSizeField } from '../components/ShoeSizeField'
 // which surfaced as a save that only worked once the user typed into
 // every empty field.
 const schema = z.object({
-  name: z.string().min(1, 'Required'),
+  name: z.string().min(1, t.profile.required),
   nickname: z.string().nullish(),
-  date_of_birth: z.string().min(1, 'Required'),
-  nationality: z.string().min(1, 'Required'),
+  date_of_birth: z.string().min(1, t.profile.required),
+  nationality: z.string().min(1, t.profile.required),
   id_number: z.string().nullish(),
   emergency_contact_name: z.string().nullish(),
   emergency_contact_phone: z.string().nullish(),
-  cert_status: z.enum(['certified', 'uncertified'], { message: 'Please choose one' }),
+  cert_status: z.enum(['certified', 'uncertified'], { message: t.profile.chooseOne }),
   cert_agency: z.string().nullish(),
   cert_level: z.string().nullish(),
   medical_notes: z.string().nullish(),
   height_cm: z.union([z.string(), z.number()]).nullish(),
   weight_kg: z.union([z.string(), z.number()]).nullish(),
-  gender: z.string().min(1, 'Required'),
-  contact_method: z.string().min(1, 'Required'),
-  contact_id: z.string().min(1, 'Required'),
+  gender: z.string().min(1, t.profile.required),
+  contact_method: z.string().min(1, t.profile.required),
+  contact_id: z.string().min(1, t.profile.required),
   nitrox_certified: z.boolean().nullish(),
   deep_certified: z.boolean().nullish(),
   logged_dives: z
     .union([z.string(), z.number()])
-    .refine(v => typeof v === 'number' || v.length > 0, { message: 'Required' }),
+    .refine(v => typeof v === 'number' || v.length > 0, { message: t.profile.required }),
   last_dive_date: z.string().nullish(),
 }).superRefine((data, ctx) => {
   // A certified diver must name their level; an uncertified one leaves it blank.
   if (data.cert_status === 'certified' && !(data.cert_level ?? '').trim()) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['cert_level'], message: 'Required' })
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['cert_level'], message: t.profile.required })
   }
 })
 type FormData = z.infer<typeof schema>
@@ -71,7 +72,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
     <div>
       <label className="block text-xs text-brand-900 font-medium mb-1 uppercase tracking-wide">
         {label}
-        {required && <span className="text-red-600 ml-0.5" aria-label="required">*</span>}
+        {required && <span className="text-red-600 ml-0.5" aria-label={t.profile.requiredAria}>*</span>}
       </label>
       {children}
     </div>
@@ -85,7 +86,7 @@ export function ProfilePage() {
 
   return (
     <div className="max-w-lg mx-auto space-y-6">
-      <h1 className="text-xl font-bold text-white">My Profile</h1>
+      <h1 className="text-xl font-bold text-white">{t.profile.title}</h1>
       {user && <CreditBalanceLine userId={user.id} />}
       <NotificationsToggle />
       {user && profile && (
@@ -124,7 +125,7 @@ function CreditBalanceLine({ userId }: { userId: string }) {
   if (balance <= 0) return null
   return (
     <div className="bg-emerald-50 border border-emerald-400 rounded-lg p-3 text-sm text-emerald-900">
-      Account credit (all events): <strong>{siteConfig.locale.currencyLabel} {balance.toLocaleString()}</strong> — see Payments for details.
+      {t.profile.creditPrefix} <strong>{siteConfig.locale.currencyLabel} {balance.toLocaleString()}</strong> {t.profile.creditSuffix}
     </div>
   )
 }
@@ -282,35 +283,35 @@ export function ProfileForm({ user, profile, onSaved }: {
       updated_at: new Date().toISOString(),
     }).eq('id', profile.id)
     if (error) {
-      toast.error(`Could not save profile: ${error.message}`)
+      toast.error(t.profile.saveError(error.message))
       return
     }
     reset(data)
     setDirtyExtras(false)
-    toast.success('Profile saved')
+    toast.success(t.profile.saved)
     onSaved?.()
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Personal Info</h2>
-          <Field label="Name" required>
+          <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">{t.profile.personalInfo}</h2>
+          <Field label={t.profile.nameLabel} required>
             <input {...register('name')} className={inputClass} />
             <p className="text-xs text-brand-900/70 mt-1">
-              First and last name, exactly as it appears on your passport / ID.
+              {t.profile.nameHint}
             </p>
             {errors.name && <p className="text-red-600 text-xs mt-1">{errors.name.message}</p>}
           </Field>
-          <Field label="Nickname">
+          <Field label={t.profile.nicknameLabel}>
             <input
               {...register('nickname')}
               className={inputClass}
-              placeholder="An English name, alias, or what you'd like to be called (optional)"
+              placeholder={t.profile.nicknamePlaceholder}
             />
             {errors.nickname && <p className="text-red-600 text-xs mt-1">{errors.nickname.message}</p>}
           </Field>
-          <Field label="Date of birth" required>
+          <Field label={t.profile.dobLabel} required>
             <Controller
               control={control}
               name="date_of_birth"
@@ -320,39 +321,39 @@ export function ProfileForm({ user, profile, onSaved }: {
             />
             {errors.date_of_birth && <p className="text-red-600 text-xs mt-1">{errors.date_of_birth.message}</p>}
           </Field>
-          <Field label="Nationality" required>
+          <Field label={t.profile.nationalityLabel} required>
             <input {...register('nationality')} className={inputClass} />
             {errors.nationality && <p className="text-red-600 text-xs mt-1">{errors.nationality.message}</p>}
           </Field>
-          <Field label="ID / Passport number"><input {...register('id_number')} className={inputClass} /></Field>
-          <Field label="Gender" required>
+          <Field label={t.profile.idPassportLabel}><input {...register('id_number')} className={inputClass} /></Field>
+          <Field label={t.profile.genderLabel} required>
             <select {...register('gender')} className={inputClass}>
               <option value="">—</option>
-              <option value="female">Female</option>
-              <option value="male">Male</option>
-              <option value="other">Other</option>
-              <option value="prefer_not_to_say">Prefer not to say</option>
+              <option value="female">{t.register.genderFemale}</option>
+              <option value="male">{t.register.genderMale}</option>
+              <option value="other">{t.register.genderOther}</option>
+              <option value="prefer_not_to_say">{t.register.genderPreferNot}</option>
             </select>
             {errors.gender && <p className="text-red-600 text-xs mt-1">{errors.gender.message}</p>}
           </Field>
         </section>
 
         <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Preferred contact</h2>
-          <Field label="Method" required>
+          <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">{t.profile.preferredContact}</h2>
+          <Field label={t.profile.methodLabel} required>
             <select
               {...register('contact_method', { onChange: () => setDirtyExtras(true) })}
               className={inputClass}
             >
               <option value="">—</option>
-              <option value="whatsapp">WhatsApp</option>
-              <option value="line">Line</option>
-              <option value="phone">Phone</option>
-              <option value="email">Email</option>
+              <option value="whatsapp">{t.profile.contactMethod.whatsapp}</option>
+              <option value="line">{t.profile.contactMethod.line}</option>
+              <option value="phone">{t.profile.contactMethod.phone}</option>
+              <option value="email">{t.profile.contactMethod.email}</option>
             </select>
             {errors.contact_method && <p className="text-red-600 text-xs mt-1">{errors.contact_method.message}</p>}
           </Field>
-          <Field label="Handle / number" required>
+          <Field label={t.profile.handleLabel} required>
             <input
               {...register('contact_id', { onChange: () => setDirtyExtras(true) })}
               className={inputClass}
@@ -363,11 +364,11 @@ export function ProfileForm({ user, profile, onSaved }: {
         </section>
 
         <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Sizing</h2>
-          <Field label="Height (cm)"><input {...register('height_cm')} type="number" step="0.1" className={inputClass} /></Field>
-          <Field label="Weight (kg)"><input {...register('weight_kg')} type="number" step="0.1" className={inputClass} /></Field>
+          <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">{t.profile.sizing}</h2>
+          <Field label={t.profile.heightCm}><input {...register('height_cm')} type="number" step="0.1" className={inputClass} /></Field>
+          <Field label={t.profile.weightKg}><input {...register('weight_kg')} type="number" step="0.1" className={inputClass} /></Field>
           <div>
-            <label className="block text-xs text-brand-900 font-medium mb-1 uppercase tracking-wide">Shoe size</label>
+            <label className="block text-xs text-brand-900 font-medium mb-1 uppercase tracking-wide">{t.profile.shoeSize}</label>
             <ShoeSizeField
               initial={profile.shoe_size}
               onChange={c => { setShoeSize(c); setDirtyExtras(true) }}
@@ -376,9 +377,9 @@ export function ProfileForm({ user, profile, onSaved }: {
         </section>
 
         <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Gear I own</h2>
+          <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">{t.profile.gearIOwn}</h2>
           <p className="text-xs text-brand-900 font-medium">
-            Checked items will be skipped when you choose à-la-carte rental at registration.
+            {t.profile.gearOwnedHint}
           </p>
           <div className="grid grid-cols-2 gap-2">
             {GEAR_ITEMS.map(item => (
@@ -396,22 +397,22 @@ export function ProfileForm({ user, profile, onSaved }: {
         </section>
 
         <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Emergency Contact</h2>
-          <Field label="Name"><input {...register('emergency_contact_name')} className={inputClass} /></Field>
-          <Field label="Phone"><input {...register('emergency_contact_phone')} type="tel" className={inputClass} /></Field>
+          <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">{t.profile.emergencyContact}</h2>
+          <Field label={t.profile.nameLabel}><input {...register('emergency_contact_name')} className={inputClass} /></Field>
+          <Field label={t.profile.phoneLabel}><input {...register('emergency_contact_phone')} type="tel" className={inputClass} /></Field>
         </section>
 
         <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Certification</h2>
-          <Field label="Certification status" required>
+          <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">{t.profile.certification}</h2>
+          <Field label={t.profile.certStatusLabel} required>
             <div className="flex flex-col gap-2">
               <label className="flex items-center gap-2 text-sm text-brand-900">
                 <input type="radio" value="certified" {...register('cert_status')} className="accent-brand-900" />
-                I have a certification
+                {t.profile.haveCert}
               </label>
               <label className="flex items-center gap-2 text-sm text-brand-900">
                 <input type="radio" value="uncertified" {...register('cert_status')} className="accent-brand-900" />
-                I am uncertified
+                {t.profile.uncertified}
               </label>
             </div>
             {errors.cert_status && <p className="text-red-600 text-xs mt-1">{errors.cert_status.message}</p>}
@@ -419,7 +420,7 @@ export function ProfileForm({ user, profile, onSaved }: {
 
           {isCertified && (
             <>
-              <Field label="Agency">
+              <Field label={t.profile.agencyLabel}>
                 <select
                   // Clearing cert_level on agency change keeps the user from
                   // saving a cert level that belongs to a different org. We do
@@ -431,15 +432,15 @@ export function ProfileForm({ user, profile, onSaved }: {
                   })}
                   className={inputClass}
                 >
-                  <option value="">— select agency —</option>
+                  <option value="">{t.profile.selectAgency}</option>
                   {orgs.map(o => (
                     <option key={o} value={o}>{o}</option>
                   ))}
                 </select>
               </Field>
-              <Field label="Level" required>
+              <Field label={t.profile.levelLabel} required>
                 <select {...register('cert_level')} className={inputClass} disabled={!selectedAgency}>
-                  <option value="">{selectedAgency ? '— select level —' : '— pick agency first —'}</option>
+                  <option value="">{selectedAgency ? t.profile.selectLevel : t.profile.pickAgencyFirst}</option>
                   {/* Keyed by name (unique inside a single-agency filter), not
                        by row id. The id swaps from the synthetic __saved_level__
                        to the real DB id once cert_levels fetches, and a key swap
@@ -453,11 +454,11 @@ export function ProfileForm({ user, profile, onSaved }: {
               </Field>
             </>
           )}
-          <Field label="Logged dives" required>
+          <Field label={t.profile.loggedDives} required>
             <input {...register('logged_dives')} type="number" min="0" className={inputClass} />
             {errors.logged_dives && <p className="text-red-600 text-xs mt-1">{errors.logged_dives.message}</p>}
           </Field>
-          <Field label="Last dive">
+          <Field label={t.profile.lastDive}>
             <Controller
               control={control}
               name="last_dive_date"
@@ -468,11 +469,11 @@ export function ProfileForm({ user, profile, onSaved }: {
           </Field>
           <label className="flex items-center gap-2 text-sm text-brand-900">
             <input type="checkbox" {...register('nitrox_certified')} className="accent-brand-900" />
-            Nitrox certified
+            {t.profile.nitroxCertified}
           </label>
           <label className="flex items-center gap-2 text-sm text-brand-900">
             <input type="checkbox" {...register('deep_certified')} className="accent-brand-900" />
-            Deep certified (40m)
+            {t.profile.deepCertified}
           </label>
         </section>
 
@@ -489,30 +490,30 @@ export function ProfileForm({ user, profile, onSaved }: {
         )}
 
         <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Medical Notes</h2>
+          <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">{t.profile.medicalNotes}</h2>
           <textarea
             {...register('medical_notes')}
             rows={3}
             className={`${inputClass} resize-none`}
-            placeholder="Allergies, conditions, medications…"
+            placeholder={t.profile.medicalNotesPlaceholder}
           />
         </section>
 
         {certCardMissing && (
           <p className="text-xs text-red-700 bg-red-50 border border-accent rounded p-2">
-            Upload a photo of your highest certification card to save your profile.
+            {t.profile.certCardRequired}
           </p>
         )}
 
         {nitroxCardMissing && (
           <p className="text-xs text-red-700 bg-red-50 border border-accent rounded p-2">
-            Upload a photo of your nitrox certification card to save your profile.
+            {t.profile.nitroxCardRequired}
           </p>
         )}
 
         {deepCardMissing && (
           <p className="text-xs text-red-700 bg-red-50 border border-accent rounded p-2">
-            Upload a photo of your Deep certification card to save your profile.
+            {t.profile.deepCardRequired}
           </p>
         )}
 
@@ -521,7 +522,7 @@ export function ProfileForm({ user, profile, onSaved }: {
           disabled={isSubmitting || !certStatus || certCardMissing || nitroxCardMissing || deepCardMissing || (!isDirty && !dirtyExtras)}
           className="w-full bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-semibold py-2 rounded-lg transition-colors disabled:opacity-50"
         >
-          {isSubmitting ? 'Saving…' : 'Save changes'}
+          {isSubmitting ? t.profile.saving : t.profile.saveChanges}
         </button>
     </form>
   )
@@ -551,7 +552,7 @@ export function NotificationsToggle() {
       if (on) { await subscribeToPush();   setState('on') }
       else    { await unsubscribeFromPush(); setState('off') }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to update notifications.')
+      setError(e instanceof Error ? e.message : t.profile.notifications.failed)
     } finally {
       setBusy(false)
     }
@@ -561,25 +562,23 @@ export function NotificationsToggle() {
 
   if (state === 'unsupported') {
     return (
-      <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-2" aria-label="Push Notifications">
-        <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Push Notifications</h2>
+      <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-2" aria-label={t.profile.notifications.title}>
+        <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">{t.profile.notifications.title}</h2>
         <p className="text-sm text-brand-900 font-medium">
-          Your device doesn't support push notifications in this browser.
-          On iPhone/iPad, install {siteConfig.identity.shortName} to your Home Screen
-          (Share → Add to Home Screen), open the app from there, and the toggle will appear.
+          {t.profile.notifications.unsupported(siteConfig.identity.shortName)}
         </p>
       </section>
     )
   }
 
   return (
-    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3" aria-label="Push Notifications">
-      <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Push Notifications</h2>
+    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3" aria-label={t.profile.notifications.title}>
+      <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">{t.profile.notifications.title}</h2>
       <label className="flex items-center justify-between gap-3">
-        <span className="text-sm text-brand-900">Event &amp; payment reminders</span>
+        <span className="text-sm text-brand-900">{t.profile.notifications.reminders}</span>
         <input
           type="checkbox"
-          aria-label="Enable push notifications"
+          aria-label={t.profile.notifications.enable}
           className="accent-brand-900 scale-125"
           disabled={busy}
           checked={state === 'on'}
@@ -587,9 +586,7 @@ export function NotificationsToggle() {
         />
       </label>
       <p className="text-xs text-brand-950 font-medium">
-        Reminders fire 1 week and 1 day before each event, plus payment nudges
-        at 3 / 2 / 1 weeks and 3 / 1 days before. iOS requires installing the
-        app to your Home Screen.
+        {t.profile.notifications.remindersDetail}
       </p>
       {error && <p className="text-red-600 text-xs">{error}</p>}
     </section>
@@ -634,7 +631,7 @@ export function CertCardSection({ userId, onPathChange }: {
     e.target.value = '' // allow re-picking the same file
     if (!file) return
     if (!file.type.startsWith('image/') && !isHeicFile(file)) {
-      setError('Please choose an image file.')
+      setError(t.profile.cards.chooseImage)
       return
     }
     setError(null)
@@ -650,7 +647,7 @@ export function CertCardSection({ userId, onPathChange }: {
       onPathChange?.(newPath)
       setSignedUrl(await getCertCardSignedUrl(newPath))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed.')
+      setError(err instanceof Error ? err.message : t.profile.cards.uploadFailed)
     } finally {
       setBusy(false)
     }
@@ -667,23 +664,22 @@ export function CertCardSection({ userId, onPathChange }: {
       onPathChange?.(null)
       setSignedUrl(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Remove failed.')
+      setError(err instanceof Error ? err.message : t.profile.cards.removeFailed)
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3" aria-label="Certification Card">
-      <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Highest Cert Photo</h2>
+    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3" aria-label={t.profile.cards.certAria}>
+      <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">{t.profile.cards.certTitle}</h2>
       <p className="text-xs text-brand-900 font-medium">
-        Photo of your certification card. Images are compressed before upload
-        so they take up minimal space while keeping the key details readable.
+        {t.profile.cards.certHint}
       </p>
       {signedUrl && (
         <img
           src={signedUrl}
-          alt="Your certification card"
+          alt={t.profile.cards.certAlt}
           className="w-full rounded-lg border border-surface-300"
         />
       )}
@@ -692,12 +688,12 @@ export function CertCardSection({ userId, onPathChange }: {
           <input
             type="file"
             accept="image/*,.heic,.heif"
-            aria-label="Upload certification card"
+            aria-label={t.profile.cards.certUpload}
             className="hidden"
             disabled={busy}
             onChange={onPickFile}
           />
-          {busy ? 'Working…' : path ? 'Replace photo' : 'Upload photo'}
+          {busy ? t.profile.cards.working : path ? t.profile.cards.replacePhoto : t.profile.cards.uploadPhoto}
         </label>
         {path && (
           <button
@@ -706,7 +702,7 @@ export function CertCardSection({ userId, onPathChange }: {
             disabled={busy}
             className="bg-surface-100 hover:bg-red-100 disabled:opacity-40 text-red-700 border border-accent text-sm font-semibold py-2 px-3 rounded-lg transition-colors"
           >
-            Remove
+            {t.profile.cards.remove}
           </button>
         )}
       </div>
@@ -752,7 +748,7 @@ export function NitroxCardSection({ userId, onPathChange }: {
     e.target.value = ''
     if (!file) return
     if (!file.type.startsWith('image/') && !isHeicFile(file)) {
-      setError('Please choose an image file.')
+      setError(t.profile.cards.chooseImage)
       return
     }
     setError(null)
@@ -767,7 +763,7 @@ export function NitroxCardSection({ userId, onPathChange }: {
       onPathChange?.(newPath)
       setSignedUrl(await getNitroxCardSignedUrl(newPath))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed.')
+      setError(err instanceof Error ? err.message : t.profile.cards.uploadFailed)
     } finally {
       setBusy(false)
     }
@@ -784,23 +780,22 @@ export function NitroxCardSection({ userId, onPathChange }: {
       onPathChange?.(null)
       setSignedUrl(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Remove failed.')
+      setError(err instanceof Error ? err.message : t.profile.cards.removeFailed)
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3" aria-label="Nitrox Certification Card">
-      <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Nitrox card photo</h2>
+    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3" aria-label={t.profile.cards.nitroxAria}>
+      <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">{t.profile.cards.nitroxTitle}</h2>
       <p className="text-xs text-brand-900 font-medium">
-        Required because you marked yourself as nitrox certified. Same
-        compression + private-storage handling as your main cert card.
+        {t.profile.cards.nitroxHint}
       </p>
       {signedUrl && (
         <img
           src={signedUrl}
-          alt="Your nitrox certification card"
+          alt={t.profile.cards.nitroxAlt}
           className="w-full rounded-lg border border-surface-300"
         />
       )}
@@ -809,12 +804,12 @@ export function NitroxCardSection({ userId, onPathChange }: {
           <input
             type="file"
             accept="image/*,.heic,.heif"
-            aria-label="Upload nitrox certification card"
+            aria-label={t.profile.cards.nitroxUpload}
             className="hidden"
             disabled={busy}
             onChange={onPickFile}
           />
-          {busy ? 'Working…' : path ? 'Replace photo' : 'Upload photo'}
+          {busy ? t.profile.cards.working : path ? t.profile.cards.replacePhoto : t.profile.cards.uploadPhoto}
         </label>
         {path && (
           <button
@@ -823,7 +818,7 @@ export function NitroxCardSection({ userId, onPathChange }: {
             disabled={busy}
             className="bg-surface-100 hover:bg-red-100 disabled:opacity-40 text-red-700 border border-accent text-sm font-semibold py-2 px-3 rounded-lg transition-colors"
           >
-            Remove
+            {t.profile.cards.remove}
           </button>
         )}
       </div>
@@ -865,7 +860,7 @@ export function DeepCardSection({ userId, onPathChange }: {
     e.target.value = ''
     if (!file) return
     if (!file.type.startsWith('image/') && !isHeicFile(file)) {
-      setError('Please choose an image file.')
+      setError(t.profile.cards.chooseImage)
       return
     }
     setError(null)
@@ -880,7 +875,7 @@ export function DeepCardSection({ userId, onPathChange }: {
       onPathChange?.(newPath)
       setSignedUrl(await getDeepCardSignedUrl(newPath))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed.')
+      setError(err instanceof Error ? err.message : t.profile.cards.uploadFailed)
     } finally {
       setBusy(false)
     }
@@ -897,23 +892,22 @@ export function DeepCardSection({ userId, onPathChange }: {
       onPathChange?.(null)
       setSignedUrl(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Remove failed.')
+      setError(err instanceof Error ? err.message : t.profile.cards.removeFailed)
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3" aria-label="Deep Certification Card">
-      <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">Deep card photo</h2>
+    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3" aria-label={t.profile.cards.deepAria}>
+      <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">{t.profile.cards.deepTitle}</h2>
       <p className="text-xs text-brand-900 font-medium">
-        Required because you marked yourself as Deep (40m) certified. Same
-        compression + private-storage handling as your main cert card.
+        {t.profile.cards.deepHint}
       </p>
       {signedUrl && (
         <img
           src={signedUrl}
-          alt="Your deep certification card"
+          alt={t.profile.cards.deepAlt}
           className="w-full rounded-lg border border-surface-300"
         />
       )}
@@ -922,12 +916,12 @@ export function DeepCardSection({ userId, onPathChange }: {
           <input
             type="file"
             accept="image/*,.heic,.heif"
-            aria-label="Upload deep certification card"
+            aria-label={t.profile.cards.deepUpload}
             className="hidden"
             disabled={busy}
             onChange={onPickFile}
           />
-          {busy ? 'Working…' : path ? 'Replace photo' : 'Upload photo'}
+          {busy ? t.profile.cards.working : path ? t.profile.cards.replacePhoto : t.profile.cards.uploadPhoto}
         </label>
         {path && (
           <button
@@ -936,7 +930,7 @@ export function DeepCardSection({ userId, onPathChange }: {
             disabled={busy}
             className="bg-surface-100 hover:bg-red-100 disabled:opacity-40 text-red-700 border border-accent text-sm font-semibold py-2 px-3 rounded-lg transition-colors"
           >
-            Remove
+            {t.profile.cards.remove}
           </button>
         )}
       </div>
