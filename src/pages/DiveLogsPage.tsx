@@ -14,6 +14,9 @@ import {
   CARD, CARD_ELEVATED, BTN_PRIMARY, BTN_GHOST, BTN_DANGER, BTN_LIGHT,
   TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, INPUT, INPUT_LABEL, PAGE_BODY,
 } from '../styles/tokens'
+import { t } from '../i18n'
+
+const dl = t.diveLogs
 
 // Per-diver dive log. List view defaults; tap "+ Add" or an existing row
 // to flip the page into the form view. Save returns to the list.
@@ -115,14 +118,14 @@ export function DiveLogsPage() {
     setExporting(true)
     try {
       const res = await requestExport()
-      toast.success(`Sent ${res.dive_count} dive${res.dive_count === 1 ? '' : 's'} to your email.`)
+      toast.success(dl.exportSent(res.dive_count))
       // Optimistic: assume the audit row was just inserted, so next-available
       // = +24h. We avoid a re-fetch in the success path.
       setHoursUntilExport(24)
     } catch (err) {
       const msg = (err as Error).message
       if (msg === 'rate-limited') {
-        toast.error('Export already requested in the last 24 hours.')
+        toast.error(dl.exportRateLimited)
         if (user) {
           const last = await getLastExportRequestAt(user.id)
           setHoursUntilExport(hoursUntil(nextExportAvailableAt(last)))
@@ -141,11 +144,11 @@ export function DiveLogsPage() {
       if (editingId) {
         const updated = await updateDiveLog(editingId, form)
         setRows(prev => prev.map(r => r.id === editingId ? updated : r))
-        toast.success('Dive log updated.')
+        toast.success(dl.updated)
       } else {
         const created = await createDiveLog({ user_id: user.id, ...form })
         setRows(prev => [created, ...prev])
-        toast.success(`Dive #${created.dive_number} logged.`)
+        toast.success(dl.logged(created.dive_number))
       }
       setView({ kind: 'list' })
     } catch (err) {
@@ -154,11 +157,11 @@ export function DiveLogsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this dive log entry? This cannot be undone.')) return
+    if (!confirm(dl.confirmDelete)) return
     try {
       await deleteDiveLog(id)
       setRows(prev => prev.filter(r => r.id !== id))
-      toast.success('Dive log deleted.')
+      toast.success(dl.deleted)
       setView({ kind: 'list' })
     } catch (err) {
       toast.error((err as Error).message)
@@ -180,13 +183,13 @@ export function DiveLogsPage() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <h2 className={`text-lg ${TEXT_HEADING}`}>Dive log</h2>
+        <h2 className={`text-lg ${TEXT_HEADING}`}>{dl.title}</h2>
         <button
           type="button"
           onClick={() => setView({ kind: 'new' })}
           className={`text-xs px-3 py-1.5 ${BTN_LIGHT}`}
         >
-          + Add
+          {dl.add}
         </button>
       </div>
 
@@ -197,11 +200,11 @@ export function DiveLogsPage() {
         onClick={handleExport}
       />
 
-      {loading && <p className={`text-sm ${PAGE_BODY}`}>Loading…</p>}
+      {loading && <p className={`text-sm ${PAGE_BODY}`}>{dl.loading}</p>}
 
       {!loading && rows.length === 0 && (
         <div className={`${CARD} p-6 text-center`}>
-          <p className={`text-sm ${TEXT_MUTED}`}>No logged dives yet. Tap “+ Add” to record your first one.</p>
+          <p className={`text-sm ${TEXT_MUTED}`}>{dl.empty}</p>
         </div>
       )}
 
@@ -212,7 +215,7 @@ export function DiveLogsPage() {
               type="button"
               onClick={() => setView({ kind: 'edit', row: r })}
               className={`${CARD_ELEVATED} w-full text-left p-3`}
-              aria-label={`Edit dive ${r.dive_number} on ${r.dived_on} at ${r.site}`}
+              aria-label={dl.editAria(r.dive_number, r.dived_on, r.site)}
             >
               <div className="flex items-baseline justify-between gap-3">
                 <div className={`font-bold ${TEXT_HEADING}`}>
@@ -223,11 +226,11 @@ export function DiveLogsPage() {
                 </div>
               </div>
               <div className={`text-xs ${TEXT_BODY} mt-1 flex flex-wrap gap-x-3 gap-y-0.5`}>
-                {r.max_depth_m != null && <span>{r.max_depth_m} m max</span>}
-                {r.dive_time_min != null && <span>{r.dive_time_min} min</span>}
+                {r.max_depth_m != null && <span>{dl.maxDepthShort(r.max_depth_m)}</span>}
+                {r.dive_time_min != null && <span>{dl.diveTimeShort(r.dive_time_min)}</span>}
                 {r.water_temp_c != null && <span>{r.water_temp_c}°C</span>}
                 {r.gas_mix && <span>{r.gas_mix}</span>}
-                {r.buddy_name && <span>w/ {r.buddy_name}</span>}
+                {r.buddy_name && <span>{dl.buddyShort(r.buddy_name)}</span>}
               </div>
             </button>
           </li>
@@ -254,11 +257,9 @@ function ExportButton({
   if (hoursUntilAvailable != null) {
     return (
       <div className={`${CARD} p-3 flex items-baseline justify-between gap-3 text-xs`}>
-        <span className={TEXT_MUTED}>
-          CSV export available in ~{hoursUntilAvailable} hour{hoursUntilAvailable === 1 ? '' : 's'}.
-        </span>
+        <span className={TEXT_MUTED}>{dl.exportAvailableIn(hoursUntilAvailable)}</span>
         <button type="button" disabled className={`${BTN_GHOST} text-xs px-3 py-1`}>
-          Email me a CSV
+          {dl.emailMeCsv}
         </button>
       </div>
     )
@@ -266,7 +267,7 @@ function ExportButton({
   return (
     <div className={`${CARD} p-3 flex items-baseline justify-between gap-3 text-xs`}>
       <span className={TEXT_MUTED}>
-        {rowCount === 0 ? 'No dives to export yet.' : `Export all ${rowCount} dive${rowCount === 1 ? '' : 's'} as a CSV.`}
+        {rowCount === 0 ? dl.nothingToExport : dl.exportAll(rowCount)}
       </span>
       <button
         type="button"
@@ -274,7 +275,7 @@ function ExportButton({
         disabled={loading || rowCount === 0}
         className={`${BTN_LIGHT} text-xs px-3 py-1`}
       >
-        {loading ? '…' : 'Email me a CSV'}
+        {loading ? dl.exporting : dl.emailMeCsv}
       </button>
     </div>
   )
@@ -326,31 +327,31 @@ function DiveLogForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className={`text-lg ${TEXT_HEADING}`}>
-          {editingNumber ? `Dive #${editingNumber}` : 'New dive'}
+          {editingNumber ? dl.diveNumber(editingNumber) : dl.newDive}
         </h2>
         <button type="button" onClick={onCancel} className={`text-xs ${TEXT_SUBTLE} hover:underline`}>
-          ‹ back to list
+          {dl.backToList}
         </button>
       </div>
 
       <div className={`${CARD_ELEVATED} p-4 grid grid-cols-1 sm:grid-cols-2 gap-3`}>
-        <Field label="Date" required>
+        <Field label={dl.date} required>
           <DateField required className={INPUT} value={form.dived_on}
             onChange={v => set('dived_on', v)} />
         </Field>
-        <Field label="Site" required>
+        <Field label={dl.site} required>
           <input type="text" required maxLength={120} className={INPUT} value={form.site}
             onChange={e => set('site', e.target.value)} />
         </Field>
 
-        <Field label="Type">
+        <Field label={dl.type}>
           <select className={INPUT} value={form.dive_type ?? ''}
             onChange={e => set('dive_type', (e.target.value || null) as DiveType | null)}>
             <option value="">—</option>
-            {DIVE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            {DIVE_TYPES.map(dt => <option key={dt} value={dt}>{dt}</option>)}
           </select>
         </Field>
-        <Field label="Gas mix">
+        <Field label={dl.gasMix}>
           <select className={INPUT} value={form.gas_mix ?? ''}
             onChange={e => set('gas_mix', (e.target.value || null) as GasMix | null)}>
             <option value="">—</option>
@@ -358,65 +359,65 @@ function DiveLogForm({
           </select>
         </Field>
 
-        <Field label="Max depth (m)">
+        <Field label={dl.maxDepth}>
           <input type="number" step="0.1" min="0" max="200" className={INPUT}
             value={form.max_depth_m ?? ''} onChange={e => setNum('max_depth_m', e.target.value)} />
         </Field>
-        <Field label="Dive time (min)">
+        <Field label={dl.diveTime}>
           <input type="number" min="0" max="480" className={INPUT}
             value={form.dive_time_min ?? ''} onChange={e => setNum('dive_time_min', e.target.value)} />
         </Field>
 
-        <Field label="Visibility (m)">
+        <Field label={dl.visibility}>
           <input type="number" step="0.1" min="0" className={INPUT}
             value={form.visibility_m ?? ''} onChange={e => setNum('visibility_m', e.target.value)} />
         </Field>
-        <Field label="Water temp (°C)">
+        <Field label={dl.waterTemp}>
           <input type="number" step="0.1" className={INPUT}
             value={form.water_temp_c ?? ''} onChange={e => setNum('water_temp_c', e.target.value)} />
         </Field>
 
-        <Field label="Air temp (°C)">
+        <Field label={dl.airTemp}>
           <input type="number" step="0.1" className={INPUT}
             value={form.air_temp_c ?? ''} onChange={e => setNum('air_temp_c', e.target.value)} />
         </Field>
-        <Field label="Wave height (m)">
+        <Field label={dl.waveHeight}>
           <input type="number" step="0.1" min="0" className={INPUT}
             value={form.wave_height_m ?? ''} onChange={e => setNum('wave_height_m', e.target.value)} />
         </Field>
 
-        <Field label="Weather">
+        <Field label={dl.weather}>
           <input type="text" className={INPUT} value={form.weather ?? ''}
             onChange={e => setText('weather', e.target.value)} />
         </Field>
-        <Field label="Weight (kg)">
+        <Field label={dl.weight}>
           <input type="number" step="0.1" min="0" className={INPUT}
             value={form.weight_kg ?? ''} onChange={e => setNum('weight_kg', e.target.value)} />
         </Field>
 
-        <Field label="Tank size (L)">
+        <Field label={dl.tankSize}>
           <input type="number" step="0.1" min="0" className={INPUT}
             value={form.tank_size_l ?? ''} onChange={e => setNum('tank_size_l', e.target.value)} />
         </Field>
-        <Field label="Start pressure (bar)">
+        <Field label={dl.startPressure}>
           <input type="number" min="0" max="350" className={INPUT}
             value={form.start_pressure_bar ?? ''} onChange={e => setNum('start_pressure_bar', e.target.value)} />
         </Field>
 
-        <Field label="End pressure (bar)">
+        <Field label={dl.endPressure}>
           <input type="number" min="0" max="350" className={INPUT}
             value={form.end_pressure_bar ?? ''} onChange={e => setNum('end_pressure_bar', e.target.value)} />
         </Field>
-        <Field label="Buddy">
+        <Field label={dl.buddy}>
           <input type="text" className={INPUT} value={form.buddy_name ?? ''}
             onChange={e => setText('buddy_name', e.target.value)} />
         </Field>
 
-        <Field label="Instructor">
+        <Field label={dl.instructor}>
           <input type="text" className={INPUT} value={form.instructor_name ?? ''}
             onChange={e => setText('instructor_name', e.target.value)} />
         </Field>
-        <Field label="Gear used">
+        <Field label={dl.gearUsed}>
           <div className="flex flex-wrap gap-1.5 col-span-2">
             {GEAR_ITEMS.map(g => {
               const on = form.gear_used?.includes(g) ?? false
@@ -437,7 +438,7 @@ function DiveLogForm({
           </div>
         </Field>
 
-        <Field label="Notes" wide>
+        <Field label={dl.notes} wide>
           <textarea rows={3} className={INPUT} value={form.notes ?? ''}
             onChange={e => setText('notes', e.target.value)} />
         </Field>
@@ -445,11 +446,11 @@ function DiveLogForm({
 
       <div className="flex gap-2">
         <button type="submit" disabled={saving} className={`flex-1 ${BTN_PRIMARY}`}>
-          {saving ? 'Saving…' : (editingNumber ? 'Save changes' : 'Save dive')}
+          {saving ? dl.saving : (editingNumber ? dl.saveChanges : dl.saveDive)}
         </button>
         {onDelete && (
           <button type="button" onClick={onDelete} className={`${BTN_DANGER} px-4`}>
-            Delete
+            {dl.delete}
           </button>
         )}
       </div>
@@ -467,7 +468,7 @@ function Field({ label, required, wide, children }: {
     <div className={wide ? 'col-span-2' : undefined}>
       <label className={INPUT_LABEL}>
         {label}
-        {required && <span className="text-red-600 ml-0.5" aria-label="required">*</span>}
+        {required && <span className="text-red-600 ml-0.5" aria-label={dl.requiredAria}>*</span>}
       </label>
       {children}
     </div>
