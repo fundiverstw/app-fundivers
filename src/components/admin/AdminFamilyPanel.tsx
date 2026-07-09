@@ -3,6 +3,9 @@ import { supabase } from '../../lib/supabase'
 import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
 import type { Profile } from '../../types/database'
+import { t } from '../../i18n'
+
+const fm = t.admin.family
 
 interface Props {
   user: Profile
@@ -69,11 +72,11 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
         .update({ parent_account: user.id })
         .eq('id', childId)
       if (error) throw error
-      toast.success('Child account linked')
+      toast.success(fm.linked)
       setFilter('')
       onChanged()
     } catch (err) {
-      toast.error(`Could not link: ${errorMessage(err)}`)
+      toast.error(fm.couldNotLink(errorMessage(err)))
     } finally {
       setLinking(false)
     }
@@ -87,10 +90,10 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
         .update({ parent_account: null })
         .eq('id', childId)
       if (error) throw error
-      toast.success('Child account unlinked')
+      toast.success(fm.unlinked)
       onChanged()
     } catch (err) {
-      toast.error(`Could not unlink: ${errorMessage(err)}`)
+      toast.error(fm.couldNotUnlink(errorMessage(err)))
     } finally {
       setUnlinkingId(null)
     }
@@ -100,12 +103,12 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
   // and offer an Unlink-from-parent control. No add-child UI here — the
   // one-level rule means a child can't have children.
   if (user.parent_account) {
-    const parentName = currentParent?.name ?? currentParent?.nickname ?? '(unknown)'
+    const parentName = currentParent?.name ?? currentParent?.nickname ?? fm.unknownParent
     return (
-      <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-2" aria-label="Family">
-        <h2 className="text-sm font-semibold text-red-600 uppercase tracking-wider">Family</h2>
+      <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-2" aria-label={fm.heading}>
+        <h2 className="text-sm font-semibold text-red-600 uppercase tracking-wider">{fm.heading}</h2>
         <p className="text-sm text-brand-900">
-          Linked as a child of <strong>{parentName}</strong>.
+          {fm.linkedAsChildOf} <strong>{parentName}</strong>
         </p>
         <div className="flex justify-end">
           <button
@@ -114,7 +117,7 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
             disabled={unlinkingId === user.id}
             className="text-xs bg-red-700 hover:bg-red-800 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded-lg"
           >
-            {unlinkingId === user.id ? 'Unlinking…' : 'Unlink from parent'}
+            {unlinkingId === user.id ? fm.unlinking : fm.unlinkFromParent}
           </button>
         </div>
       </section>
@@ -123,17 +126,17 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
 
   // Mode B: this diver is top-level — list any children + offer the picker.
   return (
-    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3" aria-label="Family">
-      <h2 className="text-sm font-semibold text-red-600 uppercase tracking-wider">Family</h2>
+    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3" aria-label={fm.heading}>
+      <h2 className="text-sm font-semibold text-red-600 uppercase tracking-wider">{fm.heading}</h2>
 
       {children.length === 0 ? (
-        <p className="text-xs text-brand-950 font-medium italic">No linked child accounts.</p>
+        <p className="text-xs text-brand-950 font-medium italic">{fm.noChildren}</p>
       ) : (
         <ul className="space-y-1">
           {children.map(c => (
             <li key={c.id} className="flex items-center justify-between gap-2 bg-surface-50 border border-surface-200 rounded-lg px-3 py-2">
               <span className="text-sm text-brand-900 font-medium">
-                {c.name ?? '(unnamed)'}
+                {c.name ?? fm.unnamed}
                 {c.nickname && c.nickname !== c.name && (
                   <span className="text-brand-900/80"> ({c.nickname})</span>
                 )}
@@ -142,10 +145,10 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
                 type="button"
                 onClick={() => unlink(c.id)}
                 disabled={unlinkingId === c.id}
-                aria-label={`Unlink ${c.name ?? 'child'}`}
+                aria-label={fm.unlinkAria(c.name ?? fm.childFallback)}
                 className="text-xs text-red-700 hover:text-red-800 font-semibold disabled:opacity-50"
               >
-                {unlinkingId === c.id ? 'Unlinking…' : 'Unlink'}
+                {unlinkingId === c.id ? fm.unlinking : fm.unlink}
               </button>
             </li>
           ))}
@@ -153,27 +156,25 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
       )}
 
       <div className="pt-2 border-t border-surface-200 space-y-2">
-        <p className="text-xs text-brand-900 font-medium">
-          Link an existing diver account as a child of this account:
-        </p>
+        <p className="text-xs text-brand-900 font-medium">{fm.linkPrompt}</p>
         <input
           type="search"
           value={filter}
           onChange={e => setFilter(e.target.value)}
-          placeholder="Search by name…"
-          aria-label="Search divers"
+          placeholder={fm.searchPlaceholder}
+          aria-label={fm.searchAria}
           className="w-full bg-white border border-surface-300 rounded-lg px-3 py-1.5 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
         />
         {filtered.length === 0 ? (
           <p className="text-xs text-brand-950 font-medium italic">
-            {filter.trim() ? 'No matching eligible divers.' : 'No eligible divers to link.'}
+            {filter.trim() ? fm.noMatches : fm.noEligible}
           </p>
         ) : (
           <ul className="space-y-1 max-h-48 overflow-y-auto">
             {filtered.map(c => (
               <li key={c.id} className="flex items-center justify-between gap-2 bg-white border border-surface-200 rounded-lg px-3 py-1.5">
                 <span className="text-sm text-brand-900 font-medium">
-                  {c.name ?? '(unnamed)'}
+                  {c.name ?? fm.unnamed}
                   {c.nickname && c.nickname !== c.name && (
                     <span className="text-brand-900/80"> ({c.nickname})</span>
                   )}
@@ -182,19 +183,17 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
                   type="button"
                   onClick={() => linkChild(c.id)}
                   disabled={linking}
-                  aria-label={`Link ${c.name ?? 'diver'} as child`}
+                  aria-label={fm.linkAria(c.name ?? fm.diverFallback)}
                   className="text-xs bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded-lg"
                 >
-                  Link as child
+                  {fm.linkAsChild}
                 </button>
               </li>
             ))}
           </ul>
         )}
         {!filter.trim() && eligibleChildren.length > 20 && (
-          <p className="text-xs text-brand-950/70 font-medium italic">
-            Showing first 20 — refine the search to narrow.
-          </p>
+          <p className="text-xs text-brand-950/70 font-medium italic">{fm.showingFirst20}</p>
         )}
       </div>
     </section>

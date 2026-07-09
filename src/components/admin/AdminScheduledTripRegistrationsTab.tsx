@@ -8,6 +8,9 @@ import {
   type AdminScheduledTripRegistration,
 } from '../../lib/scheduled-trip-registrations'
 import type { RegistrationStatus } from '../../types/database'
+import { t } from '../../i18n'
+
+const ar = t.admin.adminRegs
 
 // The Manage roster for scheduled-trip registrations: every app user who
 // registered for one of the shop's own trips, their extras + estimate + status.
@@ -63,7 +66,7 @@ export function AdminScheduledTripRegistrationsTab() {
         (r.diver && personName(r.diver.name, r.diver.nickname).toLowerCase().includes(q)))
     : regs
 
-  if (loading) return <p className="text-sm text-white/70">Loading…</p>
+  if (loading) return <p className="text-sm text-white/70">{ar.loading}</p>
 
   return (
     <div className="space-y-3">
@@ -73,20 +76,20 @@ export function AdminScheduledTripRegistrationsTab() {
         type="search"
         value={query}
         onChange={e => setQuery(e.target.value)}
-        placeholder="Search by diver or trip…"
-        aria-label="Search registrations"
+        placeholder={ar.searchTripsPlaceholder}
+        aria-label={ar.searchAria}
         className={FIELD}
       />
 
       {shown.length === 0 ? (
-        <p className="text-sm text-white/70">No registrations{q ? ' match your search' : ' yet'}.</p>
+        <p className="text-sm text-white/70">{q ? ar.noneMatch : ar.noneYet}</p>
       ) : (
         <ul className="space-y-2">
           {shown.map(r => (
             <li key={r.id}>
               <RegistrationCard
                 reg={r}
-                onSetStatus={s => act(() => setRegistrationStatus(r.id, s), `Marked ${s}`)}
+                onSetStatus={s => act(() => setRegistrationStatus(r.id, s), ar.markedStatus(s))}
               />
             </li>
           ))}
@@ -101,40 +104,40 @@ function RegistrationCard({ reg, onSetStatus }: {
   onSetStatus: (s: RegistrationStatus) => void
 }) {
   const [showContact, setShowContact] = useState(false)
-  const diverLabel = reg.diver ? personName(reg.diver.name, reg.diver.nickname) : '(unknown diver)'
+  const diverLabel = reg.diver ? personName(reg.diver.name, reg.diver.nickname) : ar.unknownDiver
   const currency = reg.estimated_currency ?? siteConfig.locale.currency
 
   return (
     <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 space-y-2">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-medium text-brand-900 text-sm truncate">{reg.trip_title ?? '(trip)'}</p>
+          <p className="font-medium text-brand-900 text-sm truncate">{reg.trip_title ?? ar.tripFallback}</p>
           <p className="text-xs text-brand-900/80 truncate">{diverLabel}</p>
         </div>
         <StatusBadge status={reg.status} />
       </div>
 
       {reg.estimated_cost != null && (
-        <div className="text-xs text-brand-900/80">Est. {reg.estimated_cost.toLocaleString()} {currency}</div>
+        <div className="text-xs text-brand-900/80">{ar.estimated(reg.estimated_cost.toLocaleString(), currency)}</div>
       )}
 
       <button type="button" onClick={() => setShowContact(v => !v)} className="text-xs font-semibold text-brand-900 underline">
-        {showContact ? 'Hide contact' : 'Reveal contact'}
+        {showContact ? ar.hideContact : ar.revealContact}
       </button>
       {showContact && reg.diver && (
         <p className="text-xs text-brand-900/80">
-          {reg.diver.email ?? '(no email)'}{reg.diver.contact_id ? ` · ${reg.diver.contact_id}` : ''}
+          {reg.diver.email ?? ar.noEmail}{reg.diver.contact_id ? ` · ${reg.diver.contact_id}` : ''}
         </p>
       )}
 
       <div className="flex flex-wrap gap-2">
         {reg.status === 'registered' && (
           <button type="button" onClick={() => onSetStatus('completed')}
-            className="text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-2.5 py-1 rounded-lg">Mark completed</button>
+            className="text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-2.5 py-1 rounded-lg">{ar.markCompleted}</button>
         )}
         {reg.status !== 'cancelled' && (
           <button type="button" onClick={() => onSetStatus('cancelled')}
-            className="text-xs font-semibold bg-red-700 hover:bg-red-800 text-white px-2.5 py-1 rounded-lg">Cancel</button>
+            className="text-xs font-semibold bg-red-700 hover:bg-red-800 text-white px-2.5 py-1 rounded-lg">{ar.cancel}</button>
         )}
       </div>
     </div>

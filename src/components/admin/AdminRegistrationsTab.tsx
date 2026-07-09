@@ -9,6 +9,9 @@ import {
   type AdminRegistration,
 } from '../../lib/package-registrations'
 import type { RegistrationStatus } from '../../types/database'
+import { t } from '../../i18n'
+
+const ar = t.admin.adminRegs
 
 // The Manage roster + kickback ledger for package registrations. Every row is an
 // app user who registered for a partner package: their chosen tier + preferred
@@ -66,7 +69,7 @@ export function AdminRegistrationsTab() {
         (r.diver && personName(r.diver.name, r.diver.nickname).toLowerCase().includes(q)))
     : regs
 
-  if (loading) return <p className="text-sm text-white/70">Loading…</p>
+  if (loading) return <p className="text-sm text-white/70">{ar.loading}</p>
 
   const kickbacks = summarizeKickbacks(regs)
 
@@ -75,13 +78,12 @@ export function AdminRegistrationsTab() {
       {error && <p className="text-sm text-red-200 bg-red-900/50 border border-accent rounded-md p-2">{error}</p>}
 
       {kickbacks.length > 0 && (
-        <div role="group" aria-label="Kickback totals" className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 space-y-1">
-          <h2 className="text-sm font-bold text-brand-900">Expected kickbacks</h2>
+        <div role="group" aria-label={ar.kickbackTotalsAria} className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 space-y-1">
+          <h2 className="text-sm font-bold text-brand-900">{ar.expectedKickbacks}</h2>
           {kickbacks.map(k => (
             <p key={k.currency} className="text-xs text-brand-900/80">
-              <span className="font-semibold">{k.currency}</span>: {k.expected.toLocaleString()} expected ·{' '}
-              {k.paid.toLocaleString()} paid ·{' '}
-              {(k.expected - k.paid).toLocaleString()} outstanding
+              <span className="font-semibold">{k.currency}</span>:{' '}
+              {ar.kickbackLine(k.expected.toLocaleString(), k.paid.toLocaleString(), (k.expected - k.paid).toLocaleString())}
             </p>
           ))}
         </div>
@@ -91,21 +93,21 @@ export function AdminRegistrationsTab() {
         type="search"
         value={query}
         onChange={e => setQuery(e.target.value)}
-        placeholder="Search by diver, package or tier…"
-        aria-label="Search registrations"
+        placeholder={ar.searchPackagesPlaceholder}
+        aria-label={ar.searchAria}
         className={FIELD}
       />
 
       {shown.length === 0 ? (
-        <p className="text-sm text-white/70">No registrations{q ? ' match your search' : ' yet'}.</p>
+        <p className="text-sm text-white/70">{q ? ar.noneMatch : ar.noneYet}</p>
       ) : (
         <ul className="space-y-2">
           {shown.map(r => (
             <li key={r.id}>
               <RegistrationCard
                 reg={r}
-                onSetKickback={s => act(() => setKickbackStatus(r.id, s), `Kickback ${s}`)}
-                onSetStatus={s => act(() => setRegistrationStatus(r.id, s), `Marked ${s}`)}
+                onSetKickback={s => act(() => setKickbackStatus(r.id, s), ar.kickbackSet(s))}
+                onSetStatus={s => act(() => setRegistrationStatus(r.id, s), ar.markedStatus(s))}
               />
             </li>
           ))}
@@ -123,7 +125,7 @@ function RegistrationCard({
   onSetStatus: (s: RegistrationStatus) => void
 }) {
   const [showContact, setShowContact] = useState(false)
-  const diverLabel = reg.diver ? personName(reg.diver.name, reg.diver.nickname) : '(unknown diver)'
+  const diverLabel = reg.diver ? personName(reg.diver.name, reg.diver.nickname) : ar.unknownDiver
   const dates = packageDateLabel(reg.preferred_start, reg.preferred_end)
   const currency = reg.estimated_currency ?? siteConfig.locale.currency
 
@@ -131,7 +133,7 @@ function RegistrationCard({
     <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 space-y-2">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-medium text-brand-900 text-sm truncate">{reg.package_title ?? '(package)'}</p>
+          <p className="font-medium text-brand-900 text-sm truncate">{reg.package_title ?? ar.packageFallback}</p>
           <p className="text-xs text-brand-900/80 truncate">
             {diverLabel}{reg.tier_name ? ` · ${reg.tier_name}` : ''}{dates ? ` · ${dates}` : ''}
           </p>
@@ -143,35 +145,35 @@ function RegistrationCard({
       </div>
 
       <div className="text-xs text-brand-900/80">
-        {reg.estimated_cost != null && <>Est. {reg.estimated_cost.toLocaleString()} {currency}</>}
-        {reg.kickback_amount != null && <> · kickback {reg.kickback_amount.toLocaleString()} {currency}</>}
+        {reg.estimated_cost != null && ar.estimated(reg.estimated_cost.toLocaleString(), currency)}
+        {reg.kickback_amount != null && ar.kickbackAmount(reg.kickback_amount.toLocaleString(), currency)}
       </div>
 
       <button type="button" onClick={() => setShowContact(v => !v)} className="text-xs font-semibold text-brand-900 underline">
-        {showContact ? 'Hide contact' : 'Reveal contact'}
+        {showContact ? ar.hideContact : ar.revealContact}
       </button>
       {showContact && reg.diver && (
         <p className="text-xs text-brand-900/80">
-          {reg.diver.email ?? '(no email)'}{reg.diver.contact_id ? ` · ${reg.diver.contact_id}` : ''}
+          {reg.diver.email ?? ar.noEmail}{reg.diver.contact_id ? ` · ${reg.diver.contact_id}` : ''}
         </p>
       )}
 
       <div className="flex flex-wrap gap-2">
         {reg.kickback_status !== 'paid' && (
           <button type="button" onClick={() => onSetKickback('paid')}
-            className="text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white px-2.5 py-1 rounded-lg">Mark kickback paid</button>
+            className="text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white px-2.5 py-1 rounded-lg">{ar.markKickbackPaid}</button>
         )}
         {reg.kickback_status === 'paid' && (
           <button type="button" onClick={() => onSetKickback('expected')}
-            className="text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1 rounded-lg">Unmark paid</button>
+            className="text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1 rounded-lg">{ar.unmarkPaid}</button>
         )}
         {reg.status === 'registered' && (
           <button type="button" onClick={() => onSetStatus('completed')}
-            className="text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-2.5 py-1 rounded-lg">Mark completed</button>
+            className="text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-2.5 py-1 rounded-lg">{ar.markCompleted}</button>
         )}
         {reg.status !== 'cancelled' && (
           <button type="button" onClick={() => onSetStatus('cancelled')}
-            className="text-xs font-semibold bg-red-700 hover:bg-red-800 text-white px-2.5 py-1 rounded-lg">Cancel</button>
+            className="text-xs font-semibold bg-red-700 hover:bg-red-800 text-white px-2.5 py-1 rounded-lg">{ar.cancel}</button>
         )}
       </div>
     </div>
