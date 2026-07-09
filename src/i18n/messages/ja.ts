@@ -403,6 +403,7 @@ export const ja: Messages = {
     preferredContact: '希望する連絡方法',
     methodLabel: '方法',
     handleLabel: 'ID / 番号',
+    contactHandlePlaceholder: '例：電話番号やメッセージアプリのID',
     contactMethod: {
       whatsapp: 'WhatsApp',
       line: 'Line',

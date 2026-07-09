@@ -404,6 +404,7 @@ export const zhTW: Messages = {
     preferredContact: '偏好聯絡方式',
     methodLabel: '方式',
     handleLabel: '帳號 / 號碼',
+    contactHandlePlaceholder: '例如：電話號碼或通訊軟體帳號',
     contactMethod: {
       whatsapp: 'WhatsApp',
       line: 'Line',

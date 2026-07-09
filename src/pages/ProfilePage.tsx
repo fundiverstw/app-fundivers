@@ -357,7 +357,7 @@ export function ProfileForm({ user, profile, onSaved }: {
             <input
               {...register('contact_id', { onChange: () => setDirtyExtras(true) })}
               className={inputClass}
-              placeholder="e.g. +886-900… or a Line ID"
+              placeholder={t.profile.contactHandlePlaceholder}
             />
             {errors.contact_id && <p className="text-red-600 text-xs mt-1">{errors.contact_id.message}</p>}
           </Field>

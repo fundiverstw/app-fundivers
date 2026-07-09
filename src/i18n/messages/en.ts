@@ -411,6 +411,7 @@ export const en = {
     preferredContact: 'Preferred contact',
     methodLabel: 'Method',
     handleLabel: 'Handle / number',
+    contactHandlePlaceholder: 'e.g. a phone number or messaging handle',
     contactMethod: {
       whatsapp: 'WhatsApp',
       line: 'Line',
