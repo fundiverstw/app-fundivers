@@ -4,6 +4,9 @@ import { errorMessage } from '../../lib/errors'
 import { fetchAllWaivers, saveWaiver, deleteWaiver } from '../../lib/waivers'
 import { uploadWaiverPdf, getWaiverPdfSignedUrl } from '../../lib/waiver-pdf'
 import type { WaiverRow, WaiverInsert } from '../../types/database'
+import { t } from '../../i18n'
+
+const wv = t.admin.waivers
 
 // Admin catalog for the shop's own waivers. Each is a free-form form the shop
 // authors — a text body OR an uploaded PDF, in whatever language they need — and
@@ -51,7 +54,7 @@ export function AdminWaiversPage() {
   async function handleDelete(w: WaiverRow) {
     try {
       await deleteWaiver(w.id)
-      toast.success('Waiver deleted')
+      toast.success(wv.deleted)
       setConfirmDelete(null)
       await reload()
     } catch (err) {
@@ -62,17 +65,14 @@ export function AdminWaiversPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-4">
       <div className="flex items-baseline justify-between gap-3">
-        <h1 className="text-2xl font-bold text-white">Waivers</h1>
+        <h1 className="text-2xl font-bold text-white">{wv.title}</h1>
         <button type="button" onClick={() => setCreating(true)}
           className="text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg">
-          + New waiver
+          {wv.newWaiver}
         </button>
       </div>
       <p className="text-sm text-white/80">
-        The forms divers e-sign. Write one as text or upload your own PDF, tag its
-        language, and set whether it auto-applies to dives or courses. Attach or
-        exempt a waiver on a specific event from that event's edit form. Editing a
-        waiver's content asks everyone to re-sign it.
+        {wv.intro}
       </p>
 
       {loadError && (
@@ -80,27 +80,27 @@ export function AdminWaiversPage() {
       )}
 
       {loading ? (
-        <p className="text-sm text-white/70">Loading…</p>
+        <p className="text-sm text-white/70">{wv.loading}</p>
       ) : waivers.length === 0 ? (
-        <p className="text-sm text-white/70">No waivers yet — add the shop's first one.</p>
+        <p className="text-sm text-white/70">{wv.none}</p>
       ) : (
         <ul className="space-y-2">
           {waivers.map(w => (
             <li key={w.id} className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="font-medium text-brand-900 text-sm truncate">
-                  {w.title}{!w.active && <span className="ml-2 text-xs text-brand-900/60">(inactive)</span>}
+                  {w.title}{!w.active && <span className="ml-2 text-xs text-brand-900/60">{wv.inactive}</span>}
                 </p>
                 <p className="text-xs text-brand-900/80">
-                  {w.pdf_path ? 'PDF' : 'Text'} · {w.cadence === 'annual' ? 'Annual' : 'Per event'} · applies to {w.applies_to}
+                  {w.pdf_path ? wv.pdf : wv.text} · {w.cadence === 'annual' ? wv.cadenceAnnual : wv.cadencePerEvent} · {wv.appliesToPrefix} {wv.appliesLabel(w.applies_to)}
                   {w.language ? ` · ${w.language}` : ''} · v{w.version}
                 </p>
               </div>
               <div className="flex gap-2 shrink-0">
                 <button type="button" onClick={() => setEditing(w)}
-                  className="text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-3 py-1 rounded-lg">Edit</button>
+                  className="text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-3 py-1 rounded-lg">{wv.edit}</button>
                 <button type="button" onClick={() => setConfirmDelete(w)}
-                  className="text-xs font-semibold bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded-lg">Delete</button>
+                  className="text-xs font-semibold bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded-lg">{wv.delete}</button>
               </div>
             </li>
           ))}
@@ -111,16 +111,16 @@ export function AdminWaiversPage() {
         <WaiverForm
           waiver={editing}
           onClose={() => { setCreating(false); setEditing(null) }}
-          onSaved={async () => { setCreating(false); setEditing(null); toast.success('Waiver saved'); await reload() }}
+          onSaved={async () => { setCreating(false); setEditing(null); toast.success(wv.saved); await reload() }}
           onError={m => toast.error(m)}
         />
       )}
 
       {confirmDelete && (
         <ConfirmModal
-          title="Delete waiver?"
-          body={`"${confirmDelete.title}" will be removed. Existing signatures stay on record, but the waiver stops applying to any event. To keep it on record but off new events, edit it and untick "Active" instead.`}
-          confirmLabel="Delete"
+          title={wv.deleteTitle}
+          body={wv.deleteBody(confirmDelete.title)}
+          confirmLabel={wv.delete}
           onClose={() => setConfirmDelete(null)}
           onConfirm={() => handleDelete(confirmDelete)}
         />
@@ -160,10 +160,10 @@ function WaiverForm({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!title.trim()) { onError('Title is required.'); return }
-    if (!code.trim()) { onError('A stable code is required.'); return }
-    if (mode === 'text' && !body.trim()) { onError('Enter the waiver text, or switch to a PDF.'); return }
-    if (mode === 'pdf' && !pdfFile && !waiver?.pdf_path) { onError('Choose a PDF file to upload.'); return }
+    if (!title.trim()) { onError(wv.titleRequired); return }
+    if (!code.trim()) { onError(wv.codeRequired); return }
+    if (mode === 'text' && !body.trim()) { onError(wv.textRequired); return }
+    if (mode === 'pdf' && !pdfFile && !waiver?.pdf_path) { onError(wv.pdfRequired); return }
     setSubmitting(true)
     try {
       const id = waiver?.id ?? crypto.randomUUID()
@@ -202,64 +202,64 @@ function WaiverForm({
   return (
     <Modal labelledBy="waiver-form-title" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-3">
-        <h2 id="waiver-form-title" className="text-lg font-bold text-brand-900">{waiver ? 'Edit waiver' : 'New waiver'}</h2>
+        <h2 id="waiver-form-title" className="text-lg font-bold text-brand-900">{waiver ? wv.editWaiver : wv.newWaiverTitle}</h2>
 
-        <Labelled label="Title *">
-          <input className={FIELD} value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Boat Diving Liability Release" />
+        <Labelled label={wv.titleLabel}>
+          <input className={FIELD} value={title} onChange={e => setTitle(e.target.value)} placeholder={wv.titlePh} />
         </Labelled>
-        <Labelled label="Code * (stable id used on signatures — don't reuse)">
-          <input className={FIELD} value={code} onChange={e => setCode(e.target.value)} placeholder="e.g. boat_liability" disabled={!!waiver} />
+        <Labelled label={wv.codeLabel}>
+          <input className={FIELD} value={code} onChange={e => setCode(e.target.value)} placeholder={wv.codePh} disabled={!!waiver} />
         </Labelled>
-        <Labelled label="Language (optional label, for your own organising)">
-          <input className={FIELD} value={language} onChange={e => setLanguage(e.target.value)} placeholder="e.g. English, 中文, 日本語" />
+        <Labelled label={wv.languageLabel}>
+          <input className={FIELD} value={language} onChange={e => setLanguage(e.target.value)} placeholder={wv.languagePh} />
         </Labelled>
 
         <div className="grid grid-cols-2 gap-2">
-          <Labelled label="Cadence">
+          <Labelled label={wv.cadence}>
             <select className={FIELD} value={cadence} onChange={e => setCadence(e.target.value as typeof CADENCES[number])}>
-              <option value="annual">Annual (signed once a year)</option>
-              <option value="per_event">Per event</option>
+              <option value="annual">{wv.cadenceAnnualLong}</option>
+              <option value="per_event">{wv.cadencePerEvent}</option>
             </select>
           </Labelled>
-          <Labelled label="Auto-applies to">
+          <Labelled label={wv.autoApplies}>
             <select className={FIELD} value={appliesTo} onChange={e => setAppliesTo(e.target.value as typeof APPLIES[number])}>
-              <option value="none">Nothing (attach per-event only)</option>
-              <option value="dives">All dives</option>
-              <option value="courses">All courses</option>
-              <option value="all">Dives and courses</option>
+              <option value="none">{wv.applyNone}</option>
+              <option value="dives">{wv.applyDives}</option>
+              <option value="courses">{wv.applyCourses}</option>
+              <option value="all">{wv.applyAll}</option>
             </select>
           </Labelled>
         </div>
         {(appliesTo === 'courses' || appliesTo === 'all') && (
-          <Labelled label="Limit to course types (optional, comma-separated: ow, aow, dsd, rescue, specialty)">
-            <input className={FIELD} value={courseColors} onChange={e => setCourseColors(e.target.value)} placeholder="ow, aow, rescue, specialty" />
+          <Labelled label={wv.courseLimit}>
+            <input className={FIELD} value={courseColors} onChange={e => setCourseColors(e.target.value)} placeholder={wv.courseLimitPh} />
           </Labelled>
         )}
 
         <fieldset className="space-y-2">
-          <legend className="text-xs font-medium text-brand-900">Content</legend>
+          <legend className="text-xs font-medium text-brand-900">{wv.content}</legend>
           <label className="flex items-center gap-2 text-sm text-brand-900">
             <input type="radio" name="waiver-mode" checked={mode === 'text'} onChange={() => setMode('text')} className="accent-brand-900" />
-            Type the form text
+            {wv.typeText}
           </label>
           <label className="flex items-center gap-2 text-sm text-brand-900">
             <input type="radio" name="waiver-mode" checked={mode === 'pdf'} onChange={() => setMode('pdf')} className="accent-brand-900" />
-            Upload a PDF
+            {wv.uploadPdf}
           </label>
           {mode === 'text' ? (
             <textarea className={`${FIELD} font-mono text-xs`} rows={8} value={body} onChange={e => setBody(e.target.value)}
-              aria-label="Waiver text"
-              placeholder="Paste the full waiver text divers will read before signing." />
+              aria-label={wv.waiverTextAria}
+              placeholder={wv.waiverTextPh} />
           ) : (
             <div className="space-y-1">
               {waiver?.pdf_path && (
                 <p className="text-xs text-brand-900/80">
-                  Current: {pdfUrl
-                    ? <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="underline">view PDF</a>
-                    : 'PDF on file'}. Choose a file to replace it.
+                  {wv.current} {pdfUrl
+                    ? <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="underline">{wv.viewPdf}</a>
+                    : wv.pdfOnFile}{wv.replaceHint}
                 </p>
               )}
-              <input type="file" accept="application/pdf" aria-label="Waiver PDF"
+              <input type="file" accept="application/pdf" aria-label={wv.waiverPdfAria}
                 onChange={e => setPdfFile(e.target.files?.[0] ?? null)} className="text-sm text-brand-900" />
             </div>
           )}
@@ -267,14 +267,14 @@ function WaiverForm({
 
         <label className="flex items-center gap-2 text-sm text-brand-900">
           <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} className="accent-brand-900" />
-          Active (available to attach to events)
+          {wv.activeLabel}
         </label>
 
         <div className="flex justify-end gap-2 pt-1">
-          <button type="button" onClick={onClose} className="text-sm font-semibold text-brand-900 px-3 py-1.5">Cancel</button>
+          <button type="button" onClick={onClose} className="text-sm font-semibold text-brand-900 px-3 py-1.5">{wv.cancel}</button>
           <button type="submit" disabled={submitting}
             className="text-sm font-semibold bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white px-4 py-1.5 rounded-lg">
-            {submitting ? 'Saving…' : 'Save'}
+            {submitting ? wv.saving : wv.save}
           </button>
         </div>
       </form>
@@ -318,7 +318,7 @@ function ConfirmModal({
         <h2 id="waiver-confirm-title" className="text-lg font-bold text-brand-900">{title}</h2>
         <p className="text-sm text-brand-900/80">{body}</p>
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="text-sm font-semibold text-brand-900 px-3 py-1.5">Cancel</button>
+          <button type="button" onClick={onClose} className="text-sm font-semibold text-brand-900 px-3 py-1.5">{wv.cancel}</button>
           <button type="button" onClick={onConfirm}
             className="text-sm font-semibold bg-red-700 hover:bg-red-800 text-white px-4 py-1.5 rounded-lg">{confirmLabel}</button>
         </div>
