@@ -4,9 +4,9 @@ import { supabase, authCallbackParams } from '../lib/supabase'
 import { Logo } from '../components/Logo'
 import { PasswordInput } from '../components/PasswordInput'
 import { CARD_ELEVATED, INPUT, INPUT_LABEL, BTN_PRIMARY, TEXT_ERROR, TEXT_LINK, TEXT_MUTED, TEXT_HEADING } from '../styles/tokens'
+import { t } from '../i18n'
 
-const LINK_ERROR =
-  'This reset link is invalid or has expired — links can only be used once, and some email providers open them automatically. Request a fresh one and use it right away.'
+const LINK_ERROR = t.auth.linkError
 
 // Public landing page for the reset-password email link. Two arrival shapes:
 //   - token_hash + type=recovery → we verifyOtp() it here. Preferred: the link
@@ -77,8 +77,8 @@ export function ResetPasswordPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setErr('')
-    if (password.length < 8) { setErr('Password must be at least 8 characters.'); return }
-    if (password !== confirm) { setErr('Passwords do not match.'); return }
+    if (password.length < 8) { setErr(t.auth.passwordMinDot); return }
+    if (password !== confirm) { setErr(t.auth.passwordsNoMatchDot); return }
     setBusy(true)
     const { error } = await supabase.auth.updateUser({ password })
     setBusy(false)
@@ -91,28 +91,28 @@ export function ResetPasswordPage() {
     <div className="min-h-screen bg-brand-900 flex items-center justify-center p-4">
       <div className={`w-full max-w-sm ${CARD_ELEVATED} p-6`}>
         <div className="flex justify-center mb-3"><Logo size="lg" /></div>
-        <p className={`${TEXT_MUTED} text-center mb-8 text-sm`}>Choose a new password</p>
+        <p className={`${TEXT_MUTED} text-center mb-8 text-sm`}>{t.auth.choosePrompt}</p>
 
         {done ? (
           <div className="text-center space-y-3">
             <div className="text-5xl">✅</div>
-            <h2 className={`text-lg font-semibold ${TEXT_HEADING}`}>Password updated</h2>
-            <p className={`text-sm ${TEXT_MUTED}`}>Signing you in…</p>
+            <h2 className={`text-lg font-semibold ${TEXT_HEADING}`}>{t.auth.passwordUpdated}</h2>
+            <p className={`text-sm ${TEXT_MUTED}`}>{t.auth.signingYouIn}</p>
           </div>
         ) : linkError ? (
           <div className="text-center space-y-4">
-            <h2 className={`text-lg font-semibold ${TEXT_HEADING}`}>Link expired</h2>
+            <h2 className={`text-lg font-semibold ${TEXT_HEADING}`}>{t.auth.linkExpired}</h2>
             <p className={`text-sm ${TEXT_ERROR}`}>{linkError}</p>
             <Link to="/forgot-password" className={`inline-block w-full ${BTN_PRIMARY}`}>
-              Request a new link
+              {t.auth.requestNewLink}
             </Link>
           </div>
         ) : !ready ? (
-          <div className={`text-center ${TEXT_MUTED} text-sm`}>Verifying reset link…</div>
+          <div className={`text-center ${TEXT_MUTED} text-sm`}>{t.auth.verifying}</div>
         ) : (
           <form onSubmit={submit} className="space-y-4">
             <div>
-              <label className={INPUT_LABEL}>New password</label>
+              <label className={INPUT_LABEL}>{t.auth.newPassword}</label>
               <PasswordInput
                 name="password" required minLength={8}
                 value={password} onChange={e => setPassword(e.target.value)}
@@ -120,7 +120,7 @@ export function ResetPasswordPage() {
               />
             </div>
             <div>
-              <label className={INPUT_LABEL}>Confirm password</label>
+              <label className={INPUT_LABEL}>{t.auth.confirmPassword}</label>
               <PasswordInput
                 name="confirm" required minLength={8}
                 value={confirm} onChange={e => setConfirm(e.target.value)}
@@ -129,13 +129,13 @@ export function ResetPasswordPage() {
             </div>
             {err && <p className={`${TEXT_ERROR} text-sm`}>{err}</p>}
             <button type="submit" disabled={busy} className={`w-full ${BTN_PRIMARY}`}>
-              {busy ? 'Saving…' : 'Set new password'}
+              {busy ? t.auth.saving : t.auth.setNewPassword}
             </button>
           </form>
         )}
 
         <p className={`text-center text-sm ${TEXT_MUTED} mt-6`}>
-          <Link to="/login" className={TEXT_LINK}>Back to sign in</Link>
+          <Link to="/login" className={TEXT_LINK}>{t.auth.backToSignIn}</Link>
         </p>
       </div>
     </div>

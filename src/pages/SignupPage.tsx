@@ -8,13 +8,14 @@ import { CURRENT_TERMS_VERSION } from '../lib/terms-version'
 import { Logo } from '../components/Logo'
 import { PasswordInput } from '../components/PasswordInput'
 import { CARD_ELEVATED, INPUT, INPUT_LABEL, BTN_PRIMARY, TEXT_ERROR, TEXT_LINK, TEXT_MUTED } from '../styles/tokens'
+import { t } from '../i18n'
 
 const schema = z.object({
-  email: z.string().email('Invalid email'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  email: z.string().email(t.auth.invalidEmail),
+  password: z.string().min(8, t.auth.passwordMin),
   confirm: z.string(),
-  agreedToTerms: z.literal(true, { message: 'Please agree to continue' }),
-}).refine(d => d.password === d.confirm, { message: 'Passwords do not match', path: ['confirm'] })
+  agreedToTerms: z.literal(true, { message: t.auth.agreeToContinue }),
+}).refine(d => d.password === d.confirm, { message: t.auth.passwordsNoMatch, path: ['confirm'] })
 type FormData = z.infer<typeof schema>
 
 export function SignupPage() {
@@ -50,23 +51,23 @@ export function SignupPage() {
     <div className="min-h-screen bg-brand-900 flex items-center justify-center p-4">
       <div className={`w-full max-w-sm ${CARD_ELEVATED} p-6`}>
         <div className="flex justify-center mb-3"><Logo size="lg" /></div>
-        <p className={`${TEXT_MUTED} text-center mb-8 text-sm`}>Create your account</p>
+        <p className={`${TEXT_MUTED} text-center mb-8 text-sm`}>{t.auth.createPrompt}</p>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label className={INPUT_LABEL}>Email</label>
+            <label className={INPUT_LABEL}>{t.auth.email}</label>
             <input {...register('email')} type="email" className={INPUT} />
             {errors.email && <p className={`${TEXT_ERROR} text-xs mt-1`}>{errors.email.message}</p>}
           </div>
 
           <div>
-            <label className={INPUT_LABEL}>Password</label>
+            <label className={INPUT_LABEL}>{t.auth.password}</label>
             <PasswordInput {...register('password')} className={INPUT} />
             {errors.password && <p className={`${TEXT_ERROR} text-xs mt-1`}>{errors.password.message}</p>}
           </div>
 
           <div>
-            <label className={INPUT_LABEL}>Confirm password</label>
+            <label className={INPUT_LABEL}>{t.auth.confirmPassword}</label>
             <PasswordInput {...register('confirm')} className={INPUT} />
             {errors.confirm && <p className={`${TEXT_ERROR} text-xs mt-1`}>{errors.confirm.message}</p>}
           </div>
@@ -74,8 +75,8 @@ export function SignupPage() {
           <label className="flex items-start gap-2 text-xs text-brand-900">
             <input {...register('agreedToTerms')} type="checkbox" className="accent-brand-900 mt-0.5" />
             <span>
-              I agree to the{' '}
-              <Link to="/terms" target="_blank" className={TEXT_LINK}>Terms of Use & Privacy</Link>.
+              {t.register.account.agreePrefix}{' '}
+              <Link to="/terms" target="_blank" className={TEXT_LINK}>{t.register.account.termsLink}</Link>.
             </span>
           </label>
           {errors.agreedToTerms && <p className={`${TEXT_ERROR} text-xs`}>{errors.agreedToTerms.message}</p>}
@@ -83,13 +84,13 @@ export function SignupPage() {
           {serverError && <p className={`${TEXT_ERROR} text-sm`}>{serverError}</p>}
 
           <button type="submit" disabled={isSubmitting} className={`w-full ${BTN_PRIMARY}`}>
-            {isSubmitting ? 'Creating account…' : 'Create account'}
+            {isSubmitting ? t.auth.creatingAccount : t.auth.createAccount}
           </button>
         </form>
 
         <p className={`text-center text-sm ${TEXT_MUTED} mt-6`}>
-          Already have an account?{' '}
-          <Link to="/login" className={TEXT_LINK}>Sign in</Link>
+          {t.auth.alreadyHave}{' '}
+          <Link to="/login" className={TEXT_LINK}>{t.auth.signIn}</Link>
         </p>
       </div>
     </div>

@@ -4,6 +4,7 @@ import {
   PAGE_HEADING, PAGE_BODY, TEXT_HEADING, TEXT_BODY,
 } from '../styles/tokens'
 import { siteConfig } from '../config/site'
+import { t } from '../i18n'
 
 const LINE_URL = siteConfig.contact.lineUrl
 const WHATSAPP_URL = siteConfig.contact.whatsappUrl
@@ -29,9 +30,9 @@ export function ContactPage() {
   return (
     <div className="max-w-xl mx-auto space-y-4">
       <div className="space-y-1">
-        <h1 className={`text-xl ${PAGE_HEADING} font-bold`}>Contact</h1>
+        <h1 className={`text-xl ${PAGE_HEADING} font-bold`}>{t.contact.title}</h1>
         <p className={`text-sm ${PAGE_BODY}`}>
-          Reach the shop on LINE or WhatsApp, or send us an email.
+          {t.contact.intro}
         </p>
       </div>
 
@@ -44,7 +45,7 @@ export function ContactPage() {
         >
           <span className="flex items-center gap-3">
             <LineGlyph />
-            <span>Add us on LINE</span>
+            <span>{t.contact.addLine}</span>
           </span>
           <span aria-hidden="true">›</span>
         </a>
@@ -57,7 +58,7 @@ export function ContactPage() {
         >
           <span className="flex items-center gap-3">
             <WhatsAppGlyph />
-            <span>Message us on WhatsApp</span>
+            <span>{t.contact.messageWhatsapp}</span>
           </span>
           <span aria-hidden="true">›</span>
         </a>
@@ -65,39 +66,38 @@ export function ContactPage() {
 
       <form onSubmit={handleSubmit} className={`${CARD} p-4 space-y-3`}>
         <div>
-          <h2 className={`${TEXT_HEADING} text-base`}>Email</h2>
+          <h2 className={`${TEXT_HEADING} text-base`}>{t.contact.emailHeading}</h2>
           <p className={`${TEXT_BODY} text-xs`}>
-            Sends to <span className="font-semibold">{SUPPORT_EMAIL}</span> via
-            your device's mail app.
+            {t.contact.sendsToPrefix} <span className="font-semibold">{SUPPORT_EMAIL}</span> {t.contact.sendsToSuffix}
           </p>
         </div>
 
         <div>
-          <label htmlFor="contact-subject" className={INPUT_LABEL}>Subject</label>
+          <label htmlFor="contact-subject" className={INPUT_LABEL}>{t.contact.subject}</label>
           <input
             id="contact-subject"
             type="text"
             value={subject}
             onChange={e => setSubject(e.target.value)}
             className={INPUT}
-            placeholder="What's this about?"
+            placeholder={t.contact.subjectPlaceholder}
           />
         </div>
 
         <div>
-          <label htmlFor="contact-message" className={INPUT_LABEL}>Message</label>
+          <label htmlFor="contact-message" className={INPUT_LABEL}>{t.contact.message}</label>
           <textarea
             id="contact-message"
             value={message}
             onChange={e => setMessage(e.target.value)}
             rows={6}
             className={`${INPUT} resize-y`}
-            placeholder="Write your message…"
+            placeholder={t.contact.messagePlaceholder}
           />
         </div>
 
         <button type="submit" className={`w-full ${BTN_PRIMARY}`}>
-          Send email
+          {t.contact.sendEmail}
         </button>
       </form>
     </div>
