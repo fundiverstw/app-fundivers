@@ -683,6 +683,25 @@ export const en = {
       waivers: { title: 'Waivers', blurb: 'Author the forms divers e-sign — as text or your own uploaded PDF, in any language. Attach or exempt them per-event from an event’s edit form.' },
       cancellationPolicies: { title: 'Cancellation policies', blurb: 'Write the cancellation terms divers acknowledge at registration; pick one per event.' },
     },
+    notifications: {
+      titleBodyRequired: 'Title and body are required.',
+      workerNotConfigured: 'VITE_PUSH_WORKER_URL is not configured for this environment.',
+      notSignedIn: 'Not signed in.',
+      broadcastFailed: (status: number) => `Broadcast failed (HTTP ${status}).`,
+      sentToast: (sent: number, skipped: number, webhook: boolean | null) =>
+        `Sent to ${sent} device${sent === 1 ? '' : 's'}` + (skipped ? `, ${skipped} skipped` : '') + (webhook == null ? '' : webhook ? ' · webhook ok' : ' · webhook failed'),
+      title: 'One-off notification',
+      intro: 'Sends an immediate push to every device that has notifications turned on. Use sparingly — every opted-in user gets it.',
+      titleLabel: 'Title *',
+      titlePlaceholder: 'e.g. Trip cancelled — typhoon',
+      bodyLabel: 'Body *',
+      bodyPlaceholder: 'What everyone needs to know.',
+      linkLabel: 'Link (optional)',
+      linkPlaceholder: '/records/bookings  or  https://example.com',
+      linkHint: 'When set, tapping the push opens this URL. When empty, tapping opens the in-app inbox so the diver can re-read the message.',
+      sending: 'Sending…',
+      sendNow: 'Send now',
+    },
   },
 }
 

@@ -3,6 +3,9 @@ import { supabase } from '../../lib/supabase'
 import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
 import { ERROR_NOTE_LIGHT } from '../../styles/tokens'
+import { t } from '../../i18n'
+
+const n = t.admin.notifications
 
 // Admin-only one-off broadcast. Posts the title+body to the push worker's
 // /admin-broadcast endpoint, which fans out web-push to every opted-in
@@ -29,18 +32,18 @@ export function AdminNotificationsPage() {
     e.preventDefault()
     setSubmitError(null)
     if (!title.trim() || !body.trim()) {
-      setSubmitError('Title and body are required.')
+      setSubmitError(n.titleBodyRequired)
       return
     }
     const workerUrl = pushWorkerUrl()
     if (!workerUrl) {
-      setSubmitError('VITE_PUSH_WORKER_URL is not configured for this environment.')
+      setSubmitError(n.workerNotConfigured)
       return
     }
     setSubmitting(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error('Not signed in.')
+      if (!session) throw new Error(n.notSignedIn)
       // Send url only when the admin filled it in. The worker reads
       // an empty/absent url as "no link" — push tap opens the inbox so
       // the diver can re-read the body, and the inbox row doesn't
@@ -60,15 +63,12 @@ export function AdminNotificationsPage() {
       })
       if (!res.ok) {
         const text = await res.text().catch(() => '')
-        throw new Error(text || `Broadcast failed (HTTP ${res.status}).`)
+        throw new Error(text || n.broadcastFailed(res.status))
       }
       const result = await res.json() as { sent?: number; skipped?: number; webhook?: boolean | null }
       const sent = result.sent ?? 0
       const skipped = result.skipped ?? 0
-      const webhookPart = result.webhook == null
-        ? ''
-        : result.webhook ? ' · webhook ok' : ' · webhook failed'
-      toast.success(`Sent to ${sent} device${sent === 1 ? '' : 's'}` + (skipped ? `, ${skipped} skipped` : '') + webhookPart)
+      toast.success(n.sentToast(sent, skipped, result.webhook ?? null))
       setTitle('')
       setBody('')
       setLink('')
@@ -83,49 +83,47 @@ export function AdminNotificationsPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
-      <h1 className="text-2xl font-bold text-white">One-off notification</h1>
+      <h1 className="text-2xl font-bold text-white">{n.title}</h1>
       <p className="text-sm text-white/80">
-        Sends an immediate push to every device that has notifications turned on.
-        Use sparingly — every opted-in user gets it.
+        {n.intro}
       </p>
       <form
         onSubmit={handleSubmit}
         className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3"
       >
         <label className="block space-y-1">
-          <span className="text-xs font-medium text-brand-900">Title *</span>
+          <span className="text-xs font-medium text-brand-900">{n.titleLabel}</span>
           <input
             type="text"
             value={title}
             onChange={e => setTitle(e.target.value)}
-            placeholder="e.g. Trip cancelled — typhoon"
+            placeholder={n.titlePlaceholder}
             maxLength={80}
             className={inputClass}
           />
         </label>
         <label className="block space-y-1">
-          <span className="text-xs font-medium text-brand-900">Body *</span>
+          <span className="text-xs font-medium text-brand-900">{n.bodyLabel}</span>
           <textarea
             value={body}
             onChange={e => setBody(e.target.value)}
-            placeholder="What everyone needs to know."
+            placeholder={n.bodyPlaceholder}
             rows={4}
             maxLength={1000}
             className={`${inputClass} resize-none`}
           />
         </label>
         <label className="block space-y-1">
-          <span className="text-xs font-medium text-brand-900">Link (optional)</span>
+          <span className="text-xs font-medium text-brand-900">{n.linkLabel}</span>
           <input
             type="text"
             value={link}
             onChange={e => setLink(e.target.value)}
-            placeholder="/records/bookings  or  https://example.com"
+            placeholder={n.linkPlaceholder}
             className={inputClass}
           />
           <span className="block text-[11px] text-brand-900/70">
-            When set, tapping the push opens this URL. When empty, tapping opens the
-            in-app inbox so the diver can re-read the message.
+            {n.linkHint}
           </span>
         </label>
         {submitError && (
@@ -137,7 +135,7 @@ export function AdminNotificationsPage() {
             disabled={submitting}
             className="py-2 px-4 rounded-lg text-sm font-semibold bg-brand-900 hover:bg-brand-950 text-white disabled:opacity-50"
           >
-            {submitting ? 'Sending…' : 'Send now'}
+            {submitting ? n.sending : n.sendNow}
           </button>
         </div>
       </form>
