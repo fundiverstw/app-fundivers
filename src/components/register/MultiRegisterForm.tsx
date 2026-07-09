@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { personName } from '../../lib/names'
 import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../lib/gear'
 import { siteConfig } from '../../config/site'
+import { t } from '../../i18n'
 import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
 import { supabase } from '../../lib/supabase'
 import { invokeWithRetry } from '../../lib/edge-invoke'
@@ -219,7 +220,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
         gearDays: days,
         transport: transportCost,
         nitroxCourse: nitroxFee,
-        surcharge: surchargeCost > 0 ? { label: 'Card/PayPal surcharge (5%)', amount: surchargeCost } : null,
+        surcharge: surchargeCost > 0 ? { label: t.register.payment.cardSurcharge, amount: surchargeCost } : null,
       })
       return { base, gearCost, transportCost, nitroxFee, surchargeCost, total, charges }
     })
@@ -338,7 +339,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
         },
       )
       if (error) throw new Error(error.message)
-      if (!data?.booking_id) throw new Error('no booking id returned')
+      if (!data?.booking_id) throw new Error(t.register.errors.noBookingId)
       return {
         id:           data.booking_id,
         status:       (data.status ?? 'pending') as Booking['status'],
@@ -393,14 +394,14 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
       return
     }
     if (successes.length === 0) {
-      setErr('No events could be booked. See errors below and try again.')
+      setErr(t.register.errors.noEventsBooked)
       return
     }
     // Mixed result — fire onAllBooked with the successes so the parent
     // updates its bookings cache, but stay open so the diver sees which
     // events failed.
     onAllBooked(successes)
-    setErr(`${successes.length} of ${cart.length} events booked. Failures listed below.`)
+    setErr(t.register.errors.partialBooked(successes.length, cart.length))
   }
 
   return (
@@ -408,7 +409,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
       className="fixed inset-0 bg-brand-900/60 backdrop-blur-sm flex items-start justify-center z-50 px-4 pt-8 pb-4 overflow-y-auto"
       role="dialog"
       aria-modal="true"
-      aria-label="Multi-event registration"
+      aria-label={t.register.multi.ariaModal}
       onClick={onClose}
     >
       <div
@@ -418,24 +419,24 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
         <header className="space-y-1">
           <div className="flex items-start justify-between gap-3">
             <h1 className="text-xl font-bold text-brand-900 leading-tight">
-              Register for {cart.length} event{cart.length === 1 ? '' : 's'}
+              {t.register.multi.registerForEvents(cart.length)}
             </h1>
             <button onClick={onClose} className="text-brand-900 font-medium text-xl leading-none shrink-0">×</button>
           </div>
-          <p className="text-xs text-brand-900 font-medium">Step {step} of 4</p>
+          <p className="text-xs text-brand-900 font-medium">{t.register.stepOf(step)}</p>
         </header>
 
         {step === 1 && (
           <section className="space-y-3">
             <p className="text-sm text-brand-950 font-medium">
-              Review the events you're registering for. Tap × on any row to drop it.
+              {t.register.multi.reviewIntro}
             </p>
             {hasBlockedPast && (
               <div role="alert" className="bg-red-50 border border-accent rounded-lg px-3 py-2 text-xs text-red-700">
                 <p className="font-semibold">
-                  {pastInCart.length === 1 ? 'One event has' : `${pastInCart.length} events have`} already taken place.
+                  {t.register.multi.pastTaken(pastInCart.length)}
                 </p>
-                <p>Registration is closed for past events — drop {pastInCart.length === 1 ? 'it' : 'them'} to continue.</p>
+                <p>{t.register.multi.pastDrop(pastInCart.length)}</p>
               </div>
             )}
             <ul className="space-y-2">
@@ -449,33 +450,33 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                       </p>
                       {ev.price != null && (
                         <p className="text-xs text-brand-950 font-medium">
-                          From {ev.currency} {ev.price.toLocaleString()}
+                          {t.register.fromPrice(ev.currency, ev.price.toLocaleString())}
                         </p>
                       )}
                     </div>
                     <button
                       type="button"
                       onClick={() => removeFromCart(ev.id)}
-                      aria-label={`Remove ${ev.title}`}
+                      aria-label={t.register.multi.removeAria(ev.title)}
                       className="text-brand-900 font-medium text-lg leading-none px-2"
                     >×</button>
                   </div>
                   {children.length > 0 && (
                     <label className="block">
-                      <span className="block text-xs text-brand-900 font-medium mb-1">For diver</span>
+                      <span className="block text-xs text-brand-900 font-medium mb-1">{t.register.multi.forDiver}</span>
                       <select
                         value={forDiverByEvent[ev.id] ?? ''}
                         onChange={e => setForDiverByEvent(prev => ({
                           ...prev,
                           [ev.id]: e.target.value || null,
                         }))}
-                        aria-label={`Diver for ${ev.title}`}
+                        aria-label={t.register.multi.diverForAria(ev.title)}
                         className="w-full bg-white border border-surface-300 rounded-lg px-2 py-1.5 text-sm text-brand-900"
                       >
-                        <option value="">Myself ({personName(profile?.name, profile?.nickname) || 'me'})</option>
+                        <option value="">{t.register.multi.myselfOption(personName(profile?.name, profile?.nickname) || t.register.multi.meFallback)}</option>
                         {children.map(c => (
                           <option key={c.id} value={c.id}>
-                            {c.name ?? '(no name)'}{c.nickname ? ` (${c.nickname})` : ''}
+                            {c.name ?? t.register.picker.noName}{c.nickname ? ` (${c.nickname})` : ''}
                           </option>
                         ))}
                       </select>
@@ -485,45 +486,44 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
               ))}
               {cart.length === 0 && (
                 <li className="text-sm text-brand-950 font-medium italic">
-                  No events left. Close this and pick at least one to continue.
+                  {t.register.multi.noEventsLeft}
                 </li>
               )}
             </ul>
             <p className="text-xs text-brand-950 font-medium">
-              Rooms and add-ons aren't selectable in the multi-event flow yet.
-              For events that need them, register individually.
+              {t.register.multi.roomsNotSelectable}
             </p>
           </section>
         )}
 
         {step === 2 && (
           <section className="space-y-4">
-            <h2 className="text-lg font-bold text-brand-900">About you</h2>
+            <h2 className="text-lg font-bold text-brand-900">{t.register.aboutYou}</h2>
             <p className="text-xs text-brand-900 font-medium">
-              Pre-filled from your profile. Edits save back when you submit.
+              {t.register.multi.prefillHint}
             </p>
             <div className="space-y-3">
-              <TextField label="Full name *" value={fullName} onChange={setFullName} required />
+              <TextField label={t.register.multi.fullNameLabel} value={fullName} onChange={setFullName} required />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <TextField label="Nationality *" value={nationality} onChange={setNationality} required />
+                <TextField label={t.register.nationalityRequired} value={nationality} onChange={setNationality} required />
                 <label className="block">
-                  <span className="block text-xs text-brand-900 font-medium mb-1">Gender *</span>
+                  <span className="block text-xs text-brand-900 font-medium mb-1">{t.register.genderRequired}</span>
                   <select
                     value={gender}
                     onChange={e => setGender(e.target.value)}
                     className="w-full bg-white border border-surface-300 rounded-lg px-2 py-2 text-sm text-brand-900"
                   >
                     <option value="">—</option>
-                    <option value="female">Female</option>
-                    <option value="male">Male</option>
-                    <option value="other">Other</option>
-                    <option value="prefer_not_to_say">Prefer not to say</option>
+                    <option value="female">{t.register.genderFemale}</option>
+                    <option value="male">{t.register.genderMale}</option>
+                    <option value="other">{t.register.genderOther}</option>
+                    <option value="prefer_not_to_say">{t.register.genderPreferNot}</option>
                   </select>
                 </label>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label className="block">
-                  <span className="block text-xs text-brand-900 font-medium mb-1">Preferred contact</span>
+                  <span className="block text-xs text-brand-900 font-medium mb-1">{t.register.preferredContact}</span>
                   <select
                     value={contactMethod}
                     onChange={e => setContactMethod(e.target.value as ContactMethod | '')}
@@ -532,13 +532,13 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                     <option value="">—</option>
                     <option value="line">LINE</option>
                     <option value="whatsapp">WhatsApp</option>
-                    <option value="phone">Phone</option>
-                    <option value="email">Email</option>
+                    <option value="phone">{t.register.contactPhone}</option>
+                    <option value="email">{t.register.contactEmail}</option>
                   </select>
                 </label>
               </div>
               {contactMethod && (
-                <TextField label={contactMethod === 'email' ? 'Email' : 'ID / number'} value={contactId} onChange={setContactId} />
+                <TextField label={contactMethod === 'email' ? t.register.contactEmail : t.register.contactIdNumber} value={contactId} onChange={setContactId} />
               )}
               <label className="flex items-center gap-2 text-sm text-brand-950 font-medium">
                 <input
@@ -551,17 +551,17 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                   }}
                   className="accent-brand-900"
                 />
-                I'm not certified yet (Discover / trial diver)
+                {t.register.notCertified}
               </label>
               {!uncertified && (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <TextField label="Cert agency" placeholder="PADI, SSI…" value={certAgency} onChange={setCertAgency} />
-                    <TextField label="Cert level" placeholder="OW, AOW…" value={certLevel} onChange={setCertLevel} />
+                    <TextField label={t.register.certAgency} placeholder={t.register.certAgencyPlaceholder} value={certAgency} onChange={setCertAgency} />
+                    <TextField label={t.register.certLevel} placeholder={t.register.certLevelPlaceholder} value={certLevel} onChange={setCertLevel} />
                   </div>
                   {certDeclarationBlocked && (
                     <p className="text-xs text-red-700 font-medium">
-                      Enter your certification level, or tick "I'm not certified yet" above.
+                      {t.register.certDeclarationError}
                     </p>
                   )}
                 </>
@@ -569,18 +569,18 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
               <div className="grid grid-cols-2 gap-3">
                 <label className="flex items-center gap-2 text-sm text-brand-950 font-medium">
                   <input type="checkbox" checked={nitroxCertified} onChange={e => setNitroxCertified(e.target.checked)} className="accent-brand-900" />
-                  Nitrox certified
+                  {t.register.nitroxCertified}
                 </label>
                 <label className="flex items-center gap-2 text-sm text-brand-950 font-medium">
                   <input type="checkbox" checked={deepCertified} onChange={e => setDeepCertified(e.target.checked)} className="accent-brand-900" />
-                  Deep certified (40m)
+                  {t.register.deepCertified}
                 </label>
               </div>
               <div className="border-t border-surface-200 pt-3 space-y-3">
-                <p className="text-xs text-brand-900 font-medium uppercase tracking-wider">Emergency contact</p>
+                <p className="text-xs text-brand-900 font-medium uppercase tracking-wider">{t.register.emergencyContact}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <TextField label="Name" value={emergencyName} onChange={setEmergencyName} />
-                  <TextField label="Phone" type="tel" value={emergencyPhone} onChange={setEmergencyPhone} />
+                  <TextField label={t.register.emergencyName} value={emergencyName} onChange={setEmergencyName} />
+                  <TextField label={t.register.emergencyPhone} type="tel" value={emergencyPhone} onChange={setEmergencyPhone} />
                 </div>
               </div>
             </div>
@@ -589,9 +589,9 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
 
         {step === 3 && (
           <section className="space-y-4">
-            <h2 className="text-lg font-bold text-brand-900">Extras per event</h2>
+            <h2 className="text-lg font-bold text-brand-900">{t.register.multi.extrasPerEvent}</h2>
             <p className="text-xs text-brand-900 font-medium">
-              Pick gear / transport / nitrox course for each event below. Transport choice is required.
+              {t.register.multi.extrasIntro}
             </p>
             <div className="space-y-3">
               {cart.map(ev => {
@@ -615,18 +615,18 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                   : profile
                 const showNitroxAddon = ev.nitrox_required && !(targetProfile?.nitrox_certified ?? false)
                 const targetLabel = targetForDiverId
-                  ? (personName(targetProfile?.name, targetProfile?.nickname) || '(child)')
+                  ? (personName(targetProfile?.name, targetProfile?.nickname) || t.register.multi.childFallback)
                   : null
                 return (
                   <div key={ev.id} className="bg-surface-50 border border-surface-200 rounded-lg p-3 space-y-2">
                     <p className="text-sm font-semibold text-brand-900">
                       {ev.title}
                       {targetLabel && (
-                        <span className="ml-2 text-xs text-brand-700">· for {targetLabel}</span>
+                        <span className="ml-2 text-xs text-brand-700">{t.register.multi.forLabel(targetLabel)}</span>
                       )}
                     </p>
                     {gearIncluded && (
-                      <p className="text-xs text-brand-950 font-medium">Gear is included with this course.</p>
+                      <p className="text-xs text-brand-950 font-medium">{t.register.multi.gearIncluded}</p>
                     )}
                     {showGearRentChoice && (
                       <div className="space-y-1">
@@ -639,11 +639,11 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                               : { rentGear: false })}
                             className="accent-brand-900"
                           />
-                          Rent gear
+                          {t.register.multi.rentGear}
                         </label>
                         {c.rentGear && (
                           <div className="pl-6 space-y-1">
-                            <p className="text-xs text-brand-950 font-medium">Check the items you need us to prepare for you:</p>
+                            <p className="text-xs text-brand-950 font-medium">{t.register.checkItems}</p>
                             <div className="grid grid-cols-2 gap-1">
                               {GEAR_ITEMS.map(item => (
                                 <label key={item} className="flex items-center gap-1 text-xs text-brand-950 font-medium">
@@ -666,41 +666,41 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                       </div>
                     )}
                     <fieldset className="space-y-1">
-                      <legend className="text-xs font-semibold text-brand-900">Transportation *</legend>
+                      <legend className="text-xs font-semibold text-brand-900">{t.register.transport.legend}</legend>
                       <label className="flex items-start gap-2 text-sm font-medium text-brand-950">
                         <input type="radio" name={`t-${ev.id}`} checked={c.needsTransport === true} onChange={() => updateChoice(ev.id, { needsTransport: true })} className="accent-brand-900 mt-1" />
                         <span className="flex-1">
-                          Yes, ride with the shop
+                          {t.register.multi.transportYes}
                           {!transportIncluded && transportSurcharge > 0 && (
-                            <span className="block text-xs text-brand-950 font-medium">+{transportSurcharge.toLocaleString()} {ev.currency}</span>
+                            <span className="block text-xs text-brand-950 font-medium">{t.register.transport.surcharge(transportSurcharge.toLocaleString(), ev.currency)}</span>
                           )}
                           {transportIncluded && rideAllowed && (
-                            <span className="block text-xs text-brand-950 font-medium">Included in base price</span>
+                            <span className="block text-xs text-brand-950 font-medium">{t.register.transport.included}</span>
                           )}
                           {rideAllowed && evSeats && evSeats.capacity > 0 && (
-                            <span className="block text-xs text-brand-950/70 font-medium">{evSeats.available} ride seat{evSeats.available === 1 ? '' : 's'} left</span>
+                            <span className="block text-xs text-brand-950/70 font-medium">{t.register.transport.seatsLeft(evSeats.available)}</span>
                           )}
                           {!rideAllowed && (
                             <span className={`block text-xs font-semibold ${rideWaitlisted ? 'text-amber-700' : 'text-brand-950/70'}`}>
                               {evSeats && evSeats.capacity > 0
-                                ? 'Shop ride is full for this dive.'
-                                : 'No shop ride is set up for this dive yet.'}{' '}
+                                ? t.register.multi.rideFull
+                                : t.register.transport.rideNotSetup}{' '}
                               {rideWaitlisted
-                                ? "You're on the ride waitlist — the shop is notified and will try to arrange transport, but a seat isn't guaranteed."
-                                : 'Select this to join the ride waitlist; the shop will be notified.'}
+                                ? t.register.multi.rideWaitlisted
+                                : t.register.transport.selectToWaitlist}
                             </span>
                           )}
                         </span>
                       </label>
                       <label className="flex items-start gap-2 text-sm text-brand-950 font-medium">
                         <input type="radio" name={`t-${ev.id}`} checked={c.needsTransport === false} onChange={() => updateChoice(ev.id, { needsTransport: false })} className="accent-brand-900 mt-1" />
-                        <span className="flex-1">No, I'll get there myself</span>
+                        <span className="flex-1">{t.register.multi.transportNo}</span>
                       </label>
                     </fieldset>
                     {showNitroxAddon && (
                       <label className="flex items-start gap-2 text-sm text-brand-950 font-medium">
                         <input type="checkbox" checked={c.addNitroxCourse} onChange={e => updateChoice(ev.id, { addNitroxCourse: e.target.checked })} className="accent-brand-900 mt-1" />
-                        <span className="flex-1">Add Nitrox course (+{NITROX_COURSE_FEE.toLocaleString()})</span>
+                        <span className="flex-1">{t.register.nitroxAddon.label(NITROX_COURSE_FEE.toLocaleString())}</span>
                       </label>
                     )}
                   </div>
@@ -712,16 +712,16 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
 
         {step === 4 && (
           <section className="space-y-3">
-            <h2 className="text-lg font-bold text-brand-900">Payment</h2>
+            <h2 className="text-lg font-bold text-brand-900">{t.register.payment.title}</h2>
             <div className="space-y-2">
               {(['bank_transfer', 'paypal', 'credit_card', 'cash'] as const).map(method => (
                 <label key={method} className="flex gap-2 text-sm text-brand-950 font-medium items-start">
                   <input type="radio" name="payment" checked={payment === method} onChange={() => setPayment(method)} className="accent-brand-900 mt-1" />
                   <span className="flex-1">
-                    {method === 'bank_transfer' && 'Bank transfer'}
-                    {method === 'paypal' && 'PayPal (+5%)'}
-                    {method === 'credit_card' && 'Credit card (+5%)'}
-                    {method === 'cash' && 'Cash (in person at the shop)'}
+                    {method === 'bank_transfer' && t.register.payment.methodBankTransfer}
+                    {method === 'paypal' && t.register.payment.methodPaypal}
+                    {method === 'credit_card' && t.register.payment.methodCreditCard}
+                    {method === 'cash' && t.register.payment.methodCash}
                   </span>
                 </label>
               ))}
@@ -729,12 +729,12 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
 
             {payment === 'credit_card' && (
               <label className="block">
-                <span className="block text-xs text-brand-900 font-medium mb-1">Invoice email (optional)</span>
+                <span className="block text-xs text-brand-900 font-medium mb-1">{t.register.payment.invoiceEmailLabel}</span>
                 <input
                   type="email"
                   value={creditCardInvoiceEmail}
                   onChange={e => setCreditCardInvoiceEmail(e.target.value)}
-                  placeholder="Defaults to your registered email"
+                  placeholder={t.register.payment.invoiceEmailPlaceholder}
                   className="w-full bg-white border border-surface-300 rounded-lg px-3 py-2 text-sm text-brand-900"
                 />
               </label>
@@ -749,10 +749,9 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                   className="accent-brand-900 mt-1"
                 />
                 <span className="flex-1">
-                  I'll pay for everyone in this group
+                  {t.register.payment.payForEveryone}
                   <span className="block text-xs text-brand-900/80">
-                    The whole group's balance sits on your account; the other divers
-                    won't be billed separately. Uncheck to have each diver pay their own.
+                    {t.register.payment.payForEveryoneDetail}
                   </span>
                 </span>
               </label>
@@ -772,7 +771,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                     {b && (
                       <div className="pl-3 space-y-0.5 text-xs text-brand-900/80">
                         {b.charges.map((cl, ci) => (
-                          <Row key={`${cl.kind}-${ci}`} label={cl.kind === 'base' ? 'Event' : cl.label} value={cl.amount} currency={ev.currency} />
+                          <Row key={`${cl.kind}-${ci}`} label={cl.kind === 'base' ? t.register.multi.eventRowLabel : cl.label} value={cl.amount} currency={ev.currency} />
                         ))}
                       </div>
                     )}
@@ -780,19 +779,19 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                 )
               })}
               <div className="border-t border-surface-200 pt-1 mt-1 flex justify-between font-bold text-brand-900">
-                <span>Grand total</span>
+                <span>{t.register.multi.grandTotal}</span>
                 <span>{cart[0]?.currency ?? siteConfig.locale.currency} {grandTotal.toLocaleString()}</span>
               </div>
             </div>
 
             <p className="text-xs text-red-700 bg-red-50 border border-accent rounded p-2">
-              Reservations are confirmed once deposit (or full payment) is received.
+              {t.register.multi.reservationsConfirmed}
             </p>
 
             {leadMissingW.length > 0 && (
-              <div className="text-xs text-brand-950 font-medium bg-amber-400/10 border border-amber-400/40 rounded-lg p-3 space-y-2" aria-label="Outstanding waivers">
-                <p className="font-semibold text-amber-800">Waivers to sign before these events</p>
-                <p>You can still book now — sign these now or any time from your profile.</p>
+              <div className="text-xs text-brand-950 font-medium bg-amber-400/10 border border-amber-400/40 rounded-lg p-3 space-y-2" aria-label={t.register.waivers.ariaOutstanding}>
+                <p className="font-semibold text-amber-800">{t.register.multi.waiversToSign}</p>
+                <p>{t.register.multi.waiversStillBook}</p>
                 <ul className="space-y-1">
                   {leadMissingW.map(entry => (
                     <li key={`${entry.def.code}:${entry.event?.id ?? 'annual'}`} className="flex items-center justify-between gap-2">
@@ -805,7 +804,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                         onClick={() => setSigningW(entry)}
                         className="shrink-0 px-2.5 py-1 rounded-lg bg-brand-900 hover:bg-brand-950 text-white text-xs font-semibold"
                       >
-                        Sign now
+                        {t.register.waivers.signNow}
                       </button>
                     </li>
                   ))}
@@ -815,7 +814,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
 
             {submitResults && submitResults.some(r => !r.ok) && (
               <div className="text-xs bg-amber-50 border border-amber-400 rounded p-2 space-y-1">
-                <p className="font-semibold text-amber-900">Some events could not be booked:</p>
+                <p className="font-semibold text-amber-900">{t.register.multi.someEventsFailed}</p>
                 {submitResults.filter(r => !r.ok).map(r => {
                   const ev = cart.find(e => e.id === r.eventId)
                   return (
@@ -837,7 +836,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
             disabled={step === 1}
             className="text-sm text-brand-900 font-medium hover:text-brand-900 disabled:opacity-40"
           >
-            ‹ Back
+            {t.register.back}
           </button>
           {step < 4 ? (
             <button
@@ -849,7 +848,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
               }
               className="bg-brand-900 hover:bg-brand-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
             >
-              Next ›
+              {t.register.next}
             </button>
           ) : (
             <button
@@ -860,7 +859,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
               {saving && (
                 <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" />
               )}
-              {saving ? 'Submitting…' : `Confirm ${cart.length} booking${cart.length === 1 ? '' : 's'}`}
+              {saving ? t.register.multi.submitting : t.register.multi.confirmBookings(cart.length)}
             </button>
           )}
         </footer>

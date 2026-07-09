@@ -4,6 +4,7 @@ import { buildRegistrationCharges, estimateTotal, rangeDaysNights } from '../../
 import { errorMessage } from '../../lib/errors'
 import { DateField } from '../DateField'
 import { siteConfig } from '../../config/site'
+import { t } from '../../i18n'
 import type { PackageTierItem, EOAddon, EORoom } from '../../types/database'
 import {
   MODAL_BACKDROP, MODAL_PANEL, INPUT, INPUT_LABEL,
@@ -180,12 +181,12 @@ export function RegisterWizard(props: Props) {
         <div onClick={e => e.stopPropagation()} className={`${MODAL_PANEL} w-full max-w-md p-6 space-y-4`}>
           <div className="flex items-start justify-between">
             <div>
-              <h2 className={`${TEXT_HEADING} text-lg`}>Register — {title}</h2>
+              <h2 className={`${TEXT_HEADING} text-lg`}>{t.register.wizard.registerTitle(title)}</h2>
               <p className={`${TEXT_SUBTLE} text-xs`}>
-                {subtitle ? `${subtitle} · ` : ''}step {stepIdx + 1} of {stepKinds.length}
+                {subtitle ? `${subtitle} · ` : ''}{t.register.wizard.stepOf(stepIdx + 1, stepKinds.length)}
               </p>
             </div>
-            <button type="button" onClick={onClose} aria-label="Close"
+            <button type="button" onClick={onClose} aria-label={t.register.close}
               className="text-brand-50 hover:text-red-300 text-xl leading-none">×</button>
           </div>
 
@@ -193,7 +194,7 @@ export function RegisterWizard(props: Props) {
 
           {kind === 'tier' && tiers && (
             <fieldset className="space-y-2">
-              <legend className={`${INPUT_LABEL} mb-0`}>Choose a package</legend>
+              <legend className={`${INPUT_LABEL} mb-0`}>{t.register.wizard.choosePackage}</legend>
               {tiers.map(t => (
                 <label key={t.id} className="flex items-center justify-between gap-3 bg-white/5 border border-white/15 rounded-lg px-3 py-2 cursor-pointer">
                   <span className="flex items-center gap-2">
@@ -203,26 +204,26 @@ export function RegisterWizard(props: Props) {
                   <span className={`text-sm ${TEXT_HEADING}`}>{t.price.toLocaleString()} {t.currency}</span>
                 </label>
               ))}
-              {tiers.length === 0 && <p className={`text-sm ${TEXT_SUBTLE}`}>No tiers available.</p>}
+              {tiers.length === 0 && <p className={`text-sm ${TEXT_SUBTLE}`}>{t.register.wizard.noTiers}</p>}
             </fieldset>
           )}
 
           {kind === 'dates' && (
             <div className="space-y-3">
-              <p className={`text-sm ${TEXT_BODY}`}>Which dates would you like to do this trip?</p>
+              <p className={`text-sm ${TEXT_BODY}`}>{t.register.wizard.whichDates}</p>
               <div>
-                <label htmlFor="rw-start" className={INPUT_LABEL}>Preferred start</label>
-                <DateField id="rw-start" value={start} onChange={setStart} className={INPUT} aria-label="Preferred start date" />
+                <label htmlFor="rw-start" className={INPUT_LABEL}>{t.register.wizard.preferredStart}</label>
+                <DateField id="rw-start" value={start} onChange={setStart} className={INPUT} aria-label={t.register.wizard.preferredStartAria} />
               </div>
               <div>
-                <label htmlFor="rw-end" className={INPUT_LABEL}>Preferred end</label>
-                <DateField id="rw-end" value={end} onChange={setEnd} min={start || undefined} className={INPUT} aria-label="Preferred end date" />
+                <label htmlFor="rw-end" className={INPUT_LABEL}>{t.register.wizard.preferredEnd}</label>
+                <DateField id="rw-end" value={end} onChange={setEnd} min={start || undefined} className={INPUT} aria-label={t.register.wizard.preferredEndAria} />
               </div>
               {start && end && end > start && (
-                <p className={`text-xs ${TEXT_SUBTLE}`}>{nights} night{nights === 1 ? '' : 's'} · {days} day{days === 1 ? '' : 's'}</p>
+                <p className={`text-xs ${TEXT_SUBTLE}`}>{t.register.wizard.nightsPrefix(nights)}{t.register.wizard.daysOnly(days)}</p>
               )}
               {start && end && end <= start && (
-                <p className={`text-xs ${TEXT_SUBTLE}`}>Pick an end date at least one night after the start.</p>
+                <p className={`text-xs ${TEXT_SUBTLE}`}>{t.register.wizard.pickEndDate}</p>
               )}
             </div>
           )}
@@ -231,29 +232,29 @@ export function RegisterWizard(props: Props) {
             <div className="space-y-3">
               {dateMode === 'fixed' && (fixedStart || fixedEnd) && (
                 <p className={`text-xs ${TEXT_SUBTLE}`}>
-                  {nights > 0 ? `${nights} night${nights === 1 ? '' : 's'} · ` : ''}{days} day{days === 1 ? '' : 's'}
+                  {nights > 0 ? t.register.wizard.nightsPrefix(nights) : ''}{t.register.wizard.daysOnly(days)}
                 </p>
               )}
               {addons.length > 0 && (
                 <fieldset className="space-y-1">
-                  <legend className={`${INPUT_LABEL} mb-0`}>Add-ons <span className={TEXT_SUBTLE}>(per day)</span></legend>
+                  <legend className={`${INPUT_LABEL} mb-0`}>{t.register.addons.title} <span className={TEXT_SUBTLE}>{t.register.wizard.perDay}</span></legend>
                   {addons.map(a => (
                     <label key={a.id} className="flex items-center justify-between gap-3 bg-white/5 border border-white/15 rounded-lg px-3 py-2 cursor-pointer">
                       <span className="flex items-center gap-2">
                         <input type="checkbox" checked={addonIds.has(a.id)} onChange={() => toggleAddon(a.id)} />
                         <span className={`text-sm ${TEXT_BODY}`}>{addonLabel(a)}</span>
                       </span>
-                      <span className={`text-sm ${TEXT_SUBTLE}`}>{(a.price ?? 0).toLocaleString()}/day</span>
+                      <span className={`text-sm ${TEXT_SUBTLE}`}>{t.register.wizard.pricePerDay((a.price ?? 0).toLocaleString())}</span>
                     </label>
                   ))}
                 </fieldset>
               )}
               {rooms.length > 0 && (
                 <fieldset className="space-y-1">
-                  <legend className={`${INPUT_LABEL} mb-0`}>Room <span className={TEXT_SUBTLE}>(per night)</span></legend>
+                  <legend className={`${INPUT_LABEL} mb-0`}>{t.register.room.title} <span className={TEXT_SUBTLE}>{t.register.wizard.perNight}</span></legend>
                   <label className="flex items-center gap-2 bg-white/5 border border-white/15 rounded-lg px-3 py-2 cursor-pointer">
                     <input type="radio" name="room" checked={roomId === null} onChange={() => setRoomId(null)} />
-                    <span className={`text-sm ${TEXT_BODY}`}>No room</span>
+                    <span className={`text-sm ${TEXT_BODY}`}>{t.register.wizard.noRoom}</span>
                   </label>
                   {rooms.map(r => (
                     <label key={r.id} className="flex items-center justify-between gap-3 bg-white/5 border border-white/15 rounded-lg px-3 py-2 cursor-pointer">
@@ -261,13 +262,13 @@ export function RegisterWizard(props: Props) {
                         <input type="radio" name="room" checked={roomId === r.id} onChange={() => setRoomId(r.id)} />
                         <span className={`text-sm ${TEXT_BODY}`}>{roomLabel(r)}</span>
                       </span>
-                      <span className={`text-sm ${TEXT_SUBTLE}`}>{(r.added_price ?? 0).toLocaleString()}/night</span>
+                      <span className={`text-sm ${TEXT_SUBTLE}`}>{t.register.wizard.pricePerNight((r.added_price ?? 0).toLocaleString())}</span>
                     </label>
                   ))}
                 </fieldset>
               )}
               {addons.length === 0 && rooms.length === 0 && (
-                <p className={`text-sm ${TEXT_SUBTLE}`}>No add-ons or room options for this trip.</p>
+                <p className={`text-sm ${TEXT_SUBTLE}`}>{t.register.wizard.noExtras}</p>
               )}
             </div>
           )}
@@ -275,12 +276,12 @@ export function RegisterWizard(props: Props) {
           {kind === 'review' && (
             <div className="space-y-3">
               <div>
-                <label htmlFor="rw-notes" className={INPUT_LABEL}>Anything to tell the shop? (optional)</label>
+                <label htmlFor="rw-notes" className={INPUT_LABEL}>{t.register.wizard.notesLabel}</label>
                 <textarea id="rw-notes" rows={3} value={notes} onChange={e => setNotes(e.target.value)}
-                  className={INPUT} placeholder="Dietary needs, experience level, questions…" />
+                  className={INPUT} placeholder={t.register.wizard.notesPlaceholder} />
               </div>
               <div className="bg-white/5 border border-white/15 rounded-lg p-3 space-y-1">
-                <p className={`text-sm ${TEXT_HEADING}`}>Cost estimate</p>
+                <p className={`text-sm ${TEXT_HEADING}`}>{t.register.wizard.costEstimate}</p>
                 {charges.map((c, i) => (
                   <div key={i} className="flex justify-between text-xs">
                     <span className={TEXT_BODY}>{c.label}</span>
@@ -288,7 +289,7 @@ export function RegisterWizard(props: Props) {
                   </div>
                 ))}
                 <div className="flex justify-between text-sm font-bold pt-1 border-t border-white/10">
-                  <span className={TEXT_HEADING}>Estimated total</span>
+                  <span className={TEXT_HEADING}>{t.register.wizard.estimatedTotal}</span>
                   <span className={TEXT_HEADING}>{money(total)}</span>
                 </div>
               </div>
@@ -299,14 +300,14 @@ export function RegisterWizard(props: Props) {
           <div className="flex gap-2 pt-1">
             {stepIdx > 0 && (
               <button type="button" className={`${BTN_SECONDARY} flex-1 px-4`} disabled={submitting}
-                onClick={() => setStepIdx(stepIdx - 1)}>Back</button>
+                onClick={() => setStepIdx(stepIdx - 1)}>{t.register.wizard.backPlain}</button>
             )}
             {kind !== 'review' ? (
               <button type="button" className={`${BTN_PRIMARY} flex-1 disabled:opacity-50`} disabled={!canProceed}
-                onClick={() => setStepIdx(stepIdx + 1)}>Next</button>
+                onClick={() => setStepIdx(stepIdx + 1)}>{t.register.wizard.nextPlain}</button>
             ) : (
               <button type="button" className={`${BTN_PRIMARY} flex-1 disabled:opacity-50`} disabled={submitting || !tierOk}
-                onClick={submit}>{submitting ? 'Sending…' : 'Register'}</button>
+                onClick={submit}>{submitting ? t.register.wizard.sending : t.common.register}</button>
             )}
           </div>
         </div>

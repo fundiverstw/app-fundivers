@@ -9,6 +9,7 @@ import { computeEffectiveFullPaymentDeadline } from '../../lib/payment-deadlines
 import { paymentInstructionsFor } from '../../lib/payment-instructions'
 import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../lib/gear'
 import { siteConfig } from '../../config/site'
+import { t } from '../../i18n'
 import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
 import { fetchCreditsForUser, openCreditBalance, applyCreditToBooking } from '../../lib/credits'
 import { invokeWithRetry } from '../../lib/edge-invoke'
@@ -95,7 +96,7 @@ async function readFunctionsError(error: { message: string; context?: unknown },
     } catch { /* fall back to wrapper text */ }
   }
   if (isGuest && /already.*registered|already.*exists/i.test(msg)) {
-    return 'An account with that email already exists. Use "Sign in" at the top of the page to continue with this email.'
+    return t.register.errors.emailExists
   }
   return msg
 }
@@ -274,8 +275,8 @@ function formatSelectionLabel(selection: Profile[], selfId: string | null): stri
   if (selection.length === 0) return null
   const names = selection.map(p =>
     (selfId && p.id === selfId)
-      ? 'Myself'
-      : (personName(p.name, p.nickname) || '(unnamed)')
+      ? t.register.picker.myself
+      : (personName(p.name, p.nickname) || t.register.picker.unnamed)
   )
   return names.join(', ')
 }
@@ -316,10 +317,10 @@ function DiverPickerStep({
         <div className="flex items-start justify-between gap-3">
           <h1 className="text-xl font-bold text-brand-900 leading-tight">{eventTitle}</h1>
           {onCancel && (
-            <button onClick={onCancel} className="text-brand-900 font-medium text-xl leading-none shrink-0" aria-label="Close">×</button>
+            <button onClick={onCancel} className="text-brand-900 font-medium text-xl leading-none shrink-0" aria-label={t.register.close}>×</button>
           )}
         </div>
-        <p className="text-xs text-brand-900 font-medium">Who is this booking for? (Select one or more)</p>
+        <p className="text-xs text-brand-900 font-medium">{t.register.picker.whoFor}</p>
       </header>
       <ul className="space-y-2">
         {all.map(p => {
@@ -336,22 +337,22 @@ function DiverPickerStep({
                   type="checkbox"
                   checked={checked}
                   onChange={() => toggle(p.id)}
-                  aria-label={isSelf ? 'Myself' : (p.name ?? '(unnamed child)')}
+                  aria-label={isSelf ? t.register.picker.myself : (p.name ?? t.register.picker.unnamedChild)}
                   className="accent-brand-900 mt-1"
                 />
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-brand-900">
-                    {isSelf ? 'Myself' : (
+                    {isSelf ? t.register.picker.myself : (
                       <>
-                        {p.name ?? '(no name)'}
+                        {p.name ?? t.register.picker.noName}
                         {p.nickname && <span className="text-brand-900/80"> ({p.nickname})</span>}
                       </>
                     )}
                   </p>
                   <p className="text-xs text-brand-900/70">
                     {isSelf
-                      ? (personName(p.name, p.nickname) || '(your account)')
-                      : (p.cert_agency && p.cert_level ? `${p.cert_agency} ${p.cert_level}` : 'Uncertified')}
+                      ? (personName(p.name, p.nickname) || t.register.picker.yourAccount)
+                      : (p.cert_agency && p.cert_level ? `${p.cert_agency} ${p.cert_level}` : t.register.picker.uncertified)}
                     {!isSelf && p.status && p.status !== 'active' && (
                       <span className="ml-2 uppercase tracking-wider text-red-700">{p.status}</span>
                     )}
@@ -363,7 +364,7 @@ function DiverPickerStep({
         })}
       </ul>
       <p className="text-xs text-brand-950 font-medium">
-        Each diver gets their own booking — extras and payment choices apply to all of them.
+        {t.register.picker.eachDiver}
       </p>
       <footer className="flex items-center justify-end gap-2 pt-2">
         <button
@@ -375,7 +376,7 @@ function DiverPickerStep({
           }}
           className="bg-brand-900 hover:bg-brand-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
         >
-          Continue ›
+          {t.register.picker.continueArrow}
         </button>
       </footer>
     </>
@@ -798,7 +799,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           .select('name')
           .eq('id', row.prereq_cert_id)
           .maybeSingle()
-        certName = (cl as { name?: string } | null)?.name ?? 'a higher certification'
+        certName = (cl as { name?: string } | null)?.name ?? t.register.prereq.higherCertFallback
       }
       const digits = typeof row.req_dives === 'number'
         ? row.req_dives
@@ -943,7 +944,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       transport: transportCost,
       nitroxCourse: (showNitroxAddon && addNitroxCourse) ? NITROX_COURSE_FEE : 0,
       surcharge: paymentSurcharge > 0
-        ? { label: `Card/PayPal surcharge (5%${payingDepositOnly ? ' of deposit' : ''})`, amount: total - subTotal }
+        ? { label: payingDepositOnly ? t.register.payment.cardSurchargeDeposit : t.register.payment.cardSurcharge, amount: total - subTotal }
         : null,
     })
   }, [base, showGearRentChoice, gearChoice, gearItems, diveDays, showRooms, roomId, rooms, roomCost,
@@ -980,7 +981,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         nitroxCardPath = await uploadNitroxCard(userId, nitroxFile)
       } catch (e) {
         setSaving(false)
-        setErr(`Could not upload nitrox card: ${e instanceof Error ? e.message : 'unknown error'}`)
+        setErr(t.register.errors.uploadNitrox(e instanceof Error ? e.message : t.register.errors.unknownError))
         return
       }
     }
@@ -990,7 +991,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         deepCardPath = await uploadDeepCard(userId, deepFile)
       } catch (e) {
         setSaving(false)
-        setErr(`Could not upload deep card: ${e instanceof Error ? e.message : 'unknown error'}`)
+        setErr(t.register.errors.uploadDeep(e instanceof Error ? e.message : t.register.errors.unknownError))
         return
       }
     }
@@ -1000,7 +1001,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         certCardPath = await uploadCertCard(userId, certFile)
       } catch (e) {
         setSaving(false)
-        setErr(`Could not upload certification card: ${e instanceof Error ? e.message : 'unknown error'}`)
+        setErr(t.register.errors.uploadCert(e instanceof Error ? e.message : t.register.errors.unknownError))
         return
       }
     }
@@ -1151,7 +1152,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       }
       setSaving(false); setErr(msg); return
     }
-    if (!data?.booking_id) { setSaving(false); setErr('Registration failed — please try again.'); return }
+    if (!data?.booking_id) { setSaving(false); setErr(t.register.errors.registrationFailed); return }
 
     // Guest path returns the session so we can sign the diver in
     // immediately; authed callers already have a session.
@@ -1219,12 +1220,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           },
         )
         if (e) throw new Error(await readFunctionsError(e, false))
-        if (!d?.booking_id) throw new Error('Registration failed')
+        if (!d?.booking_id) throw new Error(t.register.errors.registrationFailedShort)
         return d
       })
       const settled = await Promise.allSettled(calls)
       const results = settled.map((res, i) => ({
-        targetName: personName(additionalTargets[i].name, additionalTargets[i].nickname) || '(diver)',
+        targetName: personName(additionalTargets[i].name, additionalTargets[i].nickname) || t.register.results.diverFallback,
         ok:    res.status === 'fulfilled',
         error: res.status === 'rejected'
           ? (res.reason instanceof Error ? res.reason.message : String(res.reason))
@@ -1257,7 +1258,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     }
 
     setSaving(false)
-    if (!allOk) { setErr('Some divers could not be registered — see details below.'); return }
+    if (!allOk) { setErr(t.register.errors.someDiversFailed); return }
     // Booking landed — the resume draft has served its purpose; drop it so a
     // return visit doesn't re-offer a stale in-progress form.
     if (draftKey) clearRegistrationDraft(draftKey)
@@ -1279,7 +1280,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       <div className="space-y-4">
         <header className="space-y-1">
           <h1 className="text-xl font-bold text-brand-900 leading-tight">
-            {waitlisted ? "You're on the waitlist" : 'Registration submitted'}
+            {waitlisted ? t.register.done.waitlistTitle : t.register.done.submittedTitle}
           </h1>
           <p className="text-xs text-brand-900 font-medium">
             {event.title} · {formatEventSpan(event, { style: 'long' })}
@@ -1287,7 +1288,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         </header>
         {creditApplied > 0 && (
           <p className="text-sm font-semibold text-emerald-800 bg-emerald-50 border border-emerald-400 rounded-lg p-3">
-            Applied {event.currency} {creditApplied.toLocaleString()} account credit to this booking.
+            {t.register.done.creditApplied(event.currency, creditApplied.toLocaleString())}
           </p>
         )}
         <WhatHappensNext waitlisted={waitlisted} />
@@ -1296,7 +1297,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             onClick={() => onSubmitSuccess(doneInline)}
             className="bg-brand-900 hover:bg-brand-950 text-white text-sm font-semibold py-2 px-5 rounded-lg"
           >
-            Done
+            {t.register.done.done}
           </button>
         </div>
       </div>
@@ -1313,18 +1314,18 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           )}
         </div>
         <p className="text-xs text-brand-900 font-medium">{formatEventSpan(event, { style: 'long' })}</p>
-        <p className="text-xs text-brand-900 font-medium">Step {step} of 4</p>
+        <p className="text-xs text-brand-900 font-medium">{t.register.stepOf(step)}</p>
         {pickerHeader && (
           <div className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-300 rounded-lg px-2 py-1">
             <span className="text-xs text-brand-900 font-semibold">
-              Booking for: {pickerHeader.targetName}
+              {t.register.header.bookingFor(pickerHeader.targetName)}
             </span>
             <button
               type="button"
               onClick={pickerHeader.onChange}
               className="text-xs text-brand-700 hover:underline font-semibold"
             >
-              change
+              {t.register.header.change}
             </button>
           </div>
         )}
@@ -1332,9 +1333,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
       {showResumeBanner && savedDraft && (
         <div className="bg-accent/15 border border-accent rounded-lg p-3 space-y-2">
-          <p className="text-sm text-brand-900 font-semibold">Pick up where you left off?</p>
+          <p className="text-sm text-brand-900 font-semibold">{t.register.resume.title}</p>
           <p className="text-xs text-brand-900">
-            We saved your answers on this device. Resume to skip re-entering them.
+            {t.register.resume.body}
           </p>
           <div className="flex gap-2">
             <button
@@ -1342,14 +1343,14 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               onClick={() => applyDraft(savedDraft)}
               className="bg-brand-900 hover:bg-brand-950 text-white text-xs font-semibold py-1.5 px-3 rounded-lg"
             >
-              Resume
+              {t.register.resume.resume}
             </button>
             <button
               type="button"
               onClick={discardDraft}
               className="text-brand-700 hover:underline text-xs font-semibold py-1.5 px-2"
             >
-              Start fresh
+              {t.register.resume.startFresh}
             </button>
           </div>
         </div>
@@ -1358,12 +1359,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       {step === 1 && (
         <section className="space-y-3">
           {event.price != null && (
-            <p className="text-sm text-brand-950 font-medium">From {event.currency} {event.price.toLocaleString()}</p>
+            <p className="text-sm text-brand-950 font-medium">{t.register.fromPrice(event.currency, event.price.toLocaleString())}</p>
           )}
           {pastBlocked && (
             <div role="alert" className="bg-red-50 border border-accent rounded-lg px-3 py-2 text-xs text-red-700">
-              <p className="font-semibold">This event has already taken place.</p>
-              <p>Registration is closed. Check the calendar for upcoming dives and courses.</p>
+              <p className="font-semibold">{t.register.past.title}</p>
+              <p>{t.register.past.body}</p>
             </div>
           )}
           {/* Title carries the "(N spot(s) open)" / "(fully booked …)"
@@ -1375,8 +1376,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               role="alert"
               className="bg-red-50 border border-accent rounded-lg px-3 py-2 text-xs text-red-700"
             >
-              <p className="font-semibold">This event is full — register for the waitlist.</p>
-              <p>If a spot opens we'll send a push and email — you'll have 24 hours to claim it.</p>
+              <p className="font-semibold">{t.register.full.title}</p>
+              <p>{t.register.full.body}</p>
             </div>
           )}
         </section>
@@ -1384,33 +1385,33 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
       {step === 2 && (
         <section className="space-y-4">
-          <h2 className="text-lg font-bold text-brand-900">About you</h2>
+          <h2 className="text-lg font-bold text-brand-900">{t.register.aboutYou}</h2>
           <p className="text-xs text-brand-900 font-medium">
-            Pre-filled if you've registered before. Edits are saved to your profile.
+            {t.register.step2.prefillHint}
           </p>
 
           {isGuest && (
             <div className="border border-surface-200 rounded-lg p-3 space-y-3 bg-surface-50">
               <div>
-                <p className="text-sm font-semibold text-brand-900">Account</p>
+                <p className="text-sm font-semibold text-brand-900">{t.register.account.title}</p>
                 <p className="text-xs text-brand-900 font-medium">
-                  We'll create a {siteConfig.identity.shortName} account for you so you can check your booking status and sign up for future events faster.
+                  {t.register.account.body(siteConfig.identity.shortName)}
                 </p>
               </div>
-              <TextField label="Email *" type="email" value={guestEmail} onChange={setGuestEmail} required />
-              <TextField label="Password * (min 8 characters)" type="password" value={guestPassword} onChange={setGuestPassword} required />
+              <TextField label={t.register.account.emailLabel} type="email" value={guestEmail} onChange={setGuestEmail} required />
+              <TextField label={t.register.account.passwordLabel} type="password" value={guestPassword} onChange={setGuestPassword} required />
               <label className="flex items-start gap-2 text-xs text-brand-950 font-medium">
                 <input type="checkbox" checked={guestAgreedTerms} onChange={e => setGuestAgreedTerms(e.target.checked)} className="accent-brand-900 mt-0.5" />
                 <span>
-                  I agree to the{' '}
-                  <a href="/terms" target="_blank" rel="noreferrer" className="text-brand-700 hover:underline">Terms of Use & Privacy</a>.
+                  {t.register.account.agreePrefix}{' '}
+                  <a href="/terms" target="_blank" rel="noreferrer" className="text-brand-700 hover:underline">{t.register.account.termsLink}</a>.
                 </span>
               </label>
               {turnstileSiteKey ? (
                 <TurnstileWidget siteKey={turnstileSiteKey} onToken={setTurnstileToken} />
               ) : (
                 <p role="alert" className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
-                  Account registration is temporarily unavailable. Please contact us directly to book this event.
+                  {t.register.account.unavailable}
                 </p>
               )}
             </div>
@@ -1418,41 +1419,41 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
           <div className="space-y-3">
             <TextField
-              label="Name *"
+              label={t.register.step2.nameLabel}
               value={fullName}
               onChange={setFullName}
               required
-              hint="First and last name, exactly as it appears on your passport / ID."
+              hint={t.register.step2.nameHint}
             />
             <TextField
-              label="Nickname (optional)"
+              label={t.register.step2.nicknameLabel}
               value={nickname}
               onChange={setNickname}
-              placeholder="An English name, alias, or what you'd like to be called"
+              placeholder={t.register.step2.nicknamePlaceholder}
             />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <TextField label="Date of birth" type="date" value={dob} onChange={setDob} />
-              <TextField label="Nationality *" value={nationality} onChange={setNationality} required />
+              <TextField label={t.register.step2.dobLabel} type="date" value={dob} onChange={setDob} />
+              <TextField label={t.register.nationalityRequired} value={nationality} onChange={setNationality} required />
             </div>
-            <TextField label="Passport / ID number" value={idNumber} onChange={setIdNumber} />
+            <TextField label={t.register.step2.idLabel} value={idNumber} onChange={setIdNumber} />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="block">
-                <span className="block text-xs text-brand-900 font-medium mb-1">Gender *</span>
+                <span className="block text-xs text-brand-900 font-medium mb-1">{t.register.genderRequired}</span>
                 <select
                   value={gender}
                   onChange={e => setGender(e.target.value)}
                   className="w-full bg-white border border-surface-300 rounded-lg px-2 py-2 text-sm text-brand-900"
                 >
                   <option value="">—</option>
-                  <option value="female">Female</option>
-                  <option value="male">Male</option>
-                  <option value="other">Other</option>
-                  <option value="prefer_not_to_say">Prefer not to say</option>
+                  <option value="female">{t.register.genderFemale}</option>
+                  <option value="male">{t.register.genderMale}</option>
+                  <option value="other">{t.register.genderOther}</option>
+                  <option value="prefer_not_to_say">{t.register.genderPreferNot}</option>
                 </select>
               </label>
               <label className="block">
-                <span className="block text-xs text-brand-900 font-medium mb-1">Preferred contact</span>
+                <span className="block text-xs text-brand-900 font-medium mb-1">{t.register.preferredContact}</span>
                 <select
                   value={contactMethod}
                   onChange={e => setContactMethod(e.target.value as ContactMethod | '')}
@@ -1461,17 +1462,17 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                   <option value="">—</option>
                   <option value="line">LINE</option>
                   <option value="whatsapp">WhatsApp</option>
-                  <option value="phone">Phone</option>
-                  <option value="email">Email</option>
+                  <option value="phone">{t.register.contactPhone}</option>
+                  <option value="email">{t.register.contactEmail}</option>
                 </select>
               </label>
             </div>
             {contactMethod && (
-              <TextField label={`${contactMethod === 'email' ? 'Email' : 'ID / number'}`} value={contactId} onChange={setContactId} />
+              <TextField label={contactMethod === 'email' ? t.register.contactEmail : t.register.contactIdNumber} value={contactId} onChange={setContactId} />
             )}
 
             <div className="border-t border-surface-200 pt-3 space-y-3">
-              <p className="text-xs text-brand-900 font-medium uppercase tracking-wider">Diving</p>
+              <p className="text-xs text-brand-900 font-medium uppercase tracking-wider">{t.register.diving}</p>
               {!isOnBehalfOf && (
                 <label className="flex items-center gap-2 text-sm text-brand-950 font-medium">
                   <input
@@ -1484,18 +1485,18 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                     }}
                     className="accent-brand-900"
                   />
-                  I'm not certified yet (Discover / trial diver)
+                  {t.register.notCertified}
                 </label>
               )}
               {!uncertified && (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <TextField label="Cert agency" placeholder="PADI, SSI…" value={certAgency} onChange={setCertAgency} />
-                    <TextField label="Cert level" placeholder="OW, AOW…" value={certLevel} onChange={setCertLevel} />
+                    <TextField label={t.register.certAgency} placeholder={t.register.certAgencyPlaceholder} value={certAgency} onChange={setCertAgency} />
+                    <TextField label={t.register.certLevel} placeholder={t.register.certLevelPlaceholder} value={certLevel} onChange={setCertLevel} />
                   </div>
                   {certDeclarationBlocked && (
                     <p className="text-xs text-red-700 font-medium">
-                      Enter your certification level, or tick "I'm not certified yet" above.
+                      {t.register.certDeclarationError}
                     </p>
                   )}
                 </>
@@ -1503,31 +1504,30 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               {!uncertified && certLevel.trim() !== '' && !hasCertCardOnFile && !isOnBehalfOf && (
                 <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
                   <p className="text-xs font-semibold text-brand-900">
-                    Add proof of your certification
+                    {t.register.cert.addProof}
                   </p>
                   <p className="text-xs text-brand-950 font-medium">
-                    Upload a photo of your highest certification card. It's stored
-                    privately and only visible to {siteConfig.identity.shortName} staff.
+                    {t.register.cert.uploadHint(siteConfig.identity.shortName)}
                   </p>
                   <label className="block cursor-pointer bg-brand-900 hover:bg-brand-950 text-white text-sm font-semibold py-2 px-3 rounded-lg text-center">
                     <input
                       type="file"
                       accept="image/*,.heic,.heif"
-                      aria-label="Upload highest certification card"
+                      aria-label={t.register.cert.uploadAria}
                       className="hidden"
                       onChange={e => {
                         const file = e.target.files?.[0] ?? null
                         e.target.value = ''
                         setCertFileErr(null)
                         if (file && !file.type.startsWith('image/') && !isHeicFile(file)) {
-                          setCertFileErr('Please choose an image file.')
+                          setCertFileErr(t.register.errors.chooseImage)
                           return
                         }
                         setCertFile(file)
                         if (file) setCertCardAck(false)
                       }}
                     />
-                    {certFile ? `Replace photo (${certFile.name})` : 'Choose photo'}
+                    {certFile ? t.register.replacePhoto(certFile.name) : t.register.choosePhoto}
                   </label>
                   {certFileErr && <p className="text-xs text-red-700">{certFileErr}</p>}
                   {!certFile && (
@@ -1539,9 +1539,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                         className="accent-brand-900 mt-0.5"
                       />
                       <span>
-                        Can't upload now? I'll bring my physical certification card
-                        on the day of the event. I understand that without proof of
-                        certification I may be denied participation, with no refund.
+                        {t.register.cert.ack}
                       </span>
                     </label>
                   )}
@@ -1549,107 +1547,102 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               )}
               {!uncertified && certLevel.trim() !== '' && hasCertCardOnFile && (
                 <p className="text-xs text-brand-950 font-medium">
-                  Certification card on file. (Update it from your profile if
-                  it's changed.)
+                  {t.register.cert.onFile}
                 </p>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <TextField
-                  label="Logged dives" type="number" min={0}
+                  label={t.register.loggedDives} type="number" min={0}
                   value={loggedDives === 0 ? '' : String(loggedDives)}
                   onChange={v => setLoggedDives(Number(v) || 0)}
                 />
                 <label className="flex items-center sm:items-end gap-2 text-sm text-brand-950 font-medium sm:pb-2">
                   <input type="checkbox" checked={nitroxCertified} onChange={e => setNitroxCertified(e.target.checked)} className="accent-brand-900" />
-                  Nitrox certified
+                  {t.register.nitroxCertified}
                 </label>
                 <label className="flex items-center sm:items-end gap-2 text-sm text-brand-950 font-medium sm:pb-2">
                   <input type="checkbox" checked={deepCertified} onChange={e => setDeepCertified(e.target.checked)} className="accent-brand-900" />
-                  Deep certified (40m)
+                  {t.register.deepCertified}
                 </label>
               </div>
               {nitroxCertified && !hasNitroxCardOnFile && !isOnBehalfOf && (
                 <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
                   <p className="text-xs font-semibold text-brand-900">
-                    Upload a photo of your nitrox certification card *
+                    {t.register.nitrox.uploadTitle}
                   </p>
                   <p className="text-xs text-brand-950 font-medium">
-                    Required because you marked yourself as nitrox certified. The
-                    photo is stored privately and only visible to {siteConfig.identity.shortName} staff.
+                    {t.register.nitrox.uploadHint(siteConfig.identity.shortName)}
                   </p>
                   <label className="block cursor-pointer bg-brand-900 hover:bg-brand-950 text-white text-sm font-semibold py-2 px-3 rounded-lg text-center">
                     <input
                       type="file"
                       accept="image/*,.heic,.heif"
-                      aria-label="Upload nitrox certification card"
+                      aria-label={t.register.nitrox.uploadAria}
                       className="hidden"
                       onChange={e => {
                         const file = e.target.files?.[0] ?? null
                         e.target.value = ''
                         setNitroxFileErr(null)
                         if (file && !file.type.startsWith('image/') && !isHeicFile(file)) {
-                          setNitroxFileErr('Please choose an image file.')
+                          setNitroxFileErr(t.register.errors.chooseImage)
                           return
                         }
                         setNitroxFile(file)
                       }}
                     />
-                    {nitroxFile ? `Replace photo (${nitroxFile.name})` : 'Choose photo'}
+                    {nitroxFile ? t.register.replacePhoto(nitroxFile.name) : t.register.choosePhoto}
                   </label>
                   {nitroxFileErr && <p className="text-xs text-red-700">{nitroxFileErr}</p>}
                 </div>
               )}
               {nitroxCertified && hasNitroxCardOnFile && (
                 <p className="text-xs text-brand-950 font-medium">
-                  Nitrox card on file. (Update it from your profile if it's
-                  changed.)
+                  {t.register.nitrox.onFile}
                 </p>
               )}
               {deepCertified && !hasDeepCardOnFile && !isOnBehalfOf && (
                 <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
                   <p className="text-xs font-semibold text-brand-900">
-                    Upload a photo of your Deep certification card *
+                    {t.register.deep.uploadTitle}
                   </p>
                   <p className="text-xs text-brand-950 font-medium">
-                    Required because you marked yourself as Deep certified. The
-                    photo is stored privately and only visible to {siteConfig.identity.shortName} staff.
+                    {t.register.deep.uploadHint(siteConfig.identity.shortName)}
                   </p>
                   <label className="block cursor-pointer bg-brand-900 hover:bg-brand-950 text-white text-sm font-semibold py-2 px-3 rounded-lg text-center">
                     <input
                       type="file"
                       accept="image/*,.heic,.heif"
-                      aria-label="Upload deep certification card"
+                      aria-label={t.register.deep.uploadAria}
                       className="hidden"
                       onChange={e => {
                         const file = e.target.files?.[0] ?? null
                         e.target.value = ''
                         setDeepFileErr(null)
                         if (file && !file.type.startsWith('image/') && !isHeicFile(file)) {
-                          setDeepFileErr('Please choose an image file.')
+                          setDeepFileErr(t.register.errors.chooseImage)
                           return
                         }
                         setDeepFile(file)
                       }}
                     />
-                    {deepFile ? `Replace photo (${deepFile.name})` : 'Choose photo'}
+                    {deepFile ? t.register.replacePhoto(deepFile.name) : t.register.choosePhoto}
                   </label>
                   {deepFileErr && <p className="text-xs text-red-700">{deepFileErr}</p>}
                 </div>
               )}
               {deepCertified && hasDeepCardOnFile && (
                 <p className="text-xs text-brand-950 font-medium">
-                  Deep card on file. (Update it from your profile if it's
-                  changed.)
+                  {t.register.deep.onFile}
                 </p>
               )}
             </div>
 
             {prereqMismatch && (
               <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
-                <p className="text-xs font-semibold text-brand-900">This event has a prerequisite</p>
+                <p className="text-xs font-semibold text-brand-900">{t.register.prereq.title}</p>
                 <ul className="text-xs text-brand-950 font-medium list-disc pl-4 space-y-0.5">
-                  {prereqCertMismatch && <li>Requires {prereqCertName}, but you've marked yourself as not certified.</li>}
-                  {prereqDivesMismatch && <li>Requires at least {prereqReqDives} logged dives (you've entered {loggedDives}).</li>}
+                  {prereqCertMismatch && <li>{t.register.prereq.certMismatch(prereqCertName ?? '')}</li>}
+                  {prereqDivesMismatch && <li>{t.register.prereq.divesMismatch(prereqReqDives ?? 0, loggedDives)}</li>}
                 </ul>
                 <label className="flex items-start gap-2 text-xs text-brand-950 font-medium border-t border-amber-300 pt-2">
                   <input
@@ -1659,19 +1652,17 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                     className="accent-brand-900 mt-0.5"
                   />
                   <span>
-                    I understand this requirement. I'll bring proof on the day, or
-                    contact {siteConfig.identity.shortName} first. Without meeting the
-                    prerequisite I may be denied participation, with no refund.
+                    {t.register.prereq.ack(siteConfig.identity.shortName)}
                   </span>
                 </label>
               </div>
             )}
 
             <div className="border-t border-surface-200 pt-3 space-y-3">
-              <p className="text-xs text-brand-900 font-medium uppercase tracking-wider">Emergency contact</p>
+              <p className="text-xs text-brand-900 font-medium uppercase tracking-wider">{t.register.emergencyContact}</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <TextField label="Name" value={emergencyName} onChange={setEmergencyName} />
-                <TextField label="Phone" type="tel" value={emergencyPhone} onChange={setEmergencyPhone} />
+                <TextField label={t.register.emergencyName} value={emergencyName} onChange={setEmergencyName} />
+                <TextField label={t.register.emergencyPhone} type="tel" value={emergencyPhone} onChange={setEmergencyPhone} />
               </div>
             </div>
           </div>
@@ -1680,24 +1671,23 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
       {step === 3 && (
         <section className="space-y-4">
-          <h2 className="text-lg font-bold text-brand-900">Extras</h2>
+          <h2 className="text-lg font-bold text-brand-900">{t.register.extras.title}</h2>
 
           {!gearIncluded && !showGearRentChoice && !showRooms && !showAddons && !showNitroxAddon && (
-            <p className="text-brand-900 font-medium text-sm">No extras for this event.</p>
+            <p className="text-brand-900 font-medium text-sm">{t.register.extras.none}</p>
           )}
 
           {gearIncluded && (
             <p className="text-sm text-brand-950 font-medium">
-              Gear is included with this course — no need to rent.
+              {t.register.gear.includedNote}
             </p>
           )}
 
           {showGearRentChoice && (
             <div className="space-y-2">
-              <p className="text-sm font-semibold text-brand-900">Gear rental</p>
+              <p className="text-sm font-semibold text-brand-900">{t.register.gear.title}</p>
               <p className="text-xs text-brand-950 font-medium">
-                This section is only about renting equipment from us. Tell us
-                exactly what you need so we can have it ready for you.
+                {t.register.gear.blurb}
               </p>
               {event.gear_rental_info && (
                 <p className="text-xs text-brand-950 font-medium">{event.gear_rental_info}</p>
@@ -1705,20 +1695,20 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               <div className="space-y-1">
                 <label className="flex items-start gap-2 text-sm text-brand-950 font-medium">
                   <input type="radio" name="gear-choice" checked={gearChoice === 'none'} onChange={() => setGearChoice('none')} className="accent-brand-900 mt-1" />
-                  <span className="flex-1">I have all the required gear, and I do not need to rent anything.</span>
+                  <span className="flex-1">{t.register.gear.optNone}</span>
                 </label>
                 <label className="flex items-start gap-2 text-sm text-brand-950 font-medium">
                   <input type="radio" name="gear-choice" checked={gearChoice === 'rent'} onChange={() => setGearChoice('rent')} className="accent-brand-900 mt-1" />
-                  <span className="flex-1">I need to rent some or all of the required gear.</span>
+                  <span className="flex-1">{t.register.gear.optRent}</span>
                 </label>
                 <label className="flex items-start gap-2 text-sm text-brand-950 font-medium">
                   <input type="radio" name="gear-choice" checked={gearChoice === 'help'} onChange={() => setGearChoice('help')} className="accent-brand-900 mt-1" />
-                  <span className="flex-1">I have no idea what I&apos;m doing and I need to ask a human.</span>
+                  <span className="flex-1">{t.register.gear.optHelp}</span>
                 </label>
               </div>
               {gearChoice === 'rent' && (
                 <div className="pl-6 space-y-2">
-                  <p className="text-xs text-brand-950 font-medium">Check the items you need us to prepare for you:</p>
+                  <p className="text-xs text-brand-950 font-medium">{t.register.checkItems}</p>
                   <div className="grid grid-cols-2 gap-1">
                     {GEAR_ITEMS.map(item => (
                       <label key={item} className="flex items-center gap-1 text-xs text-brand-950 font-medium">
@@ -1731,12 +1721,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                   {(askShoe || askHeight || askWeight) && (
                     <div className="border-t border-surface-200 pt-2 space-y-2">
                       <p className="text-xs font-semibold text-brand-900">
-                        We need your sizes to prep this gear
+                        {t.register.gear.sizesTitle}
                         <span className="text-red-600"> *</span>
                       </p>
                       {askHeight && (
                         <label className="block text-xs text-brand-950 font-medium">
-                          Height (cm)
+                          {t.register.gear.heightCm}
                           <input
                             type="number" min="1" step="0.1" inputMode="decimal"
                             value={heightCm}
@@ -1747,7 +1737,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                       )}
                       {askWeight && (
                         <label className="block text-xs text-brand-950 font-medium">
-                          Weight (kg)
+                          {t.register.gear.weightKg}
                           <input
                             type="number" min="1" step="0.1" inputMode="decimal"
                             value={weightKg}
@@ -1758,13 +1748,13 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                       )}
                       {askShoe && (
                         <div className="text-xs text-brand-950 font-medium">
-                          Shoe size
+                          {t.register.gear.shoeSize}
                           <div className="mt-0.5">
                             <ShoeSizeField initial={profile?.shoe_size ?? null} onChange={setShoeSize} />
                           </div>
                         </div>
                       )}
-                      <p className="text-[11px] text-brand-950/70 font-medium">Saved to your profile for next time.</p>
+                      <p className="text-[11px] text-brand-950/70 font-medium">{t.register.gear.savedForNext}</p>
                     </div>
                   )}
                 </div>
@@ -1772,14 +1762,13 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               {gearChoice === 'help' && (
                 <div className="pl-6 space-y-1">
                   <p className="text-xs text-brand-950 font-medium">
-                    No worries! Tell us about your gear situation and we&apos;ll
-                    sort it out with you.
+                    {t.register.gear.helpBlurb}
                   </p>
                   <textarea
                     value={gearHelpNote}
                     onChange={e => setGearHelpNote(e.target.value)}
                     rows={3}
-                    placeholder="e.g. I'm a new diver and not sure what I own or need — please advise."
+                    placeholder={t.register.gear.helpPlaceholder}
                     className="w-full bg-white border border-surface-300 rounded-lg px-2 py-1 text-sm text-brand-900"
                   />
                 </div>
@@ -1789,12 +1778,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
           {showRooms && rooms.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm text-brand-950 font-medium font-semibold">Room</p>
+              <p className="text-sm text-brand-950 font-medium font-semibold">{t.register.room.title}</p>
               <p className="text-xs text-brand-950 font-medium">
-                Your base price already includes a place to sleep — upgrading is optional.
+                {t.register.room.blurb}
               </p>
               <select value={roomId} onChange={e => setRoomId(e.target.value)} className="w-full bg-white border border-surface-300 rounded-lg px-2 py-1 text-sm text-brand-900">
-                <option value="">— keep included room —</option>
+                <option value="">{t.register.room.keepIncluded}</option>
                 {rooms.map(r => (
                   <option key={r.id} value={r.id}>
                     {r.display_title ?? r.admin_title} {r.added_price != null && `(+${r.added_price.toLocaleString()})`}
@@ -1802,14 +1791,14 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 ))}
               </select>
               {roomId && (
-                <input value={roomNotes} onChange={e => setRoomNotes(e.target.value)} placeholder="Roommate preferences, etc." className="w-full bg-white border border-surface-300 rounded-lg px-2 py-1 text-sm text-brand-900" />
+                <input value={roomNotes} onChange={e => setRoomNotes(e.target.value)} placeholder={t.register.room.notesPlaceholder} className="w-full bg-white border border-surface-300 rounded-lg px-2 py-1 text-sm text-brand-900" />
               )}
             </div>
           )}
 
           {showAddons && addons.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm text-brand-950 font-medium font-semibold">Add-ons</p>
+              <p className="text-sm text-brand-950 font-medium font-semibold">{t.register.addons.title}</p>
               <div className="max-h-40 overflow-y-auto grid grid-cols-1 gap-1 pr-1">
                 {addons.map(a => (
                   <label key={a.id} className="flex items-center gap-2 text-xs text-brand-950 font-medium">
@@ -1823,30 +1812,30 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           )}
 
           <fieldset className="space-y-2">
-            <legend className="text-sm font-semibold text-brand-900">Transportation *</legend>
+            <legend className="text-sm font-semibold text-brand-900">{t.register.transport.legend}</legend>
             <label className="flex gap-2 text-sm font-medium items-start text-brand-950">
               <input type="radio" name="transport" checked={needsTransport === true} onChange={() => setNeedsTransport(true)} className="accent-brand-900 mt-1" />
               <span className="flex-1">
-                <span className="block">Yes, I'll ride with the shop from the dive shop to the site</span>
+                <span className="block">{t.register.transport.yesSolo}</span>
                 {!transportIncluded && transportSurcharge > 0 && (
-                  <span className="block text-xs text-brand-950 font-medium">+{transportSurcharge.toLocaleString()} {event.currency}</span>
+                  <span className="block text-xs text-brand-950 font-medium">{t.register.transport.surcharge(transportSurcharge.toLocaleString(), event.currency)}</span>
                 )}
                 {transportIncluded && rideAllowed && (
-                  <span className="block text-xs text-brand-950 font-medium">Included in base price</span>
+                  <span className="block text-xs text-brand-950 font-medium">{t.register.transport.included}</span>
                 )}
                 {rideAllowed && rideSeats != null && rideSeats.capacity > 0 && (
                   <span className="block text-xs text-brand-950/70 font-medium">
-                    {rideSeats.available} ride seat{rideSeats.available === 1 ? '' : 's'} left
+                    {t.register.transport.seatsLeft(rideSeats.available)}
                   </span>
                 )}
                 {!rideAllowed && (
                   <span className={`block text-xs font-semibold ${rideWaitlisted ? 'text-amber-700' : 'text-brand-950/70'}`}>
                     {rideSeats != null && rideSeats.capacity > 0
-                      ? 'The shop ride is full for this dive.'
-                      : 'No shop ride is set up for this dive yet.'}{' '}
+                      ? t.register.transport.rideFullSolo
+                      : t.register.transport.rideNotSetup}{' '}
                     {rideWaitlisted
-                      ? "You've been added to the ride waitlist — the shop is notified and will try to arrange transport, but a seat isn't guaranteed."
-                      : 'Select this to join the ride waitlist; the shop will be notified.'}
+                      ? t.register.transport.waitlistedSolo
+                      : t.register.transport.selectToWaitlist}
                   </span>
                 )}
               </span>
@@ -1854,9 +1843,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             <label className="flex gap-2 text-sm text-brand-950 font-medium items-start">
               <input type="radio" name="transport" checked={needsTransport === false} onChange={() => setNeedsTransport(false)} className="accent-brand-900 mt-1" />
               <span className="flex-1">
-                <span className="block">No, I don't need a ride</span>
+                <span className="block">{t.register.transport.noSolo}</span>
                 <span className="block text-xs text-brand-950 font-medium">
-                  I am responsible for getting myself to the dive/event site on time.
+                  {t.register.transport.noSoloDetail}
                 </span>
               </span>
             </label>
@@ -1866,20 +1855,20 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             <label className="flex gap-2 text-sm text-brand-950 font-medium items-start">
               <input type="checkbox" checked={addNitroxCourse} onChange={e => setAddNitroxCourse(e.target.checked)} className="accent-brand-900 mt-1" />
               <span className="flex-1">
-                <span className="block">Add Nitrox course (+{NITROX_COURSE_FEE.toLocaleString()})</span>
-                <span className="block text-xs text-brand-950 font-medium">Get your Nitrox certification during this event.</span>
+                <span className="block">{t.register.nitroxAddon.label(NITROX_COURSE_FEE.toLocaleString())}</span>
+                <span className="block text-xs text-brand-950 font-medium">{t.register.nitroxAddon.detail}</span>
               </span>
             </label>
           )}
 
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Notes (optional)"
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder={t.register.notesOptional}
             className="w-full bg-white border border-surface-300 rounded-lg px-2 py-1 text-sm text-brand-900" />
         </section>
       )}
 
       {step === 4 && (
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-brand-900">Payment</h2>
+          <h2 className="text-lg font-bold text-brand-900">{t.register.payment.title}</h2>
 
           {leadPayerId && (
             <label className="flex items-start gap-2 text-sm text-brand-950 font-medium bg-surface-50 border border-surface-200 rounded-lg p-3">
@@ -1890,10 +1879,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 className="accent-brand-900 mt-1"
               />
               <span className="flex-1">
-                I'll pay for everyone in this group
+                {t.register.payment.payForEveryone}
                 <span className="block text-xs text-brand-900/80">
-                  The whole group's balance sits on your account; the other divers
-                  won't be billed separately. Uncheck to have each diver pay their own.
+                  {t.register.payment.payForEveryoneDetail}
                 </span>
               </span>
             </label>
@@ -1905,10 +1893,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 <input type="radio" name="payment" checked={payment === method} onChange={() => setPayment(method)} className="accent-brand-900 mt-1" />
                 <span className="flex-1">
                   <span className="block">
-                    {method === 'bank_transfer' && 'Bank transfer'}
-                    {method === 'paypal' && 'PayPal (+5%)'}
-                    {method === 'credit_card' && 'Credit card (+5%)'}
-                    {method === 'cash' && 'Cash (in person at the shop)'}
+                    {method === 'bank_transfer' && t.register.payment.methodBankTransfer}
+                    {method === 'paypal' && t.register.payment.methodPaypal}
+                    {method === 'credit_card' && t.register.payment.methodCreditCard}
+                    {method === 'cash' && t.register.payment.methodCash}
                   </span>
                 </span>
               </label>
@@ -1918,13 +1906,13 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           {payment === 'credit_card' && (
             <label className="block">
               <span className="block text-xs text-brand-900 font-medium mb-1">
-                Invoice email (optional)
+                {t.register.payment.invoiceEmailLabel}
               </span>
               <input
                 type="email"
                 value={creditCardInvoiceEmail}
                 onChange={e => setCreditCardInvoiceEmail(e.target.value)}
-                placeholder="Defaults to your registered email"
+                placeholder={t.register.payment.invoiceEmailPlaceholder}
                 className="w-full bg-white border border-surface-300 rounded-lg px-3 py-2 text-sm text-brand-900"
               />
             </label>
@@ -1938,21 +1926,21 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           <div className="text-sm text-brand-950 font-medium bg-surface-50 rounded-lg p-3 space-y-1">
             {charges.map((c, i) => <Row key={`${c.kind}-${i}`} label={c.label} value={c.amount} currency={event.currency} />)}
             <div className="border-t border-surface-200 pt-1 mt-1">
-              <Row label={showGroupTotals ? 'Per diver' : 'Total'} value={total} currency={event.currency} bold />
+              <Row label={showGroupTotals ? t.register.payment.perDiver : t.register.payment.total} value={total} currency={event.currency} bold />
             </div>
             {creditNow > 0 && (
               <div className="border-t border-surface-200 pt-1 mt-1 space-y-0.5">
                 <div className="flex justify-between text-emerald-700">
-                  <span>Account credit</span>
-                  <span>− {event.currency} {creditDeducted.toLocaleString()}</span>
+                  <span>{t.register.payment.accountCredit}</span>
+                  <span>{t.register.payment.minus(event.currency, creditDeducted.toLocaleString())}</span>
                 </div>
-                <Row label="You'll pay (after credit)" value={totalAfterCredit} currency={event.currency} bold />
+                <Row label={t.register.payment.youllPayAfterCredit} value={totalAfterCredit} currency={event.currency} bold />
               </div>
             )}
             {showGroupTotals && (
               <div className="border-t border-surface-200 pt-1 mt-1 space-y-0.5">
-                <Row label={`Group total (${groupCount} divers)`} value={groupTotal} currency={event.currency} bold />
-                <p className="text-xs text-brand-900/80">You're paying for the whole group — every diver shares these options.</p>
+                <Row label={t.register.payment.groupTotal(groupCount)} value={groupTotal} currency={event.currency} bold />
+                <p className="text-xs text-brand-900/80">{t.register.payment.groupSharing}</p>
               </div>
             )}
           </div>
@@ -1966,10 +1954,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 className="accent-brand-900 mt-1"
               />
               <span className="flex-1">
-                Use my account credit ({event.currency} {availableCredit.toLocaleString()} available)
+                {t.register.payment.useCredit(event.currency, availableCredit.toLocaleString())}
                 <span className="block text-xs text-brand-900/80">
-                  We'll put it toward this booking as soon as it's created. Anything
-                  left over stays on your account.
+                  {t.register.payment.useCreditDetail}
                 </span>
               </span>
             </label>
@@ -1977,23 +1964,23 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
           {hasDeposit && (
             <div className="space-y-2">
-              <p className="text-sm text-brand-950 font-medium font-semibold">How much to pay now</p>
+              <p className="text-sm text-brand-950 font-medium font-semibold">{t.register.payment.howMuchNow}</p>
               <label className="flex gap-2 text-sm text-brand-950 font-medium items-start">
                 <input type="radio" name="pay-amount" checked={!payDepositOnly} onChange={() => setPayDepositOnly(false)} className="accent-brand-900 mt-1" />
                 <span className="flex-1">
-                  <span className="block">Pay full amount now</span>
+                  <span className="block">{t.register.payment.payFull}</span>
                   <span className="block text-xs text-brand-950 font-medium">
                     {event.currency} {(showGroupTotals ? groupFullNow : fullNowAfterCredit).toLocaleString()}
-                    {showGroupTotals ? ` — settles all ${groupCount} divers in one go.` : ' — settles your booking in one go.'}
+                    {showGroupTotals ? t.register.payment.settlesAll(groupCount) : t.register.payment.settlesOne}
                   </span>
                 </span>
               </label>
               <label className="flex gap-2 text-sm text-brand-950 font-medium items-start">
                 <input type="radio" name="pay-amount" checked={payDepositOnly} onChange={() => setPayDepositOnly(true)} className="accent-brand-900 mt-1" />
                 <span className="flex-1">
-                  <span className="block">Pay deposit only</span>
+                  <span className="block">{t.register.payment.payDepositOnly}</span>
                   <span className="block text-xs text-brand-950 font-medium">
-                    {event.currency} {(showGroupTotals ? groupDepositNow : depositNowAfterCredit).toLocaleString()} now, remainder due before the trip.
+                    {event.currency} {(showGroupTotals ? groupDepositNow : depositNowAfterCredit).toLocaleString()} {t.register.payment.remainderDueBeforeTrip}
                   </span>
                 </span>
               </label>
@@ -2002,18 +1989,17 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
           <div className="text-xs text-brand-950 font-medium bg-surface-50 border border-surface-200 rounded-lg p-3 space-y-1">
             <p>
-              Pay deposit <strong>ASAP</strong> to hold your spot.
-              Pay the remaining balance by <strong>{formatDeadline(fullPaymentDeadline)}</strong> to complete your registration.
+              {t.register.payment.payDepositAsap1} <strong>{t.register.payment.asap}</strong> {t.register.payment.payDepositAsap2} <strong>{formatDeadline(fullPaymentDeadline)}</strong> {t.register.payment.payDepositAsap3}
             </p>
             {hasDeposit && payDepositOnly && (
               <div className="border-t border-surface-200 pt-1 mt-1 space-y-0.5">
                 <p>
-                  Pay deposit <strong>ASAP</strong>:{' '}
+                  {t.register.payment.payDepositAsap1} <strong>{t.register.payment.asap}</strong>:{' '}
                   <strong>{event.currency} {(showGroupTotals ? groupDepositNow : depositNowAfterCredit).toLocaleString()}</strong>
-                  {showGroupTotals && ` (whole group, ${groupCount} divers)`}
+                  {showGroupTotals && t.register.payment.wholeGroup(groupCount)}
                 </p>
                 <p>
-                  Pay remaining balance by {formatDeadline(fullPaymentDeadline)}:{' '}
+                  {t.register.payment.payRemainingBy} {formatDeadline(fullPaymentDeadline)}:{' '}
                   <strong>{event.currency} {(showGroupTotals ? groupRemainder : remainderAfterCredit).toLocaleString()}</strong>
                 </p>
               </div>
@@ -2023,10 +2009,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           {cancelPolicy && cancelPolicy.cancellation_policy && (
             <div className="text-xs text-brand-950 font-medium bg-white/70 border border-surface-300 rounded-lg p-3 space-y-2">
               <p className="font-semibold text-brand-900">
-                Cancellation policy{cancelPolicy.title ? ` — ${cancelPolicy.title}` : ''}
+                {t.register.payment.cancellationPolicy}{cancelPolicy.title ? ` — ${cancelPolicy.title}` : ''}
               </p>
               {event.cancel_date && (
-                <p>Cancel-by date: <strong>{formatDeadline(event.cancel_date)}</strong></p>
+                <p>{t.register.payment.cancelByDate} <strong>{formatDeadline(event.cancel_date)}</strong></p>
               )}
               <p className="whitespace-pre-line max-h-40 overflow-y-auto pr-1">
                 {cancelPolicy.cancellation_policy}
@@ -2038,17 +2024,17 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                   onChange={e => setPolicyAcked(e.target.checked)}
                   className="accent-brand-900 mt-0.5"
                 />
-                <span>I have read and agree to the cancellation policy.</span>
+                <span>{t.register.payment.policyAck}</span>
               </label>
             </div>
           )}
 
           {waiverEligible && missingW && missingW.length > 0 && (
-            <div className="text-xs text-brand-950 font-medium bg-amber-400/10 border border-amber-400/40 rounded-lg p-3 space-y-2" aria-label="Outstanding waivers">
+            <div className="text-xs text-brand-950 font-medium bg-amber-400/10 border border-amber-400/40 rounded-lg p-3 space-y-2" aria-label={t.register.waivers.ariaOutstanding}>
               <p className="font-semibold text-amber-800">
-                Waivers to sign before this {event.type}
+                {t.register.waivers.toSignBefore(event.type)}
               </p>
-              <p>You can still book now — but the shop needs these signed before you get in the water. Sign now or any time from your profile.</p>
+              <p>{t.register.waivers.stillBookSolo}</p>
               <ul className="space-y-1">
                 {missingW.map(w => (
                   <li key={w.code} className="flex items-center justify-between gap-2">
@@ -2058,7 +2044,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                       onClick={() => setSigningW(w)}
                       className="shrink-0 px-2.5 py-1 rounded-lg bg-brand-900 hover:bg-brand-950 text-white text-xs font-semibold"
                     >
-                      Sign now
+                      {t.register.waivers.signNow}
                     </button>
                   </li>
                 ))}
@@ -2067,11 +2053,11 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           )}
 
           {additionalResults.length > 0 && (
-            <div className="text-xs bg-surface-50 border border-surface-300 rounded p-2 space-y-1" aria-label="Per-diver registration results">
-              <p className="font-semibold text-brand-900">Additional divers:</p>
+            <div className="text-xs bg-surface-50 border border-surface-300 rounded p-2 space-y-1" aria-label={t.register.results.ariaPerDiver}>
+              <p className="font-semibold text-brand-900">{t.register.results.additionalDivers}</p>
               {additionalResults.map((r, i) => (
                 <p key={i} className={r.ok ? 'text-emerald-800' : 'text-red-700'}>
-                  · {r.targetName}: {r.ok ? 'registered' : `failed — ${r.error}`}
+                  · {r.targetName}: {r.ok ? t.register.results.registered : t.register.results.failed(r.error ?? '')}
                 </p>
               ))}
             </div>
@@ -2083,8 +2069,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
       {saving && !isEdit && (
         <p className="text-xs text-brand-900 font-medium" role="status">
-          Submitting your registration — please keep this page open. We'll retry
-          automatically if your connection drops.
+          {t.register.status.submitting}
         </p>
       )}
 
@@ -2097,7 +2082,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           disabled={step === 1 && !onBackBeforeStepOne}
           className="text-sm text-brand-900 font-medium hover:text-brand-900 disabled:opacity-40"
         >
-          ‹ Back
+          {t.register.back}
         </button>
         {step < 4 ? (
           <button
@@ -2120,7 +2105,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             }
             className="bg-brand-900 hover:bg-brand-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
           >
-            Next ›
+            {t.register.next}
           </button>
         ) : (
           <button onClick={submit} disabled={saving || pastBlocked || sizesBlocked || (!isOnBehalfOf && !!cancelPolicy && !policyAcked)}
@@ -2128,7 +2113,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             {saving && (
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" />
             )}
-            {saving ? (isEdit ? 'Saving…' : 'Confirming…') : isEdit ? 'Save changes' : 'Confirm booking'}
+            {saving ? (isEdit ? t.register.buttons.saving : t.register.buttons.confirming) : isEdit ? t.register.buttons.saveChanges : t.register.buttons.confirmBooking}
           </button>
         )}
       </footer>
