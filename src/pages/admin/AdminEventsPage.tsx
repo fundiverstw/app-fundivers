@@ -11,6 +11,9 @@ import { useToast } from '../../hooks/useToast'
 import { MonthCalendar } from '../../components/calendar/MonthCalendar'
 import { BusyEntryModal } from '../../components/admin/BusyEntryModal'
 import type { AppEvent, StaffBusyEntry } from '../../types/database'
+import { t } from '../../i18n'
+
+const ae = t.admin.events
 
 // Persisted in sessionStorage so clicking an event and returning via the
 // detail page's "back to events" link lands the admin on the month they
@@ -110,7 +113,7 @@ export function AdminEventsPage() {
               // Best-effort: notify registered divers of the date change.
               // A push failure must not block the move from showing success.
               notifyEventRescheduled(ev.id, ev.type, from, to).catch(() => { /* best-effort */ })
-              toast.success(`Moved to ${format(parseISO(to), 'EEE, MMM d')}`)
+              toast.success(ae.movedTo(format(parseISO(to), 'EEE, MMM d')))
               setRefreshKey(k => k + 1)
             }
           : undefined}
@@ -120,7 +123,7 @@ export function AdminEventsPage() {
           if (regs === 0) return null
           return (
             <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-accent">
-              {regs} registered
+              {ae.registeredCount(regs)}
             </span>
           )
         }}

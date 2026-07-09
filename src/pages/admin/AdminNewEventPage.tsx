@@ -11,6 +11,9 @@ import {
   type FormState,
 } from '../../components/admin/event-form-state'
 import { saveEventRelations } from '../../lib/event-relations'
+import { t } from '../../i18n'
+
+const ev = t.admin.events
 
 // Thin wrapper: defer all field rendering to the shared EventForm and
 // handle the create-side persistence (insert a new events row, write its
@@ -36,15 +39,15 @@ export function AdminNewEventPage() {
         await assignVehiclesToEvent({
           vehicleIds, event: { id, type: 'dive' }, createdBy: profile?.id ?? null,
         })
-      } catch { toast.error('Dive created, but its car assignments could not be saved — add them on the edit page.') }
+      } catch { toast.error(ev.carAssignFailed) }
     }
-    toast.success(form.type === 'dive' ? 'Dive created' : 'Course created')
+    toast.success(form.type === 'dive' ? ev.diveCreated : ev.courseCreated)
     navigate(`/admin/events/${form.type}/${id}`)
   }
 
   return (
     <div className="max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold text-white mb-4">New event</h1>
+      <h1 className="text-2xl font-bold text-white mb-4">{ev.newEvent}</h1>
       <EventForm
         mode="create"
         onSubmit={handleSubmit}

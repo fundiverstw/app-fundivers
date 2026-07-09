@@ -1082,6 +1082,22 @@ export const en = {
       summary: (divers: number, toPack: number) => `${divers} diver${divers === 1 ? '' : 's'} · ${toPack} to pack`,
       noRegistrants: 'No registrants yet.',
     },
+    events: {
+      movedTo: (date: string) => `Moved to ${date}`,
+      registeredCount: (n: number) => `${n} registered`,
+      newEvent: 'New event',
+      editEvent: 'Edit event',
+      loadingEvent: 'Loading event…',
+      eventNotFound: 'Event not found.',
+      missingEventId: 'Missing event id.',
+      diveCreated: 'Dive created',
+      courseCreated: 'Course created',
+      diveUpdated: 'Dive updated',
+      courseUpdated: 'Course updated',
+      carAssignFailed: 'Dive created, but its car assignments could not be saved — add them on the edit page.',
+      carsHeading: 'Cars for this dive',
+      carsBlurb: 'Cars assigned to this dive feed the ride-seat limit on the registration form — a diver can only request a ride when a seat is free in one of them.',
+    },
   },
 }
 

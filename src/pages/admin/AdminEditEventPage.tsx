@@ -15,6 +15,9 @@ import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
 import { notifyEventScheduleChanged } from '../../lib/reschedule'
 import { fetchEventRelations, saveEventRelations } from '../../lib/event-relations'
+import { t } from '../../i18n'
+
+const ev = t.admin.events
 
 // Normalize a day list (sort + dedupe + drop blanks) for comparison.
 function normDays(days: string[]): string[] {
@@ -56,7 +59,7 @@ export function AdminEditEventPage() {
           .eq('id', id)
           .maybeSingle()
         if (error) throw error
-        if (!data) throw new Error('Event not found.')
+        if (!data) throw new Error(ev.eventNotFound)
         const rels = await fetchEventRelations(id)
         if (!cancelled) setInitial(formStateFromEvent(data as EventRow, rels))
       } catch (err) {
@@ -67,7 +70,7 @@ export function AdminEditEventPage() {
   }, [type, id])
 
   async function handleSubmit(form: FormState) {
-    if (!id) throw new Error('Missing event id.')
+    if (!id) throw new Error(ev.missingEventId)
     // Capture before the update so we can notify registrants if the dates
     // moved. `initial` is the loaded row's FormState, untouched by editing.
     const dateChange = !!initial && datesChanged(initial, form)
@@ -79,7 +82,7 @@ export function AdminEditEventPage() {
     const relError = await saveEventRelations(id, form)
     if (relError) throw relError
     if (dateChange) notifyEventScheduleChanged(id, form.type).catch(() => { /* best-effort */ })
-    toast.success(form.type === 'dive' ? 'Dive updated' : 'Course updated')
+    toast.success(form.type === 'dive' ? ev.diveUpdated : ev.courseUpdated)
     navigate(`/admin/events/${form.type}/${id}`)
   }
 
@@ -94,14 +97,14 @@ export function AdminEditEventPage() {
   if (!initial) {
     return (
       <div className="max-w-2xl mx-auto">
-        <p className="text-sm text-white/70">Loading event…</p>
+        <p className="text-sm text-white/70">{ev.loadingEvent}</p>
       </div>
     )
   }
 
   return (
     <div className="max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold text-white mb-4">Edit event</h1>
+      <h1 className="text-2xl font-bold text-white mb-4">{ev.editEvent}</h1>
       <EventForm
         mode="edit"
         initial={initial}
@@ -110,11 +113,8 @@ export function AdminEditEventPage() {
       />
       {type === 'dive' && id && (
         <div className="mt-6 space-y-2">
-          <h2 className="text-sm font-bold text-white uppercase tracking-wider">Cars for this dive</h2>
-          <p className="text-xs text-white/60">
-            Cars assigned to this dive feed the ride-seat limit on the registration form — a
-            diver can only request a ride when a seat is free in one of them.
-          </p>
+          <h2 className="text-sm font-bold text-white uppercase tracking-wider">{ev.carsHeading}</h2>
+          <p className="text-xs text-white/60">{ev.carsBlurb}</p>
           <EventCarAssignment event={{ id, type: 'dive' }} isAdmin createdBy={profile?.id ?? null} />
         </div>
       )}
