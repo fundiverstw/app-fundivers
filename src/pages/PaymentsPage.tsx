@@ -18,6 +18,7 @@ import type { AppEvent, Booking, BookingDetails, Credit, Payment } from '../type
 import {
   CARD, BTN_GHOST, BTN_PRIMARY, TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR, PAGE_BODY,
 } from '../styles/tokens'
+import { t } from '../i18n'
 
 interface BookingLine {
   booking: Booking
@@ -162,11 +163,11 @@ export function PaymentsPage() {
     setApplying(bookingId)
     try {
       const applied = await applyCreditToBooking({ bookingId, amount })
-      if (applied > 0) toast.success(`Applied ${currency} ${applied.toLocaleString()} credit`)
-      else toast.info('Nothing to apply')
+      if (applied > 0) toast.success(t.payments.applied(`${currency} ${applied.toLocaleString()}`))
+      else toast.info(t.payments.nothingToApply)
       if (user) await refetch(user.id)
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not apply credit')
+      toast.error(e instanceof Error ? e.message : t.payments.couldNotApply)
     } finally {
       setApplying(null)
     }
@@ -187,11 +188,11 @@ export function PaymentsPage() {
       for (const l of targets) {
         total += await applyCreditToBooking({ bookingId: l.booking.id, amount: l.due })
       }
-      if (total > 0) toast.success(`Applied ${currency} ${total.toLocaleString()} credit`)
-      else toast.info('Nothing to apply')
+      if (total > 0) toast.success(t.payments.applied(`${currency} ${total.toLocaleString()}`))
+      else toast.info(t.payments.nothingToApply)
       if (user) await refetch(user.id)
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not apply credit')
+      toast.error(e instanceof Error ? e.message : t.payments.couldNotApply)
     } finally {
       setApplyingAll(false)
     }
@@ -236,18 +237,17 @@ export function PaymentsPage() {
 
   return (
     <div className="max-w-lg mx-auto space-y-6">
-      <h1 className="text-xl font-bold text-white">Payments</h1>
+      <h1 className="text-xl font-bold text-white">{t.payments.title}</h1>
 
       {openCredit > 0 && (
         <div className="bg-emerald-50 border border-emerald-400 rounded-lg p-3 space-y-2">
           <p className="text-sm font-semibold text-emerald-900">
-            Account credit: {currency} {openCredit.toLocaleString()}
+            {t.payments.accountCredit(`${currency} ${openCredit.toLocaleString()}`)}
           </p>
           {spendablePool > 0 && hasDueOwn ? (
             <>
               <p className="text-xs text-emerald-900">
-                Use it toward what you owe — we'll apply it across your booking
-                balances, oldest first. Anything left over stays on your account.
+                {t.payments.useCreditHint}
               </p>
               <button
                 type="button"
@@ -256,36 +256,35 @@ export function PaymentsPage() {
                 className={`${BTN_PRIMARY} text-xs py-1.5 px-3 disabled:opacity-50`}
               >
                 {applyingAll
-                  ? 'Applying…'
-                  : `Use ${currency} ${Math.min(spendablePool, totalOwed).toLocaleString()} credit on your balance`}
+                  ? t.payments.applying
+                  : t.payments.useCreditButton(`${currency} ${Math.min(spendablePool, totalOwed).toLocaleString()}`)}
               </button>
             </>
           ) : (
             <p className="text-xs text-emerald-900">
-              We owe you this much — usually from a cancelled event. Open any
-              booking with a balance due below to apply it.
+              {t.payments.creditOwedHint}
             </p>
           )}
         </div>
       )}
 
       <div className="grid grid-cols-3 gap-2">
-        <Summary label="Deposits due" value={totalDepositDue} currency={currency} accent="text-red-600" />
-        <Summary label="Balance due"  value={totalOwed}       currency={currency} accent="text-red-600" />
-        <Summary label="Total paid"   value={totalPaid}       currency={currency} accent="text-brand-900" />
+        <Summary label={t.payments.depositsDue} value={totalDepositDue} currency={currency} accent="text-red-600" />
+        <Summary label={t.payments.balanceDueLabel}  value={totalOwed}       currency={currency} accent="text-red-600" />
+        <Summary label={t.payments.totalPaid}   value={totalPaid}       currency={currency} accent="text-brand-900" />
       </div>
 
       {active.length === 0 ? (
         <section>
-          <h2 className={`text-sm font-semibold ${TEXT_MUTED} uppercase tracking-wider mb-2`}>Per booking</h2>
-          <p className={`${PAGE_BODY} text-sm`}>No active bookings yet. Check the calendar!</p>
+          <h2 className={`text-sm font-semibold ${TEXT_MUTED} uppercase tracking-wider mb-2`}>{t.payments.perBooking}</h2>
+          <p className={`${PAGE_BODY} text-sm`}>{t.payments.noActive}</p>
         </section>
       ) : (
         <>
           {leadGroups.length > 0 && (
             <section>
               <h2 className={`text-sm font-semibold ${TEXT_MUTED} uppercase tracking-wider mb-2`}>
-                Group bookings — you're paying
+                {t.payments.groupPaying}
               </h2>
               <div className="space-y-2">
                 {leadGroups.map(([key, groupLines]) => (
@@ -304,7 +303,7 @@ export function PaymentsPage() {
 
           {ownLines.length > 0 && (
             <section>
-              <h2 className={`text-sm font-semibold ${TEXT_MUTED} uppercase tracking-wider mb-2`}>Per booking</h2>
+              <h2 className={`text-sm font-semibold ${TEXT_MUTED} uppercase tracking-wider mb-2`}>{t.payments.perBooking}</h2>
               <div className="space-y-2">
                 {ownLines.map(l => (
                   <LineCard
@@ -326,7 +325,7 @@ export function PaymentsPage() {
           {coveredMine.length > 0 && (
             <section>
               <h2 className={`text-sm font-semibold ${TEXT_MUTED} uppercase tracking-wider mb-2`}>
-                Paid by your group lead
+                {t.payments.paidByLead}
               </h2>
               <div className="space-y-2">
                 {coveredMine.map(l => <CoveredCard key={l.booking.id} line={l} currency={currency} />)}
@@ -337,7 +336,7 @@ export function PaymentsPage() {
       )}
 
       <p className={`text-xs ${TEXT_SUBTLE} text-center`}>
-        Deposit is due up-front to confirm your spot. Balance is settled closer to the event.
+        {t.payments.footer}
       </p>
     </div>
   )
@@ -357,13 +356,13 @@ function ApplyCreditControl({
   return (
     <div className="bg-emerald-50 border border-emerald-400 rounded-lg p-3 space-y-2">
       <p className="text-xs text-emerald-900">
-        You have {currency} {max.toLocaleString()} in account credit you can apply to this balance.
+        {t.payments.haveCredit(`${currency} ${max.toLocaleString()}`)}
       </p>
       <div className="flex items-center gap-2">
         <span className={`text-xs ${TEXT_MUTED}`}>{currency}</span>
         <input
           type="number"
-          aria-label="Credit amount to apply"
+          aria-label={t.payments.creditAmountAria}
           min={1}
           max={max}
           value={amount}
@@ -376,7 +375,7 @@ function ApplyCreditControl({
           onClick={() => onApply(clamped)}
           className={`${BTN_PRIMARY} text-xs py-1.5 px-3 disabled:opacity-50`}
         >
-          {busy ? 'Applying…' : 'Apply credit'}
+          {busy ? t.payments.applying : t.payments.applyCredit}
         </button>
       </div>
     </div>
@@ -405,7 +404,7 @@ function LineCard({
   onApplyCredit: (id: string, amount: number) => void
 }) {
   const { booking, event, charges, amendments, total, owed, deposit, paid, credit, due, depositDue, payments } = line
-  const label = event?.title ?? '(event)'
+  const label = event?.title ?? t.payments.eventFallback
   const refundRequested = !!booking.refund_requested_at
   const canRefundDeposit = paid > 0 && !refundRequested
   // What this booking can absorb from the diver's spendable credit pool:
@@ -430,16 +429,16 @@ function LineCard({
           )}
           <p className={`text-xs capitalize mt-0.5 font-medium ${STATUS_STYLES[booking.status]}`}>{booking.status}</p>
           {refundRequested && (
-            <p className={`text-xs ${TEXT_ERROR} mt-0.5`}>🔄 Refund requested</p>
+            <p className={`text-xs ${TEXT_ERROR} mt-0.5`}>🔄 {t.bookings.refundRequested}</p>
           )}
         </div>
         <div className="text-right shrink-0 ml-3">
           {total > 0 ? (
             <>
               <p className={`text-sm font-semibold ${TEXT_HEADING}`}>{currency} {total.toLocaleString()}</p>
-              {bal.state === 'due' && <p className={`text-xs ${TEXT_ERROR}`}>{currency} {bal.amount.toLocaleString()} due</p>}
-              {bal.state === 'credit' && <p className="text-xs text-emerald-700 font-semibold">{currency} {bal.amount.toLocaleString()} credit</p>}
-              {bal.state === 'settled' && <p className="text-xs text-brand-900 font-semibold">Paid in full</p>}
+              {bal.state === 'due' && <p className={`text-xs ${TEXT_ERROR}`}>{currency} {bal.amount.toLocaleString()} {t.bookings.due}</p>}
+              {bal.state === 'credit' && <p className="text-xs text-emerald-700 font-semibold">{currency} {bal.amount.toLocaleString()} {t.bookings.creditWord}</p>}
+              {bal.state === 'settled' && <p className="text-xs text-brand-900 font-semibold">{t.payments.paidInFull}</p>}
             </>
           ) : <p className={`text-xs ${TEXT_SUBTLE}`}>—</p>}
           <p className={`text-xs ${TEXT_SUBTLE} mt-0.5`}>{open ? '▲' : '▼'}</p>
@@ -452,48 +451,48 @@ function LineCard({
             ? <ChargeBreakdown lines={charges} amendments={amendments} currency={currency} total={owed} />
             : total > 0 && (
                 <div className={`flex justify-between ${TEXT_BODY}`}>
-                  <span>Total</span>
+                  <span>{t.bookings.total}</span>
                   <span>{currency} {total.toLocaleString()}</span>
                 </div>
               )}
           {deposit > 0 && (
             <div className="flex justify-between">
-              <span className={TEXT_BODY}>Deposit</span>
+              <span className={TEXT_BODY}>{t.bookings.deposit}</span>
               <span className={depositDue > 0 ? `${TEXT_ERROR} font-medium` : 'text-brand-900 font-semibold'}>
                 {depositDue > 0
-                  ? `${currency} ${depositDue.toLocaleString()} due`
-                  : `${currency} ${deposit.toLocaleString()} paid ✓`}
+                  ? `${currency} ${depositDue.toLocaleString()} ${t.bookings.due}`
+                  : `${currency} ${deposit.toLocaleString()} ${t.payments.paidCheck}`}
               </span>
             </div>
           )}
           {paid > 0 && (
             <div className={`flex justify-between ${TEXT_BODY}`}>
-              <span>Paid</span>
+              <span>{t.payments.paid}</span>
               <span className="text-brand-900 font-semibold">{currency} {paid.toLocaleString()}</span>
             </div>
           )}
           {credit > 0 && (
             <div className={`flex justify-between ${TEXT_BODY}`}>
-              <span>Credit (this event)</span>
+              <span>{t.bookings.creditThisEvent}</span>
               <span className="text-emerald-700 font-semibold">{currency} {credit.toLocaleString()}</span>
             </div>
           )}
           {total > 0 && (
             <div className={`flex justify-between font-semibold pt-1 border-t border-surface-200 ${TEXT_BODY}`}>
-              <span>Balance</span>
-              {bal.state === 'due' && <span className={TEXT_ERROR}>{currency} {bal.amount.toLocaleString()} due</span>}
-              {bal.state === 'credit' && <span className="text-emerald-700">{currency} {bal.amount.toLocaleString()} credit</span>}
-              {bal.state === 'settled' && <span className="text-brand-900">Settled ✓</span>}
+              <span>{t.bookings.balance}</span>
+              {bal.state === 'due' && <span className={TEXT_ERROR}>{currency} {bal.amount.toLocaleString()} {t.bookings.due}</span>}
+              {bal.state === 'credit' && <span className="text-emerald-700">{currency} {bal.amount.toLocaleString()} {t.bookings.creditWord}</span>}
+              {bal.state === 'settled' && <span className="text-brand-900">{t.bookings.settled}</span>}
             </div>
           )}
 
           <div className={`text-xs ${TEXT_SUBTLE} pt-2 border-t border-surface-200`}>
-            Booked {format(new Date(booking.created_at), 'MMM d, yyyy')}
+            {t.bookings.bookedLabel} {format(new Date(booking.created_at), 'MMM d, yyyy')}
           </div>
 
           {payments.length > 0 && (
             <div className="space-y-1">
-              <p className={`text-xs ${TEXT_MUTED} uppercase tracking-wider`}>Payment history</p>
+              <p className={`text-xs ${TEXT_MUTED} uppercase tracking-wider`}>{t.payments.paymentHistory}</p>
               {payments.map(p => (
                 <div key={p.id} className="flex justify-between text-xs">
                   <span className={TEXT_MUTED}>
@@ -518,7 +517,7 @@ function LineCard({
 
           {canRefundDeposit && (
             <button onClick={() => onRefund(booking.id)} className={`w-full ${BTN_GHOST} text-xs py-2`}>
-              Request deposit refund
+              {t.payments.requestDepositRefund}
             </button>
           )}
         </div>
@@ -544,7 +543,7 @@ function GroupCard({
   const paid = lines.reduce((s, l) => s + l.paid, 0)
   const credit = lines.reduce((s, l) => s + l.credit, 0)
   const bal = bookingBalance(owed, paid, credit)
-  const divers = [...new Set(lines.map(l => (selfId && l.booking.user_id === selfId) ? 'You' : l.ownerName))]
+  const divers = [...new Set(lines.map(l => (selfId && l.booking.user_id === selfId) ? t.payments.you : l.ownerName))]
 
   return (
     <div className={CARD}>
@@ -554,14 +553,14 @@ function GroupCard({
         className="w-full text-left p-4 flex items-start justify-between hover:bg-surface-50 rounded-xl transition-colors"
       >
         <div className="flex-1 min-w-0">
-          <p className={`font-medium ${TEXT_HEADING} text-sm`}>Group of {lines.length} booking{lines.length === 1 ? '' : 's'}</p>
+          <p className={`font-medium ${TEXT_HEADING} text-sm`}>{t.payments.groupOf(lines.length)}</p>
           <p className={`text-xs ${TEXT_MUTED} mt-0.5 truncate`}>{divers.join(', ')}</p>
         </div>
         <div className="text-right shrink-0 ml-3">
           <p className={`text-sm font-semibold ${TEXT_HEADING}`}>{currency} {owed.toLocaleString()}</p>
-          {bal.state === 'due' && <p className={`text-xs ${TEXT_ERROR}`}>{currency} {bal.amount.toLocaleString()} due</p>}
-          {bal.state === 'credit' && <p className="text-xs text-emerald-700 font-semibold">{currency} {bal.amount.toLocaleString()} credit</p>}
-          {bal.state === 'settled' && <p className="text-xs text-brand-900 font-semibold">Paid in full</p>}
+          {bal.state === 'due' && <p className={`text-xs ${TEXT_ERROR}`}>{currency} {bal.amount.toLocaleString()} {t.bookings.due}</p>}
+          {bal.state === 'credit' && <p className="text-xs text-emerald-700 font-semibold">{currency} {bal.amount.toLocaleString()} {t.bookings.creditWord}</p>}
+          {bal.state === 'settled' && <p className="text-xs text-brand-900 font-semibold">{t.payments.paidInFull}</p>}
           <p className={`text-xs ${TEXT_SUBTLE} mt-0.5`}>{open ? '▲' : '▼'}</p>
         </div>
       </button>
@@ -573,25 +572,25 @@ function GroupCard({
             return (
               <div key={l.booking.id} className="flex items-baseline justify-between gap-3">
                 <span className={`${TEXT_BODY} min-w-0`}>
-                  <span className="font-medium">{l.event?.title ?? '(event)'}</span>
-                  <span className={`${TEXT_SUBTLE} text-xs`}> · {(selfId && l.booking.user_id === selfId) ? 'You' : l.ownerName}</span>
+                  <span className="font-medium">{l.event?.title ?? t.payments.eventFallback}</span>
+                  <span className={`${TEXT_SUBTLE} text-xs`}> · {(selfId && l.booking.user_id === selfId) ? t.payments.you : l.ownerName}</span>
                 </span>
                 <span className="shrink-0 text-xs">
-                  {lb.state === 'due' && <span className={TEXT_ERROR}>{currency} {lb.amount.toLocaleString()} due</span>}
-                  {lb.state === 'settled' && <span className="text-brand-900 font-semibold">Paid ✓</span>}
-                  {lb.state === 'credit' && <span className="text-emerald-700 font-semibold">{currency} {lb.amount.toLocaleString()} credit</span>}
+                  {lb.state === 'due' && <span className={TEXT_ERROR}>{currency} {lb.amount.toLocaleString()} {t.bookings.due}</span>}
+                  {lb.state === 'settled' && <span className="text-brand-900 font-semibold">{t.payments.paidShort}</span>}
+                  {lb.state === 'credit' && <span className="text-emerald-700 font-semibold">{currency} {lb.amount.toLocaleString()} {t.bookings.creditWord}</span>}
                 </span>
               </div>
             )
           })}
           <div className={`flex justify-between font-semibold pt-2 border-t border-surface-200 ${TEXT_BODY}`}>
-            <span>Group balance</span>
-            {bal.state === 'due' && <span className={TEXT_ERROR}>{currency} {bal.amount.toLocaleString()} due</span>}
-            {bal.state === 'credit' && <span className="text-emerald-700">{currency} {bal.amount.toLocaleString()} credit</span>}
-            {bal.state === 'settled' && <span className="text-brand-900">Settled ✓</span>}
+            <span>{t.payments.groupBalance}</span>
+            {bal.state === 'due' && <span className={TEXT_ERROR}>{currency} {bal.amount.toLocaleString()} {t.bookings.due}</span>}
+            {bal.state === 'credit' && <span className="text-emerald-700">{currency} {bal.amount.toLocaleString()} {t.bookings.creditWord}</span>}
+            {bal.state === 'settled' && <span className="text-brand-900">{t.bookings.settled}</span>}
           </div>
           <p className={`text-xs ${TEXT_SUBTLE}`}>
-            Pay the group balance in one transfer; the shop records it against everyone.
+            {t.payments.groupFooter}
           </p>
         </div>
       )}
@@ -606,13 +605,13 @@ function CoveredCard({ line, currency }: { line: BookingLine; currency: string }
   return (
     <div className={`${CARD} p-4 flex items-start justify-between gap-3`}>
       <div className="min-w-0">
-        <p className={`font-medium ${TEXT_HEADING} text-sm`}>{event?.title ?? '(event)'}</p>
+        <p className={`font-medium ${TEXT_HEADING} text-sm`}>{event?.title ?? t.payments.eventFallback}</p>
         {event && <p className={`text-xs ${TEXT_MUTED} mt-0.5`}>{formatEventSpan(event, { withYear: true })}</p>}
-        <p className="text-xs text-emerald-700 font-semibold mt-0.5">Covered by {line.coveredByName}</p>
+        <p className="text-xs text-emerald-700 font-semibold mt-0.5">{t.payments.coveredBy(line.coveredByName ?? '')}</p>
       </div>
       <div className="text-right shrink-0">
         {total > 0 && <p className={`text-sm ${TEXT_SUBTLE} line-through`}>{currency} {total.toLocaleString()}</p>}
-        <p className="text-xs text-brand-900 font-semibold">Nothing due</p>
+        <p className="text-xs text-brand-900 font-semibold">{t.payments.nothingDue}</p>
       </div>
     </div>
   )
