@@ -32,6 +32,8 @@ const CARDS: ManageCard[] = [
   { to: '/admin/trusted-partners', title: 'Trusted Partners', blurb: 'Dive shops abroad divers can message directly from the Trusted Partners tab; the email stays admin-only.' },
   { to: '/admin/notifications', title: 'One-off notification', blurb: 'Send an immediate push (and optional LINE relay) to every opted-in device.' },
   { to: '/admin/accounting', title: 'Accounting export', blurb: 'Download a fiscal-year bookkeeping ZIP: per-transaction, by-event, and summary CSVs.' },
+  { to: '/admin/waivers', title: 'Waivers', blurb: 'Author the forms divers e-sign — as text or your own uploaded PDF, in any language. Attach or exempt them per-event from an event’s edit form.' },
+  { to: '/admin/cancellation-policies', title: 'Cancellation policies', blurb: 'Write the cancellation terms divers acknowledge at registration; pick one per event.' },
 ]
 
 export function AdminManagePage() {

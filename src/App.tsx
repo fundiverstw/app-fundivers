@@ -57,6 +57,8 @@ import { AdminScheduledTripsPage } from './pages/admin/AdminScheduledTripsPage'
 import { AdminTrustedPartnersPage } from './pages/admin/AdminTrustedPartnersPage'
 import { AdminGearSizingPage } from './pages/admin/AdminGearSizingPage'
 import { AdminVehiclesPage } from './pages/admin/AdminVehiclesPage'
+import { AdminWaiversPage } from './pages/admin/AdminWaiversPage'
+import { AdminCancellationPoliciesPage } from './pages/admin/AdminCancellationPoliciesPage'
 
 // Public registration flow — /register (pick an event) and /register/:type/:id
 // (deep-link from Wix calendar) both render RegisterPage. Outside ProtectedRoute
@@ -150,6 +152,8 @@ export default function App() {
                 <Route path="/admin/trusted-partners" element={<AdminTrustedPartnersPage />} />
                 <Route path="/admin/gear-sizing" element={<AdminGearSizingPage />} />
                 <Route path="/admin/vehicles" element={<AdminVehiclesPage />} />
+                <Route path="/admin/waivers" element={<AdminWaiversPage />} />
+                <Route path="/admin/cancellation-policies" element={<AdminCancellationPoliciesPage />} />
                 <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
                 <Route path="/admin/history" element={<AdminHistoryPage />} />
               </Route>

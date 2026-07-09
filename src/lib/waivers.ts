@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 import { courseColor } from './event-colors'
 import { ANNUAL_WAIVER_VALID_DAYS, rowToWaiverDef, type WaiverDef } from '../config/waivers'
-import type { EventWaiver, WaiverSignature } from '../types/database'
+import type { EventWaiver, WaiverSignature, WaiverRow, WaiverInsert } from '../types/database'
 
 // Waiver logic — combines the config catalog/global rules (src/config/waivers.ts)
 // with the DB facts (per-diver signatures, per-event overrides) to answer "which
@@ -114,6 +114,26 @@ export async function fetchWaivers(): Promise<WaiverDef[]> {
     .from('waivers').select('*').eq('active', true).order('code')
   if (error) throw error
   return (Array.isArray(data) ? data : []).map(rowToWaiverDef)
+}
+
+/** Admin CRUD: every waiver row (incl. inactive), raw. */
+export async function fetchAllWaivers(): Promise<WaiverRow[]> {
+  const { data, error } = await supabase.from('waivers').select('*').order('code')
+  if (error) throw error
+  return (Array.isArray(data) ? data : []) as WaiverRow[]
+}
+
+/** Admin CRUD: insert (no id) or update (id given). */
+export async function saveWaiver(values: WaiverInsert, id?: string): Promise<void> {
+  const { error } = id
+    ? await supabase.from('waivers').update(values).eq('id', id)
+    : await supabase.from('waivers').insert(values)
+  if (error) throw error
+}
+
+export async function deleteWaiver(id: string): Promise<void> {
+  const { error } = await supabase.from('waivers').delete().eq('id', id)
+  if (error) throw error
 }
 
 export async function fetchEventWaiverOverrides(
