@@ -19,6 +19,7 @@ import type { AppEvent, Booking, BookingAmendment, BookingDetails, Payment, Wait
 import {
   CARD, BTN_GHOST, BTN_DANGER, TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR, PAGE_BODY,
 } from '../styles/tokens'
+import { t } from '../i18n'
 
 type Row = Booking & {
   event: AppEvent | null
@@ -39,12 +40,12 @@ type Row = Booking & {
 
 function formatRemaining(expiresAt: string, nowMs: number): string {
   const ms = new Date(expiresAt).getTime() - nowMs
-  if (ms <= 0) return 'expiring now'
+  if (ms <= 0) return t.bookings.expiringNow
   const hours = Math.floor(ms / 3_600_000)
   const mins  = Math.floor((ms % 3_600_000) / 60_000)
-  if (hours > 0) return `${hours}h ${mins}m left`
-  if (mins  > 0) return `${mins}m left`
-  return 'expiring now'
+  if (hours > 0) return t.bookings.hoursMinsLeft(hours, mins)
+  if (mins  > 0) return t.bookings.minsLeft(mins)
+  return t.bookings.expiringNow
 }
 
 type AddonNameMap = Map<string, string>
@@ -164,7 +165,7 @@ export function BookingsPage() {
       // already accepted/expired or not owned by the caller.
       const { error } = await supabase.rpc('accept_waitlist_offer', { p_offer_id: offerId })
       if (error) throw error
-      toast.success('Spot accepted! We will be in touch about payment.')
+      toast.success(t.bookings.spotAccepted)
       if (user) await refetch(user.id)
     } catch (err) {
       toast.error((err as Error).message)
@@ -186,12 +187,12 @@ export function BookingsPage() {
 
   return (
     <div className="max-w-lg mx-auto space-y-6">
-      <h1 className="text-xl font-bold text-white">My Bookings</h1>
+      <h1 className="text-xl font-bold text-white">{t.bookings.title}</h1>
 
       <section>
-        <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-2">Upcoming</h2>
+        <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-2">{t.bookings.upcoming}</h2>
         {upcoming.length === 0
-          ? <p className={`${PAGE_BODY} text-sm`}>No upcoming bookings. Check the calendar!</p>
+          ? <p className={`${PAGE_BODY} text-sm`}>{t.bookings.noUpcoming}</p>
           : <div className="space-y-2">
               {upcoming.map(r => (
                 <Card
@@ -212,7 +213,7 @@ export function BookingsPage() {
 
       {past.length > 0 && (
         <section>
-          <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-2">Past / Cancelled</h2>
+          <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-2">{t.bookings.pastCancelled}</h2>
           <div className="space-y-2">
             {past.map(r => (
               <Card
@@ -273,17 +274,17 @@ function Card({
       >
         <div className="flex-1 min-w-0">
           <p className={`font-medium ${TEXT_HEADING} text-sm`}>
-            {row.event?.title ?? '(event unavailable)'}
+            {row.event?.title ?? t.bookings.eventUnavailable}
           </p>
           {row.event && (
             <p className={`text-xs ${TEXT_MUTED} mt-0.5`}>
               {formatEventSpan(row.event, { withYear: true })}
               {' · '}
-              {row.event.type === 'dive' ? 'Dive' : 'Course'}
+              {row.event.type === 'dive' ? t.calendar.typeDive : t.calendar.typeCourse}
             </p>
           )}
           {row.refund_requested_at && (
-            <p className={`text-xs ${TEXT_ERROR} mt-0.5`}>🔄 Refund requested {format(new Date(row.refund_requested_at), 'MMM d')}</p>
+            <p className={`text-xs ${TEXT_ERROR} mt-0.5`}>🔄 {t.bookings.refundRequested} {format(new Date(row.refund_requested_at), 'MMM d')}</p>
           )}
         </div>
         <div className="text-right shrink-0 ml-3">
@@ -298,37 +299,37 @@ function Card({
             ? <ChargeBreakdown lines={row.charges} amendments={amendmentLines} currency={currency} total={owed} />
             : total > 0 && (
                 <div className={`flex justify-between ${TEXT_BODY}`}>
-                  <span>Total</span>
+                  <span>{t.bookings.total}</span>
                   <span className="font-semibold">{currency} {total.toLocaleString()}</span>
                 </div>
               )}
           {deposit > 0 && (
             <div className={`flex justify-between ${TEXT_BODY}`}>
-              <span>Deposit</span>
+              <span>{t.bookings.deposit}</span>
               <span className={row.paidSum >= deposit ? 'text-brand-900 font-semibold' : TEXT_ERROR}>
-                {currency} {deposit.toLocaleString()} {row.paidSum >= deposit ? '✓' : 'due'}
+                {currency} {deposit.toLocaleString()} {row.paidSum >= deposit ? '✓' : t.bookings.due}
               </span>
             </div>
           )}
 
           {row.paidSum > 0 && (
             <div className={`flex justify-between ${TEXT_BODY}`}>
-              <span>Paid so far</span>
+              <span>{t.bookings.paidSoFar}</span>
               <span className="text-brand-900 font-semibold">{currency} {row.paidSum.toLocaleString()}</span>
             </div>
           )}
           {row.credit > 0 && (
             <div className={`flex justify-between ${TEXT_BODY}`}>
-              <span>Credit (this event)</span>
+              <span>{t.bookings.creditThisEvent}</span>
               <span className="text-emerald-700 font-semibold">{currency} {row.credit.toLocaleString()}</span>
             </div>
           )}
           {total > 0 && (
             <div className={`flex justify-between font-semibold pt-1 border-t border-surface-200 ${TEXT_BODY}`}>
-              <span>Balance</span>
-              {bal.state === 'due' && <span className={TEXT_ERROR}>{currency} {bal.amount.toLocaleString()} due</span>}
-              {bal.state === 'credit' && <span className="text-emerald-700">{currency} {bal.amount.toLocaleString()} credit</span>}
-              {bal.state === 'settled' && <span className="text-brand-900">Settled ✓</span>}
+              <span>{t.bookings.balance}</span>
+              {bal.state === 'due' && <span className={TEXT_ERROR}>{currency} {bal.amount.toLocaleString()} {t.bookings.due}</span>}
+              {bal.state === 'credit' && <span className="text-emerald-700">{currency} {bal.amount.toLocaleString()} {t.bookings.creditWord}</span>}
+              {bal.state === 'settled' && <span className="text-brand-900">{t.bookings.settled}</span>}
             </div>
           )}
 
@@ -338,18 +339,18 @@ function Card({
             <p className={`text-xs ${TEXT_MUTED} bg-surface-50 rounded p-2`}>📝 {row.notes}</p>
           )}
           <p className={`text-xs ${TEXT_SUBTLE}`}>
-            Booked {format(new Date(row.created_at), 'MMM d, yyyy')}
+            {t.bookings.bookedLabel} {format(new Date(row.created_at), 'MMM d, yyyy')}
           </p>
 
           <div className="flex flex-wrap gap-2 pt-1">
             {canCancel && (
               <button onClick={() => onCancel(row.id)} className={`flex-1 ${BTN_DANGER} text-xs py-2 px-3`}>
-                Cancel booking
+                {t.calendar.cancelBooking}
               </button>
             )}
             {canRefund && (
               <button onClick={() => onRefund(row.id)} className={`flex-1 ${BTN_GHOST} text-xs py-2 px-3`}>
-                Request refund
+                {t.bookings.requestRefund}
               </button>
             )}
             {row.event && (
@@ -375,8 +376,8 @@ function WaitlistOfferBanner({
   return (
     <div className="bg-accent text-white px-4 py-3 rounded-t-xl flex items-center justify-between gap-3">
       <div className="min-w-0">
-        <p className="font-semibold text-sm">A spot just opened up.</p>
-        <p className="text-xs text-white/90">{remainingLabel} — accept before it rolls to the next person.</p>
+        <p className="font-semibold text-sm">{t.bookings.offerTitle}</p>
+        <p className="text-xs text-white/90">{t.bookings.offerDetail(remainingLabel)}</p>
       </div>
       <button
         type="button"
@@ -384,7 +385,7 @@ function WaitlistOfferBanner({
         disabled={accepting}
         className="bg-white text-red-700 font-semibold text-xs rounded-lg px-3 py-1.5 hover:bg-surface-100 transition-colors disabled:opacity-50 shrink-0"
       >
-        {accepting ? 'Accepting…' : 'Accept'}
+        {accepting ? t.bookings.accepting : t.bookings.accept}
       </button>
     </div>
   )
@@ -394,19 +395,19 @@ function Breakdown({ details, addonNames }: { details: Booking['details'] | unde
   const d = details ?? {}
   const items: Array<[string, string | null]> = []
   if (d.gear?.assistance_note) {
-    items.push(['Gear — needs help', d.gear.assistance_note])
+    items.push([t.bookings.breakdown.gearNeedsHelp, d.gear.assistance_note])
   } else if (d.gear?.rent) {
     const extras = d.gear.items?.length ? d.gear.items.join(', ') : null
-    items.push(['Gear', extras])
+    items.push([t.bookings.breakdown.gear, extras])
   }
-  if (d.room?.option_id) items.push(['Room', d.room.notes ?? null])
+  if (d.room?.option_id) items.push([t.bookings.breakdown.room, d.room.notes ?? null])
   if ((d.add_ons?.length ?? 0) > 0) {
     const labels = d.add_ons!.map(id => addonNames.get(id) ?? id)
-    items.push(['Add-ons', labels.join(', ')])
+    items.push([t.bookings.breakdown.addons, labels.join(', ')])
   }
-  if (d.transportation) items.push(['Transportation', null])
-  if (d.nitrox_course_addon) items.push(['Nitrox course add-on', null])
-  if (d.payment_method) items.push(['Payment', d.payment_method.replace('_', ' ')])
+  if (d.transportation) items.push([t.bookings.breakdown.transportation, null])
+  if (d.nitrox_course_addon) items.push([t.bookings.breakdown.nitroxAddon, null])
+  if (d.payment_method) items.push([t.bookings.breakdown.payment, d.payment_method.replace('_', ' ')])
 
   if (items.length === 0) return null
   return (
