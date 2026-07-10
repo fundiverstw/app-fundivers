@@ -1908,4 +1908,14 @@ export const ja: Messages = {
       standalone: '単独の業務',
     },
   },
+  emails: {
+    cancellation: {
+      fallbackTitle: 'お申し込みのダイビング',
+      subject: (title: string) => `中止のお知らせ：${title}`,
+      greeting: 'こんにちは、',
+      sorry: (title: string) => `申し訳ありませんが、${title} は中止となりました。`,
+      refundNote: '内金または全額をお支払い済みの場合は、返金または日程変更についてショップからご連絡します。ご不明な点はこのメールにご返信ください。',
+      signoff: (shop: string) => `— ${shop}`,
+    },
+  },
 }

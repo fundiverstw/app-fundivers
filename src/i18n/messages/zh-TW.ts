@@ -1909,4 +1909,14 @@ export const zhTW: Messages = {
       standalone: '獨立勤務',
     },
   },
+  emails: {
+    cancellation: {
+      fallbackTitle: '你報名的潛水活動',
+      subject: (title: string) => `活動取消通知：${title}`,
+      greeting: '你好，',
+      sorry: (title: string) => `很抱歉通知你，${title} 已經取消。`,
+      refundNote: '若你已支付訂金或全額費用，店家會另行與你聯繫退款或改期事宜。有任何問題，直接回覆這封信即可。',
+      signoff: (shop: string) => `— ${shop}`,
+    },
+  },
 }

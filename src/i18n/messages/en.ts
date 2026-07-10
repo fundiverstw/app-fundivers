@@ -1917,6 +1917,16 @@ export const en = {
       standalone: 'Standalone duty',
     },
   },
+  emails: {
+    cancellation: {
+      fallbackTitle: 'your dive',
+      subject: (title: string) => `Cancelled: ${title}`,
+      greeting: 'Hi,',
+      sorry: (title: string) => `We're sorry to let you know that ${title} has been cancelled.`,
+      refundNote: 'If you paid a deposit or the full amount, the shop will be in touch about a refund or rebooking. Reply to this email with any questions.',
+      signoff: (shop: string) => `— ${shop}`,
+    },
+  },
 }
 
 /** The shape every locale catalog must satisfy, inferred from English. */

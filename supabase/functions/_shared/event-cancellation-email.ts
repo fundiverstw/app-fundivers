@@ -3,19 +3,21 @@
 // create-registration/handler.ts for the same split.
 
 import { siteConfig } from "../../../fundive.config.ts"
+import { t } from "./i18n.ts"
 
 export function buildCancellationEmail(eventTitle: string): { subject: string; text: string } {
-  const title = eventTitle.trim() || 'your dive'
+  const e = t.emails.cancellation
+  const title = eventTitle.trim() || e.fallbackTitle
   return {
-    subject: `Cancelled: ${title}`,
+    subject: e.subject(title),
     text: [
-      'Hi,',
+      e.greeting,
       '',
-      `We're sorry to let you know that ${title} has been cancelled.`,
+      e.sorry(title),
       '',
-      'If you paid a deposit or the full amount, the shop will be in touch about a refund or rebooking. Reply to this email or contact us on LINE / WhatsApp with any questions.',
+      e.refundNote,
       '',
-      `— ${siteConfig.identity.shopName}`,
+      e.signoff(siteConfig.identity.shopName),
     ].join('\n'),
   }
 }
