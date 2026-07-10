@@ -220,7 +220,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
         gearDays: days,
         transport: transportCost,
         nitroxCourse: nitroxFee,
-        surcharge: surchargeCost > 0 ? { label: t.register.payment.cardSurcharge, amount: surchargeCost } : null,
+        surcharge: surchargeCost > 0 ? { label: t.chargeLines.surcharge(siteConfig.business.cardSurchargePercent, false), amount: surchargeCost } : null,
       })
       return { base, gearCost, transportCost, nitroxFee, surchargeCost, total, charges }
     })
@@ -719,8 +719,8 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                   <input type="radio" name="payment" checked={payment === method} onChange={() => setPayment(method)} className="accent-brand-900 mt-1" />
                   <span className="flex-1">
                     {method === 'bank_transfer' && t.register.payment.methodBankTransfer}
-                    {method === 'paypal' && t.register.payment.methodPaypal}
-                    {method === 'credit_card' && t.register.payment.methodCreditCard}
+                    {method === 'paypal' && t.register.payment.methodPaypal(siteConfig.business.cardSurchargePercent)}
+                    {method === 'credit_card' && t.register.payment.methodCreditCard(siteConfig.business.cardSurchargePercent)}
                     {method === 'cash' && t.register.payment.methodCash}
                   </span>
                 </label>

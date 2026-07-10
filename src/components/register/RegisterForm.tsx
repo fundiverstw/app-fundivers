@@ -946,7 +946,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       transport: transportCost,
       nitroxCourse: (showNitroxAddon && addNitroxCourse) ? NITROX_COURSE_FEE : 0,
       surcharge: paymentSurcharge > 0
-        ? { label: payingDepositOnly ? t.register.payment.cardSurchargeDeposit : t.register.payment.cardSurcharge, amount: total - subTotal }
+        ? { label: t.chargeLines.surcharge(siteConfig.business.cardSurchargePercent, payingDepositOnly), amount: total - subTotal }
         : null,
     })
   }, [base, showGearRentChoice, gearChoice, gearItems, diveDays, showRooms, roomId, rooms, roomCost,
@@ -1896,8 +1896,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 <span className="flex-1">
                   <span className="block">
                     {method === 'bank_transfer' && t.register.payment.methodBankTransfer}
-                    {method === 'paypal' && t.register.payment.methodPaypal}
-                    {method === 'credit_card' && t.register.payment.methodCreditCard}
+                    {method === 'paypal' && t.register.payment.methodPaypal(siteConfig.business.cardSurchargePercent)}
+                    {method === 'credit_card' && t.register.payment.methodCreditCard(siteConfig.business.cardSurchargePercent)}
                     {method === 'cash' && t.register.payment.methodCash}
                   </span>
                 </span>
