@@ -3,6 +3,10 @@ import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
 import { fetchAllTrustedPartners, saveTrustedPartner, deleteTrustedPartner } from '../../lib/trusted-partners'
 import type { TrustedPartnerRow, TrustedPartnerInsert } from '../../types/database'
+import { t } from '../../i18n'
+
+const pt = t.admin.partners
+const w = t.admin.waivers
 
 // Admin catalog for trusted partners — the single "dive shops abroad we vouch
 // for" table (20260707220000). One record does double duty: it powers the
@@ -49,7 +53,7 @@ export function AdminTrustedPartnersPage() {
   async function handleDelete(p: TrustedPartnerRow) {
     try {
       await deleteTrustedPartner(p.id)
-      toast.success('Partner deleted')
+      toast.success(pt.deleted)
       setConfirmDelete(null)
       await reload()
     } catch (err) {
@@ -60,35 +64,29 @@ export function AdminTrustedPartnersPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-4">
       <div className="flex items-baseline justify-between gap-3">
-        <h1 className="text-2xl font-bold text-white">Trusted Partners</h1>
+        <h1 className="text-2xl font-bold text-white">{t.partners.title}</h1>
         <button type="button" onClick={() => setCreating(true)}
           className="text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg">
-          + New partner
+          {pt.newPartner}
         </button>
       </div>
-      <p className="text-sm text-white/80">
-        Dive shops abroad the shop vouches for. Divers see the name, region,
-        blurb and website on the Trusted Partners tab, and can message any
-        partner that has a contact email; the email stays here and is never
-        shown to divers. These are also the shops that host Packages. Retire a
-        partner (untick Active) to hide it without deleting the record.
-      </p>
+      <p className="text-sm text-white/80">{pt.intro}</p>
 
       {loadError && (
         <p className="text-sm text-red-200 bg-red-900/50 border border-accent rounded-md p-2">{loadError}</p>
       )}
 
       {loading ? (
-        <p className="text-sm text-white/70">Loading…</p>
+        <p className="text-sm text-white/70">{w.loading}</p>
       ) : partners.length === 0 ? (
-        <p className="text-sm text-white/70">No partners yet — add the shop's first one.</p>
+        <p className="text-sm text-white/70">{pt.none}</p>
       ) : (
         <ul className="space-y-2">
           {partners.map(p => (
             <li key={p.id} className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="font-medium text-brand-900 text-sm truncate">
-                  {p.name}{!p.active && <span className="ml-2 text-xs text-brand-900/60">(retired)</span>}
+                  {p.name}{!p.active && <span className="ml-2 text-xs text-brand-900/60">{pt.retired}</span>}
                 </p>
                 <p className="text-xs text-brand-900/80 truncate">
                   {[p.location ?? p.country, p.contact_email].filter(Boolean).join(' · ') || '—'}
@@ -96,9 +94,9 @@ export function AdminTrustedPartnersPage() {
               </div>
               <div className="flex gap-2 shrink-0">
                 <button type="button" onClick={() => setEditing(p)}
-                  className="text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-3 py-1 rounded-lg">Edit</button>
+                  className="text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-3 py-1 rounded-lg">{w.edit}</button>
                 <button type="button" onClick={() => setConfirmDelete(p)}
-                  className="text-xs font-semibold bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded-lg">Delete</button>
+                  className="text-xs font-semibold bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded-lg">{w.delete}</button>
               </div>
             </li>
           ))}
@@ -109,16 +107,16 @@ export function AdminTrustedPartnersPage() {
         <PartnerForm
           partner={editing}
           onClose={() => { setCreating(false); setEditing(null) }}
-          onSaved={async () => { setCreating(false); setEditing(null); toast.success('Partner saved'); await reload() }}
+          onSaved={async () => { setCreating(false); setEditing(null); toast.success(pt.saved); await reload() }}
           onError={m => toast.error(m)}
         />
       )}
 
       {confirmDelete && (
         <ConfirmModal
-          title="Delete partner?"
-          body={`"${confirmDelete.name}" will be removed. Packages that reference it must be deleted first. To keep it on record but hidden from divers, edit it and untick "Active" instead.`}
-          confirmLabel="Delete"
+          title={pt.deleteTitle}
+          body={pt.deleteBody(confirmDelete.name)}
+          confirmLabel={w.delete}
           onClose={() => setConfirmDelete(null)}
           onConfirm={() => handleDelete(confirmDelete)}
         />
@@ -149,11 +147,11 @@ function PartnerForm({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!name.trim()) { onError('Name is required.'); return }
+    if (!name.trim()) { onError(pt.nameRequired); return }
     // Email is optional (a package-only partner may not have one), but if given
     // it must be valid — it's how divers reach the partner from the directory.
     if (contactEmail.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmail.trim())) {
-      onError('That contact email is not valid.'); return
+      onError(pt.emailInvalid); return
     }
     setSubmitting(true)
     try {
@@ -181,41 +179,41 @@ function PartnerForm({
   return (
     <Modal labelledBy="partner-form-title" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-3 max-h-[80vh] overflow-y-auto">
-        <h2 id="partner-form-title" className="text-lg font-bold text-brand-900">{partner ? 'Edit partner' : 'New partner'}</h2>
-        <Labelled label="Shop name *">
-          <input className={FIELD} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Blue Manta Divers" />
+        <h2 id="partner-form-title" className="text-lg font-bold text-brand-900">{partner ? pt.editPartner : pt.newPartnerTitle}</h2>
+        <Labelled label={pt.shopName}>
+          <input className={FIELD} value={name} onChange={e => setName(e.target.value)} placeholder={pt.shopNamePh} />
         </Labelled>
         <div className="grid grid-cols-2 gap-2">
-          <Labelled label="Country"><input className={FIELD} value={country} onChange={e => setCountry(e.target.value)} placeholder="e.g. Philippines" /></Labelled>
-          <Labelled label="Location"><input className={FIELD} value={location} onChange={e => setLocation(e.target.value)} placeholder="City / region" /></Labelled>
+          <Labelled label={pt.country}><input className={FIELD} value={country} onChange={e => setCountry(e.target.value)} placeholder={pt.countryPh} /></Labelled>
+          <Labelled label={pt.location}><input className={FIELD} value={location} onChange={e => setLocation(e.target.value)} placeholder={pt.locationPh} /></Labelled>
         </div>
-        <Labelled label="Website (shown to divers)">
+        <Labelled label={pt.website}>
           <input className={FIELD} type="url" value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://partner.example" />
         </Labelled>
-        <Labelled label="Blurb (shown to divers)">
-          <textarea className={`${FIELD} resize-y`} rows={2} value={blurb} onChange={e => setBlurb(e.target.value)} placeholder="What makes them worth vouching for" />
+        <Labelled label={pt.blurb}>
+          <textarea className={`${FIELD} resize-y`} rows={2} value={blurb} onChange={e => setBlurb(e.target.value)} placeholder={pt.blurbPh} />
         </Labelled>
-        <Labelled label="Logo URL"><input className={FIELD} value={logoUrl} onChange={e => setLogoUrl(e.target.value)} /></Labelled>
+        <Labelled label={pt.logoUrl}><input className={FIELD} value={logoUrl} onChange={e => setLogoUrl(e.target.value)} /></Labelled>
         <div className="grid grid-cols-2 gap-2">
-          <Labelled label="Contact name (internal)"><input className={FIELD} value={contactName} onChange={e => setContactName(e.target.value)} /></Labelled>
-          <Labelled label="Contact email (never shown to divers)">
+          <Labelled label={pt.contactName}><input className={FIELD} value={contactName} onChange={e => setContactName(e.target.value)} /></Labelled>
+          <Labelled label={pt.contactEmail}>
             <input className={FIELD} type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="hello@partner.example" />
           </Labelled>
         </div>
         <div className="grid grid-cols-2 gap-2 items-end">
-          <Labelled label="Default kickback %">
+          <Labelled label={pt.defaultKickback}>
             <input className={FIELD} type="number" step="any" value={rate} onChange={e => setRate(e.target.value)} />
           </Labelled>
           <label className="flex items-center gap-2 text-sm text-brand-900 pb-2">
             <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} className="accent-brand-900" />
-            Active (shown to divers)
+            {pt.activeLabel}
           </label>
         </div>
         <div className="flex justify-end gap-2 pt-1">
-          <button type="button" onClick={onClose} className="text-sm font-semibold text-brand-900 px-3 py-1.5">Cancel</button>
+          <button type="button" onClick={onClose} className="text-sm font-semibold text-brand-900 px-3 py-1.5">{w.cancel}</button>
           <button type="submit" disabled={submitting}
             className="text-sm font-semibold bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white px-4 py-1.5 rounded-lg">
-            {submitting ? 'Saving…' : 'Save'}
+            {submitting ? w.saving : w.save}
           </button>
         </div>
       </form>
@@ -257,7 +255,7 @@ function ConfirmModal({
       <h2 id="partner-confirm-title" className="text-lg font-bold text-brand-900">{title}</h2>
       <p className="text-sm text-brand-900/80">{body}</p>
       <div className="flex justify-end gap-2 pt-1">
-        <button type="button" onClick={onClose} className="text-sm font-semibold text-brand-900 px-3 py-1.5">Cancel</button>
+        <button type="button" onClick={onClose} className="text-sm font-semibold text-brand-900 px-3 py-1.5">{w.cancel}</button>
         <button type="button" onClick={onConfirm}
           className="text-sm font-semibold bg-red-700 hover:bg-red-800 text-white px-4 py-1.5 rounded-lg">{confirmLabel}</button>
       </div>

@@ -7,17 +7,26 @@ import {
 import type { GearModelWithSizes } from '../../lib/gear-sizing'
 import { numOrNull } from '../../lib/num'
 import type { GearType, GearModelSizeInsert } from '../../types/database'
+import { t } from '../../i18n'
 
 // Admin editor for the shop's wetsuit / BCD / fins sizing charts. Each model
 // gets size rows with min/max fit ranges; the logistics board matches a diver's
 // measurements against these to suggest what to pack. See gear-sizing.ts.
 
+const gs = t.admin.gearSizing
+const w = t.admin.waivers
+
 const FIELD = 'w-full bg-white border border-surface-300 rounded-md px-2 py-1.5 text-sm text-brand-900 focus:outline-none focus:border-brand-900'
 const TABS: { type: GearType; label: string }[] = [
-  { type: 'wetsuit', label: 'Wetsuits' },
-  { type: 'bcd', label: 'BCDs' },
-  { type: 'fins', label: 'Fins' },
+  { type: 'wetsuit', label: gs.tabWetsuits },
+  { type: 'bcd', label: gs.tabBcds },
+  { type: 'fins', label: gs.tabFins },
 ]
+const GEAR_LABEL: Record<GearType, string> = {
+  wetsuit: gs.gearWetsuit,
+  bcd: gs.gearBcd,
+  fins: gs.gearFins,
+}
 
 const str = (n: number | null): string => (n == null ? '' : String(n))
 
@@ -48,8 +57,8 @@ export function AdminGearSizingPage() {
 
   async function addModel() {
     try {
-      await saveGearModel({ gear_type: tab, name: 'New model', size_unit: tab === 'fins' ? 'jp' : null })
-      toast.success('Model added')
+      await saveGearModel({ gear_type: tab, name: gs.newModelName, size_unit: tab === 'fins' ? 'jp' : null })
+      toast.success(gs.modelAdded)
       await reload()
     } catch (err) {
       toast.error(errorMessage(err))
@@ -59,32 +68,29 @@ export function AdminGearSizingPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-white">Gear sizing charts</h1>
-        <p className="text-sm text-white/70 mt-1">
-          Enter the shop's wetsuit, BCD and fin models with the body ranges each size fits.
-          Staff can then tap a diver's gear on the logistics board to see what to pack.
-        </p>
+        <h1 className="text-2xl font-bold text-white">{gs.title}</h1>
+        <p className="text-sm text-white/70 mt-1">{gs.intro}</p>
       </div>
 
       <div className="flex gap-2">
-        {TABS.map(t => (
+        {TABS.map(tb => (
           <button
-            key={t.type}
-            onClick={() => setTab(t.type)}
+            key={tb.type}
+            onClick={() => setTab(tb.type)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
-              tab === t.type ? 'bg-white text-brand-900' : 'bg-white/10 text-white hover:bg-white/20'
+              tab === tb.type ? 'bg-white text-brand-900' : 'bg-white/10 text-white hover:bg-white/20'
             }`}
           >
-            {t.label}
+            {tb.label}
           </button>
         ))}
       </div>
 
-      {loading && <p className="text-white/70 text-sm">Loading…</p>}
+      {loading && <p className="text-white/70 text-sm">{w.loading}</p>}
       {loadError && <p className="text-red-200 text-sm">{loadError}</p>}
 
       {!loading && shown.length === 0 && (
-        <p className="text-white/70 text-sm">No {tab} models yet.</p>
+        <p className="text-white/70 text-sm">{gs.noModelsYet(GEAR_LABEL[tab])}</p>
       )}
 
       {shown.map(m => (
@@ -95,7 +101,7 @@ export function AdminGearSizingPage() {
         onClick={addModel}
         className="w-full py-2.5 rounded-xl font-medium border border-white/30 text-white/90 hover:bg-white/10"
       >
-        + Add {tab} model
+        {gs.addModelBtn(GEAR_LABEL[tab])}
       </button>
     </div>
   )
@@ -143,7 +149,7 @@ function GearModelEditor({ model, onChanged }: { model: GearModelWithSizes; onCh
     setSaving(true)
     try {
       await saveGearModel({
-        id: model.id, gear_type: model.gear_type, name: name.trim() || 'Untitled',
+        id: model.id, gear_type: model.gear_type, name: name.trim() || gs.untitled,
         brand: brand.trim() || null,
         gender: isFins ? null : (gender || null),
         size_unit: isFins ? sizeUnit : null,
@@ -159,7 +165,7 @@ function GearModelEditor({ model, onChanged }: { model: GearModelWithSizes; onCh
           chest: r.chest.trim() || null, waist: r.waist.trim() || null, hip: r.hip.trim() || null,
         }))
       await replaceModelSizes(model.id, sizes)
-      toast.success(`Saved ${name}`)
+      toast.success(gs.savedModel(name))
       await onChanged()
     } catch (err) {
       toast.error(errorMessage(err))
@@ -171,7 +177,7 @@ function GearModelEditor({ model, onChanged }: { model: GearModelWithSizes; onCh
   async function remove() {
     try {
       await deleteGearModel(model.id)
-      toast.success('Model deleted')
+      toast.success(gs.modelDeleted)
       await onChanged()
     } catch (err) {
       toast.error(errorMessage(err))
@@ -182,28 +188,28 @@ function GearModelEditor({ model, onChanged }: { model: GearModelWithSizes; onCh
     <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 space-y-3">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <label className="col-span-2 sm:col-span-2">
-          <span className="block text-[10px] uppercase tracking-wide text-brand-900 font-medium mb-0.5">Model name</span>
+          <span className="block text-[10px] uppercase tracking-wide text-brand-900 font-medium mb-0.5">{gs.modelName}</span>
           <input className={FIELD} value={name} onChange={e => setName(e.target.value)} />
         </label>
         <label>
-          <span className="block text-[10px] uppercase tracking-wide text-brand-900 font-medium mb-0.5">Brand</span>
+          <span className="block text-[10px] uppercase tracking-wide text-brand-900 font-medium mb-0.5">{gs.brand}</span>
           <input className={FIELD} value={brand} onChange={e => setBrand(e.target.value)} />
         </label>
         {isFins ? (
           <label>
-            <span className="block text-[10px] uppercase tracking-wide text-brand-900 font-medium mb-0.5">Size unit</span>
+            <span className="block text-[10px] uppercase tracking-wide text-brand-900 font-medium mb-0.5">{gs.sizeUnit}</span>
             <select className={FIELD} value={sizeUnit} onChange={e => setSizeUnit(e.target.value)}>
               {['jp', 'eu', 'us', 'uk', 'cm'].map(u => <option key={u} value={u}>{u.toUpperCase()}</option>)}
             </select>
           </label>
         ) : (
           <label>
-            <span className="block text-[10px] uppercase tracking-wide text-brand-900 font-medium mb-0.5">Cut for</span>
+            <span className="block text-[10px] uppercase tracking-wide text-brand-900 font-medium mb-0.5">{gs.cutFor}</span>
             <select className={FIELD} value={gender} onChange={e => setGender(e.target.value)}>
-              <option value="">Unisex / any</option>
-              <option value="female">Women</option>
-              <option value="male">Men</option>
-              <option value="kids">Kids</option>
+              <option value="">{gs.unisex}</option>
+              <option value="female">{gs.women}</option>
+              <option value="male">{gs.men}</option>
+              <option value="kids">{gs.kids}</option>
             </select>
           </label>
         )}
@@ -213,14 +219,14 @@ function GearModelEditor({ model, onChanged }: { model: GearModelWithSizes; onCh
         <table className="text-xs text-brand-900 min-w-full">
           <thead>
             <tr className="text-left text-[10px] uppercase tracking-wide text-brand-900/70">
-              <th className="pr-2 pb-1">Size</th>
+              <th className="pr-2 pb-1">{gs.colSize}</th>
               {isFins ? (
-                <><th className="px-1 pb-1">Shoe min</th><th className="px-1 pb-1">Shoe max</th></>
+                <><th className="px-1 pb-1">{gs.colShoeMin}</th><th className="px-1 pb-1">{gs.colShoeMax}</th></>
               ) : (
                 <>
-                  <th className="px-1 pb-1">Ht min</th><th className="px-1 pb-1">Ht max</th>
-                  <th className="px-1 pb-1">Wt min</th><th className="px-1 pb-1">Wt max</th>
-                  <th className="px-1 pb-1">Chest</th><th className="px-1 pb-1">Waist</th><th className="px-1 pb-1">Hip</th>
+                  <th className="px-1 pb-1">{gs.colHtMin}</th><th className="px-1 pb-1">{gs.colHtMax}</th>
+                  <th className="px-1 pb-1">{gs.colWtMin}</th><th className="px-1 pb-1">{gs.colWtMax}</th>
+                  <th className="px-1 pb-1">{gs.colChest}</th><th className="px-1 pb-1">{gs.colWaist}</th><th className="px-1 pb-1">{gs.colHip}</th>
                 </>
               )}
               <th className="pb-1"></th>
@@ -229,7 +235,7 @@ function GearModelEditor({ model, onChanged }: { model: GearModelWithSizes; onCh
           <tbody>
             {rows.map((r, i) => (
               <tr key={i}>
-                <td className="pr-2 py-0.5"><input aria-label={`size label ${i}`} className={`${FIELD} w-16`} value={r.label} onChange={e => setRow(i, { label: e.target.value })} /></td>
+                <td className="pr-2 py-0.5"><input aria-label={gs.sizeLabelAria(i)} className={`${FIELD} w-16`} value={r.label} onChange={e => setRow(i, { label: e.target.value })} /></td>
                 {isFins ? (
                   <>
                     <td className="px-1 py-0.5"><input className={`${FIELD} w-16`} value={r.shoe_min} onChange={e => setRow(i, { shoe_min: e.target.value })} /></td>
@@ -247,7 +253,7 @@ function GearModelEditor({ model, onChanged }: { model: GearModelWithSizes; onCh
                   </>
                 )}
                 <td className="pl-1 py-0.5">
-                  <button aria-label={`remove size ${i}`} onClick={() => setRows(rs => rs.filter((_, idx) => idx !== i))} className="text-red-700 hover:text-red-900 px-1">×</button>
+                  <button aria-label={gs.removeSizeAria(i)} onClick={() => setRows(rs => rs.filter((_, idx) => idx !== i))} className="text-red-700 hover:text-red-900 px-1">×</button>
                 </td>
               </tr>
             ))}
@@ -255,25 +261,25 @@ function GearModelEditor({ model, onChanged }: { model: GearModelWithSizes; onCh
         </table>
       </div>
 
-      <button onClick={() => setRows(rs => [...rs, { ...emptyRow }])} className="text-xs font-medium text-brand-900 hover:underline">+ Add size</button>
+      <button onClick={() => setRows(rs => [...rs, { ...emptyRow }])} className="text-xs font-medium text-brand-900 hover:underline">{gs.addSize}</button>
 
       <div className="flex items-center justify-between gap-2 pt-1">
         <label className="flex items-center gap-1.5 text-xs text-brand-900 font-medium">
           <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} className="accent-brand-900" />
-          Active
+          {gs.active}
         </label>
         <div className="flex items-center gap-2">
           {confirmDelete ? (
             <>
-              <span className="text-xs text-brand-900">Delete?</span>
-              <button onClick={remove} className="text-xs font-semibold text-red-700 hover:text-red-900">Yes</button>
-              <button onClick={() => setConfirmDelete(false)} className="text-xs text-brand-900">No</button>
+              <span className="text-xs text-brand-900">{gs.deleteQuestion}</span>
+              <button onClick={remove} className="text-xs font-semibold text-red-700 hover:text-red-900">{gs.yes}</button>
+              <button onClick={() => setConfirmDelete(false)} className="text-xs text-brand-900">{gs.no}</button>
             </>
           ) : (
-            <button onClick={() => setConfirmDelete(true)} className="text-xs text-red-700 hover:text-red-900">Delete</button>
+            <button onClick={() => setConfirmDelete(true)} className="text-xs text-red-700 hover:text-red-900">{w.delete}</button>
           )}
           <button onClick={save} disabled={saving} className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-50">
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? w.saving : w.save}
           </button>
         </div>
       </div>
