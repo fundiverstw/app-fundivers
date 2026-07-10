@@ -20,6 +20,9 @@ import { ProfileForm } from '../ProfilePage'
 import { DiverNotes } from '../../components/admin/DiverNotes'
 import { AdminFamilyPanel } from '../../components/admin/AdminFamilyPanel'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Credit, Payment, Profile } from '../../types/database'
+import { t } from '../../i18n'
+
+const us = t.admin.users
 
 interface UserExtras {
   bookings: Array<Booking & { event: AppEvent | null; charges: ChargeLine[] }>
@@ -192,9 +195,9 @@ export function AdminUsersPage() {
         })
         return next
       })
-      toast.success(promoted ? 'Payment recorded · status set to confirmed' : 'Payment recorded')
+      toast.success(promoted ? us.paymentRecordedConfirmed : us.paymentRecorded)
     } catch (err) {
-      toast.error(`Could not record payment: ${errorMessage(err)}`)
+      toast.error(us.couldNotRecordPayment(errorMessage(err)))
       throw err
     }
   }
@@ -218,9 +221,9 @@ export function AdminUsersPage() {
         })
         return next
       })
-      toast.success('Marked deposit paid · status set to confirmed')
+      toast.success(us.depositMarked)
     } catch (err) {
-      toast.error(`Could not update status: ${errorMessage(err)}`)
+      toast.error(us.couldNotUpdateStatus(errorMessage(err)))
       throw err
     }
   }
@@ -230,9 +233,9 @@ export function AdminUsersPage() {
       const applied = await applyCreditToBooking({ bookingId, amount })
       const extras = await fetchExtras(userId)
       setExtrasCache(prev => new Map(prev).set(userId, extras))
-      toast.success(applied > 0 ? `Applied ${applied.toLocaleString()} credit` : 'Nothing to apply')
+      toast.success(applied > 0 ? t.payments.applied(applied.toLocaleString()) : t.payments.nothingToApply)
     } catch (err) {
-      toast.error(`Could not apply credit: ${errorMessage(err)}`)
+      toast.error(us.couldNotApplyCredit(errorMessage(err)))
       throw err
     }
   }
@@ -259,9 +262,9 @@ export function AdminUsersPage() {
         })
         return next
       })
-      toast.success(`Credit of ${amount.toLocaleString()} issued`)
+      toast.success(us.creditIssued(amount.toLocaleString()))
     } catch (err) {
-      toast.error(`Could not issue credit: ${errorMessage(err)}`)
+      toast.error(us.couldNotIssueCredit(errorMessage(err)))
       throw err
     }
   }
@@ -281,9 +284,9 @@ export function AdminUsersPage() {
         })
         return next
       })
-      toast.success('Credit settled')
+      toast.success(us.creditSettled)
     } catch (err) {
-      toast.error(`Could not settle credit: ${errorMessage(err)}`)
+      toast.error(us.couldNotSettleCredit(errorMessage(err)))
       throw err
     }
   }
@@ -319,21 +322,16 @@ export function AdminUsersPage() {
         })
         return next
       })
-      toast.success('Credit re-opened')
+      toast.success(us.creditReopened)
     } catch (err) {
-      toast.error(`Could not re-open credit: ${errorMessage(err)}`)
+      toast.error(us.couldNotReopenCredit(errorMessage(err)))
       throw err
     }
   }
 
   async function handleDeleteUser(target: Profile) {
     const name = target.name || target.nickname || target.contact_id || target.id
-    const confirmed = window.confirm(
-      `Permanently delete ${name}?\n\n` +
-      `This removes their account, profile, bookings, payments, ` +
-      `credits, notifications, dive log entries, and every other ` +
-      `record tied to them. This cannot be undone.`,
-    )
+    const confirmed = window.confirm(us.deleteConfirm(name))
     if (!confirmed) return
     try {
       const { error } = await supabase.rpc('admin_delete_user', { p_user_id: target.id })
@@ -345,9 +343,9 @@ export function AdminUsersPage() {
         next.delete(target.id)
         return next
       })
-      toast.success(`Deleted ${name}`)
+      toast.success(us.deletedUser(name))
     } catch (err) {
-      toast.error(`Could not delete: ${errorMessage(err)}`)
+      toast.error(us.couldNotDelete(errorMessage(err)))
     }
   }
 
@@ -384,9 +382,9 @@ export function AdminUsersPage() {
         })
         return next
       })
-      toast.success(reverted ? 'Payment voided · status reverted to pending' : 'Payment voided')
+      toast.success(reverted ? us.paymentVoidedReverted : us.paymentVoided)
     } catch (err) {
-      toast.error(`Could not void payment: ${errorMessage(err)}`)
+      toast.error(us.couldNotVoidPayment(errorMessage(err)))
       throw err
     }
   }
@@ -401,9 +399,9 @@ export function AdminUsersPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <div className="flex items-baseline justify-between gap-2">
-        <h1 className="text-xl font-bold text-white">People</h1>
+        <h1 className="text-xl font-bold text-white">{us.title}</h1>
         <span className="text-sm font-medium text-white/80">
-          {filter ? `${visible.length} of ${users.length}` : `${users.length}`} account{users.length === 1 ? '' : 's'}
+          {filter ? us.accountsFiltered(visible.length, users.length) : us.accountsAll(users.length)}
         </span>
       </div>
 
@@ -411,7 +409,7 @@ export function AdminUsersPage() {
         type="text"
         value={filter}
         onChange={e => setFilter(e.target.value)}
-        placeholder="Search by name, contact, cert…"
+        placeholder={us.searchPlaceholder}
         className="w-full bg-white border border-surface-300 rounded-lg px-3 py-2 text-brand-900 text-sm focus:outline-none focus:border-brand-900"
       />
 
@@ -444,7 +442,7 @@ export function AdminUsersPage() {
           </div>
         ))}
         {visible.length === 0 && (
-          <p className="text-brand-950 font-medium text-sm">No matches.</p>
+          <p className="text-brand-950 font-medium text-sm">{us.noMatches}</p>
         )}
       </div>
     </div>
@@ -495,14 +493,14 @@ function UserCard({
       >
         <div className="flex-1 min-w-0">
           <p className="font-medium text-brand-900 text-sm">
-            {user.name ?? '(unnamed)'}
+            {user.name ?? t.admin.family.unnamed}
             {user.nickname && <span className="text-brand-900 font-medium"> ({user.nickname})</span>}
           </p>
           <p className="text-xs text-brand-900 font-medium">
-            {user.cert_agency && user.cert_level ? `${user.cert_agency} ${user.cert_level}` : 'Uncertified'}
-            {user.logged_dives > 0 && ` · ${user.logged_dives} logged`}
-            {user.nitrox_certified && ' · Nitrox'}
-            {user.deep_certified && ' · Deep'}
+            {user.cert_agency && user.cert_level ? `${user.cert_agency} ${user.cert_level}` : t.profile.family.uncertified}
+            {user.logged_dives > 0 && us.loggedSuffix(user.logged_dives)}
+            {user.nitrox_certified && us.nitroxSuffix}
+            {user.deep_certified && us.deepSuffix}
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0 ml-3">
@@ -526,13 +524,13 @@ function UserCard({
             // RLS policy is in place, this writes through to the target row.
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold text-brand-700 uppercase tracking-wider">Editing profile</p>
+                <p className="text-xs font-semibold text-brand-700 uppercase tracking-wider">{us.editingProfile}</p>
                 <button
                   type="button"
                   onClick={onCancelEdit}
                   className="text-xs text-brand-700 hover:text-brand-900 underline"
                 >
-                  Done
+                  {us.done}
                 </button>
               </div>
               <ProfileForm
@@ -551,7 +549,7 @@ function UserCard({
                     onClick={onDelete}
                     className="text-xs text-red-700 hover:text-red-900 underline"
                   >
-                    Delete user
+                    {us.deleteUser}
                   </button>
                 )}
                 {isAdmin && (
@@ -560,7 +558,7 @@ function UserCard({
                     onClick={onEdit}
                     className="text-xs text-brand-700 hover:text-brand-900 underline"
                   >
-                    Edit profile
+                    {us.editProfile}
                   </button>
                 )}
               </div>
@@ -598,42 +596,42 @@ function ProfileDetails({ user }: { user: Profile }) {
     ? `${labelForMethod(user.contact_method)}: ${user.contact_id}`
     : null
   const sizing = [
-    user.height_cm ? `${user.height_cm} cm` : null,
-    user.weight_kg ? `${user.weight_kg} kg` : null,
-    user.shoe_size ? `shoe ${shoeAsJp(user.shoe_size) ?? user.shoe_size}` : null,
+    user.height_cm ? us.heightCm(user.height_cm) : null,
+    user.weight_kg ? us.weightKg(user.weight_kg) : null,
+    user.shoe_size ? us.shoeSize(shoeAsJp(user.shoe_size) ?? user.shoe_size) : null,
   ].filter(Boolean).join(' · ')
 
   return (
     <div className="space-y-3">
-      <Section title="Personal">
-        <Row k="Email" v={user.email} />
-        <Row k="Preferred contact" v={contact} />
-        <Row k="DOB" v={user.date_of_birth ? format(new Date(user.date_of_birth), 'MMM d, yyyy') : null} />
-        <Row k="Nationality" v={user.nationality} />
-        <Row k="ID / Passport" v={user.id_number} />
-        <Row k="Gender" v={user.gender} />
+      <Section title={us.secPersonal}>
+        <Row k={us.rowEmail} v={user.email} />
+        <Row k={us.rowPreferredContact} v={contact} />
+        <Row k={us.rowDob} v={user.date_of_birth ? format(new Date(user.date_of_birth), 'MMM d, yyyy') : null} />
+        <Row k={us.rowNationality} v={user.nationality} />
+        <Row k={us.rowIdPassport} v={user.id_number} />
+        <Row k={us.rowGender} v={user.gender} />
       </Section>
 
-      <Section title="Emergency contact">
-        <Row k="Name" v={user.emergency_contact_name} />
-        <Row k="Phone" v={user.emergency_contact_phone} />
+      <Section title={us.secEmergency}>
+        <Row k={us.rowName} v={user.emergency_contact_name} />
+        <Row k={us.rowPhone} v={user.emergency_contact_phone} />
       </Section>
 
-      <Section title="Certification">
-        <Row k="Agency + level" v={user.cert_agency && user.cert_level ? `${user.cert_agency} ${user.cert_level}` : null} />
-        <Row k="Logged dives" v={String(user.logged_dives ?? 0)} />
-        <Row k="Last dive" v={user.last_dive_date ? format(new Date(user.last_dive_date), 'MMM d, yyyy') : null} />
-        <Row k="Nitrox" v={user.nitrox_certified ? 'certified' : 'no'} />
-        <Row k="Deep (40m)" v={user.deep_certified ? 'certified' : 'no'} />
+      <Section title={t.profile.certification}>
+        <Row k={us.rowAgencyLevel} v={user.cert_agency && user.cert_level ? `${user.cert_agency} ${user.cert_level}` : null} />
+        <Row k={us.rowLoggedDives} v={String(user.logged_dives ?? 0)} />
+        <Row k={us.rowLastDive} v={user.last_dive_date ? format(new Date(user.last_dive_date), 'MMM d, yyyy') : null} />
+        <Row k={us.rowNitrox} v={user.nitrox_certified ? us.certifiedYes : us.certifiedNo} />
+        <Row k={us.rowDeep} v={user.deep_certified ? us.certifiedYes : us.certifiedNo} />
         {user.cert_card_path && <CertCardPreview path={user.cert_card_path} />}
       </Section>
 
-      <Section title="Sizing">
-        <Row k="Body + shoe" v={sizing || null} />
+      <Section title={us.secSizing}>
+        <Row k={us.rowBodyShoe} v={sizing || null} />
       </Section>
 
       {user.medical_notes && (
-        <Section title="Medical notes">
+        <Section title={us.secMedicalNotes}>
           <p className="text-brand-950 font-medium bg-surface-50 rounded p-2 text-xs whitespace-pre-wrap">{user.medical_notes}</p>
         </Section>
       )}
@@ -658,13 +656,13 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
     const paid = extras.payments.filter(p => p.booking_id === b.id && p.status === 'paid').reduce((s, p) => s + p.amount, 0)
     const owed = Number((b.details as { total?: number } | undefined)?.total ?? 0) + amendmentsDelta(extras.amendments.get(b.id) ?? [])
     const due = Math.max(0, owed - paid - openCreditForBooking(extras.credits, b.id))
-    return { id: b.id, label: b.event?.title ?? '(event)', due }
-  }).filter(t => t.due > 0)
+    return { id: b.id, label: b.event?.title ?? t.payments.eventFallback, due }
+  }).filter(tg => tg.due > 0)
   return (
     <div className="space-y-3 pt-2 border-t border-surface-200">
-      <Section title="Bookings" defaultOpen>
+      <Section title={us.secBookings} defaultOpen>
         {activeBookings.length === 0 ? (
-          <p className="text-brand-950 font-medium text-xs">None active.</p>
+          <p className="text-brand-950 font-medium text-xs">{us.noneActive}</p>
         ) : (
           <div className="space-y-3">
             {activeBookings.map(b => {
@@ -677,7 +675,7 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
                 <div key={b.id} className="space-y-1">
                   <div className="flex items-start justify-between text-xs">
                     <div className="min-w-0">
-                      <p className="text-brand-900 truncate">{b.event?.title ?? '(event)'}</p>
+                      <p className="text-brand-900 truncate">{b.event?.title ?? t.payments.eventFallback}</p>
                       {b.event && (
                         <p className="text-brand-950 font-medium">{formatEventSpan(b.event, { style: 'compact', withYear: true })}</p>
                       )}
@@ -706,7 +704,7 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
         )}
       </Section>
 
-      <Section title="Account credits" defaultOpen>
+      <Section title={us.secAccountCredits} defaultOpen>
         <CreditsPanel
           credits={extras.credits}
           openBalance={extras.openCreditBalance}
@@ -720,20 +718,20 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
         />
       </Section>
 
-      <Section title="Totals across all bookings" defaultOpen>
+      <Section title={us.secTotals} defaultOpen>
         <div className="flex justify-between text-xs">
-          <span className="text-brand-900 font-medium">Paid</span>
+          <span className="text-brand-900 font-medium">{t.payments.paid}</span>
           <span className="text-brand-900 font-semibold">{extras.paidSum.toLocaleString()}</span>
         </div>
         {extras.pendingSum > 0 && (
           <div className="flex justify-between text-xs">
-            <span className="text-brand-900 font-medium">Pending</span>
+            <span className="text-brand-900 font-medium">{us.totalsPending}</span>
             <span className="text-red-600">{extras.pendingSum.toLocaleString()}</span>
           </div>
         )}
         {extras.openCreditBalance > 0 && (
           <div className="flex justify-between text-xs">
-            <span className="text-brand-900 font-medium">Open credit (owed to diver)</span>
+            <span className="text-brand-900 font-medium">{us.openCreditOwed}</span>
             <span className="text-emerald-700 font-semibold">{extras.openCreditBalance.toLocaleString()}</span>
           </div>
         )}
@@ -767,11 +765,11 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
     setError(null)
     const amount = parseInt(amountStr, 10)
     if (!Number.isFinite(amount) || amount <= 0) {
-      setError('Amount must be a positive integer.')
+      setError(t.admin.bookingPayments.amountMustBePositive)
       return
     }
     if (reason.trim().length < 3) {
-      setError('Reason is required.')
+      setError(us.reasonRequired)
       return
     }
     setSubmitting(true)
@@ -786,17 +784,14 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
   }
 
   async function handleSettle(c: Credit) {
-    const note = window.prompt(
-      `Settle credit of ${Number(c.amount).toLocaleString()} for "${c.reason}"?\n\nNote (e.g. "Refunded via bank transfer" or "Applied to booking #abc"):`,
-      ''
-    )
+    const note = window.prompt(us.settlePrompt(Number(c.amount).toLocaleString(), c.reason), '')
     if (note === null) return
     setSettlingId(c.id)
     try { await onSettle(c.id, note.trim()) } finally { setSettlingId(null) }
   }
 
   async function handleReopen(c: Credit) {
-    if (!window.confirm(`Re-open this settled credit (${Number(c.amount).toLocaleString()} — "${c.reason}")?`)) return
+    if (!window.confirm(us.reopenConfirm(Number(c.amount).toLocaleString(), c.reason))) return
     setSettlingId(c.id)
     try { await onReopen(c.id) } finally { setSettlingId(null) }
   }
@@ -804,14 +799,14 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
   return (
     <div className="text-xs space-y-2">
       <div className="flex justify-between">
-        <span className="text-brand-900 font-medium">Credit owed (incl. overpayments)</span>
+        <span className="text-brand-900 font-medium">{us.creditOwedIncl}</span>
         <span className={`font-semibold ${openBalance > 0 ? 'text-emerald-700' : 'text-brand-900'}`}>
           {openBalance.toLocaleString()}
         </span>
       </div>
 
       {credits.length === 0 ? (
-        <p className="text-brand-950 font-medium italic">No credits on record.</p>
+        <p className="text-brand-950 font-medium italic">{us.noCredits}</p>
       ) : (
         <ul className="space-y-1 pt-1 border-t border-surface-200">
           {credits.map(c => {
@@ -820,12 +815,12 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
               <li key={c.id} className="flex items-baseline justify-between gap-2">
                 <span className="text-brand-950 font-medium flex-1">
                   {format(new Date(c.created_at), 'MMM d')} · {c.reason}
-                  {linked?.event && <span className="opacity-70"> (re: {linked.event.title})</span>}
+                  {linked?.event && <span className="opacity-70">{us.reEvent(linked.event.title)}</span>}
                   {c.status === 'settled' && c.settled_note && (
-                    <span className="opacity-70"> · settled: {c.settled_note}</span>
+                    <span className="opacity-70">{us.settledWithNote(c.settled_note)}</span>
                   )}
                   {c.status === 'settled' && !c.settled_note && (
-                    <span className="opacity-70"> · settled</span>
+                    <span className="opacity-70">{us.settledPlain}</span>
                   )}
                 </span>
                 {!readOnly && c.status === 'open' && (
@@ -835,7 +830,7 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
                     onClick={() => handleSettle(c)}
                     className="shrink-0 text-[10px] text-brand-700 hover:text-brand-900 underline disabled:opacity-50"
                   >
-                    {settlingId === c.id ? '…' : 'Settle'}
+                    {settlingId === c.id ? '…' : us.settle}
                   </button>
                 )}
                 {!readOnly && c.status === 'settled' && (
@@ -845,7 +840,7 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
                     onClick={() => handleReopen(c)}
                     className="shrink-0 text-[10px] text-brand-700 hover:text-brand-900 underline disabled:opacity-50"
                   >
-                    {settlingId === c.id ? '…' : 'Re-open'}
+                    {settlingId === c.id ? '…' : us.reopen}
                   </button>
                 )}
                 <span className={`shrink-0 font-semibold ${c.status === 'settled' ? 'text-brand-950 line-through' : 'text-emerald-700'}`}>
@@ -874,7 +869,7 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
               onClick={() => setShowForm(true)}
               className="text-xs text-brand-700 hover:text-brand-900 underline"
             >
-              + Issue credit
+              {us.issueCreditLink}
             </button>
           ) : (
             <form onSubmit={submit} className="space-y-1.5">
@@ -883,7 +878,7 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
                   type="number" inputMode="numeric" min={1} step={1}
                   value={amountStr}
                   onChange={e => setAmountStr(e.target.value)}
-                  placeholder="Amount"
+                  placeholder={us.amountPlaceholder}
                   className="w-24 bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
                 />
                 <select
@@ -891,10 +886,10 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
                   onChange={e => setLinkedBooking(e.target.value)}
                   className="flex-1 bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
                 >
-                  <option value="">— no linked booking —</option>
+                  <option value="">{us.noLinkedBooking}</option>
                   {bookings.map(b => (
                     <option key={b.id} value={b.id}>
-                      {b.event?.title ?? '(event)'}
+                      {b.event?.title ?? t.payments.eventFallback}
                     </option>
                   ))}
                 </select>
@@ -903,7 +898,7 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
                 type="text"
                 value={reason}
                 onChange={e => setReason(e.target.value)}
-                placeholder="Reason (e.g. weather-cancelled Kenting May 15)"
+                placeholder={us.reasonPlaceholder}
                 maxLength={500}
                 className="w-full bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
               />
@@ -913,14 +908,14 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
                   disabled={submitting}
                   className="text-xs bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded"
                 >
-                  {submitting ? 'Issuing…' : 'Issue credit'}
+                  {submitting ? us.issuing : us.issueCredit}
                 </button>
                 <button
                   type="button"
                   onClick={() => { setShowForm(false); setError(null); setAmountStr(''); setReason(''); setLinkedBooking('') }}
                   className="text-xs text-brand-700 hover:text-brand-900 underline"
                 >
-                  Cancel
+                  {t.admin.catalog.cancel}
                 </button>
               </div>
               {error && <p className="text-red-600">{error}</p>}
@@ -939,7 +934,7 @@ function ApplyToBookingForm({ spendable, targets, tiedCredit, onApply }: {
   onApply: (bookingId: string, amount: number) => Promise<void>
 }) {
   const [bookingId, setBookingId] = useState(targets[0]?.id ?? '')
-  const target = targets.find(t => t.id === bookingId) ?? targets[0]
+  const target = targets.find(tg => tg.id === bookingId) ?? targets[0]
   // Spendable here excludes credit already tied to (and offsetting) this same
   // booking — the RPC clamps identically, this just keeps the UI honest.
   const cap = target ? Math.min(target.due, Math.max(0, spendable - tiedCredit(target.id))) : 0
@@ -961,15 +956,15 @@ function ApplyToBookingForm({ spendable, targets, tiedCredit, onApply }: {
 
   return (
     <form onSubmit={submit} className="pt-1 border-t border-surface-200 space-y-1.5">
-      <p className="text-brand-900 font-medium">Apply credit to a booking</p>
+      <p className="text-brand-900 font-medium">{us.applyToBooking}</p>
       <div className="flex items-center gap-2">
         <select
           value={bookingId}
           onChange={e => { setBookingId(e.target.value); setAmountStr('') }}
           className="flex-1 bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
         >
-          {targets.map(t => (
-            <option key={t.id} value={t.id}>{t.label} · {t.due.toLocaleString()} due</option>
+          {targets.map(tg => (
+            <option key={tg.id} value={tg.id}>{us.dueOption(tg.label, tg.due.toLocaleString())}</option>
           ))}
         </select>
         <input
@@ -984,10 +979,10 @@ function ApplyToBookingForm({ spendable, targets, tiedCredit, onApply }: {
           disabled={busy || amount <= 0}
           className="text-xs bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded"
         >
-          {busy ? 'Applying…' : 'Apply'}
+          {busy ? t.payments.applying : us.apply}
         </button>
       </div>
-      <p className="text-brand-950">Up to {cap.toLocaleString()} of {spendable.toLocaleString()} available credit.</p>
+      <p className="text-brand-950">{us.upToOf(cap.toLocaleString(), spendable.toLocaleString())}</p>
     </form>
   )
 }
@@ -1015,7 +1010,8 @@ function Row({ k, v }: { k: string; v: string | null | undefined }) {
 }
 
 function labelForMethod(m: NonNullable<Profile['contact_method']>) {
-  return m === 'whatsapp' ? 'WhatsApp' : m === 'line' ? 'Line' : m === 'phone' ? 'Phone' : 'Email'
+  const cm = t.profile.contactMethod
+  return m === 'whatsapp' ? cm.whatsapp : m === 'line' ? cm.line : m === 'phone' ? cm.phone : cm.email
 }
 
 function statusColor(s: Booking['status']) {
@@ -1037,7 +1033,7 @@ function CertCardPreview({ path }: { path: string }) {
     <a href={url} target="_blank" rel="noopener noreferrer" className="block mt-2">
       <img
         src={url}
-        alt="Certification card"
+        alt={us.certCardAlt}
         className="w-full rounded-lg border border-surface-200"
       />
     </a>
