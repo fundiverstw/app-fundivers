@@ -1,4 +1,4 @@
-.PHONY: help dev studio mail start stop status reset diff link pull push dump-data backup-prod repair-history verify test lint lint-fix typecheck check deploy deploy-app deploy-push deploy-functions wix-sync
+.PHONY: help dev studio mail start stop status reset diff link pull push dump-data backup-prod repair-history verify test lint lint-fix typecheck check deploy deploy-app deploy-push deploy-functions wix-sync wix-sync-pull
 
 help:
 	@echo "Local dev:"
@@ -34,8 +34,9 @@ help:
 	@echo "  make deploy-push       — deploy just the push cron (fundivers-push)"
 	@echo "  make deploy-functions  — deploy all supabase edge functions in supabase/functions/"
 	@echo ""
-	@echo "Wix CMS:"
-	@echo "  make wix-sync    — POST /_functions/syncSupabase to rebuild every Wix collection in SYNC_TABLES from current Supabase data"
+	@echo "Wix CMS (Supabase -> Wix):"
+	@echo "  make wix-sync         — push-based full sync via the wix_sync_all() RPC (all collections; TABLE=events for one)"
+	@echo "  make wix-sync-pull    — fallback: have Wix pull from Supabase (POST /_functions/syncSupabase)"
 
 start:      ; @npm run db:start
 stop:       ; @npm run db:stop
@@ -95,9 +96,30 @@ deploy-push:
 
 deploy-functions: ; @npm run functions:deploy
 
-# Trigger the manual Wix re-sync. .env.local is sourced on demand so this
-# works whether or not the caller has already exported WIX_SYNC_TOKEN.
+# Push-based full Wix sync (Supabase -> Wix): re-emit every catalog/event row
+# through the wix_sync_all() RPC, which POSTs each to the Wix webhook. Reads the
+# cloud URL + service-role key from .env.production (the RPC is service-role
+# only). TABLE=<name> syncs one collection instead of all. This hits PRODUCTION
+# Wix; the DB's wix_sync_token vault secret must be set or the RPC errors.
 wix-sync:
+	@if [ ! -f .env.production ]; then echo "ERROR: .env.production not found — see docs/deployment.md"; exit 1; fi
+	@set -a; . ./.env.production; set +a; \
+	  if [ -z "$$VITE_SUPABASE_URL" ] || [ -z "$$SUPABASE_SERVICE_ROLE_KEY" ]; then \
+	    echo "ERROR: set VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.production"; exit 1; \
+	  fi; \
+	  echo "Pushing $(if $(TABLE),collection '$(TABLE)',all collections) from Supabase to Wix via wix_sync_all()…"; \
+	  curl -sS --fail-with-body -X POST \
+	    -H "apikey: $$SUPABASE_SERVICE_ROLE_KEY" \
+	    -H "Authorization: Bearer $$SUPABASE_SERVICE_ROLE_KEY" \
+	    -H 'Content-Type: application/json' \
+	    -w '\nHTTP %{http_code}\n' \
+	    -d '$(if $(TABLE),{"p_table":"$(TABLE)"},{})' \
+	    "$$VITE_SUPABASE_URL/rest/v1/rpc/wix_sync_all"
+
+# Fallback (Wix -> Supabase pull): have the Wix site re-read every collection in
+# its SYNC_TABLES from Supabase. Prefer `make wix-sync` (push); this exists for
+# recovery if the push path ever drifts. .env.local is sourced on demand.
+wix-sync-pull:
 	@if [ -f .env.local ] && [ -z "$$WIX_SYNC_TOKEN" ]; then \
 	  set -a && . ./.env.local && set +a; \
 	fi; \
