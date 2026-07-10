@@ -2,17 +2,9 @@
 // *logic* in src/lib/payment-instructions.ts — shop values are read from the
 // same fundive.config.ts and the copy from the same message catalog (both pure
 // data, so Deno reads them fine), which means neither can drift between the two.
-//
-// PINNED TO ENGLISH, deliberately. The only consumer is pdf.ts, which renders
-// with jsPDF's built-in `helvetica` — a WinAnsi font with no CJK glyphs. Passing
-// zh-TW / ja text through it does not fail; it silently emits mangled bytes
-// (「防寒衣」 → `–2[Òˆc`). Until a CJK font is embedded via addFileToVFS/addFont,
-// an English PDF is legible and a "translated" one is not. The SPA form uses the
-// locale catalog (src/lib/payment-instructions.ts); this side reads `en`
-// directly, so the copy still has exactly one source.
 
 import { siteConfig } from "../../../fundive.config.ts"
-import { en } from "../../../src/i18n/messages/en.ts"
+import { t } from "./i18n.ts"
 
 export const SHOP_PHONE    = siteConfig.contact.phone
 export const SHOP_ADDRESS  = siteConfig.contact.address
@@ -36,7 +28,7 @@ export function paymentInstructionsFor(
   method: PdfPaymentMethod,
   opts: { invoiceEmail?: string | null } = {},
 ): PaymentInstructions | null {
-  const p = en.paymentInstructions
+  const p = t.paymentInstructions
   switch (method) {
     case "cash":
       return {
@@ -84,7 +76,7 @@ export function paymentInstructionsFor(
  * verbatim on the form and PDF for every method.
  */
 export function paymentConfirmationReminder(): PaymentInstructions {
-  const p = en.paymentInstructions
+  const p = t.paymentInstructions
   return {
     title: p.afterTitle,
     lines: [

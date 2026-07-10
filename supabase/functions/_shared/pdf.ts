@@ -10,9 +10,12 @@ import { Buffer } from "node:buffer"
 import { needsCjkFont, payloadNeedsCjkFont } from "./pdf-fonts.ts"
 import { paymentInstructionsFor, paymentConfirmationReminder } from "./payment-instructions.ts"
 import { siteConfig } from "../../../fundive.config.ts"
+import { t } from "./i18n.ts"
 
 // Shop currency label shown on money rows in the PDF.
 const CUR = siteConfig.locale.currencyLabel
+const PCT = siteConfig.business.cardSurchargePercent
+const d = t.pdf
 
 // Bundled alongside this file in the edge function deploy. Forks replace this
 // image with their own logo at the same path.
@@ -218,9 +221,9 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   let y = 8
 
   doc.setFontSize(7.5)
-  doc.setFont("helvetica", "normal")
   doc.setTextColor(...C.gray)
-  doc.text("Generated: " + formatGeneratedDate(), MR, y, { align: "right" })
+  setFontFor(doc, d.generated(formatGeneratedDate()), "normal")
+  doc.text(d.generated(formatGeneratedDate()), MR, y, { align: "right" })
   y += 5
 
   if (logo) {
@@ -247,9 +250,9 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   }
 
   doc.setFontSize(16)
-  doc.setFont("helvetica", "bold")
   doc.setTextColor(...C.ocean)
-  doc.text("Registration Form", 105, y, { align: "center" })
+  setFontFor(doc, d.registrationForm, "bold")
+  doc.text(d.registrationForm, 105, y, { align: "center" })
   y += 4
 
   doc.setDrawColor(...C.ocean)
@@ -259,83 +262,85 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
 
   // ── Event ─────────────────────────────────────────────
   altState.alt = false
-  y = section(doc, y, "Event")
-  y = row(doc, y, "Event", p.eventTitle, altState)
+  y = section(doc, y, d.event)
+  y = row(doc, y, d.event, p.eventTitle, altState)
   const dateStr = p.startDate
-    ? (p.startDate + (p.endDate && p.endDate !== p.startDate ? " to " + p.endDate : ""))
+    ? (p.endDate && p.endDate !== p.startDate ? d.dateRange(p.startDate, p.endDate) : p.startDate)
     : ""
-  y = row(doc, y, "Date", dateStr, altState)
+  y = row(doc, y, d.date, dateStr, altState)
   y += 4
 
   // ── Personal details ──────────────────────────────────
   altState.alt = false
-  y = section(doc, y, "Personal details")
-  y = row(doc, y, "Name", p.name, altState)
-  y = row(doc, y, "Nickname", p.nickname, altState)
-  y = row(doc, y, "Email", p.email, altState)
-  y = row(doc, y, "Date of birth", p.dob, altState)
-  y = row(doc, y, "Nationality", p.nationality, altState)
-  y = row(doc, y, "Passport / ARC", p.idNumber, altState)
+  y = section(doc, y, d.personalDetails)
+  y = row(doc, y, d.name, p.name, altState)
+  y = row(doc, y, d.nickname, p.nickname, altState)
+  y = row(doc, y, d.email, p.email, altState)
+  y = row(doc, y, d.dob, p.dob, altState)
+  y = row(doc, y, d.nationality, p.nationality, altState)
+  y = row(doc, y, d.passportId, p.idNumber, altState)
   const contactStr = p.contactMethod ? (p.contactMethod + (p.contactId ? " - " + p.contactId : "")) : ""
-  y = row(doc, y, "Contact", contactStr, altState)
+  y = row(doc, y, d.contact, contactStr, altState)
   y += 4
 
   // ── Certification ─────────────────────────────────────
   if (p.certLevel || p.certOrg || p.loggedDives || p.lastDiveDate) {
     altState.alt = false
-    y = section(doc, y, "Certification")
-    y = row(doc, y, "Level", p.certLevel, altState)
-    y = row(doc, y, "Organization", p.certOrg, altState)
-    y = row(doc, y, "Nitrox certified", p.diverNitrox ? "Yes" : "", altState)
-    y = row(doc, y, "Deep certified (40m)", p.diverDeep ? "Yes" : "", altState)
-    y = row(doc, y, "Nitrox course add-on", p.addNitroxCourse ? "Yes" : "", altState)
-    y = row(doc, y, "Logged dives", p.loggedDives, altState)
-    y = row(doc, y, "Last dive", p.lastDiveDate, altState)
+    y = section(doc, y, d.certification)
+    y = row(doc, y, d.level, p.certLevel, altState)
+    y = row(doc, y, d.organization, p.certOrg, altState)
+    y = row(doc, y, d.nitroxCertified, p.diverNitrox ? d.yes : "", altState)
+    y = row(doc, y, d.deepCertified, p.diverDeep ? d.yes : "", altState)
+    y = row(doc, y, d.nitroxCourseAddon, p.addNitroxCourse ? d.yes : "", altState)
+    y = row(doc, y, d.loggedDives, p.loggedDives, altState)
+    y = row(doc, y, d.lastDive, p.lastDiveDate, altState)
     y += 4
   }
 
   // ── Accommodation & extras ────────────────────────────
   altState.alt = false
-  y = section(doc, y, "Accommodation & extras")
-  y = row(doc, y, "Room upgrade", p.roomBoard, altState)
-  y = row(doc, y, "Room requests", p.roomNotes, altState)
+  y = section(doc, y, d.accommodationExtras)
+  y = row(doc, y, d.roomUpgrade, p.roomBoard, altState)
+  y = row(doc, y, d.roomRequests, p.roomNotes, altState)
   if (p.otherAddons && p.otherAddons.length) {
-    y = row(doc, y, "Other add-ons", p.otherAddons.join(", "), altState)
+    y = row(doc, y, d.otherAddons, p.otherAddons.join(", "), altState)
   }
   const gearDays = p.diveDays && p.diveDays > 1 ? p.diveDays : 1
   const gearLabel = p.gearIncluded
-    ? "Included with course"
+    ? d.includedWithCourse
     : p.gearAssistanceNote
-      ? "NEEDS HELP — see note below"
+      ? d.needsHelp
       : p.rentGear
-        ? ("A-la-carte" + (gearDays > 1 ? " x" + gearDays + " days" : ""))
-        : "No"
-  y = row(doc, y, "Gear rental", gearLabel, altState)
+        ? (d.alaCarte + (gearDays > 1 ? d.alaCarteDays(gearDays) : ""))
+        : d.no
+  y = row(doc, y, d.gearRental, gearLabel, altState)
   if (p.gearAssistanceNote) {
-    y = row(doc, y, "Gear note", p.gearAssistanceNote, altState)
+    y = row(doc, y, d.gearNote, p.gearAssistanceNote, altState)
   }
   if (p.rentGear && p.gearItems && p.gearItems.length) {
-    y = row(doc, y, "Items", p.gearItems.join(", "), altState)
+    y = row(doc, y, d.items, p.gearItems.join(", "), altState)
   }
   if (p.rentGear && (p.height || p.weight || p.shoeSize)) {
-    y = row(doc, y, "Sizing", "H: " + (p.height || "") + "  W: " + (p.weight || "") + "  Shoe: " + (p.shoeSize || ""), altState)
+    y = row(doc, y, d.sizing, d.sizingValue(p.height || "", p.weight || "", p.shoeSize || ""), altState)
   }
-  y = row(doc, y, "Transportation",
-    p.needsRide ? "Riding with the shop" : "Driving themselves",
+  y = row(doc, y, d.transportation,
+    p.needsRide ? d.ridingWithShop : d.drivingThemselves,
     altState)
-  if (p.notes) y = row(doc, y, "Note", p.notes, altState)
+  if (p.notes) y = row(doc, y, d.note, p.notes, altState)
   y += 4
 
   // ── Payment ───────────────────────────────────────────
   altState.alt = false
-  y = section(doc, y, "Payment")
+  y = section(doc, y, d.payment)
+  // The surcharge is business.cardSurchargePercent — it was a hardcoded "+5%",
+  // which silently lied on any fork configured with a different rate.
   const methodLabel =
-    p.paymentMethod === "bank_transfer" ? "Bank transfer"
-    : p.paymentMethod === "paypal"      ? "PayPal (+5%)"
-    : p.paymentMethod === "credit_card" ? "Credit card (+5%)"
-    : p.paymentMethod === "cash"        ? "Cash"
+    p.paymentMethod === "bank_transfer" ? d.bankTransfer
+    : p.paymentMethod === "paypal"      ? d.paypalMethod(PCT)
+    : p.paymentMethod === "credit_card" ? d.creditCardMethod(PCT)
+    : p.paymentMethod === "cash"        ? d.cash
     : (p.paymentMethod || "")
-  y = row(doc, y, "Method", methodLabel, altState)
+  y = row(doc, y, d.method, methodLabel, altState)
   // Itemized charge breakdown — each line sums into the highlighted Total
   // below, so staff and divers can trace exactly what was charged.
   if (p.charges && p.charges.length) {
@@ -349,9 +354,9 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   doc.setFillColor(...C.oceanLight)
   doc.rect(0, y - 5, 210, 10, "F")
   doc.setFontSize(9)
-  doc.setFont("helvetica", "bold")
   doc.setTextColor(...C.ocean)
-  doc.text(`Total (${CUR})`, ML + 2, y + 1)
+  setFontFor(doc, d.total(CUR), "bold")
+  doc.text(d.total(CUR), ML + 2, y + 1)
   doc.setFontSize(13)
   doc.text(p.total != null ? String(p.total) : "-", COL, y + 1)
   y += 8
@@ -405,8 +410,8 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   doc.setFont("helvetica", "normal")
   doc.setTextColor(...C.dark)
   const summary = p.fullPaymentDeadline
-    ? `Pay deposit ASAP to hold your spot. Pay the remaining balance by ${formatDeadlineLong(p.fullPaymentDeadline)} to complete your registration.`
-    : `Pay deposit ASAP to hold your spot. Pay the remaining balance to complete your registration.`
+    ? d.payDepositSummary(formatDeadlineLong(p.fullPaymentDeadline))
+    : d.payDepositSummaryNoDeadline
   setFontFor(doc, summary, "normal")
   const wrapped = doc.splitTextToSize(summary, MR - ML - 2)
   for (const line of wrapped) { doc.text(line, ML + 2, y); y += 4.5 }
@@ -414,12 +419,13 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   if (p.payDepositOnly && typeof p.deposit === "number" && typeof p.total === "number") {
     y += 2
     const remaining = Math.max(0, p.total - p.deposit)
-    doc.setFont("helvetica", "bold")
-    doc.text(`Pay deposit ASAP: ${p.deposit} ${CUR}`, ML + 2, y)
+    setFontFor(doc, d.payDepositNow(p.deposit, CUR), "bold")
+    doc.text(d.payDepositNow(p.deposit, CUR), ML + 2, y)
     y += 4.5
     const balanceLine = p.fullPaymentDeadline
-      ? `Pay remaining balance by ${formatDeadlineLong(p.fullPaymentDeadline)}: ${remaining} ${CUR}`
-      : `Pay remaining balance: ${remaining} ${CUR}`
+      ? d.payBalanceBy(formatDeadlineLong(p.fullPaymentDeadline), remaining, CUR)
+      : d.payBalance(remaining, CUR)
+    setFontFor(doc, balanceLine, "bold")
     doc.text(balanceLine, ML + 2, y)
     y += 4.5
     doc.setFont("helvetica", "normal")
@@ -430,15 +436,15 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   if (p.cancellationPolicyText) {
     y += 6
     const heading = p.cancellationPolicyTitle
-      ? `Cancellation policy — ${p.cancellationPolicyTitle}`
-      : "Cancellation policy"
+      ? d.cancellationPolicyNamed(p.cancellationPolicyTitle)
+      : d.cancellationPolicy
     y = section(doc, y, heading)
     doc.setFontSize(8.5)
     doc.setFont("helvetica", "normal")
     doc.setTextColor(...C.dark)
     if (p.cancelDate) {
-      doc.setFont("helvetica", "bold")
-      doc.text(`Cancel-by date: ${formatDeadlineLong(p.cancelDate)}`, ML + 2, y)
+      setFontFor(doc, d.cancelByDate(formatDeadlineLong(p.cancelDate)), "bold")
+      doc.text(d.cancelByDate(formatDeadlineLong(p.cancelDate)), ML + 2, y)
       doc.setFont("helvetica", "normal")
       y += 5
     }
@@ -509,22 +515,22 @@ export interface GroupRegistrationPdfPayload {
 }
 
 const GROUP_FIELDS: Array<{ label: string; get: (d: GroupDiverColumn) => string }> = [
-  { label: "Event",         get: d => d.eventTitle },
-  { label: "Date",          get: d => d.dateStr ?? "" },
-  { label: "Name",          get: d => d.name },
-  { label: "Nickname",      get: d => d.nickname ?? "" },
-  { label: "Date of birth", get: d => d.dob ?? "" },
-  { label: "Nationality",   get: d => d.nationality ?? "" },
-  { label: "Cert level",    get: d => d.certLevel ?? "" },
-  { label: "Cert org",      get: d => d.certOrg ?? "" },
-  { label: "Nitrox",        get: d => d.nitrox ? "Yes" : "" },
-  { label: "Gear",          get: d => d.gearLabel },
-  { label: "Transport",     get: d => d.ride },
-  { label: "Room",          get: d => d.room ?? "" },
-  { label: "Add-ons",       get: d => d.addons.join(", ") },
-  { label: "Status",        get: d => d.status },
-  { label: `Deposit (${CUR})`, get: d => d.deposit != null ? String(d.deposit) : "" },
-  { label: `Total (${CUR})`,   get: d => d.total != null ? String(d.total) : "" },
+  { label: d.event,        get: c => c.eventTitle },
+  { label: d.date,         get: c => c.dateStr ?? "" },
+  { label: d.name,         get: c => c.name },
+  { label: d.nickname,     get: c => c.nickname ?? "" },
+  { label: d.dob,          get: c => c.dob ?? "" },
+  { label: d.nationality,  get: c => c.nationality ?? "" },
+  { label: d.certLevel,    get: c => c.certLevel ?? "" },
+  { label: d.certOrg,      get: c => c.certOrg ?? "" },
+  { label: d.nitrox,       get: c => c.nitrox ? d.yes : "" },
+  { label: d.gear,         get: c => c.gearLabel },
+  { label: d.transport,    get: c => c.ride },
+  { label: d.room,         get: c => c.room ?? "" },
+  { label: d.addons,       get: c => c.addons.join(", ") },
+  { label: d.status,       get: c => c.status },
+  { label: d.deposit(CUR), get: c => c.deposit != null ? String(c.deposit) : "" },
+  { label: d.total(CUR),   get: c => c.total != null ? String(c.total) : "" },
 ]
 
 const GROUP_LABEL_X = ML + 2
@@ -571,9 +577,9 @@ export async function buildGroupPdfBase64(p: GroupRegistrationPdfPayload): Promi
   const logo = await loadLogoDataUrl()
   let y = 8
   doc.setFontSize(7.5)
-  doc.setFont("helvetica", "normal")
   doc.setTextColor(...C.gray)
-  doc.text("Generated: " + formatGeneratedDate(), MR, y, { align: "right" })
+  setFontFor(doc, d.generated(formatGeneratedDate()), "normal")
+  doc.text(d.generated(formatGeneratedDate()), MR, y, { align: "right" })
   y += 5
   if (logo) {
     try {
@@ -587,9 +593,9 @@ export async function buildGroupPdfBase64(p: GroupRegistrationPdfPayload): Promi
     } catch { y += 4 }
   }
   doc.setFontSize(16)
-  doc.setFont("helvetica", "bold")
   doc.setTextColor(...C.ocean)
-  doc.text("Group Registration", 105, y, { align: "center" })
+  setFontFor(doc, d.groupRegistration, "bold")
+  doc.text(d.groupRegistration, 105, y, { align: "center" })
   y += 4
   doc.setFontSize(8.5)
   doc.setFont("helvetica", "normal")
@@ -673,10 +679,10 @@ export async function buildGroupPdfBase64(p: GroupRegistrationPdfPayload): Promi
 
   y += 4
   y = ensureY(doc, y, 8)
-  doc.setFont("helvetica", "normal")
   const summary = p.fullPaymentDeadline
-    ? `Pay deposit ASAP to hold the group's spots. Pay the remaining balance by ${formatDeadlineLong(p.fullPaymentDeadline)} to complete the registration.`
-    : `Pay deposit ASAP to hold the group's spots. Pay the remaining balance to complete the registration.`
+    ? d.payGroupSummary(formatDeadlineLong(p.fullPaymentDeadline))
+    : d.payGroupSummaryNoDeadline
+  setFontFor(doc, summary, "normal")
   for (const line of doc.splitTextToSize(summary, MR - ML - 2)) { doc.text(line, ML + 2, y); y += 4.5 }
 
   const dataUri = doc.output("datauristring")
