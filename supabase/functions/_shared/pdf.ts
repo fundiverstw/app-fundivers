@@ -7,6 +7,7 @@
 
 import { jsPDF } from "npm:jspdf@2.5.1"
 import { Buffer } from "node:buffer"
+import { needsCjkFont, payloadNeedsCjkFont } from "./pdf-fonts.ts"
 import { paymentInstructionsFor, paymentConfirmationReminder } from "./payment-instructions.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 
@@ -16,6 +17,54 @@ const CUR = siteConfig.locale.currencyLabel
 // Bundled alongside this file in the edge function deploy. Forks replace this
 // image with their own logo at the same path.
 const LOGO_PATH = new URL("./fd_logo.png", import.meta.url)
+
+// ─── CJK text support ────────────────────────────────────────────────────────
+// jsPDF's built-in helvetica is a standard-14 font with WinAnsi (cp1252)
+// encoding: it has no CJK glyphs and does NOT fail on them — it silently emits
+// mangled bytes. Diver names, event titles and free-text notes are all
+// user-supplied, so any of them can be Chinese or Japanese.
+//
+// We embed a TrueType font (jsPDF cannot embed CFF/OTF) with Latin + kana + the
+// CJK ideograph blocks, and switch to it per string, only when that string
+// actually needs it. Latin text keeps helvetica, so bold/italic weights and the
+// existing layout are untouched.
+//
+// `pdf-cjk.ttf` is Noto Sans TC (Latin + kana + ~15k ideographs). A fork whose
+// divers have Japanese names should replace it, at the same path, with Noto Sans
+// JP — the two are not supersets of one another (TC lacks 桜, JP lacks ~4.5k TC
+// ideographs). Licence: pdf-cjk.LICENSE.txt (SIL OFL 1.1).
+const CJK_FONT_PATH = new URL("./pdf-cjk.ttf", import.meta.url)
+const CJK_FAMILY = "NotoCJK"
+const CJK_VFS_NAME = "pdf-cjk.ttf"
+
+// Read + base64 the font once per isolate (~200ms, ~6.8MB), not once per PDF.
+let cjkFontB64: Promise<string | null> | null = null
+function loadCjkFontB64(): Promise<string | null> {
+  cjkFontB64 ??= Deno.readFile(CJK_FONT_PATH)
+    .then((bytes) => Buffer.from(bytes).toString("base64"))
+    // A fork may delete the font to save bundle size; ASCII PDFs still render.
+    .catch(() => null)
+  return cjkFontB64
+}
+
+const docsWithCjk = new WeakSet<jsPDF>()
+
+async function registerCjkFont(doc: jsPDF, payload: unknown): Promise<void> {
+  if (!payloadNeedsCjkFont(payload)) return
+  const b64 = await loadCjkFontB64()
+  if (!b64) return
+  doc.addFileToVFS(CJK_VFS_NAME, b64)
+  doc.addFont(CJK_VFS_NAME, CJK_FAMILY, "normal")
+  docsWithCjk.add(doc)
+}
+
+/** Select the font for one string: the embedded CJK face when helvetica cannot
+ *  encode it (weights collapse to regular — the face ships one weight), else
+ *  helvetica in the requested style. */
+function setFontFor(doc: jsPDF, text: string, style: "normal" | "bold" | "italic"): void {
+  if (docsWithCjk.has(doc) && needsCjkFont(text)) doc.setFont(CJK_FAMILY, "normal")
+  else doc.setFont("helvetica", style)
+}
 
 // Brand colours (matching the LaTeX registration form).
 const C = {
@@ -112,8 +161,8 @@ function section(doc: jsPDF, y: number, title: string): number {
   doc.setFillColor(...C.ocean)
   doc.rect(0, y, 210, 8, "F")
   doc.setTextColor(...C.white)
-  doc.setFont("helvetica", "bold")
   doc.setFontSize(8.5)
+  setFontFor(doc, title, "bold")
   doc.text(title.toUpperCase(), ML + 2, y + 5.5)
   doc.setFont("helvetica", "normal")
   doc.setTextColor(...C.dark)
@@ -124,6 +173,10 @@ function row(doc: jsPDF, y: number, label: string, value: unknown, altState: { a
   if (value === undefined || value === null || value === "" || value === false) return y
   const v = String(value)
   const ROW_H = 7
+  // Measure with the same font+size the value is drawn in, or the wrap width is
+  // computed against the wrong metrics.
+  doc.setFontSize(8.5)
+  setFontFor(doc, v, "bold")
   const wrapped = doc.splitTextToSize(v, MR - COL)
   const blockH = ROW_H + (wrapped.length > 1 ? (wrapped.length - 1) * 4.5 : 0)
   y = ensureY(doc, y, blockH)
@@ -131,10 +184,10 @@ function row(doc: jsPDF, y: number, label: string, value: unknown, altState: { a
   doc.rect(0, y - 5, 210, blockH, "F")
   altState.alt = !altState.alt
   doc.setFontSize(8.5)
-  doc.setFont("helvetica", "normal")
+  setFontFor(doc, label, "normal")
   doc.setTextColor(...C.gray)
   doc.text(label, ML + 2, y)
-  doc.setFont("helvetica", "bold")
+  setFontFor(doc, v, "bold")
   doc.setTextColor(...C.dark)
   for (let i = 0; i < wrapped.length; i++) doc.text(wrapped[i], COL, y + i * 4.5)
   return y + blockH
@@ -157,6 +210,7 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   const altState = { alt: false }
 
   // ── Header ────────────────────────────────────────────
+  await registerCjkFont(doc, p)
   const logo = await loadLogoDataUrl()
   let y = 8
 
@@ -309,9 +363,9 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
     y += 6
     y = section(doc, y, instr.title)
     doc.setFontSize(8.5)
-    doc.setFont("helvetica", "normal")
     doc.setTextColor(...C.dark)
     for (const line of instr.lines) {
+      setFontFor(doc, line, "normal")
       const wrapped = doc.splitTextToSize(line, MR - ML - 2)
       for (const w of wrapped) {
         y = ensureY(doc, y, 6)
@@ -328,9 +382,9 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   y += 6
   y = section(doc, y, reminder.title)
   doc.setFontSize(8.5)
-  doc.setFont("helvetica", "normal")
   doc.setTextColor(...C.dark)
   for (const line of reminder.lines) {
+    setFontFor(doc, line, "normal")
     const wrapped = doc.splitTextToSize(line, MR - ML - 2)
     for (const w of wrapped) {
       y = ensureY(doc, y, 6)
@@ -350,6 +404,7 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   const summary = p.fullPaymentDeadline
     ? `Pay deposit ASAP to hold your spot. Pay the remaining balance by ${formatDeadlineLong(p.fullPaymentDeadline)} to complete your registration.`
     : `Pay deposit ASAP to hold your spot. Pay the remaining balance to complete your registration.`
+  setFontFor(doc, summary, "normal")
   const wrapped = doc.splitTextToSize(summary, MR - ML - 2)
   for (const line of wrapped) { doc.text(line, ML + 2, y); y += 4.5 }
 
@@ -384,6 +439,7 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
       doc.setFont("helvetica", "normal")
       y += 5
     }
+    setFontFor(doc, p.cancellationPolicyText, "normal")
     const wrappedPol = doc.splitTextToSize(p.cancellationPolicyText, MR - ML - 2)
     for (const line of wrappedPol) {
       y = ensureY(doc, y, 6)
@@ -480,25 +536,32 @@ function groupRow(
   doc: jsPDF, y: number, label: string, values: string[],
   cols: Array<{ x: number; w: number }>, altState: { alt: boolean },
 ): number {
-  const wraps = values.map((v, i) => doc.splitTextToSize(v || "—", cols[i].w))
+  doc.setFontSize(8)
+  const wraps = values.map((v, i) => {
+    setFontFor(doc, v || "—", "normal")
+    return doc.splitTextToSize(v || "—", cols[i].w)
+  })
   const maxLines = Math.max(1, ...wraps.map(w => w.length))
   const blockH = 6 + (maxLines - 1) * 4
   doc.setFillColor(...(altState.alt ? C.oceanBg : C.white))
   doc.rect(0, y - 4.5, 210, blockH, "F")
   altState.alt = !altState.alt
   doc.setFontSize(8)
-  doc.setFont("helvetica", "normal")
+  setFontFor(doc, label, "normal")
   doc.setTextColor(...C.gray)
   doc.text(label, GROUP_LABEL_X, y)
-  doc.setFont("helvetica", "bold")
   doc.setTextColor(...C.dark)
-  wraps.forEach((w, i) => { for (let l = 0; l < w.length; l++) doc.text(w[l], cols[i].x, y + l * 4) })
+  wraps.forEach((w, i) => {
+    setFontFor(doc, values[i] || "—", "bold")
+    for (let l = 0; l < w.length; l++) doc.text(w[l], cols[i].x, y + l * 4)
+  })
   return y + blockH
 }
 
 export async function buildGroupPdfBase64(p: GroupRegistrationPdfPayload): Promise<string> {
   const doc = new jsPDF({ unit: "mm", format: "a4" })
 
+  await registerCjkFont(doc, p)
   const logo = await loadLogoDataUrl()
   let y = 8
   doc.setFontSize(7.5)
