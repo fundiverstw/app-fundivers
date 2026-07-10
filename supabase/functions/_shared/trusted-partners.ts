@@ -2,6 +2,8 @@
 // index.ts so they're vitest-importable (index.ts uses jsr:/npm: specifiers
 // vitest can't resolve). Mirrors _shared/partner-connect.ts.
 
+import { t } from "./i18n.ts"
+
 export const TRUSTED_PARTNER_MSG_MAX = 3000
 
 export interface ContactPartnerInput {
@@ -21,9 +23,9 @@ export function parseContactPartnerInput(
 ): { error: string } | { request: ContactPartnerRequest } {
   const partnerId = typeof body.partner_id === 'string' ? body.partner_id.trim() : ''
   const message = typeof body.message === 'string' ? body.message.trim() : ''
-  if (!partnerId) return { error: 'Pick a partner to contact.' }
-  if (!message) return { error: 'Write a short message first.' }
-  if (message.length > TRUSTED_PARTNER_MSG_MAX) return { error: 'Message is too long.' }
+  if (!partnerId) return { error: t.emails.errors.pickPartner }
+  if (!message) return { error: t.emails.errors.writeMessage }
+  if (message.length > TRUSTED_PARTNER_MSG_MAX) return { error: t.emails.errors.messageTooLong }
   return { request: { partnerId, message } }
 }
 

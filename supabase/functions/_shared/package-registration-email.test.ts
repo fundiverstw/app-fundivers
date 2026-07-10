@@ -1,6 +1,7 @@
 // Pure helpers for register-package: input parsing + the recommendation email.
 import { describe, it, expect } from 'vitest'
 import { parseRegisterPackageInput, buildPackageRegistrationEmail } from './package-registration-email.ts'
+import { t } from './i18n.ts'
 
 describe('parseRegisterPackageInput', () => {
   const ok = {
@@ -44,10 +45,14 @@ describe('buildPackageRegistrationEmail', () => {
     estimateTotal: 21300, currencyLabel: 'TWD',
   }
 
-  it('addresses the partner and carries the product, tier, estimate and disclaimer', () => {
-    const { subject, partnerText } = buildPackageRegistrationEmail(parts)
-    expect(subject).toContain('Anilao Week')
-    expect(subject).toContain('Package B')
+  // The partner is a third-party shop abroad; its copy must stay English no
+  // matter what shop-facing language the deployment picked. These assertions are
+  // deliberately hardcoded English — that IS the contract.
+  it('addresses the partner in English and carries the product, tier, estimate and disclaimer', () => {
+    const { partnerSubject, partnerText } = buildPackageRegistrationEmail(parts)
+    expect(partnerSubject).toContain('Anilao Week')
+    expect(partnerSubject).toContain('Package B')
+    expect(partnerSubject).toContain('a diver for')
     expect(partnerText).toContain('Hi Blue Manta,')
     expect(partnerText).toContain('Hello from FunDivers TW')
     expect(partnerText).toContain('Anilao Week')
@@ -59,16 +64,22 @@ describe('buildPackageRegistrationEmail', () => {
     expect(partnerText).toMatch(/final cost will be determined by your shop/i)
   })
 
-  it('the diver copy also carries the estimate and disclaimer', () => {
-    const { diverText } = buildPackageRegistrationEmail(parts)
+  // The diver is the shop's own customer, so their copy follows the catalog.
+  it('the diver copy is translated and carries the estimate and disclaimer', () => {
+    const d = t.emails.packageReg
+    const { diverSubject, diverText } = buildPackageRegistrationEmail(parts)
+    expect(diverSubject).toBe(d.diverSubject('FunDivers TW', 'Anilao Week', 'Package B'))
     expect(diverText).toContain('Blue Manta')
     expect(diverText).toContain('TWD 21,300')
-    expect(diverText).toMatch(/estimate only/i)
+    expect(diverText).toContain(d.disclaimer)
+    expect(diverText).toContain(d.greeting('Sam Diver'))
   })
 
-  it('renders "none" when there are no add-ons or room', () => {
-    const { partnerText } = buildPackageRegistrationEmail({ ...parts, addonLabels: [], roomLabel: null })
+  it('renders the English "none" to the partner and the translated one to the diver', () => {
+    const { partnerText, diverText } = buildPackageRegistrationEmail({ ...parts, addonLabels: [], roomLabel: null })
     expect(partnerText).toContain('Add-ons: none')
     expect(partnerText).toContain('Room option: none')
+    expect(diverText).toContain(t.emails.packageReg.addons(t.emails.common.none))
+    expect(diverText).toContain(t.emails.packageReg.room(t.emails.common.none))
   })
 })

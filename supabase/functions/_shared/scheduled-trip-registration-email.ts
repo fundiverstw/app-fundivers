@@ -3,6 +3,8 @@
 // index.ts so vitest can import them (index.ts uses jsr:/npm: specifiers).
 // Mirrors _shared/package-registration-email.ts (minus the partner/kickback).
 
+import { t } from "./i18n.ts"
+
 export const SCHEDULED_TRIP_NOTES_MAX = 3000
 
 export interface RegisterScheduledTripInput {
@@ -31,8 +33,8 @@ export function parseRegisterScheduledTripInput(
     ? body.addon_ids.filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
     : []
 
-  if (!scheduledTripId) return { error: 'Pick a trip first.' }
-  if (notes.length > SCHEDULED_TRIP_NOTES_MAX) return { error: 'Notes are too long.' }
+  if (!scheduledTripId) return { error: t.emails.errors.pickTrip }
+  if (notes.length > SCHEDULED_TRIP_NOTES_MAX) return { error: t.emails.errors.notesTooLong }
 
   return { request: { scheduledTripId, addonIds, roomId, notes } }
 }
@@ -51,7 +53,7 @@ export interface ScheduledTripEmailParts {
 }
 
 const money = (n: number, label: string) => `${label} ${Math.round(n).toLocaleString('en-US')}`
-const list = (items: string[]) => (items.length ? items.join(', ') : 'none')
+const list = (items: string[]) => (items.length ? items.join(', ') : t.emails.common.none)
 
 /**
  * The confirmation emails. One subject; a shop-facing body (a new registration
@@ -66,43 +68,44 @@ export function buildScheduledTripRegistrationEmail(
     diverName, diverEmail, estimateTotal, currencyLabel,
   } = parts
 
+  const e = t.emails.scheduledTripReg
   const who = diverName.trim() || diverEmail
   const addons = list(addonLabels)
-  const room = roomLabel || 'none'
-  const datesLine = tripDates ? `Dates: ${tripDates}` : 'Dates: (see listing)'
+  const room = roomLabel || t.emails.common.none
+  const datesLine = tripDates ? e.datesKnown(tripDates) : e.datesUnknown
   const estimateLine = money(estimateTotal, currencyLabel)
-  const subject = `${shopName} — new trip registration: ${tripTitle}`
+  const subject = e.subject(shopName, tripTitle)
 
   const shopText = [
-    `${who} registered for ${tripTitle}.`,
+    e.shopRegistered(who, tripTitle),
     '',
     datesLine,
-    `Add-ons: ${addons}`,
-    `Room option: ${room}`,
-    `Diver notes: ${notes || '—'}`,
-    `Diver email: ${diverEmail} (reply to this email to reach them directly)`,
+    e.addons(addons),
+    e.room(room),
+    e.shopDiverNotes(notes || t.emails.common.dash),
+    e.shopDiverEmail(diverEmail),
     '',
-    `Estimated cost: ${estimateLine}`,
-    'This is the diver-facing estimate — confirm the final cost with them directly.',
+    e.estimate(estimateLine),
+    e.shopEstimateNote,
     '',
-    '— ' + shopName,
+    t.emails.cancellation.signoff(shopName),
   ].join('\n')
 
   const diverText = [
-    `Hi ${who},`,
+    e.diverGreeting(who),
     '',
-    `Thanks for registering for ${tripTitle} with ${shopName}. Here's what we've got:`,
+    e.diverIntro(tripTitle, shopName),
     '',
     datesLine,
-    `Add-ons: ${addons}`,
-    `Room option: ${room}`,
+    e.addons(addons),
+    e.room(room),
     '',
-    `Estimated cost: ${estimateLine}`,
-    'This is an estimate — we\'ll confirm the final cost and payment details with you.',
+    e.estimate(estimateLine),
+    e.diverEstimateNote,
     '',
-    'Any questions, just reply here.',
+    e.diverQuestions,
     '',
-    'Thanks,',
+    t.emails.common.thanks,
     shopName,
   ].join('\n')
 

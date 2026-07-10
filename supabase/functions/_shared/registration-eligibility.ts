@@ -4,6 +4,8 @@
 // AND lets the vitest unit suite pin the exact rules. A crafted request that
 // skips the form can't get past these.
 
+import { t } from "./i18n.ts"
+
 export function parseReqDives(v: unknown): number | null {
   if (typeof v === "number") return Number.isFinite(v) ? v : null
   // Course rows store req_dives as free text ("20", "20 dives"); pull the
@@ -50,7 +52,7 @@ export function eligibilityError(
   const certLevel = (profile?.cert_level ?? "").trim()
   const uncertified = profile?.uncertified === true
   if (!certLevel && !uncertified) {
-    return "Add your certification level, or mark yourself as not certified yet, before registering."
+    return t.emails.errors.addCertLevel
   }
 
   if (event) {
@@ -63,7 +65,7 @@ export function eligibilityError(
         && typeof details.prereq_acked_at === "string"
         && (details.prereq_acked_at as string).length > 0
       if (!acked) {
-        return "This event has a certification or logged-dive prerequisite you don't meet yet. Please acknowledge the requirement to continue."
+        return t.emails.errors.prereqNotMet
       }
     }
   }

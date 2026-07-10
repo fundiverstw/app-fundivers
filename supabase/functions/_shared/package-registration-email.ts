@@ -3,6 +3,8 @@
 // index.ts so vitest can import them (index.ts uses jsr:/npm: specifiers).
 // Mirrors _shared/trusted-partners.ts.
 
+import { t } from "./i18n.ts"
+
 export const PACKAGE_NOTES_MAX = 3000
 
 export interface RegisterPackageInput {
@@ -42,11 +44,11 @@ export function parseRegisterPackageInput(
     ? body.addon_ids.filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
     : []
 
-  if (!packageId) return { error: 'Pick a package first.' }
-  if (!tierId) return { error: 'Choose a package tier.' }
-  if (!preferredStart || !preferredEnd) return { error: 'Pick your preferred dates.' }
-  if (preferredEnd <= preferredStart) return { error: 'The end date must be at least one night after the start date.' }
-  if (notes.length > PACKAGE_NOTES_MAX) return { error: 'Notes are too long.' }
+  if (!packageId) return { error: t.emails.errors.pickPackage }
+  if (!tierId) return { error: t.emails.errors.chooseTier }
+  if (!preferredStart || !preferredEnd) return { error: t.emails.errors.pickDates }
+  if (preferredEnd <= preferredStart) return { error: t.emails.errors.endAfterStart }
+  if (notes.length > PACKAGE_NOTES_MAX) return { error: t.emails.errors.notesTooLong }
 
   return {
     request: { packageId, tierId, preferredStart, preferredEnd, addonIds, roomId, notes },
@@ -71,40 +73,49 @@ export interface PackageEmailParts {
 }
 
 const money = (n: number, label: string) => `${label} ${Math.round(n).toLocaleString('en-US')}`
-const list = (items: string[]) => (items.length ? items.join(', ') : 'none')
+const list = (items: string[], noneLabel: string) => (items.length ? items.join(', ') : noneLabel)
 
 /**
- * The recommendation emails. One subject; a partner-facing body (sent from the
- * shop, reply-to the diver, so the partner knows we brokered it) and a
- * diver-facing confirmation. Both carry the estimate and the "final cost is set
- * by the partner shop" disclaimer.
+ * The recommendation emails. Two subjects and two bodies.
+ *
+ * The PARTNER copy stays in English on purpose: it goes to a third-party dive
+ * shop abroad, for whom the deployment's shop-facing language is meaningless.
+ * The DIVER copy is translated — that reader is the shop's own customer.
  */
 export function buildPackageRegistrationEmail(
   parts: PackageEmailParts,
-): { subject: string; partnerText: string; diverText: string } {
+): { partnerSubject: string; diverSubject: string; partnerText: string; diverText: string } {
   const {
     shopName, partnerName, productTitle, tierName, addonLabels, roomLabel,
     preferredStart, preferredEnd, nights, notes, diverName, diverEmail,
     estimateTotal, currencyLabel,
   } = parts
 
+  const d = t.emails.packageReg
   const who = diverName.trim() || diverEmail
-  const addons = list(addonLabels)
-  const room = roomLabel || 'none'
-  const subject = `${shopName} — a diver for ${productTitle} (${tierName})`
   const estimateLine = money(estimateTotal, currencyLabel)
+
+  // Partner-facing values: English, always.
+  const enAddons = list(addonLabels, 'none')
+  const enRoom = roomLabel || 'none'
+  const partnerSubject = `${shopName} — a diver for ${productTitle} (${tierName})`
   const disclaimer =
     'Please note this is an estimate only — the final cost will be determined by your shop.'
+
+  // Diver-facing values: the deployment's shop language.
+  const addons = list(addonLabels, t.emails.common.none)
+  const room = roomLabel || t.emails.common.none
+  const diverSubject = d.diverSubject(shopName, productTitle, tierName)
 
   const partnerText = [
     `Hi ${partnerName},`,
     '',
     `Hello from ${shopName}. We have a diver we are recommending to your shop for ` +
-      `${productTitle}, specifically ${tierName}, with ${addons} and room option: ${room}.`,
+      `${productTitle}, specifically ${tierName}, with ${enAddons} and room option: ${enRoom}.`,
     '',
     `Preferred dates: ${preferredStart} to ${preferredEnd} (${nights} night${nights === 1 ? '' : 's'})`,
-    `Add-ons: ${addons}`,
-    `Room option: ${room}`,
+    `Add-ons: ${enAddons}`,
+    `Room option: ${enRoom}`,
     `Diver notes: ${notes || '—'}`,
     `Diver email: ${diverEmail} (just reply to this email to reach them directly)`,
     '',
@@ -118,23 +129,22 @@ export function buildPackageRegistrationEmail(
   ].join('\n')
 
   const diverText = [
-    `Hi ${who},`,
+    d.greeting(who),
     '',
-    `Thanks for registering interest through ${shopName}. We've recommended you to ` +
-      `${partnerName} for ${productTitle} (${tierName}). Here's what we sent them:`,
+    d.intro(shopName, partnerName, productTitle, tierName),
     '',
-    `Preferred dates: ${preferredStart} to ${preferredEnd} (${nights} night${nights === 1 ? '' : 's'})`,
-    `Add-ons: ${addons}`,
-    `Room option: ${room}`,
+    d.dates(preferredStart, preferredEnd, nights),
+    d.addons(addons),
+    d.room(room),
     '',
-    `Estimated cost: ${estimateLine}`,
-    'This is an estimate only — the final cost will be determined by the partner shop.',
+    d.estimate(estimateLine),
+    d.disclaimer,
     '',
-    `${partnerName} may reach out to you directly at ${diverEmail}. Any questions, just reply here.`,
+    d.reachOut(partnerName, diverEmail),
     '',
-    'Thanks,',
+    t.emails.common.thanks,
     shopName,
   ].join('\n')
 
-  return { subject, partnerText, diverText }
+  return { partnerSubject, diverSubject, partnerText, diverText }
 }

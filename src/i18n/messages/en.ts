@@ -1918,6 +1918,61 @@ export const en = {
     },
   },
   emails: {
+    // Validation errors returned to the diver's browser and shown in a toast.
+    errors: {
+      pickPartner: 'Pick a partner to contact.',
+      writeMessage: 'Write a short message first.',
+      messageTooLong: 'Message is too long.',
+      tellUsDestination: 'Tell us where you want to go.',
+      destinationTooLong: 'Destination is too long.',
+      noteTooLong: 'Note is too long.',
+      pickPackage: 'Pick a package first.',
+      chooseTier: 'Choose a package tier.',
+      pickDates: 'Pick your preferred dates.',
+      endAfterStart: 'The end date must be at least one night after the start date.',
+      notesTooLong: 'Notes are too long.',
+      pickTrip: 'Pick a trip first.',
+      addCertLevel: 'Add your certification level, or mark yourself as not certified yet, before registering.',
+      prereqNotMet: "This event has a certification or logged-dive prerequisite you don't meet yet. Please acknowledge the requirement to continue.",
+    },
+    common: {
+      none: 'none',
+      dash: '—',
+      thanks: 'Thanks,',
+    },
+    // The diver's copy of a partner-package recommendation. The partner's copy
+    // stays English — see package-registration-email.ts.
+    packageReg: {
+      diverSubject: (shop: string, product: string, tier: string) => `${shop} — your ${product} (${tier}) recommendation`,
+      greeting: (who: string) => `Hi ${who},`,
+      intro: (shop: string, partner: string, product: string, tier: string) =>
+        `Thanks for registering interest through ${shop}. We've recommended you to ${partner} for ${product} (${tier}). Here's what we sent them:`,
+      dates: (start: string, end: string, nights: number) =>
+        `Preferred dates: ${start} to ${end} (${nights} night${nights === 1 ? '' : 's'})`,
+      addons: (list: string) => `Add-ons: ${list}`,
+      room: (label: string) => `Room option: ${label}`,
+      estimate: (amount: string) => `Estimated cost: ${amount}`,
+      disclaimer: 'This is an estimate only — the final cost will be determined by the partner shop.',
+      reachOut: (partner: string, email: string) =>
+        `${partner} may reach out to you directly at ${email}. Any questions, just reply here.`,
+    },
+    // Both bodies go to the shop and its own diver, so both are translated.
+    scheduledTripReg: {
+      subject: (shop: string, trip: string) => `${shop} — new trip registration: ${trip}`,
+      datesKnown: (dates: string) => `Dates: ${dates}`,
+      datesUnknown: 'Dates: (see listing)',
+      addons: (list: string) => `Add-ons: ${list}`,
+      room: (label: string) => `Room option: ${label}`,
+      estimate: (amount: string) => `Estimated cost: ${amount}`,
+      shopRegistered: (who: string, trip: string) => `${who} registered for ${trip}.`,
+      shopDiverNotes: (notes: string) => `Diver notes: ${notes}`,
+      shopDiverEmail: (email: string) => `Diver email: ${email} (reply to this email to reach them directly)`,
+      shopEstimateNote: 'This is the diver-facing estimate — confirm the final cost with them directly.',
+      diverGreeting: (who: string) => `Hi ${who},`,
+      diverIntro: (trip: string, shop: string) => `Thanks for registering for ${trip} with ${shop}. Here's what we've got:`,
+      diverEstimateNote: "This is an estimate — we'll confirm the final cost and payment details with you.",
+      diverQuestions: 'Any questions, just reply here.',
+    },
     cancellation: {
       fallbackTitle: 'your dive',
       subject: (title: string) => `Cancelled: ${title}`,

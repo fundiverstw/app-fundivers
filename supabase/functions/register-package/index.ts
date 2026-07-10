@@ -179,7 +179,7 @@ Deno.serve(async (req) => {
 
   let emailed = false
   if (GMAIL_USER && GMAIL_PASS && partner?.active && partner.contact_email) {
-    const { subject, partnerText, diverText } = buildPackageRegistrationEmail({
+    const { partnerSubject, diverSubject, partnerText, diverText } = buildPackageRegistrationEmail({
       shopName: siteConfig.identity.shopName,
       partnerName: partner.name,
       productTitle: pkg.title,
@@ -203,12 +203,12 @@ Deno.serve(async (req) => {
       await transporter.sendMail({
         from: { name: siteConfig.identity.shopName, address: GMAIL_USER },
         to: partner.contact_email, cc: COMPANY_EMAIL, replyTo: diverEmail,
-        subject, text: partnerText,
+        subject: partnerSubject, text: partnerText,
       })
       if (diverEmail.toLowerCase().trim() !== COMPANY_EMAIL.toLowerCase()) {
         await transporter.sendMail({
           from: { name: siteConfig.identity.shopName, address: GMAIL_USER },
-          to: diverEmail, subject, text: diverText,
+          to: diverEmail, subject: diverSubject, text: diverText,
         })
       }
       emailed = true

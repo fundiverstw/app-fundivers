@@ -3,6 +3,8 @@
 // specifiers that vitest can't resolve). See create-registration/handler.ts
 // for the same split.
 
+import { t } from "./i18n.ts"
+
 export const PARTNER_CONNECT_MAX = { destination: 200, note: 2000 } as const
 
 export interface PartnerConnectInput {
@@ -22,9 +24,9 @@ export function parsePartnerConnectInput(
 ): { error: string } | { request: PartnerConnectRequest } {
   const destination = typeof body.destination === 'string' ? body.destination.trim() : ''
   const note = typeof body.note === 'string' ? body.note.trim() : ''
-  if (!destination) return { error: 'Tell us where you want to go.' }
-  if (destination.length > PARTNER_CONNECT_MAX.destination) return { error: 'Destination is too long.' }
-  if (note.length > PARTNER_CONNECT_MAX.note) return { error: 'Note is too long.' }
+  if (!destination) return { error: t.emails.errors.tellUsDestination }
+  if (destination.length > PARTNER_CONNECT_MAX.destination) return { error: t.emails.errors.destinationTooLong }
+  if (note.length > PARTNER_CONNECT_MAX.note) return { error: t.emails.errors.noteTooLong }
   return { request: { destination, note } }
 }
 
