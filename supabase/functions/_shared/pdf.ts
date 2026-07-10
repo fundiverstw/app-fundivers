@@ -206,7 +206,10 @@ async function loadLogoDataUrl(): Promise<{ dataUrl: string; format: "PNG" } | n
 }
 
 export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string> {
-  const doc = new jsPDF({ unit: "mm", format: "a4" })
+  // compress: true Flate-compresses every stream. The shop logo is a large PNG
+  // that jsPDF otherwise stores as a raw RGB bitmap + alpha SMask: a 3000x1514
+  // logo alone made a 17MB attachment, close to the 25MB Gmail ceiling. Lossless.
+  const doc = new jsPDF({ unit: "mm", format: "a4", compress: true })
   const altState = { alt: false }
 
   // ── Header ────────────────────────────────────────────
@@ -559,7 +562,10 @@ function groupRow(
 }
 
 export async function buildGroupPdfBase64(p: GroupRegistrationPdfPayload): Promise<string> {
-  const doc = new jsPDF({ unit: "mm", format: "a4" })
+  // compress: true Flate-compresses every stream. The shop logo is a large PNG
+  // that jsPDF otherwise stores as a raw RGB bitmap + alpha SMask: a 3000x1514
+  // logo alone made a 17MB attachment, close to the 25MB Gmail ceiling. Lossless.
+  const doc = new jsPDF({ unit: "mm", format: "a4", compress: true })
 
   await registerCjkFont(doc, p)
   const logo = await loadLogoDataUrl()
