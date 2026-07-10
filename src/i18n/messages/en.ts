@@ -1917,6 +1917,29 @@ export const en = {
       standalone: 'Standalone duty',
     },
   },
+  // Shared by the SPA form (src/lib/payment-instructions.ts) and the emailed PDF
+  // (supabase/functions/_shared/payment-instructions.ts) so the copy can't drift.
+  paymentInstructions: {
+    cashTitle: 'How to pay — Cash',
+    cashLine: 'Bring your payment to the shop in person.',
+    phone: (v: string) => `Phone: ${v}`,
+    address: (v: string) => `Address: ${v}`,
+    map: (v: string) => `Map: ${v}`,
+    bankTitle: 'How to pay — Local bank transfer',
+    bankLine: "We'll email you our bank transfer details shortly so you can complete your payment.",
+    paypalTitle: (surcharge: string) => `How to pay — PayPal (${surcharge})`,
+    paypalLine: 'Send your payment via PayPal:',
+    paypalNote: 'Include your full name in the payment note so we can match it to your booking.',
+    cardTitle: (surcharge: string) => `How to pay — Credit card (${surcharge})`,
+    cardLine: "We'll email you an invoice with a credit-card payment link.",
+    invoiceTo: (target: string) => `Invoice will be sent to: ${target}`,
+    registeredEmail: 'your registered email',
+    afterTitle: 'After you pay',
+    afterContact: (shortName: string) =>
+      `Once you send your payment, please contact ${shortName} by email, LINE, or WhatsApp so we can confirm receipt.`,
+    afterApp: (shopName: string) =>
+      `Keep an eye on the ${shopName} app for updates to your registration status, payment confirmations, and event reminders.`,
+  },
   emails: {
     // Validation errors returned to the diver's browser and shown in a toast.
     errors: {

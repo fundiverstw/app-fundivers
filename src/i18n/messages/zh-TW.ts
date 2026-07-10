@@ -1909,6 +1909,27 @@ export const zhTW: Messages = {
       standalone: '獨立勤務',
     },
   },
+  paymentInstructions: {
+    cashTitle: '付款方式 — 現金',
+    cashLine: '請親自到店付款。',
+    phone: (v: string) => `電話：${v}`,
+    address: (v: string) => `地址：${v}`,
+    map: (v: string) => `地圖：${v}`,
+    bankTitle: '付款方式 — 國內銀行轉帳',
+    bankLine: '我們會盡快將銀行轉帳資訊寄給你，以便完成付款。',
+    paypalTitle: (surcharge: string) => `付款方式 — PayPal（${surcharge}）`,
+    paypalLine: '請透過 PayPal 付款：',
+    paypalNote: '請在付款備註中填寫你的全名，方便我們對應到你的預訂。',
+    cardTitle: (surcharge: string) => `付款方式 — 信用卡（${surcharge}）`,
+    cardLine: '我們會寄給你一封含信用卡付款連結的帳單。',
+    invoiceTo: (target: string) => `帳單將寄至：${target}`,
+    registeredEmail: '你註冊時使用的信箱',
+    afterTitle: '付款之後',
+    afterContact: (shortName: string) =>
+      `完成付款後，請透過 email、LINE 或 WhatsApp 通知 ${shortName}，以便我們確認收款。`,
+    afterApp: (shopName: string) =>
+      `請留意 ${shopName} App，以掌握報名狀態、付款確認與活動提醒的最新消息。`,
+  },
   emails: {
     errors: {
       pickPartner: '請選擇要聯絡的夥伴。',

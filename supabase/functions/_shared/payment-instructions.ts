@@ -1,9 +1,18 @@
 // Edge-function copy of the per-method "How to pay" instructions. Mirror of the
-// *logic* in src/lib/payment-instructions.ts — but shop values are read from the
-// same fundive.config.ts as the app (pure data, no imports, so Deno reads it
-// fine), so they can't drift. Keep any COPY changes in sync between the two.
+// *logic* in src/lib/payment-instructions.ts — shop values are read from the
+// same fundive.config.ts and the copy from the same message catalog (both pure
+// data, so Deno reads them fine), which means neither can drift between the two.
+//
+// PINNED TO ENGLISH, deliberately. The only consumer is pdf.ts, which renders
+// with jsPDF's built-in `helvetica` — a WinAnsi font with no CJK glyphs. Passing
+// zh-TW / ja text through it does not fail; it silently emits mangled bytes
+// (「防寒衣」 → `–2[Òˆc`). Until a CJK font is embedded via addFileToVFS/addFont,
+// an English PDF is legible and a "translated" one is not. The SPA form uses the
+// locale catalog (src/lib/payment-instructions.ts); this side reads `en`
+// directly, so the copy still has exactly one source.
 
 import { siteConfig } from "../../../fundive.config.ts"
+import { en } from "../../../src/i18n/messages/en.ts"
 
 export const SHOP_PHONE    = siteConfig.contact.phone
 export const SHOP_ADDRESS  = siteConfig.contact.address
@@ -27,40 +36,39 @@ export function paymentInstructionsFor(
   method: PdfPaymentMethod,
   opts: { invoiceEmail?: string | null } = {},
 ): PaymentInstructions | null {
+  const p = en.paymentInstructions
   switch (method) {
     case "cash":
       return {
-        title: "How to pay — Cash",
+        title: p.cashTitle,
         lines: [
-          "Bring your payment to the shop in person.",
-          `Phone: ${SHOP_PHONE}`,
-          `Address: ${SHOP_ADDRESS}`,
-          `Map: ${SHOP_MAPS_URL}`,
+          p.cashLine,
+          p.phone(SHOP_PHONE),
+          p.address(SHOP_ADDRESS),
+          p.map(SHOP_MAPS_URL),
         ],
       }
     case "bank_transfer":
       return {
-        title: "How to pay — Local bank transfer",
-        lines: [
-          "We'll email you our bank transfer details shortly so you can complete your payment.",
-        ],
+        title: p.bankTitle,
+        lines: [p.bankLine],
       }
     case "paypal":
       return {
-        title: `How to pay — PayPal (${CARD_SURCHARGE})`,
+        title: p.paypalTitle(CARD_SURCHARGE),
         lines: [
-          "Send your payment via PayPal:",
+          p.paypalLine,
           PAYPAL_LINK,
-          "Include your full name in the payment note so we can match it to your booking.",
+          p.paypalNote,
         ],
       }
     case "credit_card": {
-      const target = (opts.invoiceEmail && opts.invoiceEmail.trim()) || "your registered email"
+      const target = (opts.invoiceEmail && opts.invoiceEmail.trim()) || p.registeredEmail
       return {
-        title: `How to pay — Credit card (${CARD_SURCHARGE})`,
+        title: p.cardTitle(CARD_SURCHARGE),
         lines: [
-          "We'll email you an invoice with a credit-card payment link.",
-          `Invoice will be sent to: ${target}`,
+          p.cardLine,
+          p.invoiceTo(target),
         ],
       }
     }
@@ -76,11 +84,12 @@ export function paymentInstructionsFor(
  * verbatim on the form and PDF for every method.
  */
 export function paymentConfirmationReminder(): PaymentInstructions {
+  const p = en.paymentInstructions
   return {
-    title: "After you pay",
+    title: p.afterTitle,
     lines: [
-      `Once you send your payment, please contact ${siteConfig.identity.shortName} by email, LINE, or WhatsApp so we can confirm receipt.`,
-      `Keep an eye on the ${siteConfig.identity.shopName} app for updates to your registration status, payment confirmations, and event reminders.`,
+      p.afterContact(siteConfig.identity.shortName),
+      p.afterApp(siteConfig.identity.shopName),
     ],
   }
 }

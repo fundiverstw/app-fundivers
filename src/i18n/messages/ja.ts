@@ -1908,6 +1908,27 @@ export const ja: Messages = {
       standalone: '単独の業務',
     },
   },
+  paymentInstructions: {
+    cashTitle: 'お支払い方法 — 現金',
+    cashLine: 'ショップに直接お持ちください。',
+    phone: (v: string) => `電話：${v}`,
+    address: (v: string) => `住所：${v}`,
+    map: (v: string) => `地図：${v}`,
+    bankTitle: 'お支払い方法 — 国内銀行振込',
+    bankLine: '振込先の詳細を追ってメールでお送りしますので、お支払いをお願いします。',
+    paypalTitle: (surcharge: string) => `お支払い方法 — PayPal（${surcharge}）`,
+    paypalLine: 'PayPal でお支払いください：',
+    paypalNote: '予約と照合できるよう、支払いのメモ欄にフルネームをご記入ください。',
+    cardTitle: (surcharge: string) => `お支払い方法 — クレジットカード（${surcharge}）`,
+    cardLine: 'クレジットカード決済リンク付きの請求書をメールでお送りします。',
+    invoiceTo: (target: string) => `請求書の送付先：${target}`,
+    registeredEmail: 'ご登録のメールアドレス',
+    afterTitle: 'お支払い後について',
+    afterContact: (shortName: string) =>
+      `お支払い後、入金確認のためメール・LINE・WhatsApp のいずれかで ${shortName} までご連絡ください。`,
+    afterApp: (shopName: string) =>
+      `${shopName} のアプリで、申し込み状況・入金確認・イベントのお知らせをご確認ください。`,
+  },
   emails: {
     errors: {
       pickPartner: '連絡するパートナーを選択してください。',
