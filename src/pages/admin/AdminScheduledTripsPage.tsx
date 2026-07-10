@@ -15,12 +15,16 @@ import { FIELD, catalogLabel } from '../../components/admin/listing-fields'
 import type {
   ScheduledTrip, ScheduledTripInsert, ScheduledTripStatus, EOAddon, EORoom,
 } from '../../types/database'
+import { t } from '../../i18n'
 
 // Admin catalog for Scheduled Trips — the shop's own curated, dated trips. Two
 // tabs: Trips (CRUD, with catalog add-ons/rooms + the publish lifecycle) and
 // Registrations (who registered). Divers register self-contained via the trip
 // detail page (estimate + notify). Shares the modal/field/catalog-picker/status
 // bits with the Packages admin via components/admin/listing-ui.
+
+const st = t.admin.schedTrips
+const c = t.admin.catalog
 
 type Tab = 'trips' | 'registrations'
 
@@ -47,9 +51,9 @@ export function AdminScheduledTripsPage() {
     let cancelled = false
     ;(async () => {
       try {
-        const [t, n] = await Promise.all([fetchAllScheduledTrips(), countNewRegistrations()])
+        const [tr, n] = await Promise.all([fetchAllScheduledTrips(), countNewRegistrations()])
         if (cancelled) return
-        setTrips(t)
+        setTrips(tr)
         setNewRegistrations(n)
       } catch (err) {
         if (!cancelled) setLoadError(errorMessage(err))
@@ -62,16 +66,13 @@ export function AdminScheduledTripsPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
-      <h1 className="text-2xl font-bold text-white">Scheduled Trips</h1>
-      <p className="text-sm text-white/80">
-        The shop's own dated trips shown on the diver Scheduled Trips tab. Give a trip
-        catalog add-ons/rooms and divers register directly for a cost estimate.
-      </p>
+      <h1 className="text-2xl font-bold text-white">{t.shell.scheduledTrips}</h1>
+      <p className="text-sm text-white/80">{st.intro}</p>
 
-      <div className="flex gap-2" role="tablist" aria-label="Scheduled Trips sections">
-        <TabButton active={tab === 'trips'} onClick={() => setTab('trips')}>Trips ({trips.length})</TabButton>
+      <div className="flex gap-2" role="tablist" aria-label={st.sectionsAria}>
+        <TabButton active={tab === 'trips'} onClick={() => setTab('trips')}>{st.tabTrips(trips.length)}</TabButton>
         <TabButton active={tab === 'registrations'} onClick={() => setTab('registrations')}>
-          Registrations{newRegistrations > 0 && <span className="ml-1.5 inline-block bg-red-600 text-white rounded-full px-1.5 text-xs">{newRegistrations}</span>}
+          {st.tabRegistrations}{newRegistrations > 0 && <span className="ml-1.5 inline-block bg-red-600 text-white rounded-full px-1.5 text-xs">{newRegistrations}</span>}
         </TabButton>
       </div>
 
@@ -80,7 +81,7 @@ export function AdminScheduledTripsPage() {
       )}
 
       {loading ? (
-        <p className="text-sm text-white/70">Loading…</p>
+        <p className="text-sm text-white/70">{c.loading}</p>
       ) : tab === 'registrations' ? (
         <AdminScheduledTripRegistrationsTab />
       ) : (
@@ -115,7 +116,7 @@ function TripsTab({ trips, onChanged, onError, onOk }: {
   async function changeStatus(trip: ScheduledTrip, status: ScheduledTripStatus) {
     try {
       await setScheduledTripStatus(trip, status)
-      onOk(`Trip ${status}`)
+      onOk(st.statusChanged(status))
       await onChanged()
     } catch (err) {
       onError(errorMessage(err))
@@ -125,7 +126,7 @@ function TripsTab({ trips, onChanged, onError, onOk }: {
   async function handleDelete(trip: ScheduledTrip) {
     try {
       await deleteScheduledTrip(trip.id)
-      onOk('Trip deleted')
+      onOk(st.deleted)
       setConfirmDelete(null)
       await onChanged()
     } catch (err) {
@@ -138,12 +139,12 @@ function TripsTab({ trips, onChanged, onError, onOk }: {
       <div className="flex justify-end">
         <button type="button" onClick={() => setCreating(true)}
           className="text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg">
-          + New trip
+          {st.newTrip}
         </button>
       </div>
 
       {trips.length === 0 ? (
-        <p className="text-sm text-white/70">No scheduled trips yet — add the shop's first one.</p>
+        <p className="text-sm text-white/70">{st.none}</p>
       ) : (
         <ul className="space-y-2">
           {trips.map(trip => (
@@ -158,20 +159,20 @@ function TripsTab({ trips, onChanged, onError, onOk }: {
               <div className="flex flex-wrap gap-2">
                 {trip.status !== 'published' && (
                   <button type="button" onClick={() => changeStatus(trip, 'published')}
-                    className="text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white px-2.5 py-1 rounded-lg">Publish</button>
+                    className="text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white px-2.5 py-1 rounded-lg">{st.publish}</button>
                 )}
                 {trip.status === 'published' && (
                   <button type="button" onClick={() => changeStatus(trip, 'draft')}
-                    className="text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1 rounded-lg">Unpublish</button>
+                    className="text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1 rounded-lg">{st.unpublish}</button>
                 )}
                 {trip.status !== 'archived' && (
                   <button type="button" onClick={() => changeStatus(trip, 'archived')}
-                    className="text-xs font-semibold bg-slate-600 hover:bg-slate-700 text-white px-2.5 py-1 rounded-lg">Archive</button>
+                    className="text-xs font-semibold bg-slate-600 hover:bg-slate-700 text-white px-2.5 py-1 rounded-lg">{st.archive}</button>
                 )}
                 <button type="button" onClick={() => setEditing(trip)}
-                  className="text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-2.5 py-1 rounded-lg">Edit</button>
+                  className="text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-2.5 py-1 rounded-lg">{c.edit}</button>
                 <button type="button" onClick={() => setConfirmDelete(trip)}
-                  className="text-xs font-semibold bg-red-700 hover:bg-red-800 text-white px-2.5 py-1 rounded-lg">Delete</button>
+                  className="text-xs font-semibold bg-red-700 hover:bg-red-800 text-white px-2.5 py-1 rounded-lg">{c.delete}</button>
               </div>
             </li>
           ))}
@@ -182,16 +183,16 @@ function TripsTab({ trips, onChanged, onError, onOk }: {
         <TripForm
           trip={editing}
           onClose={() => { setCreating(false); setEditing(null) }}
-          onSaved={async () => { setCreating(false); setEditing(null); onOk('Trip saved'); await onChanged() }}
+          onSaved={async () => { setCreating(false); setEditing(null); onOk(st.saved); await onChanged() }}
           onError={onError}
         />
       )}
 
       {confirmDelete && (
         <ConfirmModal
-          title="Delete scheduled trip?"
-          body={`"${confirmDelete.title}" and any registrations for it will be removed. To hide it but keep the record, archive it instead.`}
-          confirmLabel="Delete"
+          title={st.deleteTitle}
+          body={st.deleteBody(confirmDelete.title)}
+          confirmLabel={c.delete}
           onClose={() => setConfirmDelete(null)}
           onConfirm={() => handleDelete(confirmDelete)}
         />
@@ -247,8 +248,8 @@ function TripForm({ trip, onClose, onSaved, onError }: {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!title.trim() || !destination.trim()) { onError('Title and destination are required.'); return }
-    if (startDate && endDate && endDate < startDate) { onError('End date is before the start date.'); return }
+    if (!title.trim() || !destination.trim()) { onError(st.titleDestRequired); return }
+    if (startDate && endDate && endDate < startDate) { onError(st.endBeforeStart); return }
     setSubmitting(true)
     try {
       const values: ScheduledTripInsert = {
@@ -278,41 +279,41 @@ function TripForm({ trip, onClose, onSaved, onError }: {
   return (
     <Modal labelledBy="scheduled-trip-form-title" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-3 max-h-[80vh] overflow-y-auto">
-        <h2 id="scheduled-trip-form-title" className="text-lg font-bold text-brand-900">{trip ? 'Edit trip' : 'New trip'}</h2>
-        <Labelled label="Title *"><input className={FIELD} value={title} onChange={e => setTitle(e.target.value)} /></Labelled>
-        <Labelled label="Destination *"><input className={FIELD} value={destination} onChange={e => setDestination(e.target.value)} /></Labelled>
-        <Labelled label="Summary (one line on the card)">
+        <h2 id="scheduled-trip-form-title" className="text-lg font-bold text-brand-900">{trip ? st.editTrip : st.newTripTitle}</h2>
+        <Labelled label={st.titleLabel}><input className={FIELD} value={title} onChange={e => setTitle(e.target.value)} /></Labelled>
+        <Labelled label={st.destination}><input className={FIELD} value={destination} onChange={e => setDestination(e.target.value)} /></Labelled>
+        <Labelled label={st.summary}>
           <input className={FIELD} value={summary} onChange={e => setSummary(e.target.value)} />
         </Labelled>
-        <Labelled label="Description">
+        <Labelled label={st.description}>
           <textarea className={`${FIELD} resize-none`} rows={3} value={description} onChange={e => setDescription(e.target.value)} />
         </Labelled>
         <div className="grid grid-cols-2 gap-2">
-          <Labelled label="Start date"><input className={FIELD} type="date" value={startDate} onChange={e => setStartDate(e.target.value)} /></Labelled>
-          <Labelled label="End date"><input className={FIELD} type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /></Labelled>
+          <Labelled label={st.startDate}><input className={FIELD} type="date" value={startDate} onChange={e => setStartDate(e.target.value)} /></Labelled>
+          <Labelled label={st.endDate}><input className={FIELD} type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /></Labelled>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <Labelled label="Price"><input className={FIELD} type="number" step="any" value={price} onChange={e => setPrice(e.target.value)} /></Labelled>
-          <Labelled label="Currency"><input className={FIELD} value={currency} onChange={e => setCurrency(e.target.value)} /></Labelled>
+          <Labelled label={st.price}><input className={FIELD} type="number" step="any" value={price} onChange={e => setPrice(e.target.value)} /></Labelled>
+          <Labelled label={c.currency}><input className={FIELD} value={currency} onChange={e => setCurrency(e.target.value)} /></Labelled>
         </div>
 
-        <CatalogPicker label="Add-ons offered" items={allAddons.map(a => ({ id: a.id, label: catalogLabel(a) }))}
-          selected={addonIds} onToggle={id => toggle(addonIds, setAddonIds, id)} empty="No add-ons in the catalog." />
-        <CatalogPicker label="Room options offered" items={allRooms.map(r => ({ id: r.id, label: catalogLabel(r) }))}
-          selected={roomIds} onToggle={id => toggle(roomIds, setRoomIds, id)} empty="No rooms in the catalog." />
+        <CatalogPicker label={st.addonsOffered} items={allAddons.map(a => ({ id: a.id, label: catalogLabel(a) }))}
+          selected={addonIds} onToggle={id => toggle(addonIds, setAddonIds, id)} empty={st.noAddons} />
+        <CatalogPicker label={st.roomsOffered} items={allRooms.map(r => ({ id: r.id, label: catalogLabel(r) }))}
+          selected={roomIds} onToggle={id => toggle(roomIds, setRoomIds, id)} empty={st.noRooms} />
 
-        <Labelled label="Hero image URL"><input className={FIELD} value={heroImageUrl} onChange={e => setHeroImageUrl(e.target.value)} /></Labelled>
-        <Labelled label="Highlights (one per line)">
+        <Labelled label={st.heroImageUrl}><input className={FIELD} value={heroImageUrl} onChange={e => setHeroImageUrl(e.target.value)} /></Labelled>
+        <Labelled label={st.highlights}>
           <textarea className={`${FIELD} resize-none`} rows={3} value={highlights} onChange={e => setHighlights(e.target.value)} />
         </Labelled>
-        <Labelled label="Status">
-          <select className={FIELD} value={status} onChange={e => setStatus(e.target.value as ScheduledTripStatus)} aria-label="Status">
+        <Labelled label={st.statusLabel}>
+          <select className={FIELD} value={status} onChange={e => setStatus(e.target.value as ScheduledTripStatus)} aria-label={st.statusLabel}>
             <option value="draft">draft</option>
             <option value="published">published</option>
             <option value="archived">archived</option>
           </select>
         </Labelled>
-        <FormButtons submitting={submitting} submitLabel={trip ? 'Save changes' : 'Create trip'} onClose={onClose} />
+        <FormButtons submitting={submitting} submitLabel={trip ? c.saveChanges : st.createTrip} onClose={onClose} />
       </form>
     </Modal>
   )

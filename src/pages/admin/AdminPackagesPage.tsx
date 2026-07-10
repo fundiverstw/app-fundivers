@@ -17,6 +17,7 @@ import { FIELD, catalogLabel } from '../../components/admin/listing-fields'
 import type {
   TrustedPartnerRow, Package, PackageInsert, PackageStatus, PackageTier, EOAddon, EORoom,
 } from '../../types/database'
+import { t } from '../../i18n'
 
 // Admin home for Packages — the partner-shop registration network. Two tabs:
 //   - Packages: the products published to divers, each with price tiers,
@@ -27,6 +28,10 @@ import type {
 // admin page; here they're just picked from a dropdown when creating a package.
 // The modal / field / catalog-picker / status-badge bits are shared with the
 // Scheduled Trips admin via components/admin/listing-ui.
+
+const pg = t.admin.pkgs
+const st = t.admin.schedTrips
+const c = t.admin.catalog
 
 type Tab = 'packages' | 'registrations'
 
@@ -70,16 +75,16 @@ export function AdminPackagesPage() {
     return () => { cancelled = true }
   }, [])
 
-  const partnerName = (id: string) => partners.find(p => p.id === id)?.name ?? '(unknown partner)'
+  const partnerName = (id: string) => partners.find(p => p.id === id)?.name ?? pg.unknownPartner
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
-      <h1 className="text-2xl font-bold text-white">Packages</h1>
+      <h1 className="text-2xl font-bold text-white">{t.packages.title}</h1>
 
-      <div className="flex gap-2" role="tablist" aria-label="Packages sections">
-        <TabButton active={tab === 'packages'} onClick={() => setTab('packages')}>Packages ({packages.length})</TabButton>
+      <div className="flex gap-2" role="tablist" aria-label={pg.sectionsAria}>
+        <TabButton active={tab === 'packages'} onClick={() => setTab('packages')}>{pg.tabPackages(packages.length)}</TabButton>
         <TabButton active={tab === 'registrations'} onClick={() => setTab('registrations')}>
-          Registrations{newRegistrations > 0 && <span className="ml-1.5 inline-block bg-red-600 text-white rounded-full px-1.5 text-xs">{newRegistrations}</span>}
+          {st.tabRegistrations}{newRegistrations > 0 && <span className="ml-1.5 inline-block bg-red-600 text-white rounded-full px-1.5 text-xs">{newRegistrations}</span>}
         </TabButton>
       </div>
 
@@ -88,7 +93,7 @@ export function AdminPackagesPage() {
       )}
 
       {loading ? (
-        <p className="text-sm text-white/70">Loading…</p>
+        <p className="text-sm text-white/70">{c.loading}</p>
       ) : tab === 'registrations' ? (
         <AdminRegistrationsTab />
       ) : (
@@ -136,7 +141,7 @@ function PackagesTab({
   async function changeStatus(pkg: Package, status: PackageStatus) {
     try {
       await setPackageStatus(pkg, status)
-      onOk(`Package ${status}`)
+      onOk(pg.statusChanged(status))
       await onChanged()
     } catch (err) {
       onError(errorMessage(err))
@@ -146,7 +151,7 @@ function PackagesTab({
   async function handleDelete(pkg: Package) {
     try {
       await deletePackage(pkg.id)
-      onOk('Package deleted')
+      onOk(pg.deleted)
       setConfirmDelete(null)
       await onChanged()
     } catch (err) {
@@ -161,21 +166,21 @@ function PackagesTab({
           type="button"
           onClick={() => setCreating(true)}
           disabled={partners.length === 0}
-          title={partners.length === 0 ? 'Add a trusted partner first' : undefined}
+          title={partners.length === 0 ? pg.addPartnerFirst : undefined}
           className="text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg disabled:opacity-50"
         >
-          + New package
+          {pg.newPackage}
         </button>
       </div>
 
       {partners.length === 0 && (
         <p className="text-sm text-white/70">
-          Add a <Link to="/admin/trusted-partners" className="underline">trusted partner</Link> before creating a package.
+          {pg.addPartnerPrefix}<Link to="/admin/trusted-partners" className="underline">{pg.addPartnerLink}</Link>{pg.addPartnerSuffix}
         </p>
       )}
 
       {packages.length === 0 ? (
-        <p className="text-sm text-white/70">No packages yet.</p>
+        <p className="text-sm text-white/70">{pg.none}</p>
       ) : (
         <ul className="space-y-2">
           {packages.map(pkg => (
@@ -192,20 +197,20 @@ function PackagesTab({
               <div className="flex flex-wrap gap-2">
                 {pkg.status !== 'published' && (
                   <button type="button" onClick={() => changeStatus(pkg, 'published')}
-                    className="text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white px-2.5 py-1 rounded-lg">Publish</button>
+                    className="text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white px-2.5 py-1 rounded-lg">{st.publish}</button>
                 )}
                 {pkg.status === 'published' && (
                   <button type="button" onClick={() => changeStatus(pkg, 'draft')}
-                    className="text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1 rounded-lg">Unpublish</button>
+                    className="text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1 rounded-lg">{st.unpublish}</button>
                 )}
                 {pkg.status !== 'archived' && (
                   <button type="button" onClick={() => changeStatus(pkg, 'archived')}
-                    className="text-xs font-semibold bg-slate-600 hover:bg-slate-700 text-white px-2.5 py-1 rounded-lg">Archive</button>
+                    className="text-xs font-semibold bg-slate-600 hover:bg-slate-700 text-white px-2.5 py-1 rounded-lg">{st.archive}</button>
                 )}
                 <button type="button" onClick={() => setEditing(pkg)}
-                  className="text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-2.5 py-1 rounded-lg">Edit</button>
+                  className="text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-2.5 py-1 rounded-lg">{c.edit}</button>
                 <button type="button" onClick={() => setConfirmDelete(pkg)}
-                  className="text-xs font-semibold bg-red-700 hover:bg-red-800 text-white px-2.5 py-1 rounded-lg">Delete</button>
+                  className="text-xs font-semibold bg-red-700 hover:bg-red-800 text-white px-2.5 py-1 rounded-lg">{c.delete}</button>
               </div>
             </li>
           ))}
@@ -216,16 +221,16 @@ function PackagesTab({
         <PackageForm
           pkg={editing} partners={partners}
           onClose={() => { setCreating(false); setEditing(null) }}
-          onSaved={async () => { setCreating(false); setEditing(null); onOk('Package saved'); await onChanged() }}
+          onSaved={async () => { setCreating(false); setEditing(null); onOk(pg.saved); await onChanged() }}
           onError={onError}
         />
       )}
 
       {confirmDelete && (
         <ConfirmModal
-          title="Delete package?"
-          body={`"${confirmDelete.title}", its tiers and any registrations for it will be permanently deleted.`}
-          confirmLabel="Delete"
+          title={pg.deleteTitle}
+          body={pg.deleteBody(confirmDelete.title)}
+          confirmLabel={c.delete}
           onClose={() => setConfirmDelete(null)}
           onConfirm={() => handleDelete(confirmDelete)}
         />
@@ -279,8 +284,8 @@ function PackageForm({
           const existing: PackageTier[] = await fetchPackageTiers(pkg.id)
           if (cancelled) return
           if (existing.length) {
-            setTiers(existing.map(t => ({ id: t.id, name: t.name, price: t.price })))
-            setTierPrices(existing.map(t => t.price.toString()))
+            setTiers(existing.map(pt => ({ id: pt.id, name: pt.name, price: pt.price })))
+            setTierPrices(existing.map(pt => pt.price.toString()))
           }
         }
       } catch (err) {
@@ -295,10 +300,10 @@ function PackageForm({
     set(list.includes(id) ? list.filter(x => x !== id) : [...list, id])
 
   const setTierName = (i: number, name: string) =>
-    setTiers(ts => ts.map((t, j) => (j === i ? { ...t, name } : t)))
+    setTiers(ts => ts.map((tier, j) => (j === i ? { ...tier, name } : tier)))
   const setTierPrice = (i: number, priceStr: string) => {
     setTierPrices(ps => ps.map((p, j) => (j === i ? priceStr : p)))
-    setTiers(ts => ts.map((t, j) => (j === i ? { ...t, price: Number(priceStr) || 0 } : t)))
+    setTiers(ts => ts.map((tier, j) => (j === i ? { ...tier, price: Number(priceStr) || 0 } : tier)))
   }
   const addTier = () => { setTiers(ts => [...ts, { name: '', price: 0 }]); setTierPrices(ps => [...ps, '']) }
   const removeTier = (i: number) => {
@@ -308,13 +313,13 @@ function PackageForm({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!partnerId) { onError('Pick a trusted partner.'); return }
-    if (!title.trim() || !destination.trim()) { onError('Title and destination are required.'); return }
+    if (!partnerId) { onError(pg.pickPartner); return }
+    if (!title.trim() || !destination.trim()) { onError(st.titleDestRequired); return }
     const cleanTiers = tiers
-      .map((t, i) => ({ ...t, name: t.name.trim(), price: Number(tierPrices[i]) || 0 }))
-      .filter(t => t.name)
-    if (cleanTiers.length === 0) { onError('Add at least one package tier with a name.'); return }
-    if (cleanTiers.some(t => !(t.price >= 0))) { onError('Every tier needs a price.'); return }
+      .map((tier, i) => ({ ...tier, name: tier.name.trim(), price: Number(tierPrices[i]) || 0 }))
+      .filter(tier => tier.name)
+    if (cleanTiers.length === 0) { onError(pg.atLeastOneTier); return }
+    if (cleanTiers.some(tier => !(tier.price >= 0))) { onError(pg.everyTierPrice); return }
     setSubmitting(true)
     try {
       const values: PackageInsert = {
@@ -343,62 +348,62 @@ function PackageForm({
   return (
     <Modal labelledBy="package-form-title" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-3 max-h-[80vh] overflow-y-auto">
-        <h2 id="package-form-title" className="text-lg font-bold text-brand-900">{pkg ? 'Edit package' : 'New package'}</h2>
-        <Labelled label="Trusted partner *">
-          <select className={FIELD} value={partnerId} onChange={e => setPartnerId(e.target.value)} aria-label="Trusted partner">
+        <h2 id="package-form-title" className="text-lg font-bold text-brand-900">{pkg ? pg.editPackage : pg.newPackageTitle}</h2>
+        <Labelled label={pg.trustedPartnerLabel}>
+          <select className={FIELD} value={partnerId} onChange={e => setPartnerId(e.target.value)} aria-label={pg.trustedPartnerAria}>
             {partners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </Labelled>
-        <Labelled label="Title *"><input className={FIELD} value={title} onChange={e => setTitle(e.target.value)} /></Labelled>
-        <Labelled label="Destination *"><input className={FIELD} value={destination} onChange={e => setDestination(e.target.value)} /></Labelled>
-        <Labelled label="Summary (one line on the card)">
+        <Labelled label={st.titleLabel}><input className={FIELD} value={title} onChange={e => setTitle(e.target.value)} /></Labelled>
+        <Labelled label={st.destination}><input className={FIELD} value={destination} onChange={e => setDestination(e.target.value)} /></Labelled>
+        <Labelled label={st.summary}>
           <input className={FIELD} value={summary} onChange={e => setSummary(e.target.value)} />
         </Labelled>
-        <Labelled label="Description">
+        <Labelled label={st.description}>
           <textarea className={`${FIELD} resize-none`} rows={3} value={description} onChange={e => setDescription(e.target.value)} />
         </Labelled>
 
         {/* Price tiers (Package A/B/C) */}
         <fieldset className="space-y-2 border border-surface-300 rounded-md p-2">
-          <legend className="text-xs font-semibold text-brand-900 px-1">Packages / price tiers *</legend>
-          {tiers.map((t, i) => (
+          <legend className="text-xs font-semibold text-brand-900 px-1">{pg.tiersLegend}</legend>
+          {tiers.map((tier, i) => (
             <div key={i} className="flex items-center gap-2">
-              <input className={FIELD} placeholder={`Package ${String.fromCharCode(65 + i)}`} value={t.name}
-                onChange={e => setTierName(i, e.target.value)} aria-label={`Tier ${i + 1} name`} />
-              <input className={`${FIELD} w-28`} type="number" step="any" min="0" placeholder="Price" value={tierPrices[i] ?? ''}
-                onChange={e => setTierPrice(i, e.target.value)} aria-label={`Tier ${i + 1} price`} />
+              <input className={FIELD} placeholder={pg.tierNamePh(String.fromCharCode(65 + i))} value={tier.name}
+                onChange={e => setTierName(i, e.target.value)} aria-label={pg.tierNameAria(i + 1)} />
+              <input className={`${FIELD} w-28`} type="number" step="any" min="0" placeholder={pg.pricePh} value={tierPrices[i] ?? ''}
+                onChange={e => setTierPrice(i, e.target.value)} aria-label={pg.tierPriceAria(i + 1)} />
               {tiers.length > 1 && (
-                <button type="button" onClick={() => removeTier(i)} aria-label={`Remove tier ${i + 1}`}
+                <button type="button" onClick={() => removeTier(i)} aria-label={pg.removeTierAria(i + 1)}
                   className="text-red-700 hover:text-red-900 text-lg leading-none px-1">×</button>
               )}
             </div>
           ))}
-          <button type="button" onClick={addTier} className="text-xs font-semibold text-brand-900 underline">+ Add tier</button>
+          <button type="button" onClick={addTier} className="text-xs font-semibold text-brand-900 underline">{pg.addTier}</button>
         </fieldset>
 
-        <Labelled label="Currency"><input className={FIELD} value={currency} onChange={e => setCurrency(e.target.value)} /></Labelled>
+        <Labelled label={c.currency}><input className={FIELD} value={currency} onChange={e => setCurrency(e.target.value)} /></Labelled>
 
         {/* Catalog add-ons/rooms available to registrants */}
-        <CatalogPicker label="Add-ons offered" items={allAddons.map(a => ({ id: a.id, label: catalogLabel(a) }))}
-          selected={addonIds} onToggle={id => toggle(addonIds, setAddonIds, id)} empty="No add-ons in the catalog." />
-        <CatalogPicker label="Room options offered" items={allRooms.map(r => ({ id: r.id, label: catalogLabel(r) }))}
-          selected={roomIds} onToggle={id => toggle(roomIds, setRoomIds, id)} empty="No rooms in the catalog." />
+        <CatalogPicker label={st.addonsOffered} items={allAddons.map(a => ({ id: a.id, label: catalogLabel(a) }))}
+          selected={addonIds} onToggle={id => toggle(addonIds, setAddonIds, id)} empty={st.noAddons} />
+        <CatalogPicker label={st.roomsOffered} items={allRooms.map(r => ({ id: r.id, label: catalogLabel(r) }))}
+          selected={roomIds} onToggle={id => toggle(roomIds, setRoomIds, id)} empty={st.noRooms} />
 
-        <Labelled label="Hero image URL"><input className={FIELD} value={heroImageUrl} onChange={e => setHeroImageUrl(e.target.value)} /></Labelled>
-        <Labelled label="Highlights (one per line)">
+        <Labelled label={st.heroImageUrl}><input className={FIELD} value={heroImageUrl} onChange={e => setHeroImageUrl(e.target.value)} /></Labelled>
+        <Labelled label={st.highlights}>
           <textarea className={`${FIELD} resize-none`} rows={3} value={highlights} onChange={e => setHighlights(e.target.value)} />
         </Labelled>
         <div className="grid grid-cols-2 gap-2">
-          <Labelled label="Kickback %"><input className={FIELD} type="number" step="any" value={rate} onChange={e => setRate(e.target.value)} /></Labelled>
-          <Labelled label="Status">
-            <select className={FIELD} value={status} onChange={e => setStatus(e.target.value as PackageStatus)} aria-label="Status">
+          <Labelled label={pg.kickback}><input className={FIELD} type="number" step="any" value={rate} onChange={e => setRate(e.target.value)} /></Labelled>
+          <Labelled label={st.statusLabel}>
+            <select className={FIELD} value={status} onChange={e => setStatus(e.target.value as PackageStatus)} aria-label={st.statusLabel}>
               <option value="draft">draft</option>
               <option value="published">published</option>
               <option value="archived">archived</option>
             </select>
           </Labelled>
         </div>
-        <FormButtons submitting={submitting} submitLabel={pkg ? 'Save changes' : 'Create package'} onClose={onClose} />
+        <FormButtons submitting={submitting} submitLabel={pkg ? c.saveChanges : pg.createPackage} onClose={onClose} />
       </form>
     </Modal>
   )
