@@ -82,7 +82,7 @@ export function EventVehicleGroup({
             const v = vehicleMap.get(a.vehicle_id)
             return (
               <li key={a.id} className="flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full border border-brand-900 text-brand-900 font-medium">
-                <span>{v?.name ?? '(unknown car)'}{v ? ` (${v.passenger_seats})` : ''}</span>
+                <span>{v?.name ?? tp.unknownCar}{v ? ` (${v.passenger_seats})` : ''}</span>
                 {isAdmin && (
                   <button
                     type="button"

@@ -1360,6 +1360,8 @@ export const zhTW: Messages = {
     eventForm: {
       totalPart: (amount: number, cur: string) => `總額：${amount} ${cur}`,
       depositPart: (amount: number, cur: string) => `訂金：${amount} ${cur}`,
+      transportPart: (amount: number, cur: string) => `交通費：+${amount} ${cur}`,
+      transportIncluded: '交通費：已內含',
       untitledDive: '（未命名潛水）',
       untitledCourse: '（未命名課程）',
       adminTitleRequired: '請填寫管理標題。',
@@ -1597,6 +1599,7 @@ export const zhTW: Messages = {
       noCarAssigned: '尚未指派車輛。',
       unassignAria: (name: string) => `取消指派 ${name}`,
       carFallback: '車輛',
+      unknownCar: '（未知車輛）',
       assignACar: '指派車輛',
       selectACar: '請選擇車輛…',
       cancelledHidden: '已隱藏取消的預訂。',

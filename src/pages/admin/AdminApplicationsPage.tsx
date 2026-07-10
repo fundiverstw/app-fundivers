@@ -91,7 +91,7 @@ export function AdminApplicationsPage() {
         body: { user_id: userId, decision, ...(reason ? { reason } : {}) },
       })
       if (error) throw new Error(error.message)
-      if (!data?.ok) throw new Error('decision failed')
+      if (!data?.ok) throw new Error(ap.decisionFailed)
 
       const verb = decision === 'approve' ? ap.approved : ap.rejected
       const tail = data.email_sent ? ap.emailSent : ap.emailSkipped

@@ -5,6 +5,7 @@ import type { EOPrice } from '../../types/database'
 
 const CUR = siteConfig.locale.currencyLabel
 const c = t.admin.catalog
+const ef = t.admin.eventForm
 
 // prices CRUD. Skips room_options (multi-FK; admins still manage that
 // from the inline price-tier sub-form on the new/edit event page).
@@ -26,10 +27,10 @@ export function AdminPricesPage() {
       rowLabel={r => r.admin_title || r.id}
       rowDetail={r => {
         const parts: string[] = []
-        if (r.starting_at != null)    parts.push(`total: ${r.starting_at} ${CUR}`)
-        if (r.deposit_amount != null) parts.push(`deposit: ${r.deposit_amount} ${CUR}`)
-        if (r.transport != null && r.transport > 0) parts.push(`transport: +${r.transport} ${CUR}`)
-        else                                         parts.push('transport: included')
+        if (r.starting_at != null)    parts.push(ef.totalPart(r.starting_at, CUR))
+        if (r.deposit_amount != null) parts.push(ef.depositPart(r.deposit_amount, CUR))
+        if (r.transport != null && r.transport > 0) parts.push(ef.transportPart(r.transport, CUR))
+        else                                         parts.push(ef.transportIncluded)
         return parts.join(' · ')
       }}
     />

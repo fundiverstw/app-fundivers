@@ -1359,6 +1359,8 @@ export const ja: Messages = {
     eventForm: {
       totalPart: (amount: number, cur: string) => `合計：${amount} ${cur}`,
       depositPart: (amount: number, cur: string) => `内金：${amount} ${cur}`,
+      transportPart: (amount: number, cur: string) => `交通費：+${amount} ${cur}`,
+      transportIncluded: '交通費：込み',
       untitledDive: '（無題のダイブ）',
       untitledCourse: '（無題のコース）',
       adminTitleRequired: '管理用タイトルは必須です。',
@@ -1596,6 +1598,7 @@ export const ja: Messages = {
       noCarAssigned: 'まだ車両が割り当てられていません。',
       unassignAria: (name: string) => `${name} の割り当てを解除`,
       carFallback: '車両',
+      unknownCar: '（不明な車両）',
       assignACar: '車両を割り当てる',
       selectACar: '車両を選択…',
       cancelledHidden: 'キャンセルされた予約は非表示です。',
