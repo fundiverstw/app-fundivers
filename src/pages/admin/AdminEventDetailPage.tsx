@@ -30,6 +30,10 @@ import type { WaiverDef } from '../../config/waivers'
 import { ShareEventButton } from '../../components/ShareEventButton'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Credit, DiverNote, Payment, Profile } from '../../types/database'
 import { BTN_SECONDARY, ERROR_NOTE_LIGHT } from '../../styles/tokens'
+import { t } from '../../i18n'
+
+const ed = t.admin.eventDetail
+const us = t.admin.users
 
 interface Registrant {
   booking: Booking
@@ -171,7 +175,7 @@ export function AdminEventDetailPage() {
           .filter(c => c.user_id === b.user_id && c.booking_id !== b.id)
           .reduce((s, c) => s + Number(c.amount), 0),
         payerName: (b.payer_id && b.payer_id !== b.user_id)
-          ? (personName(profileMap.get(b.payer_id)?.name, profileMap.get(b.payer_id)?.nickname) || '(lead booker)')
+          ? (personName(profileMap.get(b.payer_id)?.name, profileMap.get(b.payer_id)?.nickname) || t.admin.logistics.leadBooker)
           : null,
       })))
       setLoading(false)
@@ -235,8 +239,8 @@ export function AdminEventDetailPage() {
   // new payment rows + any auto-confirmed siblings.
   async function recordGroupPaymentFor(leadId: string, groupId: string | null, amount: number) {
     const applied = await recordGroupPayment({ leadId, amount, groupId })
-    if (applied > 0) toast.success(`Recorded ${applied.toLocaleString()} across the group`)
-    else toast.info('Nothing outstanding to apply')
+    if (applied > 0) toast.success(ed.recordedAcrossGroup(applied.toLocaleString()))
+    else toast.info(ed.nothingOutstanding)
     setRefreshKey(k => k + 1)
   }
 
@@ -261,7 +265,7 @@ export function AdminEventDetailPage() {
       setRegistrants(prev => prev.map(r =>
         r.booking.id === bookingId ? { ...r, amendments: [...r.amendments, row] } : r
       ))
-      toast.success('Amendment added.')
+      toast.success(ed.amendmentAdded)
     } catch (err) {
       toast.error(errorMessage(err))
     }
@@ -282,9 +286,9 @@ export function AdminEventDetailPage() {
           ? { ...x, payments: [...x.payments, payment], booking: { ...x.booking, status: newStatus } }
           : x
       ))
-      toast.success(promoted ? 'Payment recorded · status set to confirmed' : 'Payment recorded')
+      toast.success(promoted ? us.paymentRecordedConfirmed : us.paymentRecorded)
     } catch (err) {
-      toast.error(`Could not record payment: ${errorMessage(err)}`)
+      toast.error(us.couldNotRecordPayment(errorMessage(err)))
     }
   }
 
@@ -292,15 +296,15 @@ export function AdminEventDetailPage() {
     try {
       const applied = await applyCreditToBooking({ bookingId: r.booking.id, amount })
       if (applied > 0) {
-        toast.success(`Applied ${event?.currency ?? siteConfig.locale.currencyLabel} ${applied.toLocaleString()} credit`)
+        toast.success(ed.appliedCredit(event?.currency ?? siteConfig.locale.currencyLabel, applied.toLocaleString()))
         // Credit-apply settles/splits credit rows and inserts a payment in one
         // round-trip; reload rather than mirror that locally.
         setRefreshKey(k => k + 1)
       } else {
-        toast.info('Nothing to apply')
+        toast.info(t.payments.nothingToApply)
       }
     } catch (err) {
-      toast.error(`Could not apply credit: ${errorMessage(err)}`)
+      toast.error(us.couldNotApplyCredit(errorMessage(err)))
     }
   }
 
@@ -321,9 +325,9 @@ export function AdminEventDetailPage() {
             }
           : x
       ))
-      toast.success(reverted ? 'Payment voided · status reverted to pending' : 'Payment voided')
+      toast.success(reverted ? us.paymentVoidedReverted : us.paymentVoided)
     } catch (err) {
-      toast.error(`Could not void payment: ${errorMessage(err)}`)
+      toast.error(us.couldNotVoidPayment(errorMessage(err)))
     }
   }
 
@@ -342,7 +346,7 @@ export function AdminEventDetailPage() {
       // Notify registrants on cancel only (not restore) — email + in-app +
       // push, best-effort so a notification failure never blocks the cancel.
       if (value) notifyEventCancelled(id, type as AppEvent['type']).catch(() => { /* best-effort */ })
-      toast.success(value ? 'Event cancelled' : 'Event restored')
+      toast.success(value ? ed.eventCancelled : ed.eventRestored)
       // Auto-credit each registrant what they've paid. The cancel already
       // committed, so a failure here can't un-cancel it — surface it instead
       // so the admin knows to issue the credits by hand on the Users page.
@@ -350,16 +354,16 @@ export function AdminEventDetailPage() {
         try {
           const { issued, totalAmount } = await issueCancellationCredits({ event, createdBy: profile.id })
           if (issued > 0) {
-            toast.success(`Credited ${issued} diver${issued === 1 ? '' : 's'} ${event.currency} ${totalAmount.toLocaleString()}`)
+            toast.success(ed.creditedDivers(issued, event.currency, totalAmount.toLocaleString()))
           }
         } catch (err) {
-          toast.error(`Event cancelled, but auto-crediting failed: ${errorMessage(err)}. Issue credits manually on the Users page.`)
+          toast.error(ed.autoCreditFailed(errorMessage(err)))
         }
       }
     } catch (err) {
       const msg = errorMessage(err)
       setCancelError(msg)
-      toast.error(`Could not ${value ? 'cancel' : 'restore'} event: ${msg}`)
+      toast.error(value ? ed.couldNotCancelEvent(msg) : ed.couldNotRestoreEvent(msg))
     } finally {
       setCancelInFlight(false)
     }
@@ -372,12 +376,12 @@ export function AdminEventDetailPage() {
     try {
       const { error } = await supabase.from('events').delete().eq('id', id)
       if (error) throw error
-      toast.success('Event deleted')
+      toast.success(ed.eventDeleted)
       navigate('/admin/events')
     } catch (err) {
       const msg = errorMessage(err)
       setDeleteError(msg)
-      toast.error(`Could not delete event: ${msg}`)
+      toast.error(ed.couldNotDeleteEvent(msg))
     } finally {
       setDeleteInFlight(false)
     }
@@ -420,22 +424,22 @@ export function AdminEventDetailPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
-      <Link to="/admin/events" className="text-sm text-white/70 hover:text-white">‹ back to events</Link>
+      <Link to="/admin/events" className="text-sm text-white/70 hover:text-white">{ed.backToEvents}</Link>
 
       <header className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4">
-        <h1 className="text-xl font-bold text-brand-900">{event?.title ?? '(event not found)'}</h1>
+        <h1 className="text-xl font-bold text-brand-900">{event?.title ?? ed.eventNotFound}</h1>
         {event && (
           <p className="text-sm text-brand-900 font-medium mt-1">
             {formatEventSpan(event, { style: 'long' })}
             {' · '}
             <span className="capitalize">{event.type}</span>
-            {event.price != null && ` · From ${event.currency} ${event.price.toLocaleString()}`}
+            {event.price != null && ed.fromPrice(event.currency, event.price.toLocaleString())}
           </p>
         )}
-        <p className="text-sm text-red-600 mt-2">{activeRegistrants.length} registrant{activeRegistrants.length === 1 ? '' : 's'}</p>
+        <p className="text-sm text-red-600 mt-2">{ed.registrantCount(activeRegistrants.length)}</p>
         {event?.cancelled_at && (
           <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-red-700 bg-red-50 border border-accent rounded px-2 py-1 inline-block">
-            Cancelled {format(new Date(event.cancelled_at), 'MMM d, yyyy')}
+            {ed.cancelledOn(format(new Date(event.cancelled_at), 'MMM d, yyyy'))}
           </p>
         )}
       </header>
@@ -450,20 +454,20 @@ export function AdminEventDetailPage() {
                   onClick={() => setAddDiverOpen(true)}
                   className="text-xs bg-emerald-900/60 hover:bg-emerald-900 text-white px-3 py-1 rounded-lg"
                 >
-                  Add diver
+                  {ed.addDiver}
                 </button>
                 <Link
                   to={`/admin/events/${type}/${id}/edit`}
                   className="text-xs bg-brand-900/60 hover:bg-brand-900 text-white px-3 py-1 rounded-lg"
                 >
-                  Edit
+                  {t.admin.catalog.edit}
                 </Link>
                 <button
                   type="button"
                   onClick={() => { setCancelError(null); setCancelModalOpen(true) }}
                   className="text-xs bg-red-900/60 hover:bg-red-900 text-white px-3 py-1 rounded-lg"
                 >
-                  {event?.cancelled_at ? 'Restore event' : 'Cancel event'}
+                  {event?.cancelled_at ? ed.restoreEvent : ed.cancelEvent}
                 </button>
                 {event?.cancelled_at && (
                   <button
@@ -471,7 +475,7 @@ export function AdminEventDetailPage() {
                     onClick={() => { setDeleteError(null); setDeleteModalOpen(true) }}
                     className="text-xs bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded-lg"
                   >
-                    Delete event
+                    {ed.deleteEvent}
                   </button>
                 )}
                 <button
@@ -479,14 +483,14 @@ export function AdminEventDetailPage() {
                   onClick={() => setNotifyModalOpen(true)}
                   className="text-xs bg-amber-700/80 hover:bg-amber-700 text-white px-3 py-1 rounded-lg"
                 >
-                  Notify divers
+                  {ed.notifyDivers}
                 </button>
                 <button
                   type="button"
                   onClick={() => setExportModalOpen(true)}
                   className="text-xs bg-surface-700/80 hover:bg-surface-700 text-white px-3 py-1 rounded-lg"
                 >
-                  Export diver info
+                  {ed.exportDiverInfo}
                 </button>
               </>
             )}
@@ -494,7 +498,7 @@ export function AdminEventDetailPage() {
               to={`/admin/events/${type}/${id}/gear-map`}
               className="text-xs bg-surface-900/50 hover:bg-surface-900 text-surface-200 px-3 py-1 rounded-lg"
             >
-              Gear map →
+              {ed.gearMap}
             </Link>
             {type && id && (
               <ShareEventButton event={{ id, type }} className="text-xs bg-surface-700/80 hover:bg-surface-700 text-white px-3 py-1 rounded-lg" />
@@ -510,7 +514,7 @@ export function AdminEventDetailPage() {
               readOnly={!isAdmin}
             />
           )}
-          <AdminNotes target={{ kind: type, id }} title="Memos" />
+          <AdminNotes target={{ kind: type, id }} title={ed.memos} />
         </>
       )}
 
@@ -519,31 +523,31 @@ export function AdminEventDetailPage() {
           {/* Tabs are available even before anyone registers — an admin needs
               to assign cars and set transport info on a fresh event (the
               registration ride-gate depends on cars being assigned first). */}
-          <nav role="tablist" aria-label="Event sections" className="flex gap-2">
+          <nav role="tablist" aria-label={ed.sectionsAria} className="flex gap-2">
             <TabButton active={view === 'registrants'} onClick={() => setView('registrants')}>
-              Registrants ({activeRegistrants.length})
+              {ed.tabRegistrants(activeRegistrants.length)}
             </TabButton>
             <TabButton active={view === 'transportation'} onClick={() => setView('transportation')}>
-              Transportation
+              {t.bookings.breakdown.transportation}
             </TabButton>
             <TabButton active={view === 'balances'} onClick={() => setView('balances')}>
-              Amount owed
+              {ed.tabAmountOwed}
             </TabButton>
           </nav>
 
           {view === 'registrants' && (
             <section className="space-y-2">
               {registrants.length === 0 ? (
-                <p className="text-brand-950 font-medium text-sm">No one has registered for this event yet.</p>
+                <p className="text-brand-950 font-medium text-sm">{ed.noneRegistered}</p>
               ) : activeRegistrants.length === 0 ? (
-                <p className="text-brand-950 font-medium text-sm">No active registrants — every booking for this event was cancelled.</p>
+                <p className="text-brand-950 font-medium text-sm">{ed.allCancelled}</p>
               ) : (
                 activeRegistrants.map(renderRegistrant)
               )}
               {cancelledRegistrants.length > 0 && (
                 <details className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl px-4 py-2">
                   <summary className="text-sm font-medium text-brand-950/70 cursor-pointer select-none">
-                    Cancelled ({cancelledRegistrants.length})
+                    {ed.cancelledCount(cancelledRegistrants.length)}
                   </summary>
                   <div className="space-y-2 pt-2">
                     {cancelledRegistrants.map(renderRegistrant)}
@@ -593,7 +597,7 @@ export function AdminEventDetailPage() {
           event={event}
           onClose={() => setAddDiverOpen(false)}
           onAdded={() => {
-            toast.success('Diver registered for this event')
+            toast.success(ed.diverRegistered)
             setRefreshKey(k => k + 1)
           }}
         />
@@ -670,23 +674,16 @@ function CancelEventModal({
     >
       <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3">
         <h2 id="cancel-event-title" className="text-lg font-bold text-brand-900">
-          {alreadyCancelled ? 'Restore event?' : 'Cancel event?'}
+          {alreadyCancelled ? ed.restoreTitle : ed.cancelTitle}
         </h2>
         {alreadyCancelled ? (
-          <p className="text-sm text-brand-900">
-            This will make the event visible on the calendar again. Existing
-            bookings remain attached.
-          </p>
+          <p className="text-sm text-brand-900">{ed.restoreBody}</p>
         ) : (
           <>
-            <p className="text-sm text-brand-900">
-              The event will be hidden from the calendar and listing pages.
-              Existing bookings stay attached so refund records remain
-              traceable.
-            </p>
+            <p className="text-sm text-brand-900">{ed.cancelBody}</p>
             {activeBookingCount > 0 && (
               <p className="text-sm font-semibold text-red-700 bg-red-50 border border-accent rounded px-3 py-2">
-                {activeBookingCount} active booking{activeBookingCount === 1 ? '' : 's'} on this event will need refunds. Issue those refunds separately and record them on each booking.
+                {ed.activeBookingsWarn(activeBookingCount)}
               </p>
             )}
           </>
@@ -701,7 +698,7 @@ function CancelEventModal({
             disabled={inFlight}
             className={`flex-1 ${BTN_SECONDARY}`}
           >
-            Back
+            {ed.back}
           </button>
           <button
             type="button"
@@ -714,8 +711,8 @@ function CancelEventModal({
             }`}
           >
             {inFlight
-              ? (alreadyCancelled ? 'Restoring…' : 'Cancelling…')
-              : (alreadyCancelled ? 'Restore event' : 'Cancel event')}
+              ? (alreadyCancelled ? ed.restoring : ed.cancelling)
+              : (alreadyCancelled ? ed.restoreEvent : ed.cancelEvent)}
           </button>
         </div>
       </div>
@@ -744,20 +741,18 @@ function DeleteEventModal({
     >
       <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3">
         <h2 id="delete-event-title" className="text-lg font-bold text-red-700">
-          Delete event permanently?
+          {ed.deleteTitle}
         </h2>
         <p className="text-sm text-brand-900">
-          This permanently removes the event and cascades through every related
-          row: bookings, payments, payment amendments, memos, admin notes,
-          waitlist offers, and staff duties. <strong>This cannot be undone.</strong>
+          {ed.deleteBody}<strong>{ed.deleteBodyStrong}</strong>
         </p>
         {bookingCount > 0 && (
           <p className="text-sm font-semibold text-red-700 bg-red-50 border border-accent rounded px-3 py-2">
-            {bookingCount} booking{bookingCount === 1 ? '' : 's'} on this event and all linked payments will be wiped. Issue any refunds before deleting.
+            {ed.deleteBookingsWarn(bookingCount)}
           </p>
         )}
         <label className="block text-xs text-brand-900 font-medium">
-          Type <span className="font-mono text-red-700">{eventTitle}</span> to confirm:
+          {ed.typeToConfirmPrefix}<span className="font-mono text-red-700">{eventTitle}</span>{ed.typeToConfirmSuffix}
           <input
             type="text"
             value={typed}
@@ -777,7 +772,7 @@ function DeleteEventModal({
             disabled={inFlight}
             className={`flex-1 ${BTN_SECONDARY}`}
           >
-            Back
+            {ed.back}
           </button>
           <button
             type="button"
@@ -785,7 +780,7 @@ function DeleteEventModal({
             disabled={inFlight || !matches}
             className="flex-1 py-2 rounded-lg text-sm font-semibold text-white bg-red-700 hover:bg-red-800 disabled:opacity-50"
           >
-            {inFlight ? 'Deleting…' : 'Delete forever'}
+            {inFlight ? ed.deleting : ed.deleteForever}
           </button>
         </div>
       </div>
@@ -809,25 +804,25 @@ function NotifyDiversModal({
   const [error, setError] = useState<string | null>(null)
 
   const headerPreview = status === 'on'
-    ? `Event ${eventTitle} is ON AS SCHEDULED!`
-    : `Event ${eventTitle} is CANCELLED :(`
+    ? ed.pushHeaderOn(eventTitle)
+    : ed.pushHeaderCancelled(eventTitle)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     if (!body.trim()) {
-      setError('Body is required.')
+      setError(ed.bodyRequired)
       return
     }
     const workerUrl = ((import.meta.env.VITE_PUSH_WORKER_URL as string | undefined) ?? '').replace(/\/$/, '')
     if (!workerUrl) {
-      setError('VITE_PUSH_WORKER_URL is not configured for this environment.')
+      setError(ed.pushWorkerMissing)
       return
     }
     setSubmitting(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error('Not signed in.')
+      if (!session) throw new Error(ed.notSignedIn)
       const res = await fetch(`${workerUrl}/admin-event-broadcast`, {
         method: 'POST',
         headers: {
@@ -843,12 +838,12 @@ function NotifyDiversModal({
       })
       if (!res.ok) {
         const text = await res.text().catch(() => '')
-        throw new Error(text || `Notify failed (HTTP ${res.status}).`)
+        throw new Error(text || ed.notifyFailed(res.status))
       }
       const result = await res.json() as { sent?: number; skipped?: number; recipients?: number }
       const sent = result.sent ?? 0
       const recipients = result.recipients ?? 0
-      onSent(`Notified ${recipients} diver${recipients === 1 ? '' : 's'} (${sent} push device${sent === 1 ? '' : 's'})`)
+      onSent(ed.notifiedSummary(recipients, sent))
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -866,16 +861,13 @@ function NotifyDiversModal({
     >
       <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3" onClick={e => e.stopPropagation()}>
         <h2 id="notify-divers-title" className="text-lg font-bold text-brand-900">
-          Notify confirmed divers
+          {ed.notifyTitle}
         </h2>
-        <p className="text-sm text-brand-900">
-          Sends a push to {confirmedCount} confirmed diver{confirmedCount === 1 ? '' : 's'} on this event,
-          and lands in their in-app inbox.
-        </p>
+        <p className="text-sm text-brand-900">{ed.notifyBlurb(confirmedCount)}</p>
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="space-y-1">
-            <span className="text-xs font-medium text-brand-900">Status</span>
+            <span className="text-xs font-medium text-brand-900">{ed.statusLabel}</span>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -886,7 +878,7 @@ function NotifyDiversModal({
                     : 'bg-white text-brand-900 border-surface-300 hover:bg-surface-50'
                 }`}
               >
-                ON AS SCHEDULED
+                {ed.onAsScheduled}
               </button>
               <button
                 type="button"
@@ -897,20 +889,20 @@ function NotifyDiversModal({
                     : 'bg-white text-brand-900 border-surface-300 hover:bg-surface-50'
                 }`}
               >
-                CANCELLED
+                {ed.cancelledCaps}
               </button>
             </div>
             <p className="text-[11px] text-brand-900/70 pt-1">
-              Push title: <span className="font-medium">{headerPreview}</span>
+              {ed.pushTitlePrefix}<span className="font-medium">{headerPreview}</span>
             </p>
           </div>
 
           <label className="block space-y-1">
-            <span className="text-xs font-medium text-brand-900">Note *</span>
+            <span className="text-xs font-medium text-brand-900">{ed.noteLabel}</span>
             <textarea
               value={body}
               onChange={e => setBody(e.target.value)}
-              placeholder="Details for the divers (e.g. weather, meeting point, refund info)."
+              placeholder={ed.notePlaceholder}
               rows={5}
               maxLength={1000}
               className="w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900 resize-none"
@@ -928,7 +920,7 @@ function NotifyDiversModal({
               disabled={submitting}
               className={`flex-1 ${BTN_SECONDARY}`}
             >
-              Back
+              {ed.back}
             </button>
             <button
               type="submit"
@@ -939,7 +931,7 @@ function NotifyDiversModal({
                   : 'bg-brand-900 hover:bg-brand-950'
               }`}
             >
-              {submitting ? 'Sending…' : `Send to ${confirmedCount}`}
+              {submitting ? ed.sending : ed.sendTo(confirmedCount)}
             </button>
           </div>
         </form>
@@ -1007,10 +999,10 @@ function ExportManifestModal({
         registration: registration.trim(),
         notes: notes.split('\n').map(n => n.trim()).filter(Boolean),
       })
-      const staffPart = res.staff_count ? ` + ${res.staff_count} staff` : ''
-      onDone(`Manifest emailed — ${res.diver_count} diver${res.diver_count === 1 ? '' : 's'}${staffPart}.`)
+      const staffPart = res.staff_count ? ed.staffSuffix(res.staff_count) : ''
+      onDone(ed.manifestEmailed(res.diver_count, staffPart))
     } catch (err) {
-      onError(`Export failed: ${errorMessage(err)}`)
+      onError(ed.exportFailed(errorMessage(err)))
     } finally {
       setSubmitting(false)
     }
@@ -1026,18 +1018,14 @@ function ExportManifestModal({
     >
       <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3" onClick={e => e.stopPropagation()}>
         <h2 id="export-manifest-title" className="text-lg font-bold text-brand-900">
-          Export boat manifest
+          {ed.exportTitle}
         </h2>
-        <p className="text-sm text-brand-900">
-          Builds the vessel passenger manifest (.xlsx) for pending and confirmed
-          divers plus the staff on duty (instructors, guides, support) and emails
-          it to the shop inbox. Boat details are remembered for next time.
-        </p>
+        <p className="text-sm text-brand-900">{ed.exportBlurb}</p>
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="flex gap-2">
             <label className="flex-1 space-y-1">
-              <span className="text-xs font-medium text-brand-900">Boat name</span>
+              <span className="text-xs font-medium text-brand-900">{ed.boatName}</span>
               <input
                 type="text"
                 value={boatName}
@@ -1046,7 +1034,7 @@ function ExportManifestModal({
               />
             </label>
             <label className="flex-1 space-y-1">
-              <span className="text-xs font-medium text-brand-900">Registration</span>
+              <span className="text-xs font-medium text-brand-900">{ed.registration}</span>
               <input
                 type="text"
                 value={registration}
@@ -1057,7 +1045,7 @@ function ExportManifestModal({
           </div>
 
           <label className="block space-y-1">
-            <span className="text-xs font-medium text-brand-900">Footer notes (one per line)</span>
+            <span className="text-xs font-medium text-brand-900">{ed.footerNotes}</span>
             <textarea
               value={notes}
               onChange={e => setNotes(e.target.value)}
@@ -1073,14 +1061,14 @@ function ExportManifestModal({
               disabled={submitting}
               className={`flex-1 ${BTN_SECONDARY}`}
             >
-              Back
+              {ed.back}
             </button>
             <button
               type="submit"
               disabled={submitting}
               className="flex-1 py-2 rounded-lg text-sm font-semibold text-white bg-brand-900 hover:bg-brand-950 disabled:opacity-50"
             >
-              {submitting ? 'Exporting…' : 'Export & email'}
+              {submitting ? ed.exporting : ed.exportAndEmail}
             </button>
           </div>
         </form>
@@ -1116,17 +1104,15 @@ function GroupPaymentInline({ currency, onRecord }: {
 
   return (
     <form onSubmit={submit} className="bg-violet-50 border border-violet-200 rounded p-2 space-y-1.5">
-      <p className="text-xs font-semibold text-violet-900">Record group payment</p>
-      <p className="text-[11px] text-violet-800">
-        One lump from the lead — spread across deposits first, then balances, for everyone they cover.
-      </p>
+      <p className="text-xs font-semibold text-violet-900">{ed.recordGroupPayment}</p>
+      <p className="text-[11px] text-violet-800">{ed.groupBlurb}</p>
       <div className="flex items-center gap-2">
         <span className="text-xs text-violet-900 font-medium">{currency}</span>
         <input
           type="number" inputMode="numeric" min={1} step={1}
           value={amountStr}
           onChange={e => setAmountStr(e.target.value)}
-          placeholder="Amount received"
+          placeholder={ed.amountReceived}
           className="flex-1 bg-white border border-violet-300 rounded px-2 py-1 text-xs text-brand-900"
         />
         <button
@@ -1134,7 +1120,7 @@ function GroupPaymentInline({ currency, onRecord }: {
           disabled={busy || amount <= 0}
           className="text-xs bg-violet-700 hover:bg-violet-800 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded shrink-0"
         >
-          {busy ? 'Recording…' : 'Record'}
+          {busy ? t.admin.bookingPayments.recording : ed.record}
         </button>
       </div>
     </form>
@@ -1161,7 +1147,7 @@ function ApplyCreditInline({ cap, spendable, currency, onApply }: {
   return (
     <form onSubmit={submit} className="bg-emerald-50 border border-emerald-300 rounded p-2 space-y-1.5">
       <p className="text-xs text-emerald-900">
-        Diver has {currency} {spendable.toLocaleString()} account credit — apply up to {currency} {cap.toLocaleString()}.
+        {ed.creditBlurb(currency, spendable.toLocaleString(), cap.toLocaleString())}
       </p>
       <div className="flex items-center gap-2">
         <span className="text-xs text-brand-950 font-medium">{currency}</span>
@@ -1176,7 +1162,7 @@ function ApplyCreditInline({ cap, spendable, currency, onApply }: {
           disabled={busy || amount <= 0}
           className="text-xs bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded"
         >
-          {busy ? 'Applying…' : 'Apply credit'}
+          {busy ? t.payments.applying : ed.applyCredit}
         </button>
       </div>
     </form>
@@ -1265,7 +1251,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
             className="text-brand-900 font-medium select-text cursor-text"
             onClick={e => e.stopPropagation()}
           >
-            {r.profile?.name ?? '(no profile)'}
+            {r.profile?.name ?? t.admin.transport.noProfile}
           </span>
           {r.profile?.nickname && (
             <span
@@ -1277,27 +1263,27 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
           )}
           {r.diverNotes.length > 0 && (
             <span className="ml-2 text-xs font-semibold text-red-700">
-              {r.diverNotes.length} diver note{r.diverNotes.length === 1 ? '' : 's'}
+              {ed.diverNoteCount(r.diverNotes.length)}
             </span>
           )}
           {waiverState === 'loading' ? null
             : waiverState === 'error' ? (
-              <span className="ml-2 text-xs font-semibold text-amber-700">Waivers —</span>
+              <span className="ml-2 text-xs font-semibold text-amber-700">{ed.waiversUnknown}</span>
             ) : waiverMissing.length > 0 ? (
               <span
                 className="ml-2 text-xs font-semibold text-red-700"
                 title={waiverMissing.map(w => w.title).join(', ')}
               >
-                Missing: {waiverMissing.map(w => w.title).join(', ')}
+                {ed.missingWaivers(waiverMissing.map(w => w.title).join(', '))}
               </span>
             ) : (
-              <span className="ml-2 text-xs font-semibold text-emerald-700">Waivers OK</span>
+              <span className="ml-2 text-xs font-semibold text-emerald-700">{ed.waiversOk}</span>
             )}
           {coveredByLead && (
-            <span className="ml-2 text-xs font-semibold text-violet-700">Paid by {r.payerName}</span>
+            <span className="ml-2 text-xs font-semibold text-violet-700">{ed.paidBy(r.payerName!)}</span>
           )}
           {isLeadOwn && (
-            <span className="ml-2 text-xs font-semibold text-violet-700">Lead payer</span>
+            <span className="ml-2 text-xs font-semibold text-violet-700">{ed.leadPayer}</span>
           )}
         </span>
         <span className="shrink-0 flex items-center gap-1.5">
@@ -1320,10 +1306,10 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
             </span>
           )}
           <span className={`${payStyles[paymentStatus]} text-xs font-medium whitespace-nowrap`}>
-            {paymentStatus === 'settled'  && (totalPaid > 0 ? `Paid ${totalPaid.toLocaleString()}` : 'Settled')}
-            {paymentStatus === 'partial'  && `${bal.amount.toLocaleString()} due`}
-            {paymentStatus === 'credit'   && `${bal.amount.toLocaleString()} credit`}
-            {paymentStatus === 'none'     && 'Unpaid'}
+            {paymentStatus === 'settled'  && (totalPaid > 0 ? ed.paidAmount(totalPaid.toLocaleString()) : ed.settled)}
+            {paymentStatus === 'partial'  && ed.dueAmount(bal.amount.toLocaleString())}
+            {paymentStatus === 'credit'   && ed.creditAmount(bal.amount.toLocaleString())}
+            {paymentStatus === 'none'     && ed.unpaid}
           </span>
         </span>
       </div>
@@ -1335,8 +1321,8 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
               {(r.profile.cert_agency || r.profile.cert_level || r.profile.nitrox_certified || r.profile.deep_certified) && (
                 <p className="text-xs text-brand-900 font-medium select-text">
                   {r.profile.cert_agency && r.profile.cert_level && `${r.profile.cert_agency} ${r.profile.cert_level}`}
-                  {r.profile.nitrox_certified && ' · Nitrox'}
-                  {r.profile.deep_certified && ' · Deep'}
+                  {r.profile.nitrox_certified && us.nitroxSuffix}
+                  {r.profile.deep_certified && us.deepSuffix}
                 </p>
               )}
               {/* Decorative emoji are select-none so a drag-select copies the
@@ -1349,7 +1335,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
                   </span>
                 )}
                 {r.profile.logged_dives > 0 && (
-                  <span><span aria-hidden="true" className="select-none">📖 </span>{r.profile.logged_dives} logged</span>
+                  <span><span aria-hidden="true" className="select-none">📖 </span>{ed.loggedDives(r.profile.logged_dives)}</span>
                 )}
                 {r.profile.height_cm && r.profile.weight_kg && (
                   <span><span aria-hidden="true" className="select-none">📏 </span>{r.profile.height_cm}cm / {r.profile.weight_kg}kg</span>
@@ -1369,7 +1355,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
 
           {r.diverNotes.length > 0 && (
             <div className="text-xs bg-rose-50 border border-rose-300 rounded p-2 space-y-1">
-              <p className="font-semibold text-red-700 uppercase tracking-wider">Diver notes</p>
+              <p className="font-semibold text-red-700 uppercase tracking-wider">{ed.diverNotesHeading}</p>
               {r.diverNotes.map(n => (
                 <p key={n.id} className="text-brand-950 font-medium whitespace-pre-wrap">{n.content}</p>
               ))}
@@ -1379,14 +1365,14 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
           {r.booking.refund_requested_at && r.booking.status !== 'cancelled' && (
             <div className="flex items-center justify-between text-xs bg-red-50 border border-accent rounded p-2">
               <span className="text-red-600">
-                🔄 Refund requested {format(new Date(r.booking.refund_requested_at), 'MMM d, HH:mm')}
+                🔄 {ed.refundRequested(format(new Date(r.booking.refund_requested_at), 'MMM d, HH:mm'))}
               </span>
               {!readOnly && (
                 <button
                   onClick={() => onApproveRefund(r.booking.id)}
                   className="bg-brand-900 hover:bg-brand-950 text-white text-xs font-semibold px-2 py-1 rounded"
                 >
-                  Approve refund
+                  {ed.approveRefund}
                 </button>
               )}
             </div>
@@ -1406,7 +1392,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
             charges={r.charges}
             amendments={r.amendments.map(a => ({ label: a.note, amount: a.amount }))}
             currency={currency}
-            payerNote={coveredByLead ? `Paid by ${r.payerName}` : (isLeadOwn ? 'Lead payer for this group' : undefined)}
+            payerNote={coveredByLead ? ed.paidBy(r.payerName!) : (isLeadOwn ? ed.leadPayerForGroup : undefined)}
             pending={r.booking.status === 'pending'}
             cancelled={r.booking.status === 'cancelled'}
             readOnly={!!readOnly}
@@ -1421,7 +1407,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
               onClick={onBillToDiver}
               className="w-full text-xs bg-white border border-violet-300 hover:bg-violet-50 text-violet-800 font-semibold px-3 py-1.5 rounded"
             >
-              Bill to this diver instead
+              {ed.billToDiver}
             </button>
           )}
 
@@ -1449,7 +1435,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
                 onClick={onEdit}
                 className="text-xs bg-surface-100 hover:bg-surface-700 text-brand-900 font-semibold px-3 py-1 rounded"
               >
-                Edit registration
+                {ed.editRegistration}
               </button>
             </div>
           )}
@@ -1478,11 +1464,11 @@ function AmendmentsSection({ readOnly, onAdd }: {
     setError(null)
     const amount = parseInt(amountStr, 10)
     if (!Number.isFinite(amount) || amount <= 0) {
-      setError('Amount must be a positive integer.')
+      setError(t.admin.bookingPayments.amountMustBePositive)
       return
     }
     if (!note.trim()) {
-      setError('A note is required.')
+      setError(ed.noteRequired)
       return
     }
     setSubmitting(true)
@@ -1500,7 +1486,7 @@ function AmendmentsSection({ readOnly, onAdd }: {
 
   return (
     <div className="text-xs bg-surface-50 rounded p-2 space-y-2">
-      <p className="font-semibold text-brand-900">Add balance amendment</p>
+      <p className="font-semibold text-brand-900">{ed.addBalanceAmendment}</p>
       <form onSubmit={handleSubmit} className="space-y-1.5">
           <div className="flex items-center gap-2">
             <select
@@ -1508,8 +1494,8 @@ function AmendmentsSection({ readOnly, onAdd }: {
               onChange={e => setSign(e.target.value as '+' | '-')}
               className="bg-white border border-surface-300 rounded px-1.5 py-0.5 text-xs font-semibold text-brand-900"
             >
-              <option value="+">+ owes more</option>
-              <option value="-">− owes less</option>
+              <option value="+">{ed.owesMore}</option>
+              <option value="-">{ed.owesLess}</option>
             </select>
             <input
               type="number"
@@ -1518,7 +1504,7 @@ function AmendmentsSection({ readOnly, onAdd }: {
               step={1}
               value={amountStr}
               onChange={e => setAmountStr(e.target.value)}
-              placeholder="Amount"
+              placeholder={us.amountPlaceholder}
               className="flex-1 bg-white border border-surface-300 rounded px-2 py-0.5 text-xs text-brand-900"
             />
           </div>
@@ -1526,7 +1512,7 @@ function AmendmentsSection({ readOnly, onAdd }: {
             type="text"
             value={note}
             onChange={e => setNote(e.target.value)}
-            placeholder="Reason (required)"
+            placeholder={ed.reasonRequiredPh}
             maxLength={1000}
             className="w-full bg-white border border-surface-300 rounded px-2 py-0.5 text-xs text-brand-900"
           />
@@ -1537,7 +1523,7 @@ function AmendmentsSection({ readOnly, onAdd }: {
               disabled={submitting}
               className="text-xs bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded"
             >
-              {submitting ? 'Adding…' : 'Add amendment'}
+              {submitting ? ed.adding : ed.addAmendment}
             </button>
           </div>
       </form>
@@ -1548,21 +1534,21 @@ function AmendmentsSection({ readOnly, onAdd }: {
 function renderDetails(d: BookingDetails, names: { addonNames: AddonNameMap; roomNames: RoomNameMap }) {
   const bits: React.ReactNode[] = []
   if (d.gear?.assistance_note) {
-    bits.push(<p key="gear">🧰 Gear — needs help: {d.gear.assistance_note}</p>)
+    bits.push(<p key="gear">🧰 {ed.detailGearHelp(d.gear.assistance_note)}</p>)
   } else if (d.gear?.rent) {
     const items = d.gear.items?.length ? `: ${d.gear.items.join(', ')}` : ''
-    bits.push(<p key="gear">🧰 Gear{items}</p>)
+    bits.push(<p key="gear">🧰 {ed.detailGear(items)}</p>)
   }
   if (d.room?.option_id) {
     const roomLabel = names.roomNames.get(d.room.option_id) ?? d.room.option_id
-    bits.push(<p key="room">🛏️ Room: {roomLabel}{d.room.notes ? ` · ${d.room.notes}` : ''}</p>)
+    bits.push(<p key="room">🛏️ {ed.detailRoom(roomLabel, d.room.notes ? ` · ${d.room.notes}` : '')}</p>)
   }
   if (d.add_ons?.length) {
     const labels = d.add_ons.map(id => names.addonNames.get(id) ?? id)
-    bits.push(<p key="addons">➕ Add-ons: {labels.join(', ')}</p>)
+    bits.push(<p key="addons">➕ {ed.detailAddons(labels.join(', '))}</p>)
   }
-  if (d.transportation) bits.push(<p key="transport">🚐 Needs ride</p>)
-  if (d.nitrox_course_addon) bits.push(<p key="nitrox">🟢 Nitrox course add-on</p>)
+  if (d.transportation) bits.push(<p key="transport">🚐 {ed.detailNeedsRide}</p>)
+  if (d.nitrox_course_addon) bits.push(<p key="nitrox">🟢 {ed.detailNitrox}</p>)
   if (d.payment_method) bits.push(<p key="pay">💳 {d.payment_method.replace('_', ' ')}</p>)
   return bits.length ? bits : null
 }
@@ -1601,43 +1587,41 @@ function BalancesView({ registrants, currency }: { registrants: Registrant[]; cu
   return (
     <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-2">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-bold text-brand-900">Amount owed</h2>
+        <h2 className="text-sm font-bold text-brand-900">{ed.tabAmountOwed}</h2>
         <span className={`text-xs font-semibold ${totalDue > 0 ? 'text-red-600' : 'text-brand-900'}`}>
-          {totalDue > 0 ? `${currency} ${totalDue.toLocaleString()} outstanding` : 'All settled'}
+          {totalDue > 0 ? ed.outstanding(currency, totalDue.toLocaleString()) : ed.allSettled}
         </span>
       </div>
       {lines.length === 0 ? (
-        <p className="text-sm text-brand-950/70 font-medium italic">No active registrants.</p>
+        <p className="text-sm text-brand-950/70 font-medium italic">{t.admin.transport.noActiveRegistrants}</p>
       ) : (
         <ul className="divide-y divide-surface-200">
           {lines.map(({ r, bal }) => (
             <li key={r.booking.id} className="py-1.5 flex items-baseline justify-between gap-3">
               <span className="text-sm text-brand-900 font-medium min-w-0">
-                {r.profile?.name ?? '(no profile)'}
+                {r.profile?.name ?? t.admin.transport.noProfile}
                 {r.profile?.nickname && r.profile.nickname !== r.profile.name && (
                   <span className="text-brand-900/80 font-medium"> ({r.profile.nickname})</span>
                 )}
                 {r.payerName && (
-                  <span className="text-xs text-violet-700 font-semibold"> · paid by {r.payerName}</span>
+                  <span className="text-xs text-violet-700 font-semibold">{ed.paidByInline(r.payerName)}</span>
                 )}
               </span>
               <span className="shrink-0 text-xs font-semibold">
-                {bal.state === 'due' && <span className="text-red-600">{currency} {bal.amount.toLocaleString()} due</span>}
-                {bal.state === 'settled' && <span className="text-brand-900">Settled ✓</span>}
-                {bal.state === 'credit' && <span className="text-emerald-700">{currency} {bal.amount.toLocaleString()} credit</span>}
+                {bal.state === 'due' && <span className="text-red-600">{ed.dueLine(currency, bal.amount.toLocaleString())}</span>}
+                {bal.state === 'settled' && <span className="text-brand-900">{t.bookings.settled}</span>}
+                {bal.state === 'credit' && <span className="text-emerald-700">{ed.creditLine(currency, bal.amount.toLocaleString())}</span>}
               </span>
             </li>
           ))}
         </ul>
       )}
       <div className="flex items-baseline justify-between gap-3 pt-1 border-t border-surface-200 text-sm font-semibold text-brand-900">
-        <span>Total paid</span>
+        <span>{t.payments.totalPaid}</span>
         <span>{currency} {totalPaid.toLocaleString()}</span>
       </div>
       {!everyoneSettled && (
-        <p className="text-xs text-brand-950/70 font-medium italic">
-          Record payments on each diver's card under the Registrants tab.
-        </p>
+        <p className="text-xs text-brand-950/70 font-medium italic">{ed.recordOnCards}</p>
       )}
     </section>
   )
