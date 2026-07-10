@@ -6,6 +6,10 @@ import { personName } from '../../lib/names'
 import { RegisterFormBody } from '../register/RegisterForm'
 import type { AppEvent, Profile } from '../../types/database'
 import { MODAL_BACKDROP, TEXT_HEADING, TEXT_BODY, INPUT, INPUT_LABEL, BTN_PRIMARY, BTN_SECONDARY } from '../../styles/tokens'
+import { t } from '../../i18n'
+
+const ad = t.admin.addDiver
+const pf = t.profile.family
 
 // Three-step "register a diver on behalf" modal:
 //   1. pick which diver — search profiles by name / nickname / contact,
@@ -54,10 +58,10 @@ export function AdminAddDiverModal({
   })
 
   const title = target
-    ? `Register ${personName(target.name, target.nickname) || 'diver'}`
+    ? ad.registerFor(personName(target.name, target.nickname) || t.admin.family.diverFallback)
     : creatingNew
-      ? 'Create new diver account'
-      : 'Add diver to event'
+      ? ad.createNewAccountTitle
+      : ad.addDiverToEvent
 
   return (
     <div
@@ -73,7 +77,7 @@ export function AdminAddDiverModal({
       >
         <header className="flex items-center justify-between">
           <h2 id="add-diver-title" className={`text-lg ${TEXT_HEADING}`}>{title}</h2>
-          <button onClick={onClose} className="text-brand-900 font-medium text-xl leading-none" aria-label="Close">×</button>
+          <button onClick={onClose} className="text-brand-900 font-medium text-xl leading-none" aria-label={ad.close}>×</button>
         </header>
 
         {target ? (
@@ -83,7 +87,7 @@ export function AdminAddDiverModal({
               onClick={() => setTarget(null)}
               className="text-xs text-brand-900 hover:underline"
             >
-              ‹ pick a different diver
+              {ad.pickDifferentDiver}
             </button>
             <RegisterFormBody
               event={event}
@@ -107,22 +111,21 @@ export function AdminAddDiverModal({
         ) : (
           <>
             <p className={`text-sm ${TEXT_BODY}`}>
-              Pick a diver to register for <span className="font-semibold">{event.title}</span>. The same
-              confirmation PDF and email the diver gets when they self-register will be sent to them.
+              {ad.pickDiverPrefix}<span className="font-semibold">{event.title}</span>{ad.pickDiverSuffix}
             </p>
             <button
               type="button"
               onClick={() => setCreatingNew(true)}
               className="w-full text-sm bg-emerald-900/80 hover:bg-emerald-900 text-white font-semibold px-3 py-2 rounded-lg"
             >
-              + Create new diver account
+              {pf.createAccount}
             </button>
             <input
               type="text"
               autoFocus
               value={filter}
               onChange={e => setFilter(e.target.value)}
-              placeholder="Search by name, display name, contact…"
+              placeholder={ad.searchPlaceholder}
               className={`${INPUT} text-sm`}
             />
             <ul className="space-y-1 max-h-80 overflow-y-auto">
@@ -134,7 +137,7 @@ export function AdminAddDiverModal({
                     className="w-full text-left bg-white/70 hover:bg-surface-100 border border-surface-200 rounded-lg px-3 py-2"
                   >
                     <p className="text-sm font-medium text-brand-900">
-                      {p.name ?? '(no name)'}
+                      {p.name ?? pf.noName}
                       {p.nickname && <span className="text-brand-900/80"> ({p.nickname})</span>}
                     </p>
                     <p className="text-xs text-brand-900/70">
@@ -149,7 +152,7 @@ export function AdminAddDiverModal({
                 </li>
               ))}
               {visible.length === 0 && (
-                <li className="text-sm text-brand-900/80 italic px-1">No matching divers.</li>
+                <li className="text-sm text-brand-900/80 italic px-1">{ad.noMatchingDivers}</li>
               )}
             </ul>
           </>
@@ -181,7 +184,7 @@ function CreateNewDiverForm({
     const trimmedEmail = email.trim().toLowerCase()
     const trimmedName = fullName.trim()
     if (!trimmedEmail || !trimmedName) {
-      setError('Email and name are required.')
+      setError(pf.emailNameRequired)
       return
     }
     setSubmitting(true)
@@ -199,16 +202,16 @@ function CreateNewDiverForm({
         },
       })
       if (invokeErr) throw new Error(invokeErr.message)
-      if (!data?.ok || !data.user_id) throw new Error('account creation failed')
+      if (!data?.ok || !data.user_id) throw new Error(ad.createFailed)
 
       // Fetch the newly created (and admin-updated) profile so step 3 has a
       // real Profile to register against.
       const { data: profile, error: profErr } = await supabase
         .from('profiles').select('*').eq('id', data.user_id).single()
-      if (profErr || !profile) throw new Error(profErr?.message ?? 'profile not found after creation')
+      if (profErr || !profile) throw new Error(profErr?.message ?? ad.profileNotFound)
 
-      const tail = data.email_sent ? ' · courtesy email sent' : ' · email skipped'
-      toast.success(`Account created${tail}`)
+      const tail = data.email_sent ? pf.emailSent : pf.emailSkipped
+      toast.success(ad.accountCreated(tail))
       onCreated(profile as Profile)
     } catch (err) {
       setError(errorMessage(err))
@@ -224,16 +227,12 @@ function CreateNewDiverForm({
         onClick={onCancel}
         className="text-xs text-brand-900 hover:underline"
       >
-        ‹ back to diver list
+        {ad.backToList}
       </button>
-      <p className={`text-sm ${TEXT_BODY}`}>
-        We'll send a courtesy email letting the diver know an account was made on their behalf.
-        It doesn't include a login link — if they later want app access they reply and you
-        issue credentials manually. You'll be taken to the registration form right after.
-      </p>
+      <p className={`text-sm ${TEXT_BODY}`}>{ad.createIntro}</p>
 
       <label className="block">
-        <span className={INPUT_LABEL}>Email *</span>
+        <span className={INPUT_LABEL}>{pf.emailLabel}</span>
         <input
           type="email" required autoFocus
           value={email} onChange={e => setEmail(e.target.value)}
@@ -241,22 +240,20 @@ function CreateNewDiverForm({
         />
       </label>
       <label className="block">
-        <span className={INPUT_LABEL}>Name *</span>
+        <span className={INPUT_LABEL}>{pf.nameLabel}</span>
         <input
           type="text" required
           value={fullName} onChange={e => setFullName(e.target.value)}
           className={`${INPUT} text-sm`}
         />
-        <span className="block text-xs text-brand-900/70 mt-1">
-          First and last name, exactly as on their passport / ID.
-        </span>
+        <span className="block text-xs text-brand-900/70 mt-1">{pf.nameHint}</span>
       </label>
       <label className="block">
-        <span className={INPUT_LABEL}>Nickname</span>
+        <span className={INPUT_LABEL}>{pf.nicknameLabel}</span>
         <input
           type="text"
           value={nickname} onChange={e => setNickname(e.target.value)}
-          placeholder="English name, alias, or what they go by (optional)"
+          placeholder={ad.nicknamePlaceholder}
           className={`${INPUT} text-sm`}
         />
       </label>
@@ -270,14 +267,14 @@ function CreateNewDiverForm({
           disabled={submitting}
           className={`flex-1 ${BTN_SECONDARY}`}
         >
-          Cancel
+          {t.common.cancel}
         </button>
         <button
           type="submit"
           disabled={submitting}
           className={`flex-1 ${BTN_PRIMARY}`}
         >
-          {submitting ? 'Creating…' : 'Create account'}
+          {submitting ? pf.creating : pf.createSubmit}
         </button>
       </div>
     </form>

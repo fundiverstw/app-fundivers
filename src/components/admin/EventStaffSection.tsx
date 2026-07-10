@@ -6,6 +6,9 @@ import { useAuth } from '../../hooks/useAuth'
 import { createDutyWithNotify, instructorsNeeded } from '../../lib/duties'
 import { DUTY_ROLES, type Duty, type DutyRole, type Profile } from '../../types/database'
 import { DateField } from '../DateField'
+import { t } from '../../i18n'
+
+const st = t.admin.staff
 
 interface Props {
   eventType: 'dive' | 'course'
@@ -75,7 +78,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
   // Dives: one duty over the chosen [start, end] range.
   async function assignDive() {
     if (!user || !assigneeId || !startDate) return
-    if (endDate && endDate < startDate) { setErr('End date must be on or after start date'); return }
+    if (endDate && endDate < startDate) { setErr(st.endBeforeStart); return }
     setSubmitting(true); setErr(null)
     const { duty, error } = await createDutyWithNotify({
       assignee_id: assigneeId,
@@ -85,7 +88,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
       [fkColumn]: eventId,
     } as Parameters<typeof createDutyWithNotify>[0], user.id)
     setSubmitting(false)
-    if (error || !duty) { setErr(error?.message ?? 'Failed to assign'); return }
+    if (error || !duty) { setErr(error?.message ?? st.failedToAssign); return }
     setDuties(prev => [...prev, duty])
     setAssigneeId('')
     setStartDate(eventStart)
@@ -97,7 +100,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
   async function assignCourse() {
     if (!user || !assigneeId) return
     const days = [...selectedDays].sort()
-    if (!days.length) { setErr('Pick at least one day'); return }
+    if (!days.length) { setErr(st.pickAtLeastOneDay); return }
     setSubmitting(true); setErr(null)
     const created: Duty[] = []
     try {
@@ -109,7 +112,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
           end_date: null,
           [fkColumn]: eventId,
         } as Parameters<typeof createDutyWithNotify>[0], user.id)
-        if (error || !duty) throw error ?? new Error('Failed to assign')
+        if (error || !duty) throw error ?? new Error(st.failedToAssign)
         created.push(duty)
       }
       setAssigneeId('')
@@ -141,16 +144,16 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
   return (
     <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-brand-900">Staff on duty</h2>
+        <h2 className="text-sm font-semibold text-brand-900">{st.title}</h2>
         {needed > 0 && (
           <span className="text-xs bg-red-100 text-red-700 border border-accent px-2 py-0.5 rounded-full">
-            Need {needed} more instructor{needed === 1 ? '' : 's'}
+            {st.needMoreInstructors(needed)}
           </span>
         )}
       </div>
 
       {duties.length === 0 ? (
-        <p className="text-xs text-brand-950 font-medium">Nobody assigned yet.</p>
+        <p className="text-xs text-brand-950 font-medium">{st.nobodyAssigned}</p>
       ) : (
         <ul className="space-y-1.5">
           {duties.map(d => {
@@ -161,14 +164,14 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
             return (
               <li key={d.id} className="flex items-center justify-between text-xs bg-surface-50 rounded p-2">
                 <span className="min-w-0">
-                  <span className="font-medium text-brand-900">{personName(p?.name, p?.nickname) || '(unknown)'}</span>
+                  <span className="font-medium text-brand-900">{personName(p?.name, p?.nickname) || t.admin.gearCard.unknown}</span>
                   <span className="text-brand-900 font-medium"> · <span className="capitalize">{d.role}</span> · {span}</span>
                 </span>
                 {!readOnly && (
                   <button
                     onClick={() => remove(d.id)}
                     className="text-brand-950 font-medium hover:text-red-600 ml-2"
-                    aria-label={`Remove duty for ${personName(p?.name, p?.nickname) || 'admin'}`}
+                    aria-label={st.removeDutyAria(personName(p?.name, p?.nickname) || st.adminFallback)}
                   >
                     ✕
                   </button>
@@ -187,7 +190,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
             onChange={e => setAssigneeId(e.target.value)}
             className="flex-1 min-w-0 bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
           >
-            <option value="">Pick admin/staff…</option>
+            <option value="">{st.pickAdminStaff}</option>
             {admins.map(a => (
               <option key={a.id} value={a.id}>{personName(a.name, a.nickname) || a.id}</option>
             ))}
@@ -205,7 +208,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
             // Pick which course days this person is on duty for. Each
             // selected day becomes its own single-day duty.
             <div className="space-y-1">
-              <span className="text-brand-900 font-medium">Days on duty</span>
+              <span className="text-brand-900 font-medium">{st.daysOnDuty}</span>
               <div className="flex flex-wrap gap-1.5">
                 {courseDays.map(day => {
                   const on = selectedDays.includes(day)
@@ -230,7 +233,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
           ) : (
             <>
               <label className="flex items-center gap-2">
-                <span className="text-brand-900 font-medium shrink-0 w-12">{isMultiDay ? 'From' : 'Date'}</span>
+                <span className="text-brand-900 font-medium shrink-0 w-12">{isMultiDay ? st.from : st.date}</span>
                 <DateField
                   value={startDate}
                   min={eventStart}
@@ -241,7 +244,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
               </label>
               {isMultiDay && (
                 <label className="flex items-center gap-2">
-                  <span className="text-brand-900 font-medium shrink-0 w-12">To</span>
+                  <span className="text-brand-900 font-medium shrink-0 w-12">{st.to}</span>
                   <DateField
                     value={endDate}
                     min={startDate}
@@ -258,7 +261,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
             disabled={!assigneeId || submitting || (eventType === 'course' ? selectedDays.length === 0 : !startDate)}
             className="w-full bg-surface-700 hover:bg-surface-600 disabled:bg-surface-100 disabled:text-brand-950 font-medium text-white font-semibold px-3 py-1.5 rounded"
           >
-            Assign
+            {st.assign}
           </button>
         </div>
         {err && <p className="text-xs text-red-600">{err}</p>}
