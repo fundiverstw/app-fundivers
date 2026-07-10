@@ -21,6 +21,7 @@
 // us and don't leak schema.
 
 import { siteConfig } from "../../../fundive.config.ts"
+import { t } from "./i18n.ts"
 
 const ALLOWED_ORIGINS = [
   siteConfig.urls.app,
@@ -64,12 +65,14 @@ export function bearerToken(req: Request): string | null {
 
 // Maps a handful of common SQLSTATEs to safe public messages. Anything
 // not in the table falls back to the caller-supplied `fallback`.
+// Same copy the SPA shows for these SQLSTATEs (src/lib/errors.ts) — one source,
+// so an edge failure and a client failure read identically to the diver.
 const SQLSTATE_SAFE_MESSAGES: Record<string, string> = {
-  "23505": "Already exists.",
-  "23502": "Required field missing.",
-  "23503": "Referenced item not found.",
-  "23514": "Validation failed.",
-  "42501": "Permission denied.",
+  "23505": t.errors.alreadyInUse,
+  "23502": t.errors.requiredMissing,
+  "23503": t.errors.referencedMissing,
+  "23514": t.errors.validationFailed,
+  "42501": t.errors.permissionDenied,
 }
 
 interface ErrorLike { message?: unknown; code?: unknown }

@@ -1,6 +1,7 @@
 import { GEAR_ALACARTE_PRICES } from './gear'
 import { siteConfig } from '../config/site'
 import type { AppEvent, BookingDetails } from '../types/database'
+import { t } from '../i18n'
 
 // Flat fee for adding a Nitrox course to a dive registration, from shop config.
 // Shared by both register forms and the display-time recompute so the figure
@@ -47,7 +48,7 @@ export interface BuildChargesInput {
  * Base is always shown; every other line is dropped when it's zero/empty.
  */
 export function buildCharges(input: BuildChargesInput): ChargeLine[] {
-  const lines: ChargeLine[] = [{ kind: 'base', label: 'Base', amount: input.base }]
+  const lines: ChargeLine[] = [{ kind: 'base', label: t.chargeLines.base, amount: input.base }]
   const daySuffix = input.gearDays && input.gearDays > 1 ? ` (x${input.gearDays} days)` : ''
   for (const g of input.gear ?? []) {
     if (g.amount > 0) lines.push({ kind: 'gear', label: `Gear: ${g.item}${daySuffix}`, amount: g.amount })
@@ -59,10 +60,10 @@ export function buildCharges(input: BuildChargesInput): ChargeLine[] {
     if (a.amount > 0) lines.push({ kind: 'addon', label: `Add-on: ${a.label}`, amount: a.amount })
   }
   if (input.transport && input.transport > 0) {
-    lines.push({ kind: 'transport', label: 'Transport', amount: input.transport })
+    lines.push({ kind: 'transport', label: t.chargeLines.transport, amount: input.transport })
   }
   if (input.nitroxCourse && input.nitroxCourse > 0) {
-    lines.push({ kind: 'nitrox_course', label: 'Nitrox course', amount: input.nitroxCourse })
+    lines.push({ kind: 'nitrox_course', label: t.chargeLines.nitroxCourse, amount: input.nitroxCourse })
   }
   if (input.surcharge && input.surcharge.amount > 0) {
     lines.push({ kind: 'surcharge', label: input.surcharge.label, amount: input.surcharge.amount })
@@ -122,7 +123,8 @@ export function resolveCharges(input: ResolveChargesInput): ChargeLine[] {
     const depositOnly = !!details.pay_deposit_only
     const surchargeBase = depositOnly ? Math.min(event.deposit_amount ?? 0, subTotal) : subTotal
     surcharge = {
-      label: `Card/PayPal surcharge (5%${depositOnly ? ' of deposit' : ''})`,
+      // The rate is business.cardSurchargePercent; it used to be a hardcoded 5%.
+      label: t.chargeLines.surcharge(siteConfig.business.cardSurchargePercent, depositOnly),
       amount: Math.round(surchargeBase * rate),
     }
   }
@@ -140,7 +142,7 @@ export function resolveCharges(input: ResolveChargesInput): ChargeLine[] {
     if (diff !== 0) {
       lines.push({
         kind: 'adjustment',
-        label: 'Legacy pricing adjustment (booked before itemized pricing)',
+        label: t.chargeLines.legacyAdjustment,
         amount: diff,
       })
     }

@@ -4,6 +4,7 @@
 // trip the PushSubscription to public.push_subscriptions.
 
 import { supabase } from './supabase'
+import { t } from '../i18n'
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined
 
@@ -25,15 +26,15 @@ export async function getPushSubscription(): Promise<PushSubscription | null> {
 
 export async function subscribeToPush(): Promise<PushSubscription> {
   if (!pushSupported()) {
-    throw new Error('Push notifications are not supported on this device.')
+    throw new Error(t.push.unsupported)
   }
   if (!VAPID_PUBLIC_KEY) {
-    throw new Error('Server VAPID key is not configured.')
+    throw new Error(t.push.noVapidKey)
   }
 
   const permission = await Notification.requestPermission()
   if (permission !== 'granted') {
-    throw new Error('Notification permission was not granted.')
+    throw new Error(t.push.permissionDenied)
   }
 
   const reg = await navigator.serviceWorker.ready
@@ -63,11 +64,11 @@ export async function unsubscribeFromPush(): Promise<void> {
 
 async function persistSubscription(sub: PushSubscription): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not signed in.')
+  if (!user) throw new Error(t.push.notSignedIn)
 
   const json = sub.toJSON()
   if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
-    throw new Error('Push subscription is missing required keys.')
+    throw new Error(t.push.missingKeys)
   }
 
   const { error } = await supabase.from('push_subscriptions').upsert({

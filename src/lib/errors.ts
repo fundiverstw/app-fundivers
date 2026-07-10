@@ -15,14 +15,16 @@
 //    generic message for unknown DB errors. Authored Error messages
 //    pass through unchanged — those are written by us.
 
+import { t } from '../i18n'
+
 const SQLSTATE_FRIENDLY: Record<string, string> = {
-  '23505': 'That value is already in use.',
-  '23502': 'A required field is missing.',
-  '23503': 'A referenced item could not be found.',
-  '23514': 'That value failed a validation check.',
-  '42501': 'You don\'t have permission to do that.',
-  'PGRST116': 'No matching record found.',
-  'PGRST301': 'Authentication required.',
+  '23505': t.errors.alreadyInUse,
+  '23502': t.errors.requiredMissing,
+  '23503': t.errors.referencedMissing,
+  '23514': t.errors.validationFailed,
+  '42501': t.errors.permissionDenied,
+  'PGRST116': t.errors.noRecord,
+  'PGRST301': t.errors.authRequired,
 }
 
 // Field-specific translations. Postgres names the offending constraint /
@@ -32,10 +34,10 @@ const SQLSTATE_FRIENDLY: Record<string, string> = {
 // — we never echo the raw Postgres text (audit L3 still holds). The
 // generic SQLSTATE string is the fallback when nothing matches.
 const CONSTRAINT_FRIENDLY: { pattern: RegExp; message: string }[] = [
-  { pattern: /prereq_cert_id/, message: 'The required certification you selected is no longer available. Choose a different level or select "None".' },
-  { pattern: /_price_fkey/,    message: 'The price tier you selected is no longer available. Pick a different one.' },
-  { pattern: /cancel_policy/,  message: 'The cancellation policy you selected is no longer available. Pick a different one.' },
-  { pattern: /course_days/,    message: 'A course can have at most 4 days.' },
+  { pattern: /prereq_cert_id/, message: t.errors.prereqCertGone },
+  { pattern: /_price_fkey/,    message: t.errors.priceTierGone },
+  { pattern: /cancel_policy/,  message: t.errors.cancelPolicyGone },
+  { pattern: /course_days/,    message: t.errors.courseDaysMax },
 ]
 
 function fieldSpecificMessage(haystack: string): string | null {
@@ -52,7 +54,7 @@ interface ErrorLike {
   code?:    unknown
 }
 
-export function errorMessage(err: unknown, fallback = 'Something went wrong.'): string {
+export function errorMessage(err: unknown, fallback = t.errors.generic): string {
   if (err == null) return fallback
   if (typeof err === 'string') return err.trim() || fallback
 

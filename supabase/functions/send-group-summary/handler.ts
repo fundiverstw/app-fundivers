@@ -10,6 +10,7 @@ import { Buffer } from "node:buffer"
 import { corsHeaders, safeError } from "../_shared/responses.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 import type { GroupRegistrationPdfPayload, GroupDiverColumn } from "../_shared/pdf.ts"
+import { t } from "../_shared/i18n.ts"
 
 export interface GroupSummaryBody {
   group_id: string
@@ -61,10 +62,10 @@ interface BookingRow {
 
 function gearLabel(details: Record<string, unknown>): string {
   const gear = details.gear as { rent?: boolean; included?: boolean; assistance_note?: string } | undefined
-  if (gear?.included) return "Included"
-  if (gear?.assistance_note) return "Needs help"
-  if (gear?.rent) return "A-la-carte"
-  return "Own"
+  if (gear?.included) return t.pdf.gearIncluded
+  if (gear?.assistance_note) return t.pdf.gearNeedsHelpShort
+  if (gear?.rent) return t.pdf.alaCarte
+  return t.pdf.gearOwn
 }
 
 export async function handleGroupSummary(req: Request, deps: Deps): Promise<Response> {

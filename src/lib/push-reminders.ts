@@ -8,6 +8,8 @@
 //   • payment reminders: 21, 14, 7, 3, 1 days before start
 //     (only fire while there's an outstanding deposit or balance)
 
+import { t } from '../i18n'
+
 export type ReminderKind =
   | 'event_7d' | 'event_1d'
   | 'payment_21d' | 'payment_14d' | 'payment_7d' | 'payment_3d' | 'payment_1d'
@@ -79,7 +81,7 @@ export function selectReminders(today: string, inputs: ReminderInput[]): Reminde
     if (evKind && !r.alreadySent.has(evKind)) {
       out.push({
         userId: r.userId, eventId: r.eventId, eventType: r.eventType, kind: evKind,
-        title: days === 1 ? 'Dive tomorrow' : `Dive in ${days} days`,
+        title: days === 1 ? t.push.diveTomorrow : t.push.diveInDays(days),
         body:  r.eventTitle + timeSuffix,
         url:   '/records/bookings',
       })
@@ -92,7 +94,7 @@ export function selectReminders(today: string, inputs: ReminderInput[]): Reminde
         const depositDue = Math.max(0, r.depositAmount - r.paidAmount)
         const isDeposit  = depositDue > 0
         const amount     = isDeposit ? depositDue : balanceDue
-        const label      = isDeposit ? 'Deposit'   : 'Balance'
+        const label      = isDeposit ? t.push.deposit : t.push.balance
         out.push({
           userId: r.userId, eventId: r.eventId, eventType: r.eventType, kind: payKind,
           title: `${label} due — ${r.eventTitle}`,

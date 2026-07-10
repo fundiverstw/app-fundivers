@@ -11,6 +11,7 @@
 
 import { parseShoeSize, convertShoeSize, type ShoeUnit } from './shoe-size'
 import type { GearModel, GearModelSize, GearType } from '../types/database'
+import { t } from '../i18n'
 
 export interface GearModelWithSizes extends GearModel {
   sizes: GearModelSize[]
@@ -180,8 +181,8 @@ export function matchGear(
         // (e.g. height wants one size, weight another) — a genuine "between".
         const belowAll = scored.every(s => { const r = primaryRange(s.size, type); return r.min != null && pVal < r.min })
         const aboveAll = scored.every(s => { const r = primaryRange(s.size, type); return r.max != null && pVal > r.max })
-        if (belowAll) notes.push('below smallest stocked size')
-        else if (aboveAll) notes.push('above largest stocked size')
+        if (belowAll) notes.push(t.admin.gearFit.belowSmallest)
+        else if (aboveAll) notes.push(t.admin.gearFit.aboveLargest)
         else between = scored[1]?.size
       }
     }

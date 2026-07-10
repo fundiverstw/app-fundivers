@@ -1843,6 +1843,8 @@ export const en = {
       fits: 'fits',
       closest: 'closest',
       closestWithNotes: (notes: string) => `closest · ${notes}`,
+      belowSmallest: 'below smallest stocked size',
+      aboveLargest: 'above largest stocked size',
     },
     dashboard: {
       title: 'Dashboard',
@@ -1921,7 +1923,42 @@ export const en = {
   // (supabase/functions/_shared/payment-instructions.ts) so the copy can't drift.
   // The emailed registration PDF. Renders with an embedded CJK face, so these
   // may be translated freely — see supabase/functions/_shared/pdf-fonts.ts.
+  errors: {
+    generic: 'Something went wrong.',
+    alreadyInUse: 'That value is already in use.',
+    requiredMissing: 'A required field is missing.',
+    referencedMissing: 'A referenced item could not be found.',
+    validationFailed: 'That value failed a validation check.',
+    permissionDenied: "You don't have permission to do that.",
+    noRecord: 'No matching record found.',
+    authRequired: 'Authentication required.',
+    prereqCertGone: 'The required certification you selected is no longer available. Choose a different level or select "None".',
+    priceTierGone: 'The price tier you selected is no longer available. Pick a different one.',
+    cancelPolicyGone: 'The cancellation policy you selected is no longer available. Pick a different one.',
+    courseDaysMax: 'A course can have at most 4 days.',
+  },
+  push: {
+    unsupported: 'Push notifications are not supported on this device.',
+    noVapidKey: 'Server VAPID key is not configured.',
+    permissionDenied: 'Notification permission was not granted.',
+    notSignedIn: 'Not signed in.',
+    missingKeys: 'Push subscription is missing required keys.',
+    diveTomorrow: 'Dive tomorrow',
+    diveInDays: (days: number) => `Dive in ${days} days`,
+    deposit: 'Deposit',
+    balance: 'Balance',
+  },
+  chargeLines: {
+    base: 'Base',
+    transport: 'Transport',
+    nitroxCourse: 'Nitrox course',
+    surcharge: (pct: number, depositOnly: boolean) => `Card/PayPal surcharge (${pct}%${depositOnly ? ' of deposit' : ''})`,
+    legacyAdjustment: 'Legacy pricing adjustment (booked before itemized pricing)',
+  },
   pdf: {
+    gearIncluded: 'Included',
+    gearNeedsHelpShort: 'Needs help',
+    gearOwn: 'Own',
     generated: (date: string) => `Generated: ${date}`,
     registrationForm: 'Registration Form',
     groupRegistration: 'Group Registration',

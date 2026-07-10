@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { corsHeaders, jsonResponse, safeError, bearerToken } from './responses'
+import { t } from './i18n.ts'
 import { siteConfig } from '../../../fundive.config.ts'
 
 // happy-dom strips the `Origin` header on Request construction (it's
@@ -62,13 +63,17 @@ describe('jsonResponse (audit M4)', () => {
 
 describe('safeError (audit M4)', () => {
   it('maps SQLSTATE 23505 (unique violation) to a safe public message', () => {
-    expect(safeError({ code: '23505', message: 'duplicate key value violates unique constraint "profiles_pkey"' }, 'fallback'))
-      .toBe('Already exists.')
+    const msg = safeError({ code: '23505', message: 'duplicate key value violates unique constraint "profiles_pkey"' }, 'fallback')
+    // Same catalog string the SPA shows for this SQLSTATE (src/lib/errors.ts).
+    expect(msg).toBe(t.errors.alreadyInUse)
+    // Audit M4: the raw Postgres text must not leak the constraint / table name.
+    expect(msg).not.toMatch(/profiles_pkey|duplicate key|constraint/i)
   })
 
   it('maps SQLSTATE 42501 (RLS / insufficient privilege) to a safe message', () => {
-    expect(safeError({ code: '42501', message: 'new row violates row-level security policy "credits: admin insert"' }, 'fallback'))
-      .toBe('Permission denied.')
+    const msg = safeError({ code: '42501', message: 'new row violates row-level security policy "credits: admin insert"' }, 'fallback')
+    expect(msg).toBe(t.errors.permissionDenied)
+    expect(msg).not.toMatch(/row-level security|credits: admin insert/i)
   })
 
   it('falls back to the caller fallback for unknown SQLSTATEs', () => {
