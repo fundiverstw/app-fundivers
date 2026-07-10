@@ -12,6 +12,7 @@ const url = z.string().regex(/^https?:\/\//, 'must be an absolute http(s) URL')
 export const siteConfigSchema = z.object({
   configVersion: z.number().int().positive(),
   identity: z.object({
+    tagline: z.string(),
     appName: z.string().min(1),
     shopName: z.string().min(1),
     shortName: z.string().min(1),

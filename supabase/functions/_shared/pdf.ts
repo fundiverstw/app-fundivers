@@ -180,11 +180,14 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
     } catch { y += 4 }
   }
 
-  doc.setFontSize(8.5)
-  doc.setFont("helvetica", "italic")
-  doc.setTextColor(...C.ocean)
-  doc.text("Breathe the Adventure! Explore with Confidence!", 105, y, { align: "center" })
-  y += 6
+  // Shop's own marketing line (identity.tagline). Blank = no line, no gap.
+  if (siteConfig.identity.tagline) {
+    doc.setFontSize(8.5)
+    doc.setFont("helvetica", "italic")
+    doc.setTextColor(...C.ocean)
+    doc.text(siteConfig.identity.tagline, 105, y, { align: "center" })
+    y += 6
+  }
 
   doc.setFontSize(16)
   doc.setFont("helvetica", "bold")

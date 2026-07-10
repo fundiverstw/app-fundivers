@@ -38,6 +38,17 @@ describe('siteConfig', () => {
     }
   })
 
+  // The tagline is printed on the registration PDF by jsPDF's built-in helvetica,
+  // whose encoding is WinAnsi (cp1252). A CJK tagline does not fail there — it
+  // silently renders as mangled bytes — so reject it at config time instead.
+  it('has a PDF-safe tagline (blank, or WinAnsi-encodable)', () => {
+    const CP1252_EXTRAS = '€‚ƒ„…†‡ˆ‰Š‹Œ'
+      + 'Ž‘’“”•–—˜™š›œžŸ'
+    const unencodable = [...siteConfig.identity.tagline]
+      .filter(ch => ch.codePointAt(0)! > 0xFF && !CP1252_EXTRAS.includes(ch))
+    expect(unencodable).toEqual([])
+  })
+
   // The manifest pre-fill is optional shop content — a shop that never charters
   // a boat leaves it blank. Note lines print verbatim on the vessel form, so a
   // stray empty line is a config error rather than a harmless blank.

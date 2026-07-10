@@ -15,9 +15,12 @@
 export const siteConfig = {
   // Must equal core's current CONFIG_CONTRACT_VERSION (src/config/site.ts) or
   // the build fails. Bump it whenever core's CHANGELOG.md tells you to migrate.
-  configVersion: 6,
+  configVersion: 7,
 
   identity: {
+    // Printed in italics on the registration PDF. Leave blank to omit it.
+    // No CJK: the PDF font (jsPDF helvetica) has no CJK glyphs.
+    tagline: '',
     appName: 'FunDive',
     shopName: 'Your Dive Shop',
     shortName: 'YourShop',

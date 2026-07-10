@@ -20,10 +20,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const siteConfig = {
-  configVersion: 6,
+  configVersion: 7,
 
   identity: {
     appName: 'FunDive',
+    tagline: 'Breathe the Adventure! Explore with Confidence!',
     shopName: 'FunDivers TW',
     shortName: 'FunDivers',
     description: 'Dive registration and logbook for FunDivers Taiwan',

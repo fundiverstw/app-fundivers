@@ -11,6 +11,10 @@ import { siteConfig as raw } from '../../fundive.config'
 export interface SiteIdentity {
   /** The open-source app name (shared by all shops). */
   appName: string
+  /** Short marketing line printed on the registration PDF. Blank = omit the
+   *  line. Must be WinAnsi-encodable (no CJK) — the PDF renders with jsPDF's
+   *  built-in helvetica, which has no CJK glyphs. */
+  tagline: string
   /** This shop's full name, e.g. "FunDivers TW". */
   shopName: string
   /** Short brand name for tight UI (push titles, badges). */
@@ -133,6 +137,6 @@ export interface SiteConfig {
 // Bump when the SiteConfig contract changes in a way that requires forks to
 // migrate their fundive.config.ts. The build compares this against
 // siteConfig.configVersion and fails loudly on a mismatch.
-export const CONFIG_CONTRACT_VERSION = 6
+export const CONFIG_CONTRACT_VERSION = 7
 
 export const siteConfig: SiteConfig = raw
