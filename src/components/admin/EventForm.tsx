@@ -11,6 +11,7 @@ import {
 } from './event-form-state'
 import { DateField } from '../DateField'
 import { ERROR_NOTE } from '../../styles/tokens'
+import { t } from '../../i18n'
 
 // Shared form for creating and editing an EO_dive / EO_course. Owns all
 // field state, the lookup data (prices / rooms / addons / cert levels),
@@ -22,6 +23,9 @@ import { ERROR_NOTE } from '../../styles/tokens'
 // single selection; the events row carries its own `kind`.
 type PastEvent = { kind: 'dive' | 'course'; id: string; startDate: string; title: string; row: EventRow }
 
+const ef = t.admin.eventForm
+const cat = t.admin.catalog
+
 const CUR = siteConfig.locale.currencyLabel
 
 // "Standard (total: 5000 NTD / deposit: 1500 NTD)" — drops parts that
@@ -29,8 +33,8 @@ const CUR = siteConfig.locale.currencyLabel
 // awkward placeholder.
 function priceOptionLabel(p: EOPrice): string {
   const parts: string[] = []
-  if (p.starting_at != null)    parts.push(`total: ${p.starting_at} ${CUR}`)
-  if (p.deposit_amount != null) parts.push(`deposit: ${p.deposit_amount} ${CUR}`)
+  if (p.starting_at != null)    parts.push(ef.totalPart(p.starting_at, CUR))
+  if (p.deposit_amount != null) parts.push(ef.depositPart(p.deposit_amount, CUR))
   return parts.length ? `${p.admin_title} (${parts.join(' / ')})` : p.admin_title
 }
 
@@ -158,14 +162,14 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
       setDestinations(dataOf<TravelDestination>(8))
 
       const pastDives = dataOf<EventRow>(3).map<PastEvent>(d => ({
-        kind: 'dive', id: d.id, startDate: d.start_date ?? '', title: d.display_title ?? d.admin_title ?? '(untitled dive)', row: d,
+        kind: 'dive', id: d.id, startDate: d.start_date ?? '', title: d.display_title ?? d.admin_title ?? ef.untitledDive, row: d,
       }))
       const pastCourses = dataOf<EventRow>(4)
         .map<PastEvent>(c => ({
           kind: 'course',
           id: c.id,
           startDate: [...(c.course_days ?? [])].filter(Boolean).sort()[0] ?? '',
-          title: c.display_title ?? c.admin_title ?? '(untitled course)',
+          title: c.display_title ?? c.admin_title ?? ef.untitledCourse,
           row: c,
         }))
         .filter(c => c.startDate && c.startDate < todayStr)
@@ -239,7 +243,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
   async function submitNewPrice() {
     setPriceError(null)
     if (!priceForm.admin_title.trim()) {
-      setPriceError('Title is required.')
+      setPriceError(t.admin.waivers.titleRequired)
       return
     }
     setPriceSubmitting(true)
@@ -274,7 +278,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
 
   async function submitNewRoom() {
     setRoomError(null)
-    if (!roomForm.admin_title.trim()) { setRoomError('Title is required.'); return }
+    if (!roomForm.admin_title.trim()) { setRoomError(t.admin.waivers.titleRequired); return }
     setRoomSubmitting(true)
     try {
       const id = crypto.randomUUID()
@@ -302,7 +306,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
 
   async function submitNewAddon() {
     setAddonError(null)
-    if (!addonForm.admin_title.trim()) { setAddonError('Title is required.'); return }
+    if (!addonForm.admin_title.trim()) { setAddonError(t.admin.waivers.titleRequired); return }
     setAddonSubmitting(true)
     try {
       const id = crypto.randomUUID()
@@ -329,7 +333,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
 
   async function submitNewTravel() {
     setTravelError(null)
-    if (!travelForm.admin_title.trim()) { setTravelError('Title is required.'); return }
+    if (!travelForm.admin_title.trim()) { setTravelError(t.admin.waivers.titleRequired); return }
     setTravelSubmitting(true)
     try {
       const id = crypto.randomUUID()
@@ -362,15 +366,15 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
     // Validate the per-type required fields up front.
     if (form.type === 'dive') {
       if (!form.admin_title.trim()) {
-        setError('Admin title is required.')
+        setError(ef.adminTitleRequired)
         return
       }
       if (!form.start_date) {
-        setError('Start date is required.')
+        setError(ef.startDateRequired)
         return
       }
     } else if (!form.courseDays.some(Boolean)) {
-      setError('At least one course day is required.')
+      setError(ef.courseDayRequired)
       return
     }
 
@@ -384,8 +388,8 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
   }
 
   const defaultSubmitLabel = mode === 'create'
-    ? `Create ${form.type === 'dive' ? 'dive' : 'course'}`
-    : 'Save changes'
+    ? (form.type === 'dive' ? ef.createDive : ef.createCourse)
+    : cat.saveChanges
 
   return (
     <form onSubmit={submit} className="space-y-6">
@@ -393,8 +397,8 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
           would require migrating to the other table, which we don't support. */}
       {mode === 'create' && (
         <div className="flex gap-2">
-          <TypePill active={form.type === 'dive'}   onClick={() => { set('type', 'dive');   setPreloadId('') }}>Dive</TypePill>
-          <TypePill active={form.type === 'course'} onClick={() => { set('type', 'course'); setPreloadId('') }}>Course</TypePill>
+          <TypePill active={form.type === 'dive'}   onClick={() => { set('type', 'dive');   setPreloadId('') }}>{t.calendar.typeDive}</TypePill>
+          <TypePill active={form.type === 'course'} onClick={() => { set('type', 'course'); setPreloadId('') }}>{t.calendar.typeCourse}</TypePill>
         </div>
       )}
 
@@ -402,14 +406,14 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
         <div>
           <label className="block space-y-1">
             <span className="text-xs font-medium text-white/80">
-              Preload from past {form.type === 'dive' ? 'dive' : 'course'} (optional)
+              {form.type === 'dive' ? ef.preloadPastDive : ef.preloadPastCourse}
             </span>
             <select
               value={preloadId}
               onChange={e => handlePreload(e.target.value)}
               className={INPUT_CLASS}
             >
-              <option value="">— Start fresh —</option>
+              <option value="">{ef.startFresh}</option>
               {filteredPastEvents.map(p => (
                 <option key={p.id} value={p.id}>
                   {p.startDate || '????-??-??'} — {p.title}
@@ -420,36 +424,33 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
         </div>
       )}
 
-      <Section title="Basics">
-        <Field label={form.type === 'dive' ? 'Admin title (required, internal)' : 'Admin title (internal)'}>
+      <Section title={ef.sectionBasics}>
+        <Field label={form.type === 'dive' ? ef.adminTitleDive : ef.adminTitleCourse}>
           <Input value={form.admin_title} onChange={v => set('admin_title', v)} required={form.type === 'dive'} />
         </Field>
-        <Field label="Display title (diver-facing)">
+        <Field label={ef.displayTitle}>
           <Input value={form.display_title} onChange={v => set('display_title', v)} />
         </Field>
-        <Field label="Calendar title (calendar widget; short)">
+        <Field label={ef.calendarTitle}>
           <Input value={form.calendar_title} onChange={v => set('calendar_title', v)} />
         </Field>
         {form.type === 'dive' ? (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Field label="Start date">
+            <Field label={ef.startDate}>
               <Input type="date" value={form.start_date} onChange={v => set('start_date', v)} required />
             </Field>
-            <Field label="Start time (24h)">
+            <Field label={ef.startTime}>
               <Input type="time" value={form.start_time} onChange={v => set('start_time', v)} />
             </Field>
-            <Field label="End date">
+            <Field label={ef.endDate}>
               <Input type="date" value={form.end_date} onChange={v => set('end_date', v)} />
             </Field>
           </div>
         ) : (
           <div className="space-y-3">
             <div>
-              <span className="text-xs font-medium text-white/80">Course days (up to 4)</span>
-              <p className="text-xs text-white/60">
-                Enter each day the course runs on. Adjacent days show as one
-                continuous bar on the calendar; gaps show as separate sessions.
-              </p>
+              <span className="text-xs font-medium text-white/80">{ef.courseDays}</span>
+              <p className="text-xs text-white/60">{ef.courseDaysHint}</p>
             </div>
             <div className="space-y-2">
               {form.courseDays.map((day, i) => (
@@ -459,9 +460,9 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
                     type="button"
                     onClick={() => removeCourseDay(i)}
                     className="px-2 py-1 rounded-md text-xs font-medium text-white/80 hover:text-white border border-white/30"
-                    aria-label={`Remove day ${i + 1}`}
+                    aria-label={ef.removeDayAria(i + 1)}
                   >
-                    Remove
+                    {ef.remove}
                   </button>
                 </div>
               ))}
@@ -472,17 +473,17 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
                 onClick={addCourseDay}
                 className="self-start text-xs font-medium text-amber-300 hover:text-amber-200"
               >
-                + Add day
+                {ef.addDay}
               </button>
             )}
-            <Field label="Start time (24h)">
+            <Field label={ef.startTime}>
               <Input type="time" value={form.start_time} onChange={v => set('start_time', v)} />
             </Field>
           </div>
         )}
-        <Field label="Price tier">
+        <Field label={ef.priceTier}>
           <Select value={form.price} onChange={v => set('price', v)}>
-            <option value="">— None —</option>
+            <option value="">{ef.none}</option>
             {prices.map(p => (
               <option key={p.id} value={p.id}>{priceOptionLabel(p)}</option>
             ))}
@@ -493,26 +494,26 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
           onClick={() => setShowNewPrice(s => !s)}
           className="-mt-2 self-start text-xs font-medium text-amber-300 hover:text-amber-200"
         >
-          {showNewPrice ? '− Cancel new tier' : '+ New price tier'}
+          {showNewPrice ? ef.cancelNewTier : ef.newPriceTier}
         </button>
         {showNewPrice && (
           <div className="space-y-3 rounded-lg border border-amber-300/40 bg-white/5 p-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-200">New price tier</h3>
-            <Field label="Title (required)">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-200">{ef.newPriceTierTitle}</h3>
+            <Field label={ef.titleRequiredLabel}>
               <Input value={priceForm.admin_title} onChange={v => setPriceForm(f => ({ ...f, admin_title: v }))} />
             </Field>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Field label="Price label">
+              <Field label={ef.priceLabel}>
                 <Input value={priceForm.price} onChange={v => setPriceForm(f => ({ ...f, price: v }))} />
               </Field>
-              <Field label="Starting at">
+              <Field label={cat.prices.startingAt}>
                 <Input type="number" value={priceForm.starting_at} onChange={v => setPriceForm(f => ({ ...f, starting_at: v }))} />
               </Field>
-              <Field label="Deposit amount">
+              <Field label={ef.depositAmount}>
                 <Input type="number" value={priceForm.deposit_amount} onChange={v => setPriceForm(f => ({ ...f, deposit_amount: v }))} />
               </Field>
             </div>
-            <Field label={`Transport (${CUR} per booking; blank or 0 = included in base)`}>
+            <Field label={ef.transportField(CUR)}>
               <Input type="number" value={priceForm.transport} onChange={v => setPriceForm(f => ({ ...f, transport: v }))} />
             </Field>
             {priceError && (
@@ -525,32 +526,32 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
                 disabled={priceSubmitting}
                 className="flex-1 py-2 rounded-lg text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-50 transition-colors"
               >
-                {priceSubmitting ? 'Saving…' : 'Save price tier'}
+                {priceSubmitting ? cat.saving : ef.savePriceTier}
               </button>
               <button
                 type="button"
                 onClick={() => { setShowNewPrice(false); setPriceForm(EMPTY_PRICE_FORM); setPriceError(null) }}
                 className="px-3 py-2 rounded-lg text-sm font-medium text-white/80 hover:text-white border border-white/30"
               >
-                Cancel
+                {cat.cancel}
               </button>
             </div>
           </div>
         )}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Field label="Required dives">
+          <Field label={ef.requiredDives}>
             <Input value={form.req_dives} onChange={v => set('req_dives', v)} />
           </Field>
-          <Field label="Dive days">
+          <Field label={ef.diveDays}>
             <Input type="number" value={form.dive_days} onChange={v => set('dive_days', v)} />
           </Field>
-          <Field label="Capacity">
-            <Input type="number" value={form.capacity} onChange={v => set('capacity', v)} placeholder="Blank = no cap" />
+          <Field label={ef.capacity}>
+            <Input type="number" value={form.capacity} onChange={v => set('capacity', v)} placeholder={ef.capacityPlaceholder} />
           </Field>
         </div>
-        <Field label="Required certification">
+        <Field label={ef.requiredCert}>
           <Select value={form.prereq_cert_id} onChange={v => set('prereq_cert_id', v)}>
-            <option value="">— None —</option>
+            <option value="">{ef.none}</option>
             {/* Prereqs are encoded as PADI ranks; agency-specific levels carry
                  a padi_equivalent_id so a CMAS 2-Star diver still satisfies a
                  PADI Rescue prereq when that comparison gets wired up. */}
@@ -563,35 +564,35 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
 
       {form.type === 'dive' && (
         <>
-          <Section title="Dive details">
-            <Field label="Notes">
+          <Section title={ef.sectionDiveDetails}>
+            <Field label={ef.notes}>
               <Textarea value={form.notes} onChange={v => set('notes', v)} />
             </Field>
             <div className="flex flex-wrap gap-3">
-              <Checkbox checked={form.featured}        onChange={v => set('featured', v)}        label="Featured" />
-              <Checkbox checked={form.fully_booked}    onChange={v => set('fully_booked', v)}    label="Fully booked" />
-              <Checkbox checked={form.nitrox_required} onChange={v => set('nitrox_required', v)} label="Nitrox required" />
-              <Checkbox checked={form.is_boat_dive}    onChange={v => set('is_boat_dive', v)}    label="Boat dive" />
-              <Checkbox checked={form.is_trip}         onChange={v => set('is_trip', v)}         label="Trip (multi-day / liveaboard classification)" />
-              <Checkbox checked={form.is_private}      onChange={v => set('is_private', v)}      label="Private (hidden from public calendars)" />
+              <Checkbox checked={form.featured}        onChange={v => set('featured', v)}        label={ef.featured} />
+              <Checkbox checked={form.fully_booked}    onChange={v => set('fully_booked', v)}    label={ef.fullyBooked} />
+              <Checkbox checked={form.nitrox_required} onChange={v => set('nitrox_required', v)} label={ef.nitroxRequired} />
+              <Checkbox checked={form.is_boat_dive}    onChange={v => set('is_boat_dive', v)}    label={ef.boatDive} />
+              <Checkbox checked={form.is_trip}         onChange={v => set('is_trip', v)}         label={ef.isTrip} />
+              <Checkbox checked={form.is_private}      onChange={v => set('is_private', v)}      label={ef.isPrivate} />
             </div>
-            <Field label="Gear rental info">
+            <Field label={ef.gearRental}>
               <Input value={form.gear_rental} onChange={v => set('gear_rental', v)} />
             </Field>
             <WixImageField
-              label="Featured image (Wix URI)"
+              label={ef.featuredImage}
               value={form.featured_image}
               onChange={v => set('featured_image', v)}
             />
             <WixImageField
-              label="Second image (Wix URI)"
+              label={ef.secondImage}
               value={form.second_image}
               onChange={v => set('second_image', v)}
             />
             <div className="space-y-1">
-              <span className="text-xs font-medium text-white/80">Destinations</span>
+              <span className="text-xs font-medium text-white/80">{ef.destinations}</span>
               {destinations.length === 0 ? (
-                <p className="text-sm text-brand-950 font-medium">No destinations defined.</p>
+                <p className="text-sm text-brand-950 font-medium">{ef.noDestinations}</p>
               ) : (
                 <div className="space-y-1 max-h-56 overflow-y-auto bg-white/70 backdrop-blur-md border border-surface-200 rounded-md p-2">
                   {destinations.map(d => (
@@ -605,11 +606,11 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
                 </div>
               )}
             </div>
-            <Field label="Trip template reference">
+            <Field label={ef.tripTemplateRef}>
               <Select value={form.trip_template_reference} onChange={v => set('trip_template_reference', v)}>
-                <option value="">— None —</option>
-                {tripTemplates.map(t => (
-                  <option key={t.id} value={t.id}>{t.admin_title ?? t.id}</option>
+                <option value="">{ef.none}</option>
+                {tripTemplates.map(tt => (
+                  <option key={tt.id} value={tt.id}>{tt.admin_title ?? tt.id}</option>
                 ))}
               </Select>
             </Field>
@@ -618,21 +619,21 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
               onClick={() => setShowNewTravel(s => !s)}
               className="-mt-2 self-start text-xs font-medium text-amber-300 hover:text-amber-200"
             >
-              {showNewTravel ? '− Cancel new entry' : '+ New trip template'}
+              {showNewTravel ? ef.cancelNewEntry : ef.newTripTemplate}
             </button>
             {showNewTravel && (
               <div className="space-y-3 rounded-lg border border-amber-300/40 bg-white/5 p-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-200">New trip template</h3>
-                <Field label="Title (required)">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-200">{ef.newTripTemplateTitle}</h3>
+                <Field label={ef.titleRequiredLabel}>
                   <Input value={travelForm.admin_title} onChange={v => setTravelForm(f => ({ ...f, admin_title: v }))} />
                 </Field>
-                <Field label="Included">
+                <Field label={cat.travel.included}>
                   <Textarea value={travelForm.included} onChange={v => setTravelForm(f => ({ ...f, included: v }))} />
                 </Field>
-                <Field label="Not included">
+                <Field label={cat.travel.notIncluded}>
                   <Textarea value={travelForm.not_included} onChange={v => setTravelForm(f => ({ ...f, not_included: v }))} />
                 </Field>
-                <Field label="Transportation">
+                <Field label={cat.travel.transportation}>
                   <Textarea value={travelForm.transportation} onChange={v => setTravelForm(f => ({ ...f, transportation: v }))} />
                 </Field>
                 {travelError && (
@@ -645,22 +646,22 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
                     disabled={travelSubmitting}
                     className="flex-1 py-2 rounded-lg text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-50 transition-colors"
                   >
-                    {travelSubmitting ? 'Saving…' : 'Save trip template'}
+                    {travelSubmitting ? cat.saving : ef.saveTripTemplate}
                   </button>
                   <button
                     type="button"
                     onClick={() => { setShowNewTravel(false); setTravelForm(EMPTY_TRAVEL_FORM); setTravelError(null) }}
                     className="px-3 py-2 rounded-lg text-sm font-medium text-white/80 hover:text-white border border-white/30"
                   >
-                    Cancel
+                    {cat.cancel}
                   </button>
                 </div>
               </div>
             )}
           </Section>
 
-          <Section title="Rooms">
-            <p className="text-xs text-white/60">Tick any room options this dive offers. Leave all unticked for none.</p>
+          <Section title={ef.sectionRooms}>
+            <p className="text-xs text-white/60">{ef.roomsBlurb}</p>
             {rooms.length > 0 && (
               <div className="space-y-1 max-h-48 overflow-y-auto bg-white/70 backdrop-blur-md border border-surface-200 rounded-md p-2">
                 {rooms.map(r => (
@@ -678,18 +679,18 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
               onClick={() => setShowNewRoom(s => !s)}
               className="self-start text-xs font-medium text-amber-300 hover:text-amber-200"
             >
-              {showNewRoom ? '− Cancel new room' : '+ New room option'}
+              {showNewRoom ? ef.cancelNewRoom : ef.newRoomOption}
             </button>
             {showNewRoom && (
               <div className="space-y-3 rounded-lg border border-amber-300/40 bg-white/5 p-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-200">New room option</h3>
-                <Field label="Title (required)">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-200">{ef.newRoomOptionTitle}</h3>
+                <Field label={ef.titleRequiredLabel}>
                   <Input value={roomForm.admin_title} onChange={v => setRoomForm(f => ({ ...f, admin_title: v }))} />
                 </Field>
-                <Field label="Display name">
+                <Field label={ef.displayName}>
                   <Input value={roomForm.display_title} onChange={v => setRoomForm(f => ({ ...f, display_title: v }))} />
                 </Field>
-                <Field label={`Added price (${CUR})`}>
+                <Field label={cat.rooms.addedPrice(CUR)}>
                   <Input type="number" value={roomForm.added_price} onChange={v => setRoomForm(f => ({ ...f, added_price: v }))} />
                 </Field>
                 {roomError && (
@@ -702,14 +703,14 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
                     disabled={roomSubmitting}
                     className="flex-1 py-2 rounded-lg text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-50 transition-colors"
                   >
-                    {roomSubmitting ? 'Saving…' : 'Save room option'}
+                    {roomSubmitting ? cat.saving : ef.saveRoomOption}
                   </button>
                   <button
                     type="button"
                     onClick={() => { setShowNewRoom(false); setRoomForm(EMPTY_ROOM_FORM); setRoomError(null) }}
                     className="px-3 py-2 rounded-lg text-sm font-medium text-white/80 hover:text-white border border-white/30"
                   >
-                    Cancel
+                    {cat.cancel}
                   </button>
                 </div>
               </div>
@@ -720,32 +721,32 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
       )}
 
       {form.type === 'course' && (
-        <Section title="Course details">
-          <Field label="Course name">
+        <Section title={ef.sectionCourseDetails}>
+          <Field label={ef.courseName}>
             <Input value={form.course_name} onChange={v => set('course_name', v)} />
           </Field>
-          <Field label="Included">
+          <Field label={cat.travel.included}>
             <Textarea value={form.included} onChange={v => set('included', v)} />
           </Field>
-          <Field label="Schedule">
+          <Field label={ef.schedule}>
             <Textarea value={form.schedule} onChange={v => set('schedule', v)} />
           </Field>
           <WixImageField
-            label="Featured image (Wix URI)"
+            label={ef.featuredImage}
             value={form.featured_image}
             onChange={v => set('featured_image', v)}
           />
         </Section>
       )}
 
-      <Section title="Cancellation">
+      <Section title={ef.sectionCancellation}>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Cancel-by date">
+          <Field label={ef.cancelByDate}>
             <Input type="date" value={form.cancel_date} onChange={v => set('cancel_date', v)} />
           </Field>
-          <Field label="Cancel policy">
+          <Field label={ef.cancelPolicy}>
             <Select value={form.cancel_policy} onChange={v => set('cancel_policy', v)}>
-              <option value="">— None —</option>
+              <option value="">{ef.none}</option>
               {cancelPolicies.map(p => (
                 <option key={p.id} value={p.id}>{p.title ?? p.id}</option>
               ))}
@@ -754,19 +755,16 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
         </div>
       </Section>
 
-      <Section title="Payment deadline">
-        <p className="text-xs text-white/70">
-          Shown to divers on the registration form and in the emailed PDF.
-          Leave blank to fall back to "7 days before start date".
-        </p>
-        <Field label="Full payment deadline">
+      <Section title={ef.sectionPaymentDeadline}>
+        <p className="text-xs text-white/70">{ef.paymentDeadlineBlurb}</p>
+        <Field label={ef.fullPaymentDeadline}>
           <Input type="date" value={form.full_payment_deadline} onChange={v => set('full_payment_deadline', v)} />
         </Field>
       </Section>
 
-      <Section title="Add-ons">
+      <Section title={t.admin.groups.addons}>
         {addons.length === 0 ? (
-          <p className="text-sm text-brand-950 font-medium">No add-ons defined.</p>
+          <p className="text-sm text-brand-950 font-medium">{ef.noAddons}</p>
         ) : (
           <div className="space-y-1 max-h-56 overflow-y-auto bg-white/70 backdrop-blur-md border border-surface-200 rounded-md p-2">
             {addons.map(a => (
@@ -784,18 +782,18 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
           onClick={() => setShowNewAddon(s => !s)}
           className="self-start text-xs font-medium text-amber-300 hover:text-amber-200"
         >
-          {showNewAddon ? '− Cancel new add-on' : '+ New add-on'}
+          {showNewAddon ? ef.cancelNewAddon : ef.newAddon}
         </button>
         {showNewAddon && (
           <div className="space-y-3 rounded-lg border border-amber-300/40 bg-white/5 p-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-200">New add-on</h3>
-            <Field label="Title (required)">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-200">{ef.newAddonTitle}</h3>
+            <Field label={ef.titleRequiredLabel}>
               <Input value={addonForm.admin_title} onChange={v => setAddonForm(f => ({ ...f, admin_title: v }))} />
             </Field>
-            <Field label="Display name">
+            <Field label={ef.displayName}>
               <Input value={addonForm.display_title} onChange={v => setAddonForm(f => ({ ...f, display_title: v }))} />
             </Field>
-            <Field label={`Price (${CUR})`}>
+            <Field label={cat.addons.price(CUR)}>
               <Input type="number" value={addonForm.price} onChange={v => setAddonForm(f => ({ ...f, price: v }))} />
             </Field>
             {addonError && (
@@ -808,14 +806,14 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
                 disabled={addonSubmitting}
                 className="flex-1 py-2 rounded-lg text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-50 transition-colors"
               >
-                {addonSubmitting ? 'Saving…' : 'Save add-on'}
+                {addonSubmitting ? cat.saving : ef.saveAddon}
               </button>
               <button
                 type="button"
                 onClick={() => { setShowNewAddon(false); setAddonForm(EMPTY_ADDON_FORM); setAddonError(null) }}
                 className="px-3 py-2 rounded-lg text-sm font-medium text-white/80 hover:text-white border border-white/30"
               >
-                Cancel
+                {cat.cancel}
               </button>
             </div>
           </div>
@@ -834,14 +832,14 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
           disabled={submitting}
           className="flex-1 py-3 rounded-xl font-semibold bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-50 transition-colors"
         >
-          {submitting ? (mode === 'create' ? 'Creating…' : 'Saving…') : (submitLabel ?? defaultSubmitLabel)}
+          {submitting ? (mode === 'create' ? ef.creating : cat.saving) : (submitLabel ?? defaultSubmitLabel)}
         </button>
         <button
           type="button"
           onClick={onCancel}
           className="px-4 py-3 rounded-xl font-medium text-white/80 hover:text-white border border-white/30"
         >
-          Cancel
+          {cat.cancel}
         </button>
       </div>
     </form>
@@ -904,7 +902,7 @@ function WixImageField({
       />
       {!looksRight && (
         <span className="block text-[11px] text-amber-300">
-          Expected a Wix media URI starting with <code>wix:image://</code>. Save anyway if you've pasted a different format on purpose.
+          {ef.wixHintPrefix}<code>wix:image://</code>{ef.wixHintSuffix}
         </span>
       )}
     </label>
