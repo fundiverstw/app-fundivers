@@ -6,6 +6,9 @@ import { ChargeBreakdown, type AmendmentLine } from '../ChargeBreakdown'
 import { bookingBalance } from '../../lib/booking-balance'
 import type { ChargeLine } from '../../lib/booking-charges'
 import type { Payment } from '../../types/database'
+import { t } from '../../i18n'
+
+const bp = t.admin.bookingPayments
 
 /**
  * Per-booking payments block: shows running owed/paid/outstanding tab,
@@ -95,15 +98,15 @@ export function BookingPaymentsBlock({
     e.preventDefault()
     const amount = parseInt(amountStr, 10)
     if (!Number.isFinite(amount) || amount <= 0) {
-      setError('Amount must be a positive integer.')
+      setError(bp.amountMustBePositive)
       return
     }
-    await submit(amount, note.trim() || 'Payment')
+    await submit(amount, note.trim() || bp.paymentFallback)
   }
 
   async function handleVoid(p: Payment) {
     if (!onVoid) return
-    if (!window.confirm(`Void this ${p.amount.toLocaleString()} payment? It stays on record for audit but no longer counts toward paid sum.`)) return
+    if (!window.confirm(bp.voidConfirm(p.amount.toLocaleString()))) return
     setError(null)
     setVoidingId(p.id)
     try {
@@ -119,12 +122,12 @@ export function BookingPaymentsBlock({
     <div className="text-xs bg-surface-50 rounded p-2 space-y-2">
       {((charges && charges.length > 0) || (amendments && amendments.length > 0)) && (
         <div className="pb-2 border-b border-surface-200 space-y-1">
-          <p className="font-semibold text-brand-900">Charges</p>
+          <p className="font-semibold text-brand-900">{bp.charges}</p>
           <ChargeBreakdown lines={charges ?? []} amendments={amendments} total={owed} currency={currency ?? siteConfig.locale.currencyLabel} />
         </div>
       )}
 
-      <p className="font-semibold text-brand-900">Payments</p>
+      <p className="font-semibold text-brand-900">{t.payments.title}</p>
 
       {payerNote && (
         <p className="text-violet-800 font-semibold">{payerNote}</p>
@@ -138,29 +141,29 @@ export function BookingPaymentsBlock({
           <>
             <div className="grid grid-cols-3 gap-2 text-brand-900">
               <div>
-                <p className="font-medium opacity-70">Owed</p>
+                <p className="font-medium opacity-70">{bp.owed}</p>
                 <p className="font-semibold">{owed.toLocaleString()}</p>
               </div>
               <div>
-                <p className="font-medium opacity-70">Paid</p>
+                <p className="font-medium opacity-70">{t.payments.paid}</p>
                 <p className="font-semibold">{paid.toLocaleString()}</p>
               </div>
               <div>
-                <p className="font-medium opacity-70">Balance</p>
-                {bal.state === 'due' && <p className="font-semibold text-red-600">{bal.amount.toLocaleString()} owed</p>}
-                {bal.state === 'credit' && <p className="font-semibold text-emerald-700">{bal.amount.toLocaleString()} credit</p>}
-                {bal.state === 'settled' && <p className="font-semibold text-emerald-700">Settled ✓</p>}
+                <p className="font-medium opacity-70">{t.bookings.balance}</p>
+                {bal.state === 'due' && <p className="font-semibold text-red-600">{bp.amountOwed(bal.amount.toLocaleString())}</p>}
+                {bal.state === 'credit' && <p className="font-semibold text-emerald-700">{bp.amountCredit(bal.amount.toLocaleString())}</p>}
+                {bal.state === 'settled' && <p className="font-semibold text-emerald-700">{t.bookings.settled}</p>}
               </div>
             </div>
             {credit > 0 && (
               <div className="flex justify-between text-emerald-700">
-                <span className="font-medium">Credit (this event)</span>
+                <span className="font-medium">{t.bookings.creditThisEvent}</span>
                 <span className="font-semibold">{credit.toLocaleString()}</span>
               </div>
             )}
             {bal.state === 'credit' && (
               <p className="text-emerald-700">
-                The shop owes this diver {(currency ?? siteConfig.locale.currencyLabel)} {bal.amount.toLocaleString()} — included in their account credit.
+                {bp.shopOwesDiver(currency ?? siteConfig.locale.currencyLabel, bal.amount.toLocaleString())}
               </p>
             )}
           </>
@@ -168,7 +171,7 @@ export function BookingPaymentsBlock({
       })()}
 
       {payments.length === 0 ? (
-        <p className="text-brand-900 font-medium italic">No payments recorded yet.</p>
+        <p className="text-brand-900 font-medium italic">{bp.noPayments}</p>
       ) : (
         <ul className="space-y-1 pt-1 border-t border-surface-200">
           {payments.map(p => {
@@ -179,7 +182,7 @@ export function BookingPaymentsBlock({
             return (
               <li key={p.id} className="flex items-baseline justify-between gap-2">
                 <span className="text-brand-950 font-medium flex-1">
-                  {format(new Date(p.created_at), 'MMM d')} · {p.note ?? 'Payment'}
+                  {format(new Date(p.created_at), 'MMM d')} · {p.note ?? bp.paymentFallback}
                   {p.method && <span className="opacity-70"> ({p.method.replace('_', ' ')})</span>}
                   {p.status !== 'paid' && <span className="text-red-600"> · {p.status}</span>}
                 </span>
@@ -192,7 +195,7 @@ export function BookingPaymentsBlock({
                     onClick={() => handleVoid(p)}
                     className="shrink-0 text-[10px] text-red-700 hover:text-red-900 underline disabled:opacity-50"
                   >
-                    {voidingId === p.id ? 'Voiding…' : 'Void'}
+                    {voidingId === p.id ? bp.voiding : bp.voidAction}
                   </button>
                 )}
                 <span className={`shrink-0 font-semibold ${struck ? 'text-brand-950 line-through' : 'text-brand-900'}`}>
@@ -213,7 +216,7 @@ export function BookingPaymentsBlock({
               onClick={handleMarkDepositPaid}
               className="w-full text-xs bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white font-semibold px-3 py-1.5 rounded"
             >
-              {confirming ? 'Marking…' : 'Mark deposit paid'}
+              {confirming ? bp.marking : bp.markDepositPaid}
             </button>
           )}
 
@@ -226,7 +229,7 @@ export function BookingPaymentsBlock({
                 step={1}
                 value={amountStr}
                 onChange={e => setAmountStr(e.target.value)}
-                placeholder="Paid amount"
+                placeholder={bp.paidAmountPlaceholder}
                 className="flex-1 bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
               />
               <button
@@ -234,14 +237,14 @@ export function BookingPaymentsBlock({
                 disabled={submitting}
                 className="text-xs bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded shrink-0"
               >
-                {submitting ? 'Recording…' : 'Record payment'}
+                {submitting ? bp.recording : bp.recordPayment}
               </button>
             </div>
             <input
               type="text"
               value={note}
               onChange={e => setNote(e.target.value)}
-              placeholder="Note (optional, e.g. Balance, Partial #2)"
+              placeholder={bp.notePlaceholder}
               maxLength={500}
               className="w-full bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
             />

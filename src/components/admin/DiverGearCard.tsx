@@ -9,6 +9,10 @@ import { AdminNotes } from './AdminNotes'
 import { GearFitLookup } from './GearFitLookup'
 import type { GearModelWithSizes } from '../../lib/gear-sizing'
 import { GEAR_TYPES, type GearType, type Booking, type Profile } from '../../types/database'
+import { t } from '../../i18n'
+
+const gc = t.admin.gearCard
+const gf = t.admin.gearFit
 
 // Which config gear item stands for a sizing-chart gear type. Substring match so
 // a fork's relabelled item ("Wetsuit 5mm", "Full wetsuit") still resolves.
@@ -62,7 +66,7 @@ export function DiverGearCard({
   gearModels?: GearModelWithSizes[]
 }) {
   const { profile, booking } = row
-  const diverName = personName(profile?.name, profile?.nickname) || '(unknown)'
+  const diverName = personName(profile?.name, profile?.nickname) || gc.unknown
   const pack = gearPackList(booking)
   const toast = useToast()
   const owned = new Set(profile?.gear_owned ?? [])
@@ -95,7 +99,7 @@ export function DiverGearCard({
     setSavingSizes(false)
     if (error) {
       setSizeError(error.message)
-      toast.error(`Could not save sizes: ${error.message}`)
+      toast.error(gc.saveSizesFailed(error.message))
       return
     }
     onProfilePatched(profile.id, {
@@ -103,7 +107,7 @@ export function DiverGearCard({
       bcd_size:     bcdSize     || null,
       wetsuit_size: wetsuitSize || null,
     })
-    toast.success(`Saved sizes for ${personName(profile.name, profile.nickname) || 'diver'}`)
+    toast.success(gc.savedSizesFor(personName(profile.name, profile.nickname) || t.admin.family.diverFallback))
   }
 
   return (
@@ -144,7 +148,7 @@ export function DiverGearCard({
                   ? 'border-brand-900/40 text-brand-950 font-medium line-through'
                   : 'border-brand-900 text-brand-900'
               }`}
-              title={owned.has(item) ? 'Diver owns this item' : 'Needs packing'}
+              title={owned.has(item) ? gc.ownsItem : gc.needsPacking}
             >
               {item}
             </span>
@@ -155,16 +159,16 @@ export function DiverGearCard({
       {profile && (
         <div className="border-t border-surface-200 pt-2 space-y-2">
           <div className="flex items-end gap-2">
-            <SizeField label="Fin"     value={finSize}     onChange={setFinSize} />
-            <SizeField label="BCD"     value={bcdSize}     onChange={setBcdSize} />
-            <SizeField label="Wetsuit" value={wetsuitSize} onChange={setWetsuitSize} />
+            <SizeField label={gc.fin}      value={finSize}     onChange={setFinSize} />
+            <SizeField label={gf.bcd}      value={bcdSize}     onChange={setBcdSize} />
+            <SizeField label={gf.wetsuit}  value={wetsuitSize} onChange={setWetsuitSize} />
             <button
               type="button"
               onClick={saveSizes}
               disabled={!sizesDirty || savingSizes}
               className="shrink-0 bg-brand-900 hover:bg-brand-950 disabled:opacity-40 text-white text-xs font-semibold py-1 px-2.5 rounded-md"
             >
-              {savingSizes ? '…' : 'Save'}
+              {savingSizes ? '…' : gc.save}
             </button>
           </div>
           {sizeError && <span className="text-xs text-red-600">{sizeError}</span>}
@@ -179,13 +183,13 @@ export function DiverGearCard({
               models={gearModels}
               // Rentals come from the booking's pack list (the packing source of
               // truth), not profile.gear_owned.
-              rentalTypes={GEAR_TYPES.filter(t => { const item = gearTypeItem(t); return !!item && pack.items.includes(item) })}
+              rentalTypes={GEAR_TYPES.filter(gt => { const item = gearTypeItem(gt); return !!item && pack.items.includes(item) })}
             />
           )}
         </div>
       )}
 
-      <AdminNotes target={{ kind: 'booking', id: booking.id }} tagFilter="gear" title="Gear flags" compact />
+      <AdminNotes target={{ kind: 'booking', id: booking.id }} tagFilter="gear" title={gc.gearFlags} compact />
     </article>
   )
 }
