@@ -20,7 +20,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const siteConfig = {
-  configVersion: 5,
+  configVersion: 6,
 
   identity: {
     appName: 'FunDive',
@@ -91,6 +91,19 @@ export const siteConfig = {
       '\\bboat\\b', 'green island', 'kenting', 'penghu', 'lambai', 'xiao\\s?liuqiu',
       'orchid island', 'anilao', 'palau', 'panglao', 'bohol', 'tubbataha', 'puerto galera',
     ],
+    // Pre-fills the admin boat-manifest export. Notes are reproduced verbatim on
+    // the manifest, which matches the official Taiwanese vessel form.
+    boatManifest: {
+      boatName: '坤成8號',
+      registration: 'CT2-6445',
+      notes: [
+        '1.石城或龜山都上午：6點30分集合，7點發船，請提前抵港。下午：12點30分集合，1點出船。(時間會依海況及實際情況再做調整)',
+        '2. 裝備用網袋不要帶箱子上船',
+        '3.繳交有相片的證件，以方便海巡安檢快速出港。',
+        '4.有需要高氧的就要先說，每支加100元。',
+        '5.船上有配重120kg供使用，但配重帶要自備。',
+      ],
+    },
   },
 
   // Home dive region for the admin "Historical perspective" weather baseline.

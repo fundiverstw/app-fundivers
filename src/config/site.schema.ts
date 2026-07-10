@@ -59,6 +59,11 @@ export const siteConfigSchema = z.object({
     cardSurchargePercent: z.number().nonnegative(),
     nitroxCourseFee: z.number().nonnegative(),
     tripKeywords: z.array(z.string().min(1)),
+    boatManifest: z.object({
+      boatName: z.string(),
+      registration: z.string(),
+      notes: z.array(z.string().min(1)),
+    }),
   }),
   weatherRegion: z.object({
     latitude: z.number().min(-90).max(90),

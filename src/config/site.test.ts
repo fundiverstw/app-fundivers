@@ -38,6 +38,19 @@ describe('siteConfig', () => {
     }
   })
 
+  // The manifest pre-fill is optional shop content — a shop that never charters
+  // a boat leaves it blank. Note lines print verbatim on the vessel form, so a
+  // stray empty line is a config error rather than a harmless blank.
+  it('allows a blank boat manifest but rejects empty note lines', () => {
+    const withManifest = (boatManifest: typeof siteConfig.business.boatManifest) =>
+      ({ ...siteConfig, business: { ...siteConfig.business, boatManifest } })
+
+    expect(() => assertValidSiteConfig(withManifest({ boatName: '', registration: '', notes: [] })))
+      .not.toThrow()
+    expect(() => assertValidSiteConfig(withManifest({ ...siteConfig.business.boatManifest, notes: [''] })))
+      .toThrow()
+  })
+
   it('rejects a config with an out-of-range configVersion', () => {
     expect(() => assertValidSiteConfig({ ...siteConfig, configVersion: CONFIG_CONTRACT_VERSION - 1 }))
       .toThrow(/configVersion/)

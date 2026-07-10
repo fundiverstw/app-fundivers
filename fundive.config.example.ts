@@ -15,7 +15,7 @@
 export const siteConfig = {
   // Must equal core's current CONFIG_CONTRACT_VERSION (src/config/site.ts) or
   // the build fails. Bump it whenever core's CHANGELOG.md tells you to migrate.
-  configVersion: 5,
+  configVersion: 6,
 
   identity: {
     appName: 'FunDive',
@@ -81,6 +81,9 @@ export const siteConfig = {
     // Case-insensitive regex fragments that mark a dive as a "trip" by title
     // (destination names, "\\bboat\\b", …). Empty = never classify by title.
     tripKeywords: ['\\bboat\\b'],
+    // Pre-fills the admin boat-manifest export. Leave blank if the shop never
+    // charters a boat; notes are printed verbatim, in the shop's own language.
+    boatManifest: { boatName: '', registration: '', notes: [] },
   },
 
   // Home dive region for the admin weather baseline (decimal degrees).

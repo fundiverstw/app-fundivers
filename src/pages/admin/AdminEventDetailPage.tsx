@@ -940,21 +940,14 @@ function NotifyDiversModal({
   )
 }
 
-// Boat-manifest defaults. The chartered vessel varies per trip, so these
-// pre-fill the export modal and the admin's last-used values are remembered
-// in localStorage. Notes default to the standard pre-trip boat instructions
-// (Chinese — the manifest matches the official Taiwanese vessel form).
+// Boat-manifest defaults come from the shop config (business.boatManifest); the
+// chartered vessel varies per trip, so the admin's last-used values override
+// them from localStorage. Notes are shop-authored and never translated.
 const BOAT_MANIFEST_LS_KEY = 'fd_boat_manifest_v1'
 const DEFAULT_BOAT_MANIFEST = {
-  boatName: '坤成8號',
-  registration: 'CT2-6445',
-  notes: [
-    '1.石城或龜山都上午：6點30分集合，7點發船，請提前抵港。下午：12點30分集合，1點出船。(時間會依海況及實際情況再做調整)',
-    '2. 裝備用網袋不要帶箱子上船',
-    '3.繳交有相片的證件，以方便海巡安檢快速出港。',
-    '4.有需要高氧的就要先說，每支加100元。',
-    '5.船上有配重120kg供使用，但配重帶要自備。',
-  ].join('\n'),
+  boatName: siteConfig.business.boatManifest.boatName,
+  registration: siteConfig.business.boatManifest.registration,
+  notes: siteConfig.business.boatManifest.notes.join('\n'),
 }
 
 function loadBoatManifestDefaults(): { boatName: string; registration: string; notes: string } {
