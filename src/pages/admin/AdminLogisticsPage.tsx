@@ -24,6 +24,11 @@ import { fetchVehiclesForEvents, availableVehicles, allocationEventId } from '..
 import { planFleet, type Rider, type SeatingPlan, type FleetVehicle } from '../../lib/vehicle-planning'
 import { useAuth } from '../../hooks/useAuth'
 import type { AppEvent, Booking, BookingDetails, Credit, Duty, EventVehicle, Payment, Profile, Vehicle } from '../../types/database'
+import { t } from '../../i18n'
+
+const lg = t.admin.logistics
+const gr = t.admin.groups
+const tp = t.admin.transport
 
 // Per-booking outstanding balance + the lead responsible for it (if covered).
 interface BookingBalanceRow { bal: BookingBalance; payerName: string | null }
@@ -211,7 +216,7 @@ export function AdminLogisticsPage() {
         const owed = Number((b.details as BookingDetails | undefined)?.total ?? 0)
         const paid = paidByBooking.get(b.id) ?? 0
         const payerName = (b.payer_id && b.payer_id !== b.user_id)
-          ? (personName(profMap.get(b.payer_id)?.name, profMap.get(b.payer_id)?.nickname) || '(lead booker)')
+          ? (personName(profMap.get(b.payer_id)?.name, profMap.get(b.payer_id)?.nickname) || lg.leadBooker)
           : null
         balByBooking.set(b.id, { bal: bookingBalance(owed, paid, openCreditForBooking(credits, b.id)), payerName })
       }
@@ -280,7 +285,7 @@ export function AdminLogisticsPage() {
     if (i === undefined) {
       i = dayStaff.length
       staffIndex.set(key, i)
-      const name = personName(s.profile?.name, s.profile?.nickname) || '(staff)'
+      const name = personName(s.profile?.name, s.profile?.nickname) || lg.staffFallback
       dayStaff.push({ key, name, roles: [] })
       staffRiders.push({ id: key, name, kind: 'staff' })
     }
@@ -294,7 +299,7 @@ export function AdminLogisticsPage() {
     if (!e || e.bal.state !== 'due') return []
     return [{
       bookingId: r.booking.id,
-      name: personName(r.profile?.name, r.profile?.nickname) || '(no profile)',
+      name: personName(r.profile?.name, r.profile?.nickname) || tp.noProfile,
       amount: e.bal.amount,
       payerName: e.payerName,
     }]
@@ -325,7 +330,7 @@ export function AdminLogisticsPage() {
   const fleetPlan = combinePlans((groups ?? []).map(g => {
     const eventDivers: Rider[] = splitByTransport(g.rows).needsRide.map(r => ({
       id: r.profile?.id ?? r.booking.id,
-      name: personName(r.profile?.name, r.profile?.nickname) || '(no profile)',
+      name: personName(r.profile?.name, r.profile?.nickname) || tp.noProfile,
       kind: 'diver',
     }))
     const eventStaff: Rider[] = []
@@ -335,7 +340,7 @@ export function AdminLogisticsPage() {
       seatedStaff.add(key)
       eventStaff.push({
         id: key,
-        name: personName(s.profile?.name, s.profile?.nickname) || '(staff)',
+        name: personName(s.profile?.name, s.profile?.nickname) || lg.staffFallback,
         kind: 'staff',
       })
     }
@@ -352,24 +357,24 @@ export function AdminLogisticsPage() {
     <div className="max-w-3xl mx-auto space-y-4">
       <header className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
         <div className="flex items-baseline justify-between gap-3">
-          <h1 className="text-xl font-bold text-brand-900">Logistics</h1>
+          <h1 className="text-xl font-bold text-brand-900">{t.nav.logistics}</h1>
           {dayKey && <span className="text-xs text-brand-900 font-medium">{dayKey}</span>}
         </div>
-        <div role="tablist" aria-label="Day" className="flex flex-wrap gap-2 items-center">
-          <DayTab label="Today"     active={tab === 'today'}    onClick={() => setTab('today')} />
-          <DayTab label="Tomorrow"  active={tab === 'tomorrow'} onClick={() => setTab('tomorrow')} />
-          <DayTab label="Other day" active={tab === 'other'}    onClick={() => setTab('other')} />
+        <div role="tablist" aria-label={lg.dayTablistAria} className="flex flex-wrap gap-2 items-center">
+          <DayTab label={lg.today}    active={tab === 'today'}    onClick={() => setTab('today')} />
+          <DayTab label={lg.tomorrow} active={tab === 'tomorrow'} onClick={() => setTab('tomorrow')} />
+          <DayTab label={lg.otherDay} active={tab === 'other'}    onClick={() => setTab('other')} />
           {tab === 'other' && (
             upcomingDays && upcomingDays.length === 0 ? (
-              <span className="text-xs text-brand-950 font-medium italic">No events in the next {LOOKAHEAD_DAYS} days.</span>
+              <span className="text-xs text-brand-950 font-medium italic">{lg.noEventsInDays(LOOKAHEAD_DAYS)}</span>
             ) : (
               <select
-                aria-label="Select a day"
+                aria-label={lg.selectADayAria}
                 value={otherDay}
                 onChange={e => setOtherDay(e.target.value)}
                 className="px-3 py-1 rounded-full text-sm bg-surface-100 text-brand-900 border border-surface-200"
               >
-                <option value="">Select a day…</option>
+                <option value="">{lg.selectADay}</option>
                 {(upcomingDays ?? []).map(d => (
                   <option key={d} value={d}>{format(parseISO(d), 'EEE, MMM d')}</option>
                 ))}
@@ -380,21 +385,19 @@ export function AdminLogisticsPage() {
       </header>
 
       {promptForDay ? (
-        <p className="text-brand-950 font-medium text-sm">Pick a day above to see its logistics.</p>
+        <p className="text-brand-950 font-medium text-sm">{lg.pickADay}</p>
       ) : groups === null ? (
         <PageLoading />
       ) : groups.length === 0 ? (
-        <p className="text-brand-950 font-medium text-sm">No events scheduled for {dayKey}.</p>
+        <p className="text-brand-950 font-medium text-sm">{lg.noEventsOn(dayKey)}</p>
       ) : (
         <>
           <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
-            <h2 className="text-sm font-bold text-brand-900 uppercase tracking-wider">Overall — {dayKey}</h2>
-            <p className="text-sm text-brand-900 font-medium">
-              {groups.length} event{groups.length === 1 ? '' : 's'} · {allRows.length} diver{allRows.length === 1 ? '' : 's'}
-            </p>
+            <h2 className="text-sm font-bold text-brand-900 uppercase tracking-wider">{lg.overall(dayKey)}</h2>
+            <p className="text-sm text-brand-900 font-medium">{lg.eventsDivers(groups.length, allRows.length)}</p>
             {dayStaff.length > 0 && (
               <div className="space-y-1">
-                <p className="text-xs font-semibold text-brand-900 uppercase tracking-wide">On-duty staff</p>
+                <p className="text-xs font-semibold text-brand-900 uppercase tracking-wide">{gr.onDutyStaff}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {dayStaff.map(s => (
                     <span key={s.key} className="text-xs px-2 py-0.5 rounded-full border border-brand-900 text-brand-900 font-medium">
@@ -407,34 +410,34 @@ export function AdminLogisticsPage() {
             )}
             {allRows.length > 0 && (
               <div className="space-y-1">
-                <p className="text-xs font-semibold text-brand-900 uppercase tracking-wide">Payments</p>
+                <p className="text-xs font-semibold text-brand-900 uppercase tracking-wide">{t.payments.title}</p>
                 {dayOutstanding > 0 ? (
                   <p className="text-sm font-semibold text-red-600">
-                    {dayDue.length} diver{dayDue.length === 1 ? '' : 's'} still owe · {currency} {dayOutstanding.toLocaleString()} outstanding
+                    {lg.stillOwe(dayDue.length, currency, dayOutstanding.toLocaleString())}
                   </p>
                 ) : (
-                  <p className="text-sm text-brand-900 font-medium">All settled.</p>
+                  <p className="text-sm text-brand-900 font-medium">{lg.allSettled}</p>
                 )}
               </div>
             )}
             <div className="space-y-1">
-              <p className="text-xs font-semibold text-brand-900 uppercase tracking-wide">Transportation</p>
+              <p className="text-xs font-semibold text-brand-900 uppercase tracking-wide">{t.bookings.breakdown.transportation}</p>
               <p className="text-sm text-brand-900 font-medium">
-                <span className="text-red-600 font-semibold">{transport.needsRide.length}</span> need a ride
+                <span className="text-red-600 font-semibold">{transport.needsRide.length}</span>{lg.needARide}
                 {onDutyStaffCount > 0 && (
-                  <> · <span className="text-brand-900 font-semibold">{onDutyStaffCount}</span> on-duty staff</>
+                  <> · <span className="text-brand-900 font-semibold">{onDutyStaffCount}</span>{lg.onDutyStaffSuffix}</>
                 )}
-                {' · '}{transport.selfTransport.length} self-transport
-                {transport.unspecified.length > 0 && <> · {transport.unspecified.length} unspecified</>}
+                {' · '}{lg.selfTransportCount(transport.selfTransport.length)}
+                {transport.unspecified.length > 0 && <> · {lg.unspecifiedCount(transport.unspecified.length)}</>}
               </p>
               {transport.needsRide.length > 0 && (
                 <TransportFleetPlan plan={fleetPlan} fleetSize={activeVehicles.length} />
               )}
             </div>
             <div className="space-y-1">
-              <p className="text-xs font-semibold text-brand-900 uppercase tracking-wide">Gear to pack</p>
+              <p className="text-xs font-semibold text-brand-900 uppercase tracking-wide">{lg.gearToPack}</p>
               {overallGear.length === 0 ? (
-                <p className="text-sm text-brand-950/70 font-medium italic">Nothing to pack — everyone's on own gear.</p>
+                <p className="text-sm text-brand-950/70 font-medium italic">{lg.nothingToPack}</p>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
                   {overallGear.map(({ item, count }) => (
@@ -447,7 +450,7 @@ export function AdminLogisticsPage() {
             </div>
             {overallCare.length > 0 && (
               <div className="space-y-1">
-                <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">Handle with care</p>
+                <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">{gr.handleWithCare}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {overallCare.map(({ item, divers }) => (
                     <span key={item} className="text-xs px-2 py-0.5 rounded-full border border-amber-500 bg-amber-50 text-amber-900 font-semibold">
@@ -459,7 +462,7 @@ export function AdminLogisticsPage() {
             )}
             {overallAddons.length > 0 && (
               <div className="space-y-1">
-                <p className="text-xs font-semibold text-brand-900 uppercase tracking-wide">Add-ons</p>
+                <p className="text-xs font-semibold text-brand-900 uppercase tracking-wide">{gr.addons}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {overallAddons.map(({ title, count }) => (
                     <span key={title} className="text-xs px-2 py-0.5 rounded-full border border-surface-400 bg-surface-50 text-brand-900 font-medium">
@@ -494,12 +497,12 @@ export function AdminLogisticsPage() {
                       to={`/admin/events/${g.event.type}/${g.event.id}/edit`}
                       className="shrink-0 text-xs bg-white/15 hover:bg-white/25 text-white px-2.5 py-1 rounded-lg font-medium"
                     >
-                      Edit
+                      {t.admin.catalog.edit}
                     </Link>
                   )}
                 </div>
                 <span className="block text-xs text-white/80">
-                  {formatEventSpan(g.event, { style: 'compact' })} · {g.rows.length} diver{g.rows.length === 1 ? '' : 's'}
+                  {formatEventSpan(g.event, { style: 'compact' })} · {lg.diverCount(g.rows.length)}
                 </span>
               </div>
               <EventTransport rows={g.rows} />
@@ -522,7 +525,7 @@ export function AdminLogisticsPage() {
               <AddonSummaryGroup rows={addonTotals(g.rows, addonTitles)} />
               <PaymentsDueGroup rows={dueRowsFor(g.rows)} currency={currency} />
               {g.rows.length === 0 ? (
-                <p className="text-xs text-brand-950/70 font-medium italic pl-1">No active registrants.</p>
+                <p className="text-xs text-brand-950/70 font-medium italic pl-1">{tp.noActiveRegistrants}</p>
               ) : (
                 g.rows.map(r => (
                   <DiverGearCard key={r.booking.id} row={r} onProfilePatched={patchProfile} linkToProfile={isAdmin} gearModels={gearModels} />
@@ -583,14 +586,14 @@ function EventTransport({ rows }: { rows: DiverGearRow[] }) {
   return (
     <>
       {needsRide.length > 0 && (
-        <TransportGroup title="Needs ride" rows={needsRide} emptyHint="" />
+        <TransportGroup title={tp.needsRide} rows={needsRide} emptyHint="" />
       )}
       {unspecified.length > 0 && (
         <TransportGroup
-          title="Transport not specified"
+          title={lg.transportNotSpecified}
           rows={unspecified}
           emptyHint=""
-          note="Legacy bookings from before transport was a required question."
+          note={tp.unspecifiedNote}
         />
       )}
     </>
