@@ -4,6 +4,7 @@ import { errorMessage } from '../../lib/errors'
 import { fetchAllWaivers, saveWaiver, deleteWaiver } from '../../lib/waivers'
 import { uploadWaiverPdf, getWaiverPdfSignedUrl } from '../../lib/waiver-pdf'
 import type { WaiverRow, WaiverInsert } from '../../types/database'
+import type { WaiverCadence, WaiverAppliesTo } from '../../config/waivers'
 import { t } from '../../i18n'
 
 const wv = t.admin.waivers
@@ -15,8 +16,6 @@ const wv = t.admin.waivers
 // content bumps the version so everyone re-signs.
 
 const FIELD = 'w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900'
-const CADENCES = ['annual', 'per_event'] as const
-const APPLIES = ['none', 'dives', 'courses', 'all'] as const
 
 export function AdminWaiversPage() {
   const toast = useToast()
@@ -140,8 +139,8 @@ function WaiverForm({
   const [title, setTitle] = useState(waiver?.title ?? '')
   const [code, setCode] = useState(waiver?.code ?? '')
   const [language, setLanguage] = useState(waiver?.language ?? '')
-  const [cadence, setCadence] = useState<typeof CADENCES[number]>(waiver?.cadence ?? 'annual')
-  const [appliesTo, setAppliesTo] = useState<typeof APPLIES[number]>(waiver?.applies_to ?? 'none')
+  const [cadence, setCadence] = useState<WaiverCadence>(waiver?.cadence ?? 'annual')
+  const [appliesTo, setAppliesTo] = useState<WaiverAppliesTo>(waiver?.applies_to ?? 'none')
   const [courseColors, setCourseColors] = useState((waiver?.course_colors ?? []).join(', '))
   const [active, setActive] = useState(waiver?.active ?? true)
   const [mode, setMode] = useState<'text' | 'pdf'>(waiver?.pdf_path ? 'pdf' : 'text')
@@ -216,13 +215,13 @@ function WaiverForm({
 
         <div className="grid grid-cols-2 gap-2">
           <Labelled label={wv.cadence}>
-            <select className={FIELD} value={cadence} onChange={e => setCadence(e.target.value as typeof CADENCES[number])}>
+            <select className={FIELD} value={cadence} onChange={e => setCadence(e.target.value as WaiverCadence)}>
               <option value="annual">{wv.cadenceAnnualLong}</option>
               <option value="per_event">{wv.cadencePerEvent}</option>
             </select>
           </Labelled>
           <Labelled label={wv.autoApplies}>
-            <select className={FIELD} value={appliesTo} onChange={e => setAppliesTo(e.target.value as typeof APPLIES[number])}>
+            <select className={FIELD} value={appliesTo} onChange={e => setAppliesTo(e.target.value as WaiverAppliesTo)}>
               <option value="none">{wv.applyNone}</option>
               <option value="dives">{wv.applyDives}</option>
               <option value="courses">{wv.applyCourses}</option>
