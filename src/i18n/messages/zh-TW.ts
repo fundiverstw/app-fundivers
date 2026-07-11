@@ -883,7 +883,7 @@ export const zhTW: Messages = {
       scheduledTrips: { title: '預定行程', blurb: '店家自有的指定日期行程（價格＋目錄附加項目／房型）供潛水員報名；追蹤報名。' },
       trustedPartners: { title: '合作夥伴', blurb: '潛水員可從「合作夥伴」分頁直接聯絡的海外潛店；電子郵件僅管理員可見。' },
       notifications: { title: '通知', blurb: '立即發送推播（並可選擇 LINE 轉發）給所有已開啟通知的裝置。' },
-      accounting: { title: '會計匯出', blurb: '下載會計年度記帳 ZIP：逐筆交易、依活動與彙總 CSV。' },
+      accounting: { title: '匯出文件', blurb: '下載會計年度記帳 ZIP：逐筆交易、依活動與彙總 CSV。' },
       waivers: { title: '免責聲明', blurb: '編寫潛水員需簽署的表單 — 文字或您自行上傳的 PDF，任何語言皆可。可在活動的編輯表單中為個別活動附加或豁免。' },
       terms: { title: '使用條款', blurb: '撰寫潛水員註冊時需同意的條款。若標記為重大變更，所有人都會被要求重新同意。' },
       cancellationPolicies: { title: '取消政策', blurb: '編寫潛水員報名時需確認的取消條款；每個活動可選擇一項。' },
@@ -1122,7 +1122,7 @@ export const zhTW: Messages = {
       carsBlurb: '指派給此次潛水的車輛決定報名表上的共乘座位上限 — 只有在其中一輛車尚有空位時，潛水員才能申請共乘。',
     },
     accounting: {
-      title: '會計匯出',
+      title: '匯出文件',
       blurb: (timezone: string) => `下載該會計年度（1 月至 12 月，${timezone}）的記帳 ZIP 檔。內容包含該年度所有已標記的款項 — 已付款、已退款與已作廢 — 並註明付款人、標記人、時間、付款方式與對應的活動。`,
       fiscalYear: '會計年度',
       transactionsCsv: (year: number) => `transactions-${year}.csv`,

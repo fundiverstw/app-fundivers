@@ -890,7 +890,7 @@ export const en = {
       scheduledTrips: { title: 'Scheduled Trips', blurb: 'The shop’s own dated trips (price + catalog add-ons/rooms) divers register for; track registrations.' },
       trustedPartners: { title: 'Trusted Partners', blurb: 'Dive shops abroad divers can message directly from the Trusted Partners tab; the email stays admin-only.' },
       notifications: { title: 'Notifications', blurb: 'Send an immediate push (and optional LINE relay) to every opted-in device.' },
-      accounting: { title: 'Accounting export', blurb: 'Download a fiscal-year bookkeeping ZIP: per-transaction, by-event, and summary CSVs.' },
+      accounting: { title: 'Export documents', blurb: 'Download a fiscal-year bookkeeping ZIP: per-transaction, by-event, and summary CSVs.' },
       waivers: { title: 'Waivers', blurb: 'Author the forms divers e-sign — as text or your own uploaded PDF, in any language. Attach or exempt them per-event from an event’s edit form.' },
       terms: { title: 'Terms of Use', blurb: 'Write the terms divers agree to at signup. A material change asks everyone to re-accept.' },
       cancellationPolicies: { title: 'Cancellation policies', blurb: 'Write the cancellation terms divers acknowledge at registration; pick one per event.' },
@@ -1129,7 +1129,7 @@ export const en = {
       carsBlurb: 'Cars assigned to this dive feed the ride-seat limit on the registration form — a diver can only request a ride when a seat is free in one of them.',
     },
     accounting: {
-      title: 'Accounting export',
+      title: 'Export documents',
       blurb: (timezone: string) => `Download a fiscal-year (Jan–Dec, ${timezone}) bookkeeping ZIP. Includes every payment marked in the year — paid, refunded, and voided — with who paid, who marked it, when, the method, and the linked event.`,
       fiscalYear: 'Fiscal year',
       transactionsCsv: (year: number) => `transactions-${year}.csv`,

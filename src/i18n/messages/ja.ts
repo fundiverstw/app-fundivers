@@ -882,7 +882,7 @@ export const ja: Messages = {
       scheduledTrips: { title: '予定ツアー', blurb: 'ショップ自身の日付指定ツアー（料金＋カタログの追加オプション／部屋）をダイバーが申し込み。申込を管理します。' },
       trustedPartners: { title: '提携ショップ', blurb: 'ダイバーが「提携ショップ」タブから直接連絡できる海外のダイブショップ。メールは管理者のみ表示。' },
       notifications: { title: '通知', blurb: '通知を許可した全端末にプッシュ（および任意で LINE 転送）を即時送信します。' },
-      accounting: { title: '会計エクスポート', blurb: '会計年度の帳簿 ZIP をダウンロード：取引別・イベント別・サマリーの CSV。' },
+      accounting: { title: '書類の書き出し', blurb: '会計年度の帳簿 ZIP をダウンロード：取引別・イベント別・サマリーの CSV。' },
       waivers: { title: '免責同意書', blurb: 'ダイバーが署名するフォームを作成 — テキストまたは独自の PDF で、任意の言語で。イベントの編集フォームからイベントごとに付与・免除できます。' },
       terms: { title: '利用規約', blurb: 'ダイバーが登録時に同意する規約を作成します。重要な変更にすると全員に再同意を求めます。' },
       cancellationPolicies: { title: 'キャンセルポリシー', blurb: 'ダイバーが登録時に確認するキャンセル条件を作成。イベントごとに1つ選べます。' },
@@ -1121,7 +1121,7 @@ export const ja: Messages = {
       carsBlurb: 'このダイブに割り当てた車両が申込フォームの送迎座席数の上限になります — いずれかの車両に空席があるときだけ、ダイバーは送迎を申し込めます。',
     },
     accounting: {
-      title: '会計データの書き出し',
+      title: '書類の書き出し',
       blurb: (timezone: string) => `会計年度（1月〜12月、${timezone}）の記帳用 ZIP をダウンロードします。その年に記録されたすべての入金（入金済み・返金済み・無効）を、支払者、記録者、日時、支払方法、対象イベントとともに含みます。`,
       fiscalYear: '会計年度',
       transactionsCsv: (year: number) => `transactions-${year}.csv`,
