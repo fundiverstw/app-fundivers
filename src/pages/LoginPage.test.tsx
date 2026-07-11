@@ -78,7 +78,7 @@ describe('LoginPage', () => {
     expect(from).toHaveBeenCalledWith('profiles')
   })
 
-  it('navigates an admin to /admin after sign-in', async () => {
+  it('navigates an admin to /admin/logistics after sign-in', async () => {
     okSignIn('admin')
     const user = userEvent.setup()
     renderWithRouter(<LoginPage />)
@@ -86,7 +86,7 @@ describe('LoginPage', () => {
     await user.type(byName('password'), 'adminadmin')
     await user.click(screen.getByRole('button', { name: /sign in/i }))
 
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/admin'))
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/admin/logistics'))
   })
 
   it('navigates a staff member to /admin/events after sign-in', async () => {
@@ -122,7 +122,7 @@ describe('LoginPage', () => {
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/pending'))
   })
 
-  it('lets a pending admin still hit /admin (status gate is diver-only)', async () => {
+  it('lets a pending admin still reach the admin area (status gate is diver-only)', async () => {
     okSignIn('admin', 'u1', 'pending')
     const user = userEvent.setup()
     renderWithRouter(<LoginPage />)
@@ -130,7 +130,7 @@ describe('LoginPage', () => {
     await user.type(byName('password'), 'secret123')
     await user.click(screen.getByRole('button', { name: /sign in/i }))
 
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/admin'))
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/admin/logistics'))
   })
 
   it('surfaces auth error and does not navigate', async () => {

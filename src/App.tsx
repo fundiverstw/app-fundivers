@@ -125,7 +125,7 @@ export default function App() {
             {/* Read-only event surfaces — accessible to staff + admin */}
             <Route element={<StaffOrAdminRoute />}>
               <Route element={<AdminShell />}>
-                <Route path="/admin" element={<DashboardPage />} />
+                <Route path="/admin" element={<Navigate to="/admin/logistics" replace />} />
                 <Route path="/admin/events" element={<AdminEventsPage />} />
                 <Route path="/admin/events/:id" element={<AdminEventDetailPage />} />
                 <Route path="/admin/events/:id/gear-map" element={<AdminGearMapPage />} />
