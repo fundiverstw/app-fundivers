@@ -444,7 +444,7 @@ export function AdminEventDetailPage() {
         )}
       </header>
 
-      {event && (
+      {event && id && (
         <>
           <div className="flex flex-wrap items-center justify-end gap-2">
             {isAdmin && (
