@@ -861,6 +861,13 @@ export const ja: Messages = {
   admin: {
     manage: {
       title: '管理',
+      groups: {
+        overview: '概要',
+        eventsTrips: 'イベント・ツアー',
+        catalogLogistics: 'カタログ・運用',
+        legalPolicies: '規約・ポリシー',
+        partnersComms: 'パートナー・連絡',
+      },
       applications: { title: '申請', blurb: '保留中のダイバー申請を承認または却下します。' },
       dashboard: { title: 'ダッシュボード', blurb: 'ショップ全体の予約・売上・アクティビティのグラフ。' },
       newEvent: { title: 'イベント作成', blurb: 'ダイビングやコースを作成。既存のイベントはカレンダーから編集できます。' },

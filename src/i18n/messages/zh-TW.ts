@@ -862,6 +862,13 @@ export const zhTW: Messages = {
   admin: {
     manage: {
       title: '管理',
+      groups: {
+        overview: '總覽',
+        eventsTrips: '活動與行程',
+        catalogLogistics: '型錄與後勤',
+        legalPolicies: '條款與政策',
+        partnersComms: '夥伴與通知',
+      },
       applications: { title: '申請審核', blurb: '核准或拒絕待審的潛水員申請。' },
       dashboard: { title: '儀表板', blurb: '店家整體的預訂、營收與活動圖表。' },
       newEvent: { title: '新增活動', blurb: '建立潛水或課程。既有活動可從行事曆編輯。' },

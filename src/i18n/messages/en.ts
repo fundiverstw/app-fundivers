@@ -869,6 +869,13 @@ export const en = {
   admin: {
     manage: {
       title: 'Manage',
+      groups: {
+        overview: 'Overview',
+        eventsTrips: 'Events & Trips',
+        catalogLogistics: 'Catalog & Logistics',
+        legalPolicies: 'Legal & Policies',
+        partnersComms: 'Partners & Comms',
+      },
       applications: { title: 'Applications', blurb: 'Approve or reject pending diver applications.' },
       dashboard: { title: 'Dashboard', blurb: 'Bookings, revenue and activity charts across the shop.' },
       newEvent: { title: 'New event', blurb: 'Create a dive or course. Edit existing events from the calendar.' },
