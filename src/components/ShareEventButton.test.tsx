@@ -3,7 +3,12 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ShareEventButton } from './ShareEventButton'
 import { ToastProvider } from './Toast'
-import { siteConfig } from '../config/site'
+
+// Drive the button off the share-url helper directly so these tests exercise
+// the component's own branches (copy, error, hide-when-no-page) independent of
+// whatever event-page template the shop happens to configure.
+const { share } = vi.hoisted(() => ({ share: { url: 'https://shop.test/events/abc-123' as string | null } }))
+vi.mock('../lib/event-share', () => ({ eventShareUrl: () => share.url }))
 
 // happy-dom rejects clipboard writes by default (no secure context).
 // Stub the entire navigator.clipboard via stubGlobal so the component
@@ -18,10 +23,13 @@ beforeAll(() => {
   }))
 })
 afterAll(() => { vi.unstubAllGlobals() })
-beforeEach(() => { writeText.mockReset() })
+beforeEach(() => {
+  writeText.mockReset()
+  share.url = 'https://shop.test/events/abc-123'
+})
 
 describe('ShareEventButton', () => {
-  it('copies the Wix URL and toasts on success', async () => {
+  it('copies the event-page URL and toasts on success', async () => {
     writeText.mockResolvedValue(undefined)
     const user = userEvent.setup()
     render(
@@ -32,7 +40,7 @@ describe('ShareEventButton', () => {
 
     await user.click(screen.getByRole('button', { name: /share link/i }))
 
-    expect(writeText).toHaveBeenCalledWith(`${siteConfig.urls.site}/events/abc-123`)
+    expect(writeText).toHaveBeenCalledWith('https://shop.test/events/abc-123')
     await waitFor(() => {
       expect(screen.getByText(/copied to clipboard/i)).toBeInTheDocument()
     })
@@ -52,5 +60,16 @@ describe('ShareEventButton', () => {
     await waitFor(() => {
       expect(screen.getByText(/could not copy link/i)).toBeInTheDocument()
     })
+  })
+
+  it('renders nothing when the shop has no shareable event page', () => {
+    share.url = null
+    render(
+      <ToastProvider>
+        <ShareEventButton eventId="abc-123" />
+      </ToastProvider>
+    )
+
+    expect(screen.queryByRole('button', { name: /share link/i })).not.toBeInTheDocument()
   })
 })

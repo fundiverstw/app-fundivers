@@ -15,7 +15,7 @@
 export const siteConfig = {
   // Must equal core's current CONFIG_CONTRACT_VERSION (src/config/site.ts) or
   // the build fails. Bump it whenever core's CHANGELOG.md tells you to migrate.
-  configVersion: 7,
+  configVersion: 8,
 
   identity: {
     // Printed in italics on the registration PDF. Leave blank to omit it.
@@ -42,6 +42,7 @@ export const siteConfig = {
   urls: {
     site: 'https://www.example.com',
     app: 'https://app.example.com',
+    eventPage: 'https://www.example.com/events/{id}',
   },
 
   locale: {

@@ -31,6 +31,7 @@ export const siteConfigSchema = z.object({
   urls: z.object({
     site: url,
     app: url,
+    eventPage: url.nullable(),
   }),
   locale: z.object({
     timezone: z.string().min(1),

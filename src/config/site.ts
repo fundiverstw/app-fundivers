@@ -40,6 +40,12 @@ export interface SiteUrls {
   site: string
   /** The deployed app origin, no trailing slash. */
   app: string
+  /**
+   * Public event-page URL template used by the share-link button; `{id}` is
+   * replaced with the event id. null → the shop has no shareable event page,
+   * so the share affordance hides itself.
+   */
+  eventPage: string | null
 }
 
 /**
@@ -137,6 +143,6 @@ export interface SiteConfig {
 // Bump when the SiteConfig contract changes in a way that requires forks to
 // migrate their fundive.config.ts. The build compares this against
 // siteConfig.configVersion and fails loudly on a mismatch.
-export const CONFIG_CONTRACT_VERSION = 7
+export const CONFIG_CONTRACT_VERSION = 8
 
 export const siteConfig: SiteConfig = raw
