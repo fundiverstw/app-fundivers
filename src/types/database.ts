@@ -818,6 +818,12 @@ export interface Database {
           signed_name: string
           signed_at: string
           event_id: string | null
+          /** Content snapshot taken at signing time (20260711200000). NULL on
+           *  rows signed before snapshotting existed. */
+          signed_title: string | null
+          signed_body: string | null
+          signed_pdf_path: string | null
+          content_sha256: string | null
         }
         // Divers never insert directly — sign_waiver() is the only write path.
         // Insert here covers the admin-correction policy.
@@ -830,6 +836,10 @@ export interface Database {
           signed_name: string
           signed_at?: string
           event_id?: string | null
+          signed_title?: string | null
+          signed_body?: string | null
+          signed_pdf_path?: string | null
+          content_sha256?: string | null
         }
         Update: Partial<Database['public']['Tables']['waiver_signatures']['Insert']>
         Relationships: []
