@@ -57,7 +57,7 @@ describe('AdminDashboardPage', () => {
     const active = screen.getByText('Active divers').closest('div')!
     expect(within(active).getByText('2')).toBeInTheDocument()
 
-    const pending = screen.getByText('Pending applications').closest('div')!
+    const pending = screen.getByText('Pending new user requests').closest('div')!
     expect(within(pending).getByText('3')).toBeInTheDocument()
   })
 

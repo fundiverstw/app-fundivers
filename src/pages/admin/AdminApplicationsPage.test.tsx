@@ -48,7 +48,7 @@ describe('AdminApplicationsPage', () => {
   it('renders empty-state when no pending applications', async () => {
     from.mockReturnValue(mockQueryBuilder({ data: [] }))
     renderPage()
-    expect(await screen.findByText(/no pending applications/i)).toBeInTheDocument()
+    expect(await screen.findByText(/no pending new user requests/i)).toBeInTheDocument()
     expect(screen.getByText('0 pending')).toBeInTheDocument()
   })
 
