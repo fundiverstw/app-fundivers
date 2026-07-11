@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 // Animated water caustics — the marketing site's (site-fundivers) ambient
 // background, ported to the app's dashboard. Two SVG fractal-noise layers, each
@@ -19,15 +19,17 @@ export function Caustics() {
   // non-touch, wide screens that haven't asked for reduced motion. (The CSS
   // hides the whole .caustics element on mobile, so this also stops SMIL
   // ticking there; the check keeps it off on reduced-motion desktops too.)
-  const [animate, setAnimate] = useState(false)
-  useEffect(() => {
+  // Decided once at mount — the media state doesn't change often enough to
+  // warrant a live subscription, and computing it in a lazy initializer keeps
+  // setState out of an effect (no cascading render).
+  const [animate] = useState(() => {
     const mm = (q: string) => typeof matchMedia !== 'undefined' && matchMedia(q).matches
-    setAnimate(
+    return (
       !mm('(prefers-reduced-motion: reduce)') &&
       !mm('(hover: none) and (pointer: coarse)') &&
-      !mm('(max-width: 820px)'),
+      !mm('(max-width: 820px)')
     )
-  }, [])
+  })
 
   return (
     <div className="caustics" aria-hidden="true">
