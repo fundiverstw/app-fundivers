@@ -869,7 +869,7 @@ export const ja: Messages = {
         partnersComms: 'パートナー・連絡',
       },
       applications: { title: '申請', blurb: '保留中のダイバー申請を承認または却下します。' },
-      dashboard: { title: 'ダッシュボード', blurb: 'ショップ全体の予約・売上・アクティビティのグラフ。' },
+      dashboard: { title: '業績', blurb: 'ショップ全体の予約・売上・アクティビティのグラフ。' },
       newEvent: { title: 'イベント作成', blurb: 'ダイビングやコースを作成。既存のイベントはカレンダーから編集できます。' },
       rooms: { title: '部屋オプション', blurb: '複数日ダイビングで提供する部屋タイプの追加・名称変更・価格変更・削除。' },
       addons: { title: '追加オプション', blurb: '任意の項目（器材・コース・送迎）の追加・名称変更・価格変更・削除。' },
@@ -1872,7 +1872,7 @@ export const ja: Messages = {
       aboveLargest: '在庫の最大サイズより大きい',
     },
     dashboard: {
-      title: 'ダッシュボード',
+      title: '業績',
       subtitle: (year: number, timezone: string) => `${year}年 · ハイシーズン（6〜8月）を中心に表示 · 売上は純額（入金 − 返金）、${timezone}。`,
       historyLink: '過去との比較 →',
       revenueThisMonth: '今月の売上',
@@ -1903,7 +1903,7 @@ export const ja: Messages = {
     history: {
       title: '過去との比較',
       subtitle: (from: number, to: number, region: string) => `天候と予約の比較、${from}〜${to}年 · ${region} · ハイシーズン（6〜8月）を中心に表示。`,
-      dashboardLink: '← ダッシュボード',
+      dashboardLink: '← 業績',
       peakSeasonCompare: (now: number, prev: number) => `ハイシーズン ${now}年 vs ${prev}年`,
       peakBookings: '予約数（6〜8月）',
       avgRain: '平均降水量',

@@ -52,7 +52,7 @@ function renderPage() {
 describe('AdminDashboardPage', () => {
   it('renders KPI cards from fetched data', async () => {
     renderPage()
-    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Business performance' })).toBeInTheDocument()
 
     const active = screen.getByText('Active divers').closest('div')!
     expect(within(active).getByText('2')).toBeInTheDocument()
@@ -63,7 +63,7 @@ describe('AdminDashboardPage', () => {
 
   it('lists upcoming events in the fill table', async () => {
     renderPage()
-    await screen.findByRole('heading', { name: 'Dashboard' })
+    await screen.findByRole('heading', { name: 'Business performance' })
     await waitFor(() => expect(screen.getAllByText('Long Dong').length).toBeGreaterThanOrEqual(1))
     expect(screen.getByText('OW Course')).toBeInTheDocument()
   })

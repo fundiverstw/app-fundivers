@@ -877,7 +877,7 @@ export const en = {
         partnersComms: 'Partners & Comms',
       },
       applications: { title: 'Applications', blurb: 'Approve or reject pending diver applications.' },
-      dashboard: { title: 'Dashboard', blurb: 'Bookings, revenue and activity charts across the shop.' },
+      dashboard: { title: 'Business performance', blurb: 'Bookings, revenue and activity charts across the shop.' },
       newEvent: { title: 'New event', blurb: 'Create a dive or course. Edit existing events from the calendar.' },
       rooms: { title: 'Room options', blurb: 'Add, rename, reprice or delete room types offered with multi-day dives.' },
       addons: { title: 'Add-ons', blurb: 'Add, rename, reprice or delete optional items (gear, courses, transport).' },
@@ -1881,7 +1881,7 @@ export const en = {
       aboveLargest: 'above largest stocked size',
     },
     dashboard: {
-      title: 'Dashboard',
+      title: 'Business performance',
       subtitle: (year: number, timezone: string) => `${year} · peak season (Jun–Aug) centred · revenue netted (paid − refunded), ${timezone}.`,
       historyLink: 'Historical perspective →',
       revenueThisMonth: 'Revenue this month',
@@ -1912,7 +1912,7 @@ export const en = {
     history: {
       title: 'Historical perspective',
       subtitle: (from: number, to: number, region: string) => `Weather vs. bookings, ${from}–${to} · ${region} · peak season (Jun–Aug) centred.`,
-      dashboardLink: '← Dashboard',
+      dashboardLink: '← Business performance',
       peakSeasonCompare: (now: number, prev: number) => `Peak season ${now} vs ${prev}`,
       peakBookings: 'Bookings (Jun–Aug)',
       avgRain: 'Avg rain',

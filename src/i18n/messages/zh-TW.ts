@@ -870,7 +870,7 @@ export const zhTW: Messages = {
         partnersComms: '夥伴與通知',
       },
       applications: { title: '申請審核', blurb: '核准或拒絕待審的潛水員申請。' },
-      dashboard: { title: '儀表板', blurb: '店家整體的預訂、營收與活動圖表。' },
+      dashboard: { title: '營運績效', blurb: '店家整體的預訂、營收與活動圖表。' },
       newEvent: { title: '新增活動', blurb: '建立潛水或課程。既有活動可從行事曆編輯。' },
       rooms: { title: '房型選項', blurb: '新增、重新命名、調整價格或刪除多日潛水提供的房型。' },
       addons: { title: '附加項目', blurb: '新增、重新命名、調整價格或刪除選購項目（器材、課程、交通）。' },
@@ -1873,7 +1873,7 @@ export const zhTW: Messages = {
       aboveLargest: '大於庫存最大尺寸',
     },
     dashboard: {
-      title: '儀表板',
+      title: '營運績效',
       subtitle: (year: number, timezone: string) => `${year} 年 · 以旺季（6 至 8 月）為中心 · 營收為淨額（已付款 − 已退款），${timezone}。`,
       historyLink: '歷史對照 →',
       revenueThisMonth: '本月營收',
@@ -1904,7 +1904,7 @@ export const zhTW: Messages = {
     history: {
       title: '歷史對照',
       subtitle: (from: number, to: number, region: string) => `天氣與報名對照，${from}–${to} · ${region} · 以旺季（6 至 8 月）為中心。`,
-      dashboardLink: '← 儀表板',
+      dashboardLink: '← 營運績效',
       peakSeasonCompare: (now: number, prev: number) => `旺季 ${now} 年 vs ${prev} 年`,
       peakBookings: '報名數（6 至 8 月）',
       avgRain: '平均雨量',
