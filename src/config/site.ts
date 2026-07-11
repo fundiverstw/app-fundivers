@@ -87,6 +87,14 @@ export interface SiteFeatures {
   push: boolean
   /** Admin broadcast relay (also gated by BROADCAST_WEBHOOK_URL). */
   broadcast: boolean
+  /**
+   * Public "share this event" button. Optional, off by default. Turning it on
+   * only produces working links if the shop independently builds event pages on
+   * their own website, keyed by the app's event id, and points urls.eventPage
+   * at them ({id} is substituted). That web-dev wiring is the shop's own work —
+   * the app just emits the URL. Also gated by a non-null urls.eventPage.
+   */
+  eventSharing: boolean
 }
 
 /** Pre-fill for the admin boat-manifest export. The chartered vessel varies per

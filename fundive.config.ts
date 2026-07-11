@@ -76,6 +76,7 @@ export const siteConfig = {
   features: {
     push: true,
     broadcast: true,
+    eventSharing: true,
   },
 
   business: {
