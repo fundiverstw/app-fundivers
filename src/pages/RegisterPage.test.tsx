@@ -63,7 +63,7 @@ function renderAt(path: string) {
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/register" element={<RegisterPage />} />
-        <Route path="/register/:type/:id" element={<RegisterPage />} />
+        <Route path="/register/:id" element={<RegisterPage />} />
       </Routes>
     </MemoryRouter>
   )
@@ -88,7 +88,7 @@ describe('RegisterPage', () => {
     useAuthMock.mockReturnValue({ user: null, profile: null, loading: false })
     fetchEventsForBookings.mockResolvedValue(new Map([['dive-a', testEvent]]))
 
-    renderAt('/register/dive/dive-a')
+    renderAt('/register/dive-a')
     // The form body (stubbed) renders in place of the old gate — no auth wall.
     await screen.findByTestId('form-body')
     // Returning divers can collapse-expand a sign-in form from the banner.
@@ -105,7 +105,7 @@ describe('RegisterPage', () => {
       return mockQueryBuilder({ data: null })
     })
 
-    renderAt('/register/dive/dive-a')
+    renderAt('/register/dive-a')
     await screen.findByText(/already registered/i)
     expect(screen.getByText(/confirmed/i)).toBeInTheDocument()
   })
@@ -115,7 +115,7 @@ describe('RegisterPage', () => {
     fetchEventsForBookings.mockResolvedValue(new Map([['dive-a', testEvent]]))
     from.mockImplementation(() => mockQueryBuilder({ data: null }))
 
-    renderAt('/register/dive/dive-a')
+    renderAt('/register/dive-a')
     await screen.findByTestId('form-body')
     expect(screen.getByTestId('form-body')).toHaveTextContent('Kenting Dive')
   })

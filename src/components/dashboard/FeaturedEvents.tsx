@@ -10,7 +10,7 @@ import type { AppEvent } from '../../types/database'
 // dashboard's animated caustics as a stack of image-led hero cards. Each card
 // shows the event's featured photo (resolveImageUrl → self-hosted copy) under a
 // dark gradient so the title stays legible, and deep-links straight into that
-// event's registration form (/register/:type/:id). Renders nothing when there's
+// event's registration form (/register/:id). Renders nothing when there's
 // no featured event coming up, so the ambient background stays clear.
 
 const LOOKAHEAD_DAYS = 120
@@ -57,7 +57,7 @@ function FeaturedCard({ event: e }: { event: AppEvent }) {
 
   return (
     <Link
-      to={`/register/${e.type}/${e.id}`}
+      to={`/register/${e.id}`}
       className="group glass glow-teal relative block h-32 overflow-hidden rounded-2xl shadow-lg"
     >
       {img ? (

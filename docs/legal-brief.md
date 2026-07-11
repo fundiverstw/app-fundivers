@@ -193,7 +193,7 @@ plus subsequent forward migrations (`20260514030000_parent_child_accounts.sql`,
 5. Diver clicks confirmation link, logs in. Their status remains `pending`
    until an admin reviews and flips to `active`.
 
-### 4.2 Public registration (`/register/:type/:id` route)
+### 4.2 Public registration (`/register/:id` route)
 
 Single-form path used when arriving from the Wix marketing site or a
 deep-link. Submitted form fields populate the profile and create one
@@ -583,7 +583,7 @@ NOT cover:
 The Wix marketing site has its own terms surface that should be
 reviewed in parallel; the two should be consistent (especially the
 sections on data collection at the marketing → app handoff via
-`/register/:type/:id` deep-links).
+`/register/:id` deep-links).
 
 ---
 

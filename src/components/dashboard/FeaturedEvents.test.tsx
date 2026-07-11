@@ -38,8 +38,8 @@ describe('FeaturedEvents', () => {
     renderIt()
 
     const link = await screen.findByRole('link', { name: /featured reef dive/i })
-    expect(link).toHaveAttribute('href', '/register/dive/d1')
-    expect(screen.getByRole('link', { name: /featured course/i })).toHaveAttribute('href', '/register/course/c1')
+    expect(link).toHaveAttribute('href', '/register/d1')
+    expect(screen.getByRole('link', { name: /featured course/i })).toHaveAttribute('href', '/register/c1')
     // Non-featured events are excluded.
     expect(screen.queryByText('Ordinary Dive')).not.toBeInTheDocument()
   })

@@ -18,7 +18,7 @@ const rp = t.registerPage
 
 // Public standalone registration page. Two entry paths:
 //   /register                 → event picker (Wix home link, direct URL)
-//   /register/:type/:id       → form pre-filled with that event (Wix calendar
+//   /register/:id             → form pre-filled with that event (Wix calendar
 //                                deep-link, in-app event click)
 //
 // Both render this component. When no event is in the URL we show the picker
@@ -31,7 +31,7 @@ const rp = t.registerPage
 type Phase = 'loading' | 'event-picker' | 'event-missing' | 'form' | 'already-booked' | 'just-booked'
 
 export function RegisterPage() {
-  const { type, id } = useParams<{ type: 'dive' | 'course'; id: string }>()
+  const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user, profile, loading: authLoading } = useAuth()
 
@@ -40,14 +40,14 @@ export function RegisterPage() {
   const [justBooked, setJustBooked] = useState<Booking | null>(null)
   const [dataLoading, setDataLoading] = useState(true)
 
-  // Only fetch the specific event when :type/:id are in the URL. For the bare
+  // Only fetch the specific event when :id is in the URL. For the bare
   // /register path we don't fetch one event; the picker fetches a list.
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       setDataLoading(true)
 
-      if (!type || !id) {
+      if (!id) {
         setEvent(null)
         setExisting(null)
         setDataLoading(false)
@@ -74,11 +74,11 @@ export function RegisterPage() {
       setDataLoading(false)
     })()
     return () => { cancelled = true }
-  }, [type, id, user])
+  }, [id, user])
 
   const phase: Phase =
     authLoading || dataLoading        ? 'loading'
-    : !type || !id                    ? 'event-picker'
+    : !id                             ? 'event-picker'
     : !event                          ? 'event-missing'
     : justBooked                      ? 'just-booked'
     : existing                        ? 'already-booked'
@@ -234,7 +234,7 @@ function EventPickerStep() {
               <li key={`resume_${ev.type}_${ev.id}`}>
                 <button
                   type="button"
-                  onClick={() => navigate(`/register/${ev.type}/${ev.id}`)}
+                  onClick={() => navigate(`/register/${ev.id}`)}
                   className="w-full text-left bg-accent/15 border border-accent hover:border-brand-700 rounded-lg p-3 transition-colors flex items-center justify-between gap-3"
                 >
                   <div className="min-w-0">
@@ -265,7 +265,7 @@ function EventPickerStep() {
             <li key={`${ev.type}_${ev.id}`}>
               <button
                 type="button"
-                onClick={() => navigate(`/register/${ev.type}/${ev.id}`)}
+                onClick={() => navigate(`/register/${ev.id}`)}
                 className="w-full text-left bg-white/70 backdrop-blur-md border border-surface-200 hover:border-accent rounded-lg p-3 transition-colors"
               >
                 <div className="flex items-start justify-between gap-3">

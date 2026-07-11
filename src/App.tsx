@@ -60,7 +60,7 @@ import { AdminVehiclesPage } from './pages/admin/AdminVehiclesPage'
 import { AdminWaiversPage } from './pages/admin/AdminWaiversPage'
 import { AdminCancellationPoliciesPage } from './pages/admin/AdminCancellationPoliciesPage'
 
-// Public registration flow — /register (pick an event) and /register/:type/:id
+// Public registration flow — /register (pick an event) and /register/:id
 // (deep-link from Wix calendar) both render RegisterPage. Outside ProtectedRoute
 // so cold visitors don't hit an auth wall; lazy-loaded so the cold path doesn't
 // pay for the full PWA bundle.
@@ -89,7 +89,7 @@ export default function App() {
           }
         />
         <Route
-          path="/register/:type/:id"
+          path="/register/:id"
           element={
             <Suspense fallback={<RegisterLoading />}>
               <RegisterPage />
