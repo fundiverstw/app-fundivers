@@ -500,7 +500,7 @@ export function AdminEventDetailPage() {
             >
               {ed.gearMap}
             </Link>
-            <ShareEventButton event={{ id, type: event.type }} className="text-xs bg-surface-700/80 hover:bg-surface-700 text-white px-3 py-1 rounded-lg" />
+            <ShareEventButton eventId={id} className="text-xs bg-surface-700/80 hover:bg-surface-700 text-white px-3 py-1 rounded-lg" />
           </div>
           {event && (
             <EventStaffSection

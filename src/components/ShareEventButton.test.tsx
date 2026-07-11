@@ -26,13 +26,13 @@ describe('ShareEventButton', () => {
     const user = userEvent.setup()
     render(
       <ToastProvider>
-        <ShareEventButton event={{ id: 'abc-123', type: 'dive' }} />
+        <ShareEventButton eventId="abc-123" />
       </ToastProvider>
     )
 
     await user.click(screen.getByRole('button', { name: /share link/i }))
 
-    expect(writeText).toHaveBeenCalledWith(`${siteConfig.urls.site}/dives/abc-123`)
+    expect(writeText).toHaveBeenCalledWith(`${siteConfig.urls.site}/events/abc-123`)
     await waitFor(() => {
       expect(screen.getByText(/copied to clipboard/i)).toBeInTheDocument()
     })
@@ -43,7 +43,7 @@ describe('ShareEventButton', () => {
     const user = userEvent.setup()
     render(
       <ToastProvider>
-        <ShareEventButton event={{ id: 'xyz-789', type: 'course' }} />
+        <ShareEventButton eventId="xyz-789" />
       </ToastProvider>
     )
 

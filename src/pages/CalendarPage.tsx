@@ -219,7 +219,7 @@ export function CalendarPage() {
               {bookingLoading ? '…' : isBooked(selected) ? t.calendar.cancelBooking : t.common.register}
             </button>
             <ShareEventButton
-              event={selected}
+              eventId={selected.id}
               label={t.calendar.shareWithFriends}
               className="w-full py-2 rounded-xl text-sm font-semibold bg-surface-700 hover:bg-surface-800 text-white transition-colors"
             />

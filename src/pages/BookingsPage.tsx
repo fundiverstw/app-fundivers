@@ -355,7 +355,7 @@ function Card({
             )}
             {row.event && (
               <ShareEventButton
-                event={row.event}
+                eventId={row.event.id}
                 className="flex-1 text-xs py-2 px-3 rounded-lg bg-surface-700 hover:bg-surface-800 text-white font-medium"
               />
             )}
