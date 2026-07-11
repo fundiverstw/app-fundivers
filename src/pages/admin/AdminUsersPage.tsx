@@ -349,6 +349,24 @@ export function AdminUsersPage() {
     }
   }
 
+  // Promote/demote a user between diver / staff / admin. The DB already gates
+  // this — the `profiles: admin update` policy plus block_self_privileged_profile_change
+  // let only an admin change a role. The UI only offers it for OTHER users
+  // (never isSelf), so an admin can't demote themselves and the shop can never
+  // be left without an admin.
+  async function handleChangeRole(target: Profile, newRole: Profile['role']) {
+    if (newRole === target.role) return
+    const name = target.name || target.nickname || target.contact_id || target.id
+    try {
+      const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', target.id)
+      if (error) throw error
+      setUsers(prev => prev.map(u => (u.id === target.id ? { ...u, role: newRole } : u)))
+      toast.success(us.roleChanged(name, us.roleNames[newRole]))
+    } catch (err) {
+      toast.error(us.couldNotChangeRole(errorMessage(err)))
+    }
+  }
+
   async function handleVoidPayment(userId: string, bookingId: string, paymentId: string) {
     const extras = extrasCache.get(userId)
     if (!extras) return
@@ -436,6 +454,7 @@ export function AdminUsersPage() {
             onSettleCredit={(creditId, note) => handleSettleCredit(u.id, creditId, note)}
             onReopenCredit={(creditId) => handleReopenCredit(u.id, creditId)}
             onDelete={() => handleDeleteUser(u)}
+            onChangeRole={(role) => handleChangeRole(u, role)}
             isAdmin={isAdmin}
             isSelf={profile?.id === u.id}
           />
@@ -451,7 +470,7 @@ export function AdminUsersPage() {
 
 function UserCard({
   user, allUsers, onFamilyChanged, open, extras, loading, editing, onToggle, onEdit, onCancelEdit, onProfileSaved,
-  onRecordPayment, onVoidPayment, onMarkDepositPaid, onCreateCredit, onApplyCredit, onSettleCredit, onReopenCredit, onDelete, isAdmin, isSelf,
+  onRecordPayment, onVoidPayment, onMarkDepositPaid, onCreateCredit, onApplyCredit, onSettleCredit, onReopenCredit, onDelete, onChangeRole, isAdmin, isSelf,
 }: {
   user: Profile
   allUsers: Profile[]
@@ -472,6 +491,7 @@ function UserCard({
   onSettleCredit: (creditId: string, note: string) => Promise<void>
   onReopenCredit: (creditId: string) => Promise<void>
   onDelete: () => Promise<void>
+  onChangeRole: (role: Profile['role']) => Promise<void>
   isAdmin: boolean
   isSelf: boolean
 }) {
@@ -543,6 +563,20 @@ function UserCard({
           ) : (
             <>
               <div className="flex justify-end items-center gap-4">
+                {isAdmin && !isSelf && (
+                  <label className="flex items-center gap-1 text-xs text-brand-700">
+                    {us.roleLabel}
+                    <select
+                      value={user.role}
+                      onChange={e => onChangeRole(e.target.value as Profile['role'])}
+                      className="text-xs border border-surface-300 rounded px-1 py-0.5 bg-white text-brand-900"
+                    >
+                      <option value="diver">{us.roleNames.diver}</option>
+                      <option value="staff">{us.roleNames.staff}</option>
+                      <option value="admin">{us.roleNames.admin}</option>
+                    </select>
+                  </label>
+                )}
                 {isAdmin && !isSelf && (
                   <button
                     type="button"

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { AdminUsersPage } from './AdminUsersPage'
 import { mockQueryBuilder } from '../../../tests/test-utils'
@@ -72,5 +73,44 @@ describe('AdminUsersPage deep link', () => {
       const toggle = document.getElementById(id)!.querySelector('[aria-expanded]')
       expect(toggle).toHaveAttribute('aria-expanded', 'false')
     }
+  })
+})
+
+describe('AdminUsersPage role promotion', () => {
+  it('an admin can promote another user to staff', async () => {
+    const builder = mockQueryBuilder({ data: profiles })
+    const updateSpy = vi.fn(() => builder)
+    ;(builder as Record<string, unknown>).update = updateSpy
+    from.mockImplementation((table: string) =>
+      table === 'profiles' ? builder : mockQueryBuilder({ data: [] }),
+    )
+
+    render(<MemoryRouter initialEntries={['/admin/users?diver=u2']}><AdminUsersPage /></MemoryRouter>)
+
+    // Bo's card auto-expands; its admin action row exposes a role <select>.
+    const card = await waitFor(() => {
+      const el = document.getElementById('diver-u2')!.querySelector('select')
+      if (!el) throw new Error('role select not rendered yet')
+      return el as HTMLSelectElement
+    })
+    await userEvent.selectOptions(card, 'staff')
+
+    await waitFor(() => expect(updateSpy).toHaveBeenCalledWith({ role: 'staff' }))
+  })
+
+  it('offers no role control for the admin’s own row', async () => {
+    // admin-1 is the signed-in admin; expanding their own card must not let
+    // them change their own role (guards against self-lockout).
+    const self = [{ id: 'admin-1', name: 'Me', nickname: 'Me', role: 'admin', email: 'me@x.io', logged_dives: 0, gear_owned: [] }]
+    from.mockImplementation((table: string) =>
+      table === 'profiles' ? mockQueryBuilder({ data: self }) : mockQueryBuilder({ data: [] }),
+    )
+    render(<MemoryRouter initialEntries={['/admin/users?diver=admin-1']}><AdminUsersPage /></MemoryRouter>)
+    await screen.findByText('Me')
+    await waitFor(() => {
+      const el = document.getElementById('diver-admin-1')!.querySelector('[aria-expanded]')
+      expect(el).toHaveAttribute('aria-expanded', 'true')
+    })
+    expect(document.getElementById('diver-admin-1')!.querySelector('select')).toBeNull()
   })
 })

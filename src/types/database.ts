@@ -461,7 +461,7 @@ export interface Database {
           deep_card_path?: string | null
           medical_notes?: string | null
           avatar_url?: string | null
-          role?: 'diver' | 'admin'
+          role?: 'diver' | 'admin' | 'staff'
           height_cm?: number | null
           weight_kg?: number | null
           shoe_size?: string | null
@@ -497,7 +497,7 @@ export interface Database {
           deep_card_path?: string | null
           medical_notes?: string | null
           avatar_url?: string | null
-          role?: 'diver' | 'admin'
+          role?: 'diver' | 'admin' | 'staff'
           height_cm?: number | null
           weight_kg?: number | null
           shoe_size?: string | null
