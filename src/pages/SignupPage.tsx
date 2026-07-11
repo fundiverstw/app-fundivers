@@ -4,7 +4,6 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { supabase } from '../lib/supabase'
-import { CURRENT_TERMS_VERSION } from '../lib/terms-version'
 import { Logo } from '../components/Logo'
 import { PasswordInput } from '../components/PasswordInput'
 import { CARD_ELEVATED, INPUT, INPUT_LABEL, BTN_PRIMARY, TEXT_ERROR, TEXT_LINK, TEXT_MUTED } from '../styles/tokens'
@@ -36,7 +35,6 @@ export function SignupPage() {
       password: data.password,
       options: { data: {
         agreed_to_terms_at:      new Date().toISOString(),
-        agreed_to_terms_version: CURRENT_TERMS_VERSION,
       } },
     })
     if (error) { setServerError(error.message); return }

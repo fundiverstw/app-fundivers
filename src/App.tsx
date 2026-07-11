@@ -58,6 +58,7 @@ import { AdminTrustedPartnersPage } from './pages/admin/AdminTrustedPartnersPage
 import { AdminGearSizingPage } from './pages/admin/AdminGearSizingPage'
 import { AdminVehiclesPage } from './pages/admin/AdminVehiclesPage'
 import { AdminWaiversPage } from './pages/admin/AdminWaiversPage'
+import { AdminTermsPage } from './pages/admin/AdminTermsPage'
 import { AdminCancellationPoliciesPage } from './pages/admin/AdminCancellationPoliciesPage'
 
 // Public registration flow — /register (pick an event) and /register/:id
@@ -153,6 +154,7 @@ export default function App() {
                 <Route path="/admin/gear-sizing" element={<AdminGearSizingPage />} />
                 <Route path="/admin/vehicles" element={<AdminVehiclesPage />} />
                 <Route path="/admin/waivers" element={<AdminWaiversPage />} />
+                <Route path="/admin/terms" element={<AdminTermsPage />} />
                 <Route path="/admin/cancellation-policies" element={<AdminCancellationPoliciesPage />} />
                 <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
                 <Route path="/admin/history" element={<AdminHistoryPage />} />

@@ -3,13 +3,20 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { TermsPage } from './TermsPage'
-import { CURRENT_TERMS_VERSION } from '../lib/terms-version'
+
+// The shop's terms live in the DB; the page reads them through useTerms() and
+// consents through acceptCurrentTerms(). LIVE_VERSION stands in for whatever
+// the shop has published.
+const LIVE_VERSION = 3
 
 const useAuthMock = vi.fn()
 vi.mock('../hooks/useAuth', () => ({ useAuth: () => useAuthMock() }))
 
-const rpc = vi.fn()
-vi.mock('../lib/supabase', () => ({ supabase: { rpc: (...a: unknown[]) => rpc(...a) } }))
+const useTermsMock = vi.fn()
+vi.mock('../lib/use-terms', () => ({ useTerms: () => useTermsMock() }))
+
+const acceptCurrentTerms = vi.fn()
+vi.mock('../lib/terms', () => ({ acceptCurrentTerms: () => acceptCurrentTerms() }))
 
 const navigate = vi.fn()
 vi.mock('react-router-dom', async (orig) => ({
@@ -19,8 +26,13 @@ vi.mock('react-router-dom', async (orig) => ({
 
 beforeEach(() => {
   useAuthMock.mockReset()
-  rpc.mockReset()
+  useTermsMock.mockReset()
+  acceptCurrentTerms.mockReset()
   navigate.mockReset()
+  useTermsMock.mockReturnValue({
+    terms: { title: 'Terms of Use', body: '## Hello\n\nSome terms.', version: LIVE_VERSION },
+    loading: false,
+  })
 })
 
 function renderAt(path = '/terms') {
@@ -30,7 +42,7 @@ function renderAt(path = '/terms') {
 describe('TermsPage re-acceptance banner', () => {
   it('hides the banner when the user is already at the current version', () => {
     useAuthMock.mockReturnValue({
-      profile: { id: 'u1', agreed_to_terms_version: CURRENT_TERMS_VERSION },
+      profile: { id: 'u1', agreed_to_terms_version: LIVE_VERSION },
       refreshProfile: vi.fn(),
     })
     renderAt('/terms?reaccept=1')
@@ -50,20 +62,21 @@ describe('TermsPage re-acceptance banner', () => {
     const order: string[] = []
     const refreshProfile = vi.fn(async () => { order.push('refresh') })
     navigate.mockImplementation(() => { order.push('navigate') })
-    rpc.mockResolvedValue({ error: null })
+    acceptCurrentTerms.mockResolvedValue(LIVE_VERSION)
     useAuthMock.mockReturnValue({ profile: { id: 'u1', agreed_to_terms_version: 0 }, refreshProfile })
 
     renderAt()
     await userEvent.click(screen.getByRole('button', { name: /I agree to the updated Terms/i }))
 
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/', { replace: true }))
-    expect(rpc).toHaveBeenCalledWith('accept_current_terms', { p_version: CURRENT_TERMS_VERSION })
+    // No argument: the server picks the version, so the client cannot choose one.
+    expect(acceptCurrentTerms).toHaveBeenCalledWith()
     expect(order).toEqual(['refresh', 'navigate'])
   })
 
   it('surfaces an error and does not navigate when the RPC fails', async () => {
     const refreshProfile = vi.fn()
-    rpc.mockResolvedValue({ error: { message: 'nope' } })
+    acceptCurrentTerms.mockRejectedValue(new Error('nope'))
     useAuthMock.mockReturnValue({ profile: { id: 'u1', agreed_to_terms_version: 0 }, refreshProfile })
 
     renderAt()

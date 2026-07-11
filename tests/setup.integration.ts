@@ -25,3 +25,14 @@ if (!process.env.API_URL || !process.env.SERVICE_ROLE_KEY) {
     'supabase status did not expose API_URL and SERVICE_ROLE_KEY. Is the stack running?'
   )
 }
+
+// Point the APP's module-level client (src/lib/supabase.ts, which reads
+// import.meta.env.VITE_*) at the same local stack. Without this it picks up
+// `.env`'s VITE_SUPABASE_ANON_KEY=dummy-anon-key-for-build — a placeholder that
+// exists only to satisfy the build-time required-env check. Every read through
+// that client then fails auth, the lib helpers swallow the error and return [],
+// and the tests that exercise src/lib/* fail with a baffling
+// "expected false to be true". Two of them did, silently, for a while.
+const viteEnv = import.meta.env as unknown as Record<string, string>
+viteEnv.VITE_SUPABASE_URL = process.env.API_URL
+viteEnv.VITE_SUPABASE_ANON_KEY = process.env.ANON_KEY!

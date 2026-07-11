@@ -2,21 +2,20 @@ import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Logo } from '../components/Logo'
 import { useAuth } from '../hooks/useAuth'
-import { supabase } from '../lib/supabase'
-import { CURRENT_TERMS_VERSION } from '../lib/terms-version'
 import { siteConfig } from '../config/site'
-import { TermsContent } from '../config/terms'
+import { Markdown } from '../components/Markdown'
+import { acceptCurrentTerms } from '../lib/terms'
+import { useTerms } from '../lib/use-terms'
+import { errorMessage } from '../lib/errors'
 import { t } from '../i18n'
 
-// Terms of Use + retention policy shown to divers at signup. Intentionally
-// plain: a small shop + a small user base deserves a summary a normal person
-// can read in 90 seconds. A proper lawyer pass is still recommended before
-// going live in anything resembling production.
+// The shop's Terms of Use, authored in admin -> Manage and stored in the DB
+// (migration 20260711100000). Rendered as a Markdown subset — never as HTML.
 //
 // Doubles as the re-acceptance surface (legal-brief #2 / route guard
-// RequireCurrentTerms): when an authenticated user lands here with a
-// stale agreed_to_terms_version, the ReacceptBanner at the top calls
-// the accept_current_terms RPC and routes them back to /dashboard.
+// RequireCurrentTerms): when an authenticated user lands here with an
+// agreed_to_terms_version below the live terms.version, the ReacceptBanner at
+// the top calls the accept_current_terms RPC and routes them back to /dashboard.
 
 export function TermsPage() {
   return (
@@ -27,7 +26,7 @@ export function TermsPage() {
 
       <main className="max-w-2xl mx-auto p-6 space-y-6 text-sm leading-relaxed">
         <ReacceptBanner />
-        <TermsContent />
+        <TermsBody />
 
         <div className="text-center pt-6">
           <Link to="/" className="text-sm text-brand-700 hover:underline">{t.terms.back}</Link>
@@ -37,28 +36,44 @@ export function TermsPage() {
   )
 }
 
-// Renders only when an authenticated user has a stale
-// agreed_to_terms_version — either bounced here by RequireCurrentTerms
-// or arriving via the ?reaccept=1 query param. Anonymous visitors and
-// users already at CURRENT_TERMS_VERSION see nothing.
+// The shop's document. Empty until an admin writes one — a fresh install must
+// show nothing rather than another shop's legal text.
+function TermsBody() {
+  const { terms, loading } = useTerms()
+  if (loading) return null
+  if (!terms?.body.trim()) return <p className="text-brand-950/70 italic">{t.terms.notPublished}</p>
+  return (
+    <article className="space-y-4">
+      <h1 className="text-xl font-bold text-brand-900">{terms.title}</h1>
+      <Markdown source={terms.body} />
+    </article>
+  )
+}
+
+// Renders only when an authenticated user has an agreed_to_terms_version below
+// the live terms.version — either bounced here by RequireCurrentTerms or
+// arriving via the ?reaccept=1 query param. Anonymous visitors and up-to-date
+// users see nothing.
 function ReacceptBanner() {
   const { profile, refreshProfile } = useAuth()
+  const { terms } = useTerms()
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
-  if (!profile) return null
-  const stale = (profile.agreed_to_terms_version ?? 0) < CURRENT_TERMS_VERSION
+  if (!profile || !terms) return null
+  const stale = (profile.agreed_to_terms_version ?? 0) < terms.version
   if (!stale && params.get('reaccept') !== '1') return null
   if (!stale) return null
 
   async function onAccept() {
     setSubmitting(true)
     setErr(null)
-    const { error } = await supabase.rpc('accept_current_terms', { p_version: CURRENT_TERMS_VERSION })
-    if (error) {
-      setErr(error.message)
+    try {
+      await acceptCurrentTerms()
+    } catch (e) {
+      setErr(errorMessage(e))
       setSubmitting(false)
       return
     }

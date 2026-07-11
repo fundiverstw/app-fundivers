@@ -283,12 +283,15 @@ export interface Database {
       }
       // Defined in 20260603000000_terms_consent_versioning.sql.
       // Server-stamps both agreed_to_terms_at (now()) and
-      // agreed_to_terms_version (caller-supplied) on the caller's
+      // agreed_to_terms_version on the caller's
       // profile. Called by the re-acceptance UI on TermsPage when
       // RequireCurrentTerms detects a stale version.
+      // No arguments on purpose: the server reads public.terms.version itself,
+      // so a modified client can't consent to a version it was never shown.
+      // Returns the version actually recorded (20260711100000).
       accept_current_terms: {
-        Args: { p_version: number }
-        Returns: void
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       // Defined in 20260603020000_profile_delete_cascade_and_admin_rpc.sql.
       // Admin-only. Deletes auth.users for the target id; the existing
@@ -426,8 +429,8 @@ export interface Database {
           gear_owned: string[]
           agreed_to_terms_at: string | null
           /** Version of the Terms of Use the user agreed to (server-stamped
-           *  by handle_new_user / accept_current_terms). When the SPA's
-           *  CURRENT_TERMS_VERSION constant exceeds this, RequireCurrentTerms
+           *  by handle_new_user / accept_current_terms). When the
+           *  live public.terms.version exceeds this, RequireCurrentTerms
            *  bounces the user to /terms for re-acceptance. Null = never
            *  consented. */
           agreed_to_terms_version: number | null
@@ -1363,6 +1366,29 @@ export interface Database {
           tagline_text?: string | null
         }
         Update: Partial<Database['public']['Tables']['trip_templates']['Insert']>
+        Relationships: []
+      }
+      // Shop-authored Terms of Use (20260711100000). Exactly one row: `singleton`
+      // is a constant-true primary key. Only an admin may UPDATE it; nobody may
+      // insert or delete, so there is no Insert type worth exposing.
+      terms: {
+        Row: {
+          singleton: true
+          title: string
+          /** Markdown. Rendered read-only; never injected as HTML. */
+          body: string
+          /** Bumped only on a material change; gates RequireCurrentTerms. */
+          version: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: never
+        Update: {
+          title?: string
+          body?: string
+          version?: number
+          updated_by?: string | null
+        }
         Relationships: []
       }
       cancellation_policies: {

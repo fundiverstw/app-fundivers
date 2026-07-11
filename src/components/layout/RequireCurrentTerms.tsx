@@ -2,14 +2,17 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { Spinner } from '../ui/Spinner'
 import { useAuth } from '../../hooks/useAuth'
 import { Logo } from '../Logo'
-import { CURRENT_TERMS_VERSION } from '../../lib/terms-version'
+import { useTerms } from '../../lib/use-terms'
 
 // Route guard for legal-brief item #2. If the authenticated user's
-// profiles.agreed_to_terms_version is below CURRENT_TERMS_VERSION (or
-// null — they never consented), every authenticated route except
-// /terms itself bounces to /terms?reaccept=1. The terms page detects
-// that query param and renders a re-acceptance button that calls the
-// accept_current_terms RPC.
+// profiles.agreed_to_terms_version is below the shop's live terms.version (or
+// null — they never consented), every authenticated route except /terms itself
+// bounces to /terms?reaccept=1. The terms page detects that query param and
+// renders a re-acceptance button that calls the accept_current_terms RPC.
+//
+// The version comes from the DB now, not a code constant. While it is unknown
+// (still loading, or the read failed) we FAIL OPEN and render the route: a
+// hiccup reading one row must never lock every diver out of the whole app.
 //
 // Rendered inside ProtectedRoute so this only runs for signed-in
 // users; loading state is handled there. If profile is still null we
@@ -18,6 +21,7 @@ import { CURRENT_TERMS_VERSION } from '../../lib/terms-version'
 
 export function RequireCurrentTerms() {
   const { profile, loading } = useAuth()
+  const { terms } = useTerms()
   const location = useLocation()
 
   if (loading) {
@@ -30,7 +34,8 @@ export function RequireCurrentTerms() {
   }
 
   if (!profile) return <Outlet />
-  if ((profile.agreed_to_terms_version ?? 0) >= CURRENT_TERMS_VERSION) return <Outlet />
+  if (!terms) return <Outlet />
+  if ((profile.agreed_to_terms_version ?? 0) >= terms.version) return <Outlet />
   if (location.pathname === '/terms') return <Outlet />
   return <Navigate to="/terms?reaccept=1" replace />
 }

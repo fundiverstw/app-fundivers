@@ -35,6 +35,7 @@ const CARDS: ManageCard[] = [
   { to: '/admin/notifications', ...m.notifications },
   { to: '/admin/accounting', ...m.accounting },
   { to: '/admin/waivers', ...m.waivers },
+  { to: '/admin/terms', ...m.terms },
   { to: '/admin/cancellation-policies', ...m.cancellationPolicies },
 ]
 

@@ -13,7 +13,7 @@ import type { WaiverRow } from '../types/database'
 //
 // `code` + integer `version` remain the stable keys: `waiver_signatures` and
 // `event_waivers` reference a waiver by its code, and a version bump forces a
-// re-sign (mirrors CURRENT_TERMS_VERSION for the Terms of Use).
+// re-sign (mirrors public.terms.version for the Terms of Use).
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type WaiverCadence =
