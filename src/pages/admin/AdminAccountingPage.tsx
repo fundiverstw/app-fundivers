@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { zipSync, strToU8 } from 'fflate'
 import { supabase } from '../../lib/supabase'
 import { siteConfig } from '../../config/site'
 import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
+import { requestEventDiverExport } from '../../lib/admin-event-export'
 import {
   fiscalYearRange,
   normalizeTransactions,
@@ -77,6 +78,109 @@ function downloadZip(filename: string, files: Record<string, string>): void {
   URL.revokeObjectURL(url)
 }
 
+// Boat manifest is a per-dive .xlsx the export-event-divers edge function
+// builds and emails to the shop (BCCing the admin). The event page has the same
+// action; this surfaces it centrally so an admin can pick any dive. Last-used
+// boat values are shared with that modal via the same localStorage key.
+const BOAT_MANIFEST_LS_KEY = 'fd_boat_manifest_v1'
+const FIELD = 'w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900'
+
+type DiveOption = { id: string; label: string }
+
+function ManifestSection() {
+  const toast = useToast()
+  const bm = siteConfig.business.boatManifest
+  const [dives, setDives] = useState<DiveOption[]>([])
+  const [diveId, setDiveId] = useState('')
+  // Prefill from the admin's last-used values (shared with the event page's
+  // export modal via the same key), falling back to the shop config defaults.
+  const [boat] = useState(() => {
+    let v: { boatName?: string; registration?: string; notes?: string } = {}
+    try { v = JSON.parse(localStorage.getItem(BOAT_MANIFEST_LS_KEY) ?? '{}') } catch { /* corrupt / unavailable */ }
+    return {
+      boatName: v.boatName ?? bm.boatName,
+      registration: v.registration ?? bm.registration,
+      notes: v.notes ?? bm.notes.join('\n'),
+    }
+  })
+  const [boatName, setBoatName] = useState(boat.boatName)
+  const [registration, setRegistration] = useState(boat.registration)
+  const [notes, setNotes] = useState(boat.notes)
+  const [sending, setSending] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    const today = new Date().toISOString().slice(0, 10)
+    supabase
+      .from('events')
+      .select('id, display_title, admin_title, start_date')
+      .eq('kind', 'dive')
+      .is('cancelled_at', null)
+      .gte('start_date', today)
+      .order('start_date')
+      .then(({ data }) => {
+        if (cancelled || !data) return
+        setDives(data.map(d => ({
+          id: d.id,
+          label: `${d.display_title || d.admin_title || t.calendar.typeDive}${d.start_date ? ` — ${d.start_date}` : ''}`,
+        })))
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  async function handleSend(e: React.FormEvent) {
+    e.preventDefault()
+    if (!diveId) { toast.error(ac.manifestNeedsDive); return }
+    setSending(true)
+    try {
+      try { localStorage.setItem(BOAT_MANIFEST_LS_KEY, JSON.stringify({ boatName, registration, notes })) } catch { /* non-fatal */ }
+      const res = await requestEventDiverExport('dive', diveId, {
+        boat_name: boatName.trim(),
+        registration: registration.trim(),
+        notes: notes.split('\n').map(n => n.trim()).filter(Boolean),
+      })
+      toast.success(ac.manifestSent(res.diver_count))
+    } catch (err) {
+      toast.error(ac.manifestFailed(errorMessage(err)))
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSend} className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
+      <p className="text-xs text-brand-900/80">{ac.manifestBlurb}</p>
+      <label className="block space-y-1">
+        <span className="text-xs font-medium text-brand-900">{ac.manifestDive}</span>
+        <select value={diveId} onChange={e => setDiveId(e.target.value)} className={FIELD}>
+          <option value="">{dives.length ? ac.manifestPickDive : ac.manifestNoDives}</option>
+          {dives.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
+        </select>
+      </label>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block space-y-1">
+          <span className="text-xs font-medium text-brand-900">{ac.manifestBoatName}</span>
+          <input value={boatName} onChange={e => setBoatName(e.target.value)} className={FIELD} />
+        </label>
+        <label className="block space-y-1">
+          <span className="text-xs font-medium text-brand-900">{ac.manifestRegistration}</span>
+          <input value={registration} onChange={e => setRegistration(e.target.value)} className={FIELD} />
+        </label>
+      </div>
+      <label className="block space-y-1">
+        <span className="text-xs font-medium text-brand-900">{ac.manifestNotes}</span>
+        <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} className={`${FIELD} resize-y`} />
+      </label>
+      <div className="flex justify-end">
+        <button type="submit" disabled={sending || !diveId}
+          className="py-2 px-4 rounded-lg text-sm font-semibold bg-brand-900 hover:bg-brand-950 text-white disabled:opacity-50">
+          {sending ? ac.manifestSending : ac.manifestSend}
+        </button>
+      </div>
+    </form>
+  )
+}
+
 export function AdminAccountingPage() {
   const toast = useToast()
   const thisYear = taipeiYear()
@@ -107,11 +211,13 @@ export function AdminAccountingPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
+    <div className="max-w-2xl mx-auto space-y-8">
       <h1 className="text-2xl font-bold text-white">{ac.title}</h1>
-      <p className="text-sm text-white/80">{ac.blurb(siteConfig.locale.timezone)}</p>
 
-      <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-4">
+      <section className="space-y-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-white/70">{ac.sectionAccounting}</h2>
+        <p className="text-sm text-white/80">{ac.blurb(siteConfig.locale.timezone)}</p>
+        <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-4">
         <label className="block space-y-1">
           <span className="text-xs font-medium text-brand-900">{ac.fiscalYear}</span>
           <select
@@ -140,7 +246,13 @@ export function AdminAccountingPage() {
             {busy ? ac.preparing : ac.downloadZip}
           </button>
         </div>
-      </div>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-white/70">{ac.sectionManifest}</h2>
+        <ManifestSection />
+      </section>
     </div>
   )
 }

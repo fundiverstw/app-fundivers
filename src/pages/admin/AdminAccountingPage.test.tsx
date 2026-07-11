@@ -12,9 +12,14 @@ vi.mock('../../hooks/useToast', () => ({
   useToast: () => ({ success: toastSuccess, error: toastError, info: vi.fn() }),
 }))
 
+const requestEventDiverExport = vi.fn()
+vi.mock('../../lib/admin-event-export', () => ({
+  requestEventDiverExport: (...a: unknown[]) => requestEventDiverExport(...a),
+}))
+
 function tableBuilder(result: { data: unknown; error: unknown }) {
   const b: Record<string, unknown> = {}
-  for (const m of ['select', 'gte', 'lt', 'order', 'in', 'eq']) b[m] = () => b
+  for (const m of ['select', 'gte', 'lt', 'order', 'in', 'eq', 'is']) b[m] = () => b
   b.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
     Promise.resolve(result).then(res, rej)
   return b
@@ -27,6 +32,9 @@ function mockTables(tables: Record<string, unknown[]>) {
 
 beforeEach(() => {
   from.mockReset()
+  // Default: every table empty, so the manifest section's on-mount dive query
+  // resolves cleanly. Individual tests override with mockTables().
+  mockTables({})
   toastSuccess.mockReset()
   toastError.mockReset()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -43,7 +51,23 @@ describe('AdminAccountingPage', () => {
   it('renders a fiscal-year picker and a download button', () => {
     renderPage()
     expect(screen.getByRole('button', { name: 'Download ZIP' })).toBeInTheDocument()
-    expect(screen.getByRole('combobox')).toBeInTheDocument()
+    // Fiscal-year select plus the manifest section's dive select.
+    expect(screen.getAllByRole('combobox').length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('emails a boat manifest for the picked dive', async () => {
+    requestEventDiverExport.mockReset()
+    requestEventDiverExport.mockResolvedValue({ ok: true, diver_count: 3, staff_count: 1 })
+    mockTables({ events: [{ id: 'dive1', display_title: 'Long Dong Bay', admin_title: null, start_date: '2026-08-03' }] })
+    renderPage()
+
+    const option = await screen.findByRole('option', { name: /Long Dong Bay/ })
+    const select = option.closest('select')!
+    fireEvent.change(select, { target: { value: 'dive1' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Email manifest' }))
+
+    await waitFor(() => expect(requestEventDiverExport).toHaveBeenCalledWith('dive', 'dive1', expect.any(Object)))
+    await waitFor(() => expect(toastSuccess.mock.calls[0][0]).toMatch(/Manifest emailed/))
   })
 
   it('builds the ZIP and toasts a count when payments exist', async () => {
