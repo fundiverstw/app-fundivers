@@ -181,6 +181,72 @@ function ManifestSection() {
   )
 }
 
+type DiverOption = { id: string; label: string }
+
+// Signed-waiver records are built by the export-diver-waivers edge function
+// (admin-only): one attestation PDF per signature, plus the original form PDF
+// for uploaded-PDF waivers, zipped and returned base64 for a browser download.
+function WaiverExportSection() {
+  const toast = useToast()
+  const [divers, setDivers] = useState<DiverOption[]>([])
+  const [diverId, setDiverId] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    supabase.from('profiles').select('id, name, email').order('name')
+      .then(({ data }) => {
+        if (cancelled || !data) return
+        setDivers(data.map(d => ({ id: d.id, label: d.name || d.email || d.id })))
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  async function handleExport() {
+    if (!diverId) { toast.error(ac.waiverNeedsDiver); return }
+    setBusy(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('export-diver-waivers', { body: { diver_id: diverId } })
+      if (error) throw error
+      const res = data as { count: number; filename?: string; zip_base64?: string }
+      if (!res.count || !res.zip_base64) { toast.info(ac.waiverNone); return }
+      const bytes = Uint8Array.from(atob(res.zip_base64), c => c.charCodeAt(0))
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/zip' }))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = res.filename ?? 'waivers.zip'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      toast.success(ac.waiverExported(res.count))
+    } catch (err) {
+      toast.error(ac.waiverFailed(errorMessage(err)))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
+      <p className="text-xs text-brand-900/80">{ac.waiverBlurb}</p>
+      <label className="block space-y-1">
+        <span className="text-xs font-medium text-brand-900">{ac.waiverDiver}</span>
+        <select value={diverId} onChange={e => setDiverId(e.target.value)} className={FIELD}>
+          <option value="">{divers.length ? ac.waiverPickDiver : ac.waiverNoDivers}</option>
+          {divers.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
+        </select>
+      </label>
+      <div className="flex justify-end">
+        <button type="button" onClick={handleExport} disabled={busy || !diverId}
+          className="py-2 px-4 rounded-lg text-sm font-semibold bg-brand-900 hover:bg-brand-950 text-white disabled:opacity-50">
+          {busy ? ac.waiverExporting : ac.waiverExport}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function AdminAccountingPage() {
   const toast = useToast()
   const thisYear = taipeiYear()
@@ -252,6 +318,11 @@ export function AdminAccountingPage() {
       <section className="space-y-3">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-white/70">{ac.sectionManifest}</h2>
         <ManifestSection />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-white/70">{ac.sectionWaivers}</h2>
+        <WaiverExportSection />
       </section>
     </div>
   )
