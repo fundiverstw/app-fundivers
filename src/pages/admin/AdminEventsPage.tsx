@@ -104,7 +104,7 @@ export function AdminEventsPage() {
         month={month}
         onMonthChange={setMonth}
         events={events}
-        onPickEvent={ev => navigate(`/admin/events/${ev.type}/${ev.id}`)}
+        onPickEvent={ev => navigate(`/admin/events/${ev.id}`)}
         // Only admins can write EO_* rows (is_admin() RLS). The drag
         // gesture is gated on this prop, so staff/divers never see it.
         onRescheduleDay={isAdmin

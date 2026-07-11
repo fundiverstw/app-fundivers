@@ -48,7 +48,7 @@ function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/admin/events/:type/:id" element={<AdminEventDetailPage />} />
+        <Route path="/admin/events/:id" element={<AdminEventDetailPage />} />
       </Routes>
     </MemoryRouter>
   )
@@ -105,7 +105,7 @@ describe('AdminEventDetailPage', () => {
     })
 
     const user = userEvent.setup()
-    renderAt('/admin/events/dive/dive_x')
+    renderAt('/admin/events/dive_x')
 
     // Dense row: only name is visible when collapsed. Cert + add-ons hidden.
     await screen.findByText('Ada Lovelace')
@@ -146,7 +146,7 @@ describe('AdminEventDetailPage', () => {
       if (table === 'waivers') return mockQueryBuilder({ data: WAIVER_ROWS })
       return mockQueryBuilder({ data: [] })
     })
-    const { unmount } = renderAt('/admin/events/dive/dive_x')
+    const { unmount } = renderAt('/admin/events/dive_x')
     await screen.findByText('Ada Lovelace')
     expect(await screen.findByText(/Missing:.*Boat Travel/i)).toBeInTheDocument()
     unmount()
@@ -163,7 +163,7 @@ describe('AdminEventDetailPage', () => {
       if (table === 'waivers') return mockQueryBuilder({ data: WAIVER_ROWS })
       return mockQueryBuilder({ data: [] })
     })
-    renderAt('/admin/events/dive/dive_x')
+    renderAt('/admin/events/dive_x')
     await screen.findByText('Ada Lovelace')
     expect(await screen.findByText(/Waivers OK/i)).toBeInTheDocument()
   })
@@ -186,7 +186,7 @@ describe('AdminEventDetailPage', () => {
       if (table === 'waiver_signatures') return mockQueryBuilder({ error: { message: 'boom' } })
       return mockQueryBuilder({ data: [] })
     })
-    renderAt('/admin/events/dive/dive_x')
+    renderAt('/admin/events/dive_x')
     await screen.findByText('Ada Lovelace')
     expect(await screen.findByText(/Waivers —/i)).toBeInTheDocument()
     expect(screen.queryByText(/Waivers OK/i)).not.toBeInTheDocument()
@@ -222,7 +222,7 @@ describe('AdminEventDetailPage', () => {
     })
 
     const user = userEvent.setup()
-    renderAt('/admin/events/dive/dive_x')
+    renderAt('/admin/events/dive_x')
     await user.click(await screen.findByRole('button', { expanded: false, name: /Ada Lovelace/ }))
 
     await waitFor(() => expect(screen.getByText(/SMB Rental/)).toBeInTheDocument())
@@ -252,7 +252,7 @@ describe('AdminEventDetailPage', () => {
     })
 
     const user = userEvent.setup()
-    renderAt('/admin/events/dive/dive_x')
+    renderAt('/admin/events/dive_x')
 
     await screen.findByRole('heading', { name: /kenting/i })
     await user.click(screen.getByRole('button', { name: /cancel event/i }))
@@ -291,7 +291,7 @@ describe('AdminEventDetailPage', () => {
     })
 
     const user = userEvent.setup()
-    renderAt('/admin/events/dive/dive_x')
+    renderAt('/admin/events/dive_x')
 
     await screen.findByRole('heading', { name: /kenting/i })
     await user.click(screen.getByRole('button', { name: /restore event/i }))
@@ -312,7 +312,7 @@ describe('AdminEventDetailPage', () => {
     ]))
     from.mockImplementation(() => mockQueryBuilder({ data: [] }))
 
-    renderAt('/admin/events/dive/dive_x')
+    renderAt('/admin/events/dive_x')
     await screen.findByRole('heading', { name: /kenting/i })
     expect(screen.queryByRole('button', { name: /^delete event$/i })).not.toBeInTheDocument()
   })
@@ -340,9 +340,9 @@ describe('AdminEventDetailPage', () => {
 
     const user = userEvent.setup()
     render(
-      <MemoryRouter initialEntries={['/admin/events/dive/dive_x']}>
+      <MemoryRouter initialEntries={['/admin/events/dive_x']}>
         <Routes>
-          <Route path="/admin/events/:type/:id" element={<AdminEventDetailPage />} />
+          <Route path="/admin/events/:id" element={<AdminEventDetailPage />} />
           <Route path="/admin/events" element={<div>events-index</div>} />
         </Routes>
       </MemoryRouter>
@@ -395,7 +395,7 @@ describe('AdminEventDetailPage', () => {
       return mockQueryBuilder({ data: [] })
     })
 
-    renderAt('/admin/events/dive/dive_x')
+    renderAt('/admin/events/dive_x')
 
     // Header still loads, gear-map link still there.
     await screen.findByRole('heading', { name: /kenting/i })
@@ -443,7 +443,7 @@ describe('AdminEventDetailPage', () => {
     })
 
     const user = userEvent.setup()
-    renderAt('/admin/events/dive/dive_x')
+    renderAt('/admin/events/dive_x')
 
     await screen.findByRole('heading', { name: /kenting/i })
     await user.click(screen.getByRole('button', { name: /add diver/i }))
@@ -511,7 +511,7 @@ describe('AdminEventDetailPage', () => {
     })
 
     const user = userEvent.setup()
-    renderAt('/admin/events/dive/dive_x')
+    renderAt('/admin/events/dive_x')
 
     await user.click(await screen.findByRole('button', { expanded: false, name: /Ada Lovelace/ }))
     // The button label no longer carries the deposit amount — it's a pure
@@ -577,7 +577,7 @@ describe('AdminEventDetailPage', () => {
     })
 
     const user = userEvent.setup()
-    renderAt('/admin/events/dive/dive_x')
+    renderAt('/admin/events/dive_x')
 
     await user.click(await screen.findByRole('button', { expanded: false, name: /Ada Lovelace/ }))
 
@@ -635,7 +635,7 @@ describe('AdminEventDetailPage', () => {
     })
 
     const user = userEvent.setup()
-    renderAt('/admin/events/dive/dive_x')
+    renderAt('/admin/events/dive_x')
 
     await screen.findByRole('heading', { name: /kenting/i })
     await user.click(screen.getByRole('button', { name: /add diver/i }))
@@ -676,7 +676,7 @@ describe('AdminEventDetailPage', () => {
     invoke.mockResolvedValue({ data: { ok: true, diver_count: 7, staff_count: 2 }, error: null })
 
     const user = userEvent.setup()
-    renderAt('/admin/events/dive/dive_x')
+    renderAt('/admin/events/dive_x')
 
     // Opens the boat-manifest modal; the export fires on confirm.
     await user.click(await screen.findByRole('button', { name: /export diver info/i }))
@@ -728,7 +728,7 @@ describe('AdminEventDetailPage', () => {
     })
 
     const user = userEvent.setup()
-    renderAt('/admin/events/dive/dive_x')
+    renderAt('/admin/events/dive_x')
 
     // Collapsed view: count flag visible.
     await screen.findByText(/2 diver notes/i)
@@ -751,7 +751,7 @@ describe('AdminEventDetailPage', () => {
     })
 
     const user = userEvent.setup()
-    renderAt('/admin/events/dive/dive_empty')
+    renderAt('/admin/events/dive_empty')
 
     // The tab row is present despite zero registrants.
     expect(await screen.findByRole('tab', { name: /^transportation$/i })).toBeInTheDocument()
@@ -799,7 +799,7 @@ describe('AdminEventDetailPage', () => {
     })
 
     const user = userEvent.setup()
-    renderAt('/admin/events/dive/dive_x')
+    renderAt('/admin/events/dive_x')
 
     await screen.findByText('Ada Lovelace')
     await user.click(screen.getByRole('tab', { name: /^transportation$/i }))
@@ -833,7 +833,7 @@ describe('AdminEventDetailPage', () => {
     invoke.mockResolvedValue({ data: null, error: { message: 'email failed: smtp down' } })
 
     const user = userEvent.setup()
-    renderAt('/admin/events/dive/dive_x')
+    renderAt('/admin/events/dive_x')
 
     await user.click(await screen.findByRole('button', { name: /export diver info/i }))
     await user.click(await screen.findByRole('button', { name: /export & email/i }))
@@ -868,7 +868,7 @@ describe('AdminEventDetailPage', () => {
     rpc.mockResolvedValue({ data: 2000, error: null })
 
     const user = userEvent.setup()
-    renderAt('/admin/events/dive/dive_x')
+    renderAt('/admin/events/dive_x')
 
     // Badges: the lead's own card reads "Lead payer"; the child's "Paid by Parent Pat".
     await screen.findByText('Parent Pat')
@@ -915,7 +915,7 @@ describe('AdminEventDetailPage', () => {
     })
 
     const user = userEvent.setup()
-    renderAt('/admin/events/dive/dive_x')
+    renderAt('/admin/events/dive_x')
     await screen.findByText('Ada Lovelace')
 
     await user.click(screen.getByRole('tab', { name: /amount owed/i }))
@@ -958,7 +958,7 @@ describe('AdminEventDetailPage', () => {
     })
 
     const user = userEvent.setup()
-    renderAt('/admin/events/dive/dive_x')
+    renderAt('/admin/events/dive_x')
 
     // Roster + tab count reflect only the 2 active divers (Ada + re-registered Bob).
     await screen.findByText('Ada Lovelace')

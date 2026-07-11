@@ -24,8 +24,8 @@ function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/admin/events/:type/:id/edit" element={<AdminEditEventPage />} />
-        <Route path="/admin/events/:type/:id"      element={<div>EVENT_DETAIL</div>} />
+        <Route path="/admin/events/:id/edit" element={<AdminEditEventPage />} />
+        <Route path="/admin/events/:id"      element={<div>EVENT_DETAIL</div>} />
       </Routes>
     </MemoryRouter>
   )
@@ -76,7 +76,7 @@ describe('AdminEditEventPage', () => {
     })
 
     const user = userEvent.setup()
-    renderAt('/admin/events/dive/dive_x/edit')
+    renderAt('/admin/events/dive_x/edit')
 
     // Form prefills the existing dive title.
     const titleInput = await screen.findByLabelText(/admin title \(required, internal\)/i) as HTMLInputElement
@@ -114,7 +114,7 @@ describe('AdminEditEventPage', () => {
       return mockQueryBuilder({ data: [] })
     })
 
-    renderAt('/admin/events/dive/dive_x/edit')
+    renderAt('/admin/events/dive_x/edit')
     await screen.findByLabelText(/admin title \(required, internal\)/i)
 
     // The edit form carries a "Cars for this dive" section.
@@ -158,7 +158,7 @@ describe('AdminEditEventPage', () => {
     })
 
     const user = userEvent.setup()
-    renderAt('/admin/events/dive/dive_x/edit')
+    renderAt('/admin/events/dive_x/edit')
 
     const featuredInput = await screen.findByLabelText(/featured image \(wix uri\)/i) as HTMLInputElement
     const secondInput = screen.getByLabelText(/second image \(wix uri\)/i) as HTMLInputElement
@@ -186,7 +186,7 @@ describe('AdminEditEventPage', () => {
       return mockQueryBuilder({ data: [] })
     })
 
-    renderAt('/admin/events/dive/missing/edit')
+    renderAt('/admin/events/missing/edit')
     expect(await screen.findByText(/event not found/i)).toBeInTheDocument()
     expect(screen.queryByLabelText(/admin title \(required, internal\)/i)).not.toBeInTheDocument()
   })

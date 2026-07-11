@@ -42,7 +42,7 @@ export function AdminNewEventPage() {
       } catch { toast.error(ev.carAssignFailed) }
     }
     toast.success(form.type === 'dive' ? ev.diveCreated : ev.courseCreated)
-    navigate(`/admin/events/${form.type}/${id}`)
+    navigate(`/admin/events/${id}`)
   }
 
   return (

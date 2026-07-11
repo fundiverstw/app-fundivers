@@ -113,7 +113,7 @@ export function AdminDutyPage() {
           {unstaffed.map(ev => (
             <Link
               key={ev.id}
-              to={`/admin/events/${ev.type}/${ev.id}`}
+              to={`/admin/events/${ev.id}`}
               className="block bg-white hover:bg-surface-100 rounded-xl p-3 border border-accent transition-colors"
             >
               <p className="text-sm font-medium text-brand-900">{ev.title}</p>
@@ -175,7 +175,7 @@ function DutyRow({ enriched, highlight }: { enriched: Enriched; highlight?: bool
         </span>
       </div>
       {event
-        ? <Link to={`/admin/events/${event.type}/${event.id}`} className="block text-xs font-medium text-brand-900 hover:text-brand-700 underline truncate">
+        ? <Link to={`/admin/events/${event.id}`} className="block text-xs font-medium text-brand-900 hover:text-brand-700 underline truncate">
             {event.title}<EventStatusTags event={event} />
           </Link>
         : duty.event_id

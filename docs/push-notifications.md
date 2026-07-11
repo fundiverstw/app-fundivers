@@ -136,7 +136,7 @@ npx wrangler secret put BROADCAST_WEBHOOK_URL   # optional
 
 Lets an admin notify only the **confirmed** divers on a specific event with
 a status update — typically just before an event when conditions change.
-Surfaced in-app at `/admin/events/:type/:id` ("Notify divers" button) and
+Surfaced in-app at `/admin/events/:id` ("Notify divers" button) and
 gated by `profiles.role` in the worker.
 
 ```

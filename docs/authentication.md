@@ -112,12 +112,12 @@ authoritative list):
   /minigame/eel-snake
   <StaffOrAdminRoute>
     <AdminShell>   /admin /admin/events
-                   /admin/events/:type/:id
-                   /admin/events/:type/:id/gear-map
+                   /admin/events/:id
+                   /admin/events/:id/gear-map
   <AdminRoute>
     <AdminShell>   /admin/new /admin/new/event /admin/rooms
                    /admin/addons /admin/travel /admin/prices
-                   /admin/events/:type/:id/edit /admin/users
+                   /admin/events/:id/edit /admin/users
                    /admin/duty /admin/notifications
 ```
 

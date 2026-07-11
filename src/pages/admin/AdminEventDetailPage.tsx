@@ -56,7 +56,7 @@ type AddonNameMap = Map<string, string>
 type RoomNameMap = Map<string, string>
 
 export function AdminEventDetailPage() {
-  const { type, id } = useParams<{ type: 'dive' | 'course'; id: string }>()
+  const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { profile } = useAuth()
   const toast = useToast()
@@ -91,7 +91,7 @@ export function AdminEventDetailPage() {
   const [view, setView] = useState<'registrants' | 'transportation' | 'balances'>('registrants')
 
   useEffect(() => {
-    if (!type || !id) return
+    if (!id) return
     let cancelled = false
     ;(async () => {
       // Event info via helper
@@ -182,7 +182,7 @@ export function AdminEventDetailPage() {
     })()
 
     return () => { cancelled = true }
-  }, [type, id, refreshKey])
+  }, [id, refreshKey])
 
   // Flag, per registrant, the waivers they haven't signed for this event. Staff
   // can read all signatures, so one batched query covers the whole roster. Kept
@@ -332,7 +332,7 @@ export function AdminEventDetailPage() {
   }
 
   async function setCancelledAt(value: string | null) {
-    if (!type || !id) return
+    if (!id || !event) return
     setCancelInFlight(true)
     setCancelError(null)
     try {
@@ -345,7 +345,7 @@ export function AdminEventDetailPage() {
       setCancelModalOpen(false)
       // Notify registrants on cancel only (not restore) — email + in-app +
       // push, best-effort so a notification failure never blocks the cancel.
-      if (value) notifyEventCancelled(id, type as AppEvent['type']).catch(() => { /* best-effort */ })
+      if (value) notifyEventCancelled(id, event.type).catch(() => { /* best-effort */ })
       toast.success(value ? ed.eventCancelled : ed.eventRestored)
       // Auto-credit each registrant what they've paid. The cancel already
       // committed, so a failure here can't un-cancel it — surface it instead
@@ -370,7 +370,7 @@ export function AdminEventDetailPage() {
   }
 
   async function deleteEvent() {
-    if (!type || !id) return
+    if (!id) return
     setDeleteInFlight(true)
     setDeleteError(null)
     try {
@@ -444,7 +444,7 @@ export function AdminEventDetailPage() {
         )}
       </header>
 
-      {type && id && (
+      {event && (
         <>
           <div className="flex flex-wrap items-center justify-end gap-2">
             {isAdmin && (
@@ -457,7 +457,7 @@ export function AdminEventDetailPage() {
                   {ed.addDiver}
                 </button>
                 <Link
-                  to={`/admin/events/${type}/${id}/edit`}
+                  to={`/admin/events/${id}/edit`}
                   className="text-xs bg-brand-900/60 hover:bg-brand-900 text-white px-3 py-1 rounded-lg"
                 >
                   {t.admin.catalog.edit}
@@ -495,18 +495,16 @@ export function AdminEventDetailPage() {
               </>
             )}
             <Link
-              to={`/admin/events/${type}/${id}/gear-map`}
+              to={`/admin/events/${id}/gear-map`}
               className="text-xs bg-surface-900/50 hover:bg-surface-900 text-surface-200 px-3 py-1 rounded-lg"
             >
               {ed.gearMap}
             </Link>
-            {type && id && (
-              <ShareEventButton event={{ id, type }} className="text-xs bg-surface-700/80 hover:bg-surface-700 text-white px-3 py-1 rounded-lg" />
-            )}
+            <ShareEventButton event={{ id, type: event.type }} className="text-xs bg-surface-700/80 hover:bg-surface-700 text-white px-3 py-1 rounded-lg" />
           </div>
           {event && (
             <EventStaffSection
-              eventType={type}
+              eventType={event.type}
               eventId={id}
               eventStartDate={event.start_time}
               eventEndDate={event.end_time}
@@ -514,7 +512,7 @@ export function AdminEventDetailPage() {
               readOnly={!isAdmin}
             />
           )}
-          <AdminNotes target={{ kind: type, id }} title={ed.memos} />
+          <AdminNotes target={{ kind: event.type, id }} title={ed.memos} />
         </>
       )}
 
@@ -625,11 +623,11 @@ export function AdminEventDetailPage() {
         />
       )}
 
-      {notifyModalOpen && type && id && event && (
+      {notifyModalOpen && id && event && (
         <NotifyDiversModal
           eventTitle={event.title}
           eventId={id}
-          eventType={type}
+          eventType={event.type}
           confirmedCount={registrants.filter(r => r.booking.status === 'confirmed').length}
           onClose={() => setNotifyModalOpen(false)}
           onSent={summary => {
@@ -639,9 +637,9 @@ export function AdminEventDetailPage() {
         />
       )}
 
-      {exportModalOpen && type && id && (
+      {exportModalOpen && id && event && (
         <ExportManifestModal
-          eventType={type}
+          eventType={event.type}
           eventId={id}
           onClose={() => setExportModalOpen(false)}
           onDone={summary => {

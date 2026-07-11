@@ -78,7 +78,7 @@ describe('DutiesPage', () => {
 
     // Staff/admin can deep-link to /admin/events; divers cannot.
     expect(screen.getByRole('link', { name: /Future Dive/ }))
-      .toHaveAttribute('href', '/admin/events/dive/dive-a')
+      .toHaveAttribute('href', '/admin/events/dive-a')
   })
 
   it('shows the empty state when the user has no upcoming duties', async () => {

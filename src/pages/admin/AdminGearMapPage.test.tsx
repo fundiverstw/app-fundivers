@@ -51,9 +51,9 @@ beforeEach(() => {
 
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={['/admin/events/dive/e1/gear-map']}>
+    <MemoryRouter initialEntries={['/admin/events/e1/gear-map']}>
       <Routes>
-        <Route path="/admin/events/:type/:id/gear-map" element={<AdminGearMapPage />} />
+        <Route path="/admin/events/:id/gear-map" element={<AdminGearMapPage />} />
       </Routes>
     </MemoryRouter>
   )

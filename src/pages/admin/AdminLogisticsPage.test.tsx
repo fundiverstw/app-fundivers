@@ -288,7 +288,7 @@ describe('AdminLogisticsPage', () => {
   it('links each event banner — title and Edit button — to its edit page for admins', async () => {
     renderPage()
     await screen.findByText(/1 event · 2 divers/i)
-    const href = '/admin/events/dive/e1/edit'
+    const href = '/admin/events/e1/edit'
     expect(screen.getByRole('link', { name: /edit/i })).toHaveAttribute('href', href)
     expect(screen.getByRole('link', { name: 'Kenting fun dive' })).toHaveAttribute('href', href)
   })

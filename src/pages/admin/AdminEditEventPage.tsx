@@ -41,7 +41,7 @@ function datesChanged(before: FormState, after: FormState): boolean {
 // against the same row. Mirrors AdminNewEventPage's structure: thin
 // wrapper, all field rendering lives in the shared component.
 export function AdminEditEventPage() {
-  const { type, id } = useParams<{ type: 'dive' | 'course'; id: string }>()
+  const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const toast = useToast()
   const { profile } = useAuth()
@@ -49,7 +49,7 @@ export function AdminEditEventPage() {
   const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!type || !id) return
+    if (!id) return
     let cancelled = false
     ;(async () => {
       try {
@@ -67,7 +67,7 @@ export function AdminEditEventPage() {
       }
     })()
     return () => { cancelled = true }
-  }, [type, id])
+  }, [id])
 
   async function handleSubmit(form: FormState) {
     if (!id) throw new Error(ev.missingEventId)
@@ -83,7 +83,7 @@ export function AdminEditEventPage() {
     if (relError) throw relError
     if (dateChange) notifyEventScheduleChanged(id, form.type).catch(() => { /* best-effort */ })
     toast.success(form.type === 'dive' ? ev.diveUpdated : ev.courseUpdated)
-    navigate(`/admin/events/${form.type}/${id}`)
+    navigate(`/admin/events/${id}`)
   }
 
   if (loadError) {
@@ -109,19 +109,19 @@ export function AdminEditEventPage() {
         mode="edit"
         initial={initial}
         onSubmit={handleSubmit}
-        onCancel={() => navigate(`/admin/events/${type}/${id}`)}
+        onCancel={() => navigate(`/admin/events/${id}`)}
       />
-      {type === 'dive' && id && (
+      {initial.type === 'dive' && id && (
         <div className="mt-6 space-y-2">
           <h2 className="text-sm font-bold text-white uppercase tracking-wider">{ev.carsHeading}</h2>
           <p className="text-xs text-white/60">{ev.carsBlurb}</p>
           <EventCarAssignment event={{ id, type: 'dive' }} isAdmin createdBy={profile?.id ?? null} />
         </div>
       )}
-      {id && type && (
+      {id && (
         <div className="mt-6">
           <EventWaiverOverrides
-            event={{ id, type, title: initial.display_title || initial.admin_title || initial.course_name || '' }}
+            event={{ id, type: initial.type, title: initial.display_title || initial.admin_title || initial.course_name || '' }}
             isAdmin
             createdBy={profile?.id ?? null}
           />

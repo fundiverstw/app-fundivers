@@ -7,8 +7,8 @@ describe('safeNotificationTarget (audit M10)', () => {
   })
 
   it('accepts a path with query + hash', () => {
-    expect(safeNotificationTarget('/admin/events/dive/abc?from=push#detail'))
-      .toBe('/admin/events/dive/abc?from=push#detail')
+    expect(safeNotificationTarget('/admin/events/abc?from=push#detail'))
+      .toBe('/admin/events/abc?from=push#detail')
   })
 
   it('rejects absolute https URLs', () => {

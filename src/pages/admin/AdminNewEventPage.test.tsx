@@ -37,8 +37,7 @@ function renderPage() {
     <MemoryRouter initialEntries={['/admin/new']}>
       <Routes>
         <Route path="/admin/new"               element={<AdminNewEventPage />} />
-        <Route path="/admin/events/dive/:id"   element={<div>DIVE_DETAIL</div>} />
-        <Route path="/admin/events/course/:id" element={<div>COURSE_DETAIL</div>} />
+        <Route path="/admin/events/:id" element={<div>EVENT_DETAIL</div>} />
       </Routes>
     </MemoryRouter>
   )
@@ -315,6 +314,6 @@ describe('AdminNewEventPage', () => {
     expect(payload.admin_title).toBe('Green Island Day Trip')
     expect(payload.start_date).toBe('2026-06-01')
     expect(typeof payload.id).toBe('string')
-    expect(await screen.findByText('DIVE_DETAIL')).toBeInTheDocument()
+    expect(await screen.findByText('EVENT_DETAIL')).toBeInTheDocument()
   })
 })

@@ -117,7 +117,7 @@ function Row({ e, eventLinkBase, dim }: { e: Enriched; eventLinkBase: string | n
         </span>
       </div>
       {event && eventLinkBase
-        ? <Link to={`${eventLinkBase}/${event.type}/${event.id}`} className="block text-sm font-medium text-brand-900 hover:text-brand-950 truncate">
+        ? <Link to={`${eventLinkBase}/${event.id}`} className="block text-sm font-medium text-brand-900 hover:text-brand-950 truncate">
             {event.title}<EventStatusTags event={event} /> <span className="text-xs text-brand-900/70 font-normal">· {formatEventSpan(event)}</span>
           </Link>
         : event

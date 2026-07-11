@@ -16,8 +16,8 @@ admin):
 | --- | --- | --- |
 | `/admin`                                | `DashboardPage`         | Shared dashboard (divers see it at `/dashboard`); admin variant pulls operational counts |
 | `/admin/events`                         | `AdminEventsPage`       | Month view of every event with registration counts |
-| `/admin/events/:type/:id`               | `AdminEventDetailPage`  | Registrants, memos, status controls for one event |
-| `/admin/events/:type/:id/gear-map`      | `AdminGearMapPage`      | Per-registrant gear/sizing checklist for the event |
+| `/admin/events/:id`               | `AdminEventDetailPage`  | Registrants, memos, status controls for one event |
+| `/admin/events/:id/gear-map`      | `AdminGearMapPage`      | Per-registrant gear/sizing checklist for the event |
 
 Write/manage routes — gated by `AdminRoute` (admin only):
 
@@ -25,7 +25,7 @@ Write/manage routes — gated by `AdminRoute` (admin only):
 | --- | --- | --- |
 | `/admin/new`                            | `AdminManagePage`       | Catalog landing — links to event/room/addon/travel/price editors |
 | `/admin/new/event`                      | `AdminNewEventPage`     | Create a new dive or course |
-| `/admin/events/:type/:id/edit`          | `AdminEditEventPage`    | Edit event details |
+| `/admin/events/:id/edit`          | `AdminEditEventPage`    | Edit event details |
 | `/admin/rooms`                          | `AdminRoomsPage`        | Manage `EO_rooms` rows |
 | `/admin/addons`                         | `AdminAddonsPage`       | Manage `Other_Addons` rows |
 | `/admin/travel`                         | `AdminTravelPage`       | Manage `trip_templates` rows |
@@ -40,7 +40,7 @@ All routes are also wrapped by `ProtectedRoute` — see
 
 ## Event detail
 
-`/admin/events/:type/:id` shows one dive or course. The page has:
+`/admin/events/:id` shows one dive or course. The page has:
 
 - **Registrants** — expandable cards per booking. Expanded view
   includes the diver's profile summary (cert, contact, sizing,

@@ -15,7 +15,7 @@ const gm = t.admin.gearMap
 type Row = DiverGearRow
 
 export function AdminGearMapPage() {
-  const { type, id } = useParams<{ type: 'dive' | 'course'; id: string }>()
+  const { id } = useParams<{ id: string }>()
   const [event, setEvent] = useState<AppEvent | null>(null)
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
@@ -25,7 +25,7 @@ export function AdminGearMapPage() {
   }, [])
 
   useEffect(() => {
-    if (!type || !id) return
+    if (!id) return
     let cancelled = false
     ;(async () => {
       const eventMap = await fetchEventsForBookings([id])
@@ -50,7 +50,7 @@ export function AdminGearMapPage() {
       setLoading(false)
     })()
     return () => { cancelled = true }
-  }, [type, id])
+  }, [id])
 
   // Patch one diver's profile in the rows list — used after a successful
   // gear-size save so the card's displayed values stay in sync without
@@ -69,7 +69,7 @@ export function AdminGearMapPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
-      <Link to={`/admin/events/${type}/${id}`} className="text-sm text-white/70 hover:text-white">
+      <Link to={`/admin/events/${id}`} className="text-sm text-white/70 hover:text-white">
         {gm.backToEvent}
       </Link>
 

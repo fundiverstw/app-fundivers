@@ -483,7 +483,7 @@ export function AdminLogisticsPage() {
                   <h2 className="text-base font-semibold break-words">
                     {isAdmin ? (
                       <Link
-                        to={`/admin/events/${g.event.type}/${g.event.id}/edit`}
+                        to={`/admin/events/${g.event.id}/edit`}
                         className="hover:underline"
                       >
                         {g.event.title}
@@ -494,7 +494,7 @@ export function AdminLogisticsPage() {
                   </h2>
                   {isAdmin && (
                     <Link
-                      to={`/admin/events/${g.event.type}/${g.event.id}/edit`}
+                      to={`/admin/events/${g.event.id}/edit`}
                       className="shrink-0 text-xs bg-white/15 hover:bg-white/25 text-white px-2.5 py-1 rounded-lg font-medium"
                     >
                       {t.admin.catalog.edit}
