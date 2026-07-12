@@ -57,7 +57,7 @@ export function CreateEventVehiclePicker({ onChange }: Props) {
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-bold text-white uppercase tracking-wider">{tp.carsForDive}</h2>
+        <h2 className="text-sm font-bold text-white uppercase tracking-wider">{tp.carsForEvent}</h2>
         {selected.size > 0 && (
           <span className="text-xs text-white/70 font-semibold">{seats} passenger seat{seats === 1 ? '' : 's'}</span>
         )}

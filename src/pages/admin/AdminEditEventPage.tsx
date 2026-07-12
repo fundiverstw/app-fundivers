@@ -111,11 +111,11 @@ export function AdminEditEventPage() {
         onSubmit={handleSubmit}
         onCancel={() => navigate(`/admin/events/${id}`)}
       />
-      {initial.type === 'dive' && id && (
+      {id && (
         <div className="mt-6 space-y-2">
           <h2 className="text-sm font-bold text-white uppercase tracking-wider">{ev.carsHeading}</h2>
           <p className="text-xs text-white/60">{ev.carsBlurb}</p>
-          <EventCarAssignment event={{ id, type: 'dive' }} isAdmin createdBy={profile?.id ?? null} />
+          <EventCarAssignment event={{ id, type: initial.type }} isAdmin createdBy={profile?.id ?? null} />
         </div>
       )}
       {id && (

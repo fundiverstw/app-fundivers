@@ -1117,8 +1117,8 @@ export const ja: Messages = {
       diveUpdated: 'ダイブを更新しました',
       courseUpdated: 'コースを更新しました',
       carAssignFailed: 'ダイブは作成しましたが、車両の割り当てを保存できませんでした — 編集ページから設定してください。',
-      carsHeading: 'このダイブの車両',
-      carsBlurb: 'このダイブに割り当てた車両が申込フォームの送迎座席数の上限になります — いずれかの車両に空席があるときだけ、ダイバーは送迎を申し込めます。',
+      carsHeading: 'このイベントの車両',
+      carsBlurb: 'このイベントに割り当てた車両が申込フォームの送迎座席数の上限になります — いずれかの車両に空席があるときだけ、ダイバーは送迎を申し込めます。',
     },
     accounting: {
       title: '書類の書き出し',
@@ -1647,7 +1647,7 @@ export const ja: Messages = {
       fleetFits: (vehicles: number, seats: number, riders: number, divers: number, staff: number) =>
         `車両 ${vehicles} 台を使用 — ${seats} 席で ${riders} 名（ダイバー ${divers} 名${staff > 0 ? ` + スタッフ ${staff} 名` : ''}）。`,
       staffSuffix: '（スタッフ）',
-      carsForDive: 'このダイブの車両',
+      carsForEvent: 'このイベントの車両',
       loadingCars: '車両を読み込んでいます…',
       noActiveCars: '有効な車両がありません。',
       assignFailed: 'この車両を割り当てられませんでした — 既にこのイベントに割り当て済みの可能性があります。',

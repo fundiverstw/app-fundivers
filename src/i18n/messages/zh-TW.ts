@@ -1118,8 +1118,8 @@ export const zhTW: Messages = {
       diveUpdated: '潛水已更新',
       courseUpdated: '課程已更新',
       carAssignFailed: '潛水已建立，但車輛指派未能儲存 — 請至編輯頁面重新指派。',
-      carsHeading: '此次潛水的車輛',
-      carsBlurb: '指派給此次潛水的車輛決定報名表上的共乘座位上限 — 只有在其中一輛車尚有空位時，潛水員才能申請共乘。',
+      carsHeading: '此活動的車輛',
+      carsBlurb: '指派給此活動的車輛決定報名表上的共乘座位上限 — 只有在其中一輛車尚有空位時，潛水員才能申請共乘。',
     },
     accounting: {
       title: '匯出文件',
@@ -1648,7 +1648,7 @@ export const zhTW: Messages = {
       fleetFits: (vehicles: number, seats: number, riders: number, divers: number, staff: number) =>
         `出動 ${vehicles} 輛車 — ${seats} 個座位可載 ${riders} 人（潛水員 ${divers} 人${staff > 0 ? ` + 工作人員 ${staff} 人` : ''}）。`,
       staffSuffix: '（工作人員）',
-      carsForDive: '此次潛水的車輛',
+      carsForEvent: '此活動的車輛',
       loadingCars: '車輛載入中…',
       noActiveCars: '車隊中沒有啟用的車輛。',
       assignFailed: '無法指派此車輛 — 可能已指派給此活動。',

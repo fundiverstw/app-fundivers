@@ -22,7 +22,7 @@ export function AdminNewEventPage() {
   const navigate = useNavigate()
   const toast = useToast()
   const { profile } = useAuth()
-  // Cars picked in the form; assigned to the dive right after it's inserted.
+  // Cars picked in the form; assigned to the event right after it's inserted.
   const [vehicleIds, setVehicleIds] = useState<string[]>([])
 
   async function handleSubmit(form: FormState) {
@@ -34,10 +34,10 @@ export function AdminNewEventPage() {
     const relError = await saveEventRelations(id, form)
     if (relError) throw relError
     // Cars are assigned to the event as a whole (event-level allocation).
-    if (form.type === 'dive' && vehicleIds.length > 0) {
+    if (vehicleIds.length > 0) {
       try {
         await assignVehiclesToEvent({
-          vehicleIds, event: { id, type: 'dive' }, createdBy: profile?.id ?? null,
+          vehicleIds, event: { id, type: form.type }, createdBy: profile?.id ?? null,
         })
       } catch { toast.error(ev.carAssignFailed) }
     }
@@ -52,8 +52,7 @@ export function AdminNewEventPage() {
         mode="create"
         onSubmit={handleSubmit}
         onCancel={() => navigate('/admin/events')}
-        renderCreateExtras={type =>
-          type === 'dive' ? <CreateEventVehiclePicker onChange={setVehicleIds} /> : null}
+        renderCreateExtras={() => <CreateEventVehiclePicker onChange={setVehicleIds} />}
       />
     </div>
   )

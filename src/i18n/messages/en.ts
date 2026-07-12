@@ -1125,8 +1125,8 @@ export const en = {
       diveUpdated: 'Dive updated',
       courseUpdated: 'Course updated',
       carAssignFailed: 'Dive created, but its car assignments could not be saved — add them on the edit page.',
-      carsHeading: 'Cars for this dive',
-      carsBlurb: 'Cars assigned to this dive feed the ride-seat limit on the registration form — a diver can only request a ride when a seat is free in one of them.',
+      carsHeading: 'Cars for this event',
+      carsBlurb: 'Cars assigned to this event feed the ride-seat limit on the registration form — a diver can only request a ride when a seat is free in one of them.',
     },
     accounting: {
       title: 'Export documents',
@@ -1656,7 +1656,7 @@ export const en = {
       fleetFits: (vehicles: number, seats: number, riders: number, divers: number, staff: number) =>
         `Take ${vehicles} vehicle${vehicles === 1 ? '' : 's'} — ${seats} seat${seats === 1 ? '' : 's'} for ${riders} rider${riders === 1 ? '' : 's'} (${divers} diver${divers === 1 ? '' : 's'}${staff > 0 ? ` + ${staff} staff` : ''}).`,
       staffSuffix: ' (staff)',
-      carsForDive: 'Cars for this dive',
+      carsForEvent: 'Cars for this event',
       loadingCars: 'Loading cars…',
       noActiveCars: 'No active cars in the fleet.',
       assignFailed: 'Could not assign that car — it may already be on this event.',

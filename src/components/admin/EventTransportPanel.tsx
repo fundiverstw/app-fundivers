@@ -28,14 +28,14 @@ const transportOf = (b: Booking): boolean | undefined =>
   (b.details as BookingDetails | undefined)?.transportation
 
 /**
- * Editable transportation panel for a dive's admin page. Three parts:
+ * Editable transportation panel for an event's admin page. Three parts:
  *  1. Per-diver ride choice (admin flips Needs ride / Self-transport; this is
  *     logistics-only — it never touches the frozen charge snapshot). Staff see
  *     the read-only buckets.
- *  2. The dive's transport blurb (trip_templates.transportation) — a shared catalog
- *     field, editable inline. Dives only.
- *  3. The cars assigned to the dive on its date + the resulting ride seats,
- *     reusing the logistics allocation UI. Dives only.
+ *  2. The transport blurb (trip_templates.transportation) — a shared catalog
+ *     field, editable inline. Dives only (it's bound to the trip template).
+ *  3. The cars assigned to the event + the resulting ride seats, reusing the
+ *     logistics allocation UI. Dives and courses.
  */
 export function EventTransportPanel({ event, registrants, isAdmin, createdBy, onRideChanged }: Props) {
   const active = registrants.filter(r => r.booking.status !== 'cancelled')
@@ -55,17 +55,13 @@ export function EventTransportPanel({ event, registrants, isAdmin, createdBy, on
         <p className="text-xs text-brand-950/70 font-medium italic">{tp.cancelledHidden}</p>
       )}
 
-      {isDive && (
-        <>
-          <TransportTextEditor event={event} isAdmin={isAdmin} />
-          <EventCarAssignment
-            event={{ id: event.id, type: event.type }}
-            isAdmin={isAdmin}
-            createdBy={createdBy}
-            riders={needsRideCount}
-          />
-        </>
-      )}
+      {isDive && <TransportTextEditor event={event} isAdmin={isAdmin} />}
+      <EventCarAssignment
+        event={{ id: event.id, type: event.type }}
+        isAdmin={isAdmin}
+        createdBy={createdBy}
+        riders={needsRideCount}
+      />
     </section>
   )
 }

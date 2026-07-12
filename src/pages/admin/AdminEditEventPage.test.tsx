@@ -117,8 +117,8 @@ describe('AdminEditEventPage', () => {
     renderAt('/admin/events/dive_x/edit')
     await screen.findByLabelText(/admin title \(required, internal\)/i)
 
-    // The edit form carries a "Cars for this dive" section.
-    expect(screen.getByText(/cars for this dive/i)).toBeInTheDocument()
+    // The edit form carries a "Cars for this event" section.
+    expect(screen.getByText(/cars for this event/i)).toBeInTheDocument()
     // ...and a per-event "Waiver requirements" section.
     expect(await screen.findByText(/waiver requirements/i)).toBeInTheDocument()
   })

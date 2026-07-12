@@ -88,6 +88,14 @@ describe('EventTransportPanel (admin)', () => {
     const cars = await screen.findByRole('group', { name: /assigned cars/i })
     expect(within(cars).getByText('Delica (7)')).toBeInTheDocument()
   })
+
+  it('renders the assigned-cars section for a course too, but not the trip-template blurb', async () => {
+    renderPanel({ event: { ...event, type: 'course' } as unknown as AppEvent })
+    const cars = await screen.findByRole('group', { name: /assigned cars/i })
+    expect(within(cars).getByText('Delica (7)')).toBeInTheDocument()
+    // The transport blurb is bound to the trip template — dives only.
+    expect(screen.queryByLabelText('Transport info')).not.toBeInTheDocument()
+  })
 })
 
 describe('EventTransportPanel (staff, read-only)', () => {
