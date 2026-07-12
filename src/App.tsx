@@ -126,6 +126,10 @@ export default function App() {
             <Route element={<StaffOrAdminRoute />}>
               <Route element={<AdminShell />}>
                 <Route path="/admin" element={<Navigate to="/admin/logistics" replace />} />
+                {/* The home screen (same DashboardPage divers land on) inside the
+                    admin chrome — where the header logo points. Distinct from the
+                    /admin login-landing (logistics) and the BI /admin/dashboard. */}
+                <Route path="/admin/home" element={<DashboardPage />} />
                 <Route path="/admin/events" element={<AdminEventsPage />} />
                 <Route path="/admin/events/:id" element={<AdminEventDetailPage />} />
                 <Route path="/admin/events/:id/gear-map" element={<AdminGearMapPage />} />

@@ -56,7 +56,7 @@ export function AdminShell() {
     <div className={`min-h-screen ${PAGE} flex flex-col`}>
       <header className={NAV_BAR}>
         <div className="flex-1 flex items-center justify-start gap-4" />
-        <Link to="/admin/dashboard" aria-label={t.shell.adminHome} className="shrink-0">
+        <Link to="/admin/home" aria-label={t.shell.adminHome} className="shrink-0">
           <Logo size="sm" />
         </Link>
         <div className="flex-1 flex items-center justify-end gap-3">
