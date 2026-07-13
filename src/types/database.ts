@@ -571,6 +571,24 @@ export interface Database {
         }
         Relationships: []
       }
+      admin_audit_log: {
+        Row: {
+          id: string
+          created_at: string
+          actor_id: string | null
+          action: 'insert' | 'update' | 'delete'
+          target_table: string
+          target_id: string
+          before: Json | null
+          after: Json | null
+        }
+        // Rows are written by the audit_admin_write() trigger and made
+        // immutable by block-update/delete triggers, so the client never
+        // inserts or mutates them.
+        Insert: never
+        Update: never
+        Relationships: []
+      }
       booking_amendments: {
         Row: {
           id: string
@@ -1668,6 +1686,7 @@ export type Profile = Database['public']['Tables']['profiles']['Row']
 export type Booking = Database['public']['Tables']['bookings']['Row']
 export type Payment = Database['public']['Tables']['payments']['Row']
 export type BookingAmendment = Database['public']['Tables']['booking_amendments']['Row']
+export type AdminAuditLog = Database['public']['Tables']['admin_audit_log']['Row']
 export type Credit = Database['public']['Tables']['credits']['Row']
 export type CreditInsert = Database['public']['Tables']['credits']['Insert']
 export type EventRow = Database['public']['Tables']['events']['Row']
