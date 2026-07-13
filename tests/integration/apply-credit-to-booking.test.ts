@@ -196,6 +196,31 @@ describe('apply_credit_to_booking', () => {
     expect(Number(ok.data)).toBe(1000)
   })
 
+  it('rejects applying to a cancelled booking and leaves the credit pool intact', async () => {
+    const diver = await freshDiver()
+    const dive = await freshDive()
+    const bookingId = await makeBooking(diver.id, dive, { total: 3000 })
+    // A cancelled booking still carries its frozen details.total; the RPC must
+    // refuse rather than burn credit into a dead booking (the bug this guards).
+    await admin.from('bookings').update({ status: 'cancelled' }).eq('id', bookingId)
+    await makeCredit(diver.id, 5000)
+
+    const diverApi = await userClient(diver.email, diver.password)
+    const bad = await diverApi.rpc('apply_credit_to_booking', { p_booking_id: bookingId, p_amount: 1000 })
+    expect(bad.error).not.toBeNull()
+
+    // Nothing was spent: no payment recorded, pool untouched.
+    const pays = await paidPayments(bookingId)
+    expect(pays.data ?? []).toHaveLength(0)
+    const open = await openCredits(diver.id)
+    expect(open.data!.reduce((s, c) => s + Number(c.amount), 0)).toBe(5000)
+
+    // An admin is blocked too — the booking is dead for every caller.
+    const adminApi = await userClient(adminUser.email, adminUser.password)
+    const badAdmin = await adminApi.rpc('apply_credit_to_booking', { p_booking_id: bookingId, p_amount: 1000 })
+    expect(badAdmin.error).not.toBeNull()
+  })
+
   it('rejects a non-positive amount', async () => {
     const diver = await freshDiver()
     const dive = await freshDive()

@@ -1410,7 +1410,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
             <GroupPaymentInline currency={currency} onRecord={onRecordGroupPayment} />
           )}
 
-          {!readOnly && r.spendable > 0 && bal.state === 'due' && (
+          {!readOnly && r.booking.status !== 'cancelled' && r.spendable > 0 && bal.state === 'due' && (
             <ApplyCreditInline
               cap={Math.min(bal.amount, r.spendable)}
               spendable={r.spendable}
