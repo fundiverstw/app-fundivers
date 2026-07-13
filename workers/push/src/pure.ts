@@ -115,3 +115,16 @@ export function cancellationNotificationText(eventTitle: string): { title: strin
     body: `${eventTitle} has been cancelled. Contact the shop if you have any questions.`,
   }
 }
+
+/**
+ * Auto-built push/inbox copy telling a diver their refund request was approved.
+ * Pure so it's testable without the worker runtime. eventTitle is best-effort —
+ * a booking with no resolvable event still gets a generic (but correct) message.
+ */
+export function refundApprovedNotificationText(eventTitle: string | null): { title: string; body: string } {
+  const forEvent = eventTitle ? ` for ${eventTitle}` : ''
+  return {
+    title: 'Refund approved',
+    body: `Your refund${forEvent} has been approved. Contact the shop if you have any questions.`,
+  }
+}

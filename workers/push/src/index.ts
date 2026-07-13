@@ -26,6 +26,7 @@ import {
   toHhmm,
   rescheduleNotificationText,
   cancellationNotificationText,
+  refundApprovedNotificationText,
   type Booking,
 } from './pure'
 
@@ -103,6 +104,9 @@ export default {
     }
     if (url.pathname === '/admin-event-cancellation' && req.method === 'POST') {
       return withCors(await handleAdminEventCancellation(req, env), req, env)
+    }
+    if (url.pathname === '/admin-refund-approved' && req.method === 'POST') {
+      return withCors(await handleAdminRefundApproved(req, env), req, env)
     }
     return withCors(new Response('not found', { status: 404 }), req, env)
   },
@@ -217,6 +221,103 @@ export async function handleNotifyDuty(req: Request, env: Env): Promise<Response
     kind:     'duty',
     event_id: duty.event_id ?? null,
   })
+
+  let sent = 0
+  let skipped = 0
+  for (const s of subs) {
+    try {
+      await webpush.sendNotification(
+        { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+        payload,
+        { TTL: 60 * 60 * 24, urgency: 'high' }
+      )
+      sent++
+    } catch (err: unknown) {
+      const status = (err as { statusCode?: number })?.statusCode
+      if (status === 404 || status === 410) {
+        await service.from('push_subscriptions').delete().eq('endpoint', s.endpoint)
+      }
+      skipped++
+    }
+  }
+  return Response.json({ sent, skipped })
+}
+
+// Fires a push + inbox row to the diver the moment an admin approves their
+// refund request. Single recipient, modeled on handleNotifyDuty. The actual
+// money movement is off-app; this only informs the diver the refund is granted.
+//
+// Auth model: the caller passes their admin JWT. profiles RLS lets users read
+// only their own row, so we read the caller's profile and reject non-admins —
+// bookings RLS alone wouldn't (a diver can read their own booking).
+export async function handleAdminRefundApproved(req: Request, env: Env): Promise<Response> {
+  const auth = req.headers.get('authorization') ?? ''
+  if (!auth.startsWith('Bearer ')) return new Response('unauthorized', { status: 401 })
+  const token = auth.slice('Bearer '.length)
+
+  let body: { booking_id?: string }
+  try { body = await req.json() } catch { return new Response('bad request', { status: 400 }) }
+  const bookingId = (body.booking_id ?? '').trim()
+  if (!bookingId) return new Response('missing booking_id', { status: 400 })
+
+  const anonKey = env.SUPABASE_ANON_KEY
+  if (!anonKey) return new Response('SUPABASE_ANON_KEY not configured', { status: 500 })
+
+  const userClient = createClient<Database>(env.SUPABASE_URL, anonKey, {
+    global: { headers: { Authorization: auth } },
+    auth: { persistSession: false },
+  })
+  const { data: userRes, error: userErr } = await userClient.auth.getUser(token)
+  const callerId = userRes?.user?.id
+  if (!callerId) {
+    console.error('admin-refund-approved: getUser failed', userErr?.message ?? 'no user')
+    return new Response('unauthorized', { status: 401 })
+  }
+  const { data: prof } = await userClient
+    .from('profiles')
+    .select('role')
+    .eq('id', callerId)
+    .maybeSingle()
+  if (prof?.role !== 'admin') return new Response('forbidden', { status: 403 })
+
+  const service = createClient<Database>(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false },
+  })
+  const { data: booking } = await service
+    .from('bookings')
+    .select('user_id, event_id')
+    .eq('id', bookingId)
+    .maybeSingle()
+  if (!booking?.user_id) return new Response('not found', { status: 404 })
+
+  // Resolve event title (best-effort; a booking with no event still notifies).
+  let eventTitle: string | null = null
+  if (booking.event_id) {
+    const { data } = await service.from('events').select('display_title, admin_title').eq('id', booking.event_id).maybeSingle()
+    eventTitle = data?.display_title || data?.admin_title || null
+  }
+
+  const { title, body: text } = refundApprovedNotificationText(eventTitle)
+  const refundUrl = '/payments'
+
+  // Inbox row first, so the diver has a record even if every push endpoint 410s.
+  await service.from('notifications').insert({
+    user_id:  booking.user_id,
+    title,
+    body:     text,
+    url:      refundUrl,
+    kind:     'refund',
+    event_id: booking.event_id ?? null,
+  })
+
+  const { data: subs } = await service
+    .from('push_subscriptions')
+    .select('endpoint, p256dh, auth')
+    .eq('user_id', booking.user_id)
+  if (!subs?.length) return Response.json({ sent: 0, skipped: 1, reason: 'no-subscription' })
+
+  webpush.setVapidDetails(env.VAPID_SUBJECT, env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY)
+  const payload = JSON.stringify({ title, body: text, tag: `refund:${bookingId}`, url: refundUrl })
 
   let sent = 0
   let skipped = 0

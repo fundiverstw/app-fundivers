@@ -8,6 +8,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
 import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
+import { notifyRefundApproved } from '../../lib/refunds'
 import { AdminNotes } from '../../components/admin/AdminNotes'
 import { AdminAddDiverModal } from '../../components/admin/AdminAddDiverModal'
 import { EventStaffSection } from '../../components/admin/EventStaffSection'
@@ -248,6 +249,9 @@ export function AdminEventDetailPage() {
     // Processing the actual refund happens off-app (bank transfer etc.);
     // admin approval just marks the booking cancelled.
     await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', bookingId)
+    // Fire-and-forget diver notification (in-app inbox + push); a push failure
+    // must not undo the approval above.
+    void notifyRefundApproved(bookingId).catch(() => {})
     setRegistrants(prev => prev.map(r =>
       r.booking.id === bookingId ? { ...r, booking: { ...r.booking, status: 'cancelled' } } : r
     ))

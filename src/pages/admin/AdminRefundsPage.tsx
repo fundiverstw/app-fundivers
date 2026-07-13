@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
 import { useToast } from '../../hooks/useToast'
 import { fetchEventsForBookings } from '../../lib/events'
+import { notifyRefundApproved } from '../../lib/refunds'
 import { Spinner } from '../../components/ui/Spinner'
 import { CARD_ELEVATED, BTN_PRIMARY, TEXT_MUTED } from '../../styles/tokens'
 import { siteConfig } from '../../config/site'
@@ -99,6 +100,9 @@ export function AdminRefundsPage() {
       // etc.) happens off-app. Mirrors AdminEventDetailPage.approveRefund.
       const { error: err } = await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', bookingId)
       if (err) throw err
+      // Fire-and-forget: notify the diver, but never let a push failure turn a
+      // successful approval into an error toast.
+      void notifyRefundApproved(bookingId).catch(() => {})
       setRows(prev => (prev ?? []).filter(r => r.bookingId !== bookingId))
       toast.success(rf.approved)
     } catch (e) {

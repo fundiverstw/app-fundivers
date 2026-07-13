@@ -8,6 +8,7 @@ import {
   formatDayLabel,
   rescheduleNotificationText,
   cancellationNotificationText,
+  refundApprovedNotificationText,
   type Booking,
   type EventRow,
 } from './pure'
@@ -41,6 +42,21 @@ describe('cancellationNotificationText', () => {
     expect(title).toBe('Cancelled: Green Island Trip')
     expect(body).toContain('Green Island Trip')
     expect(body).toMatch(/cancelled/i)
+  })
+})
+
+describe('refundApprovedNotificationText', () => {
+  it('names the event when known', () => {
+    const { title, body } = refundApprovedNotificationText('Green Island Trip')
+    expect(title).toBe('Refund approved')
+    expect(body).toContain('Green Island Trip')
+    expect(body).toMatch(/approved/i)
+  })
+  it('falls back to a generic message when the event is unknown', () => {
+    const { title, body } = refundApprovedNotificationText(null)
+    expect(title).toBe('Refund approved')
+    expect(body).not.toContain('for ')
+    expect(body).toMatch(/approved/i)
   })
 })
 
