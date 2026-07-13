@@ -52,6 +52,7 @@ import { AdminNotificationsPage } from './pages/admin/AdminNotificationsPage'
 import { AdminAccountingPage } from './pages/admin/AdminAccountingPage'
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage'
 import { AdminRefundsPage } from './pages/admin/AdminRefundsPage'
+import { AdminAuditsPage } from './pages/admin/AdminAuditsPage'
 import { AdminHistoryPage } from './pages/admin/AdminHistoryPage'
 import { AdminPackagesPage } from './pages/admin/AdminPackagesPage'
 import { AdminScheduledTripsPage } from './pages/admin/AdminScheduledTripsPage'
@@ -163,6 +164,7 @@ export default function App() {
                 <Route path="/admin/cancellation-policies" element={<AdminCancellationPoliciesPage />} />
                 <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
                 <Route path="/admin/refunds" element={<AdminRefundsPage />} />
+                <Route path="/admin/audits" element={<AdminAuditsPage />} />
                 <Route path="/admin/history" element={<AdminHistoryPage />} />
               </Route>
             </Route>

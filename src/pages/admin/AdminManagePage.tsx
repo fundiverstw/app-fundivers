@@ -19,6 +19,7 @@ import { ShieldCheckIcon } from '../../components/icons/ShieldCheckIcon'
 import { TrustedPartnersIcon } from '../../components/icons/TrustedPartnersIcon'
 import { BellIcon } from '../../components/icons/BellIcon'
 import { DownloadIcon } from '../../components/icons/DownloadIcon'
+import { AuditIcon } from '../../components/icons/AuditIcon'
 
 // Hub for the admin "Manage" tab. The catalog/settings pages have grown past a
 // scannable flat list, so cards are chunked into labelled sections and shown as
@@ -45,6 +46,7 @@ const GROUPS: ManageGroup[] = [
     cards: [
       { to: '/admin/dashboard', icon: <ChartIcon />, ...m.dashboard },
       { to: '/admin/applications', icon: <ClipboardCheckIcon />, ...m.applications },
+      { to: '/admin/audits', icon: <AuditIcon />, ...m.audits },
     ],
   },
   {
