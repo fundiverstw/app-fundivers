@@ -132,6 +132,10 @@ export interface RegistrationPdfPayload {
   creditCardInvoiceEmail: string | null
   deposit: number | string | null
   total: number | null
+  /** Account credit applied at checkout (deducted deposit-first). When > 0 the
+   *  Payment section shows the gross total, this credit as a negative line, and
+   *  the resulting balance after credit. Null / 0 = no credit applied. */
+  creditApplied: number | null
   /** Itemized charge lines (base + every additional charge with its amount)
    *  snapshotted on the booking. When present, the Payment section lists each
    *  line so the total is fully backtrackable. Null/empty for older bookings. */
@@ -361,6 +365,26 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   doc.text(p.total != null ? String(p.total) : "-", COL, y + 1)
   y += 8
 
+  // Account credit — when the diver paid part of the booking with credit, show
+  // it as a negative line and the resulting balance so the gross total above
+  // and the after-credit balance are both on the PDF.
+  if (typeof p.creditApplied === "number" && p.creditApplied > 0 && typeof p.total === "number") {
+    y += 2
+    y = row(doc, y, d.creditApplied(CUR), -p.creditApplied, altState)
+    y += 2
+    const afterCredit = Math.max(0, p.total - p.creditApplied)
+    y = ensureY(doc, y, 14)
+    doc.setFillColor(...C.oceanLight)
+    doc.rect(0, y - 5, 210, 10, "F")
+    doc.setFontSize(9)
+    doc.setTextColor(...C.ocean)
+    setFontFor(doc, d.balanceAfterCredit(CUR), "bold")
+    doc.text(d.balanceAfterCredit(CUR), ML + 2, y + 1)
+    doc.setFontSize(13)
+    doc.text(String(afterCredit), COL, y + 1)
+    y += 8
+  }
+
   // How to pay — per-method instructions (shop address + map for cash,
   // bank details for transfer, paypal.me link for PayPal, invoice email
   // for credit card).
@@ -418,9 +442,14 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
 
   if (p.payDepositOnly && typeof p.deposit === "number" && typeof p.total === "number") {
     y += 2
-    const remaining = Math.max(0, p.total - p.deposit)
-    setFontFor(doc, d.payDepositNow(p.deposit, CUR), "bold")
-    doc.text(d.payDepositNow(p.deposit, CUR), ML + 2, y)
+    // Credit pays the deposit down first, then trims the leftover balance, so
+    // the "pay now / pay later" figures here match the after-credit balance
+    // shown above rather than the gross deposit and total.
+    const credit = typeof p.creditApplied === "number" ? p.creditApplied : 0
+    const depositNow = Math.max(0, p.deposit - credit)
+    const remaining = Math.max(0, (p.total - credit) - depositNow)
+    setFontFor(doc, d.payDepositNow(depositNow, CUR), "bold")
+    doc.text(d.payDepositNow(depositNow, CUR), ML + 2, y)
     y += 4.5
     const balanceLine = p.fullPaymentDeadline
       ? d.payBalanceBy(formatDeadlineLong(p.fullPaymentDeadline), remaining, CUR)

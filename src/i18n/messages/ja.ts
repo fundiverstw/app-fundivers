@@ -2072,6 +2072,8 @@ export const ja: Messages = {
     cancellationPolicyNamed: (title: string) => `キャンセル規定 — ${title}`,
     deposit: (cur: string) => `内金（${cur}）`,
     total: (cur: string) => `合計（${cur}）`,
+    creditApplied: (cur: string) => `利用アカウントクレジット（${cur}）`,
+    balanceAfterCredit: (cur: string) => `クレジット適用後の残額（${cur}）`,
   },
   paymentInstructions: {
     cashTitle: 'お支払い方法 — 現金',

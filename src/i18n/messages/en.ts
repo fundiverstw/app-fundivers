@@ -2085,6 +2085,8 @@ export const en = {
     cancellationPolicyNamed: (title: string) => `Cancellation policy — ${title}`,
     deposit: (cur: string) => `Deposit (${cur})`,
     total: (cur: string) => `Total (${cur})`,
+    creditApplied: (cur: string) => `Account credit applied (${cur})`,
+    balanceAfterCredit: (cur: string) => `Balance after credit (${cur})`,
   },
   paymentInstructions: {
     cashTitle: 'How to pay — Cash',

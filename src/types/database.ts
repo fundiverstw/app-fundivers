@@ -52,6 +52,12 @@ export interface BookingDetails {
   nitrox_course_addon?: boolean
   total?: number
   deposit?: number
+  /** Account credit the diver elected to apply at checkout, capped at `total`.
+   *  Snapshotted here so the confirmation PDF can show both the gross total and
+   *  the balance after credit — the credit itself is consumed by a separate
+   *  `apply_credit_to_booking` RPC that runs after this booking is created and
+   *  never rewrites `total`. Absent / 0 when no credit was applied. */
+  credit_applied?: number
   /** Itemized snapshot of every charge that makes up `total` (base, per-item
    *  gear, room, add-ons, transport, nitrox course, card surcharge). Frozen at
    *  registration so later catalog price changes can't rewrite history. Absent

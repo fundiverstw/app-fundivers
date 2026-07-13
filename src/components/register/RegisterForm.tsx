@@ -1071,6 +1071,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       // Surcharge-inclusive when paying by card/PayPal — the actual amount due
       // to secure the spot. Equals the face deposit for bank transfer / cash.
       deposit: hasDeposit ? depositNow : undefined,
+      // Snapshot the credit the diver applied so the confirmation PDF can show
+      // the gross total and the after-credit balance. The credit is actually
+      // consumed by applyCreditToBooking after this booking is created.
+      credit_applied: creditDeducted > 0 ? creditDeducted : undefined,
       // Stamp the ack only when there's a policy and the diver ticked the
       // box — preserving any prior ack on the existing booking otherwise.
       cancellation_policy_acked_at: cancelPolicy && policyAcked

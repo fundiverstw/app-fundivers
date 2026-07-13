@@ -2073,6 +2073,8 @@ export const zhTW: Messages = {
     cancellationPolicyNamed: (title: string) => `取消政策 — ${title}`,
     deposit: (cur: string) => `訂金（${cur}）`,
     total: (cur: string) => `總計（${cur}）`,
+    creditApplied: (cur: string) => `已折抵帳戶餘額（${cur}）`,
+    balanceAfterCredit: (cur: string) => `折抵後應付（${cur}）`,
   },
   paymentInstructions: {
     cashTitle: '付款方式 — 現金',

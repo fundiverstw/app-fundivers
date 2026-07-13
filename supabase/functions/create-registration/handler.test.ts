@@ -636,6 +636,32 @@ describe('handleRegistration — email behaviour', () => {
     const buildPdf = deps.buildPdfBase64 as unknown as { mock: { calls: Array<[{ charges: unknown }]> } }
     expect(buildPdf.mock.calls[0][0].charges).toEqual(charges)
   })
+
+  it('forwards the applied account credit into the PDF payload', async () => {
+    const { deps } = makeDeps()
+    await handleRegistration(postJson({
+      ...goodBody,
+      email:    'g@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'tk',
+      details:  { total: 3200, credit_applied: 1200 },
+    }), deps)
+    const buildPdf = deps.buildPdfBase64 as unknown as { mock: { calls: Array<[{ creditApplied: unknown }]> } }
+    expect(buildPdf.mock.calls[0][0].creditApplied).toBe(1200)
+  })
+
+  it('passes creditApplied: null when no credit was applied', async () => {
+    const { deps } = makeDeps()
+    await handleRegistration(postJson({
+      ...goodBody,
+      email:    'g@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'tk',
+      details:  { total: 3200 },
+    }), deps)
+    const buildPdf = deps.buildPdfBase64 as unknown as { mock: { calls: Array<[{ creditApplied: unknown }]> } }
+    expect(buildPdf.mock.calls[0][0].creditApplied).toBeNull()
+  })
 })
 
 describe('handleRegistration — H2 guest path gates (Turnstile, rate limit, event existence)', () => {
