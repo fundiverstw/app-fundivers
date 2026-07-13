@@ -136,7 +136,7 @@ export function BookingPaymentsBlock({
       {/* Balance = owed − paid − open credit for this event. Positive means the
           diver still owes (red); negative means they're net in credit (green). */}
       {(() => {
-        const bal = bookingBalance(owed, paid, credit)
+        const bal = bookingBalance(owed, paid, credit, { cancelled })
         return (
           <>
             <div className="grid grid-cols-3 gap-2 text-brand-900">

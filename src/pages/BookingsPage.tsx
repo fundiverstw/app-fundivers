@@ -258,7 +258,7 @@ function Card({
   // Balance nets open credit-for-this-event against what's owed (incl.
   // amendments). A negative balance — whether from an awarded credit or an
   // overpayment — is money the shop owes the diver, shown as a credit.
-  const bal = bookingBalance(owed, row.paidSum, row.credit)
+  const bal = bookingBalance(owed, row.paidSum, row.credit, { cancelled: row.status === 'cancelled' })
 
   return (
     <div className={CARD}>

@@ -297,7 +297,7 @@ export function assembleDiverAuditTrail(input: AuditTrailInput): DiverAuditTrail
       owed,
       paid,
       openCredit,
-      balance: bookingBalance(owed, paid, openCredit),
+      balance: bookingBalance(owed, paid, openCredit, { cancelled: booking.status === 'cancelled' }),
       entries: mergeEntries(
         paymentEntries(bookingPayments),
         creditEntries(bookingCredits),

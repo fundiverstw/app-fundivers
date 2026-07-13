@@ -218,7 +218,7 @@ export function AdminLogisticsPage() {
         const payerName = (b.payer_id && b.payer_id !== b.user_id)
           ? (personName(profMap.get(b.payer_id)?.name, profMap.get(b.payer_id)?.nickname) || lg.leadBooker)
           : null
-        balByBooking.set(b.id, { bal: bookingBalance(owed, paid, openCreditForBooking(credits, b.id)), payerName })
+        balByBooking.set(b.id, { bal: bookingBalance(owed, paid, openCreditForBooking(credits, b.id), { cancelled: b.status === 'cancelled' }), payerName })
       }
       if (cancelled) return
       setBalances(balByBooking)

@@ -56,6 +56,14 @@ describe('BookingPaymentsBlock — Balance', () => {
     expect(screen.getByText('Settled ✓')).toBeInTheDocument()
   })
 
+  it('shows no amount owed on a cancelled booking, even with a positive frozen owed', () => {
+    // A cancelled event: the diver owes nothing further. The 2,200 that owed −
+    // paid would otherwise show must not appear as a balance due.
+    render(<BookingPaymentsBlock {...baseProps} owed={3200} paid={1000} cancelled />)
+    expect(screen.getByText('Settled ✓')).toBeInTheDocument()
+    expect(screen.queryByText('2,200 owed')).not.toBeInTheDocument()
+  })
+
   it('treats a plain overpayment as a credit owed to the diver', () => {
     // owed 8,150, paid 8,700, no awarded credit row → 550 credit.
     render(<BookingPaymentsBlock {...baseProps} owed={8150} paid={8700} />)

@@ -242,6 +242,16 @@ describe('assembleDiverAuditTrail', () => {
     expect(reg.balance.amount).toBe(3500)
   })
 
+  it('a cancelled registration shows no balance owed', () => {
+    const input = base()
+    input.bookings = [booking({ status: 'cancelled' })]
+    // Paid 1000 of a 4000 booking, then cancelled — the frozen 3000 "due" must
+    // not surface as owed; a cancelled booking settles to zero.
+    const reg = assembleDiverAuditTrail(input).registrations[0]
+    expect(reg.balance.state).toBe('settled')
+    expect(reg.balance.amount).toBe(0)
+  })
+
   it('open credit tied to the booking offsets the balance', () => {
     const input = base()
     input.credits = [credit({ booking_id: 'b1', amount: 3000, status: 'open' })]

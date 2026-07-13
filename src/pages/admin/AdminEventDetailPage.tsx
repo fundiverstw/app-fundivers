@@ -1171,7 +1171,7 @@ function registrantBalance(r: Registrant) {
   const owed = Number((r.booking.details as { total?: number } | undefined)?.total ?? 0)
     + amendmentsDelta(r.amendments)
   const paid = r.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
-  return { owed, paid, bal: bookingBalance(owed, paid, r.credit) }
+  return { owed, paid, bal: bookingBalance(owed, paid, r.credit, { cancelled: r.booking.status === 'cancelled' }) }
 }
 
 function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, currency, onStatusChange, onApproveRefund, onEdit, onAddAmendment, onRecordPayment, onApplyCredit, onVoidPayment, onMarkDepositPaid, onBillToDiver, onRecordGroupPayment, readOnly }: {
