@@ -67,7 +67,7 @@ describe('AdminRefundsPage', () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Alice Diver')
-    await user.click(screen.getByRole('button', { name: /approve refund/i }))
+    await user.click(screen.getByRole('button', { name: /approve/i }))
     await waitFor(() => expect(updateEq).toHaveBeenCalledWith('id', 'b1'))
     expect(toastSuccess).toHaveBeenCalled()
     await waitFor(() => expect(screen.queryByText('Alice Diver')).not.toBeInTheDocument())

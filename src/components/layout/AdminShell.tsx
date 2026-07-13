@@ -63,7 +63,17 @@ export function AdminShell() {
   return (
     <div className={`min-h-screen ${PAGE} flex flex-col`}>
       <header className={NAV_BAR}>
-        <div className="flex-1 flex items-center justify-start gap-4" />
+        <div className="flex-1 flex items-center justify-start gap-4">
+          {displayRefundCount != null && displayRefundCount > 0 && (
+            <Link
+              to="/admin/refunds"
+              className="text-xs font-semibold bg-accent text-white px-2 py-0.5 rounded-full hover:bg-red-400"
+              aria-label={t.shell.pendingRefundsAria(displayRefundCount)}
+            >
+              {t.shell.pendingRefunds(displayRefundCount)}
+            </Link>
+          )}
+        </div>
         <Link to="/admin/home" aria-label={t.shell.adminHome} className="shrink-0">
           <Logo size="sm" />
         </Link>
@@ -75,15 +85,6 @@ export function AdminShell() {
               aria-label={t.shell.pendingApplications(displayPendingCount)}
             >
               {t.shell.pending(displayPendingCount)}
-            </Link>
-          )}
-          {displayRefundCount != null && displayRefundCount > 0 && (
-            <Link
-              to="/admin/refunds"
-              className="text-xs font-semibold bg-accent text-white px-2 py-0.5 rounded-full hover:bg-red-400"
-              aria-label={t.shell.pendingRefundsAria(displayRefundCount)}
-            >
-              {t.shell.pendingRefunds(displayRefundCount)}
             </Link>
           )}
           <Link to="/calendar" className="text-sm font-semibold text-amber-300 hover:text-amber-200">

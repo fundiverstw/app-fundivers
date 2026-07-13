@@ -1936,7 +1936,7 @@ export const ja: Messages = {
       colEvent: 'イベント',
       colPaid: '支払済',
       colRequested: '申請日時',
-      approve: '返金を承認',
+      approve: '承認',
       approved: '返金を承認しました · 予約をキャンセルしました',
       eventFallback: 'イベント',
     },

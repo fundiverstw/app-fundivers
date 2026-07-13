@@ -1937,7 +1937,7 @@ export const zhTW: Messages = {
       colEvent: '活動',
       colPaid: '已付',
       colRequested: '申請時間',
-      approve: '核准退款',
+      approve: '核准',
       approved: '已核准退款 · 預訂已取消',
       eventFallback: '活動',
     },

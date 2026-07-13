@@ -1945,7 +1945,7 @@ export const en = {
       colEvent: 'Event',
       colPaid: 'Paid',
       colRequested: 'Requested',
-      approve: 'Approve refund',
+      approve: 'Approve',
       approved: 'Refund approved · booking cancelled',
       eventFallback: 'Event',
     },
