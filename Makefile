@@ -29,7 +29,7 @@ help:
 	@echo "  make check       — typecheck + lint + test, in that order; pre-deploy gate"
 	@echo ""
 	@echo "Deploy:"
-	@echo "  make deploy            — deploy both workers (SPA + push cron)"
+	@echo "  make deploy            — deploy both workers (SPA + push cron) + edge functions"
 	@echo "  make deploy-app        — deploy just the SPA (app-fundiverstw)"
 	@echo "  make deploy-push       — deploy just the push cron (fundivers-push)"
 	@echo "  make deploy-functions  — deploy all supabase edge functions in supabase/functions/"
@@ -79,7 +79,7 @@ REQUIRE_CF = if [ ! -f .env.production ]; then echo "ERROR: .env.production not 
 	  exit 1; \
 	fi
 
-deploy: deploy-app deploy-push
+deploy: deploy-app deploy-push deploy-functions
 
 deploy-app:
 	@$(REQUIRE_CF)
