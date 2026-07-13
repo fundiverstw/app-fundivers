@@ -346,6 +346,15 @@ describe('RegisterForm', () => {
     await waitFor(() => expect(rpc).toHaveBeenCalledWith(
       'apply_credit_to_booking', { p_booking_id: 'b-new', p_amount: 2000 },
     ))
+
+    // The applied credit is also snapshotted onto the booking details so the
+    // confirmation PDF can show the gross total (2,800) and the after-credit
+    // balance (800). Without this, the emailed PDF would quote the full 2,800.
+    const details = (invoke.mock.calls[0][1] as {
+      body: { details: { total: number; credit_applied?: number } }
+    }).body.details
+    expect(details.total).toBe(2800)
+    expect(details.credit_applied).toBe(2000)
   })
 
   it('does not offer account credit when registering a family group', async () => {
