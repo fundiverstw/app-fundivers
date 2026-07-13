@@ -51,6 +51,12 @@ interface MockOpts {
   profileLoggedDives?: number
   prereqCertId?: string | null
   reqDives?: number | string | null
+  // Money-recompute inputs: the event's linked prices row + dive_days.
+  eventPriceId?: string | null
+  eventDiveDays?: number
+  priceStartingAt?: number
+  priceDeposit?: number
+  priceTransport?: number
 }
 
 function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites } {
@@ -85,9 +91,17 @@ function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites }
             id: 'd1', kind: 'dive', display_title: 'Test Dive',
             prereq_cert_id: opts.prereqCertId ?? null,
             req_dives: opts.reqDives ?? null,
+            price: opts.eventPriceId ?? null,
+            dive_days: opts.eventDiveDays ?? 1,
             ...(opts.eventPast
               ? { start_date: '2020-01-01', end_date: '2020-01-03', course_days: ['2020-01-01', '2020-01-02'] }
               : { start_date: '2030-06-01', end_date: '2030-06-03', course_days: ['2030-06-01', '2030-06-02', '2030-06-03'] }),
+          }
+        case 'prices':
+          return {
+            starting_at: opts.priceStartingAt ?? 0,
+            deposit_amount: opts.priceDeposit ?? 0,
+            transport: opts.priceTransport ?? 0,
           }
         default:           return null
       }
@@ -661,6 +675,34 @@ describe('handleRegistration — email behaviour', () => {
     }), deps)
     const buildPdf = deps.buildPdfBase64 as unknown as { mock: { calls: Array<[{ creditApplied: unknown }]> } }
     expect(buildPdf.mock.calls[0][0].creditApplied).toBeNull()
+  })
+
+  it('recomputes details.total from the catalog, ignoring a tampered client total', async () => {
+    const { deps, captured } = makeDeps({ eventPriceId: 'p1', priceStartingAt: 3200 })
+    await handleRegistration(postJson({
+      ...goodBody,
+      email:    'g@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'tk',
+      details:  { total: 0, deposit: 0 },
+    }), deps)
+    expect(captured.bookingInsert).toHaveLength(1)
+    expect((captured.bookingInsert[0].details as { total: number }).total).toBe(3200)
+  })
+
+  it('recomputes details.deposit (face + card surcharge) from the catalog', async () => {
+    const { deps, captured } = makeDeps({ eventPriceId: 'p1', priceStartingAt: 10000, priceDeposit: 3000 })
+    await handleRegistration(postJson({
+      ...goodBody,
+      email:    'g@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'tk',
+      details:  { total: 1, deposit: 1, payment_method: 'credit_card' },
+    }), deps)
+    const details = captured.bookingInsert[0].details as { total: number; deposit: number }
+    // subTotal 10000 + 5% full-card surcharge (500) = 10500; deposit 3000 + 5% (150) = 3150.
+    expect(details.total).toBe(10500)
+    expect(details.deposit).toBe(3150)
   })
 })
 

@@ -17,6 +17,7 @@
 import { Buffer } from "node:buffer"
 import { sanitizeProfilePatch } from "../_shared/profile-patch.ts"
 import { eligibilityError } from "../_shared/registration-eligibility.ts"
+import { computeBookingMoney } from "../_shared/booking-charges.ts"
 import { corsHeaders, safeError } from "../_shared/responses.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 import type { RegistrationPdfPayload } from "../_shared/pdf.ts"
@@ -383,6 +384,61 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
   if (!body.target_user_id) {
     const gate = await checkEligibility(userId)
     if (gate) return rollback(gate, 422)
+  }
+
+  // 1c. Recompute the booking's money server-side and overwrite the client's
+  //     figures. details.total is the amount owed (read by apply_credit_to_booking
+  //     and record_group_payment) and details.deposit is the confirm-on-deposit
+  //     threshold, so a crafted request must not be able to set its own total.
+  //     Selections (gear/room/add-ons/transport) are trusted as intent; every
+  //     price behind them comes from the catalog, never the request body.
+  {
+    const d = body.details as Record<string, unknown>
+    const { data: evMoney } = await admin
+      .from("events").select("price, dive_days").eq("id", body.event_id).maybeSingle()
+
+    let base = 0, depositAmount = 0, transportPrice = 0
+    const priceId = (evMoney?.price as string | null | undefined) ?? null
+    if (priceId) {
+      const { data: pr } = await admin
+        .from("prices").select("starting_at, deposit_amount, transport").eq("id", priceId).maybeSingle()
+      base = (pr?.starting_at as number | null) ?? 0
+      depositAmount = (pr?.deposit_amount as number | null) ?? 0
+      transportPrice = (pr?.transport as number | null) ?? 0
+    }
+
+    const roomOpt = (d.room as { option_id?: string } | undefined)?.option_id ?? null
+    let roomAddedPrice = 0
+    if (roomOpt) {
+      const { data: r } = await admin.from("rooms").select("added_price").eq("id", roomOpt).maybeSingle()
+      roomAddedPrice = (r?.added_price as number | null) ?? 0
+    }
+
+    const addOnIds = Array.isArray(d.add_ons) ? (d.add_ons as string[]) : []
+    let addonsTotal = 0
+    if (addOnIds.length) {
+      const { data: rows } = await admin.from("addons").select("price").in("id", addOnIds)
+      addonsTotal = (rows ?? []).reduce(
+        (s: number, a: { price: number | null }) => s + (a.price ?? 0), 0)
+    }
+
+    const gear = d.gear as { rent?: boolean; items?: string[] } | undefined
+    const money = computeBookingMoney({
+      base,
+      diveDays: (evMoney?.dive_days as number | null) ?? 1,
+      depositAmount,
+      transportPrice,
+      gearItems: gear?.rent ? (gear.items ?? []) : [],
+      gearPrices: siteConfig.business.gearPrices,
+      roomAddedPrice,
+      addonsTotal,
+      needsTransport: d.transportation === true,
+      nitroxCourse: !!d.nitrox_course_addon,
+      nitroxCourseFee: siteConfig.business.nitroxCourseFee,
+      paymentMethod: d.payment_method as string | null | undefined,
+      payDepositOnly: !!d.pay_deposit_only,
+    })
+    body.details = { ...d, total: money.total, deposit: money.deposit }
   }
 
   // 2. Booking insert — pre-check for active booking; partial unique

@@ -4,6 +4,7 @@ import { GEAR_ALACARTE_PRICES } from './gear'
 import type { AppEvent, BookingDetails } from '../types/database'
 import { siteConfig } from '../config/site'
 import { t } from '../i18n'
+import { computeBookingMoney } from '../../supabase/functions/_shared/booking-charges'
 
 describe('buildCharges', () => {
   it('always emits a base line and drops zero/empty lines', () => {
@@ -131,6 +132,80 @@ describe('resolveCharges', () => {
   it('returns [] when details or event is missing', () => {
     expect(resolveCharges({ details: null, event })).toEqual([])
     expect(resolveCharges({ details: { payment_method: 'cash' }, event: null })).toEqual([])
+  })
+})
+
+// The server recompute in create-registration (supabase/functions/_shared/
+// booking-charges.ts) must reach the same total the browser previews, or an
+// honest booking's authoritative total would drift from what the diver saw.
+// This parity block pins the two implementations together.
+describe('computeBookingMoney parity with client resolveCharges', () => {
+  const gearPrices = GEAR_ALACARTE_PRICES
+  const nitroxCourseFee = siteConfig.business.nitroxCourseFee
+
+  it('matches a fully-loaded bank-transfer booking (no surcharge)', () => {
+    const event = { price: 2800, transport_price: 1300, dive_days: 2, deposit_amount: 1000 } as AppEvent
+    const details: BookingDetails = {
+      gear: { rent: true, items: ['BCD', 'Dive computer'] },
+      room: { option_id: 'r1' },
+      add_ons: ['a1'],
+      transportation: true,
+      nitrox_course_addon: true,
+      payment_method: 'bank_transfer',
+    }
+    const clientTotal = chargesTotal(resolveCharges({
+      details, event,
+      roomPrices: new Map([['r1', { label: 'Deluxe', amount: 1500 }]]),
+      addonPrices: new Map([['a1', { label: 'Camera', amount: 300 }]]),
+    }))
+    const money = computeBookingMoney({
+      base: 2800, diveDays: 2, depositAmount: 1000, transportPrice: 1300,
+      gearItems: ['BCD', 'Dive computer'], gearPrices,
+      roomAddedPrice: 1500, addonsTotal: 300,
+      needsTransport: true, nitroxCourse: true, nitroxCourseFee,
+      paymentMethod: 'bank_transfer', payDepositOnly: false,
+    })
+    expect(money.total).toBe(clientTotal)
+    expect(money.deposit).toBe(1000) // face 1000, no surcharge
+  })
+
+  it('matches a full card payment (5% on the whole subtotal)', () => {
+    const event = { price: 1000, transport_price: 0, dive_days: 1, deposit_amount: 500 } as AppEvent
+    const details: BookingDetails = { payment_method: 'credit_card' }
+    const clientTotal = chargesTotal(resolveCharges({ details, event }))
+    const money = computeBookingMoney({
+      base: 1000, diveDays: 1, depositAmount: 500, transportPrice: 0,
+      gearItems: [], gearPrices, roomAddedPrice: 0, addonsTotal: 0,
+      needsTransport: false, nitroxCourse: false, nitroxCourseFee,
+      paymentMethod: 'credit_card', payDepositOnly: false,
+    })
+    expect(money.total).toBe(clientTotal) // 1000 + 50
+    expect(money.deposit).toBe(525)       // face 500 + 5% (25)
+  })
+
+  it('matches a deposit-only card payment (surcharge on the deposit only)', () => {
+    const event = { price: 1000, transport_price: 0, dive_days: 1, deposit_amount: 500 } as AppEvent
+    const details: BookingDetails = { payment_method: 'credit_card', pay_deposit_only: true }
+    const clientTotal = chargesTotal(resolveCharges({ details, event }))
+    const money = computeBookingMoney({
+      base: 1000, diveDays: 1, depositAmount: 500, transportPrice: 0,
+      gearItems: [], gearPrices, roomAddedPrice: 0, addonsTotal: 0,
+      needsTransport: false, nitroxCourse: false, nitroxCourseFee,
+      paymentMethod: 'credit_card', payDepositOnly: true,
+    })
+    expect(money.total).toBe(clientTotal) // 1000 + 25
+    expect(money.deposit).toBe(525)       // face 500 + 5% (25)
+  })
+
+  it('returns a null deposit when the event has none', () => {
+    const money = computeBookingMoney({
+      base: 3200, diveDays: 1, depositAmount: 0, transportPrice: 0,
+      gearItems: [], gearPrices, roomAddedPrice: 0, addonsTotal: 0,
+      needsTransport: false, nitroxCourse: false, nitroxCourseFee,
+      paymentMethod: 'cash', payDepositOnly: false,
+    })
+    expect(money.total).toBe(3200)
+    expect(money.deposit).toBeNull()
   })
 })
 
