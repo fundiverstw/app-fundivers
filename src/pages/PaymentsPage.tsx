@@ -406,7 +406,10 @@ function LineCard({
   const { booking, event, charges, amendments, total, owed, deposit, paid, credit, due, depositDue, payments } = line
   const label = event?.title ?? t.payments.eventFallback
   const refundRequested = !!booking.refund_requested_at
-  const canRefundDeposit = paid > 0 && !refundRequested
+  // Mirror BookingsPage: no refund request on an already-cancelled booking —
+  // the admin refund surfaces only list non-cancelled bookings, so a request
+  // made here would otherwise be invisible to admins.
+  const canRefundDeposit = paid > 0 && !refundRequested && booking.status !== 'cancelled'
   // What this booking can absorb from the diver's spendable credit pool:
   // its outstanding balance, capped by credit not already offsetting it.
   const applicable = Math.min(due, spendable)
