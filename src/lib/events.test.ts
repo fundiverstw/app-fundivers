@@ -347,6 +347,30 @@ describe('formatEventSpan — start_time_hhmm rendering', () => {
   })
 })
 
+describe('toIso — shop-timezone anchoring (via diveToEvent)', () => {
+  const baseDive: EventFixture = {
+    id: 'd-tz', kind: 'dive', display_title: 'TZ Dive',
+    start_time: '09:00:00', course_days: null, price: null, dive_days: 1,
+    start_date: '2026-05-15', end_date: '2026-05-15',
+  }
+
+  it('anchors start_time to the shop timezone, not the runtime timezone', async () => {
+    const [ev] = await fetchAndGet(baseDive)
+    // 09:00 on 2026-05-15 in Asia/Taipei (UTC+8) is 01:00Z the same day — the
+    // absolute instant is correct only if the parse is anchored to the shop tz.
+    expect(ev.start_time).toBe('2026-05-15T01:00:00.000Z')
+  })
+
+  it('keeps the shop-tz calendar day equal to the source date at midnight', async () => {
+    const [ev] = await fetchAndGet({ ...baseDive, start_time: '00:00:00' })
+    // Midnight Taipei = 16:00Z the previous day, but read back in the shop tz it
+    // is still 2026-05-15 — which is what isPastEvent compares.
+    expect(ev.start_time).toBe('2026-05-14T16:00:00.000Z')
+    expect(new Date(ev.start_time).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }))
+      .toBe('2026-05-15')
+  })
+})
+
 describe('isPastEvent', () => {
   const now = new Date('2026-06-18T04:00:00.000Z') // 2026-06-18 noon Taipei
 

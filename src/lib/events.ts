@@ -115,15 +115,39 @@ export function isPastEvent(
   return dayKey(event.end_time ?? event.start_time) < dayKey(now)
 }
 
+/** Minutes the given IANA zone is ahead of UTC at `instant`. Derived from
+ *  Intl so it tracks DST for any fork's timezone, no library needed. */
+function tzOffsetMinutes(instant: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone, hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(instant)
+  const p: Record<string, string> = {}
+  for (const part of parts) p[part.type] = part.value
+  const asUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second)
+  return (asUtc - instant.getTime()) / 60000
+}
+
 /**
  * Build an ISO timestamp from a date column ('YYYY-MM-DD') and a time column
- * ('HH:MM:SS'). PostgREST serializes both as strings. Defaults to midnight when
- * the time is null or empty.
+ * ('HH:MM:SS'). PostgREST serializes both as strings; both are the shop's
+ * calendar day / wall-clock time, so the instant is anchored to the shop
+ * timezone — NOT the runtime's. Anchoring to the runtime (a naive `new Date`)
+ * would let an edge/cron/other-tz runtime store an instant whose shop-tz
+ * calendar day differs from `date`, which `isPastEvent` (shop-tz day compare)
+ * would then read wrong. Defaults to midnight when the time is null/empty.
  */
 function toIso(date: string | null | undefined, time: string | null | undefined): string | null {
   if (!date) return null
   const t = time && time.trim() ? time.trim() : '00:00:00'
-  return new Date(`${date}T${t}`).toISOString()
+  const tz = siteConfig.locale.timezone
+  // Two-pass: treat the wall time as UTC, correct by the zone offset at that
+  // guess, then re-check the offset at the corrected instant (handles the rare
+  // DST-boundary case where the two offsets differ).
+  const guess = new Date(`${date}T${t}Z`)
+  const adjusted = new Date(guess.getTime() - tzOffsetMinutes(guess, tz) * 60000)
+  return new Date(guess.getTime() - tzOffsetMinutes(adjusted, tz) * 60000).toISOString()
 }
 
 /**

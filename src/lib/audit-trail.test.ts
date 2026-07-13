@@ -304,6 +304,20 @@ describe('signedDisplayAmount', () => {
     expect(signedDisplayAmount(e)).toBe(-250)
   })
 
+  it('shows an issued credit as money in the diver\'s favour (reduces owed)', () => {
+    const [issued] = creditEntries([credit({ status: 'open', amount: 1500 })])
+    expect(issued.kind).toBe('credit_issued')
+    expect(signedDisplayAmount(issued)).toBe(-1500)
+  })
+
+  it('shows a settled credit as consuming that favourable balance (positive)', () => {
+    const entries = creditEntries([credit({
+      status: 'settled', amount: 1500, settled_at: '2026-06-01T00:00:00.000Z',
+    })])
+    const settled = entries.find(e => e.kind === 'credit_settled')!
+    expect(signedDisplayAmount(settled)).toBe(1500)
+  })
+
   it('is null for field-change log rows', () => {
     const [e] = auditLogEntries([logRow({})])
     expect(signedDisplayAmount(e)).toBeNull()

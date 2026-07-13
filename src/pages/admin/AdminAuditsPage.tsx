@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
@@ -260,7 +260,10 @@ export function AdminAuditsPage() {
 
   useEffect(() => {
     supabase.from('profiles').select('*').order('name', { ascending: true })
-      .then(({ data }) => setProfiles((data ?? []) as Profile[]))
+      .then(({ data, error }) => {
+        if (error) setError(errorMessage(error))
+        else setProfiles((data ?? []) as Profile[])
+      })
   }, [])
 
   // Deep link: /admin/audits?diver=<id> opens straight to that diver — used
@@ -278,17 +281,24 @@ export function AdminAuditsPage() {
   const actorName = (id: string | null): string =>
     (id && nameById.get(id)) || (id ? `${au.unknownActor} (${id.slice(0, 8)})` : au.unknownActor)
 
+  // Bumped on every select() so a slower earlier fetch can't overwrite a later
+  // selection's trail (click diver A then B quickly, A resolves last).
+  const reqSeq = useRef(0)
   async function select(id: string) {
+    const seq = ++reqSeq.current
     setSelectedId(id)
     setTrail(null)
     setError(null)
     setLoading(true)
     try {
-      setTrail(await fetchDiverAuditTrail(id))
+      const result = await fetchDiverAuditTrail(id)
+      if (seq !== reqSeq.current) return
+      setTrail(result)
     } catch (e) {
+      if (seq !== reqSeq.current) return
       setError(errorMessage(e))
     } finally {
-      setLoading(false)
+      if (seq === reqSeq.current) setLoading(false)
     }
   }
 

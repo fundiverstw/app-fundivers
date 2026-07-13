@@ -384,6 +384,11 @@ export function signedDisplayAmount(entry: AuditEntry): number | null {
   if (entry.amount == null) return null
   switch (entry.kind) {
     case 'payment_paid':     return -entry.amount
+    // Issuing a credit is money in the diver's favour — it reduces what they
+    // owe (a booking-tied open credit is subtracted in bookingBalance), so it
+    // reads as a negative like a payment. Settling that credit consumes the
+    // favourable balance again, so credit_settled stays positive (default).
+    case 'credit_issued':    return -entry.amount
     case 'payment_refunded': return entry.amount
     case 'amendment':        return entry.amount
     default:                 return entry.amount
