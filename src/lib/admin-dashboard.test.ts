@@ -17,6 +17,7 @@ const NOW = '2026-06-15T12:00:00+08:00'
 const input: DashboardInput = {
   nowIso: NOW,
   pendingApplications: 2,
+  pendingRefundRequests: 3,
   payments: [
     { user_id: 'd1', booking_id: 'b1', amount: 1000, status: 'paid', method: 'bank_transfer', created_at: '2026-06-10T00:00:00+08:00' },
     { user_id: 'd1', booking_id: 'b1', amount: 200, status: 'refunded', method: 'bank_transfer', created_at: '2026-06-12T00:00:00+08:00' },
@@ -110,6 +111,7 @@ describe('computeDashboard', () => {
 
   it('passes pending applications straight through', () => {
     expect(d.kpis.pendingApplications).toBe(2)
+    expect(d.kpis.pendingRefundRequests).toBe(3)
   })
 
   it('treats past-dated events as not upcoming', () => {

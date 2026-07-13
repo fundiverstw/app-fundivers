@@ -51,6 +51,7 @@ import { AdminPricesPage } from './pages/admin/AdminPricesPage'
 import { AdminNotificationsPage } from './pages/admin/AdminNotificationsPage'
 import { AdminAccountingPage } from './pages/admin/AdminAccountingPage'
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage'
+import { AdminRefundsPage } from './pages/admin/AdminRefundsPage'
 import { AdminHistoryPage } from './pages/admin/AdminHistoryPage'
 import { AdminPackagesPage } from './pages/admin/AdminPackagesPage'
 import { AdminScheduledTripsPage } from './pages/admin/AdminScheduledTripsPage'
@@ -161,6 +162,7 @@ export default function App() {
                 <Route path="/admin/terms" element={<AdminTermsPage />} />
                 <Route path="/admin/cancellation-policies" element={<AdminCancellationPoliciesPage />} />
                 <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+                <Route path="/admin/refunds" element={<AdminRefundsPage />} />
                 <Route path="/admin/history" element={<AdminHistoryPage />} />
               </Route>
             </Route>

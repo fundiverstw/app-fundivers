@@ -51,11 +51,12 @@ async function loadDashboard(): Promise<Dashboard> {
   const today = taipeiDate(nowIso)
   const { startIso, endIso } = fiscalYearRange(taipeiYear(nowIso))
 
-  const [paymentsRes, bookingsRes, profilesRes, pendingRes, divesRes, coursesRes] = await Promise.all([
+  const [paymentsRes, bookingsRes, profilesRes, pendingRes, refundsRes, divesRes, coursesRes] = await Promise.all([
     supabase.from('payments').select('user_id, booking_id, amount, status, method, created_at').gte('created_at', startIso).lt('created_at', endIso),
     supabase.from('bookings').select('id, user_id, event_id, status, created_at, details').gte('created_at', startIso).lt('created_at', endIso),
     supabase.from('profiles').select('id, role, status, created_at, nationality, cert_level'),
     supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'pending').not('application_submitted_at', 'is', null),
+    supabase.from('bookings').select('id', { count: 'exact', head: true }).not('refund_requested_at', 'is', null).neq('status', 'cancelled'),
     supabase.from('events').select('id, display_title, admin_title, capacity, start_date').eq('kind', 'dive').is('cancelled_at', null).gte('start_date', today),
     supabase.from('events').select('id, display_title, admin_title, capacity, course_days').eq('kind', 'course').is('cancelled_at', null),
   ])
@@ -67,6 +68,7 @@ async function loadDashboard(): Promise<Dashboard> {
   const bookings = (bookingsRes.data ?? []) as BookingLite[]
   const profiles = (profilesRes.data ?? []) as ProfileLite[]
   const pendingApplications = pendingRes.count ?? 0
+  const pendingRefundRequests = refundsRes.count ?? 0
   const upcomingDives = (divesRes.data ?? []) as DiveRow[]
   const allCourses = (coursesRes.data ?? []) as CourseRow[]
 
@@ -103,7 +105,7 @@ async function loadDashboard(): Promise<Dashboard> {
   for (const r of confRes.data ?? []) if (r.event_id) counts.set(r.event_id, (counts.get(r.event_id) ?? 0) + 1)
   const confirmed: ConfirmedCount[] = [...counts.entries()].map(([eventId, count]) => ({ eventId, count }))
 
-  return computeDashboard({ nowIso, payments, bookings, profiles, events, confirmed, pendingApplications })
+  return computeDashboard({ nowIso, payments, bookings, profiles, events, confirmed, pendingApplications, pendingRefundRequests })
 }
 
 const TWD = (n: number) => `${siteConfig.locale.currency} ${Math.round(n).toLocaleString()}`
@@ -149,6 +151,13 @@ export function AdminDashboardPage() {
         <StatCard label={db.bookingsThisMonth} value={k.bookingsThisMonth} sub={db.confirmedSub(k.confirmedBookingsThisMonth)} />
         <StatCard label={db.activeDivers} value={k.activeDivers} />
         <StatCard label={db.pendingApplications} value={k.pendingApplications} />
+        {k.pendingRefundRequests > 0 ? (
+          <Link to="/admin/refunds" className="block">
+            <StatCard label={db.pendingRefundRequests} value={`${k.pendingRefundRequests} →`} />
+          </Link>
+        ) : (
+          <StatCard label={db.pendingRefundRequests} value={k.pendingRefundRequests} />
+        )}
         <StatCard label={db.upcomingEvents} value={k.upcomingEvents} />
         <StatCard label={db.avgFill} value={k.avgFillPct == null ? '—' : `${k.avgFillPct}%`} />
       </section>

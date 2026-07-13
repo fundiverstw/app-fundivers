@@ -8,7 +8,7 @@ vi.mock('../../lib/supabase', () => ({ supabase: { from: (...a: unknown[]) => fr
 
 function builder(result: Record<string, unknown>) {
   const b: Record<string, unknown> = {}
-  for (const m of ['select', 'gte', 'lt', 'eq', 'in', 'is', 'not', 'order']) b[m] = () => b
+  for (const m of ['select', 'gte', 'lt', 'eq', 'neq', 'in', 'is', 'not', 'order']) b[m] = () => b
   b.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
     Promise.resolve(result).then(res, rej)
   return b

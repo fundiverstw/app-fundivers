@@ -29,6 +29,7 @@ export interface Dashboard {
     confirmedBookingsThisMonth: number
     activeDivers: number
     pendingApplications: number
+    pendingRefundRequests: number
     upcomingEvents: number
     avgFillPct: number | null
   }
@@ -59,6 +60,7 @@ export interface DashboardInput {
   events: EventLite[]
   confirmed: ConfirmedCount[]
   pendingApplications: number
+  pendingRefundRequests: number
 }
 
 const num = (v: unknown): number => Number(v) || 0
@@ -209,6 +211,7 @@ export function computeDashboard(input: DashboardInput): Dashboard {
       confirmedBookingsThisMonth,
       activeDivers,
       pendingApplications: input.pendingApplications,
+      pendingRefundRequests: input.pendingRefundRequests,
       upcomingEvents: upcoming.length,
       avgFillPct,
     },

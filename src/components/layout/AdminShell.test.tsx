@@ -25,6 +25,7 @@ function buildPendingCountQuery(count: number) {
   return {
     select: vi.fn().mockReturnThis(),
     eq:     vi.fn().mockReturnThis(),
+    neq:    vi.fn().mockReturnThis(),
     not:    vi.fn().mockReturnThis(),
     then:   (resolve: (r: { count: number }) => void) => resolve({ count }),
   }
@@ -63,6 +64,19 @@ describe('AdminShell pending badge', () => {
     // Wait one tick so the async query result lands.
     await new Promise(r => setTimeout(r, 0))
     expect(screen.queryByText(/pending/i)).not.toBeInTheDocument()
+  })
+
+  it('shows a refund-requests badge linking to /admin/refunds', async () => {
+    useAuthMock.mockReturnValue({
+      profile: { id: 'a1', role: 'admin', nickname: 'Ada' },
+      signOut: vi.fn(),
+    })
+    // Distinct counts per table: no pending applications, two open refunds.
+    from.mockImplementation((table: string) =>
+      buildPendingCountQuery(table === 'bookings' ? 2 : 0))
+    routedRender()
+    const badge = await screen.findByText(/2 refunds/i)
+    expect(badge.closest('a')).toHaveAttribute('href', '/admin/refunds')
   })
 
   it('does not query for staff users', async () => {

@@ -29,11 +29,12 @@ export function AdminShell() {
   const navigate = useNavigate()
   const location = useLocation()
   const [pendingCount, setPendingCount] = useState<number | null>(null)
+  const [refundCount, setRefundCount] = useState<number | null>(null)
 
-  // Refetch pending-applications count on every admin route change so the
-  // badge reflects reality after approve/reject without needing a global
-  // event bus. Only admins can read pending profiles via RLS, so we gate
-  // the fetch (and the rendered badge below) on role.
+  // Refetch pending-applications and open-refund-request counts on every admin
+  // route change so the badges reflect reality after approve/reject without a
+  // global event bus. Only admins can read these rows via RLS, so we gate the
+  // fetch (and the rendered badges below) on role.
   useEffect(() => {
     if (profile?.role !== 'admin') return
     let cancelled = false
@@ -43,9 +44,16 @@ export function AdminShell() {
       .eq('status', 'pending')
       .not('application_submitted_at', 'is', null)
       .then(({ count }) => { if (!cancelled) setPendingCount(count ?? 0) })
+    supabase
+      .from('bookings')
+      .select('id', { count: 'exact', head: true })
+      .not('refund_requested_at', 'is', null)
+      .neq('status', 'cancelled')
+      .then(({ count }) => { if (!cancelled) setRefundCount(count ?? 0) })
     return () => { cancelled = true }
   }, [profile?.role, location.pathname])
   const displayPendingCount = profile?.role === 'admin' ? pendingCount : null
+  const displayRefundCount = profile?.role === 'admin' ? refundCount : null
 
   async function handleSignOut() {
     await signOut()
@@ -67,6 +75,15 @@ export function AdminShell() {
               aria-label={t.shell.pendingApplications(displayPendingCount)}
             >
               {t.shell.pending(displayPendingCount)}
+            </Link>
+          )}
+          {displayRefundCount != null && displayRefundCount > 0 && (
+            <Link
+              to="/admin/refunds"
+              className="text-xs font-semibold bg-accent text-white px-2 py-0.5 rounded-full hover:bg-red-400"
+              aria-label={t.shell.pendingRefundsAria(displayRefundCount)}
+            >
+              {t.shell.pendingRefunds(displayRefundCount)}
             </Link>
           )}
           <Link to="/calendar" className="text-sm font-semibold text-amber-300 hover:text-amber-200">
