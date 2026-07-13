@@ -8,6 +8,7 @@ import { fetchEventsInRange, fetchUpcomingEventDays, formatEventSpan } from '../
 import { gearTotals, splitByTransport, dayKeyOffset, careTotals, isCareGearItem, addonTotals } from '../../lib/logistics'
 import { bookingBalance, type BookingBalance } from '../../lib/booking-balance'
 import { openCreditForBooking } from '../../lib/credits'
+import { netPaidByBooking } from '../../lib/payments'
 import { personName } from '../../lib/names'
 import { DiverGearCard, type DiverGearRow } from '../../components/admin/DiverGearCard'
 import { TransportGroup } from '../../components/admin/TransportGroup'
@@ -205,11 +206,7 @@ export function AdminLogisticsPage() {
       // open credit, mirroring the event page's Amount-owed math so the two
       // never disagree. A covered booking keeps its own balance but notes the
       // lead who's responsible for it.
-      const paidByBooking = new Map<string, number>()
-      for (const p of (paymentsRes.data ?? []) as Payment[]) {
-        if (!p.booking_id || p.status !== 'paid') continue
-        paidByBooking.set(p.booking_id, (paidByBooking.get(p.booking_id) ?? 0) + p.amount)
-      }
+      const paidByBooking = netPaidByBooking((paymentsRes.data ?? []) as Payment[])
       const credits = (creditsRes.data ?? []) as Credit[]
       const balByBooking = new Map<string, BookingBalanceRow>()
       for (const b of bookings) {

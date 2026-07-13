@@ -25,6 +25,7 @@ import { BookingPaymentsBlock } from '../../components/admin/BookingPaymentsBloc
 import { resolveCharges, type ChargeLine } from '../../lib/booking-charges'
 import { openCreditForBooking } from '../../lib/credits'
 import { bookingBalance } from '../../lib/booking-balance'
+import { netPaid } from '../../lib/payments'
 import { EventTransportPanel } from '../../components/admin/EventTransportPanel'
 import { missingWaivers, fetchEventWaiverOverrides, fetchSignaturesForDivers, fetchWaivers } from '../../lib/waivers'
 import type { WaiverDef } from '../../config/waivers'
@@ -1170,7 +1171,7 @@ function ApplyCreditInline({ cap, spendable, currency, onApply }: {
 function registrantBalance(r: Registrant) {
   const owed = Number((r.booking.details as { total?: number } | undefined)?.total ?? 0)
     + amendmentsDelta(r.amendments)
-  const paid = r.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
+  const paid = netPaid(r.payments)
   return { owed, paid, bal: bookingBalance(owed, paid, r.credit, { cancelled: r.booking.status === 'cancelled' }) }
 }
 

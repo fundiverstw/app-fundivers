@@ -10,6 +10,7 @@ import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
 import { fetchCreditsForUser, openCreditForBooking, openCreditBalance, diverCreditBalance, applyCreditToBooking } from '../lib/credits'
 import { useToast } from '../hooks/useToast'
 import { bookingBalance } from '../lib/booking-balance'
+import { netPaid } from '../lib/payments'
 import { resolveCharges, type ChargeLine } from '../lib/booking-charges'
 import { fetchChargeCatalog } from '../lib/booking-charge-catalog'
 import { fetchAmendmentsForBookings, amendmentsDelta } from '../lib/booking-amendments'
@@ -108,7 +109,7 @@ export function PaymentsPage() {
       const total = Number(d.total ?? 0)
       const deposit = Number(d.deposit ?? 0)
       const bookingPayments = paymentsByBooking.get(b.id) ?? []
-      const paid = bookingPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
+      const paid = netPaid(bookingPayments)
       const credit = openCreditForBooking(credits, b.id)
       const rows = amendmentsByBooking.get(b.id) ?? []
       const owed = total + amendmentsDelta(rows)

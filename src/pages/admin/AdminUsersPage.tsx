@@ -16,6 +16,7 @@ import { fetchChargeCatalog } from '../../lib/booking-charge-catalog'
 import { getCertCardSignedUrl } from '../../lib/cert-card'
 import { shoeAsJp } from '../../lib/shoe-size'
 import { fetchCreditsForUser, openCreditForBooking, openCreditBalance, diverCreditBalance, createCredit, settleCredit, reopenCredit, applyCreditToBooking } from '../../lib/credits'
+import { netPaid, netPaidByBooking } from '../../lib/payments'
 import { ProfileForm } from '../ProfilePage'
 import { DiverNotes } from '../../components/admin/DiverNotes'
 import { AdminFamilyPanel } from '../../components/admin/AdminFamilyPanel'
@@ -41,11 +42,7 @@ function activeCreditRows(
   payments: Payment[],
   amendments: Map<string, BookingAmendment[]>,
 ): Array<{ id: string; owed: number; paid: number }> {
-  const paidByBooking = new Map<string, number>()
-  for (const p of payments) {
-    if (!p.booking_id || p.status !== 'paid') continue
-    paidByBooking.set(p.booking_id, (paidByBooking.get(p.booking_id) ?? 0) + p.amount)
-  }
+  const paidByBooking = netPaidByBooking(payments)
   return bookings
     // Exclude cancelled bookings and any a lead booker pays for on this
     // diver's behalf — that money (incl. overpayment) is the lead's, not a
@@ -145,7 +142,7 @@ export function AdminUsersPage() {
         charges: resolveCharges({ details: b.details as BookingDetails, event, ...catalog }),
       }
     })
-    const paidSum = payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
+    const paidSum = netPaid(payments)
     const pendingSum = payments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0)
 
     return {
@@ -188,7 +185,7 @@ export function AdminUsersPage() {
           ...cur,
           bookings: updatedBookings,
           payments: updatedPayments,
-          paidSum: updatedPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0),
+          paidSum: netPaid(updatedPayments),
           pendingSum: updatedPayments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0),
           // A payment change can push the diver into/out of overpayment, which counts as credit.
           openCreditBalance: diverCreditBalance(cur.credits, activeCreditRows(updatedBookings, updatedPayments, cur.amendments)),
@@ -393,7 +390,7 @@ export function AdminUsersPage() {
           ...cur,
           bookings: updatedBookings,
           payments: updatedPayments,
-          paidSum: updatedPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0),
+          paidSum: netPaid(updatedPayments),
           pendingSum: updatedPayments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0),
           // A payment change can push the diver into/out of overpayment, which counts as credit.
           openCreditBalance: diverCreditBalance(cur.credits, activeCreditRows(updatedBookings, updatedPayments, cur.amendments)),
@@ -687,7 +684,7 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
   const activeBookings = extras.bookings.filter(b => b.status !== 'cancelled')
   // Bookings that still owe money — credit-apply targets for the panel below.
   const applyTargets = activeBookings.map(b => {
-    const paid = extras.payments.filter(p => p.booking_id === b.id && p.status === 'paid').reduce((s, p) => s + p.amount, 0)
+    const paid = netPaid(extras.payments.filter(p => p.booking_id === b.id))
     const owed = Number((b.details as { total?: number } | undefined)?.total ?? 0) + amendmentsDelta(extras.amendments.get(b.id) ?? [])
     const due = Math.max(0, owed - paid - openCreditForBooking(extras.credits, b.id))
     return { id: b.id, label: b.event?.title ?? t.payments.eventFallback, due }
@@ -703,7 +700,7 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
               const bookingPayments = extras.payments.filter(p => p.booking_id === b.id)
               const baseTotal = Number((b.details as { total?: number } | undefined)?.total ?? 0)
               const owed = baseTotal + amendmentsDelta(extras.amendments.get(b.id) ?? [])
-              const paid = bookingPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
+              const paid = netPaid(bookingPayments)
               const credit = openCreditForBooking(extras.credits, b.id)
               return (
                 <div key={b.id} className="space-y-1">

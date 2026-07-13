@@ -121,9 +121,9 @@ describe('issueCancellationCredits', () => {
       bookings: { data: [{ id: 'b1', user_id: 'u1' }, { id: 'b2', user_id: 'u2' }, { id: 'b3', user_id: 'u3' }], error: null },
       payments: {
         data: [
-          { booking_id: 'b1', amount: 3000 },
-          { booking_id: 'b1', amount: 2000 },
-          { booking_id: 'b2', amount: 4000 },
+          { booking_id: 'b1', amount: 3000, status: 'paid' },
+          { booking_id: 'b1', amount: 2000, status: 'paid' },
+          { booking_id: 'b2', amount: 4000, status: 'paid' },
           // b3 paid nothing → no credit
         ],
         error: null,
@@ -146,6 +146,24 @@ describe('issueCancellationCredits', () => {
         status: 'open',
       },
     ])
+  })
+
+  it('credits the amount paid net of a prior refund, not the gross', async () => {
+    setup({
+      bookings: { data: [{ id: 'b1', user_id: 'u1' }], error: null },
+      payments: {
+        data: [
+          { booking_id: 'b1', amount: 3000, status: 'paid' },
+          { booking_id: 'b1', amount: 1000, status: 'refunded' }, // already returned
+        ],
+        error: null,
+      },
+    })
+    const { issueCancellationCredits } = await import('./credits')
+    const res = await issueCancellationCredits({ event, createdBy: 'admin1' })
+    // 3000 paid − 1000 already refunded = 2000, not the 3000 gross.
+    expect(res).toEqual({ issued: 1, totalAmount: 2000 })
+    expect(creditsInsert.mock.calls[0][0][0].amount).toBe(2000)
   })
 
   it('no-ops when the event has no non-cancelled bookings', async () => {

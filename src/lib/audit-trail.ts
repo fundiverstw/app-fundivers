@@ -3,6 +3,7 @@ import { fetchCreditsForUser, openCreditForBooking, diverCreditBalance } from '.
 import { fetchAmendmentsForBookings, amendmentsDelta } from './booking-amendments'
 import { fetchEventsForBookings } from './events'
 import { bookingBalance, type BookingBalance } from './booking-balance'
+import { netPaid } from './payments'
 import type {
   AdminAuditLog,
   AppEvent,
@@ -218,11 +219,7 @@ export function mergeEntries(...groups: AuditEntry[][]): AuditEntry[] {
  *  back down, voided/pending are ignored. Matches the accounting export and
  *  every balance surface. */
 export function paymentsNetPaid(payments: Payment[]): number {
-  return payments.reduce((sum, p) => {
-    if (p.status === 'paid')     return sum + Number(p.amount)
-    if (p.status === 'refunded') return sum - Number(p.amount)
-    return sum
-  }, 0)
+  return netPaid(payments)
 }
 
 export interface RegistrationAudit {

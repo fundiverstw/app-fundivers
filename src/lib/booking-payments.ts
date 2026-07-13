@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { netPaid } from './payments'
 import type { Booking, BookingDetails, Payment } from '../types/database'
 
 /**
@@ -37,7 +38,7 @@ export async function recordPayment(args: {
   if (error || !payment) throw error ?? new Error('payment insert returned no row')
 
   const deposit = Number(details.deposit ?? 0)
-  const prevPaid = existingPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
+  const prevPaid = netPaid(existingPayments)
   const newPaid = prevPaid + Number(payment.amount)
   const shouldPromote = booking.status === 'pending' && newPaid >= deposit
 
@@ -104,11 +105,8 @@ export async function voidPayment(args: {
 
   const details = (booking.details ?? {}) as BookingDetails
   const deposit = Number(details.deposit ?? 0)
-  // Recompute paid sum from the existing list, swapping in the voided row.
-  const newPaid = existingPayments.reduce((s, p) => {
-    if (p.id === paymentId) return s
-    return p.status === 'paid' ? s + Number(p.amount) : s
-  }, 0)
+  // Recompute paid sum from the existing list, dropping the voided row.
+  const newPaid = netPaid(existingPayments.filter(p => p.id !== paymentId))
   const shouldRevert = booking.status === 'confirmed' && deposit > 0 && newPaid < deposit
 
   let newStatus: Booking['status'] = booking.status

@@ -13,6 +13,7 @@ import { resolveCharges, type ChargeLine } from '../lib/booking-charges'
 import { fetchChargeCatalog } from '../lib/booking-charge-catalog'
 import { fetchCreditsForUser, openCreditForBooking } from '../lib/credits'
 import { bookingBalance } from '../lib/booking-balance'
+import { netPaid } from '../lib/payments'
 import { ShareEventButton } from '../components/ShareEventButton'
 import { ChargeBreakdown } from '../components/ChargeBreakdown'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Payment, WaitlistOffer } from '../types/database'
@@ -106,7 +107,7 @@ export function BookingsPage() {
     const nowMs = Date.now()
     setRows(bookings.map(b => {
       const bookingPayments = paymentsByBooking.get(b.id) ?? []
-      const paidSum = bookingPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
+      const paidSum = netPaid(bookingPayments)
       const offer = offersByBooking.get(b.id) ?? null
       const event = b.event_id ? eventMap.get(b.event_id) ?? null : null
       return {

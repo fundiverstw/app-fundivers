@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { fetchAmendmentsForBookings, amendmentsDelta } from './booking-amendments'
+import { netPaidByBooking } from './payments'
 import { siteConfig } from '../config/site'
 import type { AppEvent, Credit, CreditInsert } from '../types/database'
 
@@ -82,11 +83,7 @@ export async function fetchDiverCreditBalance(userId: string): Promise<number> {
   ])
   const bookings = (bookingsRes.data ?? []).filter(b => b.status !== 'cancelled')
   const amendments = await fetchAmendmentsForBookings(bookings.map(b => b.id))
-  const paidByBooking = new Map<string, number>()
-  for (const p of (paymentsRes.data ?? [])) {
-    if (!p.booking_id || p.status !== 'paid') continue
-    paidByBooking.set(p.booking_id, (paidByBooking.get(p.booking_id) ?? 0) + Number(p.amount))
-  }
+  const paidByBooking = netPaidByBooking(paymentsRes.data ?? [])
   // Bookings a lead booker pays for on this diver's behalf: exclude their
   // money from the diver's own account credit.
   const covered = new Set(
@@ -146,8 +143,8 @@ export async function settleCredit(args: {
 
 /**
  * Auto-issue an open credit to every non-cancelled registrant of an event
- * the admin just cancelled, each worth what that diver has actually paid
- * (Σ payments where status='paid'). The credit's reason names the specific
+ * the admin just cancelled, each worth what that diver has actually paid net
+ * of any prior refund (paid − refunded). The credit's reason names the specific
  * event so the diver and admin both see why it appeared.
  *
  * Idempotent per booking: a booking that already carries any credit is
@@ -173,16 +170,12 @@ export async function issueCancellationCredits(args: {
 
   const { data: payments, error: pErr } = await supabase
     .from('payments')
-    .select('booking_id, amount')
+    .select('booking_id, amount, status')
     .in('booking_id', bookingIds)
-    .eq('status', 'paid')
+    .in('status', ['paid', 'refunded'])
   if (pErr) throw pErr
 
-  const paidByBooking = new Map<string, number>()
-  for (const p of payments ?? []) {
-    if (!p.booking_id) continue
-    paidByBooking.set(p.booking_id, (paidByBooking.get(p.booking_id) ?? 0) + Number(p.amount))
-  }
+  const paidByBooking = netPaidByBooking(payments ?? [])
 
   const { data: existing, error: eErr } = await supabase
     .from('credits')
