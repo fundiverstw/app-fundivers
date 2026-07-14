@@ -8,13 +8,19 @@ import { personName } from '../../lib/names'
 import { ProfileForm } from '../ProfilePage'
 import { UserPlusIcon } from '../../components/icons/UserPlusIcon'
 import type { Profile } from '../../types/database'
-import { INPUT, INPUT_LABEL, BTN_PRIMARY } from '../../styles/tokens'
 import { t } from '../../i18n'
 
 const cd = t.admin.createDiver
 // Shared account-field labels — the same copy the on-behalf modal and the
 // family panel use, so a diver's create form reads identically everywhere.
 const pf = t.profile.family
+
+// Light-card input / label styling — admin pages render dark text on the white
+// frosted cards (matching AdminNotificationsPage). The INPUT/BTN_PRIMARY tokens
+// are near-white, tuned for the dark diver-facing chrome, so they'd vanish here.
+const LABEL = 'text-xs font-medium text-brand-900'
+const FIELD = 'w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900'
+const HINT = 'block text-xs text-brand-900/70'
 
 // Standalone "create a diver on behalf" page, reachable from the Manage hub.
 // The event-detail modal (AdminAddDiverModal) does the same account mint as a
@@ -101,37 +107,41 @@ function CreateAccountForm({ onCreated }: { onCreated: (profile: Profile) => voi
       onSubmit={handleSubmit}
       className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3"
     >
-      <label className="block">
-        <span className={INPUT_LABEL}>{pf.emailLabel}</span>
+      <label className="block space-y-1">
+        <span className={LABEL}>{pf.emailLabel}</span>
         <input
           type="email" required autoFocus
           value={email} onChange={e => setEmail(e.target.value)}
-          className={`${INPUT} text-sm`}
+          className={FIELD}
         />
-        <span className="block text-xs text-brand-900/70 mt-1">{cd.emailHint}</span>
+        <span className={HINT}>{cd.emailHint}</span>
       </label>
-      <label className="block">
-        <span className={INPUT_LABEL}>{pf.nameLabel}</span>
+      <label className="block space-y-1">
+        <span className={LABEL}>{pf.nameLabel}</span>
         <input
           type="text" required
           value={fullName} onChange={e => setFullName(e.target.value)}
-          className={`${INPUT} text-sm`}
+          className={FIELD}
         />
-        <span className="block text-xs text-brand-900/70 mt-1">{pf.nameHint}</span>
+        <span className={HINT}>{pf.nameHint}</span>
       </label>
-      <label className="block">
-        <span className={INPUT_LABEL}>{pf.nicknameLabel}</span>
+      <label className="block space-y-1">
+        <span className={LABEL}>{pf.nicknameLabel}</span>
         <input
           type="text"
           value={nickname} onChange={e => setNickname(e.target.value)}
           placeholder={pf.nicknamePlaceholder}
-          className={`${INPUT} text-sm`}
+          className={FIELD}
         />
       </label>
 
       {error && <p className="text-sm text-red-700 bg-red-50 border border-accent rounded px-2 py-1">{error}</p>}
 
-      <button type="submit" disabled={submitting} className={`w-full ${BTN_PRIMARY}`}>
+      <button
+        type="submit"
+        disabled={submitting}
+        className="w-full py-2 rounded-lg text-sm font-semibold bg-brand-900 hover:bg-brand-950 text-white disabled:opacity-50"
+      >
         {submitting ? pf.creating : pf.createSubmit}
       </button>
     </form>
