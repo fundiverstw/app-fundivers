@@ -157,7 +157,7 @@ function CreatedPanel({ profile, onCreateAnother }: {
           </Link>
           <Link
             to={`/admin/users?diver=${profile.id}`}
-            className="text-xs font-semibold bg-white hover:bg-surface-100 text-brand-900 border border-surface-300 px-3 py-1.5 rounded-lg"
+            className="text-xs font-semibold bg-white hover:bg-emerald-100 text-emerald-900 border border-emerald-300 px-3 py-1.5 rounded-lg"
           >
             {cd.openInDirectory}
           </Link>
