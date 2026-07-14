@@ -1355,6 +1355,7 @@ export const ja: Messages = {
       done: '完了',
       deleteUser: 'ユーザーを削除',
       editProfile: 'プロフィールを編集',
+      registerForEvent: 'イベントに登録',
       roleLabel: '権限',
       roleNames: { diver: 'ダイバー', staff: 'スタッフ', admin: '管理者' },
       roleChanged: (name: string, role: string) => `${name} を ${role} に変更しました`,

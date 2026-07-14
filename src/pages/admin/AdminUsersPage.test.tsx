@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { AdminUsersPage } from './AdminUsersPage'
 import { mockQueryBuilder } from '../../../tests/test-utils'
+import { t } from '../../i18n'
 
 // AdminUsersPage pulls in a large tree (the diver-facing ProfileForm, family
 // panel, notes, charge/credit maths). We only exercise the ?diver deep link
@@ -64,6 +65,13 @@ describe('AdminUsersPage deep link', () => {
     })
     const ada = document.getElementById('diver-u1')!.querySelector('[aria-expanded]')
     expect(ada).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('exposes a register-on-behalf deep link on the expanded diver card', async () => {
+    renderAt('/admin/users?diver=u2')
+    const link = await screen.findByRole('link', { name: t.admin.users.registerForEvent })
+    // Reuses the create-diver deep link: events list → preselected add-diver modal.
+    expect(link).toHaveAttribute('href', '/admin/events?diver=u2')
   })
 
   it('leaves every card collapsed with no ?diver param', async () => {

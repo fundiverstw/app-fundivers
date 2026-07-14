@@ -1356,6 +1356,7 @@ export const zhTW: Messages = {
       done: '完成',
       deleteUser: '刪除使用者',
       editProfile: '編輯個人資料',
+      registerForEvent: '報名活動',
       roleLabel: '權限',
       roleNames: { diver: '潛水員', staff: '員工', admin: '管理員' },
       roleChanged: (name: string, role: string) => `${name} 已設為${role}`,

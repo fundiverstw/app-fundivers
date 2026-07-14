@@ -1363,6 +1363,7 @@ export const en = {
       done: 'Done',
       deleteUser: 'Delete user',
       editProfile: 'Edit profile',
+      registerForEvent: 'Register for an event',
       roleLabel: 'Role',
       roleNames: { diver: 'Diver', staff: 'Staff', admin: 'Admin' },
       roleChanged: (name: string, role: string) => `${name} is now ${role}`,

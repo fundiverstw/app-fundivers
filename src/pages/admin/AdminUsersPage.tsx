@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { siteConfig } from '../../config/site'
 import { Spinner } from '../../components/ui/Spinner'
 import { format } from 'date-fns'
@@ -582,6 +582,14 @@ function UserCard({
                   >
                     {us.deleteUser}
                   </button>
+                )}
+                {isAdmin && (
+                  <Link
+                    to={`/admin/events?diver=${user.id}`}
+                    className="text-xs text-brand-700 hover:text-brand-900 underline"
+                  >
+                    {us.registerForEvent}
+                  </Link>
                 )}
                 {isAdmin && (
                   <button
