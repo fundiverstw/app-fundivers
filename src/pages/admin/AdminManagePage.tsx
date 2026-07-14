@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { t } from '../../i18n'
+import { UserPlusIcon } from '../../components/icons/UserPlusIcon'
 import { ChartIcon } from '../../components/icons/ChartIcon'
 import { ClipboardCheckIcon } from '../../components/icons/ClipboardCheckIcon'
 import { PlusCircleIcon } from '../../components/icons/PlusCircleIcon'
@@ -44,6 +45,7 @@ const GROUPS: ManageGroup[] = [
   {
     title: m.groups.overview,
     cards: [
+      { to: '/admin/create-diver', icon: <UserPlusIcon />, ...m.createDiver },
       { to: '/admin/dashboard', icon: <ChartIcon />, ...m.dashboard },
       { to: '/admin/applications', icon: <ClipboardCheckIcon />, ...m.applications },
       { to: '/admin/audits', icon: <AuditIcon />, ...m.audits },

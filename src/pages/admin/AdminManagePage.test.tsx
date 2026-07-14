@@ -19,6 +19,7 @@ describe('AdminManagePage', () => {
     const hrefs = screen.getAllByRole('link').map(a => a.getAttribute('href'))
     // Every card, no duplicates — the grouping must not drop or repeat a page.
     expect(new Set(hrefs).size).toBe(hrefs.length)
+    expect(hrefs).toContain('/admin/create-diver')
     expect(hrefs).toContain('/admin/dashboard')
     expect(hrefs).toContain('/admin/terms')
     expect(hrefs).toContain('/admin/accounting')

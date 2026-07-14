@@ -38,6 +38,7 @@ import { AdminEventDetailPage } from './pages/admin/AdminEventDetailPage'
 import { AdminGearMapPage } from './pages/admin/AdminGearMapPage'
 import { AdminLogisticsPage } from './pages/admin/AdminLogisticsPage'
 import { AdminUsersPage } from './pages/admin/AdminUsersPage'
+import { AdminCreateDiverPage } from './pages/admin/AdminCreateDiverPage'
 import { AdminApplicationsPage } from './pages/admin/AdminApplicationsPage'
 import { AdminDutyPage } from './pages/admin/AdminDutyPage'
 import { AdminNewEventPage } from './pages/admin/AdminNewEventPage'
@@ -150,6 +151,7 @@ export default function App() {
                 <Route path="/admin/prices" element={<AdminPricesPage />} />
                 <Route path="/admin/events/:id/edit" element={<AdminEditEventPage />} />
                 <Route path="/admin/users" element={<AdminUsersPage />} />
+                <Route path="/admin/create-diver" element={<AdminCreateDiverPage />} />
                 <Route path="/admin/applications" element={<AdminApplicationsPage />} />
                 <Route path="/admin/duty" element={<AdminDutyPage />} />
                 <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
