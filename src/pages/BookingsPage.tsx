@@ -384,7 +384,7 @@ function WaitlistOfferBanner({
         type="button"
         onClick={onAccept}
         disabled={accepting}
-        className="bg-white text-red-700 font-semibold text-xs rounded-lg px-3 py-1.5 hover:bg-surface-100 transition-colors disabled:opacity-50 shrink-0"
+        className="bg-red-50 text-red-700 font-semibold text-xs rounded-lg px-3 py-1.5 hover:bg-red-100 transition-colors disabled:opacity-50 shrink-0"
       >
         {accepting ? t.bookings.accepting : t.bookings.accept}
       </button>

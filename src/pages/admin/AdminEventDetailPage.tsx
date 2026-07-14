@@ -1416,7 +1416,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
             <button
               type="button"
               onClick={onBillToDiver}
-              className="w-full text-xs bg-white border border-violet-300 hover:bg-violet-50 text-violet-800 font-semibold px-3 py-1.5 rounded"
+              className="w-full text-xs bg-violet-50 border border-violet-300 hover:bg-violet-100 text-violet-800 font-semibold px-3 py-1.5 rounded"
             >
               {ed.billToDiver}
             </button>
