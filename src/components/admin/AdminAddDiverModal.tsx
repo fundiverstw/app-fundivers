@@ -28,10 +28,15 @@ export function AdminAddDiverModal({
   event,
   onClose,
   onAdded,
+  initialDiverId,
 }: {
   event: AppEvent
   onClose: () => void
   onAdded: () => void
+  /** When set (e.g. arriving from the Create-diver page), the modal skips the
+   *  picker and opens straight on that diver's registration form once the
+   *  roster loads. */
+  initialDiverId?: string
 }) {
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [filter, setFilter] = useState('')
@@ -46,10 +51,17 @@ export function AdminAddDiverModal({
       .order('name', { ascending: true })
       .then(({ data }) => {
         if (cancelled) return
-        setProfiles((data ?? []) as Profile[])
+        const rows = (data ?? []) as Profile[]
+        setProfiles(rows)
+        // Preselect the just-created diver so the admin lands on the register
+        // form, not the search list.
+        if (initialDiverId) {
+          const match = rows.find(p => p.id === initialDiverId)
+          if (match) setTarget(match)
+        }
       })
     return () => { cancelled = true }
-  }, [])
+  }, [initialDiverId])
 
   const visible = profiles.filter(p => {
     if (!filter) return true

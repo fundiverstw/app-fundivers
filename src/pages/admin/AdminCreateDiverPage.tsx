@@ -150,7 +150,7 @@ function CreatedPanel({ profile, onCreateAnother }: {
         <p className="text-xs text-emerald-800 mt-1">{cd.createdIntro}</p>
         <div className="flex flex-wrap gap-2 mt-3">
           <Link
-            to="/admin/events"
+            to={`/admin/events?diver=${profile.id}`}
             className="text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-3 py-1.5 rounded-lg"
           >
             {cd.registerForEvent}

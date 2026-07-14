@@ -64,7 +64,7 @@ describe('AdminCreateDiverPage', () => {
 
     // The details form targets the new diver, and the next-step links resolve.
     expect(screen.getByTestId('profile-form')).toHaveTextContent('editing:d1')
-    expect(screen.getByRole('link', { name: cd.registerForEvent })).toHaveAttribute('href', '/admin/events')
+    expect(screen.getByRole('link', { name: cd.registerForEvent })).toHaveAttribute('href', '/admin/events?diver=d1')
     expect(screen.getByRole('link', { name: cd.openInDirectory })).toHaveAttribute('href', '/admin/users?diver=d1')
   })
 

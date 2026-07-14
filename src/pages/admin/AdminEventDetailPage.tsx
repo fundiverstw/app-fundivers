@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { siteConfig } from '../../config/site'
 import { PageLoading } from '../../components/ui/Spinner'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -75,6 +75,19 @@ export function AdminEventDetailPage() {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<Registrant | null>(null)
   const [addDiverOpen, setAddDiverOpen] = useState(false)
+  // ?diver=<id> deep link (from the Create-diver page) auto-opens the add-diver
+  // modal preselected to that diver. Captured once, then the param is consumed
+  // so a refresh — or a later manual "Add diver" — starts from a clean picker.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [preselectDiverId, setPreselectDiverId] = useState<string | null>(() => searchParams.get('diver'))
+  useEffect(() => {
+    if (searchParams.get('diver')) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setAddDiverOpen(true)
+      setSearchParams(prev => { prev.delete('diver'); return prev }, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [refreshKey, setRefreshKey] = useState(0)
   // Cancel-event flow state. The modal opens on click; the actual update
   // runs only after the admin confirms in the modal.
@@ -598,9 +611,11 @@ export function AdminEventDetailPage() {
       {addDiverOpen && event && (
         <AdminAddDiverModal
           event={event}
-          onClose={() => setAddDiverOpen(false)}
+          initialDiverId={preselectDiverId ?? undefined}
+          onClose={() => { setAddDiverOpen(false); setPreselectDiverId(null) }}
           onAdded={() => {
             toast.success(ed.diverRegistered)
+            setPreselectDiverId(null)
             setRefreshKey(k => k + 1)
           }}
         />

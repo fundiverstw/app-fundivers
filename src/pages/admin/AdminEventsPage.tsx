@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { startOfMonth, endOfMonth, format, parseISO } from 'date-fns'
 import { fetchEventsInRange } from '../../lib/events'
 import { rescheduleEventDay, notifyEventRescheduled } from '../../lib/reschedule'
@@ -33,6 +33,10 @@ function readStoredMonth(): Date {
 
 export function AdminEventsPage() {
   const navigate = useNavigate()
+  // A ?diver=<id> deep link (from the Create-diver page) rides along to the
+  // chosen event so its detail page can open the add-diver modal preselected.
+  const [searchParams] = useSearchParams()
+  const diverParam = searchParams.get('diver')
   const { user, profile } = useAuth()
   const toast = useToast()
   const [month, setMonth] = useState<Date>(readStoredMonth)
@@ -104,7 +108,7 @@ export function AdminEventsPage() {
         month={month}
         onMonthChange={setMonth}
         events={events}
-        onPickEvent={ev => navigate(`/admin/events/${ev.id}`)}
+        onPickEvent={ev => navigate(`/admin/events/${ev.id}${diverParam ? `?diver=${diverParam}` : ''}`)}
         // Only admins can write EO_* rows (is_admin() RLS). The drag
         // gesture is gated on this prop, so staff/divers never see it.
         onRescheduleDay={isAdmin
