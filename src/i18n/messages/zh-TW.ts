@@ -895,16 +895,14 @@ export const zhTW: Messages = {
     createDiver: {
       title: '建立潛水員',
       intro: '為不想自行註冊的潛水員（現場臨時、電話預約，或樂於讓你代辦的人）建立帳號。輸入其電子郵件與姓名即可建立帳號，之後再填寫其餘資料。',
-      emailHint: '我們會寄一封簡短的通知信，告知已為其建立帳號。信中不含密碼或登入連結 — 若日後需要使用 App，請他們回信後由你手動提供帳密。',
+      emailHint: '我們會寄信通知潛水員已為其建立帳號。信中會引導他們透過 App 的密碼重設自行設定密碼，若日後想使用 App 便可自行接管 — 你無需另外提供帳密。',
       createdTitle: (name: string) => `已為 ${name} 建立帳號`,
       createdIntro: '可在下方填寫潛水員資料，或日後隨時從潛水員名冊補填。',
       detailsHeading: '潛水員資料',
-      detailsOptional: '選填 — 先儲存已知資料；其餘可由潛水員日後補齊。',
+      detailsOptional: '現在就填寫完整個人資料，或先擱著 — 帳號已可使用，日後再補齊即可。',
       registerForEvent: '報名活動',
       openInDirectory: '在潛水員名冊開啟',
       createAnother: '再建立一位潛水員',
-      createFailed: '帳號建立失敗',
-      profileNotFound: '建立後找不到個人資料',
     },
     notifications: {
       titleBodyRequired: '標題與內容為必填。',

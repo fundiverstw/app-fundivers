@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
+import { createDiverAccount } from '../../lib/create-diver'
 import { personName } from '../../lib/names'
 import { ProfileForm } from '../ProfilePage'
 import { UserPlusIcon } from '../../components/icons/UserPlusIcon'
@@ -66,35 +66,21 @@ function CreateAccountForm({ onCreated }: { onCreated: (profile: Profile) => voi
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    const trimmedEmail = email.trim().toLowerCase()
     const trimmedName = fullName.trim()
-    if (!trimmedEmail || !trimmedName) {
+    if (!email.trim() || !trimmedName) {
       setError(pf.emailNameRequired)
       return
     }
     setSubmitting(true)
     try {
-      const { data, error: invokeErr } = await supabase.functions.invoke<{
-        ok: boolean
-        user_id: string
-        email_sent: boolean
-      }>('admin-create-diver', {
-        body: {
-          email:    trimmedEmail,
-          name:     trimmedName,
-          nickname: nickname.trim() || undefined,
-        },
+      const { profile, emailSent } = await createDiverAccount({
+        email,
+        name: fullName,
+        nickname,
       })
-      if (invokeErr) throw new Error(invokeErr.message)
-      if (!data?.ok || !data.user_id) throw new Error(cd.createFailed)
-
-      const { data: profile, error: profErr } = await supabase
-        .from('profiles').select('*').eq('id', data.user_id).single()
-      if (profErr || !profile) throw new Error(profErr?.message ?? cd.profileNotFound)
-
-      const tail = data.email_sent ? pf.emailSent : pf.emailSkipped
+      const tail = emailSent ? pf.emailSent : pf.emailSkipped
       toast.success(cd.createdTitle(trimmedName) + tail)
-      onCreated(profile as Profile)
+      onCreated(profile)
     } catch (err) {
       setError(errorMessage(err))
     } finally {

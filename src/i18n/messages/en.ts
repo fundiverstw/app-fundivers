@@ -902,16 +902,14 @@ export const en = {
     createDiver: {
       title: 'Create diver',
       intro: "Set up an account for a diver who doesn't want to sign up themselves — a walk-in, a phone booking, or anyone happy to let you handle it. Enter their email and name to create the account; you can fill in the rest right after.",
-      emailHint: "We'll send a short courtesy note letting them know an account was made for them. It has no password or login link — if they ever want app access they reach out and you issue credentials.",
+      emailHint: "We'll email the diver to let them know an account was made for them. It walks them through setting their own password via the app's password reset, so they can take it over themselves if they ever want app access — no credentials to hand out.",
       createdTitle: (name: string) => `Account created for ${name}`,
       createdIntro: 'Fill in their diver details below now, or come back to it any time from the diver directory.',
       detailsHeading: 'Diver details',
-      detailsOptional: 'Optional — save what you have; the diver can complete the rest later.',
+      detailsOptional: 'Complete their profile now, or leave it — the account already works and it can be finished later.',
       registerForEvent: 'Register for an event',
       openInDirectory: 'Open in diver directory',
       createAnother: 'Create another diver',
-      createFailed: 'account creation failed',
-      profileNotFound: 'profile not found after creation',
     },
     notifications: {
       titleBodyRequired: 'Title and body are required.',

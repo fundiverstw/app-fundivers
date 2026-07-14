@@ -115,9 +115,13 @@ Deno.serve(async (req) => {
         host: "smtp.gmail.com", port: 465, secure: true,
         auth: { user: GMAIL_USER, pass: GMAIL_PASS },
       })
-      const eventClause = eventTitle
-        ? `your registration for ${eventTitle}`
-        : `your event registration`
+      // Only reassure about "no further action" when there's an actual event
+      // registration to reference. The standalone Create-diver page mints
+      // accounts with no event, so that sentence would cite a registration
+      // that doesn't exist.
+      const closingLine = eventTitle
+        ? `Otherwise no further action is required for your registration for ${eventTitle}.\n\n`
+        : ``
       await transporter.sendMail({
         from: { name: siteConfig.identity.shopName, address: GMAIL_USER },
         to:      email,
@@ -134,7 +138,7 @@ Deno.serve(async (req) => {
           `  3. Open the reset link we send you and choose a password\n\n` +
           `That's it — you'll be signed in. If the link gives you any trouble, just reply to ` +
           `this email and we'll help you out.\n\n` +
-          `Otherwise no further action is required for ${eventClause}.\n\n` +
+          closingLine +
           `— ${siteConfig.identity.shopName}`,
       })
       emailSent = true
