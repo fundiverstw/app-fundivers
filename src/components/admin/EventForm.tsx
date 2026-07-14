@@ -10,7 +10,7 @@ import {
   type FormState,
 } from './event-form-state'
 import { DateField } from '../DateField'
-import { ERROR_NOTE } from '../../styles/tokens'
+import { BTN_XS_GHOST, ERROR_NOTE } from '../../styles/tokens'
 import { t } from '../../i18n'
 
 // Shared form for creating and editing an EO_dive / EO_course. Owns all
@@ -471,7 +471,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
               <button
                 type="button"
                 onClick={addCourseDay}
-                className="self-start text-xs font-medium text-amber-300 hover:text-amber-200"
+                className={`self-start ${BTN_XS_GHOST}`}
               >
                 {ef.addDay}
               </button>
@@ -492,7 +492,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
         <button
           type="button"
           onClick={() => setShowNewPrice(s => !s)}
-          className="-mt-2 self-start text-xs font-medium text-amber-300 hover:text-amber-200"
+          className={`-mt-2 self-start ${BTN_XS_GHOST}`}
         >
           {showNewPrice ? ef.cancelNewTier : ef.newPriceTier}
         </button>
@@ -617,7 +617,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
             <button
               type="button"
               onClick={() => setShowNewTravel(s => !s)}
-              className="-mt-2 self-start text-xs font-medium text-amber-300 hover:text-amber-200"
+              className={`-mt-2 self-start ${BTN_XS_GHOST}`}
             >
               {showNewTravel ? ef.cancelNewEntry : ef.newTripTemplate}
             </button>
@@ -677,7 +677,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
             <button
               type="button"
               onClick={() => setShowNewRoom(s => !s)}
-              className="self-start text-xs font-medium text-amber-300 hover:text-amber-200"
+              className={`self-start ${BTN_XS_GHOST}`}
             >
               {showNewRoom ? ef.cancelNewRoom : ef.newRoomOption}
             </button>
@@ -780,7 +780,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
         <button
           type="button"
           onClick={() => setShowNewAddon(s => !s)}
-          className="self-start text-xs font-medium text-amber-300 hover:text-amber-200"
+          className={`self-start ${BTN_XS_GHOST}`}
         >
           {showNewAddon ? ef.cancelNewAddon : ef.newAddon}
         </button>

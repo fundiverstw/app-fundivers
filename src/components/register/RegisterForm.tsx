@@ -9,6 +9,7 @@ import { paymentInstructionsFor } from '../../lib/payment-instructions'
 import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../lib/gear'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
+import { BTN_XS_GHOST } from '../../styles/tokens'
 import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
 import { fetchCreditsForUser, openCreditBalance, applyCreditToBooking } from '../../lib/credits'
 import { invokeWithRetry } from '../../lib/edge-invoke'
@@ -1352,7 +1353,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             <button
               type="button"
               onClick={discardDraft}
-              className="text-brand-700 hover:underline text-xs font-semibold py-1.5 px-2"
+              className={BTN_XS_GHOST}
             >
               {t.register.resume.startFresh}
             </button>
