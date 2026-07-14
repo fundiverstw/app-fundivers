@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { BTN_XS_PRIMARY, BTN_XS_GHOST, BTN_XS_DANGER } from '../../styles/tokens'
 import { siteConfig } from '../../config/site'
 import { Spinner } from '../../components/ui/Spinner'
 import { format } from 'date-fns'
@@ -559,14 +560,24 @@ function UserCard({
             </div>
           ) : (
             <>
-              <div className="flex justify-end items-center gap-4">
+              <div className="flex flex-wrap justify-end items-center gap-2">
+                {isAdmin && (
+                  <Link to={`/admin/events?diver=${user.id}`} className={BTN_XS_PRIMARY}>
+                    {us.registerForEvent}
+                  </Link>
+                )}
+                {isAdmin && (
+                  <button type="button" onClick={onEdit} className={BTN_XS_GHOST}>
+                    {us.editProfile}
+                  </button>
+                )}
                 {isAdmin && !isSelf && (
-                  <label className="flex items-center gap-1 text-xs text-brand-700">
+                  <label className="flex items-center gap-1.5 text-xs text-brand-700">
                     {us.roleLabel}
                     <select
                       value={user.role}
                       onChange={e => onChangeRole(e.target.value as Profile['role'])}
-                      className="text-xs border border-surface-300 rounded px-1 py-0.5 bg-white text-brand-900"
+                      className="text-xs rounded-lg px-2 py-1 bg-white text-brand-900 border border-surface-300"
                     >
                       <option value="diver">{us.roleNames.diver}</option>
                       <option value="staff">{us.roleNames.staff}</option>
@@ -575,29 +586,8 @@ function UserCard({
                   </label>
                 )}
                 {isAdmin && !isSelf && (
-                  <button
-                    type="button"
-                    onClick={onDelete}
-                    className="text-xs text-red-700 hover:text-red-900 underline"
-                  >
+                  <button type="button" onClick={onDelete} className={BTN_XS_DANGER}>
                     {us.deleteUser}
-                  </button>
-                )}
-                {isAdmin && (
-                  <Link
-                    to={`/admin/events?diver=${user.id}`}
-                    className="text-xs text-brand-700 hover:text-brand-900 underline"
-                  >
-                    {us.registerForEvent}
-                  </Link>
-                )}
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={onEdit}
-                    className="text-xs text-brand-700 hover:text-brand-900 underline"
-                  >
-                    {us.editProfile}
                   </button>
                 )}
               </div>
