@@ -9,6 +9,7 @@ import { ProfileForm } from '../ProfilePage'
 import { UserPlusIcon } from '../../components/icons/UserPlusIcon'
 import type { Profile } from '../../types/database'
 import { t } from '../../i18n'
+import { BTN_XS_GHOST } from '../../styles/tokens'
 
 const cd = t.admin.createDiver
 // Shared account-field labels — the same copy the on-behalf modal and the
@@ -164,7 +165,7 @@ function CreatedPanel({ profile, onCreateAnother }: {
           <button
             type="button"
             onClick={onCreateAnother}
-            className="text-xs font-semibold text-brand-700 hover:text-brand-900 underline px-1"
+            className={BTN_XS_GHOST}
           >
             {cd.createAnother}
           </button>

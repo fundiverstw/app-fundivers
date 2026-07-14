@@ -10,6 +10,7 @@ import {
 } from '../../lib/package-registrations'
 import type { RegistrationStatus } from '../../types/database'
 import { t } from '../../i18n'
+import { BTN_XS_GHOST } from '../../styles/tokens'
 
 const ar = t.admin.adminRegs
 
@@ -149,7 +150,7 @@ function RegistrationCard({
         {reg.kickback_amount != null && ar.kickbackAmount(reg.kickback_amount.toLocaleString(), currency)}
       </div>
 
-      <button type="button" onClick={() => setShowContact(v => !v)} className="text-xs font-semibold text-brand-900 underline">
+      <button type="button" onClick={() => setShowContact(v => !v)} className={BTN_XS_GHOST}>
         {showContact ? ar.hideContact : ar.revealContact}
       </button>
       {showContact && reg.diver && (

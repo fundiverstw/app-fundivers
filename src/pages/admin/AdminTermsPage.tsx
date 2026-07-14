@@ -7,6 +7,7 @@ import { fetchTerms, invalidateTerms, type Terms } from '../../lib/terms'
 import { starterTermsTemplate } from '../../lib/terms-template'
 import { Markdown } from '../../components/Markdown'
 import { t } from '../../i18n'
+import { BTN_XS_GHOST } from '../../styles/tokens'
 
 const tm = t.admin.terms
 
@@ -103,11 +104,11 @@ export function AdminTermsPage() {
           <span className="text-xs font-medium text-white/80">{tm.bodyLabel}</span>
           <div className="flex gap-2">
             <button type="button" onClick={() => setShowPreview(p => !p)}
-              className="text-xs font-semibold text-white/80 hover:text-white underline">
+              className={BTN_XS_GHOST}>
               {showPreview ? tm.edit : tm.preview}
             </button>
             <button type="button" onClick={loadTemplate}
-              className="text-xs font-semibold text-amber-300 hover:text-amber-200">
+              className={BTN_XS_GHOST}>
               {tm.loadTemplate}
             </button>
           </div>

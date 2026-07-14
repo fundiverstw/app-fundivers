@@ -9,6 +9,7 @@ import { RegisterForm } from '../components/register/RegisterForm'
 import { MultiRegisterForm } from '../components/register/MultiRegisterForm'
 import { ShareEventButton } from '../components/ShareEventButton'
 import { t } from '../i18n'
+import { BTN_XS_GHOST } from '../styles/tokens'
 import type { AppEvent, Booking } from '../types/database'
 
 const TYPE_DOT: Record<AppEvent['type'], string> = {
@@ -171,7 +172,7 @@ export function CalendarPage() {
               <button
                 type="button"
                 onClick={exitMulti}
-                className="text-xs text-white/80 hover:text-white px-2 py-1.5"
+                className={BTN_XS_GHOST}
               >
                 {t.common.cancel}
               </button>

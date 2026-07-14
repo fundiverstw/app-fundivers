@@ -13,6 +13,7 @@ import { DIVE_TYPES, GAS_MIXES, type DiveLog, type DiveLogInsert, type DiveType,
 import {
   CARD, CARD_ELEVATED, BTN_PRIMARY, BTN_GHOST, BTN_DANGER, BTN_LIGHT,
   TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, INPUT, INPUT_LABEL, PAGE_BODY,
+  BTN_XS_GHOST,
 } from '../styles/tokens'
 import { t } from '../i18n'
 
@@ -329,7 +330,7 @@ function DiveLogForm({
         <h2 className={`text-lg ${TEXT_HEADING}`}>
           {editingNumber ? dl.diveNumber(editingNumber) : dl.newDive}
         </h2>
-        <button type="button" onClick={onCancel} className={`text-xs ${TEXT_SUBTLE} hover:underline`}>
+        <button type="button" onClick={onCancel} className={BTN_XS_GHOST}>
           {dl.backToList}
         </button>
       </div>

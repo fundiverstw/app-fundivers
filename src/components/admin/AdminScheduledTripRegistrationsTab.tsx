@@ -9,6 +9,7 @@ import {
 } from '../../lib/scheduled-trip-registrations'
 import type { RegistrationStatus } from '../../types/database'
 import { t } from '../../i18n'
+import { BTN_XS_GHOST } from '../../styles/tokens'
 
 const ar = t.admin.adminRegs
 
@@ -121,7 +122,7 @@ function RegistrationCard({ reg, onSetStatus }: {
         <div className="text-xs text-brand-900/80">{ar.estimated(reg.estimated_cost.toLocaleString(), currency)}</div>
       )}
 
-      <button type="button" onClick={() => setShowContact(v => !v)} className="text-xs font-semibold text-brand-900 underline">
+      <button type="button" onClick={() => setShowContact(v => !v)} className={BTN_XS_GHOST}>
         {showContact ? ar.hideContact : ar.revealContact}
       </button>
       {showContact && reg.diver && (

@@ -1328,7 +1328,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             <button
               type="button"
               onClick={pickerHeader.onChange}
-              className="text-xs text-brand-700 hover:underline font-semibold"
+              className={BTN_XS_GHOST}
             >
               {t.register.header.change}
             </button>

@@ -6,7 +6,7 @@ import { createDiverAccount } from '../../lib/create-diver'
 import { personName } from '../../lib/names'
 import { RegisterFormBody } from '../register/RegisterForm'
 import type { AppEvent, Profile } from '../../types/database'
-import { MODAL_BACKDROP, TEXT_HEADING, TEXT_BODY, INPUT, INPUT_LABEL, BTN_PRIMARY, BTN_SECONDARY } from '../../styles/tokens'
+import { MODAL_BACKDROP, TEXT_HEADING, TEXT_BODY, INPUT, INPUT_LABEL, BTN_PRIMARY, BTN_SECONDARY, BTN_XS_GHOST } from '../../styles/tokens'
 import { t } from '../../i18n'
 
 const ad = t.admin.addDiver
@@ -98,7 +98,7 @@ export function AdminAddDiverModal({
             <button
               type="button"
               onClick={() => setTarget(null)}
-              className="text-xs text-brand-900 hover:underline"
+              className={BTN_XS_GHOST}
             >
               {ad.pickDifferentDiver}
             </button>
@@ -225,7 +225,7 @@ function CreateNewDiverForm({
       <button
         type="button"
         onClick={onCancel}
-        className="text-xs text-brand-900 hover:underline"
+        className={BTN_XS_GHOST}
       >
         {ad.backToList}
       </button>

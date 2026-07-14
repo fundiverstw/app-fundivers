@@ -7,6 +7,7 @@ import { bookingBalance } from '../../lib/booking-balance'
 import type { ChargeLine } from '../../lib/booking-charges'
 import type { Payment } from '../../types/database'
 import { t } from '../../i18n'
+import { BTN_XS_DANGER } from '../../styles/tokens'
 
 const bp = t.admin.bookingPayments
 
@@ -193,7 +194,7 @@ export function BookingPaymentsBlock({
                     type="button"
                     disabled={voidingId === p.id}
                     onClick={() => handleVoid(p)}
-                    className="shrink-0 text-[10px] text-red-700 hover:text-red-900 underline disabled:opacity-50"
+                    className={`shrink-0 ${BTN_XS_DANGER}`}
                   >
                     {voidingId === p.id ? bp.voiding : bp.voidAction}
                   </button>

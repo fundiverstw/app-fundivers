@@ -8,6 +8,7 @@ import type { GearModelWithSizes } from '../../lib/gear-sizing'
 import { numOrNull } from '../../lib/num'
 import type { GearType, GearModelSizeInsert } from '../../types/database'
 import { t } from '../../i18n'
+import { BTN_XS_GHOST, BTN_XS_DANGER } from '../../styles/tokens'
 
 // Admin editor for the shop's wetsuit / BCD / fins sizing charts. Each model
 // gets size rows with min/max fit ranges; the logistics board matches a diver's
@@ -261,7 +262,7 @@ function GearModelEditor({ model, onChanged }: { model: GearModelWithSizes; onCh
         </table>
       </div>
 
-      <button onClick={() => setRows(rs => [...rs, { ...emptyRow }])} className="text-xs font-medium text-brand-900 hover:underline">{gs.addSize}</button>
+      <button onClick={() => setRows(rs => [...rs, { ...emptyRow }])} className={BTN_XS_GHOST}>{gs.addSize}</button>
 
       <div className="flex items-center justify-between gap-2 pt-1">
         <label className="flex items-center gap-1.5 text-xs text-brand-900 font-medium">
@@ -272,11 +273,11 @@ function GearModelEditor({ model, onChanged }: { model: GearModelWithSizes; onCh
           {confirmDelete ? (
             <>
               <span className="text-xs text-brand-900">{gs.deleteQuestion}</span>
-              <button onClick={remove} className="text-xs font-semibold text-red-700 hover:text-red-900">{gs.yes}</button>
-              <button onClick={() => setConfirmDelete(false)} className="text-xs text-brand-900">{gs.no}</button>
+              <button onClick={remove} className={BTN_XS_DANGER}>{gs.yes}</button>
+              <button onClick={() => setConfirmDelete(false)} className={BTN_XS_GHOST}>{gs.no}</button>
             </>
           ) : (
-            <button onClick={() => setConfirmDelete(true)} className="text-xs text-red-700 hover:text-red-900">{w.delete}</button>
+            <button onClick={() => setConfirmDelete(true)} className={BTN_XS_DANGER}>{w.delete}</button>
           )}
           <button onClick={save} disabled={saving} className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-50">
             {saving ? w.saving : w.save}

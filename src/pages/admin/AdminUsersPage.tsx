@@ -546,7 +546,7 @@ function UserCard({
                 <button
                   type="button"
                   onClick={onCancelEdit}
-                  className="text-xs text-brand-700 hover:text-brand-900 underline"
+                  className={BTN_XS_GHOST}
                 >
                   {us.done}
                 </button>
@@ -857,7 +857,7 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
                     type="button"
                     disabled={settlingId === c.id}
                     onClick={() => handleSettle(c)}
-                    className="shrink-0 text-[10px] text-brand-700 hover:text-brand-900 underline disabled:opacity-50"
+                    className={`shrink-0 ${BTN_XS_GHOST}`}
                   >
                     {settlingId === c.id ? '…' : us.settle}
                   </button>
@@ -867,7 +867,7 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
                     type="button"
                     disabled={settlingId === c.id}
                     onClick={() => handleReopen(c)}
-                    className="shrink-0 text-[10px] text-brand-700 hover:text-brand-900 underline disabled:opacity-50"
+                    className={`shrink-0 ${BTN_XS_GHOST}`}
                   >
                     {settlingId === c.id ? '…' : us.reopen}
                   </button>
@@ -896,7 +896,7 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
             <button
               type="button"
               onClick={() => setShowForm(true)}
-              className="text-xs text-brand-700 hover:text-brand-900 underline"
+              className={BTN_XS_GHOST}
             >
               {us.issueCreditLink}
             </button>
@@ -942,7 +942,7 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
                 <button
                   type="button"
                   onClick={() => { setShowForm(false); setError(null); setAmountStr(''); setReason(''); setLinkedBooking('') }}
-                  className="text-xs text-brand-700 hover:text-brand-900 underline"
+                  className={BTN_XS_GHOST}
                 >
                   {t.admin.catalog.cancel}
                 </button>

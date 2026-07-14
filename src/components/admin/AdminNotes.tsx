@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { NOTE_TAGS, type AdminNote, type NoteTag, type Profile } from '../../types/database'
 import { t } from '../../i18n'
+import { BTN_XS_GHOST } from '../../styles/tokens'
 
 const nt = t.admin.notes
 
@@ -238,10 +239,10 @@ function NoteCard({ note, onResolve, onUnresolve }: {
         </span>
         <p className={`flex-1 text-brand-900 ${note.resolved ? 'line-through' : ''}`}>{note.content}</p>
         {onResolve && (
-          <button onClick={onResolve} className="text-xs text-brand-900 font-medium hover:text-brand-900 font-semibold shrink-0">{nt.resolve}</button>
+          <button onClick={onResolve} className={`shrink-0 ${BTN_XS_GHOST}`}>{nt.resolve}</button>
         )}
         {onUnresolve && (
-          <button onClick={onUnresolve} className="text-xs text-brand-900 font-medium hover:text-brand-700 shrink-0">{nt.reopen}</button>
+          <button onClick={onUnresolve} className={`shrink-0 ${BTN_XS_GHOST}`}>{nt.reopen}</button>
         )}
       </div>
       <p className="text-xs text-brand-950 font-medium mt-1">

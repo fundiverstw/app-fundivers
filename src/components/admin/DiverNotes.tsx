@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import type { DiverNote, Profile } from '../../types/database'
 import { t } from '../../i18n'
+import { BTN_XS_GHOST } from '../../styles/tokens'
 
 const dn = t.admin.diverNotes
 
@@ -127,7 +128,7 @@ export function DiverNotes({ profileId, title = dn.title }: Props) {
                 <div className="flex gap-2 justify-end">
                   <button
                     onClick={cancelEdit}
-                    className="text-xs text-brand-900 font-medium hover:text-brand-900"
+                    className={BTN_XS_GHOST}
                   >
                     {dn.cancel}
                   </button>

@@ -18,6 +18,7 @@ import type {
   TrustedPartnerRow, Package, PackageInsert, PackageStatus, PackageTier, EOAddon, EORoom,
 } from '../../types/database'
 import { t } from '../../i18n'
+import { BTN_XS_GHOST } from '../../styles/tokens'
 
 // Admin home for Packages — the partner-shop registration network. Two tabs:
 //   - Packages: the products published to divers, each with price tiers,
@@ -378,7 +379,7 @@ function PackageForm({
               )}
             </div>
           ))}
-          <button type="button" onClick={addTier} className="text-xs font-semibold text-brand-900 underline">{pg.addTier}</button>
+          <button type="button" onClick={addTier} className={BTN_XS_GHOST}>{pg.addTier}</button>
         </fieldset>
 
         <Labelled label={c.currency}><input className={FIELD} value={currency} onChange={e => setCurrency(e.target.value)} /></Labelled>
