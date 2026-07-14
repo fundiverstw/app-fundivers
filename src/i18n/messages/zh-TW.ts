@@ -2,7 +2,7 @@
 // missing or misnamed key fails the build. First-pass translation — dive
 // terminology should get a native review before a shop ships with it. See
 // docs/i18n.md.
-import type { Messages } from './en'
+import type { Messages } from './en.ts'
 
 export const zhTW: Messages = {
   nav: {
