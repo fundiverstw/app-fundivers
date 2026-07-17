@@ -22,6 +22,10 @@ preview_urls = true
 pattern = "app.fundiverstw.com"
 zone_name = "fundiverstw.com"
 custom_domain = true
+# Mirrors the domain's live state: the route is active, and preview
+# deployments are not served from it (previews stay on their own URLs).
+enabled = true
+previews_enabled = false
 
 # Smart placement — also dashboard-only until now, and dropped by the same
 # overwrite.
