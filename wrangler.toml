@@ -2,6 +2,18 @@ name = "app-fundiverstw"
 main = "src/worker.ts"
 compatibility_date = "2026-04-01"
 
+# Both default to false once `routes` is declared below, which would switch off
+# the workers.dev subdomain and preview URLs that are currently live. Pinned to
+# the Worker's actual state so this file describes what is deployed rather than
+# quietly changing it. (Turning workers.dev off is defensible — it stops the app
+# being served from a second address — but that is a deliberate decision, not a
+# side effect of declaring a route.)
+#
+# These are top-level keys: they must stay ABOVE [[routes]], or TOML reads them
+# as fields of the route itself and wrangler rejects the config.
+workers_dev = true
+preview_urls = true
+
 # The production domain, declared here rather than only in the dashboard. A
 # deploy overwrites the remote config with this file, so a route that lives
 # only in the dashboard is silently unbound the first time anyone deploys —
