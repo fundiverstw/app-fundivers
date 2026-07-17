@@ -2,6 +2,20 @@ name = "app-fundiverstw"
 main = "src/worker.ts"
 compatibility_date = "2026-04-01"
 
+# The production domain, declared here rather than only in the dashboard. A
+# deploy overwrites the remote config with this file, so a route that lives
+# only in the dashboard is silently unbound the first time anyone deploys —
+# taking app.fundiverstw.com off the Worker.
+[[routes]]
+pattern = "app.fundiverstw.com"
+zone_name = "fundiverstw.com"
+custom_domain = true
+
+# Smart placement — also dashboard-only until now, and dropped by the same
+# overwrite.
+[placement]
+mode = "smart"
+
 [assets]
 directory = "./dist"
 binding = "ASSETS"
