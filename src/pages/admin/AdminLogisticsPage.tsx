@@ -442,7 +442,10 @@ export function AdminLogisticsPage() {
                 of size and weight, which is why the hierarchy read as flat. */}
             <header className="border-b border-surface-300 pb-2 mb-3">
               <h2 className={`${TEXT_HEADING} text-lg`}>{lg.overall(dayKey)}</h2>
-              <p className={`${TEXT_MUTED} text-sm font-medium`}>{lg.eventsDivers(groups.length, allRows.length)}</p>
+              {/* Headcount, not bookings: someone diving two of the day's events
+                  is one diver. Counting rows here would disagree with the roster
+                  below, which lists that person once. */}
+              <p className={`${TEXT_MUTED} text-sm font-medium`}>{lg.eventsDivers(groups.length, dayDivers.length)}</p>
             </header>
             {/* Two columns from sm up — the blocks are short, so one column left
                 half the board empty on anything wider than a phone. items-start

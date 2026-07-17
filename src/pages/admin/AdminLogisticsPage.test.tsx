@@ -202,7 +202,9 @@ describe('AdminLogisticsPage', () => {
     })
 
     renderPage()
-    await screen.findByRole('heading', { name: /^divers$/i })
+    // Headcount, not bookings: 3 bookings across 2 people reads as "2 divers",
+    // agreeing with the roster rather than double-counting Ada.
+    await screen.findByText(/2 events · 2 divers/i)
 
     const overall = screen.getByText(/^overall/i).closest('section')!
     const roster = within(overall).getByRole('heading', { name: /^divers$/i }).parentElement!
