@@ -8,6 +8,7 @@ import { fetchEventsInRange, fetchUpcomingEventDays, formatEventSpan } from '../
 import { gearTotals, splitByTransport, dayKeyOffset, careTotals, isCareGearItem, addonTotals } from '../../lib/logistics'
 import { bookingBalance, type BookingBalance } from '../../lib/booking-balance'
 import { openCreditForBooking } from '../../lib/credits'
+import { fetchAmendmentsForBookings, amendmentsDelta } from '../../lib/booking-amendments'
 import { netPaidByBooking } from '../../lib/payments'
 import { personName } from '../../lib/names'
 import { DiverGearCard, type DiverGearRow } from '../../components/admin/DiverGearCard'
@@ -188,7 +189,7 @@ export function AdminLogisticsPage() {
         ...duties.map(d => d.assignee_id),
       ])]
       const bookingIds = bookings.map(b => b.id)
-      const [profsRes, paymentsRes, creditsRes] = await Promise.all([
+      const [profsRes, paymentsRes, creditsRes, amendmentsByBooking] = await Promise.all([
         userIds.length
           ? supabase.from('profiles').select('*').in('id', userIds)
           : Promise.resolve({ data: [] as Profile[] }),
@@ -198,19 +199,25 @@ export function AdminLogisticsPage() {
         userIds.length
           ? supabase.from('credits').select('*').in('user_id', userIds).eq('status', 'open')
           : Promise.resolve({ data: [] as Credit[] }),
+        fetchAmendmentsForBookings(bookingIds),
       ])
       if (cancelled) return
       const profMap = new Map((profsRes.data ?? []).map(p => [p.id, p]))
 
-      // Per-booking "what's still owed" — total minus paid payments and any
-      // open credit, mirroring the event page's Amount-owed math so the two
-      // never disagree. A covered booking keeps its own balance but notes the
-      // lead who's responsible for it.
+      // Per-booking "what's still owed" — the adjusted total (frozen snapshot +
+      // the signed amendment ledger, where discounts and surcharges live) minus
+      // paid payments and any open credit, mirroring the event page's
+      // Amount-owed math so the two never disagree. Amendments are not optional
+      // here: apply_credit_to_booking clamps what it draws down to the *amended*
+      // balance, so a discounted booking settled with credit would otherwise
+      // show a phantom "due" forever. A covered booking keeps its own balance
+      // but notes the lead who's responsible for it.
       const paidByBooking = netPaidByBooking((paymentsRes.data ?? []) as Payment[])
       const credits = (creditsRes.data ?? []) as Credit[]
       const balByBooking = new Map<string, BookingBalanceRow>()
       for (const b of bookings) {
         const owed = Number((b.details as BookingDetails | undefined)?.total ?? 0)
+          + amendmentsDelta(amendmentsByBooking.get(b.id) ?? [])
         const paid = paidByBooking.get(b.id) ?? 0
         const payerName = (b.payer_id && b.payer_id !== b.user_id)
           ? (personName(profMap.get(b.payer_id)?.name, profMap.get(b.payer_id)?.nickname) || lg.leadBooker)

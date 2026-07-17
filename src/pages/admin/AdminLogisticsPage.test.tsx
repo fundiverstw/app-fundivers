@@ -120,6 +120,68 @@ describe('AdminLogisticsPage', () => {
     expect(within(due).getByText(/paid by Ada/i)).toBeInTheDocument()
   })
 
+  it('nets discounts/surcharges and credit-funded payments into the balance, like the event page', async () => {
+    const amendBookings = [
+      // Ada: 3,200 discounted by 700 → owes 2,500, settled entirely by spending
+      // account credit (which lands as a 'paid' account_credit payment row).
+      // She is all paid up and must not show as owing the undiscounted 700.
+      { id: 'b1', user_id: 'u1', payer_id: 'u1', event_id: 'e1', status: 'confirmed',
+        details: { transportation: false, gear: { rent: false }, total: 3200 } },
+      // Bo: 2,800 plus a 300 surcharge → owes 3,100, paid 1,000 → 2,100 due.
+      { id: 'b2', user_id: 'u2', payer_id: 'u2', event_id: 'e1', status: 'confirmed',
+        details: { transportation: false, gear: { rent: false }, total: 2800 } },
+    ]
+    const amendments = [
+      { id: 'a1', booking_id: 'b1', amount: -700, note: 'Loyalty discount', created_by: 'admin-1', created_at: '' },
+      { id: 'a2', booking_id: 'b2', amount: 300,  note: 'Late nitrox add',  created_by: 'admin-1', created_at: '' },
+    ]
+    const payments = [
+      { id: 'p1', booking_id: 'b1', amount: 2500, status: 'paid', method: 'account_credit' },
+      { id: 'p2', booking_id: 'b2', amount: 1000, status: 'paid', method: 'cash' },
+    ]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: amendBookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      if (table === 'payments') return mockQueryBuilder({ data: payments })
+      if (table === 'booking_amendments') return mockQueryBuilder({ data: amendments })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    renderPage()
+    await screen.findByText(/1 event · 2 divers/i)
+
+    // Only Bo owes: 2,100 — not Ada's phantom 700 from ignoring the discount.
+    const overall = screen.getByText(/^overall/i).closest('section')!
+    expect(within(overall).getByText(/1 diver still owe/i)).toBeInTheDocument()
+    expect(within(overall).getByText(/2,100 outstanding/i)).toBeInTheDocument()
+
+    const due = screen.getByRole('group', { name: /payments due/i })
+    expect(within(due).getByText(/Bo/)).toBeInTheDocument()
+    expect(within(due).getByText(/2,100 due/)).toBeInTheDocument()
+    expect(within(due).queryByText(/Ada/)).not.toBeInTheDocument()
+    expect(within(due).queryByText(/700 due/)).not.toBeInTheDocument()
+  })
+
+  it('drops an event from Payments due entirely once every diver is settled', async () => {
+    // One diver, fully discounted to zero — the group should not render at all.
+    const freeBooking = [
+      { id: 'b1', user_id: 'u1', payer_id: 'u1', event_id: 'e1', status: 'confirmed',
+        details: { transportation: false, gear: { rent: false }, total: 1500 } },
+    ]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: freeBooking })
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      if (table === 'booking_amendments') return mockQueryBuilder({ data: [
+        { id: 'a1', booking_id: 'b1', amount: -1500, note: 'Comped', created_by: 'admin-1', created_at: '' },
+      ] })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    renderPage()
+    await screen.findByText(/1 event · 1 diver/i)
+    expect(screen.queryByRole('group', { name: /payments due/i })).not.toBeInTheDocument()
+  })
+
   it('plans which vehicles carry the divers who need a ride', async () => {
     // One on-duty staff rides along; Ada needs a ride, Bo self-transports.
     const duties = [
