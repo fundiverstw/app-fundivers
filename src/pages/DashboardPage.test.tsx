@@ -6,7 +6,7 @@ import { DashboardPage } from './DashboardPage'
 const { useAuthMock } = vi.hoisted(() => ({ useAuthMock: vi.fn() }))
 vi.mock('../hooks/useAuth', () => ({ useAuth: () => useAuthMock() }))
 // FeaturedEvents fetches on mount; it has its own test. Stub it here so these
-// tests stay focused on the caustics background and welcome banner.
+// tests stay focused on the welcome banner.
 vi.mock('../components/dashboard/FeaturedEvents', () => ({
   FeaturedEvents: () => null,
 }))
@@ -20,14 +20,6 @@ function renderPage() {
 }
 
 describe('DashboardPage', () => {
-  it('renders the animated caustics background', () => {
-    useAuthMock.mockReturnValue({ user: null, profile: null })
-    renderPage()
-    expect(document.querySelector('.caustics')).not.toBeNull()
-    // Two fractal-noise layers.
-    expect(document.querySelectorAll('.caustics-layer')).toHaveLength(2)
-  })
-
   it('shows the WelcomeBanner for a user welcomed within the last 24h', () => {
     useAuthMock.mockReturnValue({
       user: { user_metadata: { welcomed_at: new Date().toISOString() } },
