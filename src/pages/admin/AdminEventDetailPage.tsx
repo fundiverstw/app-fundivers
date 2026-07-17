@@ -1215,6 +1215,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
   const coveredByLead = !!r.payerName
   const isLeadOwn = !!r.booking.payer_id && r.booking.payer_id === r.booking.user_id
   const [expanded, setExpanded] = useState(false)
+  const diverName = r.profile?.name ?? t.admin.transport.noProfile
 
   // Balance nets open credit-for-this-event against what's owed. 'overpaid' is
   // kept distinct from 'credit' so a plain overpayment is never mislabelled as
@@ -1243,18 +1244,27 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
           Cert / sizing / contact info moved to the expanded block so the
           scroll-length stays short on mobile. */}
       <div
-        role="button"
-        tabIndex={0}
         onClick={() => setExpanded(v => !v)}
-        onKeyDown={e => {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(v => !v) }
-        }}
-        aria-expanded={expanded}
-        className="w-full text-left flex items-center gap-2 px-3 py-2 cursor-pointer focus:outline-none"
+        className="w-full text-left flex items-center gap-1.5 pl-1 pr-3 cursor-pointer"
       >
-        <span aria-hidden="true" className="text-xs text-brand-950 font-medium shrink-0">
-          {expanded ? '▾' : '▸'}
-        </span>
+        {/* The caret button — not the row — owns the disclosure semantics. The
+            name beside it is deliberately select-text so it can be copied, which
+            means tapping the row's most obvious target does nothing on a phone;
+            without a real control there was no discoverable place to tap. Sized
+            to the 44px minimum touch target, which sets the row height. The row
+            keeps its own onClick as a pointer shortcut, so the button stops
+            propagation to avoid toggling twice. */}
+        <button
+          type="button"
+          onClick={e => { e.stopPropagation(); setExpanded(v => !v) }}
+          aria-expanded={expanded}
+          aria-label={expanded ? ed.hideDetailsFor(diverName) : ed.showDetailsFor(diverName)}
+          className="shrink-0 h-11 w-11 flex items-center justify-center rounded-lg text-brand-900 hover:bg-surface-100 transition-colors"
+        >
+          <span aria-hidden="true" className="text-sm leading-none">
+            {expanded ? '▾' : '▸'}
+          </span>
+        </button>
         <span className="flex-1 min-w-0 text-sm truncate">
           {/* Names stay selectable for copy/paste; clicking one places a
               caret rather than toggling the card (stopPropagation). */}
@@ -1262,7 +1272,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
             className="text-brand-900 font-medium select-text cursor-text"
             onClick={e => e.stopPropagation()}
           >
-            {r.profile?.name ?? t.admin.transport.noProfile}
+            {diverName}
           </span>
           {r.profile?.nickname && (
             <span
