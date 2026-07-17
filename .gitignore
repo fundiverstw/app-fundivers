@@ -21,6 +21,11 @@ ignore/
 
 # Local Claude Code orientation — not shipped with the open-source package
 CLAUDE.md
+# Throwaway agent worktrees: full repo copies (14M+ and growing), never content.
+.claude/
+
+# Wrangler's local build/deploy scratch state.
+.wrangler/
 
 # Editor directories and files
 .vscode/*
