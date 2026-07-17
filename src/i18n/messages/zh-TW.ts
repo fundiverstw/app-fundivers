@@ -1535,6 +1535,7 @@ export const zhTW: Messages = {
       eventsDivers: (events: number, divers: number) => `${events} 個活動 · ${divers} 位潛水員`,
       diverCount: (n: number) => `${n} 位潛水員`,
       diversOnDay: '潛水員',
+      nextEventDay: (where: string) => `下一個: ${where} →`,
       stillOwe: (n: number, currency: string, amount: string) =>
         `${n} 位潛水員尚未付清 · 未收 ${currency} ${amount}`,
       allSettled: '款項皆已結清。',

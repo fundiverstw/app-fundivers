@@ -4,6 +4,13 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { AdminLogisticsPage } from './AdminLogisticsPage'
 import { mockQueryBuilder } from '../../../tests/test-utils'
+import { siteConfig } from '../../config/site'
+import { dayKeyOffset } from '../../lib/logistics'
+
+// Mirror the page's own day maths (shop timezone, not the runner's) so the
+// jump-button tests line up with the tabs it drives.
+const todayKey = new Date().toLocaleDateString('en-CA', { timeZone: siteConfig.locale.timezone })
+const tomorrowKey = dayKeyOffset(todayKey, 1)
 
 const { from, rpc, fetchEventsInRange, fetchUpcomingEventDays, useAuthMock } = vi.hoisted(() => ({
   from: vi.fn(),
@@ -307,6 +314,43 @@ describe('AdminLogisticsPage', () => {
     const laterDay = fetchEventsInRange.mock.calls.at(-1)![0] as string
     expect(laterDay).not.toBe(firstDay)
     expect(laterDay > firstDay).toBe(true)
+  })
+
+  it('jumps to tomorrow from today when tomorrow is the next day with events', async () => {
+    fetchUpcomingEventDays.mockResolvedValue([todayKey, tomorrowKey])
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText(/1 event · 2 divers/i)
+
+    // Labelled with where it lands, and it activates the Tomorrow tab rather
+    // than dumping the admin into the "Other day" picker.
+    await user.click(await screen.findByRole('button', { name: /next: tomorrow/i }))
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: /tomorrow/i })).toHaveAttribute('aria-selected', 'true')
+    })
+    expect(fetchEventsInRange.mock.calls.at(-1)![0]).toBe(tomorrowKey)
+  })
+
+  it('skips dead days — the jump lands on the next day that actually has events', async () => {
+    // Nothing tomorrow; the next real event day is 9 days out.
+    const farOff = dayKeyOffset(todayKey, 9)
+    fetchUpcomingEventDays.mockResolvedValue([todayKey, farOff])
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText(/1 event · 2 divers/i)
+
+    await user.click(await screen.findByRole('button', { name: new RegExp(`next: ${farOff}`, 'i') }))
+    await waitFor(() => {
+      expect(fetchEventsInRange.mock.calls.at(-1)![0]).toBe(farOff)
+    })
+    expect(screen.getByRole('tab', { name: /other day/i })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('hides the jump button on the last day that has events', async () => {
+    fetchUpcomingEventDays.mockResolvedValue([todayKey])
+    renderPage()
+    await screen.findByText(/1 event · 2 divers/i)
+    expect(screen.queryByRole('button', { name: /next:/i })).not.toBeInTheDocument()
   })
 
   it('shows an empty state for a day with no events', async () => {

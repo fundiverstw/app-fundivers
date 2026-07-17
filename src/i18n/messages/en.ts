@@ -1545,6 +1545,8 @@ export const en = {
         `${events} event${events === 1 ? '' : 's'} · ${divers} diver${divers === 1 ? '' : 's'}`,
       diverCount: (n: number) => `${n} diver${n === 1 ? '' : 's'}`,
       diversOnDay: 'Divers',
+      // `where` is already localised: the "Tomorrow" tab label, or a date key.
+      nextEventDay: (where: string) => `Next: ${where} →`,
       stillOwe: (n: number, currency: string, amount: string) =>
         `${n} diver${n === 1 ? '' : 's'} still owe · ${currency} ${amount} outstanding`,
       allSettled: 'All settled.',

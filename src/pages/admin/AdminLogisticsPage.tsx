@@ -22,7 +22,7 @@ import { EventVehicleGroup } from '../../components/admin/EventVehicleGroup'
 import { fetchVehicles } from '../../lib/vehicles'
 import { fetchGearModelsWithSizes } from '../../lib/gear-models'
 import type { GearModelWithSizes } from '../../lib/gear-sizing'
-import { TEXT_HEADING, TEXT_MUTED } from '../../styles/tokens'
+import { TEXT_HEADING, TEXT_MUTED, BTN_XS_GHOST } from '../../styles/tokens'
 import { fetchVehiclesForEvents, availableVehicles, allocationEventId } from '../../lib/event-vehicles'
 import { planFleet, type Rider, type SeatingPlan, type FleetVehicle } from '../../lib/vehicle-planning'
 import { useAuth } from '../../hooks/useAuth'
@@ -159,6 +159,24 @@ export function AdminLogisticsPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setOtherDay(upcomingDays.find(d => d > tomorrowKey) ?? upcomingDays[0])
   }, [tab, otherDay, upcomingDays, tomorrowKey])
+
+  // The next day *with events* after the one on screen — the jump button skips
+  // dead days instead of stepping one calendar day at a time. null when the day
+  // shown is the last one with events inside the LOOKAHEAD_DAYS window, which is
+  // also the only case where the button is hidden.
+  const nextEventDay = useMemo(
+    () => (upcomingDays ?? []).find(d => d > dayKey) ?? null,
+    [upcomingDays, dayKey],
+  )
+
+  // Land on whichever control owns that day, so the tabs keep matching what's
+  // displayed: today/tomorrow have their own tabs, anything else is "Other day".
+  function goToDay(day: string) {
+    if (day === todayKey) { setTab('today'); return }
+    if (day === tomorrowKey) { setTab('tomorrow'); return }
+    setOtherDay(day)
+    setTab('other')
+  }
 
   useEffect(() => {
     if (!dayKey) return
@@ -440,12 +458,26 @@ export function AdminLogisticsPage() {
                 its opposite — tiny, dim, uppercase — so the two tiers can never
                 be mistaken for each other. They used to differ only by one step
                 of size and weight, which is why the hierarchy read as flat. */}
-            <header className="border-b border-surface-300 pb-2 mb-3">
-              <h2 className={`${TEXT_HEADING} text-lg`}>{lg.overall(dayKey)}</h2>
-              {/* Headcount, not bookings: someone diving two of the day's events
-                  is one diver. Counting rows here would disagree with the roster
-                  below, which lists that person once. */}
-              <p className={`${TEXT_MUTED} text-sm font-medium`}>{lg.eventsDivers(groups.length, dayDivers.length)}</p>
+            <header className="border-b border-surface-300 pb-2 mb-3 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className={`${TEXT_HEADING} text-lg`}>{lg.overall(dayKey)}</h2>
+                {/* Headcount, not bookings: someone diving two of the day's events
+                    is one diver. Counting rows here would disagree with the roster
+                    below, which lists that person once. */}
+                <p className={`${TEXT_MUTED} text-sm font-medium`}>{lg.eventsDivers(groups.length, dayDivers.length)}</p>
+              </div>
+              {/* Jump to the next day that has events. Labelled with the
+                  destination — "Tomorrow" when that's where it lands, the date
+                  otherwise — so it says where it goes rather than just "next". */}
+              {nextEventDay && (
+                <button
+                  type="button"
+                  onClick={() => goToDay(nextEventDay)}
+                  className={`shrink-0 ${BTN_XS_GHOST}`}
+                >
+                  {lg.nextEventDay(nextEventDay === tomorrowKey ? lg.tomorrow : nextEventDay)}
+                </button>
+              )}
             </header>
             {/* Two columns from sm up — the blocks are short, so one column left
                 half the board empty on anything wider than a phone. items-start
