@@ -84,6 +84,16 @@
   box-sizing: border-box;
 }
 
+/* The app is dark, so tell the UA that. Native chrome we don't draw ourselves —
+ * <select> popups, date/time pickers, autofill fills, spinners — is painted by
+ * the browser, and without this it renders in LIGHT mode: a white sheet dropping
+ * out of a dark app. This one declaration is what makes that chrome match, and
+ * its absence is why the <option> rule below had to force white to stay legible.
+ */
+:root {
+  color-scheme: dark;
+}
+
 body {
   margin: 0;
   font-family: var(--font-sans);
@@ -237,15 +247,16 @@ img, video, canvas {
 .text-brand-800 { color: var(--color-reef-300); }
 .placeholder\:text-brand-900::placeholder { color: color-mix(in oklab, var(--color-brand-100) 45%, transparent); }
 
-/* Native <select> dropdowns render their options in an OS popup with a white
-   background, but the option text inherits the select's `color` — which the
-   brand-ink flip above turns near-white, giving white-on-white options in every
-   native dropdown. Pin options to dark ink on a white sheet so the open list
-   stays legible everywhere, regardless of the closed control's (light) text. */
+/* Option lists, pinned dark to match the app. Belt-and-braces with the
+   `color-scheme: dark` above: engines disagree on whether the popup follows
+   color-scheme, `background-color` on <option>, or both (Safari ignores the
+   latter; some Linux GTK builds lean on it). Setting both means every
+   combination lands light-ink-on-dark rather than the old white sheet — which
+   only existed because nothing had declared the app dark to the UA. */
 option,
 optgroup {
-  color: var(--color-brand-950);
-  background-color: #ffffff;
+  color: var(--color-brand-50);
+  background-color: #0d1a2e;
 }
 
 /* Translucent-white cards → frosted dark glass. Opaque + the family card alphas
