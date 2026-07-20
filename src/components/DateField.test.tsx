@@ -74,4 +74,43 @@ describe('DateField', () => {
       proto.showPicker = origShowPicker
     }
   })
+
+  it('keeps a half-typed date visible after blur instead of wiping it', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+
+    const input = screen.getByLabelText('Date')
+    await user.type(input, '1987')
+    await user.tab()
+
+    // An incomplete entry emits '' upstream, but the digits stay on screen —
+    // snapping the field back to the controlled '' loses them silently.
+    expect(input).toHaveValue('1987')
+  })
+
+  it('does not refocus the text input when the calendar is opened from inside a wrapping label', async () => {
+    const proto = HTMLInputElement.prototype as unknown as { showPicker?: () => void }
+    const origShowPicker = proto.showPicker
+    proto.showPicker = vi.fn()
+    try {
+      const user = userEvent.setup()
+      // RegisterForm's TextField wraps the whole control in a <label>. A click
+      // bubbling to that label is re-dispatched to the labelled input, which
+      // would refocus it and dismiss the picker that just opened.
+      render(
+        <label>
+          <span>DOB</span>
+          <DateField value="" onChange={() => {}} aria-label="Date" />
+        </label>
+      )
+
+      const input = screen.getByLabelText('Date')
+      await user.click(screen.getByRole('button', { name: /open calendar/i }))
+
+      expect(document.activeElement).not.toBe(input)
+      expect(proto.showPicker).toHaveBeenCalled()
+    } finally {
+      proto.showPicker = origShowPicker
+    }
+  })
 })

@@ -70,9 +70,8 @@ export function DateField({
     document.body.appendChild(native)
     const cleanup = () => native.remove()
     // A picked date is an explicit set: mirror it into the visible text right
-    // away. Clicking the calendar span doesn't blur the text input, so the
-    // mirror effect's focus guard would otherwise hold the display stale until
-    // the user clicked away.
+    // away, since the mirror effect's focus guard would otherwise hold the
+    // display stale until the user clicked away.
     native.addEventListener('change', () => { onChange(native.value); setText(native.value); cleanup() })
     native.addEventListener('cancel', cleanup)
     native.addEventListener('blur', () => setTimeout(cleanup, 100))
@@ -88,7 +87,11 @@ export function DateField({
         value={text}
         onChange={e => handleType(e.target.value)}
         onFocus={() => { focused.current = true }}
-        onBlur={() => { focused.current = false; setText(value) }}
+        // Keep whatever was typed on blur. Snapping back to `value` would wipe
+        // a half-entered date to blank (incomplete entries emit '' upstream),
+        // losing the digits with no hint as to why. The pattern attribute
+        // already flags the entry as invalid until it's complete.
+        onBlur={() => { focused.current = false }}
         placeholder="YYYY-MM-DD"
         required={required}
         pattern="\d{4}-\d{2}-\d{2}"
@@ -98,11 +101,17 @@ export function DateField({
       />
       {/* A non-labelable <span> (not <button>) so a wrapping field <label>
           doesn't also associate with it — the typeable text input stays the
-          one labelled control. The picker is a touch/mouse convenience. */}
+          one labelled control. The picker is a touch/mouse convenience.
+          Non-labelable stops the association, but not click forwarding: a
+          click bubbling to a wrapping <label> is still re-dispatched to the
+          labelled control, which refocuses the text input and dismisses the
+          picker that was just opened. preventDefault suppresses that
+          forwarding; the mousedown guard keeps focus off the span. */}
       <span
         ref={btnRef}
         role="button"
-        onClick={openPicker}
+        onMouseDown={e => e.preventDefault()}
+        onClick={e => { e.preventDefault(); e.stopPropagation(); openPicker() }}
         aria-label={t.a11y.openCalendar}
         className="absolute inset-y-0 right-0 flex items-center px-2 text-brand-900/70 hover:text-brand-900 cursor-pointer"
       >
