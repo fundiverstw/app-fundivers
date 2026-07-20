@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { createDutyWithNotify, instructorsNeeded } from '../../lib/duties'
 import { DUTY_ROLES, type Duty, type DutyRole, type Profile, type EventKind } from '../../types/database'
 import { DateField } from '../DateField'
+import { usesCourseDays } from '../../lib/event-kinds'
 import { t } from '../../i18n'
 
 const st = t.admin.staff
@@ -34,7 +35,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
 
   // Form state for the "assign" row.
   const [assigneeId, setAssigneeId] = useState('')
-  const [role, setRole] = useState<DutyRole>(eventType === 'course' ? 'instructor' : 'guide')
+  const [role, setRole] = useState<DutyRole>(usesCourseDays(eventType) ? 'instructor' : 'guide')
   // Dives use a date range (contiguous span); admins can narrow to a subset
   // of days for multi-day dives.
   const staffDateId = useId()
@@ -56,14 +57,14 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
       const [dutiesRes, adminsRes, courseRes] = await Promise.all([
         supabase.from('duties').select('*').eq(fkColumn, eventId).order('role'),
         supabase.from('profiles').select('*').in('role', ['admin', 'staff']).order('name'),
-        eventType === 'course'
+        usesCourseDays(eventType)
           ? supabase.from('events').select('course_days').eq('id', eventId).single()
           : Promise.resolve({ data: null }),
       ])
       if (cancelled) return
       setDuties(dutiesRes.data ?? [])
       setAdmins(adminsRes.data ?? [])
-      if (eventType === 'course') {
+      if (usesCourseDays(eventType)) {
         const days = [...((courseRes.data?.course_days as string[] | null) ?? [])]
           .filter(Boolean).sort()
         setCourseDays(days)
@@ -126,7 +127,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
     }
   }
 
-  const assign = eventType === 'course' ? assignCourse : assignDive
+  const assign = usesCourseDays(eventType) ? assignCourse : assignDive
 
   function toggleDay(day: string) {
     setSelectedDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])
@@ -140,7 +141,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
 
   if (loading) return null
 
-  const needed = eventType === 'course' ? instructorsNeeded(duties, nonAdminDiverCount) : 0
+  const needed = usesCourseDays(eventType) ? instructorsNeeded(duties, nonAdminDiverCount) : 0
 
   return (
     <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
@@ -205,7 +206,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
           </select>
         </div>
         <div className="space-y-2 text-xs">
-          {eventType === 'course' ? (
+          {usesCourseDays(eventType) ? (
             // Pick which course days this person is on duty for. Each
             // selected day becomes its own single-day duty.
             <div className="space-y-1">
@@ -261,7 +262,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
           )}
           <button
             onClick={assign}
-            disabled={!assigneeId || submitting || (eventType === 'course' ? selectedDays.length === 0 : !startDate)}
+            disabled={!assigneeId || submitting || (usesCourseDays(eventType) ? selectedDays.length === 0 : !startDate)}
             className="w-full bg-surface-700 hover:bg-surface-600 disabled:bg-surface-100 disabled:text-brand-950 font-medium text-white font-semibold px-3 py-1.5 rounded"
           >
             {st.assign}

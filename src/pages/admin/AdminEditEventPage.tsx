@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { usesCourseDays } from '../../lib/event-kinds'
+import { EVENT_KIND_LABELS } from '../../lib/event-kinds'
 import { useAuth } from '../../hooks/useAuth'
 import { EventForm } from '../../components/admin/EventForm'
 import { EventCarAssignment } from '../../components/admin/EventCarAssignment'
@@ -83,7 +84,7 @@ export function AdminEditEventPage() {
     const relError = await saveEventRelations(id, form)
     if (relError) throw relError
     if (dateChange) notifyEventScheduleChanged(id, form.type).catch(() => { /* best-effort */ })
-    toast.success(form.type === 'dive' ? ev.diveUpdated : ev.courseUpdated)
+    toast.success(ev.updated(EVENT_KIND_LABELS[form.type]))
     navigate(`/admin/events/${id}`)
   }
 

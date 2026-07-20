@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { EVENT_KIND_LABELS } from '../../lib/event-kinds'
 import { EventForm } from '../../components/admin/EventForm'
 import { CreateEventVehiclePicker } from '../../components/admin/CreateEventVehiclePicker'
 import { assignVehiclesToEvent } from '../../lib/event-vehicles'
@@ -41,7 +42,7 @@ export function AdminNewEventPage() {
         })
       } catch { toast.error(ev.carAssignFailed) }
     }
-    toast.success(form.type === 'dive' ? ev.diveCreated : ev.courseCreated)
+    toast.success(ev.created(EVENT_KIND_LABELS[form.type]))
     navigate(`/admin/events/${id}`)
   }
 

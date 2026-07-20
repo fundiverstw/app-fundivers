@@ -3,6 +3,7 @@ import { Spinner } from '../../components/ui/Spinner'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import type { EventKind } from '../../types/database'
+import { EVENT_KIND_LABELS, usesCourseDays } from '../../lib/event-kinds'
 import { errorMessage } from '../../lib/errors'
 import { t } from '../../i18n'
 
@@ -91,8 +92,8 @@ async function loadDashboard(): Promise<Dashboard> {
       dateKey: courseDateKey(c.course_days, today),
     })),
     ...extra.map((e): EventLite => ({
-      id: e.id, type: e.kind, title: titleOf(e, e.kind === 'dive' ? t.calendar.typeDive : t.calendar.typeCourse), capacity: e.capacity,
-      dateKey: e.kind === 'course' ? courseDateKey(e.course_days, today) : (e.start_date ? e.start_date.slice(0, 10) : null),
+      id: e.id, type: e.kind, title: titleOf(e, EVENT_KIND_LABELS[e.kind]), capacity: e.capacity,
+      dateKey: usesCourseDays(e.kind) ? courseDateKey(e.course_days, today) : (e.start_date ? e.start_date.slice(0, 10) : null),
     })),
   ]
 
