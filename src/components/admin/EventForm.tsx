@@ -14,7 +14,7 @@ import { usesCourseDays, usesDateEnvelope, hasDiveFlags } from '../../lib/event-
 import { EVENT_KIND_LABELS } from '../../lib/event-kind-labels'
 import { EVENT_KINDS } from '../../types/database'
 import { DATE_ENVELOPE_KINDS, COURSE_DAY_KINDS } from '../../lib/event-kinds'
-import { newestPerCourseType, type PastEventOption } from '../../lib/event-preload'
+import { newestPerGroup, type PastEventOption } from '../../lib/event-preload'
 import { BTN_XS_GHOST, ERROR_NOTE } from '../../styles/tokens'
 import { t } from '../../i18n'
 
@@ -174,28 +174,27 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
       setTripTemplates(dataOf<TripTemplateEntry>(7))
       setDestinations(dataOf<TravelDestination>(8))
 
-      // Envelope kinds: every past outing is its own template (a dive to one
-      // site is not interchangeable with a dive to another), so they are listed
-      // individually, bounded by the query's limit.
-      const pastEnvelope = dataOf<PreloadRow>(3).map<PastEvent>(d => ({
-        kind: d.kind,
-        id: d.id,
-        startDate: d.start_date ?? '',
-        title: d.display_title ?? d.admin_title ?? ef.untitledDive,
-        courseType: d.admin_title ?? null,
-      }))
-      // Course-day kinds: collapsed to the most recent run of each course
-      // type. The shop repeats the same handful of courses, so listing every
-      // past offering made the picker unusable and told the admin nothing the
-      // newest one doesn't.
-      const pastCourses = newestPerCourseType(
+      // Both lists collapse to the newest event per admin_title — the dive
+      // location, or the course type. The shop returns to the same sites and
+      // reruns the same courses, so listing every past occurrence made the
+      // picker unusable and told the admin nothing the newest one doesn't.
+      const pastEnvelope = newestPerGroup(
+        dataOf<PreloadRow>(3).map<PastEvent>(d => ({
+          kind: d.kind,
+          id: d.id,
+          startDate: d.start_date ?? '',
+          title: d.display_title ?? d.admin_title ?? ef.untitledDive,
+          groupKey: d.admin_title ?? null,
+        })),
+      )
+      const pastCourses = newestPerGroup(
         dataOf<PreloadRow>(4)
           .map<PastEvent>(c => ({
             kind: c.kind,
             id: c.id,
             startDate: [...(c.course_days ?? [])].filter(Boolean).sort()[0] ?? '',
             title: c.display_title ?? c.admin_title ?? ef.untitledCourse,
-            courseType: c.admin_title ?? null,
+            groupKey: c.admin_title ?? null,
           }))
           .filter(c => c.startDate && c.startDate < todayStr),
       )

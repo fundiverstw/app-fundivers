@@ -118,6 +118,38 @@ describe('AdminNewEventPage', () => {
     expect((screen.getByLabelText(/nitrox required/i) as HTMLInputElement).checked).toBe(true)
   })
 
+  it('offers only the most recent trip to each dive location in the preload picker', async () => {
+    // admin_title is the site for a dive — the shop returns to Long Dong Bay
+    // constantly, and only the newest trip is worth preloading from.
+    const dive = (id: string, adminTitle: string, startDate: string) => ({
+      id, kind: 'dive', admin_title: adminTitle, display_title: adminTitle,
+      start_date: startDate, course_days: null,
+    })
+    const dives = [
+      dive('ldb-jan', 'Long Dong Bay', '2026-01-18'),
+      dive('ldb-may', 'Long Dong Bay', '2026-05-03'),
+      dive('penghu',  'Penghu',        '2026-05-15'),
+    ]
+    from.mockImplementation((table: string) => {
+      if (table !== 'events') return mockQueryBuilder({ data: [] })
+      let kinds: string[] = []
+      const b = mockQueryBuilder({ data: [] })
+      b.in = (col: string, vals: string[]) => { if (col === 'kind') kinds = vals; return b }
+      b.then = (cb?: (r: unknown) => unknown) =>
+        Promise.resolve({ data: kinds.includes('dive') ? dives : [], error: null }).then(cb)
+      return b
+    })
+    renderPage()
+
+    const select = await screen.findByLabelText(/preload from past dive/i) as HTMLSelectElement
+    const labels = [...select.options].map(o => o.textContent ?? '')
+
+    expect(labels.filter(l => l.includes('Long Dong Bay'))).toHaveLength(1)
+    expect(labels.some(l => l.includes('2026-05-03'))).toBe(true)
+    expect(labels.some(l => l.includes('2026-01-18'))).toBe(false)
+    expect(labels.some(l => l.includes('Penghu'))).toBe(true)
+  })
+
   it('offers only the most recent run of each course type in the preload picker', async () => {
     // The shop repeats the same handful of courses, so listing every past
     // offering made this dropdown unusable.
