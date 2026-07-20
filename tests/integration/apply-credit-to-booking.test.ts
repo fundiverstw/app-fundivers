@@ -160,6 +160,30 @@ describe('apply_credit_to_booking', () => {
     expect(error).not.toBeNull()
   })
 
+  it('confirms a pending booking when credit clears a discounted balance below the frozen deposit', async () => {
+    // details.deposit is frozen at booking time and amendments never reduce
+    // it, so a discount can leave the deposit larger than the whole balance.
+    // Comparing against it unclamped meant a diver who settled in full stayed
+    // pending forever.
+    const diver = await freshDiver()
+    const dive = await freshDive()
+    const booking = await makeBooking(diver.id, dive, { total: 3000, deposit: 3000 }, 'pending')
+    await admin.from('booking_amendments').insert({
+      booking_id: booking, amount: -400, note: 'Loyalty discount', created_by: adminUser.id,
+    } as never)
+    await makeCredit(diver.id, 5000)
+
+    const db = await userClient(diver.email, diver.password)
+    const { data: applied } = await db.rpc('apply_credit_to_booking', {
+      p_booking_id: booking, p_amount: 5000,
+    })
+    // Only the 2600 actually owed.
+    expect(Number(applied)).toBe(2600)
+
+    const { data: after } = await admin.from('bookings').select('status').eq('id', booking).single()
+    expect(after!.status).toBe('confirmed')
+  })
+
   it('clamps to the balance due when more is requested than owed', async () => {
     const diver = await freshDiver()
     const dive = await freshDive()
