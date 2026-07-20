@@ -313,7 +313,7 @@ function Card({
             <div className={`flex justify-between ${TEXT_BODY}`}>
               <span>{t.bookings.deposit}</span>
               <span className={depositIsCovered ? 'text-brand-900 font-semibold' : TEXT_ERROR}>
-                {currency} {Math.min(deposit, owed).toLocaleString()} {depositIsCovered ? '✓' : t.bookings.due}
+                {currency} {Math.min(deposit, owed).toLocaleString()} {depositIsCovered ? t.payments.paidCheck : t.bookings.due}
               </span>
             </div>
           )}

@@ -125,6 +125,7 @@ describe('PaymentsPage', () => {
       { id: 'a1', booking_id: 'b1', amount: -400, note: 'Loyalty discount',
         created_by: 'admin', created_at: new Date().toISOString() },
     ]
+    const user = userEvent.setup()
     from.mockImplementation((table: string) => {
       if (table === 'bookings')           return mockQueryBuilder({ data: bookings })
       if (table === 'payments')           return mockQueryBuilder({ data: payments })
@@ -141,6 +142,12 @@ describe('PaymentsPage', () => {
     // Settled, and nothing anywhere on the page claims an outstanding deposit.
     expect(screen.queryByText(/400\s*due/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/TWD\s*400/)).not.toBeInTheDocument()
+
+    // And it says so positively: the deposit reads as paid, for the amount
+    // that actually applied (2600 after the discount, not the frozen 3000).
+    await user.click(screen.getByText(/Discounted Dive/))
+    expect(await screen.findByText(/TWD\s*2,600\s*paid/i)).toBeInTheDocument()
+    expect(screen.queryByText(/TWD\s*3,000\s*paid/i)).not.toBeInTheDocument()
   })
 
   it('lets a diver apply available account credit to a booking with a balance due', async () => {

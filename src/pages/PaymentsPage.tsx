@@ -463,9 +463,12 @@ function LineCard({
             <div className="flex justify-between">
               <span className={TEXT_BODY}>{t.bookings.deposit}</span>
               <span className={depositDue > 0 ? `${TEXT_ERROR} font-medium` : 'text-brand-900 font-semibold'}>
+                {/* Once covered, say so — and state the deposit that actually
+                    applied. A discount can clamp it below the frozen figure, so
+                    showing `deposit` here would claim more was paid than was. */}
                 {depositDue > 0
                   ? `${currency} ${depositDue.toLocaleString()} ${t.bookings.due}`
-                  : `${currency} ${deposit.toLocaleString()} ${t.payments.paidCheck}`}
+                  : `${currency} ${Math.min(deposit, owed).toLocaleString()} ${t.payments.paidCheck}`}
               </span>
             </div>
           )}
