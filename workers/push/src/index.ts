@@ -849,10 +849,39 @@ export async function runDailyReminders(env: Env): Promise<{ sent: number; skipp
     .select('booking_id, amount, status')
     .in('booking_id', bookingIds)
 
+  // Net paid, matching src/lib/payments.ts netPaid: a refund is its own row,
+  // so counting only 'paid' told a partly-refunded diver they owed less than
+  // the app showed them.
   const paidByBooking = new Map<string, number>()
   for (const p of payments ?? []) {
-    if (p.status !== 'paid' || !p.booking_id) continue
-    paidByBooking.set(p.booking_id, (paidByBooking.get(p.booking_id) ?? 0) + Number(p.amount))
+    if (!p.booking_id) continue
+    const delta = p.status === 'paid' ? Number(p.amount)
+      : p.status === 'refunded' ? -Number(p.amount)
+      : 0
+    if (delta !== 0) paidByBooking.set(p.booking_id, (paidByBooking.get(p.booking_id) ?? 0) + delta)
+  }
+
+  // Discounts and credits are part of the balance everywhere else in the app;
+  // without them this cron chased divers for the undiscounted price.
+  const { data: amendments } = await sb
+    .from('booking_amendments')
+    .select('booking_id, amount')
+    .in('booking_id', bookingIds)
+  const amendmentsByBooking = new Map<string, number>()
+  for (const a of amendments ?? []) {
+    if (!a.booking_id) continue
+    amendmentsByBooking.set(a.booking_id, (amendmentsByBooking.get(a.booking_id) ?? 0) + Number(a.amount))
+  }
+
+  const { data: openCredits } = await sb
+    .from('credits')
+    .select('booking_id, amount')
+    .eq('status', 'open')
+    .in('booking_id', bookingIds)
+  const creditByBooking = new Map<string, number>()
+  for (const c of openCredits ?? []) {
+    if (!c.booking_id) continue
+    creditByBooking.set(c.booking_id, (creditByBooking.get(c.booking_id) ?? 0) + Number(c.amount))
   }
 
   // Idempotency ledger for this slice of (user, event).
@@ -872,7 +901,7 @@ export async function runDailyReminders(env: Env): Promise<{ sent: number; skipp
     sentMap.set(key, set)
   }
 
-  const inputs = buildReminderInputs({ events: [...dives, ...courses], bookings, paidByBooking, sentMap, currency: env.CURRENCY ?? 'TWD' })
+  const inputs = buildReminderInputs({ events: [...dives, ...courses], bookings, paidByBooking, amendmentsByBooking, creditByBooking, sentMap, currency: env.CURRENCY ?? 'TWD' })
   const reminders = selectReminders(today, inputs)
   if (!reminders.length) return { sent: 0, skipped: 0 }
 

@@ -113,7 +113,7 @@ describe('buildReminderInputs', () => {
       events: [dive('d1', '2026-05-08')],
       bookings: [booking()],
       paidByBooking: paid,
-      sentMap: sent,
+      amendmentsByBooking: new Map(), creditByBooking: new Map(), sentMap: sent,
     })
     expect(input.userId).toBe('u1')
     expect(input.eventId).toBe('d1')
@@ -131,6 +131,8 @@ describe('buildReminderInputs', () => {
       events: [course('c1', '2026-06-01', 'Advanced')],
       bookings: [booking({ event_id: 'c1' })],
       paidByBooking: new Map(),
+      amendmentsByBooking: new Map(),
+      creditByBooking: new Map(),
       sentMap: new Map(),
     })
     expect(input.eventType).toBe('course')
@@ -146,6 +148,8 @@ describe('buildReminderInputs', () => {
         booking({ id: 'b-nostart', event_id: 'd2' }),
       ],
       paidByBooking: new Map(),
+      amendmentsByBooking: new Map(),
+      creditByBooking: new Map(),
       sentMap: new Map(),
     })
     // d-unknown absent, d2 absent — no inputs emitted
@@ -160,7 +164,7 @@ describe('buildReminderInputs', () => {
       events: [dive('d1', '2026-05-08')],
       bookings: [booking()],
       paidByBooking: new Map(),
-      sentMap: sent,
+      amendmentsByBooking: new Map(), creditByBooking: new Map(), sentMap: sent,
     })
     expect(input.alreadySent.has('event_7d')).toBe(true)
     expect(input.alreadySent.has('event_1d')).toBe(false)
@@ -171,6 +175,8 @@ describe('buildReminderInputs', () => {
       events: [dive('d1', '2026-05-08')],
       bookings: [booking({ details: null })],
       paidByBooking: new Map(),
+      amendmentsByBooking: new Map(),
+      creditByBooking: new Map(),
       sentMap: new Map(),
     })
     expect(input.totalAmount).toBe(0)
@@ -182,6 +188,8 @@ describe('buildReminderInputs', () => {
       events: [{ ...dive('d1', '2026-05-08'), start_time: '09:00:00.000' }],
       bookings: [booking()],
       paidByBooking: new Map(),
+      amendmentsByBooking: new Map(),
+      creditByBooking: new Map(),
       sentMap: new Map(),
     })
     expect(input.eventStartTimeHhmm).toBe('09:00')
@@ -192,6 +200,8 @@ describe('buildReminderInputs', () => {
       events: [{ ...course('c1', '2026-06-01'), start_time: '14:30:00' }],
       bookings: [booking({ event_id: 'c1' })],
       paidByBooking: new Map(),
+      amendmentsByBooking: new Map(),
+      creditByBooking: new Map(),
       sentMap: new Map(),
     })
     expect(input.eventStartTimeHhmm).toBe('14:30')
@@ -202,7 +212,7 @@ describe('buildReminderInputs', () => {
       events: [dive('d1', '2026-05-08')],
       bookings: [booking()],
       paidByBooking: new Map(),
-      sentMap: new Map(),
+      amendmentsByBooking: new Map(), creditByBooking: new Map(), sentMap: new Map(),
     })
     expect(input.eventStartTimeHhmm).toBeNull()
   })

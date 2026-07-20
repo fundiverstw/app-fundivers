@@ -47,9 +47,13 @@ export interface ReminderInput {
   /** 'HH:mm' (24h) or null when source row has no start time set. */
   eventStartTimeHhmm:  string | null
   bookingStatus:       string
+  /** details.total plus the signed amendment ledger — what the diver owes. */
   totalAmount:         number
   depositAmount:       number
+  /** Net paid: 'paid' rows minus 'refunded' ones, matching netPaid. */
   paidAmount:          number
+  /** Open credit tied to this booking, which offsets the balance in the UI. */
+  creditAmount:        number
   currency:            string
   alreadySent:         ReadonlySet<ReminderKind>
 }
@@ -90,7 +94,11 @@ export function selectReminders(today: string, inputs: ReminderInput[]): Reminde
 
     const payKind = paymentKindForDays(days)
     if (payKind && !r.alreadySent.has(payKind)) {
-      const balanceDue = Math.max(0, r.totalAmount   - r.paidAmount)
+      // Same arithmetic the diver sees on /records/payments, which is where
+      // this notification sends them: owed (incl. discounts) less what they
+      // have net paid, less credit already offsetting the booking. Chasing
+      // details.total alone billed discounted divers for the full price.
+      const balanceDue = Math.max(0, r.totalAmount - r.paidAmount - r.creditAmount)
       if (balanceDue > 0) {
         const depositDue = Math.max(0, r.depositAmount - r.paidAmount)
         const isDeposit  = depositDue > 0

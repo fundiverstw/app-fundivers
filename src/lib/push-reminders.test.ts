@@ -14,6 +14,7 @@ function mk(overrides: Partial<ReminderInput> = {}): ReminderInput {
     totalAmount:    3000,
     depositAmount:  1000,
     paidAmount:     0,
+    creditAmount:   0,
     currency:       'TWD',
     alreadySent:    new Set<ReminderKind>(),
     ...overrides,
@@ -86,5 +87,43 @@ describe('selectReminders', () => {
     const out = selectReminders(TODAY, [mk()])
     expect(out.find(r => r.kind === 'event_1d')!.url).toBe('/records/bookings')
     expect(out.find(r => r.kind === 'payment_1d')!.url).toBe('/records/payments')
+  })
+})
+
+describe('selectReminders — the balance it chases', () => {
+  it('nets a discount off the amount demanded', () => {
+    // totalAmount is owed, i.e. details.total plus the amendment ledger. The
+    // reminder used to be built from details.total alone, so a discounted
+    // diver was chased for the full pre-discount price.
+    const out = selectReminders(TODAY, [mk({
+      totalAmount: 2500, depositAmount: 0, paidAmount: 0,
+    })])
+    const pay = out.find(r => r.kind === 'payment_1d')!
+    expect(pay.body).toContain('2,500')
+  })
+
+  it('counts open credit against the balance, as /records/payments does', () => {
+    // The notification links to that page; the figures have to agree.
+    const out = selectReminders(TODAY, [mk({
+      totalAmount: 3000, depositAmount: 0, paidAmount: 1000, creditAmount: 500,
+    })])
+    const pay = out.find(r => r.kind === 'payment_1d')!
+    expect(pay.body).toContain('1,500')
+  })
+
+  it('stays silent when credit already covers the whole balance', () => {
+    // Nagging someone whose balance the shop has already covered is worse than
+    // saying nothing.
+    const out = selectReminders(TODAY, [mk({
+      totalAmount: 3000, depositAmount: 0, paidAmount: 0, creditAmount: 3000,
+    })])
+    expect(out.map(r => r.kind)).not.toContain('payment_1d')
+  })
+
+  it('stays silent when a discount clears what was left to pay', () => {
+    const out = selectReminders(TODAY, [mk({
+      totalAmount: 1000, depositAmount: 0, paidAmount: 1000, creditAmount: 0,
+    })])
+    expect(out.map(r => r.kind)).not.toContain('payment_1d')
   })
 })

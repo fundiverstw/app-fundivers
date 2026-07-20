@@ -42,12 +42,17 @@ export function toHhmm(raw: string | null | undefined): string | null {
 export function buildReminderInputs(args: {
   events: EventRow[]
   bookings: Booking[]
+  /** Net paid per booking: 'paid' minus 'refunded'. */
   paidByBooking: Map<string, number>
+  /** Signed amendment total per booking — negative for a discount. */
+  amendmentsByBooking: Map<string, number>
+  /** Open credit tied to each booking. */
+  creditByBooking: Map<string, number>
   sentMap: Map<string, Set<ReminderKind>>
   /** Shop currency label shown in the money line of a reminder. */
   currency: string
 }): ReminderInput[] {
-  const { events, bookings, paidByBooking, sentMap, currency } = args
+  const { events, bookings, paidByBooking, amendmentsByBooking, creditByBooking, sentMap, currency } = args
   const eventMap = new Map(events.map((e) => [e.id, e]))
 
   const inputs: ReminderInput[] = []
@@ -66,9 +71,10 @@ export function buildReminderInputs(args: {
       eventStartDate:     ev.start_date,
       eventStartTimeHhmm: toHhmm(ev.start_time),
       bookingStatus:      b.status,
-      totalAmount:        Number(details.total   ?? 0),
+      totalAmount:        Number(details.total ?? 0) + (amendmentsByBooking.get(b.id) ?? 0),
       depositAmount:      Number(details.deposit ?? 0),
       paidAmount:         paidByBooking.get(b.id) ?? 0,
+      creditAmount:       creditByBooking.get(b.id) ?? 0,
       currency,
       alreadySent:        sentMap.get(`${b.user_id}:${eventId}`) ?? new Set<ReminderKind>(),
     })
