@@ -24,9 +24,7 @@ export function EventWaiverOverrides({ event, isAdmin, createdBy }: {
 
   async function load() {
     try {
-      const rows = await fetchEventWaiverOverrides(
-        event.type === 'dive' ? { dive_id: event.id } : { course_id: event.id },
-      )
+      const rows = await fetchEventWaiverOverrides(event.id)
       setOverrides(rows)
     } catch {
       setOverrides([])
@@ -38,9 +36,7 @@ export function EventWaiverOverrides({ event, isAdmin, createdBy }: {
     ;(async () => {
       try {
         const [rows, waivers] = await Promise.all([
-          fetchEventWaiverOverrides(
-            event.type === 'dive' ? { dive_id: event.id } : { course_id: event.id },
-          ),
+          fetchEventWaiverOverrides(event.id),
           fetchWaivers(),
         ])
         if (!cancelled) { setOverrides(rows); setCatalog(waivers) }

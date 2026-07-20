@@ -136,12 +136,9 @@ export async function deleteWaiver(id: string): Promise<void> {
   if (error) throw error
 }
 
-export async function fetchEventWaiverOverrides(
-  event: { dive_id?: string | null; course_id?: string | null },
-): Promise<EventWaiver[]> {
-  const val = event.dive_id ?? event.course_id
-  if (!val) return []
-  const { data, error } = await supabase.from('event_waivers').select('*').eq('event_id', val)
+export async function fetchEventWaiverOverrides(eventId: string | null): Promise<EventWaiver[]> {
+  if (!eventId) return []
+  const { data, error } = await supabase.from('event_waivers').select('*').eq('event_id', eventId)
   if (error) throw error
   return (Array.isArray(data) ? data : []) as EventWaiver[]
 }

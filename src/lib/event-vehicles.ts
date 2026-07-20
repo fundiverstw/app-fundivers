@@ -7,12 +7,9 @@ import type { AppEvent, EventVehicle, EventVehicleInsert, Vehicle } from '../typ
 // availability is the active fleet minus whatever's already on THIS event.
 
 // The allocations for one event.
-export async function fetchVehiclesForEvent(
-  event: { dive_id?: string | null; course_id?: string | null },
-): Promise<EventVehicle[]> {
-  const val = event.dive_id ?? event.course_id
-  if (!val) return []
-  const { data, error } = await supabase.from('event_vehicles').select('*').eq('event_id', val)
+export async function fetchVehiclesForEvent(eventId: string | null): Promise<EventVehicle[]> {
+  if (!eventId) return []
+  const { data, error } = await supabase.from('event_vehicles').select('*').eq('event_id', eventId)
   if (error) throw error
   return (data ?? []) as EventVehicle[]
 }
@@ -94,11 +91,9 @@ export interface RideSeats {
 // Ride-seat tally for an event, via the event_ride_seats SECURITY DEFINER RPC
 // (20260628000000) — the only way the registration form, run as a plain diver,
 // can learn the count without read access to event_vehicles / others' bookings.
-export async function fetchRideSeats(
-  event: { dive_id?: string | null; course_id?: string | null },
-): Promise<RideSeats> {
+export async function fetchRideSeats(eventId: string): Promise<RideSeats> {
   const { data, error } = await supabase.rpc('event_ride_seats', {
-    p_event_id: (event.dive_id ?? event.course_id) as string,
+    p_event_id: eventId,
   })
   if (error) throw error
   const row = (data as { capacity: number; claimed: number }[] | null)?.[0]

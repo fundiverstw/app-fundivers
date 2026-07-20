@@ -49,30 +49,30 @@ describe('allocationEventId', () => {
 })
 
 describe('fetchVehiclesForEvent', () => {
-  it('queries by the dive key and returns the rows', async () => {
+  it('queries event_vehicles by event id and returns the rows', async () => {
     const rows = [alloc({ id: 'a1', event_id: 'D1' })]
     const b = mockQueryBuilder({ data: rows })
     const eq = vi.fn(() => b); b.eq = eq
     from.mockReturnValue(b)
-    expect(await fetchVehiclesForEvent({ dive_id: 'D1' })).toEqual(rows)
+    expect(await fetchVehiclesForEvent('D1')).toEqual(rows)
     expect(eq).toHaveBeenCalledWith('event_id', 'D1')
   })
-  it('queries by the course key for a course', async () => {
+  it('queries the same way whatever the event kind', async () => {
     const b = mockQueryBuilder({ data: [] })
     const eq = vi.fn(() => b); b.eq = eq
     from.mockReturnValue(b)
-    await fetchVehiclesForEvent({ course_id: 'C1' })
+    await fetchVehiclesForEvent('C1')
     expect(eq).toHaveBeenCalledWith('event_id', 'C1')
   })
-  it('short-circuits with no event key', async () => {
-    expect(await fetchVehiclesForEvent({})).toEqual([])
+  it('short-circuits with no event id', async () => {
+    expect(await fetchVehiclesForEvent(null)).toEqual([])
     expect(from).not.toHaveBeenCalled()
   })
   it('surfaces a supabase error', async () => {
     const b = mockQueryBuilder({ error: { message: 'boom' } })
     b.eq = vi.fn(() => b)
     from.mockReturnValue(b)
-    await expect(fetchVehiclesForEvent({ dive_id: 'D1' })).rejects.toBeTruthy()
+    await expect(fetchVehiclesForEvent('D1')).rejects.toBeTruthy()
   })
 })
 
@@ -91,7 +91,7 @@ describe('fetchVehiclesForEvents', () => {
 })
 
 describe('assignVehicleToEvent', () => {
-  it('writes a dive-keyed row (course key null) for a dive event', async () => {
+  it('writes an event-keyed row for a dive event', async () => {
     const builder = mockQueryBuilder({ error: null })
     const insert = vi.fn(() => builder)
     builder.insert = insert
@@ -158,23 +158,23 @@ describe('unassignVehicle', () => {
 describe('fetchRideSeats', () => {
   it('derives available from the RPC capacity/claimed', async () => {
     rpc.mockResolvedValue({ data: [{ capacity: 7, claimed: 2 }], error: null })
-    expect(await fetchRideSeats({ dive_id: 'D1' })).toEqual({ capacity: 7, claimed: 2, available: 5 })
+    expect(await fetchRideSeats('D1')).toEqual({ capacity: 7, claimed: 2, available: 5 })
     expect(rpc).toHaveBeenCalledWith('event_ride_seats', { p_event_id: 'D1' })
   })
 
   it('never reports negative availability', async () => {
     rpc.mockResolvedValue({ data: [{ capacity: 4, claimed: 9 }], error: null })
-    expect(await fetchRideSeats({ dive_id: 'D1' })).toEqual({ capacity: 4, claimed: 9, available: 0 })
+    expect(await fetchRideSeats('D1')).toEqual({ capacity: 4, claimed: 9, available: 0 })
   })
 
   it('treats an empty result as 0/0', async () => {
     rpc.mockResolvedValue({ data: [], error: null })
-    expect(await fetchRideSeats({ course_id: 'C1' })).toEqual({ capacity: 0, claimed: 0, available: 0 })
+    expect(await fetchRideSeats('C1')).toEqual({ capacity: 0, claimed: 0, available: 0 })
   })
 
   it('surfaces a supabase error', async () => {
     rpc.mockResolvedValue({ data: null, error: { message: 'boom' } })
-    await expect(fetchRideSeats({ dive_id: 'D1' })).rejects.toBeTruthy()
+    await expect(fetchRideSeats('D1')).rejects.toBeTruthy()
   })
 })
 

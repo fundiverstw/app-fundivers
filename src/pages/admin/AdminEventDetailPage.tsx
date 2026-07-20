@@ -210,7 +210,7 @@ export function AdminEventDetailPage() {
       try {
         const diverIds = [...new Set(diverIdsKey.split(','))]
         const [overrides, sigs, waivers] = await Promise.all([
-          fetchEventWaiverOverrides(event.type === 'dive' ? { dive_id: event.id } : { course_id: event.id }),
+          fetchEventWaiverOverrides(event.id),
           fetchSignaturesForDivers(diverIds),
           fetchWaivers(),
         ])

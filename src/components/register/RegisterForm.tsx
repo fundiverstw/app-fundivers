@@ -779,7 +779,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   useEffect(() => {
     if (event.type !== 'dive') return
     let cancelled = false
-    fetchRideSeats({ dive_id: event.id })
+    fetchRideSeats(event.id)
       .then(seats => { if (!cancelled) setRideSeats(seats) })
       .catch(() => { /* fail open — no gate */ })
     return () => { cancelled = true }
@@ -832,7 +832,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     if (!userId) return
     try {
       const [overrides, sigs, waivers] = await Promise.all([
-        fetchEventWaiverOverrides(event.type === 'dive' ? { dive_id: event.id } : { course_id: event.id }),
+        fetchEventWaiverOverrides(event.id),
         fetchDiverSignatures(userId),
         fetchWaivers(),
       ])
@@ -846,7 +846,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     ;(async () => {
       try {
         const [overrides, sigs, waivers] = await Promise.all([
-          fetchEventWaiverOverrides(event.type === 'dive' ? { dive_id: event.id } : { course_id: event.id }),
+          fetchEventWaiverOverrides(event.id),
           fetchDiverSignatures(userId),
           fetchWaivers(),
         ])

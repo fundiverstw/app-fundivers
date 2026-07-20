@@ -140,7 +140,7 @@ describe('data layer', () => {
     const b = mockQueryBuilder({ data: [{ waiver_code: 'continuing_education', mode: 'exempt' }] })
     const eq = vi.fn(() => b); b.eq = eq
     from.mockReturnValue(b)
-    const rows = await fetchEventWaiverOverrides({ course_id: 'C1' })
+    const rows = await fetchEventWaiverOverrides('C1')
     expect(eq).toHaveBeenCalledWith('event_id', 'C1')
     expect(rows).toHaveLength(1)
   })

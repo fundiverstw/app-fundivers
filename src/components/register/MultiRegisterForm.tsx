@@ -97,7 +97,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
     let cancelled = false
     for (const ev of cart) {
       if (ev.type !== 'dive') continue
-      fetchRideSeats({ dive_id: ev.id })
+      fetchRideSeats(ev.id)
         .then(seats => { if (!cancelled) setRideSeatsByEvent(prev => ({ ...prev, [ev.id]: seats })) })
         .catch(() => { /* fail open for that event */ })
     }
@@ -124,7 +124,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
       for (const ev of leadEvts) {
         const ref: WaiverEventRef = { id: ev.id, type: ev.type, title: ev.title }
         const overrides = await fetchEventWaiverOverrides(
-          ev.type === 'dive' ? { dive_id: ev.id } : { course_id: ev.id },
+          ev.id,
         )
         for (const def of missingWaivers(ref, overrides, sigs, new Date(), waivers)) {
           if (def.cadence === 'annual') {

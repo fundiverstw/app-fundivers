@@ -28,7 +28,6 @@ export function EventCarAssignment({ event, isAdmin, createdBy, riders }: Props)
   const [claimed, setClaimed] = useState<number | null>(null)
   const [reload, setReload] = useState(0)
 
-  const eventKey = event.type === 'dive' ? { dive_id: event.id } : { course_id: event.id }
 
   useEffect(() => {
     let cancelled = false
@@ -45,25 +44,23 @@ export function EventCarAssignment({ event, isAdmin, createdBy, riders }: Props)
     let cancelled = false
     ;(async () => {
       try {
-        const rows = await fetchVehiclesForEvent(eventKey)
+        const rows = await fetchVehiclesForEvent(event.id)
         if (!cancelled) setAllocations(rows)
       } catch { if (!cancelled) setAllocations([]) }
     })()
     return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event.id, event.type, reload])
+  }, [event.id, reload])
 
   // Rider count when the caller didn't supply one — claimed = divers holding a
   // ride, from the ride-seat RPC.
   useEffect(() => {
     if (riders != null) return
     let cancelled = false
-    fetchRideSeats(eventKey)
+    fetchRideSeats(event.id)
       .then(s => { if (!cancelled) setClaimed(s.claimed) })
       .catch(() => { /* leave null */ })
     return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event.id, event.type, riders, reload])
+  }, [event.id, riders, reload])
 
   const riderCount = riders ?? claimed ?? 0
   const activeVehicles = vehicles.filter(v => v.active)
