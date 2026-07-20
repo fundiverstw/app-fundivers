@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { personName } from '../../lib/names'
 import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../lib/gear'
 import { siteConfig } from '../../config/site'
@@ -923,11 +923,17 @@ function TextField({
   required?: boolean
   placeholder?: string
 }) {
+  // Associates by id rather than by wrapping: a date field renders a second,
+  // transparent native input for the OS picker, and a wrapping label would
+  // claim that one too — ambiguous for screen readers, and it re-dispatches
+  // clicks onto the labelled control, dismissing the picker the tap opened.
+  const id = useId()
   return (
-    <label className="block">
-      <span className="block text-xs text-brand-900 font-medium mb-1">{label}</span>
+    <div className="block">
+      <label htmlFor={id} className="block text-xs text-brand-900 font-medium mb-1">{label}</label>
       {type === 'date' ? (
         <DateField
+          id={id}
           value={value}
           onChange={onChange}
           required={required}
@@ -935,6 +941,7 @@ function TextField({
         />
       ) : (
         <input
+          id={id}
           type={type}
           value={value}
           onChange={e => onChange(e.target.value)}
@@ -943,6 +950,6 @@ function TextField({
           className="w-full bg-white border border-surface-300 rounded-lg px-2 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
         />
       )}
-    </label>
+    </div>
   )
 }

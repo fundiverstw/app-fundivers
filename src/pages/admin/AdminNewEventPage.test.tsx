@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { siteConfig } from '../../config/site'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { AdminNewEventPage } from './AdminNewEventPage'
-import { mockQueryBuilder } from '../../../tests/test-utils'
+import { mockQueryBuilder, getDateInputByLabel } from '../../../tests/test-utils'
 
 const { from, rpc } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }))
 vi.mock('../../lib/supabase', () => ({
@@ -104,7 +104,7 @@ describe('AdminNewEventPage', () => {
     const select = await screen.findByLabelText(/preload from past dive/i) as HTMLSelectElement
     await user.selectOptions(select, 'past-1')
     expect((screen.getByLabelText(/admin title \(required, internal\)/i) as HTMLInputElement).value).toBe('Green Island Day Trip')
-    expect((screen.getByLabelText(/start date/i) as HTMLInputElement).value).toBe('2026-01-15')
+    expect((getDateInputByLabel(/start date/i) as HTMLInputElement).value).toBe('2026-01-15')
     expect((screen.getByLabelText(/start time/i) as HTMLInputElement).value).toBe('09:00')
     expect((screen.getByLabelText(/notes/i) as HTMLTextAreaElement).value).toBe('Bring fins')
     expect((screen.getByLabelText(/^featured$/i) as HTMLInputElement).checked).toBe(true)
@@ -271,7 +271,7 @@ describe('AdminNewEventPage', () => {
     renderPage()
     await screen.findByLabelText(/admin title \(required, internal\)/i)
     await user.type(screen.getByLabelText(/admin title \(required, internal\)/i), 'Multi-destination trip')
-    await user.type(screen.getByLabelText(/start date/i),  '2026-06-01')
+    await user.type(getDateInputByLabel(/start date/i),  '2026-06-01')
 
     await user.click(screen.getByLabelText(/Green Island — Taiwan/))
     await user.click(screen.getByLabelText(/Puerto Galera — The Philippines/))
@@ -307,7 +307,7 @@ describe('AdminNewEventPage', () => {
     renderPage()
     await screen.findByLabelText(/admin title \(required, internal\)/i)
     await user.type(screen.getByLabelText(/admin title \(required, internal\)/i), 'Green Island Day Trip')
-    await user.type(screen.getByLabelText(/start date/i),  '2026-06-01')
+    await user.type(getDateInputByLabel(/start date/i),  '2026-06-01')
     await user.click(screen.getByRole('button', { name: /create dive/i }))
     await waitFor(() => expect(insert).toHaveBeenCalled())
     const payload = (insert.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>

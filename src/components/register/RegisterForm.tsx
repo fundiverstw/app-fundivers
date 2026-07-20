@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { personName } from '../../lib/names'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
@@ -2196,8 +2196,11 @@ function PaymentInstructionLine({ line }: { line: string }) {
   )
 }
 
-// Small labeled input for the About-you step. `label` wraps the input so
-// getByLabelText / screen readers find the association without needing id.
+// Small labeled input for the About-you step. The label associates by id
+// rather than by wrapping: a date field renders a second, transparent native
+// input for the OS picker, and a wrapping label would claim that one too —
+// ambiguous for screen readers, and it re-dispatches clicks onto the labelled
+// control, which dismisses the picker the tap just opened.
 function TextField({
   label, value, onChange, type = 'text', required, placeholder, min, hint,
 }: {
@@ -2210,11 +2213,13 @@ function TextField({
   min?: number
   hint?: string
 }) {
+  const id = useId()
   return (
-    <label className="block">
-      <span className="block text-xs text-brand-900 font-medium mb-1">{label}</span>
+    <div className="block">
+      <label htmlFor={id} className="block text-xs text-brand-900 font-medium mb-1">{label}</label>
       {type === 'date' ? (
         <DateField
+          id={id}
           value={value}
           onChange={onChange}
           required={required}
@@ -2222,6 +2227,7 @@ function TextField({
         />
       ) : type === 'password' ? (
         <PasswordInput
+          id={id}
           value={value}
           onChange={e => onChange(e.target.value)}
           required={required}
@@ -2230,6 +2236,7 @@ function TextField({
         />
       ) : (
         <input
+          id={id}
           type={type}
           value={value}
           onChange={e => onChange(e.target.value)}
@@ -2240,6 +2247,6 @@ function TextField({
         />
       )}
       {hint && <span className="block text-xs text-brand-900/70 mt-1">{hint}</span>}
-    </label>
+    </div>
   )
 }

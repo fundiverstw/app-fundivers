@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { AdminEditEventPage } from './AdminEditEventPage'
-import { mockQueryBuilder } from '../../../tests/test-utils'
+import { mockQueryBuilder, getDateInputByLabel } from '../../../tests/test-utils'
 
 const { from, rpc } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }))
 vi.mock('../../lib/supabase', () => ({
@@ -81,7 +81,7 @@ describe('AdminEditEventPage', () => {
     // Form prefills the existing dive title.
     const titleInput = await screen.findByLabelText(/admin title \(required, internal\)/i) as HTMLInputElement
     await waitFor(() => expect(titleInput.value).toBe('Kenting Day Trip'))
-    expect((screen.getByLabelText(/start date/i) as HTMLInputElement).value).toBe('2026-06-01')
+    expect((getDateInputByLabel(/start date/i) as HTMLInputElement).value).toBe('2026-06-01')
     expect((screen.getByLabelText(/notes/i) as HTMLTextAreaElement).value).toBe('Bring fins')
 
     // Type a new title and save.

@@ -9,8 +9,9 @@ import { t } from '../i18n'
 // birth year decades back. This component keeps the value contract of the
 // native input (a 'YYYY-MM-DD' string, or '' when empty/incomplete) but the
 // primary control is a free-text field that auto-masks digits into
-// YYYY-MM-DD. A calendar button still opens the OS picker (via showPicker)
-// for anyone who prefers it; where that's unsupported, typing carries on.
+// YYYY-MM-DD. A transparent native date input sits over the calendar icon so
+// the OS picker is still one tap away for anyone who prefers it; where that
+// picker is unavailable, typing carries on.
 
 interface DateFieldProps {
   /** 'YYYY-MM-DD' or '' */
@@ -31,7 +32,6 @@ export function DateField({
 }: DateFieldProps) {
   const [text, setText] = useState(value)
   const focused = useRef(false)
-  const btnRef = useRef<HTMLSpanElement>(null)
 
   // Mirror the controlled value into the visible text — but not while the
   // user is typing, or a partial entry ("1987-0", which we emit upstream as
@@ -47,35 +47,12 @@ export function DateField({
     onChange(isValidYmd(masked) ? masked : '')
   }
 
-  // Open the OS date picker via a throwaway native <input type="date">.
-  // Building it on demand (rather than keeping a hidden one mounted) keeps
-  // the rendered field to a single input — no phantom duplicate for the DOM
-  // or tests. showPicker() carries a user gesture from the click; where it's
-  // unsupported, typing remains the path.
-  function openPicker() {
-    const native = document.createElement('input')
-    native.type = 'date'
-    if (value) native.value = value
-    if (min) native.min = min
-    if (max) native.max = max
-    // Anchor it at the button so a desktop picker pops up in the right place;
-    // on mobile the picker is a modal, so position is irrelevant.
-    const rect = btnRef.current?.getBoundingClientRect()
-    Object.assign(native.style, {
-      position: 'fixed',
-      top: `${rect?.bottom ?? 0}px`,
-      left: `${rect?.left ?? 0}px`,
-      width: '1px', height: '1px', opacity: '0', pointerEvents: 'none', zIndex: '-1',
-    })
-    document.body.appendChild(native)
-    const cleanup = () => native.remove()
-    // A picked date is an explicit set: mirror it into the visible text right
-    // away, since the mirror effect's focus guard would otherwise hold the
-    // display stale until the user clicked away.
-    native.addEventListener('change', () => { onChange(native.value); setText(native.value); cleanup() })
-    native.addEventListener('cancel', cleanup)
-    native.addEventListener('blur', () => setTimeout(cleanup, 100))
-    try { native.showPicker() } catch { cleanup() }
+  // A picked date is an explicit set: mirror it into the visible text right
+  // away, since the mirror effect's focus guard would otherwise hold the
+  // display stale until the field loses focus.
+  function handlePick(picked: string) {
+    onChange(picked)
+    setText(picked)
   }
 
   return (
@@ -99,29 +76,51 @@ export function DateField({
         className={`${className ?? ''} w-full`}
         style={{ paddingRight: '2.25rem' }}
       />
-      {/* A non-labelable <span> (not <button>) so a wrapping field <label>
-          doesn't also associate with it — the typeable text input stays the
-          one labelled control. The picker is a touch/mouse convenience.
-          Non-labelable stops the association, but not click forwarding: a
-          click bubbling to a wrapping <label> is still re-dispatched to the
-          labelled control, which refocuses the text input and dismisses the
-          picker that was just opened. preventDefault suppresses that
-          forwarding; the mousedown guard keeps focus off the span. */}
       <span
-        ref={btnRef}
-        role="button"
-        onMouseDown={e => e.preventDefault()}
-        onClick={e => { e.preventDefault(); e.stopPropagation(); openPicker() }}
-        aria-label={t.a11y.openCalendar}
-        className="absolute inset-y-0 right-0 flex items-center px-2 text-brand-900/70 hover:text-brand-900 cursor-pointer"
+        aria-hidden="true"
+        className="absolute inset-y-0 right-0 flex items-center px-2 text-brand-900/70 pointer-events-none"
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <rect x="3" y="4" width="18" height="18" rx="2" />
           <line x1="3" y1="9" x2="21" y2="9" />
           <line x1="8" y1="2" x2="8" y2="6" />
           <line x1="16" y1="2" x2="16" y2="6" />
         </svg>
       </span>
+      {/* A real native date input, laid over the calendar icon at zero opacity.
+          Tapping the icon taps this, so a mobile browser opens its own picker
+          through ordinary behaviour — nothing depends on showPicker(), whose
+          support and its activation / visibility rules are uneven across
+          mobile. It replaced a throwaway hidden input built on click, which
+          never reliably opened a picker on a phone.
+
+          Desktop Chrome opens a picker only from the calendar indicator, not
+          from a click anywhere on the field, so ask explicitly there.
+
+          Being a real input also makes it safe inside a wrapping field
+          <label>: a label skips its activation behaviour for events targeting
+          interactive content within it, so the tap is not re-dispatched onto
+          the text input. The <span role="button"> this replaced was not
+          interactive content, so it was re-dispatched — focusing the text
+          input and burying the picker behind the soft keyboard.
+
+          It stays tabIndex={-1} and is not the label's control (the typeable
+          text input is the first labelable descendant) — the picker is a
+          pointer convenience, and typing remains the path for keyboards. */}
+      <input
+        type="date"
+        value={isValidYmd(value) ? value : ''}
+        onChange={e => handlePick(e.target.value)}
+        onClick={e => {
+          const el = e.currentTarget as HTMLInputElement & { showPicker?: () => void }
+          try { el.showPicker?.() } catch { /* the tap itself opens it */ }
+        }}
+        min={min}
+        max={max}
+        tabIndex={-1}
+        aria-label={t.a11y.openCalendar}
+        className="absolute inset-y-0 right-0 w-9 opacity-0 cursor-pointer"
+      />
     </div>
   )
 }

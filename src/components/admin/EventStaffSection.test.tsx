@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { EventStaffSection } from './EventStaffSection'
-import { mockQueryBuilder } from '../../../tests/test-utils'
+import { mockQueryBuilder, findDateInputByValue } from '../../../tests/test-utils'
 
 const { from, useAuthMock, createDutyWithNotify } = vi.hoisted(() => ({
   from: vi.fn(),
@@ -115,7 +115,7 @@ describe('EventStaffSection course day selection', () => {
       )
 
       // The default should be the local (Taipei) date, not the UTC date.
-      await screen.findByDisplayValue('2026-04-25')
+      await findDateInputByValue('2026-04-25')
       expect(screen.queryByDisplayValue('2026-04-24')).not.toBeInTheDocument()
     } finally {
       process.env.TZ = originalTZ
@@ -150,7 +150,7 @@ describe('EventStaffSection course day selection', () => {
       />
     )
 
-    await screen.findByDisplayValue('2030-03-05')
+    await findDateInputByValue('2030-03-05')
     await user.selectOptions(screen.getAllByRole('combobox')[0], 'admin-1')
     await user.click(screen.getByRole('button', { name: /assign/i }))
 

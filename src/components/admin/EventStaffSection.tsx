@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { personName } from '../../lib/names'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
@@ -37,6 +37,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
   const [role, setRole] = useState<DutyRole>(eventType === 'course' ? 'instructor' : 'guide')
   // Dives use a date range (contiguous span); admins can narrow to a subset
   // of days for multi-day dives.
+  const staffDateId = useId()
   const [startDate, setStartDate] = useState(eventStart)
   const [endDate, setEndDate] = useState(eventEnd ?? '')
   // Courses run on an explicit (possibly non-consecutive) day list, so duty
@@ -232,27 +233,29 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
             </div>
           ) : (
             <>
-              <label className="flex items-center gap-2">
-                <span className="text-brand-900 font-medium shrink-0 w-12">{isMultiDay ? st.from : st.date}</span>
+              <div className="flex items-center gap-2">
+                <label htmlFor={`${staffDateId}-start`} className="text-brand-900 font-medium shrink-0 w-12">{isMultiDay ? st.from : st.date}</label>
                 <DateField
+                  id={`${staffDateId}-start`}
                   value={startDate}
                   min={eventStart}
                   max={eventEnd ?? eventStart}
                   onChange={setStartDate}
                   className="flex-1 min-w-0 bg-white border border-surface-300 rounded px-2 py-1 text-brand-900"
                 />
-              </label>
+              </div>
               {isMultiDay && (
-                <label className="flex items-center gap-2">
-                  <span className="text-brand-900 font-medium shrink-0 w-12">{st.to}</span>
+                <div className="flex items-center gap-2">
+                  <label htmlFor={`${staffDateId}-end`} className="text-brand-900 font-medium shrink-0 w-12">{st.to}</label>
                   <DateField
+                    id={`${staffDateId}-end`}
                     value={endDate}
                     min={startDate}
                     max={eventEnd ?? eventStart}
                     onChange={setEndDate}
                     className="flex-1 min-w-0 bg-white border border-surface-300 rounded px-2 py-1 text-brand-900"
                   />
-                </label>
+                </div>
               )}
             </>
           )}

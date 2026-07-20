@@ -1,6 +1,26 @@
 import type { ReactElement } from 'react'
-import { render, type RenderOptions } from '@testing-library/react'
+import { render, screen, type Matcher, type RenderOptions } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+
+// A DateField renders two inputs: the typeable YYYY-MM-DD text field, and a
+// transparent native <input type="date"> overlaying the calendar icon that
+// opens the OS picker. Both carry the same value and both answer to the
+// field's label, so plain getByLabelText / getByDisplayValue find two
+// elements. These pick the typeable one, which is what a test driving the
+// field means.
+function typeable(els: HTMLElement[], what: string): HTMLInputElement {
+  const hit = els.find(el => (el as HTMLInputElement).type === 'text')
+  if (!hit) throw new Error(`no typeable date input among ${els.length} matches for ${what}`)
+  return hit as HTMLInputElement
+}
+
+export function getDateInputByLabel(label: Matcher): HTMLInputElement {
+  return typeable(screen.getAllByLabelText(label), String(label))
+}
+
+export async function findDateInputByValue(value: string): Promise<HTMLInputElement> {
+  return typeable(await screen.findAllByDisplayValue(value), value)
+}
 
 export function renderWithRouter(
   ui: ReactElement,
