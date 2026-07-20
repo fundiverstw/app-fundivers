@@ -7,6 +7,7 @@ let diverB: TestUser
 let diverC: TestUser
 let fullDiveId: string
 let openDiveId: string
+const cancelledDives: string[] = []
 
 beforeAll(async () => {
   diverA = await createTestUser(admin, { role: 'diver' })
@@ -23,6 +24,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (fullDiveId) await deleteTestDive(admin, fullDiveId)
   if (openDiveId) await deleteTestDive(admin, openDiveId)
+  for (const id of cancelledDives) await deleteTestDive(admin, id)
   if (diverA) await deleteTestUser(admin, diverA.id)
   if (diverB) await deleteTestUser(admin, diverB.id)
   if (diverC) await deleteTestUser(admin, diverC.id)
@@ -228,5 +230,94 @@ describe('waitlist_offers RLS', () => {
     if (error) expect(String(error.message)).toMatch(/policy|permission|violat/i)
 
     await admin.from('bookings').delete().eq('id', bBooking.id)
+  })
+})
+
+describe('a cancelled event hands out no waitlist spots', () => {
+  // Divers reported "phantom pre-registrations" turning up after an event was
+  // called off. Cancelling an event leaves its bookings alone by design, but
+  // the waitlist machinery had no notion of a cancelled event: a diver
+  // cancelling their own booking on the dead event promoted the next person on
+  // the waitlist into it, and that diver ended up holding a pre-registration
+  // for an event that was never going to happen.
+
+  async function cancelledDiveWithWaitlister() {
+    const dive = await createTestDive(admin)
+    cancelledDives.push(dive)
+    await admin.from('events' as never).update({ fully_booked: true } as never).eq('id', dive)
+    const holder = await insertBooking(diverA.id, dive, 'confirmed')
+    const waiter = await insertBooking(diverB.id, dive, 'waitlisted')
+    await admin.from('events' as never)
+      .update({ cancelled_at: new Date().toISOString() } as never).eq('id', dive)
+    return { dive, holder, waiter }
+  }
+
+  function pendingOffers(bookingId: string) {
+    return admin.from('waitlist_offers')
+      .select('id, status').eq('booking_id', bookingId).eq('status', 'pending')
+  }
+
+  it('does not offer a spot when a booking is cancelled on a cancelled event', async () => {
+    const { holder, waiter } = await cancelledDiveWithWaitlister()
+    await admin.from('bookings').update({ status: 'cancelled' } as never).eq('id', holder.id)
+
+    const { data } = await pendingOffers(waiter.id)
+    expect(data).toHaveLength(0)
+  })
+
+  it('expires offers that were already live when the event was cancelled', async () => {
+    // Otherwise the diver is left looking at an invitation to an event that is
+    // not happening.
+    const dive = await createTestDive(admin)
+    cancelledDives.push(dive)
+    const waiter = await insertBooking(diverC.id, dive, 'waitlisted')
+    const { error: offerErr } = await admin.from('waitlist_offers').insert({ booking_id: waiter.id } as never)
+    expect(offerErr).toBeNull()
+    expect((await pendingOffers(waiter.id)).data).toHaveLength(1)
+
+    await admin.from('events' as never)
+      .update({ cancelled_at: new Date().toISOString() } as never).eq('id', dive)
+
+    expect((await pendingOffers(waiter.id)).data).toHaveLength(0)
+  })
+
+  it('refuses to accept an offer once the event is cancelled', async () => {
+    // Belt and braces for an offer that slipped through before the guards.
+    const dive = await createTestDive(admin)
+    cancelledDives.push(dive)
+    const waiter = await insertBooking(diverB.id, dive, 'waitlisted')
+    const { data: offer } = await admin.from('waitlist_offers')
+      .insert({ booking_id: waiter.id } as never).select('id').single<{ id: string }>()
+    await admin.from('events' as never)
+      .update({ cancelled_at: new Date().toISOString() } as never).eq('id', dive)
+    // Put it back to pending so the refusal is about the event, not the status.
+    await admin.from('waitlist_offers').update({ status: 'pending' } as never).eq('id', offer!.id)
+
+    const db = await userClient(diverB.email, diverB.password)
+    const { error } = await db.rpc('accept_waitlist_offer', { p_offer_id: offer!.id })
+    expect(error).not.toBeNull()
+
+    const { data: after } = await admin.from('bookings').select('status').eq('id', waiter.id).single()
+    expect(after!.status).toBe('waitlisted')
+  })
+
+  it('still promotes the next waitlister on an event that is NOT cancelled', async () => {
+    // The guard must not break the feature it is guarding.
+    const dive = await createTestDive(admin)
+    cancelledDives.push(dive)
+    await admin.from('events' as never).update({ fully_booked: true } as never).eq('id', dive)
+    const holder = await insertBooking(diverA.id, dive, 'confirmed')
+    const waiter = await insertBooking(diverC.id, dive, 'waitlisted')
+
+    await admin.from('bookings').update({ status: 'cancelled' } as never).eq('id', holder.id)
+
+    const { data } = await pendingOffers(waiter.id)
+    expect(data).toHaveLength(1)
+
+    const db = await userClient(diverC.email, diverC.password)
+    const { error } = await db.rpc('accept_waitlist_offer', { p_offer_id: data![0].id })
+    expect(error).toBeNull()
+    const { data: after } = await admin.from('bookings').select('status').eq('id', waiter.id).single()
+    expect(after!.status).toBe('pending')
   })
 })
