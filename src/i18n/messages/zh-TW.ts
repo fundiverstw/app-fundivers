@@ -61,7 +61,7 @@ export const zhTW: Messages = {
     noEvents: '目前沒有安排活動。',
     alreadyHappened: (title: string) => `${title} — 已結束`,
     noCoursesInRange: '此範圍內沒有課程。',
-    toggleDives: '切換潛水顯示',
+    toggleKind: (kind: string) => `切換${kind}顯示`,
     filterCourses: '篩選課程',
     courses: '課程',
     toggleAvailability: '切換人員可用狀態',

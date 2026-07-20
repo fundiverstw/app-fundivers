@@ -192,7 +192,7 @@ describe('CalendarPage', () => {
       expect(screen.getAllByText('Open Water Course').length).toBeGreaterThanOrEqual(2)
     })
 
-    await user.click(screen.getByRole('button', { name: /toggle dives/i }))
+    await user.click(screen.getByRole('button', { name: /toggle dive/i }))
 
     expect(screen.queryByText('Green Island Dive')).not.toBeInTheDocument()
     // Course is unaffected

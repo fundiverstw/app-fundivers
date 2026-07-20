@@ -21,6 +21,7 @@ import {
   CARD, BTN_GHOST, BTN_DANGER, TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR, PAGE_BODY,
 } from '../styles/tokens'
 import { t } from '../i18n'
+import { EVENT_KIND_LABELS } from '../lib/event-kinds'
 
 type Row = Booking & {
   event: AppEvent | null
@@ -281,7 +282,7 @@ function Card({
             <p className={`text-xs ${TEXT_MUTED} mt-0.5`}>
               {formatEventSpan(row.event, { withYear: true })}
               {' · '}
-              {row.event.type === 'dive' ? t.calendar.typeDive : t.calendar.typeCourse}
+              {EVENT_KIND_LABELS[row.event.type]}
             </p>
           )}
           {row.refund_requested_at && (

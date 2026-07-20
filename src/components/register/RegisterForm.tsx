@@ -7,6 +7,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { computeEffectiveFullPaymentDeadline } from '../../lib/payment-deadlines'
 import { paymentInstructionsFor } from '../../lib/payment-instructions'
 import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../lib/gear'
+import { usesCourseDays, allowsTransport } from '../../lib/event-kinds'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
 import { BTN_XS_GHOST } from '../../styles/tokens'
@@ -439,10 +440,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // in the booking but don't prompt. Every other course (AOW, EANx, Deep,
   // Rescue, ...) lets the diver rent, same as a dive. Dives expose the rent
   // toggle when the admin filled in gear_rental_info on the dive event.
-  const gearIncluded = event.type === 'course' && isGearIncludedCourse(event.title)
+  const gearIncluded = usesCourseDays(event.type) && isGearIncludedCourse(event.title)
   const showGearRentChoice =
-    (event.type === 'dive' && !!event.gear_rental_info) ||
-    (event.type === 'course' && !isGearIncludedCourse(event.title))
+    (!usesCourseDays(event.type) && !!event.gear_rental_info) ||
+    (usesCourseDays(event.type) && !isGearIncludedCourse(event.title))
   const showRooms = event.has_rooms && event.room_type_ids.length > 0
   const showAddons = event.has_addons && event.addon_ids.length > 0
   const showNitroxAddon = event.nitrox_required && !(profile?.nitrox_certified ?? false)
@@ -777,7 +778,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // Load this dive's ride-seat tally to gate the transport opt-in. Best-effort:
   // on failure rideSeats stays null and the gate fails open (option offered).
   useEffect(() => {
-    if (event.type !== 'dive') return
+    if (!allowsTransport(event.type)) return
     let cancelled = false
     fetchRideSeats(event.id)
       .then(seats => { if (!cancelled) setRideSeats(seats) })

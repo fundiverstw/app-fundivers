@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { usesCourseDays } from '../../lib/event-kinds'
 import { useAuth } from '../../hooks/useAuth'
 import { EventForm } from '../../components/admin/EventForm'
 import { EventCarAssignment } from '../../components/admin/EventCarAssignment'
@@ -28,7 +29,7 @@ function normDays(days: string[]): string[] {
 // registered divers. Courses compare their day list; dives compare the
 // start/end envelope.
 function datesChanged(before: FormState, after: FormState): boolean {
-  if (after.type === 'course') {
+  if (usesCourseDays(after.type)) {
     const a = normDays(before.courseDays)
     const b = normDays(after.courseDays)
     return a.length !== b.length || a.some((d, i) => d !== b[i])

@@ -13,6 +13,7 @@ import { siteConfig } from '../config/site'
 import { registrationDraftKey, loadRegistrationDraft } from '../lib/registration-draft'
 import type { AppEvent, Booking } from '../types/database'
 import { t } from '../i18n'
+import { EVENT_KIND_DOT, EVENT_KIND_LABELS } from '../lib/event-kinds'
 
 const rp = t.registerPage
 
@@ -271,8 +272,8 @@ function EventPickerStep() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full text-white ${ev.type === 'dive' ? 'bg-emerald-600' : 'bg-surface-500'}`}>
-                        {ev.type === 'dive' ? t.calendar.typeDive : t.calendar.typeCourse}
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full text-white ${EVENT_KIND_DOT[ev.type]}`}>
+                        {EVENT_KIND_LABELS[ev.type]}
                       </span>
                       <span className="font-medium text-brand-900 text-sm truncate">{ev.title}</span>
                       {ev.featured && <span className="text-xs text-red-600">★</span>}

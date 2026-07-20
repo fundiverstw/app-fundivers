@@ -12,7 +12,8 @@ import { courseColor, diveIsTripOrBoat, type CourseColor } from '../../lib/event
 import { isReschedulable } from '../../lib/reschedule'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { t } from '../../i18n'
-import type { AppEvent, StaffBusyEntry } from '../../types/database'
+import type { AppEvent, StaffBusyEntry, EventKind } from '../../types/database'
+import { EVENT_KIND_LABELS, EVENT_KIND_DOT, NON_COURSE_KINDS, usesCourseDays, hasDiveFlags } from '../../lib/event-kinds'
 
 // Shared by CalendarPage (diver) and AdminEventsPage (admin). The only
 // differences between those two surfaces are what happens when you pick an
@@ -64,18 +65,27 @@ const COURSE_DOT: Record<CourseColor, string> = {
   specialty: 'bg-purple-600',
 }
 
-const TYPE_LABELS: Record<AppEvent['type'], string> = {
-  dive:   t.calendar.typeDive,
-  course: t.calendar.typeCourse,
+
+// Fill for kinds that don't own one of the two bespoke palettes above.
+// A full Record so a new kind must choose a colour: falling through to the
+// course palette would colour it by regex-matching its title against course
+// names, which lands somewhere arbitrary.
+const KIND_BAR: Record<EventKind, { base: string; hover: string }> = {
+  dive:   { base: DIVE_LOCAL_BAR, hover: DIVE_LOCAL_BAR_HOVER },
+  course: { base: COURSE_BAR.ow,  hover: COURSE_BAR_HOVER.ow },
 }
 
 function eventBarClass(ev: AppEvent, hovered: boolean): string {
-  if (ev.type === 'dive') {
+  if (hasDiveFlags(ev.type)) {
     if (diveIsTripOrBoat(ev)) return hovered ? DIVE_TRIP_BAR_HOVER : DIVE_TRIP_BAR
     return hovered ? DIVE_LOCAL_BAR_HOVER : DIVE_LOCAL_BAR
   }
-  const key = courseColor(ev.title)
-  return hovered ? COURSE_BAR_HOVER[key] : COURSE_BAR[key]
+  if (usesCourseDays(ev.type)) {
+    const key = courseColor(ev.title)
+    return hovered ? COURSE_BAR_HOVER[key] : COURSE_BAR[key]
+  }
+  const bar = KIND_BAR[ev.type]
+  return hovered ? bar.hover : bar.base
 }
 
 // Closed-eye (eye-off) marker for private dives — admin-only, since private
@@ -195,7 +205,15 @@ export function MonthCalendar({
   busyEntries, busyShown, onToggleBusy, currentUserId, ownDutyDays, onCreateBusy, onPickBusy,
   onRescheduleDay,
 }: MonthCalendarProps) {
-  const [diveShown, setDiveShown] = useState(true)
+  // Visibility per non-course kind. Was a single `diveShown` boolean, which
+  // left any other kind falling into the course branch below and being
+  // filtered by `course_category ?? title` — a category it never has.
+  const [hiddenKinds, setHiddenKinds] = useState<Set<EventKind>>(() => new Set())
+  const toggleKind = (kind: EventKind) => setHiddenKinds(prev => {
+    const next = new Set(prev)
+    if (next.has(kind)) next.delete(kind); else next.add(kind)
+    return next
+  })
   const [hiddenCourses, setHiddenCourses] = useState<Set<string>>(new Set())
   // When any segment of a multi-day event is hovered, the parent tracks the
   // event id so every segment of that event can cross-highlight. Cleared on
@@ -218,7 +236,7 @@ export function MonthCalendar({
   const courseCategories = useMemo(() => {
     const byCat = new Map<string, CourseColor>()
     for (const e of events) {
-      if (e.type !== 'course') continue
+      if (!usesCourseDays(e.type)) continue
       const cat = e.course_category ?? e.title
       if (!byCat.has(cat)) byCat.set(cat, courseColor(e.title))
     }
@@ -227,9 +245,9 @@ export function MonthCalendar({
   }, [events])
 
   const filteredEvents = useMemo(() => events.filter(e => {
-    if (e.type === 'dive') return diveShown
-    return !hiddenCourses.has(e.course_category ?? e.title)
-  }), [events, diveShown, hiddenCourses])
+    if (usesCourseDays(e.type)) return !hiddenCourses.has(e.course_category ?? e.title)
+    return !hiddenKinds.has(e.type)
+  }), [events, hiddenKinds, hiddenCourses])
 
   const ranges: EventRange<AppEvent>[] = useMemo(() => assignTracks(filteredEvents), [filteredEvents])
 
@@ -288,8 +306,8 @@ export function MonthCalendar({
   return (
     <div className="space-y-4">
       <FilterLegend
-        diveShown={diveShown}
-        onToggleDive={() => setDiveShown(v => !v)}
+        hiddenKinds={hiddenKinds}
+        onToggleKind={toggleKind}
         courseCategories={courseCategories}
         hiddenCourses={hiddenCourses}
         onToggleCategory={toggleCourseCategory}
@@ -371,7 +389,7 @@ export function MonthCalendar({
               <div>
                 <div className="flex items-center gap-2">
                   <span className={`text-xs px-1.5 py-0.5 rounded-full ${eventBarClass(ev, false)}`}>
-                    {TYPE_LABELS[ev.type]}
+                    {EVENT_KIND_LABELS[ev.type]}
                   </span>
                   {ev.is_private && <PrivateIcon />}
                   <span className="font-medium text-brand-50 text-sm">{ev.title}</span>
@@ -769,8 +787,8 @@ function BusyBar({ seg, track, onClick, hovered, onHoverEvent }: {
 }
 
 interface FilterLegendProps {
-  diveShown: boolean
-  onToggleDive: () => void
+  hiddenKinds: Set<EventKind>
+  onToggleKind: (kind: EventKind) => void
   courseCategories: { category: string; color: CourseColor }[]
   hiddenCourses: Set<string>
   onToggleCategory: (cat: string) => void
@@ -778,7 +796,7 @@ interface FilterLegendProps {
 }
 
 function FilterLegend({
-  diveShown, onToggleDive,
+  hiddenKinds, onToggleKind,
   courseCategories, hiddenCourses, onToggleCategory,
   busyToggle,
 }: FilterLegendProps) {
@@ -799,23 +817,39 @@ function FilterLegend({
 
   return (
     <div className="flex items-center gap-2 text-xs" ref={ref}>
-      <button
-        type="button"
-        onClick={onToggleDive}
-        aria-pressed={diveShown}
-        aria-label={t.calendar.toggleDives}
-        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors ${
-          diveShown
-            ? 'bg-white/10 border-reef-400/50 text-reef-200'
-            : 'bg-white/5 border-white/10 text-brand-100/50 font-medium line-through'
-        }`}
-      >
-        <span className="w-2 h-2 rounded-full overflow-hidden flex" aria-hidden="true">
-          <span className={`flex-1 ${DIVE_LOCAL_DOT}`} />
-          <span className={`flex-1 ${DIVE_TRIP_DOT}`} />
-        </span>
-        {TYPE_LABELS.dive}
-      </button>
+      {/* One toggle per non-course kind. Courses get the category dropdown
+          beside this instead, since they filter by course type rather than by
+          kind. Dives keep their split dot (local | trip-or-boat); any other
+          kind shows its single pill colour. */}
+      {NON_COURSE_KINDS.map(kind => {
+        const shown = !hiddenKinds.has(kind)
+        return (
+          <button
+            key={kind}
+            type="button"
+            onClick={() => onToggleKind(kind)}
+            aria-pressed={shown}
+            aria-label={t.calendar.toggleKind(EVENT_KIND_LABELS[kind])}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors ${
+              shown
+                ? 'bg-white/10 border-reef-400/50 text-reef-200'
+                : 'bg-white/5 border-white/10 text-brand-100/50 font-medium line-through'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full overflow-hidden flex" aria-hidden="true">
+              {hasDiveFlags(kind) ? (
+                <>
+                  <span className={`flex-1 ${DIVE_LOCAL_DOT}`} />
+                  <span className={`flex-1 ${DIVE_TRIP_DOT}`} />
+                </>
+              ) : (
+                <span className={`flex-1 ${EVENT_KIND_DOT[kind]}`} />
+              )}
+            </span>
+            {EVENT_KIND_LABELS[kind]}
+          </button>
+        )
+      })}
 
       <div className="relative">
         <button

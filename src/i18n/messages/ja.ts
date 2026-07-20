@@ -60,7 +60,7 @@ export const ja: Messages = {
     noEvents: '予定されているイベントはありません。',
     alreadyHappened: (title: string) => `${title}（終了済み）`,
     noCoursesInRange: 'この期間にコースはありません。',
-    toggleDives: 'ダイブの表示を切り替え',
+    toggleKind: (kind: string) => `${kind}の表示を切り替え`,
     filterCourses: 'コースを絞り込む',
     courses: 'コース',
     toggleAvailability: 'スタッフの空き状況を切り替え',

@@ -1,4 +1,5 @@
 import type { EventRow, EventKind } from '../../types/database'
+import { usesDateEnvelope, usesCourseDays, hasDiveFlags } from '../../lib/event-kinds'
 
 // Form-state shape, defaults, prefill helpers, and the FormState→DB-payload
 // converters used by the create + edit pages. Lives in its own file so the
@@ -125,7 +126,7 @@ export function formStateFromEvent(e: EventRow, rels: EventRelations = NO_RELATI
     featured_image: e.featured_image ?? '',
   }
 
-  if (e.kind === 'course') {
+  if (usesCourseDays(e.kind)) {
     const courseDays = [...new Set((e.course_days ?? []).filter(Boolean))].sort()
     return {
       ...common,
@@ -145,9 +146,13 @@ export function formStateFromEvent(e: EventRow, rels: EventRelations = NO_RELATI
     }
   }
 
+  // Envelope kinds (dive, and any other kind that carries start/end dates).
+  // `type: e.kind` rather than a literal — hardcoding 'dive' here would load an
+  // event of any other envelope kind into the form AS a dive, and save it back
+  // that way.
   return {
     ...common,
-    type: 'dive',
+    type: e.kind,
     start_date: e.start_date ?? '',
     end_date: e.end_date ?? '',
     notes: e.notes ?? '',
@@ -173,12 +178,16 @@ export function formStateFromEvent(e: EventRow, rels: EventRelations = NO_RELATI
  * the set_event_relations RPC.
  */
 export function eventPayloadFromForm(form: FormState): Record<string, unknown> {
-  const isDive = form.type === 'dive'
+  // Three separate questions, not one. `isDive` used to answer all of them,
+  // which is why every field below had to be re-decided by hand.
+  const envelope   = usesDateEnvelope(form.type)  // start/end dates vs a day list
+  const courseOnly = usesCourseDays(form.type)    // course_name / included / schedule
+  const diving     = hasDiveFlags(form.type)      // boat dives, nitrox
   const timeText = form.start_time ? `${form.start_time}:00` : ''
   const days = [...new Set(form.courseDays.filter(Boolean))].sort()
   return {
     kind: form.type,
-    admin_title: isDive ? form.admin_title.trim() : (form.admin_title || null),
+    admin_title: courseOnly ? (form.admin_title || null) : form.admin_title.trim(),
     display_title: form.display_title.trim() || null,
     calendar_title: form.calendar_title || null,
     price: form.price || null,
@@ -193,22 +202,22 @@ export function eventPayloadFromForm(form: FormState): Record<string, unknown> {
     featured_image: form.featured_image.trim() || null,
     start_time: timeText || null,
     // temporal — dive envelope vs course day-list
-    start_date: isDive ? (form.start_date || null) : null,
-    end_date: isDive ? (form.end_date || null) : null,
-    course_days: isDive ? null : (days.length ? days : null),
+    start_date: envelope ? (form.start_date || null) : null,
+    end_date: envelope ? (form.end_date || null) : null,
+    course_days: courseOnly ? (days.length ? days : null) : null,
     // dive-only
-    featured: isDive ? form.featured : false,
-    is_private: isDive ? form.is_private : false,
-    is_boat_dive: isDive ? form.is_boat_dive : false,
-    is_trip: isDive ? form.is_trip : false,
-    notes: isDive ? form.notes : null,
-    nitrox_required: isDive ? form.nitrox_required : false,
-    gear_rental: isDive ? (form.gear_rental || null) : null,
-    second_image: isDive ? (form.second_image.trim() || null) : null,
-    trip_template_id: isDive ? (form.trip_template_reference || null) : null,
+    featured: courseOnly ? false : form.featured,
+    is_private: courseOnly ? false : form.is_private,
+    is_boat_dive: diving ? form.is_boat_dive : false,
+    is_trip: envelope ? form.is_trip : false,
+    notes: courseOnly ? null : form.notes,
+    nitrox_required: diving ? form.nitrox_required : false,
+    gear_rental: courseOnly ? null : (form.gear_rental || null),
+    second_image: courseOnly ? null : (form.second_image.trim() || null),
+    trip_template_id: courseOnly ? null : (form.trip_template_reference || null),
     // course-only
-    course_name: isDive ? null : (form.course_name || null),
-    included: isDive ? null : (form.included || null),
-    schedule: isDive ? null : (form.schedule || null),
+    course_name: courseOnly ? (form.course_name || null) : null,
+    included: courseOnly ? (form.included || null) : null,
+    schedule: courseOnly ? (form.schedule || null) : null,
   }
 }

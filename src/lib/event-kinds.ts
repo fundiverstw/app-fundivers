@@ -1,4 +1,5 @@
 import { EVENT_KINDS, type EventKind } from '../types/database'
+import { t } from '../i18n'
 
 // Intent helpers for branching on an event's kind.
 //
@@ -39,6 +40,10 @@ export function usesCourseDays(kind: EventKind): boolean {
 export const DATE_ENVELOPE_KINDS: readonly EventKind[] = EVENT_KINDS.filter(usesDateEnvelope)
 export const COURSE_DAY_KINDS: readonly EventKind[] = EVENT_KINDS.filter(usesCourseDays)
 
+// Kinds the calendar offers as a simple on/off toggle. Courses are excluded
+// because they filter by course category instead, one row per course type.
+export const NON_COURSE_KINDS: readonly EventKind[] = EVENT_KINDS.filter(k => !usesCourseDays(k))
+
 /**
  * True when the shop may lay on transport, so the register form offers ride
  * seats and the admin gets the car-assignment panel. Courses run at the shop;
@@ -49,10 +54,26 @@ export function allowsTransport(kind: EventKind): boolean {
 }
 
 /**
- * True when the kind carries the dive-specific flags — `is_boat_dive` and
- * `is_trip` (which surfaces the event under Scheduled Trips). Deliberately
- * narrower than `usesDateEnvelope`: these are about diving, not about dates.
+ * True when the kind carries the genuinely diving-specific fields —
+ * `is_boat_dive` and `nitrox_required`. Deliberately narrower than
+ * `usesDateEnvelope`: `is_trip` rides with the envelope kinds instead, since
+ * "runs over several days away from the shop" is not a claim about diving.
  */
 export function hasDiveFlags(kind: EventKind): boolean {
   return kind === 'dive'
+}
+
+// Diver-facing label and pill colour per kind. Declared as full Records so the
+// compiler demands an entry for every kind — these are the surfaces where a
+// missing kind would otherwise render as `undefined` in the UI. Three files
+// used to keep their own copy of the label map, and two more inlined the
+// `type === 'dive' ? … : …` ternary.
+export const EVENT_KIND_LABELS: Record<EventKind, string> = {
+  dive:   t.calendar.typeDive,
+  course: t.calendar.typeCourse,
+}
+
+export const EVENT_KIND_DOT: Record<EventKind, string> = {
+  dive:   'bg-emerald-600',
+  course: 'bg-surface-500',
 }

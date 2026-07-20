@@ -1,5 +1,6 @@
 import { parseISO, isSameDay, format } from 'date-fns'
 import { supabase } from './supabase'
+import { usesCourseDays } from './event-kinds'
 import type { AppEvent } from '../types/database'
 
 // Push worker base URL (same host as the other /admin-* endpoints).
@@ -19,7 +20,7 @@ const PUSH_WORKER_URL = (import.meta.env.VITE_PUSH_WORKER_URL as string | undefi
  * calendar day as the start.
  */
 export function isReschedulable(ev: Pick<AppEvent, 'type' | 'start_time' | 'end_time'>): boolean {
-  if (ev.type === 'course') return true
+  if (usesCourseDays(ev.type)) return true
   if (!ev.end_time) return true
   return isSameDay(parseISO(ev.start_time), parseISO(ev.end_time))
 }
@@ -48,7 +49,7 @@ export function replaceDayInList(days: string[], from: string, to: string): stri
 export async function rescheduleEventDay(ev: AppEvent, fromKey: string, toKey: string): Promise<void> {
   if (!fromKey || !toKey || fromKey === toKey) return
 
-  if (ev.type === 'course') {
+  if (usesCourseDays(ev.type)) {
     const { data, error } = await supabase
       .from('events')
       .select('course_days')

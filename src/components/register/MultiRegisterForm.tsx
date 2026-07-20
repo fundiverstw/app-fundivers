@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useState } from 'react'
 import { personName } from '../../lib/names'
 import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../lib/gear'
+import { usesCourseDays, allowsTransport } from '../../lib/event-kinds'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
 import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
@@ -92,18 +93,18 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   // Ride-seat tally per dive in the cart — gates each event's "ride with the
   // shop" option when the cars assigned to it are full. Best-effort per event.
   const [rideSeatsByEvent, setRideSeatsByEvent] = useState<Record<string, RideSeats>>({})
-  const diveKey = cart.filter(e => e.type === 'dive').map(e => e.id).join(',')
+  const rideEventKey = cart.filter(e => allowsTransport(e.type)).map(e => e.id).join(',')
   useEffect(() => {
     let cancelled = false
     for (const ev of cart) {
-      if (ev.type !== 'dive') continue
+      if (!allowsTransport(ev.type)) continue
       fetchRideSeats(ev.id)
         .then(seats => { if (!cancelled) setRideSeatsByEvent(prev => ({ ...prev, [ev.id]: seats })) })
         .catch(() => { /* fail open for that event */ })
     }
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [diveKey])
+  }, [rideEventKey])
 
   // Waivers the LEAD BOOKER still needs, across the cart events they're booking
   // for themselves (child-targeted events are excluded — the parent can't e-sign
@@ -199,7 +200,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
       const c = choicesById[ev.id] ?? { rentGear: false, gearItems: [], needsTransport: null, addNitroxCourse: false }
       const base       = ev.price ?? 0
       const days       = Math.max(1, ev.dive_days ?? 1)
-      const gearIncluded = ev.type === 'course' && isGearIncludedCourse(ev.title)
+      const gearIncluded = usesCourseDays(ev.type) && isGearIncludedCourse(ev.title)
       const gearCost   = (!gearIncluded && c.rentGear)
         ? c.gearItems.reduce((s, item) => s + (GEAR_ALACARTE_PRICES[item] ?? 0) * days, 0)
         : 0
@@ -288,7 +289,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
     // circuiting on the first error.
     const calls = cart.map(async (ev) => {
       const c = choicesById[ev.id]
-      const gearIncluded = ev.type === 'course' && isGearIncludedCourse(ev.title)
+      const gearIncluded = usesCourseDays(ev.type) && isGearIncludedCourse(ev.title)
       // When the booking is for a linked child, look up nitrox status on
       // the child's profile (not the parent's) so we don't show / charge
       // for a nitrox course they don't need.
@@ -299,7 +300,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
       const showNitroxAddon = ev.nitrox_required && !(targetProfile?.nitrox_certified ?? false)
 
       const evSeats = rideSeatsByEvent[ev.id]
-      const rideAllowed = ev.type !== 'dive' || !evSeats
+      const rideAllowed = !allowsTransport(ev.type) || !evSeats
         ? true
         : canRequestRide({ capacity: evSeats.capacity, claimed: evSeats.claimed, alreadyHasRide: false })
       const rideWaitlisted = c.needsTransport === true && !rideAllowed
@@ -602,14 +603,14 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
             <div className="space-y-3">
               {cart.map(ev => {
                 const c = choicesById[ev.id]
-                const gearIncluded = ev.type === 'course' && isGearIncludedCourse(ev.title)
+                const gearIncluded = usesCourseDays(ev.type) && isGearIncludedCourse(ev.title)
                 const showGearRentChoice =
-                  (ev.type === 'dive' && !!ev.gear_rental_info) ||
-                  (ev.type === 'course' && !isGearIncludedCourse(ev.title))
+                  (!usesCourseDays(ev.type) && !!ev.gear_rental_info) ||
+                  (usesCourseDays(ev.type) && !isGearIncludedCourse(ev.title))
                 const transportSurcharge = ev.transport_price ?? 0
                 const transportIncluded = transportSurcharge <= 0
                 const evSeats = rideSeatsByEvent[ev.id]
-                const rideAllowed = ev.type !== 'dive' || !evSeats
+                const rideAllowed = !allowsTransport(ev.type) || !evSeats
                   ? true
                   : canRequestRide({ capacity: evSeats.capacity, claimed: evSeats.claimed, alreadyHasRide: false })
                 // Opting into a full ride → a ride-waitlist request (booking

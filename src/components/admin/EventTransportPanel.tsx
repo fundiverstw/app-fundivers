@@ -6,6 +6,7 @@ import { EventCarAssignment } from './EventCarAssignment'
 import { setBookingTransportation } from '../../lib/booking-transport'
 import type { AppEvent, Booking, BookingDetails, Profile } from '../../types/database'
 import { t } from '../../i18n'
+import { allowsTransport } from '../../lib/event-kinds'
 
 const tp = t.admin.transport
 
@@ -40,7 +41,7 @@ const transportOf = (b: Booking): boolean | undefined =>
 export function EventTransportPanel({ event, registrants, isAdmin, createdBy, onRideChanged }: Props) {
   const active = registrants.filter(r => r.booking.status !== 'cancelled')
   const hasCancelled = registrants.some(r => r.booking.status === 'cancelled')
-  const isDive = event.type === 'dive'
+  const showsTransport = allowsTransport(event.type)
   const needsRideCount = active.filter(r => transportOf(r.booking) === true).length
 
   return (
@@ -55,7 +56,7 @@ export function EventTransportPanel({ event, registrants, isAdmin, createdBy, on
         <p className="text-xs text-brand-950/70 font-medium italic">{tp.cancelledHidden}</p>
       )}
 
-      {isDive && <TransportTextEditor event={event} isAdmin={isAdmin} />}
+      {showsTransport && <TransportTextEditor event={event} isAdmin={isAdmin} />}
       <EventCarAssignment
         event={{ id: event.id, type: event.type }}
         isAdmin={isAdmin}

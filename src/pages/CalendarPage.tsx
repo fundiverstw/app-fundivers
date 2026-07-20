@@ -11,15 +11,8 @@ import { ShareEventButton } from '../components/ShareEventButton'
 import { t } from '../i18n'
 import { BTN_XS_GHOST } from '../styles/tokens'
 import type { AppEvent, Booking } from '../types/database'
+import { EVENT_KIND_DOT, EVENT_KIND_LABELS } from '../lib/event-kinds'
 
-const TYPE_DOT: Record<AppEvent['type'], string> = {
-  dive:   'bg-emerald-600',
-  course: 'bg-surface-500',
-}
-const TYPE_LABELS: Record<AppEvent['type'], string> = {
-  dive:   t.calendar.typeDive,
-  course: t.calendar.typeCourse,
-}
 
 function bookingMatches(b: Booking, ev: AppEvent) {
   return b.event_id === ev.id
@@ -193,8 +186,8 @@ export function CalendarPage() {
         <div className="fixed inset-0 bg-brand-950/70 backdrop-blur-sm flex items-start justify-center z-50 px-4 pt-8 pb-4 overflow-y-auto" onClick={() => setSelected(null)}>
           <div className="glass glow-mauve rounded-2xl w-full max-w-lg p-6 space-y-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <span className={`text-xs px-2 py-1 rounded-full text-white ${TYPE_DOT[selected.type]}`}>
-                {TYPE_LABELS[selected.type]}
+              <span className={`text-xs px-2 py-1 rounded-full text-white ${EVENT_KIND_DOT[selected.type]}`}>
+                {EVENT_KIND_LABELS[selected.type]}
               </span>
               <button onClick={() => setSelected(null)} className="text-brand-100/70 hover:text-white text-xl leading-none">×</button>
             </div>

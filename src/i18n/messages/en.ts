@@ -68,7 +68,8 @@ export const en = {
     noEvents: 'No events scheduled.',
     alreadyHappened: (title: string) => `${title} — already happened`,
     noCoursesInRange: 'No courses in this range.',
-    toggleDives: 'Toggle dives',
+    // `kind` is the already-localised event-kind label.
+    toggleKind: (kind: string) => `Toggle ${kind}`,
     filterCourses: 'Filter courses',
     courses: 'Courses',
     toggleAvailability: 'Toggle staff availability',
