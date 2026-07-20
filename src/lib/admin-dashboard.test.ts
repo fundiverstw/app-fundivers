@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { computeDashboard, calendarYearMonths, type DashboardInput } from './admin-dashboard'
+import { EVENT_KIND_LABELS } from './event-kinds'
 
 describe('calendarYearMonths', () => {
   it('returns Jan→Dec so the peak season sits in the centre columns', () => {
@@ -57,9 +58,11 @@ describe('computeDashboard', () => {
       { label: 'bank_transfer', value: 800 },
       { label: 'cash', value: 500 },
     ])
+    // Labelled with the localised event-kind label, so the chart follows the
+    // deployment's language instead of two hardcoded English plurals.
     expect(d.revenueByEventType).toEqual([
-      { label: 'Dives', value: 800 },
-      { label: 'Courses', value: 500 },
+      { label: EVENT_KIND_LABELS.dive,   value: 800 },
+      { label: EVENT_KIND_LABELS.course, value: 500 },
     ])
   })
 

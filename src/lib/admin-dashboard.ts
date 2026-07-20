@@ -6,6 +6,7 @@
 // positive, `refunded` negative, `voided` is excluded entirely.
 import { canonicalCertLevel } from './cert-level'
 import { siteConfig } from '../config/site'
+import { EVENT_KIND_LABELS } from './event-kinds'
 import type { Booking, Payment, EventKind } from '../types/database'
 
 export interface MoneyPoint { label: string; value: number }
@@ -137,7 +138,7 @@ export function computeDashboard(input: DashboardInput): Dashboard {
 
   const revenueByEventType = [...groupBy(payments, p => {
     const ev = eventOfPayment(p)
-    return ev ? (ev.type === 'dive' ? 'Dives' : 'Courses') : 'Unlinked'
+    return ev ? EVENT_KIND_LABELS[ev.type] : 'Unlinked'
   }).entries()]
     .map(([label, ps]) => ({ label, value: netOf(ps) }))
     .sort((a, b) => b.value - a.value)
