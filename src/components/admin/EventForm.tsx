@@ -873,9 +873,9 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 // Wraps its child in the <label>, which suits the mixed bag of controls this
 // form puts inside it (inputs, selects, custom pickers) — not all of them take
-// an id. A DateField's transparent picker input rides along inside, but it
-// stops its own clicks from reaching this label, so the tap can't be
-// re-dispatched onto the labelled control.
+// an id. A DateField's transparent picker input rides along inside, but a
+// label skips its activation behaviour for events targeting interactive
+// content, so the tap is never re-dispatched onto the labelled control.
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block space-y-1">
@@ -919,16 +919,15 @@ const INPUT_CLASS =
   'placeholder:text-brand-900/40 focus:outline-none focus:border-accent'
 
 function Input({
-  value, onChange, type = 'text', required = false, placeholder, id,
-}: { value: string; onChange: (v: string) => void; type?: string; required?: boolean; placeholder?: string; id?: string }) {
+  value, onChange, type = 'text', required = false, placeholder,
+}: { value: string; onChange: (v: string) => void; type?: string; required?: boolean; placeholder?: string }) {
   // Dates route through DateField so they can be typed, not just picked from
   // a (sometimes month-at-a-time) native calendar.
   if (type === 'date') {
-    return <DateField id={id} value={value} onChange={onChange} required={required} className={INPUT_CLASS} />
+    return <DateField value={value} onChange={onChange} required={required} className={INPUT_CLASS} />
   }
   return (
     <input
-      id={id}
       type={type}
       value={value}
       onChange={e => onChange(e.target.value)}

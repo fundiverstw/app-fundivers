@@ -2199,8 +2199,7 @@ function PaymentInstructionLine({ line }: { line: string }) {
 // Small labeled input for the About-you step. The label associates by id
 // rather than by wrapping: a date field renders a second, transparent native
 // input for the OS picker, and a wrapping label would claim that one too —
-// ambiguous for screen readers, and it re-dispatches clicks onto the labelled
-// control, which dismisses the picker the tap just opened.
+// ambiguous for screen readers and for tests querying by label.
 function TextField({
   label, value, onChange, type = 'text', required, placeholder, min, hint,
 }: {

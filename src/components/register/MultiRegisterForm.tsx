@@ -925,8 +925,8 @@ function TextField({
 }) {
   // Associates by id rather than by wrapping: a date field renders a second,
   // transparent native input for the OS picker, and a wrapping label would
-  // claim that one too — ambiguous for screen readers, and it re-dispatches
-  // clicks onto the labelled control, dismissing the picker the tap opened.
+  // claim that one too — ambiguous for screen readers and for tests querying
+  // by label.
   const id = useId()
   return (
     <div className="block">
