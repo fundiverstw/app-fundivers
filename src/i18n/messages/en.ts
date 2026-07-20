@@ -1450,8 +1450,8 @@ export const en = {
       depositPart: (amount: number, cur: string) => `deposit: ${amount} ${cur}`,
       transportPart: (amount: number, cur: string) => `transport: +${amount} ${cur}`,
       transportIncluded: 'transport: included',
-      untitledDive: '(untitled dive)',
-      untitledCourse: '(untitled course)',
+      // `kind` is the already-localised event-kind label.
+      untitled: (kind: string) => `(untitled ${kind.toLowerCase()})`,
       adminTitleRequired: 'Admin title is required.',
       startDateRequired: 'Start date is required.',
       courseDayRequired: 'At least one course day is required.',

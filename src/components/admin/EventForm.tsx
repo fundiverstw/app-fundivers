@@ -174,16 +174,17 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
       setTripTemplates(dataOf<TripTemplateEntry>(7))
       setDestinations(dataOf<TravelDestination>(8))
 
-      // Both lists collapse to the newest event per admin_title — the dive
-      // location, or the course type. The shop returns to the same sites and
-      // reruns the same courses, so listing every past occurrence made the
-      // picker unusable and told the admin nothing the newest one doesn't.
+      // Both lists collapse to the newest event per admin_title — the site for
+      // a dive or adventure, the course type for a course. The shop returns to
+      // the same places and reruns the same courses, so listing every past
+      // occurrence made the picker unusable and told the admin nothing the
+      // newest one doesn't.
       const pastEnvelope = newestPerGroup(
         dataOf<PreloadRow>(3).map<PastEvent>(d => ({
           kind: d.kind,
           id: d.id,
           startDate: d.start_date ?? '',
-          title: d.display_title ?? d.admin_title ?? ef.untitledDive,
+          title: d.display_title ?? d.admin_title ?? ef.untitled(EVENT_KIND_LABELS[d.kind]),
           groupKey: d.admin_title ?? null,
         })),
       )
@@ -193,7 +194,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
             kind: c.kind,
             id: c.id,
             startDate: [...(c.course_days ?? [])].filter(Boolean).sort()[0] ?? '',
-            title: c.display_title ?? c.admin_title ?? ef.untitledCourse,
+            title: c.display_title ?? c.admin_title ?? ef.untitled(EVENT_KIND_LABELS[c.kind]),
             groupKey: c.admin_title ?? null,
           }))
           .filter(c => c.startDate && c.startDate < todayStr),
