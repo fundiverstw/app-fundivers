@@ -1,5 +1,5 @@
 # Pre-merge gate. Fails the branch in GitHub on any regression that
-# `make check` would catch locally — eslint, tsc, or the unit test
+# `make test` would catch locally — eslint, tsc, or the unit test
 # project.
 #
 # Runs on:
