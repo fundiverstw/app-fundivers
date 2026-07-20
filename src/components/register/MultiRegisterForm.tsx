@@ -11,6 +11,7 @@ import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/p
 import { fetchRideSeats, canRequestRide, type RideSeats } from '../../lib/event-vehicles'
 import { missingWaivers, fetchEventWaiverOverrides, fetchDiverSignatures, fetchWaivers, type WaiverEventRef } from '../../lib/waivers'
 import { WaiverSignDialog } from '../waivers/WaiverSignDialog'
+import { DateField } from '../DateField'
 import type { WaiverDef } from '../../config/waivers'
 import type { AppEvent, Booking, BookingDetails, Database, Profile } from '../../types/database'
 
@@ -169,6 +170,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   // skipped in this flow (signed-in only; assume on-file or admin
   // follow-up). The diver can update the full profile from /profile.
   const [fullName, setFullName]               = useState(profile?.name ?? '')
+  const [dob, setDob]                         = useState(profile?.date_of_birth ?? '')
   const [nationality, setNationality]         = useState(profile?.nationality ?? '')
   const [gender, setGender]                   = useState(profile?.gender ?? '')
   const [contactMethod, setContactMethod]     = useState<ContactMethod | ''>(profile?.contact_method ?? '')
@@ -243,13 +245,15 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   const hasBlockedPast = !viewerPrivileged && pastInCart.length > 0
 
   // Step gates — same spirit as solo flow, only the multi-applicable ones.
-  // Gender + nationality are mandatory on the diver's profile, same as the
-  // solo flow.
+  // Date of birth, gender and nationality are mandatory on the diver's
+  // profile, same as the solo flow. DOB reaches the server gate in
+  // create-registration, which rejects a patch whose date_of_birth slot is
+  // blank — so leaving it out here would fail the whole cart at submit.
   // Certification is mandatory: name a level or declare uncertified. (Card
   // photos aren't collected in the cart flow — the diver uploads from /profile
   // or brings the physical card; the solo flow carries the photo disclaimer.)
   const certDeclarationBlocked = !uncertified && certLevel.trim() === ''
-  const step2Blocked = fullName.trim() === '' || nationality.trim() === '' || gender.trim() === '' || certDeclarationBlocked || hasBlockedPast
+  const step2Blocked = fullName.trim() === '' || dob.trim() === '' || nationality.trim() === '' || gender.trim() === '' || certDeclarationBlocked || hasBlockedPast
   const step3Blocked = cart.some(ev => choicesById[ev.id]?.needsTransport === null)
   const submitBlocked = cart.length === 0 || hasBlockedPast
 
@@ -260,6 +264,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
     const nullish = (v: string) => v.trim() === '' ? null : v.trim()
     const profilePatch: ProfileUpdate = {
       name:               nullish(fullName),
+      date_of_birth:           nullish(dob),
       nationality:             nullish(nationality),
       gender:                  nullish(gender),
       contact_method:          (contactMethod || null) as ContactMethod | null,
@@ -505,6 +510,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
             <div className="space-y-3">
               <TextField label={t.register.multi.fullNameLabel} value={fullName} onChange={setFullName} required />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <TextField label={t.register.step2.dobRequired} type="date" value={dob} onChange={setDob} required />
                 <TextField label={t.register.nationalityRequired} value={nationality} onChange={setNationality} required />
                 <label className="block">
                   <span className="block text-xs text-brand-900 font-medium mb-1">{t.register.genderRequired}</span>
@@ -920,14 +926,23 @@ function TextField({
   return (
     <label className="block">
       <span className="block text-xs text-brand-900 font-medium mb-1">{label}</span>
-      <input
-        type={type}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        required={required}
-        placeholder={placeholder}
-        className="w-full bg-white border border-surface-300 rounded-lg px-2 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
-      />
+      {type === 'date' ? (
+        <DateField
+          value={value}
+          onChange={onChange}
+          required={required}
+          className="w-full bg-white border border-surface-300 rounded-lg px-2 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
+        />
+      ) : (
+        <input
+          type={type}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          required={required}
+          placeholder={placeholder}
+          className="w-full bg-white border border-surface-300 rounded-lg px-2 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
+        />
+      )}
     </label>
   )
 }

@@ -254,7 +254,8 @@ describe('CalendarPage', () => {
     useAuthMock.mockReturnValue({
       user:    { id: 'u1' },
       profile: {
-        id: 'u1', name: 'Ada Lovelace', nationality: 'British', gender: 'female',
+        id: 'u1', name: 'Ada Lovelace', date_of_birth: '1815-12-10',
+        nationality: 'British', gender: 'female',
         contact_method: null, contact_id: null,
         cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false, deep_certified: false,
         emergency_contact_name: null, emergency_contact_phone: null,

@@ -36,7 +36,7 @@ const sampleEvent = (id: string, title: string): AppEvent => ({
 const parentProfile: Profile = {
   id: 'p1', created_at: '', updated_at: '',
   name: 'Parent Pat', nickname: 'Pat',
-  date_of_birth: null, nationality: 'Taiwanese', id_number: null,
+  date_of_birth: '1987-05-03', nationality: 'Taiwanese', id_number: null,
   emergency_contact_name: null, emergency_contact_phone: null,
   cert_agency: 'PADI', cert_level: 'AOW',
   cert_number: null, cert_date: null, cert_card_path: 'p1/c.jpg',
@@ -110,6 +110,49 @@ describe('MultiRegisterForm parent diver picker', () => {
     expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
   })
 
+  it('blocks step 2 until a complete date of birth is entered', async () => {
+    setupFrom([])
+    const noDob: Profile = { ...parentProfile, date_of_birth: null }
+    const user = userEvent.setup()
+    render(
+      <MultiRegisterForm
+        events={[sampleEvent('e1', 'Kenting')]}
+        profile={noDob} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
+    await user.click(screen.getByRole('button', { name: /next/i }))  // 1→2
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+
+    // A partial entry emits nothing upstream, so the gate stays shut.
+    await user.type(screen.getByLabelText(/date of birth \*/i), '1987')
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+
+    await user.type(screen.getByLabelText(/date of birth \*/i), '0503')
+    expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
+  })
+
+  it('types the date of birth into a typeable field, not a raw native date input', async () => {
+    // The cart flow shares DateField with the solo flow — a native
+    // <input type="date"> makes picking a birth year decades back miserable.
+    setupFrom([])
+    const user = userEvent.setup()
+    render(
+      <MultiRegisterForm
+        events={[sampleEvent('e1', 'Kenting')]}
+        profile={parentProfile} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    const dobInput = screen.getByLabelText(/date of birth \*/i)
+    expect(dobInput).toHaveAttribute('type', 'text')
+    expect(dobInput).toHaveAttribute('placeholder', 'YYYY-MM-DD')
+  })
+
   it('shows per-event diver dropdown including each linked child', async () => {
     setupFrom([childProfile])
     render(
@@ -171,6 +214,10 @@ describe('MultiRegisterForm parent diver picker', () => {
     expect(e1Body.profile_patch).toEqual({})
     expect(e2Body.target_user_id).toBeUndefined()
     expect((e2Body.profile_patch as Record<string, unknown>).name).toBe('Parent Pat')
+    // The lead booker's patch carries their DOB, so the server gate passes.
+    // The child's stays an empty patch — exempt from that gate, since the cart
+    // flow has no field to fill a child's DOB in.
+    expect((e2Body.profile_patch as Record<string, unknown>).date_of_birth).toBe('1987-05-03')
 
     // Both share the same group_id.
     expect(e1Body.group_id).toBe(e2Body.group_id)
