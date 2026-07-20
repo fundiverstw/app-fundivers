@@ -31,7 +31,7 @@ import { missingWaivers, fetchEventWaiverOverrides, fetchSignaturesForDivers, fe
 import type { WaiverDef } from '../../config/waivers'
 import { ShareEventButton } from '../../components/ShareEventButton'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Credit, DiverNote, Payment, Profile, EventKind } from '../../types/database'
-import { BTN_SECONDARY, ERROR_NOTE_LIGHT } from '../../styles/tokens'
+import { BTN_SECONDARY, BTN_XS_BASE, ERROR_NOTE_LIGHT } from '../../styles/tokens'
 import { t } from '../../i18n'
 
 const ed = t.admin.eventDetail
@@ -1412,7 +1412,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     onClick={() => onApproveRefund(r.booking.id)}
-                    className="bg-brand-900 hover:bg-brand-950 text-white text-xs font-semibold px-2 py-1 rounded whitespace-nowrap"
+                    className={`${BTN_XS_BASE} bg-brand-900 hover:bg-brand-950 text-white whitespace-nowrap`}
                   >
                     {ed.approveRefund}
                   </button>
@@ -1421,7 +1421,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
                       status palette, since this banner is a light surface. */}
                   <button
                     onClick={() => onRejectRefund(r.booking.id)}
-                    className="bg-red-100 hover:bg-red-200 text-red-800 text-xs font-semibold px-2 py-1 rounded whitespace-nowrap"
+                    className={`${BTN_XS_BASE} bg-red-100 hover:bg-red-200 text-red-800 whitespace-nowrap`}
                   >
                     {ed.rejectRefund}
                   </button>

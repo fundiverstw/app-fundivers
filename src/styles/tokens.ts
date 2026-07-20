@@ -51,7 +51,11 @@ export const ON_DEEP_SUBTLE  = 'text-white/60'
 export const ON_DEEP_LINK    = 'text-reef-300 font-semibold hover:text-reef-200 hover:underline'
 
 // ── Buttons ────────────────────────────────────────────────────────
-const BUTTON_BASE = 'font-semibold py-2 rounded-lg transition-colors disabled:opacity-50'
+// px-4 belongs here, not at the call sites. Most callers stretch these with
+// flex-1 or w-full, which hid the omission — but a button sized to its own
+// label (an inline Approve / Reject) sat flush against its text. Harmless for
+// the stretched cases: the padding is inside a width they already have.
+const BUTTON_BASE = 'font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50'
 // Primary = reef teal on dark ink — the signature CTA (reads on the glow).
 export const BTN_PRIMARY = `${BUTTON_BASE} bg-reef-500 hover:bg-reef-400 text-slate-950`
 export const BTN_GHOST   = `${BUTTON_BASE} border border-white/20 text-brand-50 hover:bg-white/10`
@@ -67,7 +71,11 @@ export const BTN_SECONDARY = 'py-2 rounded-lg text-sm font-medium text-brand-50 
 // (text-xs · px-3 py-1) for dense action rows like the admin user-card controls,
 // where a full-height BTN_* would dominate. inline-flex so a <Link> and a
 // <button> line up identically.
-const BTN_XS_BASE = 'inline-flex items-center justify-center text-xs font-semibold px-3 py-1 rounded-lg transition-colors disabled:opacity-50'
+// Geometry for the app's small buttons. Exported so surfaces that need their
+// own colours — a button sitting on a light status-palette banner, where the
+// BTN_XS_* dark-surface colours would be invisible — still get the same size,
+// padding and radius as every other small button.
+export const BTN_XS_BASE = 'inline-flex items-center justify-center text-xs font-semibold px-3 py-1 rounded-lg transition-colors disabled:opacity-50'
 export const BTN_XS_PRIMARY = `${BTN_XS_BASE} bg-reef-500 hover:bg-reef-400 text-slate-950`
 export const BTN_XS_GHOST   = `${BTN_XS_BASE} border border-white/20 text-brand-50 hover:bg-white/10`
 export const BTN_XS_DANGER  = `${BTN_XS_BASE} bg-red-500/15 hover:bg-red-500/25 text-red-200 border border-red-400/40`
