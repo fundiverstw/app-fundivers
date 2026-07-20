@@ -1319,7 +1319,8 @@ export const zhTW: Messages = {
       loggedDives: (n: number) => `已記錄 ${n} 次`,
       diverNotesHeading: '潛水員備註',
       refundRequested: (date: string) => `已於 ${date} 申請退款`,
-      approveRefund: '核准退款',
+      approveRefund: '核准',
+      rejectRefund: '拒絕',
       leadPayerForGroup: '此團體的主要付款人',
       billToDiver: '改由這位潛水員自行付款',
       editRegistration: '編輯報名資料',
@@ -1953,6 +1954,8 @@ export const zhTW: Messages = {
       colRequested: '申請時間',
       approve: '核准',
       approved: '已核准退款 · 預訂已取消',
+      reject: '拒絕',
+      rejected: '已拒絕退款申請 · 預訂未更動',
       eventFallback: '活動',
     },
     audits: {

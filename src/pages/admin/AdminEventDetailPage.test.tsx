@@ -1015,4 +1015,42 @@ describe('AdminEventDetailPage', () => {
     await user.click(screen.getByText(/cancelled \(2\)/i))
     await waitFor(() => expect(within(details).getByText('Eve Tester')).toBeVisible())
   })
+
+  it('rejects a refund request from the registrant notice, leaving the booking alone', async () => {
+    // The undo path: the diver asked by accident. Rejecting clears the stamp
+    // and must not cancel the booking the way approving does.
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
+    ]))
+    const bookings = [{
+      id: 'b1', user_id: 'u1', status: 'confirmed', created_at: '2026-04-20',
+      event_id: 'dive_x', notes: null, refund_requested_at: '2026-07-10T02:00:00Z',
+      details: { gear: { rent: false } },
+    }]
+    const profiles = [{ id: 'u1', name: 'Ada Lovelace', nickname: 'Ada', contact_method: null, contact_id: null }]
+
+    const updates: unknown[] = []
+    from.mockImplementation((table: string) => {
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      if (table === 'bookings') {
+        const b = mockQueryBuilder({ data: bookings })
+        b.update = (patch: unknown) => { updates.push(patch); return { eq: () => Promise.resolve({ error: null }) } }
+        return b
+      }
+      return mockQueryBuilder({ data: [] })
+    })
+
+    const user = userEvent.setup()
+    renderAt('/admin/events/dive_x')
+    await screen.findByText('Ada Lovelace')
+    // The notice lives inside the expanded card.
+    await user.click(screen.getByRole('button', { expanded: false, name: /Ada Lovelace/ }))
+
+    await user.click(await screen.findByRole('button', { name: /^reject$/i }))
+
+    await waitFor(() => expect(updates).toContainEqual({ refund_requested_at: null }))
+    expect(updates).not.toContainEqual(expect.objectContaining({ status: expect.anything() }))
+    // The notice goes away, so the admin can see the request is resolved.
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^reject$/i })).not.toBeInTheDocument())
+  })
 })

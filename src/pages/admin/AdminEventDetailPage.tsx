@@ -8,7 +8,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
 import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
-import { notifyRefundApproved } from '../../lib/refunds'
+import { notifyRefundApproved, rejectRefundRequest } from '../../lib/refunds'
 import { AdminNotes } from '../../components/admin/AdminNotes'
 import { AdminAddDiverModal } from '../../components/admin/AdminAddDiverModal'
 import { EventStaffSection } from '../../components/admin/EventStaffSection'
@@ -271,6 +271,21 @@ export function AdminEventDetailPage() {
     ))
   }
 
+  async function rejectRefund(bookingId: string) {
+    // Clears the request and leaves the booking untouched — the diver's own
+    // "request refund" button becomes available again, so an accidental
+    // request is fully undone rather than resolved.
+    try {
+      await rejectRefundRequest(bookingId)
+      setRegistrants(prev => prev.map(r =>
+        r.booking.id === bookingId ? { ...r, booking: { ...r.booking, refund_requested_at: null } } : r
+      ))
+      toast.success(t.admin.refunds.rejected)
+    } catch (e) {
+      toast.error(errorMessage(e))
+    }
+  }
+
   async function submitAmendment(bookingId: string, sign: '+' | '-', amount: number, note: string) {
     if (!profile?.id) return
     try {
@@ -427,6 +442,7 @@ export function AdminEventDetailPage() {
       currency={event?.currency ?? siteConfig.locale.currencyLabel}
       onStatusChange={updateStatus}
       onApproveRefund={approveRefund}
+      onRejectRefund={rejectRefund}
       onEdit={() => setEditing(r)}
       onAddAmendment={submitAmendment}
       onRecordPayment={(amount, note) => recordPayment(r, amount, note)}
@@ -1190,7 +1206,7 @@ function registrantBalance(r: Registrant) {
   return { owed, paid, bal: bookingBalance(owed, paid, r.credit, { cancelled: r.booking.status === 'cancelled' }) }
 }
 
-function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, currency, onStatusChange, onApproveRefund, onEdit, onAddAmendment, onRecordPayment, onApplyCredit, onVoidPayment, onMarkDepositPaid, onBillToDiver, onRecordGroupPayment, readOnly }: {
+function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, currency, onStatusChange, onApproveRefund, onRejectRefund, onEdit, onAddAmendment, onRecordPayment, onApplyCredit, onVoidPayment, onMarkDepositPaid, onBillToDiver, onRecordGroupPayment, readOnly }: {
   r: Registrant
   waiverMissing: WaiverDef[]
   waiverState: 'loading' | 'ready' | 'error'
@@ -1199,6 +1215,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
   currency: string
   onStatusChange: (id: string, s: Booking['status']) => void
   onApproveRefund: (id: string) => void
+  onRejectRefund: (id: string) => void
   onEdit: () => void
   onAddAmendment: (id: string, sign: '+' | '-', amount: number, note: string) => Promise<void>
   onRecordPayment: (amount: number, note: string) => Promise<void>
@@ -1384,17 +1401,31 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
           )}
 
           {r.booking.refund_requested_at && r.booking.status !== 'cancelled' && (
-            <div className="flex items-center justify-between text-xs bg-red-50 border border-accent rounded p-2">
-              <span className="text-red-600">
+            <div className="flex items-center justify-between gap-2 text-xs bg-red-50 border border-accent rounded p-2">
+              {/* min-w-0 so the notice text is what gives way when the card is
+                  narrow — the buttons keep their own width instead of being
+                  squeezed until their labels wrap inside them. */}
+              <span className="text-red-600 min-w-0">
                 🔄 {ed.refundRequested(format(new Date(r.booking.refund_requested_at), 'MMM d, HH:mm'))}
               </span>
               {!readOnly && (
-                <button
-                  onClick={() => onApproveRefund(r.booking.id)}
-                  className="bg-brand-900 hover:bg-brand-950 text-white text-xs font-semibold px-2 py-1 rounded"
-                >
-                  {ed.approveRefund}
-                </button>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => onApproveRefund(r.booking.id)}
+                    className="bg-brand-900 hover:bg-brand-950 text-white text-xs font-semibold px-2 py-1 rounded whitespace-nowrap"
+                  >
+                    {ed.approveRefund}
+                  </button>
+                  {/* Undo an accidental request: clears the stamp and leaves the
+                      booking alone. Styled as the quieter of the two — light
+                      status palette, since this banner is a light surface. */}
+                  <button
+                    onClick={() => onRejectRefund(r.booking.id)}
+                    className="bg-red-100 hover:bg-red-200 text-red-800 text-xs font-semibold px-2 py-1 rounded whitespace-nowrap"
+                  >
+                    {ed.rejectRefund}
+                  </button>
+                </div>
               )}
             </div>
           )}

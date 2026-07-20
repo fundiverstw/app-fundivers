@@ -4,9 +4,10 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { AdminRefundsPage } from './AdminRefundsPage'
 
-const { from, updateEq, toastSuccess } = vi.hoisted(() => ({
+const { from, updateEq, updatePatch, toastSuccess } = vi.hoisted(() => ({
   from: vi.fn(),
   updateEq: vi.fn(),
+  updatePatch: vi.fn(),
   toastSuccess: vi.fn(),
 }))
 
@@ -23,7 +24,7 @@ vi.mock('../../lib/events', () => ({
 function query(result: Record<string, unknown>) {
   const b: Record<string, unknown> = {}
   for (const m of ['select', 'not', 'neq', 'order', 'in', 'eq']) b[m] = () => b
-  b.update = () => ({ eq: (...a: unknown[]) => { updateEq(...a); return Promise.resolve({ error: null }) } })
+  b.update = (patch: unknown) => { updatePatch(patch); return { eq: (...a: unknown[]) => { updateEq(...a); return Promise.resolve({ error: null }) } } }
   b.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) => Promise.resolve(result).then(res, rej)
   return b
 }
@@ -39,7 +40,7 @@ const payments = [
 ]
 
 beforeEach(() => {
-  from.mockReset(); updateEq.mockReset(); toastSuccess.mockReset()
+  from.mockReset(); updateEq.mockReset(); updatePatch.mockReset(); toastSuccess.mockReset()
   from.mockImplementation((table: string) => {
     switch (table) {
       case 'bookings': return query({ data: bookings, error: null })
@@ -69,6 +70,28 @@ describe('AdminRefundsPage', () => {
     await screen.findByText('Alice Diver')
     await user.click(screen.getByRole('button', { name: /approve/i }))
     await waitFor(() => expect(updateEq).toHaveBeenCalledWith('id', 'b1'))
+    expect(updatePatch).toHaveBeenCalledWith({ status: 'cancelled' })
+    expect(toastSuccess).toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByText('Alice Diver')).not.toBeInTheDocument())
+  })
+
+  it('rejecting clears the request and leaves the booking alone', async () => {
+    // The undo path for a diver who asked by accident: the booking keeps its
+    // status, so this must NOT write `status: cancelled` the way approve does.
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Alice Diver')
+    await user.click(screen.getByRole('button', { name: /reject/i }))
+    await waitFor(() => expect(updateEq).toHaveBeenCalledWith('id', 'b1'))
+    expect(updatePatch).toHaveBeenCalledWith({ refund_requested_at: null })
+    expect(updatePatch).not.toHaveBeenCalledWith(expect.objectContaining({ status: expect.anything() }))
+  })
+
+  it('drops a rejected request off the queue', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Alice Diver')
+    await user.click(screen.getByRole('button', { name: /reject/i }))
     expect(toastSuccess).toHaveBeenCalled()
     await waitFor(() => expect(screen.queryByText('Alice Diver')).not.toBeInTheDocument())
   })

@@ -22,3 +22,20 @@ export async function notifyRefundApproved(bookingId: string): Promise<void> {
     body: JSON.stringify({ booking_id: bookingId }),
   })
 }
+
+// Reject a refund request: clear the stamp, leaving the booking exactly as it
+// was before the diver asked. The common case is a diver who asked by accident
+// and wants to take it back — there is no admin-side "undo" otherwise, since
+// only the diver can set the stamp and only by requesting again.
+//
+// Deliberately no separate `refund_rejected_at` column: the booking's
+// `bookings_admin_audit_trg` already writes a before/after row to
+// admin_audit_log for every admin write, so the request and its rejection stay
+// on the forensic trail without new schema.
+export async function rejectRefundRequest(bookingId: string): Promise<void> {
+  const { error } = await supabase
+    .from('bookings')
+    .update({ refund_requested_at: null })
+    .eq('id', bookingId)
+  if (error) throw error
+}

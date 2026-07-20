@@ -1318,7 +1318,8 @@ export const ja: Messages = {
       loggedDives: (n: number) => `${n} 本記録`,
       diverNotesHeading: 'ダイバーメモ',
       refundRequested: (date: string) => `${date} に返金申請`,
-      approveRefund: '返金を承認',
+      approveRefund: '承認',
+      rejectRefund: '却下',
       leadPayerForGroup: 'このグループの支払い担当',
       billToDiver: 'このダイバー本人の支払いに切り替える',
       editRegistration: '申し込み内容を編集',
@@ -1952,6 +1953,8 @@ export const ja: Messages = {
       colRequested: '申請日時',
       approve: '承認',
       approved: '返金を承認しました · 予約をキャンセルしました',
+      reject: '却下',
+      rejected: '返金申請を却下しました · 予約は変更なし',
       eventFallback: 'イベント',
     },
     audits: {

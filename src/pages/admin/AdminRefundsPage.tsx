@@ -6,9 +6,9 @@ import { supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
 import { useToast } from '../../hooks/useToast'
 import { fetchEventsForBookings } from '../../lib/events'
-import { notifyRefundApproved } from '../../lib/refunds'
+import { notifyRefundApproved, rejectRefundRequest } from '../../lib/refunds'
 import { Spinner } from '../../components/ui/Spinner'
-import { CARD_ELEVATED, BTN_PRIMARY, TEXT_MUTED } from '../../styles/tokens'
+import { CARD_ELEVATED, BTN_PRIMARY, BTN_GHOST, TEXT_MUTED } from '../../styles/tokens'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
 import type { Booking } from '../../types/database'
@@ -112,6 +112,21 @@ export function AdminRefundsPage() {
     }
   }
 
+  async function reject(bookingId: string) {
+    setActing(bookingId)
+    try {
+      // Clears the request and leaves the booking untouched, so a diver who
+      // asked by accident is back where they started and can ask again.
+      await rejectRefundRequest(bookingId)
+      setRows(prev => (prev ?? []).filter(r => r.bookingId !== bookingId))
+      toast.success(rf.rejected)
+    } catch (e) {
+      toast.error(errorMessage(e))
+    } finally {
+      setActing(null)
+    }
+  }
+
   if (error) {
     return <div className="max-w-3xl mx-auto"><p className="text-sm text-red-200 bg-red-900/40 border border-accent rounded-lg p-3">{error}</p></div>
   }
@@ -145,7 +160,7 @@ export function AdminRefundsPage() {
         <ul className="space-y-3">
           {rows.map(r => (
             <li key={r.bookingId} className={`${CARD_ELEVATED} p-4 flex items-center justify-between gap-3`}>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="font-semibold text-brand-950 truncate">{r.diverName}</div>
                 <div className={`text-xs ${TEXT_MUTED} truncate`}>{r.eventTitle}</div>
                 <div className={`text-xs ${TEXT_MUTED} mt-0.5`}>
@@ -154,14 +169,24 @@ export function AdminRefundsPage() {
                   {rf.colRequested}: {format(new Date(r.requestedAt), 'PP p')}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => approve(r.bookingId)}
-                disabled={acting === r.bookingId}
-                className={`${BTN_PRIMARY} shrink-0`}
-              >
-                {rf.approve}
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => approve(r.bookingId)}
+                  disabled={acting === r.bookingId}
+                  className={`${BTN_PRIMARY} whitespace-nowrap`}
+                >
+                  {rf.approve}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => reject(r.bookingId)}
+                  disabled={acting === r.bookingId}
+                  className={`${BTN_GHOST} whitespace-nowrap`}
+                >
+                  {rf.reject}
+                </button>
+              </div>
             </li>
           ))}
         </ul>
