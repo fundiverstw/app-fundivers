@@ -172,6 +172,8 @@ export function AdminUsersPage() {
         existingPayments: existingForBooking,
         amount, note,
         recordedBy: profile.id,
+        owed: Number((booking.details as { total?: number } | null)?.total ?? 0)
+          + amendmentsDelta(extras.amendments.get(bookingId) ?? []),
       })
       const promoted = newStatus !== booking.status
       setExtrasCache(prev => {
@@ -377,6 +379,8 @@ export function AdminUsersPage() {
         booking,
         existingPayments: existingForBooking,
         paymentId,
+        owed: Number((booking.details as { total?: number } | null)?.total ?? 0)
+          + amendmentsDelta(extras.amendments.get(bookingId) ?? []),
       })
       const reverted = newStatus !== booking.status
       setExtrasCache(prev => {

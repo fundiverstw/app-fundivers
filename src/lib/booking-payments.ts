@@ -12,12 +12,34 @@ import type { Booking, BookingDetails, Payment } from '../types/database'
  * Shared by AdminEventDetailPage and AdminUsersPage so the rules
  * ("deposit fully paid → auto-confirm pending") stay in one place.
  */
+/**
+ * Is the deposit satisfied at this paid level?
+ *
+ * `owed` is the amended balance when the caller has it. Falling back to the
+ * frozen `details.total` is blind to amendments: a booking discounted below
+ * its deposit would never promote however much the diver paid, and a
+ * surcharged one would promote too early. When neither is known we cannot
+ * clamp at all — an absent total tells us nothing about the balance, and
+ * treating that as "owes nothing" would promote on any payment.
+ */
+function depositIsMet(
+  details: BookingDetails, owed: number | undefined, deposit: number, paid: number,
+): boolean {
+  const rawTotal = (details as { total?: number }).total
+  const effectiveOwed = owed ?? (rawTotal == null ? null : Number(rawTotal))
+  return effectiveOwed == null ? paid >= deposit : depositCovered(deposit, effectiveOwed, paid)
+}
+
 export async function recordPayment(args: {
   booking: Pick<Booking, 'id' | 'user_id' | 'status' | 'details'>
   existingPayments: Payment[]
   amount: number
   note: string
   recordedBy: string
+  /** What the diver owes — details.total PLUS the amendment ledger. Callers
+   *  that have the amendments should pass it; without it this falls back to
+   *  the raw frozen total, which is blind to discounts and surcharges. */
+  owed?: number
 }): Promise<{ payment: Payment; newStatus: Booking['status'] }> {
   const { booking, existingPayments, amount, note, recordedBy } = args
   const details = (booking.details ?? {}) as BookingDetails
@@ -48,12 +70,7 @@ export async function recordPayment(args: {
   // Only when we actually know the total. A booking whose details carry no
   // total tells us nothing about the balance, and treating that as "owes
   // nothing" would promote it on any payment at all.
-  const rawTotal = (details as { total?: number }).total
-  const shouldPromote = booking.status === 'pending' && (
-    rawTotal == null
-      ? newPaid >= deposit
-      : depositCovered(deposit, Number(rawTotal), newPaid)
-  )
+  const shouldPromote = booking.status === 'pending' && depositIsMet(details, args.owed, deposit, newPaid)
 
   let newStatus: Booking['status'] = booking.status
   if (shouldPromote) {
@@ -102,6 +119,8 @@ export async function voidPayment(args: {
   booking: Pick<Booking, 'id' | 'status' | 'details'>
   existingPayments: Payment[]
   paymentId: string
+  /** Amended balance, as for recordPayment. */
+  owed?: number
 }): Promise<{ payment: Payment; newStatus: Booking['status'] }> {
   const { booking, existingPayments, paymentId } = args
   const target = existingPayments.find(p => p.id === paymentId)
@@ -120,7 +139,11 @@ export async function voidPayment(args: {
   const deposit = Number(details.deposit ?? 0)
   // Recompute paid sum from the existing list, dropping the voided row.
   const newPaid = netPaid(existingPayments.filter(p => p.id !== paymentId))
-  const shouldRevert = booking.status === 'confirmed' && deposit > 0 && newPaid < deposit
+  // Mirrors the promotion rule, so recording and voiding cannot disagree: a
+  // booking discounted below its deposit was demoted by voiding any trivial
+  // payment, even with the full amended balance still covered.
+  const shouldRevert = booking.status === 'confirmed' && deposit > 0
+    && !depositIsMet(details, args.owed, deposit, newPaid)
 
   let newStatus: Booking['status'] = booking.status
   if (shouldRevert) {

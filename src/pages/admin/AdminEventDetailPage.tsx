@@ -312,6 +312,7 @@ export function AdminEventDetailPage() {
         existingPayments: r.payments,
         amount, note,
         recordedBy: profile.id,
+        owed: registrantBalance(r).owed,
       })
       const promoted = newStatus !== r.booking.status
       setRegistrants(prev => prev.map(x =>
@@ -347,6 +348,7 @@ export function AdminEventDetailPage() {
         booking: r.booking,
         existingPayments: r.payments,
         paymentId,
+        owed: registrantBalance(r).owed,
       })
       const reverted = newStatus !== r.booking.status
       setRegistrants(prev => prev.map(x =>
