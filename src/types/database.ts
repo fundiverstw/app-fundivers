@@ -1783,10 +1783,28 @@ export type StaffAvailabilityUpdate = Database['public']['Tables']['staff_availa
  *  joined profiles row in staff_availability_view. */
 export type StaffBusyEntry = Database['public']['Views']['staff_availability_view']['Row']
 
+// The event vocabulary. Derived from the generated events row rather than
+// re-declared, so it tracks the DB's events_kind_check constraint through the
+// usual type regeneration instead of drifting from it.
+export type EventKind = Database['public']['Tables']['events']['Row']['kind']
+
+// The same vocabulary as a value, so callers can iterate the kinds (filters,
+// pickers, per-kind fetches) instead of re-spelling the union — the codebase
+// used to inline `'dive' | 'course'` in twenty places, which is how a kind can
+// be added and silently fall through to the course branch everywhere.
+export const EVENT_KINDS = ['dive', 'course'] as const satisfies readonly EventKind[]
+
+// Guard: adding a kind to the DB (and so to EventKind) without adding it here
+// would leave every kind-iterating caller quietly skipping it. This fails to
+// compile until EVENT_KINDS covers the union.
+type UncoveredEventKind = Exclude<EventKind, typeof EVENT_KINDS[number]>
+export type _EventKindsAreExhaustive = UncoveredEventKind extends never ? true
+  : ['EVENT_KINDS is missing an event kind:', UncoveredEventKind]
+
 /** Normalized event shape used across Calendar + Bookings UI. */
 export interface AppEvent {
   id: string
-  type: 'dive' | 'course'
+  type: EventKind
   /** Diver-facing title — display_title with admin_title fallback. Used on
    *  every diver-facing surface (event detail, bookings, register form,
    *  notifications) EXCEPT the calendar grid pills, which use calendar_title

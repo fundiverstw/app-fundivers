@@ -6,14 +6,14 @@
 // positive, `refunded` negative, `voided` is excluded entirely.
 import { canonicalCertLevel } from './cert-level'
 import { siteConfig } from '../config/site'
-import type { Booking, Payment } from '../types/database'
+import type { Booking, Payment, EventKind } from '../types/database'
 
 export interface MoneyPoint { label: string; value: number }
 export interface CountPoint { label: string; value: number }
 
 export interface UpcomingFillRow {
   id: string
-  type: 'dive' | 'course'
+  type: EventKind
   title: string
   date: string | null
   confirmed: number
@@ -49,7 +49,7 @@ export interface Dashboard {
 export type PaymentLite = Pick<Payment, 'user_id' | 'booking_id' | 'amount' | 'status' | 'method' | 'created_at'>
 export type BookingLite = Pick<Booking, 'id' | 'user_id' | 'event_id' | 'status' | 'created_at' | 'details'>
 export interface ProfileLite { id: string; role: string; status: string; created_at: string; nationality: string | null; cert_level: string | null }
-export interface EventLite { id: string; type: 'dive' | 'course'; title: string; capacity: number | null; dateKey: string | null }
+export interface EventLite { id: string; type: EventKind; title: string; capacity: number | null; dateKey: string | null }
 export interface ConfirmedCount { eventId: string; count: number }
 
 export interface DashboardInput {

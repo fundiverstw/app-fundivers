@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Spinner } from '../../components/ui/Spinner'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import type { EventKind } from '../../types/database'
 import { errorMessage } from '../../lib/errors'
 import { t } from '../../i18n'
 
@@ -35,7 +36,7 @@ function taipeiYear(iso: string): number {
 
 type DiveRow = { id: string; display_title: string | null; admin_title: string | null; capacity: number | null; start_date: string | null }
 type CourseRow = { id: string; display_title: string | null; admin_title: string | null; capacity: number | null; course_days: string[] | null }
-type EventRowLite = DiveRow & CourseRow & { kind: 'dive' | 'course' }
+type EventRowLite = DiveRow & CourseRow & { kind: EventKind }
 
 const titleOf = (r: { display_title: string | null; admin_title: string | null }, fallback: string) =>
   r.display_title || r.admin_title || fallback

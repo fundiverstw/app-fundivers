@@ -9,6 +9,7 @@
 //     (only fire while there's an outstanding deposit or balance)
 
 import { t } from '../i18n'
+import type { EventKind } from '../types/database'
 
 export type ReminderKind =
   | 'event_7d' | 'event_1d'
@@ -40,7 +41,7 @@ export function daysBetween(fromYmd: string, toYmd: string): number {
 export interface ReminderInput {
   userId:              string
   eventId:             string
-  eventType:           'dive' | 'course'
+  eventType:           EventKind
   eventTitle:          string
   eventStartDate:      string   // YYYY-MM-DD, Taipei local
   /** 'HH:mm' (24h) or null when source row has no start time set. */
@@ -56,7 +57,7 @@ export interface ReminderInput {
 export interface ReminderOutput {
   userId:     string
   eventId:    string
-  eventType:  'dive' | 'course'
+  eventType:  EventKind
   kind:       ReminderKind
   title:      string
   body:       string

@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
 import { fetchEventRelations } from '../../lib/event-relations'
 import { siteConfig } from '../../config/site'
-import type { CancellationPolicy, CertLevel, TripTemplateEntry, EOAddon, EventRow, EOPrice, EORoom, TravelDestination } from '../../types/database'
+import type { CancellationPolicy, CertLevel, TripTemplateEntry, EOAddon, EventRow, EOPrice, EORoom, TravelDestination, EventKind } from '../../types/database'
 import {
   EMPTY_FORM,
   formStateFromEvent,
@@ -21,7 +21,7 @@ import { t } from '../../i18n'
 
 // The picker drives both the type pill and the row → form mapping from a
 // single selection; the events row carries its own `kind`.
-type PastEvent = { kind: 'dive' | 'course'; id: string; startDate: string; title: string; row: EventRow }
+type PastEvent = { kind: EventKind; id: string; startDate: string; title: string; row: EventRow }
 
 const ef = t.admin.eventForm
 const cat = t.admin.catalog

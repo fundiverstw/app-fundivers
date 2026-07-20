@@ -1,14 +1,12 @@
-import type { EventRow } from '../../types/database'
+import type { EventRow, EventKind } from '../../types/database'
 
 // Form-state shape, defaults, prefill helpers, and the FormState→DB-payload
 // converters used by the create + edit pages. Lives in its own file so the
 // EventForm component module exports only a component (react-refresh rule).
 
-export type EventType = 'dive' | 'course'
-
 export interface FormState {
   // common
-  type: EventType
+  type: EventKind
   admin_title: string    // internal label admins see (trimmed+required for dives, optional for courses)
   display_title: string  // diver-facing title; falls back to admin_title on public surfaces
   calendar_title: string // short label for the calendar widget; optional

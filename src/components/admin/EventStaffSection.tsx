@@ -4,14 +4,14 @@ import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { createDutyWithNotify, instructorsNeeded } from '../../lib/duties'
-import { DUTY_ROLES, type Duty, type DutyRole, type Profile } from '../../types/database'
+import { DUTY_ROLES, type Duty, type DutyRole, type Profile, type EventKind } from '../../types/database'
 import { DateField } from '../DateField'
 import { t } from '../../i18n'
 
 const st = t.admin.staff
 
 interface Props {
-  eventType: 'dive' | 'course'
+  eventType: EventKind
   eventId: string
   eventStartDate: string          // ISO timestamp
   eventEndDate?: string | null    // ISO timestamp; null for single-day events

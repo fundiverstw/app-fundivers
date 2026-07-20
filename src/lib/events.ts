@@ -1,8 +1,9 @@
 import { format, isSameDay, parseISO } from 'date-fns'
 import { supabase } from './supabase'
 import { diveOutingFromDestinations, type DiveOuting } from './event-colors'
+import { usesCourseDays, usesDateEnvelope, DATE_ENVELOPE_KINDS, COURSE_DAY_KINDS } from './event-kinds'
 import { siteConfig } from '../config/site'
-import type { AppEvent, EventDetails, EventRow, EOPrice } from '../types/database'
+import type { AppEvent, EventDetails, EventRow, EOPrice, EventKind } from '../types/database'
 
 type TripTemplateDetail = {
   id: string
@@ -18,7 +19,7 @@ type TripTemplateDetail = {
 // breaks the calendar's core event query.
 type EventDetailRow = {
   id: string
-  kind: 'dive' | 'course'
+  kind: EventKind
   notes: string | null
   prereqs: string | null
   req_dives: number | null
@@ -290,7 +291,7 @@ function courseToEvents(c: EventRow, priceIndex: Map<string, EOPrice>, addonIds:
 
 /** Build the AppEvent(s) for a row: one for a dive, one-per-run for a course. */
 function rowToEvents(e: EventRow, priceIndex: Map<string, EOPrice>, addonIds: string[], roomIds: string[], outing: DiveOuting | null, details: EventDetails | null): AppEvent[] {
-  if (e.kind === 'course') return courseToEvents(e, priceIndex, addonIds, details)
+  if (usesCourseDays(e.kind)) return courseToEvents(e, priceIndex, addonIds, details)
   const ev = diveToEvent(e, priceIndex, addonIds, roomIds, outing, details)
   return ev ? [ev] : []
 }
@@ -435,7 +436,7 @@ async function attachEventDetails(eventIds: string[]): Promise<Map<string, Event
 
   for (const r of rows) {
     const cert = r.prereq_cert_id ? certNames.get(r.prereq_cert_id) ?? null : null
-    const det = r.kind === 'course'
+    const det = usesCourseDays(r.kind)
       ? courseDetails(r, cert)
       : diveDetails(r, r.trip_template_id ? travel.get(r.trip_template_id) ?? null : null, cert)
     if (det) out.set(r.id, det)
@@ -493,16 +494,19 @@ export async function fetchEventsInRange(
   toDate: string,
   opts: { includePrivate?: boolean } = {},
 ): Promise<AppEvent[]> {
-  let diveQuery = supabase.from('events').select(EVENT_COLS).eq('kind', 'dive').is('cancelled_at', null)
+  // Split by temporal shape, not by kind: envelope kinds filter on the scalar
+  // start_date, course-day kinds on course_days overlap. Querying the kind
+  // groups keeps a newly added kind in whichever query matches its shape.
+  let envelopeQuery = supabase.from('events').select(EVENT_COLS).in('kind', DATE_ENVELOPE_KINDS).is('cancelled_at', null)
     .gte('start_date', fromDate).lte('start_date', toDate).order('start_date')
-  if (!opts.includePrivate) diveQuery = diveQuery.eq('is_private', false)
-  const [divesResp, coursesResp] = await Promise.all([
-    diveQuery,
-    supabase.from('events').select(EVENT_COLS).eq('kind', 'course').is('cancelled_at', null)
+  if (!opts.includePrivate) envelopeQuery = envelopeQuery.eq('is_private', false)
+  const [envelopeResp, coursesResp] = await Promise.all([
+    envelopeQuery,
+    supabase.from('events').select(EVENT_COLS).in('kind', COURSE_DAY_KINDS).is('cancelled_at', null)
       .overlaps('course_days', datesInRange(fromDate, toDate)),
   ])
 
-  const rows = [...((divesResp.data ?? []) as EventRow[]), ...((coursesResp.data ?? []) as EventRow[])]
+  const rows = [...((envelopeResp.data ?? []) as EventRow[]), ...((coursesResp.data ?? []) as EventRow[])]
   const events = (await enrichAndBuild(rows)).sort((a, b) => a.start_time.localeCompare(b.start_time))
   await attachConfirmedCounts(events)
   return events
@@ -517,14 +521,14 @@ export async function fetchUpcomingEventDays(
   fromDate: string,
   toDate: string,
 ): Promise<string[]> {
-  const [divesResp, coursesResp] = await Promise.all([
-    supabase.from('events').select('start_date').eq('kind', 'dive').is('cancelled_at', null)
+  const [envelopeResp, coursesResp] = await Promise.all([
+    supabase.from('events').select('start_date').in('kind', DATE_ENVELOPE_KINDS).is('cancelled_at', null)
       .gte('start_date', fromDate).lte('start_date', toDate),
-    supabase.from('events').select('course_days').eq('kind', 'course').is('cancelled_at', null)
+    supabase.from('events').select('course_days').in('kind', COURSE_DAY_KINDS).is('cancelled_at', null)
       .overlaps('course_days', datesInRange(fromDate, toDate)),
   ])
   const days = new Set<string>()
-  for (const d of (divesResp.data ?? []) as { start_date: string | null }[]) {
+  for (const d of (envelopeResp.data ?? []) as { start_date: string | null }[]) {
     if (d.start_date) days.add(d.start_date)
   }
   for (const c of (coursesResp.data ?? []) as { course_days: string[] | null }[]) {
@@ -553,7 +557,7 @@ export async function fetchEventsForBookings(eventIds: string[]): Promise<Map<st
 
   const out = new Map<string, AppEvent>()
   for (const e of rows) {
-    if (e.kind === 'dive') {
+    if (usesDateEnvelope(e.kind)) {
       const ev = diveToEvent(e, prices, addons.get(e.id) ?? [], rooms.get(e.id) ?? [], outings.get(e.id) ?? null, details.get(e.id) ?? null)
       if (ev) out.set(ev.id, ev)
       continue

@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import type { EventKind } from '../types/database'
 
 // Wrapper around the export-event-divers edge function. Admins call this
 // from AdminEventDetailPage; the function builds an .xlsx boat manifest and
@@ -13,7 +14,7 @@ export interface BoatManifestInput {
 }
 
 export async function requestEventDiverExport(
-  eventType: 'dive' | 'course',
+  eventType: EventKind,
   eventId: string,
   boat: BoatManifestInput,
 ): Promise<{ ok: boolean; diver_count: number; staff_count: number }> {

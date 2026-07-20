@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 import { courseColor } from './event-colors'
 import { ANNUAL_WAIVER_VALID_DAYS, rowToWaiverDef, type WaiverDef } from '../config/waivers'
-import type { EventWaiver, WaiverSignature, WaiverRow, WaiverInsert } from '../types/database'
+import type { EventWaiver, WaiverSignature, WaiverRow, WaiverInsert, EventKind } from '../types/database'
 
 // Waiver logic — combines the config catalog/global rules (src/config/waivers.ts)
 // with the DB facts (per-diver signatures, per-event overrides) to answer "which
@@ -11,7 +11,7 @@ import type { EventWaiver, WaiverSignature, WaiverRow, WaiverInsert } from '../t
 /** The minimum an event must expose for the waiver rules. */
 export interface WaiverEventRef {
   id: string
-  type: 'dive' | 'course'
+  type: EventKind
   title: string
 }
 
