@@ -12,7 +12,7 @@ import { uniqueUuids } from '../lib/uuid'
 import { resolveCharges, type ChargeLine } from '../lib/booking-charges'
 import { fetchChargeCatalog } from '../lib/booking-charge-catalog'
 import { fetchCreditsForUser, openCreditForBooking } from '../lib/credits'
-import { bookingBalance } from '../lib/booking-balance'
+import { bookingBalance, depositCovered } from '../lib/booking-balance'
 import { netPaid } from '../lib/payments'
 import { ShareEventButton } from '../components/ShareEventButton'
 import { ChargeBreakdown } from '../components/ChargeBreakdown'
@@ -261,6 +261,10 @@ function Card({
   // amendments). A negative balance — whether from an awarded credit or an
   // overpayment — is money the shop owes the diver, shown as a credit.
   const bal = bookingBalance(owed, row.paidSum, row.credit, { cancelled: row.status === 'cancelled' })
+  // A deposit is a down payment on the balance, so it cannot outlive it: a
+  // discount that drops `owed` below the frozen deposit must not leave the
+  // deposit still demanding the difference.
+  const depositIsCovered = depositCovered(deposit, owed, row.paidSum)
 
   return (
     <div className={CARD}>
@@ -308,8 +312,8 @@ function Card({
           {deposit > 0 && (
             <div className={`flex justify-between ${TEXT_BODY}`}>
               <span>{t.bookings.deposit}</span>
-              <span className={row.paidSum >= deposit ? 'text-brand-900 font-semibold' : TEXT_ERROR}>
-                {currency} {deposit.toLocaleString()} {row.paidSum >= deposit ? '✓' : t.bookings.due}
+              <span className={depositIsCovered ? 'text-brand-900 font-semibold' : TEXT_ERROR}>
+                {currency} {Math.min(deposit, owed).toLocaleString()} {depositIsCovered ? '✓' : t.bookings.due}
               </span>
             </div>
           )}

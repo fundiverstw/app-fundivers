@@ -9,7 +9,7 @@ import { personName } from '../lib/names'
 import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
 import { fetchCreditsForUser, openCreditForBooking, openCreditBalance, diverCreditBalance, applyCreditToBooking } from '../lib/credits'
 import { useToast } from '../hooks/useToast'
-import { bookingBalance } from '../lib/booking-balance'
+import { bookingBalance, depositDue } from '../lib/booking-balance'
 import { netPaid } from '../lib/payments'
 import { resolveCharges, type ChargeLine } from '../lib/booking-charges'
 import { fetchChargeCatalog } from '../lib/booking-charge-catalog'
@@ -126,7 +126,7 @@ export function PaymentsPage() {
         paid,
         credit,
         due: Math.max(0, owed - paid - credit),
-        depositDue: Math.max(0, deposit - paid),
+        depositDue: depositDue(deposit, owed, paid),
         ownerName: nameById.get(b.user_id) ?? '(diver)',
         coveredByName: coveredByOther ? (b.payer_id ? nameById.get(b.payer_id) ?? '(lead booker)' : null) : null,
       }

@@ -209,6 +209,39 @@ describe('recordPayment', () => {
     expect(bookingsUpdate).not.toHaveBeenCalled()
   })
 
+  it('promotes when a discounted balance is paid in full, even below the frozen deposit', async () => {
+    // Booked at 3000 with a full-value deposit, then discounted to 2600. The
+    // diver pays the 2600 they owe. Comparing against the frozen 3000 would
+    // leave the booking pending forever.
+    setupForRecord({ ...basePaid, id: 'p-new', amount: 2600 })
+    const { recordPayment } = await import('./booking-payments')
+
+    const booking: Pick<Booking, 'id' | 'user_id' | 'status' | 'details'> = {
+      id: 'b1', user_id: 'u1', status: 'pending',
+      details: { total: 2600, deposit: 3000, payment_method: 'cash' },
+    }
+    const { newStatus } = await recordPayment({
+      booking, existingPayments: [], amount: 2600, note: 'Balance', recordedBy: 'admin',
+    })
+    expect(newStatus).toBe('confirmed')
+  })
+
+  it('does not promote on a partial payment just because a total is missing', async () => {
+    // No total means we know nothing about the balance; treating that as
+    // "owes nothing" would confirm a booking on any payment at all.
+    setupForRecord({ ...basePaid, id: 'p-new', amount: 10 })
+    const { recordPayment } = await import('./booking-payments')
+
+    const booking: Pick<Booking, 'id' | 'user_id' | 'status' | 'details'> = {
+      id: 'b1', user_id: 'u1', status: 'pending',
+      details: { deposit: 5000, payment_method: 'cash' },
+    }
+    const { newStatus } = await recordPayment({
+      booking, existingPayments: [], amount: 10, note: 'Token', recordedBy: 'admin',
+    })
+    expect(newStatus).toBe('pending')
+  })
+
   it('counts only paid existing payments toward the deposit — voided rows do not promote', async () => {
     setupForRecord({ ...basePaid, id: 'p-new', amount: 2000 })
     const { recordPayment } = await import('./booking-payments')

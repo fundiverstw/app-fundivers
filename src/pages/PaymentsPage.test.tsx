@@ -108,6 +108,41 @@ describe('PaymentsPage', () => {
     expect(screen.getByText(/Dive B/)).toBeInTheDocument()
   })
 
+  it('shows no deposit due once a discounted booking is paid in full', async () => {
+    // The reported bug, verbatim: a diver saw "Total 2600 · Paid 2600 ·
+    // Balance settled" sitting beside "Deposit 400 due". The deposit is frozen
+    // at booking time and amendments never touch it, so a 400 discount left it
+    // demanding the difference — money nobody owed.
+    const bookings = [
+      { id: 'b1', user_id: 'u1', event_id: 'd1', status: 'confirmed', notes: null,
+        created_at: new Date().toISOString(), details: { total: 3000, deposit: 3000 } },
+    ]
+    const payments = [
+      { id: 'p1', user_id: 'u1', booking_id: 'b1', amount: 2600, currency: 'TWD', status: 'paid',
+        method: 'Bank', note: 'Paid in full', created_at: new Date().toISOString(), recorded_by: null },
+    ]
+    const amendments = [
+      { id: 'a1', booking_id: 'b1', amount: -400, note: 'Loyalty discount',
+        created_by: 'admin', created_at: new Date().toISOString() },
+    ]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings')           return mockQueryBuilder({ data: bookings })
+      if (table === 'payments')           return mockQueryBuilder({ data: payments })
+      if (table === 'booking_amendments') return mockQueryBuilder({ data: amendments })
+      return mockQueryBuilder({ data: [] })
+    })
+    fetchEventsForBookings.mockResolvedValue(new Map<string, AppEvent>([
+      ['d1', event({ id: 'd1', type: 'dive', title: 'Discounted Dive', price: 3000 })],
+    ]))
+
+    renderWithRouter(<PaymentsPage />)
+    await screen.findByText(/Discounted Dive/)
+
+    // Settled, and nothing anywhere on the page claims an outstanding deposit.
+    expect(screen.queryByText(/400\s*due/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/TWD\s*400/)).not.toBeInTheDocument()
+  })
+
   it('lets a diver apply available account credit to a booking with a balance due', async () => {
     const bookings = [
       { id: 'b1', user_id: 'u1', event_id: 'd1', status: 'pending', notes: null, created_at: new Date().toISOString(), details: { total: 3000 } },

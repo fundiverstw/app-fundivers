@@ -9,6 +9,7 @@
 //     (only fire while there's an outstanding deposit or balance)
 
 import { t } from '../i18n'
+import { depositDue as depositAmountDue } from './booking-balance'
 import type { EventKind } from '../types/database'
 
 export type ReminderKind =
@@ -100,7 +101,10 @@ export function selectReminders(today: string, inputs: ReminderInput[]): Reminde
       // details.total alone billed discounted divers for the full price.
       const balanceDue = Math.max(0, r.totalAmount - r.paidAmount - r.creditAmount)
       if (balanceDue > 0) {
-        const depositDue = Math.max(0, r.depositAmount - r.paidAmount)
+        // Clamped to what is owed: a discount can take the balance below
+        // the frozen deposit, and chasing the difference asks for money the
+        // diver does not owe.
+        const depositDue = depositAmountDue(r.depositAmount, r.totalAmount, r.paidAmount)
         const isDeposit  = depositDue > 0
         const amount     = isDeposit ? depositDue : balanceDue
         const label      = isDeposit ? t.push.deposit : t.push.balance

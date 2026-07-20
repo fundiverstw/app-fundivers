@@ -42,3 +42,26 @@ export function bookingBalance(
   if (net === 0) return { net, amount: 0, state: 'settled' }
   return { net, amount: -net, state: 'credit' }
 }
+
+/**
+ * The deposit a diver can actually still be asked for.
+ *
+ * `details.deposit` is frozen at booking time and, unlike the total, nothing
+ * reduces it afterwards — amendments move `owed`, never the deposit. So a
+ * discount that takes the balance below the original deposit used to leave the
+ * deposit demanding the difference: a diver on a 3000 booking discounted to
+ * 2600 who paid all 2600 saw "Total 2600 · Paid 2600 · Balance settled" beside
+ * "Deposit 400 due" — money nobody owed.
+ *
+ * A deposit is a down payment ON the balance, so it can never exceed it. Clamp
+ * to `owed` and the contradiction is impossible: when the balance is settled,
+ * nothing is due.
+ */
+export function depositDue(deposit: number, owed: number, paid: number): number {
+  return Math.max(0, Math.min(deposit, owed) - paid)
+}
+
+/** True when the deposit is satisfied — the threshold that confirms a spot. */
+export function depositCovered(deposit: number, owed: number, paid: number): boolean {
+  return depositDue(deposit, owed, paid) === 0
+}

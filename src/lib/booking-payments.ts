@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { netPaid } from './payments'
+import { depositCovered } from './booking-balance'
 import type { Booking, BookingDetails, Payment } from '../types/database'
 
 /**
@@ -40,7 +41,19 @@ export async function recordPayment(args: {
   const deposit = Number(details.deposit ?? 0)
   const prevPaid = netPaid(existingPayments)
   const newPaid = prevPaid + Number(payment.amount)
-  const shouldPromote = booking.status === 'pending' && newPaid >= deposit
+  // Clamped to what is owed: after a discount the frozen deposit can exceed
+  // the balance, and a diver paying the discounted total in full would then
+  // never cross it — their booking would sit pending forever.
+  //
+  // Only when we actually know the total. A booking whose details carry no
+  // total tells us nothing about the balance, and treating that as "owes
+  // nothing" would promote it on any payment at all.
+  const rawTotal = (details as { total?: number }).total
+  const shouldPromote = booking.status === 'pending' && (
+    rawTotal == null
+      ? newPaid >= deposit
+      : depositCovered(deposit, Number(rawTotal), newPaid)
+  )
 
   let newStatus: Booking['status'] = booking.status
   if (shouldPromote) {
