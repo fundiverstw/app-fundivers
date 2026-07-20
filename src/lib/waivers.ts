@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 import { courseColor } from './event-colors'
 import { usesCourseDays } from './event-kinds'
-import { ANNUAL_WAIVER_VALID_DAYS, rowToWaiverDef, type WaiverDef, type WaiverAppliesTo } from '../config/waivers'
+import { ANNUAL_WAIVER_VALID_DAYS, rowToWaiverDef, WAIVER_SCOPE_BY_KIND, type WaiverDef } from '../config/waivers'
 import type { EventWaiver, WaiverSignature, WaiverRow, WaiverInsert, EventKind } from '../types/database'
 
 // Waiver logic — combines the config catalog/global rules (src/config/waivers.ts)
@@ -21,18 +21,9 @@ export type WaiverOverride = Pick<EventWaiver, 'waiver_code' | 'mode'>
 
 const DAY_MS = 86_400_000
 
-// The `applies_to` value that names each kind. A full Record so a new kind has
-// to be given a scope: the old shape read "dive, else course", which silently
-// scoped any third kind under the course rules — including the course-colour
-// filter, which it can never match.
-const APPLIES_TO_BY_KIND: Record<EventKind, WaiverAppliesTo> = {
-  dive:   'dives',
-  course: 'courses',
-}
-
 // Does the waiver's GLOBAL rule (before per-event overrides) cover this event?
 export function globalRuleMatches(def: WaiverDef, event: WaiverEventRef): boolean {
-  const scope = APPLIES_TO_BY_KIND[event.type]
+  const scope = WAIVER_SCOPE_BY_KIND[event.type]
   if (def.appliesTo !== scope && def.appliesTo !== 'all') return false
   // Course colours narrow a course-scoped rule to particular course types;
   // they have no meaning for kinds that aren't courses.

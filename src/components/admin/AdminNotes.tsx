@@ -25,9 +25,10 @@ type NoteWithAuthors = AdminNote & {
   resolver: Pick<Profile, 'id' | 'nickname' | 'name'> | null
 }
 
+// Which column the note hangs off. The event kinds used to be spelled out
+// here, but every one of them writes event_id — only the booking case differs.
 export type NoteTarget =
-  | { kind: 'dive'; id: string }
-  | { kind: 'course'; id: string }
+  | { kind: 'event'; id: string }
   | { kind: 'booking'; id: string }
 
 interface Props {

@@ -74,6 +74,7 @@ const COURSE_DOT: Record<CourseColor, string> = {
 const KIND_BAR: Record<EventKind, { base: string; hover: string }> = {
   dive:   { base: DIVE_LOCAL_BAR, hover: DIVE_LOCAL_BAR_HOVER },
   course: { base: COURSE_BAR.ow,  hover: COURSE_BAR_HOVER.ow },
+  adventure: { base: 'bg-teal-500 text-white', hover: 'bg-teal-400 text-white' },
 }
 
 function eventBarClass(ev: AppEvent, hovered: boolean): string {

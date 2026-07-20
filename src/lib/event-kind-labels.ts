@@ -9,9 +9,11 @@ import type { EventKind } from './event-kinds'
 export const EVENT_KIND_LABELS: Record<EventKind, string> = {
   dive:   t.calendar.typeDive,
   course: t.calendar.typeCourse,
+  adventure: t.calendar.typeAdventure,
 }
 
 export const EVENT_KIND_DOT: Record<EventKind, string> = {
   dive:   'bg-emerald-600',
   course: 'bg-surface-500',
+  adventure: 'bg-teal-500',
 }

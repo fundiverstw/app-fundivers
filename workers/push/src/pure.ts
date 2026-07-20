@@ -20,6 +20,7 @@ export type EventRow = { id: string; kind: EventKind; admin_title?: string | nul
 const KIND_FALLBACK_TITLE: Record<EventKind, string> = {
   dive:   'Dive',
   course: 'Course',
+  adventure: 'Adventure',
 }
 
 function titleOf(ev: EventRow): string {

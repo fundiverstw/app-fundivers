@@ -20,7 +20,7 @@
 //   7. Build an .xlsx via _shared/event-divers-xlsx.ts and email it to
 //      fundiverstw@gmail.com with the caller BCCed.
 //
-// Body: { event_type: 'dive' | 'course', event_id: string,
+// Body: { event_type: EventKind, event_id: string,
 //         boat?: { boat_name?: string, registration?: string, notes?: string[] } }
 // Returns: 200 { ok: true, diver_count }
 //          400 on bad request

@@ -543,3 +543,36 @@ describe('fetchUpcomingEventDays', () => {
     expect(days).toEqual(['2026-07-05'])
   })
 })
+
+describe('adventure events reach the calendar', () => {
+  it('fetches adventures alongside dives in the envelope query', async () => {
+    // The calendar used to run one query per kind, hardcoded to dive and
+    // course. A kind missing from those queries is never fetched at all, so it
+    // vanishes from the calendar rather than rendering wrongly.
+    setup([{
+      id: 'adv1', kind: 'adventure', display_title: 'Camping weekend',
+      start_time: '08:00:00', price: null, dive_days: null,
+      admin_title: null, calendar_title: null, course_days: null,
+      start_date: '2026-05-12', end_date: '2026-05-14',
+    } as unknown as EventFixture])
+    const { fetchEventsInRange } = await import('./events')
+    const events = await fetchEventsInRange('2026-05-01', '2026-05-31')
+
+    expect(events).toHaveLength(1)
+    expect(events[0].type).toBe('adventure')
+    expect(events[0].start_time.slice(0, 10)).toBe('2026-05-12')
+    expect(events[0].end_time?.slice(0, 10)).toBe('2026-05-14')
+  })
+
+  it('counts an adventure day in the upcoming-days picker', async () => {
+    setup([{
+      id: 'adv2', kind: 'adventure', display_title: 'Camping',
+      start_time: '08:00:00', price: null, dive_days: null,
+      admin_title: null, calendar_title: null, course_days: null,
+      start_date: '2026-05-20', end_date: null,
+    } as unknown as EventFixture])
+    const { fetchUpcomingEventDays } = await import('./events')
+    expect(await fetchUpcomingEventDays('2026-05-01', '2026-05-31')).toContain('2026-05-20')
+  })
+})
+

@@ -6,6 +6,9 @@ import { uploadWaiverPdf, getWaiverPdfSignedUrl } from '../../lib/waiver-pdf'
 import type { WaiverRow, WaiverInsert } from '../../types/database'
 import type { WaiverCadence, WaiverAppliesTo } from '../../config/waivers'
 import { t } from '../../i18n'
+import { EVENT_KINDS } from '../../lib/event-kinds'
+import { EVENT_KIND_LABELS } from '../../lib/event-kind-labels'
+import { WAIVER_SCOPE_BY_KIND } from '../../config/waivers'
 
 const wv = t.admin.waivers
 
@@ -223,8 +226,13 @@ function WaiverForm({
           <Labelled label={wv.autoApplies}>
             <select className={FIELD} value={appliesTo} onChange={e => setAppliesTo(e.target.value as WaiverAppliesTo)}>
               <option value="none">{wv.applyNone}</option>
-              <option value="dives">{wv.applyDives}</option>
-              <option value="courses">{wv.applyCourses}</option>
+              {/* One scope per kind, from the shared vocabulary — a new kind
+                  becomes selectable here without a code change. */}
+              {EVENT_KINDS.map(kind => (
+                <option key={kind} value={WAIVER_SCOPE_BY_KIND[kind]}>
+                  {wv.applyKind(EVENT_KIND_LABELS[kind])}
+                </option>
+              ))}
               <option value="all">{wv.applyAll}</option>
             </select>
           </Labelled>

@@ -9,7 +9,7 @@
 // on the caller's JWT having profiles.role = 'admin' (not the worker-only
 // service-role gate that notify-waitlist-offer uses).
 //
-// Body: { event_id: string, event_type: 'dive' | 'course' }
+// Body: { event_id: string, event_type: EventKind }
 // Returns: 200 { ok: true, sent, recipients }
 
 import { createClient } from "jsr:@supabase/supabase-js@2.103.2"

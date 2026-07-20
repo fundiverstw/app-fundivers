@@ -17,7 +17,7 @@
 // whether the shop drives divers there — so a new kind has to answer each
 // question explicitly rather than defaulting into someone else's path.
 
-export const EVENT_KINDS = ['dive', 'course'] as const
+export const EVENT_KINDS = ['dive', 'course', 'adventure'] as const
 export type EventKind = typeof EVENT_KINDS[number]
 
 /**

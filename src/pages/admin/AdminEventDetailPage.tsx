@@ -530,7 +530,7 @@ export function AdminEventDetailPage() {
               readOnly={!isAdmin}
             />
           )}
-          <AdminNotes target={{ kind: event.type, id }} title={ed.memos} />
+          <AdminNotes target={{ kind: 'event', id }} title={ed.memos} />
         </>
       )}
 

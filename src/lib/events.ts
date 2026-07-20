@@ -2,6 +2,7 @@ import { format, isSameDay, parseISO } from 'date-fns'
 import { supabase } from './supabase'
 import { diveOutingFromDestinations, type DiveOuting } from './event-colors'
 import { usesCourseDays, usesDateEnvelope, DATE_ENVELOPE_KINDS, COURSE_DAY_KINDS } from './event-kinds'
+import { EVENT_KIND_LABELS } from './event-kind-labels'
 import { siteConfig } from '../config/site'
 import type { AppEvent, EventDetails, EventRow, EOPrice, EventKind } from '../types/database'
 
@@ -163,15 +164,18 @@ function toHhmm(raw: string | null | undefined): string | null {
   return `${m[1].padStart(2, '0')}:${m[2]}`
 }
 
-function diveToEvent(e: EventRow, priceIndex: Map<string, EOPrice>, addonIds: string[], roomIds: string[], outing: DiveOuting | null, details: EventDetails | null): AppEvent | null {
+// Builds the UI event for every envelope kind, not just dives — `type` comes
+// from the row. Hardcoding 'dive' here would fetch an adventure correctly and
+// then render and label it as a dive.
+function envelopeToEvent(e: EventRow, priceIndex: Map<string, EOPrice>, addonIds: string[], roomIds: string[], outing: DiveOuting | null, details: EventDetails | null): AppEvent | null {
   const start = toIso(e.start_date, e.start_time)
   if (!start) return null
   const p = e.price ? priceIndex.get(e.price) : undefined
   const gearText = e.gear_rental && e.gear_rental.trim() ? e.gear_rental.trim() : null
   return {
     id: e.id,
-    type: 'dive',
-    title: e.display_title || e.admin_title || 'Dive',
+    type: e.kind,
+    title: e.display_title || e.admin_title || EVENT_KIND_LABELS[e.kind],
     calendar_title: e.calendar_title ?? null,
     start_time: start,
     end_time: toIso(e.end_date, e.start_time),
@@ -292,7 +296,7 @@ function courseToEvents(c: EventRow, priceIndex: Map<string, EOPrice>, addonIds:
 /** Build the AppEvent(s) for a row: one for a dive, one-per-run for a course. */
 function rowToEvents(e: EventRow, priceIndex: Map<string, EOPrice>, addonIds: string[], roomIds: string[], outing: DiveOuting | null, details: EventDetails | null): AppEvent[] {
   if (usesCourseDays(e.kind)) return courseToEvents(e, priceIndex, addonIds, details)
-  const ev = diveToEvent(e, priceIndex, addonIds, roomIds, outing, details)
+  const ev = envelopeToEvent(e, priceIndex, addonIds, roomIds, outing, details)
   return ev ? [ev] : []
 }
 
@@ -558,7 +562,7 @@ export async function fetchEventsForBookings(eventIds: string[]): Promise<Map<st
   const out = new Map<string, AppEvent>()
   for (const e of rows) {
     if (usesDateEnvelope(e.kind)) {
-      const ev = diveToEvent(e, prices, addons.get(e.id) ?? [], rooms.get(e.id) ?? [], outings.get(e.id) ?? null, details.get(e.id) ?? null)
+      const ev = envelopeToEvent(e, prices, addons.get(e.id) ?? [], rooms.get(e.id) ?? [], outings.get(e.id) ?? null, details.get(e.id) ?? null)
       if (ev) out.set(ev.id, ev)
       continue
     }

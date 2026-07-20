@@ -906,7 +906,7 @@ export interface Database {
           pdf_path: string | null
           cadence: 'annual' | 'per_event'
           version: number
-          applies_to: 'dives' | 'courses' | 'all' | 'none'
+          applies_to: 'dives' | 'courses' | 'adventures' | 'all' | 'none'
           course_colors: string[] | null
           active: boolean
         }
@@ -921,7 +921,7 @@ export interface Database {
           pdf_path?: string | null
           cadence?: 'annual' | 'per_event'
           version?: number
-          applies_to?: 'dives' | 'courses' | 'all' | 'none'
+          applies_to?: 'dives' | 'courses' | 'adventures' | 'all' | 'none'
           course_colors?: string[] | null
           active?: boolean
         }
@@ -1121,7 +1121,7 @@ export interface Database {
       events: {
         Row: {
           id: string
-          kind: 'dive' | 'course'
+          kind: 'dive' | 'course' | 'adventure'
           admin_title: string | null
           display_title: string | null
           calendar_title: string | null
@@ -1157,7 +1157,7 @@ export interface Database {
         }
         Insert: {
           id?: string
-          kind: 'dive' | 'course'
+          kind: 'dive' | 'course' | 'adventure'
           admin_title?: string | null
           display_title?: string | null
           calendar_title?: string | null
@@ -1521,14 +1521,14 @@ export interface Database {
         Row: {
           user_id: string
           event_id: string
-          event_type: 'dive' | 'course'
+          event_type: 'dive' | 'course' | 'adventure'
           kind: string
           sent_at: string
         }
         Insert: {
           user_id: string
           event_id: string
-          event_type: 'dive' | 'course'
+          event_type: 'dive' | 'course' | 'adventure'
           kind: string
           sent_at?: string
         }

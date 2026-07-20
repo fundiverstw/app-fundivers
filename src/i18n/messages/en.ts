@@ -50,6 +50,7 @@ export const en = {
   calendar: {
     typeDive: 'Dive',
     typeCourse: 'Course',
+    typeAdventure: 'Adventure',
     registerMultiple: 'Register for multiple events',
     multiModeHint: "Multi-event mode — tap events to add. Already-booked or full events can't be added.",
     booked: 'Booked',
@@ -1063,9 +1064,9 @@ export const en = {
       cadenceAnnualLong: 'Annual (signed once a year)',
       autoApplies: 'Auto-applies to',
       applyNone: 'Nothing (attach per-event only)',
-      applyDives: 'All dives',
-      applyCourses: 'All courses',
-      applyAll: 'Dives and courses',
+      // `kind` is the already-localised event-kind label.
+      applyKind: (kind: string) => `All ${kind.toLowerCase()}s`,
+      applyAll: 'All event types',
       courseLimit: 'Limit to course types (optional, comma-separated: ow, aow, dsd, rescue, specialty)',
       courseLimitPh: 'ow, aow, rescue, specialty',
       content: 'Content',

@@ -10,6 +10,7 @@ import {
 } from './accounting-export'
 import { siteConfig } from '../config/site'
 import type { Payment } from '../types/database'
+import { EVENT_KIND_LABELS } from './event-kind-labels'
 
 function payment(over: Partial<Payment>): Payment {
   return {
@@ -153,8 +154,10 @@ describe('buildSummaryCsv', () => {
     ], 2026)
     expect(csv).toContain('Payment method,bank_transfer,1,700')
     expect(csv).toContain('Payment method,cash,1,300')
-    expect(csv).toContain('Event type,Dives,1,700')
-    expect(csv).toContain('Event type,Courses,1,300')
+    // Labelled from the shared kind vocabulary, so the breakdown follows the
+    // deployment's language and gains a row when a kind is added.
+    expect(csv).toContain(`Event type,${EVENT_KIND_LABELS.dive},1,700`)
+    expect(csv).toContain(`Event type,${EVENT_KIND_LABELS.course},1,300`)
   })
 })
 

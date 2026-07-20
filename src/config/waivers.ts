@@ -1,5 +1,6 @@
 import type { CourseColor } from '../lib/event-colors'
 import type { WaiverRow } from '../types/database'
+import type { EventKind } from '../lib/event-kinds'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Waiver domain types.
@@ -25,7 +26,18 @@ export type WaiverCadence =
 // 'none' keeps a waiver in the catalog — voluntarily signable, and requirable on
 // individual events via an event_waivers 'require' override — without any global
 // rule auto-requiring it.
-export type WaiverAppliesTo = 'dives' | 'courses' | 'all' | 'none'
+export type WaiverAppliesTo = 'dives' | 'courses' | 'adventures' | 'all' | 'none'
+
+// The `applies_to` value that names each kind. A full Record so a new kind has
+// to be given a scope: the old shape read "dive, else course", which silently
+// scoped any third kind under the course rules — including the course-colour
+// filter, which it can never match.
+export const WAIVER_SCOPE_BY_KIND: Record<EventKind, WaiverAppliesTo> = {
+  dive:   'dives',
+  course: 'courses',
+  adventure: 'adventures',
+}
+
 
 export interface WaiverDef {
   /** Stable identifier stored on signatures/overrides — never reuse for a

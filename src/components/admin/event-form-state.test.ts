@@ -582,3 +582,45 @@ describe('eventPayloadFromForm — course', () => {
     expect(eventPayloadFromForm({ ...EMPTY_FORM, type: 'course', display_title: '  D  ' }).display_title).toBe('D')
   })
 })
+
+describe('adventure events', () => {
+  it('round-trips an adventure through the form without turning it into a dive', () => {
+    // formFromEvent used to hardcode `type: 'dive'` on its non-course branch,
+    // which would load an adventure as a dive and save it back as one.
+    const form = formStateFromEvent(baseRow({
+      kind: 'adventure',
+      start_date: '2026-08-01',
+      end_date: '2026-08-03',
+      course_days: null,
+    }))
+    expect(form.type).toBe('adventure')
+    expect(form.start_date).toBe('2026-08-01')
+    expect(form.end_date).toBe('2026-08-03')
+
+    const payload = eventPayloadFromForm(form)
+    expect(payload.kind).toBe('adventure')
+    expect(payload.start_date).toBe('2026-08-01')
+    expect(payload.end_date).toBe('2026-08-03')
+    expect(payload.course_days).toBeNull()
+  })
+
+  it('nulls the diving-only columns for an adventure but keeps the trip flag', () => {
+    const payload = eventPayloadFromForm({
+      ...EMPTY_FORM,
+      type: 'adventure',
+      start_date: '2026-08-01',
+      admin_title: 'Camping weekend',
+      is_boat_dive: true,
+      nitrox_required: true,
+      is_trip: true,
+      notes: 'bring a tent',
+    })
+    // Diving specifics never apply to a camping trip...
+    expect(payload.is_boat_dive).toBe(false)
+    expect(payload.nitrox_required).toBe(false)
+    // ...but "runs over several days away from the shop" does.
+    expect(payload.is_trip).toBe(true)
+    expect(payload.notes).toBe('bring a tent')
+  })
+})
+
