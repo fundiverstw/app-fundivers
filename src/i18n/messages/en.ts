@@ -162,7 +162,7 @@ export const en = {
       nameHint: 'First and last name, exactly as it appears on your passport / ID.',
       nicknameLabel: 'Nickname (optional)',
       nicknamePlaceholder: "An English name, alias, or what you'd like to be called",
-      dobLabel: 'Date of birth',
+      dobRequired: 'Date of birth *',
       idLabel: 'Passport / ID number',
     },
     account: {
@@ -2211,6 +2211,7 @@ export const en = {
       pickTrip: 'Pick a trip first.',
       addCertLevel: 'Add your certification level, or mark yourself as not certified yet, before registering.',
       prereqNotMet: "This event has a certification or logged-dive prerequisite you don't meet yet. Please acknowledge the requirement to continue.",
+      dobRequired: "Add the diver's date of birth before registering.",
     },
     common: {
       none: 'none',

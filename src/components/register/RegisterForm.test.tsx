@@ -79,7 +79,7 @@ const noExtrasEvent: AppEvent = {
 const sampleProfile: Profile = {
   id: 'u1', created_at: '', updated_at: '',
   name: 'Ada', nickname: 'Ada',
-  date_of_birth: null, nationality: 'British', id_number: null,
+  date_of_birth: '1987-05-03', nationality: 'British', id_number: null,
   emergency_contact_name: null, emergency_contact_phone: null,
   cert_agency: 'PADI', cert_level: 'Advanced Open Water',
   cert_number: null, cert_date: null,
@@ -910,6 +910,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /solve captcha/i }))
     await user.type(screen.getByLabelText(/^name \*/i), 'Grace Hopper')
     await user.type(screen.getByLabelText(/nationality \*/i), 'American')
+    await user.type(screen.getByLabelText(/date of birth \*/i), '19061209')
     await user.selectOptions(screen.getByLabelText(/gender \*/i), 'female')
     await user.click(screen.getByLabelText(/not certified yet/i))
     // Step 2 → 3 → 4 → confirm
@@ -963,6 +964,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /solve captcha/i }))
     await user.type(screen.getByLabelText(/^name \*/i), 'Grace Hopper')
     await user.type(screen.getByLabelText(/nationality \*/i), 'American')
+    await user.type(screen.getByLabelText(/date of birth \*/i), '19061209')
     await user.selectOptions(screen.getByLabelText(/gender \*/i), 'female')
     await user.click(screen.getByLabelText(/not certified yet/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
@@ -1366,6 +1368,81 @@ describe('RegisterForm', () => {
     expect(opts.body).not.toHaveProperty('password')
     expect(setSession).not.toHaveBeenCalled()
     expect(onBooked).toHaveBeenCalledWith({ id: 'b-new', status: 'pending' })
+  })
+
+  it('blocks step 2 until a date of birth is entered — on-behalf-of included', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    // DOB is the one profile field the on-behalf paths do NOT relax: it can't
+    // be recovered later and the gear/insurance surfaces derive age from it.
+    const noDob: Profile = { ...sampleProfile, date_of_birth: null }
+    render(
+      <MemoryRouter>
+        <RegisterFormBody
+          event={sampleEvent}
+          profile={noDob}
+          userId="diver-99"
+          actingOnBehalfOf="diver-99"
+          onSubmitSuccess={() => {}}
+        />
+      </MemoryRouter>
+    )
+
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+
+    await user.type(screen.getByLabelText(/date of birth \*/i), '19870503')
+    expect(screen.getByRole('button', { name: /next/i })).toBeEnabled()
+  })
+
+  it('blocks step 2 on a partial date of birth, which emits no value upstream', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    const noDob: Profile = { ...sampleProfile, date_of_birth: null }
+    render(
+      <MemoryRouter>
+        <RegisterFormBody
+          event={sampleEvent}
+          profile={noDob}
+          userId="diver-99"
+          actingOnBehalfOf="diver-99"
+          onSubmitSuccess={() => {}}
+        />
+      </MemoryRouter>
+    )
+
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.type(screen.getByLabelText(/date of birth \*/i), '1987')
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+  })
+
+  it('sends the entered date of birth in the on-behalf-of profile patch', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    const noDob: Profile = { ...sampleProfile, date_of_birth: null }
+    render(
+      <MemoryRouter>
+        <RegisterFormBody
+          event={sampleEvent}
+          profile={noDob}
+          userId="diver-99"
+          actingOnBehalfOf="diver-99"
+          onSubmitSuccess={() => {}}
+        />
+      </MemoryRouter>
+    )
+
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.type(screen.getByLabelText(/date of birth \*/i), '19870503')
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+    const opts = invoke.mock.calls[0][1] as { body: { profile_patch: Record<string, unknown> } }
+    expect(opts.body.profile_patch).toMatchObject({ date_of_birth: '1987-05-03' })
   })
 
   it('admin "register on behalf of": skips required-field gates when diver profile is incomplete', async () => {

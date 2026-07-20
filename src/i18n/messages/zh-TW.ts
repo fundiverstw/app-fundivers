@@ -155,7 +155,7 @@ export const zhTW: Messages = {
       nameHint: '姓與名，需與您的護照 / 證件上完全相符。',
       nicknameLabel: '暱稱（選填）',
       nicknamePlaceholder: '英文名、別名，或您希望我們如何稱呼您',
-      dobLabel: '出生日期',
+      dobRequired: '出生日期 *',
       idLabel: '護照 / 證件號碼',
     },
     account: {
@@ -2195,6 +2195,7 @@ export const zhTW: Messages = {
       pickTrip: '請先選擇行程。',
       addCertLevel: '報名前請先填寫你的證照等級，或標記為尚未取得證照。',
       prereqNotMet: '這個活動有證照或潛水次數的先決條件，你目前尚未符合。請確認並同意該要求後繼續。',
+      dobRequired: '報名前請先填寫潛水員的出生日期。',
     },
     common: {
       none: '無',

@@ -154,7 +154,7 @@ export const ja: Messages = {
       nameHint: 'パスポート / 身分証明書に記載のとおりの姓名。',
       nicknameLabel: 'ニックネーム（任意）',
       nicknamePlaceholder: '英語名、通称、または呼んでほしい名前',
-      dobLabel: '生年月日',
+      dobRequired: '生年月日 *',
       idLabel: 'パスポート / 身分証明書番号',
     },
     account: {
@@ -2194,6 +2194,7 @@ export const ja: Messages = {
       pickTrip: 'まずツアーを選択してください。',
       addCertLevel: '申し込む前に、認定ランクを入力するか、未認定であることを選択してください。',
       prereqNotMet: 'このイベントには認定ランクまたは経験本数の条件があり、現在は満たしていません。続けるには要件を確認して同意してください。',
+      dobRequired: '申し込む前に、ダイバーの生年月日を入力してください。',
     },
     common: {
       none: 'なし',

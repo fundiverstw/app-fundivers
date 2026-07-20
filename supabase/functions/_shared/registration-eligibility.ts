@@ -19,6 +19,24 @@ export function parseReqDives(v: unknown): number | null {
   return null
 }
 
+/**
+ * Mirrors the RegisterForm step-2 date-of-birth gate, which applies on every
+ * path (self, guest, and on-behalf-of) — unlike the nationality/gender gates,
+ * which the on-behalf paths relax.
+ *
+ * Keyed on the patch rather than the stored profile: a patch carrying a
+ * date_of_birth slot means the form collected profile fields for this person,
+ * so the slot must be filled. The additional-diver fan-out in RegisterForm
+ * sends an empty patch (the group members' profiles stay untouched) and is
+ * deliberately not gated here — there's no field in that flow to fix it in.
+ */
+export function dobError(patch: Record<string, unknown>): string | null {
+  if (!("date_of_birth" in patch)) return null
+  const dob = patch.date_of_birth
+  if (typeof dob === "string" && dob.trim() !== "") return null
+  return t.emails.errors.dobRequired
+}
+
 export interface EligibilityProfile {
   cert_level: string | null
   uncertified: boolean | null

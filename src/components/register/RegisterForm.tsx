@@ -627,7 +627,14 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // step-2 Next until both are set. Relaxed on the on-behalf-of paths (admin /
   // parent), same as the other diver-facing required-field gates; the target
   // diver completes their profile later.
-  const profileFieldsBlocked = !isOnBehalfOf && (nationality.trim() === '' || gender.trim() === '')
+  //
+  // Date of birth is the exception: it gates on every path, including
+  // on-behalf-of. It can't be filled in later from anything the shop already
+  // holds, and the gear/insurance surfaces derive age from it — a booking with
+  // a null date_of_birth shows a blank age at the dive site.
+  const dobBlocked = dob.trim() === ''
+  const profileFieldsBlocked = dobBlocked
+    || (!isOnBehalfOf && (nationality.trim() === '' || gender.trim() === ''))
 
   // Guest-mode credentials — only collected when the visitor isn't signed in.
   // At submit, we signUp with these before inserting the booking.
@@ -1437,7 +1444,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               placeholder={t.register.step2.nicknamePlaceholder}
             />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <TextField label={t.register.step2.dobLabel} type="date" value={dob} onChange={setDob} />
+              <TextField label={t.register.step2.dobRequired} type="date" value={dob} onChange={setDob} required />
               <TextField label={t.register.nationalityRequired} value={nationality} onChange={setNationality} required />
             </div>
             <TextField label={t.register.step2.idLabel} value={idNumber} onChange={setIdNumber} />

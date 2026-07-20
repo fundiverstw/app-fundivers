@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseReqDives, eligibilityError } from './registration-eligibility'
+import { parseReqDives, eligibilityError, dobError } from './registration-eligibility'
 
 describe('parseReqDives', () => {
   it('passes through a finite number', () => {
@@ -68,5 +68,30 @@ describe('eligibilityError — event prerequisites', () => {
     const prof = { cert_level: 'OW', uncertified: false, logged_dives: 0 }
     const ev = { prereq_cert_id: null, req_dives: 10 }
     expect(eligibilityError(prof, ev, { prereq_acked_at: '' })).not.toBeNull()
+  })
+})
+
+describe('dobError', () => {
+  it('blocks a patch whose date_of_birth slot is empty', () => {
+    expect(dobError({ date_of_birth: null })).not.toBeNull()
+    expect(dobError({ date_of_birth: '' })).not.toBeNull()
+    expect(dobError({ date_of_birth: '   ' })).not.toBeNull()
+  })
+
+  it('allows a patch carrying a date of birth', () => {
+    expect(dobError({ date_of_birth: '1987-05-03' })).toBeNull()
+  })
+
+  it('blocks on every path — the patch is not tagged with who it is for', () => {
+    // The on-behalf-of paths send the same full patch shape as a diver's own
+    // registration, so one rule covers admin, parent, guest and self.
+    expect(dobError({ name: 'Ana', date_of_birth: null })).not.toBeNull()
+  })
+
+  it('skips a patch with no date_of_birth slot (the group fan-out sends {})', () => {
+    // Additional group divers register with an empty patch — their stored
+    // profile is left untouched, and there is no DOB field in that flow.
+    expect(dobError({})).toBeNull()
+    expect(dobError({ name: 'Ana' })).toBeNull()
   })
 })
