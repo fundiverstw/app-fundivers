@@ -1,7 +1,11 @@
-import { EVENT_KINDS, type EventKind } from '../types/database'
-import { t } from '../i18n'
-
-// Intent helpers for branching on an event's kind.
+// The event-kind vocabulary and the questions the code asks about it.
+//
+// Deliberately import-free: the Deno edge functions and the push worker both
+// need this vocabulary, and neither can load a module that reaches into the
+// app's config or i18n. Anything needing a translated label lives in
+// event-kind-labels.ts instead. src/types/database.ts carries a compile-time
+// guard that this list covers the generated `events.kind` union, so the two
+// cannot drift from the DB's events_kind_check constraint.
 //
 // Almost every kind check in this codebase used to be written as
 // `type === 'dive' ? … : …`, where the else-branch silently meant "course".
@@ -12,6 +16,9 @@ import { t } from '../i18n'
 // Branch on what the code actually cares about instead — the temporal shape,
 // whether the shop drives divers there — so a new kind has to answer each
 // question explicitly rather than defaulting into someone else's path.
+
+export const EVENT_KINDS = ['dive', 'course'] as const
+export type EventKind = typeof EVENT_KINDS[number]
 
 /**
  * True when the event's dates are an envelope (start_date .. end_date) rather
@@ -63,17 +70,7 @@ export function hasDiveFlags(kind: EventKind): boolean {
   return kind === 'dive'
 }
 
-// Diver-facing label and pill colour per kind. Declared as full Records so the
-// compiler demands an entry for every kind — these are the surfaces where a
-// missing kind would otherwise render as `undefined` in the UI. Three files
-// used to keep their own copy of the label map, and two more inlined the
-// `type === 'dive' ? … : …` ternary.
-export const EVENT_KIND_LABELS: Record<EventKind, string> = {
-  dive:   t.calendar.typeDive,
-  course: t.calendar.typeCourse,
-}
-
-export const EVENT_KIND_DOT: Record<EventKind, string> = {
-  dive:   'bg-emerald-600',
-  course: 'bg-surface-500',
+/** Narrow an untrusted string (a request body's event_type) to a known kind. */
+export function isEventKind(value: unknown): value is EventKind {
+  return typeof value === 'string' && (EVENT_KINDS as readonly string[]).includes(value)
 }

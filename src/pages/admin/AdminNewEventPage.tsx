@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { EVENT_KIND_LABELS } from '../../lib/event-kinds'
+import { EVENT_KIND_LABELS } from '../../lib/event-kind-labels'
 import { EventForm } from '../../components/admin/EventForm'
 import { CreateEventVehiclePicker } from '../../components/admin/CreateEventVehiclePicker'
 import { assignVehiclesToEvent } from '../../lib/event-vehicles'

@@ -17,6 +17,7 @@ import nodemailer from "npm:nodemailer@6.9.14"
 import { corsOk, jsonResponse, safeError, bearerToken } from "../_shared/responses.ts"
 import { buildCancellationEmail } from "../_shared/event-cancellation-email.ts"
 import { siteConfig } from "../../../fundive.config.ts"
+import { isEventKind, EVENT_KINDS } from "../../../src/lib/event-kinds.ts"
 
 Deno.serve(async (req) => {
   const json = (body: unknown, status = 200) => jsonResponse(req, body, status)
@@ -45,7 +46,7 @@ Deno.serve(async (req) => {
   const eventId   = (body.event_id ?? "").trim()
   const eventType = body.event_type
   if (!eventId) return json({ error: "event_id required" }, 400)
-  if (eventType !== "dive" && eventType !== "course") return json({ error: "event_type must be dive or course" }, 400)
+  if (!isEventKind(eventType)) return json({ error: `event_type must be one of: ${EVENT_KINDS.join(", ")}` }, 400)
 
   if (!GMAIL_USER || !GMAIL_PASS) return json({ error: "GMAIL_USER and GMAIL_APP_PASSWORD must be set" }, 500)
 

@@ -17,6 +17,7 @@
 import { Buffer } from "node:buffer"
 import { sanitizeProfilePatch } from "../_shared/profile-patch.ts"
 import { dobError, eligibilityError } from "../_shared/registration-eligibility.ts"
+import { usesDateEnvelope, usesCourseDays, type EventKind } from "../../../src/lib/event-kinds.ts"
 import { computeBookingMoney } from "../_shared/booking-charges.ts"
 import { corsHeaders, safeError } from "../_shared/responses.ts"
 import { siteConfig } from "../../../fundive.config.ts"
@@ -52,7 +53,7 @@ export interface RegistrationBody {
   agreed_to_terms_at?: string
   agreed_to_terms_version?: number
   target_user_id?: string
-  event_type:  'dive' | 'course'
+  event_type:  EventKind
   event_id:    string
   profile_patch: Record<string, unknown>
   details:       Record<string, unknown>
@@ -154,12 +155,12 @@ export interface Deps {
  * compare is correct. Used to reject diver/guest registrations for events that
  * already happened; admins/staff bypass this server-side check too.
  */
-async function eventHasPassed(admin: SupabaseAdminClient, eventType: string, eventId: string): Promise<boolean> {
-  const cols  = eventType === "dive" ? "start_date, end_date" : "course_days"
+async function eventHasPassed(admin: SupabaseAdminClient, eventType: EventKind, eventId: string): Promise<boolean> {
+  const cols  = usesDateEnvelope(eventType) ? "start_date, end_date" : "course_days"
   const { data } = await admin.from("events").select(cols).eq("id", eventId).maybeSingle()
   if (!data) return false // unknown event — existing existence checks handle it
   let lastDay: string | null
-  if (eventType === "dive") {
+  if (usesDateEnvelope(eventType)) {
     lastDay = (data.end_date ?? data.start_date) ?? null
   } else {
     const days = [...((data.course_days ?? []) as string[])].filter(Boolean).sort()
@@ -520,10 +521,10 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
 
   // Dives carry start_date/end_date; courses derive both from course_days.
   const courseDays = [...((event?.course_days ?? []) as string[])].filter(Boolean).sort()
-  const startDate = (body.event_type === "course"
+  const startDate = (usesCourseDays(body.event_type)
     ? (courseDays[0] ?? null)
     : (event?.start_date ?? null)) as string | null
-  const endDate = (body.event_type === "course"
+  const endDate = (usesCourseDays(body.event_type)
     ? (courseDays[courseDays.length - 1] ?? null)
     : (event?.end_date ?? null)) as string | null
   function shiftDays(yyyyMmDd: string, deltaDays: number): string {

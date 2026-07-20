@@ -11,6 +11,8 @@ import { corsHeaders, safeError } from "../_shared/responses.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 import type { GroupRegistrationPdfPayload, GroupDiverColumn } from "../_shared/pdf.ts"
 import { t } from "../_shared/i18n.ts"
+import { usesDateEnvelope, type EventKind } from "../../../src/lib/event-kinds.ts"
+import { EVENT_KIND_LABELS } from "../_shared/event-kind-labels.ts"
 
 export interface GroupSummaryBody {
   group_id: string
@@ -124,16 +126,16 @@ export async function handleGroupSummary(req: Request, deps: Deps): Promise<Resp
       .select("kind, display_title, admin_title, calendar_title, start_date, end_date, course_days")
       .eq("id", eventId)
       .maybeSingle()
-    const isDive = event?.kind === "dive"
+    const envelope = !!event?.kind && usesDateEnvelope(event.kind)
 
     const eventTitle =
       (event?.display_title as string | null) ||
       (event?.admin_title as string | null) ||
       (event?.calendar_title as string | null) ||
-      (isDive ? "Dive" : "Course")
+      (event?.kind ? EVENT_KIND_LABELS[event.kind as EventKind] : "")
     const courseDays = [...((event?.course_days ?? []) as string[])].filter(Boolean).sort()
-    const startDate = (isDive ? (event?.start_date ?? null) : (courseDays[0] ?? null)) as string | null
-    const endDate = (isDive ? (event?.end_date ?? null) : (courseDays[courseDays.length - 1] ?? null)) as string | null
+    const startDate = (envelope ? (event?.start_date ?? null) : (courseDays[0] ?? null)) as string | null
+    const endDate = (envelope ? (event?.end_date ?? null) : (courseDays[courseDays.length - 1] ?? null)) as string | null
     const dateStr = startDate
       ? (startDate + (endDate && endDate !== startDate ? " to " + endDate : ""))
       : null

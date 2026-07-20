@@ -18,6 +18,7 @@ import {
   selectReminders,
   type ReminderKind,
 } from '../../../src/lib/push-reminders'
+import { isEventKind, EVENT_KINDS, DATE_ENVELOPE_KINDS, COURSE_DAY_KINDS, type EventKind } from '../../../src/lib/event-kinds'
 import type { Database } from '../../../src/types/database'
 import {
   buildReminderInputs,
@@ -489,14 +490,14 @@ export async function handleAdminEventBroadcast(req: Request, env: Env): Promise
   if (!auth.startsWith('Bearer ')) return new Response('unauthorized', { status: 401 })
   const token = auth.slice('Bearer '.length)
 
-  let body: { event_id?: string; event_type?: 'dive' | 'course'; status?: 'on' | 'cancelled'; body?: string }
+  let body: { event_id?: string; event_type?: EventKind; status?: 'on' | 'cancelled'; body?: string }
   try { body = await req.json() } catch { return new Response('bad request', { status: 400 }) }
   const eventId   = (body.event_id ?? '').trim()
   const eventType = body.event_type
   const status    = body.status
   const text      = (body.body ?? '').trim()
   if (!eventId)                                  return new Response('event_id is required', { status: 400 })
-  if (eventType !== 'dive' && eventType !== 'course') return new Response('event_type must be dive or course', { status: 400 })
+  if (!isEventKind(eventType)) return new Response(`event_type must be one of: ${EVENT_KINDS.join(', ')}`, { status: 400 })
   if (status !== 'on' && status !== 'cancelled')      return new Response('status must be on or cancelled', { status: 400 })
   if (!text)                                          return new Response('body is required', { status: 400 })
 
@@ -600,14 +601,14 @@ export async function handleAdminEventReschedule(req: Request, env: Env): Promis
   if (!auth.startsWith('Bearer ')) return new Response('unauthorized', { status: 401 })
   const token = auth.slice('Bearer '.length)
 
-  let body: { event_id?: string; event_type?: 'dive' | 'course'; from_date?: string; to_date?: string }
+  let body: { event_id?: string; event_type?: EventKind; from_date?: string; to_date?: string }
   try { body = await req.json() } catch { return new Response('bad request', { status: 400 }) }
   const eventId   = (body.event_id ?? '').trim()
   const eventType = body.event_type
   const fromDate  = (body.from_date ?? '').trim()
   const toDate    = (body.to_date ?? '').trim()
   if (!eventId)                                       return new Response('event_id is required', { status: 400 })
-  if (eventType !== 'dive' && eventType !== 'course') return new Response('event_type must be dive or course', { status: 400 })
+  if (!isEventKind(eventType)) return new Response(`event_type must be one of: ${EVENT_KINDS.join(', ')}`, { status: 400 })
   // from_date/to_date are optional: a single-day calendar drag sends both
   // (specific message); an edit that changed dates more broadly sends
   // neither (generic message). A no-op move (both present and equal) sends
@@ -712,12 +713,12 @@ export async function handleAdminEventCancellation(req: Request, env: Env): Prom
   if (!auth.startsWith('Bearer ')) return new Response('unauthorized', { status: 401 })
   const token = auth.slice('Bearer '.length)
 
-  let body: { event_id?: string; event_type?: 'dive' | 'course' }
+  let body: { event_id?: string; event_type?: EventKind }
   try { body = await req.json() } catch { return new Response('bad request', { status: 400 }) }
   const eventId   = (body.event_id ?? '').trim()
   const eventType = body.event_type
   if (!eventId)                                       return new Response('event_id is required', { status: 400 })
-  if (eventType !== 'dive' && eventType !== 'course') return new Response('event_type must be dive or course', { status: 400 })
+  if (!isEventKind(eventType)) return new Response(`event_type must be one of: ${EVENT_KINDS.join(', ')}`, { status: 400 })
 
   const anonKey = env.SUPABASE_ANON_KEY
   if (!anonKey) return new Response('SUPABASE_ANON_KEY not configured', { status: 500 })
@@ -814,11 +815,11 @@ export async function runDailyReminders(env: Env): Promise<{ sent: number; skipp
 
   const targetSet = new Set(targetDates)
   const [divesResp, coursesResp] = await Promise.all([
-    sb.from('events').select('id, kind, admin_title, display_title, start_date, start_time').eq('kind', 'dive').in('start_date', targetDates).is('cancelled_at', null),
+    sb.from('events').select('id, kind, admin_title, display_title, start_date, start_time').in('kind', DATE_ENVELOPE_KINDS).in('start_date', targetDates).is('cancelled_at', null),
     // Courses have no start_date — fetch any course with a day on a target
     // date, then anchor the reminder to its first day so behavior matches
     // the old start_date-keyed reminder (one reminder, before day 1).
-    sb.from('events').select('id, kind, admin_title, display_title, course_days, start_time').eq('kind', 'course').overlaps('course_days', targetDates).is('cancelled_at', null),
+    sb.from('events').select('id, kind, admin_title, display_title, course_days, start_time').in('kind', COURSE_DAY_KINDS).overlaps('course_days', targetDates).is('cancelled_at', null),
   ])
   const dives   = divesResp.data   ?? []
   const courses = (coursesResp.data ?? [])

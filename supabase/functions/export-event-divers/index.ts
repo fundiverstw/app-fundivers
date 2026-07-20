@@ -34,6 +34,7 @@ import { buildEventDiversXlsxBase64, type EventDiverRow } from "../_shared/event
 import { roleToZh } from "../_shared/event-divers-manifest.ts"
 import { corsOk, jsonResponse, safeError, bearerToken } from "../_shared/responses.ts"
 import { siteConfig } from "../../../fundive.config.ts"
+import { isEventKind, usesDateEnvelope, EVENT_KINDS } from "../../../src/lib/event-kinds.ts"
 
 // Profile columns the manifest reads, shared by the booked-diver and
 // on-duty-staff fetches.
@@ -83,8 +84,8 @@ Deno.serve(async (req) => {
   try { body = await req.json() } catch { return json({ error: "invalid json body" }, 400) }
   const eventType = body.event_type
   const eventId   = body.event_id
-  if (eventType !== "dive" && eventType !== "course") {
-    return json({ error: "event_type must be 'dive' or 'course'" }, 400)
+  if (!isEventKind(eventType)) {
+    return json({ error: `event_type must be one of: ${EVENT_KINDS.join(", ")}` }, 400)
   }
   if (typeof eventId !== "string" || eventId.length === 0) {
     return json({ error: "event_id required" }, 400)
@@ -126,7 +127,7 @@ Deno.serve(async (req) => {
   // courses only carry course_days, so the manifest's date stamp comes
   // from the earliest course day instead.
   const titleCols = "display_title, admin_title, calendar_title"
-  const dateCols = eventType === "dive" ? "start_date, end_date" : "course_days"
+  const dateCols = usesDateEnvelope(eventType) ? "start_date, end_date" : "course_days"
   const { data: event, error: eErr } = await admin
     .from("events")
     .select(`id, ${dateCols}, ${titleCols}`)
@@ -136,7 +137,7 @@ Deno.serve(async (req) => {
 
   // Earliest date the event runs on, used only for the email subject /
   // filename stamp.
-  const eventStartDate = eventType === "dive"
+  const eventStartDate = usesDateEnvelope(eventType)
     ? (event.start_date as string | null)
     : ([...((event.course_days as string[] | null) ?? [])].sort()[0] ?? null)
 

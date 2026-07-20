@@ -13,7 +13,8 @@ import { isReschedulable } from '../../lib/reschedule'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { t } from '../../i18n'
 import type { AppEvent, StaffBusyEntry, EventKind } from '../../types/database'
-import { EVENT_KIND_LABELS, EVENT_KIND_DOT, NON_COURSE_KINDS, usesCourseDays, hasDiveFlags } from '../../lib/event-kinds'
+import { NON_COURSE_KINDS, usesCourseDays, hasDiveFlags } from '../../lib/event-kinds'
+import { EVENT_KIND_LABELS, EVENT_KIND_DOT } from '../../lib/event-kind-labels'
 
 // Shared by CalendarPage (diver) and AdminEventsPage (admin). The only
 // differences between those two surfaces are what happens when you pick an

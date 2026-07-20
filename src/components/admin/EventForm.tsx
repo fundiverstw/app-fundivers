@@ -10,7 +10,8 @@ import {
   type FormState,
 } from './event-form-state'
 import { DateField } from '../DateField'
-import { EVENT_KIND_LABELS, usesCourseDays, usesDateEnvelope, hasDiveFlags } from '../../lib/event-kinds'
+import { usesCourseDays, usesDateEnvelope, hasDiveFlags } from '../../lib/event-kinds'
+import { EVENT_KIND_LABELS } from '../../lib/event-kind-labels'
 import { EVENT_KINDS } from '../../types/database'
 import { BTN_XS_GHOST, ERROR_NOTE } from '../../styles/tokens'
 import { t } from '../../i18n'

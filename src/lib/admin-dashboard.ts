@@ -6,7 +6,7 @@
 // positive, `refunded` negative, `voided` is excluded entirely.
 import { canonicalCertLevel } from './cert-level'
 import { siteConfig } from '../config/site'
-import { EVENT_KIND_LABELS } from './event-kinds'
+import { EVENT_KIND_LABELS } from './event-kind-labels'
 import type { Booking, Payment, EventKind } from '../types/database'
 
 export interface MoneyPoint { label: string; value: number }

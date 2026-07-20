@@ -15,6 +15,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
 import { corsOk, jsonResponse, bearerToken } from "../_shared/responses.ts"
 import { siteConfig } from "../../../fundive.config.ts"
+import { usesDateEnvelope } from "../../../src/lib/event-kinds.ts"
 
 const COMPANY_EMAIL = siteConfig.contact.email
 
@@ -84,9 +85,11 @@ Deno.serve(async (req) => {
       .eq("id", booking.event_id).maybeSingle()
     eventTitle = (data?.display_title ?? data?.admin_title ?? eventTitle) as string
     // Dives carry start_date; courses derive it from the earliest course day.
-    startDate = data?.kind === "dive"
-      ? ((data?.start_date ?? null) as string | null)
-      : ([...((data?.course_days ?? []) as string[])].sort()[0] ?? null)
+    startDate = !data?.kind
+      ? null
+      : usesDateEnvelope(data.kind)
+        ? ((data.start_date ?? null) as string | null)
+        : ([...((data.course_days ?? []) as string[])].sort()[0] ?? null)
   }
 
   const { data: target } = await admin.auth.admin.getUserById(booking.user_id)

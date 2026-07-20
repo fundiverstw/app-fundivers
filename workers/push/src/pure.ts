@@ -3,6 +3,7 @@
 // @supabase/supabase-js, which are heavy and Node/Worker-only.
 
 import type { ReminderInput, ReminderKind } from '../../../src/lib/push-reminders'
+import type { EventKind } from '../../../src/lib/event-kinds'
 
 export type Booking = {
   id: string
@@ -11,10 +12,18 @@ export type Booking = {
   event_id: string | null
   details: { total?: number; deposit?: number } | null
 }
-export type EventRow = { id: string; kind: 'dive' | 'course'; admin_title?: string | null; display_title?: string | null; start_date: string | null; start_time?: string | null }
+export type EventRow = { id: string; kind: EventKind; admin_title?: string | null; display_title?: string | null; start_date: string | null; start_time?: string | null }
+
+// Last-resort title when an event has neither a display nor an admin title.
+// A full Record so a new kind must supply one instead of being announced as a
+// "Course" in a push notification. English-only: this worker has no catalog.
+const KIND_FALLBACK_TITLE: Record<EventKind, string> = {
+  dive:   'Dive',
+  course: 'Course',
+}
 
 function titleOf(ev: EventRow): string {
-  return ev.display_title || ev.admin_title || (ev.kind === 'dive' ? 'Dive' : 'Course')
+  return ev.display_title || ev.admin_title || KIND_FALLBACK_TITLE[ev.kind]
 }
 
 /** 'HH:MM:SS.SSS' / 'HH:MM:SS' / 'HH:MM' / empty → 'HH:mm' or null. */

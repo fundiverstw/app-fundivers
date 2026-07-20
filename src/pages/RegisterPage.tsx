@@ -13,7 +13,7 @@ import { siteConfig } from '../config/site'
 import { registrationDraftKey, loadRegistrationDraft } from '../lib/registration-draft'
 import type { AppEvent, Booking } from '../types/database'
 import { t } from '../i18n'
-import { EVENT_KIND_DOT, EVENT_KIND_LABELS } from '../lib/event-kinds'
+import { EVENT_KIND_DOT, EVENT_KIND_LABELS } from '../lib/event-kind-labels'
 
 const rp = t.registerPage
 

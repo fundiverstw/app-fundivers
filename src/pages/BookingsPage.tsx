@@ -21,7 +21,7 @@ import {
   CARD, BTN_GHOST, BTN_DANGER, TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR, PAGE_BODY,
 } from '../styles/tokens'
 import { t } from '../i18n'
-import { EVENT_KIND_LABELS } from '../lib/event-kinds'
+import { EVENT_KIND_LABELS } from '../lib/event-kind-labels'
 
 type Row = Booking & {
   event: AppEvent | null

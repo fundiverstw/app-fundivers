@@ -1,4 +1,5 @@
 import type { ChargeLine } from '../lib/booking-charges'
+import type { EventKind } from '../lib/event-kinds'
 
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[]
 
@@ -1783,21 +1784,20 @@ export type StaffAvailabilityUpdate = Database['public']['Tables']['staff_availa
  *  joined profiles row in staff_availability_view. */
 export type StaffBusyEntry = Database['public']['Views']['staff_availability_view']['Row']
 
-// The event vocabulary. Derived from the generated events row rather than
-// re-declared, so it tracks the DB's events_kind_check constraint through the
-// usual type regeneration instead of drifting from it.
-export type EventKind = Database['public']['Tables']['events']['Row']['kind']
+// The event vocabulary lives in lib/event-kinds.ts, which is import-free so the
+// Deno edge functions and the push worker can share it. Re-exported here
+// because this is where the rest of the app reaches for event types.
+export type { EventKind } from '../lib/event-kinds'
+export { EVENT_KINDS } from '../lib/event-kinds'
 
-// The same vocabulary as a value, so callers can iterate the kinds (filters,
-// pickers, per-kind fetches) instead of re-spelling the union — the codebase
-// used to inline `'dive' | 'course'` in twenty places, which is how a kind can
-// be added and silently fall through to the course branch everywhere.
-export const EVENT_KINDS = ['dive', 'course'] as const satisfies readonly EventKind[]
-
-// Guard: adding a kind to the DB (and so to EventKind) without adding it here
-// would leave every kind-iterating caller quietly skipping it. This fails to
-// compile until EVENT_KINDS covers the union.
-type UncoveredEventKind = Exclude<EventKind, typeof EVENT_KINDS[number]>
+// Guard: the vocabulary must cover the generated `events.kind` union. Adding a
+// kind to the DB without adding it to EVENT_KINDS would leave every
+// kind-iterating caller quietly skipping it; this fails to compile until they
+// agree.
+type UncoveredEventKind = Exclude<
+  Database['public']['Tables']['events']['Row']['kind'],
+  import('../lib/event-kinds').EventKind
+>
 export type _EventKindsAreExhaustive = UncoveredEventKind extends never ? true
   : ['EVENT_KINDS is missing an event kind:', UncoveredEventKind]
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { computeDashboard, calendarYearMonths, type DashboardInput } from './admin-dashboard'
-import { EVENT_KIND_LABELS } from './event-kinds'
+import { EVENT_KIND_LABELS } from './event-kind-labels'
 
 describe('calendarYearMonths', () => {
   it('returns Jan→Dec so the peak season sits in the centre columns', () => {

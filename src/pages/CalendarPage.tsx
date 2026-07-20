@@ -11,7 +11,7 @@ import { ShareEventButton } from '../components/ShareEventButton'
 import { t } from '../i18n'
 import { BTN_XS_GHOST } from '../styles/tokens'
 import type { AppEvent, Booking } from '../types/database'
-import { EVENT_KIND_DOT, EVENT_KIND_LABELS } from '../lib/event-kinds'
+import { EVENT_KIND_DOT, EVENT_KIND_LABELS } from '../lib/event-kind-labels'
 
 
 function bookingMatches(b: Booking, ev: AppEvent) {
