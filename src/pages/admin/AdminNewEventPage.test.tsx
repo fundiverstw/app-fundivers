@@ -96,7 +96,14 @@ describe('AdminNewEventPage', () => {
       if (table === 'addons') return mockQueryBuilder({ data: [] })
       // Dives + courses are one `events` table now, queried twice by kind; the
       // course-kind read maps the same row but drops it (no course_days).
-      if (table === 'events')       return mockQueryBuilder({ data: [pastDive] })
+      if (table === 'events') {
+        const b = mockQueryBuilder({ data: [pastDive] })
+        // The picker fetches only enough columns to label its rows, then pulls
+        // the full event by id once one is picked — so `.single()` has to hand
+        // back the row itself, not the list.
+        b.single = () => Promise.resolve({ data: pastDive, error: null })
+        return b
+      }
       return mockQueryBuilder({ data: [] })
     })
     const user = userEvent.setup()
@@ -109,6 +116,44 @@ describe('AdminNewEventPage', () => {
     expect((screen.getByLabelText(/notes/i) as HTMLTextAreaElement).value).toBe('Bring fins')
     expect((screen.getByLabelText(/^featured$/i) as HTMLInputElement).checked).toBe(true)
     expect((screen.getByLabelText(/nitrox required/i) as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('offers only the most recent run of each course type in the preload picker', async () => {
+    // The shop repeats the same handful of courses, so listing every past
+    // offering made this dropdown unusable.
+    const course = (id: string, adminTitle: string, days: string[]) => ({
+      id, kind: 'course', admin_title: adminTitle, display_title: adminTitle,
+      start_date: null, course_days: days,
+    })
+    const courses = [
+      course('ow-old', 'OW',  ['2026-01-10', '2026-01-11']),
+      course('ow-new', 'OW',  ['2026-05-17', '2026-05-18']),
+      course('aow',    'AOW', ['2026-03-02']),
+    ]
+    from.mockImplementation((table: string) => {
+      if (table !== 'events') return mockQueryBuilder({ data: [] })
+      // The form runs two reads against `events`, split by temporal shape.
+      // Honour the kind filter here or the course rows also come back from the
+      // envelope read, which does not collapse by course type.
+      let kinds: string[] = []
+      const b = mockQueryBuilder({ data: [] })
+      b.in = (col: string, vals: string[]) => { if (col === 'kind') kinds = vals; return b }
+      b.then = (cb?: (r: unknown) => unknown) =>
+        Promise.resolve({ data: kinds.includes('course') ? courses : [], error: null }).then(cb)
+      return b
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(await screen.findByRole('button', { name: /^course$/i }))
+    const select = await screen.findByLabelText(/preload from past course/i) as HTMLSelectElement
+    const labels = [...select.options].map(o => o.textContent ?? '')
+
+    // One entry per course type, plus the "start fresh" placeholder.
+    expect(labels.filter(l => l.includes('OW') && !l.includes('AOW'))).toHaveLength(1)
+    expect(labels.some(l => l.includes('2026-05-17'))).toBe(true)
+    expect(labels.some(l => l.includes('2026-01-10'))).toBe(false)
+    expect(labels.some(l => l.includes('AOW'))).toBe(true)
   })
 
   it('inserts a new price tier from the sub-form and auto-selects it', async () => {

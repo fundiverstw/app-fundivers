@@ -13,6 +13,8 @@ import { DateField } from '../DateField'
 import { usesCourseDays, usesDateEnvelope, hasDiveFlags } from '../../lib/event-kinds'
 import { EVENT_KIND_LABELS } from '../../lib/event-kind-labels'
 import { EVENT_KINDS } from '../../types/database'
+import { DATE_ENVELOPE_KINDS, COURSE_DAY_KINDS } from '../../lib/event-kinds'
+import { newestPerCourseType, type PastEventOption } from '../../lib/event-preload'
 import { BTN_XS_GHOST, ERROR_NOTE } from '../../styles/tokens'
 import { t } from '../../i18n'
 
@@ -24,7 +26,13 @@ import { t } from '../../i18n'
 
 // The picker drives both the type pill and the row → form mapping from a
 // single selection; the events row carries its own `kind`.
-type PastEvent = { kind: EventKind; id: string; startDate: string; title: string; row: EventRow }
+// The subset of an event the preload picker needs to label a row. Selecting
+// these instead of `*` keeps the create form from downloading every column of
+// every past event just to populate a dropdown.
+const PRELOAD_COLS = 'id, kind, admin_title, display_title, start_date, course_days'
+type PreloadRow = Pick<EventRow, 'id' | 'kind' | 'admin_title' | 'display_title' | 'start_date' | 'course_days'>
+
+type PastEvent = PastEventOption & { kind: EventKind }
 
 const ef = t.admin.eventForm
 const cat = t.admin.catalog
@@ -136,14 +144,16 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
         supabase.from('prices').select('*').order('admin_title'),
         supabase.from('rooms').select('*').order('admin_title'),
         supabase.from('addons').select('*').order('admin_title'),
+        // Only the columns the picker labels rows with — the full row is
+        // fetched when the admin actually picks one.
         mode === 'create'
-          ? supabase.from('events').select('*').eq('kind', 'dive').lt('start_date', todayStr).order('start_date', { ascending: false }).limit(50)
-          : Promise.resolve({ data: [] as EventRow[] }),
-        // Courses have no scalar date column to filter/order on — fetch a
-        // bounded set and narrow to "past" client-side via course_days.
+          ? supabase.from('events').select(PRELOAD_COLS).in('kind', DATE_ENVELOPE_KINDS).lt('start_date', todayStr).order('start_date', { ascending: false }).limit(50)
+          : Promise.resolve({ data: [] as PreloadRow[] }),
+        // Course-day kinds have no scalar date column to filter/order on —
+        // fetch a bounded set and narrow to "past" client-side via course_days.
         mode === 'create'
-          ? supabase.from('events').select('*').eq('kind', 'course').limit(200)
-          : Promise.resolve({ data: [] as EventRow[] }),
+          ? supabase.from('events').select(PRELOAD_COLS).in('kind', COURSE_DAY_KINDS).limit(200)
+          : Promise.resolve({ data: [] as PreloadRow[] }),
         supabase.from('cert_levels').select('*').order('rank'),
         supabase.from('cancellation_policies').select('*').order('title'),
         supabase.from('trip_templates').select('*').order('admin_title'),
@@ -164,19 +174,32 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
       setTripTemplates(dataOf<TripTemplateEntry>(7))
       setDestinations(dataOf<TravelDestination>(8))
 
-      const pastDives = dataOf<EventRow>(3).map<PastEvent>(d => ({
-        kind: 'dive', id: d.id, startDate: d.start_date ?? '', title: d.display_title ?? d.admin_title ?? ef.untitledDive, row: d,
+      // Envelope kinds: every past outing is its own template (a dive to one
+      // site is not interchangeable with a dive to another), so they are listed
+      // individually, bounded by the query's limit.
+      const pastEnvelope = dataOf<PreloadRow>(3).map<PastEvent>(d => ({
+        kind: d.kind,
+        id: d.id,
+        startDate: d.start_date ?? '',
+        title: d.display_title ?? d.admin_title ?? ef.untitledDive,
+        courseType: d.admin_title ?? null,
       }))
-      const pastCourses = dataOf<EventRow>(4)
-        .map<PastEvent>(c => ({
-          kind: 'course',
-          id: c.id,
-          startDate: [...(c.course_days ?? [])].filter(Boolean).sort()[0] ?? '',
-          title: c.display_title ?? c.admin_title ?? ef.untitledCourse,
-          row: c,
-        }))
-        .filter(c => c.startDate && c.startDate < todayStr)
-      const merged = [...pastDives, ...pastCourses].sort((a, b) => b.startDate.localeCompare(a.startDate))
+      // Course-day kinds: collapsed to the most recent run of each course
+      // type. The shop repeats the same handful of courses, so listing every
+      // past offering made the picker unusable and told the admin nothing the
+      // newest one doesn't.
+      const pastCourses = newestPerCourseType(
+        dataOf<PreloadRow>(4)
+          .map<PastEvent>(c => ({
+            kind: c.kind,
+            id: c.id,
+            startDate: [...(c.course_days ?? [])].filter(Boolean).sort()[0] ?? '',
+            title: c.display_title ?? c.admin_title ?? ef.untitledCourse,
+            courseType: c.admin_title ?? null,
+          }))
+          .filter(c => c.startDate && c.startDate < todayStr),
+      )
+      const merged = [...pastEnvelope, ...pastCourses].sort((a, b) => b.startDate.localeCompare(a.startDate))
       setPastEvents(merged)
     })()
     return () => { cancelled = true }
@@ -202,10 +225,16 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
   const filteredPastEvents = pastEvents.filter(p => p.kind === form.type)
 
   async function applyPreload(p: PastEvent) {
-    // Rooms/add-ons/destinations live in the junction tables, so fetch them
-    // for the picked event to clone the full config.
-    const rels = await fetchEventRelations(p.id)
-    setForm(formStateFromEvent(p.row, rels))
+    // The picker carries only enough to label a row, so pull the full event
+    // here. Rooms/add-ons/destinations live in the junction tables, so fetch
+    // those too to clone the whole config.
+    const [rowResp, rels] = await Promise.all([
+      supabase.from('events').select('*').eq('id', p.id).single(),
+      fetchEventRelations(p.id),
+    ])
+    const row = rowResp.data as EventRow | null
+    if (!row) return
+    setForm(formStateFromEvent(row, rels))
   }
 
   function handlePreload(id: string) {
