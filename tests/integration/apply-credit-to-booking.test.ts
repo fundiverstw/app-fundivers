@@ -94,6 +94,72 @@ describe('apply_credit_to_booking', () => {
     expect(Number(open.data![0].amount)).toBe(4000)
   })
 
+  it('nets refunds out of what counts as paid, so credit can clear the whole balance', async () => {
+    // A refund is its own row with status 'refunded'; the app nets it out
+    // everywhere (src/lib/payments.ts netPaid). The RPC used to sum only the
+    // 'paid' rows, so a partly-refunded booking looked more paid to it than to
+    // the screen — it applied less credit than the diver was shown as due and
+    // left a residue they could not clear.
+    const diver = await freshDiver()
+    const dive = await freshDive()
+    const booking = await makeBooking(diver.id, dive, { total: 3000 }, 'confirmed')
+    await admin.from('payments').insert([
+      { booking_id: booking, user_id: diver.id, amount: 1000, status: 'paid', method: 'cash' },
+      { booking_id: booking, user_id: diver.id, amount: 300, status: 'refunded', method: 'cash' },
+    ] as never)
+    await makeCredit(diver.id, 5000)
+
+    // net paid is 700, so 2300 is due — not the 2000 a paid-only sum implies.
+    const db = await userClient(diver.email, diver.password)
+    const { data: applied, error } = await db.rpc('apply_credit_to_booking', {
+      p_booking_id: booking, p_amount: 2300,
+    })
+    expect(error).toBeNull()
+    expect(Number(applied)).toBe(2300)
+
+    // And the balance genuinely clears: 3000 owed - 700 net paid - 2300 credit.
+    const { data: pays } = await admin
+      .from('payments').select('amount, status').eq('booking_id', booking)
+    const netPaid = (pays ?? []).reduce(
+      (s, p) => s + (p.status === 'paid' ? Number(p.amount) : p.status === 'refunded' ? -Number(p.amount) : 0), 0)
+    expect(3000 - netPaid).toBe(0)
+  })
+
+  it('counts only paid minus refunded — pending and voided rows move nothing', async () => {
+    // Exercised through the RPC rather than by calling the helper directly:
+    // booking_net_paid is SECURITY DEFINER with no ownership check, so it is
+    // deliberately not granted to anyone.
+    const diver = await freshDiver()
+    const dive = await freshDive()
+    const booking = await makeBooking(diver.id, dive, { total: 5000 }, 'confirmed')
+    await admin.from('payments').insert([
+      { booking_id: booking, user_id: diver.id, amount: 1000, status: 'paid',     method: 'cash' },
+      { booking_id: booking, user_id: diver.id, amount: 250,  status: 'refunded', method: 'cash' },
+      { booking_id: booking, user_id: diver.id, amount: 900,  status: 'pending',  method: 'cash' },
+      { booking_id: booking, user_id: diver.id, amount: 400,  status: 'voided',   method: 'cash' },
+    ] as never)
+    await makeCredit(diver.id, 9000)
+
+    // Net paid is 750 (1000 - 250), so 4250 is due. A sum that counted the
+    // pending or voided rows, or ignored the refund, would clamp lower.
+    const db = await userClient(diver.email, diver.password)
+    const { data: applied } = await db.rpc('apply_credit_to_booking', {
+      p_booking_id: booking, p_amount: 9000,
+    })
+    expect(Number(applied)).toBe(4250)
+  })
+
+  it('refuses to hand booking_net_paid to a diver directly', async () => {
+    // It would otherwise expose any booking's payment total to any signed-in
+    // user, since it takes a bare id and checks nothing.
+    const diver = await freshDiver()
+    const db = await userClient(diver.email, diver.password)
+    const { error } = await db.rpc('booking_net_paid', {
+      p_booking_id: '00000000-0000-4000-8000-000000000000',
+    })
+    expect(error).not.toBeNull()
+  })
+
   it('clamps to the balance due when more is requested than owed', async () => {
     const diver = await freshDiver()
     const dive = await freshDive()
