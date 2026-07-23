@@ -255,6 +255,79 @@ describe('PaymentsPage', () => {
     expect(screen.queryByRole('button', { name: /apply credit/i })).not.toBeInTheDocument()
   })
 
+  it('shows cancelled bookings and their payment history in their own section', async () => {
+    // The whole point of the section: a diver who paid and was then cancelled
+    // could not see the money at all, so their record looked like it vanished.
+    const bookings = [
+      { id: 'b1', user_id: 'u1', event_id: 'd1', status: 'cancelled', notes: null, created_at: new Date().toISOString(), details: { total: 2800 } },
+    ]
+    const payments = [
+      { id: 'p1', user_id: 'u1', booking_id: 'b1', amount: 2800, currency: 'TWD', status: 'paid', method: 'account_credit', note: 'Applied account credit', created_at: new Date().toISOString(), recorded_by: null },
+    ]
+    setupFrom(bookings, payments)
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['d1', event({ id: 'd1', type: 'dive', title: 'Kenting Weekend', price: 2800 })],
+    ]))
+
+    const user = userEvent.setup()
+    renderWithRouter(<PaymentsPage />)
+
+    expect(await screen.findByText(/cancelled bookings/i)).toBeInTheDocument()
+    await user.click(await screen.findByText('Kenting Weekend'))
+
+    expect(await screen.findByText(/payment history/i)).toBeInTheDocument()
+    expect(screen.getByText(/account_credit/)).toBeInTheDocument()
+  })
+
+  it('treats a cancelled booking as settled and offers no credit or refund controls', async () => {
+    const bookings = [
+      { id: 'b1', user_id: 'u1', event_id: 'd1', status: 'cancelled', notes: null, created_at: new Date().toISOString(), details: { total: 2800 } },
+    ]
+    // Spendable pool that must NOT be offered against a dead booking — the RPC
+    // rejects a cancelled booking outright.
+    const credits = [
+      { id: 'c1', user_id: 'u1', booking_id: null, amount: 5000, currency: 'TWD', reason: 'goodwill', status: 'open', created_by: null, created_at: new Date().toISOString(), settled_at: null, settled_note: null },
+    ]
+    setupFrom(bookings, [], credits)
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['d1', event({ id: 'd1', type: 'dive', title: 'Kenting Weekend', price: 2800 })],
+    ]))
+
+    const user = userEvent.setup()
+    renderWithRouter(<PaymentsPage />)
+    await user.click(await screen.findByText('Kenting Weekend'))
+
+    // Nothing owed despite a frozen total of 2,800 and no payments against it.
+    expect((await screen.findAllByText(/settled ✓/i)).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: /apply credit/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /request deposit refund/i })).not.toBeInTheDocument()
+  })
+
+  it('shows the account credit returned to the diver on a cancelled booking', async () => {
+    const bookings = [
+      { id: 'b1', user_id: 'u1', event_id: 'd1', status: 'cancelled', notes: null, created_at: new Date().toISOString(), details: { total: 2800 } },
+    ]
+    const payments = [
+      { id: 'p1', user_id: 'u1', booking_id: 'b1', amount: 2800, currency: 'TWD', status: 'paid', method: 'account_credit', note: 'Applied account credit', created_at: new Date().toISOString(), recorded_by: null },
+    ]
+    // What trg_bookings_return_account_credit_on_cancel writes back.
+    const credits = [
+      { id: 'c1', user_id: 'u1', booking_id: 'b1', amount: 2800, currency: 'TWD', reason: 'Account credit returned for cancelled booking', status: 'open', created_by: null, created_at: new Date().toISOString(), settled_at: null, settled_note: null },
+    ]
+    setupFrom(bookings, payments, credits)
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['d1', event({ id: 'd1', type: 'dive', title: 'Kenting Weekend', price: 2800 })],
+    ]))
+
+    const user = userEvent.setup()
+    renderWithRouter(<PaymentsPage />)
+
+    // The returned credit is spendable again, so it heads the page as account credit.
+    expect(await screen.findByText(/account credit:\s*TWD\s*2,800/i)).toBeInTheDocument()
+    await user.click(await screen.findByText('Kenting Weekend'))
+    expect(await screen.findByText(/payment history/i)).toBeInTheDocument()
+  })
+
   it('handles bookings with no details.total gracefully (shows dash, no error)', async () => {
     const bookings = [
       { id: 'b1', user_id: 'u1', event_id: 'd1', status: 'pending', notes: null, created_at: new Date().toISOString(), details: {} },

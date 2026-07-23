@@ -201,6 +201,11 @@ export function PaymentsPage() {
 
   const uid = user?.id
   const active = lines.filter(l => l.booking.status !== 'cancelled')
+  // Cancelled bookings still carry real payment history — what was paid, what
+  // was refunded, and any credit returned. Hiding them made a diver's record
+  // look like money had simply vanished, so they get their own read-only
+  // section rather than being dropped from the page.
+  const cancelledLines = lines.filter(l => l.booking.status === 'cancelled')
   // Bookings a lead booker pays on my behalf — shown read-only, I owe nothing.
   const coveredMine = active.filter(l => l.coveredByName)
   // Bookings I pay as the lead booker (my own + family members'), rolled up
@@ -336,6 +341,30 @@ export function PaymentsPage() {
         </>
       )}
 
+      {cancelledLines.length > 0 && (
+        <section>
+          <h2 className={`text-sm font-semibold ${TEXT_MUTED} uppercase tracking-wider mb-1`}>
+            {t.payments.cancelledSection}
+          </h2>
+          <p className={`text-xs ${TEXT_SUBTLE} mb-2`}>{t.payments.cancelledHint}</p>
+          <div className="space-y-2">
+            {cancelledLines.map(l => (
+              <LineCard
+                key={l.booking.id}
+                line={l}
+                currency={currency}
+                spendable={0}
+                applying={false}
+                open={expanded === l.booking.id}
+                onToggle={() => setExpanded(expanded === l.booking.id ? null : l.booking.id)}
+                onRefund={requestRefund}
+                onApplyCredit={applyCredit}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
       <p className={`text-xs ${TEXT_SUBTLE} text-center`}>
         {t.payments.footer}
       </p>
@@ -411,13 +440,16 @@ function LineCard({
   // the admin refund surfaces only list non-cancelled bookings, so a request
   // made here would otherwise be invisible to admins.
   const canRefundDeposit = paid > 0 && !refundRequested && booking.status !== 'cancelled'
+  const isCancelled = booking.status === 'cancelled'
   // What this booking can absorb from the diver's spendable credit pool:
-  // its outstanding balance, capped by credit not already offsetting it.
-  const applicable = Math.min(due, spendable)
+  // its outstanding balance, capped by credit not already offsetting it. A
+  // cancelled booking absorbs nothing — the RPC refuses it outright.
+  const applicable = isCancelled ? 0 : Math.min(due, spendable)
   // Balance nets open credit-for-this-event against what's owed (incl.
   // amendments). A negative balance — awarded credit or overpayment — is money
-  // the shop owes the diver, shown as a credit.
-  const bal = bookingBalance(owed, paid, credit)
+  // the shop owes the diver, shown as a credit. A cancelled booking owes
+  // nothing regardless of its frozen figures.
+  const bal = bookingBalance(owed, paid, credit, { cancelled: isCancelled })
 
   return (
     <div className={CARD}>
@@ -496,6 +528,10 @@ function LineCard({
           <div className={`text-xs ${TEXT_SUBTLE} pt-2 border-t border-surface-200`}>
             {t.bookings.bookedLabel} {format(new Date(booking.created_at), 'MMM d, yyyy')}
           </div>
+
+          {payments.length === 0 && isCancelled && (
+            <p className={`text-xs ${TEXT_SUBTLE}`}>{t.payments.noPaymentsRecorded}</p>
+          )}
 
           {payments.length > 0 && (
             <div className="space-y-1">
