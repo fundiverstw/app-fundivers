@@ -559,6 +559,7 @@ export const ja: Messages = {
     noActive: '有効な予約はありません。カレンダーをご覧ください！',
     groupPaying: 'グループ予約 — お客様が支払い',
     paidByLead: 'グループ代表者が支払い',
+    eventCancelledNotice: 'ショップがこのイベントを中止しました。',
     cancelledSection: 'キャンセルした予約',
     cancelledHint: 'キャンセルした予約のお支払いと、返還された金額です。',
     noPaymentsRecorded: 'この予約には支払い記録がありません。',

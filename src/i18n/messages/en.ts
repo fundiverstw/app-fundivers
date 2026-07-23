@@ -568,6 +568,7 @@ export const en = {
     noActive: 'No active bookings yet. Check the calendar!',
     groupPaying: "Group bookings — you're paying",
     paidByLead: 'Paid by your group lead',
+    eventCancelledNotice: 'The shop cancelled this event.',
     cancelledSection: 'Cancelled bookings',
     cancelledHint: 'What you paid, and what came back, on bookings that were cancelled.',
     noPaymentsRecorded: 'No payments were recorded on this booking.',

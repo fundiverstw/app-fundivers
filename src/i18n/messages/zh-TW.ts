@@ -560,6 +560,7 @@ export const zhTW: Messages = {
     noActive: '目前沒有有效的預訂。看看行事曆吧！',
     groupPaying: '團體預訂 — 由您付款',
     paidByLead: '由您的團體負責人付款',
+    eventCancelledNotice: '店家已取消此活動。',
     cancelledSection: '已取消的預訂',
     cancelledHint: '已取消預訂的付款紀錄，以及退回的金額。',
     noPaymentsRecorded: '此筆預訂沒有付款紀錄。',

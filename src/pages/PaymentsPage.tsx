@@ -464,6 +464,12 @@ function LineCard({
             <p className={`text-xs ${TEXT_MUTED} mt-0.5`}>{formatEventSpan(event, { withYear: true })}</p>
           )}
           <p className={`text-xs capitalize mt-0.5 font-medium ${STATUS_STYLES[booking.status]}`}>{booking.status}</p>
+          {/* A shop-side cancellation never touches booking.status, so without
+              this the card reads as an ordinary live booking — and the credit
+              that appears alongside it has no visible explanation. */}
+          {event?.cancelled_at && (
+            <p className={`text-xs ${TEXT_ERROR} mt-0.5`}>{t.payments.eventCancelledNotice}</p>
+          )}
           {refundRequested && (
             <p className={`text-xs ${TEXT_ERROR} mt-0.5`}>🔄 {t.bookings.refundRequested}</p>
           )}
