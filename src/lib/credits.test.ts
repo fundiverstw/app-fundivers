@@ -103,6 +103,19 @@ describe('diverCreditBalance', () => {
     expect(diverCreditBalance([], bookings, new Set(['b2']))).toBe(150)
   })
 
+  it('returns a cancelled booking\'s tied credit to the spendable balance', async () => {
+    const { diverCreditBalance } = await import('./credits')
+    // What trg_bookings_return_account_credit_on_cancel writes: an open credit
+    // pinned to the booking the diver just had cancelled. Callers pass only
+    // NON-cancelled bookings, so that booking is absent from the list and its
+    // credit falls into the general term — spendable again, which is the whole
+    // point of the reversal.
+    const credits = [
+      { id: 'c1', booking_id: 'b-cancelled', amount: 2800, status: 'open' },
+    ] as unknown as import('../types/database').Credit[]
+    expect(diverCreditBalance(credits, [{ id: 'b-live', owed: 3000, paid: 0 }])).toBe(2800)
+  })
+
   it('drops a covered booking\'s tied credit from the per-booking term', async () => {
     const { diverCreditBalance } = await import('./credits')
     const credits = [
