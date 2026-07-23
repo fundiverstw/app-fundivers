@@ -93,6 +93,15 @@ describe('AdminAuditsPage', () => {
     expect(screen.getAllByText('Raw record').length).toBe(2)
   })
 
+  it('links the registration card through to its event', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: /Alice Diver/ }))
+
+    const link = await screen.findByRole('link', { name: 'Green Island' })
+    expect(link).toHaveAttribute('href', '/admin/events/ev1')
+  })
+
   it('lets the admin return to the diver list', async () => {
     const user = userEvent.setup()
     renderPage()

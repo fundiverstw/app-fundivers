@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
@@ -124,7 +124,16 @@ function RegistrationCard({ reg, currency, actorName }: RegistrationCardProps) {
     <div className={`${CARD} p-4 space-y-3`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className={`font-semibold ${TEXT_BODY} truncate`}>{event?.title ?? au.eventFallback}</div>
+          {event ? (
+            <Link
+              to={`/admin/events/${event.id}`}
+              className={`block font-semibold ${TEXT_BODY} hover:underline truncate`}
+            >
+              {event.title}
+            </Link>
+          ) : (
+            <div className={`font-semibold ${TEXT_BODY} truncate`}>{au.eventFallback}</div>
+          )}
           {event && (
             <div className={`text-xs ${TEXT_MUTED}`}>{formatEventSpan(event, { withYear: true })}</div>
           )}

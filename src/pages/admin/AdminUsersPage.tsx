@@ -708,7 +708,16 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
                 <div key={b.id} className="space-y-1">
                   <div className="flex items-start justify-between text-xs">
                     <div className="min-w-0">
-                      <p className="text-brand-900 truncate">{b.event?.title ?? t.payments.eventFallback}</p>
+                      {b.event ? (
+                        <Link
+                          to={`/admin/events/${b.event.id}`}
+                          className="block text-brand-900 hover:text-brand-700 underline truncate"
+                        >
+                          {b.event.title}
+                        </Link>
+                      ) : (
+                        <p className="text-brand-900 truncate">{t.payments.eventFallback}</p>
+                      )}
                       {b.event && (
                         <p className="text-brand-950 font-medium">{formatEventSpan(b.event, { style: 'compact', withYear: true })}</p>
                       )}

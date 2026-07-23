@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { AdminUsersPage } from './AdminUsersPage'
+import { fetchEventsForBookings } from '../../lib/events'
 import { mockQueryBuilder } from '../../../tests/test-utils'
 import { t } from '../../i18n'
 
@@ -44,6 +45,7 @@ const profiles = [
 
 beforeEach(() => {
   from.mockReset(); useAuthMock.mockReset()
+  vi.mocked(fetchEventsForBookings).mockResolvedValue(new Map())
   useAuthMock.mockReturnValue({ profile: { id: 'admin-1', role: 'admin' }, user: { id: 'admin-1' } })
   from.mockImplementation((table: string) => {
     if (table === 'profiles') return mockQueryBuilder({ data: profiles })
@@ -72,6 +74,26 @@ describe('AdminUsersPage deep link', () => {
     const link = await screen.findByRole('link', { name: t.admin.users.registerForEvent })
     // Reuses the create-diver deep link: events list → preselected add-diver modal.
     expect(link).toHaveAttribute('href', '/admin/events?diver=u2')
+  })
+
+  it('links each booking to its event so an admin can act on the registration', async () => {
+    // Without this an admin reading a diver's card had no way through to the
+    // event page, where booking status is actually changed.
+    vi.mocked(fetchEventsForBookings).mockResolvedValue(
+      new Map([['ev-1', { id: 'ev-1', title: 'Green Island Fun Dive' }]]) as never,
+    )
+    from.mockImplementation((table: string) => {
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      if (table === 'bookings') {
+        return mockQueryBuilder({ data: [{ id: 'b1', user_id: 'u2', event_id: 'ev-1', status: 'confirmed', details: { total: 3000 } }] })
+      }
+      return mockQueryBuilder({ data: [] })
+    })
+
+    renderAt('/admin/users?diver=u2')
+
+    const link = await screen.findByRole('link', { name: 'Green Island Fun Dive' })
+    expect(link).toHaveAttribute('href', '/admin/events/ev-1')
   })
 
   it('leaves every card collapsed with no ?diver param', async () => {
