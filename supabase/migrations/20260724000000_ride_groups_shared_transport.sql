@@ -85,6 +85,19 @@ create function public.event_ride_seats(p_event_id uuid)
     select g.ride_day, g.group_id
     from public.event_ride_groups g
     where g.event_id = p_event_id
+      -- Only days the event actually runs on. A grouping row survives an event
+      -- being rescheduled (nothing rewrites its ride_day), and pooling seats
+      -- with a run the event no longer joins would inflate its capacity. Asked
+      -- by date SHAPE, not by kind: a course-day list, or a start/end envelope.
+      and exists (
+        select 1 from public.events e
+        where e.id = g.event_id
+          and (
+            (e.course_days is not null and g.ride_day = any(e.course_days))
+            or (e.start_date is not null
+                and g.ride_day between e.start_date and coalesce(e.end_date, e.start_date))
+          )
+      )
   ),
   -- Every (day, event) pair that shares a run with this event. The union's
   -- second branch is the rides-alone case: a null day means "this event on its

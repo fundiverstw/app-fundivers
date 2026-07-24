@@ -157,6 +157,21 @@ describe('event_ride_seats', () => {
     expect(await rideSeats(diveId)).toEqual(pooled)
   })
 
+  it('ignores a grouping row for a day the event no longer runs on', async () => {
+    // Rescheduling an event doesn't rewrite its grouping rows, so a row can be
+    // left pointing at a day the event isn't on. It must not pool seats.
+    const stray = await createTestDive(admin)
+    const g = crypto.randomUUID()
+    const ins = await admin.from('event_ride_groups').insert([
+      { ride_day: '2031-01-01', event_id: stray, group_id: g },
+      { ride_day: '2031-01-01', event_id: diveId, group_id: g },
+    ] as never)
+    if (ins.error) throw new Error(`group: ${ins.error.message}`)
+    // The stray dive runs a week from now, not on 2031-01-01 — it stays alone.
+    expect(await rideSeats(stray)).toMatchObject({ seats: 0, capacity: 0, claimed: 0 })
+    await deleteTestDive(admin, stray)
+  })
+
   it('counts a diver booked on both events of a run as one claim', async () => {
     // diverC rides on BOTH events of the run — one body, one seat. diverA and
     // diverB already hold one claim each, so the run's total goes to 3, not 4.
