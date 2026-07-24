@@ -258,6 +258,42 @@ describe('fetchEventsInRange — private dives', () => {
   })
 })
 
+describe('fetchEventsInRange — cancelled events', () => {
+  // Records the .is() filters applied to both events queries. The
+  // cancelled_at null-check is what hides cancelled events; the admin
+  // calendar drops it so they can render dimmed.
+  function setupCaptureIs() {
+    const isCalls: [string, unknown][] = []
+    from.mockImplementation((table: string) => {
+      if (table !== 'events') return emptyBuilder()
+      const b: Record<string, unknown> = {}
+      for (const m of CHAIN) {
+        b[m] = (...args: unknown[]) => { if (m === 'is') isCalls.push([args[0] as string, args[1]]); return b }
+      }
+      b.then = (cb?: (r: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(cb)
+      return b
+    })
+    return isCalls
+  }
+
+  it('hides cancelled events by default (diver-facing)', async () => {
+    const isCalls = setupCaptureIs()
+    const { fetchEventsInRange } = await import('./events')
+    await fetchEventsInRange('2026-05-01', '2026-05-31')
+    expect(isCalls.filter(([col]) => col === 'cancelled_at')).toEqual([
+      ['cancelled_at', null],
+      ['cancelled_at', null],
+    ])
+  })
+
+  it('keeps cancelled events when includeCancelled is set (admin calendar)', async () => {
+    const isCalls = setupCaptureIs()
+    const { fetchEventsInRange } = await import('./events')
+    await fetchEventsInRange('2026-05-01', '2026-05-31', { includeCancelled: true })
+    expect(isCalls.filter(([col]) => col === 'cancelled_at')).toEqual([])
+  })
+})
+
 describe('fetchEventsForBookings — full course span', () => {
   // For per-booking lookups (e.g. AdminEventDetailPage → EventStaffSection),
   // the representative event for a course must cover the full span — first

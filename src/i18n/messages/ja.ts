@@ -60,6 +60,8 @@ export const ja: Messages = {
     nextMonth: '次の月',
     noEvents: '予定されているイベントはありません。',
     alreadyHappened: (title: string) => `${title}（終了済み）`,
+    cancelled: '中止',
+    cancelledEvent: (title: string) => `${title}（中止）`,
     noCoursesInRange: 'この期間にコースはありません。',
     toggleKind: (kind: string) => `${kind}の表示を切り替え`,
     filterCourses: 'コースを絞り込む',

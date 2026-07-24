@@ -61,6 +61,8 @@ export const zhTW: Messages = {
     nextMonth: '下個月',
     noEvents: '目前沒有安排活動。',
     alreadyHappened: (title: string) => `${title} — 已結束`,
+    cancelled: '已取消',
+    cancelledEvent: (title: string) => `${title} — 已取消`,
     noCoursesInRange: '此範圍內沒有課程。',
     toggleKind: (kind: string) => `切換${kind}顯示`,
     filterCourses: '篩選課程',

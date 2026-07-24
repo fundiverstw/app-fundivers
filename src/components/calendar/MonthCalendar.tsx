@@ -385,7 +385,7 @@ export function MonthCalendar({
               highlightedIds?.has(ev.id)
                 ? 'bg-amber-400/15 border border-amber-400/60 hover:border-amber-400'
                 : 'glass glass-hover'
-            } ${ev.is_private ? 'opacity-60' : ''}`}
+            } ${ev.cancelled_at ? 'opacity-50' : ev.is_private ? 'opacity-60' : ''}`}
           >
             <div className="flex items-start justify-between">
               <div>
@@ -393,8 +393,13 @@ export function MonthCalendar({
                   <span className={`text-xs px-1.5 py-0.5 rounded-full ${eventBarClass(ev, false)}`}>
                     {EVENT_KIND_LABELS[ev.type]}
                   </span>
+                  {ev.cancelled_at && (
+                    <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">
+                      {t.calendar.cancelled}
+                    </span>
+                  )}
                   {ev.is_private && <PrivateIcon />}
-                  <span className="font-medium text-brand-50 text-sm">{ev.title}</span>
+                  <span className={`font-medium text-brand-50 text-sm ${ev.cancelled_at ? 'line-through' : ''}`}>{ev.title}</span>
                   {ev.featured && <span className="text-xs text-amber-300">★</span>}
                 </div>
                 <p className="mono text-xs text-brand-100/70 mt-1">
@@ -557,7 +562,7 @@ function DayCell({
             onClick={() => onPickEvent(seg.event)}
             hovered={hoveredEventId === seg.event.id}
             onHoverEvent={onHoverEvent}
-            draggable={rescheduleEnabled && isReschedulable(seg.event)}
+            draggable={rescheduleEnabled && isReschedulable(seg.event) && !seg.event.cancelled_at}
             onDragHoverDay={onDragHoverDay}
             onDropReschedule={onDropReschedule}
           />
@@ -688,6 +693,9 @@ function EventBar({
   }
 
   const baseClass = eventBarClass(seg.event, hovered)
+  // Cancelled events stay on the grid (an admin needs to see the hole in the
+  // month, and can tap through to restore) but read as struck-out ghosts.
+  const cancelled = !!seg.event.cancelled_at
   const leftInset = seg.isStart ? 2 : 0
   const rightInset = seg.isEnd ? 2 : 0
   const leftRadius = seg.isStart ? 'rounded-l-sm' : ''
@@ -724,9 +732,16 @@ function EventBar({
       onPointerCancel={draggable && !disabled ? reset : undefined}
       onMouseEnter={() => onHoverEvent(seg.event.id)}
       onMouseLeave={() => onHoverEvent(null)}
-      title={disabled ? t.calendar.alreadyHappened(seg.event.title) : seg.event.title}
+      title={
+        cancelled ? t.calendar.cancelledEvent(seg.event.title)
+        : disabled ? t.calendar.alreadyHappened(seg.event.title)
+        : seg.event.title
+      }
       className={`absolute text-[10px] font-semibold truncate text-left px-1 transition-all ${baseClass} ${leftRadius} ${rightRadius} ${
-        disabled ? 'opacity-40 cursor-default saturate-50' : lifted ? 'z-30 scale-105 opacity-90 shadow-lg' : seg.event.is_private ? 'opacity-50' : ''
+        cancelled ? 'opacity-40 saturate-50 line-through'
+        : disabled ? 'opacity-40 cursor-default saturate-50'
+        : lifted ? 'z-30 scale-105 opacity-90 shadow-lg'
+        : seg.event.is_private ? 'opacity-50' : ''
       }`}
       style={{
         top: track * (TRACK_HEIGHT + TRACK_GAP),

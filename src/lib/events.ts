@@ -491,24 +491,27 @@ async function enrichAndBuild(rows: EventRow[]): Promise<AppEvent[]> {
  * with at least one session day inside the window (inclusive). Dives and courses
  * are one table now (kind), but keep the two date-model queries: dives match a
  * scalar start_date range, courses match by overlapping `course_days`.
- * Cancelled events are hidden.
+ * Cancelled events are hidden unless `includeCancelled` is set (the admin
+ * calendar keeps them visible, dimmed, so a cancellation is auditable).
  */
 export async function fetchEventsInRange(
   fromDate: string,
   toDate: string,
-  opts: { includePrivate?: boolean } = {},
+  opts: { includePrivate?: boolean; includeCancelled?: boolean } = {},
 ): Promise<AppEvent[]> {
   // Split by temporal shape, not by kind: envelope kinds filter on the scalar
   // start_date, course-day kinds on course_days overlap. Querying the kind
   // groups keeps a newly added kind in whichever query matches its shape.
-  let envelopeQuery = supabase.from('events').select(EVENT_COLS).in('kind', DATE_ENVELOPE_KINDS).is('cancelled_at', null)
+  let envelopeQuery = supabase.from('events').select(EVENT_COLS).in('kind', DATE_ENVELOPE_KINDS)
     .gte('start_date', fromDate).lte('start_date', toDate).order('start_date')
+  let coursesQuery = supabase.from('events').select(EVENT_COLS).in('kind', COURSE_DAY_KINDS)
+    .overlaps('course_days', datesInRange(fromDate, toDate))
   if (!opts.includePrivate) envelopeQuery = envelopeQuery.eq('is_private', false)
-  const [envelopeResp, coursesResp] = await Promise.all([
-    envelopeQuery,
-    supabase.from('events').select(EVENT_COLS).in('kind', COURSE_DAY_KINDS).is('cancelled_at', null)
-      .overlaps('course_days', datesInRange(fromDate, toDate)),
-  ])
+  if (!opts.includeCancelled) {
+    envelopeQuery = envelopeQuery.is('cancelled_at', null)
+    coursesQuery = coursesQuery.is('cancelled_at', null)
+  }
+  const [envelopeResp, coursesResp] = await Promise.all([envelopeQuery, coursesQuery])
 
   const rows = [...((envelopeResp.data ?? []) as EventRow[]), ...((coursesResp.data ?? []) as EventRow[])]
   const events = (await enrichAndBuild(rows)).sort((a, b) => a.start_time.localeCompare(b.start_time))

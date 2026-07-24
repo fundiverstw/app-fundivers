@@ -530,6 +530,59 @@ describe('MonthCalendar private dives', () => {
   })
 })
 
+describe('MonthCalendar cancelled events', () => {
+  const cancelledDive = {
+    id: 'C1', type: 'dive' as const, title: 'Typhoon dive', calendar_title: null,
+    start_time: '2030-06-12T09:00:00', end_time: null, start_time_hhmm: '09:00',
+    featured: false, fully_booked: false, capacity: null, confirmed_count: null,
+    price: null, deposit_amount: null, transport_price: null, currency: 'TWD',
+    has_rooms: false, room_type_ids: [], has_addons: false, addon_ids: [],
+    gear_rental_info: null, nitrox_required: false, dive_days: null,
+    cancelled_at: '2030-06-01T00:00:00Z', full_payment_deadline: null,
+    cancel_policy: null, cancel_date: null, is_private: false,
+  }
+
+  function renderCancelled() {
+    render(
+      <MonthCalendar
+        month={new Date('2030-06-15')}
+        onMonthChange={() => {}}
+        events={[cancelledDive]}
+        onPickEvent={() => {}}
+        onRescheduleDay={async () => {}}
+      />
+    )
+  }
+
+  it('keeps the bar on the grid but dims and strikes it', () => {
+    renderCancelled()
+    const bar = screen.getByTitle('Typhoon dive — cancelled')
+    expect(bar.className).toMatch(/opacity-40/)
+    expect(bar.className).toMatch(/line-through/)
+  })
+
+  it('still opens a cancelled event when tapped (so it can be restored)', async () => {
+    const onPick = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <MonthCalendar
+        month={new Date('2030-06-15')}
+        onMonthChange={() => {}}
+        events={[cancelledDive]}
+        onPickEvent={onPick}
+        onRescheduleDay={async () => {}}
+      />
+    )
+    await user.click(screen.getByTitle('Typhoon dive — cancelled'))
+    expect(onPick).toHaveBeenCalledTimes(1)
+  })
+
+  it('badges the list row as cancelled', () => {
+    renderCancelled()
+    expect(screen.getByText('Cancelled')).toBeInTheDocument()
+  })
+})
+
 describe('MonthCalendar disablePastEvents', () => {
   const pastDive = {
     id: 'PAST1', type: 'dive' as const, title: 'Old Dive', calendar_title: null,

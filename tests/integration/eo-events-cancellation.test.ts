@@ -50,6 +50,10 @@ describe('cancelled events are filtered from listing reads', () => {
     const lookup = await fetchEventsForBookings([id])
     expect(lookup.has(id)).toBe(true)
     expect(lookup.get(id)?.cancelled_at).not.toBeNull()
+
+    // The admin calendar opts back in and gets it with cancelled_at set.
+    const admins = await fetchEventsInRange('2027-09-01', '2027-09-30', { includeCancelled: true })
+    expect(admins.find(e => e.id === id)?.cancelled_at).not.toBeNull()
   })
 
   it('hides a cancelled course from fetchEventsInRange', async () => {
@@ -71,5 +75,8 @@ describe('cancelled events are filtered from listing reads', () => {
 
     const after = await fetchEventsInRange('2027-09-01', '2027-09-30')
     expect(after.some(e => e.id === id)).toBe(false)
+
+    const admins = await fetchEventsInRange('2027-09-01', '2027-09-30', { includeCancelled: true })
+    expect(admins.some(e => e.id === id)).toBe(true)
   })
 })
