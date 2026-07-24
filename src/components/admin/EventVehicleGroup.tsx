@@ -12,9 +12,16 @@ interface Props {
   allocations: EventVehicle[]
   available: Vehicle[]
   vehicleMap: Map<string, Vehicle>
-  // Bodies the shop must move for this event (divers needing a ride + on-duty
-  // staff) — shown next to the assigned seat total as a sanity check.
+  // Bodies the shop must move on this event's RUN — divers needing a ride plus
+  // on-duty staff, each counted once, pooled with any event this one travels
+  // with. Shown next to the run's seat total as a sanity check.
   riders: number
+  // Seats across every car on the run (this event's cars plus its partners',
+  // a shared car counted once). The chips below still list only this event's
+  // own allocations, which is what the picker edits.
+  runSeats: number
+  // Titles of the other events sharing this run, if any.
+  sharedWith: string[]
   isAdmin: boolean
   createdBy: string | null
   onChanged: () => void
@@ -28,17 +35,13 @@ interface Props {
  * does not remove it from other events.
  */
 export function EventVehicleGroup({
-  event, allocations, available, vehicleMap, riders, isAdmin, createdBy, onChanged,
+  event, allocations, available, vehicleMap, riders, runSeats, sharedWith, isAdmin, createdBy, onChanged,
 }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Staff (read-only) with nothing assigned: nothing useful to show.
   if (!isAdmin && allocations.length === 0) return null
-
-  const assignedSeats = allocations.reduce(
-    (sum, a) => sum + (vehicleMap.get(a.vehicle_id)?.passenger_seats ?? 0), 0,
-  )
 
   async function assign(vehicleId: string) {
     if (!vehicleId || !createdBy) return
@@ -70,9 +73,15 @@ export function EventVehicleGroup({
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-sm font-bold text-brand-900">{tp.cars}</h2>
         <span className="text-xs text-brand-900 font-semibold">
-          {assignedSeats} seat{assignedSeats === 1 ? '' : 's'} · {riders} to transport
+          {tp.seatsToTransport(runSeats, riders)}
         </span>
       </div>
+
+      {sharedWith.length > 0 && (
+        <p className="text-xs text-brand-900 font-medium">
+          {tp.sharedRunNote(sharedWith.join(tp.runJoin))}
+        </p>
+      )}
 
       {allocations.length === 0 ? (
         <p className="text-xs text-brand-950/70 font-medium italic">{tp.noCarAssigned}</p>
@@ -118,9 +127,7 @@ export function EventVehicleGroup({
             </select>
           </label>
         ) : (
-          <p className="text-xs text-brand-950/70 font-medium italic">
-            Every active car is already assigned to this event.
-          </p>
+          <p className="text-xs text-brand-950/70 font-medium italic">{tp.allCarsAssigned}</p>
         )
       )}
 

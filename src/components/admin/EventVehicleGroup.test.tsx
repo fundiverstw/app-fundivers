@@ -40,6 +40,8 @@ function setup(over: Partial<React.ComponentProps<typeof EventVehicleGroup>> = {
       available={[delica, bus]}
       vehicleMap={new Map([[delica.id, delica], [bus.id, bus]])}
       riders={5}
+      runSeats={7}
+      sharedWith={[]}
       isAdmin={true}
       createdBy="admin-1"
       onChanged={onChanged}
@@ -54,8 +56,17 @@ describe('EventVehicleGroup', () => {
     // An allocated car drops out of `available` (the parent computes that).
     setup({ allocations: [alloc('a1', 'v1')], available: [bus] })
     expect(screen.getByText('Delica (7)')).toBeInTheDocument()
-    // 7 assigned seats · 5 to transport
+    // The header reports the whole run's seats and riders, not this event's slice.
     expect(screen.getByText(/7 seats · 5 to transport/)).toBeInTheDocument()
+  })
+
+  it('names the events it shares its cars with', () => {
+    setup({
+      allocations: [alloc('a1', 'v1')], available: [bus],
+      runSeats: 7, riders: 6, sharedWith: ['Refresher Course'],
+    })
+    expect(screen.getByText(/Shares its cars with Refresher Course/)).toBeInTheDocument()
+    expect(screen.getByText(/7 seats · 6 to transport/)).toBeInTheDocument()
   })
 
   it('lets an admin assign an available car', async () => {
@@ -95,6 +106,8 @@ describe('EventVehicleGroup', () => {
         available={[delica]}
         vehicleMap={new Map([[delica.id, delica]])}
         riders={0}
+        runSeats={0}
+        sharedWith={[]}
         isAdmin={false}
         createdBy={null}
         onChanged={() => {}}

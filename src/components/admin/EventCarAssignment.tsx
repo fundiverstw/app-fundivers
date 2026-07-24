@@ -2,18 +2,18 @@ import { useEffect, useState } from 'react'
 import { EventVehicleGroup } from './EventVehicleGroup'
 import { fetchVehicles } from '../../lib/vehicles'
 import {
-  fetchVehiclesForEvent, fetchRideSeats, availableVehicles,
+  fetchVehiclesForEvent, fetchRideSeats, availableVehicles, type RideSeats,
 } from '../../lib/event-vehicles'
+import { fetchRidePartnerTitles } from '../../lib/ride-groups'
+import { t } from '../../i18n'
 import type { AppEvent, EventVehicle, Vehicle } from '../../types/database'
+
+const tp = t.admin.transport
 
 interface Props {
   event: Pick<AppEvent, 'id' | 'type'>
   isAdmin: boolean
   createdBy: string | null
-  /** Live rider count (divers needing a ride). When omitted, it's fetched from
-   *  the ride-seat RPC — so this works on surfaces that haven't loaded the
-   *  event's bookings (e.g. the Edit event form). */
-  riders?: number
 }
 
 /**
@@ -21,11 +21,18 @@ interface Props {
  * the event detail page (Transportation tab) and the Edit event form. Cars are
  * assigned to the event as a whole — a car may serve several events — so what's
  * assigned here lines up with the Logistics day view.
+ *
+ * Every number comes from the event_ride_seats RPC, which measures the whole
+ * run the event travels in (see src/lib/ride-groups.ts): seats over the run's
+ * distinct cars, the on-duty staff riding them, and the divers already holding
+ * a ride. Deriving them from this event's own allocations instead would
+ * contradict the Logistics board the moment two events share a van.
  */
-export function EventCarAssignment({ event, isAdmin, createdBy, riders }: Props) {
+export function EventCarAssignment({ event, isAdmin, createdBy }: Props) {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [allocations, setAllocations] = useState<EventVehicle[]>([])
-  const [claimed, setClaimed] = useState<number | null>(null)
+  const [seats, setSeats] = useState<RideSeats | null>(null)
+  const [partners, setPartners] = useState<string[]>([])
   const [reload, setReload] = useState(0)
 
 
@@ -51,24 +58,29 @@ export function EventCarAssignment({ event, isAdmin, createdBy, riders }: Props)
     return () => { cancelled = true }
   }, [event.id, reload])
 
-  // Rider count when the caller didn't supply one — claimed = divers holding a
-  // ride, from the ride-seat RPC.
   useEffect(() => {
-    if (riders != null) return
     let cancelled = false
     fetchRideSeats(event.id)
-      .then(s => { if (!cancelled) setClaimed(s.claimed) })
-      .catch(() => { /* leave null */ })
+      .then(s => { if (!cancelled) setSeats(s) })
+      .catch(() => { /* leave null — the block still assigns cars */ })
     return () => { cancelled = true }
-  }, [event.id, riders, reload])
+  }, [event.id, reload])
 
-  const riderCount = riders ?? claimed ?? 0
+  useEffect(() => {
+    let cancelled = false
+    fetchRidePartnerTitles(event.id)
+      .then(p => { if (!cancelled) setPartners(p) })
+      .catch(() => { /* grouping is admin-curated; absent is fine */ })
+    return () => { cancelled = true }
+  }, [event.id, reload])
+
   const activeVehicles = vehicles.filter(v => v.active)
   const vehicleMap = new Map(vehicles.map(v => [v.id, v]))
-  const assignedVehicleIds = new Set(allocations.map(a => a.vehicle_id))
-  const available = availableVehicles(activeVehicles, assignedVehicleIds)
-  const capacity = allocations.reduce((s, a) => s + (vehicleMap.get(a.vehicle_id)?.passenger_seats ?? 0), 0)
-  const short = capacity > 0 && riderCount > capacity
+  const available = availableVehicles(activeVehicles, new Set(allocations.map(a => a.vehicle_id)))
+  // Bodies the run must move: the divers holding a ride plus the on-duty staff
+  // sharing those seats.
+  const riders = (seats?.claimed ?? 0) + (seats?.staff ?? 0)
+  const shortBy = seats ? Math.max(0, seats.claimed - seats.capacity) : 0
 
   return (
     <div className="space-y-2">
@@ -77,14 +89,16 @@ export function EventCarAssignment({ event, isAdmin, createdBy, riders }: Props)
         allocations={allocations}
         available={available}
         vehicleMap={vehicleMap}
-        riders={riderCount}
+        riders={riders}
+        runSeats={seats?.seats ?? 0}
+        sharedWith={partners}
         isAdmin={isAdmin}
         createdBy={createdBy}
         onChanged={() => setReload(k => k + 1)}
       />
-      {short && (
+      {shortBy > 0 && (
         <p className="text-xs text-red-600 font-semibold pl-1">
-          Short {riderCount - capacity} seat{riderCount - capacity === 1 ? '' : 's'} — {riderCount} need a ride but only {capacity} assigned.
+          {tp.eventRideShort(shortBy, seats!.claimed, seats!.capacity)}
         </p>
       )}
     </div>

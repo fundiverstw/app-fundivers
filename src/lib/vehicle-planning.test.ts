@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { planFleet, type Rider } from './vehicle-planning'
+import { planFleet, planRuns, type Rider, type RunInput } from './vehicle-planning'
 
 const FLEET = [
-  { name: 'Delica', passenger_seats: 7 },
-  { name: "Sigi's Car", passenger_seats: 4 },
-  { name: 'Veryca', passenger_seats: 1 },
+  { id: 'v1', name: 'Delica', passenger_seats: 7 },
+  { id: 'v2', name: "Sigi's Car", passenger_seats: 4 },
+  { id: 'v3', name: 'Veryca', passenger_seats: 1 },
 ]
 
 const divers = (...names: string[]): Rider[] =>
@@ -84,5 +84,141 @@ describe('planFleet', () => {
     const fleet = [...FLEET]
     planFleet(fleet, d(3), s(2))
     expect(fleet.map(v => v.name)).toEqual(['Delica', "Sigi's Car", 'Veryca'])
+  })
+})
+
+// A run is the set of events travelling together. These cover the counting
+// mistakes the old per-event summing made: a shared car counted twice, a person
+// on two events counted twice, and slack pooled across runs that can't share.
+describe('planRuns', () => {
+  const run = (over: Partial<RunInput> & { key: string }): RunInput => ({
+    events: [{ id: over.key, title: over.key }],
+    divers: [],
+    staff: [],
+    fleet: [],
+    ...over,
+  })
+
+  it('counts a car serving two events of one run once', () => {
+    const shared = { id: 'v1', name: 'Delica', passenger_seats: 8 }
+    const p = planRuns([run({
+      key: 'group:g1',
+      events: [{ id: 'e1', title: 'Bat Cave' }, { id: 'e2', title: 'Refresher' }],
+      // The same allocation shows up once per event of the run.
+      fleet: [shared, shared],
+      divers: d(5),
+      staff: s(2),
+    })])
+    expect(p.runs[0].fleetSeats).toBe(8)
+    expect(p.runs[0].seats).toBe(8)
+    expect(p.runs[0].cars).toHaveLength(1)
+    expect(p.runs[0].riders).toBe(7)
+    expect(p.runs[0].fits).toBe(true)
+    expect(p.seats).toBe(8)
+    expect(p.cars).toBe(1)
+  })
+
+  it('counts a diver booked on two events of one run as one body', () => {
+    const p = planRuns([run({
+      key: 'group:g1',
+      events: [{ id: 'e1', title: 'Dive' }, { id: 'e2', title: 'Course' }],
+      divers: [...divers('Ada'), ...divers('Ada'), ...divers('Bo')],
+      fleet: [{ id: 'v1', name: 'Car', passenger_seats: 4 }],
+    })])
+    expect(p.runs[0].divers).toBe(2)
+    expect(p.divers).toBe(2)
+  })
+
+  it('gives a staff member who is also booked as a diver one seat, as staff', () => {
+    const p = planRuns([run({
+      key: 'event:e1',
+      divers: [{ id: 'p1', name: 'Ada', kind: 'diver' }, ...divers('Bo')],
+      staff: [{ id: 'p1', name: 'Ada', kind: 'staff' }],
+      fleet: [{ id: 'v1', name: 'Car', passenger_seats: 4 }],
+    })])
+    expect(p.runs[0].riders).toBe(2)
+    expect(p.runs[0].staff).toBe(1)
+    expect(p.runs[0].divers).toBe(1)
+    expect(p.riders).toBe(2)
+  })
+
+  it('never pools seats across runs — one run can be short while the other has slack', () => {
+    const p = planRuns([
+      run({ key: 'event:e1', divers: d(6), fleet: [{ id: 'v1', name: 'Small', passenger_seats: 4 }] }),
+      run({ key: 'event:e2', divers: divers('Zoe'), fleet: [{ id: 'v2', name: 'Big', passenger_seats: 8 }] }),
+    ])
+    expect(p.runs[0].fits).toBe(false)
+    expect(p.runs[0].shortfall).toBe(2)
+    expect(p.runs[1].fits).toBe(true)
+    // The day's own totals still add the bodies and the cars taken up...
+    expect(p.riders).toBe(7)
+    expect(p.seats).toBe(12)
+    // ...but the day does not "fit" just because the totals would.
+    expect(p.fits).toBe(false)
+    expect(p.shortfall).toBe(2)
+  })
+
+  it('flags one car taken by two runs — it can only make one', () => {
+    const shared = { id: 'v1', name: 'Delica', passenger_seats: 8 }
+    const p = planRuns([
+      run({ key: 'event:e1', divers: d(2), fleet: [shared] }),
+      run({ key: 'event:e2', divers: divers('Zoe'), fleet: [shared] }),
+    ])
+    expect(p.conflicts).toEqual([
+      { kind: 'car', name: 'Delica', runKeys: ['event:e1', 'event:e2'] },
+    ])
+    // Counted once for the day, however many runs claim it.
+    expect(p.cars).toBe(1)
+    expect(p.seats).toBe(8)
+  })
+
+  it('flags a staff member and a diver expected on two runs at once', () => {
+    const car = (id: string) => ({ id, name: id, passenger_seats: 6 })
+    const p = planRuns([
+      run({ key: 'event:e1', divers: divers('Ada'), staff: staff('Billy'), fleet: [car('v1')] }),
+      run({ key: 'event:e2', divers: divers('Ada'), staff: staff('Billy'), fleet: [car('v2')] }),
+    ])
+    expect(p.conflicts).toEqual([
+      { kind: 'staff', name: 'Billy', runKeys: ['event:e1', 'event:e2'] },
+      { kind: 'diver', name: 'Ada', runKeys: ['event:e1', 'event:e2'] },
+    ])
+    // Both runs need a seat for each of them, but the day counts two people.
+    expect(p.runs[0].riders).toBe(2)
+    expect(p.runs[1].riders).toBe(2)
+    expect(p.riders).toBe(2)
+  })
+
+  it('does not flag a car that is only spare on the other run', () => {
+    const big = { id: 'v1', name: 'Big', passenger_seats: 8 }
+    const small = { id: 'v2', name: 'Small', passenger_seats: 2 }
+    const p = planRuns([
+      // One rider, so only the largest car is taken and Small sits spare.
+      run({ key: 'event:e1', divers: divers('Ada'), fleet: [big, small] }),
+      run({ key: 'event:e2', divers: divers('Bo'), fleet: [small] }),
+    ])
+    expect(p.runs[0].spare.map(v => v.name)).toEqual(['Small'])
+    expect(p.conflicts).toEqual([])
+  })
+
+  it('reports a run with riders but no car as seatless rather than short', () => {
+    const p = planRuns([run({ key: 'event:e1', divers: d(3), staff: s(1) })])
+    expect(p.runs[0].seats).toBe(0)
+    expect(p.runs[0].fits).toBe(false)
+    expect(p.runs[0].shortfall).toBe(4)
+    expect(p.runs[0].cars).toEqual([])
+  })
+
+  it('marks a single-event run as not shared', () => {
+    const p = planRuns([
+      run({ key: 'event:e1' }),
+      run({ key: 'group:g1', events: [{ id: 'e2', title: 'A' }, { id: 'e3', title: 'B' }] }),
+    ])
+    expect(p.runs[0].shared).toBe(false)
+    expect(p.runs[1].shared).toBe(true)
+  })
+
+  it('is empty and fitting when the day has no events', () => {
+    const p = planRuns([])
+    expect(p).toMatchObject({ runs: [], riders: 0, seats: 0, cars: 0, fits: true, shortfall: 0, conflicts: [] })
   })
 })

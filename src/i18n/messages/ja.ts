@@ -1670,6 +1670,29 @@ export const ja: Messages = {
       fleetFits: (vehicles: number, seats: number, riders: number, divers: number, staff: number) =>
         `車両 ${vehicles} 台を使用 — ${seats} 席で ${riders} 名（ダイバー ${divers} 名${staff > 0 ? ` + スタッフ ${staff} 名` : ''}）。`,
       staffSuffix: '（スタッフ）',
+      dayRuns: (runs: number, riders: number, divers: number, staff: number) =>
+        `${runs} 便に分かれています · 乗車 ${riders} 名（ダイバー ${divers} 名${staff > 0 ? ` + スタッフ ${staff} 名` : ''}）`,
+      runJoin: ' + ',
+      runNoCar: (riders: number, divers: number, staff: number) =>
+        `車両が未割り当て — ${riders} 名（ダイバー ${divers} 名${staff > 0 ? ` + スタッフ ${staff} 名` : ''}）が乗れません。`,
+      spareCars: (names: string) => `使用しない車両：${names}`,
+      conflictCar: (car: string, runs: string) =>
+        `${car} が別々の 2 便（${runs}）に割り当てられています — 1 台で両方は走れません。イベントを同じ便にまとめるか、別の車両を割り当ててください。`,
+      conflictStaff: (name: string, runs: string) =>
+        `${name} が別々の 2 便（${runs}）に入っています — 両方に乗ることはできません。`,
+      conflictDiver: (name: string, runs: string) =>
+        `${name} が別々の 2 便（${runs}）で送迎を希望しています — 乗れるのは 1 台だけです。`,
+      sharedTransport: '送迎の相乗り',
+      sharedTransportHint: '同じ便で移動するイベントは車両と座席を共有します。場所が違うイベントは別便にしてください。',
+      ridesAlone: '単独で移動',
+      ridesWith: (title: string) => `${title} と相乗り`,
+      ridesWithAria: (title: string) => `${title} の相乗り設定`,
+      shareFailed: '相乗りの組み合わせを変更できませんでした。',
+      seatsToTransport: (seats: number, riders: number) => `${seats} 席 · 送迎 ${riders} 名`,
+      sharedRunNote: (titles: string) => `${titles} と車両を共有`,
+      allCarsAssigned: '有効な車両はすべてこのイベントに割り当て済みです。',
+      eventRideShort: (shortfall: number, claimed: number, capacity: number) =>
+        `座席が ${shortfall} 席不足 — 送迎希望 ${claimed} 名に対し、スタッフを除いた空席は ${capacity} 席です。`,
       carsForEvent: 'このイベントの車両',
       loadingCars: '車両を読み込んでいます…',
       noActiveCars: '有効な車両がありません。',

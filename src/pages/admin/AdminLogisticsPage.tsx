@@ -5,7 +5,7 @@ import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { siteConfig } from '../../config/site'
 import { fetchEventsInRange, fetchUpcomingEventDays, formatEventSpan } from '../../lib/events'
-import { gearTotals, splitByTransport, dayKeyOffset, careTotals, isCareGearItem, addonTotals } from '../../lib/logistics'
+import { gearTotals, splitByTransport, transportHeadcount, dayKeyOffset, careTotals, isCareGearItem, addonTotals } from '../../lib/logistics'
 import { bookingBalance, type BookingBalance } from '../../lib/booking-balance'
 import { openCreditForBooking } from '../../lib/credits'
 import { fetchAmendmentsForBookings, amendmentsDelta } from '../../lib/booking-amendments'
@@ -19,14 +19,16 @@ import { AddonSummaryGroup } from '../../components/admin/AddonSummaryGroup'
 import { PaymentsDueGroup } from '../../components/admin/PaymentsDueGroup'
 import { TransportFleetPlan } from '../../components/admin/TransportFleetPlan'
 import { EventVehicleGroup } from '../../components/admin/EventVehicleGroup'
+import { SharedTransportPicker } from '../../components/admin/SharedTransportPicker'
 import { fetchVehicles } from '../../lib/vehicles'
 import { fetchGearModelsWithSizes } from '../../lib/gear-models'
 import type { GearModelWithSizes } from '../../lib/gear-sizing'
 import { TEXT_HEADING, TEXT_MUTED, BTN_XS_GHOST } from '../../styles/tokens'
 import { fetchVehiclesForEvents, availableVehicles, allocationEventId } from '../../lib/event-vehicles'
-import { planFleet, type Rider, type SeatingPlan, type FleetVehicle } from '../../lib/vehicle-planning'
+import { planRuns, type Rider, type RunInput, type RunPlan, type FleetVehicle } from '../../lib/vehicle-planning'
+import { fetchRideGroups, groupIdByEvent, buildRuns, shareRideWith, rideAlone } from '../../lib/ride-groups'
 import { useAuth } from '../../hooks/useAuth'
-import type { AppEvent, Booking, BookingDetails, Credit, Duty, EventVehicle, Payment, Profile, Vehicle } from '../../types/database'
+import type { AppEvent, Booking, BookingDetails, Credit, Duty, EventRideGroup, EventVehicle, Payment, Profile, Vehicle } from '../../types/database'
 import { t } from '../../i18n'
 
 const lg = t.admin.logistics
@@ -97,6 +99,11 @@ export function AdminLogisticsPage() {
   const [allocations, setAllocations] = useState<EventVehicle[]>([])
   // Bumped after an assign/unassign to refetch the allocations.
   const [allocReload, setAllocReload] = useState(0)
+  // Which of the day's events travel together (event_ride_groups). Rides are
+  // planned per group, so this drives every seat count on the page.
+  const [rideGroups, setRideGroups] = useState<EventRideGroup[]>([])
+  const [ridesBusy, setRidesBusy] = useState(false)
+  const [rideError, setRideError] = useState<string | null>(null)
 
   const todayKey = useMemo(
     () => new Date().toLocaleDateString('en-CA', { timeZone: siteConfig.locale.timezone }),
@@ -128,18 +135,22 @@ export function AdminLogisticsPage() {
     if (!groups || groups.length === 0) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setAllocations([])
+      setRideGroups([])
       return
     }
     const eventIds = groups.map(g => g.event.id)
     let cancelled = false
     ;(async () => {
-      try {
-        const rows = await fetchVehiclesForEvents(eventIds)
-        if (!cancelled) setAllocations(rows)
-      } catch { if (!cancelled) setAllocations([]) }
+      const [alloc, rides] = await Promise.all([
+        fetchVehiclesForEvents(eventIds).catch(() => [] as EventVehicle[]),
+        fetchRideGroups(dayKey, eventIds).catch(() => [] as EventRideGroup[]),
+      ])
+      if (cancelled) return
+      setAllocations(alloc)
+      setRideGroups(rides)
     })()
     return () => { cancelled = true }
-  }, [groups, allocReload])
+  }, [groups, allocReload, dayKey])
 
   // Populate the "Other day" dropdown with upcoming days that actually have
   // events, so the admin never picks a dead day.
@@ -318,10 +329,9 @@ export function AdminLogisticsPage() {
   // Whole-day add-on tally (SMBs, nitrox tanks, course upgrades, lights, …) so
   // the shop's prep list sits next to gear + handle-with-care in the summary.
   const overallAddons = addonTotals(allRows, addonTitles)
-  const transport = splitByTransport(allRows)
-  // Each on-duty staff member once, regardless of how many of the day's events
-  // they cover, so the board's staff count isn't double-counted.
-  const staffRiders: Rider[] = []
+  // Headcounts, not booking rows: a diver on two of the day's events is one
+  // body to seat, and their most demanding answer wins.
+  const transport = transportHeadcount(allRows)
   // Day-wide on-duty staff for the overall board — one entry per person even
   // when they cover several of the day's events, with all the roles they hold.
   const dayStaff: { key: string; name: string; roles: string[] }[] = []
@@ -332,13 +342,11 @@ export function AdminLogisticsPage() {
     if (i === undefined) {
       i = dayStaff.length
       staffIndex.set(key, i)
-      const name = personName(s.profile?.name, s.profile?.nickname) || lg.staffFallback
-      dayStaff.push({ key, name, roles: [] })
-      staffRiders.push({ id: key, name, kind: 'staff' })
+      dayStaff.push({ key, name: personName(s.profile?.name, s.profile?.nickname) || lg.staffFallback, roles: [] })
     }
     if (!dayStaff[i].roles.includes(s.role)) dayStaff[i].roles.push(s.role)
   }
-  const onDutyStaffCount = staffRiders.length
+  const onDutyStaffCount = dayStaff.length
   // The day's roster — every diver booked across the day's events, one entry per
   // person (someone diving two of the day's events is still one diver to brief,
   // count heads for, and check off). Sorted so the list reads the same on every
@@ -379,37 +387,57 @@ export function AdminLogisticsPage() {
     arr.push(a)
     allocByEvent.set(eid, arr)
   }
-  // Ride plan follows the per-event car assignments: each event's ride-needing
-  // divers and on-duty staff are seated ONLY in the cars assigned to that event
-  // (a diver can't ride in a car that isn't on their event). Staff covering
-  // several of the day's events are seated once — in the first event they turn
-  // up in — so the day total counts each body once. The overall plan is the sum
-  // of these per-event seatings, so assigning/unassigning a car reshuffles the
-  // divers and refreshes this section.
-  const seatedStaff = new Set<string>()
-  const fleetPlan = combinePlans((groups ?? []).map(g => {
-    const eventDivers: Rider[] = splitByTransport(g.rows).needsRide.map(r => ({
-      id: r.profile?.id ?? r.booking.id,
-      name: personName(r.profile?.name, r.profile?.nickname) || tp.noProfile,
-      kind: 'diver',
-    }))
-    const eventStaff: Rider[] = []
-    for (const s of g.staff) {
-      const key = s.profile?.id ?? s.dutyId
-      if (seatedStaff.has(key)) continue
-      seatedStaff.add(key)
-      eventStaff.push({
-        id: key,
+  // Ride planning is per RUN — the events that travel together, as stated in
+  // event_ride_groups. A run pools its events' ride-needing divers, on-duty
+  // staff and cars, counting each person and each physical car exactly once;
+  // separate runs are planned separately, because two runs heading for
+  // different sites can't lend each other a seat. Assigning a car or changing
+  // who travels with whom reshuffles this immediately.
+  const groupByEventId = new Map((groups ?? []).map(g => [g.event.id, g]))
+  const eventTitle = (ev: AppEvent) => ev.calendar_title || ev.title
+  const runInputs: RunInput[] = buildRuns(
+    (groups ?? []).map(g => g.event.id),
+    groupIdByEvent(rideGroups),
+  ).map(run => {
+    const members = run.eventIds.map(id => groupByEventId.get(id)).filter((g): g is EventGroup => !!g)
+    return {
+      key: run.key,
+      events: members.map(g => ({ id: g.event.id, title: eventTitle(g.event) })),
+      divers: members.flatMap(g => splitByTransport(g.rows).needsRide.map((r): Rider => ({
+        id: r.profile?.id ?? r.booking.id,
+        name: personName(r.profile?.name, r.profile?.nickname) || tp.noProfile,
+        kind: 'diver',
+      }))),
+      staff: members.flatMap(g => g.staff.map((s): Rider => ({
+        id: s.profile?.id ?? s.dutyId,
         name: personName(s.profile?.name, s.profile?.nickname) || lg.staffFallback,
         kind: 'staff',
-      })
+      }))),
+      fleet: members.flatMap(g => (allocByEvent.get(g.event.id) ?? [])
+        .map(a => vehicleMap.get(a.vehicle_id))
+        .filter((v): v is Vehicle => !!v)
+        .map((v): FleetVehicle => ({ id: v.id, name: v.name, passenger_seats: v.passenger_seats }))),
     }
-    const fleet: FleetVehicle[] = (allocByEvent.get(g.event.id) ?? [])
-      .map(a => vehicleMap.get(a.vehicle_id))
-      .filter((v): v is Vehicle => !!v)
-      .map(v => ({ name: v.name, passenger_seats: v.passenger_seats }))
-    return planFleet(fleet, eventDivers, eventStaff)
-  }))
+  })
+  const fleetPlan = planRuns(runInputs)
+  // Each event's run, so its own Cars block reports the run's seats and riders
+  // rather than a per-event slice that would contradict the board above.
+  const runByEventId = new Map<string, RunPlan>()
+  for (const run of fleetPlan.runs) {
+    for (const ev of run.events) runByEventId.set(ev.id, run)
+  }
+
+  async function changeRideGroup(action: () => Promise<void>) {
+    setRidesBusy(true); setRideError(null)
+    try {
+      await action()
+      setAllocReload(k => k + 1)
+    } catch {
+      setRideError(tp.shareFailed)
+    } finally {
+      setRidesBusy(false)
+    }
+  }
 
   const promptForDay = tab === 'other' && !otherDay
 
@@ -522,16 +550,29 @@ export function AdminLogisticsPage() {
               <div className="space-y-1">
                 <SummaryLabel>{t.bookings.breakdown.transportation}</SummaryLabel>
                 <p className="text-sm text-brand-900 font-medium">
-                  <span className="text-red-300 font-semibold">{transport.needsRide.length}</span>{lg.needARide}
+                  <span className="text-red-300 font-semibold">{transport.needsRide}</span>{lg.needARide}
                   {onDutyStaffCount > 0 && (
                     <> · <span className="text-brand-900 font-semibold">{onDutyStaffCount}</span>{lg.onDutyStaffSuffix}</>
                   )}
-                  {' · '}{lg.selfTransportCount(transport.selfTransport.length)}
-                  {transport.unspecified.length > 0 && <> · {lg.unspecifiedCount(transport.unspecified.length)}</>}
+                  {' · '}{lg.selfTransportCount(transport.selfTransport)}
+                  {transport.unspecified > 0 && <> · {lg.unspecifiedCount(transport.unspecified)}</>}
                 </p>
-                {transport.needsRide.length > 0 && (
+                {fleetPlan.riders > 0 && (
                   <TransportFleetPlan plan={fleetPlan} fleetSize={activeVehicles.length} />
                 )}
+                <SharedTransportPicker
+                  events={groups.map(g => ({ id: g.event.id, title: eventTitle(g.event) }))}
+                  groupOf={groupIdByEvent(rideGroups)}
+                  isAdmin={isAdmin}
+                  busy={ridesBusy}
+                  onShareWith={(eventId, withEventId) => changeRideGroup(() => shareRideWith({
+                    day: dayKey, eventId, withEventId, rows: rideGroups, createdBy: profile?.id ?? null,
+                  }))}
+                  onRideAlone={eventId => changeRideGroup(() => rideAlone({
+                    day: dayKey, eventId, rows: rideGroups,
+                  }))}
+                />
+                {rideError && <p className="text-sm font-semibold text-red-600">{rideError}</p>}
               </div>
               <div className="space-y-1">
                 <SummaryLabel>{lg.gearToPack}</SummaryLabel>
@@ -613,8 +654,11 @@ export function AdminLogisticsPage() {
                   new Set((allocByEvent.get(g.event.id) ?? []).map(a => a.vehicle_id)),
                 )}
                 vehicleMap={vehicleMap}
-                riders={splitByTransport(g.rows).needsRide.length
-                  + new Set(g.staff.map(s => s.profile?.id ?? s.dutyId)).size}
+                riders={runByEventId.get(g.event.id)?.riders ?? 0}
+                runSeats={runByEventId.get(g.event.id)?.fleetSeats ?? 0}
+                sharedWith={(runByEventId.get(g.event.id)?.events ?? [])
+                  .filter(e => e.id !== g.event.id)
+                  .map(e => e.title)}
                 isAdmin={isAdmin}
                 createdBy={profile?.id ?? null}
                 onChanged={() => setAllocReload(k => k + 1)}
@@ -635,27 +679,6 @@ export function AdminLogisticsPage() {
       )}
     </div>
   )
-}
-
-// Fold the per-event seatings into one day-wide plan for the overall board:
-// every car taken across the day with who's aboard, plus anyone left without a
-// seat in their own event's cars.
-function combinePlans(plans: SeatingPlan[]): SeatingPlan {
-  const cars = plans.flatMap(p => p.cars)
-  const unseated = plans.flatMap(p => p.unseated)
-  const divers = plans.reduce((s, p) => s + p.divers, 0)
-  const staff = plans.reduce((s, p) => s + p.staff, 0)
-  return {
-    cars,
-    unseated,
-    divers,
-    staff,
-    riders: divers + staff,
-    seats: plans.reduce((s, p) => s + p.seats, 0),
-    vehiclesNeeded: cars.length,
-    fits: unseated.length === 0,
-    shortfall: unseated.length,
-  }
 }
 
 function DayTab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {

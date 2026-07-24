@@ -157,19 +157,19 @@ describe('unassignVehicle', () => {
 
 describe('fetchRideSeats', () => {
   it('derives available from the RPC capacity/claimed', async () => {
-    rpc.mockResolvedValue({ data: [{ capacity: 7, claimed: 2 }], error: null })
-    expect(await fetchRideSeats('D1')).toEqual({ capacity: 7, claimed: 2, available: 5 })
+    rpc.mockResolvedValue({ data: [{ seats: 9, staff: 2, capacity: 7, claimed: 2 }], error: null })
+    expect(await fetchRideSeats('D1')).toEqual({ seats: 9, staff: 2, capacity: 7, claimed: 2, available: 5 })
     expect(rpc).toHaveBeenCalledWith('event_ride_seats', { p_event_id: 'D1' })
   })
 
   it('never reports negative availability', async () => {
-    rpc.mockResolvedValue({ data: [{ capacity: 4, claimed: 9 }], error: null })
-    expect(await fetchRideSeats('D1')).toEqual({ capacity: 4, claimed: 9, available: 0 })
+    rpc.mockResolvedValue({ data: [{ seats: 5, staff: 1, capacity: 4, claimed: 9 }], error: null })
+    expect(await fetchRideSeats('D1')).toEqual({ seats: 5, staff: 1, capacity: 4, claimed: 9, available: 0 })
   })
 
-  it('treats an empty result as 0/0', async () => {
+  it('treats an empty result as all zeroes', async () => {
     rpc.mockResolvedValue({ data: [], error: null })
-    expect(await fetchRideSeats('C1')).toEqual({ capacity: 0, claimed: 0, available: 0 })
+    expect(await fetchRideSeats('C1')).toEqual({ seats: 0, staff: 0, capacity: 0, claimed: 0, available: 0 })
   })
 
   it('surfaces a supabase error', async () => {

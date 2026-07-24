@@ -78,28 +78,39 @@ export function availableVehicles(active: Vehicle[], assignedIds: Set<string>): 
 }
 
 export interface RideSeats {
-  /** Rideable seats a diver can claim — total physical seats across the
-   *  assigned cars minus the crew's seats (the greater of one driver per
-   *  vehicle or the full on-duty staff count, who all ride the fleet). */
+  /** Physical seats across the distinct cars on the event's run. */
+  seats: number
+  /** On-duty staff on the run — they ride those same seats. */
+  staff: number
+  /** Rideable seats a diver can claim = seats − staff. */
   capacity: number
-  /** Divers already holding a ride (non-cancelled, transportation = true). */
+  /** Divers already holding a ride anywhere on the run (non-cancelled,
+   *  transportation = true), each counted once. */
   claimed: number
   /** Free seats = max(0, capacity - claimed). */
   available: number
 }
 
 // Ride-seat tally for an event, via the event_ride_seats SECURITY DEFINER RPC
-// (20260628000000) — the only way the registration form, run as a plain diver,
-// can learn the count without read access to event_vehicles / others' bookings.
+// (rewritten in 20260724000000) — the only way the registration form, run as a
+// plain diver, can learn the count without read access to event_vehicles /
+// others' bookings. Measured across the whole run the event travels in, so a
+// van shared with another event isn't counted twice.
 export async function fetchRideSeats(eventId: string): Promise<RideSeats> {
   const { data, error } = await supabase.rpc('event_ride_seats', {
     p_event_id: eventId,
   })
   if (error) throw error
-  const row = (data as { capacity: number; claimed: number }[] | null)?.[0]
+  const row = (data as RideSeats[] | null)?.[0]
   const capacity = row?.capacity ?? 0
   const claimed = row?.claimed ?? 0
-  return { capacity, claimed, available: Math.max(0, capacity - claimed) }
+  return {
+    seats: row?.seats ?? 0,
+    staff: row?.staff ?? 0,
+    capacity,
+    claimed,
+    available: Math.max(0, capacity - claimed),
+  }
 }
 
 // Whether the registration form should still offer "Yes, I need a ride". A

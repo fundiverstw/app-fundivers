@@ -41,8 +41,9 @@ public.push_subscriptions / push_notifications_sent  (cron infra)
 | `admin_notes` | `id`, `profile_id`, `created_by`, `content` | Free-text staff notes attached to a diver's profile. Read/insert open to staff+admin (insert requires `created_by = auth.uid()`); update/delete admin-only. |
 | `admin_audit_log` | `id`, `actor_id`, `action`, `target_table`, `target_id`, `before`, `after` | Append-only audit trail for admin mutations. Insert via DB triggers; reads admin-only. |
 | `duties` | `id`, `assignee_id`, `role`, `start_date`, `end_date`, `eo_dive_id` \| `eo_course_id` | Staff-or-admin shift assignments. Trigger enforces `assignee_id` references a profile with role in (admin, staff). |
-| `vehicles` | `id`, `name`, `passenger_seats`, `active` | Transport-fleet catalog (`passenger_seats` = total physical seats). Staff+admin read, admin write. Stateless capacity input to the logistics ride planner. |
-| `event_vehicles` | `id`, `vehicle_id`, `event_date`, `eo_dive_id` \| `eo_course_id` | Which car is allocated to which event on which date. XOR FK to dive/course; **unique `(vehicle_id, event_date)`** makes a car exclusive per day (the availability rule). One row per date for multi-day events. Staff+admin read, admin write. Assigned on the logistics day view. |
+| `vehicles` | `id`, `name`, `passenger_seats`, `active` | Transport-fleet catalog (`passenger_seats` = total physical seats; no seat is reserved for a driver). Staff+admin read, admin write. Stateless capacity input to the logistics ride planner. |
+| `event_vehicles` | `id`, `vehicle_id`, `event_id`, `notes` | Which car is allocated to which event. A car may serve any number of events, at most once each (unique `(event_id, vehicle_id)`). Staff+admin read, admin write. Assigned on the logistics day view, the event's Transportation tab and the create/edit event forms. |
+| `event_ride_groups` | `(ride_day, event_id)` PK, `group_id` | Which of a day's events **travel together** — the events sharing a `group_id` form one "run" and pool their cars, divers and staff; an event with no row rides alone. `group_id` has no parent table: the group is the set of rows. Staff read, admin write, set by the Shared transport picker on `/admin/logistics`. See [admin.md](./admin.md#transport-runs-seats-riders). |
 | `dive_sites` | `id`, `name`, `lat`, `lng`, `dive_type` | Public catalog rendered on `/map`; readable by all authenticated users. |
 | `waiver_signatures` | `id`, `diver_id`, `waiver_code`, `waiver_version`, `signed_name`, `signed_at`, `eo_dive_id` \| `eo_course_id` | Append-only e-signature records. The waiver **catalog + global rules** live in code (`src/config/waivers.ts`), not the DB — these rows only record who signed what, when. Annual waivers leave both event keys null; per-event waivers reference exactly one (at-most-one CHECK). Writes go through the `sign_waiver()` RPC (diver reads own; staff+admin read all). |
 | `event_waivers` | `id`, `eo_dive_id` \| `eo_course_id`, `waiver_code`, `mode` | Per-event override of a waiver's global rule: `mode` `require` adds it, `exempt` drops it for one event. XOR FK to dive/course; one override per `(event, waiver_code)`. Read by any authenticated user (the registration form needs it); admin write. Edited on the admin Edit-event form. |
@@ -146,6 +147,11 @@ Notable milestones to skim if you're new to the schema:
   DEFINER RPC: an event's ride-seat capacity (distinct assigned cars) and
   claimed count (transportation=true bookings), readable by any diver so the
   registration form can gate the "I need a ride" option.
+- `20260724000000_ride_groups_shared_transport.sql` — `event_ride_groups`
+  (which events travel together on a day) and a rewritten
+  `event_ride_seats()` measured across the whole run, returning
+  `seats / staff / capacity / claimed`. Drops the old per-vehicle driver-seat
+  reservation, which contradicted the admin planner.
 - `20260629000000_waivers.sql` — waiver tracking: `waiver_signatures`
   (append-only e-signatures), `event_waivers` (per-event require/exempt
   overrides), and the `sign_waiver()` SECURITY DEFINER RPC (server-stamps

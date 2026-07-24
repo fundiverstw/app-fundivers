@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { splitByTransport, gearTotals, dayKeyOffset, careItemsForBooking, careTotals, isCareGearItem, addonTotals } from './logistics'
+import { splitByTransport, transportHeadcount, gearTotals, dayKeyOffset, careItemsForBooking, careTotals, isCareGearItem, addonTotals } from './logistics'
 import type { Booking, Profile } from '../types/database'
 
 const row = (transportation: boolean | undefined, items: string[] = []) => ({
@@ -18,6 +18,41 @@ describe('splitByTransport', () => {
     expect(out.needsRide).toHaveLength(2)
     expect(out.selfTransport).toHaveLength(1)
     expect(out.unspecified).toHaveLength(1)
+  })
+})
+
+describe('transportHeadcount', () => {
+  // A person, not a booking: someone on two of the day's events is one body.
+  const person = (id: string, transportation: boolean | undefined) => ({
+    booking: { id: `b-${id}-${String(transportation)}`, details: { transportation } } as unknown as Booking,
+    profile: { id } as unknown as Profile,
+  })
+
+  it('counts each diver once however many of the day\'s events they are on', () => {
+    const out = transportHeadcount([person('p1', true), person('p1', true), person('p2', false)])
+    expect(out).toEqual({ needsRide: 1, selfTransport: 1, unspecified: 0 })
+  })
+
+  it('takes the most demanding answer when one person\'s bookings disagree', () => {
+    // Ride to the morning dive, own car to the afternoon course — the shop
+    // still has to seat them.
+    expect(transportHeadcount([person('p1', false), person('p1', true)]))
+      .toEqual({ needsRide: 1, selfTransport: 0, unspecified: 0 })
+    // Unspecified outranks self-transport for the same reason.
+    expect(transportHeadcount([person('p2', false), person('p2', undefined)]))
+      .toEqual({ needsRide: 0, selfTransport: 0, unspecified: 1 })
+  })
+
+  it('keeps profile-less rows apart — they cannot be merged', () => {
+    const anon = (id: string) => ({
+      booking: { id, details: { transportation: true } } as unknown as Booking,
+      profile: null,
+    })
+    expect(transportHeadcount([anon('b1'), anon('b2')]).needsRide).toBe(2)
+  })
+
+  it('is all zeroes for no rows', () => {
+    expect(transportHeadcount([])).toEqual({ needsRide: 0, selfTransport: 0, unspecified: 0 })
   })
 })
 

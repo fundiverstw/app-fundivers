@@ -142,13 +142,15 @@ export interface Database {
         Args: { p_event_ids: string[] }
         Returns: Array<{ event_id: string; n: number }>
       }
-      // Defined in 20260628000000_event_ride_seats.sql. Ride-seat tally for an
-      // event: capacity (sum of passenger_seats over the distinct assigned
-      // vehicles) and claimed (non-cancelled bookings with transportation=true).
-      // SECURITY DEFINER so the registration form can read it as a plain diver.
+      // Rewritten in 20260724000000_ride_groups_shared_transport.sql. Ride-seat
+      // tally measured across the whole run the event travels in (see
+      // event_ride_groups): capacity = seats over the run's distinct vehicles
+      // minus its on-duty staff, who ride those same seats; claimed = distinct
+      // divers holding a ride anywhere in the run. SECURITY DEFINER so the
+      // registration form can read it as a plain diver.
       event_ride_seats: {
         Args: { p_event_id: string }
-        Returns: Array<{ capacity: number; claimed: number }>
+        Returns: Array<{ seats: number; staff: number; capacity: number; claimed: number }>
       }
       // Defined in 20260707050000_converge_functions_to_events.sql. Reconciles an
       // event's junction rows (rooms / add-ons / destinations) in one call.
@@ -831,6 +833,27 @@ export interface Database {
           notes?: string | null
         }
         Update: Partial<Database['public']['Tables']['event_vehicles']['Insert']>
+        Relationships: []
+      }
+      // Events that travel together on one day (20260724000000). A group *is*
+      // the set of rows sharing group_id — there's no parent table — and an
+      // event with no row for the day rides alone.
+      event_ride_groups: {
+        Row: {
+          ride_day: string
+          event_id: string
+          group_id: string
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          ride_day: string
+          event_id: string
+          group_id: string
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['event_ride_groups']['Insert']>
         Relationships: []
       }
       waiver_signatures: {
@@ -1726,6 +1749,8 @@ export type TrustedPartnerInsert = Database['public']['Tables']['trusted_partner
 export type TrustedPartner = Database['public']['Functions']['list_trusted_partners']['Returns'][number]
 export type EventVehicle = Database['public']['Tables']['event_vehicles']['Row']
 export type EventVehicleInsert = Database['public']['Tables']['event_vehicles']['Insert']
+export type EventRideGroup = Database['public']['Tables']['event_ride_groups']['Row']
+export type EventRideGroupInsert = Database['public']['Tables']['event_ride_groups']['Insert']
 // Gear sizing charts — per-shop wetsuit/BCD/fins models + size bands
 export const GEAR_TYPES = ['wetsuit', 'bcd', 'fins'] as const
 export type GearType = typeof GEAR_TYPES[number]

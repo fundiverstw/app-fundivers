@@ -90,6 +90,39 @@ export function splitByTransport<T extends BookingRow>(rows: T[]): {
 }
 
 /**
+ * The day's transport choices as a HEADCOUNT, not a row count: a diver booked
+ * on two of the day's events is one body to move. Rows are keyed by profile,
+ * falling back to the booking id when a row has no profile (those can't merge).
+ *
+ * When one person's rows disagree — a ride to the morning dive, own car to the
+ * afternoon course — the more demanding answer wins, since the shop still has
+ * to seat them: ride > unspecified > self.
+ */
+export function transportHeadcount(rows: DiverRow[]): {
+  needsRide: number
+  selfTransport: number
+  unspecified: number
+} {
+  const rank = { self: 0, unspecified: 1, ride: 2 } as const
+  type Choice = keyof typeof rank
+  const byPerson = new Map<string, Choice>()
+  for (const r of rows) {
+    const key = r.profile?.id ?? r.booking.id
+    const t = (r.booking.details as BookingDetails | undefined)?.transportation
+    const choice: Choice = t === true ? 'ride' : t === false ? 'self' : 'unspecified'
+    const prev = byPerson.get(key)
+    if (prev === undefined || rank[choice] > rank[prev]) byPerson.set(key, choice)
+  }
+  const counts = { needsRide: 0, selfTransport: 0, unspecified: 0 }
+  for (const c of byPerson.values()) {
+    if (c === 'ride') counts.needsRide++
+    else if (c === 'self') counts.selfTransport++
+    else counts.unspecified++
+  }
+  return counts
+}
+
+/**
  * How many of each gear item the shop must pack across a set of bookings,
  * ordered by the canonical GEAR_ITEMS list. Items nobody needs are omitted.
  */

@@ -290,10 +290,110 @@ describe('AdminLogisticsPage', () => {
     await screen.findByText(/1 event · 2 divers/i)
 
     const overall = screen.getByText(/^overall/i).closest('section')!
-    // Ada needs a ride but no car is on her event, so she stays unseated and the
-    // unassigned Delica is not used to carry her.
-    expect(await within(overall).findByText(/No seat/i)).toBeInTheDocument()
+    // Ada needs a ride but no car is on her event, so the run has no ride at all
+    // and the unassigned Delica is not used to carry her.
+    expect(await within(overall).findByText(/No car assigned — 1 rider/i)).toBeInTheDocument()
     expect(within(overall).queryByText(/Delica/)).not.toBeInTheDocument()
+  })
+
+  // ── Shared transport (runs) ───────────────────────────────────────────────
+  // Two events on one day: a dive at Bat Cave and a Refresher course. Whether
+  // they can share a van is the shop's call (event_ride_groups), and every seat
+  // number follows from it.
+  const twoEventDay = () => {
+    const events = [
+      diveEvent,
+      { id: 'e2', type: 'course', title: 'Refresher Course', start_time: '2026-06-18T00:00:00Z', end_time: null },
+    ]
+    fetchEventsInRange.mockResolvedValue(events)
+    const twoBookings = [
+      ...bookings,
+      { id: 'b3', user_id: 'u3', event_id: 'e2', status: 'pending',
+        details: { transportation: true, gear: { rent: false, items: [] } } },
+    ]
+    const threeProfiles = [...profiles, { id: 'u3', name: 'Cy', nickname: 'Cy', contact_id: '0902', gear_owned: [] }]
+    return { twoBookings, threeProfiles }
+  }
+
+  it('pools riders and cars across events that travel together', async () => {
+    const { twoBookings, threeProfiles } = twoEventDay()
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: twoBookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: threeProfiles })
+      if (table === 'vehicles') return mockQueryBuilder({ data: [
+        { id: 'v1', created_at: '', name: 'Delica', passenger_seats: 8, active: true, created_by: null },
+      ] })
+      // The Delica is on the dive only; the course rides in it by sharing the run.
+      if (table === 'event_vehicles') return mockQueryBuilder({ data: [
+        { id: 'ev1', vehicle_id: 'v1', event_id: 'e1' },
+      ] })
+      if (table === 'event_ride_groups') return mockQueryBuilder({ data: [
+        { ride_day: todayKey, event_id: 'e1', group_id: 'g1', created_at: '', created_by: null },
+        { ride_day: todayKey, event_id: 'e2', group_id: 'g1', created_at: '', created_by: null },
+      ] })
+      return mockQueryBuilder({ data: [] })
+    })
+    renderPage()
+    await screen.findByText(/2 events · 3 divers/i)
+
+    const overall = screen.getByText(/^overall/i).closest('section')!
+    // One run, one car, both events' ride-needing divers aboard — the course's
+    // diver is not left seatless just because the car is booked to the dive.
+    expect(await within(overall).findByText(/Take 1 vehicle — 8 seats for 2 riders/i)).toBeInTheDocument()
+    expect(within(overall).queryByText(/No car assigned/i)).not.toBeInTheDocument()
+    expect(within(overall).queryByText(/separate run/i)).not.toBeInTheDocument()
+  })
+
+  it('plans events that ride alone as separate runs, without pooling their slack', async () => {
+    const { twoBookings, threeProfiles } = twoEventDay()
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: twoBookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: threeProfiles })
+      if (table === 'vehicles') return mockQueryBuilder({ data: [
+        { id: 'v1', created_at: '', name: 'Delica', passenger_seats: 8, active: true, created_by: null },
+      ] })
+      if (table === 'event_vehicles') return mockQueryBuilder({ data: [
+        { id: 'ev1', vehicle_id: 'v1', event_id: 'e1' },
+      ] })
+      // No grouping rows: two runs.
+      return mockQueryBuilder({ data: [] })
+    })
+    renderPage()
+    await screen.findByText(/2 events · 3 divers/i)
+
+    const overall = screen.getByText(/^overall/i).closest('section')!
+    expect(await within(overall).findByText(/2 separate runs · 2 riders/i)).toBeInTheDocument()
+    // The dive's Delica seats its diver; the course's diver has no car at all,
+    // and the Delica's spare seats are NOT offered to them.
+    expect(within(overall).getByText(/Take 1 vehicle — 8 seats for 1 rider/i)).toBeInTheDocument()
+    expect(within(overall).getByText(/No car assigned — 1 rider/i)).toBeInTheDocument()
+  })
+
+  it('lets an admin put two events on the same run', async () => {
+    const { twoBookings, threeProfiles } = twoEventDay()
+    const upsert = vi.fn()
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: twoBookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: threeProfiles })
+      if (table === 'event_ride_groups') {
+        const b = mockQueryBuilder({ data: [] })
+        b.upsert = (...a: unknown[]) => { upsert(...a); return b }
+        return b
+      }
+      return mockQueryBuilder({ data: [] })
+    })
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText(/2 events · 3 divers/i)
+
+    await user.selectOptions(
+      screen.getByLabelText(/Shared transport for Kenting fun dive/i),
+      'e2',
+    )
+    await waitFor(() => expect(upsert).toHaveBeenCalled())
+    const rows = upsert.mock.calls[0][0] as Array<{ event_id: string; ride_day: string }>
+    expect(rows.map(r => r.event_id).sort()).toEqual(['e1', 'e2'])
+    expect(rows[0].ride_day).toBe(todayKey)
   })
 
   it('prompts to add vehicles when riders need a ride but the fleet is empty', async () => {

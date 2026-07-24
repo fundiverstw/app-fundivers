@@ -42,7 +42,6 @@ export function EventTransportPanel({ event, registrants, isAdmin, createdBy, on
   const active = registrants.filter(r => r.booking.status !== 'cancelled')
   const hasCancelled = registrants.some(r => r.booking.status === 'cancelled')
   const showsTransport = allowsTransport(event.type)
-  const needsRideCount = active.filter(r => transportOf(r.booking) === true).length
 
   return (
     <section className="space-y-3">
@@ -61,7 +60,6 @@ export function EventTransportPanel({ event, registrants, isAdmin, createdBy, on
         event={{ id: event.id, type: event.type }}
         isAdmin={isAdmin}
         createdBy={createdBy}
-        riders={needsRideCount}
       />
     </section>
   )

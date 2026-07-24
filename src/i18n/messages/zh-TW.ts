@@ -1671,6 +1671,29 @@ export const zhTW: Messages = {
       fleetFits: (vehicles: number, seats: number, riders: number, divers: number, staff: number) =>
         `出動 ${vehicles} 輛車 — ${seats} 個座位可載 ${riders} 人（潛水員 ${divers} 人${staff > 0 ? ` + 工作人員 ${staff} 人` : ''}）。`,
       staffSuffix: '（工作人員）',
+      dayRuns: (runs: number, riders: number, divers: number, staff: number) =>
+        `${runs} 趟獨立車程 · 共 ${riders} 人（潛水員 ${divers} 人${staff > 0 ? ` + 工作人員 ${staff} 人` : ''}）`,
+      runJoin: ' + ',
+      runNoCar: (riders: number, divers: number, staff: number) =>
+        `尚未指派車輛 — ${riders} 人（潛水員 ${divers} 人${staff > 0 ? ` + 工作人員 ${staff} 人` : ''}）沒有車可搭。`,
+      spareCars: (names: string) => `無需出動：${names}`,
+      conflictCar: (car: string, runs: string) =>
+        `${car} 被指派到兩趟不同的車程（${runs}）— 一輛車只能跑一趟。請將這些活動併為同一趟，或改派其他車輛。`,
+      conflictStaff: (name: string, runs: string) =>
+        `${name} 同時排班於兩趟不同的車程（${runs}）— 無法同時搭乘。`,
+      conflictDiver: (name: string, runs: string) =>
+        `${name} 在兩趟不同的車程（${runs}）都需要共乘 — 只能搭其中一輛。`,
+      sharedTransport: '共同交通',
+      sharedTransportHint: '同趟出發的活動共用車輛與座位。不同地點的活動必須各自安排。',
+      ridesAlone: '單獨出車',
+      ridesWith: (title: string) => `與 ${title} 同車`,
+      ridesWithAria: (title: string) => `${title} 的共同交通`,
+      shareFailed: '無法變更同車的活動組合。',
+      seatsToTransport: (seats: number, riders: number) => `${seats} 個座位 · 需載 ${riders} 人`,
+      sharedRunNote: (titles: string) => `與 ${titles} 共用車輛`,
+      allCarsAssigned: '所有啟用的車輛都已指派給此活動。',
+      eventRideShort: (shortfall: number, claimed: number, capacity: number) =>
+        `座位不足 ${shortfall} 個 — ${claimed} 位潛水員需要共乘，扣除工作人員後只剩 ${capacity} 個座位。`,
       carsForEvent: '此活動的車輛',
       loadingCars: '車輛載入中…',
       noActiveCars: '車隊中沒有啟用的車輛。',
