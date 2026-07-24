@@ -303,6 +303,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
       const rideAllowed = !allowsTransport(ev.type) || !evSeats
         ? true
         : canRequestRide({ capacity: evSeats.capacity, claimed: evSeats.claimed, alreadyHasRide: false })
+      // Display only — the DB recomputes the flag on insert (20260724010000).
       const rideWaitlisted = c.needsTransport === true && !rideAllowed
 
       const details: BookingDetails = {

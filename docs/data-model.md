@@ -152,6 +152,9 @@ Notable milestones to skim if you're new to the schema:
   `event_ride_seats()` measured across the whole run, returning
   `seats / staff / capacity / claimed`. Drops the old per-vehicle driver-seat
   reservation, which contradicted the admin planner.
+- `20260724010000_server_side_ride_waitlist.sql` — `details.ride_waitlisted`
+  is recomputed by a BEFORE trigger from `event_ride_tally()` instead of
+  trusted from the client, so a full run can't be hidden from the admins.
 - `20260629000000_waivers.sql` — waiver tracking: `waiver_signatures`
   (append-only e-signatures), `event_waivers` (per-event require/exempt
   overrides), and the `sign_waiver()` SECURITY DEFINER RPC (server-stamps

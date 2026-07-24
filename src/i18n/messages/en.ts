@@ -75,6 +75,7 @@ export const en = {
     toggleKind: (kind: string) => `Toggle ${kind}`,
     filterCourses: 'Filter courses',
     courses: 'Courses',
+    toggleCancelled: 'Toggle cancelled events',
     toggleAvailability: 'Toggle staff availability',
     weekdays: ['S', 'M', 'T', 'W', 'T', 'F', 'S'],
     moveEventDay: 'Move event day',

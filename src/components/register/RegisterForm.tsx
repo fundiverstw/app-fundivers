@@ -892,6 +892,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     })
   // The diver opted into a ride with no free seat left → a ride-waitlist
   // request. The booking still goes through; the shop is notified to add a car.
+  // What we send is only what we show them: the DB recomputes the flag on insert
+  // (20260724010000), so a stale or forged value can't hide a full run.
   const rideWaitlisted = needsTransport === true && !rideAllowed
   const subTotal = base + gearCost + roomCost + addonsCost + transportCost + ((showNitroxAddon && addNitroxCourse) ? NITROX_COURSE_FEE : 0)
 

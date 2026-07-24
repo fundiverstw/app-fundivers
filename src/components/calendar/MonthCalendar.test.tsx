@@ -579,7 +579,37 @@ describe('MonthCalendar cancelled events', () => {
 
   it('badges the list row as cancelled', () => {
     renderCancelled()
-    expect(screen.getByText('Cancelled')).toBeInTheDocument()
+    // The list badge plus the filter pill both carry the word.
+    expect(screen.getAllByText('Cancelled').length).toBeGreaterThan(0)
+  })
+
+  it('offers a filter pill that takes cancelled events off the grid', async () => {
+    const user = userEvent.setup()
+    render(
+      <MonthCalendar
+        month={new Date('2030-06-15')}
+        onMonthChange={() => {}}
+        events={[cancelledDive, { ...cancelledDive, id: 'L1', title: 'Live dive', cancelled_at: null }]}
+        onPickEvent={() => {}}
+      />
+    )
+    expect(screen.getByTitle('Typhoon dive — cancelled')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /toggle cancelled events/i }))
+    expect(screen.queryByTitle('Typhoon dive — cancelled')).not.toBeInTheDocument()
+    // The live event beside it is untouched.
+    expect(screen.getByTitle('Live dive')).toBeInTheDocument()
+  })
+
+  it('omits the pill when nothing that month is cancelled (diver calendar)', () => {
+    render(
+      <MonthCalendar
+        month={new Date('2030-06-15')}
+        onMonthChange={() => {}}
+        events={[{ ...cancelledDive, cancelled_at: null }]}
+        onPickEvent={() => {}}
+      />
+    )
+    expect(screen.queryByRole('button', { name: /toggle cancelled events/i })).not.toBeInTheDocument()
   })
 })
 

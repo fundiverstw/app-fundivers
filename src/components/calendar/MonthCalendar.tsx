@@ -217,6 +217,10 @@ export function MonthCalendar({
     return next
   })
   const [hiddenCourses, setHiddenCourses] = useState<Set<string>>(new Set())
+  // Cancelled events are shown by default — an admin needs to see the hole in
+  // the month — but they still take a track each, so a month with several
+  // cancellations gets taller. The toggle takes them out entirely.
+  const [cancelledShown, setCancelledShown] = useState(true)
   // When any segment of a multi-day event is hovered, the parent tracks the
   // event id so every segment of that event can cross-highlight. Cleared on
   // mouse leave.
@@ -246,10 +250,13 @@ export function MonthCalendar({
       .sort((a, b) => a.category.localeCompare(b.category))
   }, [events])
 
+  const hasCancelled = useMemo(() => events.some(e => e.cancelled_at), [events])
+
   const filteredEvents = useMemo(() => events.filter(e => {
+    if (e.cancelled_at && !cancelledShown) return false
     if (usesCourseDays(e.type)) return !hiddenCourses.has(e.course_category ?? e.title)
     return !hiddenKinds.has(e.type)
-  }), [events, hiddenKinds, hiddenCourses])
+  }), [events, hiddenKinds, hiddenCourses, cancelledShown])
 
   const ranges: EventRange<AppEvent>[] = useMemo(() => assignTracks(filteredEvents), [filteredEvents])
 
@@ -314,6 +321,11 @@ export function MonthCalendar({
         hiddenCourses={hiddenCourses}
         onToggleCategory={toggleCourseCategory}
         busyToggle={busyOverlayEnabled ? { shown: !!busyShown, onToggle: onToggleBusy! } : undefined}
+        // Only offered where there's something to hide — diver-facing fetches
+        // never return a cancelled event, so the pill would be dead weight.
+        cancelledToggle={hasCancelled
+          ? { shown: cancelledShown, onToggle: () => setCancelledShown(v => !v) }
+          : undefined}
       />
 
       <div className="flex items-center justify-between gap-2">
@@ -810,12 +822,13 @@ interface FilterLegendProps {
   hiddenCourses: Set<string>
   onToggleCategory: (cat: string) => void
   busyToggle?: { shown: boolean; onToggle: () => void }
+  cancelledToggle?: { shown: boolean; onToggle: () => void }
 }
 
 function FilterLegend({
   hiddenKinds, onToggleKind,
   courseCategories, hiddenCourses, onToggleCategory,
-  busyToggle,
+  busyToggle, cancelledToggle,
 }: FilterLegendProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement | null>(null)
@@ -939,6 +952,25 @@ function FilterLegend({
         >
           <span className={`w-2 h-2 rounded-full ${BUSY_DOT}`} />
           {t.calendar.busy}
+        </button>
+      )}
+
+      {cancelledToggle && (
+        <button
+          type="button"
+          onClick={cancelledToggle.onToggle}
+          aria-pressed={cancelledToggle.shown}
+          aria-label={t.calendar.toggleCancelled}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors ${
+            cancelledToggle.shown
+              ? 'bg-white/10 border-reef-400/50 text-reef-200'
+              : 'bg-white/5 border-white/10 text-brand-100/50 font-medium line-through'
+          }`}
+        >
+          {/* Hollow dot: a cancelled bar is a ghost of a real event, not a
+              category of its own, so it gets an outline rather than a fill. */}
+          <span className="w-2 h-2 rounded-full border border-current" aria-hidden="true" />
+          {t.calendar.cancelled}
         </button>
       )}
     </div>

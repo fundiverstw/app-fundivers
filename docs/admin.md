@@ -119,6 +119,15 @@ or one person (staff or diver) expected on two runs at once.
 The same arithmetic backs the diver-facing "N ride seats left" on the
 registration form, via the `event_ride_seats` RPC — `capacity = seats −
 staff`, `claimed` = distinct divers holding a ride anywhere on the run.
+
+A ride requested when the run is full is not refused: the booking goes
+through flagged `details.ride_waitlisted`, and every admin gets an "add a
+car" notification. That flag is **computed by the database** on insert and
+on any details edit (`bookings_set_ride_waitlist`), not taken from the
+client — a forged `false` would otherwise hide a full run from the shop,
+and a stray `true` would page every admin about a ride nobody asked for.
+A diver who already holds a ride somewhere on the run keeps it; a second
+booking on the same run is the same body in the same seat.
 The planner itself is pure and unit-tested in
 `src/lib/vehicle-planning.ts` (`planFleet` for one run, `planRuns` for a
 day); grouping lives in `src/lib/ride-groups.ts`.

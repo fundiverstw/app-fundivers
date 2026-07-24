@@ -67,6 +67,7 @@ export const zhTW: Messages = {
     toggleKind: (kind: string) => `切換${kind}顯示`,
     filterCourses: '篩選課程',
     courses: '課程',
+    toggleCancelled: '顯示／隱藏已取消的活動',
     toggleAvailability: '切換人員可用狀態',
     weekdays: ['日', '一', '二', '三', '四', '五', '六'],
     moveEventDay: '移動活動日期',

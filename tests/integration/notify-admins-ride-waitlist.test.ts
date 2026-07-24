@@ -6,6 +6,11 @@
 // to every admin. Ordinary ride bookings and cancelled ones don't notify, and
 // a booking already-waitlisted doesn't re-notify on a later update.
 //
+// The flag itself is computed by the DB (20260724010000), never taken from the
+// client, so these scenarios are set up by seat CAPACITY: this event has no car,
+// which is what makes a ride request here a waitlist request. The
+// ordinary-booking case gets its own event with a car to sit in.
+//
 // One diver per scenario: the one-active-booking-per-user index forbids two
 // non-cancelled bookings for the same diver on one event.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
@@ -18,13 +23,15 @@ const admin = adminClient()
 let adminUser: TestUser
 const divers: TestUser[] = []
 let diveId: string
+let seatedDive: string | undefined
+let vehicleId: string | undefined
 const cleanupBookings: string[] = []
 
 async function insertBooking(
-  userId: string, details: Record<string, unknown>, status = 'pending',
+  userId: string, details: Record<string, unknown>, status = 'pending', eventId = diveId,
 ): Promise<string> {
   const { data, error } = await admin.from('bookings').insert({
-    user_id: userId, event_id: diveId, details, status,
+    user_id: userId, event_id: eventId, details, status,
   } as never).select('id').single()
   if (error) throw new Error(`insertBooking: ${error.message}`)
   const id = (data as { id: string }).id
@@ -47,6 +54,11 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (cleanupBookings.length) await admin.from('bookings').delete().in('id', cleanupBookings)
+  if (seatedDive) {
+    await admin.from('notifications').delete().eq('kind', 'ride_waitlist').eq('event_id', seatedDive)
+    await deleteTestDive(admin, seatedDive)
+  }
+  if (vehicleId) await admin.from('vehicles').delete().eq('id', vehicleId)
   // Scoped to this test's event so no other run's rows are touched. (event_id
   // is text in notifications; the trigger stores the event uuid as text.)
   await admin.from('notifications').delete().eq('kind', 'ride_waitlist').eq('event_id', diveId)
@@ -64,9 +76,21 @@ describe('notify_admins_ride_waitlist', () => {
     expect(notes[0].event_id).toBe(diveId)
   })
 
-  it('does not notify for an ordinary ride booking', async () => {
+  it('does not notify for an ordinary ride booking — the run has a free seat', async () => {
+    seatedDive = await createTestDive(admin)
+    const veh = await admin.from('vehicles')
+      .insert({ name: 'Waitlist trigger test car', passenger_seats: 4 } as never)
+      .select('id').single()
+    if (veh.error) throw new Error(veh.error.message)
+    vehicleId = (veh.data as { id: string }).id
+    const alloc = await admin.from('event_vehicles')
+      .insert({ vehicle_id: vehicleId, event_id: seatedDive } as never)
+    if (alloc.error) throw new Error(alloc.error.message)
+
     const before = (await adminNotes()).length
-    await insertBooking(divers[1].id, { transportation: true, ride_waitlisted: false })
+    const id = await insertBooking(divers[1].id, { transportation: true }, 'pending', seatedDive)
+    const { data } = await admin.from('bookings').select('details').eq('id', id).single()
+    expect((data as { details: Record<string, unknown> }).details.ride_waitlisted).toBe(false)
     expect((await adminNotes()).length).toBe(before)
   })
 

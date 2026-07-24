@@ -75,7 +75,9 @@ describe('bookings.details JSONB', () => {
       })
       .select().single()
     expect(error).toBeNull()
-    expect(data!.details).toEqual(payload)
+    // ride_waitlisted is stamped by the DB, not stored as sent (20260724010000):
+    // this dive has no car, so the ride request is a waitlist request.
+    expect(data!.details).toEqual({ ...payload, ride_waitlisted: true })
     if (data) bookingIds.push(data.id)
     await admin.from('bookings').delete().eq('id', data!.id)
     await deleteTestDive(admin, freshDive)

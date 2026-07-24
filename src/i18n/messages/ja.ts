@@ -66,6 +66,7 @@ export const ja: Messages = {
     toggleKind: (kind: string) => `${kind}の表示を切り替え`,
     filterCourses: 'コースを絞り込む',
     courses: 'コース',
+    toggleCancelled: '中止イベントの表示切り替え',
     toggleAvailability: 'スタッフの空き状況を切り替え',
     weekdays: ['日', '月', '火', '水', '木', '金', '土'],
     moveEventDay: 'イベントの日付を変更',
