@@ -179,8 +179,8 @@ describe('fetchRideSeats', () => {
 })
 
 describe('canRequestRide', () => {
-  it('blocks when no car is assigned to the event (capacity 0)', () => {
-    expect(canRequestRide({ capacity: 0, claimed: 0, alreadyHasRide: false })).toBe(false)
+  it('allows when no car is assigned yet (capacity 0 = plan the van later)', () => {
+    expect(canRequestRide({ capacity: 0, claimed: 0, alreadyHasRide: false })).toBe(true)
   })
   it('allows while a seat is free', () => {
     expect(canRequestRide({ capacity: 7, claimed: 6, alreadyHasRide: false })).toBe(true)

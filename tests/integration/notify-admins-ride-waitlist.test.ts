@@ -7,9 +7,9 @@
 // a booking already-waitlisted doesn't re-notify on a later update.
 //
 // The flag itself is computed by the DB (20260724010000), never taken from the
-// client, so these scenarios are set up by seat CAPACITY: this event has no car,
-// which is what makes a ride request here a waitlist request. The
-// ordinary-booking case gets its own event with a car to sit in.
+// client, so these scenarios are set up by seat CAPACITY. A car-less event means
+// "capacity not configured" in FunDive and never waitlists, so the waitlist
+// scenarios use a one-seat car that the first diver fills.
 //
 // One diver per scenario: the one-active-booking-per-user index forbids two
 // non-cancelled bookings for the same diver on one event.
@@ -25,6 +25,7 @@ const divers: TestUser[] = []
 let diveId: string
 let seatedDive: string | undefined
 let vehicleId: string | undefined
+let roomyVehicleId: string | undefined
 const cleanupBookings: string[] = []
 
 async function insertBooking(
@@ -48,8 +49,20 @@ async function adminNotes() {
 
 beforeAll(async () => {
   adminUser = await createTestUser(admin, { role: 'admin' })
-  for (let i = 0; i < 4; i++) divers.push(await createTestUser(admin, { role: 'diver' }))
+  for (let i = 0; i < 5; i++) divers.push(await createTestUser(admin, { role: 'diver' }))
   diveId = await createTestDive(admin)
+  // One seat, so the first ride booking fills it and every later one is a
+  // genuine waitlist request.
+  const veh = await admin.from('vehicles')
+    .insert({ name: 'Waitlist trigger test car', passenger_seats: 1 } as never)
+    .select('id').single()
+  if (veh.error) throw new Error(veh.error.message)
+  vehicleId = (veh.data as { id: string }).id
+  const alloc = await admin.from('event_vehicles')
+    .insert({ vehicle_id: vehicleId, event_id: diveId } as never)
+  if (alloc.error) throw new Error(alloc.error.message)
+  // divers[4] takes the only seat; they are an ordinary booking, not a waitlist.
+  await insertBooking(divers[4].id, { transportation: true })
 })
 
 afterAll(async () => {
@@ -58,7 +71,7 @@ afterAll(async () => {
     await admin.from('notifications').delete().eq('kind', 'ride_waitlist').eq('event_id', seatedDive)
     await deleteTestDive(admin, seatedDive)
   }
-  if (vehicleId) await admin.from('vehicles').delete().eq('id', vehicleId)
+  for (const id of [vehicleId, roomyVehicleId]) if (id) await admin.from('vehicles').delete().eq('id', id)
   // Scoped to this test's event so no other run's rows are touched. (event_id
   // is text in notifications; the trigger stores the event uuid as text.)
   await admin.from('notifications').delete().eq('kind', 'ride_waitlist').eq('event_id', diveId)
@@ -78,13 +91,13 @@ describe('notify_admins_ride_waitlist', () => {
 
   it('does not notify for an ordinary ride booking — the run has a free seat', async () => {
     seatedDive = await createTestDive(admin)
-    const veh = await admin.from('vehicles')
-      .insert({ name: 'Waitlist trigger test car', passenger_seats: 4 } as never)
+    const roomy = await admin.from('vehicles')
+      .insert({ name: 'Waitlist trigger roomy car', passenger_seats: 4 } as never)
       .select('id').single()
-    if (veh.error) throw new Error(veh.error.message)
-    vehicleId = (veh.data as { id: string }).id
+    if (roomy.error) throw new Error(roomy.error.message)
+    roomyVehicleId = (roomy.data as { id: string }).id
     const alloc = await admin.from('event_vehicles')
-      .insert({ vehicle_id: vehicleId, event_id: seatedDive } as never)
+      .insert({ vehicle_id: roomyVehicleId, event_id: seatedDive } as never)
     if (alloc.error) throw new Error(alloc.error.message)
 
     const before = (await adminNotes()).length

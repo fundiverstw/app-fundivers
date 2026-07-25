@@ -74,6 +74,18 @@ describe('bookings.details.ride_waitlisted is recomputed by the DB', () => {
     expect(third.ride_waitlisted).toBe(true)
   })
 
+  it('leaves a run with no car at all unflagged — capacity is not set up yet', async () => {
+    // FunDive's default (canRequestRide at capacity 0) is to take the booking and
+    // let the shop plan the van later, so this must not page the admins.
+    const carless = await createTestDive(admin)
+    const newcomer = await createTestUser(admin, { role: 'diver' })
+    const details = await book(newcomer.id, { transportation: true }, carless)
+    expect(details.ride_waitlisted).toBe(false)
+    await admin.from('bookings').delete().eq('user_id', newcomer.id)
+    await deleteTestUser(admin, newcomer.id)
+    await deleteTestDive(admin, carless)
+  })
+
   it('strips the flag when no ride was requested', async () => {
     const selfDriver = await book(diverA.id, {
       transportation: false, ride_waitlisted: true,

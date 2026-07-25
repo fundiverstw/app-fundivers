@@ -113,15 +113,15 @@ export async function fetchRideSeats(eventId: string): Promise<RideSeats> {
   }
 }
 
-// Whether the registration form should still offer "Yes, I need a ride". A
-// diver can only ride in a car assigned to their event:
-//   - a diver already holding a ride keeps it — their own claim is credited back.
-//   - capacity 0 → no car assigned to the event, so no ride is available.
-//   - otherwise allow only while a seat is free.
+// Whether the registration form should still offer "Yes, I need a ride".
+//   - capacity 0 → no cars assigned yet, ride capacity isn't configured, so
+//     don't block (keeps the plan-the-van-later flow working).
+//   - otherwise allow only while a seat is free. A diver editing a booking that
+//     already holds a ride keeps it — their own claim is credited back.
 export function canRequestRide(
   args: { capacity: number; claimed: number; alreadyHasRide: boolean },
 ): boolean {
+  if (args.capacity <= 0) return true
   if (args.alreadyHasRide) return true
-  if (args.capacity <= 0) return false
   return args.capacity - args.claimed > 0
 }
