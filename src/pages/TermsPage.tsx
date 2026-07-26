@@ -90,7 +90,7 @@ function ReacceptBanner() {
       className="rounded-lg border-2 border-accent bg-red-50 p-4 space-y-3"
     >
       <p className="font-bold text-red-700">{t.terms.updatedTitle}</p>
-      <p className="text-brand-950">{t.terms.updatedBody}</p>
+      <p className="text-red-900">{t.terms.updatedBody}</p>
       <button
         type="button"
         onClick={onAccept}

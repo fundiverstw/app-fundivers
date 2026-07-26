@@ -254,7 +254,7 @@ function GearModelEditor({ model, onChanged }: { model: GearModelWithSizes; onCh
                   </>
                 )}
                 <td className="pl-1 py-0.5">
-                  <button aria-label={gs.removeSizeAria(i)} onClick={() => setRows(rs => rs.filter((_, idx) => idx !== i))} className="text-red-700 hover:text-red-900 px-1">×</button>
+                  <button aria-label={gs.removeSizeAria(i)} onClick={() => setRows(rs => rs.filter((_, idx) => idx !== i))} className="text-red-300 hover:text-red-200 px-1">×</button>
                 </td>
               </tr>
             ))}

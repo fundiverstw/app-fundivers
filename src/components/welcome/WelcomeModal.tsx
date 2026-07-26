@@ -49,7 +49,7 @@ export function WelcomeModal({ user, onDismiss }: { user: User; onDismiss: () =>
           </ul>
           <p className="text-brand-950 font-medium">
             {t.welcome.contactPrefix(siteConfig.identity.shortName)}{' '}
-            <a href={`mailto:${siteConfig.contact.email}`} className="text-brand-700 underline hover:text-brand-900">{siteConfig.contact.email}</a>.
+            <a href={`mailto:${siteConfig.contact.email}`} className="text-reef-300 underline hover:text-reef-200">{siteConfig.contact.email}</a>.
           </p>
         </div>
         <button

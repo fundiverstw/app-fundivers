@@ -355,7 +355,7 @@ function DiverPickerStep({
                       ? (personName(p.name, p.nickname) || t.register.picker.yourAccount)
                       : (p.cert_agency && p.cert_level ? `${p.cert_agency} ${p.cert_level}` : t.register.picker.uncertified)}
                     {!isSelf && p.status && p.status !== 'active' && (
-                      <span className="ml-2 uppercase tracking-wider text-red-700">{p.status}</span>
+                      <span className="ml-2 uppercase tracking-wider text-red-300">{p.status}</span>
                     )}
                   </p>
                 </div>
@@ -1332,7 +1332,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         <p className="text-xs text-brand-900 font-medium">{t.register.stepOf(step)}</p>
         {pickerHeader && (
           <div className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-300 rounded-lg px-2 py-1">
-            <span className="text-xs text-brand-900 font-semibold">
+            <span className="text-xs text-amber-900 font-semibold">
               {t.register.header.bookingFor(pickerHeader.targetName)}
             </span>
             <button
@@ -1518,10 +1518,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               )}
               {!uncertified && certLevel.trim() !== '' && !hasCertCardOnFile && !isOnBehalfOf && (
                 <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
-                  <p className="text-xs font-semibold text-brand-900">
+                  <p className="text-xs font-semibold text-amber-900">
                     {t.register.cert.addProof}
                   </p>
-                  <p className="text-xs text-brand-950 font-medium">
+                  <p className="text-xs text-amber-900 font-medium">
                     {t.register.cert.uploadHint(siteConfig.identity.shortName)}
                   </p>
                   <label className="block cursor-pointer bg-brand-900 hover:bg-brand-950 text-white text-sm font-semibold py-2 px-3 rounded-lg text-center">
@@ -1546,7 +1546,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                   </label>
                   {certFileErr && <p className="text-xs text-red-700">{certFileErr}</p>}
                   {!certFile && (
-                    <label className="flex items-start gap-2 text-xs text-brand-950 font-medium border-t border-amber-300 pt-2">
+                    <label className="flex items-start gap-2 text-xs text-amber-900 font-medium border-t border-amber-300 pt-2">
                       <input
                         type="checkbox"
                         checked={certCardAck}
@@ -1582,10 +1582,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               </div>
               {nitroxCertified && !hasNitroxCardOnFile && !isOnBehalfOf && (
                 <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
-                  <p className="text-xs font-semibold text-brand-900">
+                  <p className="text-xs font-semibold text-amber-900">
                     {t.register.nitrox.uploadTitle}
                   </p>
-                  <p className="text-xs text-brand-950 font-medium">
+                  <p className="text-xs text-amber-900 font-medium">
                     {t.register.nitrox.uploadHint(siteConfig.identity.shortName)}
                   </p>
                   <label className="block cursor-pointer bg-brand-900 hover:bg-brand-950 text-white text-sm font-semibold py-2 px-3 rounded-lg text-center">
@@ -1617,10 +1617,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               )}
               {deepCertified && !hasDeepCardOnFile && !isOnBehalfOf && (
                 <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
-                  <p className="text-xs font-semibold text-brand-900">
+                  <p className="text-xs font-semibold text-amber-900">
                     {t.register.deep.uploadTitle}
                   </p>
-                  <p className="text-xs text-brand-950 font-medium">
+                  <p className="text-xs text-amber-900 font-medium">
                     {t.register.deep.uploadHint(siteConfig.identity.shortName)}
                   </p>
                   <label className="block cursor-pointer bg-brand-900 hover:bg-brand-950 text-white text-sm font-semibold py-2 px-3 rounded-lg text-center">
@@ -1654,12 +1654,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
             {prereqMismatch && (
               <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
-                <p className="text-xs font-semibold text-brand-900">{t.register.prereq.title}</p>
-                <ul className="text-xs text-brand-950 font-medium list-disc pl-4 space-y-0.5">
+                <p className="text-xs font-semibold text-amber-900">{t.register.prereq.title}</p>
+                <ul className="text-xs text-amber-900 font-medium list-disc pl-4 space-y-0.5">
                   {prereqCertMismatch && <li>{t.register.prereq.certMismatch(prereqCertName ?? '')}</li>}
                   {prereqDivesMismatch && <li>{t.register.prereq.divesMismatch(prereqReqDives ?? 0, loggedDives)}</li>}
                 </ul>
-                <label className="flex items-start gap-2 text-xs text-brand-950 font-medium border-t border-amber-300 pt-2">
+                <label className="flex items-start gap-2 text-xs text-amber-900 font-medium border-t border-amber-300 pt-2">
                   <input
                     type="checkbox"
                     checked={prereqAck}
@@ -1945,7 +1945,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             </div>
             {creditNow > 0 && (
               <div className="border-t border-surface-200 pt-1 mt-1 space-y-0.5">
-                <div className="flex justify-between text-emerald-700">
+                <div className="flex justify-between text-emerald-300">
                   <span>{t.register.payment.accountCredit}</span>
                   <span>{t.register.payment.minus(event.currency, creditDeducted.toLocaleString())}</span>
                 </div>
@@ -2046,7 +2046,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
           {waiverEligible && missingW && missingW.length > 0 && (
             <div className="text-xs text-brand-950 font-medium bg-amber-400/10 border border-amber-400/40 rounded-lg p-3 space-y-2" aria-label={t.register.waivers.ariaOutstanding}>
-              <p className="font-semibold text-amber-800">
+              <p className="font-semibold text-amber-300">
                 {t.register.waivers.toSignBefore(event.type)}
               </p>
               <p>{t.register.waivers.stillBookSolo}</p>
@@ -2071,7 +2071,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             <div className="text-xs bg-surface-50 border border-surface-300 rounded p-2 space-y-1" aria-label={t.register.results.ariaPerDiver}>
               <p className="font-semibold text-brand-900">{t.register.results.additionalDivers}</p>
               {additionalResults.map((r, i) => (
-                <p key={i} className={r.ok ? 'text-emerald-800' : 'text-red-700'}>
+                <p key={i} className={r.ok ? 'text-emerald-300' : 'text-red-300'}>
                   · {r.targetName}: {r.ok ? t.register.results.registered : t.register.results.failed(r.error ?? '')}
                 </p>
               ))}

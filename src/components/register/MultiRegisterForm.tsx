@@ -568,7 +568,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                     <TextField label={t.register.certLevel} placeholder={t.register.certLevelPlaceholder} value={certLevel} onChange={setCertLevel} />
                   </div>
                   {certDeclarationBlocked && (
-                    <p className="text-xs text-red-700 font-medium">
+                    <p className="text-xs text-red-300 font-medium">
                       {t.register.certDeclarationError}
                     </p>
                   )}
@@ -630,7 +630,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                     <p className="text-sm font-semibold text-brand-900">
                       {ev.title}
                       {targetLabel && (
-                        <span className="ml-2 text-xs text-brand-700">{t.register.multi.forLabel(targetLabel)}</span>
+                        <span className="ml-2 text-xs text-brand-300">{t.register.multi.forLabel(targetLabel)}</span>
                       )}
                     </p>
                     {gearIncluded && (
@@ -798,7 +798,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
 
             {leadMissingW.length > 0 && (
               <div className="text-xs text-brand-950 font-medium bg-amber-400/10 border border-amber-400/40 rounded-lg p-3 space-y-2" aria-label={t.register.waivers.ariaOutstanding}>
-                <p className="font-semibold text-amber-800">{t.register.multi.waiversToSign}</p>
+                <p className="font-semibold text-amber-300">{t.register.multi.waiversToSign}</p>
                 <p>{t.register.multi.waiversStillBook}</p>
                 <ul className="space-y-1">
                   {leadMissingW.map(entry => (

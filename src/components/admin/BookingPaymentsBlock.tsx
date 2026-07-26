@@ -131,7 +131,7 @@ export function BookingPaymentsBlock({
       <p className="font-semibold text-brand-900">{t.payments.title}</p>
 
       {payerNote && (
-        <p className="text-violet-800 font-semibold">{payerNote}</p>
+        <p className="text-violet-300 font-semibold">{payerNote}</p>
       )}
 
       {/* Balance = owed − paid − open credit for this event. Positive means the
@@ -152,18 +152,18 @@ export function BookingPaymentsBlock({
               <div>
                 <p className="font-medium opacity-70">{t.bookings.balance}</p>
                 {bal.state === 'due' && <p className="font-semibold text-red-600">{bp.amountOwed(bal.amount.toLocaleString())}</p>}
-                {bal.state === 'credit' && <p className="font-semibold text-emerald-700">{bp.amountCredit(bal.amount.toLocaleString())}</p>}
-                {bal.state === 'settled' && <p className="font-semibold text-emerald-700">{t.bookings.settled}</p>}
+                {bal.state === 'credit' && <p className="font-semibold text-emerald-300">{bp.amountCredit(bal.amount.toLocaleString())}</p>}
+                {bal.state === 'settled' && <p className="font-semibold text-emerald-300">{t.bookings.settled}</p>}
               </div>
             </div>
             {credit > 0 && (
-              <div className="flex justify-between text-emerald-700">
+              <div className="flex justify-between text-emerald-300">
                 <span className="font-medium">{t.bookings.creditThisEvent}</span>
                 <span className="font-semibold">{credit.toLocaleString()}</span>
               </div>
             )}
             {bal.state === 'credit' && (
-              <p className="text-emerald-700">
+              <p className="text-emerald-300">
                 {bp.shopOwesDiver(currency ?? siteConfig.locale.currencyLabel, bal.amount.toLocaleString())}
               </p>
             )}

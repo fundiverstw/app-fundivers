@@ -157,7 +157,7 @@ export function DiverNotes({ profileId, title = dn.title }: Props) {
                       <button
                         onClick={() => deleteNote(n.id)}
                         aria-label={dn.deleteNoteFromAria(personName(n.author?.name, n.author?.nickname) || t.admin.notes.unknownAuthor)}
-                        className="text-xs text-red-700 font-semibold hover:text-red-800"
+                        className="text-xs text-red-300 font-semibold hover:text-red-200"
                       >
                         {dn.delete}
                       </button>

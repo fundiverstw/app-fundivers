@@ -242,7 +242,7 @@ function EventPickerStep() {
                     <span className="font-medium text-brand-900 text-sm truncate block">{ev.title}</span>
                     <span className="text-xs text-brand-900 font-medium">{formatEventSpan(ev)}</span>
                   </div>
-                  <span className="text-xs text-brand-700 font-semibold shrink-0">{rp.resume}</span>
+                  <span className="text-xs text-brand-300 font-semibold shrink-0">{rp.resume}</span>
                 </button>
               </li>
             ))}

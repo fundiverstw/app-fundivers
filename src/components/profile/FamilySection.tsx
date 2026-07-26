@@ -76,7 +76,7 @@ function FamilyPanel({ parent }: { parent: Profile }) {
                   <p className="text-xs text-brand-900/70">
                     {c.cert_agency && c.cert_level ? `${c.cert_agency} ${c.cert_level}` : t.profile.family.uncertified}
                     {c.status && c.status !== 'active' && (
-                      <span className="ml-2 uppercase tracking-wider text-red-700">{c.status}</span>
+                      <span className="ml-2 uppercase tracking-wider text-red-300">{c.status}</span>
                     )}
                   </p>
                 </div>

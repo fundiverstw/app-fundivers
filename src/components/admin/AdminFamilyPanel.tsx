@@ -146,7 +146,7 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
                 onClick={() => unlink(c.id)}
                 disabled={unlinkingId === c.id}
                 aria-label={fm.unlinkAria(c.name ?? fm.childFallback)}
-                className="text-xs text-red-700 hover:text-red-800 font-semibold disabled:opacity-50"
+                className="text-xs text-red-300 hover:text-red-200 font-semibold disabled:opacity-50"
               >
                 {unlinkingId === c.id ? fm.unlinking : fm.unlink}
               </button>

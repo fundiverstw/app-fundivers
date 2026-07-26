@@ -158,7 +158,7 @@ export function AdminAddDiverModal({
                       {(p.cert_agency || p.cert_level) && p.contact_id && ' · '}
                       {p.contact_id ?? ''}
                       {p.status && p.status !== 'active' && (
-                        <span className="ml-2 uppercase tracking-wider text-red-700">{p.status}</span>
+                        <span className="ml-2 uppercase tracking-wider text-red-300">{p.status}</span>
                       )}
                     </p>
                   </button>

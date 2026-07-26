@@ -17,6 +17,7 @@ import { FamilySection } from '../components/profile/FamilySection'
 import { MyWaivers } from '../components/profile/MyWaivers'
 import { siteConfig } from '../config/site'
 import { DateField } from '../components/DateField'
+import { BTN_DANGER } from '../styles/tokens'
 import type { Profile, CertLevel } from '../types/database'
 import { ShoeSizeField } from '../components/ShoeSizeField'
 import { t } from '../i18n'
@@ -700,7 +701,7 @@ export function CertCardSection({ userId, onPathChange }: {
             type="button"
             onClick={onRemove}
             disabled={busy}
-            className="bg-surface-100 hover:bg-red-100 disabled:opacity-40 text-red-700 border border-accent text-sm font-semibold py-2 px-3 rounded-lg transition-colors"
+            className={`${BTN_DANGER} text-sm`}
           >
             {t.profile.cards.remove}
           </button>
@@ -816,7 +817,7 @@ export function NitroxCardSection({ userId, onPathChange }: {
             type="button"
             onClick={onRemove}
             disabled={busy}
-            className="bg-surface-100 hover:bg-red-100 disabled:opacity-40 text-red-700 border border-accent text-sm font-semibold py-2 px-3 rounded-lg transition-colors"
+            className={`${BTN_DANGER} text-sm`}
           >
             {t.profile.cards.remove}
           </button>
@@ -928,7 +929,7 @@ export function DeepCardSection({ userId, onPathChange }: {
             type="button"
             onClick={onRemove}
             disabled={busy}
-            className="bg-surface-100 hover:bg-red-100 disabled:opacity-40 text-red-700 border border-accent text-sm font-semibold py-2 px-3 rounded-lg transition-colors"
+            className={`${BTN_DANGER} text-sm`}
           >
             {t.profile.cards.remove}
           </button>
