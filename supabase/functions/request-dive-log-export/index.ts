@@ -12,9 +12,11 @@
 //
 // Body: {} (the user is identified by the Bearer token; nothing else needed).
 // Returns: 200 { ok: true, dive_count, requested_at }
+//          400 { error: "nothing to export" } for an empty logbook — no mail
+//              is sent and no cooldown is burned, so the diver can log a dive
+//              and export straight away. The SPA disables the button at zero
+//              rows, so this only answers a direct call.
 //          429 { error: "rate-limited", retry_after_seconds, last_requested_at }
-//          204 { ok: true, dive_count: 0 } when there's nothing to export
-//              (we still count this as a request to discourage hammering).
 
 import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
@@ -90,6 +92,7 @@ Deno.serve(async (req) => {
   if (lErr) return json({ error: safeError(lErr, "dive logs fetch failed") }, 500)
 
   const rows = (logs ?? []) as unknown as DiveLogCsvRow[]
+  if (rows.length === 0) return json({ error: "nothing to export" }, 400)
   const csv = buildDiveLogCsv(rows)
 
   if (!GMAIL_USER || !GMAIL_PASS) {
@@ -104,9 +107,7 @@ Deno.serve(async (req) => {
     const stamp = new Date().toISOString().slice(0, 10)
     const filename = `${siteConfig.identity.shortName.toLowerCase()}-dive-log-${stamp}.csv`
     const subject  = `${siteConfig.identity.shopName} — your dive log export`
-    const text     = rows.length === 0
-      ? `Hi,\n\nYou requested a CSV export of your dive logs, but you don't have any logged dives yet. The attached file contains only the header row.\n\nLog dives any time at ${siteConfig.urls.app}/records/dive-logs.\n\n— ${siteConfig.identity.shopName}`
-      : `Hi,\n\nAttached is a CSV export of your ${rows.length} logged dive${rows.length === 1 ? "" : "s"} from ${siteConfig.identity.shopName}.\n\nYou can request another export 24 hours from now.\n\n— ${siteConfig.identity.shopName}`
+    const text     = `Hi,\n\nAttached is a CSV export of your ${rows.length} logged dive${rows.length === 1 ? "" : "s"} from ${siteConfig.identity.shopName}.\n\nYou can request another export 24 hours from now.\n\n— ${siteConfig.identity.shopName}`
     await transporter.sendMail({
       from: { name: siteConfig.identity.shopName, address: GMAIL_USER },
       to:      userEmail,
