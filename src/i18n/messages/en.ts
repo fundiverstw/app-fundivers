@@ -682,7 +682,22 @@ export const en = {
       wholeNumber: 'Must be a whole number.',
       tooLong: (max: number) => `Keep this under ${max} characters.`,
       endAboveStart: 'End pressure cannot be higher than start pressure.',
+      dateRequired: 'Pick the date you dived.',
+      dateOutOfRange: 'That date looks wrong — check the year.',
       fixFields: 'Some entries are out of range — check the highlighted fields.',
+    },
+    diveTypes: {
+      shore: 'Shore',
+      boat: 'Boat',
+      training: 'Training',
+      drift: 'Drift',
+      night: 'Night',
+      wreck: 'Wreck',
+      other: 'Other',
+    },
+    gasMixes: {
+      air: 'Air',
+      other: 'Other',
     },
   },
   duties: {

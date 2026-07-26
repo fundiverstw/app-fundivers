@@ -673,7 +673,22 @@ export const ja: Messages = {
       wholeNumber: '整数で入力してください。',
       tooLong: (max: number) => `${max} 文字以内で入力してください。`,
       endAboveStart: '終了残圧は開始残圧を超えられません。',
+      dateRequired: 'ダイビングした日付を選んでください。',
+      dateOutOfRange: '日付が正しくないようです。年を確認してください。',
       fixFields: '範囲外の項目があります。ハイライトされた欄を確認してください。',
+    },
+    diveTypes: {
+      shore: 'ビーチ',
+      boat: 'ボート',
+      training: '講習',
+      drift: 'ドリフト',
+      night: 'ナイト',
+      wreck: 'レック',
+      other: 'その他',
+    },
+    gasMixes: {
+      air: 'エア',
+      other: 'その他',
     },
   },
   duties: {

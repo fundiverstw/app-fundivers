@@ -674,7 +674,22 @@ export const zhTW: Messages = {
       wholeNumber: '請輸入整數。',
       tooLong: (max: number) => `請勿超過 ${max} 個字元。`,
       endAboveStart: '結束殘壓不得高於起始殘壓。',
+      dateRequired: '請選擇潛水日期。',
+      dateOutOfRange: '日期有誤，請確認年份。',
       fixFields: '部分欄位超出範圍，請檢查標示的欄位。',
+    },
+    diveTypes: {
+      shore: '岸潛',
+      boat: '船潛',
+      training: '訓練潛水',
+      drift: '流潛',
+      night: '夜潛',
+      wreck: '沉船潛水',
+      other: '其他',
+    },
+    gasMixes: {
+      air: '空氣',
+      other: '其他',
     },
   },
   duties: {

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { DiveLogsPage } from './DiveLogsPage'
 import type { DiveLog } from '../types/database'
+import { todayIso } from '../lib/dates'
 
 // useAuth is mocked so we get a stable user id without mounting AuthProvider.
 const useAuthMock = vi.fn()
@@ -391,5 +392,66 @@ describe('DiveLogsPage mobile layout', () => {
     const form = screen.getByRole('button', { name: /save dive/i }).closest('form')!
     expect(form.querySelectorAll('[class*="col-span-2"]')).toHaveLength(0)
     expect(form.querySelectorAll('[class*="col-span-full"]').length).toBeGreaterThan(0)
+  })
+})
+
+describe('DiveLogsPage dates and labels', () => {
+  it("defaults a new dive to the shop's today, not UTC's", async () => {
+    // The UTC-vs-shop-timezone difference is pinned in dates.test.ts, where it
+    // can use fake timers safely. Here we only need the form to be reading the
+    // shop-aware helper rather than slicing toISOString().
+    fetchDiveLogsMock.mockResolvedValue([])
+    renderPage()
+    await waitFor(() => expect(fetchDiveLogsMock).toHaveBeenCalled())
+    fireEvent.click(screen.getByRole('button', { name: /\+ add/i }))
+    expect(screen.getByPlaceholderText('YYYY-MM-DD')).toHaveValue(todayIso())
+  })
+
+  it('renders the stored calendar day without a timezone shift', async () => {
+    // new Date('2026-04-30') is UTC midnight, which formats as the 29th in any
+    // timezone behind Greenwich.
+    fetchDiveLogsMock.mockResolvedValue([sampleRow({ dive_number: 9, dived_on: '2026-04-30' })])
+    renderPage()
+    const item = await screen.findByRole('button', { name: /edit dive 9/i })
+    expect(within(item).getByText(/Apr 30, 2026/)).toBeInTheDocument()
+  })
+
+  it('refuses a mistyped year', async () => {
+    const row = sampleRow({ id: 'r1', dive_number: 3, site: 'Mistyped' })
+    fetchDiveLogsMock.mockResolvedValue([row])
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: /edit dive 3/i }))
+    const form = screen.getByDisplayValue('Mistyped').closest('form') as HTMLFormElement
+
+    fireEvent.change(screen.getByPlaceholderText('YYYY-MM-DD'), { target: { value: '9999-04-30' } })
+    fireEvent.submit(form)
+
+    expect(updateDiveLogMock).not.toHaveBeenCalled()
+    expect(await screen.findByText(/check the year/i)).toBeInTheDocument()
+  })
+
+  it('labels the dive-type and gas-mix options instead of showing raw column values', async () => {
+    fetchDiveLogsMock.mockResolvedValue([])
+    renderPage()
+    await waitFor(() => expect(fetchDiveLogsMock).toHaveBeenCalled())
+    fireEvent.click(screen.getByRole('button', { name: /\+ add/i }))
+
+    const type = screen.getByLabelText(/^type$/i)
+    expect(within(type).getByRole('option', { name: 'Shore' })).toBeInTheDocument()
+    expect(within(type).queryByRole('option', { name: 'shore' })).not.toBeInTheDocument()
+    // The stored value stays the raw enum — only the caption is translated.
+    expect(within(type).getByRole('option', { name: 'Shore' })).toHaveValue('shore')
+  })
+
+  it('keeps a gear item the shop has since removed togglable', async () => {
+    // toggleGear preserves unrecognised entries, so without this the item was
+    // stuck on the dive with no button to clear it.
+    const row = sampleRow({ id: 'r1', dive_number: 3, site: 'Legacy', gear_used: ['Rebreather'] })
+    fetchDiveLogsMock.mockResolvedValue([row])
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: /edit dive 3/i }))
+
+    const button = screen.getByRole('button', { name: 'Rebreather', pressed: true })
+    expect(button).toBeInTheDocument()
   })
 })

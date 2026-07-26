@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
-  DIVE_LOG_BOUNDS, DIVE_LOG_TEXT_MAX, NUMERIC_FIELDS,
+  DIVE_LOG_BOUNDS, DIVE_LOG_TEXT_MAX, NUMERIC_FIELDS, EARLIEST_DIVE_DATE, latestDiveDate,
   validateDiveLog, roundDiveLogNumbers, hasErrors,
 } from './dive-log-validation'
+import { addIsoDays, todayIso } from './dates'
 
-const valid = { site: 'Long Dong Bay' }
+const valid = { site: 'Long Dong Bay', dived_on: '2026-04-30' }
 
 describe('DIVE_LOG_BOUNDS', () => {
   // The whole point of the table is that it is narrower than the column, so a
@@ -33,7 +34,8 @@ describe('validateDiveLog', () => {
 
   it('accepts a fully populated, plausible dive', () => {
     expect(validateDiveLog({
-      site: 'Batcave', max_depth_m: 18.5, dive_time_min: 42, visibility_m: 12,
+      site: 'Batcave', dived_on: '2026-04-30',
+      max_depth_m: 18.5, dive_time_min: 42, visibility_m: 12,
       water_temp_c: 26.5, air_temp_c: 31, wave_height_m: 0.5, weight_kg: 6,
       tank_size_l: 11.1, start_pressure_bar: 200, end_pressure_bar: 60,
       buddy_name: 'Alice', instructor_name: 'Bob', notes: 'Turtles.',
@@ -43,6 +45,31 @@ describe('validateDiveLog', () => {
   it('requires a site', () => {
     expect(validateDiveLog({}).site).toBeTruthy()
     expect(validateDiveLog({ site: '   ' }).site).toBeTruthy()
+  })
+
+  it('requires a date', () => {
+    expect(validateDiveLog({ site: 'Batcave' }).dived_on).toBeTruthy()
+    expect(validateDiveLog({ site: 'Batcave', dived_on: '' }).dived_on).toBeTruthy()
+  })
+
+  it('rejects a mistyped year in either direction', () => {
+    // A stray 9 puts the dive in 9999, where it pins itself to the top of the
+    // list forever. Everything else in the form is bounded; this was not.
+    expect(validateDiveLog({ ...valid, dived_on: '9999-01-01' }).dived_on).toBeTruthy()
+    expect(validateDiveLog({ ...valid, dived_on: '1899-01-01' }).dived_on).toBeTruthy()
+  })
+
+  it('accepts the boundary dates themselves', () => {
+    expect(validateDiveLog({ ...valid, dived_on: EARLIEST_DIVE_DATE }).dived_on).toBeUndefined()
+    expect(validateDiveLog({ ...valid, dived_on: latestDiveDate() }).dived_on).toBeUndefined()
+  })
+
+  it('tolerates today being tomorrow east of the shop, but not a real future date', () => {
+    // A diver logging from a timezone ahead of the shop is legitimately on the
+    // next calendar day; a week out is a typo.
+    expect(validateDiveLog({ ...valid, dived_on: todayIso() }).dived_on).toBeUndefined()
+    expect(validateDiveLog({ ...valid, dived_on: addIsoDays(todayIso(), 1) }).dived_on).toBeUndefined()
+    expect(validateDiveLog({ ...valid, dived_on: addIsoDays(todayIso(), 7) }).dived_on).toBeTruthy()
   })
 
   it('treats a blank number as not-entered rather than zero', () => {

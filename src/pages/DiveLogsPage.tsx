@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { isoDate } from '../lib/dates'
+import { todayIso, parseIsoDate } from '../lib/dates'
 import { format } from 'date-fns'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
@@ -9,11 +9,13 @@ import {
 } from '../lib/dive-logs'
 import { GEAR_ITEMS } from '../lib/gear'
 import {
-  DIVE_LOG_BOUNDS, DIVE_LOG_TEXT_MAX, validateDiveLog, roundDiveLogNumbers, hasErrors,
+  DIVE_LOG_BOUNDS, DIVE_LOG_TEXT_MAX, EARLIEST_DIVE_DATE, latestDiveDate,
+  validateDiveLog, roundDiveLogNumbers, hasErrors,
   type NumericField, type DiveLogErrors,
 } from '../lib/dive-log-validation'
 import { DateField } from '../components/DateField'
-import { DIVE_TYPES, GAS_MIXES, type DiveLog, type DiveLogInsert, type DiveType, type GasMix } from '../types/database'
+import { type DiveLog, type DiveLogInsert, type DiveType, type GasMix } from '../types/database'
+import { DIVE_TYPE_OPTIONS, GAS_MIX_OPTIONS, GAS_MIX_LABELS } from '../lib/dive-log-labels'
 import {
   CARD, CARD_ELEVATED, BTN_PRIMARY, BTN_GHOST, BTN_DANGER, BTN_LIGHT,
   TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR, INPUT, INPUT_LABEL, PAGE_BODY,
@@ -34,7 +36,7 @@ const dl = t.diveLogs
 type FormState = Omit<DiveLogInsert, 'user_id'>
 
 const blankForm = (): FormState => ({
-  dived_on:           isoDate(new Date()),
+  dived_on:           todayIso(),
   site:               '',
   dive_type:          null,
   max_depth_m:        null,
@@ -227,14 +229,14 @@ export function DiveLogsPage() {
                   #{r.dive_number} · {r.site}
                 </div>
                 <div className={`text-xs ${TEXT_SUBTLE}`}>
-                  {format(new Date(r.dived_on), 'PP')}
+                  {format(parseIsoDate(r.dived_on), 'PP')}
                 </div>
               </div>
               <div className={`text-xs ${TEXT_BODY} mt-1 flex flex-wrap gap-x-3 gap-y-0.5`}>
                 {r.max_depth_m != null && <span>{dl.maxDepthShort(r.max_depth_m)}</span>}
                 {r.dive_time_min != null && <span>{dl.diveTimeShort(r.dive_time_min)}</span>}
                 {r.water_temp_c != null && <span>{r.water_temp_c}°C</span>}
-                {r.gas_mix && <span>{r.gas_mix}</span>}
+                {r.gas_mix && <span>{GAS_MIX_LABELS[r.gas_mix]}</span>}
                 {r.buddy_name && <span>{dl.buddyShort(r.buddy_name)}</span>}
                 {r.instructor_name && <span>{dl.instructorShort(r.instructor_name)}</span>}
               </div>
@@ -244,6 +246,19 @@ export function DiveLogsPage() {
       </ul>
     </div>
   )
+}
+
+/**
+ * The gear toggles to offer: the shop's current list, plus anything already
+ * saved on this dive that has since left it.
+ *
+ * `toggleGear` preserves entries it doesn't recognise, so dropping an item
+ * from the config used to leave it stuck on old dives with no button to
+ * remove it — recorded, invisible, and exported to CSV anyway.
+ */
+function gearChoices(saved: string[] | null | undefined): string[] {
+  const extras = (saved ?? []).filter(g => !GEAR_ITEMS.includes(g))
+  return [...GEAR_ITEMS, ...extras]
 }
 
 function hoursUntil(d: Date | null): number | null {
@@ -368,8 +383,9 @@ function DiveLogForm({
       </div>
 
       <div className={`${CARD_ELEVATED} p-4 grid grid-cols-1 sm:grid-cols-2 gap-3`}>
-        <Field label={dl.date} required>
+        <Field label={dl.date} required error={errors.dived_on}>
           <DateField required className={INPUT} value={form.dived_on}
+            min={EARLIEST_DIVE_DATE} max={latestDiveDate()}
             onChange={v => set('dived_on', v)} />
         </Field>
         <Field label={dl.site} required error={errors.site}>
@@ -382,14 +398,14 @@ function DiveLogForm({
           <select className={INPUT} value={form.dive_type ?? ''}
             onChange={e => set('dive_type', (e.target.value || null) as DiveType | null)}>
             <option value="">—</option>
-            {DIVE_TYPES.map(dt => <option key={dt} value={dt}>{dt}</option>)}
+            {DIVE_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </Field>
         <Field label={dl.gasMix}>
           <select className={INPUT} value={form.gas_mix ?? ''}
             onChange={e => set('gas_mix', (e.target.value || null) as GasMix | null)}>
             <option value="">—</option>
-            {GAS_MIXES.map(g => <option key={g} value={g}>{g}</option>)}
+            {GAS_MIX_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </Field>
 
@@ -436,7 +452,7 @@ function DiveLogForm({
         </Field>
         <Field label={dl.gearUsed} wide group>
           <div className="flex flex-wrap gap-1.5">
-            {GEAR_ITEMS.map(g => {
+            {gearChoices(form.gear_used).map(g => {
               const on = form.gear_used?.includes(g) ?? false
               return (
                 <button

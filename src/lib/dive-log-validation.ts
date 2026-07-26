@@ -17,6 +17,7 @@
 // widening the entry here, not hunting for a literal in the JSX.
 
 import { t } from '../i18n'
+import { todayIso, addIsoDays } from './dates'
 
 export type NumericField =
   | 'max_depth_m'
@@ -69,12 +70,22 @@ export const DIVE_LOG_TEXT_MAX = {
 
 export type TextField = keyof typeof DIVE_LOG_TEXT_MAX
 
-export type DiveLogField = NumericField | TextField
+// Recreational scuba starts around the Aqua-Lung; anything earlier is a typo,
+// and so is anything ahead of today. The future gets a day of slack rather
+// than a hard stop at the shop's today: a diver logging from a timezone east
+// of the shop is legitimately already on tomorrow's date.
+export const EARLIEST_DIVE_DATE = '1950-01-01'
+
+export function latestDiveDate(): string {
+  return addIsoDays(todayIso(), 1)
+}
+
+export type DiveLogField = NumericField | TextField | 'dived_on'
 export type DiveLogErrors = Partial<Record<DiveLogField, string>>
 
 type Numbers = Partial<Record<NumericField, number | null | undefined>>
 type Texts = Partial<Record<TextField, string | null | undefined>>
-export type ValidatableDiveLog = Numbers & Texts
+export type ValidatableDiveLog = Numbers & Texts & { dived_on?: string | null }
 
 /**
  * Snap each number to the decimal places its column keeps.
@@ -104,6 +115,12 @@ export function validateDiveLog(form: ValidatableDiveLog): DiveLogErrors {
   const e = t.diveLogs.errors
 
   if (!form.site?.trim()) errors.site = e.siteRequired
+
+  if (!form.dived_on) {
+    errors.dived_on = e.dateRequired
+  } else if (form.dived_on < EARLIEST_DIVE_DATE || form.dived_on > latestDiveDate()) {
+    errors.dived_on = e.dateOutOfRange
+  }
 
   for (const field of NUMERIC_FIELDS) {
     const v = form[field]
