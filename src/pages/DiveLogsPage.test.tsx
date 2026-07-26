@@ -263,3 +263,133 @@ describe('DiveLogsPage CSV export', () => {
     await waitFor(() => expect(screen.getByText(/csv export available in/i)).toBeInTheDocument())
   })
 })
+
+describe('DiveLogsPage field validation', () => {
+  async function openEditForm(row: DiveLog) {
+    fetchDiveLogsMock.mockResolvedValue([row])
+    renderPage()
+    const trigger = await screen.findByRole('button', {
+      name: new RegExp(`edit dive ${row.dive_number}`, 'i'),
+    })
+    fireEvent.click(trigger)
+    return screen.getByDisplayValue(row.site).closest('form') as HTMLFormElement
+  }
+
+  it('refuses to save a value the column cannot hold, and names the field', async () => {
+    // The reported bug: 999 in water temp is a numeric(3,1) overflow, which
+    // used to surface as the raw Postgres "numeric field overflow".
+    const row = sampleRow({ id: 'r1', dive_number: 3, site: 'Overflow' })
+    const form = await openEditForm(row)
+
+    fireEvent.change(screen.getByDisplayValue('26'), { target: { value: '999' } })
+    fireEvent.submit(form)
+
+    expect(updateDiveLogMock).not.toHaveBeenCalled()
+    expect(await screen.findByText(/must be between -2 and 40/i)).toBeInTheDocument()
+  })
+
+  it('bounds every numeric input in the DOM so the browser blocks it first', async () => {
+    const row = sampleRow({ id: 'r1', dive_number: 3, site: 'Bounded' })
+    const form = await openEditForm(row)
+
+    const numbers = within(form).getAllByRole('spinbutton')
+    expect(numbers.length).toBeGreaterThan(0)
+    for (const input of numbers) {
+      expect(input).toHaveAttribute('min')
+      expect(input).toHaveAttribute('max')
+    }
+  })
+
+  it('clears a field complaint as soon as the diver edits it', async () => {
+    const row = sampleRow({ id: 'r1', dive_number: 3, site: 'Retract' })
+    const form = await openEditForm(row)
+
+    fireEvent.change(screen.getByDisplayValue('26'), { target: { value: '999' } })
+    fireEvent.submit(form)
+    expect(await screen.findByText(/must be between -2 and 40/i)).toBeInTheDocument()
+
+    fireEvent.change(screen.getByDisplayValue('999'), { target: { value: '27' } })
+    await waitFor(() => expect(screen.queryByText(/must be between -2 and 40/i)).not.toBeInTheDocument())
+  })
+
+  it('rejects a tank that came back fuller than it went in', async () => {
+    const row = sampleRow({ id: 'r1', dive_number: 3, site: 'Backwards' })
+    const form = await openEditForm(row)
+
+    fireEvent.change(screen.getByDisplayValue('60'), { target: { value: '250' } })
+    fireEvent.submit(form)
+
+    expect(updateDiveLogMock).not.toHaveBeenCalled()
+    expect(await screen.findByText(/end pressure cannot be higher/i)).toBeInTheDocument()
+  })
+
+  it('rounds a too-precise number to what the column stores', async () => {
+    const row = sampleRow({ id: 'r1', dive_number: 3, site: 'Rounded' })
+    updateDiveLogMock.mockResolvedValue(row)
+    const form = await openEditForm(row)
+
+    fireEvent.change(screen.getByDisplayValue('18.5'), { target: { value: '18.549' } })
+    fireEvent.submit(form)
+
+    await waitFor(() => expect(updateDiveLogMock).toHaveBeenCalledOnce())
+    expect(updateDiveLogMock.mock.calls[0][1]).toMatchObject({ max_depth_m: 18.5 })
+  })
+})
+
+describe('DiveLogsPage buddy and instructor', () => {
+  it('shows both names on the list row when the dive has them', async () => {
+    fetchDiveLogsMock.mockResolvedValue([
+      sampleRow({ id: 'a', dive_number: 4, site: 'Batcave', buddy_name: 'Alice', instructor_name: 'Bob' }),
+    ])
+    renderPage()
+    const item = await screen.findByRole('button', { name: /edit dive 4/i })
+    expect(within(item).getByText(/Alice/)).toBeInTheDocument()
+    expect(within(item).getByText(/Bob/)).toBeInTheDocument()
+  })
+
+  it('omits each name when the dive does not have it', async () => {
+    fetchDiveLogsMock.mockResolvedValue([
+      sampleRow({ id: 'a', dive_number: 4, site: 'Solo', buddy_name: null, instructor_name: null }),
+    ])
+    renderPage()
+    const item = await screen.findByRole('button', { name: /edit dive 4/i })
+    expect(within(item).queryByText(/w\//)).not.toBeInTheDocument()
+    expect(within(item).queryByText(/instr\./)).not.toBeInTheDocument()
+  })
+
+  it('round-trips both names through the edit form', async () => {
+    const row = sampleRow({ id: 'r1', dive_number: 5, site: 'Names', buddy_name: null, instructor_name: null })
+    fetchDiveLogsMock.mockResolvedValue([row])
+    updateDiveLogMock.mockResolvedValue(row)
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: /edit dive 5/i }))
+
+    const form = screen.getByDisplayValue('Names').closest('form') as HTMLFormElement
+    fireEvent.change(within(form).getByLabelText(/^buddy$/i), { target: { value: 'Alice' } })
+    fireEvent.change(within(form).getByLabelText(/^instructor$/i), { target: { value: 'Bob' } })
+    fireEvent.submit(form)
+
+    await waitFor(() => expect(updateDiveLogMock).toHaveBeenCalledOnce())
+    expect(updateDiveLogMock.mock.calls[0][1]).toMatchObject({
+      buddy_name: 'Alice', instructor_name: 'Bob',
+    })
+  })
+})
+
+describe('DiveLogsPage mobile layout', () => {
+  it('spans wide rows across the explicit grid, never a hardcoded 2 columns', async () => {
+    // The form grid is one column on mobile. `col-span-2` there makes CSS Grid
+    // create an implicit second track, which collapses the real `minmax(0,1fr)`
+    // column to near zero — and with `overflow-wrap: break-word` on body, every
+    // caption then renders one letter per line. `col-span-full` spans only the
+    // explicit grid, so it stays one column until the sm breakpoint.
+    fetchDiveLogsMock.mockResolvedValue([])
+    renderPage()
+    await waitFor(() => expect(fetchDiveLogsMock).toHaveBeenCalled())
+    fireEvent.click(screen.getByRole('button', { name: /\+ add/i }))
+
+    const form = screen.getByRole('button', { name: /save dive/i }).closest('form')!
+    expect(form.querySelectorAll('[class*="col-span-2"]')).toHaveLength(0)
+    expect(form.querySelectorAll('[class*="col-span-full"]').length).toBeGreaterThan(0)
+  })
+})

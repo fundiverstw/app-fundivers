@@ -639,6 +639,7 @@ export const zhTW: Messages = {
     maxDepthShort: (m: number) => `最深 ${m} 公尺`,
     diveTimeShort: (min: number) => `${min} 分鐘`,
     buddyShort: (name: string) => `與 ${name}`,
+    instructorShort: (name: string) => `教練 ${name}`,
     diveNumber: (n: number) => `第 ${n} 次潛水`,
     newDive: '新增潛水',
     backToList: '‹ 返回列表',
@@ -666,6 +667,15 @@ export const zhTW: Messages = {
     saveDive: '儲存潛水記錄',
     delete: '刪除',
     requiredAria: '必填',
+    errors: {
+      siteRequired: '請填寫潛點。',
+      notANumber: '請輸入數字。',
+      outOfRange: (min: number, max: number) => `必須介於 ${min} 至 ${max} 之間。`,
+      wholeNumber: '請輸入整數。',
+      tooLong: (max: number) => `請勿超過 ${max} 個字元。`,
+      endAboveStart: '結束殘壓不得高於起始殘壓。',
+      fixFields: '部分欄位超出範圍，請檢查標示的欄位。',
+    },
   },
   duties: {
     title: '我的勤務',

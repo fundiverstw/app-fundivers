@@ -638,6 +638,7 @@ export const ja: Messages = {
     maxDepthShort: (m: number) => `最大 ${m} m`,
     diveTimeShort: (min: number) => `${min} 分`,
     buddyShort: (name: string) => `バディ：${name}`,
+    instructorShort: (name: string) => `インストラクター：${name}`,
     diveNumber: (n: number) => `${n} 本目のダイビング`,
     newDive: '新しいダイビング',
     backToList: '‹ 一覧に戻る',
@@ -665,6 +666,15 @@ export const ja: Messages = {
     saveDive: 'ログを保存',
     delete: '削除',
     requiredAria: '必須',
+    errors: {
+      siteRequired: 'ダイブサイトを入力してください。',
+      notANumber: '数値を入力してください。',
+      outOfRange: (min: number, max: number) => `${min} から ${max} の範囲で入力してください。`,
+      wholeNumber: '整数で入力してください。',
+      tooLong: (max: number) => `${max} 文字以内で入力してください。`,
+      endAboveStart: '終了残圧は開始残圧を超えられません。',
+      fixFields: '範囲外の項目があります。ハイライトされた欄を確認してください。',
+    },
   },
   duties: {
     title: '担当業務',

@@ -8,11 +8,15 @@ import {
   getLastExportRequestAt, nextExportAvailableAt, requestExport,
 } from '../lib/dive-logs'
 import { GEAR_ITEMS } from '../lib/gear'
+import {
+  DIVE_LOG_BOUNDS, DIVE_LOG_TEXT_MAX, validateDiveLog, roundDiveLogNumbers, hasErrors,
+  type NumericField, type DiveLogErrors,
+} from '../lib/dive-log-validation'
 import { DateField } from '../components/DateField'
 import { DIVE_TYPES, GAS_MIXES, type DiveLog, type DiveLogInsert, type DiveType, type GasMix } from '../types/database'
 import {
   CARD, CARD_ELEVATED, BTN_PRIMARY, BTN_GHOST, BTN_DANGER, BTN_LIGHT,
-  TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, INPUT, INPUT_LABEL, PAGE_BODY,
+  TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR, INPUT, INPUT_LABEL, PAGE_BODY,
   BTN_XS_GHOST,
 } from '../styles/tokens'
 import { t } from '../i18n'
@@ -232,6 +236,7 @@ export function DiveLogsPage() {
                 {r.water_temp_c != null && <span>{r.water_temp_c}°C</span>}
                 {r.gas_mix && <span>{r.gas_mix}</span>}
                 {r.buddy_name && <span>{dl.buddyShort(r.buddy_name)}</span>}
+                {r.instructor_name && <span>{dl.instructorShort(r.instructor_name)}</span>}
               </div>
             </button>
           </li>
@@ -293,18 +298,33 @@ function DiveLogForm({
 }) {
   const [form, setForm] = useState<FormState>(initial)
   const [saving, setSaving] = useState(false)
+  const [errors, setErrors] = useState<DiveLogErrors>({})
+
+  // Editing a field retracts its complaint immediately rather than making the
+  // diver re-submit to find out whether the new value is any better.
+  function clearError(k: keyof FormState) {
+    setErrors(prev => {
+      if (!(k in prev)) return prev
+      const next = { ...prev }
+      delete next[k as keyof DiveLogErrors]
+      return next
+    })
+  }
 
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
     setForm(prev => ({ ...prev, [k]: v }))
+    clearError(k)
   }
 
   function setNum(k: keyof FormState, raw: string) {
+    clearError(k)
     if (raw === '') return setForm(prev => ({ ...prev, [k]: null } as FormState))
     const n = Number(raw)
     if (Number.isFinite(n)) setForm(prev => ({ ...prev, [k]: n } as FormState))
   }
 
   function setText(k: keyof FormState, raw: string) {
+    clearError(k)
     setForm(prev => ({ ...prev, [k]: raw === '' ? null : raw } as FormState))
   }
 
@@ -319,9 +339,21 @@ function DiveLogForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.site || !form.dived_on) return
+    if (!form.dived_on) return
+    // Round before validating so the numbers we check are the ones the
+    // columns will actually hold, then save the rounded copy for the same
+    // reason. Native min/max already covers the common case; this catches
+    // whatever gets past it and turns a driver-level overflow into a message
+    // pointing at the offending box.
+    const rounded = roundDiveLogNumbers(form)
+    const found = validateDiveLog(rounded)
+    if (hasErrors(found)) {
+      setErrors(found)
+      return
+    }
+    setErrors({})
     setSaving(true)
-    try { await onSave(form) } finally { setSaving(false) }
+    try { await onSave(rounded) } finally { setSaving(false) }
   }
 
   return (
@@ -340,9 +372,10 @@ function DiveLogForm({
           <DateField required className={INPUT} value={form.dived_on}
             onChange={v => set('dived_on', v)} />
         </Field>
-        <Field label={dl.site} required>
-          <input type="text" required maxLength={120} className={INPUT} value={form.site}
-            onChange={e => set('site', e.target.value)} />
+        <Field label={dl.site} required error={errors.site}>
+          <input type="text" required maxLength={DIVE_LOG_TEXT_MAX.site} className={INPUT}
+            aria-invalid={errors.site ? true : undefined}
+            value={form.site} onChange={e => set('site', e.target.value)} />
         </Field>
 
         <Field label={dl.type}>
@@ -360,66 +393,49 @@ function DiveLogForm({
           </select>
         </Field>
 
-        <Field label={dl.maxDepth}>
-          <input type="number" step="0.1" min="0" max="200" className={INPUT}
-            value={form.max_depth_m ?? ''} onChange={e => setNum('max_depth_m', e.target.value)} />
+        <NumberField field="max_depth_m" label={dl.maxDepth} value={form.max_depth_m}
+          error={errors.max_depth_m} onChange={setNum} />
+        <NumberField field="dive_time_min" label={dl.diveTime} value={form.dive_time_min}
+          error={errors.dive_time_min} onChange={setNum} />
+
+        <NumberField field="visibility_m" label={dl.visibility} value={form.visibility_m}
+          error={errors.visibility_m} onChange={setNum} />
+        <NumberField field="water_temp_c" label={dl.waterTemp} value={form.water_temp_c}
+          error={errors.water_temp_c} onChange={setNum} />
+
+        <NumberField field="air_temp_c" label={dl.airTemp} value={form.air_temp_c}
+          error={errors.air_temp_c} onChange={setNum} />
+        <NumberField field="wave_height_m" label={dl.waveHeight} value={form.wave_height_m}
+          error={errors.wave_height_m} onChange={setNum} />
+
+        <Field label={dl.weather} error={errors.weather}>
+          <input type="text" maxLength={DIVE_LOG_TEXT_MAX.weather} className={INPUT}
+            aria-invalid={errors.weather ? true : undefined}
+            value={form.weather ?? ''} onChange={e => setText('weather', e.target.value)} />
         </Field>
-        <Field label={dl.diveTime}>
-          <input type="number" min="0" max="480" className={INPUT}
-            value={form.dive_time_min ?? ''} onChange={e => setNum('dive_time_min', e.target.value)} />
+        <NumberField field="weight_kg" label={dl.weight} value={form.weight_kg}
+          error={errors.weight_kg} onChange={setNum} />
+
+        <NumberField field="tank_size_l" label={dl.tankSize} value={form.tank_size_l}
+          error={errors.tank_size_l} onChange={setNum} />
+        <NumberField field="start_pressure_bar" label={dl.startPressure} value={form.start_pressure_bar}
+          error={errors.start_pressure_bar} onChange={setNum} />
+
+        <NumberField field="end_pressure_bar" label={dl.endPressure} value={form.end_pressure_bar}
+          error={errors.end_pressure_bar} onChange={setNum} />
+        <Field label={dl.buddy} error={errors.buddy_name}>
+          <input type="text" maxLength={DIVE_LOG_TEXT_MAX.buddy_name} className={INPUT}
+            aria-invalid={errors.buddy_name ? true : undefined}
+            value={form.buddy_name ?? ''} onChange={e => setText('buddy_name', e.target.value)} />
         </Field>
 
-        <Field label={dl.visibility}>
-          <input type="number" step="0.1" min="0" className={INPUT}
-            value={form.visibility_m ?? ''} onChange={e => setNum('visibility_m', e.target.value)} />
+        <Field label={dl.instructor} error={errors.instructor_name}>
+          <input type="text" maxLength={DIVE_LOG_TEXT_MAX.instructor_name} className={INPUT}
+            aria-invalid={errors.instructor_name ? true : undefined}
+            value={form.instructor_name ?? ''} onChange={e => setText('instructor_name', e.target.value)} />
         </Field>
-        <Field label={dl.waterTemp}>
-          <input type="number" step="0.1" className={INPUT}
-            value={form.water_temp_c ?? ''} onChange={e => setNum('water_temp_c', e.target.value)} />
-        </Field>
-
-        <Field label={dl.airTemp}>
-          <input type="number" step="0.1" className={INPUT}
-            value={form.air_temp_c ?? ''} onChange={e => setNum('air_temp_c', e.target.value)} />
-        </Field>
-        <Field label={dl.waveHeight}>
-          <input type="number" step="0.1" min="0" className={INPUT}
-            value={form.wave_height_m ?? ''} onChange={e => setNum('wave_height_m', e.target.value)} />
-        </Field>
-
-        <Field label={dl.weather}>
-          <input type="text" className={INPUT} value={form.weather ?? ''}
-            onChange={e => setText('weather', e.target.value)} />
-        </Field>
-        <Field label={dl.weight}>
-          <input type="number" step="0.1" min="0" className={INPUT}
-            value={form.weight_kg ?? ''} onChange={e => setNum('weight_kg', e.target.value)} />
-        </Field>
-
-        <Field label={dl.tankSize}>
-          <input type="number" step="0.1" min="0" className={INPUT}
-            value={form.tank_size_l ?? ''} onChange={e => setNum('tank_size_l', e.target.value)} />
-        </Field>
-        <Field label={dl.startPressure}>
-          <input type="number" min="0" max="350" className={INPUT}
-            value={form.start_pressure_bar ?? ''} onChange={e => setNum('start_pressure_bar', e.target.value)} />
-        </Field>
-
-        <Field label={dl.endPressure}>
-          <input type="number" min="0" max="350" className={INPUT}
-            value={form.end_pressure_bar ?? ''} onChange={e => setNum('end_pressure_bar', e.target.value)} />
-        </Field>
-        <Field label={dl.buddy}>
-          <input type="text" className={INPUT} value={form.buddy_name ?? ''}
-            onChange={e => setText('buddy_name', e.target.value)} />
-        </Field>
-
-        <Field label={dl.instructor}>
-          <input type="text" className={INPUT} value={form.instructor_name ?? ''}
-            onChange={e => setText('instructor_name', e.target.value)} />
-        </Field>
-        <Field label={dl.gearUsed}>
-          <div className="flex flex-wrap gap-1.5 col-span-2">
+        <Field label={dl.gearUsed} wide group>
+          <div className="flex flex-wrap gap-1.5">
             {GEAR_ITEMS.map(g => {
               const on = form.gear_used?.includes(g) ?? false
               return (
@@ -445,6 +461,10 @@ function DiveLogForm({
         </Field>
       </div>
 
+      {hasErrors(errors) && (
+        <p role="alert" className={`text-sm ${TEXT_ERROR}`}>{dl.errors.fixFields}</p>
+      )}
+
       <div className="flex gap-2">
         <button type="submit" disabled={saving} className={`flex-1 ${BTN_PRIMARY}`}>
           {saving ? dl.saving : (editingNumber ? dl.saveChanges : dl.saveDive)}
@@ -459,19 +479,74 @@ function DiveLogForm({
   )
 }
 
-function Field({ label, required, wide, children }: {
+// Every numeric box in the logbook, driven off the shared bounds table so the
+// spinner range the diver sees and the range the validator enforces cannot
+// drift apart.
+function NumberField({ field, label, value, error, onChange }: {
+  field: NumericField
+  label: string
+  value: number | null | undefined
+  error?: string
+  onChange: (field: NumericField, raw: string) => void
+}) {
+  const { min, max, decimals } = DIVE_LOG_BOUNDS[field]
+  return (
+    <Field label={label} error={error}>
+      <input
+        type="number"
+        className={INPUT}
+        min={min}
+        max={max}
+        step={decimals === 0 ? 1 : 0.1}
+        aria-invalid={error ? true : undefined}
+        value={value ?? ''}
+        onChange={e => onChange(field, e.target.value)}
+      />
+    </Field>
+  )
+}
+
+/**
+ * One labelled control in the logbook grid.
+ *
+ * The control is nested inside the `<label>` so it picks up the caption as its
+ * accessible name without either side having to invent an id. `group` opts out
+ * for the gear picker, whose children are a row of toggles rather than a
+ * single control — a `<label>` wrapping several buttons names none of them.
+ *
+ * `col-span-full` rather than `col-span-2` for the wide row: the grid is one
+ * column on mobile, and asking for two there makes CSS Grid conjure an
+ * implicit second track, which collapses the real column and shreds every
+ * caption down to one letter per line.
+ */
+function Field({ label, required, wide, group, error, children }: {
   label: string
   required?: boolean
   wide?: boolean
+  group?: boolean
+  error?: string
   children: React.ReactNode
 }) {
+  const caption = (
+    <span className={INPUT_LABEL}>
+      {label}
+      {required && <span className="text-red-600 ml-0.5" aria-label={dl.requiredAria}>*</span>}
+    </span>
+  )
   return (
-    <div className={wide ? 'col-span-2' : undefined}>
-      <label className={INPUT_LABEL}>
-        {label}
-        {required && <span className="text-red-600 ml-0.5" aria-label={dl.requiredAria}>*</span>}
-      </label>
-      {children}
+    <div className={wide ? 'col-span-full min-w-0' : 'min-w-0'}>
+      {group ? (
+        <div role="group" aria-label={label}>
+          {caption}
+          {children}
+        </div>
+      ) : (
+        <label className="block">
+          {caption}
+          {children}
+        </label>
+      )}
+      {error && <p role="alert" className={`mt-1 text-xs ${TEXT_ERROR}`}>{error}</p>}
     </div>
   )
 }

@@ -647,6 +647,7 @@ export const en = {
     maxDepthShort: (m: number) => `${m} m max`,
     diveTimeShort: (min: number) => `${min} min`,
     buddyShort: (name: string) => `w/ ${name}`,
+    instructorShort: (name: string) => `instr. ${name}`,
     diveNumber: (n: number) => `Dive #${n}`,
     newDive: 'New dive',
     backToList: '‹ back to list',
@@ -674,6 +675,15 @@ export const en = {
     saveDive: 'Save dive',
     delete: 'Delete',
     requiredAria: 'required',
+    errors: {
+      siteRequired: 'Site is required.',
+      notANumber: 'Enter a number.',
+      outOfRange: (min: number, max: number) => `Must be between ${min} and ${max}.`,
+      wholeNumber: 'Must be a whole number.',
+      tooLong: (max: number) => `Keep this under ${max} characters.`,
+      endAboveStart: 'End pressure cannot be higher than start pressure.',
+      fixFields: 'Some entries are out of range — check the highlighted fields.',
+    },
   },
   duties: {
     title: 'My duties',
