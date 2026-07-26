@@ -230,16 +230,14 @@ describe('requestExport', () => {
     await expect(requestExport()).rejects.toThrow('boom')
   })
 
-  // Surprise: when context.json() rejects with an Error, the catch re-throws
-  // that Error (it is `instanceof Error`) rather than falling through to the
-  // transport message. So the parse-failure surfaces as the json() error, not
-  // error.message.
-  it('re-throws a json() Error instead of falling back to the transport message', async () => {
+  // A gateway 502 puts HTML in the body, so json() rejects with a SyntaxError.
+  // The diver needs the transport message, not "Unexpected token '<'".
+  it('falls back to the transport message when context.json rejects with an Error', async () => {
     invoke.mockResolvedValue({
       data: null,
       error: { message: 'bad gateway', context: { json: async () => { throw new Error('not json') } } },
     })
-    await expect(requestExport()).rejects.toThrow('not json')
+    await expect(requestExport()).rejects.toThrow('bad gateway')
   })
 
   it('falls back to the transport message when context.json rejects with a non-Error', async () => {

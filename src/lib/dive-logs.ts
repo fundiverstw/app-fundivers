@@ -70,20 +70,25 @@ export async function requestExport(): Promise<{ ok: boolean; dive_count: number
     'request-dive-log-export',
     { body: {} },
   )
-  if (error) {
-    // supabase-js wraps non-2xx as FunctionsHttpError; the body lives in
-    // .context. Pull it out so callers can branch on rate-limited vs other
-    // errors and surface the right copy.
-    const ctx = (error as { context?: unknown }).context
-    if (ctx && typeof (ctx as Response).json === 'function') {
-      try {
-        const body = await (ctx as Response).json() as { error?: string; retry_after_seconds?: number }
-        if (body?.error) throw new Error(body.error)
-      } catch (e) {
-        if (e instanceof Error) throw e
-      }
-    }
-    throw new Error(error.message)
-  }
+  if (error) throw new Error(await functionErrorMessage(error))
   return data!
+}
+
+/**
+ * The message the function actually sent, or supabase-js's generic one.
+ *
+ * supabase-js wraps a non-2xx as FunctionsHttpError with the response tucked
+ * into `.context`, so callers can branch on 'rate-limited' vs anything else.
+ * A gateway 502 puts HTML there instead of JSON — parsing it must fall back to
+ * the wrapper's message, not surface a `SyntaxError` about an unexpected '<'.
+ */
+async function functionErrorMessage(error: Error): Promise<string> {
+  const ctx = (error as { context?: unknown }).context
+  if (!ctx || typeof (ctx as Response).json !== 'function') return error.message
+  try {
+    const body = await (ctx as Response).json() as { error?: string }
+    return body?.error || error.message
+  } catch {
+    return error.message
+  }
 }
