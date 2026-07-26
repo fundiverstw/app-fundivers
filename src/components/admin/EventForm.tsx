@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
 import { fetchEventRelations } from '../../lib/event-relations'
 import { siteConfig } from '../../config/site'
-import type { CancellationPolicy, CertLevel, TripTemplateEntry, EOAddon, EventRow, EOPrice, EORoom, TravelDestination, EventKind } from '../../types/database'
+import type { CancellationPolicy, CertLevel, TripTemplateEntry, EOAddon, EventRow, EOPrice, EORoom, TravelDestination } from '../../types/database'
 import {
   EMPTY_FORM,
   formStateFromEvent,
@@ -24,15 +24,11 @@ import { t } from '../../i18n'
 // AdminEditEventPage) is responsible for the actual DB write + post-
 // submit navigation; the form just hands back the validated FormState.
 
-// The picker drives both the type pill and the row → form mapping from a
-// single selection; the events row carries its own `kind`.
 // The subset of an event the preload picker needs to label a row. Selecting
 // these instead of `*` keeps the create form from downloading every column of
 // every past event just to populate a dropdown.
 const PRELOAD_COLS = 'id, kind, admin_title, display_title, start_date, course_days'
 type PreloadRow = Pick<EventRow, 'id' | 'kind' | 'admin_title' | 'display_title' | 'start_date' | 'course_days'>
-
-type PastEvent = PastEventOption & { kind: EventKind }
 
 const ef = t.admin.eventForm
 const cat = t.admin.catalog
@@ -103,7 +99,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Past events for the preload picker, sorted most-recent-first.
-  const [pastEvents, setPastEvents] = useState<PastEvent[]>([])
+  const [pastEvents, setPastEvents] = useState<PastEventOption[]>([])
   const [preloadId, setPreloadId] = useState<string>('')
   // Inline-create sub-forms — all collapsed by default. Each can be opened
   // independently so admins can spin up new lookup rows without leaving
@@ -180,7 +176,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
       // occurrence made the picker unusable and told the admin nothing the
       // newest one doesn't.
       const pastEnvelope = newestPerGroup(
-        dataOf<PreloadRow>(3).map<PastEvent>(d => ({
+        dataOf<PreloadRow>(3).map<PastEventOption>(d => ({
           kind: d.kind,
           id: d.id,
           startDate: d.start_date ?? '',
@@ -190,7 +186,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
       )
       const pastCourses = newestPerGroup(
         dataOf<PreloadRow>(4)
-          .map<PastEvent>(c => ({
+          .map<PastEventOption>(c => ({
             kind: c.kind,
             id: c.id,
             startDate: [...(c.course_days ?? [])].filter(Boolean).sort()[0] ?? '',
@@ -224,7 +220,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
 
   const filteredPastEvents = pastEvents.filter(p => p.kind === form.type)
 
-  async function applyPreload(p: PastEvent) {
+  async function applyPreload(p: PastEventOption) {
     // The picker carries only enough to label a row, so pull the full event
     // here. Rooms/add-ons/destinations live in the junction tables, so fetch
     // those too to clone the whole config.
