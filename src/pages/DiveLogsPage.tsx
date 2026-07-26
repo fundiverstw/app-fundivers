@@ -455,9 +455,10 @@ function DiveLogForm({
           </div>
         </Field>
 
-        <Field label={dl.notes} wide>
-          <textarea rows={3} className={INPUT} value={form.notes ?? ''}
-            onChange={e => setText('notes', e.target.value)} />
+        <Field label={dl.notes} wide error={errors.notes}>
+          <textarea rows={3} maxLength={DIVE_LOG_TEXT_MAX.notes} className={INPUT}
+            aria-invalid={errors.notes ? true : undefined}
+            value={form.notes ?? ''} onChange={e => setText('notes', e.target.value)} />
         </Field>
       </div>
 

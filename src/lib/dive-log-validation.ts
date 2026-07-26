@@ -35,21 +35,23 @@ export interface NumericBound {
   max: number
   /** Decimal places the column keeps. 0 means the column is an integer. */
   decimals: number
-  /** The column this maps to, as a reminder of the hard ceiling behind it. */
-  column: string
 }
 
+// The columns behind these, for anyone widening a bound: max_depth_m and
+// visibility_m are numeric(4,1); water_temp_c, air_temp_c, wave_height_m,
+// weight_kg and tank_size_l are numeric(3,1), so 100 does not fit. dive_time_min
+// is CHECK 0-480 and both pressures are CHECK 0-350.
 export const DIVE_LOG_BOUNDS: Record<NumericField, NumericBound> = {
-  max_depth_m:        { min: 0,   max: 200, decimals: 1, column: 'numeric(4,1), CHECK 0-200' },
-  dive_time_min:      { min: 0,   max: 480, decimals: 0, column: 'integer, CHECK 0-480' },
-  visibility_m:       { min: 0,   max: 100, decimals: 1, column: 'numeric(4,1)' },
-  water_temp_c:       { min: -2,  max: 40,  decimals: 1, column: 'numeric(3,1)' },
-  air_temp_c:         { min: -50, max: 60,  decimals: 1, column: 'numeric(3,1)' },
-  wave_height_m:      { min: 0,   max: 20,  decimals: 1, column: 'numeric(3,1)' },
-  weight_kg:          { min: 0,   max: 50,  decimals: 1, column: 'numeric(3,1)' },
-  tank_size_l:        { min: 0,   max: 30,  decimals: 1, column: 'numeric(3,1)' },
-  start_pressure_bar: { min: 0,   max: 350, decimals: 0, column: 'integer, CHECK 0-350' },
-  end_pressure_bar:   { min: 0,   max: 350, decimals: 0, column: 'integer, CHECK 0-350' },
+  max_depth_m:        { min: 0,   max: 200, decimals: 1 },
+  dive_time_min:      { min: 0,   max: 480, decimals: 0 },
+  visibility_m:       { min: 0,   max: 100, decimals: 1 },
+  water_temp_c:       { min: -2,  max: 40,  decimals: 1 },
+  air_temp_c:         { min: -50, max: 60,  decimals: 1 },
+  wave_height_m:      { min: 0,   max: 20,  decimals: 1 },
+  weight_kg:          { min: 0,   max: 50,  decimals: 1 },
+  tank_size_l:        { min: 0,   max: 30,  decimals: 1 },
+  start_pressure_bar: { min: 0,   max: 350, decimals: 0 },
+  end_pressure_bar:   { min: 0,   max: 350, decimals: 0 },
 }
 
 export const NUMERIC_FIELDS = Object.keys(DIVE_LOG_BOUNDS) as NumericField[]
