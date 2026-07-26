@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest'
-import { isoDate } from './dates'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { isoDate, todayIso, parseIsoDate, addIsoDays } from './dates'
+import { siteConfig } from '../config/site'
+
+afterEach(() => { vi.useRealTimers() })
 
 describe('isoDate', () => {
   it('returns YYYY-MM-DD for a known UTC instant', () => {
@@ -26,5 +29,60 @@ describe('isoDate', () => {
   it('handles month and year boundaries', () => {
     expect(isoDate(new Date('2027-01-01T00:00:00.000Z'))).toBe('2027-01-01')
     expect(isoDate(new Date('2026-12-31T23:59:59.999Z'))).toBe('2026-12-31')
+  })
+})
+
+describe('todayIso', () => {
+  it("returns the shop's calendar date, not UTC's", () => {
+    // 02:00 in Taipei on the 26th is still the 25th in UTC. Slicing
+    // toISOString() here pre-filled the dive-log form with yesterday for the
+    // first eight hours of every day.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-25T18:00:00Z'))
+    expect(isoDate(new Date())).toBe('2026-07-25')
+    if (siteConfig.locale.timezone === 'Asia/Taipei') {
+      expect(todayIso()).toBe('2026-07-26')
+    }
+  })
+
+  it('is a well-formed YYYY-MM-DD whatever the configured timezone', () => {
+    expect(todayIso()).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+})
+
+describe('parseIsoDate', () => {
+  it('lands on local midnight of the stored day', () => {
+    const d = parseIsoDate('2026-04-30')
+    expect(d.getFullYear()).toBe(2026)
+    expect(d.getMonth()).toBe(3)
+    expect(d.getDate()).toBe(30)
+    expect(d.getHours()).toBe(0)
+  })
+
+  it('does not drift the way new Date() on a date-only string does', () => {
+    // new Date('2026-04-30') is UTC midnight, which reads as the 29th anywhere
+    // west of Greenwich. The stored calendar date must survive the round trip.
+    for (const iso of ['2026-01-01', '2026-04-30', '2026-12-31']) {
+      const d = parseIsoDate(iso)
+      const back = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      expect(back).toBe(iso)
+    }
+  })
+})
+
+describe('addIsoDays', () => {
+  it('adds and subtracts whole days', () => {
+    expect(addIsoDays('2026-04-30', 1)).toBe('2026-05-01')
+    expect(addIsoDays('2026-05-01', -1)).toBe('2026-04-30')
+    expect(addIsoDays('2026-04-30', 0)).toBe('2026-04-30')
+  })
+
+  it('crosses a year boundary', () => {
+    expect(addIsoDays('2026-12-31', 1)).toBe('2027-01-01')
+  })
+
+  it('handles a leap day', () => {
+    expect(addIsoDays('2028-02-28', 1)).toBe('2028-02-29')
+    expect(addIsoDays('2028-02-29', 1)).toBe('2028-03-01')
   })
 })
