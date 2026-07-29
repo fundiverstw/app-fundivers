@@ -86,7 +86,7 @@ function fillRequired(site = 'Test Site') {
   fireEvent.change(screen.getByLabelText(/site/i), { target: { value: site } })
   fireEvent.change(screen.getByLabelText(/max depth/i), { target: { value: '18' } })
   fireEvent.change(screen.getByLabelText(/dive time/i), { target: { value: '42' } })
-  fireEvent.change(screen.getByLabelText(/^buddy/i), { target: { value: 'Alice' } })
+  fireEvent.change(screen.getByLabelText(/^buddy \/ instructor/i), { target: { value: 'Alice' } })
 }
 
 function addOptionalField(label: string | RegExp) {
@@ -439,7 +439,7 @@ describe('DiveLogsPage buddy and instructor', () => {
     expect(within(item).queryByText(/instr\./)).not.toBeInTheDocument()
   })
 
-  it('round-trips both names through the edit form', async () => {
+  it('files the one name under the role the toggle is on', async () => {
     const row = sampleRow({ id: 'r1', dive_number: 5, site: 'Names', buddy_name: null, instructor_name: null })
     fetchDiveLogsMock.mockResolvedValue([row])
     updateDiveLogMock.mockResolvedValue(row)
@@ -447,14 +447,47 @@ describe('DiveLogsPage buddy and instructor', () => {
     fireEvent.click(await screen.findByRole('button', { name: /edit dive 5/i }))
 
     const form = screen.getByDisplayValue('Names').closest('form') as HTMLFormElement
-    fireEvent.change(within(form).getByLabelText(/^buddy/i), { target: { value: 'Alice' } })
-    fireEvent.change(within(form).getByLabelText(/^instructor/i), { target: { value: 'Bob' } })
+    fireEvent.change(within(form).getByLabelText(/^buddy \/ instructor/i), { target: { value: 'Alice' } })
     fireEvent.submit(form)
 
     await waitFor(() => expect(updateDiveLogMock).toHaveBeenCalledOnce())
     expect(updateDiveLogMock.mock.calls[0][1]).toMatchObject({
-      buddy_name: 'Alice', instructor_name: 'Bob',
+      buddy_name: 'Alice', instructor_name: null,
     })
+  })
+
+  it('moves the name across when the role is switched, leaving nothing behind', async () => {
+    const row = sampleRow({ id: 'r1', dive_number: 5, site: 'Switch', buddy_name: null, instructor_name: null })
+    fetchDiveLogsMock.mockResolvedValue([row])
+    updateDiveLogMock.mockResolvedValue(row)
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: /edit dive 5/i }))
+
+    const form = screen.getByDisplayValue('Switch').closest('form') as HTMLFormElement
+    const roles = within(form).getByRole('group', { name: /buddy or instructor/i })
+    fireEvent.change(within(form).getByLabelText(/^buddy \/ instructor/i), { target: { value: 'Bob' } })
+    fireEvent.click(within(roles).getByRole('button', { name: /^instructor$/i }))
+
+    // The box keeps the name; only which column it lands in changed.
+    expect(within(form).getByLabelText(/^buddy \/ instructor/i)).toHaveValue('Bob')
+    fireEvent.submit(form)
+
+    await waitFor(() => expect(updateDiveLogMock).toHaveBeenCalledOnce())
+    expect(updateDiveLogMock.mock.calls[0][1]).toMatchObject({
+      buddy_name: null, instructor_name: 'Bob',
+    })
+  })
+
+  it('opens on the instructor role when that is what the dive was logged with', async () => {
+    const row = sampleRow({ id: 'r1', dive_number: 5, site: 'Taught', buddy_name: null, instructor_name: 'Bob' })
+    fetchDiveLogsMock.mockResolvedValue([row])
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: /edit dive 5/i }))
+
+    const form = screen.getByDisplayValue('Taught').closest('form') as HTMLFormElement
+    expect(within(form).getByLabelText(/^buddy \/ instructor/i)).toHaveValue('Bob')
+    const roles = within(form).getByRole('group', { name: /buddy or instructor/i })
+    expect(within(roles).getByRole('button', { name: /^instructor$/i })).toHaveAttribute('aria-pressed', 'true')
   })
 })
 
@@ -474,7 +507,7 @@ describe('DiveLogsPage required fields', () => {
     expect(createDiveLogMock).not.toHaveBeenCalled()
     expect(await screen.findByText(/enter your max depth/i)).toBeInTheDocument()
     expect(screen.getByText(/enter how long the dive was/i)).toBeInTheDocument()
-    expect(screen.getByText(/add a buddy or an instructor/i)).toBeInTheDocument()
+    expect(screen.getByText(/enter who you dived with/i)).toBeInTheDocument()
   })
 
   it('takes an instructor in place of a buddy', async () => {
@@ -483,7 +516,8 @@ describe('DiveLogsPage required fields', () => {
     fireEvent.change(screen.getByLabelText(/site/i), { target: { value: 'Somewhere' } })
     fireEvent.change(screen.getByLabelText(/max depth/i), { target: { value: '18' } })
     fireEvent.change(screen.getByLabelText(/dive time/i), { target: { value: '42' } })
-    fireEvent.change(screen.getByLabelText(/^instructor/i), { target: { value: 'Bob' } })
+    fireEvent.click(within(form).getByRole('button', { name: /^instructor$/i }))
+    fireEvent.change(screen.getByLabelText(/^buddy \/ instructor/i), { target: { value: 'Bob' } })
     fireEvent.submit(form)
 
     await waitFor(() => expect(createDiveLogMock).toHaveBeenCalledOnce())
