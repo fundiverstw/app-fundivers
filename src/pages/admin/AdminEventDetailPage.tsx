@@ -31,7 +31,7 @@ import { missingWaivers, fetchEventWaiverOverrides, fetchSignaturesForDivers, fe
 import type { WaiverDef } from '../../config/waivers'
 import { ShareEventButton } from '../../components/ShareEventButton'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Credit, DiverNote, Payment, Profile, EventKind } from '../../types/database'
-import { BTN_SECONDARY, BTN_XS_BASE, ERROR_NOTE_LIGHT } from '../../styles/tokens'
+import { BTN_SECONDARY, BTN_XS_BASE, BTN_XS_GHOST, ERROR_NOTE_LIGHT } from '../../styles/tokens'
 import { t } from '../../i18n'
 
 const ed = t.admin.eventDetail
@@ -1345,7 +1345,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
                   <button
                     type="button"
                     onClick={e => { e.stopPropagation(); onMarkWaiversInPerson() }}
-                    className="ml-1.5 text-xs font-semibold text-sky-300 underline hover:text-sky-200"
+                    className={`${BTN_XS_GHOST} ml-1.5 whitespace-nowrap`}
                   >
                     {ed.markWaiversInPerson}
                   </button>
