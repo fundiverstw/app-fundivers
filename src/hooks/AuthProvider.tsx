@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
@@ -23,6 +23,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user,    setUser]    = useState<User    | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  // Which user's profile currently sits in `profile`. Lets onAuthStateChange
+  // tell a fresh sign-in / account switch (must gate on `loading` until the
+  // new profile arrives) apart from a token refresh for the same user (profile
+  // is already in hand — re-fetch silently, no spinner flash).
+  const loadedForRef = useRef<string | null>(null)
 
   async function fetchProfile(userId: string) {
     const { data } = await supabase
@@ -30,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .select('*')
       .eq('id', userId)
       .single()
+    loadedForRef.current = data ? userId : null
     setProfile(data)
     setLoading(false)
   }
@@ -59,8 +65,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
-      if (session?.user) fetchProfile(session.user.id)
-      else { setProfile(null); setLoading(false) }
+      if (session?.user) {
+        // Gate the app on `loading` until THIS user's profile is loaded. On a
+        // fresh sign-in (or a switch to a different user) the profile is still
+        // null, so without this the route guards evaluate profile=null and
+        // bounce an admin/active user through /calendar to /pending before the
+        // fetch lands. A token refresh for the already-loaded user keeps its
+        // profile and skips the spinner.
+        if (loadedForRef.current !== session.user.id) setLoading(true)
+        fetchProfile(session.user.id)
+      } else {
+        loadedForRef.current = null
+        setProfile(null)
+        setLoading(false)
+      }
     })
 
     return () => subscription.unsubscribe()

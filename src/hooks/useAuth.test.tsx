@@ -94,6 +94,50 @@ describe('useAuth', () => {
     await waitFor(() => expect(result.current.profile).not.toBeNull())
   })
 
+  it('re-enters loading while a freshly-signed-in user\'s profile resolves', async () => {
+    // Regression: a fresh sign-in must gate the app on `loading` until the
+    // profile lands. Otherwise route guards see profile=null with loading
+    // already false and bounce an admin/active user to /pending before the
+    // fetch completes.
+    getSession.mockResolvedValue({ data: { session: null } })
+    let resolveProfile: (v: { data: unknown }) => void = () => {}
+    profileSingle.mockImplementation(() => new Promise<{ data: unknown }>(res => { resolveProfile = res }))
+
+    const { useAuth, wrapper } = await importHook()
+    const { result } = renderHook(() => useAuth(), { wrapper })
+    await waitFor(() => expect(result.current.loading).toBe(false)) // signed out, settled
+
+    act(() => {
+      authStateListeners.forEach(cb => cb('SIGNED_IN', { user: { id: 'u2' } }))
+    })
+    // The profile fetch is still pending → the app is loading again, so guards
+    // wait instead of reading a null profile.
+    await waitFor(() => expect(result.current.loading).toBe(true))
+    expect(result.current.profile).toBe(null)
+
+    await act(async () => { resolveProfile({ data: { id: 'u2', role: 'admin', status: 'active' } }) })
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.profile).toMatchObject({ id: 'u2', role: 'admin' })
+  })
+
+  it('does not flash loading on a token refresh for the already-loaded user', async () => {
+    // TOKEN_REFRESHED fires for the same user roughly hourly; we already hold
+    // their profile, so re-fetching must stay silent (no app-wide spinner).
+    getSession.mockResolvedValue({ data: { session: { user: { id: 'u4' } } } })
+    profileSingle.mockResolvedValue({ data: { id: 'u4', role: 'diver', status: 'active' } })
+
+    const { useAuth, wrapper } = await importHook()
+    const { result } = renderHook(() => useAuth(), { wrapper })
+    await waitFor(() => expect(result.current.profile).not.toBeNull())
+    expect(result.current.loading).toBe(false)
+
+    act(() => {
+      authStateListeners.forEach(cb => cb('TOKEN_REFRESHED', { user: { id: 'u4' } }))
+    })
+    // Same user → loading stays false throughout.
+    expect(result.current.loading).toBe(false)
+  })
+
   it('clears profile on sign out event', async () => {
     getSession.mockResolvedValue({ data: { session: { user: { id: 'u3' } } } })
     profileSingle.mockResolvedValue({ data: { id: 'u3' } })
