@@ -419,13 +419,23 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // under another user's folder, and either way the target diver can
   // upload from /profile later.
   const isOnBehalfOf = !!actingOnBehalfOf
-  // A signed-in diver booking only for themselves can spend their in-store
-  // account credit on the new booking right at checkout. Guests (brand-new
-  // accounts), edits, on-behalf-of, and family-group submits are excluded —
-  // group leads use the Payments page to apply credit to the consolidated
-  // balance afterward.
-  const creditEligible = !!userId && !isGuest && !isEdit && !isOnBehalfOf
-    && additionalTargets.length === 0 && !leadPayerId
+  // The diver whose credit the PRIMARY booking can spend: the target when
+  // booking on someone's behalf (an admin, or a parent for their child),
+  // otherwise the signed-in diver themselves.
+  const primaryTargetId = actingOnBehalfOf ?? userId ?? null
+  // Account credit can be applied at checkout by any signed-in caller — the
+  // spend is self-gating. The form only offers a target's credit if it can
+  // READ that target's credit rows (RLS: a diver reads their own, a parent
+  // their child's, an admin anyone's), and apply_credit_to_booking authorises
+  // exactly the same set (migration 20260729000000). So admins and parents
+  // can apply a diver's credit here too, not just a diver for themselves.
+  // Guests (no account yet) and edits are excluded; edits settle on Payments.
+  const creditEligible = !!userId && !isGuest && !isEdit
+  // Whose credit — a name to show on the apply control when it isn't the
+  // signed-in diver's own (on-behalf / parent-for-child). Null ⇒ "my".
+  const creditOwnerName = isOnBehalfOf
+    ? (personName(profile?.name, profile?.nickname) || t.register.results.diverFallback)
+    : null
   const initialDetails = existingBooking?.details as BookingDetails | undefined
   // Registration is closed for events that have already happened — but admins
   // and staff keep full control (e.g. recording a booking after the fact) and
@@ -528,6 +538,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // apply it at checkout (default on — use credit before paying out of pocket).
   // creditApplied records what the RPC actually consumed, for the success view.
   const [availableCredit, setAvailableCredit] = useState(0)
+  // Spendable credit for each additional family pick (group submit), keyed by
+  // target id, so each diver's own credit can be applied to their own booking.
+  const [additionalCredits, setAdditionalCredits] = useState<Record<string, number>>({})
   const [useAccountCredit, setUseAccountCredit] = useState(true)
   const [creditApplied, setCreditApplied] = useState(0)
   // Default to full payment per product spec. Only meaningful when the event
@@ -763,17 +776,29 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     return () => { cancelled = true }
   }, [event.id, showRooms, showAddons, event.room_type_ids, event.addon_ids, event.cancel_policy])
 
-  // Load the diver's spendable account credit so step 4 can offer to apply it.
-  // Best-effort: a failure just hides the option (the diver can still use the
-  // Payments page later).
+  // Load spendable account credit for every diver whose booking this submit
+  // creates — the primary target plus any additional family picks — so step 4
+  // can offer to apply each diver's own credit. RLS scopes each read (self /
+  // a parent's child / admin), so a target we aren't allowed to read simply
+  // returns nothing and no option shows. Best-effort: a failure just hides it.
+  const additionalTargetKey = additionalTargets.map(t => t.id).join(',')
   useEffect(() => {
-    if (!creditEligible || !userId) return
+    if (!creditEligible) return
     let cancelled = false
-    fetchCreditsForUser(userId)
-      .then(rows => { if (!cancelled) setAvailableCredit(openCreditBalance(rows)) })
-      .catch(() => { /* no credit option shown on failure */ })
+    if (primaryTargetId) {
+      fetchCreditsForUser(primaryTargetId)
+        .then(rows => { if (!cancelled) setAvailableCredit(openCreditBalance(rows)) })
+        .catch(() => { /* no credit option shown on failure */ })
+    }
+    const ids = additionalTargetKey ? additionalTargetKey.split(',') : []
+    if (ids.length > 0) {
+      Promise.all(ids.map(async id => {
+        try { return [id, openCreditBalance(await fetchCreditsForUser(id))] as const }
+        catch { return [id, 0] as const }
+      })).then(entries => { if (!cancelled) setAdditionalCredits(Object.fromEntries(entries)) })
+    }
     return () => { cancelled = true }
-  }, [creditEligible, userId])
+  }, [creditEligible, primaryTargetId, additionalTargetKey])
 
   // Load this dive's ride-seat tally to gate the transport opt-in. Best-effort:
   // on failure rideSeats stays null and the gate fails open (option offered).
@@ -923,17 +948,39 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const groupDepositNow  = depositNow * groupCount
   const groupRemainder   = remainderLater * groupCount
 
-  // Account credit the diver applies at checkout (solo path only — the group
-  // toggle above and the credit toggle are mutually exclusive). It pays the
-  // booking down deposit-first, so it trims what's owed now and the leftover
-  // balance. When the toggle is off (or no credit) these fall back to the gross
-  // figures, so the same expressions render both cases.
-  const creditNow            = creditEligible && useAccountCredit ? availableCredit : 0
+  // Account credit applied at checkout pays the booking down deposit-first, so
+  // it trims what's owed now and the leftover balance. When the toggle is off
+  // (or no credit) these fall back to the gross figures, so the same
+  // expressions render both cases.
+  // Live "after credit" math applies only to a single booking. A group submit
+  // shows gross per-diver / group totals and applies each diver's own credit
+  // to their own booking afterward (surfaced as the per-diver list at step 4).
+  const singleBooking        = additionalTargets.length === 0
+  const creditNow            = creditEligible && useAccountCredit && singleBooking ? availableCredit : 0
   const creditDeducted       = Math.min(creditNow, total)
   const totalAfterCredit     = Math.max(0, total - creditNow)
   const fullNowAfterCredit   = Math.max(0, fullNow - creditNow)
   const depositNowAfterCredit = Math.max(0, depositNow - creditNow)
   const remainderAfterCredit = Math.max(0, remainderLater - Math.max(0, creditNow - depositNow))
+
+  // The divers whose credit this submit can apply, with amounts: the primary
+  // target (self or on-behalf) plus any additional family picks that have
+  // credit. Drives the apply control at step 4. `name` is null for the signed-in
+  // diver's own credit (rendered as "my"), a diver's name otherwise.
+  const creditTargets: Array<{ id: string; name: string | null; amount: number }> = creditEligible
+    ? [
+        ...(availableCredit > 0 && primaryTargetId
+          ? [{ id: primaryTargetId, name: creditOwnerName, amount: availableCredit }]
+          : []),
+        ...additionalTargets
+          .filter(tg => (additionalCredits[tg.id] ?? 0) > 0)
+          .map(tg => ({
+            id: tg.id,
+            name: personName(tg.name, tg.nickname) || t.register.results.diverFallback,
+            amount: additionalCredits[tg.id],
+          })),
+      ]
+    : []
 
   // Itemized breakdown of every charge that makes up `total`. Drives both the
   // on-screen summary and the snapshot written into details.charges, so what
@@ -1236,6 +1283,13 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         )
         if (e) throw new Error(await readFunctionsError(e, false))
         if (!d?.booking_id) throw new Error(t.register.errors.registrationFailedShort)
+        // Apply this diver's OWN account credit to their own booking when the
+        // opt-in is on (the caller — parent or admin — is authorised by
+        // apply_credit_to_booking). Best-effort: the booking already landed.
+        if (creditEligible && useAccountCredit && (additionalCredits[target.id] ?? 0) > 0) {
+          try { await applyCreditToBooking({ bookingId: d.booking_id, amount: additionalCredits[target.id] }) }
+          catch (err) { console.error('account credit apply failed for', target.id, err) }
+        }
         return d
       })
       const settled = await Promise.allSettled(calls)
@@ -1261,9 +1315,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       }
     }
 
-    // Spend the diver's account credit against the brand-new booking when they
-    // opted in. Best-effort: the booking already succeeded, so a credit hiccup
-    // shouldn't fail registration — the diver can still apply it from Payments.
+    // Spend the primary target's account credit against the brand-new booking
+    // when opted in — the target's own credit whether the caller is the diver,
+    // a parent booking for their child, or an admin (all authorised by
+    // apply_credit_to_booking). Best-effort: the booking already succeeded, so
+    // a credit hiccup shouldn't fail registration — it can still be applied
+    // from Payments later.
     if (creditEligible && useAccountCredit && availableCredit > 0 && data.booking_id) {
       try {
         setCreditApplied(await applyCreditToBooking({ bookingId: data.booking_id, amount: availableCredit }))
@@ -1960,21 +2017,39 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             )}
           </div>
 
-          {creditEligible && availableCredit > 0 && (
-            <label className="flex items-start gap-2 text-sm text-brand-950 font-medium bg-emerald-400/10 border border-emerald-400/40 rounded-lg p-3">
-              <input
-                type="checkbox"
-                checked={useAccountCredit}
-                onChange={e => setUseAccountCredit(e.target.checked)}
-                className="accent-brand-900 mt-1"
-              />
-              <span className="flex-1">
-                {t.register.payment.useCredit(event.currency, availableCredit.toLocaleString())}
-                <span className="block text-xs text-brand-900/80">
-                  {t.register.payment.useCreditDetail}
+          {creditTargets.length > 0 && (
+            <div className="bg-emerald-400/15 border border-emerald-400/50 rounded-lg p-3 space-y-2">
+              <label className="flex items-start gap-2 text-sm text-brand-950 font-medium">
+                <input
+                  type="checkbox"
+                  checked={useAccountCredit}
+                  onChange={e => setUseAccountCredit(e.target.checked)}
+                  className="accent-brand-900 mt-1"
+                />
+                <span className="flex-1">
+                  <span className="block font-semibold text-brand-900">
+                    {creditTargets.length === 1
+                      ? (creditTargets[0].name
+                          ? t.register.payment.useCreditFor(creditTargets[0].name, event.currency, creditTargets[0].amount.toLocaleString())
+                          : t.register.payment.useCredit(event.currency, creditTargets[0].amount.toLocaleString()))
+                      : t.register.payment.useCreditGroup}
+                  </span>
+                  <span className="block text-xs text-brand-900/80">
+                    {t.register.payment.useCreditDetail}
+                  </span>
                 </span>
-              </span>
-            </label>
+              </label>
+              {creditTargets.length > 1 && useAccountCredit && (
+                <ul className="text-xs text-brand-900/90 font-medium pl-6 space-y-0.5">
+                  {creditTargets.map(ct => (
+                    <li key={ct.id} className="flex justify-between gap-3">
+                      <span>{ct.name ?? t.register.payment.creditYou}</span>
+                      <span className="text-emerald-300">{t.register.payment.minus(event.currency, ct.amount.toLocaleString())}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
 
           {hasDeposit && (

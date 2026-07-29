@@ -357,7 +357,7 @@ describe('RegisterForm', () => {
     expect(details.credit_applied).toBe(2000)
   })
 
-  it('does not offer account credit when registering a family group', async () => {
+  it('offers and applies each diver\'s own account credit for a family group', async () => {
     const child: Profile = { ...sampleProfile, id: 'kid1', name: 'Kid', nickname: null, parent_account: 'u1' }
     const openCredit = {
       id: 'c1', user_id: 'u1', booking_id: null, amount: 2000, currency: 'TWD',
@@ -367,6 +367,8 @@ describe('RegisterForm', () => {
     from.mockImplementation((table: string) => {
       if (table === 'rooms')     return mockQueryBuilder({ data: sampleRooms })
       if (table === 'addons') return mockQueryBuilder({ data: sampleAddons })
+      // Every credits read returns an open 2,000 credit, so both the parent
+      // (primary) and the child (additional target) have credit to apply.
       if (table === 'credits')      return mockQueryBuilder({ data: [openCredit] })
       if (table === 'profiles')     return mockQueryBuilder({ data: [child] })
       return mockQueryBuilder()
@@ -377,8 +379,8 @@ describe('RegisterForm', () => {
         onClose={() => {}} onBooked={() => {}} />
     )
 
-    // Parent + child both selected → group submit, which routes credit through
-    // the Payments page instead of the checkout toggle.
+    // Parent + child both selected → group submit. The group now offers to
+    // apply each diver's own credit to their own booking.
     await screen.findByText(/who is this booking for/i)
     await user.click(screen.getByLabelText(/kid/i))
     await user.click(screen.getByRole('button', { name: /continue/i }))
@@ -388,7 +390,60 @@ describe('RegisterForm', () => {
     await user.click(screen.getByLabelText(/i have all the required gear/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
-    expect(screen.queryByText(/use my account credit/i)).not.toBeInTheDocument()
+    expect(await screen.findByText(/apply each diver.s account credit/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /confirm/i }))
+
+    // Each booking has its own diver's credit spent against it via the RPC.
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith(
+      'apply_credit_to_booking', expect.objectContaining({ p_amount: 2000 }),
+    ))
+  })
+
+  it('lets an admin/parent apply the target diver\'s credit when booking on their behalf', async () => {
+    const target: Profile = { ...sampleProfile, id: 'diver-99', name: 'Reef Kid', nickname: null }
+    const openCredit = {
+      id: 'c1', user_id: 'diver-99', booking_id: null, amount: 2000, currency: 'TWD',
+      reason: 'Cancelled trip', status: 'open', created_by: null,
+      created_at: new Date().toISOString(), settled_at: null, settled_note: null,
+    }
+    from.mockImplementation((table: string) => {
+      if (table === 'rooms')     return mockQueryBuilder({ data: sampleRooms })
+      if (table === 'addons')    return mockQueryBuilder({ data: sampleAddons })
+      if (table === 'waivers')   return mockQueryBuilder({ data: WAIVER_ROWS })
+      if (table === 'credits')   return mockQueryBuilder({ data: [openCredit] })
+      return mockQueryBuilder()
+    })
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter>
+        <RegisterFormBody
+          event={sampleEvent}
+          profile={target}
+          userId="admin-1"
+          actingOnBehalfOf="diver-99"
+          onSubmitSuccess={() => {}}
+        />
+      </MemoryRouter>
+    )
+
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    // The card names the target diver (not "my") and shows their balance.
+    expect(await screen.findByText(/apply reef kid.s account credit/i)).toBeInTheDocument()
+    expect(screen.getByText(/TWD 2,000 available/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+    // The TARGET diver's credit is spent against the on-behalf booking — the
+    // parent/admin caller is authorised by apply_credit_to_booking.
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith(
+      'apply_credit_to_booking', { p_booking_id: 'b-new', p_amount: 2000 },
+    ))
   })
 
   it('shows an in-flight "Confirming…" state while the submit round-trip is pending', async () => {

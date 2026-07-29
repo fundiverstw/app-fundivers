@@ -286,6 +286,40 @@ describe('apply_credit_to_booking', () => {
     expect(Number(ok.data)).toBe(1000)
   })
 
+  it('lets a parent spend their child\'s credit, but an unrelated diver cannot', async () => {
+    // Migration 20260729000000: a parent registering/paying for their child
+    // needs to apply the child's own credit. The RPC spends the booking owner's
+    // (child's) credit; the auth gate now admits the parent alongside the owner
+    // and admins. An unrelated diver is still rejected.
+    const parent = await freshDiver()
+    const child = await freshDiver()
+    await admin.from('profiles').update({ parent_account: parent.id } as never).eq('id', child.id)
+    const dive = await freshDive()
+    const bookingId = await makeBooking(child.id, dive, { total: 3000 })
+    await makeCredit(child.id, 5000)
+
+    // An unrelated diver cannot touch the child's booking.
+    const stranger = await freshDiver()
+    const strangerApi = await userClient(stranger.email, stranger.password)
+    const bad = await strangerApi.rpc('apply_credit_to_booking', { p_booking_id: bookingId, p_amount: 1000 })
+    expect(bad.error).not.toBeNull()
+
+    // The parent can — spending the CHILD's credit against the child's booking.
+    const parentApi = await userClient(parent.email, parent.password)
+    const ok = await parentApi.rpc('apply_credit_to_booking', { p_booking_id: bookingId, p_amount: 1000 })
+    expect(ok.error).toBeNull()
+    expect(Number(ok.data)).toBe(1000)
+
+    // The money moved from the child's pool, and a paid 'account_credit'
+    // payment landed on the child's booking.
+    const pays = await paidPayments(bookingId)
+    expect(pays.data).toHaveLength(1)
+    expect(pays.data![0].method).toBe('account_credit')
+    expect(Number(pays.data![0].amount)).toBe(1000)
+    const open = await openCredits(child.id)
+    expect(open.data!.reduce((s, c) => s + Number(c.amount), 0)).toBe(4000)
+  })
+
   it('rejects applying to a cancelled booking and leaves the credit pool intact', async () => {
     const diver = await freshDiver()
     const dive = await freshDive()
