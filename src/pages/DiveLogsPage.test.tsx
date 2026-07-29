@@ -182,7 +182,6 @@ describe('DiveLogsPage add flow', () => {
     await user.click(screen.getByRole('button', { name: /\+ add/i }))
 
     fillRequired()
-    addOptionalField(/^dive #$/i)
     const numberInput = screen.getByLabelText(/^dive #/i)
     await user.clear(numberInput)
     await user.type(numberInput, '247')
@@ -216,7 +215,6 @@ describe('DiveLogsPage add flow', () => {
     await user.click(screen.getByRole('button', { name: /\+ add/i }))
 
     fillRequired('New Site')
-    addOptionalField(/^dive #$/i)
     const numberInput = screen.getByLabelText(/^dive #/i)
     await user.clear(numberInput)
     await user.type(numberInput, '5')
@@ -510,9 +508,11 @@ describe('DiveLogsPage optional fields', () => {
     fireEvent.click(screen.getByRole('button', { name: /\+ add/i }))
 
     expect(screen.getByLabelText(/site/i)).toBeInTheDocument()
-    // The name is optional but always on the form — it is the card's heading,
-    // and burying it in the picker made an existing dive look unrenameable.
+    // Name and number are optional but always on the form: the name is the
+    // card's heading and the number is what the logbook is ordered by, so
+    // burying either in the picker made them look unsettable.
     expect(screen.getByLabelText(/^dive name$/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^dive #/i)).toBeInTheDocument()
     expect(screen.queryByLabelText(/^notes$/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/^visibility/i)).not.toBeInTheDocument()
   })

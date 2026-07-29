@@ -65,7 +65,7 @@ const blankForm = (nextNumber: number): FormState => ({
 // entry is a handful of boxes rather than twenty. Order here is the order they appear
 // in, both in the grid and in the picker.
 const OPTIONAL_FIELDS = [
-  'dive_number', 'dive_type', 'gas_mix',
+  'dive_type', 'gas_mix',
   'visibility_m', 'water_temp_c', 'air_temp_c', 'wave_height_m', 'weather',
   'weight_kg', 'tank_size_l', 'start_pressure_bar', 'end_pressure_bar',
   'gear_used', 'notes',
@@ -74,7 +74,6 @@ const OPTIONAL_FIELDS = [
 type OptionalField = typeof OPTIONAL_FIELDS[number]
 
 const OPTIONAL_LABELS: Record<OptionalField, string> = {
-  dive_number:        dl.diveNumberField,
   dive_type:          dl.type,
   gas_mix:            dl.gasMix,
   visibility_m:       dl.visibility,
@@ -97,14 +96,9 @@ const CHIP_ON = `${CHIP_BASE} bg-brand-900 text-white border-brand-900`
 /**
  * Which optional fields to show on open: the ones that already carry a value,
  * so editing an old entry never buries data behind a picker.
- *
- * dive_number is the exception — a new dive arrives pre-filled with the
- * suggested next number, which is a hint rather than something the diver
- * typed, so it only counts as "set" when there is a dive to edit.
  */
-function initiallyShown(initial: FormState, editing: boolean): Set<OptionalField> {
+function initiallyShown(initial: FormState): Set<OptionalField> {
   return new Set(OPTIONAL_FIELDS.filter(k => {
-    if (k === 'dive_number') return editing
     const v = initial[k]
     return Array.isArray(v) ? v.length > 0 : v != null && v !== ''
   }))
@@ -400,7 +394,7 @@ function DiveLogForm({
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<DiveLogErrors>({})
   const [shown, setShown] = useState<Set<OptionalField>>(
-    () => initiallyShown(initial, editingNumber != null),
+    () => initiallyShown(initial),
   )
   const [picking, setPicking] = useState(false)
 
@@ -483,15 +477,6 @@ function DiveLogForm({
     const label = OPTIONAL_LABELS[k]
     const onRemove = () => removeField(k)
     switch (k) {
-      case 'dive_number':
-        return (
-          <Field key={k} label={label} error={errors.dive_number} onRemove={onRemove}>
-            <input type="number" min={1} max={DIVE_LOG_NUMBER_MAX} step={1} className={INPUT}
-              aria-invalid={errors.dive_number ? true : undefined}
-              value={form.dive_number ?? ''} onChange={e => setNum('dive_number', e.target.value)} />
-            <span className={`mt-1 block text-xs ${TEXT_MUTED}`}>{dl.diveNumberHint}</span>
-          </Field>
-        )
       case 'dive_type':
         return (
           <Field key={k} label={label} onRemove={onRemove}>
@@ -576,6 +561,12 @@ function DiveLogForm({
             value={form.title ?? ''} onChange={e => setText('title', e.target.value)} />
         </Field>
 
+        <Field label={dl.diveNumberField} error={errors.dive_number}>
+          <input type="number" min={1} max={DIVE_LOG_NUMBER_MAX} step={1} className={INPUT}
+            aria-invalid={errors.dive_number ? true : undefined}
+            value={form.dive_number ?? ''} onChange={e => setNum('dive_number', e.target.value)} />
+          <span className={`mt-1 block text-xs ${TEXT_MUTED}`}>{dl.diveNumberHint}</span>
+        </Field>
         <Field label={dl.date} required error={errors.dived_on}>
           <DateField required className={INPUT} value={form.dived_on}
             min={EARLIEST_DIVE_DATE} max={latestDiveDate()}
