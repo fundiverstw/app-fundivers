@@ -65,8 +65,8 @@ describe('usePWAUpdate', () => {
 
   it('schedules a periodic registration.update() — the polling cadence for long-lived tabs', () => {
     // Without polling, a PWA kept open across days only re-checks for new
-    // builds on tab focus. The polling is what makes the banner appear
-    // for users who never close the tab.
+    // builds on tab focus. The polling is what surfaces the waiting SW so
+    // UpdateBannerHost can apply it at the next navigation.
     const { getCaptured } = configureMock({ needRefresh: false })
     renderHook(() => usePWAUpdate())
     const update = vi.fn().mockResolvedValue(undefined)
@@ -74,9 +74,9 @@ describe('usePWAUpdate', () => {
     getCaptured().onRegisteredSW?.('/sw.js', fakeRegistration)
 
     expect(update).not.toHaveBeenCalled()
-    vi.advanceTimersByTime(30 * 60 * 1000)
+    vi.advanceTimersByTime(5 * 60 * 1000)
     expect(update).toHaveBeenCalledOnce()
-    vi.advanceTimersByTime(30 * 60 * 1000)
+    vi.advanceTimersByTime(5 * 60 * 1000)
     expect(update).toHaveBeenCalledTimes(2)
   })
 
