@@ -10,9 +10,10 @@ import { t } from '../../i18n'
 // AdminUsersPage pulls in a large tree (the diver-facing ProfileForm, family
 // panel, notes, charge/credit maths). We only exercise the ?diver deep link
 // here, so the heavy children and data helpers are stubbed to no-ops.
-const { from, useAuthMock } = vi.hoisted(() => ({ from: vi.fn(), useAuthMock: vi.fn() }))
+const { from, useAuthMock, issueTempPasswordMock } = vi.hoisted(() => ({ from: vi.fn(), useAuthMock: vi.fn(), issueTempPasswordMock: vi.fn() }))
 
 vi.mock('../../lib/supabase', () => ({ supabase: { from: (...a: unknown[]) => from(...a) } }))
+vi.mock('../../lib/admin-password', () => ({ issueTempPassword: (...a: unknown[]) => issueTempPasswordMock(...a) }))
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => useAuthMock() }))
 vi.mock('../../hooks/useToast', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }) }))
 vi.mock('../ProfilePage', () => ({ ProfileForm: () => null }))
@@ -44,7 +45,7 @@ const profiles = [
 ]
 
 beforeEach(() => {
-  from.mockReset(); useAuthMock.mockReset()
+  from.mockReset(); useAuthMock.mockReset(); issueTempPasswordMock.mockReset()
   vi.mocked(fetchEventsForBookings).mockResolvedValue(new Map())
   useAuthMock.mockReturnValue({ profile: { id: 'admin-1', role: 'admin' }, user: { id: 'admin-1' } })
   from.mockImplementation((table: string) => {
@@ -126,6 +127,45 @@ describe('AdminUsersPage role promotion', () => {
     await userEvent.selectOptions(card, 'staff')
 
     await waitFor(() => expect(updateSpy).toHaveBeenCalledWith({ role: 'staff' }))
+  })
+
+  it('issues a temp password and reveals it once the admin confirms', async () => {
+    // jsdom has no window.confirm — install a stub that accepts.
+    const confirmSpy = vi.fn(() => true)
+    window.confirm = confirmSpy
+    issueTempPasswordMock.mockResolvedValue('ABCD-EFGH-JKLM')
+
+    render(<MemoryRouter initialEntries={['/admin/users?diver=u2']}><AdminUsersPage /></MemoryRouter>)
+
+    const btn = await screen.findByRole('button', { name: t.admin.users.issueTempPassword })
+    await userEvent.click(btn)
+
+    expect(confirmSpy).toHaveBeenCalled()
+    await waitFor(() => expect(issueTempPasswordMock).toHaveBeenCalledWith('u2'))
+    // The plaintext is revealed to the admin exactly once.
+    expect(await screen.findByText('ABCD-EFGH-JKLM')).toBeInTheDocument()
+  })
+
+  it('does not issue a temp password if the admin cancels the confirm', async () => {
+    const confirmSpy = vi.fn(() => false)
+    window.confirm = confirmSpy
+
+    render(<MemoryRouter initialEntries={['/admin/users?diver=u2']}><AdminUsersPage /></MemoryRouter>)
+    const btn = await screen.findByRole('button', { name: t.admin.users.issueTempPassword })
+    await userEvent.click(btn)
+
+    expect(confirmSpy).toHaveBeenCalled()
+    expect(issueTempPasswordMock).not.toHaveBeenCalled()
+  })
+
+  it('offers no temp-password control for the admin’s own row', async () => {
+    const self = [{ id: 'admin-1', name: 'Me', nickname: 'Me', role: 'admin', email: 'me@x.io', logged_dives: 0, gear_owned: [] }]
+    from.mockImplementation((table: string) =>
+      table === 'profiles' ? mockQueryBuilder({ data: self }) : mockQueryBuilder({ data: [] }),
+    )
+    render(<MemoryRouter initialEntries={['/admin/users?diver=admin-1']}><AdminUsersPage /></MemoryRouter>)
+    await screen.findByText('Me')
+    expect(screen.queryByRole('button', { name: t.admin.users.issueTempPassword })).not.toBeInTheDocument()
   })
 
   it('offers no role control for the admin’s own row', async () => {

@@ -18,6 +18,7 @@ import { getCertCardSignedUrl } from '../../lib/cert-card'
 import { shoeAsJp } from '../../lib/shoe-size'
 import { fetchCreditsForUser, openCreditForBooking, openCreditBalance, diverCreditBalance, createCredit, settleCredit, reopenCredit, applyCreditToBooking } from '../../lib/credits'
 import { netPaid, netPaidByBooking } from '../../lib/payments'
+import { issueTempPassword } from '../../lib/admin-password'
 import { ProfileForm } from '../ProfilePage'
 import { DiverNotes } from '../../components/admin/DiverNotes'
 import { AdminFamilyPanel } from '../../components/admin/AdminFamilyPanel'
@@ -367,6 +368,22 @@ export function AdminUsersPage() {
     }
   }
 
+  // Issue a temporary password for a diver and hand the plaintext back to the
+  // card so the admin can relay it. The password is generated + set entirely
+  // server-side (admin-set-temp-password edge function); we never see or store
+  // an existing password. Rethrows so the card can skip revealing on failure.
+  async function handleIssueTempPassword(target: Profile): Promise<string> {
+    const name = target.name || target.nickname || target.contact_id || target.id
+    try {
+      const password = await issueTempPassword(target.id)
+      toast.success(us.tempPasswordIssued(name))
+      return password
+    } catch (err) {
+      toast.error(us.couldNotIssueTempPassword(errorMessage(err)))
+      throw err
+    }
+  }
+
   async function handleVoidPayment(userId: string, bookingId: string, paymentId: string) {
     const extras = extrasCache.get(userId)
     if (!extras) return
@@ -457,6 +474,7 @@ export function AdminUsersPage() {
             onReopenCredit={(creditId) => handleReopenCredit(u.id, creditId)}
             onDelete={() => handleDeleteUser(u)}
             onChangeRole={(role) => handleChangeRole(u, role)}
+            onIssueTempPassword={() => handleIssueTempPassword(u)}
             isAdmin={isAdmin}
             isSelf={profile?.id === u.id}
           />
@@ -472,7 +490,7 @@ export function AdminUsersPage() {
 
 function UserCard({
   user, allUsers, onFamilyChanged, open, extras, loading, editing, onToggle, onEdit, onCancelEdit, onProfileSaved,
-  onRecordPayment, onVoidPayment, onMarkDepositPaid, onCreateCredit, onApplyCredit, onSettleCredit, onReopenCredit, onDelete, onChangeRole, isAdmin, isSelf,
+  onRecordPayment, onVoidPayment, onMarkDepositPaid, onCreateCredit, onApplyCredit, onSettleCredit, onReopenCredit, onDelete, onChangeRole, onIssueTempPassword, isAdmin, isSelf,
 }: {
   user: Profile
   allUsers: Profile[]
@@ -494,10 +512,32 @@ function UserCard({
   onReopenCredit: (creditId: string) => Promise<void>
   onDelete: () => Promise<void>
   onChangeRole: (role: Profile['role']) => Promise<void>
+  onIssueTempPassword: () => Promise<string>
   isAdmin: boolean
   isSelf: boolean
 }) {
   const { user: authUser } = useAuth()
+  // The freshly-issued temp password to reveal to the admin, plus per-card
+  // action state. Held here (not in the page) so it's scoped to this diver and
+  // clears when the card unmounts.
+  const [tempPassword, setTempPassword] = useState<string | null>(null)
+  const [issuing, setIssuing] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  async function handleIssue() {
+    const name = user.name || user.nickname || user.contact_id || user.id
+    if (!window.confirm(us.tempPasswordConfirm(name))) return
+    setIssuing(true)
+    try {
+      const pw = await onIssueTempPassword()
+      setTempPassword(pw)
+      setCopied(false)
+    } catch {
+      // The page handler already surfaced the error toast.
+    } finally {
+      setIssuing(false)
+    }
+  }
   return (
     <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl">
       {/* role="button", not a real <button>: text inside a <button> can't be
@@ -590,11 +630,45 @@ function UserCard({
                   </label>
                 )}
                 {isAdmin && !isSelf && (
+                  <button type="button" onClick={handleIssue} disabled={issuing} className={BTN_XS_GHOST}>
+                    {issuing ? us.issuing : us.issueTempPassword}
+                  </button>
+                )}
+                {isAdmin && !isSelf && (
                   <button type="button" onClick={onDelete} className={BTN_XS_DANGER}>
                     {us.deleteUser}
                   </button>
                 )}
               </div>
+
+              {tempPassword && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 space-y-2">
+                  <p className="text-xs font-semibold text-amber-900 uppercase tracking-wider">{us.tempPasswordTitle}</p>
+                  <div className="flex items-center gap-2">
+                    {/* select-all + selectable so the admin can copy it even if
+                        the clipboard API is unavailable. */}
+                    <code className="flex-1 select-all font-mono text-sm text-brand-900 bg-white border border-surface-300 rounded px-2 py-1 break-all">
+                      {tempPassword}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try { await navigator.clipboard?.writeText(tempPassword); setCopied(true) }
+                        catch { /* clipboard blocked — the admin can still select the text */ }
+                      }}
+                      className={BTN_XS_GHOST}
+                    >
+                      {copied ? us.copied : us.copy}
+                    </button>
+                  </div>
+                  <p className="text-xs text-amber-900">{us.tempPasswordHint}</p>
+                  <div className="flex justify-end">
+                    <button type="button" onClick={() => setTempPassword(null)} className={BTN_XS_GHOST}>
+                      {us.dismiss}
+                    </button>
+                  </div>
+                </div>
+              )}
               <ProfileDetails user={user} />
               <DiverNotes profileId={user.id} />
               {isAdmin && (
