@@ -1,12 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { ProfilePage } from './ProfilePage'
+import { ProfilePage, ChangePasswordSection } from './ProfilePage'
 import { renderWithRouter, mockQueryBuilder } from '../../tests/test-utils'
 
-const { update, from, useAuthMock, uploadCertCard, getCertCardSignedUrl, deleteCertCard } = vi.hoisted(() => ({
+const { update, from, signInWithPassword, updateUser, useAuthMock, uploadCertCard, getCertCardSignedUrl, deleteCertCard } = vi.hoisted(() => ({
   update: vi.fn(),
   from: vi.fn(),
+  signInWithPassword: vi.fn(),
+  updateUser: vi.fn(),
   useAuthMock: vi.fn(),
   uploadCertCard: vi.fn(),
   getCertCardSignedUrl: vi.fn(),
@@ -14,7 +16,13 @@ const { update, from, useAuthMock, uploadCertCard, getCertCardSignedUrl, deleteC
 }))
 
 vi.mock('../lib/supabase', () => ({
-  supabase: { from: (...a: unknown[]) => from(...a) },
+  supabase: {
+    from: (...a: unknown[]) => from(...a),
+    auth: {
+      signInWithPassword: (...a: unknown[]) => signInWithPassword(...a),
+      updateUser: (...a: unknown[]) => updateUser(...a),
+    },
+  },
 }))
 
 vi.mock('../hooks/useAuth', () => ({
@@ -36,6 +44,8 @@ function input(name: string): HTMLInputElement | HTMLTextAreaElement {
 beforeEach(() => {
   update.mockReset()
   from.mockReset()
+  signInWithPassword.mockReset()
+  updateUser.mockReset()
   useAuthMock.mockReset()
   uploadCertCard.mockReset()
   getCertCardSignedUrl.mockReset()
@@ -322,5 +332,56 @@ describe('ProfilePage', () => {
     expect(screen.getByText(/my profile/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /save changes/i })).not.toBeInTheDocument()
     expect(update).not.toHaveBeenCalled()
+  })
+})
+
+describe('ChangePasswordSection', () => {
+  it('re-verifies the current password then updates it, clearing the fields', async () => {
+    signInWithPassword.mockResolvedValue({ error: null })
+    updateUser.mockResolvedValue({ error: null })
+
+    const user = userEvent.setup()
+    renderWithRouter(<ChangePasswordSection email="ada@example.com" />)
+
+    await user.type(input('current-password'), 'oldpassword')
+    await user.type(input('new-password'), 'newpassword1')
+    await user.type(input('confirm-password'), 'newpassword1')
+    await user.click(screen.getByRole('button', { name: /update password/i }))
+
+    await waitFor(() => expect(updateUser).toHaveBeenCalledWith({ password: 'newpassword1' }))
+    expect(signInWithPassword).toHaveBeenCalledWith({ email: 'ada@example.com', password: 'oldpassword' })
+    // The re-auth must precede the change.
+    expect(signInWithPassword.mock.invocationCallOrder[0])
+      .toBeLessThan(updateUser.mock.invocationCallOrder[0])
+    await waitFor(() => expect((input('current-password') as HTMLInputElement).value).toBe(''))
+  })
+
+  it('rejects a mismatched confirmation without hitting Supabase', async () => {
+    const user = userEvent.setup()
+    renderWithRouter(<ChangePasswordSection email="ada@example.com" />)
+
+    await user.type(input('current-password'), 'oldpassword')
+    await user.type(input('new-password'), 'newpassword1')
+    await user.type(input('confirm-password'), 'different2')
+    await user.click(screen.getByRole('button', { name: /update password/i }))
+
+    expect(await screen.findByText(/do not match/i)).toBeInTheDocument()
+    expect(signInWithPassword).not.toHaveBeenCalled()
+    expect(updateUser).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a wrong current password and never calls updateUser', async () => {
+    signInWithPassword.mockResolvedValue({ error: { message: 'Invalid login credentials' } })
+
+    const user = userEvent.setup()
+    renderWithRouter(<ChangePasswordSection email="ada@example.com" />)
+
+    await user.type(input('current-password'), 'wrongpass'.padEnd(8, 'x'))
+    await user.type(input('new-password'), 'newpassword1')
+    await user.type(input('confirm-password'), 'newpassword1')
+    await user.click(screen.getByRole('button', { name: /update password/i }))
+
+    expect(await screen.findByText(/current password is incorrect/i)).toBeInTheDocument()
+    expect(updateUser).not.toHaveBeenCalled()
   })
 })

@@ -20,6 +20,7 @@ import { DateField } from '../components/DateField'
 import { BTN_DANGER } from '../styles/tokens'
 import type { Profile, CertLevel } from '../types/database'
 import { ShoeSizeField } from '../components/ShoeSizeField'
+import { PasswordInput } from '../components/PasswordInput'
 import { t } from '../i18n'
 
 // Schema intentionally matches what the HTML form emits (strings for text +
@@ -96,6 +97,7 @@ export function ProfilePage() {
         // props at mount — no sync-state-from-prop effect needed.
         <>
           <ProfileForm key={profile.id} user={user} profile={profile} />
+          <ChangePasswordSection email={user.email ?? ''} />
           <MyWaivers diverId={profile.id} />
           <FamilySection parent={profile} />
         </>
@@ -590,6 +592,70 @@ export function NotificationsToggle() {
         {t.profile.notifications.remindersDetail}
       </p>
       {error && <p className="text-red-600 text-xs">{error}</p>}
+    </section>
+  )
+}
+
+// In-app password change for a signed-in diver. Unlike ResetPasswordPage
+// (which unlocks off a one-time recovery link), the diver is already
+// authenticated here, so we re-verify the *current* password with
+// signInWithPassword before calling updateUser — a walk-up on an unlocked
+// session can't silently take over the account without knowing the old one.
+export function ChangePasswordSection({ email }: { email: string }) {
+  const toast = useToast()
+  const [current, setCurrent] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    if (password.length < 8) { setError(t.auth.passwordMinDot); return }
+    if (password !== confirm) { setError(t.auth.passwordsNoMatchDot); return }
+    if (password === current) { setError(t.profile.password.sameAsCurrent); return }
+    setBusy(true)
+    const { error: reauthError } = await supabase.auth.signInWithPassword({ email, password: current })
+    if (reauthError) { setBusy(false); setError(t.profile.password.wrongCurrent); return }
+    const { error: updateError } = await supabase.auth.updateUser({ password })
+    setBusy(false)
+    if (updateError) { setError(updateError.message); return }
+    setCurrent(''); setPassword(''); setConfirm('')
+    toast.success(t.profile.password.updated)
+  }
+
+  return (
+    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3" aria-label={t.profile.password.title}>
+      <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">{t.profile.password.title}</h2>
+      <form onSubmit={submit} className="space-y-3">
+        <Field label={t.profile.password.current}>
+          <PasswordInput
+            name="current-password" autoComplete="current-password" required
+            value={current} onChange={e => setCurrent(e.target.value)} className={inputClass}
+          />
+        </Field>
+        <Field label={t.auth.newPassword}>
+          <PasswordInput
+            name="new-password" autoComplete="new-password" required minLength={8}
+            value={password} onChange={e => setPassword(e.target.value)} className={inputClass}
+          />
+        </Field>
+        <Field label={t.auth.confirmPassword}>
+          <PasswordInput
+            name="confirm-password" autoComplete="new-password" required minLength={8}
+            value={confirm} onChange={e => setConfirm(e.target.value)} className={inputClass}
+          />
+        </Field>
+        {error && <p className="text-red-600 text-xs">{error}</p>}
+        <button
+          type="submit"
+          disabled={busy || !current || !password || !confirm}
+          className="w-full bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-semibold py-2 rounded-lg transition-colors disabled:opacity-50"
+        >
+          {busy ? t.auth.saving : t.profile.password.submit}
+        </button>
+      </form>
     </section>
   )
 }
