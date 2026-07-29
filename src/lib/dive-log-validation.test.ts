@@ -47,7 +47,7 @@ describe('validateDiveLog', () => {
       max_depth_m: 18.5, dive_time_min: 42, visibility_m: 12,
       water_temp_c: 26.5, air_temp_c: 31, wave_height_m: 0.5, weight_kg: 6,
       tank_size_l: 11.1, start_pressure_bar: 200, end_pressure_bar: 60,
-      buddy_name: 'Alice', instructor_name: 'Bob', notes: 'Turtles.',
+      buddy_name: 'Alice', notes: 'Turtles.',
     })).toEqual({})
   })
 
@@ -79,11 +79,10 @@ describe('validateDiveLog', () => {
     expect(validateDiveLog({ ...valid, ...allNull })).toEqual({})
   })
 
-  it('requires a buddy or an instructor, and takes either', () => {
+  it('requires a name for whoever the dive was with', () => {
     expect(validateDiveLog({ ...valid, buddy_name: null }).buddy_name).toBeTruthy()
+    expect(validateDiveLog({ ...valid, buddy_name: undefined }).buddy_name).toBeTruthy()
     expect(validateDiveLog({ ...valid, buddy_name: '   ' }).buddy_name).toBeTruthy()
-    expect(validateDiveLog({ ...valid, buddy_name: null, instructor_name: 'Bob' })).toEqual({})
-    expect(validateDiveLog({ ...valid, buddy_name: 'Alice', instructor_name: null })).toEqual({})
   })
 
   it('rejects a mistyped year in either direction', () => {

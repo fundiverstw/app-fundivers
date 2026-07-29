@@ -25,7 +25,6 @@ export const DIVE_LOG_CSV_COLUMNS = [
   'start_pressure_bar',
   'end_pressure_bar',
   'buddy_name',
-  'instructor_name',
   'notes',
 ] as const
 

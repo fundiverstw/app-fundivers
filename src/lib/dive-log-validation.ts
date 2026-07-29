@@ -75,7 +75,6 @@ export const DIVE_LOG_TEXT_MAX = {
   site: 120,
   weather: 60,
   buddy_name: 120,
-  instructor_name: 120,
   notes: 2000,
 } as const
 
@@ -158,12 +157,8 @@ export function validateDiveLog(
     errors.dived_on = e.dateOutOfRange
   }
 
-  // A dive with nobody on it is a dive nobody can vouch for. Either name
-  // satisfies this — the complaint hangs off the buddy box because it comes
-  // first, but filling in the instructor clears it just as well.
-  if (!form.buddy_name?.trim() && !form.instructor_name?.trim()) {
-    errors.buddy_name = e.companionRequired
-  }
+  // A dive with nobody on it is a dive nobody can vouch for.
+  if (!form.buddy_name?.trim()) errors.buddy_name = e.companionRequired
 
   for (const field of NUMERIC_FIELDS) {
     const v = form[field]

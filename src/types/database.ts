@@ -1626,7 +1626,6 @@ export interface Database {
           start_pressure_bar: number | null
           end_pressure_bar: number | null
           buddy_name: string | null
-          instructor_name: string | null
           notes: string | null
           created_at: string
           updated_at: string
@@ -1654,7 +1653,6 @@ export interface Database {
           start_pressure_bar?: number | null
           end_pressure_bar?: number | null
           buddy_name?: string | null
-          instructor_name?: string | null
           notes?: string | null
           created_at?: string
           updated_at?: string

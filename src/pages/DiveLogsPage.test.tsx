@@ -73,7 +73,6 @@ const sampleRow = (overrides: Partial<DiveLog> = {}): DiveLog => ({
   start_pressure_bar: 200,
   end_pressure_bar:   60,
   buddy_name:        'Alice',
-  instructor_name:   null,
   notes:             'Saw a turtle',
   created_at:        '2026-04-30T08:00:00Z',
   updated_at:        '2026-04-30T08:00:00Z',
@@ -202,7 +201,6 @@ describe('DiveLogsPage add flow', () => {
     await user.click(screen.getByRole('button', { name: /\+ add/i }))
 
     fillRequired()
-    addOptionalField(/^dive name$/i)
     await user.type(screen.getByLabelText(/^dive name$/i), 'Manta night dive')
     await user.click(screen.getByRole('button', { name: /save dive/i }))
 
@@ -418,29 +416,27 @@ describe('DiveLogsPage field validation', () => {
   })
 })
 
-describe('DiveLogsPage buddy and instructor', () => {
-  it('shows both names on the list row when the dive has them', async () => {
+describe('DiveLogsPage buddy / instructor', () => {
+  it('shows the name on the list row', async () => {
     fetchDiveLogsMock.mockResolvedValue([
-      sampleRow({ id: 'a', dive_number: 4, site: 'Batcave', buddy_name: 'Alice', instructor_name: 'Bob' }),
+      sampleRow({ id: 'a', dive_number: 4, site: 'Batcave', buddy_name: 'Alice' }),
     ])
     renderPage()
     const item = await screen.findByRole('button', { name: /edit dive 4/i })
     expect(within(item).getByText(/Alice/)).toBeInTheDocument()
-    expect(within(item).getByText(/Bob/)).toBeInTheDocument()
   })
 
-  it('omits each name when the dive does not have it', async () => {
+  it('omits the name when the dive does not have one', async () => {
     fetchDiveLogsMock.mockResolvedValue([
-      sampleRow({ id: 'a', dive_number: 4, site: 'Solo', buddy_name: null, instructor_name: null }),
+      sampleRow({ id: 'a', dive_number: 4, site: 'Solo', buddy_name: null }),
     ])
     renderPage()
     const item = await screen.findByRole('button', { name: /edit dive 4/i })
     expect(within(item).queryByText(/w\//)).not.toBeInTheDocument()
-    expect(within(item).queryByText(/instr\./)).not.toBeInTheDocument()
   })
 
-  it('files the one name under the role the toggle is on', async () => {
-    const row = sampleRow({ id: 'r1', dive_number: 5, site: 'Names', buddy_name: null, instructor_name: null })
+  it('round-trips the name through the edit form', async () => {
+    const row = sampleRow({ id: 'r1', dive_number: 5, site: 'Names', buddy_name: null })
     fetchDiveLogsMock.mockResolvedValue([row])
     updateDiveLogMock.mockResolvedValue(row)
     renderPage()
@@ -451,43 +447,7 @@ describe('DiveLogsPage buddy and instructor', () => {
     fireEvent.submit(form)
 
     await waitFor(() => expect(updateDiveLogMock).toHaveBeenCalledOnce())
-    expect(updateDiveLogMock.mock.calls[0][1]).toMatchObject({
-      buddy_name: 'Alice', instructor_name: null,
-    })
-  })
-
-  it('moves the name across when the role is switched, leaving nothing behind', async () => {
-    const row = sampleRow({ id: 'r1', dive_number: 5, site: 'Switch', buddy_name: null, instructor_name: null })
-    fetchDiveLogsMock.mockResolvedValue([row])
-    updateDiveLogMock.mockResolvedValue(row)
-    renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: /edit dive 5/i }))
-
-    const form = screen.getByDisplayValue('Switch').closest('form') as HTMLFormElement
-    const roles = within(form).getByRole('group', { name: /buddy or instructor/i })
-    fireEvent.change(within(form).getByLabelText(/^buddy \/ instructor/i), { target: { value: 'Bob' } })
-    fireEvent.click(within(roles).getByRole('button', { name: /^instructor$/i }))
-
-    // The box keeps the name; only which column it lands in changed.
-    expect(within(form).getByLabelText(/^buddy \/ instructor/i)).toHaveValue('Bob')
-    fireEvent.submit(form)
-
-    await waitFor(() => expect(updateDiveLogMock).toHaveBeenCalledOnce())
-    expect(updateDiveLogMock.mock.calls[0][1]).toMatchObject({
-      buddy_name: null, instructor_name: 'Bob',
-    })
-  })
-
-  it('opens on the instructor role when that is what the dive was logged with', async () => {
-    const row = sampleRow({ id: 'r1', dive_number: 5, site: 'Taught', buddy_name: null, instructor_name: 'Bob' })
-    fetchDiveLogsMock.mockResolvedValue([row])
-    renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: /edit dive 5/i }))
-
-    const form = screen.getByDisplayValue('Taught').closest('form') as HTMLFormElement
-    expect(within(form).getByLabelText(/^buddy \/ instructor/i)).toHaveValue('Bob')
-    const roles = within(form).getByRole('group', { name: /buddy or instructor/i })
-    expect(within(roles).getByRole('button', { name: /^instructor$/i })).toHaveAttribute('aria-pressed', 'true')
+    expect(updateDiveLogMock.mock.calls[0][1]).toMatchObject({ buddy_name: 'Alice' })
   })
 })
 
@@ -510,13 +470,12 @@ describe('DiveLogsPage required fields', () => {
     expect(screen.getByText(/enter who you dived with/i)).toBeInTheDocument()
   })
 
-  it('takes an instructor in place of a buddy', async () => {
+  it('saves once whoever the dive was with is named', async () => {
     createDiveLogMock.mockResolvedValue(sampleRow({ id: 'new' }))
     const form = await openNewForm()
     fireEvent.change(screen.getByLabelText(/site/i), { target: { value: 'Somewhere' } })
     fireEvent.change(screen.getByLabelText(/max depth/i), { target: { value: '18' } })
     fireEvent.change(screen.getByLabelText(/dive time/i), { target: { value: '42' } })
-    fireEvent.click(within(form).getByRole('button', { name: /^instructor$/i }))
     fireEvent.change(screen.getByLabelText(/^buddy \/ instructor/i), { target: { value: 'Bob' } })
     fireEvent.submit(form)
 
@@ -545,15 +504,17 @@ describe('DiveLogsPage required fields', () => {
 })
 
 describe('DiveLogsPage optional fields', () => {
-  it('opens a new dive with only the required boxes', async () => {
+  it('opens a new dive with the core boxes and nothing else', async () => {
     renderPage()
     await waitFor(() => expect(fetchDiveLogsMock).toHaveBeenCalled())
     fireEvent.click(screen.getByRole('button', { name: /\+ add/i }))
 
     expect(screen.getByLabelText(/site/i)).toBeInTheDocument()
+    // The name is optional but always on the form — it is the card's heading,
+    // and burying it in the picker made an existing dive look unrenameable.
+    expect(screen.getByLabelText(/^dive name$/i)).toBeInTheDocument()
     expect(screen.queryByLabelText(/^notes$/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/^visibility/i)).not.toBeInTheDocument()
-    expect(screen.queryByLabelText(/^dive name$/i)).not.toBeInTheDocument()
   })
 
   it('adds a field from the picker and drops it from the remaining list', async () => {

@@ -57,16 +57,15 @@ const blankForm = (nextNumber: number): FormState => ({
   start_pressure_bar: null,
   end_pressure_bar:   null,
   buddy_name:         null,
-  instructor_name:    null,
   notes:              null,
 })
 
 // Everything the form does not insist on. These start hidden and the diver
 // pulls in the ones they care about from the "+ Add field" list, so a routine
-// entry is six boxes rather than twenty. Order here is the order they appear
+// entry is a handful of boxes rather than twenty. Order here is the order they appear
 // in, both in the grid and in the picker.
 const OPTIONAL_FIELDS = [
-  'title', 'dive_number', 'dive_type', 'gas_mix',
+  'dive_number', 'dive_type', 'gas_mix',
   'visibility_m', 'water_temp_c', 'air_temp_c', 'wave_height_m', 'weather',
   'weight_kg', 'tank_size_l', 'start_pressure_bar', 'end_pressure_bar',
   'gear_used', 'notes',
@@ -75,7 +74,6 @@ const OPTIONAL_FIELDS = [
 type OptionalField = typeof OPTIONAL_FIELDS[number]
 
 const OPTIONAL_LABELS: Record<OptionalField, string> = {
-  title:              dl.name,
   dive_number:        dl.diveNumberField,
   dive_type:          dl.type,
   gas_mix:            dl.gasMix,
@@ -91,9 +89,6 @@ const OPTIONAL_LABELS: Record<OptionalField, string> = {
   gear_used:          dl.gearUsed,
   notes:              dl.notes,
 }
-
-const COMPANION_ROLES = ['buddy', 'instructor'] as const
-type CompanionRole = typeof COMPANION_ROLES[number]
 
 const CHIP_BASE = 'text-xs px-2 py-1 rounded-md border transition-colors'
 const CHIP_OFF = `${CHIP_BASE} bg-white text-brand-900 border-surface-300 hover:bg-surface-100`
@@ -136,7 +131,6 @@ function formFromRow(row: DiveLog): FormState {
     start_pressure_bar: row.start_pressure_bar,
     end_pressure_bar:   row.end_pressure_bar,
     buddy_name:         row.buddy_name,
-    instructor_name:    row.instructor_name,
     notes:              row.notes,
   }
 }
@@ -329,7 +323,6 @@ export function DiveLogsPage() {
                 {r.water_temp_c != null && <span>{r.water_temp_c}°C</span>}
                 {r.gas_mix && <span>{GAS_MIX_LABELS[r.gas_mix]}</span>}
                 {r.buddy_name && <span>{dl.buddyShort(r.buddy_name)}</span>}
-                {r.instructor_name && <span>{dl.instructorShort(r.instructor_name)}</span>}
               </div>
             </button>
           </li>
@@ -410,12 +403,6 @@ function DiveLogForm({
     () => initiallyShown(initial, editingNumber != null),
   )
   const [picking, setPicking] = useState(false)
-  // Held rather than derived: a diver who picks "Instructor" and then clears
-  // the box would otherwise snap back to "Buddy" with nothing to go on.
-  const [companionRole, setRole] = useState<CompanionRole>(
-    () => initial.instructor_name ? 'instructor' : 'buddy',
-  )
-  const companionName = (companionRole === 'buddy' ? form.buddy_name : form.instructor_name) ?? ''
 
   // Editing a field retracts its complaint immediately rather than making the
   // diver re-submit to find out whether the new value is any better.
@@ -443,34 +430,6 @@ function DiveLogForm({
   function setText(k: keyof FormState, raw: string) {
     clearError(k)
     setForm(prev => ({ ...prev, [k]: raw === '' ? null : raw } as FormState))
-  }
-
-  // One name, one role. A dive is logged with a buddy or with an instructor,
-  // hardly ever both, so the form asks once and the toggle decides which
-  // column it lands in — the two are still distinct in the row, the CSV and
-  // the list card. Switching roles carries the name across and empties the
-  // one being left, so a dive never ends up filed under both.
-  function setCompanionName(raw: string) {
-    clearError('buddy_name')
-    const value = raw === '' ? null : raw
-    setForm(prev => ({
-      ...prev,
-      buddy_name:      companionRole === 'buddy'      ? value : null,
-      instructor_name: companionRole === 'instructor' ? value : null,
-    }))
-  }
-
-  function setCompanionRole(role: CompanionRole) {
-    setRole(role)
-    clearError('buddy_name')
-    setForm(prev => {
-      const name = prev.buddy_name ?? prev.instructor_name ?? null
-      return {
-        ...prev,
-        buddy_name:      role === 'buddy'      ? name : null,
-        instructor_name: role === 'instructor' ? name : null,
-      }
-    })
   }
 
   function addField(k: OptionalField) {
@@ -524,15 +483,6 @@ function DiveLogForm({
     const label = OPTIONAL_LABELS[k]
     const onRemove = () => removeField(k)
     switch (k) {
-      case 'title':
-        return (
-          <Field key={k} label={label} wide error={errors.title} onRemove={onRemove}>
-            <input type="text" maxLength={DIVE_LOG_TEXT_MAX.title} className={INPUT}
-              placeholder={dl.namePlaceholder}
-              aria-invalid={errors.title ? true : undefined}
-              value={form.title ?? ''} onChange={e => setText('title', e.target.value)} />
-          </Field>
-        )
       case 'dive_number':
         return (
           <Field key={k} label={label} error={errors.dive_number} onRemove={onRemove}>
@@ -619,6 +569,13 @@ function DiveLogForm({
       </div>
 
       <div className={`${CARD_ELEVATED} p-4 grid grid-cols-1 sm:grid-cols-2 gap-3`}>
+        <Field label={dl.name} wide error={errors.title}>
+          <input type="text" maxLength={DIVE_LOG_TEXT_MAX.title} className={INPUT}
+            placeholder={dl.namePlaceholder}
+            aria-invalid={errors.title ? true : undefined}
+            value={form.title ?? ''} onChange={e => setText('title', e.target.value)} />
+        </Field>
+
         <Field label={dl.date} required error={errors.dived_on}>
           <DateField required className={INPUT} value={form.dived_on}
             min={EARLIEST_DIVE_DATE} max={latestDiveDate()}
@@ -635,29 +592,10 @@ function DiveLogForm({
         <NumberField field="dive_time_min" label={dl.diveTime} required value={form.dive_time_min}
           error={errors.dive_time_min} onChange={setNum} />
 
-        <Field
-          label={dl.companion}
-          required
-          error={errors.buddy_name}
-          after={
-            <div role="group" aria-label={dl.companionRoleAria} className="mt-1.5 flex gap-1.5">
-              {COMPANION_ROLES.map(r => (
-                <button
-                  type="button"
-                  key={r}
-                  onClick={() => setCompanionRole(r)}
-                  aria-pressed={companionRole === r}
-                  className={companionRole === r ? CHIP_ON : CHIP_OFF}
-                >
-                  {r === 'buddy' ? dl.buddy : dl.instructor}
-                </button>
-              ))}
-            </div>
-          }
-        >
+        <Field label={dl.companion} required error={errors.buddy_name}>
           <input type="text" maxLength={DIVE_LOG_TEXT_MAX.buddy_name} className={INPUT}
             aria-invalid={errors.buddy_name ? true : undefined}
-            value={companionName} onChange={e => setCompanionName(e.target.value)} />
+            value={form.buddy_name ?? ''} onChange={e => setText('buddy_name', e.target.value)} />
         </Field>
 
         {OPTIONAL_FIELDS.filter(k => shown.has(k)).map(optionalField)}
@@ -755,16 +693,13 @@ function NumberField({ field, label, required, value, error, onChange, onRemove 
  * `onRemove` sits outside the `<label>` on purpose: a button nested in a label
  * gets the label's click forwarded to the control as well.
  */
-function Field({ label, required, wide, group, error, onRemove, after, children }: {
+function Field({ label, required, wide, group, error, onRemove, children }: {
   label: string
   required?: boolean
   wide?: boolean
   group?: boolean
   error?: string
   onRemove?: () => void
-  /** Controls that belong to the field but not inside its `<label>` — a row of
-   *  toggles a label would otherwise try to name. */
-  after?: React.ReactNode
   children: React.ReactNode
 }) {
   const caption = (
@@ -796,7 +731,6 @@ function Field({ label, required, wide, group, error, onRemove, after, children 
           {children}
         </label>
       )}
-      {after}
       {error && <p role="alert" className={`mt-1 text-xs ${TEXT_ERROR}`}>{error}</p>}
     </div>
   )
