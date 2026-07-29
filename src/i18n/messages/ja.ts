@@ -1398,7 +1398,6 @@ export const ja: Messages = {
       editProfile: 'プロフィールを編集',
       registerForEvent: 'イベントに登録',
       issueTempPassword: '仮パスワードを発行',
-      issuing: '発行中…',
       tempPasswordConfirm: (name: string) =>
         `${name} さんの仮パスワードを発行しますか？現在のパスワードは直ちに使用できなくなります。`,
       tempPasswordIssued: (name: string) => `${name} さんの仮パスワードを発行しました`,

@@ -1399,7 +1399,6 @@ export const zhTW: Messages = {
       editProfile: '編輯個人資料',
       registerForEvent: '報名活動',
       issueTempPassword: '發行臨時密碼',
-      issuing: '發行中…',
       tempPasswordConfirm: (name: string) =>
         `要為 ${name} 發行新的臨時密碼嗎？他們目前的密碼將立即失效。`,
       tempPasswordIssued: (name: string) => `已為 ${name} 發行臨時密碼`,

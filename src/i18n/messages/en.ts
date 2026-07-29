@@ -1411,7 +1411,6 @@ export const en = {
       editProfile: 'Edit profile',
       registerForEvent: 'Register for an event',
       issueTempPassword: 'Issue temp password',
-      issuing: 'Issuing…',
       tempPasswordConfirm: (name: string) =>
         `Issue a new temporary password for ${name}? Their current password will stop working immediately.`,
       tempPasswordIssued: (name: string) => `Temporary password issued for ${name}`,
