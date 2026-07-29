@@ -1358,6 +1358,11 @@ export const ja: Messages = {
       waiversUnknown: '同意書 —',
       missingWaivers: (list: string) => `未署名：${list}`,
       waiversOk: '同意書は完了',
+      markWaiversInPerson: '対面で完了にする',
+      markWaiversInPersonConfirm: (name: string, list: string) =>
+        `次の同意書を ${name} さんが紙で署名済みとして記録しますか：${list}？\n\n記入済みの紙の書類が手元にある場合のみ実行してください。`,
+      waiversRecordedInPerson: '対面署名として記録しました。',
+      waiversRecordFailed: (detail: string) => `同意書を記録できませんでした：${detail}`,
       paidBy: (name: string) => `${name} が支払い`,
       leadPayer: '幹事（支払い担当）',
       paidAmount: (amount: string) => `${amount} 支払い済み`,

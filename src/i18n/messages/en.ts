@@ -1371,6 +1371,11 @@ export const en = {
       waiversUnknown: 'Waivers —',
       missingWaivers: (list: string) => `Missing: ${list}`,
       waiversOk: 'Waivers OK',
+      markWaiversInPerson: 'Mark done in person',
+      markWaiversInPersonConfirm: (name: string, list: string) =>
+        `Record these as signed on paper by ${name}: ${list}?\n\nOnly do this if you have the completed paper form(s) on file.`,
+      waiversRecordedInPerson: 'Recorded as signed in person.',
+      waiversRecordFailed: (detail: string) => `Could not record waivers: ${detail}`,
       paidBy: (name: string) => `Paid by ${name}`,
       leadPayer: 'Lead payer',
       paidAmount: (amount: string) => `Paid ${amount}`,

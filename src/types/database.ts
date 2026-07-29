@@ -363,6 +363,18 @@ export interface Database {
         }
         Returns: string
       }
+      // Admin-only: record a waiver a diver signed on paper, in person. Snapshots
+      // content like sign_waiver but for an arbitrary diver, tagged in_person.
+      admin_record_paper_waiver: {
+        Args: {
+          p_diver_id:    string
+          p_code:        string
+          p_version:     number
+          p_signed_name: string
+          p_event_id?:   string | null
+        }
+        Returns: string
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
@@ -872,9 +884,14 @@ export interface Database {
           signed_body: string | null
           signed_pdf_path: string | null
           content_sha256: string | null
+          /** 'e_signed' (diver typed their name in-app) or 'in_person' (admin
+           *  recorded a paper form). Added 20260731000000. */
+          method: 'e_signed' | 'in_person'
+          /** The admin who logged an in_person record; NULL for e-signatures. */
+          recorded_by: string | null
         }
         // Divers never insert directly — sign_waiver() is the only write path.
-        // Insert here covers the admin-correction policy.
+        // Insert here covers the admin-correction policy (and admin_record_paper_waiver).
         Insert: {
           id?: string
           created_at?: string
@@ -888,6 +905,8 @@ export interface Database {
           signed_body?: string | null
           signed_pdf_path?: string | null
           content_sha256?: string | null
+          method?: 'e_signed' | 'in_person'
+          recorded_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['waiver_signatures']['Insert']>
         Relationships: []

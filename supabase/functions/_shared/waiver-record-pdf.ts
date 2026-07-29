@@ -34,6 +34,7 @@ export interface WaiverRecord {
   body: string | null; // text-waiver markdown snapshot
   pdfPath: string | null; // uploaded-PDF snapshot path
   sha256: string | null;
+  method?: "e_signed" | "in_person" | null; // how the signature was captured
 }
 
 /** Returns the base64 of a single-page A4 record PDF. */
@@ -75,6 +76,9 @@ export async function buildWaiverRecordPdfBase64(r: WaiverRecord): Promise<strin
     ["Signed by", r.signedName],
     ["Account", r.diverLabel],
     ["Signed at", new Date(r.signedAt).toISOString().replace("T", " ").slice(0, 19) + " UTC"],
+    ["Method", r.method === "in_person"
+      ? "Recorded in person from a completed paper form (logged by staff)"
+      : "Signed electronically in the app"],
     ["Waiver version", String(r.version)],
     ["Content SHA-256", r.sha256 ?? "(not archived)"],
   ];

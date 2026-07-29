@@ -1359,6 +1359,11 @@ export const zhTW: Messages = {
       waiversUnknown: '免責同意書 —',
       missingWaivers: (list: string) => `尚未簽署：${list}`,
       waiversOk: '免責同意書已完成',
+      markWaiversInPerson: '標記為當面完成',
+      markWaiversInPersonConfirm: (name: string, list: string) =>
+        `要將以下同意書記錄為 ${name} 已於紙本簽署嗎：${list}？\n\n請僅在已取得填妥的紙本表單時執行。`,
+      waiversRecordedInPerson: '已記錄為當面簽署。',
+      waiversRecordFailed: (detail: string) => `無法記錄同意書：${detail}`,
       paidBy: (name: string) => `由 ${name} 支付`,
       leadPayer: '主要付款人',
       paidAmount: (amount: string) => `已付 ${amount}`,

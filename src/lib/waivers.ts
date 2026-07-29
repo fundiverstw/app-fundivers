@@ -179,6 +179,29 @@ export async function signWaiver(args: {
   return data as string
 }
 
+// Admin: record a waiver a diver signed ON PAPER (in person) on their behalf,
+// via the admin-gated admin_record_paper_waiver RPC. Snapshots content like
+// sign_waiver but tags the row in_person + recorded_by. Per-event waivers pass
+// the event; annual waivers omit it. Returns the new signature id.
+export async function recordPaperWaiver(args: {
+  diverId: string
+  def: WaiverDef
+  signedName: string
+  event?: WaiverEventRef
+}): Promise<string> {
+  const { diverId, def, signedName, event } = args
+  const perEvent = def.cadence === 'per_event' ? event : undefined
+  const { data, error } = await supabase.rpc('admin_record_paper_waiver', {
+    p_diver_id: diverId,
+    p_code: def.code,
+    p_version: def.version,
+    p_signed_name: signedName,
+    p_event_id: perEvent ? perEvent.id : null,
+  })
+  if (error) throw error
+  return data as string
+}
+
 // Admin: set or clear a per-event override. `mode = null` removes any override
 // for that waiver on the event (reverting to the global rule).
 export async function setEventWaiverOverride(args: {

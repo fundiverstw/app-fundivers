@@ -27,7 +27,7 @@ import { openCreditForBooking } from '../../lib/credits'
 import { bookingBalance } from '../../lib/booking-balance'
 import { netPaid } from '../../lib/payments'
 import { EventTransportPanel } from '../../components/admin/EventTransportPanel'
-import { missingWaivers, fetchEventWaiverOverrides, fetchSignaturesForDivers, fetchWaivers } from '../../lib/waivers'
+import { missingWaivers, fetchEventWaiverOverrides, fetchSignaturesForDivers, fetchWaivers, recordPaperWaiver } from '../../lib/waivers'
 import type { WaiverDef } from '../../config/waivers'
 import { ShareEventButton } from '../../components/ShareEventButton'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Credit, DiverNote, Payment, Profile, EventKind } from '../../types/database'
@@ -229,6 +229,28 @@ export function AdminEventDetailPage() {
     })()
     return () => { cancelled = true }
   }, [event, diverIdsKey])
+
+  // Mark every waiver a registrant is currently missing as signed on paper,
+  // in person. Records each on the diver's behalf (admin-gated RPC) using their
+  // profile name as the signature, then clears them from the missing set so the
+  // badge flips to "Waivers OK". Only offered to admins (the RPC rejects staff).
+  async function handleMarkWaiversInPerson(r: Registrant) {
+    if (!event) return
+    const missing = missingByDiver[r.booking.user_id] ?? []
+    if (missing.length === 0) return
+    const diverName = r.profile?.name || r.profile?.nickname || t.admin.transport.noProfile
+    if (!window.confirm(ed.markWaiversInPersonConfirm(diverName, missing.map(w => w.title).join(', ')))) return
+    try {
+      const ref = { id: event.id, type: event.type, title: event.title }
+      await Promise.all(missing.map(def =>
+        recordPaperWaiver({ diverId: r.booking.user_id, def, signedName: diverName, event: ref }),
+      ))
+      setMissingByDiver(prev => ({ ...prev, [r.booking.user_id]: [] }))
+      toast.success(ed.waiversRecordedInPerson)
+    } catch (err) {
+      toast.error(ed.waiversRecordFailed(errorMessage(err)))
+    }
+  }
 
   async function updateStatus(bookingId: string, newStatus: Booking['status']) {
     await supabase.from('bookings').update({ status: newStatus }).eq('id', bookingId)
@@ -454,6 +476,7 @@ export function AdminEventDetailPage() {
       onBillToDiver={() => billToDiver(r.booking.id)}
       onRecordGroupPayment={(amount) =>
         recordGroupPaymentFor(r.booking.payer_id ?? r.booking.user_id, r.booking.group_id, amount)}
+      onMarkWaiversInPerson={() => handleMarkWaiversInPerson(r)}
       readOnly={!isAdmin}
     />
   )
@@ -1208,7 +1231,7 @@ function registrantBalance(r: Registrant) {
   return { owed, paid, bal: bookingBalance(owed, paid, r.credit, { cancelled: r.booking.status === 'cancelled' }) }
 }
 
-function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, currency, onStatusChange, onApproveRefund, onRejectRefund, onEdit, onAddAmendment, onRecordPayment, onApplyCredit, onVoidPayment, onMarkDepositPaid, onBillToDiver, onRecordGroupPayment, readOnly }: {
+function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, currency, onStatusChange, onApproveRefund, onRejectRefund, onEdit, onAddAmendment, onRecordPayment, onApplyCredit, onVoidPayment, onMarkDepositPaid, onBillToDiver, onRecordGroupPayment, onMarkWaiversInPerson, readOnly }: {
   r: Registrant
   waiverMissing: WaiverDef[]
   waiverState: 'loading' | 'ready' | 'error'
@@ -1226,6 +1249,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
   onMarkDepositPaid: () => Promise<void>
   onBillToDiver: () => Promise<void>
   onRecordGroupPayment: (amount: number) => Promise<void>
+  onMarkWaiversInPerson: () => void | Promise<void>
   readOnly?: boolean
 }) {
   // payer_id set to someone else → this diver is covered by a lead booker.
@@ -1310,12 +1334,23 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
             : waiverState === 'error' ? (
               <span className="ml-2 text-xs font-semibold text-amber-300">{ed.waiversUnknown}</span>
             ) : waiverMissing.length > 0 ? (
-              <span
-                className="ml-2 text-xs font-semibold text-red-300"
-                title={waiverMissing.map(w => w.title).join(', ')}
-              >
-                {ed.missingWaivers(waiverMissing.map(w => w.title).join(', '))}
-              </span>
+              <>
+                <span
+                  className="ml-2 text-xs font-semibold text-red-300"
+                  title={waiverMissing.map(w => w.title).join(', ')}
+                >
+                  {ed.missingWaivers(waiverMissing.map(w => w.title).join(', '))}
+                </span>
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={e => { e.stopPropagation(); onMarkWaiversInPerson() }}
+                    className="ml-1.5 text-xs font-semibold text-sky-300 underline hover:text-sky-200"
+                  >
+                    {ed.markWaiversInPerson}
+                  </button>
+                )}
+              </>
             ) : (
               <span className="ml-2 text-xs font-semibold text-emerald-300">{ed.waiversOk}</span>
             )}

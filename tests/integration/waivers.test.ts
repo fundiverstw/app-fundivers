@@ -96,6 +96,59 @@ describe('sign_waiver RPC', () => {
   })
 })
 
+describe('admin_record_paper_waiver RPC', () => {
+  it('lets an admin record a paper (in-person) signature for another diver, snapshotting content', async () => {
+    const adminApi = await userClient(adminUser.email, adminUser.password)
+    const { data: id, error } = await adminApi.rpc('admin_record_paper_waiver', {
+      p_diver_id: diverB.id, p_code: 'diver_medical', p_version: 1, p_signed_name: '  Diver B  ', p_event_id: null,
+    })
+    expect(error).toBeNull()
+    const { data: row } = await admin.from('waiver_signatures').select('*').eq('id', id as string).single()
+    const sig = row as { diver_id: string; method: string; recorded_by: string; signed_name: string; content_sha256: string | null }
+    expect(sig.diver_id).toBe(diverB.id)       // recorded for the target, not the caller
+    expect(sig.method).toBe('in_person')
+    expect(sig.recorded_by).toBe(adminUser.id)  // audit: who logged the paper form
+    expect(sig.signed_name).toBe('Diver B')     // trimmed server-side
+    expect(sig.content_sha256).toBeTruthy()     // content snapshot, same as sign_waiver
+  })
+
+  it('ties a per-event paper signature to its event', async () => {
+    const adminApi = await userClient(adminUser.email, adminUser.password)
+    const { data: id } = await adminApi.rpc('admin_record_paper_waiver', {
+      p_diver_id: diverB.id, p_code: 'continuing_education', p_version: 1, p_signed_name: 'Diver B', p_event_id: courseId,
+    })
+    const { data: row } = await admin.from('waiver_signatures').select('event_id, method').eq('id', id as string).single()
+    expect((row as { event_id: string; method: string }).event_id).toBe(courseId)
+    expect((row as { event_id: string; method: string }).method).toBe('in_person')
+  })
+
+  it('rejects a non-admin diver', async () => {
+    const b = await userClient(diverB.email, diverB.password)
+    const { error } = await b.rpc('admin_record_paper_waiver', {
+      p_diver_id: diverA.id, p_code: 'diver_medical', p_version: 1, p_signed_name: 'Diver A', p_event_id: null,
+    })
+    expect(error).not.toBeNull()
+  })
+
+  it('rejects staff (admin-only)', async () => {
+    const s = await userClient(staff.email, staff.password)
+    const { error } = await s.rpc('admin_record_paper_waiver', {
+      p_diver_id: diverA.id, p_code: 'diver_medical', p_version: 1, p_signed_name: 'Diver A', p_event_id: null,
+    })
+    expect(error).not.toBeNull()
+  })
+
+  it('leaves a normal sign_waiver row tagged e_signed by default', async () => {
+    const a = await userClient(diverA.email, diverA.password)
+    const { data: id } = await a.rpc('sign_waiver', {
+      p_code: 'padi_liability', p_version: 1, p_signed_name: 'Diver A', p_event_id: null,
+    })
+    const { data: row } = await a.from('waiver_signatures').select('method, recorded_by').eq('id', id as string).single()
+    expect((row as { method: string; recorded_by: string | null }).method).toBe('e_signed')
+    expect((row as { method: string; recorded_by: string | null }).recorded_by).toBeNull()
+  })
+})
+
 describe('waiver_signatures RLS', () => {
   it('lets a diver read only their own signatures', async () => {
     const a = await userClient(diverA.email, diverA.password)

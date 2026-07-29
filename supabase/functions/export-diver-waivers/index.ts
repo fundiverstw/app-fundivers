@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
       .from("profiles").select("name, email").eq("id", diverId).single();
     const { data: sigs } = await admin
       .from("waiver_signatures")
-      .select("waiver_code, waiver_version, signed_name, signed_at, signed_title, signed_body, signed_pdf_path, content_sha256")
+      .select("waiver_code, waiver_version, signed_name, signed_at, signed_title, signed_body, signed_pdf_path, content_sha256, method")
       .eq("diver_id", diverId)
       .order("signed_at", { ascending: true });
 
@@ -69,6 +69,7 @@ Deno.serve(async (req) => {
         body: s.signed_body,
         pdfPath: s.signed_pdf_path,
         sha256: s.content_sha256,
+        method: s.method,
       });
       const base = `${s.waiver_code}-v${s.waiver_version}`;
       files[uniqueName(files, `${base}.pdf`)] = new Uint8Array(Buffer.from(b64, "base64"));

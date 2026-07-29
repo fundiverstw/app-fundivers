@@ -4,7 +4,7 @@ import {
   globalRuleMatches, requiredWaiversForEvent, isSignatureCurrent, missingWaivers,
   annualWaiverStatus, annualWaivers, fetchWaivers,
   fetchEventWaiverOverrides, fetchDiverSignatures, fetchSignaturesForDivers,
-  signWaiver, setEventWaiverOverride, type WaiverEventRef, type WaiverOverride,
+  signWaiver, recordPaperWaiver, setEventWaiverOverride, type WaiverEventRef, type WaiverOverride,
 } from './waivers'
 import type { WaiverDef } from '../config/waivers'
 import { supabase } from './supabase'
@@ -173,6 +173,24 @@ describe('data layer', () => {
     await signWaiver({ def: MEDICAL, signedName: 'Jane', event: dive })
     expect(rpc).toHaveBeenCalledWith('sign_waiver', expect.objectContaining({
       p_event_id: null,
+    }))
+  })
+
+  it('recordPaperWaiver calls the admin RPC for the target diver, with the event id for per-event', async () => {
+    rpc.mockResolvedValue({ data: 'sig-3', error: null })
+    const id = await recordPaperWaiver({ diverId: 'diver-9', def: CE, signedName: 'Jane Doe', event: owCourse })
+    expect(id).toBe('sig-3')
+    expect(rpc).toHaveBeenCalledWith('admin_record_paper_waiver', expect.objectContaining({
+      p_diver_id: 'diver-9', p_code: 'continuing_education', p_version: CE.version,
+      p_signed_name: 'Jane Doe', p_event_id: 'C1',
+    }))
+  })
+
+  it('recordPaperWaiver omits the event for an annual waiver', async () => {
+    rpc.mockResolvedValue({ data: 'sig-4', error: null })
+    await recordPaperWaiver({ diverId: 'diver-9', def: MEDICAL, signedName: 'Jane', event: dive })
+    expect(rpc).toHaveBeenCalledWith('admin_record_paper_waiver', expect.objectContaining({
+      p_diver_id: 'diver-9', p_event_id: null,
     }))
   })
 
