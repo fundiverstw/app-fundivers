@@ -19,7 +19,7 @@ import { DIVE_TYPE_OPTIONS, GAS_MIX_OPTIONS, GAS_MIX_LABELS } from '../lib/dive-
 import {
   CARD, CARD_ELEVATED, BTN_PRIMARY, BTN_GHOST, BTN_DANGER, BTN_LIGHT,
   TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR, INPUT, INPUT_LABEL, PAGE_BODY,
-  BTN_XS_GHOST,
+  BTN_XS_GHOST, BTN_XS_PRIMARY,
 } from '../styles/tokens'
 import { t } from '../i18n'
 
@@ -60,6 +60,57 @@ const blankForm = (nextNumber: number): FormState => ({
   instructor_name:    null,
   notes:              null,
 })
+
+// Everything the form does not insist on. These start hidden and the diver
+// pulls in the ones they care about from the "+ Add field" list, so a routine
+// entry is six boxes rather than twenty. Order here is the order they appear
+// in, both in the grid and in the picker.
+const OPTIONAL_FIELDS = [
+  'title', 'dive_number', 'dive_type', 'gas_mix',
+  'visibility_m', 'water_temp_c', 'air_temp_c', 'wave_height_m', 'weather',
+  'weight_kg', 'tank_size_l', 'start_pressure_bar', 'end_pressure_bar',
+  'gear_used', 'notes',
+] as const
+
+type OptionalField = typeof OPTIONAL_FIELDS[number]
+
+const OPTIONAL_LABELS: Record<OptionalField, string> = {
+  title:              dl.name,
+  dive_number:        dl.diveNumberField,
+  dive_type:          dl.type,
+  gas_mix:            dl.gasMix,
+  visibility_m:       dl.visibility,
+  water_temp_c:       dl.waterTemp,
+  air_temp_c:         dl.airTemp,
+  wave_height_m:      dl.waveHeight,
+  weather:            dl.weather,
+  weight_kg:          dl.weight,
+  tank_size_l:        dl.tankSize,
+  start_pressure_bar: dl.startPressure,
+  end_pressure_bar:   dl.endPressure,
+  gear_used:          dl.gearUsed,
+  notes:              dl.notes,
+}
+
+const CHIP_BASE = 'text-xs px-2 py-1 rounded-md border transition-colors'
+const CHIP_OFF = `${CHIP_BASE} bg-white text-brand-900 border-surface-300 hover:bg-surface-100`
+const CHIP_ON = `${CHIP_BASE} bg-brand-900 text-white border-brand-900`
+
+/**
+ * Which optional fields to show on open: the ones that already carry a value,
+ * so editing an old entry never buries data behind a picker.
+ *
+ * dive_number is the exception — a new dive arrives pre-filled with the
+ * suggested next number, which is a hint rather than something the diver
+ * typed, so it only counts as "set" when there is a dive to edit.
+ */
+function initiallyShown(initial: FormState, editing: boolean): Set<OptionalField> {
+  return new Set(OPTIONAL_FIELDS.filter(k => {
+    if (k === 'dive_number') return editing
+    const v = initial[k]
+    return Array.isArray(v) ? v.length > 0 : v != null && v !== ''
+  }))
+}
 
 function formFromRow(row: DiveLog): FormState {
   return {
@@ -352,6 +403,10 @@ function DiveLogForm({
   const [form, setForm] = useState<FormState>(initial)
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<DiveLogErrors>({})
+  const [shown, setShown] = useState<Set<OptionalField>>(
+    () => initiallyShown(initial, editingNumber != null),
+  )
+  const [picking, setPicking] = useState(false)
 
   // Editing a field retracts its complaint immediately rather than making the
   // diver re-submit to find out whether the new value is any better.
@@ -379,6 +434,23 @@ function DiveLogForm({
   function setText(k: keyof FormState, raw: string) {
     clearError(k)
     setForm(prev => ({ ...prev, [k]: raw === '' ? null : raw } as FormState))
+  }
+
+  function addField(k: OptionalField) {
+    setShown(prev => new Set(prev).add(k))
+    setPicking(false)
+  }
+
+  // Removing empties the field as well as hiding it: a hidden box that still
+  // carries a value would save something the diver can no longer see.
+  function removeField(k: OptionalField) {
+    setShown(prev => {
+      const next = new Set(prev)
+      next.delete(k)
+      return next
+    })
+    setForm(prev => ({ ...prev, [k]: k === 'gear_used' ? [] : null }))
+    clearError(k)
   }
 
   function toggleGear(item: string) {
@@ -409,6 +481,95 @@ function DiveLogForm({
     try { await onSave(rounded) } finally { setSaving(false) }
   }
 
+  const remaining = OPTIONAL_FIELDS.filter(k => !shown.has(k))
+
+  function optionalField(k: OptionalField) {
+    const label = OPTIONAL_LABELS[k]
+    const onRemove = () => removeField(k)
+    switch (k) {
+      case 'title':
+        return (
+          <Field key={k} label={label} wide error={errors.title} onRemove={onRemove}>
+            <input type="text" maxLength={DIVE_LOG_TEXT_MAX.title} className={INPUT}
+              placeholder={dl.namePlaceholder}
+              aria-invalid={errors.title ? true : undefined}
+              value={form.title ?? ''} onChange={e => setText('title', e.target.value)} />
+          </Field>
+        )
+      case 'dive_number':
+        return (
+          <Field key={k} label={label} error={errors.dive_number} onRemove={onRemove}>
+            <input type="number" min={1} max={DIVE_LOG_NUMBER_MAX} step={1} className={INPUT}
+              aria-invalid={errors.dive_number ? true : undefined}
+              value={form.dive_number ?? ''} onChange={e => setNum('dive_number', e.target.value)} />
+            <span className={`mt-1 block text-xs ${TEXT_MUTED}`}>{dl.diveNumberHint}</span>
+          </Field>
+        )
+      case 'dive_type':
+        return (
+          <Field key={k} label={label} onRemove={onRemove}>
+            <select className={INPUT} value={form.dive_type ?? ''}
+              onChange={e => set('dive_type', (e.target.value || null) as DiveType | null)}>
+              <option value="">—</option>
+              {DIVE_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </Field>
+        )
+      case 'gas_mix':
+        return (
+          <Field key={k} label={label} onRemove={onRemove}>
+            <select className={INPUT} value={form.gas_mix ?? ''}
+              onChange={e => set('gas_mix', (e.target.value || null) as GasMix | null)}>
+              <option value="">—</option>
+              {GAS_MIX_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </Field>
+        )
+      case 'weather':
+        return (
+          <Field key={k} label={label} error={errors.weather} onRemove={onRemove}>
+            <input type="text" maxLength={DIVE_LOG_TEXT_MAX.weather} className={INPUT}
+              aria-invalid={errors.weather ? true : undefined}
+              value={form.weather ?? ''} onChange={e => setText('weather', e.target.value)} />
+          </Field>
+        )
+      case 'gear_used':
+        return (
+          <Field key={k} label={label} wide group onRemove={onRemove}>
+            <div className="flex flex-wrap gap-1.5">
+              {gearChoices(form.gear_used).map(g => {
+                const on = form.gear_used?.includes(g) ?? false
+                return (
+                  <button
+                    type="button"
+                    key={g}
+                    onClick={() => toggleGear(g)}
+                    className={on ? CHIP_ON : CHIP_OFF}
+                    aria-pressed={on}
+                  >
+                    {g}
+                  </button>
+                )
+              })}
+            </div>
+          </Field>
+        )
+      case 'notes':
+        return (
+          <Field key={k} label={label} wide error={errors.notes} onRemove={onRemove}>
+            <textarea rows={3} maxLength={DIVE_LOG_TEXT_MAX.notes} className={INPUT}
+              aria-invalid={errors.notes ? true : undefined}
+              value={form.notes ?? ''} onChange={e => setText('notes', e.target.value)} />
+          </Field>
+        )
+      default:
+        return (
+          <NumberField key={k} field={k} label={label} value={form[k]}
+            error={errors[k]} onChange={setNum} onRemove={onRemove} />
+        )
+    }
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="flex items-baseline justify-between gap-2">
@@ -421,19 +582,6 @@ function DiveLogForm({
       </div>
 
       <div className={`${CARD_ELEVATED} p-4 grid grid-cols-1 sm:grid-cols-2 gap-3`}>
-        <Field label={dl.name} wide error={errors.title}>
-          <input type="text" maxLength={DIVE_LOG_TEXT_MAX.title} className={INPUT}
-            placeholder={dl.namePlaceholder}
-            aria-invalid={errors.title ? true : undefined}
-            value={form.title ?? ''} onChange={e => setText('title', e.target.value)} />
-        </Field>
-
-        <Field label={dl.diveNumberField} error={errors.dive_number}>
-          <input type="number" min={1} max={DIVE_LOG_NUMBER_MAX} step={1} className={INPUT}
-            aria-invalid={errors.dive_number ? true : undefined}
-            value={form.dive_number ?? ''} onChange={e => setNum('dive_number', e.target.value)} />
-          <span className={`mt-1 block text-xs ${TEXT_MUTED}`}>{dl.diveNumberHint}</span>
-        </Field>
         <Field label={dl.date} required error={errors.dived_on}>
           <DateField required className={INPUT} value={form.dived_on}
             min={EARLIEST_DIVE_DATE} max={latestDiveDate()}
@@ -445,88 +593,46 @@ function DiveLogForm({
             value={form.site} onChange={e => set('site', e.target.value)} />
         </Field>
 
-        <Field label={dl.type}>
-          <select className={INPUT} value={form.dive_type ?? ''}
-            onChange={e => set('dive_type', (e.target.value || null) as DiveType | null)}>
-            <option value="">—</option>
-            {DIVE_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </Field>
-        <Field label={dl.gasMix}>
-          <select className={INPUT} value={form.gas_mix ?? ''}
-            onChange={e => set('gas_mix', (e.target.value || null) as GasMix | null)}>
-            <option value="">—</option>
-            {GAS_MIX_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </Field>
-
-        <NumberField field="max_depth_m" label={dl.maxDepth} value={form.max_depth_m}
+        <NumberField field="max_depth_m" label={dl.maxDepth} required value={form.max_depth_m}
           error={errors.max_depth_m} onChange={setNum} />
-        <NumberField field="dive_time_min" label={dl.diveTime} value={form.dive_time_min}
+        <NumberField field="dive_time_min" label={dl.diveTime} required value={form.dive_time_min}
           error={errors.dive_time_min} onChange={setNum} />
 
-        <NumberField field="visibility_m" label={dl.visibility} value={form.visibility_m}
-          error={errors.visibility_m} onChange={setNum} />
-        <NumberField field="water_temp_c" label={dl.waterTemp} value={form.water_temp_c}
-          error={errors.water_temp_c} onChange={setNum} />
-
-        <NumberField field="air_temp_c" label={dl.airTemp} value={form.air_temp_c}
-          error={errors.air_temp_c} onChange={setNum} />
-        <NumberField field="wave_height_m" label={dl.waveHeight} value={form.wave_height_m}
-          error={errors.wave_height_m} onChange={setNum} />
-
-        <Field label={dl.weather} error={errors.weather}>
-          <input type="text" maxLength={DIVE_LOG_TEXT_MAX.weather} className={INPUT}
-            aria-invalid={errors.weather ? true : undefined}
-            value={form.weather ?? ''} onChange={e => setText('weather', e.target.value)} />
-        </Field>
-        <NumberField field="weight_kg" label={dl.weight} value={form.weight_kg}
-          error={errors.weight_kg} onChange={setNum} />
-
-        <NumberField field="tank_size_l" label={dl.tankSize} value={form.tank_size_l}
-          error={errors.tank_size_l} onChange={setNum} />
-        <NumberField field="start_pressure_bar" label={dl.startPressure} value={form.start_pressure_bar}
-          error={errors.start_pressure_bar} onChange={setNum} />
-
-        <NumberField field="end_pressure_bar" label={dl.endPressure} value={form.end_pressure_bar}
-          error={errors.end_pressure_bar} onChange={setNum} />
-        <Field label={dl.buddy} error={errors.buddy_name}>
+        <Field label={dl.buddy} required error={errors.buddy_name}>
           <input type="text" maxLength={DIVE_LOG_TEXT_MAX.buddy_name} className={INPUT}
             aria-invalid={errors.buddy_name ? true : undefined}
             value={form.buddy_name ?? ''} onChange={e => setText('buddy_name', e.target.value)} />
         </Field>
-
         <Field label={dl.instructor} error={errors.instructor_name}>
           <input type="text" maxLength={DIVE_LOG_TEXT_MAX.instructor_name} className={INPUT}
             aria-invalid={errors.instructor_name ? true : undefined}
             value={form.instructor_name ?? ''} onChange={e => setText('instructor_name', e.target.value)} />
         </Field>
-        <Field label={dl.gearUsed} wide group>
-          <div className="flex flex-wrap gap-1.5">
-            {gearChoices(form.gear_used).map(g => {
-              const on = form.gear_used?.includes(g) ?? false
-              return (
-                <button
-                  type="button"
-                  key={g}
-                  onClick={() => toggleGear(g)}
-                  className={`text-xs px-2 py-1 rounded-md border transition-colors ${
-                    on ? 'bg-brand-900 text-white border-brand-900' : 'bg-white text-brand-900 border-surface-300 hover:bg-surface-100'
-                  }`}
-                  aria-pressed={on}
-                >
-                  {g}
-                </button>
-              )
-            })}
-          </div>
-        </Field>
 
-        <Field label={dl.notes} wide error={errors.notes}>
-          <textarea rows={3} maxLength={DIVE_LOG_TEXT_MAX.notes} className={INPUT}
-            aria-invalid={errors.notes ? true : undefined}
-            value={form.notes ?? ''} onChange={e => setText('notes', e.target.value)} />
-        </Field>
+        {OPTIONAL_FIELDS.filter(k => shown.has(k)).map(optionalField)}
+
+        {remaining.length > 0 && (
+          <div className="col-span-full">
+            {picking ? (
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-1.5" role="group" aria-label={dl.addFieldAria}>
+                  {remaining.map(k => (
+                    <button type="button" key={k} onClick={() => addField(k)} className={CHIP_OFF}>
+                      {OPTIONAL_LABELS[k]}
+                    </button>
+                  ))}
+                </div>
+                <button type="button" onClick={() => setPicking(false)} className={BTN_XS_GHOST}>
+                  {dl.addFieldDone}
+                </button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => setPicking(true)} className={BTN_XS_PRIMARY}>
+                {dl.addField}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {hasErrors(errors) && (
@@ -550,22 +656,30 @@ function DiveLogForm({
 // Every numeric box in the logbook, driven off the shared bounds table so the
 // spinner range the diver sees and the range the validator enforces cannot
 // drift apart.
-function NumberField({ field, label, value, error, onChange }: {
+//
+// The decimal columns take `step="any"` rather than `step="0.1"`. A concrete
+// step makes the browser reject 18.55 outright, with a native tooltip and no
+// way past it — but the column keeps one decimal and roundDiveLogNumbers
+// already snaps to it, so the entry is fine. "any" keeps the min/max check
+// and lets the rounding do the rest.
+function NumberField({ field, label, required, value, error, onChange, onRemove }: {
   field: NumericField
   label: string
+  required?: boolean
   value: number | null | undefined
   error?: string
   onChange: (field: NumericField, raw: string) => void
+  onRemove?: () => void
 }) {
   const { min, max, decimals } = DIVE_LOG_BOUNDS[field]
   return (
-    <Field label={label} error={error}>
+    <Field label={label} required={required} error={error} onRemove={onRemove}>
       <input
         type="number"
         className={INPUT}
         min={min}
         max={max}
-        step={decimals === 0 ? 1 : 0.1}
+        step={decimals === 0 ? 1 : 'any'}
         aria-invalid={error ? true : undefined}
         value={value ?? ''}
         onChange={e => onChange(field, e.target.value)}
@@ -586,13 +700,17 @@ function NumberField({ field, label, value, error, onChange }: {
  * column on mobile, and asking for two there makes CSS Grid conjure an
  * implicit second track, which collapses the real column and shreds every
  * caption down to one letter per line.
+ *
+ * `onRemove` sits outside the `<label>` on purpose: a button nested in a label
+ * gets the label's click forwarded to the control as well.
  */
-function Field({ label, required, wide, group, error, children }: {
+function Field({ label, required, wide, group, error, onRemove, children }: {
   label: string
   required?: boolean
   wide?: boolean
   group?: boolean
   error?: string
+  onRemove?: () => void
   children: React.ReactNode
 }) {
   const caption = (
@@ -602,7 +720,17 @@ function Field({ label, required, wide, group, error, children }: {
     </span>
   )
   return (
-    <div className={wide ? 'col-span-full min-w-0' : 'min-w-0'}>
+    <div className={`relative min-w-0${wide ? ' col-span-full' : ''}`}>
+      {onRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={dl.removeFieldAria(label)}
+          className={`absolute right-0 top-0 leading-none px-1 text-sm ${TEXT_SUBTLE} hover:text-brand-50`}
+        >
+          ×
+        </button>
+      )}
       {group ? (
         <div role="group" aria-label={label}>
           {caption}

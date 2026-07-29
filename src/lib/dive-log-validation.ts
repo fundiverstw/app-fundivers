@@ -57,6 +57,16 @@ export const DIVE_LOG_BOUNDS: Record<NumericField, NumericBound> = {
 
 export const NUMERIC_FIELDS = Object.keys(DIVE_LOG_BOUNDS) as NumericField[]
 
+// The two numbers that make an entry a dive record rather than a note. Every
+// other measurement is something the diver opts into from the form's
+// "add field" list, so leaving one out is a choice, not an omission.
+const REQUIRED_NUMERIC_MESSAGES: Partial<Record<NumericField, string>> = {
+  max_depth_m: t.diveLogs.errors.depthRequired,
+  dive_time_min: t.diveLogs.errors.timeRequired,
+}
+
+export const REQUIRED_NUMERIC_FIELDS = Object.keys(REQUIRED_NUMERIC_MESSAGES) as NumericField[]
+
 // The text columns are plain `text`, so nothing here prevents a DB error.
 // These are limits on what a logbook entry is reasonably made of, and they
 // stop a paste of an entire document from becoming a row.
@@ -148,9 +158,20 @@ export function validateDiveLog(
     errors.dived_on = e.dateOutOfRange
   }
 
+  // A dive with nobody on it is a dive nobody can vouch for. Either name
+  // satisfies this — the complaint hangs off the buddy box because it comes
+  // first, but filling in the instructor clears it just as well.
+  if (!form.buddy_name?.trim() && !form.instructor_name?.trim()) {
+    errors.buddy_name = e.companionRequired
+  }
+
   for (const field of NUMERIC_FIELDS) {
     const v = form[field]
-    if (v == null) continue
+    if (v == null) {
+      const missing = REQUIRED_NUMERIC_MESSAGES[field]
+      if (missing) errors[field] = missing
+      continue
+    }
     const { min, max, decimals } = DIVE_LOG_BOUNDS[field]
     if (!Number.isFinite(v)) {
       errors[field] = e.notANumber

@@ -1,11 +1,20 @@
 import { describe, it, expect } from 'vitest'
 import {
-  DIVE_LOG_BOUNDS, DIVE_LOG_TEXT_MAX, NUMERIC_FIELDS, EARLIEST_DIVE_DATE, latestDiveDate,
+  DIVE_LOG_BOUNDS, DIVE_LOG_TEXT_MAX, NUMERIC_FIELDS, REQUIRED_NUMERIC_FIELDS,
+  EARLIEST_DIVE_DATE, latestDiveDate,
   validateDiveLog, roundDiveLogNumbers, hasErrors,
 } from './dive-log-validation'
 import { addIsoDays, todayIso } from './dates'
 
-const valid = { site: 'Long Dong Bay', dived_on: '2026-04-30' }
+// The minimum a dive log is allowed to be: where, when, how deep, how long,
+// and who you were down there with.
+const valid = {
+  site: 'Long Dong Bay',
+  dived_on: '2026-04-30',
+  max_depth_m: 18,
+  dive_time_min: 42,
+  buddy_name: 'Alice',
+}
 
 describe('DIVE_LOG_BOUNDS', () => {
   // The whole point of the table is that it is narrower than the column, so a
@@ -28,7 +37,7 @@ describe('DIVE_LOG_BOUNDS', () => {
 })
 
 describe('validateDiveLog', () => {
-  it('accepts an entry with nothing but the required site', () => {
+  it('accepts an entry with nothing but the required fields', () => {
     expect(validateDiveLog(valid)).toEqual({})
   })
 
@@ -43,13 +52,38 @@ describe('validateDiveLog', () => {
   })
 
   it('requires a site', () => {
-    expect(validateDiveLog({}).site).toBeTruthy()
-    expect(validateDiveLog({ site: '   ' }).site).toBeTruthy()
+    expect(validateDiveLog({ ...valid, site: undefined }).site).toBeTruthy()
+    expect(validateDiveLog({ ...valid, site: '   ' }).site).toBeTruthy()
   })
 
   it('requires a date', () => {
-    expect(validateDiveLog({ site: 'Batcave' }).dived_on).toBeTruthy()
-    expect(validateDiveLog({ site: 'Batcave', dived_on: '' }).dived_on).toBeTruthy()
+    expect(validateDiveLog({ ...valid, dived_on: undefined }).dived_on).toBeTruthy()
+    expect(validateDiveLog({ ...valid, dived_on: '' }).dived_on).toBeTruthy()
+  })
+
+  it('requires a max depth and a dive time', () => {
+    for (const field of REQUIRED_NUMERIC_FIELDS) {
+      expect(validateDiveLog({ ...valid, [field]: null })[field], field).toBeTruthy()
+      expect(validateDiveLog({ ...valid, [field]: undefined })[field], field).toBeTruthy()
+    }
+  })
+
+  it('accepts zero for a required number rather than treating it as missing', () => {
+    // A snorkel-depth training dive is 0 m; that is a value, not a blank.
+    expect(validateDiveLog({ ...valid, max_depth_m: 0, dive_time_min: 0 })).toEqual({})
+  })
+
+  it('leaves the optional numbers alone when they are blank', () => {
+    const optional = NUMERIC_FIELDS.filter(f => !REQUIRED_NUMERIC_FIELDS.includes(f))
+    const allNull = Object.fromEntries(optional.map(f => [f, null]))
+    expect(validateDiveLog({ ...valid, ...allNull })).toEqual({})
+  })
+
+  it('requires a buddy or an instructor, and takes either', () => {
+    expect(validateDiveLog({ ...valid, buddy_name: null }).buddy_name).toBeTruthy()
+    expect(validateDiveLog({ ...valid, buddy_name: '   ' }).buddy_name).toBeTruthy()
+    expect(validateDiveLog({ ...valid, buddy_name: null, instructor_name: 'Bob' })).toEqual({})
+    expect(validateDiveLog({ ...valid, buddy_name: 'Alice', instructor_name: null })).toEqual({})
   })
 
   it('rejects a mistyped year in either direction', () => {
@@ -70,12 +104,6 @@ describe('validateDiveLog', () => {
     expect(validateDiveLog({ ...valid, dived_on: todayIso() }).dived_on).toBeUndefined()
     expect(validateDiveLog({ ...valid, dived_on: addIsoDays(todayIso(), 1) }).dived_on).toBeUndefined()
     expect(validateDiveLog({ ...valid, dived_on: addIsoDays(todayIso(), 7) }).dived_on).toBeTruthy()
-  })
-
-  it('treats a blank number as not-entered rather than zero', () => {
-    // Every numeric field is optional; null must survive validation untouched.
-    const allNull = Object.fromEntries(NUMERIC_FIELDS.map(f => [f, null]))
-    expect(validateDiveLog({ ...valid, ...allNull })).toEqual({})
   })
 
   // The reported bug: repeating 9s in every box. Each of these lands inside a
