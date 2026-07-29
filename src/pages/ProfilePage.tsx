@@ -630,8 +630,13 @@ export function ChangePasswordSection({ email }: { email: string }) {
       <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">{t.profile.password.title}</h2>
       <form onSubmit={submit} className="space-y-3">
         <Field label={t.profile.password.current}>
+          {/* autoComplete="off": the browser's saved credential goes stale the
+              moment the password is changed, and it was autofilling this
+              re-auth field with the OLD password — which then failed
+              verification. Leave it blank so the diver types their real
+              current password. */}
           <PasswordInput
-            name="current-password" autoComplete="current-password" required
+            name="current-password" autoComplete="off" required
             value={current} onChange={e => setCurrent(e.target.value)} className={inputClass}
           />
         </Field>
