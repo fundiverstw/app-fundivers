@@ -67,7 +67,9 @@ describe('buildDiveLogCsv', () => {
       { dive_number: 2, site: 'B' },
       { dive_number: 3, site: 'C' },
     ])
-    const sites = csv.split('\r\n').slice(1, 4).map(l => l.split(',')[2])
+    // site is the 4th column (dive_number, title, dived_on, site, …).
+    const siteCol = DIVE_LOG_CSV_COLUMNS.indexOf('site')
+    const sites = csv.split('\r\n').slice(1, 4).map(l => l.split(',')[siteCol])
     expect(sites).toEqual(['A', 'B', 'C'])
   })
 

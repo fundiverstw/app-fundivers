@@ -1589,6 +1589,7 @@ export interface Database {
           id: string
           user_id: string
           dive_number: number
+          title: string | null
           dived_on: string
           site: string
           dive_type: DiveType | null
@@ -1616,6 +1617,7 @@ export interface Database {
           user_id: string
           // Optional on insert — the trigger fills it in when omitted.
           dive_number?: number
+          title?: string | null
           dived_on: string
           site: string
           dive_type?: DiveType | null

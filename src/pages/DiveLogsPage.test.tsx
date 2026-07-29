@@ -55,6 +55,7 @@ const sampleRow = (overrides: Partial<DiveLog> = {}): DiveLog => ({
   id:                'd1',
   user_id:           'u1',
   dive_number:       1,
+  title:             null,
   dived_on:          '2026-04-30',
   site:              '蘭嶼東清灣',
   dive_type:         'shore',
@@ -105,6 +106,15 @@ describe('DiveLogsPage list view', () => {
     renderPage()
     expect(await screen.findByText(/蘭嶼東清灣/)).toBeInTheDocument()
   })
+
+  it('shows the dive title as the card heading, with #number · site beneath it', async () => {
+    fetchDiveLogsMock.mockResolvedValue([
+      sampleRow({ title: 'Manta cleaning station', dive_number: 12, site: 'Green Island' }),
+    ])
+    renderPage()
+    expect(await screen.findByText('Manta cleaning station')).toBeInTheDocument()
+    expect(screen.getByText(/#12 · Green Island/)).toBeInTheDocument()
+  })
 })
 
 describe('DiveLogsPage add flow', () => {
@@ -119,15 +129,15 @@ describe('DiveLogsPage add flow', () => {
     expect(screen.getByText(/new dive/i)).toBeInTheDocument()
 
     // Date defaults to today; site is required and starts empty.
-    const siteInput = screen.getAllByDisplayValue('').find(el => el.tagName === 'INPUT' && el.getAttribute('type') === 'text')!
-    await user.type(siteInput, 'Test Site')
+    await user.type(screen.getByLabelText(/site/i), 'Test Site')
     await user.click(screen.getByRole('button', { name: /save dive/i }))
 
     await waitFor(() => expect(createDiveLogMock).toHaveBeenCalledOnce())
     const arg = createDiveLogMock.mock.calls[0][0]
     expect(arg.site).toBe('Test Site')
     expect(arg.user_id).toBe('u1')
-    // dive_number is intentionally omitted so the DB trigger assigns it per-user.
+    // The pre-filled dive # was left unchanged, so it's omitted and the DB
+    // trigger assigns it per-user.
     expect(arg.dive_number).toBeUndefined()
 
     // Returns to list view with the new row visible.
@@ -145,6 +155,59 @@ describe('DiveLogsPage add flow', () => {
     await user.click(screen.getByRole('button', { name: /save dive/i }))
     expect(createDiveLogMock).not.toHaveBeenCalled()
     expect(screen.getByText(/new dive/i)).toBeInTheDocument()
+  })
+
+  it('sends an explicit dive number when the diver overrides the pre-filled one', async () => {
+    // No prior dives → the field pre-fills 1; the diver arriving with an
+    // existing logbook overwrites it to start their count at 247.
+    fetchDiveLogsMock.mockResolvedValue([])
+    createDiveLogMock.mockResolvedValue(sampleRow({ id: 'new', dive_number: 247, site: 'Test Site' }))
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => expect(fetchDiveLogsMock).toHaveBeenCalled())
+    await user.click(screen.getByRole('button', { name: /\+ add/i }))
+
+    await user.type(screen.getByLabelText(/site/i), 'Test Site')
+    const numberInput = screen.getByLabelText(/dive #/i)
+    await user.clear(numberInput)
+    await user.type(numberInput, '247')
+    await user.click(screen.getByRole('button', { name: /save dive/i }))
+
+    await waitFor(() => expect(createDiveLogMock).toHaveBeenCalledOnce())
+    expect(createDiveLogMock.mock.calls[0][0].dive_number).toBe(247)
+  })
+
+  it('saves a user-set dive title', async () => {
+    fetchDiveLogsMock.mockResolvedValue([])
+    createDiveLogMock.mockResolvedValue(sampleRow({ id: 'new', dive_number: 1, site: 'Test Site', title: 'Manta night dive' }))
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => expect(fetchDiveLogsMock).toHaveBeenCalled())
+    await user.click(screen.getByRole('button', { name: /\+ add/i }))
+
+    await user.type(screen.getByLabelText(/site/i), 'Test Site')
+    await user.type(screen.getByLabelText(/dive name/i), 'Manta night dive')
+    await user.click(screen.getByRole('button', { name: /save dive/i }))
+
+    await waitFor(() => expect(createDiveLogMock).toHaveBeenCalledOnce())
+    expect(createDiveLogMock.mock.calls[0][0].title).toBe('Manta night dive')
+  })
+
+  it('blocks a duplicate dive number with a friendly error and does not insert', async () => {
+    fetchDiveLogsMock.mockResolvedValue([sampleRow({ id: 'a', dive_number: 5, site: 'Old' })])
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByRole('button', { name: /edit dive 5/i })
+    await user.click(screen.getByRole('button', { name: /\+ add/i }))
+
+    await user.type(screen.getByLabelText(/site/i), 'New Site')
+    const numberInput = screen.getByLabelText(/dive #/i)
+    await user.clear(numberInput)
+    await user.type(numberInput, '5')
+    await user.click(screen.getByRole('button', { name: /save dive/i }))
+
+    expect(await screen.findByText(/already have a dive #5/i)).toBeInTheDocument()
+    expect(createDiveLogMock).not.toHaveBeenCalled()
   })
 })
 

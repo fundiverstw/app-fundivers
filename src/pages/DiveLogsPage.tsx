@@ -9,7 +9,7 @@ import {
 } from '../lib/dive-logs'
 import { GEAR_ITEMS } from '../lib/gear'
 import {
-  DIVE_LOG_BOUNDS, DIVE_LOG_TEXT_MAX, EARLIEST_DIVE_DATE, latestDiveDate,
+  DIVE_LOG_BOUNDS, DIVE_LOG_TEXT_MAX, DIVE_LOG_NUMBER_MAX, EARLIEST_DIVE_DATE, latestDiveDate,
   validateDiveLog, roundDiveLogNumbers, hasErrors,
   type NumericField, type DiveLogErrors,
 } from '../lib/dive-log-validation'
@@ -33,9 +33,13 @@ const dl = t.diveLogs
 // per 24 hours; UI shows a disabled-state countdown so the user doesn't
 // waste a click discovering it's rate-limited.
 
-type FormState = Omit<DiveLogInsert, 'user_id'>
+// dive_number is broken out so the form can hold null (blank ⇒ auto-assign on
+// a new dive) even though the Insert type only allows number | undefined.
+type FormState = Omit<DiveLogInsert, 'user_id' | 'dive_number'> & { dive_number?: number | null }
 
-const blankForm = (): FormState => ({
+const blankForm = (nextNumber: number): FormState => ({
+  dive_number:        nextNumber,
+  title:              null,
   dived_on:           todayIso(),
   site:               '',
   dive_type:          null,
@@ -59,6 +63,8 @@ const blankForm = (): FormState => ({
 
 function formFromRow(row: DiveLog): FormState {
   return {
+    dive_number:        row.dive_number,
+    title:              row.title,
     dived_on:           row.dived_on,
     site:               row.site,
     dive_type:          row.dive_type,
@@ -99,6 +105,12 @@ export function DiveLogsPage() {
   // to be accurate to the hour anyway, so compute-on-load is fine.
   const [hoursUntilExport, setHoursUntilExport] = useState<number | null>(null)
   const [exporting, setExporting] = useState(false)
+
+  // The number a brand-new dive is pre-filled with — one past the diver's
+  // highest so far (or 1 for their first). Left unchanged, it's sent as null so
+  // the trigger assigns it; the diver can overwrite it to start from an
+  // existing logbook count.
+  const nextDiveNumber = rows.length ? Math.max(...rows.map(r => r.dive_number)) + 1 : 1
 
   useEffect(() => {
     if (!user) return
@@ -147,19 +159,34 @@ export function DiveLogsPage() {
 
   async function handleSave(form: FormState, editingId: string | null) {
     if (!user) return
+    const { dive_number, ...rest } = form
     try {
       if (editingId) {
-        const updated = await updateDiveLog(editingId, form)
+        // Only send a number when one is present — a cleared field leaves the
+        // existing number untouched (the column is NOT NULL).
+        const patch: Partial<DiveLogInsert> = { ...rest }
+        if (dive_number != null) patch.dive_number = dive_number
+        const updated = await updateDiveLog(editingId, patch)
         setRows(prev => prev.map(r => r.id === editingId ? updated : r))
         toast.success(dl.updated)
       } else {
-        const created = await createDiveLog({ user_id: user.id, ...form })
+        // Blank, or left at the suggested next number ⇒ let the BEFORE INSERT
+        // trigger assign it (its advisory lock stops two tabs colliding). An
+        // explicit, different value is the diver starting from their own count.
+        const explicit = dive_number != null && dive_number !== nextDiveNumber ? { dive_number } : {}
+        const created = await createDiveLog({ user_id: user.id, ...rest, ...explicit })
         setRows(prev => [created, ...prev])
         toast.success(dl.logged(created.dive_number))
       }
       setView({ kind: 'list' })
     } catch (err) {
-      toast.error((err as Error).message)
+      // A racing insert/edit can still collide on UNIQUE(user_id, dive_number)
+      // past the client-side check — surface a friendly message, not raw SQL.
+      if (dive_number != null && (err as { code?: string }).code === '23505') {
+        toast.error(dl.errors.diveNumberTaken(dive_number))
+      } else {
+        toast.error((err as Error).message)
+      }
     }
   }
 
@@ -176,12 +203,19 @@ export function DiveLogsPage() {
   }
 
   if (view.kind === 'new' || view.kind === 'edit') {
+    const editingRow = view.kind === 'edit' ? view.row : null
+    // Numbers already used by the diver's OTHER dives — what a user-chosen
+    // number is validated against so a collision is caught before submit.
+    const takenNumbers = new Set(
+      rows.filter(r => r.id !== editingRow?.id).map(r => r.dive_number),
+    )
     return (
       <DiveLogForm
-        initial={view.kind === 'edit' ? formFromRow(view.row) : blankForm()}
-        editingNumber={view.kind === 'edit' ? view.row.dive_number : null}
-        onSave={(form) => handleSave(form, view.kind === 'edit' ? view.row.id : null)}
-        onDelete={view.kind === 'edit' ? () => handleDelete(view.row.id) : undefined}
+        initial={editingRow ? formFromRow(editingRow) : blankForm(nextDiveNumber)}
+        editingNumber={editingRow ? editingRow.dive_number : null}
+        takenNumbers={takenNumbers}
+        onSave={(form) => handleSave(form, editingRow ? editingRow.id : null)}
+        onDelete={editingRow ? () => handleDelete(editingRow.id) : undefined}
         onCancel={() => setView({ kind: 'list' })}
       />
     )
@@ -225,13 +259,16 @@ export function DiveLogsPage() {
               aria-label={dl.editAria(r.dive_number, r.dived_on, r.site)}
             >
               <div className="flex items-baseline justify-between gap-3">
-                <div className={`font-bold ${TEXT_HEADING}`}>
-                  #{r.dive_number} · {r.site}
+                <div className={`font-bold ${TEXT_HEADING} min-w-0 truncate`}>
+                  {r.title || `#${r.dive_number} · ${r.site}`}
                 </div>
-                <div className={`text-xs ${TEXT_SUBTLE}`}>
+                <div className={`text-xs ${TEXT_SUBTLE} shrink-0`}>
                   {format(parseIsoDate(r.dived_on), 'PP')}
                 </div>
               </div>
+              {r.title && (
+                <div className={`text-xs ${TEXT_SUBTLE}`}>#{r.dive_number} · {r.site}</div>
+              )}
               <div className={`text-xs ${TEXT_BODY} mt-1 flex flex-wrap gap-x-3 gap-y-0.5`}>
                 {r.max_depth_m != null && <span>{dl.maxDepthShort(r.max_depth_m)}</span>}
                 {r.dive_time_min != null && <span>{dl.diveTimeShort(r.dive_time_min)}</span>}
@@ -303,10 +340,11 @@ function ExportButton({
 }
 
 function DiveLogForm({
-  initial, editingNumber, onSave, onDelete, onCancel,
+  initial, editingNumber, takenNumbers, onSave, onDelete, onCancel,
 }: {
   initial: FormState
   editingNumber: number | null
+  takenNumbers: Set<number>
   onSave: (form: FormState) => void | Promise<void>
   onDelete?: () => void | Promise<void>
   onCancel: () => void
@@ -361,7 +399,7 @@ function DiveLogForm({
     // whatever gets past it and turns a driver-level overflow into a message
     // pointing at the offending box.
     const rounded = roundDiveLogNumbers(form)
-    const found = validateDiveLog(rounded)
+    const found = validateDiveLog(rounded, { takenNumbers })
     if (hasErrors(found)) {
       setErrors(found)
       return
@@ -383,6 +421,19 @@ function DiveLogForm({
       </div>
 
       <div className={`${CARD_ELEVATED} p-4 grid grid-cols-1 sm:grid-cols-2 gap-3`}>
+        <Field label={dl.name} wide error={errors.title}>
+          <input type="text" maxLength={DIVE_LOG_TEXT_MAX.title} className={INPUT}
+            placeholder={dl.namePlaceholder}
+            aria-invalid={errors.title ? true : undefined}
+            value={form.title ?? ''} onChange={e => setText('title', e.target.value)} />
+        </Field>
+
+        <Field label={dl.diveNumberField} error={errors.dive_number}>
+          <input type="number" min={1} max={DIVE_LOG_NUMBER_MAX} step={1} className={INPUT}
+            aria-invalid={errors.dive_number ? true : undefined}
+            value={form.dive_number ?? ''} onChange={e => setNum('dive_number', e.target.value)} />
+          <span className={`mt-1 block text-xs ${TEXT_MUTED}`}>{dl.diveNumberHint}</span>
+        </Field>
         <Field label={dl.date} required error={errors.dived_on}>
           <DateField required className={INPUT} value={form.dived_on}
             min={EARLIEST_DIVE_DATE} max={latestDiveDate()}

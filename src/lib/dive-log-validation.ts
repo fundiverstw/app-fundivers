@@ -61,12 +61,18 @@ export const NUMERIC_FIELDS = Object.keys(DIVE_LOG_BOUNDS) as NumericField[]
 // These are limits on what a logbook entry is reasonably made of, and they
 // stop a paste of an entire document from becoming a row.
 export const DIVE_LOG_TEXT_MAX = {
+  title: 120,
   site: 120,
   weather: 60,
   buddy_name: 120,
   instructor_name: 120,
   notes: 2000,
 } as const
+
+// Upper bound on a user-set dive number. Recreational logbooks never approach
+// this; it exists to reject a typo or a paste from becoming an integer that
+// overflows or renders absurdly. The column itself is a plain integer.
+export const DIVE_LOG_NUMBER_MAX = 100_000
 
 export type TextField = keyof typeof DIVE_LOG_TEXT_MAX
 
@@ -80,12 +86,15 @@ export function latestDiveDate(): string {
   return addIsoDays(todayIso(), 1)
 }
 
-export type DiveLogField = NumericField | TextField | 'dived_on'
+export type DiveLogField = NumericField | TextField | 'dived_on' | 'dive_number'
 export type DiveLogErrors = Partial<Record<DiveLogField, string>>
 
 type Numbers = Partial<Record<NumericField, number | null | undefined>>
 type Texts = Partial<Record<TextField, string | null | undefined>>
-export type ValidatableDiveLog = Numbers & Texts & { dived_on?: string | null }
+export type ValidatableDiveLog = Numbers & Texts & {
+  dived_on?: string | null
+  dive_number?: number | null
+}
 
 /**
  * Snap each number to the decimal places its column keeps.
@@ -110,9 +119,26 @@ export function roundDiveLogNumbers<T extends ValidatableDiveLog>(form: T): T {
  * Field-keyed messages for everything wrong with the entry, empty when it is
  * safe to send. Runs against already-rounded numbers.
  */
-export function validateDiveLog(form: ValidatableDiveLog): DiveLogErrors {
+export function validateDiveLog(
+  form: ValidatableDiveLog,
+  opts?: { takenNumbers?: Set<number> },
+): DiveLogErrors {
   const errors: DiveLogErrors = {}
   const e = t.diveLogs.errors
+
+  // dive_number is optional on a new entry (blank ⇒ the trigger auto-assigns
+  // the next per-diver number). When the diver DOES set one it must be a
+  // positive whole number not already used by another of their dives.
+  const num = form.dive_number
+  if (num != null) {
+    if (!Number.isFinite(num) || !Number.isInteger(num)) {
+      errors.dive_number = e.diveNumberWhole
+    } else if (num < 1 || num > DIVE_LOG_NUMBER_MAX) {
+      errors.dive_number = e.diveNumberRange(1, DIVE_LOG_NUMBER_MAX)
+    } else if (opts?.takenNumbers?.has(num)) {
+      errors.dive_number = e.diveNumberTaken(num)
+    }
+  }
 
   if (!form.site?.trim()) errors.site = e.siteRequired
 

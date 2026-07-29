@@ -186,3 +186,26 @@ describe('hasErrors', () => {
     expect(hasErrors(validateDiveLog({ ...valid, weight_kg: 999 }))).toBe(true)
   })
 })
+
+describe('validateDiveLog — dive_number', () => {
+  it('accepts a null dive number (blank ⇒ the trigger auto-assigns)', () => {
+    expect(validateDiveLog({ ...valid, dive_number: null })).toEqual({})
+  })
+
+  it('accepts a positive whole number', () => {
+    expect(validateDiveLog({ ...valid, dive_number: 247 })).toEqual({})
+  })
+
+  it('rejects a non-integer or non-positive number', () => {
+    expect(validateDiveLog({ ...valid, dive_number: 2.5 }).dive_number).toBeTruthy()
+    expect(validateDiveLog({ ...valid, dive_number: 0 }).dive_number).toBeTruthy()
+    expect(validateDiveLog({ ...valid, dive_number: -3 }).dive_number).toBeTruthy()
+  })
+
+  it('flags a number already used by another of the diver\'s dives', () => {
+    const taken = new Set([5, 6])
+    expect(validateDiveLog({ ...valid, dive_number: 5 }, { takenNumbers: taken }).dive_number).toBeTruthy()
+    // A free number passes.
+    expect(validateDiveLog({ ...valid, dive_number: 7 }, { takenNumbers: taken })).toEqual({})
+  })
+})

@@ -7,6 +7,7 @@
 // (id/date/site → conditions → tank → people → notes).
 export const DIVE_LOG_CSV_COLUMNS = [
   'dive_number',
+  'title',
   'dived_on',
   'site',
   'dive_type',
