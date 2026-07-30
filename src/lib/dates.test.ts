@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { isoDate, todayIso, parseIsoDate, addIsoDays, formatTimestampDay } from './dates'
+import { isoDate, todayIso, parseIsoDate, addIsoDays, formatTimestampDay, diffIsoDays } from './dates'
 import { siteConfig } from '../config/site'
 
 afterEach(() => { vi.useRealTimers() })
@@ -103,5 +103,37 @@ describe('formatTimestampDay', () => {
   it('returns null instead of throwing on an unparseable value', () => {
     expect(formatTimestampDay('not a date')).toBeNull()
     expect(formatTimestampDay('undefined')).toBeNull()
+  })
+})
+
+describe('diffIsoDays', () => {
+  it('counts whole days forward and back', () => {
+    expect(diffIsoDays('2026-08-01', '2026-08-08')).toBe(7)
+    expect(diffIsoDays('2026-08-08', '2026-08-01')).toBe(-7)
+    expect(diffIsoDays('2026-08-01', '2026-08-01')).toBe(0)
+  })
+
+  it('crosses months and years', () => {
+    expect(diffIsoDays('2026-08-30', '2026-09-02')).toBe(3)
+    expect(diffIsoDays('2026-12-31', '2027-01-01')).toBe(1)
+  })
+
+  it('counts the leap day', () => {
+    expect(diffIsoDays('2028-02-28', '2028-03-01')).toBe(2)
+    expect(diffIsoDays('2027-02-28', '2027-03-01')).toBe(1)
+  })
+
+  // Whole-day arithmetic must not pick up an hour of DST drift, whatever
+  // timezone a fork of this app runs in.
+  it('is a whole number across a northern-hemisphere DST switch', () => {
+    expect(diffIsoDays('2026-03-01', '2026-04-01')).toBe(31)
+    expect(diffIsoDays('2026-10-01', '2026-11-01')).toBe(31)
+  })
+
+  it('round-trips against addIsoDays', () => {
+    const from = '2026-08-01'
+    for (const days of [1, 13, 40, 365]) {
+      expect(diffIsoDays(from, addIsoDays(from, days))).toBe(days)
+    }
   })
 })

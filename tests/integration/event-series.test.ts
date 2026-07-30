@@ -3,6 +3,9 @@ import {
   adminClient, anonClient, userClient,
   createTestUser, deleteTestUser, type TestUser,
 } from './helpers'
+import { occurrenceDates } from '../../src/lib/recurrence'
+import { shiftFormToDate, seriesAnchor } from '../../src/lib/event-series'
+import { eventPayloadFromForm, EMPTY_FORM, type FormState } from '../../src/components/admin/event-form-state'
 
 // The recurring-events schema (20260804000000_event_series.sql).
 //
@@ -208,6 +211,115 @@ describe('event_series RLS', () => {
     } finally {
       await admin.from('events').delete().eq('id', eventId)
       await admin.from('event_series').delete().eq('id', seriesId)
+    }
+  })
+})
+
+// The generator builds its rows from the same pure helpers the app does, so
+// inserting them here is what proves a generated occurrence actually satisfies
+// every constraint on `events` — events_dive_has_start and
+// events_course_has_days in particular, which differ by kind.
+describe('generated occurrences satisfy the events constraints', () => {
+  async function generate(form: FormState, count: number) {
+    const seriesId = await mintSeries({ kind: form.type })
+    const anchor = seriesAnchor(form)!
+    const dates = occurrenceDates({ freq: 'weekly', interval: 1, weekdays: [6], count }, anchor)
+    const rows = dates.map(date => ({
+      ...eventPayloadFromForm(shiftFormToDate(form, date)),
+      series_id: seriesId,
+    }))
+    const { error } = await admin.from('events').insert(rows as never)
+    return { seriesId, dates, error }
+  }
+
+  async function cleanup(seriesId: string) {
+    await admin.from('events').delete().eq('series_id', seriesId)
+    await admin.from('event_series').delete().eq('id', seriesId)
+  }
+
+  it('inserts a batch of dives as one statement, all sharing the series', async () => {
+    const form: FormState = {
+      ...EMPTY_FORM, type: 'dive', admin_title: 'Saturday boat dive',
+      start_date: '2031-05-03', notes: 'bring a torch', capacity: '8',
+    }
+    const { seriesId, dates, error } = await generate(form, 4)
+    try {
+      expect(error).toBeNull()
+      const { data } = await admin.from('events')
+        .select('start_date, capacity, series_id, notes')
+        .eq('series_id', seriesId).order('start_date')
+      const rows = (data ?? []) as Array<{ start_date: string; capacity: number; notes: string }>
+      expect(rows.map(r => r.start_date)).toEqual(dates)
+      // The template's own fields ride along unchanged on every occurrence.
+      expect(rows.every(r => r.capacity === 8 && r.notes === 'bring a torch')).toBe(true)
+    } finally {
+      await cleanup(seriesId)
+    }
+  })
+
+  it('shifts a multi-day course block, keeping its gaps and its day count', async () => {
+    const form: FormState = {
+      ...EMPTY_FORM, type: 'course', admin_title: 'Open Water',
+      course_name: 'Open Water',
+      // Sat, Sun, then the FOLLOWING Sat — the shape must survive the shift.
+      courseDays: ['2031-05-03', '2031-05-04', '2031-05-10'],
+    }
+    const { seriesId, error } = await generate(form, 3)
+    try {
+      expect(error).toBeNull()
+      const { data } = await admin.from('events')
+        .select('course_days, start_date').eq('series_id', seriesId)
+      const rows = (data ?? []) as Array<{ course_days: string[]; start_date: string | null }>
+      expect(rows).toHaveLength(3)
+      const sets = rows.map(r => r.course_days.map(d => String(d).slice(0, 10)).sort())
+      expect(sets).toContainEqual(['2031-05-03', '2031-05-04', '2031-05-10'])
+      expect(sets).toContainEqual(['2031-05-10', '2031-05-11', '2031-05-17'])
+      expect(sets).toContainEqual(['2031-05-17', '2031-05-18', '2031-05-24'])
+      // A course carries no envelope; events_course_has_days is what it satisfies.
+      expect(rows.every(r => r.start_date === null)).toBe(true)
+    } finally {
+      await cleanup(seriesId)
+    }
+  })
+
+  it('carries the shifted cancellation and payment deadlines, not the template\'s', async () => {
+    const form: FormState = {
+      ...EMPTY_FORM, type: 'dive', admin_title: 'Deadline dive', notes: '',
+      start_date: '2031-06-07', cancel_date: '2031-06-05', full_payment_deadline: '2031-05-31',
+    }
+    const { seriesId, error } = await generate(form, 3)
+    try {
+      expect(error).toBeNull()
+      const { data } = await admin.from('events')
+        .select('start_date, cancel_date, full_payment_deadline')
+        .eq('series_id', seriesId).order('start_date')
+      const rows = (data ?? []) as Array<{ start_date: string; cancel_date: string; full_payment_deadline: string }>
+      // Every occurrence keeps the same two-day / seven-day lead time.
+      for (const r of rows) {
+        const start = new Date(r.start_date).getTime()
+        expect((start - new Date(r.cancel_date).getTime()) / 86_400_000).toBe(2)
+        expect((start - new Date(r.full_payment_deadline).getTime()) / 86_400_000).toBe(7)
+      }
+      expect(rows.map(r => r.cancel_date)).toEqual(['2031-06-05', '2031-06-12', '2031-06-19'])
+    } finally {
+      await cleanup(seriesId)
+    }
+  })
+
+  it('rejects the whole batch rather than half of it when a row is invalid', async () => {
+    // A dive with no start_date violates events_dive_has_start; because the
+    // occurrences go in as one statement, none of them should land.
+    const seriesId = await mintSeries()
+    try {
+      const { error } = await admin.from('events').insert([
+        { kind: 'dive', admin_title: 'good', start_date: '2031-07-05', notes: '', series_id: seriesId },
+        { kind: 'dive', admin_title: 'bad', start_date: null, notes: '', series_id: seriesId },
+      ] as never)
+      expect(error).not.toBeNull()
+      const { data } = await admin.from('events').select('id').eq('series_id', seriesId)
+      expect(data ?? []).toEqual([])
+    } finally {
+      await cleanup(seriesId)
     }
   })
 })

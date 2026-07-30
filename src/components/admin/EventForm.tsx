@@ -81,10 +81,11 @@ export interface EventFormProps {
   onCancel: () => void
   /** Override the submit button text (defaults to "Create dive/course" or "Save changes"). */
   submitLabel?: string
-  /** Extra create-mode section (e.g. car assignment) rendered above the submit
-   *  buttons. Receives the current event type so it can show only for dives.
+  /** Extra create-mode section (car assignment, recurrence) rendered above the
+   *  submit buttons. Receives the live form so it can key off the kind AND the
+   *  dates already entered — a repeat pattern is meaningless without an anchor.
    *  Edit mode has its own persisted sections, so this is ignored there. */
-  renderCreateExtras?: (type: FormState['type']) => React.ReactNode
+  renderCreateExtras?: (form: FormState) => React.ReactNode
 }
 
 export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, renderCreateExtras }: EventFormProps) {
@@ -855,7 +856,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
         )}
       </Section>
 
-      {mode === 'create' && renderCreateExtras?.(form.type)}
+      {mode === 'create' && renderCreateExtras?.(form)}
 
       {error && (
         <p className="text-sm text-red-200 bg-red-900/50 border border-accent rounded-md p-2">{error}</p>

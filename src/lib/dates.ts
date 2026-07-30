@@ -65,3 +65,18 @@ export function formatTimestampDay(iso: string | null | undefined): string | nul
   const d = new Date(iso)
   return Number.isNaN(d.getTime()) ? null : format(d, 'MMM d, yyyy')
 }
+
+/**
+ * Whole calendar days from `from` to `to` (negative when `to` is earlier).
+ *
+ * Computed in UTC on purpose. The local-midnight arithmetic used elsewhere in
+ * this module is right for RENDERING a calendar date, but subtracting two local
+ * midnights across a DST boundary yields 23 or 25 hours and a fractional day
+ * count. Date.UTC has no such boundaries, and the difference between two
+ * calendar dates doesn't depend on a timezone anyway.
+ */
+export function diffIsoDays(from: string, to: string): number {
+  const [y1, m1, d1] = from.split('-').map(Number)
+  const [y2, m2, d2] = to.split('-').map(Number)
+  return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86_400_000)
+}
