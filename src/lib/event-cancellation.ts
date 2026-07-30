@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { issueCancellationCredits } from './credits'
 import type { AppEvent } from '../types/database'
 
 // Push worker base URL (same host as the other /admin-* endpoints). Empty
@@ -34,4 +35,49 @@ async function postCancellationPush(eventId: string, eventType: AppEvent['type']
     },
     body: JSON.stringify({ event_id: eventId, event_type: eventType }),
   })
+}
+
+export interface CancelEventResult {
+  /** Divers issued a cancellation credit. */
+  credited: number
+  creditedAmount: number
+  /** Set when the credits failed AFTER the cancellation committed — the event
+   *  IS cancelled, and the shop has to issue those credits by hand. */
+  creditError: unknown
+}
+
+/**
+ * Cancel one event and do everything that has to follow: notify the
+ * registrants, then credit each of them what they paid.
+ *
+ * Extracted so the "cancel the rest of this series" action cannot drift from
+ * the single-event one. A bulk UPDATE over the remaining occurrences would be
+ * two lines and silently skip both follow-ups — divers on the later dates would
+ * find their dive gone with no message and no refund.
+ *
+ * Throws only if the cancellation itself fails. The notify is fire-and-forget
+ * by design, and a credit failure is reported rather than thrown because the
+ * cancellation has already committed and cannot be undone by rejecting here.
+ */
+export async function cancelEventAndFollowUp(args: {
+  event: AppEvent
+  createdBy: string | null
+  at?: string
+}): Promise<CancelEventResult> {
+  const { event, createdBy, at } = args
+  const { error } = await supabase
+    .from('events')
+    .update({ cancelled_at: at ?? new Date().toISOString() } as never)
+    .eq('id', event.id)
+  if (error) throw error
+
+  notifyEventCancelled(event.id, event.type).catch(() => { /* best-effort */ })
+
+  if (!createdBy) return { credited: 0, creditedAmount: 0, creditError: null }
+  try {
+    const { issued, totalAmount } = await issueCancellationCredits({ event, createdBy })
+    return { credited: issued, creditedAmount: totalAmount, creditError: null }
+  } catch (creditError) {
+    return { credited: 0, creditedAmount: 0, creditError }
+  }
 }

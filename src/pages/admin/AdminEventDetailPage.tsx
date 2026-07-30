@@ -10,6 +10,7 @@ import { errorMessage } from '../../lib/errors'
 import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
 import { notifyRefundApproved, rejectRefundRequest } from '../../lib/refunds'
 import { AdminNotes } from '../../components/admin/AdminNotes'
+import { EventSeriesSection } from '../../components/admin/EventSeriesSection'
 import { AdminAddDiverModal } from '../../components/admin/AdminAddDiverModal'
 import { EventStaffSection } from '../../components/admin/EventStaffSection'
 import { RegisterForm } from '../../components/register/RegisterForm'
@@ -571,6 +572,8 @@ export function AdminEventDetailPage() {
               readOnly={!isAdmin}
             />
           )}
+          {/* Renders nothing for a one-off event; it resolves its own series. */}
+          <EventSeriesSection eventId={id} onChanged={() => setRefreshKey(k => k + 1)} />
           <AdminNotes target={{ kind: 'event', id }} title={ed.memos} />
         </>
       )}

@@ -4,6 +4,8 @@ import { usesCourseDays } from './event-kinds'
 import { occurrenceDates, datesAfter, type RecurrenceRule } from './recurrence'
 import { eventPayloadFromForm, type FormState } from '../components/admin/event-form-state'
 import { saveEventRelations } from './event-relations'
+import { fetchEventsForBookings } from './events'
+import { cancelEventAndFollowUp } from './event-cancellation'
 import type { EventRow, EventSeries } from '../types/database'
 
 // Turning one filled-in event form plus a recurrence rule into a batch of real
@@ -209,4 +211,113 @@ export async function extendSeries(
 
   for (const row of rows) await saveEventRelations(row.id, template)
   return { eventIds: rows.map(r => r.id), dates }
+}
+
+// ── Series-wide operations ───────────────────────────────────────────────────
+
+/** Occurrences strictly after `fromDate` that aren't already cancelled. */
+export function laterOccurrences(rows: EventRow[], fromDate: string): EventRow[] {
+  return sortOccurrences(rows).filter(row => {
+    const date = occurrenceDate(row)
+    return !!date && date > fromDate && !row.cancelled_at
+  })
+}
+
+/**
+ * Date fields are deliberately NOT carried when an edit is pushed to later
+ * occurrences.
+ *
+ * Copying them would collapse every remaining Saturday onto the edited one's
+ * date — the single worst thing this feature could do. The deadlines go with
+ * them because they are derived from each occurrence's own start: keeping the
+ * edited event's cancel_date would put occurrence eight's deadline in the past,
+ * the same trap shiftFormToDate exists to avoid.
+ */
+const PER_OCCURRENCE_FIELDS = [
+  'start_date', 'end_date', 'course_days', 'cancel_date', 'full_payment_deadline',
+] as const
+
+/** The edited event's settings, minus anything specific to its own date. */
+export function sharedPatchFromForm(form: FormState): Record<string, unknown> {
+  const payload = { ...eventPayloadFromForm(form) }
+  for (const field of PER_OCCURRENCE_FIELDS) delete payload[field]
+  return payload
+}
+
+/**
+ * Push one occurrence's settings onto every later occurrence in its series.
+ * Returns how many rows were touched.
+ */
+export async function applyToLaterOccurrences(
+  seriesId: string, fromDate: string, form: FormState,
+): Promise<number> {
+  const rows = await fetchSeriesOccurrences(seriesId)
+  const targets = laterOccurrences(rows, fromDate)
+  if (targets.length === 0) return 0
+  const { error } = await supabase
+    .from('events')
+    .update(sharedPatchFromForm(form) as never)
+    .in('id', targets.map(r => r.id))
+  if (error) throw error
+  return targets.length
+}
+
+/**
+ * Cancel every later occurrence in the series, each with the notification and
+ * the diver credits a single cancellation does.
+ *
+ * Sequential on purpose: each cancellation writes credit rows and fires two
+ * notification backends, and firing fifty of those at once is how you get rate
+ * limits and half-sent batches. A failure stops the run and reports what got
+ * through, so the shop knows exactly where to resume.
+ */
+export interface CancelLaterResult {
+  cancelled: number
+  credited: number
+  creditedAmount: number
+  /** Occurrences whose credits failed after their cancellation committed. */
+  creditFailures: number
+  /** Set when the run stopped early; the count above is what did land. */
+  stoppedBy: unknown
+}
+
+export async function cancelLaterOccurrences(args: {
+  seriesId: string
+  fromDate: string
+  createdBy: string | null
+}): Promise<CancelLaterResult> {
+  const { seriesId, fromDate, createdBy } = args
+  const targets = laterOccurrences(await fetchSeriesOccurrences(seriesId), fromDate)
+
+  // The credit maths needs a built AppEvent (currency, price, the whole
+  // envelope), not the raw row — so go through the same builder every other
+  // surface uses rather than hand-rolling a conversion here.
+  const built = await fetchEventsForBookings(targets.map(r => r.id))
+
+  const result: CancelLaterResult = {
+    cancelled: 0, credited: 0, creditedAmount: 0, creditFailures: 0, stoppedBy: null,
+  }
+  for (const row of targets) {
+    const event = built.get(row.id)
+    if (!event) continue
+    try {
+      const one = await cancelEventAndFollowUp({ event, createdBy })
+      result.cancelled += 1
+      result.credited += one.credited
+      result.creditedAmount += one.creditedAmount
+      if (one.creditError) result.creditFailures += 1
+    } catch (err) {
+      result.stoppedBy = err
+      break
+    }
+  }
+  return result
+}
+
+/** The series an event belongs to, or null for a one-off. */
+export async function fetchEventSeriesId(eventId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('events').select('series_id').eq('id', eventId).maybeSingle()
+  if (error) throw error
+  return (data as { series_id: string | null } | null)?.series_id ?? null
 }

@@ -7,6 +7,7 @@ import {
 } from '../../lib/recurrence'
 import { parseIsoDate } from '../../lib/dates'
 import { t } from '../../i18n'
+import { TEXT_ERROR } from '../../styles/tokens'
 
 const rc = t.admin.recurrence
 
@@ -178,7 +179,7 @@ export function RecurrenceFields({ anchor, onChange }: RecurrenceFieldsProps) {
           </div>
 
           {problems.length > 0 ? (
-            <ul className="text-xs text-red-700 font-medium space-y-0.5">
+            <ul className={`text-xs space-y-0.5 ${TEXT_ERROR}`}>
               {problems.map(p => <li key={p.field}>{p.message}</li>)}
             </ul>
           ) : (

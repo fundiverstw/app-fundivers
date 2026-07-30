@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { seriesAnchor, shiftFormToDate, occurrenceDate, sortOccurrences } from './event-series'
+import {
+  seriesAnchor, shiftFormToDate, occurrenceDate, sortOccurrences,
+  laterOccurrences, sharedPatchFromForm,
+} from './event-series'
 import { EMPTY_FORM, type FormState } from '../components/admin/event-form-state'
 import type { EventRow } from '../types/database'
 
@@ -151,5 +154,56 @@ describe('sortOccurrences', () => {
     const rows = [row({ id: 'b', start_date: '2026-08-08' }), row({ id: 'a', start_date: '2026-08-01' })]
     sortOccurrences(rows)
     expect(rows.map(r => r.id)).toEqual(['b', 'a'])
+  })
+})
+
+describe('laterOccurrences', () => {
+  const series = [
+    row({ id: 'a', start_date: '2026-08-01' }),
+    row({ id: 'b', start_date: '2026-08-08' }),
+    row({ id: 'c', start_date: '2026-08-15', cancelled_at: '2026-07-01T00:00:00Z' }),
+    row({ id: 'd', start_date: '2026-08-22' }),
+  ]
+
+  it('takes only what comes strictly after the given date', () => {
+    expect(laterOccurrences(series, '2026-08-08').map(r => r.id)).toEqual(['d'])
+  })
+
+  it('excludes the given date itself, so an action never hits its own event', () => {
+    expect(laterOccurrences(series, '2026-08-01').map(r => r.id)).not.toContain('a')
+  })
+
+  // Re-cancelling an already-cancelled occurrence would fire a second round of
+  // notifications and credits at divers who already got them.
+  it('skips occurrences that are already cancelled', () => {
+    expect(laterOccurrences(series, '2026-07-01').map(r => r.id)).toEqual(['a', 'b', 'd'])
+  })
+
+  it('is empty for the last occurrence', () => {
+    expect(laterOccurrences(series, '2026-08-22')).toEqual([])
+  })
+})
+
+describe('sharedPatchFromForm', () => {
+  // Copying dates onto later occurrences would collapse the whole series onto
+  // one day. This is the guard against that.
+  it('carries settings but never any date field', () => {
+    const patch = sharedPatchFromForm(dive({
+      capacity: '10', start_date: '2026-08-01', end_date: '2026-08-02',
+      cancel_date: '2026-07-30', full_payment_deadline: '2026-07-25',
+    }))
+    expect(patch.capacity).toBe(10)
+    expect(patch).not.toHaveProperty('start_date')
+    expect(patch).not.toHaveProperty('end_date')
+    expect(patch).not.toHaveProperty('cancel_date')
+    expect(patch).not.toHaveProperty('full_payment_deadline')
+    expect(patch).not.toHaveProperty('course_days')
+  })
+
+  it('carries a course\'s own settings without its day list', () => {
+    const patch = sharedPatchFromForm(course({ course_name: 'Open Water', included: 'gear' }))
+    expect(patch.course_name).toBe('Open Water')
+    expect(patch.included).toBe('gear')
+    expect(patch).not.toHaveProperty('course_days')
   })
 })
