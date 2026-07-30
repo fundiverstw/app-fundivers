@@ -77,15 +77,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      # The official installer rather than a third-party setup action: the other
-      # jobs pin their actions by SHA, and this keeps the supply chain to one
-      # first-party source with the version pinned explicitly. Keep DENO_VERSION
-      # in step with what the shop runs locally.
-      - name: Install Deno
-        env:
-          DENO_VERSION: v2.9.0
-        run: |
-          curl -fsSL https://deno.land/install.sh \
-            | DENO_INSTALL="$HOME/.deno" sh -s "$DENO_VERSION"
-          echo "$HOME/.deno/bin" >> "$GITHUB_PATH"
+      - uses: denoland/setup-deno@e95548e56dfa95d4e1a28d6f422fafe75c4c26fb # v2.0.3
+        with:
+          deno-version: v2.x
       - run: bash scripts/check-edge.sh
