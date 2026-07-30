@@ -3,7 +3,6 @@ import { addIsoDays, diffIsoDays } from './dates'
 import { usesCourseDays } from './event-kinds'
 import { occurrenceDates, datesAfter, type RecurrenceRule } from './recurrence'
 import { eventPayloadFromForm, type FormState } from '../components/admin/event-form-state'
-import { saveEventRelations } from './event-relations'
 import { fetchEventsForBookings } from './events'
 import { cancelEventAndFollowUp } from './event-cancellation'
 import type { EventRow, EventSeries } from '../types/database'
@@ -58,79 +57,61 @@ export function shiftFormToDate(form: FormState, target: string): FormState {
   return next
 }
 
-export interface CreateSeriesArgs {
+export interface CreateEventsArgs {
   form: FormState
-  rule: RecurrenceRule
-  createdBy: string | null
+  /** Omit for a one-off event; give a rule to generate a batch. */
+  rule?: RecurrenceRule | null
   label?: string
-  /** Cars to assign to every occurrence, as the create form already does for one. */
-  assignVehicles?: (eventId: string, type: FormState['type']) => Promise<void>
+  vehicleIds?: string[]
+  createdBy: string | null
 }
 
-export interface CreateSeriesResult {
-  seriesId: string
-  /** Occurrence ids in date order; the first is the template's own date. */
+export interface CreateEventsResult {
+  /** New event ids in date order; the first is the template's own date. */
   eventIds: string[]
   dates: string[]
-  /** Occurrences whose junction rows (rooms / add-ons / cars) failed to save.
-   *  The events exist and are correct; only the extras need a manual fix. */
-  relationFailures: string[]
 }
 
 /**
- * Insert the series and its occurrences.
+ * Create one event, or a whole recurrence batch, in a single transaction.
  *
- * The events go in as ONE insert so the batch is all-or-nothing: a partial
- * series — some Saturdays bookable, some not — is worse than none, and PostgREST
- * gives us a single statement for free here. Junctions and cars are written
- * afterwards per occurrence and reported rather than thrown, because an event
- * missing its add-ons is fixable by editing it, while rolling back eight
- * already-inserted events is not.
+ * Everything goes through create_events_with_relations: the events, their
+ * room / add-on / destination junctions, their car allocations and the series
+ * row all land together or not at all. Doing it from the browser took 3 round
+ * trips for one event and 2 + 2N for a batch, any of which could fail on its
+ * own and leave a half-generated series that the client could report but not
+ * undo.
  */
-export async function createEventSeries(args: CreateSeriesArgs): Promise<CreateSeriesResult> {
-  const { form, rule, createdBy, label, assignVehicles } = args
+export async function createEvents(args: CreateEventsArgs): Promise<CreateEventsResult> {
+  const { form, rule, label, vehicleIds = [], createdBy } = args
   const anchor = seriesAnchor(form)
-  if (!anchor) throw new Error('the event needs a date before it can repeat')
+  if (rule && !anchor) throw new Error('the event needs a date before it can repeat')
 
-  const dates = occurrenceDates(rule, anchor)
+  const dates = rule && anchor ? occurrenceDates(rule, anchor) : []
+  const payloads = dates.length > 0
+    ? dates.map(date => eventPayloadFromForm(shiftFormToDate(form, date)))
+    : [eventPayloadFromForm(form)]
 
-  const { data: series, error: seriesErr } = await supabase
-    .from('event_series')
-    .insert({
-      kind: form.type,
-      freq: rule.freq,
-      interval: rule.interval,
-      weekdays: rule.freq === 'weekly' ? (rule.weekdays ?? null) : null,
-      label: label?.trim() || null,
-      created_by: createdBy,
-    } as never)
-    .select('id')
-    .single()
-  if (seriesErr) throw seriesErr
-  const seriesId = (series as { id: string }).id
-
-  const rows = dates.map(date => ({
-    id: crypto.randomUUID(),
-    ...eventPayloadFromForm(shiftFormToDate(form, date)),
-    series_id: seriesId,
-  }))
-  const { error: eventsErr } = await supabase.from('events').insert(rows as never)
-  if (eventsErr) {
-    // Nothing points at the series now, so leave no orphan rule behind.
-    await supabase.from('event_series').delete().eq('id', seriesId)
-    throw eventsErr
-  }
-
-  const relationFailures: string[] = []
-  for (const row of rows) {
-    const relError = await saveEventRelations(row.id, form)
-    if (relError) { relationFailures.push(row.id); continue }
-    if (assignVehicles) {
-      try { await assignVehicles(row.id, form.type) } catch { relationFailures.push(row.id) }
-    }
-  }
-
-  return { seriesId, eventIds: rows.map(r => r.id), dates, relationFailures }
+  const { data, error } = await supabase.rpc('create_events_with_relations', {
+    p_events: payloads,
+    p_room_ids: form.roomIds,
+    p_addon_ids: form.addonIds,
+    p_destination_ids: form.destinationIds,
+    p_vehicle_ids: vehicleIds,
+    p_series: rule
+      ? {
+          kind: form.type,
+          freq: rule.freq,
+          interval: rule.interval,
+          weekdays: rule.freq === 'weekly' ? (rule.weekdays ?? null) : null,
+          label: label?.trim() || null,
+        }
+      : null,
+    p_created_by: createdBy,
+  })
+  if (error) throw error
+  const eventIds = (data ?? []) as string[]
+  return { eventIds, dates: dates.length > 0 ? dates : [anchor].filter((d): d is string => !!d) }
 }
 
 export async function fetchSeries(seriesId: string): Promise<EventSeries | null> {
@@ -199,18 +180,21 @@ export async function extendSeries(
 
   const rule = ruleFromSeries(series, howMany)
   const dates = datesAfter(rule, lastDate, howMany)
+  // The last occurrence is the template, so any edit the shop has since made to
+  // the series carries forward into the new dates.
   const template = formFromRow(last)
 
-  const rows = dates.map(date => ({
-    id: crypto.randomUUID(),
-    ...eventPayloadFromForm(shiftFormToDate(template, date)),
-    series_id: seriesId,
-  }))
-  const { error } = await supabase.from('events').insert(rows as never)
+  // p_series_id rather than p_series: these join the existing batch instead of
+  // starting another one. Same single transaction as the initial create.
+  const { data, error } = await supabase.rpc('create_events_with_relations', {
+    p_events: dates.map(date => eventPayloadFromForm(shiftFormToDate(template, date))),
+    p_room_ids: template.roomIds,
+    p_addon_ids: template.addonIds,
+    p_destination_ids: template.destinationIds,
+    p_series_id: seriesId,
+  })
   if (error) throw error
-
-  for (const row of rows) await saveEventRelations(row.id, template)
-  return { eventIds: rows.map(r => r.id), dates }
+  return { eventIds: (data ?? []) as string[], dates }
 }
 
 // ── Series-wide operations ───────────────────────────────────────────────────

@@ -323,3 +323,149 @@ describe('generated occurrences satisfy the events constraints', () => {
     }
   })
 })
+
+// create_events_with_relations (20260805000000). The property under test is
+// all-or-nothing: before it, a batch was 2 + 2N round trips from the browser and
+// a failure partway left a half-generated series nobody could undo.
+describe('create_events_with_relations', () => {
+  const baseEvent = (over: Record<string, unknown> = {}) => ({
+    kind: 'dive', admin_title: 'atomic dive', notes: '', start_date: '2032-01-03',
+    fully_booked: false, featured: false, is_private: false,
+    is_boat_dive: false, is_trip: false, nitrox_required: false,
+    ...over,
+  })
+
+  async function cleanupTitles(prefix: string) {
+    await admin.from('events').delete().like('admin_title', `${prefix}%`)
+    await admin.from('event_series').delete().like('label', `${prefix}%`)
+  }
+
+  it('creates one event with no series when no rule is given', async () => {
+    const { data, error } = await admin.rpc('create_events_with_relations', {
+      p_events: [baseEvent({ admin_title: 'atomic-one A' })],
+    })
+    try {
+      expect(error).toBeNull()
+      expect((data as string[]).length).toBe(1)
+      const { data: row } = await admin.from('events')
+        .select('series_id, start_date').eq('id', (data as string[])[0]).single()
+      expect((row as { series_id: string | null }).series_id).toBeNull()
+    } finally {
+      await cleanupTitles('atomic-one')
+    }
+  })
+
+  it('creates a series and points every event at it, in the order given', async () => {
+    const { data, error } = await admin.rpc('create_events_with_relations', {
+      p_events: [
+        baseEvent({ admin_title: 'atomic-many A', start_date: '2032-02-07' }),
+        baseEvent({ admin_title: 'atomic-many B', start_date: '2032-02-14' }),
+        baseEvent({ admin_title: 'atomic-many C', start_date: '2032-02-21' }),
+      ],
+      p_series: { kind: 'dive', freq: 'weekly', interval: 1, weekdays: [6], label: 'atomic-many series' },
+    })
+    try {
+      expect(error).toBeNull()
+      const ids = data as string[]
+      expect(ids).toHaveLength(3)
+      const { data: rows } = await admin.from('events')
+        .select('id, series_id, start_date').in('id', ids)
+      const seriesIds = new Set((rows ?? []).map(r => (r as { series_id: string }).series_id))
+      expect(seriesIds.size).toBe(1)
+      expect([...seriesIds][0]).not.toBeNull()
+      // Returned ids follow the input order, which is what lets the caller
+      // navigate to the first occurrence.
+      const byId = new Map((rows ?? []).map(r => [(r as { id: string }).id, r as { start_date: string }]))
+      expect(byId.get(ids[0])!.start_date).toBe('2032-02-07')
+      expect(byId.get(ids[2])!.start_date).toBe('2032-02-21')
+    } finally {
+      await cleanupTitles('atomic-many')
+    }
+  })
+
+  // The whole point. A dive with no start_date violates events_dive_has_start.
+  it('rolls back every event AND the series when one row is invalid', async () => {
+    const { error } = await admin.rpc('create_events_with_relations', {
+      p_events: [
+        baseEvent({ admin_title: 'atomic-rb A', start_date: '2032-03-06' }),
+        baseEvent({ admin_title: 'atomic-rb B', start_date: null }),
+      ],
+      p_series: { kind: 'dive', freq: 'weekly', interval: 1, weekdays: [6], label: 'atomic-rb series' },
+    })
+    expect(error).not.toBeNull()
+
+    const { data: events } = await admin.from('events').select('id').like('admin_title', 'atomic-rb%')
+    expect(events ?? []).toEqual([])
+    const { data: series } = await admin.from('event_series').select('id').like('label', 'atomic-rb%')
+    expect(series ?? []).toEqual([])
+  })
+
+  it('attaches to an existing series with p_series_id, for extending a batch', async () => {
+    const seriesId = await mintSeries({ label: 'atomic-ext series' })
+    const { data, error } = await admin.rpc('create_events_with_relations', {
+      p_events: [baseEvent({ admin_title: 'atomic-ext A', start_date: '2032-04-03' })],
+      p_series_id: seriesId,
+    })
+    try {
+      expect(error).toBeNull()
+      const { data: row } = await admin.from('events')
+        .select('series_id').eq('id', (data as string[])[0]).single()
+      expect((row as { series_id: string }).series_id).toBe(seriesId)
+    } finally {
+      await cleanupTitles('atomic-ext')
+    }
+  })
+
+  it('refuses to both create and attach a series', async () => {
+    const seriesId = await mintSeries({ label: 'atomic-both series' })
+    try {
+      const { error } = await admin.rpc('create_events_with_relations', {
+        p_events: [baseEvent({ admin_title: 'atomic-both A' })],
+        p_series: { kind: 'dive', freq: 'weekly', interval: 1, weekdays: [6] },
+        p_series_id: seriesId,
+      })
+      expect(error).not.toBeNull()
+      const { data: events } = await admin.from('events').select('id').like('admin_title', 'atomic-both%')
+      expect(events ?? []).toEqual([])
+    } finally {
+      await cleanupTitles('atomic-both')
+    }
+  })
+
+  it('rejects an empty batch and one past the occurrence cap', async () => {
+    expect((await admin.rpc('create_events_with_relations', { p_events: [] })).error).not.toBeNull()
+    const tooMany = Array.from({ length: 53 }, (_, i) => baseEvent({ admin_title: `atomic-cap ${i}` }))
+    const { error } = await admin.rpc('create_events_with_relations', { p_events: tooMany })
+    expect(error).not.toBeNull()
+    const { data } = await admin.from('events').select('id').like('admin_title', 'atomic-cap%')
+    expect(data ?? []).toEqual([])
+  })
+
+  // SECURITY INVOKER: the events / event_series RLS policies do the
+  // authorisation, so there is no second gate here to drift out of step.
+  it('lets an admin call it and refuses a staff user', async () => {
+    const asAdmin = await userClient(adminUser.email, adminUser.password)
+    const ok = await asAdmin.rpc('create_events_with_relations', {
+      p_events: [baseEvent({ admin_title: 'atomic-rls A', start_date: '2032-05-01' })],
+    })
+    try {
+      expect(ok.error).toBeNull()
+      const asStaff = await userClient(staffUser.email, staffUser.password)
+      const denied = await asStaff.rpc('create_events_with_relations', {
+        p_events: [baseEvent({ admin_title: 'atomic-rls B', start_date: '2032-05-08' })],
+      })
+      expect(denied.error).not.toBeNull()
+      const { data } = await admin.from('events').select('id').eq('admin_title', 'atomic-rls B')
+      expect(data ?? []).toEqual([])
+    } finally {
+      await cleanupTitles('atomic-rls')
+    }
+  })
+
+  it('is not callable by an unauthenticated client', async () => {
+    const { error } = await anonClient().rpc('create_events_with_relations', {
+      p_events: [baseEvent({ admin_title: 'atomic-anon A' })],
+    })
+    expect(error).not.toBeNull()
+  })
+})

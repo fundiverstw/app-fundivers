@@ -17,8 +17,9 @@ vi.mock('../../hooks/useAuth', () => ({
 beforeEach(() => {
   from.mockReset()
   rpc.mockReset()
-  // set_event_relations writes the junctions after the row insert.
-  rpc.mockResolvedValue({ error: null })
+  // create_events_with_relations writes the event, its junctions and its cars in
+  // one transaction, returning the new ids.
+  rpc.mockResolvedValue({ data: ['new-event-1'], error: null })
 })
 
 function fakeCatalog() {
@@ -330,18 +331,12 @@ describe('AdminNewEventPage', () => {
     })
   })
 
-  it('writes selected travel_destinations to the junctions via set_event_relations', async () => {
-    const insert = vi.fn().mockReturnValue({ then: (cb: (r: { error: null }) => void) => Promise.resolve({ error: null }).then(cb) })
+  it('sends selected travel_destinations to the create RPC, not onto the event row', async () => {
     from.mockImplementation((table: string) => {
       if (table === 'travel_destinations') return mockQueryBuilder({ data: [
         { id: 'dest-1', admin_title: 'Green Island',  country: 'Taiwan',          sort_order: 1 },
         { id: 'dest-2', admin_title: 'Puerto Galera', country: 'The Philippines', sort_order: 2 },
       ] })
-      if (table === 'events') {
-        const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
-        b.insert = insert
-        return b
-      }
       return mockQueryBuilder({ data: [] })
     })
     const user = userEvent.setup()
@@ -355,42 +350,33 @@ describe('AdminNewEventPage', () => {
 
     await user.click(screen.getByRole('button', { name: /create dive/i }))
 
-    await waitFor(() => expect(insert).toHaveBeenCalled())
-    // destination_reference is no longer on the row — it goes to the junction
-    // tables through the RPC (keyed by event id, no per-kind arg).
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith('set_event_relations', expect.anything()))
-    const relArgs = (rpc.mock.calls.find(c => c[0] === 'set_event_relations')?.[1] ?? {}) as Record<string, unknown>
-    expect(relArgs.p_destination_ids).toEqual(['dest-1', 'dest-2'])
-    const payload = (insert.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('create_events_with_relations', expect.anything()))
+    const args = (rpc.mock.calls.find(c => c[0] === 'create_events_with_relations')?.[1] ?? {}) as Record<string, unknown>
+    expect(args.p_destination_ids).toEqual(['dest-1', 'dest-2'])
+    // destination_reference is not a column — destinations live in the junction.
+    const payload = (args.p_events as Record<string, unknown>[])[0]
     expect(payload).not.toHaveProperty('destination_reference')
   })
 
-  it('inserts a dive with minimum required fields and navigates to its detail page', async () => {
-    const insert = vi.fn().mockReturnValue({ then: (cb: (r: { error: null }) => void) => Promise.resolve({ error: null }).then(cb) })
-    from.mockImplementation((table: string) => {
-      if (table === 'prices')    return mockQueryBuilder({ data: [] })
-      if (table === 'rooms')     return mockQueryBuilder({ data: [] })
-      if (table === 'addons') return mockQueryBuilder({ data: [] })
-      if (table === 'events') {
-        // Hybrid: select() chain (past-event fetch) returns empty,
-        // insert() routes through the spy so we can assert payload.
-        const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
-        b.insert = insert
-        return b
-      }
-      return mockQueryBuilder({ data: [] })
-    })
+  it('creates a dive in one transaction and navigates to its detail page', async () => {
+    from.mockImplementation(() => mockQueryBuilder({ data: [] }))
     const user = userEvent.setup()
     renderPage()
     await screen.findByLabelText(/admin title \(required, internal\)/i)
     await user.type(screen.getByLabelText(/admin title \(required, internal\)/i), 'Green Island Day Trip')
     await user.type(getDateInputByLabel(/start date/i),  '2026-06-01')
     await user.click(screen.getByRole('button', { name: /create dive/i }))
-    await waitFor(() => expect(insert).toHaveBeenCalled())
-    const payload = (insert.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
-    expect(payload.admin_title).toBe('Green Island Day Trip')
-    expect(payload.start_date).toBe('2026-06-01')
-    expect(typeof payload.id).toBe('string')
+
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('create_events_with_relations', expect.anything()))
+    const args = (rpc.mock.calls.find(c => c[0] === 'create_events_with_relations')?.[1] ?? {}) as Record<string, unknown>
+    const events = args.p_events as Record<string, unknown>[]
+    expect(events).toHaveLength(1)
+    expect(events[0].admin_title).toBe('Green Island Day Trip')
+    expect(events[0].start_date).toBe('2026-06-01')
+    // No rule set, so no series is created.
+    expect(args.p_series).toBeNull()
+    // The id comes back from the RPC — the client no longer mints one.
+    expect(events[0].id).toBeUndefined()
     expect(await screen.findByText('EVENT_DETAIL')).toBeInTheDocument()
   })
 })

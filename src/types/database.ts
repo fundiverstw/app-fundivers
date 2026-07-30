@@ -298,6 +298,24 @@ export interface Database {
       // No arguments on purpose: the server reads public.terms.version itself,
       // so a modified client can't consent to a version it was never shown.
       // Returns the version actually recorded (20260711100000).
+      // Defined in 20260805000000_create_events_atomically.sql. SECURITY
+      // INVOKER — the events / event_series RLS policies authorise the caller.
+      // Creates one or many events, their junction rows, and optionally the
+      // recurrence series, in a single transaction. Returns the new event ids
+      // in the order given.
+      create_events_with_relations: {
+        Args: {
+          p_events: unknown
+          p_room_ids?: string[]
+          p_addon_ids?: string[]
+          p_destination_ids?: string[]
+          p_vehicle_ids?: string[]
+          p_series?: unknown
+          p_series_id?: string | null
+          p_created_by?: string | null
+        }
+        Returns: string[]
+      }
       accept_current_terms: {
         Args: Record<PropertyKey, never>
         Returns: number
