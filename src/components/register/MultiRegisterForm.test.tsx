@@ -90,6 +90,25 @@ describe('MultiRegisterForm parent diver picker', () => {
     expect(screen.queryByLabelText(/diver for kenting/i)).not.toBeInTheDocument()
   })
 
+  // The name goes onto boat manifests and waiver records, so the multi-event
+  // flow has to say which name it wants — it was the one entry point without
+  // the passport/ID hint the single-event form and the profile both carry.
+  it('asks for the legal name, with the passport / ID hint', async () => {
+    setupFrom([])
+    render(
+      <MultiRegisterForm
+        events={[sampleEvent('e1', 'Kenting')]}
+        profile={parentProfile} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
+    await userEvent.setup().click(screen.getByRole('button', { name: /next/i }))  // 1→2
+
+    expect(screen.getByLabelText(/^legal name \*/i)).toBeInTheDocument()
+    expect(screen.getByText(/exactly as it appears on your passport/i)).toBeInTheDocument()
+  })
+
   it('blocks step 2 until the diver names a cert level or declares uncertified', async () => {
     setupFrom([])
     const blankCert: Profile = { ...parentProfile, cert_level: null, cert_agency: null }

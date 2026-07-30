@@ -718,7 +718,7 @@ describe('AdminEventDetailPage', () => {
     expect(form).toBeInTheDocument()
 
     await user.type(screen.getByLabelText(/^email \*$/i), 'eve@example.com')
-    await user.type(screen.getByLabelText(/^name \*/i), 'Eve Tester')
+    await user.type(screen.getByLabelText(/^legal name \*/i), 'Eve Tester')
     await user.type(screen.getByLabelText(/^nickname$/i), 'Eve')
 
     await user.click(screen.getByRole('button', { name: /create account/i }))

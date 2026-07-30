@@ -804,7 +804,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     const next = screen.getByRole('button', { name: /next/i })
     expect(next).toBeDisabled()
-    await user.type(screen.getByLabelText(/^name \*/i), 'Grace Hopper')
+    await user.type(screen.getByLabelText(/^legal name \*/i), 'Grace Hopper')
     expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
   })
 
@@ -963,7 +963,7 @@ describe('RegisterForm', () => {
     await user.type(screen.getByLabelText(/password/i, { selector: 'input' }), 'abcdefgh')
     await user.click(screen.getByLabelText(/I agree to the/i))
     await user.click(screen.getByRole('button', { name: /solve captcha/i }))
-    await user.type(screen.getByLabelText(/^name \*/i), 'Grace Hopper')
+    await user.type(screen.getByLabelText(/^legal name \*/i), 'Grace Hopper')
     await user.type(screen.getByLabelText(/nationality \*/i), 'American')
     await user.type(screen.getByLabelText(/date of birth \*/i), '19061209')
     await user.selectOptions(screen.getByLabelText(/gender \*/i), 'female')
@@ -1017,7 +1017,7 @@ describe('RegisterForm', () => {
     await user.type(screen.getByLabelText(/password/i, { selector: 'input' }), 'abcdefgh')
     await user.click(screen.getByLabelText(/I agree to the/i))
     await user.click(screen.getByRole('button', { name: /solve captcha/i }))
-    await user.type(screen.getByLabelText(/^name \*/i), 'Grace Hopper')
+    await user.type(screen.getByLabelText(/^legal name \*/i), 'Grace Hopper')
     await user.type(screen.getByLabelText(/nationality \*/i), 'American')
     await user.type(screen.getByLabelText(/date of birth \*/i), '19061209')
     await user.selectOptions(screen.getByLabelText(/gender \*/i), 'female')
@@ -1080,7 +1080,7 @@ describe('RegisterForm', () => {
     await user.type(screen.getByLabelText(/email \*/i), 'new@diver.test')
     await user.type(screen.getByLabelText(/password/i, { selector: 'input' }), 'abcdefgh')
     await user.click(screen.getByLabelText(/I agree to the/i))
-    await user.type(screen.getByLabelText(/^name \*/i), 'Grace Hopper')
+    await user.type(screen.getByLabelText(/^legal name \*/i), 'Grace Hopper')
 
     // No captcha widget renders — the notice replaces it and there is no
     // token, so the only way forward is blocked.
@@ -1530,7 +1530,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     // Full name left blank, cert_level pre-filled from profile with no
     // card on file — Next should still be enabled.
-    expect((screen.getByLabelText(/^name \*/i) as HTMLInputElement).value).toBe('')
+    expect((screen.getByLabelText(/^legal name \*/i) as HTMLInputElement).value).toBe('')
     expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
     await user.click(screen.getByRole('button', { name: /next/i }))
     // Step 3 — don't touch transport; Next should still be enabled.
