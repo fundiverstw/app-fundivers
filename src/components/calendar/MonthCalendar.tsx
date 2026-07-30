@@ -175,7 +175,16 @@ export interface MonthCalendarProps {
   highlightedIds?: Set<string>
 
   // ── Staff availability overlay (optional) ────────────────────────────
-  /** Staff_busy rows touching the visible range. When omitted the overlay is fully off. */
+  /** Staff_busy rows touching the visible range. When omitted the overlay is
+   *  fully off.
+   *
+   *  What arrives here differs by role, and that asymmetry is deliberate: RLS
+   *  hands a staff member only their OWN rows, and an admin everyone's. So the
+   *  non-own bar styling and the "owner · title" label below render for admins
+   *  only — not because they are half-built, but because a staff member has no
+   *  colleague rows to draw. Duties are admin-write only and there is no
+   *  shift-swap flow, so a staff member could do nothing with a colleague's
+   *  leave dates; showing them would be exposure without purpose. */
   busyEntries?: StaffBusyEntry[]
   /** Controlled state of the Busy toggle. The parent owns this so the
    *  default can wait for async profile data (initializing here would
