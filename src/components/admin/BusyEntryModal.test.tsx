@@ -35,6 +35,11 @@ const baseEntry: StaffBusyEntry = {
   updated_at: '2030-01-01T00:00:00Z',
 }
 
+const OWNERS = [
+  { id: 'u1', name: 'Ada Lovelace', nickname: 'Ada' },
+  { id: 'u2', name: 'Grace Hopper', nickname: null },
+]
+
 describe('BusyEntryModal (create)', () => {
   it('submits a new entry with the form values', async () => {
     createMock.mockResolvedValue({ ...baseEntry, id: 'new1', title: 'Vacation' })
@@ -84,6 +89,88 @@ describe('BusyEntryModal (create)', () => {
   })
 })
 
+// Only admins are handed an `owners` list; a staff user gets no picker at all
+// and can only ever write their own row.
+describe('BusyEntryModal (admin owner picker)', () => {
+  it('shows no staff picker when no owners are supplied', () => {
+    render(
+      <BusyEntryModal
+        mode="create"
+        userId="u1"
+        defaultDate="2030-07-04"
+        onClose={() => {}}
+        onSaved={() => {}}
+      />
+    )
+    expect(screen.queryByLabelText(/staff member/i)).not.toBeInTheDocument()
+  })
+
+  it('creates an entry against another staff member', async () => {
+    createMock.mockResolvedValue({ ...baseEntry, id: 'new2', user_id: 'u2' })
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <BusyEntryModal
+        mode="create"
+        userId="u1"
+        owners={OWNERS}
+        defaultDate="2030-07-04"
+        onClose={() => {}}
+        onSaved={onSaved}
+      />
+    )
+    // Defaults to the viewer, so the shop's own entry stays one click away.
+    const picker = screen.getByLabelText(/staff member/i) as HTMLSelectElement
+    expect(picker.value).toBe('u1')
+    await user.selectOptions(picker, 'u2')
+    await user.type(screen.getByLabelText(/title/i), 'Away')
+    await user.click(screen.getByRole('button', { name: /mark busy/i }))
+    expect(createMock).toHaveBeenCalledWith(expect.objectContaining({
+      user_id: 'u2',
+      title: 'Away',
+    }))
+    expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ id: 'new2' }))
+  })
+
+  it('reassigns an existing entry to a different staff member', async () => {
+    updateMock.mockResolvedValue({ ...baseEntry, user_id: 'u2' })
+    const user = userEvent.setup()
+    render(
+      <BusyEntryModal
+        mode="edit"
+        entry={baseEntry}
+        owners={OWNERS}
+        canDelete
+        onClose={() => {}}
+        onSaved={() => {}}
+        onDeleted={() => {}}
+      />
+    )
+    await user.selectOptions(screen.getByLabelText(/staff member/i), 'u2')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    expect(updateMock).toHaveBeenCalledWith('b1', expect.objectContaining({ user_id: 'u2' }))
+  })
+
+  it('refuses to save with nobody selected', async () => {
+    const user = userEvent.setup()
+    render(
+      <BusyEntryModal
+        mode="edit"
+        entry={baseEntry}
+        owners={OWNERS}
+        canDelete
+        onClose={() => {}}
+        onSaved={() => {}}
+        onDeleted={() => {}}
+      />
+    )
+    await user.selectOptions(screen.getByLabelText(/staff member/i), '')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    expect(updateMock).not.toHaveBeenCalled()
+    expect(await screen.findByText(/choose whose availability/i)).toBeInTheDocument()
+  })
+})
+
 describe('BusyEntryModal (edit)', () => {
   it('renders the existing values and saves an update', async () => {
     updateMock.mockResolvedValue({ ...baseEntry, title: 'Renamed' })
@@ -120,6 +207,24 @@ describe('BusyEntryModal (edit)', () => {
       />
     )
     expect(screen.queryByRole('button', { name: /^delete$/i })).not.toBeInTheDocument()
+  })
+
+  it('leaves user_id out of the patch when the owner has not moved', async () => {
+    updateMock.mockResolvedValue(baseEntry)
+    const user = userEvent.setup()
+    render(
+      <BusyEntryModal
+        mode="edit"
+        entry={baseEntry}
+        owners={OWNERS}
+        canDelete
+        onClose={() => {}}
+        onSaved={() => {}}
+        onDeleted={() => {}}
+      />
+    )
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    expect(updateMock).toHaveBeenCalledWith('b1', expect.not.objectContaining({ user_id: expect.anything() }))
   })
 
   it('calls deleteStaffAvailability + onDeleted when Delete is confirmed', async () => {

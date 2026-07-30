@@ -131,8 +131,8 @@ const TRACK_GAP = 2
 interface BusyLayoutEvent extends LayoutEvent {
   busy: StaffBusyEntry
   /** Whether this row belongs to the current viewer. Own rows show their
-   *  real title; other rows show only the owner's display name (title is
-   *  null in that case because the view masks it). */
+   *  title alone; other rows lead with the owner's display name, since
+   *  whose day is blocked is the thing an admin is scanning for. */
   isOwn: boolean
 }
 function toBusyLayoutEvent(b: StaffBusyEntry, currentUserId: string | null): BusyLayoutEvent {
@@ -149,7 +149,9 @@ function toBusyLayoutEvent(b: StaffBusyEntry, currentUserId: string | null): Bus
 
 function busyDisplayLabel(entry: StaffBusyEntry, isOwn: boolean): string {
   if (isOwn) return entry.title ?? entry.owner_display_name ?? t.calendar.busy
-  return entry.owner_display_name ?? t.calendar.busy
+  const owner = entry.owner_display_name ?? t.calendar.busy
+  // Reachable only for an admin: RLS hands staff nobody's rows but their own.
+  return entry.title ? `${owner} · ${entry.title}` : owner
 }
 
 export interface MonthCalendarProps {

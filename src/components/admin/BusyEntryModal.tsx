@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from 'react'
 import {
   createStaffAvailability, updateStaffAvailability, deleteStaffAvailability,
+  type AvailabilityOwner,
 } from '../../lib/staff-availability'
-import type { StaffBusyEntry } from '../../types/database'
+import type { StaffBusyEntry, StaffAvailabilityUpdate } from '../../types/database'
+import { personName } from '../../lib/names'
 import { DateField } from '../DateField'
 import {
   MODAL_BACKDROP, MODAL_PANEL, INPUT, INPUT_LABEL,
@@ -12,7 +14,11 @@ import { t } from '../../i18n'
 
 const bz = t.admin.busy
 
-interface CreateProps {
+/** Admin-only: the staff/admin members this entry may be recorded against.
+ *  Omitted for a staff user, who can only ever write their own rows. */
+type OwnerPickerProps = { owners?: AvailabilityOwner[] }
+
+interface CreateProps extends OwnerPickerProps {
   mode: 'create'
   userId: string
   defaultDate: string  // YYYY-MM-DD prefilled into start_date + end_date
@@ -20,13 +26,13 @@ interface CreateProps {
   onSaved: (row: StaffBusyEntry) => void
 }
 
-interface EditProps {
+interface EditProps extends OwnerPickerProps {
   mode: 'edit'
-  // The edit modal is only opened for the viewer's own rows, so title /
-  // details are present (not masked); the type still allows null so the
-  // shape matches the view projection on the way in.
+  // Opened for the viewer's own rows, and for any row when the viewer is an
+  // admin. The type still allows a null title / details so the shape matches
+  // the view projection on the way in.
   entry: StaffBusyEntry
-  canDelete: boolean  // own row only
+  canDelete: boolean
   onClose: () => void
   onSaved: (row: StaffBusyEntry) => void
   onDeleted: (id: string) => void
@@ -37,7 +43,9 @@ export type BusyEntryModalProps = CreateProps | EditProps
 export function BusyEntryModal(props: BusyEntryModalProps) {
   const editing = props.mode === 'edit'
   const initial = editing ? props.entry : null
+  const owners = props.owners
 
+  const [ownerId, setOwnerId] = useState(initial?.user_id ?? (props.mode === 'create' ? props.userId : ''))
   const [startDate, setStartDate] = useState(initial?.start_date ?? (props.mode === 'create' ? props.defaultDate : ''))
   // Default 09:00 to keep the picker out of midnight which is rarely what people mean.
   const [startTime, setStartTime] = useState(initial?.start_time?.slice(0, 5) ?? '09:00')
@@ -52,11 +60,12 @@ export function BusyEntryModal(props: BusyEntryModalProps) {
     setError(null)
     if (!title.trim()) { setError(bz.titleRequired); return }
     if (endDate < startDate) { setError(bz.endBeforeStart); return }
+    if (!ownerId) { setError(bz.ownerRequired); return }
     setSubmitting(true)
     try {
       if (props.mode === 'create') {
         const row = await createStaffAvailability({
-          user_id: props.userId,
+          user_id: ownerId,
           start_date: startDate,
           start_time: startTime,
           end_date: endDate,
@@ -65,13 +74,17 @@ export function BusyEntryModal(props: BusyEntryModalProps) {
         })
         props.onSaved(row)
       } else {
-        const row = await updateStaffAvailability(props.entry.id, {
+        const patch: StaffAvailabilityUpdate = {
           start_date: startDate,
           start_time: startTime,
           end_date: endDate,
           title: title.trim(),
           details: details.trim() || null,
-        })
+        }
+        // Only sent when it actually moved: an unchanged user_id would still
+        // trip the owner-role trigger's UPDATE OF user_id for no reason.
+        if (ownerId !== props.entry.user_id) patch.user_id = ownerId
+        const row = await updateStaffAvailability(props.entry.id, patch)
         props.onSaved(row)
       }
     } catch (err) {
@@ -106,7 +119,7 @@ export function BusyEntryModal(props: BusyEntryModalProps) {
             <div>
               <h2 className={`${TEXT_HEADING} text-lg`}>{editing ? bz.editTitle : bz.createTitle}</h2>
               <p className={`${TEXT_BODY} text-xs`}>
-                Periods you're not available for duties.
+                {owners ? bz.subtitleAdmin : bz.subtitleOwn}
               </p>
             </div>
             <button
@@ -116,6 +129,28 @@ export function BusyEntryModal(props: BusyEntryModalProps) {
               aria-label={bz.close}
             >×</button>
           </div>
+
+          {owners && (
+            <div>
+              <label htmlFor="busy-owner" className={INPUT_LABEL}>{bz.owner}</label>
+              {/* No `required`: the browser would block submit with its own
+                  tooltip, in the browser's language rather than the shop's,
+                  and the inline ownerRequired message would never be seen.
+                  The blank option is reachable when an entry's owner has since
+                  been demoted out of staff — then there is genuinely nobody
+                  selected until the admin picks. */}
+              <select
+                id="busy-owner"
+                value={ownerId} onChange={e => setOwnerId(e.target.value)}
+                className={INPUT}
+              >
+                <option value="">{bz.pickOwner}</option>
+                {owners.map(o => (
+                  <option key={o.id} value={o.id}>{personName(o.name, o.nickname) || o.id}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>

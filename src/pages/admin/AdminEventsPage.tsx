@@ -4,7 +4,10 @@ import { startOfMonth, endOfMonth, format, parseISO } from 'date-fns'
 import { fetchEventsInRange } from '../../lib/events'
 import { rescheduleEventDay, notifyEventRescheduled } from '../../lib/reschedule'
 import { fetchMyDutyDays } from '../../lib/duties'
-import { fetchStaffAvailabilityInRange } from '../../lib/staff-availability'
+import {
+  fetchStaffAvailabilityInRange, fetchAvailabilityOwners,
+  type AvailabilityOwner,
+} from '../../lib/staff-availability'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
@@ -52,6 +55,9 @@ export function AdminEventsPage() {
   const [myDutyDays, setMyDutyDays] = useState<Map<string, Set<string>>>(new Map())
   const [createBusyDate, setCreateBusyDate] = useState<string | null>(null)
   const [editBusy, setEditBusy] = useState<StaffBusyEntry | null>(null)
+  // Admins only: everyone an availability row can be recorded against. Empty
+  // for staff, who write nothing but their own.
+  const [owners, setOwners] = useState<AvailabilityOwner[]>([])
   // null = no manual toggle yet, fall back to the role default. Once the
   // user clicks the pill, this becomes a concrete boolean and wins. The
   // null sentinel matters because `profile` from useAuth resolves async,
@@ -104,6 +110,22 @@ export function AdminEventsPage() {
   const isAdmin = profile?.role === 'admin'
   const busyShown = busyShownOverride ?? isStaffOrAdmin
 
+  // Loaded once, not per month: the roster changes far more slowly than the
+  // calendar month does, and it is only read when a modal opens.
+  useEffect(() => {
+    if (!isAdmin) return
+    let cancelled = false
+    fetchAvailabilityOwners()
+      .then(rows => { if (!cancelled) setOwners(rows) })
+      .catch(() => { /* the picker falls back to the viewer's own row */ })
+    return () => { cancelled = true }
+  }, [isAdmin])
+
+  // An admin manages everyone's availability; staff manage only their own.
+  const canEditBusy = (b: StaffBusyEntry) => isAdmin || (!!user && b.user_id === user.id)
+  // Withheld until the roster lands so the select can never render empty.
+  const ownerOptions = isAdmin && owners.length > 0 ? owners : undefined
+
   return (
     <div className="max-w-2xl mx-auto">
       <MonthCalendar
@@ -142,10 +164,9 @@ export function AdminEventsPage() {
           ? day => setCreateBusyDate(format(day, 'yyyy-MM-dd'))
           : undefined}
         onPickBusy={isStaffOrAdmin
-          // Only open the edit modal on rows the viewer owns. Non-own rows
-          // have their title/details masked (NULL) by the view, so there's
-          // nothing personal to show and editing them would fail RLS anyway.
-          ? b => { if (user && b.user_id === user.id) setEditBusy(b) }
+          // Staff open only their own rows — RLS hands them nothing else, so
+          // a non-own row can only be one an admin is looking at.
+          ? b => { if (canEditBusy(b)) setEditBusy(b) }
           : undefined}
       />
 
@@ -153,6 +174,7 @@ export function AdminEventsPage() {
         <BusyEntryModal
           mode="create"
           userId={user.id}
+          owners={ownerOptions}
           defaultDate={createBusyDate}
           onClose={() => setCreateBusyDate(null)}
           onSaved={row => {
@@ -166,7 +188,8 @@ export function AdminEventsPage() {
         <BusyEntryModal
           mode="edit"
           entry={editBusy}
-          canDelete={!!user && editBusy.user_id === user.id}
+          owners={ownerOptions}
+          canDelete={canEditBusy(editBusy)}
           onClose={() => setEditBusy(null)}
           onSaved={row => {
             setBusyEntries(prev => prev.map(b => b.id === row.id ? row : b))
