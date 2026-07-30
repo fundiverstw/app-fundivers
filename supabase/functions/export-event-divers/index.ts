@@ -126,11 +126,13 @@ Deno.serve(async (req) => {
   // Pull the event row. Dives carry a start_date/end_date envelope;
   // courses only carry course_days, so the manifest's date stamp comes
   // from the earliest course day instead.
-  const titleCols = "display_title, admin_title, calendar_title"
-  const dateCols = usesDateEnvelope(eventType) ? "start_date, end_date" : "course_days"
+  // One static column list covering both temporal shapes, rather than
+  // interpolating the date columns per kind. An interpolated select string is
+  // opaque to supabase-js's type-level parser, which made every field read off
+  // this row `any` — the two extra columns cost far less than that.
   const { data: event, error: eErr } = await admin
     .from("events")
-    .select(`id, ${dateCols}, ${titleCols}`)
+    .select("id, start_date, end_date, course_days, display_title, admin_title, calendar_title")
     .eq("id", eventId)
     .single()
   if (eErr || !event) return json({ error: safeError(eErr, "event not found") }, 404)
@@ -138,8 +140,8 @@ Deno.serve(async (req) => {
   // Earliest date the event runs on, used only for the email subject /
   // filename stamp.
   const eventStartDate = usesDateEnvelope(eventType)
-    ? (event.start_date as string | null)
-    : ([...((event.course_days as string[] | null) ?? [])].sort()[0] ?? null)
+    ? event.start_date
+    : ([...(event.course_days ?? [])].sort()[0] ?? null)
 
   // Bookings for this event whose divers are expected to attend.
   const { data: bookings, error: bErr } = await admin

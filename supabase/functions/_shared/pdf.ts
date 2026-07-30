@@ -187,7 +187,8 @@ function row(doc: jsPDF, y: number, label: string, value: unknown, altState: { a
   const wrapped = doc.splitTextToSize(v, MR - COL)
   const blockH = ROW_H + (wrapped.length > 1 ? (wrapped.length - 1) * 4.5 : 0)
   y = ensureY(doc, y, blockH)
-  doc.setFillColor(...(altState.alt ? C.oceanBg : C.white))
+  const fill = altState.alt ? C.oceanBg : C.white
+  doc.setFillColor(fill[0], fill[1], fill[2])
   doc.rect(0, y - 5, 210, blockH, "F")
   altState.alt = !altState.alt
   doc.setFontSize(8.5)
@@ -325,7 +326,7 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
     y = row(doc, y, d.items, p.gearItems.join(", "), altState)
   }
   if (p.rentGear && (p.height || p.weight || p.shoeSize)) {
-    y = row(doc, y, d.sizing, d.sizingValue(p.height || "", p.weight || "", p.shoeSize || ""), altState)
+    y = row(doc, y, d.sizing, d.sizingValue(String(p.height || ""), String(p.weight || ""), String(p.shoeSize || "")), altState)
   }
   y = row(doc, y, d.transportation,
     p.needsRide ? d.ridingWithShop : d.drivingThemselves,
@@ -581,7 +582,8 @@ function groupRow(
   })
   const maxLines = Math.max(1, ...wraps.map(w => w.length))
   const blockH = 6 + (maxLines - 1) * 4
-  doc.setFillColor(...(altState.alt ? C.oceanBg : C.white))
+  const fill = altState.alt ? C.oceanBg : C.white
+  doc.setFillColor(fill[0], fill[1], fill[2])
   doc.rect(0, y - 4.5, 210, blockH, "F")
   altState.alt = !altState.alt
   doc.setFontSize(8)

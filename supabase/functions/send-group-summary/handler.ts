@@ -23,7 +23,7 @@ type AnyClient = { from(table: string): any }
 
 export interface SupabaseAuthedClient {
   auth: {
-    getUser(): Promise<{ data: { user: { id: string; email: string | null } | null }; error: { message: string } | null }>
+    getUser(): Promise<{ data: { user: { id: string; email?: string | null } | null }; error: { message: string } | null }>
   }
 }
 

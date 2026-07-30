@@ -10,10 +10,14 @@
 # require the local Supabase stack (Docker). When CI grows a Supabase
 # step, add an `integration` job here that depends on it.
 #
-# Three independent jobs run in parallel so a single failure shows
-# alongside the other two, not in series. In-flight runs for the same
+# Four independent jobs run in parallel so a single failure shows
+# alongside the others, not in series. In-flight runs for the same
 # ref are cancelled when a new commit lands so a long queue can't
 # shadow newer fixes.
+#
+# The `edge` job is separate from `tsc` because the two checkers see
+# different files: tsc -b covers src/ and the workers, and cannot read
+# supabase/functions/ at all.
 name: CI
 
 on:
@@ -67,3 +71,21 @@ jobs:
       - run: npm ci
         working-directory: workers/push
       - run: npx vitest run --project unit
+
+  edge:
+    name: Edge functions (deno check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      # The official installer rather than a third-party setup action: the other
+      # jobs pin their actions by SHA, and this keeps the supply chain to one
+      # first-party source with the version pinned explicitly. Keep DENO_VERSION
+      # in step with what the shop runs locally.
+      - name: Install Deno
+        env:
+          DENO_VERSION: v2.9.0
+        run: |
+          curl -fsSL https://deno.land/install.sh \
+            | DENO_INSTALL="$HOME/.deno" sh -s "$DENO_VERSION"
+          echo "$HOME/.deno/bin" >> "$GITHUB_PATH"
+      - run: bash scripts/check-edge.sh

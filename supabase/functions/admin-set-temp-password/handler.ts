@@ -26,7 +26,7 @@ export function generateTempPassword(): string {
   return `${c.slice(0, 4).join("")}-${c.slice(4, 8).join("")}-${c.slice(8, 12).join("")}`
 }
 
-interface AuthUser { id: string; email: string | null }
+interface AuthUser { id: string; email?: string | null }
 
 // Narrow, structurally-satisfied interfaces for the injected deps. `any` on
 // the query-builder chain is deliberate — modelling PostgrestQueryBuilder's

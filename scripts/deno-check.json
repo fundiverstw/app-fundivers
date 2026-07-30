@@ -1,0 +1,7 @@
+{
+  "//": "Config used ONLY by scripts/check-edge.sh. It deliberately lives outside supabase/functions/ so the Supabase edge runtime never reads it at deploy time, and it sets nodeModulesDir to none so a check cannot rewrite the repo's npm-managed node_modules (which `--node-modules-dir=auto` does).",
+  "nodeModulesDir": "none",
+  "compilerOptions": {
+    "lib": ["deno.window", "dom", "esnext"]
+  }
+}

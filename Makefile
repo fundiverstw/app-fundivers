@@ -58,12 +58,16 @@ dump-data:  ; @npm run db:dump-data
 backup-prod: ; @npm run db:backup-prod
 repair-history: ; @npm run db:repair-history
 verify:     ; @bash scripts/verify-sync.sh
-test:       typecheck lint test-only
+test:       typecheck lint check-edge test-only
 test-only:  ; @npm run test:all
 security:   ; @npx vitest run --project security
 lint:       ; @npm run lint
 lint-fix:   ; @npm run lint:fix
 typecheck:  ; @npx tsc -b
+# tsc -b cannot read supabase/functions/ (jsr:/npm:/https: specifiers), so a
+# broken import there only shows up as a 503 on boot after deploy. Deno's own
+# checker is the only thing that reads those files the way the runtime does.
+check-edge: ; @bash scripts/check-edge.sh
 
 # Cloudflare Worker deploys read their creds (CLOUDFLARE_API_TOKEN,
 # CLOUDFLARE_ACCOUNT_ID) and the cloud VITE_* build vars from .env.production,

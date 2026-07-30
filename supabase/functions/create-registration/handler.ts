@@ -94,18 +94,23 @@ export interface SupabaseAdminClient {
         password: string
         email_confirm?: boolean
         user_metadata?: Record<string, unknown>
-      }): Promise<{ data: { user: { id: string; email: string | null } | null }; error: { message: string } | null }>
-      getUserById(id: string): Promise<{ data: { user: { id: string; email: string | null } | null }; error: { message: string } | null }>
+      }): Promise<{ data: { user: { id: string; email?: string | null } | null }; error: { message: string } | null }>
+      getUserById(id: string): Promise<{ data: { user: { id: string; email?: string | null } | null }; error: { message: string } | null }>
       deleteUser(id: string): Promise<unknown>
     }
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   from(table: string): any
+  // PromiseLike, not Promise: supabase-js returns a thenable query builder
+  // here, which an await resolves but which is not a Promise instance.
+  rpc(
+    fn: string, args?: Record<string, unknown>,
+  ): PromiseLike<{ data: unknown; error: { message: string } | null }>
 }
 
 export interface SupabaseAuthedClient {
   auth: {
-    getUser(): Promise<{ data: { user: { id: string; email: string | null } | null }; error: { message: string } | null }>
+    getUser(): Promise<{ data: { user: { id: string; email?: string | null } | null }; error: { message: string } | null }>
   }
 }
 
@@ -321,22 +326,26 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
       // undetectable; post 20260603020000 the cascade-down trigger
       // will also fire if a profile delete happens, but the
       // primary cleanup we WANT here is the auth side.
-      try {
-        const { error } = await admin.auth.admin.deleteUser(userId) as
-          { error?: { message: string } | null }
-        if (error) {
+      // Swallows its own failure: supabase-js's query builder is a thenable
+      // with a `then` and NO `catch`, so the `.catch()` this used to chain threw
+      // a TypeError out of rollback() — turning a clean error response plus an
+      // orphan-log row into an opaque runtime 500 with nothing logged, in
+      // exactly the double-failure case the logging exists for.
+      const logOrphan = async (why: string) => {
+        try {
           await admin.rpc("log_orphan_auth_user", {
             p_user_id: userId,
             p_email:   registrantEmail || null,
-            p_reason:  `rollback after: ${reason} | deleteUser: ${error.message}`,
-          }).catch(() => { /* log path itself failed; nothing more to do */ })
-        }
+            p_reason:  `rollback after: ${reason} | ${why}`,
+          })
+        } catch { /* log path itself failed; nothing more to do */ }
+      }
+      try {
+        const { error } = await admin.auth.admin.deleteUser(userId) as
+          { error?: { message: string } | null }
+        if (error) await logOrphan(`deleteUser: ${error.message}`)
       } catch (e) {
-        await admin.rpc("log_orphan_auth_user", {
-          p_user_id: userId,
-          p_email:   registrantEmail || null,
-          p_reason:  `rollback after: ${reason} | deleteUser threw: ${(e as Error).message}`,
-        }).catch(() => { /* log path itself failed; nothing more to do */ })
+        await logOrphan(`deleteUser threw: ${(e as Error).message}`)
       }
     }
     return json({ error: reason }, status)

@@ -15,4 +15,5 @@ import type { EventKind } from "../../../src/lib/event-kinds.ts"
 export const EVENT_KIND_LABELS: Record<EventKind, string> = {
   dive:   t.calendar.typeDive,
   course: t.calendar.typeCourse,
+  adventure: t.calendar.typeAdventure,
 }
