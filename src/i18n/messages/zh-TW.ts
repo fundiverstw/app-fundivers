@@ -877,8 +877,6 @@ export const zhTW: Messages = {
     iosStep3b: '（位於右上角）。',
     iosNote: '此功能僅適用於 Safari — iOS 上的 Chrome、Firefox 及應用程式內建瀏覽器無法加入主畫面。',
     gotIt: '知道了',
-    updateAvailable: '有新版本可用。',
-    update: '更新',
   },
   contact: {
     title: '聯絡',

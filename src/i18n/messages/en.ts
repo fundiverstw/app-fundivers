@@ -885,8 +885,6 @@ export const en = {
     iosStep3b: 'in the top-right corner.',
     iosNote: "This only works in Safari — Chrome, Firefox, and in-app browsers on iOS can't add to the home screen.",
     gotIt: 'Got it',
-    updateAvailable: 'A new version is available.',
-    update: 'Update',
   },
   contact: {
     title: 'Contact',

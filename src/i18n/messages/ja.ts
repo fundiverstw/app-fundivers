@@ -876,8 +876,6 @@ export const ja: Messages = {
     iosStep3b: '（右上）。',
     iosNote: 'この機能は Safari でのみ動作します — iOS の Chrome、Firefox、アプリ内ブラウザではホーム画面に追加できません。',
     gotIt: 'わかりました',
-    updateAvailable: '新しいバージョンがあります。',
-    update: '更新',
   },
   contact: {
     title: 'お問い合わせ',
