@@ -1209,6 +1209,10 @@ export interface Database {
           included: string | null
           schedule: string | null
           starting_at: number | null
+          /** The recurrence batch this event was generated in (20260804000000),
+           *  or null for a one-off. Grouping only — the occurrence itself is
+           *  fully independent. */
+          series_id: string | null
         }
         Insert: {
           id?: string
@@ -1245,8 +1249,38 @@ export interface Database {
           included?: string | null
           schedule?: string | null
           starting_at?: number | null
+          series_id?: string | null
         }
         Update: Partial<Database['public']['Tables']['events']['Insert']>
+        Relationships: []
+      }
+      // A recurrence rule and the batch of events generated from it
+      // (20260804000000). Stores no dates of its own: the rule is re-anchored
+      // on the last occurrence to extend the series, so the two can never
+      // disagree. Staff read, admin write; divers see the occurrences only.
+      event_series: {
+        Row: {
+          id: string
+          created_at: string
+          created_by: string | null
+          /** Admin-facing name for the batch. Occurrences carry their own titles. */
+          label: string | null
+          kind: 'dive' | 'course' | 'adventure'
+          freq: 'daily' | 'weekly' | 'monthly_weekday'
+          interval: number
+          /** `weekly` only: ISO weekdays, 1 = Monday … 7 = Sunday. NULL otherwise. */
+          weekdays: number[] | null
+        }
+        Insert: {
+          id?: string
+          created_by?: string | null
+          label?: string | null
+          kind: 'dive' | 'course' | 'adventure'
+          freq: 'daily' | 'weekly' | 'monthly_weekday'
+          interval: number
+          weekdays?: number[] | null
+        }
+        Update: Partial<Database['public']['Tables']['event_series']['Insert']>
         Relationships: []
       }
       cert_levels: {
@@ -1766,6 +1800,8 @@ export type AdminAuditLog = Database['public']['Tables']['admin_audit_log']['Row
 export type Credit = Database['public']['Tables']['credits']['Row']
 export type CreditInsert = Database['public']['Tables']['credits']['Insert']
 export type EventRow = Database['public']['Tables']['events']['Row']
+export type EventSeries = Database['public']['Tables']['event_series']['Row']
+export type EventSeriesInsert = Database['public']['Tables']['event_series']['Insert']
 export type EOPrice = Database['public']['Tables']['prices']['Row']
 export type EORoom = Database['public']['Tables']['rooms']['Row']
 export type EOAddon = Database['public']['Tables']['addons']['Row']
