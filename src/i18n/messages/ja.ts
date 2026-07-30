@@ -1680,6 +1680,23 @@ export const ja: Messages = {
       reopen: '↺ 再開',
       unknownAuthor: '不明',
     },
+    diverWaivers: {
+      title: 'ダイバー単位の免責同意書',
+      intro: '予約内容にかかわらずこのダイバーに適用される年次書類です。イベント固有の書類は参加者名簿から記録します。',
+      loading: '読み込み中…',
+      loadFailed: '免責同意書の状況を読み込めませんでした。記録する前に再読み込みしてください。',
+      noneInCatalog: 'カタログにダイバー単位の免責同意書がありません。',
+      markInPerson: '対面で完了として記録',
+      recordingBusy: '記録中…',
+      confirm: (name: string, waiver: string) =>
+        `「${waiver}」を ${name} が対面で署名したものとして記録しますか？紙の書類として代理で登録します。`,
+      recorded: '対面で署名済みとして記録しました。',
+      failed: (detail: string) => `免責同意書を記録できませんでした：${detail}`,
+      needsName: '紙の免責同意書を記録する前に、このプロフィールに氏名を登録してください。',
+      capturedInPerson: '対面で記録',
+      capturedInApp: 'アプリ内で署名',
+      onDate: (date: string) => ` · ${date}`,
+    },
     diverNotes: {
       title: 'ダイバーメモ（スタッフのみ）',
       none: 'ダイバーメモはまだありません。',

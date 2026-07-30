@@ -1696,6 +1696,23 @@ export const en = {
       reopen: '↺ reopen',
       unknownAuthor: 'unknown',
     },
+    diverWaivers: {
+      title: 'Diver-level waivers',
+      intro: 'Annual forms that apply to this diver whatever they book. Event-specific forms are recorded from the event roster.',
+      loading: 'Loading…',
+      loadFailed: 'Could not load waiver status. Reload before recording anything.',
+      noneInCatalog: 'No diver-level waivers in the catalog.',
+      markInPerson: 'Mark done in person',
+      recordingBusy: 'Recording…',
+      confirm: (name: string, waiver: string) =>
+        `Record "${waiver}" as signed in person by ${name}? This logs it on their behalf, marked as a paper form.`,
+      recorded: 'Recorded as signed in person.',
+      failed: (detail: string) => `Could not record the waiver: ${detail}`,
+      needsName: 'Add a name to this profile before recording a paper waiver.',
+      capturedInPerson: 'Recorded in person',
+      capturedInApp: 'Signed in the app',
+      onDate: (date: string) => ` · ${date}`,
+    },
     diverNotes: {
       title: 'Diver notes (staff only)',
       none: 'No diver notes yet.',

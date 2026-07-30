@@ -21,6 +21,7 @@ import { netPaid, netPaidByBooking } from '../../lib/payments'
 import { issueTempPassword } from '../../lib/admin-password'
 import { ProfileForm } from '../ProfilePage'
 import { DiverNotes } from '../../components/admin/DiverNotes'
+import { DiverWaivers } from '../../components/admin/DiverWaivers'
 import { AdminFamilyPanel } from '../../components/admin/AdminFamilyPanel'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Credit, Payment, Profile } from '../../types/database'
 import { t } from '../../i18n'
@@ -670,6 +671,12 @@ function UserCard({
                 </div>
               )}
               <ProfileDetails user={user} />
+              {/* The legal name alone, never "Name (nickname)": this string is
+                  stored as the signature on the waiver record. */}
+              <DiverWaivers
+                diverId={user.id}
+                diverName={user.name || user.nickname || user.email}
+              />
               <DiverNotes profileId={user.id} />
               {isAdmin && (
                 <AdminFamilyPanel user={user} allUsers={allUsers} onChanged={onFamilyChanged} />

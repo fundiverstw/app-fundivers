@@ -1681,6 +1681,23 @@ export const zhTW: Messages = {
       reopen: '↺ 重新開啟',
       unknownAuthor: '未知',
     },
+    diverWaivers: {
+      title: '潛水員層級免責同意書',
+      intro: '不論報名何種活動都適用於該潛水員的年度表單。活動專屬表單請於活動名單中登錄。',
+      loading: '載入中…',
+      loadFailed: '無法載入免責同意書狀態。請重新載入後再進行登錄。',
+      noneInCatalog: '目錄中沒有潛水員層級的免責同意書。',
+      markInPerson: '標記為現場完成',
+      recordingBusy: '登錄中…',
+      confirm: (name: string, waiver: string) =>
+        `要將「${waiver}」登錄為 ${name} 現場親簽嗎？系統會以紙本表單的方式代為登錄。`,
+      recorded: '已登錄為現場親簽。',
+      failed: (detail: string) => `無法登錄免責同意書：${detail}`,
+      needsName: '登錄紙本免責同意書前，請先為此帳號填寫姓名。',
+      capturedInPerson: '現場登錄',
+      capturedInApp: '於 App 內簽署',
+      onDate: (date: string) => ` · ${date}`,
+    },
     diverNotes: {
       title: '潛水員備註（僅工作人員可見）',
       none: '尚無潛水員備註。',

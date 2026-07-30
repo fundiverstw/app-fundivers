@@ -82,14 +82,29 @@ export interface AnnualWaiverStatus {
   validUntil: string | null
 }
 
+/**
+ * The diver's most recent signature of `code`, or null. What "current" means
+ * depends on cadence, so this answers only "what was signed last" — the admin
+ * panel reads it to show how that signature was captured (paper vs in-app).
+ */
+export function latestSignatureFor(
+  code: string, signatures: WaiverSignature[],
+): WaiverSignature | null {
+  return signatures
+    .filter(s => s.waiver_code === code)
+    .reduce<WaiverSignature | null>(
+      (best, s) =>
+        !best || new Date(s.signed_at).getTime() > new Date(best.signed_at).getTime() ? s : best,
+      null,
+    )
+}
+
 // Status of an annual waiver for the My Waivers panel — derived from the diver's
 // latest signature of that code.
 export function annualWaiverStatus(
   def: WaiverDef, signatures: WaiverSignature[], now: Date,
 ): AnnualWaiverStatus {
-  const latest = signatures
-    .filter(s => s.waiver_code === def.code)
-    .sort((a, b) => new Date(b.signed_at).getTime() - new Date(a.signed_at).getTime())[0]
+  const latest = latestSignatureFor(def.code, signatures)
   if (!latest) return { state: 'unsigned', signedAt: null, validUntil: null }
   if (latest.waiver_version < def.version) {
     return { state: 'outdated', signedAt: latest.signed_at, validUntil: null }
