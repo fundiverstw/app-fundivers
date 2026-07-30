@@ -50,6 +50,26 @@ help:
 	@echo "  make wix-sync         — push-based full sync via the wix_sync_all() RPC (all collections; TABLE=events for one)"
 	@echo "  make wix-sync-pull    — fallback: have Wix pull from Supabase (POST /_functions/syncSupabase)"
 
+# Guard for anything that reads or writes the LOCAL database.
+#
+# app-fundivers and fundive run their local Supabase stacks on the SAME ports, so
+# only one can be up at a time. A CLI command run from this repo while the other
+# stack is the live one connects happily to the WRONG database: `supabase
+# migration list --local` then reports the other repo's migrations as "remote",
+# which reads exactly like production drift, and the integration suite would
+# assert against the other repo's schema. Both have happened.
+#
+# The container name is project-scoped (supabase_db_<project_id>), so its
+# presence is the one unambiguous check. scripts/verify-sync.sh does the same.
+LOCAL_DB_CONTAINER = supabase_db_app-fundivers
+REQUIRE_LOCAL = \
+	if ! docker ps --format '{{.Names}}' | grep -qx "$(LOCAL_DB_CONTAINER)"; then \
+	  echo "ERROR: this repo's local stack is not running ($(LOCAL_DB_CONTAINER))."; \
+	  echo "       Another project's stack may hold the ports — check: docker ps --format '{{.Names}}'"; \
+	  echo "       Start this one with: make start"; \
+	  exit 1; \
+	fi
+
 start:      ; @npm run db:start
 stop:       ; @npm run db:stop
 status:     ; @npm run db:status
@@ -71,11 +91,17 @@ backup-prod: ; @npm run db:backup-prod
 repair-history: ; @npm run db:repair-history
 verify:     ; @bash scripts/verify-sync.sh
 test:       typecheck lint check-edge test-only
-test-only:  ; @npm run test:all
-security:   ; @npx vitest run --project security
+test-only:
+	@$(REQUIRE_LOCAL)
+	@npm run test:all
+security:
+	@$(REQUIRE_LOCAL)
+	@npx vitest run --project security
 # Just the multi-step journeys, for when you want to know whether a whole
 # feature still works rather than which rule broke.
-scenario:   ; @npx vitest run --project scenario
+scenario:
+	@$(REQUIRE_LOCAL)
+	@npx vitest run --project scenario
 
 # Run this before `make push` or `make deploy`.
 #
