@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { isoDate, todayIso, parseIsoDate, addIsoDays } from './dates'
+import { isoDate, todayIso, parseIsoDate, addIsoDays, formatTimestampDay } from './dates'
 import { siteConfig } from '../config/site'
 
 afterEach(() => { vi.useRealTimers() })
@@ -84,5 +84,24 @@ describe('addIsoDays', () => {
   it('handles a leap day', () => {
     expect(addIsoDays('2028-02-28', 1)).toBe('2028-02-29')
     expect(addIsoDays('2028-02-29', 1)).toBe('2028-03-01')
+  })
+})
+
+describe('formatTimestampDay', () => {
+  it('renders a timestamptz as a short day', () => {
+    expect(formatTimestampDay('2026-07-30T09:15:00Z')).toMatch(/Jul \d+, 2026/)
+  })
+
+  it('returns null for null / undefined / empty', () => {
+    expect(formatTimestampDay(null)).toBeNull()
+    expect(formatTimestampDay(undefined)).toBeNull()
+    expect(formatTimestampDay('')).toBeNull()
+  })
+
+  // The whole reason it exists: date-fns `format` throws "Invalid time value"
+  // on an unparseable string, and these render inside much larger admin cards.
+  it('returns null instead of throwing on an unparseable value', () => {
+    expect(formatTimestampDay('not a date')).toBeNull()
+    expect(formatTimestampDay('undefined')).toBeNull()
   })
 })

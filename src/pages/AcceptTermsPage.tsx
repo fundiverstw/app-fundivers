@@ -21,7 +21,7 @@ const at = t.acceptTerms
 // it returns anything about the diver, so a stranger with a guessed uuid learns
 // nothing — not a name, not an email, not whether that account exists.
 
-type Phase = TermsTokenState | 'loading' | 'accepted' | 'failed'
+type Phase = TermsTokenState | 'loading' | 'accepted'
 
 export function AcceptTermsPage() {
   const [params] = useSearchParams()
@@ -39,8 +39,9 @@ export function AcceptTermsPage() {
         if (!cancelled) setPhase(state)
       } catch {
         // A failed lookup must not present as a working link: better to send
-        // them back to us than to have them tap Accept into a raw error.
-        if (!cancelled) setPhase('failed')
+        // them back to us than to have them tap Accept into a raw error. Same
+        // copy as a token we can't find — from here the two are the same thing.
+        if (!cancelled) setPhase('unknown')
       }
     })()
     return () => { cancelled = true }

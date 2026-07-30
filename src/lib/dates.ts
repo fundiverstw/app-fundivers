@@ -13,6 +13,7 @@
 // Use `todayIso` and `parseIsoDate` for date columns; `isoDate` stays for the
 // callers that genuinely want a UTC slice of a specific instant.
 
+import { format } from 'date-fns'
 import { siteConfig } from '../config/site'
 
 /** A Date as a `YYYY-MM-DD` calendar string (UTC), for Supabase date columns. */
@@ -46,4 +47,21 @@ export function addIsoDays(iso: string, days: number): string {
   d.setDate(d.getDate() + days)
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+/**
+ * A `timestamptz` rendered as "Jul 30, 2026", or null when it can't be parsed.
+ *
+ * date-fns `format` throws "Invalid time value" on a bad string, and these
+ * timestamps are one line inside a much larger admin card — a malformed one
+ * must not take the whole card down with it. Null lets the caller drop the
+ * line instead.
+ *
+ * For a `date` COLUMN use parseIsoDate first: this parses as an instant, which
+ * is right for timestamps and a day out for calendar dates.
+ */
+export function formatTimestampDay(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? null : format(d, 'MMM d, yyyy')
 }

@@ -13,7 +13,7 @@ import { t } from '../../i18n'
 import { BTN_XS_GHOST } from '../../styles/tokens'
 import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
 import { fetchCreditsForUser, openCreditBalance, applyCreditToBooking } from '../../lib/credits'
-import { invokeWithRetry } from '../../lib/edge-invoke'
+import { invokeWithRetry, edgeErrorMessage } from '../../lib/edge-invoke'
 import { fetchRideSeats, canRequestRide, type RideSeats } from '../../lib/event-vehicles'
 import { missingWaivers, fetchEventWaiverOverrides, fetchDiverSignatures, fetchWaivers } from '../../lib/waivers'
 import { WaiverSignDialog } from '../waivers/WaiverSignDialog'
@@ -82,20 +82,10 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked, existi
 // (see event.transport_price). NULL or 0 = transportation bundled into
 // the base price.
 
-// supabase-js wraps every non-2xx as `FunctionsHttpError` whose .message
-// is just "Edge Function returned a non-2xx status code"; the actual
-// server message is buried in .context (a Response). Pull it out, then
-// soften the most common case (email already taken) with a recovery
-// hint pointing at the inline sign-in banner.
+// The server's message, then a softener over the most common case (email
+// already taken) pointing at the inline sign-in banner.
 async function readFunctionsError(error: { message: string; context?: unknown }, isGuest: boolean): Promise<string> {
-  let msg = error.message
-  const ctx = error.context
-  if (ctx && typeof (ctx as Response).json === 'function') {
-    try {
-      const body = await (ctx as Response).json() as { error?: string }
-      if (body?.error) msg = body.error
-    } catch { /* fall back to wrapper text */ }
-  }
+  const msg = await edgeErrorMessage(error)
   if (isGuest && /already.*registered|already.*exists/i.test(msg)) {
     return t.register.errors.emailExists
   }

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { format } from 'date-fns'
 import {
   fetchLatestTermsToken, sendTermsRequest, type TermsConsentToken,
 } from '../../lib/terms'
 import { useTerms } from '../../lib/use-terms'
+import { formatTimestampDay as fmt } from '../../lib/dates'
 import { errorMessage } from '../../lib/errors'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
@@ -71,7 +71,7 @@ export function DiverTermsConsent({ user }: { user: Profile }) {
   // Fail closed on an unknown live version: better to under-claim than to show
   // a green "current" we could not verify.
   const current = !!terms && agreedVersion >= terms.version
-  const never = !user.agreed_to_terms_at
+  const never = agreedVersion === 0
 
   const statusText = current
     ? tc.statusCurrent(agreedVersion, fmt(user.agreed_to_terms_at) ?? t.emails.common.dash)
@@ -81,16 +81,10 @@ export function DiverTermsConsent({ user }: { user: Profile }) {
 
   // Skipped rather than half-rendered when a timestamp won't parse: the status
   // above is the load-bearing part and comes straight off the profile.
-  const linkText = !latest ? null
-    : fmt(latest.used_at) ? tc.linkUsed(fmt(latest.used_at)!)
-    : !fmt(latest.expires_at) ? null
-    : new Date(latest.expires_at) < new Date() ? tc.linkExpired(fmt(latest.expires_at)!)
-    : fmt(latest.created_at) ? tc.linkPending(fmt(latest.created_at)!, fmt(latest.expires_at)!)
-    : null
+  const linkText = describeLink(latest)
 
   return (
-    <div className="space-y-1 pt-1">
-      <div className="flex items-start justify-between gap-3">
+    <div className="flex items-start justify-between gap-3 pt-1">
         <span className="min-w-0">
           <span className="block text-xs font-semibold text-brand-700 uppercase tracking-wider">
             {tc.title}
@@ -112,17 +106,18 @@ export function DiverTermsConsent({ user }: { user: Profile }) {
           >
             {sending ? tc.sending : latest ? tc.resend : tc.send}
           </button>
-        )}
-      </div>
+      )}
     </div>
   )
 }
 
-// Null rather than a throw for anything unparseable. date-fns raises
-// "Invalid time value" on a bad string, and one malformed timestamp must not
-// take out the whole user card it is a single line of.
-function fmt(iso: string | null | undefined): string | null {
-  if (!iso) return null
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? null : format(d, 'MMM d, yyyy')
+function describeLink(latest: TermsConsentToken | null): string | null {
+  if (!latest) return null
+  const used = fmt(latest.used_at)
+  if (used) return tc.linkUsed(used)
+  const expires = fmt(latest.expires_at)
+  if (!expires) return null
+  if (new Date(latest.expires_at) < new Date()) return tc.linkExpired(expires)
+  const sent = fmt(latest.created_at)
+  return sent ? tc.linkPending(sent, expires) : null
 }

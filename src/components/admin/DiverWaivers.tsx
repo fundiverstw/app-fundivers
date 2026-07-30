@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
-import { format } from 'date-fns'
 import {
   annualWaivers, annualWaiverStatus, latestSignatureFor,
   fetchDiverSignatures, fetchWaivers, recordPaperWaiver,
   type AnnualWaiverStatus,
 } from '../../lib/waivers'
+import { formatTimestampDay } from '../../lib/dates'
 import { errorMessage } from '../../lib/errors'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
+import { ANNUAL_STATUS_LABEL, ANNUAL_STATUS_CLASS } from '../waivers/annual-status'
 import type { WaiverDef } from '../../config/waivers'
 import type { WaiverSignature } from '../../types/database'
 import { t } from '../../i18n'
@@ -112,19 +113,6 @@ export function DiverWaivers({ diverId, diverName }: { diverId: string; diverNam
   )
 }
 
-const STATUS_LABEL: Record<AnnualWaiverStatus['state'], string> = {
-  signed: t.profile.waivers.statusSigned,
-  expired: t.profile.waivers.statusExpired,
-  outdated: t.profile.waivers.statusOutdated,
-  unsigned: t.profile.waivers.statusUnsigned,
-}
-const STATUS_CLASS: Record<AnnualWaiverStatus['state'], string> = {
-  signed: 'text-emerald-700',
-  expired: 'text-red-600',
-  outdated: 'text-amber-700',
-  unsigned: 'text-red-600',
-}
-
 function WaiverRow({ def, status, latest, busy, canRecord, onMarkInPerson }: {
   def: WaiverDef
   status: AnnualWaiverStatus
@@ -134,16 +122,16 @@ function WaiverRow({ def, status, latest, busy, canRecord, onMarkInPerson }: {
   onMarkInPerson: () => void
 }) {
   const ok = status.state === 'signed'
+  const validUntil = formatTimestampDay(status.validUntil)
+  const signedOn = formatTimestampDay(latest?.signed_at)
   return (
     <li className="py-2 flex items-center justify-between gap-3">
       <span className="min-w-0">
         <span className="block text-sm text-brand-900 font-medium truncate">{def.title}</span>
-        <span className={`block text-xs font-medium ${STATUS_CLASS[status.state]}`}>
-          {STATUS_LABEL[status.state]}
-          {ok && status.validUntil && (
-            <span className="text-brand-950/70">
-              {t.profile.waivers.validUntil(format(new Date(status.validUntil), 'MMM d, yyyy'))}
-            </span>
+        <span className={`block text-xs font-medium ${ANNUAL_STATUS_CLASS[status.state]}`}>
+          {ANNUAL_STATUS_LABEL[status.state]}
+          {ok && validUntil && (
+            <span className="text-brand-950/70">{t.profile.waivers.validUntil(validUntil)}</span>
           )}
         </span>
         {latest && (
@@ -151,7 +139,7 @@ function WaiverRow({ def, status, latest, busy, canRecord, onMarkInPerson }: {
           // the diver e-signed it.
           <span className="block text-xs text-brand-950/70 font-medium">
             {latest.method === 'in_person' ? dw.capturedInPerson : dw.capturedInApp}
-            {dw.onDate(format(new Date(latest.signed_at), 'MMM d, yyyy'))}
+            {signedOn && dw.onDate(signedOn)}
           </span>
         )}
       </span>

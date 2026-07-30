@@ -69,9 +69,9 @@ Deno.serve(async (req) => {
   // Mail is the whole point here, unlike the courtesy email where the account
   // was the deliverable — so a send failure is this endpoint's failure.
   if (!GMAIL_USER || !GMAIL_PASS) return json({ error: "email is not configured" }, 500)
-  const t = target as { name: string | null; nickname: string | null }
+  const who = target as { name: string | null; nickname: string | null }
   const { subject, text } = buildTermsRequestEmail({
-    name: t.name || t.nickname || to,
+    name: who.name || who.nickname || to,
     acceptUrl: termsConsentUrl((tokenRow as { token: string }).token),
   })
   try {

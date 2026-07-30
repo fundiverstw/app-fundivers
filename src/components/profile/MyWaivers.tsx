@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { annualWaivers, annualWaiverStatus, fetchDiverSignatures, fetchWaivers, type AnnualWaiverStatus } from '../../lib/waivers'
 import { WaiverSignDialog } from '../waivers/WaiverSignDialog'
+import { ANNUAL_STATUS_LABEL, ANNUAL_STATUS_CLASS } from '../waivers/annual-status'
 import type { WaiverDef } from '../../config/waivers'
+import { formatTimestampDay } from '../../lib/dates'
 import type { WaiverSignature } from '../../types/database'
 import { t } from '../../i18n'
 
@@ -69,36 +71,20 @@ export function MyWaivers({ diverId }: { diverId: string }) {
   )
 }
 
-const STATUS_LABEL: Record<AnnualWaiverStatus['state'], string> = {
-  signed: t.profile.waivers.statusSigned,
-  expired: t.profile.waivers.statusExpired,
-  outdated: t.profile.waivers.statusOutdated,
-  unsigned: t.profile.waivers.statusUnsigned,
-}
-const STATUS_CLASS: Record<AnnualWaiverStatus['state'], string> = {
-  signed: 'text-emerald-700',
-  expired: 'text-red-600',
-  outdated: 'text-amber-700',
-  unsigned: 'text-red-600',
-}
-
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString()
-}
-
 function WaiverRow({ def, status, onSign }: {
   def: WaiverDef
   status: AnnualWaiverStatus
   onSign: () => void
 }) {
   const ok = status.state === 'signed'
+  const validUntil = formatTimestampDay(status.validUntil)
   return (
     <li className="py-2 flex items-center justify-between gap-3">
       <span className="min-w-0">
         <span className="block text-sm text-brand-900 font-medium truncate">{def.title}</span>
-        <span className={`block text-xs font-medium ${STATUS_CLASS[status.state]}`}>
-          {STATUS_LABEL[status.state]}
-          {ok && status.validUntil && <span className="text-brand-950/70">{t.profile.waivers.validUntil(fmtDate(status.validUntil))}</span>}
+        <span className={`block text-xs font-medium ${ANNUAL_STATUS_CLASS[status.state]}`}>
+          {ANNUAL_STATUS_LABEL[status.state]}
+          {ok && validUntil && <span className="text-brand-950/70">{t.profile.waivers.validUntil(validUntil)}</span>}
         </span>
       </span>
       <button

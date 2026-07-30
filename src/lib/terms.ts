@@ -76,20 +76,26 @@ export async function acceptTermsWithToken(token: string): Promise<number> {
   return data as number
 }
 
+/** The status of a consent link, WITHOUT the token itself. */
 export interface TermsConsentToken {
-  token: string
   created_at: string
   expires_at: string
   used_at: string | null
-  accepted_version: number | null
 }
 
-/** Admin-only (RLS): the most recent consent link minted for a diver, for the
- *  "link sent / accepted" line on the user card. */
+/**
+ * Admin-only (RLS): when the most recent consent link was minted and whether it
+ * has been used, for the "link sent / accepted" line on the user card.
+ *
+ * The `token` column is deliberately NOT selected. It is a bearer credential
+ * that redeems consent, and the card only needs dates — shipping it into an
+ * admin's browser would invite a "copy link" button that lets the shop accept
+ * the terms on the diver's behalf, which is the one thing this design refuses.
+ */
 export async function fetchLatestTermsToken(userId: string): Promise<TermsConsentToken | null> {
   const { data, error } = await supabase
     .from('terms_consent_tokens')
-    .select('token, created_at, expires_at, used_at, accepted_version')
+    .select('created_at, expires_at, used_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(1)
