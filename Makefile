@@ -1,4 +1,13 @@
-.PHONY: help dev studio mail start stop status reset diff link pull push dump-data backup-prod repair-history verify test test-only security lint lint-fix typecheck deploy deploy-app deploy-push deploy-functions wix-sync wix-sync-pull
+# The Supabase CLI ships PostHog telemetry, and its shutdown flush can time out
+# and take the CLI's EXIT CODE with it — so a `make deploy` whose functions
+# deployed perfectly still failed with "Timeout while shutting down PostHog"
+# followed by make Error 1. DO_NOT_TRACK is the cross-tool convention
+# (consoledonottrack.com) the CLI honours: no telemetry, no flush, no spurious
+# failure. Set here rather than via `supabase telemetry disable` so it travels
+# with the repo — every fork and CI run gets it, with no per-machine setup.
+export DO_NOT_TRACK := 1
+
+.PHONY: help dev studio mail start stop status reset diff link pull push dump-data backup-prod repair-history verify test test-only security scenario preflight check-edge lint lint-fix typecheck deploy deploy-app deploy-push deploy-functions wix-sync wix-sync-pull
 
 help:
 	@echo "Local dev:"
@@ -21,9 +30,12 @@ help:
 	@echo "  make verify      — check local is in sync with cloud (schema + row counts)"
 	@echo ""
 	@echo "Testing:"
-	@echo "  make test        — the gate: typecheck + lint + every local test (unit + component + integration + security)"
+	@echo "  make preflight   — run before a push: everything below, incl. the suites CI cannot (they need Docker)"
+	@echo "  make test        — the gate: typecheck + lint + deno check + every local test"
 	@echo "  make test-only   — just the test run, skipping typecheck and lint"
+	@echo "  make scenario    — only the multi-step feature journeys in tests/scenario/"
 	@echo "  make security    — run only the black-box attacker probes in tests/security/"
+	@echo "  make check-edge  — deno check over supabase/functions/ (tsc -b cannot read them)"
 	@echo "  make lint        — run eslint over the SPA + tests"
 	@echo "  make lint-fix    — run eslint with --fix to auto-correct what it can"
 	@echo "  make typecheck   — run tsc --noEmit (no build, just type validation)"
