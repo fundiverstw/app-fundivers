@@ -117,14 +117,62 @@ catching mock-vs-prod drift; an earlier incident where mocked tests
 passed but a real migration broke is why we bothered to wire the live
 stack in the first place.
 
+## Scenario tests
+
+`tests/scenario/` walks whole journeys instead of pinning single rules:
+"a paid-up dive is cancelled and each diver ends up with a credit they
+can spend on another dive", not "this constraint fires". Same live local
+stack as the integration suite, and the same rule about not mocking it.
+
+The reason for a separate project is that the two find different bugs.
+An integration test asserts one rule and is blind to the seam BETWEEN
+rules — which is where ours have actually been: a cancellation that
+commits but whose credits fail, a series whose later occurrences keep
+the template's cancellation deadline, an account that exists but whose
+terms consent was never recorded. Each piece was right on its own; the
+order of operations was not.
+
+Write one when a feature spans more than one write. The shape is:
+
+```ts
+const w = await world(l)                       // a shop with an admin
+const diver = await w.person('diver')
+const eventId = await w.dive()
+const bookingId = await w.book({ diver, eventId, total: 3000 })
+await w.pay({ bookingId, diver, amount: 1000 })
+expect(...)                                    // what the shop would see
+```
+
+`tests/scenario/world.ts` holds the vocabulary — people, dives, series,
+bookings, payments, availability, duties, waivers, terms links — and a
+ledger so one `afterAll` tears the whole world down. Add a step there
+rather than reaching for raw inserts in a test, so the next scenario
+gets it for free. `tests/integration/scenario.ts` is the older,
+money-only version of the same idea and is still used by
+`balance-consistency`.
+
+Journeys covered today: booking lifecycle (deposit → discount → settle,
+refunds, cancellation, over-capacity waitlisting), event cancellation
+(credits issued and spent, calling off the rest of a recurring batch),
+staffing (availability vs the duty-overlap trigger, admin-managed
+windows), and walk-in paperwork (terms by emailed link, paper waivers
+recorded in person).
+
 ## Running tests
 
 ```sh
-make test                       # unit + integration (stack must be up)
-npx vitest run                  # same, without the guard
+make test                       # every project (stack must be up)
+make preflight                  # the same, named as the pre-push gate
+make scenario                   # just the multi-step journeys
+make check-edge                 # deno check over supabase/functions/
+npx vitest run                  # same as make test, without the guard
 npx vitest run src/lib          # just a folder
 npx vitest                      # watch mode (unit only by default)
 ```
+
+`make preflight` is what a push is meant to clear. It covers what CI
+cannot: CI has no Docker, so the integration, scenario and security
+projects only ever run locally.
 
 ## Coverage
 

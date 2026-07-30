@@ -64,6 +64,26 @@ export default defineConfig({
         },
       },
       {
+        // Multi-step journeys, not single rules: "a diver books, pays a deposit,
+        // then the shop cancels the whole series" rather than "this constraint
+        // fires". Same live local stack as the integration suite, and a separate
+        // project so a failure reads as "the cancellation journey broke" instead
+        // of being buried among a few hundred rule assertions. This is the
+        // pre-push gate — see `make preflight`.
+        extends: true,
+        test: {
+          name: 'scenario',
+          globals: true,
+          environment: 'node',
+          globalSetup: ['./tests/global-setup.integration.ts'],
+          setupFiles: ['./tests/setup.integration.ts'],
+          include: ['tests/scenario/**/*.test.ts'],
+          testTimeout: 60_000,
+          hookTimeout: 60_000,
+          fileParallelism: false,
+        },
+      },
+      {
         // Black-box "attacker" probes. Same live local stack as the
         // integration suite, but every request goes out via native
         // fetch() — no supabase-js abstraction, so we exercise the

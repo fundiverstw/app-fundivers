@@ -61,6 +61,21 @@ verify:     ; @bash scripts/verify-sync.sh
 test:       typecheck lint check-edge test-only
 test-only:  ; @npm run test:all
 security:   ; @npx vitest run --project security
+# Just the multi-step journeys, for when you want to know whether a whole
+# feature still works rather than which rule broke.
+scenario:   ; @npx vitest run --project scenario
+
+# Run this before `make push` or `make deploy`.
+#
+# `make test` already covers every vitest project, including the three that need
+# the local Supabase stack (integration, scenario, security) and which CI
+# therefore cannot run. This target exists to name that moment: the gate a push
+# is meant to clear.
+preflight: test
+	@echo ""
+	@echo "preflight: tsc + eslint + deno check + unit + integration + scenario + security — all green."
+	@echo "           Safe to push. Remember `make verify` if the cloud schema may have drifted."
+
 lint:       ; @npm run lint
 lint-fix:   ; @npm run lint:fix
 typecheck:  ; @npx tsc -b
