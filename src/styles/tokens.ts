@@ -91,7 +91,7 @@ export const ERROR_NOTE       = 'text-xs text-red-200 bg-red-900/40 border borde
 export const ERROR_NOTE_LIGHT = 'text-xs text-red-200 bg-red-900/30 border border-red-400/40 rounded px-2 py-1'
 
 // ── Navigation chrome ──────────────────────────────────────────────
-// Waybar glass — the blurred translucent bars floating above the water, set off
-// from the page by a hairline highlight.
+// Waybar chrome — bars set off from the page by a hairline highlight. The top
+// header is blurred glass; the bottom tab bar is opaque (see `.waybar-solid`).
 export const NAV_BAR    = 'waybar border-b border-white/10 px-4 py-3 flex items-center justify-between'
-export const NAV_BOTTOM = 'fixed bottom-0 left-0 right-0 waybar border-t border-white/10 flex justify-around py-2 z-40'
+export const NAV_BOTTOM = 'fixed bottom-0 left-0 right-0 waybar-solid border-t border-white/10 flex justify-around py-2 z-40'

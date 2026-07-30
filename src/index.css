@@ -210,6 +210,13 @@ img, video, canvas {
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
   }
+  /* The bottom tab bar's surface. Deliberately NOT `.waybar`: the page scrolls
+     underneath a fixed bar the whole height of the viewport, so translucency
+     puts moving body text directly behind the tab labels. Opaque, and no blur
+     to pay for since nothing shows through. */
+  .waybar-solid {
+    background: #0d1a2e;
+  }
   /* Waybar module — a nav item that lights up with an accent underglow when
      active. */
   .module {
