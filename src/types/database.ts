@@ -302,6 +302,19 @@ export interface Database {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      // Both defined in 20260803000000_terms_consent_by_email.sql, and both
+      // deliberately anon-callable: they exist for a diver with no session,
+      // holding a one-time link from an email. Neither returns personal data.
+      // `_state` is 'valid' | 'used' | 'expired' | 'unknown'; accept_ burns the
+      // token and stamps agreed_to_terms_* with the SERVER's terms.version.
+      terms_consent_token_state: {
+        Args: { p_token: string }
+        Returns: string
+      }
+      accept_terms_with_token: {
+        Args: { p_token: string }
+        Returns: number
+      }
       // Defined in 20260603020000_profile_delete_cascade_and_admin_rpc.sql.
       // Admin-only. Deletes auth.users for the target id; the existing
       // FK cascade handles profiles + dependents. Refuses self-deletion.
@@ -1466,6 +1479,26 @@ export interface Database {
           version?: number
           updated_by?: string | null
         }
+        Relationships: []
+      }
+      // One-time links letting a diver accept the Terms with no session
+      // (20260803000000). Minted by the service-role edge functions, redeemed
+      // by accept_terms_with_token(). Admin-readable so the user card can show
+      // "link sent / accepted"; no client ever inserts or updates.
+      terms_consent_tokens: {
+        Row: {
+          token: string
+          user_id: string
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          /** Set when the diver redeemed it — the audit trail for an
+           *  email-route consent. */
+          used_at: string | null
+          accepted_version: number | null
+        }
+        Insert: never
+        Update: never
         Relationships: []
       }
       cancellation_policies: {

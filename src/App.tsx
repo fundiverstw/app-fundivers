@@ -18,6 +18,7 @@ import { SignupPage } from './pages/SignupPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { TermsPage } from './pages/TermsPage'
+import { AcceptTermsPage } from './pages/AcceptTermsPage'
 import { CalendarPage } from './pages/CalendarPage'
 import { BookingsPage } from './pages/BookingsPage'
 import { PaymentsPage } from './pages/PaymentsPage'
@@ -84,6 +85,9 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/terms" element={<TermsPage />} />
+        {/* Public: a one-time emailed link, for the diver who has no session
+            to be gated by (see AcceptTermsPage). */}
+        <Route path="/accept-terms" element={<AcceptTermsPage />} />
         <Route
           path="/register"
           element={

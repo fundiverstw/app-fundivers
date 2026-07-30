@@ -22,6 +22,7 @@ import { issueTempPassword } from '../../lib/admin-password'
 import { ProfileForm } from '../ProfilePage'
 import { DiverNotes } from '../../components/admin/DiverNotes'
 import { DiverWaivers } from '../../components/admin/DiverWaivers'
+import { DiverTermsConsent } from '../../components/admin/DiverTermsConsent'
 import { AdminFamilyPanel } from '../../components/admin/AdminFamilyPanel'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Credit, Payment, Profile } from '../../types/database'
 import { t } from '../../i18n'
@@ -671,6 +672,7 @@ function UserCard({
                 </div>
               )}
               <ProfileDetails user={user} />
+              <DiverTermsConsent user={user} />
               {/* The legal name alone, never "Name (nickname)": this string is
                   stored as the signature on the waiver record. */}
               <DiverWaivers

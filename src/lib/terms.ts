@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { edgeErrorMessage } from './edge-invoke'
 
 // The shop's Terms of Use live in the DB (migration 20260711100000), not in
 // code: the shop authors them in admin -> Manage. `version` gates re-acceptance
@@ -49,4 +50,58 @@ export async function acceptCurrentTerms(): Promise<number> {
   const { data, error } = await supabase.rpc('accept_current_terms')
   if (error) throw error
   return data as number
+}
+
+// ── Consent without a session ────────────────────────────────────────────────
+// A diver whose account the shop minted for them has no password and no reason
+// to get one, so the in-app gate above never reaches them. They consent instead
+// by opening a one-time link from their email; these two wrap the anon-callable
+// RPCs behind it. Neither needs a session, and neither returns anything about
+// the diver — the token is the only thing identifying them.
+
+export type TermsTokenState = 'valid' | 'used' | 'expired' | 'unknown'
+
+export async function termsTokenState(token: string): Promise<TermsTokenState> {
+  const { data, error } = await supabase.rpc('terms_consent_token_state', { p_token: token })
+  // A failed read must not read as a valid link: the diver would tap Accept and
+  // get a raw error instead of "ask us for a fresh link".
+  if (error) throw error
+  return data as TermsTokenState
+}
+
+/** Records consent and burns the token. Returns the version recorded. */
+export async function acceptTermsWithToken(token: string): Promise<number> {
+  const { data, error } = await supabase.rpc('accept_terms_with_token', { p_token: token })
+  if (error) throw error
+  return data as number
+}
+
+export interface TermsConsentToken {
+  token: string
+  created_at: string
+  expires_at: string
+  used_at: string | null
+  accepted_version: number | null
+}
+
+/** Admin-only (RLS): the most recent consent link minted for a diver, for the
+ *  "link sent / accepted" line on the user card. */
+export async function fetchLatestTermsToken(userId: string): Promise<TermsConsentToken | null> {
+  const { data, error } = await supabase
+    .from('terms_consent_tokens')
+    .select('token, created_at, expires_at, used_at, accepted_version')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return data ?? null
+}
+
+/** Admin-only: mint a fresh link and email it to the diver. */
+export async function sendTermsRequest(userId: string): Promise<void> {
+  const { error } = await supabase.functions.invoke('send-terms-request', {
+    body: { user_id: userId },
+  })
+  if (error) throw new Error(await edgeErrorMessage(error))
 }

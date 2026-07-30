@@ -21,6 +21,9 @@
 import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
 import { corsOk, jsonResponse, safeError, bearerToken } from "../_shared/responses.ts"
+import {
+  buildWalkInAccountEmail, termsConsentUrl, TERMS_CONSENT_TOKEN_DAYS,
+} from "../_shared/terms-consent-email.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 
 const COMPANY_EMAIL = siteConfig.contact.email
@@ -104,10 +107,27 @@ Deno.serve(async (req) => {
     return json({ error: safeError(profErr, "profile update failed") }, 500)
   }
 
-  // Courtesy email — points the diver at the self-service password-reset
-  // flow so they can take the account over with their own password. They
-  // only need to act if they want app access; otherwise their event
-  // registration stands on its own.
+  // A one-time link so the diver can agree to the Terms without ever signing
+  // in. Nothing else in this flow records consent — handle_new_user only stamps
+  // it when the signup form's checkbox is present, and there is no form here.
+  // Best-effort: an account with no consent link beats no account, and the
+  // admin can send the request on its own from the user card.
+  let acceptUrl: string | null = null
+  const expiresAt = new Date(Date.now() + TERMS_CONSENT_TOKEN_DAYS * 86_400_000).toISOString()
+  const { data: tokenRow, error: tokenErr } = await admin
+    .from("terms_consent_tokens")
+    .insert({ user_id: newUserId, created_by: u.user.id, expires_at: expiresAt } as never)
+    .select("token")
+    .maybeSingle()
+  if (tokenErr || !tokenRow) {
+    console.error("terms consent token failed:", tokenErr?.message ?? "no row")
+  } else {
+    acceptUrl = termsConsentUrl((tokenRow as { token: string }).token)
+  }
+
+  // Courtesy email — carries the consent link, and points the diver at the
+  // self-service password-reset flow so they can take the account over with
+  // their own password. App access is optional; the consent is not.
   let emailSent = false
   if (GMAIL_USER && GMAIL_PASS) {
     try {
@@ -115,31 +135,15 @@ Deno.serve(async (req) => {
         host: "smtp.gmail.com", port: 465, secure: true,
         auth: { user: GMAIL_USER, pass: GMAIL_PASS },
       })
-      // Only reassure about "no further action" when there's an actual event
-      // registration to reference. The standalone Create-diver page mints
-      // accounts with no event, so that sentence would cite a registration
-      // that doesn't exist.
-      const closingLine = eventTitle
-        ? `Otherwise no further action is required for your registration for ${eventTitle}.\n\n`
-        : ``
+      const { subject, text } = buildWalkInAccountEmail({
+        name: fullName, email, eventTitle, acceptUrl,
+      })
       await transporter.sendMail({
         from: { name: siteConfig.identity.shopName, address: GMAIL_USER },
-        to:      email,
-        bcc:     COMPANY_EMAIL,
-        subject: `${siteConfig.identity.shopName} — account created for you`,
-        text:
-          `Hi ${fullName},\n\n` +
-          `We have created a ${siteConfig.identity.shopName} app diver account on your behalf.\n\n` +
-          `If you would like to access this account for all the great features on the app ` +
-          `(dive logs, easy event registration, push notifications, fun games, etc.), you can ` +
-          `set your own password and take it over in a minute:\n\n` +
-          `  1. Go to ${siteConfig.urls.app}/forgot-password\n` +
-          `  2. Enter this email address: ${email}\n` +
-          `  3. Open the reset link we send you and choose a password\n\n` +
-          `That's it — you'll be signed in. If the link gives you any trouble, just reply to ` +
-          `this email and we'll help you out.\n\n` +
-          closingLine +
-          `— ${siteConfig.identity.shopName}`,
+        to:   email,
+        bcc:  COMPANY_EMAIL,
+        subject,
+        text,
       })
       emailSent = true
     } catch (e) {

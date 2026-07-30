@@ -47,3 +47,25 @@ export async function invokeWithRetry<T>(
   }
   return last
 }
+
+/**
+ * The server's real error message out of a FunctionsHttpError.
+ *
+ * supabase-js wraps every non-2xx edge response as a FunctionsHttpError whose
+ * `.message` is only "Edge Function returned a non-2xx status code"; the
+ * function's own `{ error }` JSON is buried in `.context` (a Response). Without
+ * digging it out an admin sees an opaque status error instead of "email already
+ * registered" / "forbidden".
+ */
+export async function edgeErrorMessage(
+  error: { message: string; context?: unknown },
+): Promise<string> {
+  const ctx = error.context
+  if (ctx && typeof (ctx as Response).json === 'function') {
+    try {
+      const body = await (ctx as Response).json() as { error?: string }
+      if (body?.error) return body.error
+    } catch { /* body wasn't JSON — fall back to the generic message */ }
+  }
+  return error.message
+}

@@ -1,24 +1,9 @@
 import { supabase } from './supabase'
+import { edgeErrorMessage } from './edge-invoke'
 import type { Profile } from '../types/database'
 import { t } from '../i18n'
 
 const ad = t.admin.addDiver
-
-// supabase-js wraps every non-2xx edge-function response as a FunctionsHttpError
-// whose .message is just "Edge Function returned a non-2xx status code"; the
-// server's real message ({ error } JSON) is buried in .context (a Response).
-// Pull it out so callers see "email already registered" / "forbidden" instead
-// of an opaque status error. Same idiom as admin-event-export / scheduled-trips.
-async function functionErrorMessage(error: { message: string; context?: unknown }): Promise<string> {
-  const ctx = error.context
-  if (ctx && typeof (ctx as Response).json === 'function') {
-    try {
-      const body = await (ctx as Response).json() as { error?: string }
-      if (body?.error) return body.error
-    } catch { /* body wasn't JSON — fall back to the generic message */ }
-  }
-  return error.message
-}
 
 export interface CreateDiverAccountInput {
   email: string
@@ -53,7 +38,7 @@ export async function createDiverAccount(
       event_title: input.eventTitle,
     },
   })
-  if (error) throw new Error(await functionErrorMessage(error))
+  if (error) throw new Error(await edgeErrorMessage(error))
   if (!data?.ok || !data.user_id) throw new Error(ad.createFailed)
 
   const { data: profile, error: profErr } = await supabase
