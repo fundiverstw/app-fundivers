@@ -151,12 +151,20 @@ gets it for free. `tests/integration/scenario.ts` is the older,
 money-only version of the same idea and is still used by
 `balance-consistency`.
 
-Journeys covered today: booking lifecycle (deposit → discount → settle,
-refunds, cancellation, over-capacity waitlisting), event cancellation
-(credits issued and spent, calling off the rest of a recurring batch),
-staffing (availability vs the duty-overlap trigger, admin-managed
-windows), and walk-in paperwork (terms by emailed link, paper waivers
-recorded in person).
+Journeys covered today:
+
+- **booking lifecycle** — deposit → discount → settle, refunds netting,
+  cancellation, over-capacity waitlisting;
+- **event cancellation** — credits issued and spent, calling off the rest
+  of a recurring batch;
+- **staffing** — availability vs the duty-overlap trigger, admin-managed
+  windows;
+- **walk-in paperwork** — terms by emailed link, paper waivers recorded
+  in person;
+- **ride seats** — filling a van, guides taking seats from divers, two
+  dives sharing one van as a single run;
+- **family booking** — a parent paying for the group with one transfer,
+  who may be named as payer, what the family can read of each other.
 
 ## Running tests
 

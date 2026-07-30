@@ -29,10 +29,11 @@ export interface Ledger {
   events: string[]
   series: string[]
   waivers: string[]
+  vehicles: string[]
 }
 
 export function ledger(): Ledger {
-  return { users: [], events: [], series: [], waivers: [] }
+  return { users: [], events: [], series: [], waivers: [], vehicles: [] }
 }
 
 export async function teardownWorld(l: Ledger, admin: DB = adminClient()) {
@@ -42,7 +43,10 @@ export async function teardownWorld(l: Ledger, admin: DB = adminClient()) {
     await admin.from('events').update({ series_id: null } as never).eq('series_id', id)
     await admin.from('event_series').delete().eq('id', id)
   }
+  // Events before vehicles: deleting an event cascades its event_vehicles rows,
+  // and a lingering allocation would block the vehicle delete.
   for (const id of l.events) await deleteTestDive(admin, id)
+  for (const id of l.vehicles) await admin.from('vehicles').delete().eq('id', id)
   for (const code of l.waivers) await admin.from('waivers').delete().eq('code', code)
   for (const id of l.users) await deleteTestUser(admin, id)
 }
@@ -169,6 +173,141 @@ export class World {
   async bookingStatus(bookingId: string): Promise<string> {
     const { data } = await this.admin.from('bookings').select('status').eq('id', bookingId).single()
     return (data as { status: string }).status
+  }
+
+  // ── transport ─────────────────────────────────────────────────────────────
+
+  /** A car in the fleet, tracked for teardown. */
+  async vehicle(seats: number, name = `Scenario van ${seats}`): Promise<string> {
+    const { data, error } = await this.admin.from('vehicles')
+      .insert({ name: `${name} ${crypto.randomUUID().slice(0, 6)}`, passenger_seats: seats } as never)
+      .select('id').single()
+    if (error) throw new Error(`world.vehicle: ${error.message}`)
+    const id = (data as { id: string }).id
+    this.ledger.vehicles.push(id)
+    return id
+  }
+
+  /** Put a car on an event. Cars are allocated per event, not per booking. */
+  async allocateCar(vehicleId: string, eventId: string): Promise<this> {
+    const { error } = await this.admin.from('event_vehicles')
+      .insert({ vehicle_id: vehicleId, event_id: eventId } as never)
+    if (error) throw new Error(`world.allocateCar: ${error.message}`)
+    return this
+  }
+
+  /**
+   * Group events into ONE run that shares its transport, which is the unit the
+   * seat maths works in — a van on two dives the same day is one van, not two.
+   */
+  async shareTransport(eventIds: string[], inDays: number): Promise<string> {
+    const groupId = crypto.randomUUID()
+    const { error } = await this.admin.from('event_ride_groups').insert(
+      eventIds.map(event_id => ({ ride_day: this.dayFromNow(inDays), event_id, group_id: groupId })) as never,
+    )
+    if (error) throw new Error(`world.shareTransport: ${error.message}`)
+    return groupId
+  }
+
+  /**
+   * A booking that asks for a ride. `ride_waitlisted` comes back as the DATABASE
+   * stamped it — the client's value is ignored, so this is the only honest way to
+   * ask whether the diver got a seat.
+   */
+  async bookWithRide(args: {
+    diver: TestUser; eventId: string; total?: number; deposit?: number
+    status?: 'pending' | 'confirmed'
+  }): Promise<{ bookingId: string; waitlisted: boolean }> {
+    const { diver, eventId, total = 3000, deposit = 1000, status = 'pending' } = args
+    const { data, error } = await this.admin.from('bookings').insert({
+      user_id: diver.id, event_id: eventId, status,
+      details: { total, deposit, transportation: true },
+    } as never).select('id, details').single()
+    if (error) throw new Error(`world.bookWithRide: ${error.message}`)
+    const row = data as { id: string; details: { ride_waitlisted?: boolean } }
+    return { bookingId: row.id, waitlisted: row.details.ride_waitlisted === true }
+  }
+
+  /** Ask for a ride on an existing booking, and read back what the DB decided. */
+  async requestRide(bookingId: string): Promise<boolean> {
+    const { data: current } = await this.admin.from('bookings')
+      .select('details').eq('id', bookingId).single()
+    const details = (current as { details: Record<string, unknown> }).details ?? {}
+    const { data, error } = await this.admin.from('bookings')
+      .update({ details: { ...details, transportation: true } } as never)
+      .eq('id', bookingId).select('details').single()
+    if (error) throw new Error(`world.requestRide: ${error.message}`)
+    return (data as { details: { ride_waitlisted?: boolean } }).details.ride_waitlisted === true
+  }
+
+  /** seats / staff / capacity / claimed for the run an event belongs to. */
+  async rideSeats(eventId: string): Promise<{
+    seats: number; staff: number; capacity: number; claimed: number
+  }> {
+    const { data, error } = await this.admin.rpc('event_ride_seats', { p_event_id: eventId })
+    if (error) throw new Error(`world.rideSeats: ${error.message}`)
+    const row = (data as Array<Record<string, number>>)[0]
+    return {
+      seats: Number(row.seats), staff: Number(row.staff),
+      capacity: Number(row.capacity), claimed: Number(row.claimed),
+    }
+  }
+
+  // ── families ──────────────────────────────────────────────────────────────
+
+  /** Link children to a parent account, as the family panel does. */
+  async family(parent: TestUser, children: TestUser[]): Promise<this> {
+    const { error } = await this.admin.from('profiles')
+      .update({ parent_account: parent.id } as never)
+      .in('id', children.map(c => c.id))
+    if (error) throw new Error(`world.family: ${error.message}`)
+    return this
+  }
+
+  /**
+   * One booking per person on the same event, all paid for by the lead, in one
+   * group. created_at is staggered so "oldest first" is deterministic.
+   */
+  async groupBooking(args: {
+    lead: TestUser; members: TestUser[]; eventId: string
+    total?: number; deposit?: number
+    status?: 'pending' | 'confirmed'
+  }): Promise<{ groupId: string; bookingIds: string[] }> {
+    const { lead, members, eventId, total = 6000, deposit = 2000, status = 'pending' } = args
+    const groupId = crypto.randomUUID()
+    const bookingIds: string[] = []
+    let tick = 0
+    for (const person of [lead, ...members]) {
+      const { data, error } = await this.admin.from('bookings').insert({
+        user_id: person.id, event_id: eventId, status,
+        details: { total, deposit, payment_method: 'bank_transfer' },
+        payer_id: lead.id, group_id: groupId,
+        created_at: `2026-01-01T00:00:0${tick}Z`,
+      } as never).select('id').single()
+      if (error) throw new Error(`world.groupBooking: ${error.message}`)
+      bookingIds.push((data as { id: string }).id)
+      tick += 1
+    }
+    return { groupId, bookingIds }
+  }
+
+  /** The lead hands over one lump sum; the RPC spreads it across the group. */
+  async payForGroup(args: { lead: TestUser; amount: number; groupId: string }): Promise<number> {
+    const db = await this.as(this.adminUser)
+    const { data, error } = await db.rpc('record_group_payment', {
+      p_lead: args.lead.id, p_amount: args.amount, p_group_id: args.groupId,
+    })
+    if (error) throw new Error(`world.payForGroup: ${error.message}`)
+    return Number(data)
+  }
+
+  async paidOn(bookingId: string): Promise<number> {
+    const { data } = await this.admin.from('payments')
+      .select('amount, status').eq('booking_id', bookingId)
+    return (data ?? []).reduce((sum, p) => {
+      const row = p as { amount: number; status: string }
+      return sum + (row.status === 'paid' ? Number(row.amount) : row.status === 'refunded' ? -Number(row.amount) : 0)
+    }, 0)
   }
 
   // ── availability and duties ───────────────────────────────────────────────
