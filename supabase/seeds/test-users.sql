@@ -201,7 +201,7 @@ insert into public.events (
   id, kind, admin_title, display_title, calendar_title,
   course_days, start_time,
   course_name, schedule, dive_days, capacity,
-  price, starting_at
+  price
 ) values (
   'e0000000-0000-0000-0000-000000000002'::uuid, 'course',
   'Crowded test course',
@@ -212,8 +212,7 @@ insert into public.events (
   'Open Water',
   '4 days, Thu–Sun',
   4, 40,
-  '7eca095c-6bc6-4adf-9e48-d8b70b59fb9f'::uuid,
-  15400
+  '7eca095c-6bc6-4adf-9e48-d8b70b59fb9f'::uuid
 ) on conflict (id) do nothing;
 
 -- 25 bookings on the crowded dive — mixed statuses so the cards

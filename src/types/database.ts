@@ -1226,7 +1226,6 @@ export interface Database {
           course_name: string | null
           included: string | null
           schedule: string | null
-          starting_at: number | null
           /** The recurrence batch this event was generated in (20260804000000),
            *  or null for a one-off. Grouping only — the occurrence itself is
            *  fully independent. */
@@ -1266,7 +1265,6 @@ export interface Database {
           course_name?: string | null
           included?: string | null
           schedule?: string | null
-          starting_at?: number | null
           series_id?: string | null
         }
         Update: Partial<Database['public']['Tables']['events']['Insert']>
