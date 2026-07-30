@@ -12,11 +12,5 @@
 --
 -- Nothing in the schema depends on it either: no index, view, trigger,
 -- constraint or foreign key names it.
---
--- Deliberately NOT dropping events.legacy_id in the same breath. It is equally
--- dead in code, but it is a cross-system identifier — the link from an event
--- back to its Wix record — and that mapping is worth having during the
--- app-fundivers -> fundive data migration even though no code reads it. Drop it
--- after that migration, not before.
 
 alter table public.events drop column if exists starting_at;
