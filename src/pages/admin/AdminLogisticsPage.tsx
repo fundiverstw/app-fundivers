@@ -532,15 +532,16 @@ export function AdminLogisticsPage() {
                 half the board empty on anything wider than a phone. items-start
                 keeps a tall block (the fleet plan) from stretching its neighbour. */}
             <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2 items-start">
-              {dayDivers.length > 0 && (
+              {allRows.length > 0 && (
                 <div className="space-y-1">
-                  <SummaryLabel>{lg.diversOnDay}</SummaryLabel>
-                  <div className="flex flex-wrap gap-1.5">
-                    {dayDivers.map(d => (
-                      // Selectable so a name can be copied straight off the board.
-                      <span key={d.key} className={`${SUMMARY_CHIP} select-text`}>{d.name}</span>
-                    ))}
-                  </div>
+                  <SummaryLabel>{t.payments.title}</SummaryLabel>
+                  {dayOutstanding > 0 ? (
+                    <p className="text-sm font-semibold text-red-300">
+                      {lg.stillOwe(dayDue.length, currency, dayOutstanding.toLocaleString())}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-brand-900 font-medium">{lg.allSettled}</p>
+                  )}
                 </div>
               )}
               {dayStaff.length > 0 && (
@@ -556,16 +557,15 @@ export function AdminLogisticsPage() {
                   </div>
                 </div>
               )}
-              {allRows.length > 0 && (
+              {dayDivers.length > 0 && (
                 <div className="space-y-1">
-                  <SummaryLabel>{t.payments.title}</SummaryLabel>
-                  {dayOutstanding > 0 ? (
-                    <p className="text-sm font-semibold text-red-300">
-                      {lg.stillOwe(dayDue.length, currency, dayOutstanding.toLocaleString())}
-                    </p>
-                  ) : (
-                    <p className="text-sm text-brand-900 font-medium">{lg.allSettled}</p>
-                  )}
+                  <SummaryLabel>{lg.diversOnDay}</SummaryLabel>
+                  <div className="flex flex-wrap gap-1.5">
+                    {dayDivers.map(d => (
+                      // Selectable so a name can be copied straight off the board.
+                      <span key={d.key} className={`${SUMMARY_CHIP} select-text`}>{d.name}</span>
+                    ))}
+                  </div>
                 </div>
               )}
               <div className="space-y-1">
