@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { siteConfig } from '../../config/site'
 import { format } from 'date-fns'
+import { shopZoned } from '../../lib/dates'
 import { errorMessage } from '../../lib/errors'
 import { ChargeBreakdown, type AmendmentLine } from '../ChargeBreakdown'
 import { bookingBalance } from '../../lib/booking-balance'
@@ -183,7 +184,7 @@ export function BookingPaymentsBlock({
             return (
               <li key={p.id} className="flex items-baseline justify-between gap-2">
                 <span className="text-brand-950 font-medium flex-1">
-                  {format(new Date(p.created_at), 'MMM d')} · {p.note ?? bp.paymentFallback}
+                  {format(shopZoned(new Date(p.created_at)), 'MMM d')} · {p.note ?? bp.paymentFallback}
                   {p.method && <span className="opacity-70"> ({p.method.replace('_', ' ')})</span>}
                   {p.status !== 'paid' && <span className="text-red-600"> · {p.status}</span>}
                 </span>

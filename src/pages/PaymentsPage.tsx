@@ -3,6 +3,7 @@ import { siteConfig } from '../config/site'
 import { STATUS_STYLES } from '../lib/booking-status'
 import { PageLoading } from '../components/ui/Spinner'
 import { format } from 'date-fns'
+import { shopZoned } from '../lib/dates'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { personName } from '../lib/names'
@@ -532,7 +533,7 @@ function LineCard({
           )}
 
           <div className={`text-xs ${TEXT_SUBTLE} pt-2 border-t border-surface-200`}>
-            {t.bookings.bookedLabel} {format(new Date(booking.created_at), 'MMM d, yyyy')}
+            {t.bookings.bookedLabel} {format(shopZoned(new Date(booking.created_at)), 'MMM d, yyyy')}
           </div>
 
           {payments.length === 0 && isCancelled && (
@@ -545,7 +546,7 @@ function LineCard({
               {payments.map(p => (
                 <div key={p.id} className="flex justify-between text-xs">
                   <span className={TEXT_MUTED}>
-                    {format(new Date(p.created_at), 'MMM d')}{p.method && ` · ${p.method}`}
+                    {format(shopZoned(new Date(p.created_at)), 'MMM d')}{p.method && ` · ${p.method}`}
                   </span>
                   <span className={`${PAYMENT_STATUS_STYLES[p.status]} capitalize`}>
                     {currency} {p.amount.toLocaleString()} · {p.status}

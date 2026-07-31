@@ -34,11 +34,19 @@ export interface CellSegment<T extends LayoutEvent = AppEvent> {
  * Events are sorted ascending by start date (with ties broken by longer duration
  * first so the longer bar gets the lower track).
  */
-export function assignTracks<T extends LayoutEvent>(events: T[]): EventRange<T>[] {
+export function assignTracks<T extends LayoutEvent>(
+  events: T[],
+  // How to reduce an event's start/end to the calendar day cell it belongs in.
+  // Default parses as a local instant — correct for the naive wall-clock strings
+  // the staff-busy overlay builds. Real events carry a UTC instant, so their
+  // caller passes a shop-timezone resolver to land them on the shop's day rather
+  // than the viewer's (which shifts by ±1 near midnight for a diver abroad).
+  toDay: (iso: string) => Date = (iso) => startOfDay(new Date(iso)),
+): EventRange<T>[] {
   const ranges: EventRange<T>[] = events.map(event => ({
     event,
-    start: startOfDay(new Date(event.start_time)),
-    end: startOfDay(new Date(event.end_time ?? event.start_time)),
+    start: toDay(event.start_time),
+    end: toDay(event.end_time ?? event.start_time),
     track: 0,
   }))
   ranges.sort((a, b) => {

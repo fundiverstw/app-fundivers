@@ -1,4 +1,5 @@
 import { format, isSameDay, parseISO } from 'date-fns'
+import { shopZoned } from './dates'
 import { supabase } from './supabase'
 import { diveOutingFromDestinations, type DiveOuting } from './event-colors'
 import { usesCourseDays, usesDateEnvelope, DATE_ENVELOPE_KINDS, COURSE_DAY_KINDS } from './event-kinds'
@@ -84,8 +85,12 @@ export function formatEventSpan(
 ): string {
   const style = opts.style ?? 'short'
   const year = opts.withYear ? ' yyyy' : ''
-  const start = parseISO(event.start_time)
-  const end = event.end_time ? parseISO(event.end_time) : null
+  // Render the shop's calendar day, not the viewer's: parseISO gives a UTC
+  // instant that format() would otherwise stamp with the browser's timezone,
+  // shifting an event near midnight onto the previous/next day for a diver
+  // abroad. The time itself comes from start_time_hhmm (already shop-local).
+  const start = shopZoned(parseISO(event.start_time))
+  const end = event.end_time ? shopZoned(parseISO(event.end_time)) : null
   const singleDay = !end || isSameDay(start, end)
   const startFmt = ({
     long:    'EEEE, MMMM d',

@@ -7,6 +7,7 @@ import { fetchTerms, invalidateTerms, type Terms } from '../../lib/terms'
 import { starterTermsTemplate } from '../../lib/terms-template'
 import { Markdown } from '../../components/Markdown'
 import { t } from '../../i18n'
+import { siteConfig } from '../../config/site'
 import { BTN_XS_GHOST } from '../../styles/tokens'
 
 const tm = t.admin.terms
@@ -91,7 +92,7 @@ export function AdminTermsPage() {
       <p className="text-xs text-white/70">
         {tm.currentVersion(row?.version ?? 1)}
         {' · '}
-        {row?.body.trim() ? tm.lastUpdated(new Date(row.updatedAt).toLocaleDateString()) : tm.never}
+        {row?.body.trim() ? tm.lastUpdated(new Date(row.updatedAt).toLocaleDateString(undefined, { timeZone: siteConfig.locale.timezone })) : tm.never}
       </p>
 
       <label className="block space-y-1">

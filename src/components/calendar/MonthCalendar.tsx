@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth,
+  format, parseISO, startOfDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth,
   addMonths, subMonths, startOfWeek, endOfWeek,
 } from 'date-fns'
+import { shopZoned } from '../../lib/dates'
 import {
   assignTracks, segmentsForDay,
   type CellSegment, type EventRange, type LayoutEvent,
@@ -269,7 +270,14 @@ export function MonthCalendar({
     return !hiddenKinds.has(e.type)
   }), [events, hiddenKinds, hiddenCourses, cancelledShown])
 
-  const ranges: EventRange<AppEvent>[] = useMemo(() => assignTracks(filteredEvents), [filteredEvents])
+  // Real events carry a UTC instant; bucket them by the SHOP's calendar day so a
+  // near-midnight event lands in the same cell for every viewer, not the day the
+  // browser's timezone rolls it into. (Busy overlay keeps the default local
+  // parse — its start_time is already a naive shop wall-clock string.)
+  const ranges: EventRange<AppEvent>[] = useMemo(
+    () => assignTracks(filteredEvents, iso => startOfDay(shopZoned(new Date(iso)))),
+    [filteredEvents],
+  )
 
   const busyOverlayEnabled = busyEntries !== undefined && onToggleBusy !== undefined
   const busyLayoutEvents = useMemo<BusyLayoutEvent[]>(() => {
@@ -306,11 +314,13 @@ export function MonthCalendar({
     return max
   }, [busyRanges, month])
 
-  const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }, [])
+  // Shop-today midnight, so "past" and month-membership are judged on the shop's
+  // calendar rather than the viewer's — same reasoning as the track bucketing.
+  const todayStart = useMemo(() => startOfDay(shopZoned(new Date())), [])
   const inMonthEvents = useMemo(
     () => filteredEvents.filter(e =>
-      (isSameMonth(new Date(e.start_time), month) || (e.end_time && isSameMonth(new Date(e.end_time), month)))
-      && (!hidePastInList || new Date(e.start_time) >= todayStart)
+      (isSameMonth(shopZoned(new Date(e.start_time)), month) || (e.end_time && isSameMonth(shopZoned(new Date(e.end_time)), month)))
+      && (!hidePastInList || shopZoned(new Date(e.start_time)) >= todayStart)
     ),
     [filteredEvents, month, hidePastInList, todayStart]
   )

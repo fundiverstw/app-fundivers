@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
+import { shopZoned } from '../../lib/dates'
 import { personName } from '../../lib/names'
 import { supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
@@ -166,7 +167,7 @@ export function AdminRefundsPage() {
                 <div className={`text-xs ${TEXT_MUTED} mt-0.5`}>
                   {rf.colPaid}: <span className="tabular-nums text-brand-900 font-medium">{money(r.paid, r.currency)}</span>
                   {' · '}
-                  {rf.colRequested}: {format(new Date(r.requestedAt), 'PP p')}
+                  {rf.colRequested}: {format(shopZoned(new Date(r.requestedAt)), 'PP p')}
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">

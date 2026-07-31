@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { personName } from '../../lib/names'
 import { format } from 'date-fns'
+import { shopZoned } from '../../lib/dates'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import type { DiverNote, Profile } from '../../types/database'
@@ -165,9 +166,9 @@ export function DiverNotes({ profileId, title = dn.title }: Props) {
                   )}
                 </div>
                 <p className="text-xs text-brand-950 font-medium">
-                  {personName(n.author?.name, n.author?.nickname) || t.admin.notes.unknownAuthor} · {format(new Date(n.created_at), 'MMM d, yyyy · HH:mm')}
+                  {personName(n.author?.name, n.author?.nickname) || t.admin.notes.unknownAuthor} · {format(shopZoned(new Date(n.created_at)), 'MMM d, yyyy · HH:mm')}
                   {n.edited_at && (
-                    <>{dn.edited}{n.editor && dn.editedBy(personName(n.editor.name, n.editor.nickname))} {format(new Date(n.edited_at), 'MMM d')}</>
+                    <>{dn.edited}{n.editor && dn.editedBy(personName(n.editor.name, n.editor.nickname))} {format(shopZoned(new Date(n.edited_at)), 'MMM d')}</>
                   )}
                 </p>
               </>

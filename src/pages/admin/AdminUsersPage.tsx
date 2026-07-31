@@ -4,6 +4,7 @@ import { BTN_XS_PRIMARY, BTN_XS_GHOST, BTN_XS_DANGER } from '../../styles/tokens
 import { siteConfig } from '../../config/site'
 import { Spinner } from '../../components/ui/Spinner'
 import { format } from 'date-fns'
+import { shopZoned, parseIsoDate } from '../../lib/dates'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
@@ -722,7 +723,7 @@ function ProfileDetails({ user }: { user: Profile }) {
       <Section title={us.secPersonal}>
         <Row k={us.rowEmail} v={user.email} />
         <Row k={us.rowPreferredContact} v={contact} />
-        <Row k={us.rowDob} v={user.date_of_birth ? format(new Date(user.date_of_birth), 'MMM d, yyyy') : null} />
+        <Row k={us.rowDob} v={user.date_of_birth ? format(parseIsoDate(user.date_of_birth), 'MMM d, yyyy') : null} />
         <Row k={us.rowNationality} v={user.nationality} />
         <Row k={us.rowIdPassport} v={user.id_number} />
         <Row k={us.rowGender} v={user.gender} />
@@ -736,7 +737,7 @@ function ProfileDetails({ user }: { user: Profile }) {
       <Section title={t.profile.certification}>
         <Row k={us.rowAgencyLevel} v={user.cert_agency && user.cert_level ? `${user.cert_agency} ${user.cert_level}` : null} />
         <Row k={us.rowLoggedDives} v={String(user.logged_dives ?? 0)} />
-        <Row k={us.rowLastDive} v={user.last_dive_date ? format(new Date(user.last_dive_date), 'MMM d, yyyy') : null} />
+        <Row k={us.rowLastDive} v={user.last_dive_date ? format(parseIsoDate(user.last_dive_date), 'MMM d, yyyy') : null} />
         <Row k={us.rowNitrox} v={user.nitrox_certified ? us.certifiedYes : us.certifiedNo} />
         <Row k={us.rowDeep} v={user.deep_certified ? us.certifiedYes : us.certifiedNo} />
         {user.cert_card_path && <CertCardPreview path={user.cert_card_path} />}
@@ -939,7 +940,7 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
             return (
               <li key={c.id} className="flex items-baseline justify-between gap-2">
                 <span className="text-brand-950 font-medium flex-1">
-                  {format(new Date(c.created_at), 'MMM d')} · {c.reason}
+                  {format(shopZoned(new Date(c.created_at)), 'MMM d')} · {c.reason}
                   {linked?.event && <span className="opacity-70">{us.reEvent(linked.event.title)}</span>}
                   {c.status === 'settled' && c.settled_note && (
                     <span className="opacity-70">{us.settledWithNote(c.settled_note)}</span>

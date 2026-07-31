@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
+import { shopZoned } from '../../lib/dates'
 import { supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
 import { personName } from '../../lib/names'
@@ -91,7 +92,7 @@ function EntryRow({ entry, currency, actorName }: EntryRowProps) {
         )}
       </div>
       <div className={`text-xs ${TEXT_SUBTLE} mt-0.5`}>
-        {format(new Date(entry.at), 'yyyy-MM-dd HH:mm')}
+        {format(shopZoned(new Date(entry.at)), 'yyyy-MM-dd HH:mm')}
         {entry.method ? ` · ${entry.method}` : ''}
         {entry.actorId ? ` · ${au.byActor(actorName(entry.actorId))}` : ''}
       </div>

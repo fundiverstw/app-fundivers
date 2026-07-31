@@ -50,7 +50,38 @@ export function addIsoDays(iso: string, days: number): string {
 }
 
 /**
- * A `timestamptz` rendered as "Jul 30, 2026", or null when it can't be parsed.
+ * A Date whose LOCAL fields carry the shop-timezone wall clock of `instant`.
+ *
+ * date-fns `format` reads a Date's LOCAL fields, so it renders every instant in
+ * whatever timezone the browser happens to sit in — a diver in London sees a
+ * Taipei event's date and time shifted onto their own clock. Feeding `format`
+ * this shifted Date instead makes it render the shop's wall clock everywhere.
+ *
+ * The result is a fiction — its absolute instant is wrong by the zone offset —
+ * so it is ONLY safe to hand to a formatter. Never do arithmetic on it, and
+ * never store or compare it as an instant.
+ *
+ * An unparseable Date is returned untouched so the caller's `format` throws
+ * (or its NaN guard fires) exactly as it did before this indirection.
+ */
+export function shopZoned(instant: Date): Date {
+  if (Number.isNaN(instant.getTime())) return instant
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: siteConfig.locale.timezone,
+    hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(instant)
+  const p: Record<string, string> = {}
+  for (const part of parts) p[part.type] = part.value
+  // hourCycle h23 can emit '24' for midnight on some engines; fold it to 0.
+  return new Date(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second)
+}
+
+/**
+ * Render a `timestamptz` (or Date) with a date-fns format string, in the shop's
+ * timezone. The one entry point for timestamp display so no call site has to
+ * remember to shop-zone first. Returns null when the value can't be parsed.
  *
  * date-fns `format` throws "Invalid time value" on a bad string, and these
  * timestamps are one line inside a much larger admin card — a malformed one
@@ -60,10 +91,15 @@ export function addIsoDays(iso: string, days: number): string {
  * For a `date` COLUMN use parseIsoDate first: this parses as an instant, which
  * is right for timestamps and a day out for calendar dates.
  */
-export function formatTimestampDay(iso: string | null | undefined): string | null {
+export function formatTimestamp(iso: string | Date | null | undefined, fmt: string): string | null {
   if (!iso) return null
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? null : format(d, 'MMM d, yyyy')
+  const d = iso instanceof Date ? iso : new Date(iso)
+  return Number.isNaN(d.getTime()) ? null : format(shopZoned(d), fmt)
+}
+
+/** A `timestamptz` rendered as "Jul 30, 2026" in the shop's timezone, or null. */
+export function formatTimestampDay(iso: string | null | undefined): string | null {
+  return formatTimestamp(iso, 'MMM d, yyyy')
 }
 
 /**

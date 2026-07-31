@@ -3,6 +3,7 @@ import { fetchNotifications, markRead, markAllRead } from '../lib/notifications'
 import type { Notification } from '../types/database'
 import { ON_DEEP_MUTED } from '../styles/tokens'
 import { t } from '../i18n'
+import { siteConfig } from '../config/site'
 
 const nt = t.notifications
 
@@ -121,5 +122,5 @@ function relativeTime(iso: string): string {
   if (hr < 24) return nt.hoursAgo(hr)
   const d = Math.round(hr / 24)
   if (d < 7) return nt.daysAgo(d)
-  return new Date(iso).toLocaleDateString()
+  return new Date(iso).toLocaleDateString(undefined, { timeZone: siteConfig.locale.timezone })
 }

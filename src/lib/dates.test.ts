@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { isoDate, todayIso, parseIsoDate, addIsoDays, formatTimestampDay, diffIsoDays } from './dates'
+import { format } from 'date-fns'
+import { isoDate, todayIso, parseIsoDate, addIsoDays, shopZoned, formatTimestamp, formatTimestampDay, diffIsoDays } from './dates'
 import { siteConfig } from '../config/site'
+
+const isTaipei = siteConfig.locale.timezone === 'Asia/Taipei'
 
 afterEach(() => { vi.useRealTimers() })
 
@@ -84,6 +87,49 @@ describe('addIsoDays', () => {
   it('handles a leap day', () => {
     expect(addIsoDays('2028-02-28', 1)).toBe('2028-02-29')
     expect(addIsoDays('2028-02-29', 1)).toBe('2028-03-01')
+  })
+})
+
+describe('shopZoned', () => {
+  // Whatever timezone the test runner sits in, formatting a shop-zoned instant
+  // must render the shop's wall clock, not the runner's. These lock Asia/Taipei
+  // (UTC+8): 16:00Z is midnight the next day in Taipei.
+  it.runIf(isTaipei)('carries the shop wall clock into a date-fns format', () => {
+    expect(format(shopZoned(new Date('2026-05-14T16:00:00.000Z')), 'yyyy-MM-dd HH:mm'))
+      .toBe('2026-05-15 00:00')
+  })
+
+  it.runIf(isTaipei)('renders the shop day for an instant that is the previous day in UTC', () => {
+    // 20:00Z May 14 is still May 14 in UTC / the Americas, but 04:00 May 15 in
+    // Taipei — the day a diver abroad must see for a Taipei event.
+    expect(format(shopZoned(new Date('2026-05-14T20:00:00.000Z')), 'EEE, MMM d'))
+      .toBe('Fri, May 15')
+  })
+
+  it.runIf(isTaipei)('folds a midnight boundary to hour 0, never 24', () => {
+    expect(shopZoned(new Date('2026-05-14T16:00:00.000Z')).getHours()).toBe(0)
+  })
+
+  it('leaves an unparseable Date untouched so callers throw/guard as before', () => {
+    const bad = new Date('nonsense')
+    expect(Number.isNaN(shopZoned(bad).getTime())).toBe(true)
+  })
+})
+
+describe('formatTimestamp', () => {
+  it('formats a timestamptz with the given pattern in the shop timezone', () => {
+    expect(formatTimestamp('2026-07-30T09:15:00Z', 'MMM d, yyyy')).toMatch(/Jul \d+, 2026/)
+  })
+
+  it.runIf(isTaipei)('uses the shop day, not UTC, near midnight', () => {
+    expect(formatTimestamp('2026-05-14T20:00:00.000Z', 'yyyy-MM-dd')).toBe('2026-05-15')
+  })
+
+  it('returns null for null / undefined / empty / unparseable', () => {
+    expect(formatTimestamp(null, 'PP')).toBeNull()
+    expect(formatTimestamp(undefined, 'PP')).toBeNull()
+    expect(formatTimestamp('', 'PP')).toBeNull()
+    expect(formatTimestamp('not a date', 'PP')).toBeNull()
   })
 })
 

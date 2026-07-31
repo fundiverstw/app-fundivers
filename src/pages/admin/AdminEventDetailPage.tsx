@@ -3,6 +3,7 @@ import { siteConfig } from '../../config/site'
 import { PageLoading } from '../../components/ui/Spinner'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
+import { shopZoned } from '../../lib/dates'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
@@ -499,7 +500,7 @@ export function AdminEventDetailPage() {
         <p className="text-sm text-red-600 mt-2">{ed.registrantCount(activeRegistrants.length)}</p>
         {event?.cancelled_at && (
           <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-red-700 bg-red-50 border border-accent rounded px-2 py-1 inline-block">
-            {ed.cancelledOn(format(new Date(event.cancelled_at), 'MMM d, yyyy'))}
+            {ed.cancelledOn(format(shopZoned(new Date(event.cancelled_at)), 'MMM d, yyyy'))}
           </p>
         )}
       </header>
@@ -1446,7 +1447,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
                   narrow — the buttons keep their own width instead of being
                   squeezed until their labels wrap inside them. */}
               <span className="text-red-600 min-w-0">
-                🔄 {ed.refundRequested(format(new Date(r.booking.refund_requested_at), 'MMM d, HH:mm'))}
+                🔄 {ed.refundRequested(format(shopZoned(new Date(r.booking.refund_requested_at)), 'MMM d, HH:mm'))}
               </span>
               {!readOnly && (
                 <div className="flex items-center gap-1.5 shrink-0">

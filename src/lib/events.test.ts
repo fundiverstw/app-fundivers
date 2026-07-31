@@ -11,6 +11,7 @@
  * mocked builder keys its rows off the `.eq('kind', …)` filter.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { siteConfig } from '../config/site'
 
 const { from } = vi.hoisted(() => ({ from: vi.fn() }))
 vi.mock('./supabase', () => ({
@@ -393,6 +394,24 @@ describe('formatEventSpan — start_time_hhmm rendering', () => {
     })
     expect(out).toMatch(/· 09:00 → /)
   })
+
+  // The reason for shop-zoning the date: an instant that is the previous day in
+  // UTC (and further west) must still show the shop's calendar day, so a diver
+  // abroad sees the same date the shop does — not their own browser's day.
+  it.runIf(siteConfig.locale.timezone === 'Asia/Taipei')(
+    'renders the shop-timezone day for a near-midnight instant, whatever the runtime zone',
+    async () => {
+      const { formatEventSpan } = await import('./events')
+      // 22:00Z May 14 = 06:00 May 15 in Taipei. UTC and the Americas call this
+      // May 14; the shop (and this output) must say May 15.
+      const out = formatEventSpan({
+        start_time: '2026-05-14T22:00:00.000Z',
+        end_time: null,
+        start_time_hhmm: '06:00',
+      })
+      expect(out).toBe('Fri, May 15 · 06:00')
+    },
+  )
 })
 
 describe('toIso — shop-timezone anchoring (via diveToEvent)', () => {

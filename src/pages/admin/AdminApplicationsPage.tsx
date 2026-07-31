@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { personName } from '../../lib/names'
 import { format } from 'date-fns'
+import { shopZoned } from '../../lib/dates'
 import { supabase } from '../../lib/supabase'
 import { useToast } from '../../hooks/useToast'
 import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
@@ -135,7 +136,7 @@ export function AdminApplicationsPage() {
                     {personName(u.name, u.nickname) || ap.noNameYet}
                   </div>
                   <div className={`text-xs ${TEXT_MUTED}`}>
-                    {ap.submittedOn(format(new Date(u.created_at), 'PP'))}
+                    {ap.submittedOn(format(shopZoned(new Date(u.created_at)), 'PP'))}
                   </div>
                 </div>
                 <span className={`text-xs ${TEXT_MUTED}`}>{isExpanded ? '−' : '+'}</span>

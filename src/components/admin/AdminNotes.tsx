@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { personName } from '../../lib/names'
 import { format } from 'date-fns'
+import { shopZoned } from '../../lib/dates'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { NOTE_TAGS, type AdminNote, type NoteTag, type Profile } from '../../types/database'
@@ -247,9 +248,9 @@ function NoteCard({ note, onResolve, onUnresolve }: {
         )}
       </div>
       <p className="text-xs text-brand-950 font-medium mt-1">
-        {author} · {format(new Date(note.created_at), 'MMM d · HH:mm')}
+        {author} · {format(shopZoned(new Date(note.created_at)), 'MMM d · HH:mm')}
         {note.resolved && note.resolved_at && (
-          <> · resolved by {personName(note.resolver?.name, note.resolver?.nickname) || 'unknown'} {format(new Date(note.resolved_at), 'MMM d')}</>
+          <> · resolved by {personName(note.resolver?.name, note.resolver?.nickname) || 'unknown'} {format(shopZoned(new Date(note.resolved_at)), 'MMM d')}</>
         )}
       </p>
     </div>

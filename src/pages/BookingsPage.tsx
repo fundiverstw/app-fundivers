@@ -3,6 +3,7 @@ import { siteConfig } from '../config/site'
 import { STATUS_STYLES } from '../lib/booking-status'
 import { PageLoading } from '../components/ui/Spinner'
 import { format } from 'date-fns'
+import { shopZoned } from '../lib/dates'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
@@ -290,7 +291,7 @@ function Card({
             </p>
           )}
           {row.refund_requested_at && (
-            <p className={`text-xs ${TEXT_ERROR} mt-0.5`}>🔄 {t.bookings.refundRequested} {format(new Date(row.refund_requested_at), 'MMM d')}</p>
+            <p className={`text-xs ${TEXT_ERROR} mt-0.5`}>🔄 {t.bookings.refundRequested} {format(shopZoned(new Date(row.refund_requested_at)), 'MMM d')}</p>
           )}
         </div>
         <div className="text-right shrink-0 ml-3">
@@ -345,7 +346,7 @@ function Card({
             <p className={`text-xs ${TEXT_MUTED} bg-surface-50 rounded p-2`}>📝 {row.notes}</p>
           )}
           <p className={`text-xs ${TEXT_SUBTLE}`}>
-            {t.bookings.bookedLabel} {format(new Date(row.created_at), 'MMM d, yyyy')}
+            {t.bookings.bookedLabel} {format(shopZoned(new Date(row.created_at)), 'MMM d, yyyy')}
           </p>
 
           <div className="flex flex-wrap gap-2 pt-1">
