@@ -47,7 +47,6 @@ describe('AdminEditEventPage', () => {
       nitrox_required: false,
       dive_days: 1,
       featured_image: null,
-      second_image: null,
       prereqs: null,
       req_dives: null,
       notes: 'Bring fins',
@@ -104,7 +103,7 @@ describe('AdminEditEventPage', () => {
       start_date: '2026-06-01', start_time: '08:00:00', end_date: '2026-06-01',
       featured: false, fully_booked: false, price: null,
       gear_rental: null, nitrox_required: false, dive_days: 1,
-      featured_image: null, second_image: null, prereqs: null, req_dives: null,
+      featured_image: null, prereqs: null, req_dives: null,
       notes: '', cancel_date: null, cancel_policy: null,
       trip_template_id: null,
       prereq_cert_id: null, cancelled_at: null,
@@ -123,8 +122,8 @@ describe('AdminEditEventPage', () => {
     expect(await screen.findByText(/waiver requirements/i)).toBeInTheDocument()
   })
 
-  it('prefills the Wix featured/second image fields and round-trips them into the update payload', async () => {
-    // Both inputs round-trip the wix:image:// URI verbatim — no parsing,
+  it('prefills the Wix featured image field and round-trips it into the update payload', async () => {
+    // The input round-trips the wix:image:// URI verbatim — no parsing,
     // no validation beyond a soft hint we don't assert on here.
     const existing = {
       id: 'dive_x', kind: 'dive',
@@ -140,7 +139,6 @@ describe('AdminEditEventPage', () => {
       nitrox_required: false,
       dive_days: 1,
       featured_image: 'wix:image://v1/abc/featured.jpg#originWidth=2000&originHeight=3000',
-      second_image:   'wix:image://v1/def/second.jpg#originWidth=2000&originHeight=3000',
       prereqs: null, req_dives: null,
       notes: '',
       cancel_date: null, cancel_policy: null,
@@ -161,23 +159,15 @@ describe('AdminEditEventPage', () => {
     renderAt('/admin/events/dive_x/edit')
 
     const featuredInput = await screen.findByLabelText(/featured image \(wix uri\)/i) as HTMLInputElement
-    const secondInput = screen.getByLabelText(/second image \(wix uri\)/i) as HTMLInputElement
-    await waitFor(() => {
-      expect(featuredInput.value).toBe(existing.featured_image)
-      expect(secondInput.value).toBe(existing.second_image)
-    })
+    await waitFor(() => expect(featuredInput.value).toBe(existing.featured_image))
 
-    // Swap both for new URIs and save.
     await user.clear(featuredInput)
     await user.type(featuredInput, 'wix:image://v1/new/hero.jpg')
-    await user.clear(secondInput)
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
     await waitFor(() => expect(updateSpy).toHaveBeenCalled())
     const payload = (updateSpy.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
     expect(payload.featured_image).toBe('wix:image://v1/new/hero.jpg')
-    // Empty input round-trips to null in the payload.
-    expect(payload.second_image).toBeNull()
   })
 
   it('renders an error and no form when the dive is not found', async () => {

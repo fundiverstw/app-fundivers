@@ -1593,7 +1593,6 @@ export const en = {
       isPrivate: 'Private (hidden from public calendars)',
       gearRental: 'Gear rental info',
       featuredImage: 'Featured image (Wix URI)',
-      secondImage: 'Second image (Wix URI)',
       destinations: 'Destinations',
       noDestinations: 'No destinations defined.',
       tripTemplateRef: 'Trip template reference',

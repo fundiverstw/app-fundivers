@@ -24,7 +24,6 @@ export interface FormState {
   // Plain image URLs the shop hosts itself; the SPA stores and round-trips
   // the text (no upload/resolve).
   featured_image: string // both kinds
-  second_image: string   // dive-only — left empty for courses
   // dive
   notes: string          // dive-only NOT NULL
   featured: boolean
@@ -60,7 +59,7 @@ export const EMPTY_FORM: FormState = {
   prereq_cert_id: '',
   req_dives: '', dive_days: '',
   addonIds: [],
-  featured_image: '', second_image: '',
+  featured_image: '',
   notes: '', featured: false, fully_booked: false, is_private: false, is_boat_dive: false, is_trip: false,
   roomIds: [],
   nitrox_required: false, gear_rental: '',
@@ -138,7 +137,6 @@ export function formStateFromEvent(e: EventRow, rels: EventRelations = NO_RELATI
       course_name: e.course_name ?? '',
       included: e.included ?? '',
       schedule: e.schedule ?? '',
-      second_image: '',
       notes: '', featured: false, is_private: false, is_boat_dive: false, is_trip: false,
       roomIds: [],
       nitrox_required: false, gear_rental: '',
@@ -165,7 +163,6 @@ export function formStateFromEvent(e: EventRow, rels: EventRelations = NO_RELATI
     gear_rental: e.gear_rental ?? '',
     destinationIds: rels.destinationIds,
     trip_template_reference: e.trip_template_id ?? '',
-    second_image: e.second_image ?? '',
     courseDays: [], course_name: '',
     included: '', schedule: '',
   }
@@ -213,7 +210,6 @@ export function eventPayloadFromForm(form: FormState): Record<string, unknown> {
     notes: courseOnly ? null : form.notes,
     nitrox_required: diving ? form.nitrox_required : false,
     gear_rental: courseOnly ? null : (form.gear_rental || null),
-    second_image: courseOnly ? null : (form.second_image.trim() || null),
     trip_template_id: courseOnly ? null : (form.trip_template_reference || null),
     // course-only
     course_name: courseOnly ? (form.course_name || null) : null,

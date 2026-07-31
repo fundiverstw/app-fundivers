@@ -1580,7 +1580,6 @@ export const zhTW: Messages = {
       isPrivate: '私人活動（不在公開日曆顯示）',
       gearRental: '裝備租借資訊',
       featuredImage: '精選圖片（Wix URI）',
-      secondImage: '第二張圖片（Wix URI）',
       destinations: '目的地',
       noDestinations: '尚未定義任何目的地。',
       tripTemplateRef: '行程範本參照',

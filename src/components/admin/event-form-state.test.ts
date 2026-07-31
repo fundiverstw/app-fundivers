@@ -40,7 +40,6 @@ function baseRow(overrides: Partial<EventRow> = {}): EventRow {
     is_boat_dive: false,
     is_trip: false,
     nitrox_required: false,
-    second_image: null,
     gear_rental: null,
     notes: null,
     trip_template_id: null,
@@ -107,7 +106,6 @@ describe('formStateFromEvent — dive', () => {
       trip_template_id: 'dt_ref',
       full_payment_deadline: '2026-06-25',
       featured_image: 'https://cdn.example/hero.jpg',
-      second_image: 'https://cdn.example/second.jpg',
     }), rels({ roomIds: ['rm1', 'rm2'], addonIds: ['ad1', 'ad2'], destinationIds: ['dest1'] }))
     expect(fs).toEqual({
       type: 'dive',
@@ -138,7 +136,6 @@ describe('formStateFromEvent — dive', () => {
       trip_template_reference: 'dt_ref',
       full_payment_deadline: '2026-06-25',
       featured_image: 'https://cdn.example/hero.jpg',
-      second_image: 'https://cdn.example/second.jpg',
       courseDays: [],
       course_name: '',
       included: '',
@@ -182,7 +179,6 @@ describe('formStateFromEvent — dive', () => {
       trip_template_id: null,
       full_payment_deadline: null,
       featured_image: null,
-      second_image: null,
     }))
     expect(fs.admin_title).toBe('')
     expect(fs.calendar_title).toBe('')
@@ -198,7 +194,6 @@ describe('formStateFromEvent — dive', () => {
     expect(fs.trip_template_reference).toBe('')
     expect(fs.full_payment_deadline).toBe('')
     expect(fs.featured_image).toBe('')
-    expect(fs.second_image).toBe('')
   })
 
   it('strips the capacity suffix the DB trigger appends to display_title', () => {
@@ -266,7 +261,6 @@ describe('formStateFromEvent — course', () => {
       cancel_date: '2026-06-25',
       cancel_policy: 'Policy',
       featured_image: 'https://cdn.example/course.jpg',
-      second_image: '',
       notes: '',
       featured: false,
       fully_booked: false,
@@ -350,7 +344,6 @@ describe('eventPayloadFromForm — dive', () => {
       trip_template_reference: 'dt',
       full_payment_deadline: '2026-06-25',
       featured_image: '  https://cdn.example/hero.jpg  ',
-      second_image: '  https://cdn.example/second.jpg  ',
     })
     expect(payload).toEqual({
       kind: 'dive',
@@ -378,7 +371,6 @@ describe('eventPayloadFromForm — dive', () => {
       notes: 'Notes',
       nitrox_required: true,
       gear_rental: 'full',
-      second_image: 'https://cdn.example/second.jpg',
       trip_template_id: 'dt',
       course_name: null,
       included: null,
@@ -419,7 +411,6 @@ describe('eventPayloadFromForm — dive', () => {
     expect(payload.trip_template_id).toBeNull()
     expect(payload.full_payment_deadline).toBeNull()
     expect(payload.featured_image).toBeNull()
-    expect(payload.second_image).toBeNull()
     // notes is NOT NULL for a dive, so it stays an empty string rather than null.
     expect(payload.notes).toBe('')
   })
@@ -441,17 +432,16 @@ describe('eventPayloadFromForm — dive', () => {
       .toMatchObject({ req_dives: 0, dive_days: 0 })
   })
 
-  it('trims admin_title and the image fields', () => {
+  it('trims admin_title and the featured image', () => {
     const payload = eventPayloadFromForm({
       ...EMPTY_FORM,
       admin_title: '  Title  ',
-      featured_image: '   ',
-      second_image: '  https://x/y.jpg  ',
+      featured_image: '  https://x/y.jpg  ',
     })
     expect(payload.admin_title).toBe('Title')
+    expect(payload.featured_image).toBe('https://x/y.jpg')
     // A whitespace-only image trims to '' which is falsy → null.
-    expect(payload.featured_image).toBeNull()
-    expect(payload.second_image).toBe('https://x/y.jpg')
+    expect(eventPayloadFromForm({ ...EMPTY_FORM, featured_image: '   ' }).featured_image).toBeNull()
   })
 })
 
@@ -505,7 +495,6 @@ describe('eventPayloadFromForm — course', () => {
       notes: null,
       nitrox_required: false,
       gear_rental: null,
-      second_image: null,
       trip_template_id: null,
       course_name: 'PADI OW',
       included: 'Manual',

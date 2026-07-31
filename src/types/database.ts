@@ -1219,7 +1219,6 @@ export interface Database {
           is_boat_dive: boolean | null
           is_trip: boolean | null
           nitrox_required: boolean
-          second_image: string | null
           gear_rental: string | null
           notes: string | null
           trip_template_id: string | null
@@ -1258,7 +1257,6 @@ export interface Database {
           is_boat_dive?: boolean | null
           is_trip?: boolean | null
           nitrox_required?: boolean
-          second_image?: string | null
           gear_rental?: string | null
           notes?: string | null
           trip_template_id?: string | null

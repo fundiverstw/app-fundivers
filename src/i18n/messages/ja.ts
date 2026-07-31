@@ -1579,7 +1579,6 @@ export const ja: Messages = {
       isPrivate: '非公開（公開カレンダーに表示しない）',
       gearRental: '器材レンタル情報',
       featuredImage: 'メイン画像（Wix URI）',
-      secondImage: '2 枚目の画像（Wix URI）',
       destinations: '目的地',
       noDestinations: '目的地が登録されていません。',
       tripTemplateRef: 'ツアーテンプレートの参照',

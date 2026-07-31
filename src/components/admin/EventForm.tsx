@@ -620,11 +620,6 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
               value={form.featured_image}
               onChange={v => set('featured_image', v)}
             />
-            <WixImageField
-              label={ef.secondImage}
-              value={form.second_image}
-              onChange={v => set('second_image', v)}
-            />
             <div className="space-y-1">
               <span className="text-xs font-medium text-white/80">{ef.destinations}</span>
               {destinations.length === 0 ? (
