@@ -122,8 +122,11 @@ const BUSY_DOT             = 'bg-violet-600'
 // same shade as own-busy bars so the two duty-signals share one palette.
 const OWN_DUTY_STRIPE = 'repeating-linear-gradient(45deg, transparent 0 6px, #7c3aed 6px 12px)'
 
-const TRACK_HEIGHT = 18
-const TRACK_GAP = 2
+// Event/busy bar row height and the gap between stacked bars. Sized to seat the
+// text-xs pill label comfortably now that the app runs a larger base font — the
+// bar height doubles as the label's line-height so the title vertical-centres.
+const TRACK_HEIGHT = 24
+const TRACK_GAP = 3
 
 // Project a staff_busy view row into the LayoutEvent shape so it can
 // share the track allocator. end_date is inclusive (busy through end of
@@ -481,12 +484,12 @@ function MonthGrid({
 }: MonthGridProps) {
   const leading = days[0].getDay()
   const totalRows = Math.max(1, trackRows) + busyTrackRows
-  const cellMinHeight = 22 + totalRows * (TRACK_HEIGHT + TRACK_GAP) + 6
+  const cellMinHeight = 32 + totalRows * (TRACK_HEIGHT + TRACK_GAP) + 8
 
   return (
     <div className="grid grid-cols-7 glass rounded-2xl overflow-hidden text-sm">
       {t.calendar.weekdays.map((d, i) => (
-        <div key={i} className="bg-white/5 text-center text-xs text-brand-100/80 font-semibold py-1 border-b border-white/10">{d}</div>
+        <div key={i} className="bg-white/5 text-center text-sm text-brand-100/80 font-semibold py-1.5 border-b border-white/10">{d}</div>
       ))}
       {Array.from({ length: leading }).map((_, i) => (
         <div
@@ -579,7 +582,7 @@ function DayCell({
       }`}
       style={{ minHeight }}
     >
-      <span className={`text-[10px] block text-center w-5 h-5 flex items-center justify-center mx-auto ${
+      <span className={`text-sm block text-center w-7 h-7 flex items-center justify-center mx-auto ${
         isToday ? 'text-reef-300 font-bold' : 'text-brand-100/80'
       }`}>
         {format(day, 'd')}
@@ -772,7 +775,7 @@ function EventBar({
         : disabled ? t.calendar.alreadyHappened(seg.event.title)
         : seg.event.title
       }
-      className={`absolute text-[10px] font-semibold truncate text-left px-1 transition-all ${baseClass} ${leftRadius} ${rightRadius} ${
+      className={`absolute text-xs font-semibold truncate text-left px-1.5 transition-all ${baseClass} ${leftRadius} ${rightRadius} ${
         cancelled ? 'opacity-40 saturate-50 line-through'
         : disabled ? 'opacity-40 cursor-default saturate-50'
         : lifted ? 'z-30 scale-105 opacity-90 shadow-lg'
@@ -781,6 +784,7 @@ function EventBar({
       style={{
         top: track * (TRACK_HEIGHT + TRACK_GAP),
         height: TRACK_HEIGHT,
+        lineHeight: `${TRACK_HEIGHT}px`,
         left: leftInset,
         right: rightInset,
         backgroundImage: isOwnDuty ? OWN_DUTY_STRIPE : undefined,
@@ -825,10 +829,11 @@ function BusyBar({ seg, track, onClick, hovered, onHoverEvent }: {
       onMouseEnter={() => onHoverEvent(seg.event.id)}
       onMouseLeave={() => onHoverEvent(null)}
       title={label}
-      className={`absolute text-[10px] font-semibold truncate text-left px-1 transition-colors ${baseClass} ${leftRadius} ${rightRadius} ${isClickable ? '' : 'cursor-default'}`}
+      className={`absolute text-xs font-semibold truncate text-left px-1.5 transition-colors ${baseClass} ${leftRadius} ${rightRadius} ${isClickable ? '' : 'cursor-default'}`}
       style={{
         top: track * (TRACK_HEIGHT + TRACK_GAP),
         height: TRACK_HEIGHT,
+        lineHeight: `${TRACK_HEIGHT}px`,
         left: leftInset,
         right: rightInset,
       }}
@@ -926,7 +931,7 @@ function FilterLegend({
           </span>
           {t.calendar.courses}
           {hiddenCourses.size > 0 && !allCoursesHidden && (
-            <span className="ml-0.5 text-[10px] text-brand-100/60 font-medium">({visibleCourses}/{courseCategories.length})</span>
+            <span className="ml-0.5 text-xs text-brand-100/60 font-medium">({visibleCourses}/{courseCategories.length})</span>
           )}
           <span aria-hidden="true">▾</span>
         </button>

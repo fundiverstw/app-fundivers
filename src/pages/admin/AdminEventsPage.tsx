@@ -127,7 +127,7 @@ export function AdminEventsPage() {
   const ownerOptions = isAdmin && owners.length > 0 ? owners : undefined
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-3xl mx-auto">
       <MonthCalendar
         month={month}
         onMonthChange={setMonth}

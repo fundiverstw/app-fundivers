@@ -98,7 +98,7 @@ export function CalendarPage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-2xl mx-auto">
       {user && mode === 'single' && (
         <button
           type="button"
