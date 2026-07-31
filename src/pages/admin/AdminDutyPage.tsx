@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { isoDate } from '../../lib/dates'
+import { isoDate, todayIso } from '../../lib/dates'
 import { PageLoading } from '../../components/ui/Spinner'
 import { personName } from '../../lib/names'
 import { Link } from 'react-router-dom'
@@ -85,7 +85,7 @@ export function AdminDutyPage() {
     return <PageLoading />
   }
 
-  const today = format(new Date(), 'yyyy-MM-dd')
+  const today = todayIso()
   const upcoming = duties.filter(e => (e.duty.end_date ?? e.duty.start_date) >= today)
   const mine = user ? upcoming.filter(e => e.duty.assignee_id === user.id) : []
 

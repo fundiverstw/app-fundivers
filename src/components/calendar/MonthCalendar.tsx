@@ -552,7 +552,9 @@ function DayCell({
   const weekEnd = endOfWeek(day, { weekStartsOn: 0 })
   const segMap = segmentsForDay(day, ranges, weekStart, weekEnd)
   const busySegMap = segmentsForDay(day, busyRanges, weekStart, weekEnd)
-  const isToday = isSameDay(day, new Date())
+  // Shop-today, to stay consistent with the shop-day bucketing above — the
+  // tinted "today" cell must be the shop's today, not the viewer's.
+  const isToday = isSameDay(day, shopZoned(new Date()))
   const inMonth = isSameMonth(day, month)
   const dayKey = format(day, 'yyyy-MM-dd')
 

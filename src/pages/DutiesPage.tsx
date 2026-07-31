@@ -5,6 +5,7 @@ import { format, parseISO } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
+import { todayIso } from '../lib/dates'
 import { EventStatusTags } from '../components/EventStatusTags'
 import type { AppEvent, Duty } from '../types/database'
 import { PAGE_BODY } from '../styles/tokens'
@@ -63,7 +64,7 @@ export function DutiesPage() {
     return <PageLoading />
   }
 
-  const today = format(new Date(), 'yyyy-MM-dd')
+  const today = todayIso()
   const upcoming = enriched.filter(e => (e.duty.end_date ?? e.duty.start_date) >= today)
   const past     = enriched.filter(e => (e.duty.end_date ?? e.duty.start_date) <  today)
 

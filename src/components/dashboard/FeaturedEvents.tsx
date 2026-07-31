@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { format } from 'date-fns'
 import { fetchEventsInRange, formatEventSpan, isPastEvent, eventIsFull } from '../../lib/events'
+import { todayIso, addIsoDays } from '../../lib/dates'
 import { resolveImageUrl } from '../../lib/images'
 import { t } from '../../i18n'
 import type { AppEvent } from '../../types/database'
@@ -21,9 +21,10 @@ export function FeaturedEvents() {
 
   useEffect(() => {
     let cancelled = false
-    const today = new Date()
-    const from = format(today, 'yyyy-MM-dd')
-    const to = format(new Date(today.getTime() + LOOKAHEAD_DAYS * 86_400_000), 'yyyy-MM-dd')
+    // Anchor the fetch window to the shop's today, not the viewer's, so the
+    // range lines up with the shop-tz start_date column and isPastEvent filter.
+    const from = todayIso()
+    const to = addIsoDays(from, LOOKAHEAD_DAYS)
     fetchEventsInRange(from, to)
       .then(all => {
         if (cancelled) return

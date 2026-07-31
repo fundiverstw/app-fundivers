@@ -61,6 +61,12 @@ export function addIsoDays(iso: string, days: number): string {
  * so it is ONLY safe to hand to a formatter. Never do arithmetic on it, and
  * never store or compare it as an instant.
  *
+ * Caveat: the shop wall clock is rebuilt via the runtime-local Date
+ * constructor, so a viewer in a DST-observing zone whose local spring-forward
+ * gap coincides with the shop time can see an HH:mm an hour off. Date-only
+ * formats are unaffected, and the shop zone this app targets (Asia/Taipei) has
+ * no DST.
+ *
  * An unparseable Date is returned untouched so the caller's `format` throws
  * (or its NaN guard fires) exactly as it did before this indirection.
  */

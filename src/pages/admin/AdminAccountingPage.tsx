@@ -5,6 +5,7 @@ import { siteConfig } from '../../config/site'
 import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
 import { requestEventDiverExport } from '../../lib/admin-event-export'
+import { todayIso } from '../../lib/dates'
 import {
   fiscalYearRange,
   normalizeTransactions,
@@ -110,7 +111,7 @@ function ManifestSection() {
 
   useEffect(() => {
     let cancelled = false
-    const today = new Date().toISOString().slice(0, 10)
+    const today = todayIso()
     supabase
       .from('events')
       .select('id, display_title, admin_title, start_date')

@@ -1,4 +1,5 @@
 import { siteConfig } from '../config/site'
+import { todayIso } from './dates'
 
 // A fill-in-the-details starting point for a shop that has no Terms yet.
 //
@@ -16,7 +17,7 @@ import { siteConfig } from '../config/site'
 export function starterTermsTemplate(): string {
   const { shopName } = siteConfig.identity
   const { email } = siteConfig.contact
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayIso()
 
   return `> **Delete this block before publishing.** This is a starting point, not
 > legal advice. Replace every TODO, and have a lawyer read it before you rely on
