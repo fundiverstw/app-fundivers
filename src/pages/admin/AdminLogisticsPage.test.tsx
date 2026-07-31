@@ -77,6 +77,59 @@ describe('AdminLogisticsPage', () => {
     expect(screen.getByRole('group', { name: /needs ride/i })).toBeInTheDocument()
   })
 
+  it('keeps a waitlisted diver out of the seated prep totals and surfaces them as tentative', async () => {
+    const mixed = [
+      // Ada is confirmed — her BCD counts toward "Gear to pack".
+      { id: 'b1', user_id: 'u1', event_id: 'e1', status: 'confirmed',
+        details: { transportation: true, gear: { rent: true, items: ['BCD'] } } },
+      // Bo is waitlisted — his Wetsuit is tentative, not part of the boat's load,
+      // and he needs no van seat until he clears the list.
+      { id: 'b2', user_id: 'u2', event_id: 'e1', status: 'waitlisted',
+        details: { transportation: true, gear: { rent: true, items: ['Wetsuit'] } } },
+    ]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: mixed })
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      return mockQueryBuilder({ data: [] })
+    })
+    renderPage()
+
+    // Roster + header count seated divers only: one diver, one to ride.
+    await screen.findByText(/1 event · 1 diver/i)
+    const overall = screen.getByText(/^overall/i).closest('section')!
+    // Ada's BCD is packed; Bo's Wetsuit is NOT in the seated "Gear to pack".
+    const gearSection = within(overall).getByText(/gear to pack/i).closest('div')!
+    expect(within(gearSection).getByText('BCD ×1')).toBeInTheDocument()
+    expect(within(gearSection).queryByText('Wetsuit ×1')).not.toBeInTheDocument()
+
+    // The Tentative block names the waitlisted diver and his extra load.
+    const tentative = within(overall).getByText(/tentative — 1 waitlisted/i).closest('div')!
+    expect(within(tentative).getByText('Bo')).toBeInTheDocument()
+    expect(within(tentative).getByText('Wetsuit ×1')).toBeInTheDocument()
+    // Ada (seated) is not listed as tentative.
+    expect(within(tentative).queryByText('Ada')).not.toBeInTheDocument()
+  })
+
+  it('groups waitlisted diver cards under a Waitlist heading within the event', async () => {
+    const mixed = [
+      { id: 'b1', user_id: 'u1', event_id: 'e1', status: 'confirmed',
+        details: { gear: { rent: true, items: ['BCD'] } } },
+      { id: 'b2', user_id: 'u2', event_id: 'e1', status: 'waitlisted',
+        details: { gear: { rent: true, items: ['Wetsuit'] } } },
+    ]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: mixed })
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      return mockQueryBuilder({ data: [] })
+    })
+    renderPage()
+    await screen.findByText(/1 event · 1 diver/i)
+
+    // Both cards render; the waitlisted one carries the badge.
+    expect(screen.getByText(/waitlist \(1\)/i)).toBeInTheDocument()
+    expect(screen.getAllByText('Waitlisted').length).toBeGreaterThan(0)
+  })
+
   it('offers a per-event car picker listing the day\'s available cars', async () => {
     const vehicleRows = [{ id: 'v1', name: 'Delica', passenger_seats: 7, active: true, created_at: '', created_by: null }]
     from.mockImplementation((table: string) => {

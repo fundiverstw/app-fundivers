@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { splitByTransport, transportHeadcount, gearTotals, dayKeyOffset, careItemsForBooking, careTotals, isCareGearItem, addonTotals } from './logistics'
+import { splitByTransport, transportHeadcount, gearTotals, dayKeyOffset, careItemsForBooking, careTotals, isCareGearItem, addonTotals, partitionByWaitlist } from './logistics'
 import type { Booking, Profile } from '../types/database'
 
 const row = (transportation: boolean | undefined, items: string[] = []) => ({
@@ -142,6 +142,42 @@ describe('addonTotals', () => {
   it('skips add-on ids with no resolved title and returns [] when there are none', () => {
     expect(addonTotals([addonRow(['unknown-id'])], titles)).toEqual([])
     expect(addonTotals([addonRow([])], titles)).toEqual([])
+  })
+})
+
+describe('partitionByWaitlist', () => {
+  const statusRow = (id: string, status: string) => ({
+    booking: { id, status } as unknown as Booking,
+  })
+
+  it('splits waitlisted rows out from the seated (pending/confirmed) ones', () => {
+    const rows = [
+      statusRow('b1', 'confirmed'),
+      statusRow('b2', 'waitlisted'),
+      statusRow('b3', 'pending'),
+      statusRow('b4', 'waitlisted'),
+    ]
+    const { seated, waitlisted } = partitionByWaitlist(rows)
+    expect(seated.map(r => r.booking.id)).toEqual(['b1', 'b3'])
+    expect(waitlisted.map(r => r.booking.id)).toEqual(['b2', 'b4'])
+  })
+
+  it('treats every non-waitlisted status as seated and preserves order', () => {
+    const rows = [statusRow('b1', 'pending'), statusRow('b2', 'confirmed')]
+    const { seated, waitlisted } = partitionByWaitlist(rows)
+    expect(seated).toHaveLength(2)
+    expect(waitlisted).toHaveLength(0)
+  })
+
+  it('so a waitlisted diver never inflates the day\'s gear-to-pack totals', () => {
+    // The seat-honest workflow: pack for seated divers, tally waitlist apart.
+    const rows = [
+      { booking: { id: 'b1', status: 'confirmed', details: { gear: { rent: true, items: ['BCD'] } } } as unknown as Booking },
+      { booking: { id: 'b2', status: 'waitlisted', details: { gear: { rent: true, items: ['BCD', 'Wetsuit'] } } } as unknown as Booking },
+    ]
+    const { seated, waitlisted } = partitionByWaitlist(rows)
+    expect(gearTotals(seated)).toEqual([{ item: 'BCD', count: 1 }])
+    expect(gearTotals(waitlisted)).toEqual([{ item: 'BCD', count: 1 }, { item: 'Wetsuit', count: 1 }])
   })
 })
 

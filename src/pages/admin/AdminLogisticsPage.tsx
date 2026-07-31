@@ -5,7 +5,7 @@ import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { siteConfig } from '../../config/site'
 import { fetchEventsInRange, fetchUpcomingEventDays, formatEventSpan } from '../../lib/events'
-import { gearTotals, splitByTransport, transportHeadcount, dayKeyOffset, careTotals, isCareGearItem, addonTotals } from '../../lib/logistics'
+import { gearTotals, splitByTransport, transportHeadcount, dayKeyOffset, careTotals, isCareGearItem, addonTotals, partitionByWaitlist } from '../../lib/logistics'
 import { bookingBalance, type BookingBalance } from '../../lib/booking-balance'
 import { openCreditForBooking } from '../../lib/credits'
 import { fetchAmendmentsForBookings, amendmentsDelta } from '../../lib/booking-amendments'
@@ -52,10 +52,10 @@ const SUMMARY_CHIP =
  * carries the amber warning tone — light amber, since the label sits on the
  * dark glass rather than on the amber chips' light fill.
  */
-function SummaryLabel({ children, tone }: { children: ReactNode; tone?: 'care' }) {
+function SummaryLabel({ children, tone }: { children: ReactNode; tone?: 'care' | 'tentative' }) {
   return (
     <h3 className={`text-[11px] font-semibold uppercase tracking-wider ${
-      tone === 'care' ? 'text-amber-300' : 'text-brand-100/70'
+      tone === 'care' ? 'text-amber-300' : tone === 'tentative' ? 'text-violet-300' : 'text-brand-100/70'
     }`}>
       {children}
     </h3>
@@ -322,16 +322,25 @@ export function AdminLogisticsPage() {
   }
 
   const allRows = (groups ?? []).flatMap(g => g.rows)
+  // Waitlisted divers have no confirmed seat, so their gear/rides are tentative:
+  // every prep total below is computed from `seatedRows`, and the waitlist load
+  // is surfaced on its own "Tentative" block so the shop packs for the boat it
+  // actually has, then knows the extra if the waitlist clears.
+  const { seated: seatedRows, waitlisted: waitlistRows } = partitionByWaitlist(allRows)
   // Care items (dive computers, lights, cameras) are issued and tracked
   // separately, so drop them from the dive-bag "Gear to pack" chips.
-  const overallGear = gearTotals(allRows).filter(g => !isCareGearItem(g.item))
-  const overallCare = careTotals(allRows, addonTitles)
+  const overallGear = gearTotals(seatedRows).filter(g => !isCareGearItem(g.item))
+  const overallCare = careTotals(seatedRows, addonTitles)
   // Whole-day add-on tally (SMBs, nitrox tanks, course upgrades, lights, …) so
   // the shop's prep list sits next to gear + handle-with-care in the summary.
-  const overallAddons = addonTotals(allRows, addonTitles)
+  const overallAddons = addonTotals(seatedRows, addonTitles)
   // Headcounts, not booking rows: a diver on two of the day's events is one
   // body to seat, and their most demanding answer wins.
-  const transport = transportHeadcount(allRows)
+  const transport = transportHeadcount(seatedRows)
+  // The tentative load — one combined heads-up list (all pack items, incl. care,
+  // plus add-ons) of what the waitlisted divers would add if they get a seat.
+  const waitlistGear = gearTotals(waitlistRows)
+  const waitlistAddons = addonTotals(waitlistRows, addonTitles)
   // Day-wide on-duty staff for the overall board — one entry per person even
   // when they cover several of the day's events, with all the roles they hold.
   const dayStaff: { key: string; name: string; roles: string[] }[] = []
@@ -353,13 +362,23 @@ export function AdminLogisticsPage() {
   // reload. Keyed by booking when a row has no profile, since those can't merge.
   const dayDivers: { key: string; name: string }[] = []
   const diverKeys = new Set<string>()
-  for (const r of allRows) {
+  for (const r of seatedRows) {
     const key = r.profile?.id ?? r.booking.id
     if (diverKeys.has(key)) continue
     diverKeys.add(key)
     dayDivers.push({ key, name: personName(r.profile?.name, r.profile?.nickname) || tp.noProfile })
   }
   dayDivers.sort((a, b) => a.name.localeCompare(b.name))
+  // The waitlisted roster — same dedupe, for the Tentative block. A person
+  // already seated (on another of the day's events) is not re-listed as waiting.
+  const waitlistDivers: { key: string; name: string }[] = []
+  for (const r of waitlistRows) {
+    const key = r.profile?.id ?? r.booking.id
+    if (diverKeys.has(key)) continue
+    diverKeys.add(key)
+    waitlistDivers.push({ key, name: personName(r.profile?.name, r.profile?.nickname) || tp.noProfile })
+  }
+  waitlistDivers.sort((a, b) => a.name.localeCompare(b.name))
   // Divers who still owe — for the whole-day summary and each event's list.
   const currency = (groups ?? [])[0]?.event.currency ?? siteConfig.locale.currency
   const dueRowsFor = (rows: DiverGearRow[]) => rows.flatMap(r => {
@@ -403,7 +422,9 @@ export function AdminLogisticsPage() {
     return {
       key: run.key,
       events: members.map(g => ({ id: g.event.id, title: eventTitle(g.event) })),
-      divers: members.flatMap(g => splitByTransport(g.rows).needsRide.map((r): Rider => ({
+      // Only seated divers hold a seat, so only they get planned into a car —
+      // a waitlisted diver isn't given van space they may never use.
+      divers: members.flatMap(g => splitByTransport(partitionByWaitlist(g.rows).seated).needsRide.map((r): Rider => ({
         id: r.profile?.id ?? r.booking.id,
         name: personName(r.profile?.name, r.profile?.nickname) || tp.noProfile,
         kind: 'diver',
@@ -609,10 +630,42 @@ export function AdminLogisticsPage() {
                   </div>
                 </div>
               )}
+              {waitlistRows.length > 0 && (
+                // Full-width so the "if the waitlist clears" load reads as a
+                // block apart from the confirmed prep lists above it.
+                <div className="space-y-1.5 sm:col-span-2 border-t border-violet-400/30 pt-3">
+                  <SummaryLabel tone="tentative">{lg.tentativeWaitlist(waitlistRows.length)}</SummaryLabel>
+                  <p className="text-xs text-brand-100/70 font-medium">{lg.tentativeHint}</p>
+                  {waitlistDivers.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {waitlistDivers.map(d => (
+                        <span key={d.key} className="text-xs px-2 py-0.5 rounded-full border border-violet-400/40 bg-violet-500/10 text-violet-100 font-medium select-text">
+                          {d.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {(waitlistGear.length > 0 || waitlistAddons.length > 0) && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {waitlistGear.map(({ item, count }) => (
+                        <span key={`g-${item}`} className={SUMMARY_CHIP}>{item} ×{count}</span>
+                      ))}
+                      {waitlistAddons.map(({ title, count }) => (
+                        <span key={`a-${title}`} className={SUMMARY_CHIP}>{title} ×{count}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </section>
 
-          {groups.map(g => (
+          {groups.map(g => {
+          // Seated divers pack/plan for real; waitlisted ones are grouped last
+          // and kept out of this event's gear/care/add-on/transport tallies so
+          // they agree with the seated-only Overall board above.
+          const { seated: eventSeated, waitlisted: eventWaitlist } = partitionByWaitlist(g.rows)
+          return (
             <section key={g.event.id} className="space-y-2 pt-2">
               {/* Bold banner per event so the sections are obvious when
                   scrolling a tall phone screen. */}
@@ -644,7 +697,7 @@ export function AdminLogisticsPage() {
                   {formatEventSpan(g.event, { style: 'compact' })} · {lg.diverCount(g.rows.length)}
                 </span>
               </div>
-              <EventTransport rows={g.rows} />
+              <EventTransport rows={eventSeated} />
               <StaffDutyGroup rows={g.staff} />
               <EventVehicleGroup
                 event={g.event}
@@ -663,18 +716,30 @@ export function AdminLogisticsPage() {
                 createdBy={profile?.id ?? null}
                 onChanged={() => setAllocReload(k => k + 1)}
               />
-              <CareGearGroup rows={careTotals(g.rows, addonTitles)} />
-              <AddonSummaryGroup rows={addonTotals(g.rows, addonTitles)} />
+              <CareGearGroup rows={careTotals(eventSeated, addonTitles)} />
+              <AddonSummaryGroup rows={addonTotals(eventSeated, addonTitles)} />
+              {/* Payments are money owed regardless of seat, so this stays on
+                  the full roster — a waitlisted diver who owes still shows. */}
               <PaymentsDueGroup rows={dueRowsFor(g.rows)} currency={currency} />
               {g.rows.length === 0 ? (
                 <p className="text-xs text-brand-950/70 font-medium italic pl-1">{tp.noActiveRegistrants}</p>
               ) : (
-                g.rows.map(r => (
+                eventSeated.map(r => (
                   <DiverGearCard key={r.booking.id} row={r} onProfilePatched={patchProfile} linkToProfile={isAdmin} gearModels={gearModels} />
                 ))
               )}
+              {eventWaitlist.length > 0 && (
+                <>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-violet-300 pt-1 pl-1">
+                    {lg.waitlistHeading(eventWaitlist.length)}
+                  </p>
+                  {eventWaitlist.map(r => (
+                    <DiverGearCard key={r.booking.id} row={r} onProfilePatched={patchProfile} linkToProfile={isAdmin} gearModels={gearModels} />
+                  ))}
+                </>
+              )}
             </section>
-          ))}
+          )})}
         </>
       )}
     </div>

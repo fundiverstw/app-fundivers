@@ -1190,6 +1190,8 @@ export const zhTW: Messages = {
       backToEvent: '‹ 返回活動',
       title: '器材總覽',
       summary: (divers: number, toPack: number) => `${divers} 位潛水員 · ${toPack} 項待打包`,
+      waitlisted: (divers: number, toPack: number) => `＋候補 ${divers} 位 · ${toPack} 項（暫定）`,
+      waitlistHeading: (n: number) => `候補（${n}）`,
       noRegistrants: '尚無報名者。',
     },
     events: {
@@ -1633,6 +1635,9 @@ export const zhTW: Messages = {
       transportNotSpecified: '交通方式未指定',
       leadBooker: '（主揪）',
       staffFallback: '（工作人員）',
+      tentativeWaitlist: (n: number) => `暫定 — 候補 ${n} 位`,
+      tentativeHint: '尚未有座位。僅在候補遞補後才需加入裝載。',
+      waitlistHeading: (n: number) => `候補（${n}）`,
     },
     family: {
       heading: '家庭成員',
@@ -1912,6 +1917,7 @@ export const zhTW: Messages = {
       fin: '蛙鞋',
       save: '儲存',
       gearFlags: '裝備注意事項',
+      waitlisted: '候補',
     },
     bookingPayments: {
       charges: '費用明細',

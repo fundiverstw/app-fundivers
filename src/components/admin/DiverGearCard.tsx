@@ -114,15 +114,24 @@ export function DiverGearCard({
     <article className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 space-y-2">
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-brand-900">
-            {linkToProfile && profile ? (
-              <Link to={`/admin/users?diver=${profile.id}`} className="hover:underline">
-                {diverName}
-              </Link>
-            ) : (
-              diverName
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-sm font-semibold text-brand-900">
+              {linkToProfile && profile ? (
+                <Link to={`/admin/users?diver=${profile.id}`} className="hover:underline">
+                  {diverName}
+                </Link>
+              ) : (
+                diverName
+              )}
+            </h2>
+            {/* Waitlisted divers have no confirmed seat yet — flag their card so
+                their gear reads as tentative, not part of the boat's pack list. */}
+            {booking.status === 'waitlisted' && (
+              <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 border border-violet-300 font-semibold shrink-0">
+                {gc.waitlisted}
+              </span>
             )}
-          </h2>
+          </div>
           {sizing && <p className="text-xs text-brand-900 font-medium">{sizing}</p>}
         </div>
         <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${

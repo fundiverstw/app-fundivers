@@ -1189,6 +1189,8 @@ export const ja: Messages = {
       backToEvent: '‹ イベントに戻る',
       title: '器材一覧',
       summary: (divers: number, toPack: number) => `ダイバー${divers}名 · ${toPack}件を準備`,
+      waitlisted: (divers: number, toPack: number) => `＋キャンセル待ち${divers}名 · ${toPack}件（暫定）`,
+      waitlistHeading: (n: number) => `キャンセル待ち（${n}）`,
       noRegistrants: 'まだ登録者がいません。',
     },
     events: {
@@ -1632,6 +1634,9 @@ export const ja: Messages = {
       transportNotSpecified: '交通手段が未指定',
       leadBooker: '（幹事）',
       staffFallback: '（スタッフ）',
+      tentativeWaitlist: (n: number) => `暫定 — キャンセル待ち${n}名`,
+      tentativeHint: '座席は未確定です。キャンセル待ちが繰り上がった場合のみ追加してください。',
+      waitlistHeading: (n: number) => `キャンセル待ち（${n}）`,
     },
     family: {
       heading: '家族',
@@ -1911,6 +1916,7 @@ export const ja: Messages = {
       fin: 'フィン',
       save: '保存',
       gearFlags: '器材の注意点',
+      waitlisted: 'キャンセル待ち',
     },
     bookingPayments: {
       charges: '料金内訳',

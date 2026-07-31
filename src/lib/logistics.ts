@@ -6,6 +6,24 @@ import type { Booking, BookingDetails, Profile } from '../types/database'
 /** A row carrying at least its booking — enough to read gear + transport. */
 type BookingRow = { booking: Booking }
 
+/**
+ * Split rows by seat state. Callers pre-filter cancelled bookings, so the
+ * remainder is either "seated" (pending/confirmed — has a spot on the boat) or
+ * "waitlisted" (no spot yet, so its gear/transport is tentative). Every prep
+ * total is computed from `seated`; `waitlisted` is surfaced on its own so staff
+ * see the extra load only *if* the waitlist clears. Generic so callers keep
+ * their richer row type (DiverGearRow, RegistrantRow, …).
+ */
+export function partitionByWaitlist<T extends BookingRow>(rows: T[]): { seated: T[]; waitlisted: T[] } {
+  const seated: T[] = []
+  const waitlisted: T[] = []
+  for (const r of rows) {
+    if (r.booking.status === 'waitlisted') waitlisted.push(r)
+    else seated.push(r)
+  }
+  return { seated, waitlisted }
+}
+
 /** A row carrying its booking + resolved diver profile (logistics view). */
 type DiverRow = { booking: Booking; profile: Profile | null }
 

@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
 import { gearPackList } from '../../lib/gear'
+import { partitionByWaitlist } from '../../lib/logistics'
 import { DiverGearCard, type DiverGearRow } from '../../components/admin/DiverGearCard'
 import { fetchGearModelsWithSizes } from '../../lib/gear-models'
 import type { GearModelWithSizes } from '../../lib/gear-sizing'
@@ -67,6 +68,13 @@ export function AdminGearMapPage() {
     return <PageLoading />
   }
 
+  // Seated (pending/confirmed) divers pack for sure; waitlisted ones are
+  // tentative, so render them last under their own note and keep them out of
+  // the "to pack" tally in the header.
+  const { seated, waitlisted } = partitionByWaitlist(rows)
+  const seatedToPack = seated.filter(r => gearPackList(r.booking).items.length > 0).length
+  const waitlistToPack = waitlisted.filter(r => gearPackList(r.booking).items.length > 0).length
+
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <Link to={`/admin/events/${id}`} className="text-sm text-white/70 hover:text-white">
@@ -81,15 +89,28 @@ export function AdminGearMapPage() {
           </p>
         )}
         <p className="text-sm text-red-600 mt-2">
-          {gm.summary(rows.length, rows.filter(r => gearPackList(r.booking).items.length > 0).length)}
+          {gm.summary(seated.length, seatedToPack)}
         </p>
+        {waitlisted.length > 0 && (
+          <p className="text-sm text-violet-400 font-medium mt-1">
+            {gm.waitlisted(waitlisted.length, waitlistToPack)}
+          </p>
+        )}
       </header>
 
       {rows.length === 0 ? (
         <p className="text-brand-950 font-medium text-sm">{gm.noRegistrants}</p>
       ) : (
         <section className="space-y-3">
-          {rows.map(r => <DiverGearCard key={r.booking.id} row={r} onProfilePatched={patchProfile} gearModels={gearModels} />)}
+          {seated.map(r => <DiverGearCard key={r.booking.id} row={r} onProfilePatched={patchProfile} gearModels={gearModels} />)}
+          {waitlisted.length > 0 && (
+            <>
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-violet-400 pt-1">
+                {gm.waitlistHeading(waitlisted.length)}
+              </h2>
+              {waitlisted.map(r => <DiverGearCard key={r.booking.id} row={r} onProfilePatched={patchProfile} gearModels={gearModels} />)}
+            </>
+          )}
         </section>
       )}
     </div>

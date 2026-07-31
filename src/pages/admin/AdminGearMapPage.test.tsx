@@ -59,6 +59,38 @@ function renderPage() {
   )
 }
 
+describe('AdminGearMapPage waitlist split', () => {
+  it('counts only seated divers in "to pack" and lists waitlisted ones apart', async () => {
+    const seated = { id: 'b1', user_id: 'u1', status: 'confirmed',
+      details: { gear: { rent: true, items: ['BCD'] } } }
+    const waiting = { id: 'b2', user_id: 'u2', status: 'waitlisted',
+      details: { gear: { rent: true, items: ['Wetsuit'] } } }
+    const twoProfiles = [
+      sampleProfile,
+      { id: 'u2', nickname: 'Bo', gear_owned: [] },
+    ]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: [seated, waiting] })
+      if (table === 'profiles') return mockQueryBuilder({ data: twoProfiles })
+      return mockQueryBuilder({ data: [] })
+    })
+    render(
+      <MemoryRouter initialEntries={['/admin/events/e1/gear-map']}>
+        <Routes>
+          <Route path="/admin/events/:id/gear-map" element={<AdminGearMapPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    // Header: 1 seated diver to pack, plus a tentative note for the 1 waitlisted.
+    expect(await screen.findByText(/1 diver · 1 to pack/i)).toBeInTheDocument()
+    expect(screen.getByText(/1 waitlisted · 1 tentative to pack/i)).toBeInTheDocument()
+    // The waitlisted card sits under its own heading and carries the badge.
+    expect(screen.getByText(/waitlist \(1\)/i)).toBeInTheDocument()
+    expect(screen.getByText('Waitlisted')).toBeInTheDocument()
+  })
+})
+
 describe('AdminGearMapPage gear-size editor', () => {
   it('seeds inputs from the diver profile and calls update_diver_gear_sizes RPC on save', async () => {
     renderPage()
