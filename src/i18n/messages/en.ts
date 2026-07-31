@@ -1647,6 +1647,13 @@ export const en = {
       unspecifiedCount: (n: number) => `${n} unspecified`,
       gearToPack: 'Gear to pack',
       nothingToPack: "Nothing to pack — everyone's on own gear.",
+      // Sized gear (BCD, wetsuit, fins, boots) opens into the per-size list a
+      // packer works from; the accessible name says which item is opening.
+      showSizesFor: (item: string) => `Show sizes for ${item}`,
+      hideSizesFor: (item: string) => `Hide sizes for ${item}`,
+      sizesFor: (item: string) => `${item} sizes`,
+      sizeUnknown: 'No size on file',
+      sizeCount: (size: string, n: number) => `${size} ×${n}`,
       transportNotSpecified: 'Transport not specified',
       leadBooker: '(lead booker)',
       staffFallback: '(staff)',

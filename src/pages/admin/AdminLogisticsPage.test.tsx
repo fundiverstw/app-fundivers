@@ -77,6 +77,83 @@ describe('AdminLogisticsPage', () => {
     expect(screen.getByRole('group', { name: /needs ride/i })).toBeInTheDocument()
   })
 
+  it('opens a sized gear chip into the sizes the day needs, and closes it again', async () => {
+    const user = userEvent.setup()
+    const sizedBookings = [
+      { id: 'b1', user_id: 'u1', event_id: 'e1', status: 'confirmed',
+        details: { gear: { rent: true, items: ['BCD', 'Regulator'] } } },
+      { id: 'b2', user_id: 'u2', event_id: 'e1', status: 'confirmed',
+        details: { gear: { rent: true, items: ['BCD'] } } },
+    ]
+    const sizedProfiles = [
+      { ...profiles[0], bcd_size: 'M' },
+      { ...profiles[1], bcd_size: 'L' },
+    ]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: sizedBookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: sizedProfiles })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    renderPage()
+    const overall = (await screen.findByText(/^overall/i)).closest('section')!
+    const gearSection = within(overall).getByText(/gear to pack/i).closest('div')!
+
+    // Sizes are behind the chip, not on the board.
+    expect(within(gearSection).queryByText('M ×1')).not.toBeInTheDocument()
+
+    const chip = within(gearSection).getByRole('button', { name: /show sizes for BCD/i })
+    expect(chip).toHaveAttribute('aria-expanded', 'false')
+    await user.click(chip)
+
+    // Each size, its count, and who it's for.
+    expect(within(gearSection).getByText('M ×1')).toBeInTheDocument()
+    expect(within(gearSection).getByText('L ×1')).toBeInTheDocument()
+    expect(within(gearSection).getByText('Ada')).toBeInTheDocument()
+    expect(within(gearSection).getByText('Bo')).toBeInTheDocument()
+    expect(chip).toHaveAttribute('aria-expanded', 'true')
+
+    // Clicking again puts it away.
+    await user.click(within(gearSection).getByRole('button', { name: /hide sizes for BCD/i }))
+    expect(within(gearSection).queryByText('M ×1')).not.toBeInTheDocument()
+  })
+
+  it('leaves one-size gear as a plain chip with nothing to open', async () => {
+    renderPage()
+    await screen.findByText(/1 event · 2 divers/i)
+    const overall = screen.getByText(/^overall/i).closest('section')!
+    const gearSection = within(overall).getByText(/gear to pack/i).closest('div')!
+    // The default fixtures rent a BCD and a Wetsuit — both sized, both buttons.
+    expect(within(gearSection).getByRole('button', { name: /show sizes for BCD/i })).toBeInTheDocument()
+    // A regulator has no size column, so its chip is not a control at all.
+    expect(within(gearSection).queryByRole('button', { name: /regulator/i })).not.toBeInTheDocument()
+  })
+
+  it('shows divers with no size on file rather than dropping them from the list', async () => {
+    const user = userEvent.setup()
+    const sizedBookings = [
+      { id: 'b1', user_id: 'u1', event_id: 'e1', status: 'confirmed',
+        details: { gear: { rent: true, items: ['Wetsuit'] } } },
+      { id: 'b2', user_id: 'u2', event_id: 'e1', status: 'confirmed',
+        details: { gear: { rent: true, items: ['Wetsuit'] } } },
+    ]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: sizedBookings })
+      // Ada has a wetsuit size; Bo has none — he's the one to chase.
+      if (table === 'profiles') return mockQueryBuilder({ data: [{ ...profiles[0], wetsuit_size: 'S' }, profiles[1]] })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    renderPage()
+    const overall = (await screen.findByText(/^overall/i)).closest('section')!
+    const gearSection = within(overall).getByText(/gear to pack/i).closest('div')!
+    await user.click(within(gearSection).getByRole('button', { name: /show sizes for Wetsuit/i }))
+
+    expect(within(gearSection).getByText('S ×1')).toBeInTheDocument()
+    expect(within(gearSection).getByText(/no size on file ×1/i)).toBeInTheDocument()
+    expect(within(gearSection).getByText('Bo')).toBeInTheDocument()
+  })
+
   it('keeps a waitlisted diver out of the seated prep totals and surfaces them as tentative', async () => {
     const mixed = [
       // Ada is confirmed — her BCD counts toward "Gear to pack".

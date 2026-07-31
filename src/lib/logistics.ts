@@ -1,6 +1,7 @@
 import { addDays, format, parseISO } from 'date-fns'
 import { GEAR_ITEMS, gearPackList } from './gear'
 import { personName } from './names'
+import { shoeAsJp } from './shoe-size'
 import type { Booking, BookingDetails, Profile } from '../types/database'
 
 /** A row carrying at least its booking — enough to read gear + transport. */
@@ -154,6 +155,93 @@ export function gearTotals(rows: BookingRow[]): Array<{ item: string; count: num
   return GEAR_ITEMS
     .map(item => ({ item, count: counts.get(item) ?? 0 }))
     .filter(x => x.count > 0)
+}
+
+// Which profile size column a gear item is packed by. Regulators, masks and
+// computers are one-size to the shop, so they have no entry and stay a plain
+// count. Substring match, so a fork's relabelled item ("Wetsuit 5mm",
+// "Full-foot fins") still resolves to the right column.
+const GEAR_SIZE_SOURCE: Array<{ match: string; source: SizedGear }> = [
+  { match: 'bcd',     source: 'bcd' },
+  { match: 'wetsuit', source: 'wetsuit' },
+  { match: 'fin',     source: 'fins' },
+  { match: 'boot',    source: 'boots' },
+]
+
+export type SizedGear = 'bcd' | 'wetsuit' | 'fins' | 'boots'
+
+/** The size column a gear item is packed by, or null when the item has none. */
+export function gearSizeSource(item: string): SizedGear | null {
+  const lower = item.toLowerCase()
+  return GEAR_SIZE_SOURCE.find(s => lower.includes(s.match))?.source ?? null
+}
+
+/** Is this item packed in sizes (so its chip is worth opening)? */
+export function isSizedGearItem(item: string): boolean {
+  return gearSizeSource(item) !== null
+}
+
+// Letter sizes sort by the rack order a packer thinks in, not alphabetically
+// (which would give L, M, S, XL). Anything unrecognised falls through to the
+// numeric/alphabetical tail.
+const LETTER_SIZE_ORDER = ['XXS', 'XS', 'S', 'SM', 'M', 'ML', 'L', 'XL', 'XXL', 'XXXL']
+
+function sizeRank(label: string): { tier: number; key: number | string } {
+  const letter = LETTER_SIZE_ORDER.indexOf(label.trim().toUpperCase())
+  if (letter >= 0) return { tier: 0, key: letter }
+  // "JP 26", "5mm", "41" — sort by the first number in the label.
+  const num = label.match(/\d+(?:\.\d+)?/)
+  if (num) return { tier: 1, key: parseFloat(num[0]) }
+  return { tier: 2, key: label.toLowerCase() }
+}
+
+export interface GearSizeGroup {
+  /** The size as it will be displayed; null = no size recorded for that diver. */
+  size: string | null
+  divers: Array<{ bookingId: string; name: string }>
+}
+
+/**
+ * For one gear item, the sizes the day actually needs and who each one is for —
+ * what a packer reads off the rack ("BCD: M ×2, L ×1, one unknown"). Rows
+ * without the item are skipped; a diver with no size on file lands in the
+ * trailing `size: null` group rather than being dropped, because an unknown
+ * size is the thing the shop most needs to chase before the van leaves.
+ *
+ * Boots are keyed off the diver's shoe size, normalised to JP the same way the
+ * gear card shows it, so one pair of boots isn't counted twice under "US 9" and
+ * "JP 27". Sizes are grouped case-insensitively and shown in rack order.
+ */
+export function gearSizeBreakdown(rows: DiverRow[], item: string): GearSizeGroup[] {
+  const source = gearSizeSource(item)
+  if (!source) return []
+  const groups = new Map<string, GearSizeGroup>()
+  for (const r of rows) {
+    if (!gearPackList(r.booking).items.includes(item)) continue
+    const raw =
+      source === 'boots'   ? (shoeAsJp(r.profile?.shoe_size) ?? r.profile?.shoe_size ?? '')
+      : source === 'bcd'     ? (r.profile?.bcd_size ?? '')
+      : source === 'wetsuit' ? (r.profile?.wetsuit_size ?? '')
+      : (r.profile?.fin_size ?? '')
+    const label = raw.trim()
+    const key = label ? label.toUpperCase() : ''
+    const group = groups.get(key) ?? { size: label || null, divers: [] }
+    group.divers.push({
+      bookingId: r.booking.id,
+      name: personName(r.profile?.name, r.profile?.nickname) || '(no profile)',
+    })
+    groups.set(key, group)
+  }
+  return [...groups.values()].sort((a, b) => {
+    // Unknown sizes sort last — they're a to-do, not a rack slot.
+    if (a.size === null) return 1
+    if (b.size === null) return -1
+    const ra = sizeRank(a.size), rb = sizeRank(b.size)
+    if (ra.tier !== rb.tier) return ra.tier - rb.tier
+    return typeof ra.key === 'number' && typeof rb.key === 'number'
+      ? ra.key - rb.key
+      : String(ra.key).localeCompare(String(rb.key))
+  })
 }
 
 /**

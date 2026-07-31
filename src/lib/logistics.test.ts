@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { splitByTransport, transportHeadcount, gearTotals, dayKeyOffset, careItemsForBooking, careTotals, isCareGearItem, addonTotals, partitionByWaitlist } from './logistics'
+import { splitByTransport, transportHeadcount, gearTotals, dayKeyOffset, careItemsForBooking, careTotals, isCareGearItem, addonTotals, partitionByWaitlist, gearSizeBreakdown, isSizedGearItem, gearSizeSource } from './logistics'
 import type { Booking, Profile } from '../types/database'
 
 const row = (transportation: boolean | undefined, items: string[] = []) => ({
@@ -178,6 +178,106 @@ describe('partitionByWaitlist', () => {
     const { seated, waitlisted } = partitionByWaitlist(rows)
     expect(gearTotals(seated)).toEqual([{ item: 'BCD', count: 1 }])
     expect(gearTotals(waitlisted)).toEqual([{ item: 'BCD', count: 1 }, { item: 'Wetsuit', count: 1 }])
+  })
+})
+
+describe('gearSizeSource / isSizedGearItem', () => {
+  it('maps the sized items to their profile column and leaves the rest unsized', () => {
+    expect(gearSizeSource('BCD')).toBe('bcd')
+    expect(gearSizeSource('Wetsuit')).toBe('wetsuit')
+    expect(gearSizeSource('Fins')).toBe('fins')
+    expect(gearSizeSource('Boots')).toBe('boots')
+    expect(gearSizeSource('Regulator')).toBeNull()
+    expect(gearSizeSource('Mask')).toBeNull()
+    expect(isSizedGearItem('Dive computer')).toBe(false)
+  })
+
+  it('resolves a fork\'s relabelled items by substring', () => {
+    expect(gearSizeSource('Wetsuit 5mm')).toBe('wetsuit')
+    expect(gearSizeSource('Full-foot fin')).toBe('fins')
+    expect(gearSizeSource('Dive boot')).toBe('boots')
+  })
+})
+
+describe('gearSizeBreakdown', () => {
+  const sized = (id: string, name: string, items: string[], sizes: Partial<Profile>) => ({
+    booking: { id, details: { gear: { rent: true, items } } } as unknown as Booking,
+    profile: { name, ...sizes } as unknown as Profile,
+  })
+
+  it('groups the divers who need an item by their size, in rack order', () => {
+    const rows = [
+      sized('b1', 'Ada', ['BCD'], { bcd_size: 'L' }),
+      sized('b2', 'Bo',  ['BCD'], { bcd_size: 'M' }),
+      sized('b3', 'Cy',  ['BCD'], { bcd_size: 'M' }),
+      sized('b4', 'Di',  ['BCD'], { bcd_size: 'S' }),
+    ]
+    expect(gearSizeBreakdown(rows, 'BCD')).toEqual([
+      { size: 'S', divers: [{ bookingId: 'b4', name: 'Di' }] },
+      { size: 'M', divers: [{ bookingId: 'b2', name: 'Bo' }, { bookingId: 'b3', name: 'Cy' }] },
+      { size: 'L', divers: [{ bookingId: 'b1', name: 'Ada' }] },
+    ])
+  })
+
+  it('ignores divers who are not renting that item', () => {
+    const rows = [
+      sized('b1', 'Ada', ['BCD'],     { bcd_size: 'M', wetsuit_size: 'S' }),
+      sized('b2', 'Bo',  ['Wetsuit'], { bcd_size: 'L', wetsuit_size: 'M' }),
+    ]
+    expect(gearSizeBreakdown(rows, 'BCD')).toEqual([
+      { size: 'M', divers: [{ bookingId: 'b1', name: 'Ada' }] },
+    ])
+  })
+
+  it('collects divers with no size on file into a trailing unknown group', () => {
+    const rows = [
+      sized('b1', 'Ada', ['Wetsuit'], { wetsuit_size: '  ' }),
+      sized('b2', 'Bo',  ['Wetsuit'], {}),
+      sized('b3', 'Cy',  ['Wetsuit'], { wetsuit_size: 'M' }),
+    ]
+    expect(gearSizeBreakdown(rows, 'Wetsuit')).toEqual([
+      { size: 'M', divers: [{ bookingId: 'b3', name: 'Cy' }] },
+      { size: null, divers: [{ bookingId: 'b1', name: 'Ada' }, { bookingId: 'b2', name: 'Bo' }] },
+    ])
+  })
+
+  it('groups case-insensitively so "m" and "M" are one rack slot', () => {
+    const rows = [
+      sized('b1', 'Ada', ['BCD'], { bcd_size: 'M' }),
+      sized('b2', 'Bo',  ['BCD'], { bcd_size: 'm' }),
+    ]
+    const groups = gearSizeBreakdown(rows, 'BCD')
+    expect(groups).toHaveLength(1)
+    expect(groups[0].divers).toHaveLength(2)
+  })
+
+  it('sorts numeric sizes by value, not as strings', () => {
+    const rows = [
+      sized('b1', 'Ada', ['Fins'], { fin_size: '42' }),
+      sized('b2', 'Bo',  ['Fins'], { fin_size: '9' }),
+      sized('b3', 'Cy',  ['Fins'], { fin_size: '38' }),
+    ]
+    expect(gearSizeBreakdown(rows, 'Fins').map(g => g.size)).toEqual(['9', '38', '42'])
+  })
+
+  it('reads boots off the shoe size, normalised to JP so one pair counts once', () => {
+    // Same foot expressed two ways: EU 41 M and JP 26 both convert to JP 26.
+    const rows = [
+      sized('b1', 'Ada', ['Boots'], { shoe_size: 'EU 41 M' }),
+      sized('b2', 'Bo',  ['Boots'], { shoe_size: 'JP 26 M' }),
+      sized('b3', 'Cy',  ['Boots'], { shoe_size: null }),
+    ]
+    const groups = gearSizeBreakdown(rows, 'Boots')
+    expect(groups[0]).toEqual({
+      size: 'JP 26',
+      divers: [{ bookingId: 'b1', name: 'Ada' }, { bookingId: 'b2', name: 'Bo' }],
+    })
+    expect(groups[1].size).toBeNull()
+  })
+
+  it('returns nothing for an item the shop does not size', () => {
+    const rows = [sized('b1', 'Ada', ['Regulator'], {})]
+    expect(gearSizeBreakdown(rows, 'Regulator')).toEqual([])
   })
 })
 
