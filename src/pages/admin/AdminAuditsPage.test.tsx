@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { AdminAuditsPage } from './AdminAuditsPage'
+import { siteConfig } from '../../config/site'
 import type { DiverAuditTrail } from '../../lib/audit-trail'
 
 const { from, fetchDiverAuditTrail } = vi.hoisted(() => ({
@@ -92,6 +93,19 @@ describe('AdminAuditsPage', () => {
     // ...and each exposes a raw-record debug drawer.
     expect(screen.getAllByText('Raw record').length).toBe(2)
   })
+
+  // 00:00Z is 08:00 the same day in Taipei — the audit stamp must read the
+  // shop's clock, not the runner's, whatever timezone the viewer/CI sits in.
+  it.runIf(siteConfig.locale.timezone === 'Asia/Taipei')(
+    'stamps entry times in the shop timezone',
+    async () => {
+      const user = userEvent.setup()
+      renderPage()
+      await user.click(await screen.findByRole('button', { name: /Alice Diver/ }))
+      // Shares a line with the method/actor, so match on a substring.
+      expect(await screen.findByText(/2026-05-10 08:00/)).toBeInTheDocument()
+    },
+  )
 
   it('links the registration card through to its event', async () => {
     const user = userEvent.setup()

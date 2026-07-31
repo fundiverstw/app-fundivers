@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
+import { startOfDay } from 'date-fns'
 import { assignTracks, segmentsForDay } from './calendar-layout'
+import { shopZoned } from './dates'
+import { siteConfig } from '../config/site'
 import type { AppEvent } from '../types/database'
 
 function mk(id: string, type: AppEvent['type'], start: string, end?: string): AppEvent {
@@ -51,6 +54,43 @@ describe('assignTracks', () => {
     expect(tracks.b).toBe(1)
     expect(tracks.c).toBe(0)
   })
+
+  it('honours a custom toDay resolver when bucketing into day cells', () => {
+    // Two events on genuinely different instants, but a resolver that collapses
+    // everything to one day must make them share a cell and therefore stack.
+    const oneDay = () => startOfDay(new Date('2026-05-01T00:00:00'))
+    const ranges = assignTracks(
+      [mk('a', 'dive', '2026-05-01'), mk('b', 'dive', '2026-08-20')],
+      oneDay,
+    )
+    const tracks = Object.fromEntries(ranges.map(r => [r.event.id, r.track]))
+    expect(tracks.a).toBe(0)
+    expect(tracks.b).toBe(1) // forced to overlap → stacked
+  })
+})
+
+describe('assignTracks — shop-timezone bucketing', () => {
+  // The MonthCalendar passes a shop-zone resolver so a UTC instant lands in the
+  // shop's calendar cell, not the viewer's. 20:00Z on May 14 is still May 14 in
+  // UTC/the Americas but 04:00 May 15 in Taipei.
+  const nearMidnight = {
+    id: 'x', start_time: '2026-05-14T20:00:00.000Z', end_time: null,
+  }
+
+  it('default resolver buckets by the runtime-local day', () => {
+    const [r] = assignTracks([nearMidnight])
+    expect(r.start).toEqual(startOfDay(new Date('2026-05-14T20:00:00.000Z')))
+  })
+
+  it.runIf(siteConfig.locale.timezone === 'Asia/Taipei')(
+    'shop resolver rolls a late-UTC instant onto the shop day',
+    () => {
+      const [r] = assignTracks([nearMidnight], iso => startOfDay(shopZoned(new Date(iso))))
+      expect(r.start.getFullYear()).toBe(2026)
+      expect(r.start.getMonth()).toBe(4) // May
+      expect(r.start.getDate()).toBe(15) // Taipei day, not the 14th
+    },
+  )
 })
 
 describe('segmentsForDay', () => {

@@ -1,4 +1,5 @@
 import { parseISO, isSameDay, format } from 'date-fns'
+import { shopZoned } from './dates'
 import { supabase } from './supabase'
 import { usesCourseDays } from './event-kinds'
 import type { AppEvent } from '../types/database'
@@ -17,12 +18,14 @@ const PUSH_WORKER_URL = (import.meta.env.VITE_PUSH_WORKER_URL as string | undefi
  * Whether an event supports the one-day drag-to-reschedule gesture.
  * Courses always do (every calendar cell is one course_days entry).
  * Dives only when single-day — no end date, or an end on the same
- * calendar day as the start.
+ * calendar day as the start. "Same day" is judged in the shop's timezone
+ * (like the calendar cells), so an admin abroad still sees a one-day Taipei
+ * dive that straddles midnight in their own zone as single-day.
  */
 export function isReschedulable(ev: Pick<AppEvent, 'type' | 'start_time' | 'end_time'>): boolean {
   if (usesCourseDays(ev.type)) return true
   if (!ev.end_time) return true
-  return isSameDay(parseISO(ev.start_time), parseISO(ev.end_time))
+  return isSameDay(shopZoned(parseISO(ev.start_time)), shopZoned(parseISO(ev.end_time)))
 }
 
 /** YYYY-MM-DD date keys → simple comparable form. */
@@ -71,12 +74,12 @@ export async function rescheduleEventDay(ev: AppEvent, fromKey: string, toKey: s
 
   // Single-day dive: move start_date, and end_date too when it mirrors the
   // start (so a one-day dive stays one day). time is left untouched.
-  // start_time/end_time are UTC ISO; derive the LOCAL day key so it lines
-  // up with the calendar cell's date (which is local) rather than slicing
-  // the UTC string, which shifts a day on UTC+8.
-  const startKey = format(parseISO(ev.start_time), 'yyyy-MM-dd')
+  // start_time/end_time are UTC ISO; derive the SHOP day key so it lines up
+  // with the calendar cell's date (the calendar buckets events by shop day)
+  // rather than slicing the UTC string, which shifts a day on UTC+8.
+  const startKey = format(shopZoned(parseISO(ev.start_time)), 'yyyy-MM-dd')
   if (startKey !== fromKey) return
-  const endKey = ev.end_time ? format(parseISO(ev.end_time), 'yyyy-MM-dd') : null
+  const endKey = ev.end_time ? format(shopZoned(parseISO(ev.end_time)), 'yyyy-MM-dd') : null
   const patch: Record<string, string> = { start_date: toKey }
   if (endKey === null || endKey === startKey) patch.end_date = toKey
   const { error } = await supabase

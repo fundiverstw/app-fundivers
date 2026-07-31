@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MonthCalendar } from './MonthCalendar'
-import type { StaffBusyEntry } from '../../types/database'
+import { siteConfig } from '../../config/site'
+import type { AppEvent, StaffBusyEntry } from '../../types/database'
 
 const busy: StaffBusyEntry = {
   id: 'b1',
@@ -24,6 +25,42 @@ const maskedBusy: StaffBusyEntry = {
   title: null,
   details: null,
 }
+
+function mkEvent(over: Partial<AppEvent> & Pick<AppEvent, 'id' | 'start_time'>): AppEvent {
+  return {
+    type: 'dive', title: over.id, calendar_title: null, end_time: null,
+    start_time_hhmm: null, featured: false, fully_booked: false,
+    capacity: null, confirmed_count: null,
+    price: null, deposit_amount: null, currency: 'TWD',
+    has_rooms: false, room_type_ids: [], has_addons: false, addon_ids: [],
+    gear_rental_info: null, nitrox_required: false, dive_days: null,
+    cancelled_at: null, is_private: false,
+    ...over,
+  } as AppEvent
+}
+
+describe('MonthCalendar shop-timezone placement', () => {
+  // 20:00Z on 2026-05-14 is still the 14th in UTC/the Americas but 04:00 on the
+  // 15th in Taipei. The pill must sit in the shop's cell so every viewer — a
+  // diver abroad included — sees it on the day the shop scheduled it.
+  it.runIf(siteConfig.locale.timezone === 'Asia/Taipei')(
+    'places a near-midnight event in the shop-timezone day cell, not the viewer-local one',
+    () => {
+      const { container } = render(
+        <MonthCalendar
+          month={new Date('2026-05-15T00:00:00')}
+          onMonthChange={() => {}}
+          events={[mkEvent({ id: 'Night Dive', start_time: '2026-05-14T20:00:00.000Z' })]}
+          onPickEvent={() => {}}
+        />
+      )
+      const day15 = container.querySelector('[data-day="2026-05-15"]') as HTMLElement
+      const day14 = container.querySelector('[data-day="2026-05-14"]') as HTMLElement
+      expect(within(day15).getByText('Night Dive')).toBeInTheDocument()
+      expect(within(day14).queryByText('Night Dive')).not.toBeInTheDocument()
+    },
+  )
+})
 
 describe('MonthCalendar staff-busy overlay', () => {
   it('omits the Busy toggle when busyEntries is undefined', () => {
@@ -130,8 +167,8 @@ describe('MonthCalendar staff-busy overlay', () => {
     const ev = {
       id: 'D1', type: 'dive' as const, title: 'Reef trip',
       calendar_title: null,
-      start_time: '2030-06-12T09:00:00',
-      end_time:   '2030-06-12T15:00:00',
+      start_time: '2030-06-12T09:00:00Z',
+      end_time:   '2030-06-12T15:00:00Z',
       start_time_hhmm: '09:00',
       featured: false, fully_booked: false,
       capacity: null, confirmed_count: null,
@@ -178,8 +215,8 @@ describe('MonthCalendar staff-busy overlay', () => {
     const ev = {
       id: 'D1', type: 'dive' as const, title: 'Reef trip',
       calendar_title: null,
-      start_time: '2030-06-10T09:00:00',
-      end_time:   '2030-06-12T15:00:00',
+      start_time: '2030-06-10T09:00:00Z',
+      end_time:   '2030-06-12T15:00:00Z',
       start_time_hhmm: '09:00',
       featured: false, fully_booked: false,
       capacity: null, confirmed_count: null,
@@ -259,8 +296,8 @@ describe('MonthCalendar course color buckets', () => {
   function makeCourse(id: string, title: string) {
     return {
       id, type: 'course' as const, title, calendar_title: null,
-      start_time: '2030-06-12T09:00:00',
-      end_time:   '2030-06-12T15:00:00',
+      start_time: '2030-06-12T09:00:00Z',
+      end_time:   '2030-06-12T15:00:00Z',
       start_time_hhmm: '09:00',
       featured: false, fully_booked: false,
       capacity: null, confirmed_count: null,
@@ -377,8 +414,8 @@ describe('MonthCalendar course filter', () => {
     return {
       id, type: 'course' as const, title, calendar_title: null,
       course_category,
-      start_time: '2030-06-12T09:00:00',
-      end_time:   '2030-06-12T15:00:00',
+      start_time: '2030-06-12T09:00:00Z',
+      end_time:   '2030-06-12T15:00:00Z',
       start_time_hhmm: '09:00',
       featured: false, fully_booked: false,
       capacity: null, confirmed_count: null,
@@ -447,8 +484,8 @@ describe('MonthCalendar dive color buckets', () => {
   function makeDive(id: string, title: string, dive_outing?: 'local' | 'trip' | null) {
     return {
       id, type: 'dive' as const, title, calendar_title: null,
-      start_time: '2030-06-12T09:00:00',
-      end_time:   '2030-06-12T15:00:00',
+      start_time: '2030-06-12T09:00:00Z',
+      end_time:   '2030-06-12T15:00:00Z',
       start_time_hhmm: '09:00',
       featured: false, fully_booked: false,
       capacity: null, confirmed_count: null,
@@ -495,7 +532,7 @@ describe('MonthCalendar private dives', () => {
   const baseDive = {
     id: 'P1', type: 'dive' as const, title: 'Charter dive',
     calendar_title: null,
-    start_time: '2030-06-12T09:00:00', end_time: '2030-06-12T15:00:00',
+    start_time: '2030-06-12T09:00:00Z', end_time: '2030-06-12T15:00:00Z',
     start_time_hhmm: '09:00',
     featured: false, fully_booked: false, capacity: null, confirmed_count: null,
     price: null, deposit_amount: null, transport_price: null, currency: 'TWD',
@@ -533,7 +570,7 @@ describe('MonthCalendar private dives', () => {
 describe('MonthCalendar cancelled events', () => {
   const cancelledDive = {
     id: 'C1', type: 'dive' as const, title: 'Typhoon dive', calendar_title: null,
-    start_time: '2030-06-12T09:00:00', end_time: null, start_time_hhmm: '09:00',
+    start_time: '2030-06-12T09:00:00Z', end_time: null, start_time_hhmm: '09:00',
     featured: false, fully_booked: false, capacity: null, confirmed_count: null,
     price: null, deposit_amount: null, transport_price: null, currency: 'TWD',
     has_rooms: false, room_type_ids: [], has_addons: false, addon_ids: [],
@@ -616,7 +653,7 @@ describe('MonthCalendar cancelled events', () => {
 describe('MonthCalendar disablePastEvents', () => {
   const pastDive = {
     id: 'PAST1', type: 'dive' as const, title: 'Old Dive', calendar_title: null,
-    start_time: '2020-06-10T09:00:00', end_time: null, start_time_hhmm: '09:00',
+    start_time: '2020-06-10T09:00:00Z', end_time: null, start_time_hhmm: '09:00',
     featured: false, fully_booked: false, capacity: null, confirmed_count: null,
     price: null, deposit_amount: null, transport_price: null, currency: 'TWD',
     has_rooms: false, room_type_ids: [], has_addons: false, addon_ids: [],
