@@ -59,15 +59,15 @@ function renderAt(path: string) {
 }
 
 describe('AdminUsersPage deep link', () => {
-  it('auto-expands the diver named in ?diver=', async () => {
+  it('auto-expands the diver named in ?diver=, showing only that diver', async () => {
     renderAt('/admin/users?diver=u2')
-    // Bo's card opens; Ada's stays collapsed.
+    // Bo's card opens…
     await waitFor(() => {
       const bo = document.getElementById('diver-u2')!.querySelector('[aria-expanded]')
       expect(bo).toHaveAttribute('aria-expanded', 'true')
     })
-    const ada = document.getElementById('diver-u1')!.querySelector('[aria-expanded]')
-    expect(ada).toHaveAttribute('aria-expanded', 'false')
+    // …and the list is gated on search, so the non-linked diver isn't rendered.
+    expect(document.getElementById('diver-u1')).toBeNull()
   })
 
   it('exposes a register-on-behalf deep link on the expanded diver card', async () => {
@@ -97,13 +97,23 @@ describe('AdminUsersPage deep link', () => {
     expect(link).toHaveAttribute('href', '/admin/events/ev-1')
   })
 
-  it('leaves every card collapsed with no ?diver param', async () => {
+  it('shows no roster until the admin searches, with a prompt instead', async () => {
     renderAt('/admin/users')
-    await screen.findByText('Ada')
-    for (const id of ['diver-u1', 'diver-u2']) {
-      const toggle = document.getElementById(id)!.querySelector('[aria-expanded]')
-      expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    }
+    expect(await screen.findByText(t.admin.users.searchPrompt)).toBeInTheDocument()
+    expect(document.getElementById('diver-u1')).toBeNull()
+    expect(document.getElementById('diver-u2')).toBeNull()
+  })
+
+  it('reveals matching, collapsed cards reactively as the admin types', async () => {
+    const user = userEvent.setup()
+    renderAt('/admin/users')
+    await screen.findByText(t.admin.users.searchPrompt)
+    await user.type(screen.getByPlaceholderText(t.admin.users.searchPlaceholder), 'Ada')
+
+    const ada = document.getElementById('diver-u1')!.querySelector('[aria-expanded]')
+    expect(ada).toHaveAttribute('aria-expanded', 'false')
+    // Bo doesn't match the query, so his card isn't rendered.
+    expect(document.getElementById('diver-u2')).toBeNull()
   })
 })
 

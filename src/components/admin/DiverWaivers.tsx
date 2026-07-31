@@ -9,6 +9,7 @@ import { errorMessage } from '../../lib/errors'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
 import { ANNUAL_STATUS_LABEL, ANNUAL_STATUS_CLASS } from '../waivers/annual-status'
+import { Disclosure } from '../ui/Disclosure'
 import type { WaiverDef } from '../../config/waivers'
 import type { WaiverSignature } from '../../types/database'
 import { t } from '../../i18n'
@@ -76,11 +77,8 @@ export function DiverWaivers({ diverId, diverName }: { diverId: string; diverNam
   const now = new Date()
 
   return (
-    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
-      <div>
-        <h2 className="text-sm font-semibold text-red-600 uppercase tracking-wider">{dw.title}</h2>
-        <p className="text-xs text-brand-950/70 font-medium">{dw.intro}</p>
-      </div>
+    <Disclosure card title={dw.title} titleClassName="text-sm font-semibold text-red-600 uppercase tracking-wider">
+      <p className="text-xs text-brand-950/70 font-medium">{dw.intro}</p>
       {failed ? (
         <p className="text-xs text-amber-700 font-medium">{dw.loadFailed}</p>
       ) : signatures === null ? (
@@ -109,7 +107,7 @@ export function DiverWaivers({ diverId, diverName }: { diverId: string; diverNam
           )}
         </>
       )}
-    </section>
+    </Disclosure>
   )
 }
 

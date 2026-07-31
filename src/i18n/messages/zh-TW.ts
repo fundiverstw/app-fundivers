@@ -1426,6 +1426,7 @@ export const zhTW: Messages = {
       accountsFiltered: (shown: number, total: number) => `${total} 個帳號中的 ${shown} 個`,
       searchPlaceholder: '搜尋姓名、聯絡方式或證照…',
       noMatches: '沒有符合的結果。',
+      searchPrompt: '以姓名、暱稱或聯絡方式搜尋潛水員以查看其帳號。',
       loggedSuffix: (n: number) => ` · 已記錄 ${n} 次`,
       nitroxSuffix: ' · 高氧',
       deepSuffix: ' · 深潛',

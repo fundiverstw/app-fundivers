@@ -1438,6 +1438,7 @@ export const en = {
       accountsFiltered: (shown: number, total: number) => `${shown} of ${total} account${total === 1 ? '' : 's'}`,
       searchPlaceholder: 'Search by name, contact, cert…',
       noMatches: 'No matches.',
+      searchPrompt: 'Search for a diver by name, nickname or contact to see their account.',
       loggedSuffix: (n: number) => ` · ${n} logged`,
       nitroxSuffix: ' · Nitrox',
       deepSuffix: ' · Deep',

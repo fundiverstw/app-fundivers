@@ -1425,6 +1425,7 @@ export const ja: Messages = {
       accountsFiltered: (shown: number, total: number) => `${total} 件中 ${shown} 件のアカウント`,
       searchPlaceholder: '氏名・連絡先・認定ランクで検索…',
       noMatches: '一致するものがありません。',
+      searchPrompt: '氏名・ニックネーム・連絡先で検索するとアカウントが表示されます。',
       loggedSuffix: (n: number) => ` · ${n} 本記録`,
       nitroxSuffix: ' · ナイトロックス',
       deepSuffix: ' · ディープ',

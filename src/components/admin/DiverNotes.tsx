@@ -4,6 +4,7 @@ import { format } from 'date-fns'
 import { shopZoned } from '../../lib/dates'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
+import { Disclosure } from '../ui/Disclosure'
 import type { DiverNote, Profile } from '../../types/database'
 import { t } from '../../i18n'
 import { BTN_XS_GHOST } from '../../styles/tokens'
@@ -107,9 +108,7 @@ export function DiverNotes({ profileId, title = dn.title }: Props) {
   }
 
   return (
-    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
-      <h2 className="text-sm font-semibold text-red-600 uppercase tracking-wider">{title}</h2>
-
+    <Disclosure card title={title} titleClassName="text-sm font-semibold text-red-600 uppercase tracking-wider">
       <div className="space-y-2">
         {notes.length === 0 && (
           <p className="text-xs text-brand-950 font-medium">{dn.none}</p>
@@ -197,6 +196,6 @@ export function DiverNotes({ profileId, title = dn.title }: Props) {
           </button>
         </div>
       </div>
-    </section>
+    </Disclosure>
   )
 }

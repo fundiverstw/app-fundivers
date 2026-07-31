@@ -92,6 +92,11 @@
  */
 :root {
   color-scheme: dark;
+  /* Larger base type app-wide. Every text/spacing utility is rem-based, so
+     nudging the root font size scales the whole UI proportionally — text,
+     padding, gaps and icon glyphs grow together and layouts stay balanced.
+     16px → 18px (+12.5%). */
+  font-size: 112.5%;
 }
 
 body {

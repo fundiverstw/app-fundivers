@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
+import { Disclosure } from '../ui/Disclosure'
 import type { Profile } from '../../types/database'
 import { t } from '../../i18n'
 
@@ -105,8 +106,7 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
   if (user.parent_account) {
     const parentName = currentParent?.name ?? currentParent?.nickname ?? fm.unknownParent
     return (
-      <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-2" aria-label={fm.heading}>
-        <h2 className="text-sm font-semibold text-red-600 uppercase tracking-wider">{fm.heading}</h2>
+      <Disclosure card title={fm.heading} titleClassName="text-sm font-semibold text-red-600 uppercase tracking-wider">
         <p className="text-sm text-brand-900">
           {fm.linkedAsChildOf} <strong>{parentName}</strong>
         </p>
@@ -120,15 +120,13 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
             {unlinkingId === user.id ? fm.unlinking : fm.unlinkFromParent}
           </button>
         </div>
-      </section>
+      </Disclosure>
     )
   }
 
   // Mode B: this diver is top-level — list any children + offer the picker.
   return (
-    <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3" aria-label={fm.heading}>
-      <h2 className="text-sm font-semibold text-red-600 uppercase tracking-wider">{fm.heading}</h2>
-
+    <Disclosure card title={fm.heading} titleClassName="text-sm font-semibold text-red-600 uppercase tracking-wider">
       {children.length === 0 ? (
         <p className="text-xs text-brand-950 font-medium italic">{fm.noChildren}</p>
       ) : (
@@ -196,6 +194,6 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
           <p className="text-xs text-brand-950/70 font-medium italic">{fm.showingFirst20}</p>
         )}
       </div>
-    </section>
+    </Disclosure>
   )
 }

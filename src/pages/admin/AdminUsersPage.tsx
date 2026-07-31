@@ -25,6 +25,7 @@ import { DiverNotes } from '../../components/admin/DiverNotes'
 import { DiverWaivers } from '../../components/admin/DiverWaivers'
 import { DiverTermsConsent } from '../../components/admin/DiverTermsConsent'
 import { AdminFamilyPanel } from '../../components/admin/AdminFamilyPanel'
+import { Disclosure } from '../../components/ui/Disclosure'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Credit, Payment, Profile } from '../../types/database'
 import { t } from '../../i18n'
 
@@ -429,11 +430,17 @@ export function AdminUsersPage() {
     }
   }
 
+  // No roster is shown until the admin searches — a shop with hundreds of
+  // divers doesn't want the whole list dumped on open. A deep-linked diver
+  // (?diver=<id>) is the one exception, so the gear-card jump-to still works.
+  const query = filter.trim().toLowerCase()
+  const searching = query.length > 0
   const visible = users.filter(u => {
-    if (!filter) return true
+    if (deepLinkId && u.id === deepLinkId) return true
+    if (!searching) return false
     const haystack = [u.name, u.nickname, u.contact_id]
       .filter(Boolean).join(' ').toLowerCase()
-    return haystack.includes(filter.toLowerCase())
+    return haystack.includes(query)
   })
 
   return (
@@ -441,7 +448,7 @@ export function AdminUsersPage() {
       <div className="flex items-baseline justify-between gap-2">
         <h1 className="text-xl font-bold text-white">{us.title}</h1>
         <span className="text-sm font-medium text-white/80">
-          {filter ? us.accountsFiltered(visible.length, users.length) : us.accountsAll(users.length)}
+          {searching ? us.accountsFiltered(visible.length, users.length) : us.accountsAll(users.length)}
         </span>
       </div>
 
@@ -484,7 +491,9 @@ export function AdminUsersPage() {
           </div>
         ))}
         {visible.length === 0 && (
-          <p className="text-brand-950 font-medium text-sm">{us.noMatches}</p>
+          <p className="text-brand-950 font-medium text-sm">
+            {searching ? us.noMatches : us.searchPrompt}
+          </p>
         )}
       </div>
     </div>
@@ -576,7 +585,7 @@ function UserCard({
           }`}>
             {user.role}
           </span>
-          <span className="text-xs text-brand-950 font-medium select-none">{open ? '▲' : '▼'}</span>
+          <span className="text-lg leading-none text-brand-950 font-medium select-none px-1">{open ? '▲' : '▼'}</span>
         </div>
       </div>
 
@@ -777,7 +786,7 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
   }).filter(tg => tg.due > 0)
   return (
     <div className="space-y-3 pt-2 border-t border-surface-200">
-      <Section title={us.secBookings} defaultOpen>
+      <Section title={us.secBookings}>
         {activeBookings.length === 0 ? (
           <p className="text-brand-950 font-medium text-xs">{us.noneActive}</p>
         ) : (
@@ -830,7 +839,7 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
         )}
       </Section>
 
-      <Section title={us.secAccountCredits} defaultOpen>
+      <Section title={us.secAccountCredits}>
         <CreditsPanel
           credits={extras.credits}
           openBalance={extras.openCreditBalance}
@@ -844,7 +853,7 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
         />
       </Section>
 
-      <Section title={us.secTotals} defaultOpen>
+      <Section title={us.secTotals}>
         <div className="flex justify-between text-xs">
           <span className="text-brand-900 font-medium">{t.payments.paid}</span>
           <span className="text-brand-900 font-semibold">{extras.paidSum.toLocaleString()}</span>
@@ -1115,13 +1124,9 @@ function ApplyToBookingForm({ spendable, targets, tiedCredit, onApply }: {
 
 function Section({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
   return (
-    <details open={defaultOpen} className="group space-y-1">
-      <summary className="flex items-center gap-1 cursor-pointer select-none list-none text-xs font-semibold text-brand-700 uppercase tracking-wider [&::-webkit-details-marker]:hidden">
-        <span className="text-brand-400 transition-transform group-open:rotate-90">&#9656;</span>
-        {title}
-      </summary>
-      <div className="pl-1 pt-1 space-y-0.5">{children}</div>
-    </details>
+    <Disclosure title={title} defaultOpen={defaultOpen} bodyClassName="pl-1 pt-1 space-y-0.5">
+      {children}
+    </Disclosure>
   )
 }
 
