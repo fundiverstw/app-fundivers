@@ -17,6 +17,7 @@ export const DIVE_LOG_CSV_COLUMNS = [
   "wave_height_m",
   "weight_kg",
   "gear_used",
+  "wetsuit_thickness",
   "gas_mix",
   "tank_size_l",
   "start_pressure_bar",

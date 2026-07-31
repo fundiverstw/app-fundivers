@@ -673,6 +673,8 @@ export const ja: Messages = {
     startPressure: '開始残圧（bar）',
     endPressure: '終了残圧（bar）',
     companion: 'バディ／インストラクター',
+    wetsuitThickness: 'ウェットスーツの厚さ',
+    wetsuitThicknessPlaceholder: '例: 5mm、5/3mm、ドライスーツ',
     gearUsed: '使用器材',
     notes: 'メモ',
     saving: '保存中…',

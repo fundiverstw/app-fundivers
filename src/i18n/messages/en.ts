@@ -682,6 +682,8 @@ export const en = {
     startPressure: 'Start pressure (bar)',
     endPressure: 'End pressure (bar)',
     companion: 'Buddy / instructor',
+    wetsuitThickness: 'Wetsuit thickness',
+    wetsuitThicknessPlaceholder: 'e.g. 5mm, 5/3mm, drysuit',
     gearUsed: 'Gear used',
     notes: 'Notes',
     saving: 'Saving…',

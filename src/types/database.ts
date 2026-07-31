@@ -1704,6 +1704,7 @@ export interface Database {
           wave_height_m: number | null
           weight_kg: number | null
           gear_used: string[]
+          wetsuit_thickness: string | null
           gas_mix: GasMix | null
           tank_size_l: number | null
           start_pressure_bar: number | null
@@ -1731,6 +1732,7 @@ export interface Database {
           wave_height_m?: number | null
           weight_kg?: number | null
           gear_used?: string[]
+          wetsuit_thickness?: string | null
           gas_mix?: GasMix | null
           tank_size_l?: number | null
           start_pressure_bar?: number | null

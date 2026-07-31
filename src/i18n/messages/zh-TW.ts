@@ -674,6 +674,8 @@ export const zhTW: Messages = {
     startPressure: '起始氣壓（bar）',
     endPressure: '結束氣壓（bar）',
     companion: '潛伴／教練',
+    wetsuitThickness: '防寒衣厚度',
+    wetsuitThicknessPlaceholder: '例如：5mm、5/3mm、乾式防寒衣',
     gearUsed: '使用裝備',
     notes: '備註',
     saving: '儲存中…',

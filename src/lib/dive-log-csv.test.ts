@@ -57,7 +57,7 @@ describe('buildDiveLogCsv', () => {
     const dataLine = csv.split('\r\n')[1]
     expect(dataLine.startsWith('1,2026')).toBe(false) // sanity: no date filled
     expect(dataLine).not.toContain('undefined')
-    // dive_number=1, dived_on='', site='Wai-ao', then 17 empty cells.
+    // dive_number=1, dived_on='', site='Wai-ao', then the rest empty.
     expect(dataLine.split(',')).toHaveLength(DIVE_LOG_CSV_COLUMNS.length)
   })
 

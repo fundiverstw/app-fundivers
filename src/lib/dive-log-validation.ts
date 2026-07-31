@@ -74,6 +74,7 @@ export const DIVE_LOG_TEXT_MAX = {
   title: 120,
   site: 120,
   weather: 60,
+  wetsuit_thickness: 30,
   buddy_name: 120,
   notes: 2000,
 } as const

@@ -68,6 +68,7 @@ const sampleRow = (overrides: Partial<DiveLog> = {}): DiveLog => ({
   wave_height_m:     0.5,
   weight_kg:         5,
   gear_used:         ['BCD', 'Wetsuit'],
+  wetsuit_thickness: '5mm',
   gas_mix:           'air',
   tank_size_l:       12,
   start_pressure_bar: 200,
@@ -205,6 +206,23 @@ describe('DiveLogsPage add flow', () => {
 
     await waitFor(() => expect(createDiveLogMock).toHaveBeenCalledOnce())
     expect(createDiveLogMock.mock.calls[0][0].title).toBe('Manta night dive')
+  })
+
+  it('saves an opted-in wetsuit thickness as free text', async () => {
+    fetchDiveLogsMock.mockResolvedValue([])
+    createDiveLogMock.mockResolvedValue(sampleRow({ id: 'new', dive_number: 1, site: 'Test Site' }))
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => expect(fetchDiveLogsMock).toHaveBeenCalled())
+    await user.click(screen.getByRole('button', { name: /\+ add/i }))
+
+    fillRequired()
+    addOptionalField(/wetsuit thickness/i)
+    await user.type(screen.getByLabelText(/^wetsuit thickness$/i), '5/3mm')
+    await user.click(screen.getByRole('button', { name: /save dive/i }))
+
+    await waitFor(() => expect(createDiveLogMock).toHaveBeenCalledOnce())
+    expect(createDiveLogMock.mock.calls[0][0].wetsuit_thickness).toBe('5/3mm')
   })
 
   it('blocks a duplicate dive number with a friendly error and does not insert', async () => {

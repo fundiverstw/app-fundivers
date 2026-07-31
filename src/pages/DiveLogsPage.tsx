@@ -52,6 +52,7 @@ const blankForm = (nextNumber: number): FormState => ({
   wave_height_m:      null,
   weight_kg:          null,
   gear_used:          [],
+  wetsuit_thickness:  null,
   gas_mix:            null,
   tank_size_l:        null,
   start_pressure_bar: null,
@@ -68,7 +69,7 @@ const OPTIONAL_FIELDS = [
   'dive_type', 'gas_mix',
   'visibility_m', 'water_temp_c', 'air_temp_c', 'wave_height_m', 'weather',
   'weight_kg', 'tank_size_l', 'start_pressure_bar', 'end_pressure_bar',
-  'gear_used', 'notes',
+  'wetsuit_thickness', 'gear_used', 'notes',
 ] as const
 
 type OptionalField = typeof OPTIONAL_FIELDS[number]
@@ -85,6 +86,7 @@ const OPTIONAL_LABELS: Record<OptionalField, string> = {
   tank_size_l:        dl.tankSize,
   start_pressure_bar: dl.startPressure,
   end_pressure_bar:   dl.endPressure,
+  wetsuit_thickness:  dl.wetsuitThickness,
   gear_used:          dl.gearUsed,
   notes:              dl.notes,
 }
@@ -120,6 +122,7 @@ function formFromRow(row: DiveLog): FormState {
     wave_height_m:      row.wave_height_m,
     weight_kg:          row.weight_kg,
     gear_used:          row.gear_used,
+    wetsuit_thickness:  row.wetsuit_thickness,
     gas_mix:            row.gas_mix,
     tank_size_l:        row.tank_size_l,
     start_pressure_bar: row.start_pressure_bar,
@@ -503,6 +506,15 @@ function DiveLogForm({
             <input type="text" maxLength={DIVE_LOG_TEXT_MAX.weather} className={INPUT}
               aria-invalid={errors.weather ? true : undefined}
               value={form.weather ?? ''} onChange={e => setText('weather', e.target.value)} />
+          </Field>
+        )
+      case 'wetsuit_thickness':
+        return (
+          <Field key={k} label={label} error={errors.wetsuit_thickness} onRemove={onRemove}>
+            <input type="text" maxLength={DIVE_LOG_TEXT_MAX.wetsuit_thickness} className={INPUT}
+              placeholder={dl.wetsuitThicknessPlaceholder}
+              aria-invalid={errors.wetsuit_thickness ? true : undefined}
+              value={form.wetsuit_thickness ?? ''} onChange={e => setText('wetsuit_thickness', e.target.value)} />
           </Field>
         )
       case 'gear_used':
