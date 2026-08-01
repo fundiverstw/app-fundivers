@@ -673,7 +673,7 @@ export function AdminLogisticsPage() {
                 its opposite — tiny, dim, uppercase — so the two tiers can never
                 be mistaken for each other. They used to differ only by one step
                 of size and weight, which is why the hierarchy read as flat. */}
-            <header className="border-b border-surface-300 pb-2 mb-3 flex items-start justify-between gap-3">
+            <header className="border-b border-surface-300 pb-2 mb-3 space-y-2 sm:space-y-0 sm:flex sm:items-start sm:justify-between sm:gap-3">
               <div className="min-w-0">
                 <h2 className={`${TEXT_HEADING} text-lg`}>{lg.overall(dayKey)}</h2>
                 {/* Headcount, not bookings: someone diving two of the day's events
@@ -681,7 +681,7 @@ export function AdminLogisticsPage() {
                     below, which lists that person once. */}
                 <p className={`${TEXT_MUTED} text-sm font-medium`}>{lg.eventsDivers(groups.length, dayDivers.length)}</p>
               </div>
-              <div className="shrink-0 flex flex-wrap justify-end gap-2">
+              <div className="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
                 {/* Open the overlap with tomorrow without leaving the day being
                     packed — the whole point is reading both at once. */}
                 {backToBack && (
@@ -709,6 +709,13 @@ export function AdminLogisticsPage() {
                 )}
               </div>
             </header>
+            {/* Opens directly under the button that asks for it. Anywhere further
+                down and a phone would show no visible response to the tap. */}
+            {backToBack && diffOpen && (
+              <div className="mb-4">
+                <NextDayGearDiff day={nextDayKey} diff={nextDayDiff} />
+              </div>
+            )}
             {/* Two columns from sm up — the blocks are short, so one column left
                 half the board empty on anything wider than a phone. items-start
                 keeps a tall block (the fleet plan) from stretching its neighbour. */}
@@ -831,9 +838,6 @@ export function AdminLogisticsPage() {
                     </div>
                   )}
                 </div>
-              )}
-              {backToBack && diffOpen && (
-                <NextDayGearDiff day={nextDayKey} diff={nextDayDiff} />
               )}
             </div>
           </section>

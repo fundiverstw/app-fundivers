@@ -693,7 +693,11 @@ describe('AdminLogisticsPage', () => {
     await screen.findByText(/1 event · 2 divers/i)
 
     await user.click(await screen.findByRole('button', { name: /show the next day's gear diff/i }))
-    expect(await screen.findByText(new RegExp(`next day — ${tomorrowKey}`, 'i'))).toBeInTheDocument()
+    // It has to open next to the button that asks for it: further down the
+    // Overall board and a phone shows no visible response to the tap.
+    const panel = await screen.findByText(new RegExp(`next day — ${tomorrowKey}`, 'i'))
+    const gearBlock = screen.getByText(/gear to pack/i)
+    expect(panel.compareDocumentPosition(gearBlock) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 
     expect(within(await screen.findByRole('group', { name: /stays out/i })).getByText('BCD · M ×1')).toBeInTheDocument()
     expect(within(screen.getByRole('group', { name: /also pack/i })).getByText('BCD · XL ×1')).toBeInTheDocument()
