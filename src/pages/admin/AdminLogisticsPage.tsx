@@ -22,6 +22,7 @@ import { TransportFleetPlan } from '../../components/admin/TransportFleetPlan'
 import { EventVehicleGroup } from '../../components/admin/EventVehicleGroup'
 import { SharedTransportPicker } from '../../components/admin/SharedTransportPicker'
 import { NextDayGearDiff } from '../../components/admin/NextDayGearDiff'
+import { fetchDayGearRows } from '../../lib/logistics-day'
 import { fetchVehicles } from '../../lib/vehicles'
 import { fetchGearModelsWithSizes } from '../../lib/gear-models'
 import type { GearModelWithSizes } from '../../lib/gear-sizing'
@@ -172,25 +173,6 @@ interface EventGroup {
   staff: StaffDutyRow[]
 }
 
-/**
- * One day's roster cut down to what the gear diff needs — who is booked and
- * what sizes they wear. Deliberately not the full day loader: payments, staff,
- * cars and add-ons change nothing about what's on the rack.
- */
-async function fetchDayGearRows(dayKey: string): Promise<DiverGearRow[]> {
-  const events = await fetchEventsInRange(dayKey, dayKey, { includePrivate: true })
-  const eventIds = [...new Set(events.map(e => e.id))]
-  if (!eventIds.length) return []
-  const { data: bookingData } = await supabase
-    .from('bookings').select('*').in('event_id', eventIds).neq('status', 'cancelled')
-  const bookings = (bookingData ?? []) as Booking[]
-  if (!bookings.length) return []
-  const userIds = [...new Set(bookings.map(b => b.user_id))]
-  const { data: profileData } = await supabase.from('profiles').select('*').in('id', userIds)
-  const profileMap = new Map(((profileData ?? []) as Profile[]).map(p => [p.id, p]))
-  return bookings.map(b => ({ booking: b, profile: profileMap.get(b.user_id) ?? null }))
-}
-
 // How far ahead the "Other day" picker looks for days that have events.
 const LOOKAHEAD_DAYS = 30
 
@@ -231,6 +213,7 @@ export function AdminLogisticsPage() {
   // days aren't back-to-back. null = open but the next day is still loading.
   const [diffOpen, setDiffOpen] = useState(false)
   const [nextDayRows, setNextDayRows] = useState<DiverGearRow[] | null>(null)
+  const [nextDayFailed, setNextDayFailed] = useState(false)
   // Pieces already loaded onto the van, ticked off behind the size chips. Held
   // here rather than inside GearChips because the seated and waitlist chip sets
   // share one day's list — two owners would clobber each other's writes.
@@ -322,9 +305,16 @@ export function AdminLogisticsPage() {
     let cancelled = false
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setNextDayRows(null)
+    setNextDayFailed(false)
     ;(async () => {
-      const rows = await fetchDayGearRows(nextDayKey).catch(() => [] as DiverGearRow[])
-      if (!cancelled) setNextDayRows(rows)
+      try {
+        const rows = await fetchDayGearRows(nextDayKey)
+        if (!cancelled) setNextDayRows(rows)
+      } catch {
+        // Say the read failed rather than diffing against an empty next day,
+        // which would look like a real answer: everything back to the shop.
+        if (!cancelled) setNextDayFailed(true)
+      }
     })()
     return () => { cancelled = true }
   }, [diffOpen, backToBack, nextDayKey])
@@ -713,7 +703,7 @@ export function AdminLogisticsPage() {
                 down and a phone would show no visible response to the tap. */}
             {backToBack && diffOpen && (
               <div className="mb-4">
-                <NextDayGearDiff day={nextDayKey} diff={nextDayDiff} />
+                <NextDayGearDiff day={nextDayKey} diff={nextDayDiff} failed={nextDayFailed} />
               </div>
             )}
             {/* Two columns from sm up — the blocks are short, so one column left

@@ -1654,6 +1654,7 @@ export const zhTW: Messages = {
       nextDayHeading: (day: string) => `隔日 — ${day}`,
       nextDayHint: '依尺寸逐一比對。留在車上的裝備就不必經過晾曬架。',
       nextDayLoading: '讀取隔日資料中…',
+      nextDayFailed: '無法讀取隔日資料。請重新整理頁面後再開啟一次。',
       nextDayNothing: '兩天都沒有租借 — 沒有可延用的裝備。',
       nextDayStaysOut: '留在車上',
       nextDayStaysOutHint: '今天已裝載，隔天仍需使用。',

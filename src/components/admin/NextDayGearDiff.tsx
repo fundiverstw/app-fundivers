@@ -64,9 +64,15 @@ function DiffColumn({ title, hint, tone, lines, count }: {
  * come off the rack, and what goes home to dry. Matched size by size, because
  * that's the unit a piece is actually reusable at.
  *
- * `diff` is null while the next day is still loading.
+ * `diff` is null while the next day is still loading; `failed` when the read
+ * errored, which must be said out loud — an empty next day and an unreadable
+ * one produce very different packing advice from identical-looking panels.
  */
-export function NextDayGearDiff({ day, diff }: { day: string; diff: GearDayDiff | null }) {
+export function NextDayGearDiff({ day, diff, failed = false }: {
+  day: string
+  diff: GearDayDiff | null
+  failed?: boolean
+}) {
   const chase = (diff?.lines ?? []).filter(l => l.unknownSize && l.nextDivers.length > 0)
   return (
     <div className="space-y-2 rounded-lg border border-white/15 bg-white/5 p-3">
@@ -76,7 +82,9 @@ export function NextDayGearDiff({ day, diff }: { day: string; diff: GearDayDiff 
         </h3>
         <p className="text-xs text-brand-100/70 font-medium">{lg.nextDayHint}</p>
       </div>
-      {diff === null ? (
+      {failed ? (
+        <p className="text-sm font-semibold text-amber-200">{lg.nextDayFailed}</p>
+      ) : diff === null ? (
         <p className="text-sm text-brand-100/70 font-medium italic">{lg.nextDayLoading}</p>
       ) : diff.lines.length === 0 ? (
         <p className="text-sm text-brand-100/70 font-medium italic">{lg.nextDayNothing}</p>

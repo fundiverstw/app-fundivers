@@ -1653,6 +1653,7 @@ export const ja: Messages = {
       nextDayHeading: (day: string) => `翌日 — ${day}`,
       nextDayHint: 'サイズ単位で照合しています。積んだままにできる分は乾燥ラックを経由せずに済みます。',
       nextDayLoading: '翌日を読み込み中…',
+      nextDayFailed: '翌日を読み込めませんでした。ページを再読み込みしてもう一度開いてください。',
       nextDayNothing: 'どちらの日もレンタルなし — 持ち越す器材はありません。',
       nextDayStaysOut: '積んだまま',
       nextDayStaysOutHint: '本日積んでおり、翌日も必要です。',

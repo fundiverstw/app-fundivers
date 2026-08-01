@@ -1674,6 +1674,7 @@ export const en = {
       nextDayHeading: (day: string) => `Next day — ${day}`,
       nextDayHint: 'Matched size by size. Anything that stays out skips a trip through the drying rack.',
       nextDayLoading: 'Reading the next day…',
+      nextDayFailed: 'Could not read the next day. Reload the page and open this again.',
       nextDayNothing: 'Neither day rents gear — nothing to carry over.',
       nextDayStaysOut: 'Stays out',
       nextDayStaysOutHint: 'Packed today and needed again tomorrow.',
