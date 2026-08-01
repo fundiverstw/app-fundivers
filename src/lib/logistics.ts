@@ -232,16 +232,136 @@ export function gearSizeBreakdown(rows: DiverRow[], item: string): GearSizeGroup
     })
     groups.set(key, group)
   }
-  return [...groups.values()].sort((a, b) => {
-    // Unknown sizes sort last — they're a to-do, not a rack slot.
-    if (a.size === null) return 1
-    if (b.size === null) return -1
-    const ra = sizeRank(a.size), rb = sizeRank(b.size)
-    if (ra.tier !== rb.tier) return ra.tier - rb.tier
-    return typeof ra.key === 'number' && typeof rb.key === 'number'
-      ? ra.key - rb.key
-      : String(ra.key).localeCompare(String(rb.key))
-  })
+  return [...groups.values()].sort((a, b) => compareSizes(a.size, b.size))
+}
+
+/** Rack order for two size labels; an unrecorded size sorts last, because it's
+ *  a to-do rather than a slot on the rack. */
+function compareSizes(a: string | null, b: string | null): number {
+  if (a === null) return b === null ? 0 : 1
+  if (b === null) return -1
+  const ra = sizeRank(a), rb = sizeRank(b)
+  if (ra.tier !== rb.tier) return ra.tier - rb.tier
+  return typeof ra.key === 'number' && typeof rb.key === 'number'
+    ? ra.key - rb.key
+    : String(ra.key).localeCompare(String(rb.key))
+}
+
+/** One rack slot on one day: the size (or none) and who needs it. */
+interface GearUnits {
+  size: string | null
+  unknownSize: boolean
+  divers: string[]
+}
+
+// A day's gear reduced to countable rack slots, keyed item → size key. Sized
+// items split per size (that's the granularity a piece is reused at — an M BCD
+// covers tomorrow's M diver, not their L colleague); one-size items collapse to
+// a single bucket. '' keys both the unsized bucket and the no-size-on-file one,
+// which never collide since an item is one or the other.
+function gearUnitsByItem(rows: DiverRow[]): Map<string, Map<string, GearUnits>> {
+  const byItem = new Map<string, Map<string, GearUnits>>()
+  for (const { item } of gearTotals(rows)) {
+    const bucket = new Map<string, GearUnits>()
+    if (isSizedGearItem(item)) {
+      for (const g of gearSizeBreakdown(rows, item)) {
+        bucket.set(g.size ? g.size.toUpperCase() : '', {
+          size: g.size,
+          unknownSize: g.size === null,
+          divers: g.divers.map(d => d.name),
+        })
+      }
+    } else {
+      bucket.set('', {
+        size: null,
+        unknownSize: false,
+        divers: rows
+          .filter(r => gearPackList(r.booking).items.includes(item))
+          .map(r => personName(r.profile?.name, r.profile?.nickname) || '(no profile)'),
+      })
+    }
+    byItem.set(item, bucket)
+  }
+  return byItem
+}
+
+export interface GearDiffLine {
+  item: string
+  /** The size as displayed; null when the item has no size dimension at all,
+   *  and also when it has one but no size is on file — see `unknownSize`. */
+  size: string | null
+  /** True only when the item IS packed in sizes but none is recorded. */
+  unknownSize: boolean
+  /** Pieces this size is needed in today, and on the next day. */
+  today: number
+  next: number
+  /** Pieces already out that the next day reuses. */
+  keep: number
+  /** Pieces the next day needs on top of what's already out. */
+  add: number
+  /** Pieces out today that the next day has no use for. */
+  free: number
+  /** Who needs this item+size on the next day. */
+  nextDivers: string[]
+}
+
+export interface GearDayDiff {
+  lines: GearDiffLine[]
+  keep: number
+  add: number
+  free: number
+}
+
+/**
+ * What today's packed gear leaves to do for the next day — the overlap a shop
+ * running back-to-back days cares about. Per item and per size: what stays on
+ * the van (`keep`), what still has to be pulled off the rack (`add`), and what
+ * comes home to dry because nobody needs it tomorrow (`free`).
+ *
+ * Sizes are the unit of reuse, not items: three BCDs out today only cover
+ * tomorrow if they're the sizes tomorrow wears. A piece whose diver has no size
+ * on file never counts as reusable — the shop can't promise an unknown matches
+ * anything — so it lands wholly in `add` (next day) and `free` (today), which
+ * is also the nudge to go and record the size.
+ *
+ * Both sides should be seated rows only, matching every other prep total: a
+ * waitlisted diver's gear isn't packed, so it can't be kept out either.
+ */
+export function gearDayDiff(todayRows: DiverRow[], nextRows: DiverRow[]): GearDayDiff {
+  const todayUnits = gearUnitsByItem(todayRows)
+  const nextUnits = gearUnitsByItem(nextRows)
+  const lines: GearDiffLine[] = []
+  for (const item of GEAR_ITEMS) {
+    const a = todayUnits.get(item)
+    const b = nextUnits.get(item)
+    if (!a && !b) continue
+    const keys = [...new Set([...(a?.keys() ?? []), ...(b?.keys() ?? [])])]
+    const units = keys
+      .map(key => ({ key, unit: (a?.get(key) ?? b?.get(key))! }))
+      .sort((x, y) => compareSizes(x.unit.size, y.unit.size))
+    for (const { key, unit } of units) {
+      const today = a?.get(key)?.divers.length ?? 0
+      const next = b?.get(key)?.divers.length ?? 0
+      const keep = unit.unknownSize ? 0 : Math.min(today, next)
+      lines.push({
+        item,
+        size: unit.size,
+        unknownSize: unit.unknownSize,
+        today,
+        next,
+        keep,
+        add: next - keep,
+        free: today - keep,
+        nextDivers: b?.get(key)?.divers ?? [],
+      })
+    }
+  }
+  return {
+    lines,
+    keep: lines.reduce((s, l) => s + l.keep, 0),
+    add: lines.reduce((s, l) => s + l.add, 0),
+    free: lines.reduce((s, l) => s + l.free, 0),
+  }
 }
 
 /**

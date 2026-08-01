@@ -576,6 +576,68 @@ describe('AdminLogisticsPage', () => {
     expect(screen.getByRole('tab', { name: /other day/i })).toHaveAttribute('aria-selected', 'true')
   })
 
+  it('diffs today\'s packed gear against tomorrow\'s, size by size', async () => {
+    // Back-to-back days: today's M BCD covers tomorrow's M diver, today's S
+    // comes home, and tomorrow's XL still has to be pulled off the rack.
+    fetchUpcomingEventDays.mockResolvedValue([todayKey, tomorrowKey])
+    const tomorrowEvent = { ...diveEvent, id: 'e2', title: 'Sunday fun dive' }
+    fetchEventsInRange.mockImplementation((day: string) =>
+      Promise.resolve([day === tomorrowKey ? tomorrowEvent : diveEvent]))
+
+    const bookingsByEvent: Record<string, unknown[]> = {
+      e1: [
+        { id: 'b1', user_id: 'u1', event_id: 'e1', status: 'confirmed', details: { gear: { rent: true, items: ['BCD'] } } },
+        { id: 'b2', user_id: 'u2', event_id: 'e1', status: 'confirmed', details: { gear: { rent: true, items: ['BCD'] } } },
+      ],
+      e2: [
+        { id: 'b3', user_id: 'u3', event_id: 'e2', status: 'confirmed', details: { gear: { rent: true, items: ['BCD'] } } },
+        { id: 'b4', user_id: 'u4', event_id: 'e2', status: 'confirmed', details: { gear: { rent: true, items: ['BCD'] } } },
+      ],
+    }
+    const sizedProfiles = [
+      { ...profiles[0], bcd_size: 'M' },
+      { ...profiles[1], bcd_size: 'S' },
+      { id: 'u3', name: 'Cy', nickname: 'Cy', gear_owned: [], bcd_size: 'M' },
+      { id: 'u4', name: 'Di', nickname: 'Di', gear_owned: [], bcd_size: 'XL' },
+    ]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') {
+        // The day loader and the next-day loader both filter by event id, so
+        // hand each the bookings for the events it actually asked about.
+        const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
+        b.in = (_col: string, ids: string[]) =>
+          mockQueryBuilder({ data: ids.flatMap(id => bookingsByEvent[id] ?? []) })
+        return b
+      }
+      if (table === 'profiles') return mockQueryBuilder({ data: sizedProfiles })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText(/1 event · 2 divers/i)
+
+    await user.click(await screen.findByRole('button', { name: /show the next day's gear diff/i }))
+    expect(await screen.findByText(new RegExp(`next day — ${tomorrowKey}`, 'i'))).toBeInTheDocument()
+
+    expect(within(await screen.findByRole('group', { name: /stays out/i })).getByText('BCD · M ×1')).toBeInTheDocument()
+    expect(within(screen.getByRole('group', { name: /also pack/i })).getByText('BCD · XL ×1')).toBeInTheDocument()
+    expect(within(screen.getByRole('group', { name: /back to the shop/i })).getByText('BCD · S ×1')).toBeInTheDocument()
+
+    // Closing puts it away without disturbing the rest of the board.
+    await user.click(screen.getByRole('button', { name: /hide the next day's gear diff/i }))
+    expect(screen.queryByRole('group', { name: /stays out/i })).not.toBeInTheDocument()
+  })
+
+  it('offers no gear diff when the next event day is not the very next day', async () => {
+    // Gear sitting through a gap gets dried and racked anyway, so carrying it
+    // over is not advice anyone can act on.
+    fetchUpcomingEventDays.mockResolvedValue([todayKey, dayKeyOffset(todayKey, 9)])
+    renderPage()
+    await screen.findByText(/1 event · 2 divers/i)
+    expect(screen.queryByRole('button', { name: /next day's gear diff/i })).not.toBeInTheDocument()
+  })
+
   it('hides the jump button on the last day that has events', async () => {
     fetchUpcomingEventDays.mockResolvedValue([todayKey])
     renderPage()

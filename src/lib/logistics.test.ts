@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { splitByTransport, transportHeadcount, gearTotals, dayKeyOffset, careItemsForBooking, careTotals, isCareGearItem, addonTotals, partitionByWaitlist, gearSizeBreakdown, isSizedGearItem, gearSizeSource } from './logistics'
+import { splitByTransport, transportHeadcount, gearTotals, dayKeyOffset, careItemsForBooking, careTotals, isCareGearItem, addonTotals, partitionByWaitlist, gearSizeBreakdown, isSizedGearItem, gearSizeSource, gearDayDiff } from './logistics'
 import type { Booking, Profile } from '../types/database'
 
 const row = (transportation: boolean | undefined, items: string[] = []) => ({
@@ -278,6 +278,82 @@ describe('gearSizeBreakdown', () => {
   it('returns nothing for an item the shop does not size', () => {
     const rows = [sized('b1', 'Ada', ['Regulator'], {})]
     expect(gearSizeBreakdown(rows, 'Regulator')).toEqual([])
+  })
+})
+
+describe('gearDayDiff', () => {
+  const diver = (id: string, name: string, items: string[], sizes: Partial<Profile> = {}) => ({
+    booking: { id, details: { gear: { rent: true, items } } } as unknown as Booking,
+    profile: { name, ...sizes } as unknown as Profile,
+  })
+  const lineFor = (diff: ReturnType<typeof gearDayDiff>, item: string, size: string | null) =>
+    diff.lines.find(l => l.item === item && l.size === size)!
+
+  it('keeps a size out when both days need it, in the same quantity', () => {
+    const today = [diver('b1', 'Ada', ['BCD'], { bcd_size: 'M' })]
+    const next  = [diver('b2', 'Bo',  ['BCD'], { bcd_size: 'M' })]
+    const diff = gearDayDiff(today, next)
+    expect(diff).toMatchObject({ keep: 1, add: 0, free: 0 })
+    expect(lineFor(diff, 'BCD', 'M')).toMatchObject({ today: 1, next: 1, keep: 1, add: 0, free: 0 })
+  })
+
+  it('matches per size, not per item — a spare M does not cover an XL', () => {
+    const today = [
+      diver('b1', 'Ada', ['BCD'], { bcd_size: 'M' }),
+      diver('b2', 'Bo',  ['BCD'], { bcd_size: 'M' }),
+    ]
+    const next = [
+      diver('b3', 'Cy',  ['BCD'], { bcd_size: 'M' }),
+      diver('b4', 'Di',  ['BCD'], { bcd_size: 'XL' }),
+    ]
+    const diff = gearDayDiff(today, next)
+    expect(diff).toMatchObject({ keep: 1, add: 1, free: 1 })
+    expect(lineFor(diff, 'BCD', 'M')).toMatchObject({ keep: 1, add: 0, free: 1 })
+    expect(lineFor(diff, 'BCD', 'XL')).toMatchObject({ keep: 0, add: 1, free: 0 })
+  })
+
+  it('counts one-size items on quantity alone', () => {
+    const today = [diver('b1', 'Ada', ['Regulator']), diver('b2', 'Bo', ['Regulator'])]
+    const next  = [diver('b3', 'Cy',  ['Regulator'])]
+    const diff = gearDayDiff(today, next)
+    expect(lineFor(diff, 'Regulator', null)).toMatchObject({ today: 2, next: 1, keep: 1, add: 0, free: 1 })
+  })
+
+  it('never reuses a piece whose diver has no size on file', () => {
+    // An unknown size can't be promised to match anything, so today's piece
+    // goes back and tomorrow's has to be pulled — and the names say who to ask.
+    const today = [diver('b1', 'Ada', ['Wetsuit'], { wetsuit_size: null })]
+    const next  = [diver('b2', 'Bo',  ['Wetsuit'], { wetsuit_size: null })]
+    const diff = gearDayDiff(today, next)
+    expect(diff).toMatchObject({ keep: 0, add: 1, free: 1 })
+    expect(lineFor(diff, 'Wetsuit', null)).toMatchObject({ unknownSize: true, nextDivers: ['Bo'] })
+  })
+
+  it('groups sizes case-insensitively and lists them in rack order', () => {
+    const today = [
+      diver('b1', 'Ada', ['Wetsuit'], { wetsuit_size: 'l' }),
+      diver('b2', 'Bo',  ['Wetsuit'], { wetsuit_size: 'S' }),
+      diver('b3', 'Cy',  ['Wetsuit'], { wetsuit_size: 'L' }),
+    ]
+    const diff = gearDayDiff(today, [])
+    expect(diff.lines.map(l => l.size?.toUpperCase())).toEqual(['S', 'L'])
+    expect(lineFor(diff, 'Wetsuit', 'S')).toMatchObject({ free: 1 })
+    expect(diff.free).toBe(3)
+  })
+
+  it('orders items by the canonical gear list and skips ones neither day rents', () => {
+    const today = [diver('b1', 'Ada', ['Fins', 'BCD'], { fin_size: 'M', bcd_size: 'M' })]
+    const next  = [diver('b2', 'Bo',  ['Regulator'])]
+    expect(gearDayDiff(today, next).lines.map(l => l.item)).toEqual(['BCD', 'Regulator', 'Fins'])
+  })
+
+  it('is empty when neither day rents anything', () => {
+    expect(gearDayDiff([], [])).toEqual({ lines: [], keep: 0, add: 0, free: 0 })
+  })
+
+  it('treats an empty next day as everything coming home', () => {
+    const diff = gearDayDiff([diver('b1', 'Ada', ['BCD', 'Regulator'], { bcd_size: 'M' })], [])
+    expect(diff).toMatchObject({ keep: 0, add: 0, free: 2 })
   })
 })
 

@@ -5,7 +5,7 @@ import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { siteConfig } from '../../config/site'
 import { fetchEventsInRange, fetchUpcomingEventDays, formatEventSpan } from '../../lib/events'
-import { gearTotals, splitByTransport, transportHeadcount, dayKeyOffset, careTotals, isCareGearItem, addonTotals, partitionByWaitlist, gearSizeBreakdown, isSizedGearItem } from '../../lib/logistics'
+import { gearTotals, splitByTransport, transportHeadcount, dayKeyOffset, careTotals, isCareGearItem, addonTotals, partitionByWaitlist, gearSizeBreakdown, isSizedGearItem, gearDayDiff } from '../../lib/logistics'
 import { bookingBalance, type BookingBalance } from '../../lib/booking-balance'
 import { openCreditForBooking } from '../../lib/credits'
 import { fetchAmendmentsForBookings, amendmentsDelta } from '../../lib/booking-amendments'
@@ -20,6 +20,7 @@ import { PaymentsDueGroup } from '../../components/admin/PaymentsDueGroup'
 import { TransportFleetPlan } from '../../components/admin/TransportFleetPlan'
 import { EventVehicleGroup } from '../../components/admin/EventVehicleGroup'
 import { SharedTransportPicker } from '../../components/admin/SharedTransportPicker'
+import { NextDayGearDiff } from '../../components/admin/NextDayGearDiff'
 import { fetchVehicles } from '../../lib/vehicles'
 import { fetchGearModelsWithSizes } from '../../lib/gear-models'
 import type { GearModelWithSizes } from '../../lib/gear-sizing'
@@ -131,6 +132,25 @@ interface EventGroup {
   staff: StaffDutyRow[]
 }
 
+/**
+ * One day's roster cut down to what the gear diff needs — who is booked and
+ * what sizes they wear. Deliberately not the full day loader: payments, staff,
+ * cars and add-ons change nothing about what's on the rack.
+ */
+async function fetchDayGearRows(dayKey: string): Promise<DiverGearRow[]> {
+  const events = await fetchEventsInRange(dayKey, dayKey, { includePrivate: true })
+  const eventIds = [...new Set(events.map(e => e.id))]
+  if (!eventIds.length) return []
+  const { data: bookingData } = await supabase
+    .from('bookings').select('*').in('event_id', eventIds).neq('status', 'cancelled')
+  const bookings = (bookingData ?? []) as Booking[]
+  if (!bookings.length) return []
+  const userIds = [...new Set(bookings.map(b => b.user_id))]
+  const { data: profileData } = await supabase.from('profiles').select('*').in('id', userIds)
+  const profileMap = new Map(((profileData ?? []) as Profile[]).map(p => [p.id, p]))
+  return bookings.map(b => ({ booking: b, profile: profileMap.get(b.user_id) ?? null }))
+}
+
 // How far ahead the "Other day" picker looks for days that have events.
 const LOOKAHEAD_DAYS = 30
 
@@ -167,6 +187,10 @@ export function AdminLogisticsPage() {
   const [rideGroups, setRideGroups] = useState<EventRideGroup[]>([])
   const [ridesBusy, setRidesBusy] = useState(false)
   const [rideError, setRideError] = useState<string | null>(null)
+  // The next-day gear diff is opt-in — it costs an extra round trip and most
+  // days aren't back-to-back. null = open but the next day is still loading.
+  const [diffOpen, setDiffOpen] = useState(false)
+  const [nextDayRows, setNextDayRows] = useState<DiverGearRow[] | null>(null)
 
   const todayKey = useMemo(
     () => new Date().toLocaleDateString('en-CA', { timeZone: siteConfig.locale.timezone }),
@@ -242,6 +266,24 @@ export function AdminLogisticsPage() {
     () => (upcomingDays ?? []).find(d => d > dayKey) ?? null,
     [upcomingDays, dayKey],
   )
+
+  // Carrying gear over only makes sense on consecutive days: put a gap between
+  // them and the kit is dried and racked anyway, so the diff would be advice
+  // nobody can act on. The button is offered on back-to-back days only.
+  const nextDayKey = dayKey ? dayKeyOffset(dayKey, 1) : ''
+  const backToBack = !!nextDayKey && nextEventDay === nextDayKey
+
+  useEffect(() => {
+    if (!diffOpen || !backToBack) return
+    let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNextDayRows(null)
+    ;(async () => {
+      const rows = await fetchDayGearRows(nextDayKey).catch(() => [] as DiverGearRow[])
+      if (!cancelled) setNextDayRows(rows)
+    })()
+    return () => { cancelled = true }
+  }, [diffOpen, backToBack, nextDayKey])
 
   // Land on whichever control owns that day, so the tabs keep matching what's
   // displayed: today/tomorrow have their own tabs, anything else is "Other day".
@@ -404,6 +446,11 @@ export function AdminLogisticsPage() {
   // plus add-ons) of what the waitlisted divers would add if they get a seat.
   const waitlistGear = gearTotals(waitlistRows)
   const waitlistAddons = addonTotals(waitlistRows, addonTitles)
+  // Seated rows on both sides, matching every other prep total: a waitlisted
+  // diver's gear isn't packed today, so it can't be kept out for tomorrow.
+  const nextDayDiff = nextDayRows
+    ? gearDayDiff(seatedRows, partitionByWaitlist(nextDayRows).seated)
+    : null
   // Day-wide on-duty staff for the overall board — one entry per person even
   // when they cover several of the day's events, with all the roles they hold.
   const dayStaff: { key: string; name: string; roles: string[] }[] = []
@@ -578,18 +625,33 @@ export function AdminLogisticsPage() {
                     below, which lists that person once. */}
                 <p className={`${TEXT_MUTED} text-sm font-medium`}>{lg.eventsDivers(groups.length, dayDivers.length)}</p>
               </div>
-              {/* Jump to the next day that has events. Labelled with the
-                  destination — "Tomorrow" when that's where it lands, the date
-                  otherwise — so it says where it goes rather than just "next". */}
-              {nextEventDay && (
-                <button
-                  type="button"
-                  onClick={() => goToDay(nextEventDay)}
-                  className={`shrink-0 ${BTN_XS_GHOST}`}
-                >
-                  {lg.nextEventDay(nextEventDay === tomorrowKey ? lg.tomorrow : nextEventDay)}
-                </button>
-              )}
+              <div className="shrink-0 flex flex-wrap justify-end gap-2">
+                {/* Open the overlap with tomorrow without leaving the day being
+                    packed — the whole point is reading both at once. */}
+                {backToBack && (
+                  <button
+                    type="button"
+                    onClick={() => setDiffOpen(o => !o)}
+                    aria-expanded={diffOpen}
+                    aria-label={diffOpen ? lg.hideNextDayDiff : lg.showNextDayDiff}
+                    className={BTN_XS_GHOST}
+                  >
+                    {lg.nextDayDiff}
+                  </button>
+                )}
+                {/* Jump to the next day that has events. Labelled with the
+                    destination — "Tomorrow" when that's where it lands, the date
+                    otherwise — so it says where it goes rather than just "next". */}
+                {nextEventDay && (
+                  <button
+                    type="button"
+                    onClick={() => goToDay(nextEventDay)}
+                    className={BTN_XS_GHOST}
+                  >
+                    {lg.nextEventDay(nextEventDay === tomorrowKey ? lg.tomorrow : nextEventDay)}
+                  </button>
+                )}
+              </div>
             </header>
             {/* Two columns from sm up — the blocks are short, so one column left
                 half the board empty on anything wider than a phone. items-start
@@ -713,6 +775,9 @@ export function AdminLogisticsPage() {
                     </div>
                   )}
                 </div>
+              )}
+              {backToBack && diffOpen && (
+                <NextDayGearDiff day={nextDayKey} diff={nextDayDiff} />
               )}
             </div>
           </section>

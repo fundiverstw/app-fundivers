@@ -132,6 +132,35 @@ The planner itself is pure and unit-tested in
 `src/lib/vehicle-planning.ts` (`planFleet` for one run, `planRuns` for a
 day); grouping lives in `src/lib/ride-groups.ts`.
 
+## Gear: the next-day diff
+
+A shop running back-to-back weekend days doesn't want to haul every set
+back to base to dry only to load it again the next morning. The Overall
+board's **Next-day gear** button opens the overlap between the day on
+screen and the one after it: what stays on the van, what still has to
+come off the rack, and what goes home to dry.
+
+The unit of reuse is the **size**, not the item — three BCDs out today
+only cover tomorrow if they are the sizes tomorrow wears — so the diff
+is computed per `(item, size)` via the same `gearSizeBreakdown` the
+size-expanding chips use. One-size kit (regulators, masks, computers)
+matches on quantity alone.
+
+Two rules keep it honest:
+
+- **Only back-to-back days.** The button is offered when the *very next
+  calendar day* has events. Across a gap the kit would be dried and
+  racked anyway, so a carry-over suggestion would be unactionable.
+- **An unknown size never carries over.** A diver with no size on file
+  can't be promised a match, so their piece lands wholly in "Also pack"
+  (tomorrow) and "Back to the shop" (today), and their name goes on the
+  chase list — which is the real thing to fix before the van leaves.
+
+Both sides count **seated** rows only, matching every other prep total:
+a waitlisted diver's gear isn't packed today, so it can't be kept out
+for tomorrow. `gearDayDiff` in `src/lib/logistics.ts` is pure and
+unit-tested; the panel is `src/components/admin/NextDayGearDiff.tsx`.
+
 ## Event memos
 
 `event_memos` is a free-form "sticky note" table for operational flags.
