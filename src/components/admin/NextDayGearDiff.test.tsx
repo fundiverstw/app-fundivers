@@ -45,15 +45,31 @@ describe('NextDayGearDiff', () => {
     expect(column(/back to the shop/i).getByText('BCD · M ×1')).toBeInTheDocument()
   })
 
-  it('never carries over a piece with no size on file, and names who to ask', () => {
+  it('holds pieces with no size on file out of all three columns', () => {
     renderDiff(
       [diver('b1', 'Ada', ['Wetsuit'], { wetsuit_size: null })],
       [diver('b2', 'Bo', ['Wetsuit'], { wetsuit_size: null })],
     )
-    expect(column(/stays out/i).getByText(/nothing/i)).toBeInTheDocument()
-    expect(column(/also pack/i).getByText(/no size on file/i)).toBeInTheDocument()
-    expect(screen.getByText(/ask for a size/i)).toBeInTheDocument()
-    expect(screen.getByText('Bo')).toBeInTheDocument()
+    // They can't be matched, so listing them as both "pack" and "return" would
+    // crowd out the real answer with the same piece counted twice.
+    for (const col of [/stays out/i, /also pack/i, /back to the shop/i]) {
+      expect(column(col).getByText(/nothing/i)).toBeInTheDocument()
+    }
+    const chase = within(screen.getByRole('group', { name: /sizes to confirm/i }))
+    expect(chase.getByText('Wetsuit ×1')).toBeInTheDocument()
+    expect(chase.getByText('Bo')).toBeInTheDocument()
+  })
+
+  it('still shows the sized pieces when one diver has no size on file', () => {
+    // The reported symptom: with the unsized lines mixed in, the matched pieces
+    // vanished into "stays out" and the board read as if nothing had sizes.
+    renderDiff(
+      [diver('b1', 'Ada', ['BCD'], { bcd_size: 'M' }), diver('b2', 'Bo', ['BCD'], {})],
+      [diver('b3', 'Cy', ['BCD'], { bcd_size: 'L' }), diver('b4', 'Di', ['BCD'], {})],
+    )
+    expect(column(/back to the shop/i).getByText('BCD · M ×1')).toBeInTheDocument()
+    expect(column(/also pack/i).getByText('BCD · L ×1')).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: /sizes to confirm/i })).toHaveTextContent('BCD ×1')
   })
 
   it('shows a loading note while the next day is still being read', () => {

@@ -173,10 +173,15 @@ Two rules keep it honest:
 - **Only back-to-back days.** The button is offered when the *very next
   calendar day* has events. Across a gap the kit would be dried and
   racked anyway, so a carry-over suggestion would be unactionable.
-- **An unknown size never carries over.** A diver with no size on file
-  can't be promised a match, so their piece lands wholly in "Also pack"
-  (tomorrow) and "Back to the shop" (today), and their name goes on the
-  chase list — which is the real thing to fix before the van leaves.
+- **An unknown size never carries over, and never enters the columns.**
+  A diver with no size on file can't be promised a match, so their
+  pieces are held out of all three columns and listed once under
+  **Sizes to confirm** with the names to ask. Counting them as "also
+  pack" *and* "back to the shop" was the first attempt, and it read as
+  a broken diff: one unsized diver puts a line in every sized item they
+  rent (BCD, wetsuit, fins, boots at once), and because everyone who IS
+  sized quietly cancels out into "Stays out", the unsized minority was
+  the only thing left visible.
 
 Both sides count **seated** rows only, matching every other prep total:
 a waitlisted diver's gear isn't packed today, so it can't be kept out

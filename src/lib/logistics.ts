@@ -307,9 +307,13 @@ export interface GearDiffLine {
 
 export interface GearDayDiff {
   lines: GearDiffLine[]
+  /** Counts over placeable pieces only — lines with a size the shop can pull.
+   *  An unsized piece is not a rack slot, so it is counted in `unsized`. */
   keep: number
   add: number
   free: number
+  /** Pieces neither day can place: no size on file for that diver. */
+  unsized: number
 }
 
 /**
@@ -356,11 +360,18 @@ export function gearDayDiff(todayRows: DiverRow[], nextRows: DiverRow[]): GearDa
       })
     }
   }
+  // Sized and unsized lines are counted apart. Mixing them reads as a broken
+  // diff: one diver with no size on file contributes an unsized line to every
+  // sized item they rent (BCD, wetsuit, fins, boots at once), and since those
+  // can never match, they are the only thing left in "also pack" once everyone
+  // who IS sized has quietly cancelled out into "stays out".
+  const sized = lines.filter(l => !l.unknownSize)
   return {
     lines,
-    keep: lines.reduce((s, l) => s + l.keep, 0),
-    add: lines.reduce((s, l) => s + l.add, 0),
-    free: lines.reduce((s, l) => s + l.free, 0),
+    keep: sized.reduce((s, l) => s + l.keep, 0),
+    add: sized.reduce((s, l) => s + l.add, 0),
+    free: sized.reduce((s, l) => s + l.free, 0),
+    unsized: lines.filter(l => l.unknownSize).reduce((s, l) => s + Math.max(l.today, l.next), 0),
   }
 }
 

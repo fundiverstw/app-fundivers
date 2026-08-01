@@ -1687,7 +1687,8 @@ export const en = {
       // "BCD ×2" for one-size kit, "BCD · M ×2" once the item is packed in sizes.
       gearPiece: (item: string, n: number) => `${item} ×${n}`,
       gearPieceSized: (item: string, size: string, n: number) => `${item} · ${size} ×${n}`,
-      nextDayChase: 'Ask for a size before pulling these:',
+      nextDayChase: 'Sizes to confirm',
+      nextDayChaseHint: 'No size on file, so these are in none of the columns above — nobody can pull them until someone asks.',
     },
     family: {
       heading: 'Family',

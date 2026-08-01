@@ -1665,7 +1665,8 @@ export const ja: Messages = {
       nextDayNone: 'なし',
       gearPiece: (item: string, n: number) => `${item} ×${n}`,
       gearPieceSized: (item: string, size: string, n: number) => `${item}・${size} ×${n}`,
-      nextDayChase: '出す前にサイズを確認してください：',
+      nextDayChase: '要サイズ確認',
+      nextDayChaseHint: 'サイズ未登録のため上の3列には含まれていません。確認するまで出せません。',
     },
     family: {
       heading: '家族',

@@ -16,7 +16,6 @@ const COLUMN_TONES = {
 
 /** "BCD ×2", or "BCD · M ×2" once the shop packs the item in sizes. */
 function pieceLabel(line: GearDiffLine, n: number): string {
-  if (line.unknownSize) return lg.gearPieceSized(line.item, lg.sizeUnknown, n)
   return line.size ? lg.gearPieceSized(line.item, line.size, n) : lg.gearPiece(line.item, n)
 }
 
@@ -42,12 +41,8 @@ function DiffColumn({ title, hint, tone, lines, count }: {
         <ul className="flex flex-wrap gap-1.5">
           {lines.map(({ line, n }) => (
             <li
-              key={`${line.item}|${line.size ?? ''}|${line.unknownSize}`}
-              className={`text-xs px-2 py-0.5 rounded-full border font-medium ${
-                // An unrecorded size is the one entry a packer can't act on, so
-                // it carries the warning tone in whichever column it lands in.
-                line.unknownSize ? 'border-amber-500/50 bg-amber-500/10 text-amber-100' : chip
-              }`}
+              key={`${line.item}|${line.size ?? ''}`}
+              className={`text-xs px-2 py-0.5 rounded-full border font-medium ${chip}`}
             >
               {pieceLabel(line, n)}
             </li>
@@ -73,7 +68,12 @@ export function NextDayGearDiff({ day, diff, failed = false }: {
   diff: GearDayDiff | null
   failed?: boolean
 }) {
-  const chase = (diff?.lines ?? []).filter(l => l.unknownSize && l.nextDivers.length > 0)
+  // Unsized pieces are held out of the three columns entirely. They can't be
+  // matched, so they'd otherwise appear in "also pack" AND "back to the shop"
+  // at once, crowding out the real answer — and one unsized diver puts a line
+  // in all four sized items, which reads as "the diff can't see any sizes".
+  const sizedLines = (diff?.lines ?? []).filter(l => !l.unknownSize)
+  const unsized = (diff?.lines ?? []).filter(l => l.unknownSize)
   return (
     <div className="space-y-2 rounded-lg border border-white/15 bg-white/5 p-3">
       <div>
@@ -93,28 +93,32 @@ export function NextDayGearDiff({ day, diff, failed = false }: {
           <div className="grid gap-x-5 gap-y-4 sm:grid-cols-3 items-start">
             <DiffColumn
               title={lg.nextDayStaysOut} hint={lg.nextDayStaysOutHint} tone="keep" count={diff.keep}
-              lines={diff.lines.filter(l => l.keep > 0).map(line => ({ line, n: line.keep }))}
+              lines={sizedLines.filter(l => l.keep > 0).map(line => ({ line, n: line.keep }))}
             />
             <DiffColumn
               title={lg.nextDayAlsoPack} hint={lg.nextDayAlsoPackHint} tone="add" count={diff.add}
-              lines={diff.lines.filter(l => l.add > 0).map(line => ({ line, n: line.add }))}
+              lines={sizedLines.filter(l => l.add > 0).map(line => ({ line, n: line.add }))}
             />
             <DiffColumn
               title={lg.nextDayBackToShop} hint={lg.nextDayBackToShopHint} tone="free" count={diff.free}
-              lines={diff.lines.filter(l => l.free > 0).map(line => ({ line, n: line.free }))}
+              lines={sizedLines.filter(l => l.free > 0).map(line => ({ line, n: line.free }))}
             />
           </div>
-          {chase.length > 0 && (
-            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 space-y-0.5">
-              <h4 className="text-[11px] font-semibold uppercase tracking-wider text-amber-300">
-                {lg.nextDayChase}
-              </h4>
+          {unsized.length > 0 && (
+            <div role="group" aria-label={lg.nextDayChase} className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 space-y-1">
+              <div>
+                <h4 className="text-[11px] font-semibold uppercase tracking-wider text-amber-300">
+                  {lg.nextDayChase} · {lg.nextDayPieces(diff.unsized)}
+                </h4>
+                <p className="text-[11px] text-amber-200/80 font-medium">{lg.nextDayChaseHint}</p>
+              </div>
               <ul className="space-y-0.5">
-                {chase.map(l => (
+                {unsized.map(l => (
                   <li key={`chase-${l.item}`} className="text-xs text-amber-100">
-                    <span className="font-semibold">{l.item}</span>
-                    {' · '}
-                    <span className="select-text">{l.nextDivers.join(', ')}</span>
+                    <span className="font-semibold">{lg.gearPiece(l.item, Math.max(l.today, l.next))}</span>
+                    {l.nextDivers.length > 0 && (
+                      <>{' · '}<span className="select-text">{l.nextDivers.join(', ')}</span></>
+                    )}
                   </li>
                 ))}
               </ul>

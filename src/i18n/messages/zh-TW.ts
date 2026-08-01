@@ -1666,7 +1666,8 @@ export const zhTW: Messages = {
       nextDayNone: '無',
       gearPiece: (item: string, n: number) => `${item} ×${n}`,
       gearPieceSized: (item: string, size: string, n: number) => `${item}・${size} ×${n}`,
-      nextDayChase: '出裝前請先確認尺寸：',
+      nextDayChase: '待確認尺寸',
+      nextDayChaseHint: '尚未登記尺寸，因此不列入上方三欄。確認前無法出裝。',
     },
     family: {
       heading: '家庭成員',

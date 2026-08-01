@@ -319,14 +319,35 @@ describe('gearDayDiff', () => {
     expect(lineFor(diff, 'Regulator', null)).toMatchObject({ today: 2, next: 1, keep: 1, add: 0, free: 1 })
   })
 
-  it('never reuses a piece whose diver has no size on file', () => {
-    // An unknown size can't be promised to match anything, so today's piece
-    // goes back and tomorrow's has to be pulled — and the names say who to ask.
+  it('never reuses a piece whose diver has no size on file, and counts it apart', () => {
+    // An unknown size can't be promised to match anything. It is NOT folded
+    // into add/free either: one unsized diver puts a line in every sized item
+    // they rent, which would swamp the real answer in all three columns.
     const today = [diver('b1', 'Ada', ['Wetsuit'], { wetsuit_size: null })]
     const next  = [diver('b2', 'Bo',  ['Wetsuit'], { wetsuit_size: null })]
     const diff = gearDayDiff(today, next)
-    expect(diff).toMatchObject({ keep: 0, add: 1, free: 1 })
+    expect(diff).toMatchObject({ keep: 0, add: 0, free: 0, unsized: 1 })
     expect(lineFor(diff, 'Wetsuit', null)).toMatchObject({ unknownSize: true, nextDivers: ['Bo'] })
+  })
+
+  it('keeps one unsized diver from drowning out everyone who IS sized', () => {
+    // The reported symptom: sized pieces match and vanish into "stays out", so
+    // the unsized ones are all that is left visible and the board reads as if
+    // no sizes existed at all. They belong in their own bucket.
+    const today = [
+      diver('b1', 'Ada', ['BCD', 'Wetsuit', 'Fins'], { bcd_size: 'M', wetsuit_size: 'M', fin_size: 'M' }),
+      diver('b2', 'Bo',  ['BCD', 'Wetsuit', 'Fins'], {}),
+    ]
+    const next = [
+      diver('b3', 'Cy',  ['BCD', 'Wetsuit', 'Fins'], { bcd_size: 'M', wetsuit_size: 'M', fin_size: 'M' }),
+      diver('b4', 'Di',  ['BCD', 'Wetsuit', 'Fins'], {}),
+    ]
+    const diff = gearDayDiff(today, next)
+    // Three matched pieces stay out; nothing extra to pull or return.
+    expect(diff).toMatchObject({ keep: 3, add: 0, free: 0, unsized: 3 })
+    // The unsized lines are still there to be listed — just not as pack items.
+    expect(diff.lines.filter(l => l.unknownSize).map(l => l.item))
+      .toEqual(['BCD', 'Wetsuit', 'Fins'])
   })
 
   it('groups sizes case-insensitively and lists them in rack order', () => {
@@ -348,12 +369,12 @@ describe('gearDayDiff', () => {
   })
 
   it('is empty when neither day rents anything', () => {
-    expect(gearDayDiff([], [])).toEqual({ lines: [], keep: 0, add: 0, free: 0 })
+    expect(gearDayDiff([], [])).toEqual({ lines: [], keep: 0, add: 0, free: 0, unsized: 0 })
   })
 
   it('treats an empty next day as everything coming home', () => {
     const diff = gearDayDiff([diver('b1', 'Ada', ['BCD', 'Regulator'], { bcd_size: 'M' })], [])
-    expect(diff).toMatchObject({ keep: 0, add: 0, free: 2 })
+    expect(diff).toMatchObject({ keep: 0, add: 0, free: 2, unsized: 0 })
   })
 })
 
