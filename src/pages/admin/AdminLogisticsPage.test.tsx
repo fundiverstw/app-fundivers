@@ -47,6 +47,8 @@ const profiles = [
 ]
 
 beforeEach(() => {
+  // The packed-gear tick list lives in localStorage, so it would leak across tests.
+  localStorage.clear()
   from.mockReset(); rpc.mockReset(); fetchEventsInRange.mockReset(); fetchUpcomingEventDays.mockReset()
   useAuthMock.mockReset()
   useAuthMock.mockReturnValue({ profile: { id: 'admin-1', role: 'admin' } })
@@ -116,6 +118,79 @@ describe('AdminLogisticsPage', () => {
     // Clicking again puts it away.
     await user.click(within(gearSection).getByRole('button', { name: /hide sizes for BCD/i }))
     expect(within(gearSection).queryByText('M ×1')).not.toBeInTheDocument()
+  })
+
+  it('ticks each diver\'s piece off as it goes on the van, and shows how far along the size is', async () => {
+    const user = userEvent.setup()
+    const sizedBookings = [
+      { id: 'b1', user_id: 'u1', event_id: 'e1', status: 'confirmed', details: { gear: { rent: true, items: ['BCD'] } } },
+      { id: 'b2', user_id: 'u2', event_id: 'e1', status: 'confirmed', details: { gear: { rent: true, items: ['BCD'] } } },
+    ]
+    const sizedProfiles = [{ ...profiles[0], bcd_size: 'M' }, { ...profiles[1], bcd_size: 'M' }]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: sizedBookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: sizedProfiles })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    renderPage()
+    const overall = (await screen.findByText(/^overall/i)).closest('section')!
+    const gearSection = within(overall).getByText(/gear to pack/i).closest('div')!
+    await user.click(within(gearSection).getByRole('button', { name: /show sizes for BCD/i }))
+
+    // Both pieces start unpacked, and no progress is claimed.
+    const ada = within(gearSection).getByRole('button', { name: /mark ada's bcd as packed/i })
+    expect(ada).toHaveAttribute('aria-pressed', 'false')
+    expect(within(gearSection).queryByText(/packed/i)).not.toBeInTheDocument()
+
+    await user.click(ada)
+    expect(within(gearSection).getByRole('button', { name: /mark ada's bcd as not packed/i }))
+      .toHaveAttribute('aria-pressed', 'true')
+    expect(within(gearSection).getByText(/1\/2 packed/i)).toBeInTheDocument()
+
+    // The second piece completes the size, which says so rather than "2/2".
+    await user.click(within(gearSection).getByRole('button', { name: /mark bo's bcd as packed/i }))
+    expect(within(gearSection).getByText(/all packed/i)).toBeInTheDocument()
+
+    // Clicking a packed piece puts it back.
+    await user.click(within(gearSection).getByRole('button', { name: /mark ada's bcd as not packed/i }))
+    expect(within(gearSection).getByRole('button', { name: /mark ada's bcd as packed/i }))
+      .toHaveAttribute('aria-pressed', 'false')
+    expect(within(gearSection).getByText(/1\/2 packed/i)).toBeInTheDocument()
+  })
+
+  it('remembers what is packed across a reload, per day', async () => {
+    const user = userEvent.setup()
+    fetchUpcomingEventDays.mockResolvedValue([todayKey, tomorrowKey])
+    const sizedBookings = [
+      { id: 'b1', user_id: 'u1', event_id: 'e1', status: 'confirmed', details: { gear: { rent: true, items: ['BCD'] } } },
+    ]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: sizedBookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: [{ ...profiles[0], bcd_size: 'M' }] })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    const openBcd = async () => {
+      const overall = (await screen.findByText(/^overall/i)).closest('section')!
+      const gearSection = within(overall).getByText(/gear to pack/i).closest('div')!
+      await user.click(within(gearSection).getByRole('button', { name: /show sizes for BCD/i }))
+      return gearSection
+    }
+
+    const first = renderPage()
+    await user.click(within(await openBcd()).getByRole('button', { name: /mark ada's bcd as packed/i }))
+    first.unmount()
+
+    // Same day: the tick survives.
+    renderPage()
+    expect(within(await openBcd()).getByRole('button', { name: /mark ada's bcd as not packed/i }))
+      .toHaveAttribute('aria-pressed', 'true')
+
+    // Tomorrow keeps its own list — today's packing says nothing about it.
+    await user.click(screen.getByRole('tab', { name: /tomorrow/i }))
+    expect(within(await openBcd()).getByRole('button', { name: /mark ada's bcd as packed/i }))
+      .toHaveAttribute('aria-pressed', 'false')
   })
 
   it('leaves one-size gear as a plain chip with nothing to open', async () => {

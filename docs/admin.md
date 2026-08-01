@@ -132,6 +132,28 @@ The planner itself is pure and unit-tested in
 `src/lib/vehicle-planning.ts` (`planFleet` for one run, `planRuns` for a
 day); grouping lives in `src/lib/ride-groups.ts`.
 
+## Gear: the packed tick list
+
+Opening a sized gear chip on the Overall board ("BCD ×3") expands it into
+the sizes the day needs and, under each size, one **toggle per diver's
+piece**. Tapping a name flips it to packed; the size line then reads
+"1/3 packed", or "all packed" once the size is done.
+
+State is device-local (`localStorage`, `src/lib/gear-packed.ts`), stored
+one entry per day and expired after the newest 14 days. That is a
+deliberate limit, and the panel says so in the hint text: **the list does
+not sync between phones.** It's a scratchpad for the person loading the
+van during one packing session, not a record anyone reads back later, and
+a checkbox that needed a round trip per tap would be worse at that job.
+Making it shared would mean a table, RLS and realtime — a different
+feature.
+
+A piece is keyed `${bookingId}|${item}`; the size is **not** in the key,
+so correcting a diver's size on their gear card doesn't lose the tick.
+The set lives on `AdminLogisticsPage` rather than inside `GearChips`
+because the seated and waitlist chip sets share one day's list — two
+owners would clobber each other's writes.
+
 ## Gear: the next-day diff
 
 A shop running back-to-back weekend days doesn't want to haul every set

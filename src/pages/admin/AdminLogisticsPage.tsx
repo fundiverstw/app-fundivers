@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { siteConfig } from '../../config/site'
 import { fetchEventsInRange, fetchUpcomingEventDays, formatEventSpan } from '../../lib/events'
 import { gearTotals, splitByTransport, transportHeadcount, dayKeyOffset, careTotals, isCareGearItem, addonTotals, partitionByWaitlist, gearSizeBreakdown, isSizedGearItem, gearDayDiff } from '../../lib/logistics'
+import { gearPieceKey, loadPackedGear, savePackedGear, togglePackedGear } from '../../lib/gear-packed'
 import { bookingBalance, type BookingBalance } from '../../lib/booking-balance'
 import { openCreditForBooking } from '../../lib/credits'
 import { fetchAmendmentsForBookings, amendmentsDelta } from '../../lib/booking-amendments'
@@ -73,10 +74,15 @@ function SummaryLabel({ children, tone }: { children: ReactNode; tone?: 'care' |
  *
  * One panel at a time. The sizes are a short list read in passing, and stacking
  * several open panels would push the rest of the board off a phone screen.
+ *
+ * Inside the panel every diver's piece is a toggle, so the person loading the
+ * van ticks each one off as it goes in — see `packedGear` on the page.
  */
-function GearChips({ totals, rows }: {
+function GearChips({ totals, rows, packed, onTogglePiece }: {
   totals: Array<{ item: string; count: number }>
   rows: DiverGearRow[]
+  packed: Set<string>
+  onTogglePiece: (bookingId: string, item: string) => void
 }) {
   const [openItem, setOpenItem] = useState<string | null>(null)
   const breakdown = openItem ? gearSizeBreakdown(rows, openItem) : []
@@ -104,22 +110,56 @@ function GearChips({ totals, rows }: {
         })}
       </div>
       {openItem && (
-        <div className="rounded-lg border border-white/15 bg-white/5 p-2 space-y-1">
+        <div className="rounded-lg border border-white/15 bg-white/5 p-2 space-y-1.5">
           <SummaryLabel>{lg.sizesFor(openItem)}</SummaryLabel>
-          <ul className="space-y-0.5">
-            {breakdown.map(g => (
-              <li key={g.size ?? 'unknown'} className="text-xs text-brand-50">
-                {/* An unrecorded size is the one line worth chasing before the
-                    van leaves, so it carries the warning tone rather than
-                    reading as just another rack slot. */}
-                <span className={`font-semibold ${g.size ? '' : 'text-amber-300'}`}>
-                  {g.size ? lg.sizeCount(g.size, g.divers.length) : lg.sizeCount(lg.sizeUnknown, g.divers.length)}
-                </span>
-                {' · '}
-                <span className="text-brand-100/70 select-text">{g.divers.map(d => d.name).join(', ')}</span>
-              </li>
-            ))}
+          <ul className="space-y-1.5">
+            {breakdown.map(g => {
+              const done = g.divers.filter(d => packed.has(gearPieceKey(d.bookingId, openItem))).length
+              return (
+                <li key={g.size ?? 'unknown'} className="space-y-1">
+                  <p className="text-xs text-brand-50">
+                    {/* An unrecorded size is the one line worth chasing before
+                        the van leaves, so it carries the warning tone rather
+                        than reading as just another rack slot. */}
+                    <span className={`font-semibold ${g.size ? '' : 'text-amber-300'}`}>
+                      {g.size ? lg.sizeCount(g.size, g.divers.length) : lg.sizeCount(lg.sizeUnknown, g.divers.length)}
+                    </span>
+                    {done > 0 && (
+                      <span className={done === g.divers.length ? 'text-emerald-300 font-semibold' : 'text-brand-100/70'}>
+                        {' · '}{done === g.divers.length ? lg.allPacked : lg.packedProgress(done, g.divers.length)}
+                      </span>
+                    )}
+                  </p>
+                  <ul className="flex flex-wrap gap-1.5">
+                    {g.divers.map(d => {
+                      const isPacked = packed.has(gearPieceKey(d.bookingId, openItem))
+                      return (
+                        <li key={d.bookingId}>
+                          <button
+                            type="button"
+                            onClick={() => onTogglePiece(d.bookingId, openItem)}
+                            aria-pressed={isPacked}
+                            aria-label={isPacked ? lg.unmarkPacked(d.name, openItem) : lg.markPacked(d.name, openItem)}
+                            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+                              isPacked
+                                ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-100 font-semibold'
+                                : 'border-white/25 text-brand-100 font-medium hover:border-white/50 hover:bg-white/10'
+                            }`}
+                          >
+                            {isPacked ? lg.packedName(d.name) : d.name}
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </li>
+              )
+            })}
           </ul>
+          {/* Says both what the chips do and how far the state travels — a tick
+              list that silently lives on one phone would mislead a second
+              packer into thinking their colleague hadn't started. */}
+          <p className="text-[11px] text-brand-100/60 font-medium">{lg.packedHint}</p>
         </div>
       )}
     </>
@@ -191,6 +231,10 @@ export function AdminLogisticsPage() {
   // days aren't back-to-back. null = open but the next day is still loading.
   const [diffOpen, setDiffOpen] = useState(false)
   const [nextDayRows, setNextDayRows] = useState<DiverGearRow[] | null>(null)
+  // Pieces already loaded onto the van, ticked off behind the size chips. Held
+  // here rather than inside GearChips because the seated and waitlist chip sets
+  // share one day's list — two owners would clobber each other's writes.
+  const [packedGear, setPackedGear] = useState<Set<string>>(new Set())
 
   const todayKey = useMemo(
     () => new Date().toLocaleDateString('en-CA', { timeZone: siteConfig.locale.timezone }),
@@ -413,6 +457,18 @@ export function AdminLogisticsPage() {
     })()
     return () => { cancelled = true }
   }, [dayKey])
+
+  useEffect(() => {
+    if (!dayKey) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPackedGear(loadPackedGear(dayKey))
+  }, [dayKey])
+
+  function togglePackedPiece(bookingId: string, item: string) {
+    const next = togglePackedGear(packedGear, gearPieceKey(bookingId, item))
+    setPackedGear(next)
+    savePackedGear(dayKey, next)
+  }
 
   // Keep a diver's displayed sizes in sync after an inline save, across every
   // event group they appear in that day.
@@ -725,7 +781,7 @@ export function AdminLogisticsPage() {
                 {overallGear.length === 0 ? (
                   <p className="text-sm text-brand-950/70 font-medium italic">{lg.nothingToPack}</p>
                 ) : (
-                  <GearChips totals={overallGear} rows={seatedRows} />
+                  <GearChips totals={overallGear} rows={seatedRows} packed={packedGear} onTogglePiece={togglePackedPiece} />
                 )}
               </div>
               {overallCare.length > 0 && (
@@ -766,7 +822,7 @@ export function AdminLogisticsPage() {
                       ))}
                     </div>
                   )}
-                  {waitlistGear.length > 0 && <GearChips totals={waitlistGear} rows={waitlistRows} />}
+                  {waitlistGear.length > 0 && <GearChips totals={waitlistGear} rows={waitlistRows} packed={packedGear} onTogglePiece={togglePackedPiece} />}
                   {waitlistAddons.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
                       {waitlistAddons.map(({ title, count }) => (

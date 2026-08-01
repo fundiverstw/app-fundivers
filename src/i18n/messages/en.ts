@@ -1653,6 +1653,13 @@ export const en = {
       sizesFor: (item: string) => `${item} sizes`,
       sizeUnknown: 'No size on file',
       sizeCount: (size: string, n: number) => `${size} ×${n}`,
+      // Each piece behind an opened size chip ticks off as it goes on the van.
+      packedName: (name: string) => `${name} ✓`,
+      markPacked: (name: string, item: string) => `Mark ${name}'s ${item} as packed`,
+      unmarkPacked: (name: string, item: string) => `Mark ${name}'s ${item} as not packed`,
+      packedProgress: (packed: number, total: number) => `${packed}/${total} packed`,
+      allPacked: 'all packed ✓',
+      packedHint: 'Tap a name as that piece goes on the van. Kept on this device only.',
       transportNotSpecified: 'Transport not specified',
       leadBooker: '(lead booker)',
       staffFallback: '(staff)',
