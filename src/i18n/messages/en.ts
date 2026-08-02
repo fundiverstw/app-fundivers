@@ -1399,6 +1399,10 @@ export const en = {
         `Record these as signed on paper by ${name}: ${list}?\n\nOnly do this if you have the completed paper form(s) on file.`,
       waiversRecordedInPerson: 'Recorded as signed in person.',
       waiversRecordFailed: (detail: string) => `Could not record waivers: ${detail}`,
+      // Promoting a waitlisted diver emails them; say which way it went, since
+      // the seat is theirs either way and only the shop can tell the difference.
+      waitlistConfirmEmailed: 'Confirmed — the diver has been emailed.',
+      waitlistConfirmEmailFailed: 'Confirmed, but the email failed. Tell the diver yourself.',
       paidBy: (name: string) => `Paid by ${name}`,
       leadPayer: 'Lead payer',
       paidAmount: (amount: string) => `Paid ${amount}`,
@@ -2510,6 +2514,17 @@ export const en = {
       greeting: 'Hi,',
       sorry: (title: string) => `We're sorry to let you know that ${title} has been cancelled.`,
       refundNote: 'If you paid a deposit or the full amount, the shop will be in touch about a refund or rebooking. Reply to this email with any questions.',
+      signoff: (shop: string) => `— ${shop}`,
+    },
+    // Promoted off the waitlist by the shop. Unlike the automatic offer email,
+    // this one needs no reply — the seat is already theirs.
+    waitlistConfirmed: {
+      fallbackTitle: 'your dive',
+      subject: (title: string) => `Confirmed: ${title}`,
+      greeting: 'Hi,',
+      goodNews: (title: string) => `Good news — a spot opened up, and your waitlisted booking for ${title} is now confirmed.`,
+      when: (date: string) => `Date: ${date}`,
+      nextSteps: (url: string) => `Nothing to accept — the seat is yours. Open ${url} to check your gear, transport and anything still owing on this booking.`,
       signoff: (shop: string) => `— ${shop}`,
     },
     // The courtesy email for an account the shop minted on a diver's behalf.

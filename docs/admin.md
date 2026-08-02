@@ -49,6 +49,22 @@ All routes are also wrapped by `ProtectedRoute` — see
 - **Per-registrant actions:**
   - Change `bookings.status` to any of
     `pending` / `confirmed` / `waitlisted` / `cancelled`.
+  - **Promoting off the waitlist emails the diver.** `waitlisted` →
+    `confirmed` is the only status change that notifies, via the
+    `notify-booking-confirmed` edge function. Every other status the
+    shop sets follows something the diver just did — they registered,
+    they paid, they asked to cancel — but someone on the waitlist is
+    waiting on a stranger to drop out, so without a message they find
+    out by opening the app on the off chance. The predicate is
+    `isWaitlistPromotion` in `src/lib/booking-status.ts`; the send is
+    fire-and-forget, so a bounced email surfaces as a toast telling the
+    admin to call them, and never rolls back the seat.
+
+    This is the *manual* path only. When a cancellation frees a spot,
+    the cron worker offers it to the next person in line and
+    `notify-waitlist-offer` emails them a deadline to accept — that
+    email asks for an action, this one doesn't, because the shop has
+    already handed the seat over.
   - **Mark deposit paid** — shown on pending bookings. A pure status
     shortcut: confirms the booking (deposit received off-app) and does
     **not** record a payment or change the owed/paid balance. Record the

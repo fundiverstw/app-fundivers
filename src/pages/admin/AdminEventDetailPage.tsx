@@ -10,6 +10,8 @@ import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
 import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
 import { notifyRefundApproved, rejectRefundRequest } from '../../lib/refunds'
+import { isWaitlistPromotion } from '../../lib/booking-status'
+import { notifyWaitlistConfirmed } from '../../lib/booking-notifications'
 import { AdminNotes } from '../../components/admin/AdminNotes'
 import { EventSeriesSection } from '../../components/admin/EventSeriesSection'
 import { AdminAddDiverModal } from '../../components/admin/AdminAddDiverModal'
@@ -255,7 +257,16 @@ export function AdminEventDetailPage() {
   }
 
   async function updateStatus(bookingId: string, newStatus: Booking['status']) {
+    const before = registrants.find(r => r.booking.id === bookingId)?.booking.status
     await supabase.from('bookings').update({ status: newStatus }).eq('id', bookingId)
+    // A diver waiting on someone else to drop out has no way to see this
+    // coming, so the promotion is the one status change that emails them.
+    // Fire-and-forget: the seat is already theirs whether or not the mail lands.
+    if (before && isWaitlistPromotion(before, newStatus)) {
+      void notifyWaitlistConfirmed(bookingId)
+        .then(() => toast.success(ed.waitlistConfirmEmailed))
+        .catch(() => toast.error(ed.waitlistConfirmEmailFailed))
+    }
     setRegistrants(prev => prev.map(r =>
       r.booking.id === bookingId ? { ...r, booking: { ...r.booking, status: newStatus } } : r
     ))

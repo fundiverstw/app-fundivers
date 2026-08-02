@@ -594,6 +594,105 @@ describe('AdminEventDetailPage', () => {
     expect(paymentInsert).not.toHaveBeenCalled()
   })
 
+  it('emails a waitlisted diver when the admin promotes them to confirmed', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
+    ]))
+    const bookings = [{
+      id: 'b1', user_id: 'u1', status: 'waitlisted', created_at: '2026-04-20',
+      event_id: 'dive_x', notes: null, refund_requested_at: null,
+      details: { total: 4900, deposit: 4900 },
+    }]
+    const bookingUpdate = vi.fn().mockReturnValue({ eq: () => Promise.resolve({ error: null }) })
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') {
+        const b = mockQueryBuilder({ data: bookings }) as Record<string, unknown>
+        b.update = bookingUpdate
+        return b
+      }
+      if (table === 'profiles') return mockQueryBuilder({ data: [{ id: 'u1', name: 'Ada Lovelace', nickname: 'Ada' }] })
+      return mockQueryBuilder({ data: [] })
+    })
+    invoke.mockResolvedValue({ data: { ok: true, sent: true }, error: null })
+
+    const user = userEvent.setup()
+    renderAt('/admin/events/dive_x')
+
+    await user.selectOptions(await screen.findByDisplayValue('waitlisted'), 'confirmed')
+
+    await waitFor(() => expect(bookingUpdate).toHaveBeenCalledWith({ status: 'confirmed' }))
+    // The one status change a diver can't see coming, so it's the one that mails.
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith(
+      'notify-booking-confirmed', { body: { booking_id: 'b1' } },
+    ))
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalled())
+  })
+
+  it('keeps the promotion and says the email failed, rather than reporting the whole thing broken', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
+    ]))
+    const bookings = [{
+      id: 'b1', user_id: 'u1', status: 'waitlisted', created_at: '2026-04-20',
+      event_id: 'dive_x', notes: null, refund_requested_at: null,
+      details: { total: 4900, deposit: 4900 },
+    }]
+    const bookingUpdate = vi.fn().mockReturnValue({ eq: () => Promise.resolve({ error: null }) })
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') {
+        const b = mockQueryBuilder({ data: bookings }) as Record<string, unknown>
+        b.update = bookingUpdate
+        return b
+      }
+      if (table === 'profiles') return mockQueryBuilder({ data: [{ id: 'u1', name: 'Ada Lovelace', nickname: 'Ada' }] })
+      return mockQueryBuilder({ data: [] })
+    })
+    invoke.mockResolvedValue({ data: null, error: new Error('smtp down') })
+
+    const user = userEvent.setup()
+    renderAt('/admin/events/dive_x')
+
+    await user.selectOptions(await screen.findByDisplayValue('waitlisted'), 'confirmed')
+
+    // The seat is theirs either way; the shop just has to tell them by hand.
+    await waitFor(() => expect(bookingUpdate).toHaveBeenCalledWith({ status: 'confirmed' }))
+    await waitFor(() => expect(toastError).toHaveBeenCalled())
+    expect(await screen.findByDisplayValue('confirmed')).toBeInTheDocument()
+  })
+
+  it('does not email on any other status change', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
+    ]))
+    const bookings = [{
+      id: 'b1', user_id: 'u1', status: 'pending', created_at: '2026-04-20',
+      event_id: 'dive_x', notes: null, refund_requested_at: null,
+      details: { total: 4900, deposit: 4900 },
+    }]
+    const bookingUpdate = vi.fn().mockReturnValue({ eq: () => Promise.resolve({ error: null }) })
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') {
+        const b = mockQueryBuilder({ data: bookings }) as Record<string, unknown>
+        b.update = bookingUpdate
+        return b
+      }
+      if (table === 'profiles') return mockQueryBuilder({ data: [{ id: 'u1', name: 'Ada Lovelace', nickname: 'Ada' }] })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    const user = userEvent.setup()
+    renderAt('/admin/events/dive_x')
+
+    // pending → confirmed is the diver's own deposit landing; they know already.
+    await user.selectOptions(await screen.findByDisplayValue('pending'), 'confirmed')
+    await waitFor(() => expect(bookingUpdate).toHaveBeenCalledWith({ status: 'confirmed' }))
+
+    await user.selectOptions(await screen.findByDisplayValue('confirmed'), 'waitlisted')
+    await waitFor(() => expect(bookingUpdate).toHaveBeenCalledWith({ status: 'waitlisted' }))
+
+    expect(invoke).not.toHaveBeenCalled()
+  })
+
   it('records a custom partial balance payment without promoting status', async () => {
     fetchEventsForBookings.mockResolvedValue(new Map([
       ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
