@@ -1635,6 +1635,8 @@ export const en = {
         `${events} event${events === 1 ? '' : 's'} · ${divers} diver${divers === 1 ? '' : 's'}`,
       diverCount: (n: number) => `${n} diver${n === 1 ? '' : 's'}`,
       diversOnDay: 'Divers',
+      // Every name chip on the Overall board opens that person's directory card.
+      viewProfile: (name: string) => `View ${name}'s profile`,
       // `where` is already localised: the "Tomorrow" tab label, or a date key.
       nextEventDay: (where: string) => `Next: ${where} →`,
       stillOwe: (n: number, currency: string, amount: string) =>

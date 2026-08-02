@@ -1621,6 +1621,7 @@ export const zhTW: Messages = {
       eventsDivers: (events: number, divers: number) => `${events} 個活動 · ${divers} 位潛水員`,
       diverCount: (n: number) => `${n} 位潛水員`,
       diversOnDay: '潛水員',
+      viewProfile: (name: string) => `檢視 ${name} 的個人資料`,
       nextEventDay: (where: string) => `下一個: ${where} →`,
       stillOwe: (n: number, currency: string, amount: string) =>
         `${n} 位潛水員尚未付清 · 未收 ${currency} ${amount}`,

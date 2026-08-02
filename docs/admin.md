@@ -218,6 +218,13 @@ them, and flip resolved when handled.
 - Expanded state also fetches the diver's bookings + a payment summary
   (paid vs pending totals).
 - Badge next to the name shows `diver` / `admin`.
+- **Deep link:** `/admin/users?diver=<id>` opens (and scrolls to) that
+  diver's card. Every name chip on the Logistics board — the day's
+  divers, the on-duty staff, the tentative waitlist — links here, as
+  does each diver gear card, so a name read while packing can be
+  followed to sizes and contact without retyping it into the search.
+  Staff see plain text instead: the directory is admin-only, so the
+  link would only bounce them.
 
 ## Role-view toggle
 

@@ -793,6 +793,75 @@ describe('AdminLogisticsPage', () => {
     expect(screen.queryByRole('link', { name: 'Ada' })).not.toBeInTheDocument()
   })
 
+  it('links every name chip on the Overall board to that person\'s directory card', async () => {
+    const duties = [
+      { id: 'd1', assignee_id: 's1', role: 'guide', event_id: 'e1', start_date: todayKey, end_date: null },
+    ]
+    const withWaitlist = [
+      ...bookings,
+      { id: 'b3', user_id: 'u3', event_id: 'e1', status: 'waitlisted', details: {} },
+    ]
+    const allProfiles = [
+      ...profiles,
+      { id: 's1', name: 'Dana', nickname: 'Dana', gear_owned: [] },
+      { id: 'u3', name: 'Eve',  nickname: 'Eve',  gear_owned: [] },
+    ]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: withWaitlist })
+      if (table === 'profiles') return mockQueryBuilder({ data: allProfiles })
+      if (table === 'duties') return mockQueryBuilder({ data: duties })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    renderPage()
+    const overall = (await screen.findByText(/^overall/i)).closest('section')!
+    // Seated diver, on-duty staff and waitlisted diver — all three rosters.
+    expect(within(overall).getByRole('link', { name: /view Ada's profile/i }))
+      .toHaveAttribute('href', '/admin/users?diver=u1')
+    expect(within(overall).getByRole('link', { name: /view Dana's profile/i }))
+      .toHaveAttribute('href', '/admin/users?diver=s1')
+    expect(within(overall).getByRole('link', { name: /view Eve's profile/i }))
+      .toHaveAttribute('href', '/admin/users?diver=u3')
+  })
+
+  it('keeps the staff chip announcing the person, not their duty list', async () => {
+    const duties = [
+      { id: 'd1', assignee_id: 's1', role: 'guide', event_id: 'e1', start_date: todayKey, end_date: null },
+    ]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: bookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: [...profiles, { id: 's1', name: 'Dana', nickname: 'Dana', gear_owned: [] }] })
+      if (table === 'duties') return mockQueryBuilder({ data: duties })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    renderPage()
+    const overall = (await screen.findByText(/^overall/i)).closest('section')!
+    // The role stays visible on the chip; it just isn't the link's name.
+    const chip = within(overall).getByRole('link', { name: /view Dana's profile/i })
+    expect(chip).toHaveTextContent(/guide/)
+  })
+
+  it('leaves the board name chips plain for staff, who cannot open the directory', async () => {
+    useAuthMock.mockReturnValue({ profile: { id: 's-1', role: 'staff' } })
+    renderPage()
+    const overall = (await screen.findByText(/^overall/i)).closest('section')!
+    expect(within(overall).getByText('Ada')).toBeInTheDocument()
+    expect(within(overall).queryByRole('link', { name: /view Ada's profile/i })).not.toBeInTheDocument()
+  })
+
+  it('leaves a booking with no profile plain — there is no card to open', async () => {
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: [bookings[0]] })
+      if (table === 'profiles') return mockQueryBuilder({ data: [] })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    renderPage()
+    const overall = (await screen.findByText(/^overall/i)).closest('section')!
+    expect(within(overall).getByText('(no profile)').closest('a')).toBeNull()
+  })
+
   it('sends the event title to the event page and the Edit button to the editor — not both to edit', async () => {
     renderPage()
     await screen.findByText(/1 event · 2 divers/i)
