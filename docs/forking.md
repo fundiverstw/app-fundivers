@@ -75,11 +75,19 @@ separate mechanism (baked into the manifest + `index.html` at build).
 
 - `push` / `broadcast` — refine the push + admin-broadcast features (also gated by
   the VAPID / webhook env).
+- `eventSharing` — the in-app "share this event" button. **Optional, off by
+  default.** It copies a link to a public event page **on your own website** —
+  the app hosts no such page. Turning it on is opt-in and requires web-dev work
+  you do yourself:
+  1. Build event pages on your site addressed by the **app's event id** (the
+     `events` table UUID — the app knows only that, not your own slugs).
+  2. Set `urls.eventPage` to a template with an `{id}` placeholder, e.g.
+     `https://www.example.com/events/{id}`.
+  3. Set `features.eventSharing: true`.
 
-The "share this event" button needs no toggle: it copies
-`<urls.app>/register/<event id>`, the app's own public registration page. That
-route is outside the auth gate, so whoever the link reaches sees the event and
-can sign up — set `urls.app` correctly and sharing works.
+  If the toggle is off or `urls.eventPage` is unset, the button simply doesn't
+  render — no fallback, nothing breaks. FunDivers points this at a synced Wix
+  event page; that Wix wiring is FunDivers' own, not part of the app.
 
 ## Versioning & pulling core updates
 
