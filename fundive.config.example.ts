@@ -15,7 +15,7 @@
 export const siteConfig = {
   // Must equal core's current CONFIG_CONTRACT_VERSION (src/config/site.ts) or
   // the build fails. Bump it whenever core's CHANGELOG.md tells you to migrate.
-  configVersion: 8,
+  configVersion: 9,
 
   identity: {
     // Printed in italics on the registration PDF. Leave blank to omit it.
@@ -42,7 +42,6 @@ export const siteConfig = {
   urls: {
     site: 'https://www.example.com',
     app: 'https://app.example.com',
-    eventPage: 'https://www.example.com/events/{id}',
   },
 
   locale: {
@@ -72,9 +71,6 @@ export const siteConfig = {
   features: {
     push: true,
     broadcast: false,
-    // Optional. Requires your own event pages on urls.site keyed by the app's
-    // event id (see urls.eventPage). Left off — most forks won't have this.
-    eventSharing: false,
   },
 
   business: {

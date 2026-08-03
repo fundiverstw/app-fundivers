@@ -31,7 +31,6 @@ export const siteConfigSchema = z.object({
   urls: z.object({
     site: url,
     app: url,
-    eventPage: url.nullable(),
   }),
   locale: z.object({
     timezone: z.string().min(1),
@@ -53,7 +52,6 @@ export const siteConfigSchema = z.object({
   features: z.object({
     push: z.boolean(),
     broadcast: z.boolean(),
-    eventSharing: z.boolean(),
   }),
   business: z.object({
     gearItems: z.array(z.string().min(1)).min(1),

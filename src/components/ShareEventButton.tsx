@@ -13,7 +13,6 @@ const DEFAULT_CLASS = 'text-xs bg-surface-700 hover:bg-surface-800 text-white px
 export function ShareEventButton({ eventId, className = DEFAULT_CLASS, label = t.share.shareLink }: Props) {
   const toast = useToast()
   const url = eventShareUrl(eventId)
-  if (!url) return null
   return (
     <button
       type="button"

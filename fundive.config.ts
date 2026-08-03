@@ -20,7 +20,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const siteConfig = {
-  configVersion: 8,
+  configVersion: 9,
 
   identity: {
     appName: 'FunDive',
@@ -45,7 +45,6 @@ export const siteConfig = {
   urls: {
     site: 'https://www.fundiverstw.com',
     app: 'https://app.fundiverstw.com',
-    eventPage: 'https://www.fundiverstw.com/events/{id}',
   },
 
   locale: {
@@ -76,7 +75,6 @@ export const siteConfig = {
   features: {
     push: true,
     broadcast: true,
-    eventSharing: true,
   },
 
   business: {
