@@ -62,6 +62,15 @@ describe('siteConfig', () => {
       .toThrow()
   })
 
+  // urls.app is concatenated into share links and emailed deep links, and is
+  // matched verbatim as a CORS origin. Both break on a trailing slash, and
+  // neither breaks loudly, so the config guard is where it has to be caught.
+  it('rejects an origin with a trailing slash', () => {
+    const withApp = (app: string) => ({ ...siteConfig, urls: { ...siteConfig.urls, app } })
+    expect(() => assertValidSiteConfig(withApp('https://app.example.com/'))).toThrow(/slash/)
+    expect(() => assertValidSiteConfig(withApp('https://app.example.com'))).not.toThrow()
+  })
+
   it('rejects a config with an out-of-range configVersion', () => {
     expect(() => assertValidSiteConfig({ ...siteConfig, configVersion: CONFIG_CONTRACT_VERSION - 1 }))
       .toThrow(/configVersion/)

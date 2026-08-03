@@ -9,6 +9,12 @@ import { CONFIG_CONTRACT_VERSION, type SiteConfig } from './site'
 
 const url = z.string().regex(/^https?:\/\//, 'must be an absolute http(s) URL')
 
+// Origins the app builds paths onto (the share link, emailed deep links) and
+// compares verbatim against a request's Origin header (edge-function CORS). A
+// trailing slash yields "…//register/<id>" and never matches an Origin, so
+// reject it here rather than shipping a fork whose edge functions all 403.
+const origin = url.refine(u => !u.endsWith('/'), 'must not end with a trailing slash')
+
 export const siteConfigSchema = z.object({
   configVersion: z.number().int().positive(),
   identity: z.object({
@@ -29,8 +35,8 @@ export const siteConfigSchema = z.object({
     paypalLink: url,
   }),
   urls: z.object({
-    site: url,
-    app: url,
+    site: origin,
+    app: origin,
   }),
   locale: z.object({
     timezone: z.string().min(1),
