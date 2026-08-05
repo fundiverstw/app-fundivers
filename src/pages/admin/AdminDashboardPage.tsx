@@ -145,7 +145,10 @@ export function AdminDashboardPage() {
           <h1 className="text-2xl font-bold text-white">{db.title}</h1>
           <p className="text-sm text-white/70">{db.subtitle(year, siteConfig.locale.timezone)}</p>
         </div>
-        <Link to="/admin/history" className="text-sm text-amber-300 hover:text-amber-200 shrink-0 mt-1">{db.historyLink}</Link>
+        <div className="flex flex-col items-end gap-1 shrink-0 mt-1">
+          <Link to="/admin/history" className="text-sm text-amber-300 hover:text-amber-200">{db.historyLink}</Link>
+          <Link to="/admin/accounting" className="text-sm text-amber-300 hover:text-amber-200">{db.revenueLink}</Link>
+        </div>
       </div>
 
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -200,7 +203,21 @@ export function AdminDashboardPage() {
 
       <ChartCard title={db.upcomingFill} empty={!dash.upcomingFill.length}>
         <div className="max-h-80 overflow-y-auto -mx-1 px-1">
-          <table className="w-full text-xs text-brand-900">
+          {/* table-fixed + explicit column widths, so the row fits the narrowest
+              phone instead of widening the table. A cell's max-width is ignored
+              under auto layout, so `truncate` on the title could not hold it
+              back: five columns of natural width ran ~50px past a 320px card,
+              and because this wrapper scrolls vertically the browser computes
+              overflow-x to `auto` too — which is how a vertical scroll panel
+              grows a horizontal scrollbar nobody asked for. */}
+          <table className="w-full table-fixed text-xs text-brand-900">
+            <colgroup>
+              <col />
+              <col className="w-[5.2rem]" />
+              <col className="w-14" />
+              <col className="w-14" />
+              <col className="w-12" />
+            </colgroup>
             <thead className="text-brand-900/60 text-left">
               <tr>
                 <th className="font-medium pb-1">{db.colEvent}</th>
@@ -213,7 +230,7 @@ export function AdminDashboardPage() {
             <tbody>
               {dash.upcomingFill.map(r => (
                 <tr key={`${r.type}:${r.id}`} className="border-t border-surface-100">
-                  <td className="py-1 pr-2 truncate max-w-[14rem]">{r.title}</td>
+                  <td className="py-1 pr-2 truncate">{r.title}</td>
                   <td className="py-1 pr-2 tabular-nums">{r.date ?? '—'}</td>
                   <td className="py-1 text-right tabular-nums">{r.confirmed}</td>
                   <td className="py-1 text-right tabular-nums">{r.capacity ?? '—'}</td>

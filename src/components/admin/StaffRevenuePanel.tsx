@@ -107,30 +107,39 @@ function PersonBreakdown({ person }: { person: PersonRevenue }) {
     <div className="space-y-4">
       <div className="space-y-1">
         <h4 className="text-xs font-semibold uppercase tracking-wider text-brand-900/70">{r.breakdownMonths}</h4>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-brand-900 min-w-[26rem]">
-            <thead>
-              <tr className="text-left text-xs text-brand-900/60">
-                <th className="py-1 pr-3 font-medium">{r.colMonth}</th>
-                <th className="py-1 pr-3 font-medium text-right">{r.colCourses}</th>
-                <th className="py-1 pr-3 font-medium text-right">{r.colDives}</th>
-                <th className="py-1 pr-3 font-medium text-right">{r.colStudents}</th>
-                <th className="py-1 font-medium text-right">{r.colCollected}</th>
+        {/* table-fixed rather than a min-width scroll container: five short
+            columns fit the narrowest phone once the numerics stop claiming
+            their natural width, and a table that fits beats one that scrolls
+            sideways inside a card. */}
+        <table className="w-full table-fixed text-sm text-brand-900">
+          <colgroup>
+            <col />
+            <col className="w-[3.2rem]" />
+            <col className="w-[3.2rem]" />
+            <col className="w-[3.2rem]" />
+            <col className="w-[6.5rem]" />
+          </colgroup>
+          <thead>
+            <tr className="text-left text-xs text-brand-900/60">
+              <th className="py-1 pr-3 font-medium">{r.colMonth}</th>
+              <th className="py-1 pr-3 font-medium text-right">{r.colCourses}</th>
+              <th className="py-1 pr-3 font-medium text-right">{r.colDives}</th>
+              <th className="py-1 pr-3 font-medium text-right">{r.colStudents}</th>
+              <th className="py-1 font-medium text-right">{r.colCollected}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {person.months.map(m => (
+              <tr key={m.month} className="border-t border-surface-200">
+                <td className="py-1 pr-3">{m.month}</td>
+                <td className="py-1 pr-3 text-right tabular-nums">{m.taughtEvents}</td>
+                <td className="py-1 pr-3 text-right tabular-nums">{m.ledEvents}</td>
+                <td className="py-1 pr-3 text-right tabular-nums">{m.students}</td>
+                <td className="py-1 text-right tabular-nums font-semibold">{money(m.collected)}</td>
               </tr>
-            </thead>
-            <tbody>
-              {person.months.map(m => (
-                <tr key={m.month} className="border-t border-surface-200">
-                  <td className="py-1 pr-3">{m.month}</td>
-                  <td className="py-1 pr-3 text-right tabular-nums">{m.taughtEvents}</td>
-                  <td className="py-1 pr-3 text-right tabular-nums">{m.ledEvents}</td>
-                  <td className="py-1 pr-3 text-right tabular-nums">{m.students}</td>
-                  <td className="py-1 text-right tabular-nums font-semibold">{money(m.collected)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <div className="space-y-1">
@@ -256,45 +265,49 @@ export function StaffRevenuePanel({ selfOnlyPersonId }: StaffRevenuePanelProps) 
           ) : !people.length ? (
             <p className="text-sm text-brand-900/70">{r.empty}</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-brand-900 min-w-[24rem]">
-                <thead>
-                  <tr className="text-left text-xs text-brand-900/60">
-                    <th className="py-1 pr-3 font-medium">{r.colPerson}</th>
-                    <th className="py-1 pr-3 font-medium text-right">{r.colEvents}</th>
-                    <th className="py-1 pr-3 font-medium text-right">{r.colStudents}</th>
-                    <th className="py-1 font-medium text-right">{r.colCollected}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {people.map(p => {
-                    const open = openPersonId === p.personId
-                    return (
-                      <Fragment key={p.personId}>
-                        <tr className="border-t border-surface-200">
-                          <td className="py-1 pr-3">
-                            <button type="button"
-                              onClick={() => setOpenPersonId(id => id === p.personId ? null : p.personId)}
-                              aria-expanded={open}
-                              className="font-medium underline decoration-dotted hover:no-underline">
-                              {p.name}
-                            </button>
-                          </td>
-                          <td className="py-1 pr-3 text-right tabular-nums">{p.completed.events}</td>
-                          <td className="py-1 pr-3 text-right tabular-nums">{p.completed.students}</td>
-                          <td className="py-1 text-right tabular-nums font-semibold">{money(p.completed.collected)}</td>
+            <table className="w-full table-fixed text-sm text-brand-900">
+              <colgroup>
+                <col />
+                <col className="w-[3.6rem]" />
+                <col className="w-[3.6rem]" />
+                <col className="w-[6.5rem]" />
+              </colgroup>
+              <thead>
+                <tr className="text-left text-xs text-brand-900/60">
+                  <th className="py-1 pr-3 font-medium">{r.colPerson}</th>
+                  <th className="py-1 pr-3 font-medium text-right">{r.colEvents}</th>
+                  <th className="py-1 pr-3 font-medium text-right">{r.colStudents}</th>
+                  <th className="py-1 font-medium text-right">{r.colCollected}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {people.map(p => {
+                  const open = openPersonId === p.personId
+                  return (
+                    <Fragment key={p.personId}>
+                      <tr className="border-t border-surface-200">
+                        <td className="py-1 pr-3">
+                          <button type="button"
+                            onClick={() => setOpenPersonId(id => id === p.personId ? null : p.personId)}
+                            aria-expanded={open}
+                            className="block w-full text-left truncate font-medium underline decoration-dotted hover:no-underline">
+                            {p.name}
+                          </button>
+                        </td>
+                        <td className="py-1 pr-3 text-right tabular-nums">{p.completed.events}</td>
+                        <td className="py-1 pr-3 text-right tabular-nums">{p.completed.students}</td>
+                        <td className="py-1 text-right tabular-nums font-semibold">{money(p.completed.collected)}</td>
+                      </tr>
+                      {open && (
+                        <tr>
+                          <td colSpan={4} className="pt-2 pb-4"><PersonBreakdown person={p} /></td>
                         </tr>
-                        {open && (
-                          <tr>
-                            <td colSpan={4} className="pt-2 pb-4"><PersonBreakdown person={p} /></td>
-                          </tr>
-                        )}
-                      </Fragment>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+                      )}
+                    </Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
           )
         )}
 

@@ -2199,6 +2199,7 @@ export const zhTW: Messages = {
       title: '營運績效',
       subtitle: (year: number, timezone: string) => `${year} 年 · 以旺季（6 至 8 月）為中心 · 營收為淨額（已付款 − 已退款），${timezone}。`,
       historyLink: '歷史對照 →',
+      revenueLink: '各員工營收 →',
       revenueThisMonth: '本月營收',
       revenueYear: (year: number) => `${year} 年營收`,
       bookingsThisMonth: '本月報名數',

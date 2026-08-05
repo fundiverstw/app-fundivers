@@ -2227,6 +2227,7 @@ export const en = {
       title: 'Business performance',
       subtitle: (year: number, timezone: string) => `${year} · peak season (Jun–Aug) centred · revenue netted (paid − refunded), ${timezone}.`,
       historyLink: 'Historical perspective →',
+      revenueLink: 'Revenue by staff →',
       revenueThisMonth: 'Revenue this month',
       revenueYear: (year: number) => `Revenue ${year}`,
       bookingsThisMonth: 'Bookings this month',

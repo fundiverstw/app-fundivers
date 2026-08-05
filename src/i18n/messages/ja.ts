@@ -2198,6 +2198,7 @@ export const ja: Messages = {
       title: '業績',
       subtitle: (year: number, timezone: string) => `${year}年 · ハイシーズン（6〜8月）を中心に表示 · 売上は純額（入金 − 返金）、${timezone}。`,
       historyLink: '過去との比較 →',
+      revenueLink: 'スタッフ別の売上 →',
       revenueThisMonth: '今月の売上',
       revenueYear: (year: number) => `${year}年の売上`,
       bookingsThisMonth: '今月の予約数',
