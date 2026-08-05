@@ -61,6 +61,20 @@ export function allowsTransport(kind: EventKind): boolean {
 }
 
 /**
+ * True when the kind is taught rather than led — a qualified instructor runs
+ * it, and a guide rostered onto it is assisting, not delivering it.
+ *
+ * Deliberately its own question rather than a reuse of `usesCourseDays`, even
+ * though both answer "course" today. One is about the shape of the dates, the
+ * other about who is qualified to earn from the event; a fourth kind could
+ * easily be taught without running on a `course_days` list, and revenue
+ * attribution reads this one — see `earnsRevenue` in staff-revenue.ts.
+ */
+export function isInstructorLed(kind: EventKind): boolean {
+  return kind === 'course'
+}
+
+/**
  * True when the kind carries the genuinely diving-specific fields —
  * `is_boat_dive` and `nitrox_required`. Deliberately narrower than
  * `usesDateEnvelope`: `is_trip` rides with the envelope kinds instead, since

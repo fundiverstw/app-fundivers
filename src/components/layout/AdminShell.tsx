@@ -8,6 +8,7 @@ import { CalendarIcon } from '../icons/CalendarIcon'
 import { CrosshairIcon } from '../icons/CrosshairIcon'
 import { PeopleIcon } from '../icons/PeopleIcon'
 import { PlusCircleIcon } from '../icons/PlusCircleIcon'
+import { ChartIcon } from '../icons/ChartIcon'
 import { LogisticsIcon } from '../icons/LogisticsIcon'
 import { t } from '../../i18n'
 import {
@@ -15,13 +16,22 @@ import {
   ON_DEEP_MUTED, ON_DEEP_SUBTLE,
 } from '../../styles/tokens'
 
-type NavItem = { to: string; label: string; icon: React.ReactNode; adminOnly?: boolean }
+type NavItem = {
+  to: string
+  label: string
+  icon: React.ReactNode
+  adminOnly?: boolean
+  /** Shown only to staff. Admins reach the same page from the Manage hub —
+   *  a staff nav is two items long and has room, an admin's is already five. */
+  staffOnly?: boolean
+}
 const adminNav: NavItem[] = [
-  { to: '/admin/events',    label: t.nav.calendar,  icon: <CalendarIcon /> },
-  { to: '/admin/logistics', label: t.nav.logistics, icon: <LogisticsIcon /> },
-  { to: '/admin/users',     label: t.nav.divers,    icon: <PeopleIcon />,     adminOnly: true },
-  { to: '/admin/duty',      label: t.nav.duty,      icon: <CrosshairIcon />,  adminOnly: true },
-  { to: '/admin/new',       label: t.nav.manage,    icon: <PlusCircleIcon />, adminOnly: true },
+  { to: '/admin/events',     label: t.nav.calendar,  icon: <CalendarIcon /> },
+  { to: '/admin/logistics',  label: t.nav.logistics, icon: <LogisticsIcon /> },
+  { to: '/admin/accounting', label: t.nav.revenue,   icon: <ChartIcon />,      staffOnly: true },
+  { to: '/admin/users',      label: t.nav.divers,    icon: <PeopleIcon />,     adminOnly: true },
+  { to: '/admin/duty',       label: t.nav.duty,      icon: <CrosshairIcon />,  adminOnly: true },
+  { to: '/admin/new',        label: t.nav.manage,    icon: <PlusCircleIcon />, adminOnly: true },
 ]
 
 export function AdminShell() {
@@ -101,7 +111,9 @@ export function AdminShell() {
       </main>
 
       <nav className={NAV_BOTTOM}>
-        {adminNav.filter(i => !i.adminOnly || profile?.role === 'admin').map(({ to, label, icon }) => (
+        {adminNav
+          .filter(i => (!i.adminOnly || profile?.role === 'admin') && (!i.staffOnly || profile?.role !== 'admin'))
+          .map(({ to, label, icon }) => (
           <NavLink
             key={to}
             to={to}

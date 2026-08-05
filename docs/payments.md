@@ -168,6 +168,14 @@ in the group is stamped with `bookings.payer_id` = the lead (added in
   their sum. Reverting a diver later doesn't move already-recorded payments
   (the money was applied to that diver's event).
 
+## Revenue attributed to staff
+
+`netPaid` is also what the staff revenue report counts as revenue — a
+season's money split among the crew who instructed or guided each
+event. The rule, the `profiles.compensated` flag it leans on, and why
+booked-but-unpaid totals are deliberately excluded are documented in
+[admin.md](./admin.md#revenue-by-staff).
+
 ## Related reminders
 
 See [push-notifications.md](./push-notifications.md). The cron fires

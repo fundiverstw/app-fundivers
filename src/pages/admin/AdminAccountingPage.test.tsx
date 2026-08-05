@@ -3,8 +3,9 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { AdminAccountingPage } from './AdminAccountingPage'
 
-const { from } = vi.hoisted(() => ({ from: vi.fn() }))
+const { from, useAuthMock } = vi.hoisted(() => ({ from: vi.fn(), useAuthMock: vi.fn() }))
 vi.mock('../../lib/supabase', () => ({ supabase: { from: (...a: unknown[]) => from(...a) } }))
+vi.mock('../../hooks/useAuth', () => ({ useAuth: () => useAuthMock() }))
 
 const toastSuccess = vi.fn()
 const toastError = vi.fn()
@@ -19,7 +20,7 @@ vi.mock('../../lib/admin-event-export', () => ({
 
 function tableBuilder(result: { data: unknown; error: unknown }) {
   const b: Record<string, unknown> = {}
-  for (const m of ['select', 'gte', 'lt', 'order', 'in', 'eq', 'is']) b[m] = () => b
+  for (const m of ['select', 'gte', 'lt', 'lte', 'order', 'in', 'eq', 'is', 'not', 'or']) b[m] = () => b
   b.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
     Promise.resolve(result).then(res, rej)
   return b
@@ -32,6 +33,8 @@ function mockTables(tables: Record<string, unknown[]>) {
 
 beforeEach(() => {
   from.mockReset()
+  useAuthMock.mockReset()
+  useAuthMock.mockReturnValue({ profile: { id: 'admin-1', role: 'admin' } })
   // Default: every table empty, so the manifest section's on-mount dive query
   // resolves cleanly. Individual tests override with mockTables().
   mockTables({})
@@ -98,5 +101,69 @@ describe('AdminAccountingPage', () => {
     expect(toastError.mock.calls[0][0]).toMatch(/No payments recorded/)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((URL as any).createObjectURL).not.toHaveBeenCalled()
+  })
+})
+
+// One dive in the current season, guided by a paid staff member and a
+// volunteer, with a single confirmed booking paid in full.
+function seasonWithOneDive(year: number) {
+  return {
+    duties: [
+      { event_id: 'd1', assignee_id: 'staff-1', role: 'guide' },
+      { event_id: 'd1', assignee_id: 'vol-1', role: 'guide' },
+    ],
+    events: [{
+      id: 'd1', kind: 'dive', admin_title: 'Bat Cave', display_title: null,
+      start_date: `${year}-01-04`, end_date: null, course_days: null, cancelled_at: null,
+    }],
+    bookings: [{ id: 'b1', event_id: 'd1', status: 'confirmed' }],
+    payments: [{ booking_id: 'b1', status: 'paid', amount: 3000 }],
+    profiles: [
+      { id: 'staff-1', name: 'Sam Reef', nickname: 'Sam', compensated: true },
+      { id: 'vol-1', name: 'Val Kelp', nickname: 'Val', compensated: false },
+    ],
+  }
+}
+
+describe('AdminAccountingPage revenue tab', () => {
+  it('shows an admin both tabs and the whole crew on the revenue one', async () => {
+    mockTables(seasonWithOneDive(new Date().getFullYear()))
+    renderPage()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Revenue' }))
+    // The volunteer is out of the split, so the paid guide keeps the lot.
+    expect(await screen.findByText('Sam')).toBeInTheDocument()
+    expect(screen.getByText('NTD 3,000')).toBeInTheDocument()
+    expect(screen.queryByText('Val')).not.toBeInTheDocument()
+  })
+
+  it('gives a staff viewer their own figures and no tabs or exports', async () => {
+    useAuthMock.mockReturnValue({ profile: { id: 'staff-1', role: 'staff' } })
+    mockTables(seasonWithOneDive(new Date().getFullYear()))
+    renderPage()
+
+    expect(await screen.findAllByText('NTD 3,000')).not.toHaveLength(0)
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Download ZIP' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Email manifest' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the unattributed roster-gap block away from staff', async () => {
+    const season = seasonWithOneDive(new Date().getFullYear())
+    // Nobody rostered who can earn: the dive's takings belong to no one.
+    season.duties = [{ event_id: 'd1', assignee_id: 'staff-1', role: 'support' }]
+
+    useAuthMock.mockReturnValue({ profile: { id: 'admin-1', role: 'admin' } })
+    mockTables(season)
+    const view = renderPage()
+    fireEvent.click(screen.getByRole('tab', { name: 'Revenue' }))
+    expect(await screen.findByText('Unattributed')).toBeInTheDocument()
+    view.unmount()
+
+    useAuthMock.mockReturnValue({ profile: { id: 'staff-1', role: 'staff' } })
+    mockTables(season)
+    renderPage()
+    await waitFor(() => expect(screen.getByText(/no completed events/i)).toBeInTheDocument())
+    expect(screen.queryByText('Unattributed')).not.toBeInTheDocument()
   })
 })

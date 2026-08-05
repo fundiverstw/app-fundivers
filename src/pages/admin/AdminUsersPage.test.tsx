@@ -193,4 +193,34 @@ describe('AdminUsersPage role promotion', () => {
     })
     expect(document.getElementById('diver-admin-1')!.querySelector('select')).toBeNull()
   })
+
+  it('offers the paid-crew toggle on staff, not on divers', async () => {
+    const mixed = [
+      { id: 'u3', name: 'Cass', nickname: 'Cass', role: 'staff', email: 'c@x.io', logged_dives: 0, gear_owned: [], compensated: false },
+    ]
+    from.mockImplementation((table: string) =>
+      table === 'profiles' ? mockQueryBuilder({ data: mixed }) : mockQueryBuilder({ data: [] }),
+    )
+    renderAt('/admin/users?diver=u3')
+    expect(await screen.findByLabelText(t.admin.users.compensatedLabel)).not.toBeChecked()
+
+    from.mockImplementation((table: string) =>
+      table === 'profiles' ? mockQueryBuilder({ data: profiles }) : mockQueryBuilder({ data: [] }),
+    )
+    renderAt('/admin/users?diver=u1')
+    await screen.findByText('Ada')
+    expect(document.getElementById('diver-u1')!.querySelector('input[type="checkbox"]')).toBeNull()
+  })
+
+  it('writes the paid-crew flag back to the profile', async () => {
+    const update = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) })
+    const staff = [{ id: 'u3', name: 'Cass', nickname: 'Cass', role: 'staff', email: 'c@x.io', logged_dives: 0, gear_owned: [], compensated: false }]
+    from.mockImplementation((table: string) => {
+      if (table !== 'profiles') return mockQueryBuilder({ data: [] })
+      return Object.assign(mockQueryBuilder({ data: staff }), { update })
+    })
+    renderAt('/admin/users?diver=u3')
+    await userEvent.click(await screen.findByLabelText(t.admin.users.compensatedLabel))
+    await waitFor(() => expect(update).toHaveBeenCalledWith({ compensated: true }))
+  })
 })

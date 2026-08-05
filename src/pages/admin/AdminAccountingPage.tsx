@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { zipSync, strToU8 } from 'fflate'
 import { supabase } from '../../lib/supabase'
 import { siteConfig } from '../../config/site'
+import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
+import { StaffRevenuePanel } from '../../components/admin/StaffRevenuePanel'
 import { errorMessage } from '../../lib/errors'
 import { requestEventDiverExport } from '../../lib/admin-event-export'
 import { todayIso } from '../../lib/dates'
@@ -248,8 +250,33 @@ function WaiverExportSection() {
   )
 }
 
+function Tab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`px-3 py-1 rounded-full text-sm transition-colors ${
+        active
+          ? 'bg-brand-900 text-white font-semibold'
+          : 'bg-surface-100 text-brand-900 hover:bg-surface-200'
+      }`}
+    >
+      {label}
+    </button>
+  )
+}
+
+// Staff reach this page for the revenue tab only. The document exports below
+// are admin work — a fiscal-year ledger, the boat manifest, another diver's
+// signed waivers — so a staff viewer never gets the tab bar at all, just their
+// own figures.
 export function AdminAccountingPage() {
   const toast = useToast()
+  const { profile } = useAuth()
+  const isAdmin = profile?.role === 'admin'
+  const [tab, setTab] = useState<'exports' | 'revenue'>(isAdmin ? 'exports' : 'revenue')
   const thisYear = taipeiYear()
   const years = useMemo(
     () => Array.from({ length: 5 }, (_, i) => thisYear - i),
@@ -277,10 +304,27 @@ export function AdminAccountingPage() {
     }
   }
 
+  if (!isAdmin) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-8">
+        <h1 className="text-2xl font-bold text-white">{t.admin.revenue.titleSelf}</h1>
+        <StaffRevenuePanel selfOnlyPersonId={profile?.id ?? null} />
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-2xl mx-auto space-y-8">
       <h1 className="text-2xl font-bold text-white">{ac.title}</h1>
 
+      <div role="tablist" className="flex gap-2">
+        <Tab label={ac.tabExports} active={tab === 'exports'} onClick={() => setTab('exports')} />
+        <Tab label={ac.tabRevenue} active={tab === 'revenue'} onClick={() => setTab('revenue')} />
+      </div>
+
+      {tab === 'revenue' && <StaffRevenuePanel selfOnlyPersonId={null} />}
+
+      {tab === 'exports' && <>
       <section className="space-y-3">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-white/70">{ac.sectionAccounting}</h2>
         <p className="text-sm text-white/80">{ac.blurb(siteConfig.locale.timezone)}</p>
@@ -325,6 +369,7 @@ export function AdminAccountingPage() {
         <h2 className="text-xs font-semibold uppercase tracking-wider text-white/70">{ac.sectionWaivers}</h2>
         <WaiverExportSection />
       </section>
+      </>}
     </div>
   )
 }

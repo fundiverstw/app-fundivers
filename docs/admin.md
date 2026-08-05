@@ -18,6 +18,7 @@ admin):
 | `/admin/events`                         | `AdminEventsPage`       | Month view of every event with registration counts |
 | `/admin/events/:id`               | `AdminEventDetailPage`  | Registrants, memos, status controls for one event |
 | `/admin/events/:id/gear-map`      | `AdminGearMapPage`      | Per-registrant gear/sizing checklist for the event |
+| `/admin/accounting`                     | `AdminAccountingPage`   | Revenue by staff + document exports. Staff get the revenue tab only, scoped to themselves — see [Revenue by staff](#revenue-by-staff) |
 
 Write/manage routes — gated by `AdminRoute` (admin only):
 
@@ -242,6 +243,51 @@ them, and flip resolved when handled.
   Staff see plain text instead: the directory is admin-only, so the
   link would only bounce them.
 
+## Revenue by staff
+
+`/admin/accounting` carries two tabs: the document exports it always
+had, and **Revenue** — what each paid crew member generated over a
+season. Staff reach the same route and get only the revenue half,
+scoped to themselves; the page renders no tab bar and no exports for
+them, and `StaffRevenuePanel` narrows the fetch to the events they
+were actually rostered on.
+
+The attribution rule lives in `src/lib/staff-revenue.ts` (pure, and
+unit-tested against every branch):
+
+| Kind | instructor | guide | support |
+| --- | --- | --- | --- |
+| course (anything `isInstructorLed`) | earns | — | — |
+| dive / adventure | earns | earns | — |
+
+Two people who both qualify on one event split it evenly. Crew whose
+`profiles.compensated` is false — the owner, volunteer divemasters —
+keep their duty credit and stay on the roster but take no share, and
+are left out of the denominator, so a paid guide working alongside a
+volunteer is credited with the whole dive.
+
+Money is `netPaid` over the event's **confirmed** bookings: payments
+taken minus refunds, the same sum every other money surface uses. Not
+what the event was sold for — a deposit on a course that has not run
+is not revenue anyone has generated. Cancelled events drop out
+entirely; their money is a refund story the Audits page tells.
+
+Only events whose last day has passed count toward the season figure.
+Anything still to come is reported separately as a one-line note, so
+"what has this person generated" can't be inflated by a trip that
+hasn't happened.
+
+Events that took money with nobody rostered who could earn from them
+land in an **Unattributed** block, admin-only, listing the specific
+events so duties can be filled in retroactively. Without it the
+per-person columns would quietly fail to reconcile with what the shop
+actually took.
+
+`compensated` is set from the diver directory (a "Paid" checkbox on
+admin/staff cards) and is admin-managed in the database:
+`block_self_privileged_profile_change` rejects a non-admin changing it,
+alongside `role`, `status` and `parent_account`.
+
 ## Role-view toggle
 
 Admins can switch between diver and admin shells without logging out:
@@ -268,6 +314,9 @@ with their own test bookings.
 | Manage `EO_*` catalog (new/edit/rooms/addons/travel/prices) | no | no | yes |
 | Assign duties | no | no | yes |
 | Be assigned a duty (trigger gate) | no | yes | yes |
+| Read own revenue by season | no | yes | yes |
+| Read anyone's revenue / the unattributed bucket | no | no | yes |
+| Set `profiles.compensated` (trigger gate) | no | no | yes |
 | Send broadcast push | no | no | yes |
 
 The actual enforcement lives in RLS policies in the migrations

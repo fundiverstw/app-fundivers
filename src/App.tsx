@@ -141,6 +141,9 @@ export default function App() {
                 <Route path="/admin/events/:id" element={<AdminEventDetailPage />} />
                 <Route path="/admin/events/:id/gear-map" element={<AdminGearMapPage />} />
                 <Route path="/admin/logistics" element={<AdminLogisticsPage />} />
+                {/* Staff see only the revenue tab here — the document exports
+                    are admin work and the page hides them by role. */}
+                <Route path="/admin/accounting" element={<AdminAccountingPage />} />
               </Route>
             </Route>
             {/* Write/manage routes — admin only */}
@@ -159,7 +162,6 @@ export default function App() {
                 <Route path="/admin/applications" element={<AdminApplicationsPage />} />
                 <Route path="/admin/duty" element={<AdminDutyPage />} />
                 <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
-                <Route path="/admin/accounting" element={<AdminAccountingPage />} />
                 <Route path="/admin/packages" element={<AdminPackagesPage />} />
                 <Route path="/admin/scheduled-trips" element={<AdminScheduledTripsPage />} />
                 <Route path="/admin/trusted-partners" element={<AdminTrustedPartnersPage />} />
