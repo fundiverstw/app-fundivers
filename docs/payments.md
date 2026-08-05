@@ -172,7 +172,7 @@ in the group is stamped with `bookings.payer_id` = the lead (added in
 
 `netPaid` is also what the staff revenue report counts as revenue — a
 season's money split among the crew who instructed or guided each
-event. The rule, the `profiles.compensated` flag it leans on, and why
+event. The rule, how earners are inferred from the duty roster, and why
 booked-but-unpaid totals are deliberately excluded are documented in
 [admin.md](./admin.md#revenue-by-staff).
 

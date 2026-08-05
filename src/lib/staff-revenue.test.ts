@@ -32,9 +32,9 @@ function build(over: Partial<BuildStaffRevenueInput> = {}) {
     bookings: [],
     payments: [],
     people: [
-      { id: 'billy', name: 'Billy Evalt', nickname: 'Billy', compensated: true },
-      { id: 'dennis', name: 'Dennis Wong', nickname: 'Dennis', compensated: true },
-      { id: 'eric', name: 'Eric Odle', nickname: null, compensated: false },
+      { id: 'billy', name: 'Billy Evalt', nickname: 'Billy' },
+      { id: 'dennis', name: 'Dennis Wong', nickname: 'Dennis' },
+      { id: 'eric', name: 'Eric Odle', nickname: null },
     ],
     ...over,
   })
@@ -139,7 +139,7 @@ describe('buildStaffRevenue attribution', () => {
     expect(r.people.map(p => p.completed.collected)).toEqual([6200, 6200])
   })
 
-  it('excludes uncompensated crew from the denominator entirely', () => {
+  it('splits between every rostered guide — who is paid is not the app\u2019s to know', () => {
     const s = sale('b1', 'd1', 13200)
     const r = build({
       events: [dive()],
@@ -150,9 +150,7 @@ describe('buildStaffRevenue attribution', () => {
       bookings: [s.booking],
       payments: [s.payment],
     })
-    expect(r.people).toHaveLength(1)
-    expect(r.people[0].personId).toBe('billy')
-    expect(r.people[0].completed.collected).toBe(13200)
+    expect(r.people.map(p => p.completed.collected)).toEqual([6600, 6600])
     expect(r.unattributed.collected).toBe(0)
   })
 
@@ -174,16 +172,19 @@ describe('buildStaffRevenue attribution', () => {
     expect(r.unattributed.events).toHaveLength(0)
   })
 
-  it('counts a whole dive as unattributed when only uncompensated crew led it', () => {
+  it('credits a guide the app has never been told anything about', () => {
+    // Attribution keys off the duty roster, not a roster of known people, so a
+    // crew member missing from `people` still earns — they just show by id.
     const s = sale('b1', 'd1', 5000)
     const r = build({
       events: [dive()],
-      duties: [{ event_id: 'd1', assignee_id: 'eric', role: 'guide' }],
+      duties: [{ event_id: 'd1', assignee_id: 'stranger', role: 'guide' }],
       bookings: [s.booking],
       payments: [s.payment],
     })
-    expect(r.people).toHaveLength(0)
-    expect(r.unattributed.collected).toBe(5000)
+    expect(r.people).toHaveLength(1)
+    expect(r.people[0].personId).toBe('stranger')
+    expect(r.unattributed.collected).toBe(0)
   })
 })
 
@@ -365,8 +366,8 @@ describe('buildStaffRevenue breakdowns', () => {
     const b = sale('b2', 'd2', 100)
     const r = build({
       people: [
-        { id: 'billy', name: 'Billy Evalt', nickname: 'Billy', compensated: true },
-        { id: 'wessel', name: 'Wessel Jacobus Herbst', nickname: null, compensated: true },
+        { id: 'billy', name: 'Billy Evalt', nickname: 'Billy' },
+        { id: 'wessel', name: 'Wessel Jacobus Herbst', nickname: null },
       ],
       events: [dive(), dive({ id: 'd2' })],
       duties: [

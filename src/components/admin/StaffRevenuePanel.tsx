@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { siteConfig } from '../../config/site'
 import { errorMessage } from '../../lib/errors'
 import { todayIso } from '../../lib/dates'
-import { BTN_XS_BASE } from '../../styles/tokens'
+import { BTN_XS_BASE, ERROR_NOTE_LIGHT } from '../../styles/tokens'
 import { EVENT_KIND_LABELS } from '../../lib/event-kind-labels'
 import {
   buildStaffRevenue,
@@ -21,6 +21,7 @@ import { t } from '../../i18n'
 const r = t.admin.revenue
 const CUR = siteConfig.locale.currencyLabel
 const EVENT_COLUMNS = 'id, kind, admin_title, display_title, start_date, end_date, course_days, cancelled_at'
+const FIELD = 'w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900'
 
 function money(n: number): string {
   return `${CUR} ${Math.round(n).toLocaleString()}`
@@ -80,7 +81,7 @@ async function loadSeason(
   const [dutyRes, bookingRes, peopleRes] = await Promise.all([
     supabase.from('duties').select('event_id, assignee_id, role').in('event_id', eventIds),
     supabase.from('bookings').select('id, event_id, status').in('event_id', eventIds).eq('status', 'confirmed'),
-    supabase.from('profiles').select('id, name, nickname, compensated').in('role', ['admin', 'staff']),
+    supabase.from('profiles').select('id, name, nickname').in('role', ['admin', 'staff']),
   ])
   if (dutyRes.error) throw dutyRes.error
   if (bookingRes.error) throw bookingRes.error
@@ -208,18 +209,30 @@ export function StaffRevenuePanel({ selfOnlyPersonId }: StaffRevenuePanelProps) 
   const years = useMemo(() => Array.from({ length: 5 }, (_, i) => thisYear - i), [thisYear])
   const [season, setSeason] = useState(thisYear)
   const [openPersonId, setOpenPersonId] = useState<string | null>(null)
+  /** Admin crew filter: '' shows the whole-crew comparison, an id narrows to
+   *  one person's season. */
+  const [pickedPersonId, setPickedPersonId] = useState('')
   // One state slot stamped with the fetch it answers, rather than separate
   // report/error/loading flags reset at the top of the effect. Loading is then
   // "the answer I hold is not for the season I'm showing", which is true from
   // the first render and needs no synchronous setState inside the effect.
-  const [answer, setAnswer] = useState<{ key: string; report?: StaffRevenueReport; error?: string } | null>(null)
+  const [answer, setAnswer] = useState<{
+    key: string
+    report?: StaffRevenueReport
+    /** Every admin/staff profile, not just those with attributed revenue —
+     *  the crew picker has to offer someone before you can discover they
+     *  earned nothing this season. */
+    roster?: RevenuePerson[]
+    error?: string
+  } | null>(null)
   const key = `${season}|${selfOnlyPersonId ?? ''}`
 
   useEffect(() => {
     let cancelled = false
     loadSeason(season, selfOnlyPersonId)
       .then(input => {
-        if (!cancelled) setAnswer({ key, report: buildStaffRevenue({ season, today: todayIso(), ...input }) })
+        if (cancelled) return
+        setAnswer({ key, roster: input.people, report: buildStaffRevenue({ season, today: todayIso(), ...input }) })
       })
       .catch(err => { if (!cancelled) setAnswer({ key, error: errorMessage(err) }) })
     return () => { cancelled = true }
@@ -234,34 +247,60 @@ export function StaffRevenuePanel({ selfOnlyPersonId }: StaffRevenuePanelProps) 
     ? (selfOnlyPersonId ? report.people.filter(p => p.personId === selfOnlyPersonId) : report.people)
     : []
   const self = selfOnlyPersonId ? people[0] ?? null : null
-  const nobodyPaid = !!report && !report.people.length && !report.unattributed.events.length
+  const roster = [...(current?.roster ?? [])].sort((a, b) =>
+    (a.nickname || a.name || '').localeCompare(b.nickname || b.name || ''))
+  const picked = pickedPersonId ? people.find(p => p.personId === pickedPersonId) ?? null : null
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-white/80">{selfOnlyPersonId ? r.blurbSelf : r.blurb}</p>
 
       <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-4">
-        <label className="block space-y-1">
-          <span className="text-xs font-medium text-brand-900">{r.season}</span>
-          <select
-            value={season}
-            onChange={e => { setSeason(Number(e.target.value)); setOpenPersonId(null) }}
-            className="w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
-          >
-            {years.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-        </label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block space-y-1">
+            <span className="text-xs font-medium text-brand-900">{r.season}</span>
+            <select
+              value={season}
+              onChange={e => { setSeason(Number(e.target.value)); setOpenPersonId(null) }}
+              className={FIELD}
+            >
+              {years.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </label>
+
+          {/* Crew picker, admin only. The comparison table doubles as a
+              selector — click a name to expand it — but that is invisible when
+              a season has no attributed revenue yet, which is exactly when an
+              admin goes looking for a particular person. */}
+          {!selfOnlyPersonId && (
+            <label className="block space-y-1">
+              <span className="text-xs font-medium text-brand-900">{r.crew}</span>
+              <select
+                value={pickedPersonId}
+                onChange={e => { setPickedPersonId(e.target.value); setOpenPersonId(null) }}
+                className={FIELD}
+              >
+                <option value="">{r.allCrew}</option>
+                {roster.map(p => (
+                  <option key={p.id} value={p.id}>{p.nickname || p.name || p.id}</option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
 
         {loading && <p className="text-sm text-brand-900/70">{r.loading}</p>}
-        {error && <p className="text-sm text-red-700">{r.failed(error)}</p>}
+        {error && <p className={ERROR_NOTE_LIGHT}>{r.failed(error)}</p>}
 
         {!loading && !error && report && (
           selfOnlyPersonId ? (
             self
               ? <PersonBreakdown person={self} />
               : <p className="text-sm text-brand-900/70">{r.emptySelf}</p>
-          ) : nobodyPaid ? (
-            <p className="text-sm text-brand-900/70">{r.noCompensated}</p>
+          ) : pickedPersonId ? (
+            picked
+              ? <PersonBreakdown person={picked} />
+              : <p className="text-sm text-brand-900/70">{r.emptyPerson}</p>
           ) : !people.length ? (
             <p className="text-sm text-brand-900/70">{r.empty}</p>
           ) : (

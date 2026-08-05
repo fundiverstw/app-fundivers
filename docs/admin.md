@@ -260,11 +260,15 @@ unit-tested against every branch):
 | course (anything `isInstructorLed`) | earns | — | — |
 | dive / adventure | earns | earns | — |
 
-Two people who both qualify on one event split it evenly. Crew whose
-`profiles.compensated` is false — the owner, volunteer divemasters —
-keep their duty credit and stay on the roster but take no share, and
-are left out of the denominator, so a paid guide working alongside a
-volunteer is credited with the whole dive.
+Two people who both qualify on one event split it evenly.
+
+Who the shop actually *pays* is not recorded anywhere, and deliberately
+so: attribution is inferred from the duty roster, so anyone rostered in
+an earning role shares the event. A `compensated`-style flag was tried
+and dropped — it starts false for every existing profile, and a report
+that silently attributes nothing looks exactly like a report with
+nothing to attribute. The shop applies its own knowledge of who is on
+the payroll when reading the numbers.
 
 Money is `netPaid` over the event's **confirmed** bookings: payments
 taken minus refunds, the same sum every other money surface uses. Not
@@ -283,10 +287,16 @@ events so duties can be filled in retroactively. Without it the
 per-person columns would quietly fail to reconcile with what the shop
 actually took.
 
-`compensated` is set from the diver directory (a "Paid" checkbox on
-admin/staff cards) and is admin-managed in the database:
-`block_self_privileged_profile_change` rejects a non-admin changing it,
-alongside `role`, `status` and `parent_account`.
+An admin gets a **crew picker** beside the season picker: "All crew"
+shows the comparison table (click a name to expand it in place), or
+pick one person for their season alone. The picker lists every
+admin/staff profile, not only those with revenue — you have to be able
+to select someone before you can learn they earned nothing.
+
+Reachable from **Business performance** (`/admin/dashboard`), which
+links to it beside the historical-perspective link, and from the
+Manage hub. Staff get it as a nav item, since the dashboard is
+admin-only.
 
 ## Role-view toggle
 
@@ -316,7 +326,6 @@ with their own test bookings.
 | Be assigned a duty (trigger gate) | no | yes | yes |
 | Read own revenue by season | no | yes | yes |
 | Read anyone's revenue / the unattributed bucket | no | no | yes |
-| Set `profiles.compensated` (trigger gate) | no | no | yes |
 | Send broadcast push | no | no | yes |
 
 The actual enforcement lives in RLS policies in the migrations

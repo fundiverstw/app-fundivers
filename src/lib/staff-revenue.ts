@@ -13,11 +13,11 @@
 //   - When two people qualify on the same event -- a course big enough to
 //     split between instructors, a dive needing a second guide -- they split
 //     its revenue evenly.
-//   - Crew who are not compensated at all (the owner, volunteer divemasters)
-//     keep their duty credit but take no share, and are left out of the
-//     denominator. Counting them would silently dilute every paid guide's
-//     share of every dive they were on, with nothing about the result looking
-//     wrong.
+//
+// Who is paid is inferred from the roster rather than recorded: anyone rostered
+// in an earning role shares the event. The shop knows which of its crew it
+// actually pays; the app does not need to, and a flag nobody maintains would
+// be worse than no flag at all.
 //
 // Revenue is money actually received -- `paid` minus `refunded` across the
 // event's confirmed bookings, via netPaidByBooking, the same sum every other
@@ -60,7 +60,6 @@ export interface RevenuePerson {
   id: string
   name: string | null
   nickname: string | null
-  compensated: boolean
 }
 
 /** True when someone working `role` on a `kind` event earns a share of it. */
@@ -87,7 +86,7 @@ export interface EventRevenue {
   students: number
   /** Net collected across the event's confirmed bookings. */
   collected: number
-  /** Compensated crew who earn from this event. */
+  /** Crew rostered in a role that earns from this event. */
   earnerIds: string[]
   /** collected / earnerIds.length — one person's cut. Zero when nobody earns. */
   share: number
@@ -209,8 +208,7 @@ export function buildStaffRevenue(input: BuildStaffRevenueInput): StaffRevenueRe
     const earnerIds = [...new Set(
       (dutiesByEvent.get(e.id) ?? [])
         .filter(d => earnsRevenue(e.kind, d.role))
-        .map(d => d.assignee_id)
-        .filter(id => personById.get(id)?.compensated),
+        .map(d => d.assignee_id),
     )].sort()
 
     const row: EventRevenue = {
@@ -279,7 +277,7 @@ export function buildStaffRevenue(input: BuildStaffRevenueInput): StaffRevenueRe
 
     return {
       personId,
-      name: displayName(personById.get(personId) ?? { id: personId, name: null, nickname: null, compensated: true }),
+      name: displayName(personById.get(personId) ?? { id: personId, name: null, nickname: null }),
       months: [...months.values()].sort((a, b) => a.month.localeCompare(b.month)),
       categories: [...categories.values()].sort(
         (a, b) => a.kind.localeCompare(b.kind) || a.category.localeCompare(b.category),

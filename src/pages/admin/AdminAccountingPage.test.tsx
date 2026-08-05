@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { AdminAccountingPage } from './AdminAccountingPage'
 import { siteConfig } from '../../config/site'
@@ -105,13 +105,13 @@ describe('AdminAccountingPage', () => {
   })
 })
 
-// One dive in the current season, guided by a paid staff member and a
-// volunteer, with a single confirmed booking paid in full.
+// One dive in the current season with two rostered guides and a single
+// confirmed booking paid in full — so the takings split evenly between them.
 function seasonWithOneDive(year: number) {
   return {
     duties: [
       { event_id: 'd1', assignee_id: 'staff-1', role: 'guide' },
-      { event_id: 'd1', assignee_id: 'vol-1', role: 'guide' },
+      { event_id: 'd1', assignee_id: 'staff-2', role: 'guide' },
     ],
     events: [{
       id: 'd1', kind: 'dive', admin_title: 'Bat Cave', display_title: null,
@@ -120,8 +120,8 @@ function seasonWithOneDive(year: number) {
     bookings: [{ id: 'b1', event_id: 'd1', status: 'confirmed' }],
     payments: [{ booking_id: 'b1', status: 'paid', amount: 3000 }],
     profiles: [
-      { id: 'staff-1', name: 'Sam Reef', nickname: 'Sam', compensated: true },
-      { id: 'vol-1', name: 'Val Kelp', nickname: 'Val', compensated: false },
+      { id: 'staff-1', name: 'Sam Reef', nickname: 'Sam' },
+      { id: 'staff-2', name: 'Val Kelp', nickname: 'Val' },
     ],
   }
 }
@@ -132,10 +132,41 @@ describe('AdminAccountingPage revenue tab', () => {
     renderPage()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Revenue' }))
-    // The volunteer is out of the split, so the paid guide keeps the lot.
-    expect(await screen.findByText('Sam')).toBeInTheDocument()
-    expect(screen.getByText(`${siteConfig.locale.currencyLabel} 3,000`)).toBeInTheDocument()
-    expect(screen.queryByText('Val')).not.toBeInTheDocument()
+    // Two rostered guides, so the dive's takings halve between them. Scoped to
+    // the table — the crew picker lists the same names as <option>s.
+    const table = within(await screen.findByRole('table'))
+    expect(table.getByText('Sam')).toBeInTheDocument()
+    expect(table.getByText('Val')).toBeInTheDocument()
+    expect(table.getAllByText(`${siteConfig.locale.currencyLabel} 1,500`)).toHaveLength(2)
+  })
+
+  it('lets an admin pick one crew member out of the comparison', async () => {
+    mockTables(seasonWithOneDive(new Date().getFullYear()))
+    renderPage()
+    fireEvent.click(screen.getByRole('tab', { name: 'Revenue' }))
+
+    const crew = await screen.findByLabelText('Crew')
+    // Every admin/staff profile is offered, not only those with revenue.
+    expect(within(crew).getAllByRole('option').map(o => o.textContent))
+      .toEqual(['All crew', 'Sam', 'Val'])
+
+    fireEvent.change(crew, { target: { value: 'staff-1' } })
+    // Narrowed to one person: their month breakdown replaces the crew table,
+    // so Val survives only as an option in the picker.
+    expect(await screen.findByText('By month')).toBeInTheDocument()
+    expect(screen.getAllByText('Val')).toHaveLength(1)
+    expect(screen.getByText('Val').tagName).toBe('OPTION')
+  })
+
+  it('says so plainly when the picked person earned nothing that season', async () => {
+    const season = seasonWithOneDive(new Date().getFullYear())
+    season.profiles.push({ id: 'staff-3', name: 'Nia Shoal', nickname: 'Nia' })
+    mockTables(season)
+    renderPage()
+    fireEvent.click(screen.getByRole('tab', { name: 'Revenue' }))
+
+    fireEvent.change(await screen.findByLabelText('Crew'), { target: { value: 'staff-3' } })
+    expect(await screen.findByText(/Nothing attributed to this person/)).toBeInTheDocument()
   })
 
   it('gives a staff viewer their own figures and no tabs or exports', async () => {
@@ -143,7 +174,7 @@ describe('AdminAccountingPage revenue tab', () => {
     mockTables(seasonWithOneDive(new Date().getFullYear()))
     renderPage()
 
-    expect(await screen.findAllByText(`${siteConfig.locale.currencyLabel} 3,000`)).not.toHaveLength(0)
+    expect(await screen.findAllByText(`${siteConfig.locale.currencyLabel} 1,500`)).not.toHaveLength(0)
     expect(screen.queryByRole('tab')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Download ZIP' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Email manifest' })).not.toBeInTheDocument()

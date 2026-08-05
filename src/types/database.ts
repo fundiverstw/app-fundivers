@@ -494,11 +494,6 @@ export interface Database {
            *  One-level only — enforced by the trg_profiles_one_level_family
            *  trigger (20260514030000_parent_child_accounts.sql). */
           parent_account: string | null
-          /** True when this person is paid for duty work. Only meaningful for
-           *  admin/staff. Drives the split denominator in staff revenue
-           *  attribution — see src/lib/staff-revenue.ts. Admin-managed:
-           *  block_self_privileged_profile_change rejects a self-update. */
-          compensated: boolean
         }
         Insert: {
           id: string
@@ -536,7 +531,6 @@ export interface Database {
           gear_owned?: string[]
           status?: 'pending' | 'active' | 'rejected'
           parent_account?: string | null
-          compensated?: boolean
         }
         Update: {
           id?: string
@@ -573,7 +567,6 @@ export interface Database {
           gear_owned?: string[]
           status?: 'pending' | 'active' | 'rejected'
           parent_account?: string | null
-          compensated?: boolean
         }
         Relationships: []
       }

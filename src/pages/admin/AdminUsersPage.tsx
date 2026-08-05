@@ -372,24 +372,6 @@ export function AdminUsersPage() {
     }
   }
 
-  // Mark whether the shop pays this person for duty work. Drives the split
-  // denominator in staff revenue attribution — uncompensated crew keep their
-  // duty credit but take no share, so a paid guide working alongside a
-  // volunteer is credited with the whole dive. Offered for self too: an admin
-  // who instructs is usually paid, and block_self_privileged_profile_change
-  // waves admins through while still blocking a staff member's self-update.
-  async function handleChangeCompensated(target: Profile, compensated: boolean) {
-    const name = target.name || target.nickname || target.contact_id || target.id
-    try {
-      const { error } = await supabase.from('profiles').update({ compensated }).eq('id', target.id)
-      if (error) throw error
-      setUsers(prev => prev.map(u => (u.id === target.id ? { ...u, compensated } : u)))
-      toast.success(compensated ? us.compensatedOn(name) : us.compensatedOff(name))
-    } catch (err) {
-      toast.error(us.couldNotChangeCompensated(errorMessage(err)))
-    }
-  }
-
   // Issue a temporary password for a diver and hand the plaintext back to the
   // card so the admin can relay it. The password is generated + set entirely
   // server-side (admin-set-temp-password edge function); we never see or store
@@ -502,7 +484,6 @@ export function AdminUsersPage() {
             onReopenCredit={(creditId) => handleReopenCredit(u.id, creditId)}
             onDelete={() => handleDeleteUser(u)}
             onChangeRole={(role) => handleChangeRole(u, role)}
-            onChangeCompensated={(paid) => handleChangeCompensated(u, paid)}
             onIssueTempPassword={() => handleIssueTempPassword(u)}
             isAdmin={isAdmin}
             isSelf={profile?.id === u.id}
@@ -521,7 +502,7 @@ export function AdminUsersPage() {
 
 function UserCard({
   user, allUsers, onFamilyChanged, open, extras, loading, editing, onToggle, onEdit, onCancelEdit, onProfileSaved,
-  onRecordPayment, onVoidPayment, onMarkDepositPaid, onCreateCredit, onApplyCredit, onSettleCredit, onReopenCredit, onDelete, onChangeRole, onChangeCompensated, onIssueTempPassword, isAdmin, isSelf,
+  onRecordPayment, onVoidPayment, onMarkDepositPaid, onCreateCredit, onApplyCredit, onSettleCredit, onReopenCredit, onDelete, onChangeRole, onIssueTempPassword, isAdmin, isSelf,
 }: {
   user: Profile
   allUsers: Profile[]
@@ -543,7 +524,6 @@ function UserCard({
   onReopenCredit: (creditId: string) => Promise<void>
   onDelete: () => Promise<void>
   onChangeRole: (role: Profile['role']) => Promise<void>
-  onChangeCompensated: (compensated: boolean) => Promise<void>
   onIssueTempPassword: () => Promise<string>
   isAdmin: boolean
   isSelf: boolean
@@ -659,17 +639,6 @@ function UserCard({
                       <option value="staff">{us.roleNames.staff}</option>
                       <option value="admin">{us.roleNames.admin}</option>
                     </select>
-                  </label>
-                )}
-                {isAdmin && user.role !== 'diver' && (
-                  <label className="flex items-center gap-1.5 text-xs text-brand-700" title={us.compensatedHint}>
-                    <input
-                      type="checkbox"
-                      checked={user.compensated}
-                      onChange={e => onChangeCompensated(e.target.checked)}
-                      className="accent-brand-900"
-                    />
-                    {us.compensatedLabel}
                   </label>
                 )}
                 {isAdmin && !isSelf && (
