@@ -121,7 +121,7 @@ function PersonBreakdown({ person }: { person: PersonRevenue }) {
             <col className="w-[6.5rem]" />
           </colgroup>
           <thead>
-            <tr className="text-left text-xs text-brand-900/60">
+            <tr className="text-left text-xs text-brand-900/70">
               <th className="py-1 pr-3 font-medium">{r.colMonth}</th>
               <th className="py-1 pr-3 font-medium text-right">{r.colCourses}</th>
               <th className="py-1 pr-3 font-medium text-right">{r.colDives}</th>
@@ -150,7 +150,7 @@ function PersonBreakdown({ person }: { person: PersonRevenue }) {
             <li key={`${c.kind}:${c.category}`} className="flex justify-between gap-3 border-t border-surface-200 py-1">
               <span>
                 {c.category || EVENT_KIND_LABELS[c.kind]}
-                <span className="text-brand-900/60"> · {c.events} · {c.students}</span>
+                <span className="text-brand-900/70"> · {c.events} · {c.students}</span>
               </span>
               <span className="tabular-nums font-semibold">{money(c.collected)}</span>
             </li>
@@ -312,7 +312,7 @@ export function StaffRevenuePanel({ selfOnlyPersonId }: StaffRevenuePanelProps) 
                 <col className="w-[6.5rem]" />
               </colgroup>
               <thead>
-                <tr className="text-left text-xs text-brand-900/60">
+                <tr className="text-left text-xs text-brand-900/70">
                   <th className="py-1 pr-3 font-medium">{r.colPerson}</th>
                   <th className="py-1 pr-3 font-medium text-right">{r.colEvents}</th>
                   <th className="py-1 pr-3 font-medium text-right">{r.colStudents}</th>
