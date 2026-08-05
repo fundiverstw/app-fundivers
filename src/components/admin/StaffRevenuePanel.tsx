@@ -8,11 +8,11 @@ import { BTN_XS_BASE, ERROR_NOTE_LIGHT } from '../../styles/tokens'
 import { EVENT_KIND_LABELS } from '../../lib/event-kind-labels'
 import {
   buildStaffRevenue,
+  type EventRevenue,
   type PersonRevenue,
   type RevenueBooking,
   type RevenueDuty,
   type RevenueEvent,
-  type RevenuePayment,
   type RevenuePerson,
   type StaffRevenueReport,
 } from '../../lib/staff-revenue'
@@ -20,8 +20,12 @@ import { t } from '../../i18n'
 
 const r = t.admin.revenue
 const CUR = siteConfig.locale.currencyLabel
-const EVENT_COLUMNS = 'id, kind, admin_title, display_title, start_date, end_date, course_days, cancelled_at'
+const EVENT_COLUMNS = 'id, kind, admin_title, display_title, start_date, end_date, course_days, cancelled_at, price'
 const FIELD = 'w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900'
+
+/** An `events` row as selected above: RevenueEvent plus the price FK we
+ *  resolve to a per-head figure before handing it to the lib. */
+type EventRow = Omit<RevenueEvent, 'base_price'> & { price: string | null }
 
 function money(n: number): string {
   return `${CUR} ${Math.round(n).toLocaleString()}`
@@ -31,11 +35,11 @@ function money(n: number): string {
  * Load everything buildStaffRevenue needs for one season.
  *
  * `scopeToPersonId` is set for a staff viewer, and narrows the fetch to the
- * events they were actually on — not just the display. RLS lets staff read the
- * whole payments ledger, so this is not a security boundary, but there is no
- * reason to pull the shop's entire book of business into a guide's browser to
- * render their own five rows. Co-crew duties on those same events still come
- * back, because the split denominator needs them.
+ * events they were actually on — not just the display. RLS lets staff read
+ * every booking, so this is not a security boundary, but there is no reason to
+ * pull the shop's entire book of business into a guide's browser to render
+ * their own five rows. Co-crew duties on those same events still come back,
+ * because the split denominator needs them.
  */
 async function loadSeason(
   season: number,
@@ -44,13 +48,12 @@ async function loadSeason(
   events: RevenueEvent[]
   duties: RevenueDuty[]
   bookings: RevenueBooking[]
-  payments: RevenuePayment[]
   people: RevenuePerson[]
 }> {
   const jan1 = `${season}-01-01`
   const dec31 = `${season}-12-31`
 
-  let events: RevenueEvent[]
+  let rows: EventRow[]
   if (scopeToPersonId) {
     const { data: mine, error } = await supabase
       .from('duties')
@@ -59,10 +62,10 @@ async function loadSeason(
       .not('event_id', 'is', null)
     if (error) throw error
     const ids = [...new Set((mine ?? []).map(d => d.event_id).filter((x): x is string => !!x))]
-    if (!ids.length) return { events: [], duties: [], bookings: [], payments: [], people: [] }
+    if (!ids.length) return { events: [], duties: [], bookings: [], people: [] }
     const { data, error: evErr } = await supabase.from('events').select(EVENT_COLUMNS).in('id', ids)
     if (evErr) throw evErr
-    events = (data ?? []) as RevenueEvent[]
+    rows = (data ?? []) as EventRow[]
   } else {
     // Kinds on the date envelope carry start_date, so the season filter lands
     // in the query and keeps the bulk of the table out of the response.
@@ -72,95 +75,155 @@ async function loadSeason(
     const { data, error } = await supabase.from('events').select(EVENT_COLUMNS)
       .or(`and(start_date.gte.${jan1},start_date.lte.${dec31}),course_days.not.is.null`)
     if (error) throw error
-    events = (data ?? []) as RevenueEvent[]
+    rows = (data ?? []) as EventRow[]
   }
 
-  const eventIds = events.map(e => e.id)
-  if (!eventIds.length) return { events, duties: [], bookings: [], payments: [], people: [] }
+  const eventIds = rows.map(e => e.id)
+  if (!eventIds.length) return { events: [], duties: [], bookings: [], people: [] }
 
-  const [dutyRes, bookingRes, peopleRes] = await Promise.all([
+  const priceIds = [...new Set(rows.map(e => e.price).filter((x): x is string => !!x))]
+  const [dutyRes, bookingRes, peopleRes, priceRes] = await Promise.all([
     supabase.from('duties').select('event_id, assignee_id, role').in('event_id', eventIds),
-    supabase.from('bookings').select('id, event_id, status').in('event_id', eventIds).eq('status', 'confirmed'),
+    supabase.from('bookings').select('id, event_id, status, details').in('event_id', eventIds).eq('status', 'confirmed'),
     supabase.from('profiles').select('id, name, nickname').in('role', ['admin', 'staff']),
+    priceIds.length
+      ? supabase.from('prices').select('id, starting_at').in('id', priceIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; starting_at: number | null }>, error: null }),
   ])
   if (dutyRes.error) throw dutyRes.error
   if (bookingRes.error) throw bookingRes.error
   if (peopleRes.error) throw peopleRes.error
+  if (priceRes.error) throw priceRes.error
 
-  const bookings = (bookingRes.data ?? []) as RevenueBooking[]
-  const bookingIds = bookings.map(b => b.id)
-  const payRes = bookingIds.length
-    ? await supabase.from('payments').select('booking_id, status, amount').in('booking_id', bookingIds)
-    : { data: [], error: null }
-  if (payRes.error) throw payRes.error
+  // The catalogue price only backstops bookings taken before charges were
+  // snapshotted; a booking with its own base line never consults it.
+  const priceById = new Map((priceRes.data ?? []).map(p => [p.id, Number(p.starting_at) || 0]))
 
   return {
-    events,
+    events: rows.map(({ price, ...e }) => ({ ...e, base_price: price ? priceById.get(price) ?? null : null })),
     duties: (dutyRes.data ?? []) as RevenueDuty[],
-    bookings,
-    payments: (payRes.data ?? []).map(p => ({ ...p, amount: Number(p.amount) || 0 })) as RevenuePayment[],
+    bookings: (bookingRes.data ?? []) as RevenueBooking[],
     people: (peopleRes.data ?? []) as RevenuePerson[],
   }
 }
 
+/** One event line inside an expanded month or type group. */
+function EventLine({ e }: { e: EventRevenue }) {
+  return (
+    <li className="flex justify-between gap-3 border-t border-surface-100 py-1 text-xs">
+      <span className="min-w-0">
+        <Link to={`/admin/events/${e.eventId}`} className="underline hover:no-underline">{e.title}</Link>
+        <span className="text-brand-900/70"> · {e.firstDay} · {r.headCount(e.students)}</span>
+      </span>
+      <span className="tabular-nums shrink-0">{money(e.share)}</span>
+    </li>
+  )
+}
+
 function PersonBreakdown({ person }: { person: PersonRevenue }) {
+  const [openMonth, setOpenMonth] = useState<string | null>(null)
+  const [openGroup, setOpenGroup] = useState<'taught' | 'led' | null>(null)
+
   return (
     <div className="space-y-4">
       <div className="space-y-1">
         <h4 className="text-xs font-semibold uppercase tracking-wider text-brand-900/70">{r.breakdownMonths}</h4>
-        {/* table-fixed rather than a min-width scroll container: five short
+        {/* table-fixed rather than a min-width scroll container: four short
             columns fit the narrowest phone once the numerics stop claiming
             their natural width, and a table that fits beats one that scrolls
-            sideways inside a card. */}
+            sideways inside a card. The count columns are wide enough for their
+            own headers — at 3.2rem "Courses" wrapped onto a second line. */}
         <table className="w-full table-fixed text-sm text-brand-900">
+          {/* Every label column is sized to its own header; the money column
+              is the auto one, so table-fixed hands it the slack instead of
+              starving "Month" or wrapping "Courses". */}
           <colgroup>
+            <col className="w-[3.6rem]" />
+            <col className="w-[3.8rem]" />
+            <col className="w-[2.9rem]" />
             <col />
-            <col className="w-[3.2rem]" />
-            <col className="w-[3.2rem]" />
-            <col className="w-[3.2rem]" />
-            <col className="w-[6.5rem]" />
           </colgroup>
           <thead>
             <tr className="text-left text-xs text-brand-900/70">
-              <th className="py-1 pr-3 font-medium">{r.colMonth}</th>
-              <th className="py-1 pr-3 font-medium text-right">{r.colCourses}</th>
-              <th className="py-1 pr-3 font-medium text-right">{r.colDives}</th>
-              <th className="py-1 pr-3 font-medium text-right">{r.colStudents}</th>
-              <th className="py-1 font-medium text-right">{r.colCollected}</th>
+              <th className="py-1 pr-2 font-medium">{r.colMonth}</th>
+              <th className="py-1 pr-2 font-medium text-right">{r.colCourses}</th>
+              <th className="py-1 pr-2 font-medium text-right">{r.colDives}</th>
+              <th className="py-1 font-medium text-right">{r.colRevenue}</th>
             </tr>
           </thead>
           <tbody>
-            {person.months.map(m => (
-              <tr key={m.month} className="border-t border-surface-200">
-                <td className="py-1 pr-3">{m.month}</td>
-                <td className="py-1 pr-3 text-right tabular-nums">{m.taughtEvents}</td>
-                <td className="py-1 pr-3 text-right tabular-nums">{m.ledEvents}</td>
-                <td className="py-1 pr-3 text-right tabular-nums">{m.students}</td>
-                <td className="py-1 text-right tabular-nums font-semibold">{money(m.collected)}</td>
-              </tr>
-            ))}
+            {person.months.map(m => {
+              const open = openMonth === m.month
+              return (
+                <Fragment key={m.month}>
+                  <tr className="border-t border-surface-200">
+                    <td className="py-1 pr-2">
+                      <button type="button"
+                        onClick={() => setOpenMonth(id => id === m.month ? null : m.month)}
+                        aria-expanded={open}
+                        className="underline decoration-dotted hover:no-underline">
+                        {m.month}
+                      </button>
+                    </td>
+                    <td className="py-1 pr-2 text-right tabular-nums">{m.taughtEvents}</td>
+                    <td className="py-1 pr-2 text-right tabular-nums">{m.ledEvents}</td>
+                    <td className="py-1 text-right tabular-nums font-semibold">{money(m.revenue)}</td>
+                  </tr>
+                  {open && (
+                    <tr>
+                      <td colSpan={4} className="pb-2">
+                        <ul>{m.events.map(e => <EventLine key={e.eventId} e={e} />)}</ul>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              )
+            })}
           </tbody>
         </table>
       </div>
 
       <div className="space-y-1">
         <h4 className="text-xs font-semibold uppercase tracking-wider text-brand-900/70">{r.breakdownTypes}</h4>
-        <ul className="text-sm text-brand-900 space-y-0.5">
-          {person.categories.map(c => (
-            <li key={`${c.kind}:${c.category}`} className="flex justify-between gap-3 border-t border-surface-200 py-1">
-              <span>
-                {c.category || EVENT_KIND_LABELS[c.kind]}
-                <span className="text-brand-900/70"> · {c.events} · {c.students}</span>
-              </span>
-              <span className="tabular-nums font-semibold">{money(c.collected)}</span>
-            </li>
-          ))}
+        <ul className="text-sm text-brand-900">
+          {person.groups.map(g => {
+            const key = g.taught ? 'taught' : 'led'
+            const open = openGroup === key
+            return (
+              <li key={key} className="border-t border-surface-200">
+                <button type="button"
+                  onClick={() => setOpenGroup(k => k === key ? null : key)}
+                  aria-expanded={open}
+                  className="flex w-full justify-between gap-3 py-1 text-left">
+                  <span className="underline decoration-dotted">
+                    {g.taught ? r.groupCourses : r.groupDives}
+                    <span className="text-brand-900/70"> · {r.eventCount(g.events)}</span>
+                  </span>
+                  <span className="tabular-nums font-semibold">{money(g.revenue)}</span>
+                </button>
+                {open && (
+                  <ul className="pb-2 pl-3">
+                    {g.categories.map(c => (
+                      <li key={`${c.kind}:${c.category}`}
+                        className="flex justify-between gap-3 border-t border-surface-100 py-1 text-xs">
+                        <span className="truncate">
+                          {c.category || EVENT_KIND_LABELS[c.kind]}
+                          <span className="text-brand-900/70"> · {r.eventCount(c.events)} · {r.headCount(c.students)}</span>
+                        </span>
+                        <span className="tabular-nums shrink-0">{money(c.revenue)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            )
+          })}
         </ul>
       </div>
 
       {person.upcoming.events > 0 && (
         <p className="text-[11px] text-brand-900/70">
-          {r.upcoming(money(person.upcoming.collected), person.upcoming.events)}
+          {r.upcoming(money(person.upcoming.revenue), person.upcoming.events)}
         </p>
       )}
     </div>
@@ -174,7 +237,7 @@ function UnattributedBlock({ report }: { report: StaffRevenueReport }) {
     <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-sm font-semibold text-amber-900">{r.unattributed}</span>
-        <span className="text-sm font-semibold text-amber-900 tabular-nums">{money(report.unattributed.collected)}</span>
+        <span className="text-sm font-semibold text-amber-900 tabular-nums">{money(report.unattributed.revenue)}</span>
       </div>
       <p className="text-xs text-amber-900/80">{r.unattributedBlurb(report.unattributed.events.length)}</p>
       <button type="button" onClick={() => setOpen(v => !v)}
@@ -188,7 +251,7 @@ function UnattributedBlock({ report }: { report: StaffRevenueReport }) {
               <Link to={`/admin/events/${e.eventId}`} className="underline hover:no-underline truncate">
                 {e.firstDay} · {e.title}
               </Link>
-              <span className="tabular-nums shrink-0">{money(e.collected)}</span>
+              <span className="tabular-nums shrink-0">{money(e.revenue)}</span>
             </li>
           ))}
         </ul>
@@ -307,16 +370,16 @@ export function StaffRevenuePanel({ selfOnlyPersonId }: StaffRevenuePanelProps) 
             <table className="w-full table-fixed text-sm text-brand-900">
               <colgroup>
                 <col />
-                <col className="w-[3.6rem]" />
-                <col className="w-[3.6rem]" />
-                <col className="w-[6.5rem]" />
+                <col className="w-[3.5rem]" />
+                <col className="w-[3.3rem]" />
+                <col className="w-[5.2rem]" />
               </colgroup>
               <thead>
                 <tr className="text-left text-xs text-brand-900/70">
                   <th className="py-1 pr-3 font-medium">{r.colPerson}</th>
                   <th className="py-1 pr-3 font-medium text-right">{r.colEvents}</th>
                   <th className="py-1 pr-3 font-medium text-right">{r.colStudents}</th>
-                  <th className="py-1 font-medium text-right">{r.colCollected}</th>
+                  <th className="py-1 font-medium text-right">{r.colRevenue}</th>
                 </tr>
               </thead>
               <tbody>
@@ -335,7 +398,7 @@ export function StaffRevenuePanel({ selfOnlyPersonId }: StaffRevenuePanelProps) 
                         </td>
                         <td className="py-1 pr-3 text-right tabular-nums">{p.completed.events}</td>
                         <td className="py-1 pr-3 text-right tabular-nums">{p.completed.students}</td>
-                        <td className="py-1 text-right tabular-nums font-semibold">{money(p.completed.collected)}</td>
+                        <td className="py-1 text-right tabular-nums font-semibold">{money(p.completed.revenue)}</td>
                       </tr>
                       {open && (
                         <tr>

@@ -170,10 +170,12 @@ in the group is stamped with `bookings.payer_id` = the lead (added in
 
 ## Revenue attributed to staff
 
-`netPaid` is also what the staff revenue report counts as revenue — a
-season's money split among the crew who instructed or guided each
-event. The rule, how earners are inferred from the duty roster, and why
-booked-but-unpaid totals are deliberately excluded are documented in
+The staff revenue report deliberately does **not** use `netPaid`. It
+counts an event's base price times its confirmed heads — what the work
+was worth, regardless of what has been banked — and reads the `base`
+line of `bookings.details.charges` to get it, so gear, transport and
+add-ons stay out. The attribution rule and how earners are inferred from
+the duty roster are documented in
 [admin.md](./admin.md#revenue-by-staff).
 
 ## Related reminders

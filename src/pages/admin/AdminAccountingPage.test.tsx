@@ -115,10 +115,11 @@ function seasonWithOneDive(year: number) {
     ],
     events: [{
       id: 'd1', kind: 'dive', admin_title: 'Bat Cave', display_title: null,
-      start_date: `${year}-01-04`, end_date: null, course_days: null, cancelled_at: null,
+      start_date: `${year}-01-04`, end_date: null, course_days: null, cancelled_at: null, price: null,
     }],
-    bookings: [{ id: 'b1', event_id: 'd1', status: 'confirmed' }],
-    payments: [{ booking_id: 'b1', status: 'paid', amount: 3000 }],
+    // One diver at a 3,000 base fee — the dive is worth 3,000, halved between
+    // the two rostered guides.
+    bookings: [{ id: 'b1', event_id: 'd1', status: 'confirmed', details: { charges: [{ kind: 'base', amount: 3000 }] } }],
     profiles: [
       { id: 'staff-1', name: 'Sam Reef', nickname: 'Sam' },
       { id: 'staff-2', name: 'Val Kelp', nickname: 'Val' },
@@ -156,6 +157,32 @@ describe('AdminAccountingPage revenue tab', () => {
     expect(await screen.findByText('By month')).toBeInTheDocument()
     expect(screen.getAllByText('Val')).toHaveLength(1)
     expect(screen.getByText('Val').tagName).toBe('OPTION')
+  })
+
+  it('expands a month row into the events behind it', async () => {
+    mockTables(seasonWithOneDive(new Date().getFullYear()))
+    renderPage()
+    fireEvent.click(screen.getByRole('tab', { name: 'Revenue' }))
+    fireEvent.change(await screen.findByLabelText('Crew'), { target: { value: 'staff-1' } })
+
+    const month = await screen.findByRole('button', { name: /^\d{4}-\d{2}$/ })
+    expect(screen.queryByRole('link', { name: 'Bat Cave' })).not.toBeInTheDocument()
+    fireEvent.click(month)
+    expect(await screen.findByRole('link', { name: 'Bat Cave' })).toHaveAttribute('href', '/admin/events/d1')
+  })
+
+  it('collapses the type breakdown into Courses and Dives, expanding on click', async () => {
+    mockTables(seasonWithOneDive(new Date().getFullYear()))
+    renderPage()
+    fireEvent.click(screen.getByRole('tab', { name: 'Revenue' }))
+    fireEvent.change(await screen.findByLabelText('Crew'), { target: { value: 'staff-1' } })
+
+    // Only the group this person worked shows — no empty "Courses" row.
+    const groups = await screen.findAllByRole('button', { name: /Courses|Dives/ })
+    expect(groups.map(g => g.textContent)).toEqual([expect.stringContaining('Dives')])
+
+    fireEvent.click(groups[0])
+    expect(await screen.findByText(/Bat Cave/)).toBeInTheDocument()
   })
 
   it('says so plainly when the picked person earned nothing that season', async () => {
