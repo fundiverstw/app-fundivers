@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { AdminAccountingPage } from './AdminAccountingPage'
+import { siteConfig } from '../../config/site'
 
 const { from, useAuthMock } = vi.hoisted(() => ({ from: vi.fn(), useAuthMock: vi.fn() }))
 vi.mock('../../lib/supabase', () => ({ supabase: { from: (...a: unknown[]) => from(...a) } }))
@@ -133,7 +134,7 @@ describe('AdminAccountingPage revenue tab', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Revenue' }))
     // The volunteer is out of the split, so the paid guide keeps the lot.
     expect(await screen.findByText('Sam')).toBeInTheDocument()
-    expect(screen.getByText('NTD 3,000')).toBeInTheDocument()
+    expect(screen.getByText(`${siteConfig.locale.currencyLabel} 3,000`)).toBeInTheDocument()
     expect(screen.queryByText('Val')).not.toBeInTheDocument()
   })
 
@@ -142,7 +143,7 @@ describe('AdminAccountingPage revenue tab', () => {
     mockTables(seasonWithOneDive(new Date().getFullYear()))
     renderPage()
 
-    expect(await screen.findAllByText('NTD 3,000')).not.toHaveLength(0)
+    expect(await screen.findAllByText(`${siteConfig.locale.currencyLabel} 3,000`)).not.toHaveLength(0)
     expect(screen.queryByRole('tab')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Download ZIP' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Email manifest' })).not.toBeInTheDocument()
