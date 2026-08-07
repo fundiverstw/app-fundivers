@@ -21,6 +21,9 @@ import { siteConfig } from "../../../fundive.config.ts"
 
 const COMPANY_EMAIL = siteConfig.contact.email
 
+// Keep in step with trg_profiles_child_account_cap, which is the authority.
+const MAX_CHILD_ACCOUNTS = 10
+
 interface Body {
   email:         string
   name:     string
@@ -65,7 +68,7 @@ Deno.serve(async (req) => {
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } })
   const { data: parentProfile, error: pErr } = await admin
     .from("profiles")
-    .select("id, status, parent_account")
+    .select("id, status, parent_account, name, nickname")
     .eq("id", parentId)
     .maybeSingle()
   if (pErr || !parentProfile) return json({ error: "profile not found" }, 403)
@@ -74,6 +77,21 @@ Deno.serve(async (req) => {
   }
   if (parentProfile.parent_account) {
     return json({ error: "child accounts cannot themselves create children (one-level family trees only)" }, 403)
+  }
+
+  // Ceiling on how many accounts one diver may mint. The authority is
+  // trg_profiles_child_account_cap; this pre-check exists so the diver reads a
+  // sentence rather than a constraint violation, and so we don't burn a
+  // createUser call we're about to roll back.
+  const { count: childCount, error: cErr } = await admin
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("parent_account", parentId)
+  if (cErr) return json({ error: safeError(cErr, "could not count child accounts") }, 500)
+  if ((childCount ?? 0) >= MAX_CHILD_ACCOUNTS) {
+    return json({
+      error: `you already manage ${MAX_CHILD_ACCOUNTS} child accounts, which is the maximum — contact us if you need more`,
+    }, 403)
   }
 
   // Create the auth user. email_confirm = true so the child can log in
@@ -107,9 +125,26 @@ Deno.serve(async (req) => {
     return json({ error: safeError(profErr, "profile update failed") }, 500)
   }
 
+  // Who did this, recorded where the shop can see it. Creating an account for
+  // an address you don't own is the abuse this endpoint enables; the cap bounds
+  // it, and this row is what makes a pattern of it visible after the fact. A
+  // failed audit insert must not fail the creation, which already succeeded.
+  const { error: auditErr } = await admin.from("admin_audit_log").insert({
+    actor_id:     parentId,
+    action:       "insert",
+    target_table: "profiles",
+    target_id:    newUserId,
+    before:       null,
+    after:        { event: "child_account_created", email },
+  })
+  if (auditErr) console.error("child-account audit insert failed:", safeError(auditErr, "audit failed"))
+
   // Courtesy email to the child. Mirrors the admin-create-diver wording —
   // we don't expose credentials. If the child wants direct app access they
-  // reach out to the shop.
+  // reach out to the shop. It names the parent so a recipient who doesn't
+  // recognise them has something to push back on.
+  const parentLabel = [parentProfile.name, parentProfile.nickname ? `(${parentProfile.nickname})` : null]
+    .filter(Boolean).join(" ") || "Another diver"
   let emailSent = false
   if (GMAIL_USER && GMAIL_PASS) {
     try {
@@ -124,11 +159,13 @@ Deno.serve(async (req) => {
         subject: `${siteConfig.identity.shopName} — account created for you`,
         text:
           `Hi ${fullName},\n\n` +
-          `${parentProfile ? '' : ''}` +
-          `A ${siteConfig.identity.shopName} app diver account has been created on your behalf so we can register you for events.\n\n` +
+          `${parentLabel} has created a ${siteConfig.identity.shopName} app diver account for you, ` +
+          `so they can register you for events. They manage the account on your behalf.\n\n` +
           `If you would like to access this account for all the great features on the app ` +
           `(dive logs, easy event registration, push notifications, etc.) please reply to this email ` +
           `or message us, and we'll issue you a temporary username and password to log in with.\n\n` +
+          `If you don't know ${parentLabel}, or you didn't expect this, please reply to this email ` +
+          `and we'll remove the account.\n\n` +
           `Otherwise no further action is required.\n\n` +
           `— ${siteConfig.identity.shopName}`,
       })
