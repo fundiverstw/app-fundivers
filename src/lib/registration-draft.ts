@@ -104,6 +104,30 @@ export function loadRegistrationDraft(key: string): RegistrationDraft | null {
   return normalizeDraft(v)
 }
 
+/**
+ * Drop every draft on this device, whoever they belong to.
+ *
+ * Called on sign-out. A draft holds date of birth, national ID number and
+ * emergency contact details, and the 14-day expiry is there to stop stale data
+ * lingering — not to bound who can read it. On a shared or public device,
+ * "signed out" has to mean the next person cannot open the form and find the
+ * previous diver's identity documents pre-filled.
+ *
+ * Enumerates keys first, then deletes: removing entries while iterating
+ * localStorage by index shifts the indices underneath the loop and silently
+ * skips half of them.
+ */
+export function clearAllRegistrationDrafts(): void {
+  const keys: string[] = []
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key?.startsWith(`${REGISTRATION_DRAFT_PREFIX}:`)) keys.push(key)
+    }
+  } catch { return }
+  for (const key of keys) clearRegistrationDraft(key)
+}
+
 // Enumerate every live draft on this device — powers the "continue where you
 // left off" shortcut on the event picker. Expired / corrupt entries are
 // skipped (and dropped) by loadRegistrationDraft.

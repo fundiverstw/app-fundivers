@@ -5,6 +5,7 @@ import {
   loadRegistrationDraft,
   clearRegistrationDraft,
   listRegistrationDrafts,
+  clearAllRegistrationDrafts,
   REGISTRATION_DRAFT_PREFIX,
   type RegistrationDraft,
 } from './registration-draft'
@@ -141,5 +142,65 @@ describe('listRegistrationDrafts', () => {
     )
     const drafts = listRegistrationDrafts()
     expect(drafts.map(d => d.eventId)).toEqual(['fresh'])
+  })
+})
+
+describe('clearAllRegistrationDrafts', () => {
+  it('removes every draft on the device, whoever they belong to', () => {
+    saveRegistrationDraft(registrationDraftKey('dive', 'evt1', 'user9'), makeDraft())
+    saveRegistrationDraft(registrationDraftKey('dive', 'evt2', 'user9'), makeDraft())
+    saveRegistrationDraft(registrationDraftKey('course', 'c2', 'otherUser'), makeDraft())
+    saveRegistrationDraft(registrationDraftKey('dive', 'evt3', null), makeDraft())
+
+    clearAllRegistrationDrafts()
+
+    expect(listRegistrationDrafts()).toEqual([])
+  })
+
+  // Deleting while iterating localStorage by index shifts the indices under the
+  // loop; a naive implementation clears roughly half and reports success.
+  it('clears all of them even though deleting shifts the indices', () => {
+    for (let i = 0; i < 8; i++) {
+      saveRegistrationDraft(registrationDraftKey('dive', `evt${i}`, 'u1'), makeDraft())
+    }
+    expect(listRegistrationDrafts()).toHaveLength(8)
+
+    clearAllRegistrationDrafts()
+
+    expect(listRegistrationDrafts()).toHaveLength(0)
+    for (let i = 0; i < 8; i++) {
+      expect(localStorage.getItem(registrationDraftKey('dive', `evt${i}`, 'u1'))).toBeNull()
+    }
+  })
+
+  it('leaves unrelated keys alone', () => {
+    saveRegistrationDraft(registrationDraftKey('dive', 'evt1', 'u1'), makeDraft())
+    localStorage.setItem('fd_gear_packed:2026-08-07', '["mask"]')
+    localStorage.setItem('unrelated_key', 'x')
+
+    clearAllRegistrationDrafts()
+
+    expect(localStorage.getItem('fd_gear_packed:2026-08-07')).toBe('["mask"]')
+    expect(localStorage.getItem('unrelated_key')).toBe('x')
+  })
+
+  it('is a no-op when there is nothing stored', () => {
+    expect(() => clearAllRegistrationDrafts()).not.toThrow()
+    expect(listRegistrationDrafts()).toEqual([])
+  })
+})
+
+describe(`${REGISTRATION_DRAFT_PREFIX} residue after sign-out`, () => {
+  it('leaves no identity fields behind in storage', () => {
+    saveRegistrationDraft(registrationDraftKey('dive', 'evt1', 'u1'), makeDraft())
+    // The reason this fix exists: these are the fields a draft carries.
+    expect(JSON.stringify(localStorage)).toContain('A123')
+
+    clearAllRegistrationDrafts()
+
+    const dump = JSON.stringify(localStorage)
+    expect(dump).not.toContain('A123')          // national ID
+    expect(dump).not.toContain('1990-12-10')    // date of birth
+    expect(dump).not.toContain('Ada Lovelace')
   })
 })

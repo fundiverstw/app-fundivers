@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { CLEAR_SUPABASE_CACHE_MSG } from '../sw-cache-policy'
+import { clearAllRegistrationDrafts } from '../lib/registration-draft'
 import { AuthContext } from './auth-context'
 import type { Profile } from '../types/database'
 
@@ -98,6 +99,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof navigator !== 'undefined' && navigator.serviceWorker?.controller) {
       navigator.serviceWorker.controller.postMessage(CLEAR_SUPABASE_CACHE_MSG)
     }
+    // Same reasoning, different store: a half-finished registration keeps date
+    // of birth, national ID and emergency contact in localStorage for 14 days.
+    // Clearing the SW cache but leaving those behind would be a strange place
+    // to stop.
+    clearAllRegistrationDrafts()
   }
 
   return (
