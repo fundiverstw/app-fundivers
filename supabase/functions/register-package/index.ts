@@ -20,6 +20,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
 import { corsOk, jsonResponse, safeError, bearerToken } from "../_shared/responses.ts"
+import { takeActionSlot, rateLimitedBody } from "../_shared/rate-limit.ts"
 import {
   parseRegisterPackageInput,
   buildPackageRegistrationEmail,
@@ -65,6 +66,14 @@ Deno.serve(async (req) => {
   const reqData = parsed.request
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } })
+
+  // Abuse ceiling: this endpoint sends mail on the caller's say-so, so an
+  // unbounded loop here burns the shop's SMTP quota and takes down every other
+  // transactional email with it. Limits live in _shared/rate-limit.ts.
+  const slot = await takeActionSlot(admin, diverId, "register_package")
+  if (!slot.allowed) {
+    return json(rateLimitedBody("register_package", slot.retryAfterSeconds), 429)
+  }
 
   // Package must be published; grab the catalog id allow-lists + kickback rate.
   const { data: pkg, error: pErr } = await admin

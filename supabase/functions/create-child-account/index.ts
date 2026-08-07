@@ -17,6 +17,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
 import { corsOk, jsonResponse, safeError, bearerToken } from "../_shared/responses.ts"
+import { takeActionSlot, rateLimitedBody } from "../_shared/rate-limit.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 
 const COMPANY_EMAIL = siteConfig.contact.email
@@ -92,6 +93,14 @@ Deno.serve(async (req) => {
     return json({
       error: `you already manage ${MAX_CHILD_ACCOUNTS} child accounts, which is the maximum — contact us if you need more`,
     }, 403)
+  }
+
+  // Separate from the cap: the cap bounds how many accounts may EXIST, this
+  // bounds how fast they may be attempted. Deleting a child to free a slot must
+  // not hand back an unlimited mail sender.
+  const slot = await takeActionSlot(admin, parentId, "create_child_account")
+  if (!slot.allowed) {
+    return json(rateLimitedBody("create_child_account", slot.retryAfterSeconds), 429)
   }
 
   // Create the auth user. email_confirm = true so the child can log in

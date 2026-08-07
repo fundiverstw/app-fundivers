@@ -34,6 +34,8 @@ interface Opts {
   callerEmail?: string | null
   bookings?: Array<Record<string, unknown>>
   bookingsError?: boolean
+  /** Seconds the limiter says to wait. 0/undefined = allowed. */
+  rateLimitedFor?: number
   transporter?: boolean
 }
 
@@ -56,9 +58,14 @@ function makeDeps(opts: Opts = {}) {
       { id: 'd1', kind: 'dive', display_title: 'Green Island', admin_title: null, calendar_title: null, start_date: '2030-06-12', end_date: null, course_days: null },
     ] },
   }
-  const admin = { from: opts.bookingsError
-    ? () => ({ select: () => ({ eq: () => ({ order: () => ({ then: (r: (v: unknown) => unknown) => r({ data: null, error: { message: 'boom' } }) }) }) }) })
-    : makeFrom(tables) }
+  const admin = {
+    from: opts.bookingsError
+      ? () => ({ select: () => ({ eq: () => ({ order: () => ({ then: (r: (v: unknown) => unknown) => r({ data: null, error: { message: 'boom' } }) }) }) }) })
+      : makeFrom(tables),
+    // take_action_slot: 0 means "allowed". opts.rateLimitedFor seconds models a
+    // caller who has hit the ceiling.
+    rpc: async () => ({ data: opts.rateLimitedFor ?? 0, error: null }),
+  }
   const deps: Deps = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     admin: admin as any,
@@ -84,6 +91,18 @@ function post(body: unknown, withToken = true): Request {
 }
 
 describe('handleGroupSummary', () => {
+  it('refuses and sends nothing once the caller is over the rate limit', async () => {
+    const { deps, sendMail, buildGroupPdfBase64 } = makeDeps({ rateLimitedFor: 3600 })
+    const res = await handleGroupSummary(post({ group_id: 'g1' }), deps)
+    expect(res.status).toBe(429)
+    const body = await res.json() as { retry_after_seconds: number; action: string }
+    expect(body.retry_after_seconds).toBe(3600)
+    expect(body.action).toBe('group_summary')
+    // The point of the limit is the mail and the PDF, so neither may happen.
+    expect(sendMail).not.toHaveBeenCalled()
+    expect(buildGroupPdfBase64).not.toHaveBeenCalled()
+  })
+
   it('builds one consolidated payload and emails the company + the lead', async () => {
     const { deps, sendMail, buildGroupPdfBase64 } = makeDeps()
     const res = await handleGroupSummary(post({ group_id: 'g1' }), deps)

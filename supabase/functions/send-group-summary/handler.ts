@@ -8,6 +8,7 @@
 
 import { Buffer } from "node:buffer"
 import { corsHeaders, safeError } from "../_shared/responses.ts"
+import { takeActionSlot, rateLimitedBody, type RpcClient } from "../_shared/rate-limit.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 import type { GroupRegistrationPdfPayload, GroupDiverColumn } from "../_shared/pdf.ts"
 import { t } from "../_shared/i18n.ts"
@@ -19,7 +20,7 @@ export interface GroupSummaryBody {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyClient = { from(table: string): any }
+type AnyClient = { from(table: string): any } & RpcClient
 
 export interface SupabaseAuthedClient {
   auth: {
@@ -93,6 +94,14 @@ export async function handleGroupSummary(req: Request, deps: Deps): Promise<Resp
   if (whoErr || !callerId) return json({ error: "unauthorized" }, 401)
 
   const admin = deps.admin
+
+  // Builds and mails a PDF, so it is a mail sender like the rest. Checked after
+  // the caller is known but before any work, so a loop costs one RPC call.
+  const slot = await takeActionSlot(admin, callerId, "group_summary")
+  if (!slot.allowed) {
+    return json(rateLimitedBody("group_summary", slot.retryAfterSeconds), 429)
+  }
+
   const { data: bookingsData, error: bErr } = await admin
     .from("bookings")
     .select("id, user_id, status, details, event_id, group_id, payer_id, created_at")

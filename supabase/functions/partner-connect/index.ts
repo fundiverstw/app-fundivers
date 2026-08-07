@@ -17,6 +17,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
 import { corsOk, jsonResponse, safeError, bearerToken } from "../_shared/responses.ts"
+import { takeActionSlot, rateLimitedBody } from "../_shared/rate-limit.ts"
 import { parsePartnerConnectInput, buildPartnerConnectEmail } from "../_shared/partner-connect.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 
@@ -50,6 +51,14 @@ Deno.serve(async (req) => {
   if ("error" in parsed) return json({ error: parsed.error }, 400)
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } })
+
+  // Abuse ceiling: this endpoint sends mail on the caller's say-so, so an
+  // unbounded loop here burns the shop's SMTP quota and takes down every other
+  // transactional email with it. Limits live in _shared/rate-limit.ts.
+  const slot = await takeActionSlot(admin, userId, "partner_connect")
+  if (!slot.allowed) {
+    return json(rateLimitedBody("partner_connect", slot.retryAfterSeconds), 429)
+  }
   const { data: profile, error: pErr } = await admin
     .from("profiles")
     .select("name, nickname")
