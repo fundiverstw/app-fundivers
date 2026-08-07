@@ -19,6 +19,7 @@ into source.
 | [forking.md](./forking.md)                             | Running your own shop: the `fundive.config.ts` seam, brand assets, feature gates, and how to pull core updates without conflicts |
 | [i18n.md](./i18n.md)                                   | Shop-facing language: `locale.language`, the `src/i18n` message catalogs, adding strings and languages |
 | [security-audit.md](./security-audit.md)               | Point-in-time audit (2026-06-02): findings by severity, fix priority |
+| [security-audit-2026-08.md](./security-audit-2026-08.md) | Second audit (2026-08-07): findings, what was verified clean, residual risks |
 | [legal-brief.md](./legal-brief.md)                     | Brief for the Terms-of-Use / Privacy lawyer review: data inventory, flows, code-text alignment, open questions |
 
 ## Conventions called out across docs
