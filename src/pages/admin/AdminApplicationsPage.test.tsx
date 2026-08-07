@@ -65,6 +65,53 @@ describe('AdminApplicationsPage', () => {
     expect(screen.getByText('2 pending')).toBeInTheDocument()
   })
 
+  // Regression: the query also required `application_submitted_at is not null`.
+  // That column is stamped by a trigger only once name, DOB, cert level and
+  // both contact fields are filled in, so a diver who signed up and stopped
+  // short never got it — and was invisible on the only screen that can approve
+  // them. On production that hid every single pending diver, all 26 of them.
+  it('lists a pending diver who never completed their profile', async () => {
+    const calls: Array<{ method: string; args: unknown[] }> = []
+    const builder: Record<string, unknown> = {}
+    for (const m of ['select', 'eq', 'not', 'is', 'order', 'limit']) {
+      builder[m] = (...args: unknown[]) => { calls.push({ method: m, args }); return builder }
+    }
+    builder.then = (onFulfilled?: (r: unknown) => unknown) =>
+      Promise.resolve({
+        data: [{ id: 'u1', name: 'Leo', created_at: '2026-04-30T00:00:00Z', status: 'pending', application_submitted_at: null }],
+        error: null,
+      }).then(onFulfilled)
+    from.mockReturnValueOnce(builder)
+
+    renderPage()
+
+    expect(await screen.findByText('Leo')).toBeInTheDocument()
+    expect(screen.getByText('1 pending')).toBeInTheDocument()
+    // Nothing may narrow the queue beyond status='pending'.
+    expect(calls.some(c => c.args.some(a => a === 'application_submitted_at' && c.method === 'not'))).toBe(false)
+  })
+
+  it('flags an incomplete profile rather than hiding it', async () => {
+    from.mockReturnValueOnce(mockQueryBuilder({
+      data: [{ id: 'u1', name: 'Leo', created_at: '2026-04-30T00:00:00Z', status: 'pending', application_submitted_at: null }],
+    }))
+    renderPage()
+    expect(await screen.findByText('Leo')).toBeInTheDocument()
+    expect(screen.getByText(/profile incomplete/i)).toBeInTheDocument()
+  })
+
+  it('does not flag a diver who did complete their profile', async () => {
+    from.mockReturnValueOnce(mockQueryBuilder({
+      data: [{
+        id: 'u2', name: 'Ada', created_at: '2026-04-30T00:00:00Z', status: 'pending',
+        application_submitted_at: '2026-04-30T01:00:00Z',
+      }],
+    }))
+    renderPage()
+    expect(await screen.findByText('Ada')).toBeInTheDocument()
+    expect(screen.queryByText(/profile incomplete/i)).not.toBeInTheDocument()
+  })
+
   it('approve calls notify-application-decision and removes the row', async () => {
     from.mockReturnValueOnce(mockQueryBuilder({
       data: [{ id: 'u1', name: 'Alice', created_at: '2026-04-30T00:00:00Z', status: 'pending' }],

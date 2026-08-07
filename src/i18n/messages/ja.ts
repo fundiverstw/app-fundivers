@@ -1295,6 +1295,7 @@ export const ja: Messages = {
       none: '保留中の新規ユーザー申請はありません。',
       noNameYet: '（氏名未入力）',
       submittedOn: (date: string) => `${date} に送信`,
+      profileIncomplete: 'プロフィール未完成',
       rejectReasonPlaceholder: '却下理由（任意・メールに記載されます）',
       approve: '承認',
       reject: '却下',

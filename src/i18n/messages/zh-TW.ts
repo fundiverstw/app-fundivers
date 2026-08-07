@@ -1296,6 +1296,7 @@ export const zhTW: Messages = {
       none: '目前沒有待審核的新用戶申請。',
       noNameYet: '（尚未填寫姓名）',
       submittedOn: (date: string) => `送出於 ${date}`,
+      profileIncomplete: '資料未填完',
       rejectReasonPlaceholder: '婉拒原因（選填，會附在通知信中）',
       approve: '核准',
       reject: '婉拒',

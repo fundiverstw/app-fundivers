@@ -37,17 +37,27 @@ export function AdminApplicationsPage() {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      // Filter to applications the diver has actually submitted — the
-      // BEFORE UPDATE trigger on profiles stamps `application_submitted_at`
-      // the first time all required fields are populated. Without this
-      // filter, admins see a row the instant a diver hits "Sign up",
-      // before they've typed a single field.
+      // Every pending diver, with no second condition on top of the status.
+      //
+      // This used to also require `application_submitted_at is not null`, on
+      // the reasoning that a diver who has typed nothing yet isn't an
+      // application worth showing. But that column is stamped by a trigger
+      // only once name, date_of_birth, cert_level, contact_method AND
+      // contact_id are all populated, and a diver who signs up and stops short
+      // of that never gets it. They were then invisible here — the one screen
+      // that can approve them — so they sat on /pending permanently with no
+      // way for anyone to let them in. It was hiding all 26 of them.
+      //
+      // An incomplete profile is a thing to show the admin, not a reason to
+      // hide the person. The card flags it so approving stays an informed
+      // decision.
       const { data } = await supabase
         .from('profiles')
         .select('*')
         .eq('status', 'pending')
-        .not('application_submitted_at', 'is', null)
-        .order('application_submitted_at', { ascending: false })
+        // Completed applications first; the rest by signup date underneath.
+        .order('application_submitted_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false })
       if (!cancelled) setUsers((data ?? []) as Profile[])
     })()
     return () => { cancelled = true }
@@ -138,6 +148,11 @@ export function AdminApplicationsPage() {
                   <div className={`text-xs ${TEXT_MUTED}`}>
                     {ap.submittedOn(format(shopZoned(new Date(u.created_at)), 'PP'))}
                   </div>
+                  {!u.application_submitted_at && (
+                    <span className="inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">
+                      {ap.profileIncomplete}
+                    </span>
+                  )}
                 </div>
                 <span className={`text-xs ${TEXT_MUTED}`}>{isExpanded ? '−' : '+'}</span>
               </button>
