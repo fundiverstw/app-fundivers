@@ -44,6 +44,11 @@ interface MockOpts {
   rateLimitCounts?: { in_last_60s: number; in_last_24h: number }
   eventNotFound?:  boolean
   eventPast?:      boolean
+  /** Bookings already carrying the posted group_id. */
+  groupSiblings?:  Array<{ user_id: string }>
+  groupSiblingsError?: boolean
+  /** Of those bookings' owners, the ones who are children of the caller. */
+  groupKin?:       Array<{ id: string }>
   deleteUserError?: string
   // Eligibility-gate inputs (effective profile + event prereqs).
   profileCertLevel?: string | null
@@ -108,7 +113,15 @@ function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites }
     })()
     const builder: Record<string, unknown> = {}
     const chain = ['select', 'eq', 'neq', 'in', 'is', 'not', 'or', 'order', 'limit', 'filter', 'match']
-    for (const m of chain) builder[m] = () => builder
+    // Which columns the query filtered on, so the mock can tell the group-
+    // ownership lookups apart from the other reads against the same tables.
+    const filtered = new Set<string>()
+    for (const m of chain) {
+      builder[m] = (...args: unknown[]) => {
+        if ((m === 'eq' || m === 'in') && typeof args[0] === 'string') filtered.add(args[0])
+        return builder
+      }
+    }
     builder.single      = () => Promise.resolve({ data: canned, error: null })
     builder.maybeSingle = () => Promise.resolve({ data: canned, error: null })
     builder.then = (onFulfilled?: (r: unknown) => unknown) =>
@@ -136,6 +149,18 @@ function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites }
     if (table === 'bookings') {
       builder.maybeSingle = () =>
         Promise.resolve({ data: opts.existingBooking ?? null, error: null })
+      // The group-ownership check lists every booking sharing the group_id.
+      builder.then = (onFulfilled?: (r: unknown) => unknown) =>
+        Promise.resolve(filtered.has('group_id')
+          ? { data: opts.groupSiblings ?? [], error: opts.groupSiblingsError ? { message: 'boom' } : null }
+          : { data: canned, error: null }).then(onFulfilled)
+    }
+    if (table === 'profiles') {
+      // ...and resolves which of those bookings belong to children of the caller.
+      builder.then = (onFulfilled?: (r: unknown) => unknown) =>
+        Promise.resolve(filtered.has('parent_account')
+          ? { data: opts.groupKin ?? [], error: null }
+          : { data: canned, error: null }).then(onFulfilled)
     }
     return builder
   }
@@ -877,6 +902,91 @@ describe('handleRegistration — happy path returns the booking id and session',
     expect(res.status).toBe(200)
     const body = await res.json() as { session: unknown }
     expect(body.session).toBeNull()
+  })
+})
+
+describe('handleRegistration — group ownership', () => {
+  // send-group-summary authorises on "you hold a booking in this group", and
+  // the group PDF carries every member's name, DOB, nationality and cert. If
+  // anyone could attach a booking to a group_id they learned, that read is
+  // theirs too.
+  it('refuses a group_id whose existing bookings belong to a stranger', async () => {
+    const { deps, captured } = makeDeps({
+      callerUserId: 'self-uid',
+      groupSiblings: [{ user_id: 'someone-else' }],
+      groupKin: [],
+    })
+    const res = await handleRegistration(
+      postJson({ ...goodBody, group_id: 'victim-group' }, { Authorization: 'Bearer self-jwt' }),
+      deps,
+    )
+    expect(res.status).toBe(403)
+    expect(captured.bookingInsert).toHaveLength(0)
+  })
+
+  it('allows a group the caller already has a booking in', async () => {
+    const { deps, captured } = makeDeps({
+      callerUserId: 'self-uid',
+      groupSiblings: [{ user_id: 'self-uid' }],
+    })
+    const res = await handleRegistration(
+      postJson({ ...goodBody, group_id: 'my-group' }, { Authorization: 'Bearer self-jwt' }),
+      deps,
+    )
+    expect(res.status).toBe(200)
+    expect(captured.bookingInsert[0]).toMatchObject({ group_id: 'my-group' })
+  })
+
+  // The ordinary family case: a parent registering several children puts
+  // bookings owned by each child into one group.
+  it("allows a group holding the caller's children", async () => {
+    const { deps, captured } = makeDeps({
+      callerUserId: 'parent-uid',
+      groupSiblings: [{ user_id: 'kid-1' }, { user_id: 'kid-2' }],
+      groupKin: [{ id: 'kid-1' }, { id: 'kid-2' }],
+    })
+    const res = await handleRegistration(
+      postJson({ ...goodBody, group_id: 'family-group' }, { Authorization: 'Bearer parent-jwt' }),
+      deps,
+    )
+    expect(res.status).toBe(200)
+    expect(captured.bookingInsert).toHaveLength(1)
+  })
+
+  it('refuses when only some of the group is the caller\'s to manage', async () => {
+    const { deps, captured } = makeDeps({
+      callerUserId: 'parent-uid',
+      groupSiblings: [{ user_id: 'kid-1' }, { user_id: 'stranger' }],
+      groupKin: [{ id: 'kid-1' }],
+    })
+    const res = await handleRegistration(
+      postJson({ ...goodBody, group_id: 'mixed-group' }, { Authorization: 'Bearer parent-jwt' }),
+      deps,
+    )
+    expect(res.status).toBe(403)
+    expect(captured.bookingInsert).toHaveLength(0)
+  })
+
+  it('allows a brand-new group id nobody has used yet', async () => {
+    const { deps, captured } = makeDeps({ callerUserId: 'self-uid', groupSiblings: [] })
+    const res = await handleRegistration(
+      postJson({ ...goodBody, group_id: 'fresh-group' }, { Authorization: 'Bearer self-jwt' }),
+      deps,
+    )
+    expect(res.status).toBe(200)
+    expect(captured.bookingInsert[0]).toMatchObject({ group_id: 'fresh-group' })
+  })
+
+  it('does not run the check at all when no group_id is posted', async () => {
+    const { deps, captured } = makeDeps({
+      callerUserId: 'self-uid',
+      // Would refuse if consulted — it must not be.
+      groupSiblings: [{ user_id: 'someone-else' }],
+      groupKin: [],
+    })
+    const res = await handleRegistration(postJson(goodBody, { Authorization: 'Bearer self-jwt' }), deps)
+    expect(res.status).toBe(200)
+    expect(captured.bookingInsert[0]).toMatchObject({ group_id: null })
   })
 })
 

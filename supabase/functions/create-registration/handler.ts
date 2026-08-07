@@ -468,6 +468,41 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     return rollback(`This diver already has an active booking for this event (status: ${existing.status}).`)
   }
 
+  // A group is whatever set of bookings shares a client-generated group_id, and
+  // send-group-summary authorises on exactly that: hold a booking in the group
+  // and you may pull the group's PDF, which carries every member's name, date
+  // of birth, nationality and certification. That made group_id a capability
+  // token by accident rather than by design — unguessable today only because
+  // the client mints it with crypto.randomUUID().
+  //
+  // So joining is no longer self-service. Every booking already in the group
+  // must belong to the caller or to a child they manage, which is exactly what
+  // a legitimate group is: one person registering themselves, their children,
+  // or themselves across several events. A stranger who learns a group_id now
+  // cannot attach to it.
+  if (body.group_id) {
+    const { data: siblings, error: sibErr } = await admin
+      .from("bookings")
+      .select("user_id")
+      .eq("group_id", body.group_id)
+    if (sibErr) return rollback(safeError(sibErr, "group check failed"))
+    const otherIds = [...new Set(((siblings ?? []) as Array<{ user_id: string }>)
+      .map(s => s.user_id)
+      .filter(id => id !== userId && id !== callerId))]
+    if (otherIds.length > 0) {
+      const controller = callerId ?? userId
+      const { data: kin } = await admin
+        .from("profiles")
+        .select("id")
+        .in("id", otherIds)
+        .eq("parent_account", controller)
+      const managed = new Set(((kin ?? []) as Array<{ id: string }>).map(k => k.id))
+      if (otherIds.some(id => !managed.has(id))) {
+        return rollback("this group belongs to someone else", 403)
+      }
+    }
+  }
+
   const fk = { event_id: body.event_id }
   // A lead-payer designation is only honoured when it names the registrant
   // themselves or the authenticated caller (a parent paying for a child).
