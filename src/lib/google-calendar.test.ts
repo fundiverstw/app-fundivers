@@ -50,6 +50,15 @@ describe('googleCalendarUrl', () => {
     expect(param(url, 'dates')).toBe('20260808T230000Z/20260809T070000Z')
   })
 
+  it('percent-encodes spaces rather than leaving form-style plus signs', async () => {
+    const { googleCalendarUrl } = await import('./google-calendar')
+    const url = googleCalendarUrl(event({ title: 'Longdong shore dive' }))
+
+    expect(url).toContain('text=Longdong%20shore%20dive')
+    expect(url).not.toContain('+')
+    expect(param(url, 'text')).toBe('Longdong shore dive')
+  })
+
   it('honours the shop-configured event length', async () => {
     config.business.eventDurationHours = 3
     const { googleCalendarUrl } = await import('./google-calendar')

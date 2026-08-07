@@ -78,5 +78,8 @@ export function googleCalendarUrl(event: CalendarLinkEvent): string {
     details: descriptionParam(event),
   })
   if (!allowsTransport(event.type)) params.set('location', siteConfig.contact.address)
-  return `${TEMPLATE_URL}?${params}`
+  // URLSearchParams serializes a space as '+', which only decodes back to a
+  // space under form-encoding rules. '%20' reads the same either way, so the
+  // title can't land in Google's compose box with plus signs in it.
+  return `${TEMPLATE_URL}?${params.toString().replace(/\+/g, '%20')}`
 }
