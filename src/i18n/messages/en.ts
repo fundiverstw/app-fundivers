@@ -62,6 +62,7 @@ export const en = {
     priceFrom: (amount: string) => `From ${amount}`,
     cancelBooking: 'Cancel booking',
     shareWithFriends: 'Share link with friends',
+    addToGoogleCalendar: 'Add to Google Calendar',
     busy: 'Busy',
     private: 'Private',
     thisMonth: 'This month',

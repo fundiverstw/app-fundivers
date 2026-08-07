@@ -87,6 +87,8 @@ export const siteConfig = {
     paymentDeadlineFallbackDays: 7,
     cardSurchargePercent: 5,
     nitroxCourseFee: 6000,
+    // Length of a single-day event in the "Add to Google Calendar" link.
+    eventDurationHours: 8,
     // Regex-alternation fragments (case-insensitive) that flag a dive as a
     // "trip" by title when it has no tagged destination — boat dives and
     // anywhere beyond the usual Taipei→Keelung shore drive.

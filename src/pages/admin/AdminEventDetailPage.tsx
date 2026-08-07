@@ -34,6 +34,7 @@ import { EventTransportPanel } from '../../components/admin/EventTransportPanel'
 import { missingWaivers, fetchEventWaiverOverrides, fetchSignaturesForDivers, fetchWaivers, recordPaperWaiver } from '../../lib/waivers'
 import type { WaiverDef } from '../../config/waivers'
 import { ShareEventButton } from '../../components/ShareEventButton'
+import { AddToGoogleCalendarButton } from '../../components/AddToGoogleCalendarButton'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Credit, DiverNote, Payment, Profile, EventKind } from '../../types/database'
 import { BTN_SECONDARY, BTN_XS_BASE, BTN_XS_GHOST, ERROR_NOTE_LIGHT } from '../../styles/tokens'
 import { t } from '../../i18n'
@@ -573,6 +574,12 @@ export function AdminEventDetailPage() {
               {ed.gearMap}
             </Link>
             <ShareEventButton eventId={id} className="text-xs bg-surface-700/80 hover:bg-surface-700 text-white px-3 py-1 rounded-lg" />
+            {event && (
+              <AddToGoogleCalendarButton
+                event={event}
+                className="inline-flex items-center justify-center text-xs bg-surface-700/80 hover:bg-surface-700 text-white px-3 py-1 rounded-lg"
+              />
+            )}
           </div>
           {event && (
             <EventStaffSection

@@ -7,6 +7,7 @@ import { useAuth } from '../hooks/useAuth'
 import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
 import { todayIso } from '../lib/dates'
 import { EventStatusTags } from '../components/EventStatusTags'
+import { AddToGoogleCalendarButton } from '../components/AddToGoogleCalendarButton'
 import type { AppEvent, Duty } from '../types/database'
 import { PAGE_BODY } from '../styles/tokens'
 import { t } from '../i18n'
@@ -128,6 +129,14 @@ function Row({ e, eventLinkBase, dim }: { e: Enriched; eventLinkBase: string | n
             : <p className="text-xs text-brand-950 font-medium">{du.standalone}</p>
       }
       {duty.notes && <p className="text-xs text-brand-900 font-medium bg-surface-50 rounded p-2 mt-1">📝 {duty.notes}</p>}
+      {event && (
+        <div className="pt-1">
+          <AddToGoogleCalendarButton
+            event={event}
+            className="inline-flex items-center justify-center text-xs font-medium px-3 py-1 rounded-lg bg-surface-700 hover:bg-surface-800 text-white"
+          />
+        </div>
+      )}
     </div>
   )
 }

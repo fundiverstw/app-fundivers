@@ -54,6 +54,7 @@ export const ja: Messages = {
     priceFrom: (amount: string) => `${amount}〜`,
     cancelBooking: '予約をキャンセル',
     shareWithFriends: 'リンクを友達に共有',
+    addToGoogleCalendar: 'Google カレンダーに追加',
     busy: '予定あり',
     private: '非公開',
     thisMonth: '今月',

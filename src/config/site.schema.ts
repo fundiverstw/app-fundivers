@@ -67,6 +67,7 @@ export const siteConfigSchema = z.object({
     paymentDeadlineFallbackDays: z.number().int().positive(),
     cardSurchargePercent: z.number().nonnegative(),
     nitroxCourseFee: z.number().nonnegative(),
+    eventDurationHours: z.number().positive().optional(),
     tripKeywords: z.array(z.string().min(1)),
     boatManifest: z.object({
       boatName: z.string(),

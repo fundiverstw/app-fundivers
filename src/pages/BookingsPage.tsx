@@ -16,6 +16,7 @@ import { fetchCreditsForUser, openCreditForBooking } from '../lib/credits'
 import { bookingBalance, depositCovered } from '../lib/booking-balance'
 import { netPaid } from '../lib/payments'
 import { ShareEventButton } from '../components/ShareEventButton'
+import { AddToGoogleCalendarButton } from '../components/AddToGoogleCalendarButton'
 import { ChargeBreakdown } from '../components/ChargeBreakdown'
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, Payment, WaitlistOffer } from '../types/database'
 import {
@@ -359,6 +360,12 @@ function Card({
               <button onClick={() => onRefund(row.id)} className={`flex-1 ${BTN_GHOST} text-xs py-2 px-3`}>
                 {t.bookings.requestRefund}
               </button>
+            )}
+            {row.event && row.status !== 'cancelled' && (
+              <AddToGoogleCalendarButton
+                event={row.event}
+                className="flex-1 inline-flex items-center justify-center text-xs py-2 px-3 rounded-lg bg-surface-700 hover:bg-surface-800 text-white font-medium"
+              />
             )}
             {row.event && (
               <ShareEventButton

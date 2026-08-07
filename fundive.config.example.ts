@@ -85,6 +85,8 @@ export const siteConfig = {
     paymentDeadlineFallbackDays: 7,
     cardSurchargePercent: 5,
     nitroxCourseFee: 300,
+    // Length of a single-day event in the "Add to Google Calendar" link.
+    eventDurationHours: 8,
     // Case-insensitive regex fragments that mark a dive as a "trip" by title
     // (destination names, "\\bboat\\b", …). Empty = never classify by title.
     tripKeywords: ['\\bboat\\b'],

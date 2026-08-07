@@ -119,6 +119,10 @@ export interface SiteBusiness {
   cardSurchargePercent: number
   /** Flat fee to add a Nitrox course to a dive registration, in shop currency. */
   nitroxCourseFee: number
+  /** How long a single-day event runs, in hours, for the "Add to Google
+   *  Calendar" link. Events store a start time but no end time, and Google
+   *  needs a span. Omit to accept the code-side default (8). */
+  eventDurationHours?: number
   /** Case-insensitive regex-alternation fragments that mark a dive as a "trip"
    *  (vs a local shore dive) by title — destination names, "\\bboat\\b", etc.
    *  Empty = never match by title. Used for calendar coloring. */

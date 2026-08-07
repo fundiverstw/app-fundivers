@@ -55,6 +55,7 @@ export const zhTW: Messages = {
     priceFrom: (amount: string) => `${amount} 起`,
     cancelBooking: '取消報名',
     shareWithFriends: '分享連結給朋友',
+    addToGoogleCalendar: '加入 Google 日曆',
     busy: '忙碌',
     private: '私人',
     thisMonth: '本月',
