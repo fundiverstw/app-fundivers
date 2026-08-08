@@ -108,7 +108,7 @@ export function DiverNotes({ profileId, title = dn.title }: Props) {
   }
 
   return (
-    <Disclosure card title={title} titleClassName="text-sm font-semibold text-red-600 uppercase tracking-wider">
+    <Disclosure card title={title} titleClassName="text-sm font-semibold text-brand-700 uppercase tracking-wider">
       <div className="space-y-2">
         {notes.length === 0 && (
           <p className="text-xs text-brand-950 font-medium">{dn.none}</p>

@@ -77,7 +77,7 @@ export function DiverWaivers({ diverId, diverName }: { diverId: string; diverNam
   const now = new Date()
 
   return (
-    <Disclosure card title={dw.title} titleClassName="text-sm font-semibold text-red-600 uppercase tracking-wider">
+    <Disclosure card title={dw.title} titleClassName="text-sm font-semibold text-brand-700 uppercase tracking-wider">
       <p className="text-xs text-brand-950/70 font-medium">{dw.intro}</p>
       {failed ? (
         <p className="text-xs text-amber-700 font-medium">{dw.loadFailed}</p>

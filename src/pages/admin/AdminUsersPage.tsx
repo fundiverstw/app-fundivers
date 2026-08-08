@@ -18,6 +18,8 @@ import { fetchChargeCatalog } from '../../lib/booking-charge-catalog'
 import { getCertCardSignedUrl } from '../../lib/cert-card'
 import { shoeAsJp } from '../../lib/shoe-size'
 import { contactMethodLabel } from '../../lib/contact-labels'
+import { profileGapLabels } from '../../lib/profile-completeness'
+import { personName } from '../../lib/names'
 import { fetchCreditsForUser, openCreditForBooking, openCreditBalance, diverCreditBalance, createCredit, settleCredit, reopenCredit, applyCreditToBooking } from '../../lib/credits'
 import { netPaid, netPaidByBooking } from '../../lib/payments'
 import { issueTempPassword } from '../../lib/admin-password'
@@ -31,6 +33,7 @@ import type { AppEvent, Booking, BookingAmendment, BookingDetails, Credit, Payme
 import { t } from '../../i18n'
 
 const us = t.admin.users
+const cm = t.admin.completeness
 
 interface UserExtras {
   bookings: Array<Booking & { event: AppEvent | null; charges: ChargeLine[] }>
@@ -536,6 +539,7 @@ function UserCard({
   const [tempPassword, setTempPassword] = useState<string | null>(null)
   const [issuing, setIssuing] = useState(false)
   const [copied, setCopied] = useState(false)
+  const gaps = profileGapLabels(user)
 
   async function handleIssue() {
     const name = user.name || user.nickname || user.contact_id || user.id
@@ -579,6 +583,16 @@ function UserCard({
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0 ml-3">
+          {/* Visible while the card is still collapsed, so an admin scanning
+              search results can see who needs chasing without opening each. */}
+          {gaps.length > 0 && (
+            <span
+              className="text-xs font-semibold px-2 py-0.5 rounded-full select-none bg-amber-100 text-amber-900"
+              title={cm.missingList(gaps.join(', '))}
+            >
+              {cm.incomplete}
+            </span>
+          )}
           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full select-none ${
             user.role === 'admin' ? 'bg-accent text-white'
             : user.role === 'staff' ? 'bg-amber-500 text-white'
@@ -718,6 +732,20 @@ function UserCard({
   )
 }
 
+// Sits at the top of the expanded diver, above the sections it summarises, so
+// an admin sees at a glance whether anything is outstanding before scrolling
+// the field-by-field chips.
+function IncompleteBanner({ user }: { user: Profile }) {
+  const missing = profileGapLabels(user)
+  if (missing.length === 0) return null
+  return (
+    <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
+      <p className="text-xs font-semibold text-amber-900 uppercase tracking-wider">{cm.incomplete}</p>
+      <p className="text-xs text-amber-900">{cm.missingList(missing.join(', '))}</p>
+    </div>
+  )
+}
+
 function ProfileDetails({ user }: { user: Profile }) {
   const contact = user.contact_method && user.contact_id
     ? `${contactMethodLabel(user.contact_method)}: ${user.contact_id}`
@@ -730,13 +758,16 @@ function ProfileDetails({ user }: { user: Profile }) {
 
   return (
     <div className="space-y-3">
+      <IncompleteBanner user={user} />
+
       <Section title={us.secPersonal}>
         <Row k={us.rowEmail} v={user.email} />
-        <Row k={us.rowPreferredContact} v={contact} />
-        <Row k={us.rowDob} v={user.date_of_birth ? format(parseIsoDate(user.date_of_birth), 'MMM d, yyyy') : null} />
-        <Row k={us.rowNationality} v={user.nationality} />
+        <Row k={us.rowName} v={personName(user.name, user.nickname) || null} required />
+        <Row k={us.rowPreferredContact} v={contact} required />
+        <Row k={us.rowDob} v={user.date_of_birth ? format(parseIsoDate(user.date_of_birth), 'MMM d, yyyy') : null} required />
+        <Row k={us.rowNationality} v={user.nationality} required />
         <Row k={us.rowIdPassport} v={user.id_number} />
-        <Row k={us.rowGender} v={user.gender} />
+        <Row k={us.rowGender} v={user.gender} required />
       </Section>
 
       <Section title={us.secEmergency}>
@@ -745,7 +776,13 @@ function ProfileDetails({ user }: { user: Profile }) {
       </Section>
 
       <Section title={t.profile.certification}>
-        <Row k={us.rowAgencyLevel} v={user.cert_agency && user.cert_level ? `${user.cert_agency} ${user.cert_level}` : null} />
+        {/* Not required of a diver who ticked "not certified yet" — for them
+            the blank is the answer, not a gap. */}
+        <Row
+          k={us.rowAgencyLevel}
+          v={user.cert_level ? `${user.cert_agency ?? ''} ${user.cert_level}`.trim() : null}
+          required={!user.uncertified}
+        />
         <Row k={us.rowLoggedDives} v={String(user.logged_dives ?? 0)} />
         <Row k={us.rowLastDive} v={user.last_dive_date ? format(parseIsoDate(user.last_dive_date), 'MMM d, yyyy') : null} />
         <Row k={us.rowNitrox} v={user.nitrox_certified ? us.certifiedYes : us.certifiedNo} />
@@ -1131,12 +1168,18 @@ function Section({ title, children, defaultOpen = false }: { title: string; chil
   )
 }
 
-function Row({ k, v }: { k: string; v: string | null | undefined }) {
-  if (!v) return null
+// An empty optional field is nothing to say, so the row stays hidden. An empty
+// *required* one is the opposite — it's the thing the admin needs to see, and
+// hiding it is what made "Profile incomplete" a riddle. Those rows render with
+// a Missing chip in place of the value.
+function Row({ k, v, required }: { k: string; v: string | null | undefined; required?: boolean }) {
+  if (!v && !required) return null
   return (
-    <div className="flex justify-between text-xs">
+    <div className="flex justify-between text-xs gap-3">
       <span className="text-brand-900 font-medium">{k}</span>
-      <span className="text-brand-900 text-right">{v}</span>
+      {v
+        ? <span className="text-brand-900 text-right">{v}</span>
+        : <span className="shrink-0 font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-900">{cm.missing}</span>}
     </div>
   )
 }

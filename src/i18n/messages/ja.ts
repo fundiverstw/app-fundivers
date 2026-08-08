@@ -1295,7 +1295,6 @@ export const ja: Messages = {
       none: '保留中の新規ユーザー申請はありません。',
       noNameYet: '（氏名未入力）',
       submittedOn: (date: string) => `${date} に送信`,
-      profileIncomplete: 'プロフィール未完成',
       rejectReasonPlaceholder: '却下理由（任意・メールに記載されます）',
       approve: '承認',
       reject: '却下',
@@ -1316,6 +1315,11 @@ export const ja: Messages = {
       firstBooking: '最初の予約',
       unknownEvent: '（不明なイベント）',
       notes: (notes: string) => `備考：${notes}`,
+    },
+    completeness: {
+      incomplete: 'プロフィール未完成',
+      missing: '未入力',
+      missingList: (fields: string) => `未入力：${fields}`,
     },
     charts: {
       noData: 'この期間のデータはありません。',

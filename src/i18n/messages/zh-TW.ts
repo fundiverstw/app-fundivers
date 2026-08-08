@@ -1296,7 +1296,6 @@ export const zhTW: Messages = {
       none: '目前沒有待審核的新用戶申請。',
       noNameYet: '（尚未填寫姓名）',
       submittedOn: (date: string) => `送出於 ${date}`,
-      profileIncomplete: '資料未填完',
       rejectReasonPlaceholder: '婉拒原因（選填，會附在通知信中）',
       approve: '核准',
       reject: '婉拒',
@@ -1317,6 +1316,11 @@ export const zhTW: Messages = {
       firstBooking: '第一筆報名',
       unknownEvent: '（未知活動）',
       notes: (notes: string) => `備註：${notes}`,
+    },
+    completeness: {
+      incomplete: '資料未填完',
+      missing: '未填',
+      missingList: (fields: string) => `尚未填寫：${fields}`,
     },
     charts: {
       noData: '此區間內沒有資料。',

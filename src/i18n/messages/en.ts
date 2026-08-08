@@ -1307,7 +1307,6 @@ export const en = {
       none: 'No pending new user requests.',
       noNameYet: '(no name yet)',
       submittedOn: (date: string) => `submitted ${date}`,
-      profileIncomplete: 'Profile incomplete',
       rejectReasonPlaceholder: 'Optional rejection reason (included in the email)',
       approve: 'Approve',
       reject: 'Reject',
@@ -1328,6 +1327,13 @@ export const en = {
       firstBooking: 'First booking',
       unknownEvent: '(unknown event)',
       notes: (notes: string) => `Notes: ${notes}`,
+    },
+    // Shared by every admin surface that flags an unfinished diver profile:
+    // the approvals queue and the diver directory.
+    completeness: {
+      incomplete: 'Profile incomplete',
+      missing: 'Missing',
+      missingList: (fields: string) => `Still missing: ${fields}`,
     },
     charts: {
       noData: 'No data in range.',

@@ -153,7 +153,7 @@ export function AdminNotes({ target, tagFilter, title = nt.title, compact = fals
       <div className="flex items-center justify-between gap-2">
         <h2 className={compact
           ? 'text-xs font-semibold text-brand-900'
-          : 'text-sm font-semibold text-red-600 uppercase tracking-wider'}>
+          : 'text-sm font-semibold text-brand-700 uppercase tracking-wider'}>
           {title}
           {compact && open.length === 0 && (
             <span className="font-normal text-brand-950/60"> · none</span>

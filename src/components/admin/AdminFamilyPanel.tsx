@@ -106,7 +106,7 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
   if (user.parent_account) {
     const parentName = currentParent?.name ?? currentParent?.nickname ?? fm.unknownParent
     return (
-      <Disclosure card title={fm.heading} titleClassName="text-sm font-semibold text-red-600 uppercase tracking-wider">
+      <Disclosure card title={fm.heading} titleClassName="text-sm font-semibold text-brand-700 uppercase tracking-wider">
         <p className="text-sm text-brand-900">
           {fm.linkedAsChildOf} <strong>{parentName}</strong>
         </p>
@@ -126,7 +126,7 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
 
   // Mode B: this diver is top-level — list any children + offer the picker.
   return (
-    <Disclosure card title={fm.heading} titleClassName="text-sm font-semibold text-red-600 uppercase tracking-wider">
+    <Disclosure card title={fm.heading} titleClassName="text-sm font-semibold text-brand-700 uppercase tracking-wider">
       {children.length === 0 ? (
         <p className="text-xs text-brand-950 font-medium italic">{fm.noChildren}</p>
       ) : (

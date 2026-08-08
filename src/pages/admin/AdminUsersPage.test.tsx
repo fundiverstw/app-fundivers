@@ -117,6 +117,51 @@ describe('AdminUsersPage deep link', () => {
   })
 })
 
+describe('AdminUsersPage profile completeness', () => {
+  // The directory used to hide every blank field, so an admin looking at an
+  // unfinished diver saw a tidy card and no hint of what was missing.
+  it('names the gaps and marks each missing required field', async () => {
+    const partial = [{
+      id: 'u2', name: 'Bo', nickname: 'Bo', role: 'diver', email: 'b@x.io',
+      logged_dives: 0, gear_owned: [],
+      date_of_birth: '1990-01-01', contact_method: 'line', contact_id: 'bo-line',
+      cert_level: 'OW', cert_agency: 'PADI',
+      nationality: null, gender: null,
+    }]
+    from.mockImplementation((table: string) =>
+      table === 'profiles' ? mockQueryBuilder({ data: partial }) : mockQueryBuilder({ data: [] }),
+    )
+    renderAt('/admin/users?diver=u2')
+
+    await screen.findByText('Bo')
+    const summary = (await screen.findByText(/still missing/i)).textContent ?? ''
+    expect(summary).toMatch(/nationality/i)
+    expect(summary).toMatch(/gender/i)
+    // One chip per blank required row — nationality and gender.
+    expect(screen.getAllByText(t.admin.completeness.missing)).toHaveLength(2)
+    // Filled-in required fields render their value, not a chip (the card
+    // header shows the same cert string, hence getAll).
+    expect(screen.getAllByText('PADI OW').length).toBeGreaterThan(0)
+  })
+
+  it('shows no incomplete flag once every required field is filled', async () => {
+    const full = [{
+      id: 'u2', name: 'Bo', nickname: 'Bo', role: 'diver', email: 'b@x.io',
+      logged_dives: 0, gear_owned: [],
+      date_of_birth: '1990-01-01', nationality: 'TW', gender: 'female',
+      contact_method: 'line', contact_id: 'bo-line', cert_level: 'OW', cert_agency: 'PADI',
+    }]
+    from.mockImplementation((table: string) =>
+      table === 'profiles' ? mockQueryBuilder({ data: full }) : mockQueryBuilder({ data: [] }),
+    )
+    renderAt('/admin/users?diver=u2')
+
+    await screen.findByText('Bo')
+    expect(screen.queryByText(/still missing/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(t.admin.completeness.missing)).not.toBeInTheDocument()
+  })
+})
+
 describe('AdminUsersPage role promotion', () => {
   it('an admin can promote another user to staff', async () => {
     const builder = mockQueryBuilder({ data: profiles })

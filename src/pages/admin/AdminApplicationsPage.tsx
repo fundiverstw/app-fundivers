@@ -6,12 +6,14 @@ import { supabase } from '../../lib/supabase'
 import { useToast } from '../../hooks/useToast'
 import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
 import { contactMethodLabel } from '../../lib/contact-labels'
+import { profileGapLabels } from '../../lib/profile-completeness'
 import {
   CARD_ELEVATED, BTN_PRIMARY, BTN_DANGER, TEXT_MUTED, INPUT,
 } from '../../styles/tokens'
 import { t } from '../../i18n'
 
 const ap = t.admin.applications
+const cm = t.admin.completeness
 import type { AppEvent, Booking, Profile } from '../../types/database'
 
 // Admin queue for the manual-verification gate. Lists every profile in
@@ -149,11 +151,7 @@ export function AdminApplicationsPage() {
                   <div className={`text-xs ${TEXT_MUTED}`}>
                     {ap.submittedOn(format(shopZoned(new Date(u.created_at)), 'PP'))}
                   </div>
-                  {!u.application_submitted_at && (
-                    <span className="inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">
-                      {ap.profileIncomplete}
-                    </span>
-                  )}
+                  <IncompleteFlag profile={u} />
                 </div>
                 <span className={`text-xs ${TEXT_MUTED}`}>{isExpanded ? '−' : '+'}</span>
               </button>
@@ -203,6 +201,24 @@ export function AdminApplicationsPage() {
           )
         })}
       </ul>
+    </div>
+  )
+}
+
+// "Profile incomplete" on its own left the admin to open the card and diff it
+// against the required set in their head, so the badge now names the gaps.
+// Computed from the row's own fields rather than application_submitted_at:
+// that stamp never lands for an uncertified diver, which would brand a
+// perfectly complete Discover profile as incomplete forever.
+function IncompleteFlag({ profile }: { profile: Profile }) {
+  const missing = profileGapLabels(profile)
+  if (missing.length === 0) return null
+  return (
+    <div className="mt-1 space-y-0.5">
+      <span className="inline-block text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">
+        {cm.incomplete}
+      </span>
+      <div className="text-xs text-amber-900">{cm.missingList(missing.join(', '))}</div>
     </div>
   )
 }
