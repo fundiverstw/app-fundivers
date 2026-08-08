@@ -83,7 +83,8 @@ export async function fetchContinuableCourses(
   if (bookingError) throw new Error(bookingError.message)
 
   const candidates = ((bookingRows ?? []) as Booking[])
-    .filter(b => b.event_id && b.event_id !== excludeEventId && !b.continues_booking_id)
+    .filter((b): b is Booking & { event_id: string } =>
+      !!b.event_id && b.event_id !== excludeEventId && !b.continues_booking_id)
   if (!candidates.length) return []
 
   const { data: eventRows, error: eventError } = await supabase
