@@ -767,6 +767,63 @@ describe('AdminEventDetailPage', () => {
     expect(bookingUpdate).not.toHaveBeenCalled()
   })
 
+  it('defaults a balance amendment to "owes less", so a submit with no sign chosen discounts rather than bills', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
+    ]))
+
+    const bookings = [{
+      id: 'b1', user_id: 'u1', status: 'confirmed', created_at: '2026-04-20',
+      event_id: 'dive_x', notes: null, refund_requested_at: null,
+      details: { total: 12000 },
+    }]
+    const profiles = [{
+      id: 'u1', name: 'Ada Lovelace', nickname: null,
+      cert_agency: null, cert_level: null, nitrox_certified: false,
+      logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null,
+      contact_method: null, contact_id: null,
+    }]
+
+    const amendmentInsert = vi.fn().mockReturnValue({
+      select: () => ({
+        single: () => Promise.resolve({
+          data: { id: 'am-1', booking_id: 'b1', amount: -500, note: 'Gear never issued', created_by: 'admin-1', created_at: '2026-05-14T10:00:00Z' },
+          error: null,
+        }),
+      }),
+    })
+
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: bookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      if (table === 'booking_amendments') {
+        const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
+        b.insert = amendmentInsert
+        return b
+      }
+      return mockQueryBuilder({ data: [] })
+    })
+
+    const user = userEvent.setup()
+    renderAt('/admin/events/dive_x')
+
+    await user.click(await screen.findByRole('button', { expanded: false, name: /Ada Lovelace/ }))
+
+    const less = screen.getByRole('option', { name: /owes less/i }) as HTMLOptionElement
+    const more = screen.getByRole('option', { name: /owes more/i }) as HTMLOptionElement
+    expect(less.selected).toBe(true)
+    expect(more.selected).toBe(false)
+
+    await user.type(screen.getByPlaceholderText(/^amount$/i), '500')
+    await user.type(screen.getByPlaceholderText(/reason \(required\)/i), 'Gear never issued')
+    await user.click(screen.getByRole('button', { name: /^add amendment$/i }))
+
+    await waitFor(() => expect(amendmentInsert).toHaveBeenCalled())
+    expect(amendmentInsert.mock.calls[0]?.[0]).toMatchObject({
+      booking_id: 'b1', amount: -500, note: 'Gear never issued',
+    })
+  })
+
   it('creates a new diver account from the Add diver modal and advances to the register step', async () => {
     fetchEventsForBookings.mockResolvedValue(new Map([
       ['dive_x', {

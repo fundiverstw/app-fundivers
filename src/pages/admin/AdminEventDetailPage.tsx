@@ -1602,7 +1602,10 @@ function AmendmentsSection({ readOnly, onAdd }: {
   readOnly: boolean
   onAdd: (sign: '+' | '-', amount: number, note: string) => Promise<void>
 }) {
-  const [sign, setSign] = useState<'+' | '-'>('+')
+  // Defaults to "owes less": amendments are overwhelmingly discounts and
+  // goodwill write-offs, and billing a diver extra by mis-clicking is the
+  // costlier way to get this wrong.
+  const [sign, setSign] = useState<'+' | '-'>('-')
   const [amountStr, setAmountStr] = useState('')
   const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -1625,7 +1628,7 @@ function AmendmentsSection({ readOnly, onAdd }: {
       await onAdd(sign, amount, note.trim())
       setAmountStr('')
       setNote('')
-      setSign('+')
+      setSign('-')
     } finally {
       setSubmitting(false)
     }
@@ -1643,8 +1646,8 @@ function AmendmentsSection({ readOnly, onAdd }: {
               onChange={e => setSign(e.target.value as '+' | '-')}
               className="bg-white border border-surface-300 rounded px-1.5 py-0.5 text-xs font-semibold text-brand-900"
             >
-              <option value="+">{ed.owesMore}</option>
               <option value="-">{ed.owesLess}</option>
+              <option value="+">{ed.owesMore}</option>
             </select>
             <input
               type="number"
