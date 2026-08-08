@@ -9,6 +9,7 @@ import { gearTotals, splitByTransport, transportHeadcount, dayKeyOffset, careTot
 import { gearPieceKey, loadPackedGear, savePackedGear, togglePackedGear } from '../../lib/gear-packed'
 import { bookingBalance, type BookingBalance } from '../../lib/booking-balance'
 import { openCreditForBooking } from '../../lib/credits'
+import { bookingsOnDay } from '../../lib/course-continuation'
 import { fetchAmendmentsForBookings, amendmentsDelta } from '../../lib/booking-amendments'
 import { netPaidByBooking } from '../../lib/payments'
 import { personName } from '../../lib/names'
@@ -402,7 +403,11 @@ export function AdminLogisticsPage() {
           ? supabase.from('duties').select('*').in('event_id', eventIds).lte('start_date', dayKey).or(dayCovered)
           : Promise.resolve({ data: [] as Duty[] }),
       ])
-      const bookings = (bookingsB.data ?? []) as Booking[]
+      // Drop the bookings that aren't on site today: a course booking may be
+      // limited to some of its course's days when the diver is finishing a
+      // course they started on an earlier one. Everything below — headcount,
+      // gear, cars, balances — is a day-of view, so this belongs at the source.
+      const bookings = bookingsOnDay((bookingsB.data ?? []) as Booking[], dayKey)
       const duties = (dutiesB.data ?? []) as Duty[]
 
       // Resolve catalog titles for the day's add-ons so we can pick out the

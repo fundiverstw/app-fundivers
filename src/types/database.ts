@@ -135,6 +135,21 @@ export interface Database {
         Args: { p_offer_id: string }
         Returns: void
       }
+      // Defined in 20260814000000_course_continuation.sql; security-definer,
+      // admin-only. Registers a diver onto a second scheduled course to finish
+      // a course they started elsewhere: validates the pairing, optionally
+      // trims the original booking to the days they actually attended, and
+      // inserts the zero-cost continuation. Returns its booking id.
+      create_course_continuation: {
+        Args: {
+          p_source_booking: string
+          p_event_id:       string
+          p_days:           string[]
+          p_source_days?:   string[] | null
+          p_charge_label?:  string | null
+        }
+        Returns: string
+      }
       // Defined in 20260514010000_event_capacity.sql; security-definer.
       // Returns one row per event with at least one confirmed booking.
       // Lets divers see real aggregate capacity numbers past their RLS.
@@ -600,6 +615,15 @@ export interface Database {
            *  own account shows "covered by the lead". Added in
            *  20260622000000_lead_payer.sql. */
           payer_id: string | null
+          /** Set when this booking finishes a course started on another
+           *  scheduled course: it points at the booking that holds the money,
+           *  and is itself always zero-cost. Written only by the
+           *  create_course_continuation RPC (20260814000000). */
+          continues_booking_id: string | null
+          /** Which of the event's course_days this diver attends. NULL — the
+           *  normal case, and every booking predating the column — means all of
+           *  them. Read by the day-level gear and headcount views. */
+          attend_days: string[] | null
         }
         Insert: {
           id?: string
@@ -612,6 +636,10 @@ export interface Database {
           refund_requested_at?: string | null
           group_id?: string | null
           payer_id?: string | null
+          /** Continuations are inserted by create_course_continuation() only —
+           *  present here for completeness, not as a client write path. */
+          continues_booking_id?: string | null
+          attend_days?: string[] | null
         }
         Update: {
           id?: string
@@ -623,6 +651,8 @@ export interface Database {
           refund_requested_at?: string | null
           group_id?: string | null
           payer_id?: string | null
+          continues_booking_id?: string | null
+          attend_days?: string[] | null
         }
         Relationships: []
       }

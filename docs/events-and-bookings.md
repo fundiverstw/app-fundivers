@@ -208,3 +208,36 @@ Each card shows:
 - `BookingDetails.deposit` can be missing or 0 when the event carries
   no `deposit_amount`. In that case `PaymentsPage` shows no
   "Deposit due" line for that booking.
+
+## One course, several scheduled courses
+
+A student who starts Open Water on the 10th and finishes it with the
+course three weeks later is **one course, two events**. Migration
+`20260814000000_course_continuation.sql` adds the two columns that say
+so:
+
+| Column | Meaning |
+| --- | --- |
+| `bookings.continues_booking_id` | The earlier booking this one continues. The earlier booking holds the money; the continuation is always zero-cost (`details.total = 0`, one stated zero charge line, `details.course_continuation = true`). `NULL` on a normal booking. |
+| `bookings.attend_days` | Which of the event's `course_days` this diver is actually there for. `NULL` — every existing booking, and every diver doing the whole course — means **all of them**. |
+
+Created only by the admin, from the target course's page
+("Continue a course here" → `CourseContinuationModal`), which calls the
+`create_course_continuation` RPC. The RPC is where the rules live, not
+the form: admin-only, both events must be courses, the days must belong
+to the target course's `course_days`, the diver must not already be
+booked on it, and a continuation cannot itself be continued (a third leg
+points at the original booking, so "where is the money?" stays a lookup
+rather than a walk). It optionally trims the *original* booking's
+`attend_days` in the same call — the days the student actually attended
+before they stopped.
+
+`attend_days` is what keeps the day-level views honest. Every "who is
+here today" read — `fetchDayGearRows`, the logistics day loader — filters
+through `bookingsOnDay()` (`src/lib/course-continuation.ts`), so a
+student booked for the last two days of a course is not counted, or
+packed for, on the first two. A `NULL` attend_days always answers "yes,
+present", which is what keeps every pre-existing booking correct.
+
+Capacity is deliberately unchanged: a continuing student occupies a real
+seat on the second course and counts toward it like any other registrant.

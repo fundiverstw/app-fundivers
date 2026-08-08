@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { fetchEventsInRange } from './events'
+import { bookingsOnDay } from './course-continuation'
 import type { Booking, Profile } from '../types/database'
 
 /** A day's booking with the diver behind it — what the gear views read. */
@@ -27,7 +28,11 @@ export async function fetchDayGearRows(dayKey: string): Promise<DayGearRow[]> {
   const { data: bookingData, error: bookingError } = await supabase
     .from('bookings').select('*').in('event_id', eventIds).neq('status', 'cancelled')
   if (bookingError) throw new Error(`bookings for ${dayKey}: ${bookingError.message}`)
-  const bookings = (bookingData ?? []) as Booking[]
+  // A course booking can be limited to some of the course's days — a student
+  // finishing a course they started on an earlier one attends the last two days
+  // and no others. Packing gear for the days they aren't coming is exactly the
+  // waste this filter exists to prevent.
+  const bookings = bookingsOnDay((bookingData ?? []) as Booking[], dayKey)
   if (!bookings.length) return []
   const userIds = [...new Set(bookings.map(b => b.user_id))]
   const { data: profileData, error: profileError } = await supabase

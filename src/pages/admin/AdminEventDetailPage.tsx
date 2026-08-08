@@ -3,7 +3,7 @@ import { siteConfig } from '../../config/site'
 import { PageLoading } from '../../components/ui/Spinner'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import { shopZoned } from '../../lib/dates'
+import { shopZoned, parseIsoDate } from '../../lib/dates'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
@@ -15,6 +15,8 @@ import { notifyWaitlistConfirmed } from '../../lib/booking-notifications'
 import { AdminNotes } from '../../components/admin/AdminNotes'
 import { EventSeriesSection } from '../../components/admin/EventSeriesSection'
 import { AdminAddDiverModal } from '../../components/admin/AdminAddDiverModal'
+import { CourseContinuationModal } from '../../components/admin/CourseContinuationModal'
+import { isCourseContinuation, attendDayKeys } from '../../lib/course-continuation'
 import { EventStaffSection } from '../../components/admin/EventStaffSection'
 import { RegisterForm } from '../../components/register/RegisterForm'
 import { shoeAsJp } from '../../lib/shoe-size'
@@ -80,6 +82,7 @@ export function AdminEventDetailPage() {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<Registrant | null>(null)
   const [addDiverOpen, setAddDiverOpen] = useState(false)
+  const [continuationOpen, setContinuationOpen] = useState(false)
   // ?diver=<id> deep link (from the Create-diver page) auto-opens the add-diver
   // modal preselected to that diver. Captured once, then the param is consumed
   // so a refresh — or a later manual "Add diver" — starts from a clean picker.
@@ -529,6 +532,17 @@ export function AdminEventDetailPage() {
                 >
                   {ed.addDiver}
                 </button>
+                {/* Courses only: a continuation is meaningless for a fun dive,
+                    which is one day and one price with nothing to finish. */}
+                {event.type === 'course' && !event.cancelled_at && (
+                  <button
+                    type="button"
+                    onClick={() => setContinuationOpen(true)}
+                    className="text-xs bg-emerald-900/60 hover:bg-emerald-900 text-white px-3 py-1 rounded-lg"
+                  >
+                    {t.admin.continuation.action}
+                  </button>
+                )}
                 <Link
                   to={`/admin/events/${id}/edit`}
                   className="text-xs bg-brand-900/60 hover:bg-brand-900 text-white px-3 py-1 rounded-lg"
@@ -681,6 +695,14 @@ export function AdminEventDetailPage() {
             setPreselectDiverId(null)
             setRefreshKey(k => k + 1)
           }}
+        />
+      )}
+
+      {continuationOpen && event && (
+        <CourseContinuationModal
+          event={event}
+          onClose={() => setContinuationOpen(false)}
+          onAdded={() => setRefreshKey(k => k + 1)}
         />
       )}
 
@@ -1376,6 +1398,22 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
             ) : (
               <span className="ml-2 text-xs font-semibold text-emerald-300">{ed.waiversOk}</span>
             )}
+          {/* Finishing a course started on another scheduled course: the money
+              sits on that booking, so this row must never read as unpaid. */}
+          {isCourseContinuation(r.booking) && (
+            <span className="ml-2 text-xs font-semibold text-teal-300" title={t.admin.continuation.noCharge}>
+              {t.admin.continuation.badge}
+            </span>
+          )}
+          {/* Set on either side of a continuation — the days this diver is
+              actually on site, when that's fewer than the course runs. */}
+          {attendDayKeys(r.booking).length > 0 && (
+            <span className="ml-2 text-xs font-semibold text-teal-300">
+              {t.admin.continuation.partialDays(
+                attendDayKeys(r.booking).map(d => format(parseIsoDate(d), 'MMM d')).join(' · '),
+              )}
+            </span>
+          )}
           {coveredByLead && (
             <span className="ml-2 text-xs font-semibold text-violet-300">{ed.paidBy(r.payerName!)}</span>
           )}
