@@ -1317,7 +1317,7 @@ export const en = {
       emailSent: ' · email sent',
       emailSkipped: ' · email skipped',
       decisionFailed: 'Decision failed',
-      email: 'Email',
+      accountEmail: 'Account email',
       cert: 'Cert',
       loggedDives: 'Logged dives',
       nationality: 'Nationality',

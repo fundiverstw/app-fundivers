@@ -1306,7 +1306,7 @@ export const zhTW: Messages = {
       emailSent: ' · 通知信已寄出',
       emailSkipped: ' · 未寄送通知信',
       decisionFailed: '審核處理失敗',
-      email: '電子郵件',
+      accountEmail: '帳號電子郵件',
       cert: '證照',
       loggedDives: '潛水紀錄次數',
       nationality: '國籍',

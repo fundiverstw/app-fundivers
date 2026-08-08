@@ -5,6 +5,7 @@ import { shopZoned } from '../../lib/dates'
 import { supabase } from '../../lib/supabase'
 import { useToast } from '../../hooks/useToast'
 import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
+import { contactMethodLabel } from '../../lib/contact-labels'
 import {
   CARD_ELEVATED, BTN_PRIMARY, BTN_DANGER, TEXT_MUTED, INPUT,
 } from '../../styles/tokens'
@@ -209,7 +210,12 @@ export function AdminApplicationsPage() {
 function ApplicantSummary({ profile }: { profile: Profile }) {
   return (
     <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
-      <Row k={ap.email} v={profile.contact_id ?? '—'} />
+      {/* The handle the diver gave, under the method they actually picked —
+          it's a Line ID or a phone number as often as an email address. Their
+          account email is a separate row: it's always there (auth requires
+          it), and it's how the approve/reject mail reaches them. */}
+      <Row k={contactMethodLabel(profile.contact_method)} v={profile.contact_id ?? '—'} />
+      <Row k={ap.accountEmail} v={profile.email ?? '—'} />
       <Row k={ap.cert}  v={profile.cert_level ? `${profile.cert_agency ?? ''} ${profile.cert_level}`.trim() : '—'} />
       <Row k={ap.loggedDives} v={String(profile.logged_dives ?? 0)} />
       <Row k={ap.nationality} v={profile.nationality ?? '—'} />

@@ -17,6 +17,7 @@ import { resolveCharges, type ChargeLine } from '../../lib/booking-charges'
 import { fetchChargeCatalog } from '../../lib/booking-charge-catalog'
 import { getCertCardSignedUrl } from '../../lib/cert-card'
 import { shoeAsJp } from '../../lib/shoe-size'
+import { contactMethodLabel } from '../../lib/contact-labels'
 import { fetchCreditsForUser, openCreditForBooking, openCreditBalance, diverCreditBalance, createCredit, settleCredit, reopenCredit, applyCreditToBooking } from '../../lib/credits'
 import { netPaid, netPaidByBooking } from '../../lib/payments'
 import { issueTempPassword } from '../../lib/admin-password'
@@ -719,7 +720,7 @@ function UserCard({
 
 function ProfileDetails({ user }: { user: Profile }) {
   const contact = user.contact_method && user.contact_id
-    ? `${labelForMethod(user.contact_method)}: ${user.contact_id}`
+    ? `${contactMethodLabel(user.contact_method)}: ${user.contact_id}`
     : null
   const sizing = [
     user.height_cm ? us.heightCm(user.height_cm) : null,
@@ -1138,11 +1139,6 @@ function Row({ k, v }: { k: string; v: string | null | undefined }) {
       <span className="text-brand-900 text-right">{v}</span>
     </div>
   )
-}
-
-function labelForMethod(m: NonNullable<Profile['contact_method']>) {
-  const cm = t.profile.contactMethod
-  return m === 'whatsapp' ? cm.whatsapp : m === 'line' ? cm.line : m === 'phone' ? cm.phone : cm.email
 }
 
 function statusColor(s: Booking['status']) {

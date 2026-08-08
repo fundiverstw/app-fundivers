@@ -112,6 +112,44 @@ describe('AdminApplicationsPage', () => {
     expect(screen.queryByText(/profile incomplete/i)).not.toBeInTheDocument()
   })
 
+  // Regression: the contact handle was hard-labelled "Email", so a diver who
+  // picked Line saw their Line ID filed under Email — and their real address
+  // was nowhere on the card.
+  it('labels the contact handle with the method the diver picked', async () => {
+    from.mockReturnValueOnce(mockQueryBuilder({
+      data: [{
+        id: 'u1', name: 'Alice', created_at: '2026-04-30T00:00:00Z', status: 'pending',
+        contact_method: 'line', contact_id: 'alice-line-id', email: 'alice@example.com',
+      }],
+    }))
+    from.mockReturnValueOnce(mockQueryBuilder({ data: [] }))
+
+    renderPage()
+    fireEvent.click(await screen.findByText('Alice'))
+
+    expect(await screen.findByText('Line')).toBeInTheDocument()
+    expect(screen.getByText('alice-line-id')).toBeInTheDocument()
+    // …and the account email is its own row, whatever the preferred method.
+    expect(screen.getByText(/account email/i)).toBeInTheDocument()
+    expect(screen.getByText('alice@example.com')).toBeInTheDocument()
+  })
+
+  it('falls back to a generic contact label when no method is set yet', async () => {
+    from.mockReturnValueOnce(mockQueryBuilder({
+      data: [{
+        id: 'u1', name: 'Leo', created_at: '2026-04-30T00:00:00Z', status: 'pending',
+        contact_method: null, contact_id: null, email: 'leo@example.com',
+      }],
+    }))
+    from.mockReturnValueOnce(mockQueryBuilder({ data: [] }))
+
+    renderPage()
+    fireEvent.click(await screen.findByText('Leo'))
+
+    expect(await screen.findByText(/preferred contact/i)).toBeInTheDocument()
+    expect(screen.getByText('leo@example.com')).toBeInTheDocument()
+  })
+
   it('approve calls notify-application-decision and removes the row', async () => {
     from.mockReturnValueOnce(mockQueryBuilder({
       data: [{ id: 'u1', name: 'Alice', created_at: '2026-04-30T00:00:00Z', status: 'pending' }],

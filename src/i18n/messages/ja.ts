@@ -1305,7 +1305,7 @@ export const ja: Messages = {
       emailSent: ' · メール送信済み',
       emailSkipped: ' · メール送信なし',
       decisionFailed: '処理に失敗しました',
-      email: 'メールアドレス',
+      accountEmail: 'アカウントのメールアドレス',
       cert: '認定',
       loggedDives: 'ログダイブ数',
       nationality: '国籍',
