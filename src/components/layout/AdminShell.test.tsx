@@ -79,6 +79,40 @@ describe('AdminShell pending badge', () => {
     expect(badge.closest('a')).toHaveAttribute('href', '/admin/refunds')
   })
 
+  // Regression: the badge counted only profiles with a non-null
+  // application_submitted_at. That column is stamped by a DB trigger and never
+  // lands for a diver who stopped short of completing their profile, so the
+  // badge showed nothing while divers sat waiting — the same defect that hid
+  // them from the approvals queue itself.
+  it('counts every pending diver, including ones with an unfinished profile', async () => {
+    useAuthMock.mockReturnValue({
+      profile: { id: 'a1', role: 'admin', nickname: 'Ada' },
+      signOut: vi.fn(),
+    })
+    const calls: Array<{ method: string; args: unknown[] }> = []
+    from.mockImplementation((table: string) => {
+      const q: Record<string, unknown> = {}
+      for (const m of ['select', 'eq', 'neq', 'not', 'is']) {
+        q[m] = (...args: unknown[]) => {
+          if (table === 'profiles') calls.push({ method: m, args })
+          return q
+        }
+      }
+      // 4 pending divers, none of whom ever earned the timestamp.
+      q.then = (resolve: (r: { count: number }) => void) => resolve({ count: table === 'profiles' ? 4 : 0 })
+      return q
+    })
+
+    routedRender()
+
+    await waitFor(() => expect(screen.getByText(/4 pending/i)).toBeInTheDocument())
+    // Nothing may narrow the count beyond status='pending'.
+    expect(calls.some(c => c.args.includes('application_submitted_at'))).toBe(false)
+    expect(calls.filter(c => c.method === 'eq')).toEqual([
+      { method: 'eq', args: ['status', 'pending'] },
+    ])
+  })
+
   it('does not query for staff users', async () => {
     useAuthMock.mockReturnValue({
       profile: { id: 's1', role: 'staff', nickname: 'Sam' },

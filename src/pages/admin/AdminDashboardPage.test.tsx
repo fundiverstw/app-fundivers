@@ -68,6 +68,38 @@ describe('AdminDashboardPage', () => {
     expect(screen.getByText('OW Course')).toBeInTheDocument()
   })
 
+  // Regression: the pending-requests KPI also required a non-null
+  // application_submitted_at, so divers who never finished their profile went
+  // uncounted here, in the nav badge, and in the approvals queue alike.
+  it('counts every pending diver, including ones with an unfinished profile', async () => {
+    const calls: Array<{ method: string; args: unknown[] }> = []
+    let eventsCall = 0
+    from.mockImplementation((table: string) => {
+      const b: Record<string, unknown> = {}
+      for (const m of ['select', 'gte', 'lt', 'eq', 'neq', 'in', 'is', 'not', 'order']) {
+        b[m] = (...args: unknown[]) => {
+          if (table === 'profiles') calls.push({ method: m, args })
+          return b
+        }
+      }
+      const result =
+        table === 'payments' ? { data: payments, error: null }
+        : table === 'bookings' ? { data: bookings, error: null }
+        : table === 'profiles' ? { data: profiles, count: 7, error: null }
+        : table === 'events' ? { data: eventsCall++ === 0 ? dives : courses, error: null }
+        : { data: [], error: null }
+      b.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+        Promise.resolve(result).then(res, rej)
+      return b
+    })
+
+    renderPage()
+
+    const pending = (await screen.findByText('Pending new user requests')).closest('div')!
+    expect(within(pending).getByText('7')).toBeInTheDocument()
+    expect(calls.some(c => c.args.includes('application_submitted_at'))).toBe(false)
+  })
+
   it('surfaces a fetch error', async () => {
     from.mockImplementation((table: string) =>
       table === 'payments'

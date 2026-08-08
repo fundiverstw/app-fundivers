@@ -58,7 +58,11 @@ async function loadDashboard(): Promise<Dashboard> {
     supabase.from('payments').select('user_id, booking_id, amount, status, method, created_at').gte('created_at', startIso).lt('created_at', endIso),
     supabase.from('bookings').select('id, user_id, event_id, status, created_at, details').gte('created_at', startIso).lt('created_at', endIso),
     supabase.from('profiles').select('id, role, status, created_at, nationality, cert_level'),
-    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'pending').not('application_submitted_at', 'is', null),
+    // Every pending diver — same condition as the approvals queue and the nav
+    // badge. Filtering on application_submitted_at here hid the divers who
+    // never completed their profile, which is most of the ones who need
+    // chasing. See AdminShell for the full story.
+    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('bookings').select('id', { count: 'exact', head: true }).not('refund_requested_at', 'is', null).neq('status', 'cancelled'),
     supabase.from('events').select('id, display_title, admin_title, capacity, start_date').eq('kind', 'dive').is('cancelled_at', null).gte('start_date', today),
     supabase.from('events').select('id, display_title, admin_title, capacity, course_days').eq('kind', 'course').is('cancelled_at', null),
