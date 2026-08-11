@@ -91,7 +91,9 @@ describe('bookings constraints', () => {
     // column (NOT NULL) instead of the old eo_dive_id/eo_course_id XOR.
     const neither = await admin
       .from('bookings')
-      .insert({ user_id: user.id, status: 'pending' })
+      // Deliberately omitting event_id. The Insert type now requires it —
+      // which is the invariant this test proves the database enforces too.
+      .insert({ user_id: user.id, status: 'pending' } as never)
     expect(neither.error).toBeTruthy()
     expect(String(neither.error?.message ?? '')).toMatch(/event_present|event_id|null|check/i)
   })

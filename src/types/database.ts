@@ -599,7 +599,10 @@ export interface Database {
           id: string
           created_at: string
           user_id: string
-          event_id: string | null
+          /** NOT NULL in the schema (and belt-and-braces CHECK
+           *  `bookings_event_present`). A booking without an event is not a
+           *  state the database can hold, so don't reintroduce a null branch. */
+          event_id: string
           status: 'pending' | 'confirmed' | 'cancelled' | 'waitlisted'
           notes: string | null
           details: BookingDetails
@@ -629,7 +632,7 @@ export interface Database {
           id?: string
           created_at?: string
           user_id: string
-          event_id?: string | null
+          event_id: string
           status?: 'pending' | 'confirmed' | 'cancelled' | 'waitlisted'
           notes?: string | null
           details?: BookingDetails
@@ -644,7 +647,7 @@ export interface Database {
         Update: {
           id?: string
           user_id?: string
-          event_id?: string | null
+          event_id?: string
           status?: 'pending' | 'confirmed' | 'cancelled' | 'waitlisted'
           notes?: string | null
           details?: BookingDetails

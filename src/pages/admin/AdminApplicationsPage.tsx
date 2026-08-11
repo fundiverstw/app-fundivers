@@ -81,8 +81,8 @@ export function AdminApplicationsPage() {
 
     let hydrated: PendingExtras['booking'] = null
     if (first) {
-      const eventMap = await fetchEventsForBookings(first.event_id ? [first.event_id] : [])
-      const event = first.event_id ? eventMap.get(first.event_id) ?? null : null
+      const eventMap = await fetchEventsForBookings([first.event_id])
+      const event = eventMap.get(first.event_id) ?? null
       hydrated = { ...first, event }
     }
 

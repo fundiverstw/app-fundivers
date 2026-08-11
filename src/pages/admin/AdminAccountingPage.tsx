@@ -47,7 +47,7 @@ async function fetchTransactions(year: number): Promise<AccountingTransaction[]>
     ? (await supabase.from('bookings').select('id, user_id, event_id, status, details').in('id', bookingIds)).data ?? []
     : []
 
-  const eventIds = [...new Set(bookings.map(b => b.event_id).filter((x): x is string => !!x))]
+  const eventIds = [...new Set(bookings.map(b => b.event_id))]
   const personIds = [...new Set([
     ...payments.map(p => p.user_id),
     ...payments.map(p => p.recorded_by).filter((x): x is string => !!x),

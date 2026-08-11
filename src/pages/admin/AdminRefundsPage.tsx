@@ -45,7 +45,7 @@ async function loadRefundRequests(): Promise<RefundRow[]> {
 
   const userIds = [...new Set(bookings.map(b => b.user_id).filter((x): x is string => !!x))]
   const bookingIds = bookings.map(b => b.id)
-  const eventIds = [...new Set(bookings.map(b => b.event_id).filter((x): x is string => !!x))]
+  const eventIds = [...new Set(bookings.map(b => b.event_id))]
 
   const [profilesRes, paymentsRes, eventMap] = await Promise.all([
     supabase.from('profiles').select('id, name, nickname').in('id', userIds),
@@ -68,7 +68,7 @@ async function loadRefundRequests(): Promise<RefundRow[]> {
   }
 
   return bookings.map(b => {
-    const event = b.event_id ? eventMap.get(b.event_id) ?? null : null
+    const event = eventMap.get(b.event_id) ?? null
     return {
       bookingId: b.id,
       diverName: nameById.get(b.user_id ?? '') || rf.colDiver,

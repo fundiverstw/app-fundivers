@@ -37,7 +37,11 @@ const CONSTRAINT_FRIENDLY: { pattern: RegExp; message: string }[] = [
   { pattern: /prereq_cert_id/, message: t.errors.prereqCertGone },
   { pattern: /_price_fkey/,    message: t.errors.priceTierGone },
   { pattern: /cancel_policy/,  message: t.errors.cancelPolicyGone },
-  { pattern: /course_days/,    message: t.errors.courseDaysMax },
+  // Matches the CHECK `events_course_has_days` and a bare `course_days`
+  // column mention. The `has_` is not optional decoration: the constraint was
+  // renamed with the unified events table, and a pattern of /course_days/
+  // silently stopped matching it — the admin got the generic 23514 string.
+  { pattern: /course_(has_)?days/, message: t.errors.courseDaysRange },
 ]
 
 function fieldSpecificMessage(haystack: string): string | null {

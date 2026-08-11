@@ -82,7 +82,7 @@ async function loadDashboard(): Promise<Dashboard> {
   // Event rows we still need titles for: events referenced by bookings that
   // aren't already in the upcoming-dives / all-courses sets we loaded.
   const knownIds = new Set([...upcomingDives.map(d => d.id), ...allCourses.map(c => c.id)])
-  const refIds = [...new Set(bookings.map(b => b.event_id).filter((x): x is string => !!x && !knownIds.has(x)))]
+  const refIds = [...new Set(bookings.map(b => b.event_id).filter(x => !knownIds.has(x)))]
   const extra = refIds.length
     ? (await supabase.from('events').select('id, kind, display_title, admin_title, capacity, start_date, course_days').in('id', refIds)).data as EventRowLite[] ?? []
     : []
@@ -107,9 +107,9 @@ async function loadDashboard(): Promise<Dashboard> {
   const upcomingIds = events.filter(e => e.dateKey && e.dateKey >= today).map(e => e.id)
   const confRes = upcomingIds.length
     ? await supabase.from('bookings').select('event_id').eq('status', 'confirmed').in('event_id', upcomingIds)
-    : { data: [] as Array<{ event_id: string | null }> }
+    : { data: [] as Array<{ event_id: string }> }
   const counts = new Map<string, number>()
-  for (const r of confRes.data ?? []) if (r.event_id) counts.set(r.event_id, (counts.get(r.event_id) ?? 0) + 1)
+  for (const r of confRes.data ?? []) counts.set(r.event_id, (counts.get(r.event_id) ?? 0) + 1)
   const confirmed: ConfirmedCount[] = [...counts.entries()].map(([eventId, count]) => ({ eventId, count }))
 
   return computeDashboard({ nowIso, payments, bookings, profiles, events, confirmed, pendingApplications, pendingRefundRequests })

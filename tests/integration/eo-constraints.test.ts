@@ -3,12 +3,13 @@
  * still-legacy prices, rooms, addons. These exercise the real FK
  * relationships (events.price -> prices.id) and events' own CHECKs.
  *
- * The remaining EO_* tables carry Bubble-legacy column names with spaces and
- * capitals ("Created Date"), hyphens and double-quote quoting. supabase-js
- * forwards them to PostgREST unchanged.
+ * The filename is legacy; the tables are not. Nothing here is Bubble-shaped
+ * any more — every column is lowercase and every id is a uuid.
  */
 import { describe, it, expect, afterEach } from 'vitest'
 import { adminClient } from './helpers'
+import { errorMessage } from '../../src/lib/errors'
+import { t } from '../../src/i18n'
 
 const admin = adminClient()
 const createdPriceIds: string[] = []
@@ -112,7 +113,20 @@ describe('catalog table constraints', () => {
       course_days: ['2026-05-09', '2026-05-10', '2026-05-11', '2026-05-12', '2026-05-13'],
     } as never)
     expect(error).toBeTruthy()
-    expect(String(error?.message ?? '')).toMatch(/events_course_has_days|course_days|violat|check/i)
+    // Assert what the ADMIN sees, not that some error happened: errorMessage
+    // matches the constraint name to name the field. The unit test can only
+    // pin a string we typed — this one reads the name Postgres actually
+    // emits, so renaming the constraint without updating the pattern fails
+    // here instead of silently degrading to the generic "check failed" copy.
+    expect(errorMessage(error)).toBe(t.errors.courseDaysRange)
+  })
+
+  it('a course with no days at all reports the same friendly message', async () => {
+    const { error } = await admin.from('events' as never).insert({
+      id: rid(), kind: 'course', display_title: 'Dayless course',
+    } as never)
+    expect(error).toBeTruthy()
+    expect(errorMessage(error)).toBe(t.errors.courseDaysRange)
   })
 
   it('rooms and addons have id primary keys (round-trips cleanly)', async () => {

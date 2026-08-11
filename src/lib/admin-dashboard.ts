@@ -124,7 +124,7 @@ export function computeDashboard(input: DashboardInput): Dashboard {
   const eventOfPayment = (p: PaymentLite): EventLite | null => {
     const b = p.booking_id ? bookingById.get(p.booking_id) : undefined
     if (!b) return null
-    return b.event_id ? eventById.get(b.event_id) ?? null : null
+    return eventById.get(b.event_id) ?? null
   }
 
   // --- Revenue ---

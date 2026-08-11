@@ -79,7 +79,7 @@ export function PaymentsPage() {
     const bookingIds = bookings.map(b => b.id)
     const personIds = [...new Set(bookings.flatMap(b => [b.user_id, b.payer_id]).filter((x): x is string => !!x))]
 
-    const eventIds = bookings.map(b => b.event_id).filter((x): x is string => !!x)
+    const eventIds = bookings.map(b => b.event_id)
     const [paymentsRes, profilesRes, eventMap, catalog, amendmentsByBooking] = await Promise.all([
       bookingIds.length
         ? supabase.from('payments').select('*').in('booking_id', bookingIds)
@@ -105,7 +105,7 @@ export function PaymentsPage() {
     }
 
     const lineData: BookingLine[] = bookings.map(b => {
-      const event = b.event_id ? eventMap.get(b.event_id) ?? null : null
+      const event = eventMap.get(b.event_id) ?? null
       const d = (b.details ?? {}) as { total?: number; deposit?: number }
       const total = Number(d.total ?? 0)
       const deposit = Number(d.deposit ?? 0)

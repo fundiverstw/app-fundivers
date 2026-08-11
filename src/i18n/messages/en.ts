@@ -2409,7 +2409,7 @@ export const en = {
     prereqCertGone: 'The required certification you selected is no longer available. Choose a different level or select "None".',
     priceTierGone: 'The price tier you selected is no longer available. Pick a different one.',
     cancelPolicyGone: 'The cancellation policy you selected is no longer available. Pick a different one.',
-    courseDaysMax: 'A course can have at most 4 days.',
+    courseDaysRange: 'A course needs between 1 and 4 days.',
   },
   push: {
     unsupported: 'Push notifications are not supported on this device.',

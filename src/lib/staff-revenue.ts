@@ -61,7 +61,7 @@ export interface RevenueBookingDetails {
 
 export interface RevenueBooking {
   id: string
-  event_id: string | null
+  event_id: string
   status: string
   details: RevenueBookingDetails | null
 }
@@ -214,7 +214,7 @@ export function buildStaffRevenue(input: BuildStaffRevenueInput): StaffRevenueRe
 
   const soldByEvent = new Map<string, { students: number; revenue: number }>()
   for (const b of input.bookings) {
-    if (b.status !== 'confirmed' || !b.event_id) continue
+    if (b.status !== 'confirmed') continue
     const bucket = soldByEvent.get(b.event_id) ?? { students: 0, revenue: 0 }
     bucket.students += 1
     bucket.revenue += bookingBase(b.details, eventById.get(b.event_id)?.base_price ?? null)

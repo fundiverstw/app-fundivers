@@ -135,7 +135,7 @@ export function AdminUsersPage() {
     const bookings = bookingsRes.data ?? []
     const payments = (paymentsRes.data ?? []) as Payment[]
 
-    const eventIds = bookings.map(b => b.event_id).filter((x): x is string => !!x)
+    const eventIds = bookings.map(b => b.event_id)
     const [eventMap, amendments, catalog] = await Promise.all([
       eventIds.length
         ? fetchEventsForBookings(eventIds)
@@ -145,7 +145,7 @@ export function AdminUsersPage() {
     ])
 
     const hydrated = bookings.map(b => {
-      const event = b.event_id ? eventMap.get(b.event_id) ?? null : null
+      const event = eventMap.get(b.event_id) ?? null
       return {
         ...b,
         event,

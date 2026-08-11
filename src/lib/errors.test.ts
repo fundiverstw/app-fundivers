@@ -38,10 +38,12 @@ describe('errorMessage', () => {
       message: 'violates foreign key constraint "events_cancel_policy_fkey"',
     })).toMatch(/cancellation policy/i)
 
+    // The real constraint name, verbatim from Postgres — a test pinned to a
+    // renamed constraint passes while the live message falls through.
     expect(errorMessage({
       code: '23514',
-      message: 'new row violates check constraint "eo_courses_course_days_len"',
-    })).toMatch(/at most 4 days/i)
+      message: 'new row for relation "events" violates check constraint "events_course_has_days"',
+    })).toMatch(/between 1 and 4 days/i)
   })
 
   it('falls back to the generic SQLSTATE string when no constraint matches', () => {

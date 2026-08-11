@@ -2373,7 +2373,7 @@ export const zhTW: Messages = {
     prereqCertGone: '你選擇的必要證照等級已不存在。請改選其他等級，或選擇「無」。',
     priceTierGone: '你選擇的價格級距已不存在。請改選其他級距。',
     cancelPolicyGone: '你選擇的取消政策已不存在。請改選其他政策。',
-    courseDaysMax: '課程最多只能有 4 天。',
+    courseDaysRange: '課程必須有 1 至 4 天。',
   },
   push: {
     unsupported: '這個裝置不支援推播通知。',

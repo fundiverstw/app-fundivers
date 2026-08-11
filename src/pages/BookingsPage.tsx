@@ -89,7 +89,7 @@ export function BookingsPage() {
       offersByBooking = new Map((offers ?? []).map(o => [o.booking_id, o as WaitlistOffer]))
     }
 
-    const eventIds = bookings.map(b => b.event_id).filter((x): x is string => !!x)
+    const eventIds = bookings.map(b => b.event_id)
     const [eventMap, catalog] = await Promise.all([
       eventIds.length
         ? fetchEventsForBookings(eventIds)
@@ -112,7 +112,7 @@ export function BookingsPage() {
       const bookingPayments = paymentsByBooking.get(b.id) ?? []
       const paidSum = netPaid(bookingPayments)
       const offer = offersByBooking.get(b.id) ?? null
-      const event = b.event_id ? eventMap.get(b.event_id) ?? null : null
+      const event = eventMap.get(b.event_id) ?? null
       return {
         ...b,
         event,

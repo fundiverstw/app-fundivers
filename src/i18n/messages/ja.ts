@@ -2372,7 +2372,7 @@ export const ja: Messages = {
     prereqCertGone: '選択した必要認定ランクは現在利用できません。別のランクを選ぶか、「なし」を選択してください。',
     priceTierGone: '選択した料金区分は現在利用できません。別の区分を選択してください。',
     cancelPolicyGone: '選択したキャンセル規定は現在利用できません。別の規定を選択してください。',
-    courseDaysMax: 'コースは最大 4 日までです。',
+    courseDaysRange: 'コースの日程は 1 日以上 4 日以内にしてください。',
   },
   push: {
     unsupported: 'この端末はプッシュ通知に対応していません。',
