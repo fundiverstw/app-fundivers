@@ -12,6 +12,7 @@ into source.
 | [events-and-bookings.md](./events-and-bookings.md)     | Calendar rendering, register-form wizard, `bookings.details` JSONB shape |
 | [payments.md](./payments.md)                           | Deposit vs balance semantics, payments ledger, refund flow |
 | [admin.md](./admin.md)                                 | Admin routes, event memos, user search, role-view toggle |
+| [dive-site-maps.md](./dive-site-maps.md)               | Diver-contributed 3D seafloor maps: the implicit 1 m lattice, honest-gap surfacing, contribution model. Admin-only, not yet persisted |
 | [packages.md](./packages.md)                           | Partner-shop registration network: product tiers, add-on/room estimate, recommendation email, kickback ledger |
 | [push-notifications.md](./push-notifications.md)       | Web Push: VAPID, service worker, Cloudflare cron sender, `/admin-broadcast`, `/notify-duty`, CORS |
 | [testing.md](./testing.md)                             | Unit vs integration conventions, `mockQueryBuilder`, Makefile surface |
