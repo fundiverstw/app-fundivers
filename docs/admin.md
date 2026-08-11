@@ -14,7 +14,9 @@ admin):
 
 | Route | Page | Purpose |
 | --- | --- | --- |
-| `/admin`                                | `DashboardPage`         | Shared dashboard (divers see it at `/dashboard`); admin variant pulls operational counts |
+| `/admin`                                | —                       | Redirects to `/admin/logistics`, the day board |
+| `/admin/home`                           | `DashboardPage`         | Shared dashboard (divers see it at `/dashboard`); admin variant pulls operational counts |
+| `/admin/logistics`                      | `AdminLogisticsPage`    | The day board: runs, seats, riders, gear — see [Transport](#transport-runs-seats-riders) |
 | `/admin/events`                         | `AdminEventsPage`       | Month view of every event with registration counts |
 | `/admin/events/:id`               | `AdminEventDetailPage`  | Registrants, memos, status controls for one event |
 | `/admin/events/:id/gear-map`      | `AdminGearMapPage`      | Per-registrant gear/sizing checklist for the event |
@@ -25,13 +27,13 @@ Write/manage routes — gated by `AdminRoute` (admin only):
 | Route | Page | Purpose |
 | --- | --- | --- |
 | `/admin/new`                            | `AdminManagePage`       | Catalog landing — links to event/room/addon/travel/price editors |
-| `/admin/new/event`                      | `AdminNewEventPage`     | Create a new dive or course |
+| `/admin/new/event`                      | `AdminNewEventPage`     | Create an event of any `kind` (dive / course / adventure), optionally as a recurring series |
 | `/admin/events/:id/edit`          | `AdminEditEventPage`    | Edit event details |
-| `/admin/rooms`                          | `AdminRoomsPage`        | Manage `EO_rooms` rows |
-| `/admin/addons`                         | `AdminAddonsPage`       | Manage `Other_Addons` rows |
+| `/admin/rooms`                          | `AdminRoomsPage`        | Manage `rooms` rows |
+| `/admin/addons`                         | `AdminAddonsPage`       | Manage `addons` rows |
 | `/admin/travel`                         | `AdminTravelPage`       | Manage `trip_templates` rows |
 | `/admin/destinations`                   | `AdminDestinationsPage` | Manage `travel_destinations` rows |
-| `/admin/prices`                         | `AdminPricesPage`       | Manage `EO_prices` rows |
+| `/admin/prices`                         | `AdminPricesPage`       | Manage `prices` rows |
 | `/admin/users`                          | `AdminUsersPage`        | Searchable diver directory with full profile cards |
 | `/admin/duty`                           | `AdminDutyPage`         | Assign staff/admin to events; fires push to assignee |
 | `/admin/notifications`                  | `AdminNotificationsPage` | Compose + send a one-off Web-Push broadcast to all subscribed devices |
@@ -41,7 +43,7 @@ All routes are also wrapped by `ProtectedRoute` — see
 
 ## Event detail
 
-`/admin/events/:id` shows one dive or course. The page has:
+`/admin/events/:id` shows one event, whatever its `kind`. The page has:
 
 - **Registrants** — expandable cards per booking. Expanded view
   includes the diver's profile summary (cert, contact, sizing,
@@ -205,24 +207,33 @@ a waitlisted diver's gear isn't packed today, so it can't be kept out
 for tomorrow. `gearDayDiff` in `src/lib/logistics.ts` is pure and
 unit-tested; the panel is `src/components/admin/NextDayGearDiff.tsx`.
 
-## Event memos
+## Event memos (`admin_notes`)
 
-`event_memos` is a free-form "sticky note" table for operational flags.
-Memos surface on the admin event-detail page and are **not visible to
-divers**.
+`admin_notes` is the free-form "sticky note" table for operational flags.
+Memos surface on the admin event-detail page and the per-diver gear card,
+and are **not visible to divers**.
 
 Every memo is:
 
-- Attached to exactly one of `eo_dive_id` / `eo_course_id` (XOR check).
-- Tagged with one of: `urgent`, `payment`, `gear`, `logistics`,
-  `cert`, `medical`, `note`. The tag drives the colour in the UI.
+- Attached to exactly one target — `event_id` **or** `booking_id`, never
+  both and never neither (CHECK `admin_notes_target_present`). This is the
+  one XOR left in the schema; events themselves are a single table now.
+- Tagged with one of: `urgent`, `payment`, `gear`, `logistics`, `cert`,
+  `medical`, `note`, `general`. The tag drives the colour in the UI, and
+  the gear card filters to `gear`-tagged notes on the booking.
 - Free-text content, 1–2000 chars.
 - **Resolvable** — when resolved, `resolved`, `resolved_by`, and
-  `resolved_at` are set as a trio (DB CHECK enforces this). Resolved
-  memos stay in the table but are visually separated.
+  `resolved_at` are set as a trio (CHECK `admin_notes_resolved_consistency`).
+  Resolved memos stay in the table but are visually separated.
 
-UI: `src/components/admin/EventMemos.tsx`. Admins create memos, tag
-them, and flip resolved when handled.
+UI: `src/components/admin/AdminNotes.tsx`, which takes a
+`target={{ kind: 'event' | 'booking', id }}`.
+
+Standing facts about a **person** go in `diver_notes` instead (allergies,
+accommodations — anything true every time they dive, not just on one
+event). Those hang off `profile_id`, render on the diver's card at
+`/admin/users`, and have `profile_id` / `created_by` / `created_at` frozen
+by trigger so the attribution can't be rewritten.
 
 ## Users
 
@@ -344,7 +355,7 @@ with their own test bookings.
 | Create / resolve event memos | no | no | yes |
 | Read & insert `admin_notes` (own attribution) | no | yes | yes |
 | Update / delete `admin_notes` | no | no | yes |
-| Manage `EO_*` catalog (new/edit/rooms/addons/travel/prices) | no | no | yes |
+| Manage the catalog (events / rooms / addons / travel / prices) | no | no | yes |
 | Assign duties | no | no | yes |
 | Be assigned a duty (trigger gate) | no | yes | yes |
 | Read own revenue by season | no | yes | yes |

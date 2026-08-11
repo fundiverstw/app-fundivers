@@ -2,37 +2,49 @@
 
 ## Event data flow
 
-Two catalog tables drive everything shown on the calendar:
+**One table drives the calendar:** `events`, discriminated by `kind`
+(`dive` | `course` | `adventure`). Dives and adventures carry a
+`start_date` / `end_date` envelope; courses run on an explicit list of days
+(see [#course_days](#course_days)). Which shape a kind uses is a question
+you ask — `usesDateEnvelope(kind)` / `usesCourseDays(kind)` from
+`src/lib/event-kinds.ts` — never a `kind === 'dive'` test. See
+[data-model.md](./data-model.md#ask-what-a-kind-does).
 
-- `EO_dives` — single-session dives.
-- `EO_courses` — courses that run on an explicit list of days
-  (see [#course_days](#course_days)).
-
-Both use **text** `_id`, `start_date`, `end_date`, and time columns.
 Normalization into a uniform `AppEvent` type happens in
 `src/lib/events.ts`:
 
 - `fetchEventsInRange(fromDate, toDate)` — calendar month views.
-- `fetchEventsForBookings(diveIds, courseIds)` — bookings / payments
-  pages that need to show event info alongside a booking row.
+- `fetchEventsForBookings(eventIds)` — bookings / payments pages that need
+  to show event info alongside a booking row.
+- `fetchUpcomingEventDays()` — the dashboard's next-days strip.
 
-Every UI surface reads `AppEvent`, not raw `EO_*` rows.
+Both range queries filter on `DATE_ENVELOPE_KINDS` / `COURSE_DAY_KINDS`
+rather than naming kinds, so a new kind joins the right query the moment
+it answers `usesDateEnvelope`. Every UI surface reads `AppEvent`, not raw
+`events` rows.
 
 ### `AppEvent` shape (abbreviated)
 
 ```ts
 {
-  id: string                 // the EO_dives/EO_courses _id
-  type: 'dive' | 'course'
-  title: string              // dive_title || title || fallback
-  start_time: string         // ISO timestamp (Taipei-local composed from text cols)
+  id: string                 // events.id (uuid)
+  type: EventKind            // 'dive' | 'course' | 'adventure'
+  title: string              // display_title || admin_title || fallback
+  calendar_title: string | null   // short label for the calendar grid pill
+  start_time: string         // ISO timestamp (shop-local, composed from the row)
   end_time:   string | null
+  start_time_hhmm: string | null  // 'HH:mm', null when no time is set
   price:      number | null
   deposit_amount: number | null
-  currency:   'TWD'
+  transport_price: number | null
+  currency:   string         // locale.currency
+  capacity / confirmed_count / fully_booked / cancelled_at / is_private
   has_rooms / room_type_ids / has_addons / addon_ids / gear_rental_info / nitrox_required / dive_days
+  details?: EventDetails | null   // the calendar modal's descriptive block
 }
 ```
+
+`src/types/database.ts` is the full, commented definition.
 
 ## Calendar rendering
 
@@ -58,8 +70,9 @@ Every UI surface reads `AppEvent`, not raw `EO_*` rows.
 
 ### `course_days`
 
-A course runs on an explicit list of dates: `EO_courses.course_days`
-(a `date[]`, max 4 — DB CHECK `eo_courses_course_days_len`). Admins
+A course runs on an explicit list of dates: `events.course_days`
+(a `date[]`, 1–4 entries — DB CHECK `events_course_has_days`, which also
+enforces that a `kind = 'course'` row has them at all). Admins
 enter each day in the event form. `courseToEvents()` in
 `src/lib/events.ts` sorts + dedupes the list, groups **consecutive**
 calendar days into one continuous segment, and emits one `AppEvent`
@@ -95,22 +108,23 @@ Clicking an event in the calendar opens `RegisterForm`
 total = base_price
       + gear_cost       (0 if included; otherwise à-la-carte only:
                          ∑ per-item × days for the chosen items)
-      + room_cost       (selected EO_rooms.added_price)
-      + addons_cost     (∑ Other_Addons.price for selected ids)
+      + room_cost       (selected rooms.added_price)
+      + addons_cost     (∑ addons.price for selected ids)
       + transport_cost  (event.transport_price if surcharge>0 and ticked;
                          else 0 — surcharge=0 means transport is bundled
                          and we render "Included with base price")
-      + nitrox_course   (6,000 TWD if required-and-not-certified and ticked)
-total *= 1.05           (if payment_method === 'credit_card')
+      + nitrox_course   (business.nitroxCourseFee if required-and-not-
+                         certified and ticked)
+total *= 1 + business.cardSurchargePercent/100
+                        (if payment_method === 'credit_card')
 ```
 
-Gear prices (`GEAR_ALACARTE_PRICES`) live in `src/lib/gear.ts`;
-`NITROX_COURSE_FEE` lives in `src/lib/booking-charges.ts` (shared by both
-register forms and the display-time recompute). Gear is à-la-carte only —
-there is no full-set package. **Transport** moved out of the constants in
-migration `20260430030000_eo_prices_transport_int.sql`: it's now a
-per-event integer on the linked `EO_prices.transport` row, surfaced
-on `AppEvent` as `transport_price`.
+Every figure in that formula is shop config, not a literal: gear prices
+(`GEAR_ALACARTE_PRICES` in `src/lib/gear.ts`) and `NITROX_COURSE_FEE` (in
+`src/lib/booking-charges.ts`) both read `business.*` from
+`fundive.config.ts`. Gear is à-la-carte only — there is no full-set
+package. **Transport** is a per-event integer on the linked
+`prices.transport` row, surfaced on `AppEvent` as `transport_price`.
 
 `buildCharges()` in `src/lib/booking-charges.ts` turns these into an
 itemized `ChargeLine[]` that is both shown in the form summary and
@@ -122,23 +136,33 @@ frozen against later price changes (see
 
 The form does **not** write to `bookings` directly. It invokes the
 `create-registration` Supabase Edge Function
-(`supabase/functions/create-registration/index.ts`) which atomically:
+(`supabase/functions/create-registration/handler.ts`) which atomically:
 
-1. (Guest path only) Creates the auth user with `email_confirm: true`
+1. Resolves `event_id` against `events` (and rejects an event that has
+   already happened) before doing anything expensive.
+2. (Guest path only) Creates the auth user with `email_confirm: true`
    so a typo'd address is rejected loudly instead of silently dropped.
-2. Updates `profiles` from `profile_patch`.
-3. Inserts one row into `public.bookings` (under service-role, so RLS
+3. Updates `profiles` from `profile_patch`.
+4. Inserts one row into `public.bookings` (under service-role, so RLS
    doesn't apply at this stage):
    - `user_id`, `status: 'pending'`
-   - `eo_dive_id` XOR `eo_course_id` set from the event type
+   - `event_id` — the single FK to `events`. The request body also carries
+     `event_type` (the `kind`), which the function uses for the
+     has-it-passed check and to read the right dates for the emailed copy
+     (`usesCourseDays(event_type)` picks `course_days` over the envelope)
    - `notes` — free-text field from the form
    - `details` JSONB — see
-     [data-model.md § BookingDetails](./data-model.md#bookingdetails-jsonb-shape)
-     (`total`, `deposit`, and the itemized `charges` are snapshots).
-4. Builds a registration PDF (`supabase/functions/_shared/pdf.ts`) and
-   sends it via Gmail SMTP to `fundiverstw@gmail.com` and the diver —
-   unless `suppress_email` is set (group registration; see below).
-5. Returns `{ booking_id, session? }` — `session` populated on the
+     [data-model.md § BookingDetails](./data-model.md#bookingdetails-jsonb-shape).
+     `total` / `deposit` / `charges` are snapshots, and the function
+     **recomputes `total` and `deposit` server-side** from the event's
+     linked `prices` row (`computeBookingMoney`) rather than trusting the
+     client's figures — they are what `apply_credit_to_booking` and
+     `record_group_payment` read, so a crafted request must not be able to
+     set its own.
+5. Builds a registration PDF (`supabase/functions/_shared/pdf.ts`) and
+   sends it via Gmail SMTP to `contact.email` from the config and to the
+   diver — unless `suppress_email` is set (group registration; see below).
+6. Returns `{ booking_id, session? }` — `session` populated on the
    guest path so the SPA can `setSession()` without a second
    round-trip.
 
@@ -176,9 +200,11 @@ a *group total* (per-diver figure × diver count) when the lead pays for
 everyone: each sibling booking carries the same per-diver `total`, so
 what the lead owes is the sum.
 
-The unique indexes `bookings_user_dive_uniq` /
-`bookings_user_course_uniq` prevent a diver from double-booking the
-same event — Supabase returns a conflict and the form shows an error.
+The partial unique index `bookings_one_active_per_user_idx`
+(`(user_id, event_id)` where the booking isn't cancelled) prevents a diver
+from double-booking the same event — Supabase returns a conflict and the
+form shows an error. Cancelled rows are excluded, so a diver who cancelled
+can register again.
 
 ## BookingsPage — the diver's view
 

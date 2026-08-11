@@ -131,7 +131,8 @@ admin" link, and `AdminShell` has "view as diver" — see
 Auth role drives RLS. A diver only sees their own `bookings` /
 `payments` / `push_subscriptions`; staff and admin share broader
 `select` policies on `profiles`, `bookings`, `payments`,
-`event_memos` (gated through the `is_staff_or_admin()` SQL helper).
+`admin_notes` / `diver_notes` (gated through the `is_staff_or_admin()`
+SQL helper).
 Writes on those tables stay admin-only via `is_admin()`. The push
 worker uses the **service role** key and bypasses RLS entirely — that's
 why it lives server-side, never in the browser.

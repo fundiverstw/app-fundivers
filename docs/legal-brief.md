@@ -106,7 +106,7 @@ checkbox should be added to signup).
 | Column | Sensitivity | Notes |
 | --- | --- | --- |
 | `user_id` | n/a | FK to profiles |
-| `eo_dive_id` XOR `eo_course_id` | n/a | which event was booked |
+| `event_id` | n/a | which event was booked (FK → `events`) |
 | `status` | n/a | `pending` / `confirmed` / `waitlisted` / `cancelled` |
 | `notes` | sensitive | diver-supplied free text — may contain medical / personal info |
 | `details` | sensitive | JSONB with room choice, add-ons, gear preferences, transport, payment method, deposit acknowledgements |

@@ -73,8 +73,9 @@ it('does a thing', async () => {
 - `userClient(email, password)` — signs in as a real auth user.
 - `createTestUser({ role })` — creates a one-off `test_<rand>@example.test`
   account with email pre-confirmed; optionally promotes to admin.
-- `createTestDive() / createTestCourse()` — minimal rows in the
-  `EO_*` tables so a booking can reference them.
+- `createTestDive() / createTestCourse()` — minimal `events` rows
+  (`kind: 'dive'` with a date envelope, `kind: 'course'` with
+  `course_days`) so a booking can reference them.
 - `deleteTestUser()` / `deleteTestDive()` / `deleteTestCourse()` for cleanup.
 
 **Setup** (`tests/setup.integration.ts`) runs `supabase status -o env`
@@ -90,14 +91,17 @@ the full list. Representative slices:
 | Pattern | Focus |
 | --- | --- |
 | `auth-smoke.test.ts` / `profile-trigger.test.ts`           | Signup trigger creates a profile; login returns a session; `handle_new_user` edge cases |
-| `constraints.test.ts` / `core-rls.test.ts`                 | Booking XOR / unique / immutability triggers / core RLS |
+| `constraints.test.ts` / `core-rls.test.ts`                 | Booking uniqueness / immutability triggers / core RLS |
+| `bookings-one-active-per-event.test.ts`                    | The partial unique index that stops a double booking but allows re-registering after a cancel |
 | `staff-role.test.ts`                                       | The staff role's read scope and write denial |
-| `eo-*-admin-writes.test.ts` / `eo-public-read.test.ts`     | RLS on the EO_\* catalog tables (admin can write, anon/diver read what's public) |
-| `eo-events-*.test.ts`                                      | Event-level constraints (cancellation, payment deadlines) |
-| `event-addons.test.ts` / `event-rooms.test.ts`             | Junction tables (`eo_dive_addons`, `eo_dive_rooms`) |
-| `memos.test.ts`                                            | `event_memos` XOR + resolved-trio CHECK |
+| `eo-*.test.ts`                                             | Legacy filenames, current tables: RLS and constraints on `events` and the catalog (`prices`, `rooms`, `addons`) — admin can write, anon/diver read what's public |
+| `set-event-relations.test.ts`                              | The single write path for the `event_rooms` / `event_addons` / `event_destinations` junctions |
+| `event-capacity.test.ts` / `event-cascade-delete.test.ts`  | Confirmed-head counting; what a deleted event takes with it |
+| `event-series.test.ts`                                     | Recurrence batches and re-anchoring |
+| `course-continuation.test.ts`                              | `create_course_continuation()`: the rules for finishing a course on a later one |
+| `memos.test.ts`                                            | `admin_notes` target XOR + resolved-trio CHECK |
 | `duties.test.ts`                                           | Duty assignee trigger (must be staff or admin) |
-| `dive-sites-rls.test.ts` / `cert-levels-rls.test.ts`       | Reference data: read-open, write-admin |
+| `cert-levels-rls.test.ts`                                  | Reference data: read-open, write-admin |
 | `admin-audit-log.test.ts`                                  | Admin mutations land in the audit log |
 | `pii-retention.test.ts`                                    | TOS-acceptance + retention behaviours |
 | `seed-integrity.test.ts`                                   | `supabase/seed.sql` still loads cleanly |

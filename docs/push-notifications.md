@@ -142,8 +142,8 @@ gated by `profiles.role` in the worker.
 ```
 POST /admin-event-broadcast
 Authorization: Bearer <admin user's session JWT>
-{ "event_id": "<EO_dives._id | EO_courses._id>",
-  "event_type": "dive" | "course",
+{ "event_id": "<events.id>",
+  "event_type": "dive" | "course" | "adventure",
   "status": "on" | "cancelled",
   "body": "Free-form note that becomes the push body." }
 → { "sent": N, "skipped": M, "recipients": K }
@@ -154,7 +154,7 @@ Title is auto-built: `Event {display_title} is ON AS SCHEDULED!` or
 (the inbox), so the diver can re-read the body after the system tray
 dismisses the push. Inbox rows are written `kind = 'event_status'`.
 
-This endpoint is decoupled from `EO_*.cancelled_at` — sending a CANCELLED
+This endpoint is decoupled from `events.cancelled_at` — sending a CANCELLED
 notification does **not** flip the column. Use the existing "Cancel event"
 flow for that; the two are intentionally independent so admins can also
 broadcast "back on" updates without restoring the row.
@@ -175,8 +175,8 @@ a spot needs to know. Gated by `profiles.role = 'admin'` in the worker.
 ```
 POST /admin-event-reschedule
 Authorization: Bearer <admin user's session JWT>
-{ "event_id": "<EO_dives._id | EO_courses._id>",
-  "event_type": "dive" | "course",
+{ "event_id": "<events.id>",
+  "event_type": "dive" | "course" | "adventure",
   "from_date": "YYYY-MM-DD",   // optional — both present = single-day move
   "to_date":   "YYYY-MM-DD" }  // optional
 → { "sent": N, "skipped": M, "recipients": K }
@@ -212,8 +212,8 @@ Two backends, because of where the keys live:
 ```
 POST /admin-event-cancellation
 Authorization: Bearer <admin user's session JWT>
-{ "event_id": "<EO_dives._id | EO_courses._id>",
-  "event_type": "dive" | "course" }
+{ "event_id": "<events.id>",
+  "event_type": "dive" | "course" | "adventure" }
 → { "sent": N, "skipped": M, "recipients": K }
 ```
 

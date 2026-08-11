@@ -7,7 +7,7 @@ into source.
 | Doc | What it covers |
 | --- | --- |
 | [architecture.md](./architecture.md)                   | Stack, directory layout, runtime boundaries (client / worker / Supabase) |
-| [data-model.md](./data-model.md)                       | Every table, the `EO_*` Bubble-import convention, XOR FK pattern |
+| [data-model.md](./data-model.md)                       | Every table, the unified `events` model, the catalog reference tables |
 | [authentication.md](./authentication.md)               | Sign-up trigger, `useAuth`, role gating, `ProtectedRoute` / `AdminRoute` |
 | [events-and-bookings.md](./events-and-bookings.md)     | Calendar rendering, register-form wizard, `bookings.details` JSONB shape |
 | [payments.md](./payments.md)                           | Deposit vs balance semantics, payments ledger, refund flow |
@@ -31,8 +31,11 @@ into source.
   `locale.language` in `fundive.config.ts` and lives in the `src/i18n`
   message catalogs, not as inline literals. See [i18n.md](./i18n.md).
 - **No emojis in code or commits** unless explicitly requested.
-- **XOR FKs** appear in `bookings` and `event_memos`: exactly one of
-  `eo_dive_id` / `eo_course_id` is set. Don't "fix" one side.
+- **One `events` table, discriminated by `kind`.** Dives, courses and
+  adventures are rows in `events`; every child table points at it with a
+  plain `event_id`. Ask what a kind *does* through the helpers in
+  `src/lib/event-kinds.ts` — never `=== 'dive'`. See
+  [data-model.md](./data-model.md#the-events-table).
 
 ## Common commands
 

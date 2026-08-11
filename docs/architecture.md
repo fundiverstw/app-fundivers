@@ -25,39 +25,35 @@
 
 ## Directory layout
 
+`src/App.tsx` is the authoritative route table and `ls src/pages/` the
+authoritative page list; the landmarks worth knowing are:
+
 ```
 src/
   App.tsx                 Route table (browser-side)
   main.tsx                React entry + SW registration
   sw.ts                   Service worker (injectManifest target)
+  config/site.ts          Typed handle on fundive.config.ts (the shop seam)
   lib/
     supabase.ts           Singleton supabase client
-    events.ts             EO_dives / EO_courses → AppEvent normalization
+    event-kinds.ts        The `kind` vocabulary + the questions to ask of it
+                          (import-free: edge functions + push worker share it)
+    events.ts             events rows → AppEvent normalization
     calendar-layout.ts    Multi-day bar track-stacking
+    booking-charges.ts    buildCharges / resolveCharges — the itemized total
     push.ts               Web Push enrollment (subscribe/unsubscribe)
     push-reminders.ts     Pure reminder-selection logic (shared with worker)
   hooks/useAuth.ts        Session + profile subscription
   pages/
-    DashboardPage.tsx     Shared dashboard (rendered at /dashboard for
-                          divers and /admin for admins)
+    DashboardPage.tsx     Shared dashboard (/dashboard for divers,
+                          /admin/home for admins)
     CalendarPage.tsx      Diver calendar + register flow entry
-    MapPage.tsx           Dive sites map
-    BookingsPage.tsx      Diver's own bookings (upcoming / past)
-    PaymentsPage.tsx      Diver's own payment status
+    RecordsPage.tsx       Tab shell over Bookings / Payments / Dive logs
     ProfilePage.tsx       Editable profile + push-notification toggle
     DutiesPage.tsx        Staff/admin own-duty list
     RegisterPage.tsx      Public, no-auth registration funnel
-    EelSnakePage.tsx      Easter-egg minigame
-    LoginPage.tsx / SignupPage.tsx / ForgotPasswordPage.tsx /
-    ResetPasswordPage.tsx / TermsPage.tsx
-    admin/
-      AdminEventsPage.tsx / AdminEventDetailPage.tsx /
-      AdminEditEventPage.tsx / AdminNewEventPage.tsx /
-      AdminGearMapPage.tsx / AdminUsersPage.tsx /
-      AdminDutyPage.tsx / AdminNotificationsPage.tsx /
-      AdminManagePage.tsx (catalog landing) +
-      AdminRoomsPage / AdminAddonsPage / AdminTravelPage /
-      AdminPricesPage  (catalog editors)
+    admin/                Event, logistics, catalog, user and accounting
+                          surfaces — see admin.md for the route table
   components/
     layout/
       AppShell.tsx           Diver shell (top bar + bottom nav)
@@ -68,8 +64,9 @@ src/
     register/
       RegisterForm.tsx       3-step booking wizard (used by RegisterPage)
     admin/
-      EventMemos.tsx         Staff-visible flags per event
-  types/database.ts          Hand-maintained Supabase Database type
+      AdminNotes.tsx         Operational memos on an event or a booking
+  types/database.ts          Hand-maintained Supabase Database type, and the
+                             compile-time guard pinning EVENT_KINDS to the DB
 
 supabase/migrations/         Forward-only SQL migrations
 supabase/functions/          Supabase Edge Functions (Deno)
@@ -151,9 +148,14 @@ Practical rules:
 - **No custom app server.** PostgREST + RLS covers all CRUD; we avoid
   a whole runtime. RLS policies in migrations are the source of truth
   for authorization.
-- **EO\_\* tables are legacy Bubble-imported** catalog data (dives,
-  courses, prices, rooms, addons). They use text `_id` columns and
-  text date/time columns because that's what Bubble emits. Treat them
-  as read-mostly data the app normalizes through `src/lib/events.ts`.
+- **One `events` table, not one per kind.** Dives, courses and
+  adventures differ in a handful of columns and in almost nothing else
+  a booking, duty, car or waiver cares about, so they share a table and
+  a `kind` discriminator; every child points at it with a plain
+  `event_id`. The Bubble-imported `EO_*` pair this replaced is gone,
+  along with its text ids and text date columns. The catalog tables
+  (`prices`, `rooms`, `addons`, `trip_templates`, `travel_destinations`)
+  stay read-mostly data the app normalizes through `src/lib/events.ts`.
+  See [data-model.md](./data-model.md#the-events-table).
 - **injectManifest, not generateSW.** We need a custom `push` event
   handler, which `generateSW` doesn't support.
