@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   boundsOf, viewBoxFor, toSvg, pathData, bearingEnd, scaleBarMetres,
   depthLabel, singleDatum, countsBySource, isVolumetric, VOLUMETRIC_FEATURES,
+  canReduceToDatum, unreducibleSoundings, isObserved, observedOnly,
   type DiveSiteMap,
 } from './dive-site-map'
 
@@ -141,7 +142,7 @@ describe('countsBySource', () => {
       { id: 'c', at: { x: 2, y: 2 }, depth_m: 9, datum: 'TWCD2021', source: 'diver' },
     ]
     map.features = [{ id: 'f', kind: 'arch', source: 'diver', geometry: { shape: 'point', at: { x: 0, y: 0 } } }]
-    expect(countsBySource(map)).toEqual({ hand_drawn: 1, diver: 3, survey: 0 })
+    expect(countsBySource(map)).toEqual({ hand_drawn: 1, diver: 3, survey: 0, placeholder: 0 })
   })
 })
 
@@ -155,5 +156,70 @@ describe('volumetric features', () => {
     expect(isVolumetric('overhang')).toBe(true)
     expect(isVolumetric('slope')).toBe(false)
     expect(isVolumetric('sand')).toBe(false)
+  })
+})
+
+describe('reducing depths to a datum', () => {
+  it('can reduce an instantaneous reading only when its time is known', () => {
+    const base = { id: 'a', at: { x: 0, y: 0 }, depth_m: 24, source: 'diver' as const }
+    expect(canReduceToDatum({ ...base, datum: 'instantaneous', observed_at: '2026-08-11T02:15:00Z' })).toBe(true)
+    expect(canReduceToDatum({ ...base, datum: 'instantaneous' })).toBe(false)
+  })
+
+  it('cannot reduce a reading whose datum was never stated, dated or not', () => {
+    const base = { id: 'a', at: { x: 0, y: 0 }, depth_m: 24, source: 'hand_drawn' as const }
+    expect(canReduceToDatum({ ...base, datum: 'unknown' })).toBe(false)
+    expect(canReduceToDatum({ ...base, datum: 'unknown', observed_at: '2015-06-01T00:00:00Z' })).toBe(false)
+  })
+
+  it('treats an already-reduced reading as needing nothing further', () => {
+    const s = { id: 'a', at: { x: 0, y: 0 }, depth_m: 24, datum: 'TWCD2021' as const, source: 'survey' as const }
+    expect(canReduceToDatum(s)).toBe(false)
+    expect(unreducibleSoundings({ ...emptyMap(), soundings: [s] })).toEqual([])
+  })
+
+  it('lists the soundings that can never be brought onto a common datum', () => {
+    const map = emptyMap()
+    map.soundings = [
+      { id: 'drawn', at: { x: 0, y: 0 }, depth_m: 24, datum: 'unknown', source: 'hand_drawn' },
+      { id: 'timed', at: { x: 1, y: 1 }, depth_m: 18, datum: 'instantaneous', observed_at: '2026-08-11T02:15:00Z', source: 'diver' },
+      { id: 'untimed', at: { x: 2, y: 2 }, depth_m: 12, datum: 'instantaneous', source: 'diver' },
+    ]
+    expect(unreducibleSoundings(map).map(s => s.id)).toEqual(['drawn', 'untimed'])
+  })
+})
+
+describe('placeholder scaffold', () => {
+  it('is not an observation', () => {
+    expect(isObserved('placeholder')).toBe(false)
+    expect(isObserved('diver')).toBe(true)
+    expect(isObserved('hand_drawn')).toBe(true)
+    expect(isObserved('survey')).toBe(true)
+  })
+
+  it('is stripped before anything is measured or counted', () => {
+    const map = emptyMap()
+    map.features = [
+      { id: 'scaffold', kind: 'boundary', source: 'placeholder',
+        geometry: { shape: 'path', points: [{ x: 0, y: 0 }, { x: 10, y: 0 }] } },
+      { id: 'real', kind: 'wall', source: 'diver',
+        geometry: { shape: 'path', points: [{ x: 0, y: 0 }, { x: 5, y: 5 }] } },
+    ]
+    map.soundings = [
+      { id: 'd', at: { x: 1, y: 1 }, depth_m: 9, datum: 'instantaneous', source: 'diver' },
+    ]
+    const observed = observedOnly(map)
+    expect(observed.features.map(f => f.id)).toEqual(['real'])
+    expect(observed.soundings).toHaveLength(1)
+  })
+
+  it('does not inflate the contribution counts', () => {
+    const map = emptyMap()
+    map.features = [
+      { id: 'scaffold', kind: 'boundary', source: 'placeholder',
+        geometry: { shape: 'path', points: [{ x: 0, y: 0 }, { x: 1, y: 0 }] } },
+    ]
+    expect(countsBySource(map)).toEqual({ hand_drawn: 0, diver: 0, survey: 0, placeholder: 1 })
+    expect(countsBySource(observedOnly(map)).placeholder).toBe(0)
   })
 })

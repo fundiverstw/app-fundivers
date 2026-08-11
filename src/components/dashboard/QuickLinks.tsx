@@ -27,7 +27,14 @@ const destinations: Destination[] = [
   { to: '/scheduled-trips',  label: t.shell.scheduledTrips,  icon: <ScheduledTripsIcon /> },
 ]
 
-export function QuickLinks() {
+interface QuickLinksProps {
+  /** Where the dive-site map tile goes. Undefined when the viewer may not open
+   *  it yet — the tile then renders greyed out rather than as a link to a page
+   *  they would be turned away from. */
+  siteMapTo?: string
+}
+
+export function QuickLinks({ siteMapTo }: QuickLinksProps = {}) {
   return (
     <nav aria-label={t.dashboard.quickLinks} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       {destinations.map(({ to, label, icon }) => (
@@ -36,13 +43,20 @@ export function QuickLinks() {
           <span className="text-xs leading-tight">{label}</span>
         </Link>
       ))}
-      <div className={`${TILE} ${TEXT_SUBTLE}`}>
-        <MapIcon />
-        <span className="text-xs leading-tight">{t.dashboard.siteMaps}</span>
-        <span className="text-[10px] uppercase tracking-wide opacity-80">
-          {t.dashboard.comingSoon}
-        </span>
-      </div>
+      {siteMapTo ? (
+        <Link to={siteMapTo} className={`${TILE} ${TEXT_BODY}`}>
+          <MapIcon />
+          <span className="text-xs leading-tight">{t.dashboard.siteMaps}</span>
+        </Link>
+      ) : (
+        <div className={`${TILE} ${TEXT_SUBTLE} cursor-not-allowed opacity-60`} aria-disabled="true">
+          <MapIcon />
+          <span className="text-xs leading-tight">{t.dashboard.siteMaps}</span>
+          <span className="text-[10px] uppercase tracking-wide opacity-80">
+            {t.dashboard.comingSoon}
+          </span>
+        </div>
+      )}
     </nav>
   )
 }

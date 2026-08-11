@@ -33,6 +33,7 @@ import { ScheduledTripsPage } from './pages/ScheduledTripsPage'
 import { ScheduledTripDetailPage } from './pages/ScheduledTripDetailPage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { DashboardPage } from './pages/DashboardPage'
+import { DiveSiteMapPreviewPage } from './pages/dev/DiveSiteMapPreviewPage'
 import { DutiesPage } from './pages/DutiesPage'
 import { AdminEventsPage } from './pages/admin/AdminEventsPage'
 import { AdminEventDetailPage } from './pages/admin/AdminEventDetailPage'
@@ -80,6 +81,11 @@ export default function App() {
       <ToastProvider>
       <UpdateBannerHost />
       <Routes>
+        {/* Dev-only, and outside the auth guards so the renderer can be looked
+            at without a session. Tree-shaken out of a production build. */}
+        {import.meta.env.DEV && (
+          <Route path="/dev/site-map" element={<div className="min-h-screen p-4 text-brand-50"><DiveSiteMapPreviewPage /></div>} />
+        )}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />

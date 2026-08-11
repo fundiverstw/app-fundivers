@@ -55,6 +55,25 @@ describe('DashboardPage', () => {
     expect(screen.getByText(/dive site maps/i)).toBeInTheDocument()
   })
 
+  it('greys the dive-site map tile out for a diver, rather than hiding it', () => {
+    useAuthMock.mockReturnValue({ user: { user_metadata: {} }, profile: { role: 'diver' } })
+    render(<MemoryRouter><DashboardPage quickLinks /></MemoryRouter>)
+    expect(screen.getByText(/dive site maps/i)).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /dive site maps/i })).not.toBeInTheDocument()
+  })
+
+  it('leaves it closed to staff as well — admin only for now', () => {
+    useAuthMock.mockReturnValue({ user: { user_metadata: {} }, profile: { role: 'staff' } })
+    render(<MemoryRouter><DashboardPage quickLinks /></MemoryRouter>)
+    expect(screen.queryByRole('link', { name: /dive site maps/i })).not.toBeInTheDocument()
+  })
+
+  it('opens it to an admin', () => {
+    useAuthMock.mockReturnValue({ user: { user_metadata: {} }, profile: { role: 'admin' } })
+    render(<MemoryRouter><DashboardPage quickLinks /></MemoryRouter>)
+    expect(screen.getByRole('link', { name: /dive site maps/i })).toBeInTheDocument()
+  })
+
   it('omits them by default, so the admin home page is unchanged', () => {
     useAuthMock.mockReturnValue({ user: { user_metadata: {} }, profile: null })
     renderPage()
