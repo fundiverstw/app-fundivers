@@ -38,6 +38,9 @@ export const ja: Messages = {
     poweredByGithub: 'GitHub の fundive',
     releaseNotes: (version: string) => `fundive ${version} のリリースノート`,
     featuredTrips: 'おすすめツアー',
+    quickLinks: '見つける',
+    siteMaps: 'ダイビングサイトマップ',
+    comingSoon: '近日公開',
     waitlist: 'キャンセル待ち',
   },
   calendar: {

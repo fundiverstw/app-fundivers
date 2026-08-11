@@ -111,7 +111,7 @@ export default function App() {
           <Route path="/pending" element={<PendingPage />} />
           <Route element={<RequireActive />}>
             <Route element={<AppShell />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/dashboard" element={<DashboardPage quickLinks />} />
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/records" element={<RecordsPage />}>
                 <Route index element={<Navigate to="bookings" replace />} />

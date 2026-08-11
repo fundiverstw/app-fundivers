@@ -9,15 +9,12 @@ import { Logo } from '../Logo'
 import { CalendarIcon } from '../icons/CalendarIcon'
 import { ChatIcon } from '../icons/ChatIcon'
 import { CrosshairIcon } from '../icons/CrosshairIcon'
-import { TrustedPartnersIcon } from '../icons/TrustedPartnersIcon'
-import { PackagesIcon } from '../icons/PackagesIcon'
-import { ScheduledTripsIcon } from '../icons/ScheduledTripsIcon'
 import { PersonIcon } from '../icons/PersonIcon'
 import { NotificationBell } from '../NotificationBell'
 import { t } from '../../i18n'
 import {
-  PAGE, NAV_BAR, NAV_BOTTOM, BTN_LIGHT,
-  ON_DEEP_MUTED, ON_DEEP_SUBTLE, ON_DEEP_BODY,
+  PAGE, NAV_BAR, NAV_BOTTOM, BTN_LIGHT, BTN_XS_GHOST,
+  ON_DEEP_SUBTLE, ON_DEEP_BODY,
 } from '../../styles/tokens'
 
 function RecordsIcon() {
@@ -79,27 +76,6 @@ export function AppShell() {
     <div className={`min-h-screen ${PAGE} flex flex-col`}>
       <header className={NAV_BAR}>
         <div className="flex-1 flex items-center justify-start gap-4">
-          <Link
-            to="/trusted-partners"
-            aria-label={t.shell.trustedPartners}
-            className="text-brand-100/70 hover:text-reef-300 transition-colors"
-          >
-            <TrustedPartnersIcon />
-          </Link>
-          <Link
-            to="/packages"
-            aria-label={t.shell.packages}
-            className="text-brand-100/70 hover:text-reef-300 transition-colors"
-          >
-            <PackagesIcon />
-          </Link>
-          <Link
-            to="/scheduled-trips"
-            aria-label={t.shell.scheduledTrips}
-            className="text-brand-100/70 hover:text-reef-300 transition-colors"
-          >
-            <ScheduledTripsIcon />
-          </Link>
           <NotificationBell />
         </div>
         <Link to="/dashboard" aria-label={t.shell.home} className="shrink-0">
@@ -118,7 +94,7 @@ export function AppShell() {
           ) : (
             <span className={`text-sm ${ON_DEEP_BODY}`}>{personName(profile?.name, profile?.nickname)}</span>
           )}
-          <button onClick={handleSignOut} className={`text-xs ${ON_DEEP_MUTED} hover:text-white`}>
+          <button onClick={handleSignOut} className={BTN_XS_GHOST}>
             {t.common.signOut}
           </button>
         </div>

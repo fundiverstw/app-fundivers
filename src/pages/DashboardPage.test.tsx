@@ -47,4 +47,17 @@ describe('DashboardPage', () => {
     renderPage()
     expect(screen.queryByText(/welcome to fundivers/i)).not.toBeInTheDocument()
   })
+
+  it('renders the quick links when asked, below the featured trips', () => {
+    useAuthMock.mockReturnValue({ user: { user_metadata: {} }, profile: null })
+    render(<MemoryRouter><DashboardPage quickLinks /></MemoryRouter>)
+    expect(screen.getByRole('link', { name: /trusted partners/i })).toBeInTheDocument()
+    expect(screen.getByText(/dive site maps/i)).toBeInTheDocument()
+  })
+
+  it('omits them by default, so the admin home page is unchanged', () => {
+    useAuthMock.mockReturnValue({ user: { user_metadata: {} }, profile: null })
+    renderPage()
+    expect(screen.queryByRole('link', { name: /trusted partners/i })).not.toBeInTheDocument()
+  })
 })

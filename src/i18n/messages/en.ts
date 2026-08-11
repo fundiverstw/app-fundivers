@@ -46,6 +46,9 @@ export const en = {
     poweredByGithub: 'fundive on GitHub',
     releaseNotes: (version: string) => `fundive ${version} release notes`,
     featuredTrips: 'Featured trips',
+    quickLinks: 'Explore',
+    siteMaps: 'Dive Site Maps',
+    comingSoon: 'Soon',
     waitlist: 'waitlist',
   },
   calendar: {

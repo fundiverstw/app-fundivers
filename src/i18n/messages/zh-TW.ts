@@ -39,6 +39,9 @@ export const zhTW: Messages = {
     poweredByGithub: 'fundive 的 GitHub',
     releaseNotes: (version: string) => `fundive ${version} 發行說明`,
     featuredTrips: '精選行程',
+    quickLinks: '探索',
+    siteMaps: '潛點地圖',
+    comingSoon: '即將推出',
     waitlist: '候補',
   },
   calendar: {

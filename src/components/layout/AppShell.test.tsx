@@ -137,10 +137,26 @@ describe('AppShell', () => {
     expect(screen.getByText('Alice')).toBeInTheDocument()
   })
 
-  it('renders the Trusted Partners shortcut linking to /trusted-partners', () => {
+  it('no longer carries the Trusted Partners / Packages / Scheduled Trips shortcuts', () => {
     useAuthMock.mockReturnValue({ profile: null, signOut })
     routedRender()
-    expect(screen.getByRole('link', { name: /trusted partners/i })).toHaveAttribute('href', '/trusted-partners')
+    expect(screen.queryByRole('link', { name: /trusted partners/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^packages$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /scheduled trips/i })).not.toBeInTheDocument()
+  })
+
+  it('keeps the notification bell in the header', () => {
+    useAuthMock.mockReturnValue({ profile: null, signOut })
+    routedRender()
+    expect(screen.getByRole('link', { name: /notification/i })).toBeInTheDocument()
+  })
+
+  it('renders Sign out as a button that reads as one, not as bare text', () => {
+    useAuthMock.mockReturnValue({ profile: null, signOut })
+    routedRender()
+    const button = screen.getByRole('button', { name: /sign out/i })
+    expect(button.className).toContain('border')
+    expect(button.className).toContain('rounded-lg')
   })
 
   // The update banner moved to UpdateBannerHost (mounted at App root so it
