@@ -34,6 +34,15 @@ export const ja: Messages = {
     pendingRefunds: (n: number) => `${n}件の返金`,
     pendingRefundsAria: (n: number) => `${n}件の返金申請待ち`,
   },
+  siteMap: {
+    empty: 'このダイビングサイトの地図はまだありません。',
+    entry: 'エントリー',
+    north: '北',
+    ariaLabel: (name: string) => `${name} のダイビングサイトマップ`,
+    drawnBy: (author: string, year?: number) => year ? `作図：${author}、${year}` : `作図：${author}`,
+    datumUnknown: '水深は原図のまま。垂直基準の記載はなく、潮汐補正もされていません。',
+    datumNamed: (datum: string) => `水深は ${datum} に換算済み。`,
+  },
   dashboard: {
     poweredByGithub: 'GitHub の fundive',
     releaseNotes: (version: string) => `fundive ${version} のリリースノート`,

@@ -35,6 +35,15 @@ export const zhTW: Messages = {
     pendingRefunds: (n: number) => `${n} 件退款`,
     pendingRefundsAria: (n: number) => `${n} 件待處理退款申請`,
   },
+  siteMap: {
+    empty: '這個潛點還沒有任何地圖資料。',
+    entry: '入水點',
+    north: '北',
+    ariaLabel: (name: string) => `${name} 潛點地圖`,
+    drawnBy: (author: string, year?: number) => year ? `繪製：${author}，${year}` : `繪製：${author}`,
+    datumUnknown: '深度依原圖標示，未註明垂直基準，也未經潮汐校正。',
+    datumNamed: (datum: string) => `深度已歸算至 ${datum}。`,
+  },
   dashboard: {
     poweredByGithub: 'fundive 的 GitHub',
     releaseNotes: (version: string) => `fundive ${version} 發行說明`,

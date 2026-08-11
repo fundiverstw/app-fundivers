@@ -42,6 +42,15 @@ export const en = {
     pendingRefunds: (n: number) => `${n} refund${n === 1 ? '' : 's'}`,
     pendingRefundsAria: (n: number) => `${n} pending refund request${n === 1 ? '' : 's'}`,
   },
+  siteMap: {
+    empty: 'Nothing has been mapped at this site yet.',
+    entry: 'Entry',
+    north: 'N',
+    ariaLabel: (name: string) => `Dive site map of ${name}`,
+    drawnBy: (author: string, year?: number) => year ? `Drawn by ${author}, ${year}` : `Drawn by ${author}`,
+    datumUnknown: 'Depths as drawn — no vertical datum stated, not tide-corrected.',
+    datumNamed: (datum: string) => `Depths reduced to ${datum}.`,
+  },
   dashboard: {
     poweredByGithub: 'fundive on GitHub',
     releaseNotes: (version: string) => `fundive ${version} release notes`,
