@@ -15,7 +15,7 @@ admin):
 | Route | Page | Purpose |
 | --- | --- | --- |
 | `/admin`                                | —                       | Redirects to `/admin/logistics`, the day board |
-| `/admin/home`                           | `DashboardPage`         | Shared dashboard (divers see it at `/dashboard`); admin variant pulls operational counts |
+| `/admin/home`                           | `DashboardPage`         | Shared home page (divers see the same one at `/dashboard`) — welcome banner, featured trips, and the shortcut tiles, including the admin-only dive-site map. Where the header logo points |
 | `/admin/logistics`                      | `AdminLogisticsPage`    | The day board: runs, seats, riders, gear — see [Transport](#transport-runs-seats-riders) |
 | `/admin/events`                         | `AdminEventsPage`       | Month view of every event with registration counts |
 | `/admin/events/:id`               | `AdminEventDetailPage`  | Registrants, memos, status controls for one event |

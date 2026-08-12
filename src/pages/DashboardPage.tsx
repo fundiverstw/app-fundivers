@@ -5,9 +5,9 @@ import { WelcomeBanner } from '../components/welcome/WelcomeBanner'
 import { t } from '../i18n'
 
 interface DashboardPageProps {
-  /** The diver home page carries the shortcut tiles that used to sit in the
-   *  header. The admin shell renders this same page at /admin/home and has its
-   *  own header links, so it opts out rather than inheriting them. */
+  /** The shortcut tiles that used to sit in the diver header. Both home pages
+   *  (/dashboard and /admin/home) opt in; the prop stays so a page that embeds
+   *  this component without room for them can leave them off. */
   quickLinks?: boolean
 }
 

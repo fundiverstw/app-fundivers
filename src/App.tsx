@@ -141,8 +141,11 @@ export default function App() {
                 <Route path="/admin" element={<Navigate to="/admin/logistics" replace />} />
                 {/* The home screen (same DashboardPage divers land on) inside the
                     admin chrome — where the header logo points. Distinct from the
-                    /admin login-landing (logistics) and the BI /admin/dashboard. */}
-                <Route path="/admin/home" element={<DashboardPage />} />
+                    /admin login-landing (logistics) and the BI /admin/dashboard.
+                    Carries the same shortcut tiles: none of the four appear in the
+                    admin chrome, and the dive-site map is admin-only, so this is
+                    the one place an admin can reach it. */}
+                <Route path="/admin/home" element={<DashboardPage quickLinks />} />
                 <Route path="/admin/events" element={<AdminEventsPage />} />
                 <Route path="/admin/events/:id" element={<AdminEventDetailPage />} />
                 <Route path="/admin/events/:id/gear-map" element={<AdminGearMapPage />} />

@@ -131,6 +131,11 @@ Admin-only, gated in `DashboardPage`: the `QuickLinks` tile links through for
 else. A tile that appears from nowhere later is harder to notice than one that
 lights up.
 
+Both home pages render the tiles — the diver `/dashboard` and the admin
+`/admin/home`. An admin working inside the admin chrome never passes through the
+diver home, so gating the only entry point behind a page they don't visit made
+the feature admin-only in name and unreachable in practice.
+
 The workbench itself is `/dev/site-map`, dev-only via `import.meta.env.DEV` and
 outside the auth guards so the renderer can be looked at without a session. It
 is tree-shaken out of production builds.
