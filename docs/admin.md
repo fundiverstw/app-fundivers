@@ -173,6 +173,14 @@ The set lives on `AdminLogisticsPage` rather than inside `GearChips`
 because the seated and waitlist chip sets share one day's list — two
 owners would clobber each other's writes.
 
+## Reading the board with no signal
+
+The next ten days of this board are kept on staff and admin devices, so it
+still reads on a boat. It is read-only there, it says on screen when what
+you are looking at came off the device rather than the network, and a
+diver's medical notes, ID number, date of birth and emergency contacts are
+never written to a device at all. See [offline.md](./offline.md).
+
 ## Gear: the next-day diff
 
 A shop running back-to-back weekend days doesn't want to haul every set

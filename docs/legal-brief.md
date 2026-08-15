@@ -237,7 +237,28 @@ into `push_subscriptions`. Cron worker (`workers/push/`) fans out
 event reminders via VAPID-signed Web Push. Endpoint + key material
 are per-device PII.
 
-### 4.7 PII purge
+### 4.7 On-device copies held by staff
+
+Staff and admin devices keep the next 10 days of the operational day
+board in IndexedDB so it reads with no signal (see
+[offline.md](./offline.md)). It is a read-only cache, refreshed while
+online and deleted on sign-out, and the record names the user who
+captured it so it cannot be read back by a different account on the
+same device.
+
+The diver rows in it are reduced before they are written. A staff
+device does **not** hold `medical_notes`, `id_number`,
+`date_of_birth`, `nationality`, `emergency_contact_name`,
+`emergency_contact_phone`, `email`, or certification-card paths. It
+holds name, nickname, equipment sizes, gear owned, certification level
+and agency, logged dives, and contact method + handle.
+
+Two consequences worth the reviewer's attention: a lost or stolen staff
+device exposes that reduced set for up to 10 days forward, and a
+`purge_stale_pii` run does not reach copies already written to a
+device — they age out on the next capture, or on sign-out.
+
+### 4.8 PII purge
 
 `purge_stale_pii(months int default 12)` is a SECURITY DEFINER
 function callable only by service_role. It identifies diver
@@ -262,7 +283,7 @@ Source: `supabase/migrations/20260423150000_pii_retention_and_tos.sql`.
 - The function is invoked manually today; no cron schedule is yet
   attached. Operator should confirm the intended cadence.
 
-### 4.8 Account deletion (manual)
+### 4.9 Account deletion (manual)
 
 The current terms direct deletion requests to
 `fundiverstw@gmail.com`. There is no in-app self-serve deletion

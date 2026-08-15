@@ -1709,6 +1709,20 @@ export const en = {
       selectADay: 'Select a day…',
       pickADay: 'Pick a day above to see its logistics.',
       noEventsOn: (day: string) => `No events scheduled for ${day}.`,
+      // The board keeps the next N days on this device so it still reads on a
+      // boat. Whether what's on screen was read just now or hours ago is the
+      // one thing staff must never have to guess.
+      offline: {
+        showingSaved: (when: string) => `No connection — showing the copy saved on this device at ${when}.`,
+        savedAt: (when: string) => `Saved on this device at ${when}`,
+        neverSaved: 'Not saved on this device yet',
+        savedDays: (days: number) => `Next ${days} days`,
+        saveNow: 'Save now',
+        saving: 'Saving…',
+        saveFailed: 'The last save failed, so the copy on this device is older than this.',
+        unavailable: 'No connection, and this day was not saved on this device.',
+        redacted: 'Emergency contacts, medical notes and ID numbers are never saved to this device — reconnect to see them.',
+      },
       overall: (day: string) => `Overall — ${day}`,
       eventsDivers: (events: number, divers: number) =>
         `${events} event${events === 1 ? '' : 's'} · ${divers} diver${divers === 1 ? '' : 's'}`,

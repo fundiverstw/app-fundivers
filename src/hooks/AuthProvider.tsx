@@ -4,6 +4,7 @@ import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { CLEAR_SUPABASE_CACHE_MSG } from '../sw-cache-policy'
 import { clearAllRegistrationDrafts } from '../lib/registration-draft'
+import { clearStoredSnapshot } from '../lib/offline-db'
 import { AuthContext } from './auth-context'
 import type { Profile } from '../types/database'
 
@@ -104,6 +105,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Clearing the SW cache but leaving those behind would be a strange place
     // to stop.
     clearAllRegistrationDrafts()
+    // Third store, same reasoning: a staff device holds ten days of rosters and
+    // gear lists in IndexedDB. Those rows were read under this user's RLS
+    // scope, so they leave with them.
+    await clearStoredSnapshot()
   }
 
   return (

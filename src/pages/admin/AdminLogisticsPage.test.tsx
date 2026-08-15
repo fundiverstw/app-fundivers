@@ -6,6 +6,10 @@ import { AdminLogisticsPage } from './AdminLogisticsPage'
 import { mockQueryBuilder } from '../../../tests/test-utils'
 import { siteConfig } from '../../config/site'
 import { dayKeyOffset } from '../../lib/logistics'
+import { OfflineContext, type OfflineContextValue } from '../../hooks/offline-context'
+import { EMPTY_DAY_BOARD, type DayBoardData } from '../../lib/day-board'
+import { SNAPSHOT_VERSION, type OfflineSnapshot } from '../../lib/offline-snapshot'
+import { t } from '../../i18n'
 
 // Mirror the page's own day maths (shop timezone, not the runner's) so the
 // jump-button tests line up with the tabs it drives.
@@ -930,5 +934,121 @@ describe('AdminLogisticsPage', () => {
     const overallAddons = within(overall).getByText(/^add-ons$/i).closest('div')!
     expect(within(overallAddons).getByText(/SMB Rental ×1/)).toBeInTheDocument()
     expect(within(overallAddons).getByText(/Light Rental \(2 Days\) ×1/)).toBeInTheDocument()
+  })
+})
+
+// ── With no signal ─────────────────────────────────────────────────────
+// The board is the surface staff read on a boat, so it has to render off the
+// device and be visibly labelled as having done so.
+
+function offlineCtx(over: Partial<OfflineContextValue> = {}): OfflineContextValue {
+  return { snapshot: null, status: 'synced', online: true, refresh: vi.fn(), ...over }
+}
+
+function snapshotWith(boards: Record<string, DayBoardData>): OfflineSnapshot {
+  return {
+    version: SNAPSHOT_VERSION,
+    userId: 'admin-1',
+    capturedAt: '2026-08-15T07:14:00Z',
+    days: Object.keys(boards),
+    upcomingDays: [],
+    vehicles: [],
+    gearModels: [],
+    boards,
+    transport: {},
+  }
+}
+
+const storedBoard: DayBoardData = {
+  ...EMPTY_DAY_BOARD,
+  events: [diveEvent] as unknown as DayBoardData['events'],
+  bookings: bookings as unknown as DayBoardData['bookings'],
+  profiles: profiles as unknown as DayBoardData['profiles'],
+}
+
+function renderOffline(ctx: OfflineContextValue) {
+  return render(
+    <MemoryRouter>
+      <OfflineContext.Provider value={ctx}>
+        <AdminLogisticsPage />
+      </OfflineContext.Provider>
+    </MemoryRouter>,
+  )
+}
+
+describe('AdminLogisticsPage with no signal', () => {
+  it('renders the day off the device and says the copy is stored', async () => {
+    const ctx = offlineCtx({ online: false, snapshot: snapshotWith({ [todayKey]: storedBoard }) })
+    renderOffline(ctx)
+
+    expect(await screen.findByText(/Kenting fun dive/)).toBeInTheDocument()
+    expect(screen.getAllByText(/Ada/).length).toBeGreaterThan(0)
+    const status = screen.getByRole('status')
+    expect(status).toHaveTextContent(/no connection/i)
+    expect(status).toHaveTextContent(/Aug 15/)
+  })
+
+  it('never touches the network when the browser reports no connection', async () => {
+    renderOffline(offlineCtx({ online: false, snapshot: snapshotWith({ [todayKey]: storedBoard }) }))
+    await screen.findByText(/Kenting fun dive/)
+    expect(fetchEventsInRange).not.toHaveBeenCalled()
+  })
+
+  // The one case the board must not render as a quiet day: it genuinely does
+  // not know, and saying "no events scheduled" would be a confident wrong answer.
+  it('says the day was never saved rather than showing it as empty', async () => {
+    renderOffline(offlineCtx({ online: false, snapshot: snapshotWith({ '2020-01-01': EMPTY_DAY_BOARD }) }))
+    expect(await screen.findByText(t.admin.logistics.offline.unavailable)).toBeInTheDocument()
+    expect(screen.queryByText(/no events scheduled/i)).not.toBeInTheDocument()
+  })
+
+  it('says so when the device holds nothing at all', async () => {
+    renderOffline(offlineCtx({ online: false, snapshot: null }))
+    expect(await screen.findByText(t.admin.logistics.offline.unavailable)).toBeInTheDocument()
+  })
+
+  // A captured day with no events is an answer, and reads as one.
+  it('shows a captured but quiet day as quiet', async () => {
+    renderOffline(offlineCtx({ online: false, snapshot: snapshotWith({ [todayKey]: EMPTY_DAY_BOARD }) }))
+    expect(await screen.findByText(/no events scheduled/i)).toBeInTheDocument()
+  })
+
+  // The browser reports a connection because there is a bar of signal or a
+  // captive portal; the read still fails. Nobody gets to toggle a flag first.
+  it('falls back to the device when a live read fails despite being "online"', async () => {
+    fetchEventsInRange.mockRejectedValue(new Error('network'))
+    renderOffline(offlineCtx({ online: true, snapshot: snapshotWith({ [todayKey]: storedBoard }) }))
+    expect(await screen.findByText(/Kenting fun dive/)).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(/no connection/i)
+  })
+
+  it('keeps reading live when there is a connection, and stays quiet about it', async () => {
+    renderOffline(offlineCtx({ online: true, snapshot: snapshotWith({ [todayKey]: storedBoard }) }))
+    await screen.findByText(/Kenting fun dive/)
+    expect(fetchEventsInRange).toHaveBeenCalled()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('plans rides off the stored fleet when the vehicles read fails', async () => {
+    renderOffline(offlineCtx({
+      online: false,
+      snapshot: {
+        ...snapshotWith({ [todayKey]: storedBoard }),
+        vehicles: [
+          { id: 'v1', name: 'Shop van', passenger_seats: 7, active: true, created_at: '', created_by: null },
+        ] as unknown as OfflineSnapshot['vehicles'],
+      },
+    }))
+    await screen.findByText(/Kenting fun dive/)
+    // Without the stored fleet the planner reports an empty catalog and offers
+    // no plan at all; with it, the seven seats are there to allocate.
+    await waitFor(() =>
+      expect(screen.queryByText(new RegExp(t.admin.transport.noFleetPrefix))).not.toBeInTheDocument())
+  })
+
+  it('reports an empty fleet when the device holds none either', async () => {
+    renderOffline(offlineCtx({ online: false, snapshot: snapshotWith({ [todayKey]: storedBoard }) }))
+    await screen.findByText(/Kenting fun dive/)
+    expect(await screen.findByText(new RegExp(t.admin.transport.noFleetPrefix))).toBeInTheDocument()
   })
 })

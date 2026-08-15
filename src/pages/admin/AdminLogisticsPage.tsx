@@ -2,15 +2,13 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { PageLoading } from '../../components/ui/Spinner'
 import { format, parseISO } from 'date-fns'
-import { supabase } from '../../lib/supabase'
 import { siteConfig } from '../../config/site'
-import { fetchEventsInRange, fetchUpcomingEventDays, formatEventSpan } from '../../lib/events'
+import { fetchUpcomingEventDays, formatEventSpan } from '../../lib/events'
 import { gearTotals, splitByTransport, transportHeadcount, dayKeyOffset, careTotals, isCareGearItem, addonTotals, partitionByWaitlist, gearSizeBreakdown, isSizedGearItem, gearDayDiff } from '../../lib/logistics'
 import { gearPieceKey, loadPackedGear, savePackedGear, togglePackedGear } from '../../lib/gear-packed'
 import { bookingBalance, type BookingBalance } from '../../lib/booking-balance'
 import { openCreditForBooking } from '../../lib/credits'
-import { bookingsOnDay } from '../../lib/course-continuation'
-import { fetchAmendmentsForBookings, amendmentsDelta } from '../../lib/booking-amendments'
+import { amendmentsDelta } from '../../lib/booking-amendments'
 import { netPaidByBooking } from '../../lib/payments'
 import { personName } from '../../lib/names'
 import { DiverGearCard, type DiverGearRow } from '../../components/admin/DiverGearCard'
@@ -23,16 +21,19 @@ import { TransportFleetPlan } from '../../components/admin/TransportFleetPlan'
 import { EventVehicleGroup } from '../../components/admin/EventVehicleGroup'
 import { SharedTransportPicker } from '../../components/admin/SharedTransportPicker'
 import { NextDayGearDiff } from '../../components/admin/NextDayGearDiff'
-import { fetchDayGearRows } from '../../lib/logistics-day'
+import { OfflineBoardStatus } from '../../components/admin/OfflineBoardStatus'
 import { fetchVehicles } from '../../lib/vehicles'
 import { fetchGearModelsWithSizes } from '../../lib/gear-models'
 import type { GearModelWithSizes } from '../../lib/gear-sizing'
 import { TEXT_HEADING, TEXT_MUTED, BTN_XS_GHOST } from '../../styles/tokens'
-import { fetchVehiclesForEvents, availableVehicles, allocationEventId } from '../../lib/event-vehicles'
+import { availableVehicles, allocationEventId } from '../../lib/event-vehicles'
 import { planRuns, type Rider, type RunInput, type RunPlan, type FleetVehicle } from '../../lib/vehicle-planning'
-import { fetchRideGroups, groupIdByEvent, buildRuns, shareRideWith, rideAlone } from '../../lib/ride-groups'
+import { groupIdByEvent, buildRuns, shareRideWith, rideAlone } from '../../lib/ride-groups'
+import { amendmentsByBooking } from '../../lib/day-board'
+import { liveOrStored, loadDayBoard, loadDayGearRows, loadDayTransport, type DayBoardSource } from '../../lib/day-board-source'
 import { useAuth } from '../../hooks/useAuth'
-import type { AppEvent, Booking, BookingDetails, Credit, Duty, EventRideGroup, EventVehicle, Payment, Profile, Vehicle } from '../../types/database'
+import { useOffline } from '../../hooks/useOffline'
+import type { AppEvent, BookingDetails, EventRideGroup, EventVehicle, Profile, Vehicle } from '../../types/database'
 import { t } from '../../i18n'
 
 const lg = t.admin.logistics
@@ -225,14 +226,19 @@ type Tab = 'today' | 'tomorrow' | 'other'
 
 export function AdminLogisticsPage() {
   const { profile } = useAuth()
+  const offline = useOffline()
   const isAdmin = profile?.role === 'admin'
   const [tab, setTab] = useState<Tab>('today')
   const [otherDay, setOtherDay] = useState('')
   // The shop's gear sizing charts, loaded once for the rental fit lookup.
   const [gearModels, setGearModels] = useState<GearModelWithSizes[]>([])
   useEffect(() => {
-    fetchGearModelsWithSizes().then(setGearModels).catch(() => { /* charts are optional */ })
-  }, [])
+    void liveOrStored(
+      offline?.online ?? true,
+      fetchGearModelsWithSizes,
+      () => offline?.snapshot?.gearModels ?? [],
+    ).then(setGearModels)
+  }, [offline?.snapshot, offline?.online])
   // null = not loaded yet; [] = loaded, no event-days in range.
   const [upcomingDays, setUpcomingDays] = useState<string[] | null>(null)
   // null = loading; [] = loaded, no events that day.
@@ -263,6 +269,10 @@ export function AdminLogisticsPage() {
   // here rather than inside GearChips because the seated and waitlist chip sets
   // share one day's list — two owners would clobber each other's writes.
   const [packedGear, setPackedGear] = useState<Set<string>>(new Set())
+  // Where the day on screen came from. null while loading; 'unavailable' means
+  // no network AND nothing captured for this day, which is the one case the
+  // board must not render as an empty day.
+  const [boardSource, setBoardSource] = useState<DayBoardSource | 'unavailable' | null>(null)
 
   const todayKey = useMemo(
     () => new Date().toLocaleDateString('en-CA', { timeZone: siteConfig.locale.timezone }),
@@ -279,13 +289,17 @@ export function AdminLogisticsPage() {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      try {
-        const v = await fetchVehicles()
-        if (!cancelled) setVehicles(v)
-      } catch { /* fleet just won't be planned; logistics still works */ }
+      // Off the device when the network can't answer; an empty fleet just
+      // means rides aren't planned, and logistics still works without them.
+      const v = await liveOrStored(
+        offline?.online ?? true,
+        fetchVehicles,
+        () => offline?.snapshot?.vehicles ?? [],
+      )
+      if (!cancelled) setVehicles(v)
     })()
     return () => { cancelled = true }
-  }, [])
+  }, [offline?.snapshot, offline?.online])
 
   // Car allocations for the day's events — refetched when the events change or
   // after an assign/unassign (allocReload). Allocations are keyed by event now,
@@ -300,27 +314,32 @@ export function AdminLogisticsPage() {
     const eventIds = groups.map(g => g.event.id)
     let cancelled = false
     ;(async () => {
-      const [alloc, rides] = await Promise.all([
-        fetchVehiclesForEvents(eventIds).catch(() => [] as EventVehicle[]),
-        fetchRideGroups(dayKey, eventIds).catch(() => [] as EventRideGroup[]),
-      ])
+      const { allocations: alloc, rideGroups: rides } = await loadDayTransport(
+        dayKey, eventIds, offline?.snapshot ?? null, offline?.online ?? true,
+      )
       if (cancelled) return
       setAllocations(alloc)
       setRideGroups(rides)
     })()
     return () => { cancelled = true }
-  }, [groups, allocReload, dayKey])
+  }, [groups, allocReload, dayKey, offline?.snapshot, offline?.online])
 
   // Populate the "Other day" dropdown with upcoming days that actually have
   // events, so the admin never picks a dead day.
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const days = await fetchUpcomingEventDays(todayKey, dayKeyOffset(todayKey, LOOKAHEAD_DAYS))
+      // Without the picker there is no way to reach day three from a boat, so
+      // it falls back to the captured list like everything else.
+      const days = await liveOrStored(
+        offline?.online ?? true,
+        () => fetchUpcomingEventDays(todayKey, dayKeyOffset(todayKey, LOOKAHEAD_DAYS)),
+        () => offline?.snapshot?.upcomingDays ?? [],
+      )
       if (!cancelled) setUpcomingDays(days)
     })()
     return () => { cancelled = true }
-  }, [todayKey])
+  }, [todayKey, offline?.snapshot, offline?.online])
 
   // Entering "Other day" with nothing chosen yet → default to the first
   // upcoming day beyond tomorrow (those two have their own tabs).
@@ -353,7 +372,7 @@ export function AdminLogisticsPage() {
     setNextDayFailed(false)
     ;(async () => {
       try {
-        const rows = await fetchDayGearRows(nextDayKey)
+        const rows = await loadDayGearRows(nextDayKey, offline?.snapshot ?? null, offline?.online ?? true)
         if (!cancelled) setNextDayRows(rows)
       } catch {
         // Say the read failed rather than diffing against an empty next day,
@@ -362,7 +381,7 @@ export function AdminLogisticsPage() {
       }
     })()
     return () => { cancelled = true }
-  }, [diffOpen, backToBack, nextDayKey])
+  }, [diffOpen, backToBack, nextDayKey, offline?.snapshot, offline?.online])
 
   // Land on whichever control owns that day, so the tabs keep matching what's
   // displayed: today/tomorrow have their own tabs, anything else is "Other day".
@@ -379,72 +398,25 @@ export function AdminLogisticsPage() {
     // Reset to the loading spinner whenever the selected day changes.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setGroups(null)
+    setBoardSource(null)
     ;(async () => {
-      // fetchEventsInRange(day, day) returns dives starting that day and
-      // courses running that day. A rare multi-day dive that started earlier
-      // won't appear — acceptable for a day-of view.
-      const events = await fetchEventsInRange(dayKey, dayKey, { includePrivate: true })
+      // Live when the network can supply it, off this device when it can't.
+      // See docs/offline.md — everything below is shape-identical either way.
+      const result = await loadDayBoard(dayKey, offline?.snapshot ?? null, offline?.online ?? true)
       if (cancelled) return
-      // Dedupe by id (a course could yield more than one segment); first wins.
-      const seen = new Set<string>()
-      const uniqueEvents = events.filter(e => (seen.has(e.id) ? false : (seen.add(e.id), true)))
+      if (!result) { setGroups(null); setBoardSource('unavailable'); return }
+      setBoardSource(result.source)
+      const { events: uniqueEvents, bookings, duties } = result.data
       if (!uniqueEvents.length) { setGroups([]); return }
-
-      const eventIds = uniqueEvents.map(e => e.id)
-      // Duties whose date range covers this day, for the day's events. Staff
-      // have no transport preference, so each on-duty assignment is surfaced
-      // in the ride planning below. A null end_date is a single-day duty.
-      const dayCovered = `end_date.gte.${dayKey},end_date.is.null`
-      const [bookingsB, dutiesB] = await Promise.all([
-        eventIds.length
-          ? supabase.from('bookings').select('*').in('event_id', eventIds).neq('status', 'cancelled')
-          : Promise.resolve({ data: [] as Booking[] }),
-        eventIds.length
-          ? supabase.from('duties').select('*').in('event_id', eventIds).lte('start_date', dayKey).or(dayCovered)
-          : Promise.resolve({ data: [] as Duty[] }),
-      ])
-      // Drop the bookings that aren't on site today: a course booking may be
-      // limited to some of its course's days when the diver is finishing a
-      // course they started on an earlier one. Everything below — headcount,
-      // gear, cars, balances — is a day-of view, so this belongs at the source.
-      const bookings = bookingsOnDay((bookingsB.data ?? []) as Booking[], dayKey)
-      const duties = (dutiesB.data ?? []) as Duty[]
 
       // Resolve catalog titles for the day's add-ons so we can pick out the
       // delicate ones (lights, cameras) for the care inventory.
-      const addonIds = [...new Set(
-        bookings.flatMap(b => (b.details as BookingDetails | undefined)?.add_ons ?? []),
-      )]
-      const addonsRes = addonIds.length
-        ? await supabase.from('addons').select('id, display_title, admin_title').in('id', addonIds)
-        : { data: [] as Array<{ id: string; display_title: string | null; admin_title: string | null }> }
-      if (cancelled) return
       setAddonTitles(new Map(
-        (addonsRes.data ?? []).map(a => [a.id, a.display_title || a.admin_title || a.id]),
+        result.data.addons.map(a => [a.id, a.display_title || a.admin_title || a.id]),
       ))
 
-      const userIds = [...new Set([
-        ...bookings.map(b => b.user_id),
-        // Lead payers may not themselves be booked that day, but we still need
-        // their name for "paid by …" on a covered diver's balance.
-        ...bookings.map(b => b.payer_id).filter((x): x is string => !!x),
-        ...duties.map(d => d.assignee_id),
-      ])]
-      const bookingIds = bookings.map(b => b.id)
-      const [profsRes, paymentsRes, creditsRes, amendmentsByBooking] = await Promise.all([
-        userIds.length
-          ? supabase.from('profiles').select('*').in('id', userIds)
-          : Promise.resolve({ data: [] as Profile[] }),
-        bookingIds.length
-          ? supabase.from('payments').select('*').in('booking_id', bookingIds)
-          : Promise.resolve({ data: [] as Payment[] }),
-        userIds.length
-          ? supabase.from('credits').select('*').in('user_id', userIds).eq('status', 'open')
-          : Promise.resolve({ data: [] as Credit[] }),
-        fetchAmendmentsForBookings(bookingIds),
-      ])
-      if (cancelled) return
-      const profMap = new Map((profsRes.data ?? []).map(p => [p.id, p]))
+      const amendmentsByBookingId = amendmentsByBooking(result.data.amendments)
+      const profMap = new Map(result.data.profiles.map(p => [p.id, p]))
 
       // Per-booking "what's still owed" — the adjusted total (frozen snapshot +
       // the signed amendment ledger, where discounts and surcharges live) minus
@@ -454,12 +426,12 @@ export function AdminLogisticsPage() {
       // balance, so a discounted booking settled with credit would otherwise
       // show a phantom "due" forever. A covered booking keeps its own balance
       // but notes the lead who's responsible for it.
-      const paidByBooking = netPaidByBooking((paymentsRes.data ?? []) as Payment[])
-      const credits = (creditsRes.data ?? []) as Credit[]
+      const paidByBooking = netPaidByBooking(result.data.payments)
+      const credits = result.data.credits
       const balByBooking = new Map<string, BookingBalanceRow>()
       for (const b of bookings) {
         const owed = Number((b.details as BookingDetails | undefined)?.total ?? 0)
-          + amendmentsDelta(amendmentsByBooking.get(b.id) ?? [])
+          + amendmentsDelta(amendmentsByBookingId.get(b.id) ?? [])
         const paid = paidByBooking.get(b.id) ?? 0
         const payerName = (b.payer_id && b.payer_id !== b.user_id)
           ? (personName(profMap.get(b.payer_id)?.name, profMap.get(b.payer_id)?.nickname) || lg.leadBooker)
@@ -495,7 +467,7 @@ export function AdminLogisticsPage() {
       })))
     })()
     return () => { cancelled = true }
-  }, [dayKey])
+  }, [dayKey, offline?.snapshot, offline?.online])
 
   useEffect(() => {
     if (!dayKey) return
@@ -709,10 +681,15 @@ export function AdminLogisticsPage() {
             )
           )}
         </div>
+        <OfflineBoardStatus offline={offline} source={boardSource} />
       </header>
 
       {promptForDay ? (
         <p className="text-brand-950 font-medium text-sm">{lg.pickADay}</p>
+      ) : boardSource === 'unavailable' ? (
+        // The banner above already says why. Rendering "no events scheduled"
+        // here would be a confident answer we don't have.
+        null
       ) : groups === null ? (
         <PageLoading />
       ) : groups.length === 0 ? (
