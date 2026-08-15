@@ -80,9 +80,16 @@ export const siteConfig = {
   },
 
   business: {
-    gearItems: ['BCD', 'Regulator', 'Wetsuit', 'Fins', 'Mask', 'Boots', 'Dive computer'],
+    // An item offered in more than one style is listed once per style, with the
+    // style in trailing parentheses — the app reads that as one slot on the
+    // diver, so a booking rents one boot style or the other, never both.
+    gearItems: [
+      'BCD', 'Regulator', 'Wetsuit', 'Fins', 'Mask',
+      'Boots (rubber sole)', 'Boots (felt sole)', 'Dive computer',
+    ],
     gearPrices: {
-      BCD: 400, Regulator: 500, Wetsuit: 200, Fins: 100, Mask: 100, Boots: 50, 'Dive computer': 250,
+      BCD: 400, Regulator: 500, Wetsuit: 200, Fins: 100, Mask: 100,
+      'Boots (rubber sole)': 50, 'Boots (felt sole)': 50, 'Dive computer': 250,
     },
     paymentDeadlineFallbackDays: 7,
     cardSurchargePercent: 5,

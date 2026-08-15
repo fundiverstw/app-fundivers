@@ -282,6 +282,32 @@ describe('MultiRegisterForm parent diver picker', () => {
     expect(body.payer_id).toBeUndefined()
   })
 
+  it('ticks one boot style when the parent opts into rental, and swaps rather than stacks', async () => {
+    setupFrom([])
+    const user = userEvent.setup()
+    render(
+      <MultiRegisterForm
+        events={[{ ...sampleEvent('e1', 'Kenting'), gear_rental_info: 'Rentals available on site.' }]}
+        profile={parentProfile} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/rent gear/i))
+
+    const box = (item: string) =>
+      screen.getByLabelText((text: string) => text.includes(item)) as HTMLInputElement
+    expect(box('Boots (rubber sole)').checked).toBe(true)
+    expect(box('Boots (felt sole)').checked).toBe(false)
+
+    await user.click(box('Boots (felt sole)'))
+    expect(box('Boots (felt sole)').checked).toBe(true)
+    expect(box('Boots (rubber sole)').checked).toBe(false)
+    expect(box('BCD').checked).toBe(true)
+  })
+
   it('shows an itemized price breakdown per event on the payment step', async () => {
     setupFrom([])
     const user = userEvent.setup()

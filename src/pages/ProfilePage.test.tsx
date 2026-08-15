@@ -3,6 +3,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ProfilePage, ChangePasswordSection } from './ProfilePage'
 import { renderWithRouter, mockQueryBuilder } from '../../tests/test-utils'
+import { t } from '../i18n'
 
 const { update, from, signInWithPassword, updateUser, useAuthMock, uploadCertCard, getCertCardSignedUrl, deleteCertCard } = vi.hoisted(() => ({
   update: vi.fn(),
@@ -224,6 +225,60 @@ describe('ProfilePage', () => {
     const payload = update.mock.calls[0][0] as Record<string, unknown>
     expect(payload.shoe_size).toBe('EU 42 M')
     expect(payload.gear_owned).toEqual(['BCD', 'Fins'])
+  })
+
+  it('offers both boot styles and lets a diver own both', async () => {
+    useAuthMock.mockReturnValue({
+      user: { id: 'u1' },
+      profile: {
+        id: 'u1',
+        name: 'Ada',
+        nickname: 'Ada',
+        date_of_birth: '1815-12-10',
+        nationality: 'British',
+        gender: 'female',
+        contact_method: 'email',
+        contact_id: 'ada@example.com',
+        cert_level: 'Open Water',
+        cert_card_path: 'u1/existing.jpg',
+        logged_dives: 0,
+        gear_owned: [],
+      },
+    })
+    from.mockImplementation(() => ({
+      ...mockQueryBuilder({ data: { cert_card_path: 'u1/existing.jpg' } }),
+      update: (...a: unknown[]) => { update(...a); return mockQueryBuilder() },
+    }))
+
+    const user = userEvent.setup()
+    renderWithRouter(<ProfilePage />)
+    await waitFor(() => expect((input('name') as HTMLInputElement).value).toBe('Ada'))
+
+    // Unlike the rental checklist, owning both pairs is a fact, not a conflict.
+    await user.click(screen.getByLabelText('Boots (rubber sole)'))
+    await user.click(screen.getByLabelText('Boots (felt sole)'))
+    expect((screen.getByLabelText('Boots (rubber sole)') as HTMLInputElement).checked).toBe(true)
+    expect((screen.getByLabelText('Boots (felt sole)') as HTMLInputElement).checked).toBe(true)
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await waitFor(() => expect(update).toHaveBeenCalledOnce())
+    const payload = update.mock.calls[0][0] as Record<string, unknown>
+    expect(payload.gear_owned).toEqual(['Boots (rubber sole)', 'Boots (felt sole)'])
+  })
+
+  it('explains the styles under the gear-I-own checklist', async () => {
+    useAuthMock.mockReturnValue({
+      user: { id: 'u1' },
+      profile: {
+        id: 'u1', name: 'Ada', nickname: 'Ada', date_of_birth: '1815-12-10',
+        nationality: 'British', gender: 'female', contact_method: 'email',
+        contact_id: 'ada@example.com', cert_level: 'Open Water',
+        cert_card_path: 'u1/existing.jpg', logged_dives: 0, gear_owned: [],
+      },
+    })
+    from.mockImplementation(() => mockQueryBuilder({ data: { cert_card_path: 'u1/existing.jpg' } }))
+    renderWithRouter(<ProfilePage />)
+    expect(await screen.findByText(t.profile.gearStylesHint)).toBeInTheDocument()
   })
 
   it('lets an uncertified diver save without a cert level or card', async () => {

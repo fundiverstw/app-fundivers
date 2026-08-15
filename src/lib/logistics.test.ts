@@ -197,6 +197,47 @@ describe('gearSizeSource / isSizedGearItem', () => {
     expect(gearSizeSource('Full-foot fin')).toBe('fins')
     expect(gearSizeSource('Dive boot')).toBe('boots')
   })
+
+  it('packs both boot styles by shoe size', () => {
+    expect(gearSizeSource('Boots (rubber sole)')).toBe('boots')
+    expect(gearSizeSource('Boots (felt sole)')).toBe('boots')
+  })
+})
+
+// The two sole styles are separate racks in the shop — a felt-soled pair does
+// not cover a diver who asked for rubber — so they count and break down apart.
+describe('boot styles as separate rack lines', () => {
+  const renting = (id: string, items: string[]) =>
+    ({ booking: { id, details: { gear: { rent: true, items } } } as unknown as Booking })
+
+  it('totals each style on its own line', () => {
+    const totals = gearTotals([
+      renting('b1', ['Boots (rubber sole)']),
+      renting('b2', ['Boots (felt sole)']),
+      renting('b3', ['Boots (felt sole)']),
+    ])
+    expect(totals).toEqual([
+      { item: 'Boots (rubber sole)', count: 1 },
+      { item: 'Boots (felt sole)', count: 2 },
+    ])
+  })
+
+  it('breaks each style down over its own divers, not the other style\'s', () => {
+    const sized = (id: string, name: string, items: string[], shoe: string) => ({
+      booking: { id, details: { gear: { rent: true, items } } } as unknown as Booking,
+      profile: { name, shoe_size: shoe } as unknown as Profile,
+    })
+    const rows = [
+      sized('b1', 'Ada', ['Boots (rubber sole)'], 'JP 26 M'),
+      sized('b2', 'Bo',  ['Boots (felt sole)'],   'JP 27 M'),
+    ]
+    expect(gearSizeBreakdown(rows, 'Boots (rubber sole)')).toEqual([
+      { size: 'JP 26', divers: [{ bookingId: 'b1', name: 'Ada' }] },
+    ])
+    expect(gearSizeBreakdown(rows, 'Boots (felt sole)')).toEqual([
+      { size: 'JP 27', divers: [{ bookingId: 'b2', name: 'Bo' }] },
+    ])
+  })
 })
 
 describe('gearSizeBreakdown', () => {

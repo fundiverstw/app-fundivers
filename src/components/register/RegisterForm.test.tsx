@@ -9,7 +9,18 @@ import {
   type RegistrationDraft,
 } from '../../lib/registration-draft'
 import { siteConfig } from '../../config/site'
+import { GEAR_ITEMS } from '../../lib/gear'
+import { t } from '../../i18n'
 import type { AppEvent, EOAddon, EORoom, Profile } from '../../types/database'
+
+const RUBBER_BOOTS = 'Boots (rubber sole)'
+const FELT_BOOTS   = 'Boots (felt sole)'
+/** Everything the shop rents except one item — the "owns all but X" fixtures. */
+const ownsAllBut = (...except: string[]) => GEAR_ITEMS.filter(i => !except.includes(i))
+/** A gear checkbox by item name. Labels carry the price too ("Fins (100)"), and
+ *  the boot styles share a prefix, so match on the full name as a substring. */
+const gearBox = (item: string) =>
+  screen.getByLabelText((text: string) => text.includes(item)) as HTMLInputElement
 
 const { from, update, invoke, setSession, rpc } = vi.hoisted(() => ({
   from: vi.fn(),
@@ -480,7 +491,7 @@ describe('RegisterForm', () => {
     // clicking Wetsuit adds only Wetsuit (keeps the original test intent).
     const profileOwnsAll: Profile = {
       ...sampleProfile,
-      gear_owned: ['BCD', 'Regulator', 'Wetsuit', 'Fins', 'Mask', 'Boots', 'Dive computer'],
+      gear_owned: ownsAllBut(),
     }
     render(
       <RegisterForm event={sampleEvent} profile={profileOwnsAll} userId="u1"
@@ -542,7 +553,7 @@ describe('RegisterForm', () => {
     const profile: Profile = {
       ...sampleProfile,
       shoe_size: null,
-      gear_owned: ['BCD', 'Regulator', 'Wetsuit', 'Mask', 'Boots', 'Dive computer'],
+      gear_owned: ownsAllBut('Fins'),
     }
     render(<RegisterForm event={sampleEvent} profile={profile} userId="u1" onClose={() => {}} onBooked={() => {}} />)
     await user.click(screen.getByRole('button', { name: /next/i }))
@@ -572,7 +583,7 @@ describe('RegisterForm', () => {
       ...sampleProfile,
       height_cm: null,
       weight_kg: null,
-      gear_owned: ['BCD', 'Regulator', 'Fins', 'Mask', 'Boots', 'Dive computer'],
+      gear_owned: ownsAllBut('Wetsuit'),
     }
     render(<RegisterForm event={sampleEvent} profile={profile} userId="u1" onClose={() => {}} onBooked={() => {}} />)
     await user.click(screen.getByRole('button', { name: /next/i }))
@@ -678,12 +689,87 @@ describe('RegisterForm', () => {
       expect((screen.getByLabelText(/Fins/i) as HTMLInputElement).checked).toBe(false)
       expect((screen.getByLabelText(/Wetsuit/i) as HTMLInputElement).checked).toBe(true)
       expect((screen.getByLabelText(/Mask/i) as HTMLInputElement).checked).toBe(true)
-      expect((screen.getByLabelText(/Boots/i) as HTMLInputElement).checked).toBe(true)
+      // One boot style, not both — they are the same pair of feet.
+      expect(gearBox(RUBBER_BOOTS).checked).toBe(true)
+      expect(gearBox(FELT_BOOTS).checked).toBe(false)
     })
 
     // Once the user toggles any item, explicit choice wins (no re-seed on re-render).
     await user.click(screen.getByLabelText(/Wetsuit/i)) // uncheck
     expect((screen.getByLabelText(/Wetsuit/i) as HTMLInputElement).checked).toBe(false)
+  })
+
+  it('swaps to felt-soled boots rather than renting the diver two pairs', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={sampleEvent} profile={{ ...sampleProfile, gear_owned: [] }}
+        userId="u1" onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/i need to rent/i))
+
+    await waitFor(() => expect(gearBox(RUBBER_BOOTS).checked).toBe(true))
+    await user.click(gearBox(FELT_BOOTS))
+    expect(gearBox(FELT_BOOTS).checked).toBe(true)
+    expect(gearBox(RUBBER_BOOTS).checked).toBe(false)
+
+    // Unrelated items are untouched by the swap.
+    expect(gearBox('BCD').checked).toBe(true)
+    expect(gearBox('Regulator').checked).toBe(true)
+  })
+
+  it('explains why ticking one boot style clears the other', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={sampleEvent} profile={{ ...sampleProfile, gear_owned: [] }}
+        userId="u1" onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/i need to rent/i))
+    expect(await screen.findByText(t.register.gear.stylesHint)).toBeInTheDocument()
+  })
+
+  it('books the boot style the diver actually picked', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={sampleEvent} profile={{ ...sampleProfile, gear_owned: ownsAllBut(RUBBER_BOOTS, FELT_BOOTS) }}
+        userId="u1" onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/i need to rent/i))
+    await user.click(gearBox(FELT_BOOTS))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+    const body = invoke.mock.calls[0][1] as { body: { details: { gear: { items: string[] } } } }
+    expect(body.body.details.gear.items).toEqual([FELT_BOOTS])
+  })
+
+  it('still asks for a shoe size when the boots being rented are felt-soled', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    const profile: Profile = {
+      ...sampleProfile,
+      shoe_size: null,
+      gear_owned: ownsAllBut(RUBBER_BOOTS, FELT_BOOTS),
+    }
+    render(<RegisterForm event={sampleEvent} profile={profile} userId="u1" onClose={() => {}} onBooked={() => {}} />)
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/i need to rent/i))
+    await user.click(gearBox(FELT_BOOTS))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+
+    expect(await screen.findByText(/we need your sizes/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
   })
 
   it('applies a 5% surcharge for credit card payment on the total', async () => {

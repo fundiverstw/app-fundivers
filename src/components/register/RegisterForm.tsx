@@ -6,7 +6,8 @@ import { formatEventSpan, eventIsFull, isPastEvent } from '../../lib/events'
 import { useAuth } from '../../hooks/useAuth'
 import { computeEffectiveFullPaymentDeadline } from '../../lib/payment-deadlines'
 import { paymentInstructionsFor } from '../../lib/payment-instructions'
-import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../lib/gear'
+import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_GEAR_ALTERNATIVES, isGearIncludedCourse, defaultRentalItems, toggleGearSelection } from '../../lib/gear'
+import { gearSizeSource } from '../../lib/logistics'
 import { usesCourseDays, allowsTransport } from '../../lib/event-kinds'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
@@ -484,12 +485,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const [editedGearItems, setEditedGearItems] = useState<string[] | null>(
     (initialDetails?.gear?.rent && initialDetails.gear.items) ? initialDetails.gear.items : null
   )
-  const defaultGearItems = useMemo(() => {
-    const owned = new Set(profile?.gear_owned ?? [])
-    return (GEAR_ITEMS as readonly string[]).filter(item => !owned.has(item))
-  }, [profile])
+  const defaultGearItems = useMemo(() => defaultRentalItems(profile?.gear_owned), [profile])
   const gearItems = editedGearItems ?? defaultGearItems
-  // Rental gear needs sizes on file: shoe size for Fins/Boots, height + weight
+  // Rental gear needs sizes on file: shoe size for fins/boots, height + weight
   // for Wetsuit/BCD. When the diver's profile is missing the relevant size we
   // collect it here and save it back to their profile on submit.
   const [shoeSize, setShoeSize] = useState(profile?.shoe_size ?? '')
@@ -608,13 +606,16 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const prereqMismatch = prereqCertMismatch || prereqDivesMismatch
   const prereqBlocked = prereqMismatch && !prereqAck
 
-  // Size requirements for the gear being rented (Fins/Boots → shoe size;
-  // Wetsuit/BCD → height + weight). We only prompt for sizes the profile is
-  // missing; once present, the booking just reuses them.
+  // Size requirements for the gear being rented (fins/boots → shoe size;
+  // wetsuit/BCD → height + weight). Resolved through gearSizeSource rather than
+  // by item name, so a shop that renames or splits an item ("Boots (felt
+  // sole)") still gets asked for the size that packs it. We only prompt for
+  // sizes the profile is missing; once present, the booking just reuses them.
   const rentingGear = showGearRentChoice && gearChoice === 'rent'
   const rentedItems = rentingGear ? gearItems : []
-  const askShoe   = (rentedItems.includes('Fins') || rentedItems.includes('Boots')) && !profile?.shoe_size
-  const askBody   = rentedItems.includes('Wetsuit') || rentedItems.includes('BCD')
+  const rentedSizeSources = new Set(rentedItems.map(gearSizeSource))
+  const askShoe   = (rentedSizeSources.has('fins') || rentedSizeSources.has('boots')) && !profile?.shoe_size
+  const askBody   = rentedSizeSources.has('wetsuit') || rentedSizeSources.has('bcd')
   const askHeight = askBody && profile?.height_cm == null
   const askWeight = askBody && profile?.weight_kg == null
   const shoeMissing   = askShoe   && !shoeSize.trim()
@@ -1004,7 +1005,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     // First toggle promotes the rendered default (or existing list) into
     // an explicit edited list; subsequent toggles update it.
     const current = editedGearItems ?? gearItems
-    setEditedGearItems(current.includes(item) ? current.filter(i => i !== item) : [...current, item])
+    setEditedGearItems(toggleGearSelection(current, item))
   }
   function toggleAddon(id: string) {
     setAddonIds(prev => {
@@ -1771,6 +1772,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               {gearChoice === 'rent' && (
                 <div className="pl-6 space-y-2">
                   <p className="text-xs text-brand-950 font-medium">{t.register.checkItems}</p>
+                  {HAS_GEAR_ALTERNATIVES && (
+                    <p className="text-xs text-brand-950 font-medium">{t.register.gear.stylesHint}</p>
+                  )}
                   <div className="grid grid-cols-2 gap-1">
                     {GEAR_ITEMS.map(item => (
                       <label key={item} className="flex items-center gap-1 text-xs text-brand-950 font-medium">

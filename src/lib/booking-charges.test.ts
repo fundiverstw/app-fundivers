@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildCharges, chargesTotal, resolveCharges, NITROX_COURSE_FEE } from './booking-charges'
-import { GEAR_ALACARTE_PRICES } from './gear'
+import { GEAR_ALACARTE_PRICES, FULL_GEAR_SET } from './gear'
 import type { AppEvent, BookingDetails } from '../types/database'
 import { siteConfig } from '../config/site'
 import { t } from '../i18n'
@@ -104,7 +104,7 @@ describe('resolveCharges', () => {
     // A legacy full-set package was cheaper than today's à-la-carte gear, so the
     // recorded total (8,150) is below base 7,200 + the current gear sum. Derive
     // the gear sum from the live prices so this stays correct as prices change.
-    const items = ['BCD', 'Regulator', 'Wetsuit', 'Fins', 'Mask', 'Boots', 'Dive computer']
+    const items = [...FULL_GEAR_SET]
     const gearSum = items.reduce((s, i) => s + GEAR_ALACARTE_PRICES[i], 0)
     const recompute = 7200 + gearSum
     const details: BookingDetails = {

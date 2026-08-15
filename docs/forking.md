@@ -69,6 +69,50 @@ Keep the PWA manifest colors in `fundive.config.ts` (`theme` / `backgroundColor`
 browser chrome / splash) in sync with your `--color-brand-*` by hand; they're a
 separate mechanism (baked into the manifest + `index.html` at build).
 
+### Gear catalog
+
+`business.gearItems` is the one list behind three surfaces: the profile's "Gear
+I own" checklist, the à-la-carte rental checklist at registration, and the
+logistics packing totals. `business.gearPrices` must carry a key for every
+entry — an item with no price rents for nothing.
+
+Items are stored **by label**, in `profiles.gear_owned` and in
+`bookings.details.gear.items`. Renaming an entry therefore orphans existing
+rows: the checklist silently drops the diver's choice and the packing board
+leaves the item off. Ship a forward migration that rewrites the old label
+alongside the config change — see
+`supabase/migrations/20260815000000_split_boots_by_sole.sql` for the shape,
+including the two things it deliberately leaves alone (`details.charges`, a
+frozen receipt of what the diver was charged, and the audit log, a record of
+what was written).
+
+**One item, several styles.** An item the shop stocks in more than one style is
+listed once per style with the style in trailing parentheses:
+
+```ts
+gearItems: [..., 'Boots (rubber sole)', 'Boots (felt sole)', ...]
+```
+
+The app reads a shared base name as **one slot on the diver**. Boots are the
+case this exists for — felt soles grip algae-covered rock on a shore entry,
+rubber is for boats, sand and walking, so a shop needs to know which pair to
+pack — but the rule is general (`'Wetsuit (3mm)'` / `'Wetsuit (5mm)'` behaves
+the same). What follows from a slot:
+
+- the rental checklist starts with **one** style ticked, so nobody is defaulted
+  into paying for two pairs of boots;
+- ticking one style unticks the others (`toggleGearSelection` in
+  `src/lib/gear.ts`);
+- a diver who owns *any* style of an item rents none of them by default;
+- course-bundled gear packs `FULL_GEAR_SET` — one of every slot — rather than
+  the raw catalog;
+- but the **profile** checklist has no exclusivity: owning both a felt and a
+  rubber pair is a fact, not a conflict.
+
+Packing keeps the styles apart — they are separate racks, and a felt pair does
+not cover a diver who asked for rubber — while sizing still resolves through
+`gearSizeSource`, so both styles are packed by shoe size.
+
 ### Feature toggles
 
 `fundive.config.ts` → `features` gates optional surfaces:

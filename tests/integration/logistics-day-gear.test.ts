@@ -88,7 +88,7 @@ beforeAll(async () => {
   eventToday = await createDive(DAY)
   eventNext  = await createDive(NEXT_DAY)
   courseNext = await createCourse(NEXT_DAY)
-  const full = ['BCD', 'Wetsuit', 'Fins', 'Boots', 'Regulator']
+  const full = ['BCD', 'Wetsuit', 'Fins', 'Boots (rubber sole)', 'Regulator']
   await book(diverToday.id, eventToday, rents(full))
   await book(diverNext.id,  eventNext,  rents(full))
   // Course-bundled gear: no item list, the whole set is implied.
@@ -129,7 +129,7 @@ describe('fetchDayGearRows', () => {
 
   it('feeds a real size breakdown, not an unknown-size bucket', async () => {
     const rows = await fetchDayGearRows(NEXT_DAY)
-    for (const [item, size] of [['BCD', 'L'], ['Wetsuit', 'M'], ['Fins', 'M'], ['Boots', 'JP 27']]) {
+    for (const [item, size] of [['BCD', 'L'], ['Wetsuit', 'M'], ['Fins', 'M'], ['Boots (rubber sole)', 'JP 27']]) {
       const groups = gearSizeBreakdown(rows, item)
       expect(groups.map(g => g.size), `${item} should resolve to ${size}`).toContain(size)
     }
@@ -176,7 +176,7 @@ describe('gearDayDiff over two live days', () => {
     expect(line('BCD', 'M')).toMatchObject({ keep: 0, add: 0, free: 1 })
     expect(line('BCD', 'L')).toMatchObject({ keep: 0, add: 1, free: 0 })
     expect(line('BCD', 'S')).toMatchObject({ keep: 0, add: 1, free: 0 })
-    expect(line('Boots', 'JP 26')).toMatchObject({ free: 1 })
-    expect(line('Boots', 'JP 27')).toMatchObject({ add: 1 })
+    expect(line('Boots (rubber sole)', 'JP 26')).toMatchObject({ free: 1 })
+    expect(line('Boots (rubber sole)', 'JP 27')).toMatchObject({ add: 1 })
   })
 })

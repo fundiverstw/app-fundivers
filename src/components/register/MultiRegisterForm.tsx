@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useState } from 'react'
 import { personName } from '../../lib/names'
-import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, isGearIncludedCourse } from '../../lib/gear'
+import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_GEAR_ALTERNATIVES, isGearIncludedCourse, defaultRentalItems, toggleGearSelection } from '../../lib/gear'
 import { usesCourseDays, allowsTransport } from '../../lib/event-kinds'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
@@ -647,7 +647,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                             type="checkbox"
                             checked={c.rentGear}
                             onChange={e => updateChoice(ev.id, e.target.checked
-                              ? { rentGear: true, gearItems: GEAR_ITEMS.filter(i => !(targetProfile?.gear_owned ?? []).includes(i)) }
+                              ? { rentGear: true, gearItems: defaultRentalItems(targetProfile?.gear_owned) }
                               : { rentGear: false })}
                             className="accent-brand-900"
                           />
@@ -656,6 +656,9 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                         {c.rentGear && (
                           <div className="pl-6 space-y-1">
                             <p className="text-xs text-brand-950 font-medium">{t.register.checkItems}</p>
+                            {HAS_GEAR_ALTERNATIVES && (
+                              <p className="text-xs text-brand-950 font-medium">{t.register.gear.stylesHint}</p>
+                            )}
                             <div className="grid grid-cols-2 gap-1">
                               {GEAR_ITEMS.map(item => (
                                 <label key={item} className="flex items-center gap-1 text-xs text-brand-950 font-medium">
@@ -663,9 +666,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                                     type="checkbox"
                                     checked={c.gearItems.includes(item)}
                                     onChange={() => updateChoice(ev.id, {
-                                      gearItems: c.gearItems.includes(item)
-                                        ? c.gearItems.filter(i => i !== item)
-                                        : [...c.gearItems, item],
+                                      gearItems: toggleGearSelection(c.gearItems, item),
                                     })}
                                     className="accent-brand-900"
                                   />

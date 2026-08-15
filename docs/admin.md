@@ -187,6 +187,13 @@ is computed per `(item, size)` via the same `gearSizeBreakdown` the
 size-expanding chips use. One-size kit (regulators, masks, computers)
 matches on quantity alone.
 
+An item the shop stocks in more than one style is a separate line per
+style, because they are separate racks: a felt-soled boot does not cover
+a diver who asked for rubber. Both styles still size off the same profile
+column (boots off `shoe_size`), so `Boots (felt sole) · JP 26` and
+`Boots (rubber sole) · JP 26` are two rack slots, not one. See
+[forking.md](./forking.md#gear-catalog) for how the catalog declares them.
+
 Two rules keep it honest:
 
 - **Only back-to-back days.** The button is offered when the *very next

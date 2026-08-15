@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
 import { pushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
-import { GEAR_ITEMS } from '../lib/gear'
+import { GEAR_ITEMS, HAS_GEAR_ALTERNATIVES } from '../lib/gear'
 import { numOrNull } from '../lib/num'
 import { uploadCertCard, getCertCardSignedUrl, deleteCertCard } from '../lib/cert-card'
 import { uploadNitroxCard, getNitroxCardSignedUrl, deleteNitroxCard } from '../lib/nitrox-card'
@@ -384,6 +384,11 @@ export function ProfileForm({ user, profile, onSaved }: {
           <p className="text-xs text-brand-900 font-medium">
             {t.profile.gearOwnedHint}
           </p>
+          {HAS_GEAR_ALTERNATIVES && (
+            <p className="text-xs text-brand-900 font-medium">
+              {t.profile.gearStylesHint}
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-2">
             {GEAR_ITEMS.map(item => (
               <label key={item} className="flex items-center gap-2 text-sm text-brand-900">
