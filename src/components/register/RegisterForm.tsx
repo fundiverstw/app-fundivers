@@ -6,7 +6,7 @@ import { formatEventSpan, eventIsFull, isPastEvent } from '../../lib/events'
 import { useAuth } from '../../hooks/useAuth'
 import { computeEffectiveFullPaymentDeadline } from '../../lib/payment-deadlines'
 import { paymentInstructionsFor } from '../../lib/payment-instructions'
-import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_GEAR_ALTERNATIVES, isGearIncludedCourse, defaultRentalItems, toggleGearSelection } from '../../lib/gear'
+import { RENTAL_GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_RENTAL_GEAR_ALTERNATIVES, HAS_OWNED_ONLY_GEAR, isGearIncludedCourse, defaultRentalItems, toggleGearSelection } from '../../lib/gear'
 import { gearSizeSource } from '../../lib/logistics'
 import { usesCourseDays, allowsTransport } from '../../lib/event-kinds'
 import { siteConfig } from '../../config/site'
@@ -1772,11 +1772,14 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               {gearChoice === 'rent' && (
                 <div className="pl-6 space-y-2">
                   <p className="text-xs text-brand-950 font-medium">{t.register.checkItems}</p>
-                  {HAS_GEAR_ALTERNATIVES && (
+                  {HAS_RENTAL_GEAR_ALTERNATIVES && (
                     <p className="text-xs text-brand-950 font-medium">{t.register.gear.stylesHint}</p>
                   )}
+                  {HAS_OWNED_ONLY_GEAR && (
+                    <p className="text-xs text-brand-950 font-medium">{t.register.gear.ownedOnlyHint}</p>
+                  )}
                   <div className="grid grid-cols-2 gap-1">
-                    {GEAR_ITEMS.map(item => (
+                    {RENTAL_GEAR_ITEMS.map(item => (
                       <label key={item} className="flex items-center gap-1 text-xs text-brand-950 font-medium">
                         <input type="checkbox" checked={gearItems.includes(item)} onChange={() => toggleItem(item)} className="accent-brand-900" />
                         {item} ({GEAR_ALACARTE_PRICES[item]})

@@ -254,7 +254,8 @@ describe('ProfilePage', () => {
     renderWithRouter(<ProfilePage />)
     await waitFor(() => expect((input('name') as HTMLInputElement).value).toBe('Ada'))
 
-    // Unlike the rental checklist, owning both pairs is a fact, not a conflict.
+    // Rubber soles are owned-only — the shop doesn't rent them, but a diver who
+    // brings a pair still gets to say so. Owning both is a fact, not a conflict.
     await user.click(screen.getByLabelText('Boots (rubber sole)'))
     await user.click(screen.getByLabelText('Boots (felt sole)'))
     expect((screen.getByLabelText('Boots (rubber sole)') as HTMLInputElement).checked).toBe(true)

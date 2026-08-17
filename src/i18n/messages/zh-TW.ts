@@ -236,6 +236,7 @@ export const zhTW: Messages = {
       optRent: '我需要租借部分或全部的必要器材。',
       optHelp: '我完全不知道該怎麼辦，需要真人協助。',
       stylesHint: '同一項器材若有多種款式，請選擇您要我們準備的那一種；勾選其中一種會自動取消另一種。',
+      ownedOnlyHint: '以上是我們提供租借的全部項目。未列出的器材請自行攜帶，並請在個人資料中登記，讓我們知道您已備妥。',
       sizesTitle: '我們需要您的尺寸才能準備這些器材',
       heightCm: '身高（公分）',
       weightKg: '體重（公斤）',

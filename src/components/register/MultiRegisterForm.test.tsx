@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MultiRegisterForm } from './MultiRegisterForm'
 import { mockQueryBuilder } from '../../../tests/test-utils'
 import type { AppEvent, Profile } from '../../types/database'
+import { t } from '../../i18n'
 
 const { from, invoke, rpc } = vi.hoisted(() => ({
   from: vi.fn(),
@@ -282,7 +283,7 @@ describe('MultiRegisterForm parent diver picker', () => {
     expect(body.payer_id).toBeUndefined()
   })
 
-  it('ticks one boot style when the parent opts into rental, and swaps rather than stacks', async () => {
+  it('offers only the boot style the shop rents when the parent opts into rental', async () => {
     setupFrom([])
     const user = userEvent.setup()
     render(
@@ -299,13 +300,10 @@ describe('MultiRegisterForm parent diver picker', () => {
 
     const box = (item: string) =>
       screen.getByLabelText((text: string) => text.includes(item)) as HTMLInputElement
-    expect(box('Boots (rubber sole)').checked).toBe(true)
-    expect(box('Boots (felt sole)').checked).toBe(false)
-
-    await user.click(box('Boots (felt sole)'))
     expect(box('Boots (felt sole)').checked).toBe(true)
-    expect(box('Boots (rubber sole)').checked).toBe(false)
+    expect(screen.queryByLabelText((text: string) => text.includes('Boots (rubber sole)'))).toBeNull()
     expect(box('BCD').checked).toBe(true)
+    expect(screen.getByText(t.register.gear.ownedOnlyHint)).toBeInTheDocument()
   })
 
   it('shows an itemized price breakdown per event on the payment step', async () => {

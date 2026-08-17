@@ -2,6 +2,7 @@ import { addDays, format, parseISO } from 'date-fns'
 import { GEAR_ITEMS, gearPackList } from './gear'
 import { personName } from './names'
 import { shoeAsJp } from './shoe-size'
+import { GEAR_TYPES, type GearType } from '../types/database'
 import type { Booking, BookingDetails, Profile } from '../types/database'
 
 /** A row carrying at least its booking — enough to read gear + transport. */
@@ -179,6 +180,16 @@ export function gearSizeSource(item: string): SizedGear | null {
 /** Is this item packed in sizes (so its chip is worth opening)? */
 export function isSizedGearItem(item: string): boolean {
   return gearSizeSource(item) !== null
+}
+
+/**
+ * Which sizing charts a packed set of items calls for. Asked of the items
+ * themselves rather than of the catalog, so a shop listing a type in several
+ * styles — two boot soles, two wetsuit thicknesses — resolves whichever style
+ * was actually rented instead of only the first one the catalog names.
+ */
+export function packedGearTypes(items: string[]): GearType[] {
+  return GEAR_TYPES.filter(gt => items.some(item => gearSizeSource(item) === gt))
 }
 
 // Letter sizes sort by the rack order a packer thinks in, not alphabetically

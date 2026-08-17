@@ -1,15 +1,28 @@
 import type { Booking } from '../types/database'
 import { siteConfig } from '../config/site'
 
-// Canonical list of rental-gear items, shared between the profile's "Gear I
-// own" checklist and the register-form a-la-carte checklist so the two
-// sides can be matched 1:1 (items you own are excluded from rental). Set per
-// shop in fundive.config.ts.
+// Canonical list of gear items, set per shop in fundive.config.ts. This is the
+// catalog a diver describes themselves against — the profile's "Gear I own"
+// checklist — so it covers what divers turn up carrying, not only what the shop
+// keeps on the rental rack.
 export const GEAR_ITEMS = siteConfig.business.gearItems
 
 // Per-item daily rental price (shop currency). Gear is rented à-la-carte only —
 // the diver picks exactly the items they need and pays per item per dive day.
 export const GEAR_ALACARTE_PRICES: Record<string, number> = siteConfig.business.gearPrices
+
+/**
+ * What the shop actually rents. A catalog item with no rental price is
+ * owned-only: it stays on the profile checklist, so a diver can record that
+ * they own a pair, and never appears in the register form's rental list.
+ *
+ * FunDivers is the case this exists for. It stocks felt soles on the rack
+ * because the shore entries here are algae-covered rock, and rubber ones are a
+ * pair divers bring rather than borrow.
+ */
+export const RENTAL_GEAR_ITEMS = (GEAR_ITEMS as readonly string[]).filter(item =>
+  Object.hasOwn(GEAR_ALACARTE_PRICES, item),
+)
 
 // Two catalog entries that differ only by a trailing parenthesised qualifier
 // fill the same slot on a diver: "Boots (rubber sole)" and "Boots (felt sole)"
@@ -21,28 +34,40 @@ export function gearSlot(item: string): string {
   return item.replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase()
 }
 
-/** The other catalog entries that fill the same slot as `item`. */
-export function gearAlternatives(item: string): string[] {
+/** The other entries in `within` that fill the same slot as `item`. Defaults to
+ *  the whole catalog; pass the rental list to ask what a booking can swap for. */
+export function gearAlternatives(item: string, within: readonly string[] = GEAR_ITEMS): string[] {
   const slot = gearSlot(item)
-  return (GEAR_ITEMS as readonly string[]).filter(i => i !== item && gearSlot(i) === slot)
+  return within.filter(i => i !== item && gearSlot(i) === slot)
 }
 
-/** Does this shop's catalog offer any item in more than one style? Drives the
- *  hint that explains why ticking one style clears the other. */
+/** Does the catalog list any item in more than one style? Drives the profile
+ *  hint that asks the diver to tick every style they own. */
 export const HAS_GEAR_ALTERNATIVES =
   (GEAR_ITEMS as readonly string[]).some(item => gearAlternatives(item).length > 0)
 
+/** Does the shop *rent* any item in more than one style? Drives the register
+ *  hint that explains why ticking one style clears the other — a shop that
+ *  rents a single style has nothing to explain. */
+export const HAS_RENTAL_GEAR_ALTERNATIVES =
+  RENTAL_GEAR_ITEMS.some(item => gearAlternatives(item, RENTAL_GEAR_ITEMS).length > 0)
+
+/** Does the catalog hold anything the shop doesn't rent? Drives the line that
+ *  tells a diver the rental list is the whole rack, not a shortened menu. */
+export const HAS_OWNED_ONLY_GEAR = RENTAL_GEAR_ITEMS.length < GEAR_ITEMS.length
+
 /**
- * What the à-la-carte checklist starts ticked with: everything the diver
- * doesn't already own. A slot they own in *any* style is dropped whole — a
- * diver with felt boots is not defaulted into renting rubber ones — and a slot
- * they own nothing in defaults to the first style the shop lists, so nobody is
- * quietly charged for two pairs of boots they never chose.
+ * What the à-la-carte checklist starts ticked with: everything the shop rents
+ * that the diver doesn't already own. A slot they own in *any* style is dropped
+ * whole — a diver who owns rubber-soled boots isn't defaulted into renting felt
+ * ones, though they can still tick them for a dive that wants the grip — and a
+ * slot they own nothing in defaults to the first style the shop rents, so nobody
+ * is quietly charged for two pairs of boots they never chose.
  */
 export function defaultRentalItems(owned: string[] | null | undefined): string[] {
   const ownedSlots = new Set((owned ?? []).map(gearSlot))
   const taken = new Set<string>()
-  return (GEAR_ITEMS as readonly string[]).filter(item => {
+  return RENTAL_GEAR_ITEMS.filter(item => {
     const slot = gearSlot(item)
     if (ownedSlots.has(slot) || taken.has(slot)) return false
     taken.add(slot)
@@ -54,6 +79,11 @@ export function defaultRentalItems(owned: string[] | null | undefined): string[]
  * Tick or untick one item in the à-la-carte checklist. Ticking a style unticks
  * the others in its slot, so the running total can never bill for two pairs of
  * boots at once.
+ *
+ * Alternatives are read from the whole catalog, not just the rental list: a
+ * selection carried in from an older booking can name a style the shop has since
+ * stopped renting, and the checklist no longer draws a box to untick it with.
+ * Ticking the style that replaced it clears it.
  */
 export function toggleGearSelection(current: string[], item: string): string[] {
   if (current.includes(item)) return current.filter(i => i !== item)
@@ -61,8 +91,9 @@ export function toggleGearSelection(current: string[], item: string): string[] {
   return [...current.filter(i => !alternatives.has(i)), item]
 }
 
-// One of every slot — what "a full set" means once an item comes in styles.
-// Packing GEAR_ITEMS raw would put both boot styles on the van for one diver.
+// One of every slot the shop rents — what "a full set" means once an item comes
+// in styles. Packing GEAR_ITEMS raw would put both boot styles on the van for
+// one diver, and a style the shop doesn't stock for rental at all.
 export const FULL_GEAR_SET = defaultRentalItems([])
 
 // Courses that don't prompt for gear rental: Open Water and Discover Scuba

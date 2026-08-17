@@ -21,6 +21,8 @@ const ownsAllBut = (...except: string[]) => GEAR_ITEMS.filter(i => !except.inclu
  *  the boot styles share a prefix, so match on the full name as a substring. */
 const gearBox = (item: string) =>
   screen.getByLabelText((text: string) => text.includes(item)) as HTMLInputElement
+const queryGearBox = (item: string) =>
+  screen.queryByLabelText((text: string) => text.includes(item))
 
 const { from, update, invoke, setSession, rpc } = vi.hoisted(() => ({
   from: vi.fn(),
@@ -689,9 +691,9 @@ describe('RegisterForm', () => {
       expect((screen.getByLabelText(/Fins/i) as HTMLInputElement).checked).toBe(false)
       expect((screen.getByLabelText(/Wetsuit/i) as HTMLInputElement).checked).toBe(true)
       expect((screen.getByLabelText(/Mask/i) as HTMLInputElement).checked).toBe(true)
-      // One boot style, not both — they are the same pair of feet.
-      expect(gearBox(RUBBER_BOOTS).checked).toBe(true)
-      expect(gearBox(FELT_BOOTS).checked).toBe(false)
+      // The one boot style the shop rents; rubber soles are owned-only.
+      expect(gearBox(FELT_BOOTS).checked).toBe(true)
+      expect(queryGearBox(RUBBER_BOOTS)).toBeNull()
     })
 
     // Once the user toggles any item, explicit choice wins (no re-seed on re-render).
@@ -699,7 +701,7 @@ describe('RegisterForm', () => {
     expect((screen.getByLabelText(/Wetsuit/i) as HTMLInputElement).checked).toBe(false)
   })
 
-  it('swaps to felt-soled boots rather than renting the diver two pairs', async () => {
+  it('never offers rubber soles for rental, whatever the diver owns', async () => {
     setupFrom()
     const user = userEvent.setup()
     render(
@@ -710,17 +712,12 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/i need to rent/i))
 
-    await waitFor(() => expect(gearBox(RUBBER_BOOTS).checked).toBe(true))
-    await user.click(gearBox(FELT_BOOTS))
-    expect(gearBox(FELT_BOOTS).checked).toBe(true)
-    expect(gearBox(RUBBER_BOOTS).checked).toBe(false)
-
-    // Unrelated items are untouched by the swap.
+    await waitFor(() => expect(gearBox(FELT_BOOTS).checked).toBe(true))
+    expect(queryGearBox(RUBBER_BOOTS)).toBeNull()
     expect(gearBox('BCD').checked).toBe(true)
-    expect(gearBox('Regulator').checked).toBe(true)
   })
 
-  it('explains why ticking one boot style clears the other', async () => {
+  it('tells the diver the list is everything the shop rents', async () => {
     setupFrom()
     const user = userEvent.setup()
     render(
@@ -730,10 +727,12 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/i need to rent/i))
-    expect(await screen.findByText(t.register.gear.stylesHint)).toBeInTheDocument()
+    expect(await screen.findByText(t.register.gear.ownedOnlyHint)).toBeInTheDocument()
+    // Nothing to swap between, so no line about ticking one style clearing another.
+    expect(screen.queryByText(t.register.gear.stylesHint)).toBeNull()
   })
 
-  it('books the boot style the diver actually picked', async () => {
+  it('books the felt-soled boots the shop actually rents', async () => {
     setupFrom()
     const user = userEvent.setup()
     render(
@@ -743,7 +742,6 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/i need to rent/i))
-    await user.click(gearBox(FELT_BOOTS))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
@@ -765,11 +763,34 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/i need to rent/i))
-    await user.click(gearBox(FELT_BOOTS))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
 
     expect(await screen.findByText(/we need your sizes/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+  })
+
+  it('leaves boots unticked for a diver who owns rubber ones, who can still add felt', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    const profile: Profile = {
+      ...sampleProfile,
+      shoe_size: null,
+      gear_owned: ownsAllBut(FELT_BOOTS),
+    }
+    render(<RegisterForm event={sampleEvent} profile={profile} userId="u1" onClose={() => {}} onBooked={() => {}} />)
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/i need to rent/i))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+
+    // Owning a pair of boots in any style is a filled slot: nothing pre-ticked.
+    await waitFor(() => expect(gearBox(FELT_BOOTS).checked).toBe(false))
+    expect(screen.queryByText(/we need your sizes/i)).toBeNull()
+
+    // The grip on a shore entry is a reason to rent felt anyway.
+    await user.click(gearBox(FELT_BOOTS))
+    expect(gearBox(FELT_BOOTS).checked).toBe(true)
+    expect(await screen.findByText(/we need your sizes/i)).toBeInTheDocument()
   })
 
   it('applies a 5% surcharge for credit card payment on the total', async () => {

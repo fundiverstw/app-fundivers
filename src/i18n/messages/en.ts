@@ -244,6 +244,7 @@ export const en = {
       optRent: 'I need to rent some or all of the required gear.',
       optHelp: "I have no idea what I'm doing and I need to ask a human.",
       stylesHint: 'Where an item comes in more than one style, pick the one you want prepared — ticking one clears the other.',
+      ownedOnlyHint: 'This is everything we rent. Any gear you own that is not listed here is yours to bring — record it on your profile so we know you have it.',
       sizesTitle: 'We need your sizes to prep this gear',
       heightCm: 'Height (cm)',
       weightKg: 'Weight (kg)',

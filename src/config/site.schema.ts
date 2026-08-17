@@ -74,6 +74,20 @@ export const siteConfigSchema = z.object({
       registration: z.string(),
       notes: z.array(z.string().min(1)),
     }),
+  }).superRefine((business, ctx) => {
+    // A priced item the catalog doesn't list is a typo, and it fails silently:
+    // the item is simply never offered. A catalog item with no price is the
+    // other way round and legitimate — that is how a shop marks gear divers may
+    // own but cannot rent.
+    const items = new Set(business.gearItems)
+    for (const priced of Object.keys(business.gearPrices)) {
+      if (items.has(priced)) continue
+      ctx.addIssue({
+        code: 'custom',
+        path: ['gearPrices', priced],
+        message: `gearPrices names "${priced}", which is not in gearItems`,
+      })
+    }
   }),
   weatherRegion: z.object({
     latitude: z.number().min(-90).max(90),

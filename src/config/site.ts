@@ -109,9 +109,11 @@ export interface SiteBoatManifest {
 }
 
 export interface SiteBusiness {
-  /** Rental-gear checklist, shared by the profile and register forms. */
+  /** Every gear item the catalog knows: the profile's "gear I own" checklist. */
   gearItems: string[]
-  /** Per-item daily à-la-carte rental price, in the shop currency. */
+  /** Per-item daily à-la-carte rental price, in the shop currency. Keys are the
+   *  subset of `gearItems` the shop actually rents; an item with no price here
+   *  can be owned but never rented. */
   gearPrices: Record<string, number>
   /** Fallback full-payment deadline when an event sets none: N days before start. */
   paymentDeadlineFallbackDays: number

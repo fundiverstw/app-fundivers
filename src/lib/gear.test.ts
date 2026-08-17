@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   isGearIncludedCourse, gearPackList, gearSlot, gearAlternatives,
   defaultRentalItems, toggleGearSelection, FULL_GEAR_SET, GEAR_ITEMS,
-  GEAR_ALACARTE_PRICES, HAS_GEAR_ALTERNATIVES,
+  GEAR_ALACARTE_PRICES, HAS_GEAR_ALTERNATIVES, RENTAL_GEAR_ITEMS,
+  HAS_RENTAL_GEAR_ALTERNATIVES, HAS_OWNED_ONLY_GEAR,
 } from './gear'
 import type { Booking } from '../types/database'
 
@@ -25,10 +26,10 @@ describe('gearPackList', () => {
     expect(out.items).toContain('Dive computer')
   })
 
-  it('packs one boot style for course-included gear, not both', () => {
+  it('packs the boot style the shop rents for course-included gear, not both', () => {
     const out = gearPackList(bookingWith({ rent: false, included: true }))
-    expect(out.items).toContain(RUBBER)
-    expect(out.items).not.toContain(FELT)
+    expect(out.items).toContain(FELT)
+    expect(out.items).not.toContain(RUBBER)
   })
 
   it('surfaces the assistance note and packs nothing yet', () => {
@@ -81,21 +82,36 @@ describe('isGearIncludedCourse', () => {
 })
 
 describe('the shipped catalog', () => {
-  it('offers both boot styles, each with its own price', () => {
+  it('lets a diver say they own either boot style', () => {
     expect(GEAR_ITEMS).toContain(RUBBER)
     expect(GEAR_ITEMS).toContain(FELT)
-    expect(GEAR_ALACARTE_PRICES[RUBBER]).toBeTypeOf('number')
-    expect(GEAR_ALACARTE_PRICES[FELT]).toBeTypeOf('number')
   })
 
-  it('prices every item it lists', () => {
-    for (const item of GEAR_ITEMS) {
+  it('rents felt soles only', () => {
+    expect(RENTAL_GEAR_ITEMS).toContain(FELT)
+    expect(RENTAL_GEAR_ITEMS).not.toContain(RUBBER)
+  })
+
+  it('prices every item it rents, and rents every item it prices', () => {
+    for (const item of RENTAL_GEAR_ITEMS) {
       expect(GEAR_ALACARTE_PRICES[item], `${item} has no price`).toBeTypeOf('number')
+    }
+    for (const priced of Object.keys(GEAR_ALACARTE_PRICES)) {
+      expect(RENTAL_GEAR_ITEMS, `${priced} is priced but never offered`).toContain(priced)
     }
   })
 
-  it('reports that it has alternatives, which is what shows the hint', () => {
+  it('rents everything else in the catalog', () => {
+    for (const item of GEAR_ITEMS) {
+      if (item === RUBBER) continue
+      expect(RENTAL_GEAR_ITEMS, `${item} is not rentable`).toContain(item)
+    }
+  })
+
+  it('shows the profile styles hint but not the rental one', () => {
     expect(HAS_GEAR_ALTERNATIVES).toBe(true)
+    expect(HAS_RENTAL_GEAR_ALTERNATIVES).toBe(false)
+    expect(HAS_OWNED_ONLY_GEAR).toBe(true)
   })
 })
 
@@ -136,12 +152,22 @@ describe('gearAlternatives', () => {
       expect(gearAlternatives(item)).not.toContain(item)
     }
   })
+
+  it('finds no rentable alternative to felt soles, since rubber is owned-only', () => {
+    expect(gearAlternatives(FELT, RENTAL_GEAR_ITEMS)).toEqual([])
+  })
 })
 
 describe('defaultRentalItems', () => {
-  it('ticks one boot style, not both, for a diver who owns nothing', () => {
+  it('ticks the boot style the shop rents for a diver who owns nothing', () => {
     const items = defaultRentalItems([])
-    expect(items.filter(i => gearSlot(i) === 'boots')).toEqual([RUBBER])
+    expect(items.filter(i => gearSlot(i) === 'boots')).toEqual([FELT])
+  })
+
+  it('never offers an owned-only item, whoever the diver is', () => {
+    expect(defaultRentalItems([])).not.toContain(RUBBER)
+    expect(defaultRentalItems([FELT])).not.toContain(RUBBER)
+    expect(defaultRentalItems(['BCD', 'Mask'])).not.toContain(RUBBER)
   })
 
   it('still ticks everything else the diver does not own', () => {
@@ -161,6 +187,11 @@ describe('defaultRentalItems', () => {
     expect(defaultRentalItems([RUBBER]).some(i => gearSlot(i) === 'boots')).toBe(false)
   })
 
+  it('still lets that diver rent felt ones by hand, for a slippery entry', () => {
+    expect(RENTAL_GEAR_ITEMS).toContain(FELT)
+    expect(toggleGearSelection(defaultRentalItems([RUBBER]), FELT)).toContain(FELT)
+  })
+
   it('excludes every other item the diver owns, by exact name', () => {
     const items = defaultRentalItems(['BCD', 'Mask'])
     expect(items).not.toContain('BCD')
@@ -178,8 +209,9 @@ describe('defaultRentalItems', () => {
     expect(defaultRentalItems(undefined)).toEqual(defaultRentalItems([]))
   })
 
-  it('is what FULL_GEAR_SET is: one of every slot', () => {
+  it('is what FULL_GEAR_SET is: one of every slot the shop rents', () => {
     expect(FULL_GEAR_SET).toEqual(defaultRentalItems([]))
+    expect(FULL_GEAR_SET).toEqual(RENTAL_GEAR_ITEMS)
     expect(FULL_GEAR_SET.length).toBe(GEAR_ITEMS.length - 1)
   })
 })
@@ -196,6 +228,11 @@ describe('toggleGearSelection', () => {
   it('swaps boot styles rather than stacking them', () => {
     expect(toggleGearSelection(['BCD', RUBBER], FELT)).toEqual(['BCD', FELT])
     expect(toggleGearSelection(['BCD', FELT], RUBBER)).toEqual(['BCD', RUBBER])
+  })
+
+  it('clears a style the shop no longer rents, which no box can untick', () => {
+    expect(RENTAL_GEAR_ITEMS).not.toContain(RUBBER)
+    expect(toggleGearSelection(['Regulator', RUBBER], FELT)).toEqual(['Regulator', FELT])
   })
 
   it('leaves the diver with no boots when they untick the one they had', () => {

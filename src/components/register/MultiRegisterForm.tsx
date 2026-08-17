@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useState } from 'react'
 import { personName } from '../../lib/names'
-import { GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_GEAR_ALTERNATIVES, isGearIncludedCourse, defaultRentalItems, toggleGearSelection } from '../../lib/gear'
+import { RENTAL_GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_RENTAL_GEAR_ALTERNATIVES, HAS_OWNED_ONLY_GEAR, isGearIncludedCourse, defaultRentalItems, toggleGearSelection } from '../../lib/gear'
 import { usesCourseDays, allowsTransport } from '../../lib/event-kinds'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
@@ -656,11 +656,14 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                         {c.rentGear && (
                           <div className="pl-6 space-y-1">
                             <p className="text-xs text-brand-950 font-medium">{t.register.checkItems}</p>
-                            {HAS_GEAR_ALTERNATIVES && (
+                            {HAS_RENTAL_GEAR_ALTERNATIVES && (
                               <p className="text-xs text-brand-950 font-medium">{t.register.gear.stylesHint}</p>
                             )}
+                            {HAS_OWNED_ONLY_GEAR && (
+                              <p className="text-xs text-brand-950 font-medium">{t.register.gear.ownedOnlyHint}</p>
+                            )}
                             <div className="grid grid-cols-2 gap-1">
-                              {GEAR_ITEMS.map(item => (
+                              {RENTAL_GEAR_ITEMS.map(item => (
                                 <label key={item} className="flex items-center gap-1 text-xs text-brand-950 font-medium">
                                   <input
                                     type="checkbox"

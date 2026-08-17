@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { splitByTransport, transportHeadcount, gearTotals, dayKeyOffset, careItemsForBooking, careTotals, isCareGearItem, addonTotals, partitionByWaitlist, gearSizeBreakdown, isSizedGearItem, gearSizeSource, gearDayDiff } from './logistics'
+import { splitByTransport, transportHeadcount, gearTotals, dayKeyOffset, careItemsForBooking, careTotals, isCareGearItem, addonTotals, partitionByWaitlist, gearSizeBreakdown, isSizedGearItem, gearSizeSource, gearDayDiff, packedGearTypes } from './logistics'
 import type { Booking, Profile } from '../types/database'
 
 const row = (transportation: boolean | undefined, items: string[] = []) => ({
@@ -201,6 +201,24 @@ describe('gearSizeSource / isSizedGearItem', () => {
   it('packs both boot styles by shoe size', () => {
     expect(gearSizeSource('Boots (rubber sole)')).toBe('boots')
     expect(gearSizeSource('Boots (felt sole)')).toBe('boots')
+  })
+})
+
+describe('packedGearTypes', () => {
+  it('names the charts the packed items call for, and nothing else', () => {
+    expect(packedGearTypes(['BCD', 'Wetsuit', 'Fins'])).toEqual(['wetsuit', 'bcd', 'fins'])
+    expect(packedGearTypes(['Regulator', 'Mask', 'Dive computer'])).toEqual([])
+    expect(packedGearTypes([])).toEqual([])
+  })
+
+  // Boots have no sizing chart of their own — they are packed off the shoe size.
+  it('reads a style-qualified item as its type', () => {
+    expect(packedGearTypes(['Wetsuit (5mm)'])).toEqual(['wetsuit'])
+    expect(packedGearTypes(['Boots (felt sole)'])).toEqual([])
+  })
+
+  it('names a type once however many styles of it are packed', () => {
+    expect(packedGearTypes(['Wetsuit (3mm)', 'Wetsuit (5mm)'])).toEqual(['wetsuit'])
   })
 })
 

@@ -202,6 +202,15 @@ column (boots off `shoe_size`), so `Boots (felt sole) · JP 26` and
 `Boots (rubber sole) · JP 26` are two rack slots, not one. See
 [forking.md](./forking.md#gear-catalog) for how the catalog declares them.
 
+FunDivers rents one of those two: the rack is felt soles, which is what
+grips the algae-covered rock on our shore entries. Rubber soles stay in
+the catalog so a diver can record that they own a pair — the board reads
+that as a filled slot and packs them no boots, and they can still ask for
+felt ones on a dive that wants the grip. Nothing the shop doesn't rent
+can be booked, so `Boots (rubber sole)` should never reach a packing
+total; if it does, it is a row that predates
+`20260817000000_rent_felt_soled_boots_only.sql`.
+
 Two rules keep it honest:
 
 - **Only back-to-back days.** The button is offered when the *very next

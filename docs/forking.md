@@ -73,15 +73,37 @@ separate mechanism (baked into the manifest + `index.html` at build).
 
 `business.gearItems` is the one list behind three surfaces: the profile's "Gear
 I own" checklist, the à-la-carte rental checklist at registration, and the
-logistics packing totals. `business.gearPrices` must carry a key for every
-entry — an item with no price rents for nothing.
+logistics packing totals.
+
+**`gearPrices` decides what the shop rents.** Its keys are the subset of
+`gearItems` that appears in the rental checklist, each with its daily price. An
+item left out is *owned-only*: a diver can still record that they own one, and
+the shop never offers it. That is the whole seam — there is no separate rental
+list to keep in sync:
+
+```ts
+gearItems:  [..., 'Boots (rubber sole)', 'Boots (felt sole)', ...]
+gearPrices: { ..., 'Boots (felt sole)': 50, ... }   // rubber is owned-only
+```
+
+The reverse — a price for an item the catalog doesn't list — is rejected by the
+config schema, because it fails silently otherwise: the typo'd item is simply
+never offered.
+
+Owned-only items are still first-class everywhere else. They count on the
+packing board if an older booking names one, they resolve to the same sizing
+column, and `RENTAL_GEAR_ITEMS` (not `GEAR_ITEMS`) is what the register forms
+render. When some of the catalog is owned-only, the rental checklist says so, so
+a diver reads the short list as the whole rack rather than a broken form.
 
 Items are stored **by label**, in `profiles.gear_owned` and in
 `bookings.details.gear.items`. Renaming an entry therefore orphans existing
 rows: the checklist silently drops the diver's choice and the packing board
 leaves the item off. Ship a forward migration that rewrites the old label
-alongside the config change — see
-`supabase/migrations/20260815000000_split_boots_by_sole.sql` for the shape,
+alongside the config change — the same applies when an item stops being
+rentable, since bookings can still be carrying it. See
+`supabase/migrations/20260815000000_split_boots_by_sole.sql` and
+`20260817000000_rent_felt_soled_boots_only.sql` for the shape,
 including the two things it deliberately leaves alone (`details.charges`, a
 frozen receipt of what the diver was charged, and the audit log, a record of
 what was written).
@@ -99,11 +121,15 @@ rubber is for boats, sand and walking, so a shop needs to know which pair to
 pack — but the rule is general (`'Wetsuit (3mm)'` / `'Wetsuit (5mm)'` behaves
 the same). What follows from a slot:
 
-- the rental checklist starts with **one** style ticked, so nobody is defaulted
-  into paying for two pairs of boots;
+- the rental checklist starts with **one** style ticked — the first style the
+  shop actually rents — so nobody is defaulted into paying for two pairs of boots;
 - ticking one style unticks the others (`toggleGearSelection` in
-  `src/lib/gear.ts`);
-- a diver who owns *any* style of an item rents none of them by default;
+  `src/lib/gear.ts`), reading alternatives from the whole catalog rather than the
+  rental list, so a style carried in from an older booking is cleared even though
+  no box is drawn for it any more;
+- a diver who owns *any* style of an item rents none of them by default, though
+  they can still tick a style they own another of — FunDivers rents felt soles to
+  divers who own rubber ones for exactly that reason;
 - course-bundled gear packs `FULL_GEAR_SET` — one of every slot — rather than
   the raw catalog;
 - but the **profile** checklist has no exclusivity: owning both a felt and a

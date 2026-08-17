@@ -2,23 +2,18 @@ import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { personName } from '../../lib/names'
 import { supabase } from '../../lib/supabase'
-import { gearPackList, GEAR_ITEMS } from '../../lib/gear'
+import { gearPackList } from '../../lib/gear'
+import { packedGearTypes } from '../../lib/logistics'
 import { shoeAsJp } from '../../lib/shoe-size'
 import { useToast } from '../../hooks/useToast'
 import { AdminNotes } from './AdminNotes'
 import { GearFitLookup } from './GearFitLookup'
 import type { GearModelWithSizes } from '../../lib/gear-sizing'
-import { GEAR_TYPES, type GearType, type Booking, type Profile } from '../../types/database'
+import type { Booking, Profile } from '../../types/database'
 import { t } from '../../i18n'
 
 const gc = t.admin.gearCard
 const gf = t.admin.gearFit
-
-// Which config gear item stands for a sizing-chart gear type. Substring match so
-// a fork's relabelled item ("Wetsuit 5mm", "Full wetsuit") still resolves.
-function gearTypeItem(type: GearType): string | undefined {
-  return GEAR_ITEMS.find(i => i.toLowerCase().includes(type))
-}
 
 // Route under-13s (by date of birth) to kids' gear charts; otherwise use the
 // profile's gender as-is. Keeps the pure matcher free of date handling.
@@ -192,7 +187,7 @@ export function DiverGearCard({
               models={gearModels}
               // Rentals come from the booking's pack list (the packing source of
               // truth), not profile.gear_owned.
-              rentalTypes={GEAR_TYPES.filter(gt => { const item = gearTypeItem(gt); return !!item && pack.items.includes(item) })}
+              rentalTypes={packedGearTypes(pack.items)}
             />
           )}
         </div>
