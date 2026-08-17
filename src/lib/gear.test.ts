@@ -4,6 +4,7 @@ import {
   defaultRentalItems, toggleGearSelection, FULL_GEAR_SET, GEAR_ITEMS,
   GEAR_ALACARTE_PRICES, HAS_GEAR_ALTERNATIVES, RENTAL_GEAR_ITEMS,
   HAS_RENTAL_GEAR_ALTERNATIVES, HAS_OWNED_ONLY_GEAR,
+  gearOwnGroups, gearBaseLabel, gearStyleLabel, ownedInSlot,
 } from './gear'
 import type { Booking } from '../types/database'
 
@@ -155,6 +156,59 @@ describe('gearAlternatives', () => {
 
   it('finds no rentable alternative to felt soles, since rubber is owned-only', () => {
     expect(gearAlternatives(FELT, RENTAL_GEAR_ITEMS)).toEqual([])
+  })
+})
+
+describe('gearOwnGroups', () => {
+  it('folds the boot styles into one row with both styles to choose from', () => {
+    const boots = gearOwnGroups().find(g => g.label === 'Boots')
+    expect(boots).toEqual({ items: [RUBBER, FELT], label: 'Boots', styles: ['rubber sole', 'felt sole'] })
+  })
+
+  it('leaves a single-style item as its own row, styles empty', () => {
+    const bcd = gearOwnGroups().find(g => g.label === 'BCD')
+    expect(bcd).toEqual({ items: ['BCD'], label: 'BCD', styles: [] })
+  })
+
+  it('covers the whole catalog exactly once, in catalog order', () => {
+    expect(gearOwnGroups().flatMap(g => g.items)).toEqual(GEAR_ITEMS)
+  })
+
+  it('keeps a lone qualified item spelled out rather than shortening it', () => {
+    expect(gearOwnGroups(['Mask (low volume)'])).toEqual([
+      { items: ['Mask (low volume)'], label: 'Mask (low volume)', styles: [] },
+    ])
+  })
+
+  it('reads an unqualified entry as a style of its own name', () => {
+    const groups = gearOwnGroups(['Boots', 'Boots (felt sole)'])
+    expect(groups).toEqual([
+      { items: ['Boots', 'Boots (felt sole)'], label: 'Boots', styles: ['Boots', 'felt sole'] },
+    ])
+  })
+})
+
+describe('gearBaseLabel / gearStyleLabel', () => {
+  it('splits a styled item into the name a checkbox reads and the style beside it', () => {
+    expect(gearBaseLabel(FELT)).toBe('Boots')
+    expect(gearStyleLabel(FELT)).toBe('felt sole')
+  })
+
+  it('leaves an unstyled item whole', () => {
+    expect(gearBaseLabel('Dive computer')).toBe('Dive computer')
+    expect(gearStyleLabel('Dive computer')).toBeNull()
+  })
+
+  it('keeps the catalog\'s own casing, unlike the slot key', () => {
+    expect(gearBaseLabel(RUBBER)).toBe('Boots')
+    expect(gearSlot(RUBBER)).toBe('boots')
+  })
+})
+
+describe('ownedInSlot', () => {
+  it('lists what the diver owns in a slot, in catalog order', () => {
+    expect(ownedInSlot([FELT, 'BCD', RUBBER], [RUBBER, FELT])).toEqual([RUBBER, FELT])
+    expect(ownedInSlot(['BCD'], [RUBBER, FELT])).toEqual([])
   })
 })
 

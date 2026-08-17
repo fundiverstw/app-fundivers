@@ -34,6 +34,50 @@ export function gearSlot(item: string): string {
   return item.replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase()
 }
 
+/** The catalog label without its style qualifier, in the catalog's own casing:
+ *  "Boots (felt sole)" reads as "Boots" on the checkbox that covers both. */
+export function gearBaseLabel(item: string): string {
+  return item.replace(/\s*\([^)]*\)\s*$/, '').trim()
+}
+
+/** The style qualifier on its own — "felt sole" — or null when the item carries none. */
+export function gearStyleLabel(item: string): string | null {
+  const match = item.match(/\(([^)]*)\)\s*$/)
+  return match ? match[1].trim() : null
+}
+
+/** One row of the "gear I own" checklist: an item, plus the styles it comes in. */
+export interface GearOwnGroup {
+  /** The catalog labels this row covers, in catalog order. */
+  items: string[]
+  /** What the checkbox reads. */
+  label: string
+  /** Style names parallel to `items`, or empty for an item with one style. */
+  styles: string[]
+}
+
+/**
+ * Fold the catalog into checklist rows: one row per slot, so a diver ticks
+ * "Boots" once and then says which soles. Owning two styles of one item is a
+ * fact rather than a conflict, which is why this is a list of styles to choose
+ * from and not the rental checklist's pick-one.
+ */
+export function gearOwnGroups(catalog: readonly string[] = GEAR_ITEMS): GearOwnGroup[] {
+  const bySlot = new Map<string, string[]>()
+  for (const item of catalog) {
+    const slot = gearSlot(item)
+    bySlot.set(slot, [...(bySlot.get(slot) ?? []), item])
+  }
+  return [...bySlot.values()].map(items => items.length === 1
+    ? { items, label: items[0], styles: [] }
+    : { items, label: gearBaseLabel(items[0]), styles: items.map(i => gearStyleLabel(i) ?? i) })
+}
+
+/** The entries of `slotItems` the diver owns, in catalog order. */
+export function ownedInSlot(owned: string[], slotItems: string[]): string[] {
+  return slotItems.filter(i => owned.includes(i))
+}
+
 /** The other entries in `within` that fill the same slot as `item`. Defaults to
  *  the whole catalog; pass the rental list to ask what a booking can swap for. */
 export function gearAlternatives(item: string, within: readonly string[] = GEAR_ITEMS): string[] {

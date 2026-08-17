@@ -6,7 +6,8 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
 import { pushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
-import { GEAR_ITEMS, HAS_GEAR_ALTERNATIVES } from '../lib/gear'
+import { HAS_GEAR_ALTERNATIVES } from '../lib/gear'
+import { GearOwnedChecklist } from '../components/profile/GearOwnedChecklist'
 import { numOrNull } from '../lib/num'
 import { uploadCertCard, getCertCardSignedUrl, deleteCertCard } from '../lib/cert-card'
 import { uploadNitroxCard, getNitroxCardSignedUrl, deleteNitroxCard } from '../lib/nitrox-card'
@@ -248,8 +249,8 @@ export function ProfileForm({ user, profile, onSaved }: {
   const [shoeSize, setShoeSize] = useState<string>(profile.shoe_size ?? '')
   const [dirtyExtras, setDirtyExtras] = useState(false)
 
-  function toggleGearOwned(item: string) {
-    setGearOwned(prev => prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item])
+  function setGearOwnedDirty(next: string[]) {
+    setGearOwned(next)
     setDirtyExtras(true)
   }
 
@@ -389,19 +390,7 @@ export function ProfileForm({ user, profile, onSaved }: {
               {t.profile.gearStylesHint}
             </p>
           )}
-          <div className="grid grid-cols-2 gap-2">
-            {GEAR_ITEMS.map(item => (
-              <label key={item} className="flex items-center gap-2 text-sm text-brand-900">
-                <input
-                  type="checkbox"
-                  checked={gearOwned.includes(item)}
-                  onChange={() => toggleGearOwned(item)}
-                  className="accent-brand-900"
-                />
-                {item}
-              </label>
-            ))}
-          </div>
+          <GearOwnedChecklist owned={gearOwned} onChange={setGearOwnedDirty} />
         </section>
 
         <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">

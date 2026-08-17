@@ -133,7 +133,11 @@ the same). What follows from a slot:
 - course-bundled gear packs `FULL_GEAR_SET` — one of every slot — rather than
   the raw catalog;
 - but the **profile** checklist has no exclusivity: owning both a felt and a
-  rubber pair is a fact, not a conflict.
+  rubber pair is a fact, not a conflict. It shows one checkbox per slot —
+  "Boots" — with a styles dropdown beside it, so a diver ticks the item and then
+  says which styles they own, one or several. Ticking the item records nothing on
+  its own: which style they own is the question being asked, and guessing it
+  would put the wrong pair on the packing board.
 
 Packing keeps the styles apart — they are separate racks, and a felt pair does
 not cover a diver who asked for rubber — while sizing still resolves through
