@@ -3,6 +3,7 @@ import { TrustedPartnersIcon } from '../icons/TrustedPartnersIcon'
 import { PackagesIcon } from '../icons/PackagesIcon'
 import { ScheduledTripsIcon } from '../icons/ScheduledTripsIcon'
 import { MapIcon } from '../icons/MapIcon'
+import { AlmanacIcon } from '../icons/AlmanacIcon'
 import { t } from '../../i18n'
 import { CARD, TEXT_BODY, TEXT_SUBTLE } from '../../styles/tokens'
 
@@ -25,6 +26,7 @@ const destinations: Destination[] = [
   { to: '/trusted-partners', label: t.shell.trustedPartners, icon: <TrustedPartnersIcon /> },
   { to: '/packages',         label: t.shell.packages,        icon: <PackagesIcon /> },
   { to: '/scheduled-trips',  label: t.shell.scheduledTrips,  icon: <ScheduledTripsIcon /> },
+  { to: '/almanac',          label: t.dashboard.almanac,     icon: <AlmanacIcon /> },
 ]
 
 interface QuickLinksProps {
@@ -36,7 +38,7 @@ interface QuickLinksProps {
 
 export function QuickLinks({ siteMapTo }: QuickLinksProps = {}) {
   return (
-    <nav aria-label={t.dashboard.quickLinks} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <nav aria-label={t.dashboard.quickLinks} className="grid grid-cols-2 gap-2 sm:grid-cols-3">
       {destinations.map(({ to, label, icon }) => (
         <Link key={to} to={to} className={`${TILE} ${TEXT_BODY}`}>
           {icon}

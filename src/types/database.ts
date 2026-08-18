@@ -348,6 +348,49 @@ export interface Database {
         Args: { p_token: string }
         Returns: number
       }
+      // Almanac: get approved records for an event (diver-safe, no RLS needed).
+      almanac_event_records: {
+        Args: { p_event_id: string }
+        Returns: Array<{
+          id: string
+          created_at: string
+          obs_date: string
+          air_temp_c: number | null
+          water_temp_c: number | null
+          visibility_m: number | null
+          current_strength: string | null
+          wave_height_m: number | null
+          wave_period_s: number | null
+          weather: string | null
+          wildlife: string[] | null
+          coral_health: string | null
+          elevation_m: number | null
+          route_condition: string | null
+          summit_visible: boolean | null
+          diver_name: string | null
+          diver_nickname: string | null
+        }>
+      }
+      // Almanac: submit or update a diver's own pending observation.
+      submit_almanac_record: {
+        Args: {
+          p_event_id: string
+          p_obs_date: string
+          p_air_temp_c?: number | null
+          p_water_temp_c?: number | null
+          p_visibility_m?: number | null
+          p_current_strength?: string | null
+          p_wave_height_m?: number | null
+          p_wave_period_s?: number | null
+          p_weather?: string | null
+          p_wildlife?: string[] | null
+          p_coral_health?: string | null
+          p_elevation_m?: number | null
+          p_route_condition?: string | null
+          p_summit_visible?: boolean | null
+        }
+        Returns: string
+      }
       // Defined in 20260603020000_profile_delete_cascade_and_admin_rpc.sql.
       // Admin-only. Deletes auth.users for the target id; the existing
       // FK cascade handles profiles + dependents. Refuses self-deletion.
@@ -1610,6 +1653,61 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['cancellation_policies']['Insert']>
         Relationships: []
       }
+      // Crowdsourced environmental observations for dive sites and adventure
+      // events. Divers submit; staff/admin approve; approved records show
+      // on the event detail and the almanac page.
+      almanac_records: {
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          diver_id: string
+          event_id: string
+          obs_date: string
+          air_temp_c: number | null
+          water_temp_c: number | null
+          visibility_m: number | null
+          current_strength: 'calm' | 'light' | 'moderate' | 'strong' | 'very_strong' | null
+          wave_height_m: number | null
+          wave_period_s: number | null
+          weather: 'clear' | 'partly_cloudy' | 'cloudy' | 'overcast' | 'rain' | 'thunderstorm' | 'windy' | 'fog' | 'typhoon' | null
+          wildlife: string[] | null
+          coral_health: 'excellent' | 'good' | 'fair' | 'poor' | 'bleaching' | null
+          elevation_m: number | null
+          route_condition: 'dry' | 'wet' | 'muddy' | 'icy' | 'snow' | 'rockfall' | null
+          summit_visible: boolean | null
+          status: 'pending' | 'approved' | 'rejected'
+          approved_by: string | null
+          approved_at: string | null
+          staff_notes: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          diver_id?: string
+          event_id: string
+          obs_date: string
+          air_temp_c?: number | null
+          water_temp_c?: number | null
+          visibility_m?: number | null
+          current_strength?: 'calm' | 'light' | 'moderate' | 'strong' | 'very_strong' | null
+          wave_height_m?: number | null
+          wave_period_s?: number | null
+          weather?: 'clear' | 'partly_cloudy' | 'cloudy' | 'overcast' | 'rain' | 'thunderstorm' | 'windy' | 'fog' | 'typhoon' | null
+          wildlife?: string[] | null
+          coral_health?: 'excellent' | 'good' | 'fair' | 'poor' | 'bleaching' | null
+          elevation_m?: number | null
+          route_condition?: 'dry' | 'wet' | 'muddy' | 'icy' | 'snow' | 'rockfall' | null
+          summit_visible?: boolean | null
+          status?: 'pending' | 'approved' | 'rejected'
+          approved_by?: string | null
+          approved_at?: string | null
+          staff_notes?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['almanac_records']['Insert']>
+        Relationships: []
+      }
       travel_destinations: {
         Row: {
           id: string
@@ -1945,11 +2043,28 @@ export type ScheduledTripStatus = typeof SCHEDULED_TRIP_STATUSES[number]
 export const WAITLIST_OFFER_STATUSES = ['pending', 'accepted', 'expired'] as const
 export type WaitlistOfferStatus = typeof WAITLIST_OFFER_STATUSES[number]
 export type WaitlistOffer = Database['public']['Tables']['waitlist_offers']['Row']
+
+// Almanac: crowdsourced environmental observations
+export const ALMANAC_CURRENT_STRENGTHS = ['calm', 'light', 'moderate', 'strong', 'very_strong'] as const
+export type AlmanacCurrentStrength = typeof ALMANAC_CURRENT_STRENGTHS[number]
+export const ALMANAC_WEATHERS = ['clear', 'partly_cloudy', 'cloudy', 'overcast', 'rain', 'thunderstorm', 'windy', 'fog', 'typhoon'] as const
+export type AlmanacWeather = typeof ALMANAC_WEATHERS[number]
+export const ALMANAC_CORAL_HEALTHS = ['excellent', 'good', 'fair', 'poor', 'bleaching'] as const
+export type AlmanacCoralHealth = typeof ALMANAC_CORAL_HEALTHS[number]
+export const ALMANAC_ROUTE_CONDITIONS = ['dry', 'wet', 'muddy', 'icy', 'snow', 'rockfall'] as const
+export type AlmanacRouteCondition = typeof ALMANAC_ROUTE_CONDITIONS[number]
+export const ALMANAC_STATUSES = ['pending', 'approved', 'rejected'] as const
+export type AlmanacStatus = typeof ALMANAC_STATUSES[number]
+export type AlmanacRecord = Database['public']['Tables']['almanac_records']['Row']
+export type AlmanacRecordInsert = Database['public']['Tables']['almanac_records']['Insert']
 export const DUTY_ROLES = ['instructor', 'guide', 'support'] as const
 export type DutyRole = typeof DUTY_ROLES[number]
 
 export type StaffAvailabilityInsert = Database['public']['Tables']['staff_availability']['Insert']
 export type StaffAvailabilityUpdate = Database['public']['Tables']['staff_availability']['Update']
+
+// Almanac RPC return type
+export type AlmanacEventRecord = Database['public']['Functions']['almanac_event_records']['Returns'][number]
 /** Privacy-projected row used by the UI. title/details are NULL for any
  *  entry not owned by the calling user. owner_display_name comes from the
  *  joined profiles row in staff_availability_view. */

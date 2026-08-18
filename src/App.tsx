@@ -66,6 +66,11 @@ import { AdminWaiversPage } from './pages/admin/AdminWaiversPage'
 import { AdminTermsPage } from './pages/admin/AdminTermsPage'
 import { AdminCancellationPoliciesPage } from './pages/admin/AdminCancellationPoliciesPage'
 
+// Almanac page
+const AlmanacPage = lazy(() =>
+  import('./pages/AlmanacPage').then(m => ({ default: m.AlmanacPage }))
+)
+
 // Public registration flow — /register (pick an event) and /register/:id
 // (deep-link from Wix calendar) both render RegisterPage. Outside ProtectedRoute
 // so cold visitors don't hit an auth wall; lazy-loaded so the cold path doesn't
@@ -119,6 +124,7 @@ export default function App() {
             <Route element={<AppShell />}>
               <Route path="/dashboard" element={<DashboardPage quickLinks />} />
               <Route path="/calendar" element={<CalendarPage />} />
+              <Route path="/almanac" element={<AlmanacPage />} />
               <Route path="/records" element={<RecordsPage />}>
                 <Route index element={<Navigate to="bookings" replace />} />
                 <Route path="bookings" element={<BookingsPage />} />
