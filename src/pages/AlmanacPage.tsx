@@ -1,17 +1,15 @@
 /**
- * Almanac page — crowdsourced environmental observations for events.
+ * Almanac — crowdsourced environmental observations attached to past events.
  *
- * Divers can submit observations (air/water temp, visibility, current,
- * weather, wildlife, coral health, mountaineering details). Staff/admin
- * can approve or reject pending records. Approved records appear on the
- * event detail and the almanac page.
+ * A diver files what they saw on the day (temperatures, visibility, current,
+ * weather, wildlife, coral, and terrain readings for the kinds that climb);
+ * staff rule on each submission; approved records are what the crowd reads.
  *
- * The page shows:
- * 1. A summary card of approved observations (averages, counts)
- * 2. A form to submit a new observation
- * 3. A list of past events with their observations
+ * The three sections mirror those three roles: the review queue (staff only),
+ * the submission form, and the approved history grouped by event.
  */
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { format } from 'date-fns'
 import { useAuth } from '../hooks/useAuth'
 import { t } from '../i18n'
 import {
@@ -23,34 +21,52 @@ import {
   type AlmanacWeather,
   type AlmanacCoralHealth,
   type AlmanacRouteCondition,
+  type AlmanacStatus,
   type AlmanacEventRecord,
+  type AlmanacPendingRecord,
 } from '../types/database'
-import {
-  usesDateEnvelope,
-  type EventKind,
-} from '../lib/event-kinds'
+import { hasTerrainConditions, type EventKind } from '../lib/event-kinds'
 import { fetchEventsInRange, formatEventSpan, isPastEvent } from '../lib/events'
-import { todayIso, addIsoDays } from '../lib/dates'
+import { todayIso, addIsoDays, parseIsoDate, shopDayIso } from '../lib/dates'
 import { supabase } from '../lib/supabase'
 import {
   CARD,
   TEXT_BODY,
   TEXT_SUBTLE,
   TEXT_HEADING,
+  INPUT,
+  INPUT_LABEL,
+  BTN_PRIMARY,
+  BTN_SECONDARY,
+  BTN_XS_PRIMARY,
+  BTN_XS_DANGER,
+  ERROR_NOTE_LIGHT,
 } from '../styles/tokens'
 import { CalendarIcon } from '../components/icons/CalendarIcon'
 import { ChevronDownIcon } from '../components/icons/ChevronDownIcon'
 import { ChevronUpIcon } from '../components/icons/ChevronUpIcon'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// How far back the page looks. Only past events can be observed, so there is
+// no reason to fetch the upcoming half of the calendar at all.
+const LOOKBACK_DAYS = 90
 
-interface EventWithObservations {
+interface PastEvent {
   id: string
   title: string
   start_time: string
+  end_time: string | null
+  start_time_hhmm: string | null
   kind: EventKind
-  is_past: boolean
   observations: AlmanacEventRecord[]
+}
+
+/** A submission of the signed-in diver's that the crowd cannot see yet. */
+interface OwnSubmission {
+  id: string
+  event_id: string
+  obs_date: string
+  status: AlmanacStatus
+  staff_notes: string | null
 }
 
 interface AlmanacFormState {
@@ -67,10 +83,8 @@ interface AlmanacFormState {
   coral_health: AlmanacCoralHealth | ''
   elevation_m: string
   route_condition: AlmanacRouteCondition | ''
-  summit_visible: boolean | null
+  summit_visible: boolean
 }
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const emptyForm: AlmanacFormState = {
   event_id: '',
@@ -86,207 +100,142 @@ const emptyForm: AlmanacFormState = {
   coral_health: '',
   elevation_m: '',
   route_condition: '',
-  summit_visible: null,
-}
-
-function localDate(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${dd}`
+  summit_visible: false,
 }
 
 function parseNum(v: string): number | null {
-  if (!v) return null
-  const n = parseFloat(v)
-  return isNaN(n) ? null : n
+  if (!v.trim()) return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
 }
 
-function formatNum(v: number | null, decimals: number = 1): string {
+function formatNum(v: number | null, decimals = 1): string {
   return v === null ? '—' : v.toFixed(decimals)
 }
 
-function formatEventDate(d: Date): string {
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+/** A `date` column rendered as the day it stores, not a UTC-shifted one. */
+function formatObsDate(iso: string): string {
+  return format(parseIsoDate(iso), 'MMM d, yyyy')
 }
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
+function parseWildlife(raw: string): string[] {
+  return raw.split(',').map(s => s.trim()).filter(Boolean)
+}
 
-/** Single observation row in the historical list. */
-function ObservationRow({
-  record,
-  diverName,
-  diverNickname,
-}: {
-  record: AlmanacEventRecord
-  diverName: string | null
-  diverNickname: string | null
-}) {
-  const label = diverNickname
-    ? `${diverName} · ${t.almanac.recordsFromNickname(diverName)}`
-    : t.almanac.recordsFrom(diverName ?? '—')
+// ─── Readings ────────────────────────────────────────────────────────────────
 
+/** The readings a record carries, as label/value pairs — blank ones dropped. */
+type Reading = { label: string; value: string }
+
+function readingsOf(record: AlmanacEventRecord | AlmanacPendingRecord): Reading[] {
+  const readings: Reading[] = []
+  const push = (label: string, value: string | null) => {
+    if (value !== null) readings.push({ label, value })
+  }
+  push(t.almanac.airTemp, record.air_temp_c === null ? null : `${formatNum(record.air_temp_c)}°C`)
+  push(t.almanac.waterTemp, record.water_temp_c === null ? null : `${formatNum(record.water_temp_c)}°C`)
+  push(t.almanac.visibility, record.visibility_m === null ? null : `${formatNum(record.visibility_m)}m`)
+  push(t.almanac.current, record.current_strength && t.almanac.currentStrengths[record.current_strength])
+  push(t.almanac.weather, record.weather && t.almanac.weathers[record.weather])
+  push(t.almanac.waveHeight, record.wave_height_m === null ? null : `${formatNum(record.wave_height_m)}m`)
+  push(t.almanac.wavePeriod, record.wave_period_s === null ? null : `${formatNum(record.wave_period_s)}s`)
+  push(t.almanac.coralHealth, record.coral_health && t.almanac.coralHealths[record.coral_health])
+  push(t.almanac.wildlife, record.wildlife?.length ? record.wildlife.join(', ') : null)
+  push(t.almanac.elevation, record.elevation_m === null ? null : `${record.elevation_m}m`)
+  push(t.almanac.routeCondition, record.route_condition && t.almanac.routeConditions[record.route_condition])
+  push(t.almanac.summitVisible, record.summit_visible === null
+    ? null
+    : record.summit_visible ? t.almanac.yes : t.almanac.no)
+  return readings
+}
+
+function ReadingGrid({ readings }: { readings: Reading[] }) {
   return (
-    <div className={`${CARD} border border-white/10 rounded-lg p-3`}>
-      <div className="flex items-center justify-between">
-        <span className={`text-xs ${TEXT_SUBTLE}`}>
-          {t.almanac.recordsDate(localDate(new Date(record.obs_date)))}
-        </span>
+    <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+      {readings.map(({ label, value }) => (
+        <div key={label} className="contents">
+          <dt className={TEXT_SUBTLE}>{label}</dt>
+          <dd className={TEXT_BODY}>{value}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+// ─── Approved history ────────────────────────────────────────────────────────
+
+function ObservationRow({ record }: { record: AlmanacEventRecord }) {
+  return (
+    <div className="rounded-lg border border-white/10 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className={`text-xs ${TEXT_SUBTLE}`}>{formatObsDate(record.obs_date)}</span>
         <span className={`text-[10px] uppercase tracking-wide ${TEXT_SUBTLE}`}>
-          {label}
+          {t.almanac.recordsFrom(record.diver_display ?? '—')}
         </span>
       </div>
-      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-        {record.air_temp_c !== null && (
-          <>
-            <span className={TEXT_SUBTLE}>{t.almanac.airTemp}</span>
-            <span>{formatNum(record.air_temp_c, 1)}°C</span>
-          </>
-        )}
-        {record.water_temp_c !== null && (
-          <>
-            <span className={TEXT_SUBTLE}>{t.almanac.waterTemp}</span>
-            <span>{formatNum(record.water_temp_c, 1)}°C</span>
-          </>
-        )}
-        {record.visibility_m !== null && (
-          <>
-            <span className={TEXT_SUBTLE}>{t.almanac.visibility}</span>
-            <span>{formatNum(record.visibility_m, 1)}m</span>
-          </>
-        )}
-        {record.current_strength && (
-          <>
-            <span className={TEXT_SUBTLE}>{t.almanac.current}</span>
-            <span>{t.almanac.currentStrengths[record.current_strength as AlmanacCurrentStrength]}</span>
-          </>
-        )}
-        {record.weather && (
-          <>
-            <span className={TEXT_SUBTLE}>{t.almanac.weather}</span>
-            <span>{t.almanac.weathers[record.weather as AlmanacWeather]}</span>
-          </>
-        )}
-        {record.wave_height_m !== null && (
-          <>
-            <span className={TEXT_SUBTLE}>{t.almanac.waveHeight}</span>
-            <span>{formatNum(record.wave_height_m, 1)}m</span>
-          </>
-        )}
-        {record.coral_health && (
-          <>
-            <span className={TEXT_SUBTLE}>{t.almanac.coralHealth}</span>
-            <span>{t.almanac.coralHealths[record.coral_health as AlmanacCoralHealth]}</span>
-          </>
-        )}
-        {record.wildlife && record.wildlife.length > 0 && (
-          <>
-            <span className={TEXT_SUBTLE}>{t.almanac.wildlife}</span>
-            <span>{record.wildlife.join(', ')}</span>
-          </>
-        )}
-        {record.elevation_m !== null && (
-          <>
-            <span className={TEXT_SUBTLE}>{t.almanac.elevation}</span>
-            <span>{record.elevation_m}m</span>
-          </>
-        )}
-        {record.route_condition && (
-          <>
-            <span className={TEXT_SUBTLE}>{t.almanac.routeCondition}</span>
-            <span>{t.almanac.routeConditions[record.route_condition as AlmanacRouteCondition]}</span>
-          </>
-        )}
-        {record.summit_visible !== null && (
-          <>
-            <span className={TEXT_SUBTLE}>{t.almanac.summitVisible}</span>
-            <span>{record.summit_visible ? '✓' : '✗'}</span>
-          </>
-        )}
-      </div>
+      <ReadingGrid readings={readingsOf(record)} />
     </div>
   )
 }
 
-/** Summary statistics for a set of approved observations. */
+/** Averages across an event's approved observations. */
 function ObservationSummary({ records }: { records: AlmanacEventRecord[] }) {
-  if (records.length === 0) return null
-
-  const airTemps = records.map(r => r.air_temp_c).filter((v): v is number => v !== null)
-  const waterTemps = records.map(r => r.water_temp_c).filter((v): v is number => v !== null)
-  const visibilities = records.map(r => r.visibility_m).filter((v): v is number => v !== null)
+  const mean = (values: (number | null)[]): number | null => {
+    const present = values.filter((v): v is number => v !== null)
+    return present.length === 0 ? null : present.reduce((a, b) => a + b, 0) / present.length
+  }
+  const averages: Reading[] = []
+  const airTemp = mean(records.map(r => r.air_temp_c))
+  const waterTemp = mean(records.map(r => r.water_temp_c))
+  const visibility = mean(records.map(r => r.visibility_m))
+  if (airTemp !== null) averages.push({ label: t.almanac.airTemp, value: `${formatNum(airTemp)}°C` })
+  if (waterTemp !== null) averages.push({ label: t.almanac.waterTemp, value: `${formatNum(waterTemp)}°C` })
+  if (visibility !== null) averages.push({ label: t.almanac.visibility, value: `${formatNum(visibility)}m` })
+  if (averages.length === 0) return null
 
   return (
-    <div className={`${CARD} border border-white/10 rounded-lg p-3`}>
-      <h4 className={`text-xs font-semibold ${TEXT_HEADING}`}>
-        {t.almanac.recordsHeading}
-      </h4>
+    <div className="rounded-lg border border-white/10 p-3">
+      <h4 className={`text-xs ${TEXT_HEADING}`}>{t.almanac.averages}</h4>
       <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
-        {airTemps.length > 0 && (
-          <div>
-            <div className={TEXT_SUBTLE}>{t.almanac.airTemp}</div>
-            <div className={`font-semibold ${TEXT_BODY}`}>
-              {formatNum(airTemps.reduce((a, b) => a + b, 0) / airTemps.length, 1)}°C
-            </div>
+        {averages.map(({ label, value }) => (
+          <div key={label}>
+            <div className={TEXT_SUBTLE}>{label}</div>
+            <div className={`font-semibold ${TEXT_BODY}`}>{value}</div>
           </div>
-        )}
-        {waterTemps.length > 0 && (
-          <div>
-            <div className={TEXT_SUBTLE}>{t.almanac.waterTemp}</div>
-            <div className={`font-semibold ${TEXT_BODY}`}>
-              {formatNum(waterTemps.reduce((a, b) => a + b, 0) / waterTemps.length, 1)}°C
-            </div>
-          </div>
-        )}
-        {visibilities.length > 0 && (
-          <div>
-            <div className={TEXT_SUBTLE}>{t.almanac.visibility}</div>
-            <div className={`font-semibold ${TEXT_BODY}`}>
-              {formatNum(visibilities.reduce((a, b) => a + b, 0) / visibilities.length, 1)}m
-            </div>
-          </div>
-        )}
+        ))}
       </div>
       <div className={`mt-1 text-center text-[10px] ${TEXT_SUBTLE}`}>
-        {records.length} observation{records.length !== 1 ? 's' : ''}
+        {t.almanac.observationCount(records.length)}
       </div>
     </div>
   )
 }
 
-/** Collapsible event card showing its observations. */
-function EventCard({
-  event,
-}: {
-  event: EventWithObservations
-}) {
+function EventCard({ event }: { event: PastEvent }) {
   const [expanded, setExpanded] = useState(false)
 
   return (
-    <div className={`${CARD} border border-white/10 rounded-lg`}>
+    <div className={CARD}>
       <button
+        type="button"
         onClick={() => setExpanded(!expanded)}
-        className={`flex w-full items-center justify-between gap-2 p-3 text-left transition-colors hover:bg-gray-50`}
+        className="flex w-full items-center justify-between gap-2 p-3 text-left"
         aria-expanded={expanded}
       >
         <div className="flex items-center gap-2">
           <CalendarIcon />
           <div>
-            <div className={`text-sm font-medium ${TEXT_BODY}`}>{event.title}</div>
+            <div className={`text-sm ${TEXT_BODY}`}>{event.title}</div>
             <div className={`text-xs ${TEXT_SUBTLE}`}>
-              {formatEventSpan({
-                start_time: event.start_time,
-                end_time: null,
-                start_time_hhmm: null,
-              }, { style: 'short' })}
+              {formatEventSpan(event, { style: 'short' })}
             </div>
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
             event.observations.length > 0
-              ? 'bg-emerald-100 text-emerald-700'
-              : 'bg-gray-100 text-gray-500'
+              ? 'bg-emerald-500/20 text-emerald-200'
+              : `bg-white/10 ${TEXT_SUBTLE}`
           }`}>
             {event.observations.length}
           </span>
@@ -294,58 +243,137 @@ function EventCard({
         </div>
       </button>
       {expanded && (
-        <div className="border-t px-3 pb-3">
+        <div className="space-y-2 border-t border-white/10 px-3 pt-3 pb-3">
           <ObservationSummary records={event.observations} />
-          <div className="mt-2 space-y-2">
-            {event.observations.map(r => (
-              <ObservationRow
-                key={r.id}
-                record={r}
-                diverName={r.diver_name}
-                diverNickname={r.diver_nickname}
-              />
-            ))}
-            {event.observations.length === 0 && (
-              <div className={`py-4 text-center text-sm ${TEXT_SUBTLE}`}>
-                {t.almanac.recordsNoneForEvent}
-              </div>
-            )}
-          </div>
+          {event.observations.map(r => <ObservationRow key={r.id} record={r} />)}
+          {event.observations.length === 0 && (
+            <div className={`py-4 text-center text-sm ${TEXT_SUBTLE}`}>
+              {t.almanac.recordsNoneForEvent}
+            </div>
+          )}
         </div>
       )}
     </div>
   )
 }
 
-/** Form for submitting a new almanac observation. */
+// ─── Staff review queue ──────────────────────────────────────────────────────
+
+function ModerationQueue({
+  records,
+  onModerate,
+}: {
+  records: AlmanacPendingRecord[]
+  onModerate: (id: string, status: 'approved' | 'rejected', notes: string) => Promise<void>
+}) {
+  const [notes, setNotes] = useState<Record<string, string>>({})
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const rule = async (id: string, status: 'approved' | 'rejected') => {
+    setBusyId(id)
+    setError(null)
+    try {
+      await onModerate(id, status, notes[id] ?? '')
+    } catch {
+      setError(t.almanac.moderationFailed)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  return (
+    <section className={`${CARD} p-4`}>
+      <h2 className={`text-sm ${TEXT_HEADING}`}>
+        {t.almanac.moderation} ({records.length})
+      </h2>
+      {error && <p className={`mt-2 ${ERROR_NOTE_LIGHT}`}>{error}</p>}
+      {records.length === 0 ? (
+        <p className={`mt-2 text-sm ${TEXT_SUBTLE}`}>{t.almanac.queueEmpty}</p>
+      ) : (
+        <ul className="mt-3 space-y-3">
+          {records.map(record => (
+            <li key={record.id} className="rounded-lg border border-white/10 p-3">
+              <div className={`text-sm ${TEXT_BODY}`}>{record.event_title ?? '—'}</div>
+              <div className={`text-xs ${TEXT_SUBTLE}`}>
+                {formatObsDate(record.obs_date)} · {t.almanac.recordsFrom(record.diver_display ?? '—')}
+              </div>
+              <ReadingGrid readings={readingsOf(record)} />
+              <label className="mt-3 block">
+                <span className={INPUT_LABEL}>{t.almanac.staffNotes}</span>
+                <input
+                  type="text"
+                  className={INPUT}
+                  value={notes[record.id] ?? ''}
+                  onChange={e => setNotes(prev => ({ ...prev, [record.id]: e.target.value }))}
+                />
+              </label>
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  className={BTN_XS_PRIMARY}
+                  disabled={busyId === record.id}
+                  onClick={() => rule(record.id, 'approved')}
+                >
+                  {t.almanac.approve}
+                </button>
+                <button
+                  type="button"
+                  className={BTN_XS_DANGER}
+                  disabled={busyId === record.id}
+                  onClick={() => rule(record.id, 'rejected')}
+                >
+                  {t.almanac.reject}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+// ─── Submission form ─────────────────────────────────────────────────────────
+
 function AlmanacForm({
   events,
-  profile,
   onSubmit,
 }: {
-  events: EventWithObservations[]
-  profile: { role: string } | null
+  events: PastEvent[]
   onSubmit: (form: AlmanacFormState) => Promise<void>
 }) {
   const [form, setForm] = useState<AlmanacFormState>(emptyForm)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  const isStaff = profile?.role === 'staff' || profile?.role === 'admin'
-
-  const updateField = (field: keyof AlmanacFormState, value: string | boolean | null) => {
+  const updateField = <K extends keyof AlmanacFormState>(field: K, value: AlmanacFormState[K]) => {
     setForm(prev => ({ ...prev, [field]: value }))
     setError(null)
   }
 
+  // Picking the event fills the date with the day it ran — the answer the
+  // diver would have typed by hand almost every time.
+  const selectEvent = (eventId: string) => {
+    const picked = events.find(ev => ev.id === eventId)
+    setForm(prev => ({
+      ...prev,
+      event_id: eventId,
+      obs_date: picked ? shopDayIso(picked.start_time) : '',
+    }))
+    setError(null)
+  }
+
+  const selectedEvent = events.find(ev => ev.id === form.event_id)
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.obs_date) {
-      setError(t.almanac.obsDateRequired)
+    if (!form.event_id) {
+      setError(t.almanac.eventRequired)
       return
     }
-    if (!form.event_id) {
-      setError(t.almanac.submitFailed)
+    if (!form.obs_date) {
+      setError(t.almanac.obsDateRequired)
       return
     }
     setSubmitting(true)
@@ -353,252 +381,194 @@ function AlmanacForm({
     try {
       await onSubmit(form)
       setForm(emptyForm)
-    } catch {
-      setError(t.almanac.submitFailed)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.almanac.submitFailed)
     } finally {
       setSubmitting(false)
     }
   }
 
-  const handleClear = () => {
-    setForm(emptyForm)
-    setError(null)
-  }
-
-  const selectClass = `w-full rounded-lg border border-white/15 bg-white px-3 py-2 text-sm ${TEXT_BODY} focus:border-brand-500 focus:outline-none`
-  const inputClass = `w-full rounded-lg border border-white/15 bg-white px-3 py-2 text-sm ${TEXT_BODY} focus:border-brand-500 focus:outline-none`
-
   return (
-    <form onSubmit={handleSubmit} className={`${CARD} border border-white/10 rounded-lg p-4`}>
-      <h3 className={`text-sm font-semibold ${TEXT_HEADING}`}>
-        {t.almanac.submit}
-      </h3>
+    <form onSubmit={handleSubmit} className={`${CARD} p-4`}>
+      <h2 className={`text-sm ${TEXT_HEADING}`}>{t.almanac.submit}</h2>
 
-      {/* Event selector */}
-      <div className="mt-3">
-        <label className={`mb-1 block text-xs ${TEXT_SUBTLE}`}>
-          {t.almanac.title} {isStaff ? `(${t.almanac.moderation})` : ''}
-        </label>
-        <select
-          value={form.event_id}
-          onChange={e => updateField('event_id', e.target.value)}
-          className={selectClass}
-        >
-          <option value="">{t.almanac.noRecordsYet}</option>
-          {events
-            .filter(ev => ev.is_past)
-            .map(ev => (
-              <option key={ev.id} value={ev.id}>
-                {ev.title} ({formatEventDate(new Date(ev.start_time))})
-              </option>
-            ))}
+      <label className="mt-3 block">
+        <span className={INPUT_LABEL}>{t.almanac.event}</span>
+        <select className={INPUT} value={form.event_id} onChange={e => selectEvent(e.target.value)}>
+          <option value="">{t.almanac.eventPlaceholder}</option>
+          {events.map(ev => (
+            <option key={ev.id} value={ev.id}>
+              {ev.title} — {formatEventSpan(ev, { style: 'compact' })}
+            </option>
+          ))}
         </select>
-      </div>
+      </label>
 
-      {/* Date */}
-      <div className="mt-3">
-        <label className={`mb-1 block text-xs ${TEXT_SUBTLE}`}>
-          {t.almanac.obsDate}
-        </label>
+      <label className="mt-3 block">
+        <span className={INPUT_LABEL}>{t.almanac.obsDate}</span>
         <input
           type="date"
+          className={INPUT}
+          max={todayIso()}
           value={form.obs_date}
           onChange={e => updateField('obs_date', e.target.value)}
-          className={inputClass}
-          required
         />
-      </div>
+      </label>
 
-      {/* Temperature & visibility — 3-up on desktop */}
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div>
-          <label className={`mb-1 block text-xs ${TEXT_SUBTLE}`}>{t.almanac.airTemp}</label>
+        <label className="block">
+          <span className={INPUT_LABEL}>{t.almanac.airTemp}</span>
           <input
-            type="number"
-            step="0.1"
+            type="number" step="any" className={INPUT}
             placeholder={t.almanac.airTempPh}
             value={form.air_temp_c}
             onChange={e => updateField('air_temp_c', e.target.value)}
-            className={inputClass}
           />
-        </div>
-        <div>
-          <label className={`mb-1 block text-xs ${TEXT_SUBTLE}`}>{t.almanac.waterTemp}</label>
+        </label>
+        <label className="block">
+          <span className={INPUT_LABEL}>{t.almanac.waterTemp}</span>
           <input
-            type="number"
-            step="0.1"
+            type="number" step="any" className={INPUT}
             placeholder={t.almanac.waterTempPh}
             value={form.water_temp_c}
             onChange={e => updateField('water_temp_c', e.target.value)}
-            className={inputClass}
           />
-        </div>
-        <div>
-          <label className={`mb-1 block text-xs ${TEXT_SUBTLE}`}>{t.almanac.visibility}</label>
+        </label>
+        <label className="block">
+          <span className={INPUT_LABEL}>{t.almanac.visibility}</span>
           <input
-            type="number"
-            step="0.1"
+            type="number" step="any" className={INPUT}
             placeholder={t.almanac.visibilityPh}
             value={form.visibility_m}
             onChange={e => updateField('visibility_m', e.target.value)}
-            className={inputClass}
           />
-        </div>
+        </label>
       </div>
 
-      {/* Current & Weather */}
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <label className={`mb-1 block text-xs ${TEXT_SUBTLE}`}>{t.almanac.current}</label>
+        <label className="block">
+          <span className={INPUT_LABEL}>{t.almanac.current}</span>
           <select
+            className={INPUT}
             value={form.current_strength}
             onChange={e => updateField('current_strength', e.target.value as AlmanacCurrentStrength | '')}
-            className={selectClass}
           >
             <option value="">—</option>
             {ALMANAC_CURRENT_STRENGTHS.map(s => (
               <option key={s} value={s}>{t.almanac.currentStrengths[s]}</option>
             ))}
           </select>
-        </div>
-        <div>
-          <label className={`mb-1 block text-xs ${TEXT_SUBTLE}`}>{t.almanac.weather}</label>
+        </label>
+        <label className="block">
+          <span className={INPUT_LABEL}>{t.almanac.weather}</span>
           <select
+            className={INPUT}
             value={form.weather}
             onChange={e => updateField('weather', e.target.value as AlmanacWeather | '')}
-            className={selectClass}
           >
             <option value="">—</option>
             {ALMANAC_WEATHERS.map(w => (
               <option key={w} value={w}>{t.almanac.weathers[w]}</option>
             ))}
           </select>
-        </div>
+        </label>
       </div>
 
-      {/* Wave height & period */}
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <label className={`mb-1 block text-xs ${TEXT_SUBTLE}`}>{t.almanac.waveHeight}</label>
+        <label className="block">
+          <span className={INPUT_LABEL}>{t.almanac.waveHeight}</span>
           <input
-            type="number"
-            step="0.1"
+            type="number" step="any" className={INPUT}
             placeholder={t.almanac.waveHeightPh}
             value={form.wave_height_m}
             onChange={e => updateField('wave_height_m', e.target.value)}
-            className={inputClass}
           />
-        </div>
-        <div>
-          <label className={`mb-1 block text-xs ${TEXT_SUBTLE}`}>{t.almanac.wavePeriod}</label>
+        </label>
+        <label className="block">
+          <span className={INPUT_LABEL}>{t.almanac.wavePeriod}</span>
           <input
-            type="number"
-            step="0.1"
+            type="number" step="any" className={INPUT}
             placeholder={t.almanac.wavePeriodPh}
             value={form.wave_period_s}
             onChange={e => updateField('wave_period_s', e.target.value)}
-            className={inputClass}
           />
-        </div>
+        </label>
       </div>
 
-      {/* Coral health */}
-      <div className="mt-3">
-        <label className={`mb-1 block text-xs ${TEXT_SUBTLE}`}>{t.almanac.coralHealth}</label>
+      <label className="mt-3 block">
+        <span className={INPUT_LABEL}>{t.almanac.coralHealth}</span>
         <select
+          className={INPUT}
           value={form.coral_health}
           onChange={e => updateField('coral_health', e.target.value as AlmanacCoralHealth | '')}
-          className={selectClass}
         >
           <option value="">—</option>
           {ALMANAC_CORAL_HEALTHS.map(c => (
             <option key={c} value={c}>{t.almanac.coralHealths[c]}</option>
           ))}
         </select>
-      </div>
+      </label>
 
-      {/* Wildlife */}
-      <div className="mt-3">
-        <label className={`mb-1 block text-xs ${TEXT_SUBTLE}`}>{t.almanac.wildlife}</label>
+      <label className="mt-3 block">
+        <span className={INPUT_LABEL}>{t.almanac.wildlife}</span>
         <input
-          type="text"
-          placeholder="e.g. turtle, manta ray, whale shark"
+          type="text" className={INPUT}
+          placeholder={t.almanac.wildlifePh}
           value={form.wildlife}
           onChange={e => updateField('wildlife', e.target.value)}
-          className={inputClass}
         />
-      </div>
+      </label>
 
-      {/* Adventure fields — only show for adventure events */}
-      {form.event_id && (() => {
-        const selectedEvent = events.find(ev => ev.id === form.event_id)
-        if (!selectedEvent || !usesDateEnvelope(selectedEvent.kind)) return null
-        if (selectedEvent.kind !== 'adventure') return null
-        return (
-          <>
-            <div className="mt-4 border-t pt-3">
-              <h4 className={`text-xs font-semibold ${TEXT_HEADING}`}>
-                {t.almanac.title} — {t.calendar.typeAdventure}
-              </h4>
-            </div>
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label className={`mb-1 block text-xs ${TEXT_SUBTLE}`}>{t.almanac.elevation}</label>
-                <input
-                  type="number"
-                  placeholder={t.almanac.elevationPh}
-                  value={form.elevation_m}
-                  onChange={e => updateField('elevation_m', e.target.value)}
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={`mb-1 block text-xs ${TEXT_SUBTLE}`}>{t.almanac.routeCondition}</label>
-                <select
-                  value={form.route_condition}
-                  onChange={e => updateField('route_condition', e.target.value as AlmanacRouteCondition | '')}
-                  className={selectClass}
-                >
-                  <option value="">—</option>
-                  {ALMANAC_ROUTE_CONDITIONS.map(rc => (
-                    <option key={rc} value={rc}>{t.almanac.routeConditions[rc]}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="mt-3">
-              <label className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={form.summit_visible === true}
-                  onChange={e => updateField('summit_visible', e.target.checked)}
-                  className="rounded border-gray-300"
-                />
-                <span className={`text-xs ${TEXT_BODY}`}>{t.almanac.summitVisible}</span>
-              </label>
-            </div>
-          </>
-        )
-      })()}
-
-      {/* Error & actions */}
-      {error && (
-        <div className="mt-3 rounded-lg bg-red-50 p-2 text-xs text-red-600">
-          {error}
-        </div>
+      {selectedEvent && hasTerrainConditions(selectedEvent.kind) && (
+        <>
+          <h3 className={`mt-4 border-t border-white/10 pt-3 text-xs ${TEXT_HEADING}`}>
+            {t.almanac.terrainHeading}
+          </h3>
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className={INPUT_LABEL}>{t.almanac.elevation}</span>
+              <input
+                type="number" step="1" className={INPUT}
+                placeholder={t.almanac.elevationPh}
+                value={form.elevation_m}
+                onChange={e => updateField('elevation_m', e.target.value)}
+              />
+            </label>
+            <label className="block">
+              <span className={INPUT_LABEL}>{t.almanac.routeCondition}</span>
+              <select
+                className={INPUT}
+                value={form.route_condition}
+                onChange={e => updateField('route_condition', e.target.value as AlmanacRouteCondition | '')}
+              >
+                <option value="">—</option>
+                {ALMANAC_ROUTE_CONDITIONS.map(rc => (
+                  <option key={rc} value={rc}>{t.almanac.routeConditions[rc]}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label className="mt-3 flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={form.summit_visible}
+              onChange={e => updateField('summit_visible', e.target.checked)}
+            />
+            <span className={`text-sm ${TEXT_BODY}`}>{t.almanac.summitVisible}</span>
+          </label>
+        </>
       )}
-      <div className="mt-3 flex gap-2">
-        <button
-          type="submit"
-          disabled={submitting}
-          className={`flex-1 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50`}
-        >
+
+      {error && <p className={`mt-3 ${ERROR_NOTE_LIGHT}`}>{error}</p>}
+
+      <div className="mt-4 flex gap-2">
+        <button type="submit" disabled={submitting} className={`flex-1 ${BTN_PRIMARY}`}>
           {submitting ? t.almanac.submitting : t.almanac.submitRecord}
         </button>
         <button
           type="button"
-          onClick={handleClear}
-          className={`rounded-lg border border-white/15 px-4 py-2 text-sm font-medium ${TEXT_BODY} transition-colors hover:bg-gray-50`}
+          className={`px-4 ${BTN_SECONDARY}`}
+          onClick={() => { setForm(emptyForm); setError(null) }}
         >
           {t.almanac.clearForm}
         </button>
@@ -609,150 +579,209 @@ function AlmanacForm({
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
+const STATUS_LABEL: Record<AlmanacStatus, string> = {
+  pending: t.almanac.statusPending,
+  approved: t.almanac.statusApproved,
+  rejected: t.almanac.statusRejected,
+}
+
 export function AlmanacPage() {
   const { user, profile, loading: authLoading } = useAuth()
-  const [events, setEvents] = useState<EventWithObservations[]>([])
+  const [events, setEvents] = useState<PastEvent[]>([])
+  const [ownSubmissions, setOwnSubmissions] = useState<OwnSubmission[]>([])
+  const [pending, setPending] = useState<AlmanacPendingRecord[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [submitStatus, setSubmitStatus] = useState<string | null>(null)
 
-  // Fetch events with their almanac records
+  const isStaff = profile?.role === 'staff' || profile?.role === 'admin'
+  // The id, not the object: an auth context that hands back a fresh user
+  // object each render would otherwise re-run the whole load on every render.
+  const userId = user?.id ?? null
+
+  const loadQueue = useCallback(async () => {
+    if (!isStaff) return
+    const { data, error } = await supabase.rpc('almanac_pending_records')
+    if (error) {
+      console.error('Failed to load the almanac review queue:', error)
+      return
+    }
+    setPending(data ?? [])
+  }, [isStaff])
+
+  const loadOwnSubmissions = useCallback(async () => {
+    if (!userId) return
+    // Approved records already show in the history below; this list exists to
+    // tell a diver about the ones the crowd cannot see yet.
+    const { data, error } = await supabase
+      .from('almanac_records')
+      .select('id, event_id, obs_date, status, staff_notes')
+      .eq('diver_id', userId)
+      .neq('status', 'approved')
+      .order('obs_date', { ascending: false })
+    if (error) {
+      console.error('Failed to load your almanac submissions:', error)
+      return
+    }
+    setOwnSubmissions(data ?? [])
+  }, [userId])
+
+  const loadEvents = useCallback(async () => {
+    const today = todayIso()
+    const past = (await fetchEventsInRange(addIsoDays(today, -LOOKBACK_DAYS), today))
+      .filter(ev => isPastEvent(ev))
+    if (past.length === 0) {
+      setEvents([])
+      return
+    }
+    const { data, error } = await supabase.rpc('almanac_records_for_events', {
+      p_event_ids: past.map(ev => ev.id),
+    })
+    if (error) throw error
+    const byEvent = new Map<string, AlmanacEventRecord[]>()
+    for (const record of data ?? []) {
+      const bucket = byEvent.get(record.event_id)
+      if (bucket) bucket.push(record)
+      else byEvent.set(record.event_id, [record])
+    }
+    setEvents(past
+      .map(ev => ({
+        id: ev.id,
+        title: ev.title,
+        start_time: ev.start_time,
+        end_time: ev.end_time,
+        start_time_hhmm: ev.start_time_hhmm,
+        kind: ev.type,
+        observations: byEvent.get(ev.id) ?? [],
+      }))
+      .sort((a, b) => b.start_time.localeCompare(a.start_time)))
+  }, [])
+
   useEffect(() => {
-    if (!user) return
-
-    const fetchAlmanac = async () => {
+    if (!userId) return
+    let cancelled = false
+    const load = async () => {
       setLoading(true)
+      setLoadError(null)
       try {
-        // Fetch recent events (past 30 days + upcoming 90 days)
-        const from = addIsoDays(todayIso(), -30)
-        const to = addIsoDays(todayIso(), 90)
-        const eventsList = await fetchEventsInRange(from, to)
-
-        const enriched: EventWithObservations[] = []
-
-        // Fetch almanac records for each event (best-effort)
-        for (const evt of eventsList) {
-          const { data: records, error: recordsError } = await supabase
-            .rpc('almanac_event_records', { p_event_id: evt.id })
-
-          if (recordsError) {
-            console.error('Failed to fetch almanac records:', recordsError)
-            continue
-          }
-
-          enriched.push({
-            id: evt.id,
-            title: evt.title,
-            start_time: evt.start_time,
-            kind: evt.type,
-            is_past: isPastEvent(evt),
-            observations: (records as AlmanacEventRecord[]) || [],
-          })
-        }
-
-        setEvents(enriched)
+        await Promise.all([loadEvents(), loadOwnSubmissions(), loadQueue()])
       } catch (err) {
-        console.error('Failed to fetch almanac data:', err)
+        console.error('Failed to load the almanac:', err)
+        if (!cancelled) setLoadError(t.almanac.recordsFailed)
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
-
-    fetchAlmanac()
-  }, [user])
+    load()
+    return () => { cancelled = true }
+  }, [userId, loadEvents, loadOwnSubmissions, loadQueue])
 
   const handleSubmit = async (form: AlmanacFormState) => {
-    if (!user) return
-
-    try {
-      await supabase.rpc('submit_almanac_record', {
-        p_event_id: form.event_id,
-        p_obs_date: form.obs_date,
-        p_air_temp_c: parseNum(form.air_temp_c),
-        p_water_temp_c: parseNum(form.water_temp_c),
-        p_visibility_m: parseNum(form.visibility_m),
-        p_current_strength: form.current_strength || null,
-        p_wave_height_m: parseNum(form.wave_height_m),
-        p_wave_period_s: parseNum(form.wave_period_s),
-        p_weather: form.weather || null,
-        p_wildlife: form.wildlife.trim()
-          ? form.wildlife.split(',').map(s => s.trim()).filter(Boolean)
-          : null,
-        p_coral_health: form.coral_health || null,
-        p_elevation_m: parseNum(form.elevation_m),
-        p_route_condition: form.route_condition || null,
-        p_summit_visible: form.summit_visible,
-      })
-
-      setSubmitStatus(t.almanac.submitted)
-      setTimeout(() => setSubmitStatus(null), 3000)
-
-      // Refresh the event list
-      const { data: records } = await supabase.rpc('almanac_event_records', {
-        p_event_id: form.event_id,
-      })
-      setEvents(prev =>
-        prev.map(ev =>
-          ev.id === form.event_id ? { ...ev, observations: records as AlmanacEventRecord[] } : ev
-        )
-      )
-    } catch (err) {
-      console.error('Failed to submit almanac record:', err)
-      setSubmitStatus(t.almanac.submitFailed)
-      setTimeout(() => setSubmitStatus(null), 3000)
+    const selected = events.find(ev => ev.id === form.event_id)
+    const terrain = selected ? hasTerrainConditions(selected.kind) : false
+    const { error } = await supabase.rpc('submit_almanac_record', {
+      p_event_id: form.event_id,
+      p_obs_date: form.obs_date,
+      p_air_temp_c: parseNum(form.air_temp_c),
+      p_water_temp_c: parseNum(form.water_temp_c),
+      p_visibility_m: parseNum(form.visibility_m),
+      p_current_strength: form.current_strength || null,
+      p_wave_height_m: parseNum(form.wave_height_m),
+      p_wave_period_s: parseNum(form.wave_period_s),
+      p_weather: form.weather || null,
+      p_wildlife: parseWildlife(form.wildlife),
+      p_coral_health: form.coral_health || null,
+      p_elevation_m: terrain ? parseNum(form.elevation_m) : null,
+      p_route_condition: terrain ? form.route_condition || null : null,
+      p_summit_visible: terrain ? form.summit_visible : null,
+    })
+    if (error) {
+      console.error('Failed to submit the almanac record:', error)
+      throw new Error(error.message.includes('almanac_record_already_reviewed')
+        ? t.almanac.submitAlreadyReviewed
+        : t.almanac.submitFailed)
     }
+    setSubmitStatus(t.almanac.submitted)
+    await loadOwnSubmissions()
+  }
+
+  const handleModerate = async (id: string, status: 'approved' | 'rejected', notes: string) => {
+    const { error } = await supabase.rpc('moderate_almanac_record', {
+      p_record_id: id,
+      p_status: status,
+      p_staff_notes: notes.trim() || null,
+    })
+    if (error) throw error
+    await Promise.all([loadQueue(), loadEvents()])
   }
 
   if (authLoading || loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className={`text-sm ${TEXT_SUBTLE}`}>Loading almanac…</div>
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <p className={`text-sm ${TEXT_SUBTLE}`}>{t.almanac.recordsLoading}</p>
       </div>
     )
   }
 
+  const eventsWithRecords = events.filter(ev => ev.observations.length > 0)
+
   return (
-    <div className="relative -m-4 min-h-[calc(100vh-3rem)] overflow-hidden">
-      <div className="relative z-10 mx-auto flex w-full max-w-md flex-col gap-4 px-4 pt-6 pb-28">
-        {/* Header */}
-        <div>
-          <h1 className={`text-xl font-bold ${TEXT_HEADING}`}>{t.almanac.title}</h1>
-          <p className={`mt-1 text-sm ${TEXT_SUBTLE}`}>{t.almanac.blurb}</p>
-        </div>
+    <div className="mx-auto flex w-full max-w-md flex-col gap-4 pt-2 pb-8">
+      <header>
+        <h1 className={`text-xl ${TEXT_HEADING}`}>{t.almanac.title}</h1>
+        <p className={`mt-1 text-sm ${TEXT_SUBTLE}`}>{t.almanac.blurb}</p>
+      </header>
 
-        {/* Submit form */}
-        <AlmanacForm
-          events={events}
-          profile={profile}
-          onSubmit={handleSubmit}
-        />
+      {loadError && <p className={ERROR_NOTE_LIGHT}>{loadError}</p>}
 
-        {/* Submit status */}
-        {submitStatus && (
-          <div className="rounded-lg bg-emerald-50 p-2 text-xs text-emerald-700">
-            {submitStatus}
+      {isStaff && <ModerationQueue records={pending} onModerate={handleModerate} />}
+
+      {events.length === 0 ? (
+        <p className={`${CARD} p-4 text-center text-sm ${TEXT_SUBTLE}`}>{t.almanac.noPastEvents}</p>
+      ) : (
+        <AlmanacForm events={events} onSubmit={handleSubmit} />
+      )}
+
+      {submitStatus && (
+        <p className="rounded-lg bg-emerald-500/15 p-2 text-center text-xs text-emerald-200">
+          {submitStatus}
+        </p>
+      )}
+
+      {ownSubmissions.length > 0 && (
+        <section>
+          <h2 className={`mb-2 text-sm ${TEXT_HEADING}`}>{t.almanac.yourSubmissions}</h2>
+          <ul className="space-y-2">
+            {ownSubmissions.map(sub => (
+              <li key={sub.id} className={`${CARD} flex items-center justify-between gap-2 p-3`}>
+                <div>
+                  <div className={`text-sm ${TEXT_BODY}`}>
+                    {events.find(ev => ev.id === sub.event_id)?.title ?? '—'}
+                  </div>
+                  <div className={`text-xs ${TEXT_SUBTLE}`}>
+                    {formatObsDate(sub.obs_date)}
+                    {sub.staff_notes ? ` · ${sub.staff_notes}` : ''}
+                  </div>
+                </div>
+                <span className={`text-[10px] uppercase tracking-wide ${TEXT_SUBTLE}`}>
+                  {STATUS_LABEL[sub.status]}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section>
+        <h2 className={`mb-2 text-sm ${TEXT_HEADING}`}>{t.almanac.recordsHeading}</h2>
+        {eventsWithRecords.length === 0 ? (
+          <p className={`${CARD} p-4 text-center text-sm ${TEXT_SUBTLE}`}>{t.almanac.noRecordsYet}</p>
+        ) : (
+          <div className="space-y-2">
+            {eventsWithRecords.map(ev => <EventCard key={ev.id} event={ev} />)}
           </div>
         )}
-
-        {/* Historical events */}
-        <div>
-          <h2 className={`mb-2 text-sm font-semibold ${TEXT_HEADING}`}>
-            {t.almanac.recordsHeading}
-          </h2>
-          {events.length === 0 ? (
-            <div className={`rounded-lg ${CARD} p-4 text-center text-sm ${TEXT_SUBTLE}`}>
-              {t.almanac.noRecordsYet}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {events
-                .filter(ev => ev.is_past)
-                .map(ev => (
-                  <EventCard key={ev.id} event={ev} />
-                ))}
-            </div>
-          )}
-        </div>
-      </div>
+      </section>
     </div>
   )
 }

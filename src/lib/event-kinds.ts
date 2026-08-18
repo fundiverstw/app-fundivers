@@ -84,6 +84,17 @@ export function hasDiveFlags(kind: EventKind): boolean {
   return kind === 'dive'
 }
 
+/**
+ * True when the kind travels overland, so an almanac observation for it
+ * carries terrain readings — elevation, route surface, whether the summit was
+ * out. Its own question rather than a reuse of `hasDiveFlags`'s inverse: a
+ * future kind could be neither a dive nor a climb, and would then have to say
+ * so here rather than inheriting a form section it has no use for.
+ */
+export function hasTerrainConditions(kind: EventKind): boolean {
+  return kind === 'adventure'
+}
+
 /** Narrow an untrusted string (a request body's event_type) to a known kind. */
 export function isEventKind(value: unknown): value is EventKind {
   return typeof value === 'string' && (EVENT_KINDS as readonly string[]).includes(value)

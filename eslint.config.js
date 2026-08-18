@@ -6,7 +6,10 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // supabase/.temp is the CLI's scratch space for the running local stack —
+  // generated, git-ignored, and full of minified vendor code that fails every
+  // style rule. eslint does not read supabase/.gitignore, so name it here.
+  globalIgnores(['dist', 'supabase/.temp']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
