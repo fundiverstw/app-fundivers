@@ -135,6 +135,18 @@ describe('AlmanacPage', () => {
     expect(screen.queryByText(t.almanac.approve)).not.toBeInTheDocument()
   })
 
+  it('tells staff when the queue failed to load rather than showing it empty', async () => {
+    authState.role = 'staff'
+    rpc.mockImplementation(async (name: string) =>
+      name === 'almanac_pending_records'
+        ? { data: null, error: { message: 'function does not exist' } }
+        : { data: [], error: null })
+    renderPage()
+
+    expect(await screen.findByText(t.almanac.recordsFailed)).toBeInTheDocument()
+    expect(screen.queryByText(t.almanac.queueEmpty)).not.toBeInTheDocument()
+  })
+
   it('lets staff approve a pending record', async () => {
     authState.role = 'staff'
     const user = userEvent.setup()

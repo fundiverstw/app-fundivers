@@ -602,10 +602,9 @@ export function AlmanacPage() {
   const loadQueue = useCallback(async () => {
     if (!isStaff) return
     const { data, error } = await supabase.rpc('almanac_pending_records')
-    if (error) {
-      console.error('Failed to load the almanac review queue:', error)
-      return
-    }
+    // Thrown rather than logged: a staff member whose queue failed to load
+    // would otherwise see an empty queue and read it as "nothing to review".
+    if (error) throw error
     setPending(data ?? [])
   }, [isStaff])
 
@@ -734,7 +733,7 @@ export function AlmanacPage() {
 
       {loadError && <p className={ERROR_NOTE_LIGHT}>{loadError}</p>}
 
-      {isStaff && <ModerationQueue records={pending} onModerate={handleModerate} />}
+      {isStaff && !loadError && <ModerationQueue records={pending} onModerate={handleModerate} />}
 
       {events.length === 0 ? (
         <p className={`${CARD} p-4 text-center text-sm ${TEXT_SUBTLE}`}>{t.almanac.noPastEvents}</p>
