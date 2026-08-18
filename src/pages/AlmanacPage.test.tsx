@@ -24,8 +24,10 @@ const pastEvent = {
   start_time_hhmm: '09:00',
 }
 
+const sameDayEvent = { ...pastEvent, id: 'event-2', title: 'Longdong boat dive' }
+
 vi.mock('../lib/events', () => ({
-  fetchEventsInRange: vi.fn(async () => [pastEvent]),
+  fetchEventsInRange: vi.fn(async () => [pastEvent, sameDayEvent]),
   formatEventSpan: () => 'Sat, Aug 1',
   isPastEvent: () => true,
 }))
@@ -85,10 +87,30 @@ describe('AlmanacPage', () => {
     renderPage()
 
     await waitFor(() => expect(rpc).toHaveBeenCalledWith('almanac_records_for_events', {
-      p_event_ids: ['event-1'],
+      p_event_ids: ['event-1', 'event-2'],
     }))
     expect(rpc.mock.calls.filter(c => c[0] === 'almanac_records_for_events')).toHaveLength(1)
     expect(await screen.findByText(t.almanac.recordsHeading)).toBeInTheDocument()
+  })
+
+  it('groups the history by calendar date, merging events that share a day', async () => {
+    const user = userEvent.setup()
+    mockRpc({
+      almanac_records_for_events: [
+        approvedRecord,
+        { ...approvedRecord, id: 'record-3', event_id: 'event-2', diver_display: 'Jun' },
+        { ...approvedRecord, id: 'record-4', obs_date: '2026-07-30' },
+      ],
+    })
+    renderPage()
+
+    const days = await screen.findAllByText(/Aug 1, 2026|Jul 30, 2026/)
+    expect(days).toHaveLength(2)
+
+    await user.click(screen.getByRole('button', { name: /Aug 1, 2026/ }))
+    expect(screen.getByText('Longdong shore dive')).toBeInTheDocument()
+    expect(screen.getByText('Longdong boat dive')).toBeInTheDocument()
+    expect(screen.getByText(t.almanac.observationCount(2))).toBeInTheDocument()
   })
 
   it('submits the form through the RPC, parsing numbers and wildlife', async () => {

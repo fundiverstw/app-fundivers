@@ -57,7 +57,6 @@ interface PastEvent {
   end_time: string | null
   start_time_hhmm: string | null
   kind: EventKind
-  observations: AlmanacEventRecord[]
 }
 
 /** A submission of the signed-in diver's that the crowd cannot see yet. */
@@ -164,11 +163,36 @@ function ReadingGrid({ readings }: { readings: Reading[] }) {
 
 // ─── Approved history ────────────────────────────────────────────────────────
 
-function ObservationRow({ record }: { record: AlmanacEventRecord }) {
+/** One calendar day's approved observations, whichever events they came from. */
+interface ObservationDay {
+  date: string
+  records: AlmanacEventRecord[]
+}
+
+/**
+ * Approved records bucketed by the day they describe, newest first.
+ *
+ * The almanac answers "what were conditions like on this date", so the day is
+ * the unit — two events diving the same site on the same morning belong in one
+ * bucket, and each row still names the event it was filed against.
+ */
+function daysOf(records: AlmanacEventRecord[]): ObservationDay[] {
+  const byDate = new Map<string, AlmanacEventRecord[]>()
+  for (const record of records) {
+    const bucket = byDate.get(record.obs_date)
+    if (bucket) bucket.push(record)
+    else byDate.set(record.obs_date, [record])
+  }
+  return [...byDate.entries()]
+    .map(([date, dayRecords]) => ({ date, records: dayRecords }))
+    .sort((a, b) => b.date.localeCompare(a.date))
+}
+
+function ObservationRow({ record, eventTitle }: { record: AlmanacEventRecord; eventTitle: string | null }) {
   return (
     <div className="rounded-lg border border-white/10 p-3">
       <div className="flex items-center justify-between gap-2">
-        <span className={`text-xs ${TEXT_SUBTLE}`}>{formatObsDate(record.obs_date)}</span>
+        <span className={`text-xs ${TEXT_BODY}`}>{eventTitle ?? '—'}</span>
         <span className={`text-[10px] uppercase tracking-wide ${TEXT_SUBTLE}`}>
           {t.almanac.recordsFrom(record.diver_display ?? '—')}
         </span>
@@ -178,7 +202,7 @@ function ObservationRow({ record }: { record: AlmanacEventRecord }) {
   )
 }
 
-/** Averages across an event's approved observations. */
+/** Averages across one day's approved observations. */
 function ObservationSummary({ records }: { records: AlmanacEventRecord[] }) {
   const mean = (values: (number | null)[]): number | null => {
     const present = values.filter((v): v is number => v !== null)
@@ -204,14 +228,11 @@ function ObservationSummary({ records }: { records: AlmanacEventRecord[] }) {
           </div>
         ))}
       </div>
-      <div className={`mt-1 text-center text-[10px] ${TEXT_SUBTLE}`}>
-        {t.almanac.observationCount(records.length)}
-      </div>
     </div>
   )
 }
 
-function EventCard({ event }: { event: PastEvent }) {
+function DayCard({ day, eventTitles }: { day: ObservationDay; eventTitles: Map<string, string> }) {
   const [expanded, setExpanded] = useState(false)
 
   return (
@@ -225,32 +246,24 @@ function EventCard({ event }: { event: PastEvent }) {
         <div className="flex items-center gap-2">
           <CalendarIcon />
           <div>
-            <div className={`text-sm ${TEXT_BODY}`}>{event.title}</div>
+            <div className={`text-sm ${TEXT_BODY}`}>{formatObsDate(day.date)}</div>
             <div className={`text-xs ${TEXT_SUBTLE}`}>
-              {formatEventSpan(event, { style: 'short' })}
+              {t.almanac.observationCount(day.records.length)}
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-1">
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-            event.observations.length > 0
-              ? 'bg-emerald-500/20 text-emerald-200'
-              : `bg-white/10 ${TEXT_SUBTLE}`
-          }`}>
-            {event.observations.length}
-          </span>
-          {expanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
-        </div>
+        {expanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
       </button>
       {expanded && (
         <div className="space-y-2 border-t border-white/10 px-3 pt-3 pb-3">
-          <ObservationSummary records={event.observations} />
-          {event.observations.map(r => <ObservationRow key={r.id} record={r} />)}
-          {event.observations.length === 0 && (
-            <div className={`py-4 text-center text-sm ${TEXT_SUBTLE}`}>
-              {t.almanac.recordsNoneForEvent}
-            </div>
-          )}
+          <ObservationSummary records={day.records} />
+          {day.records.map(r => (
+            <ObservationRow
+              key={r.id}
+              record={r}
+              eventTitle={eventTitles.get(r.event_id) ?? null}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -588,6 +601,7 @@ const STATUS_LABEL: Record<AlmanacStatus, string> = {
 export function AlmanacPage() {
   const { user, profile, loading: authLoading } = useAuth()
   const [events, setEvents] = useState<PastEvent[]>([])
+  const [records, setRecords] = useState<AlmanacEventRecord[]>([])
   const [ownSubmissions, setOwnSubmissions] = useState<OwnSubmission[]>([])
   const [pending, setPending] = useState<AlmanacPendingRecord[]>([])
   const [loading, setLoading] = useState(true)
@@ -629,20 +643,6 @@ export function AlmanacPage() {
     const today = todayIso()
     const past = (await fetchEventsInRange(addIsoDays(today, -LOOKBACK_DAYS), today))
       .filter(ev => isPastEvent(ev))
-    if (past.length === 0) {
-      setEvents([])
-      return
-    }
-    const { data, error } = await supabase.rpc('almanac_records_for_events', {
-      p_event_ids: past.map(ev => ev.id),
-    })
-    if (error) throw error
-    const byEvent = new Map<string, AlmanacEventRecord[]>()
-    for (const record of data ?? []) {
-      const bucket = byEvent.get(record.event_id)
-      if (bucket) bucket.push(record)
-      else byEvent.set(record.event_id, [record])
-    }
     setEvents(past
       .map(ev => ({
         id: ev.id,
@@ -651,9 +651,17 @@ export function AlmanacPage() {
         end_time: ev.end_time,
         start_time_hhmm: ev.start_time_hhmm,
         kind: ev.type,
-        observations: byEvent.get(ev.id) ?? [],
       }))
       .sort((a, b) => b.start_time.localeCompare(a.start_time)))
+    if (past.length === 0) {
+      setRecords([])
+      return
+    }
+    const { data, error } = await supabase.rpc('almanac_records_for_events', {
+      p_event_ids: past.map(ev => ev.id),
+    })
+    if (error) throw error
+    setRecords(data ?? [])
   }, [])
 
   useEffect(() => {
@@ -722,7 +730,8 @@ export function AlmanacPage() {
     )
   }
 
-  const eventsWithRecords = events.filter(ev => ev.observations.length > 0)
+  const days = daysOf(records)
+  const eventTitles = new Map(events.map(ev => [ev.id, ev.title]))
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4 pt-2 pb-8">
@@ -773,11 +782,13 @@ export function AlmanacPage() {
 
       <section>
         <h2 className={`mb-2 text-sm ${TEXT_HEADING}`}>{t.almanac.recordsHeading}</h2>
-        {eventsWithRecords.length === 0 ? (
+        {days.length === 0 ? (
           <p className={`${CARD} p-4 text-center text-sm ${TEXT_SUBTLE}`}>{t.almanac.noRecordsYet}</p>
         ) : (
           <div className="space-y-2">
-            {eventsWithRecords.map(ev => <EventCard key={ev.id} event={ev} />)}
+            {days.map(day => (
+              <DayCard key={day.date} day={day} eventTitles={eventTitles} />
+            ))}
           </div>
         )}
       </section>

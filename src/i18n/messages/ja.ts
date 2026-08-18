@@ -113,7 +113,6 @@ export const ja: Messages = {
     averages: '平均',
     observationCount: (n: number) => `${n} 件の観察`,
     recordsFrom: (name: string) => `${name} による`,
-    recordsNoneForEvent: 'このイベントの承認済み観察はありません。',
     recordsLoading: 'アルマナックを読み込み中…',
     recordsFailed: '観察を読み込めませんでした。',
     yourSubmissions: 'あなたの投稿',

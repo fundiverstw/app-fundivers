@@ -114,7 +114,6 @@ export const zhTW: Messages = {
     averages: '平均',
     observationCount: (n: number) => `${n} 筆觀察`,
     recordsFrom: (name: string) => `由 ${name}`,
-    recordsNoneForEvent: '此活動沒有通過審核的觀察。',
     recordsLoading: '載入環境日誌中…',
     recordsFailed: '無法載入觀察。',
     yourSubmissions: '你的提交',

@@ -121,7 +121,6 @@ export const en = {
     averages: 'Averages',
     observationCount: (n: number) => `${n} observation${n === 1 ? '' : 's'}`,
     recordsFrom: (name: string) => `by ${name}`,
-    recordsNoneForEvent: 'No approved observations for this event.',
     recordsLoading: 'Loading the almanac…',
     recordsFailed: 'Could not load observations.',
     yourSubmissions: 'Your submissions',
