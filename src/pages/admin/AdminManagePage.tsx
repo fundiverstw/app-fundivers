@@ -64,6 +64,7 @@ const GROUPS: ManageGroup[] = [
   {
     title: m.groups.catalogLogistics,
     cards: [
+      { to: '/admin/dive-sites', icon: <MapPinIcon />, ...m.diveSites },
       { to: '/admin/prices', icon: <TagIcon />, ...m.prices },
       { to: '/admin/rooms', icon: <BedIcon />, ...m.rooms },
       { to: '/admin/addons', icon: <PlusSquareIcon />, ...m.addons },

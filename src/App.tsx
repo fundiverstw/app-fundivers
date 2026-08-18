@@ -65,6 +65,7 @@ import { AdminVehiclesPage } from './pages/admin/AdminVehiclesPage'
 import { AdminWaiversPage } from './pages/admin/AdminWaiversPage'
 import { AdminTermsPage } from './pages/admin/AdminTermsPage'
 import { AdminCancellationPoliciesPage } from './pages/admin/AdminCancellationPoliciesPage'
+import { AdminDiveSitesPage } from './pages/admin/AdminDiveSitesPage'
 
 // Almanac page
 const AlmanacPage = lazy(() =>
@@ -185,6 +186,7 @@ export default function App() {
                 <Route path="/admin/waivers" element={<AdminWaiversPage />} />
                 <Route path="/admin/terms" element={<AdminTermsPage />} />
                 <Route path="/admin/cancellation-policies" element={<AdminCancellationPoliciesPage />} />
+                <Route path="/admin/dive-sites" element={<AdminDiveSitesPage />} />
                 <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
                 <Route path="/admin/refunds" element={<AdminRefundsPage />} />
                 <Route path="/admin/audits" element={<AdminAuditsPage />} />

@@ -7,10 +7,12 @@
 //   3. A pending record is visible to its author and to staff, and to nobody
 //      else — approved ones are visible to all.
 //   4. The review queue and the ruling RPC are staff/admin only.
+//   5. Records hang off the dive_sites catalog: a site with observations
+//      cannot be deleted out from under them, and only admins curate it.
 import { describe, it, expect, afterAll, beforeAll } from 'vitest'
 import {
   adminClient, userClient,
-  createTestUser, deleteTestUser, createTestDive, deleteTestDive,
+  createTestUser, deleteTestUser,
   type TestUser,
 } from './helpers'
 
@@ -18,14 +20,14 @@ const admin = adminClient()
 let staff: TestUser
 let diver: TestUser
 let otherDiver: TestUser
-let eventId: string
+let siteId: string
 
 const TODAY = new Date().toLocaleDateString('en-CA')
 const YESTERDAY = new Date(Date.now() - 86_400_000).toLocaleDateString('en-CA')
 const TOMORROW = new Date(Date.now() + 86_400_000).toLocaleDateString('en-CA')
 
 async function clearRecords() {
-  await admin.from('almanac_records').delete().eq('event_id', eventId)
+  await admin.from('almanac_records').delete().eq('site_id', siteId)
 }
 
 function recordRow(id: string) {
@@ -36,13 +38,18 @@ beforeAll(async () => {
   staff = await createTestUser(admin, { role: 'staff' })
   diver = await createTestUser(admin, { role: 'diver' })
   otherDiver = await createTestUser(admin, { role: 'diver' })
-  eventId = await createTestDive(admin)
+  const { data, error } = await admin
+    .from('dive_sites')
+    .insert({ name: `Bat Cave ${crypto.randomUUID().slice(0, 8)}`, kind: 'dive' } as never)
+    .select('id').single()
+  if (error) throw new Error(`dive site insert failed: ${error.message}`)
+  siteId = (data as { id: string }).id
   await admin.from('profiles').update({ name: 'Almanac Diver' } as never).eq('id', diver.id)
 })
 
 afterAll(async () => {
   await clearRecords()
-  await deleteTestDive(admin, eventId)
+  await admin.from('dive_sites').delete().eq('id', siteId)
   for (const u of [staff, diver, otherDiver]) await deleteTestUser(admin, u.id)
 })
 
@@ -51,7 +58,7 @@ describe('almanac_records writes', () => {
     const client = await userClient(diver.email, diver.password)
     const { error } = await client.from('almanac_records').insert({
       diver_id: diver.id,
-      event_id: eventId,
+      site_id: siteId,
       obs_date: YESTERDAY,
       status: 'approved',
     } as never)
@@ -63,7 +70,7 @@ describe('almanac_records writes', () => {
     const client = await userClient(diver.email, diver.password)
 
     const first = await client.rpc('submit_almanac_record', {
-      p_event_id: eventId,
+      p_site_id: siteId,
       p_obs_date: YESTERDAY,
       p_air_temp_c: 28.4,
       p_wildlife: ['turtle'],
@@ -76,7 +83,7 @@ describe('almanac_records writes', () => {
     expect(Number(filed.data!.air_temp_c)).toBe(28.4)
 
     const second = await client.rpc('submit_almanac_record', {
-      p_event_id: eventId,
+      p_site_id: siteId,
       p_obs_date: YESTERDAY,
       p_water_temp_c: 26,
     })
@@ -93,7 +100,7 @@ describe('almanac_records writes', () => {
   it('refuses an observation dated in the future', async () => {
     const client = await userClient(diver.email, diver.password)
     const { error } = await client.rpc('submit_almanac_record', {
-      p_event_id: eventId,
+      p_site_id: siteId,
       p_obs_date: TOMORROW,
       p_air_temp_c: 30,
     })
@@ -104,7 +111,7 @@ describe('almanac_records writes', () => {
     await clearRecords()
     const client = await userClient(diver.email, diver.password)
     const filed = await client.rpc('submit_almanac_record', {
-      p_event_id: eventId, p_obs_date: YESTERDAY, p_air_temp_c: 28,
+      p_site_id: siteId, p_obs_date: YESTERDAY, p_air_temp_c: 28,
     })
     const staffClient = await userClient(staff.email, staff.password)
     await staffClient.rpc('moderate_almanac_record', {
@@ -113,7 +120,7 @@ describe('almanac_records writes', () => {
     })
 
     const { error } = await client.rpc('submit_almanac_record', {
-      p_event_id: eventId, p_obs_date: YESTERDAY, p_air_temp_c: 99,
+      p_site_id: siteId, p_obs_date: YESTERDAY, p_air_temp_c: 99,
     })
     expect(error?.message).toContain('almanac_record_already_reviewed')
   })
@@ -124,7 +131,7 @@ describe('almanac_records visibility', () => {
     await clearRecords()
     const client = await userClient(diver.email, diver.password)
     const filed = await client.rpc('submit_almanac_record', {
-      p_event_id: eventId, p_obs_date: TODAY, p_visibility_m: 18,
+      p_site_id: siteId, p_obs_date: TODAY, p_visibility_m: 18,
     })
     const recordId = filed.data as string
 
@@ -140,15 +147,16 @@ describe('almanac_records visibility', () => {
     expect(seen.data).toHaveLength(1)
   })
 
-  it('publishes only approved records through almanac_records_for_events', async () => {
+  it('publishes only approved records through almanac_records_in_range', async () => {
     await clearRecords()
     const client = await userClient(diver.email, diver.password)
     const pending = await client.rpc('submit_almanac_record', {
-      p_event_id: eventId, p_obs_date: YESTERDAY, p_visibility_m: 12,
+      p_site_id: siteId, p_obs_date: YESTERDAY, p_visibility_m: 12,
     })
     const stranger = await userClient(otherDiver.email, otherDiver.password)
 
-    const before = await stranger.rpc('almanac_records_for_events', { p_event_ids: [eventId] })
+    const window = { p_from: YESTERDAY, p_to: TODAY }
+    const before = await stranger.rpc('almanac_records_in_range', window)
     expect(before.data).toHaveLength(0)
 
     const staffClient = await userClient(staff.email, staff.password)
@@ -157,9 +165,9 @@ describe('almanac_records visibility', () => {
       p_status: 'approved',
     })
 
-    const after = await stranger.rpc('almanac_records_for_events', { p_event_ids: [eventId] })
+    const after = await stranger.rpc('almanac_records_in_range', window)
     expect(after.data).toHaveLength(1)
-    expect(after.data![0].event_id).toBe(eventId)
+    expect(after.data![0].site_id).toBe(siteId)
     expect(after.data![0].diver_display).toBe('Almanac Diver')
   })
 })
@@ -169,7 +177,7 @@ describe('almanac moderation', () => {
     await clearRecords()
     const client = await userClient(diver.email, diver.password)
     const filed = await client.rpc('submit_almanac_record', {
-      p_event_id: eventId, p_obs_date: YESTERDAY, p_air_temp_c: 31,
+      p_site_id: siteId, p_obs_date: YESTERDAY, p_air_temp_c: 31,
     })
     const recordId = filed.data as string
 
@@ -202,7 +210,7 @@ describe('almanac moderation', () => {
     await clearRecords()
     const client = await userClient(diver.email, diver.password)
     const filed = await client.rpc('submit_almanac_record', {
-      p_event_id: eventId, p_obs_date: YESTERDAY, p_air_temp_c: 27,
+      p_site_id: siteId, p_obs_date: YESTERDAY, p_air_temp_c: 27,
     })
     const staffClient = await userClient(staff.email, staff.password)
     const { error } = await staffClient.rpc('moderate_almanac_record', {
@@ -210,5 +218,46 @@ describe('almanac moderation', () => {
       p_status: 'pending' as never,
     })
     expect(error?.message).toContain('almanac_status_must_be_approved_or_rejected')
+  })
+})
+
+describe('dive_sites catalog', () => {
+  it('is admin-curated and diver-readable', async () => {
+    const client = await userClient(diver.email, diver.password)
+
+    const read = await client.from('dive_sites').select('id').eq('id', siteId)
+    expect(read.data).toHaveLength(1)
+
+    const write = await client.from('dive_sites').insert({
+      name: 'Diver-invented site', kind: 'dive',
+    } as never)
+    expect(write.error).not.toBeNull()
+  })
+
+  it('refuses the same name twice for a kind, whatever the casing', async () => {
+    const name = `Twice ${crypto.randomUUID().slice(0, 8)}`
+    const first = await admin.from('dive_sites').insert({ name, kind: 'dive' } as never).select('id').single()
+    expect(first.error).toBeNull()
+
+    const clash = await admin.from('dive_sites').insert({ name: name.toUpperCase(), kind: 'dive' } as never)
+    expect(clash.error).not.toBeNull()
+
+    // The same name for the other kind is a different place, and allowed.
+    const otherKind = await admin.from('dive_sites').insert({ name, kind: 'adventure' } as never).select('id').single()
+    expect(otherKind.error).toBeNull()
+
+    await admin.from('dive_sites').delete().eq('id', (first.data as { id: string }).id)
+    await admin.from('dive_sites').delete().eq('id', (otherKind.data as { id: string }).id)
+  })
+
+  it('will not let a site with observations be deleted', async () => {
+    await clearRecords()
+    const client = await userClient(diver.email, diver.password)
+    await client.rpc('submit_almanac_record', {
+      p_site_id: siteId, p_obs_date: YESTERDAY, p_air_temp_c: 26,
+    })
+
+    const { error } = await admin.from('dive_sites').delete().eq('id', siteId)
+    expect(error).not.toBeNull()
   })
 })

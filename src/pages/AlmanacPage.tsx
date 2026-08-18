@@ -24,11 +24,12 @@ import {
   type AlmanacStatus,
   type AlmanacEventRecord,
   type AlmanacPendingRecord,
+  type DiveSite,
 } from '../types/database'
 import { hasTerrainConditions, SITE_CONDITION_KINDS, type EventKind } from '../lib/event-kinds'
 import { EVENT_KIND_LABELS } from '../lib/event-kind-labels'
-import { fetchEventsInRange, formatEventSpan, isPastEvent } from '../lib/events'
-import { todayIso, addIsoDays, parseIsoDate, shopDayIso } from '../lib/dates'
+import { fetchDiveSites } from '../lib/dive-sites'
+import { todayIso, addIsoDays, parseIsoDate } from '../lib/dates'
 import { supabase } from '../lib/supabase'
 import {
   CARD,
@@ -48,23 +49,13 @@ import { CalendarIcon } from '../components/icons/CalendarIcon'
 import { ChevronDownIcon } from '../components/icons/ChevronDownIcon'
 import { ChevronUpIcon } from '../components/icons/ChevronUpIcon'
 
-// How far back the page looks. Only past events can be observed, so there is
-// no reason to fetch the upcoming half of the calendar at all.
+// How much of the almanac's history the page reads back.
 const LOOKBACK_DAYS = 90
-
-interface PastEvent {
-  id: string
-  title: string
-  start_time: string
-  end_time: string | null
-  start_time_hhmm: string | null
-  kind: EventKind
-}
 
 /** A submission of the signed-in diver's that the crowd cannot see yet. */
 interface OwnSubmission {
   id: string
-  event_id: string
+  site_id: string
   obs_date: string
   status: AlmanacStatus
   staff_notes: string | null
@@ -72,7 +63,7 @@ interface OwnSubmission {
 
 interface AlmanacFormState {
   kind: EventKind
-  event_id: string
+  site_id: string
   obs_date: string
   air_temp_c: string
   water_temp_c: string
@@ -88,9 +79,14 @@ interface AlmanacFormState {
   summit_visible: boolean
 }
 
+// The date defaults to today: without an outing to derive it from, "when were
+// you there" is nearly always today or a day or two back, and a diver who was
+// somewhere else edits one field instead of filling one from blank.
+const blankForm = (): AlmanacFormState => ({ ...emptyForm, obs_date: todayIso() })
+
 const emptyForm: AlmanacFormState = {
   kind: SITE_CONDITION_KINDS[0],
-  event_id: '',
+  site_id: '',
   obs_date: '',
   air_temp_c: '',
   water_temp_c: '',
@@ -167,7 +163,7 @@ function ReadingGrid({ readings }: { readings: Reading[] }) {
 
 // ─── Approved history ────────────────────────────────────────────────────────
 
-/** One calendar day's approved observations, whichever events they came from. */
+/** One calendar day's approved observations, from every site. */
 interface ObservationDay {
   date: string
   records: AlmanacEventRecord[]
@@ -177,8 +173,8 @@ interface ObservationDay {
  * Approved records bucketed by the day they describe, newest first.
  *
  * The almanac answers "what were conditions like on this date", so the day is
- * the unit — two events diving the same site on the same morning belong in one
- * bucket, and each row still names the event it was filed against.
+ * the unit — every site observed that day sits in one bucket, and each row
+ * names its site.
  */
 function daysOf(records: AlmanacEventRecord[]): ObservationDay[] {
   const byDate = new Map<string, AlmanacEventRecord[]>()
@@ -192,11 +188,11 @@ function daysOf(records: AlmanacEventRecord[]): ObservationDay[] {
     .sort((a, b) => b.date.localeCompare(a.date))
 }
 
-function ObservationRow({ record, eventTitle }: { record: AlmanacEventRecord; eventTitle: string | null }) {
+function ObservationRow({ record }: { record: AlmanacEventRecord }) {
   return (
     <div className="rounded-lg border border-white/10 p-3">
       <div className="flex items-center justify-between gap-2">
-        <span className={`text-xs ${TEXT_BODY}`}>{eventTitle ?? '—'}</span>
+        <span className={`text-xs ${TEXT_BODY}`}>{record.site_name}</span>
         <span className={`text-[10px] uppercase tracking-wide ${TEXT_SUBTLE}`}>
           {t.almanac.recordsFrom(record.diver_display ?? '—')}
         </span>
@@ -236,7 +232,7 @@ function ObservationSummary({ records }: { records: AlmanacEventRecord[] }) {
   )
 }
 
-function DayCard({ day, eventTitles }: { day: ObservationDay; eventTitles: Map<string, string> }) {
+function DayCard({ day }: { day: ObservationDay }) {
   const [expanded, setExpanded] = useState(false)
 
   return (
@@ -261,13 +257,7 @@ function DayCard({ day, eventTitles }: { day: ObservationDay; eventTitles: Map<s
       {expanded && (
         <div className="space-y-2 border-t border-white/10 px-3 pt-3 pb-3">
           <ObservationSummary records={day.records} />
-          {day.records.map(r => (
-            <ObservationRow
-              key={r.id}
-              record={r}
-              eventTitle={eventTitles.get(r.event_id) ?? null}
-            />
-          ))}
+          {day.records.map(r => <ObservationRow key={r.id} record={r} />)}
         </div>
       )}
     </div>
@@ -311,7 +301,7 @@ function ModerationQueue({
         <ul className="mt-3 space-y-3">
           {records.map(record => (
             <li key={record.id} className="rounded-lg border border-white/10 p-3">
-              <div className={`text-sm ${TEXT_BODY}`}>{record.event_title ?? '—'}</div>
+              <div className={`text-sm ${TEXT_BODY}`}>{record.site_name}</div>
               <div className={`text-xs ${TEXT_SUBTLE}`}>
                 {formatObsDate(record.obs_date)} · {t.almanac.recordsFrom(record.diver_display ?? '—')}
               </div>
@@ -362,13 +352,13 @@ const SITE_LABEL: Record<EventKind, string> = {
 }
 
 function AlmanacForm({
-  events,
+  sites,
   onSubmit,
 }: {
-  events: PastEvent[]
+  sites: DiveSite[]
   onSubmit: (form: AlmanacFormState) => Promise<void>
 }) {
-  const [form, setForm] = useState<AlmanacFormState>(emptyForm)
+  const [form, setForm] = useState<AlmanacFormState>(blankForm)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -377,31 +367,20 @@ function AlmanacForm({
     setError(null)
   }
 
-  // Picking the event fills the date with the day it ran — the answer the
-  // diver would have typed by hand almost every time.
-  const selectEvent = (eventId: string) => {
-    const picked = events.find(ev => ev.id === eventId)
-    setForm(prev => ({
-      ...prev,
-      event_id: eventId,
-      obs_date: picked ? shopDayIso(picked.start_time) : '',
-    }))
-    setError(null)
-  }
-
-  // The toggle is the first choice: it narrows the picker to that kind and
-  // decides whether the terrain block is asked for at all.
+  // The toggle is the first choice: it narrows the picker to the places of
+  // that kind and decides whether the terrain block is asked for at all.
   const selectKind = (kind: EventKind) => {
-    setForm(prev => ({ ...prev, kind, event_id: '', obs_date: '' }))
+    setForm(prev => ({ ...prev, kind, site_id: '' }))
     setError(null)
   }
 
-  const kindEvents = events.filter(ev => ev.kind === form.kind)
+  // Retired sites keep their history but stop being offered.
+  const kindSites = sites.filter(site => site.active && site.kind === form.kind)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.event_id) {
-      setError(t.almanac.eventRequired)
+    if (!form.site_id) {
+      setError(t.almanac.siteRequired)
       return
     }
     if (!form.obs_date) {
@@ -412,7 +391,7 @@ function AlmanacForm({
     setError(null)
     try {
       await onSubmit(form)
-      setForm(emptyForm)
+      setForm(blankForm())
     } catch (err) {
       setError(err instanceof Error ? err.message : t.almanac.submitFailed)
     } finally {
@@ -443,17 +422,17 @@ function AlmanacForm({
 
       <label className="mt-3 block">
         <span className={INPUT_LABEL}>{SITE_LABEL[form.kind]}</span>
-        <select className={INPUT} value={form.event_id} onChange={e => selectEvent(e.target.value)}>
-          <option value="">{t.almanac.eventPlaceholder}</option>
-          {kindEvents.map(ev => (
-            <option key={ev.id} value={ev.id}>
-              {ev.title} — {formatEventSpan(ev, { style: 'compact' })}
+        <select className={INPUT} value={form.site_id} onChange={e => updateField('site_id', e.target.value)}>
+          <option value="">{t.almanac.sitePlaceholder}</option>
+          {kindSites.map(site => (
+            <option key={site.id} value={site.id}>
+              {site.region ? `${site.name} — ${site.region}` : site.name}
             </option>
           ))}
         </select>
       </label>
-      {kindEvents.length === 0 && (
-        <p className={`mt-1 text-xs ${TEXT_SUBTLE}`}>{t.almanac.noPastEvents}</p>
+      {kindSites.length === 0 && (
+        <p className={`mt-1 text-xs ${TEXT_SUBTLE}`}>{t.almanac.noSites}</p>
       )}
 
       <label className="mt-3 block">
@@ -620,7 +599,7 @@ function AlmanacForm({
         <button
           type="button"
           className={`px-4 ${BTN_SECONDARY}`}
-          onClick={() => { setForm(emptyForm); setError(null) }}
+          onClick={() => { setForm(blankForm()); setError(null) }}
         >
           {t.almanac.clearForm}
         </button>
@@ -639,7 +618,7 @@ const STATUS_LABEL: Record<AlmanacStatus, string> = {
 
 export function AlmanacPage() {
   const { user, profile, loading: authLoading } = useAuth()
-  const [events, setEvents] = useState<PastEvent[]>([])
+  const [sites, setSites] = useState<DiveSite[]>([])
   const [records, setRecords] = useState<AlmanacEventRecord[]>([])
   const [ownSubmissions, setOwnSubmissions] = useState<OwnSubmission[]>([])
   const [pending, setPending] = useState<AlmanacPendingRecord[]>([])
@@ -667,7 +646,7 @@ export function AlmanacPage() {
     // tell a diver about the ones the crowd cannot see yet.
     const { data, error } = await supabase
       .from('almanac_records')
-      .select('id, event_id, obs_date, status, staff_notes')
+      .select('id, site_id, obs_date, status, staff_notes')
       .eq('diver_id', userId)
       .neq('status', 'approved')
       .order('obs_date', { ascending: false })
@@ -678,26 +657,15 @@ export function AlmanacPage() {
     setOwnSubmissions(data ?? [])
   }, [userId])
 
-  const loadEvents = useCallback(async () => {
+  const loadSites = useCallback(async () => {
+    setSites(await fetchDiveSites())
+  }, [])
+
+  const loadRecords = useCallback(async () => {
     const today = todayIso()
-    const past = (await fetchEventsInRange(addIsoDays(today, -LOOKBACK_DAYS), today))
-      .filter(ev => isPastEvent(ev))
-    setEvents(past
-      .map(ev => ({
-        id: ev.id,
-        title: ev.title,
-        start_time: ev.start_time,
-        end_time: ev.end_time,
-        start_time_hhmm: ev.start_time_hhmm,
-        kind: ev.type,
-      }))
-      .sort((a, b) => b.start_time.localeCompare(a.start_time)))
-    if (past.length === 0) {
-      setRecords([])
-      return
-    }
-    const { data, error } = await supabase.rpc('almanac_records_for_events', {
-      p_event_ids: past.map(ev => ev.id),
+    const { data, error } = await supabase.rpc('almanac_records_in_range', {
+      p_from: addIsoDays(today, -LOOKBACK_DAYS),
+      p_to: today,
     })
     if (error) throw error
     setRecords(data ?? [])
@@ -710,7 +678,7 @@ export function AlmanacPage() {
       setLoading(true)
       setLoadError(null)
       try {
-        await Promise.all([loadEvents(), loadOwnSubmissions(), loadQueue()])
+        await Promise.all([loadSites(), loadRecords(), loadOwnSubmissions(), loadQueue()])
       } catch (err) {
         console.error('Failed to load the almanac:', err)
         if (!cancelled) setLoadError(t.almanac.recordsFailed)
@@ -720,12 +688,12 @@ export function AlmanacPage() {
     }
     load()
     return () => { cancelled = true }
-  }, [userId, loadEvents, loadOwnSubmissions, loadQueue])
+  }, [userId, loadSites, loadRecords, loadOwnSubmissions, loadQueue])
 
   const handleSubmit = async (form: AlmanacFormState) => {
     const terrain = hasTerrainConditions(form.kind)
     const { error } = await supabase.rpc('submit_almanac_record', {
-      p_event_id: form.event_id,
+      p_site_id: form.site_id,
       p_obs_date: form.obs_date,
       p_air_temp_c: parseNum(form.air_temp_c),
       p_water_temp_c: parseNum(form.water_temp_c),
@@ -757,7 +725,7 @@ export function AlmanacPage() {
       p_staff_notes: notes.trim() || null,
     })
     if (error) throw error
-    await Promise.all([loadQueue(), loadEvents()])
+    await Promise.all([loadQueue(), loadRecords()])
   }
 
   if (authLoading || loading) {
@@ -769,7 +737,7 @@ export function AlmanacPage() {
   }
 
   const days = daysOf(records)
-  const eventTitles = new Map(events.map(ev => [ev.id, ev.title]))
+  const siteNames = new Map(sites.map(site => [site.id, site.name]))
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4 pt-2 pb-8">
@@ -782,10 +750,10 @@ export function AlmanacPage() {
 
       {isStaff && !loadError && <ModerationQueue records={pending} onModerate={handleModerate} />}
 
-      {events.length === 0 ? (
-        <p className={`${CARD} p-4 text-center text-sm ${TEXT_SUBTLE}`}>{t.almanac.noPastEvents}</p>
+      {sites.length === 0 ? (
+        <p className={`${CARD} p-4 text-center text-sm ${TEXT_SUBTLE}`}>{t.almanac.noSites}</p>
       ) : (
-        <AlmanacForm events={events} onSubmit={handleSubmit} />
+        <AlmanacForm sites={sites} onSubmit={handleSubmit} />
       )}
 
       {submitStatus && (
@@ -802,7 +770,7 @@ export function AlmanacPage() {
               <li key={sub.id} className={`${CARD} flex items-center justify-between gap-2 p-3`}>
                 <div>
                   <div className={`text-sm ${TEXT_BODY}`}>
-                    {events.find(ev => ev.id === sub.event_id)?.title ?? '—'}
+                    {siteNames.get(sub.site_id) ?? '—'}
                   </div>
                   <div className={`text-xs ${TEXT_SUBTLE}`}>
                     {formatObsDate(sub.obs_date)}
@@ -824,9 +792,7 @@ export function AlmanacPage() {
           <p className={`${CARD} p-4 text-center text-sm ${TEXT_SUBTLE}`}>{t.almanac.noRecordsYet}</p>
         ) : (
           <div className="space-y-2">
-            {days.map(day => (
-              <DayCard key={day.date} day={day} eventTitles={eventTitles} />
-            ))}
+            {days.map(day => <DayCard key={day.date} day={day} />)}
           </div>
         )}
       </section>

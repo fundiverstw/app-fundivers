@@ -348,14 +348,16 @@ export interface Database {
         Args: { p_token: string }
         Returns: number
       }
-      // Almanac: approved observations for a batch of events. Defined in
-      // 20260818000000_almanac_records.sql. Takes an array so the page can
-      // render a whole date range in one request.
-      almanac_records_for_events: {
-        Args: { p_event_ids: string[] }
+      // Almanac: approved observations for a window of calendar days. Defined
+      // in 20260820000000_almanac_by_dive_site.sql — a date range rather than a
+      // list of ids, because the page reads the almanac by day.
+      almanac_records_in_range: {
+        Args: { p_from: string; p_to: string }
         Returns: Array<{
           id: string
-          event_id: string
+          site_id: string
+          site_name: string
+          site_kind: SiteKind
           created_at: string
           obs_date: string
           air_temp_c: number | null
@@ -379,8 +381,9 @@ export interface Database {
         Args: Record<string, never>
         Returns: Array<{
           id: string
-          event_id: string
-          event_title: string | null
+          site_id: string
+          site_name: string
+          site_kind: SiteKind
           obs_date: string
           created_at: string
           air_temp_c: number | null
@@ -401,7 +404,7 @@ export interface Database {
       // Almanac: submit or revise the caller's own pending observation.
       submit_almanac_record: {
         Args: {
-          p_event_id: string
+          p_site_id: string
           p_obs_date: string
           p_air_temp_c?: number | null
           p_water_temp_c?: number | null
@@ -1322,6 +1325,7 @@ export interface Database {
           price: string | null
           dive_days: number | null
           prereq_cert_id: string | null
+          site_id: string | null
           cancel_date: string | null
           cancel_policy: string | null
           fully_booked: boolean
@@ -1360,6 +1364,7 @@ export interface Database {
           price?: string | null
           dive_days?: number | null
           prereq_cert_id?: string | null
+          site_id?: string | null
           cancel_date?: string | null
           cancel_policy?: string | null
           fully_booked?: boolean
@@ -1692,13 +1697,40 @@ export interface Database {
       // Crowdsourced environmental observations for dive sites and adventure
       // events. Divers submit; staff/admin approve; approved records show
       // on the event detail and the almanac page.
+      // Defined in 20260820000000_almanac_by_dive_site.sql. The shop's places:
+      // `kind` is the events vocabulary narrowed to the kinds that travel to a
+      // site, so the almanac's dive/adventure toggle filters on it.
+      dive_sites: {
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          name: string
+          kind: SiteKind
+          region: string | null
+          notes: string | null
+          active: boolean
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          name: string
+          kind: SiteKind
+          region?: string | null
+          notes?: string | null
+          active?: boolean
+        }
+        Update: Partial<Database['public']['Tables']['dive_sites']['Insert']>
+        Relationships: []
+      }
       almanac_records: {
         Row: {
           id: string
           created_at: string
           updated_at: string
           diver_id: string
-          event_id: string
+          site_id: string
           obs_date: string
           air_temp_c: number | null
           water_temp_c: number | null
@@ -1722,7 +1754,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
           diver_id?: string
-          event_id: string
+          site_id: string
           obs_date: string
           air_temp_c?: number | null
           water_temp_c?: number | null
@@ -2089,6 +2121,13 @@ export const ALMANAC_CORAL_HEALTHS = ['excellent', 'good', 'fair', 'poor', 'blea
 export type AlmanacCoralHealth = typeof ALMANAC_CORAL_HEALTHS[number]
 export const ALMANAC_ROUTE_CONDITIONS = ['dry', 'wet', 'muddy', 'icy', 'snow', 'rockfall'] as const
 export type AlmanacRouteCondition = typeof ALMANAC_ROUTE_CONDITIONS[number]
+// The dive_sites vocabulary: the event kinds the shop travels to a site for.
+// Pinned to the DB's `dive_sites_kind_check`, and asserted against
+// SITE_CONDITION_KINDS in dive-sites.test.ts — the two answer the same
+// question from either side of the wire, so they must not drift.
+export const SITE_KINDS = ['dive', 'adventure'] as const
+export type SiteKind = typeof SITE_KINDS[number]
+
 export const ALMANAC_STATUSES = ['pending', 'approved', 'rejected'] as const
 export type AlmanacStatus = typeof ALMANAC_STATUSES[number]
 export const DUTY_ROLES = ['instructor', 'guide', 'support'] as const
@@ -2097,8 +2136,11 @@ export type DutyRole = typeof DUTY_ROLES[number]
 export type StaffAvailabilityInsert = Database['public']['Tables']['staff_availability']['Insert']
 export type StaffAvailabilityUpdate = Database['public']['Tables']['staff_availability']['Update']
 
+export type DiveSite = Database['public']['Tables']['dive_sites']['Row']
+export type DiveSiteInsert = Database['public']['Tables']['dive_sites']['Insert']
+
 // Almanac RPC return types
-export type AlmanacEventRecord = Database['public']['Functions']['almanac_records_for_events']['Returns'][number]
+export type AlmanacEventRecord = Database['public']['Functions']['almanac_records_in_range']['Returns'][number]
 export type AlmanacPendingRecord = Database['public']['Functions']['almanac_pending_records']['Returns'][number]
 /** Privacy-projected row used by the UI. title/details are NULL for any
  *  entry not owned by the calling user. owner_display_name comes from the

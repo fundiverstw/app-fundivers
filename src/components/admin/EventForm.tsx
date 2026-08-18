@@ -3,14 +3,14 @@ import { supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
 import { fetchEventRelations } from '../../lib/event-relations'
 import { siteConfig } from '../../config/site'
-import type { CancellationPolicy, CertLevel, TripTemplateEntry, EOAddon, EventRow, EOPrice, EORoom, TravelDestination } from '../../types/database'
+import type { CancellationPolicy, CertLevel, DiveSite, TripTemplateEntry, EOAddon, EventRow, EOPrice, EORoom, TravelDestination } from '../../types/database'
 import {
   EMPTY_FORM,
   formStateFromEvent,
   type FormState,
 } from './event-form-state'
 import { DateField } from '../DateField'
-import { usesCourseDays, usesDateEnvelope, hasDiveFlags } from '../../lib/event-kinds'
+import { usesCourseDays, usesDateEnvelope, hasDiveFlags, recordsSiteConditions } from '../../lib/event-kinds'
 import { EVENT_KIND_LABELS } from '../../lib/event-kind-labels'
 import { EVENT_KINDS } from '../../types/database'
 import { DATE_ENVELOPE_KINDS, COURSE_DAY_KINDS } from '../../lib/event-kinds'
@@ -97,6 +97,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
   const [cancelPolicies, setCancelPolicies] = useState<CancellationPolicy[]>([])
   const [tripTemplates, setTripTemplates] = useState<TripTemplateEntry[]>([])
   const [destinations, setDestinations] = useState<TravelDestination[]>([])
+  const [diveSites, setDiveSites] = useState<DiveSite[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Past events for the preload picker, sorted most-recent-first.
@@ -155,6 +156,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
         supabase.from('cancellation_policies').select('*').order('title'),
         supabase.from('trip_templates').select('*').order('admin_title'),
         supabase.from('travel_destinations').select('*').order('sort_order', { nullsFirst: false }),
+        supabase.from('dive_sites').select('*').eq('active', true).order('name'),
       ])
       if (cancelled) return
       const dataOf = <T,>(i: number): T[] => {
@@ -170,6 +172,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
       setCancelPolicies(dataOf<CancellationPolicy>(6))
       setTripTemplates(dataOf<TripTemplateEntry>(7))
       setDestinations(dataOf<TravelDestination>(8))
+      setDiveSites(dataOf<DiveSite>(9))
 
       // Both lists collapse to the newest event per admin_title — the site for
       // a dive or adventure, the course type for a course. The shop returns to
@@ -216,6 +219,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
     if (certLevels.length && next.prereq_cert_id && !certLevels.some(c => c.id === next.prereq_cert_id)) next.prereq_cert_id = ''
     if (prices.length && next.price && !prices.some(p => p.id === next.price)) next.price = ''
     if (cancelPolicies.length && next.cancel_policy && !cancelPolicies.some(p => p.id === next.cancel_policy)) next.cancel_policy = ''
+    if (diveSites.length && next.site_id && !diveSites.some(site => site.id === next.site_id)) next.site_id = ''
     return next
   }
 
@@ -585,6 +589,18 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
             <Input type="number" value={form.capacity} onChange={v => set('capacity', v)} placeholder={ef.capacityPlaceholder} />
           </Field>
         </div>
+        {recordsSiteConditions(form.type) && (
+          <Field label={ef.site}>
+            <Select value={form.site_id} onChange={v => set('site_id', v)}>
+              <option value="">{ef.none}</option>
+              {diveSites.filter(site => site.kind === form.type).map(site => (
+                <option key={site.id} value={site.id}>
+                  {site.region ? `${site.name} — ${site.region}` : site.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
         <Field label={ef.requiredCert}>
           <Select value={form.prereq_cert_id} onChange={v => set('prereq_cert_id', v)}>
             <option value="">{ef.none}</option>

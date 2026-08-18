@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AlmanacPage } from './AlmanacPage'
 import { mockQueryBuilder } from '../../tests/test-utils'
@@ -16,22 +16,15 @@ vi.mock('../hooks/useAuth', () => ({
   }),
 }))
 
-const pastEvent = {
-  id: 'event-1',
-  type: 'dive',
-  title: 'Longdong shore dive',
-  start_time: '2026-08-01T01:00:00Z',
-  end_time: null,
-  start_time_hhmm: '09:00',
-}
+const sites = [
+  { id: 'site-1', name: 'Bat Cave', kind: 'dive', region: 'Longdong', active: true },
+  { id: 'site-2', name: 'Dragon Head', kind: 'dive', region: null, active: true },
+  { id: 'site-3', name: 'Hehuanshan', kind: 'adventure', region: null, active: true },
+  { id: 'site-4', name: 'Closed Cove', kind: 'dive', region: null, active: false },
+]
 
-const sameDayEvent = { ...pastEvent, id: 'event-2', title: 'Longdong boat dive' }
-const pastAdventure = { ...pastEvent, id: 'event-3', type: 'adventure', title: 'Hehuanshan traverse' }
-
-vi.mock('../lib/events', () => ({
-  fetchEventsInRange: vi.fn(async () => [pastEvent, sameDayEvent, pastAdventure]),
-  formatEventSpan: () => 'Sat, Aug 1',
-  isPastEvent: () => true,
+vi.mock('../lib/dive-sites', () => ({
+  fetchDiveSites: vi.fn(async () => sites),
 }))
 
 const rpc = vi.fn()
@@ -46,7 +39,9 @@ vi.mock('../lib/supabase', () => ({
 
 const approvedRecord = {
   id: 'record-1',
-  event_id: 'event-1',
+  site_id: 'site-1',
+  site_name: 'Bat Cave',
+  site_kind: 'dive',
   created_at: '2026-08-02T00:00:00Z',
   obs_date: '2026-08-01',
   air_temp_c: 30,
@@ -64,7 +59,7 @@ const approvedRecord = {
   diver_display: 'Mei',
 }
 
-const pendingRecord = { ...approvedRecord, id: 'record-2', event_title: 'Longdong shore dive' }
+const pendingRecord = { ...approvedRecord, id: 'record-2' }
 
 function mockRpc(overrides: Record<string, unknown[]> = {}) {
   rpc.mockImplementation(async (name: string) => ({
@@ -84,23 +79,22 @@ describe('AlmanacPage', () => {
     mockRpc()
   })
 
-  it('fetches every event\'s approved records in one request', async () => {
-    mockRpc({ almanac_records_for_events: [approvedRecord] })
+  it('reads the history as one date window, not one call per place', async () => {
+    mockRpc({ almanac_records_in_range: [approvedRecord] })
     renderPage()
 
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith('almanac_records_for_events', {
-      p_event_ids: ['event-1', 'event-2', 'event-3'],
-    }))
-    expect(rpc.mock.calls.filter(c => c[0] === 'almanac_records_for_events')).toHaveLength(1)
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('almanac_records_in_range',
+      expect.objectContaining({ p_from: expect.any(String), p_to: expect.any(String) })))
+    expect(rpc.mock.calls.filter(c => c[0] === 'almanac_records_in_range')).toHaveLength(1)
     expect(await screen.findByText(t.almanac.recordsHeading)).toBeInTheDocument()
   })
 
-  it('groups the history by calendar date, merging events that share a day', async () => {
+  it('groups the history by calendar date, merging sites that share a day', async () => {
     const user = userEvent.setup()
     mockRpc({
-      almanac_records_for_events: [
+      almanac_records_in_range: [
         approvedRecord,
-        { ...approvedRecord, id: 'record-3', event_id: 'event-2', diver_display: 'Jun' },
+        { ...approvedRecord, id: 'record-3', site_id: 'site-2', site_name: 'Dragon Head', diver_display: 'Jun' },
         { ...approvedRecord, id: 'record-4', obs_date: '2026-07-30' },
       ],
     })
@@ -109,10 +103,11 @@ describe('AlmanacPage', () => {
     const days = await screen.findAllByText(/Aug 1, 2026|Jul 30, 2026/)
     expect(days).toHaveLength(2)
 
+    const augCard = screen.getByRole('button', { name: /Aug 1, 2026/ }).parentElement!
     await user.click(screen.getByRole('button', { name: /Aug 1, 2026/ }))
-    expect(screen.getByText('Longdong shore dive')).toBeInTheDocument()
-    expect(screen.getByText('Longdong boat dive')).toBeInTheDocument()
-    expect(screen.getByText(t.almanac.observationCount(2))).toBeInTheDocument()
+    expect(within(augCard).getByText('Bat Cave')).toBeInTheDocument()
+    expect(within(augCard).getByText('Dragon Head')).toBeInTheDocument()
+    expect(within(augCard).getByText(t.almanac.observationCount(2))).toBeInTheDocument()
   })
 
   it('submits the form through the RPC, parsing numbers and wildlife', async () => {
@@ -120,14 +115,14 @@ describe('AlmanacPage', () => {
     renderPage()
     await screen.findByRole('button', { name: t.almanac.submitRecord })
 
-    await user.selectOptions(screen.getByLabelText(t.almanac.siteDive), 'event-1')
+    await user.selectOptions(screen.getByLabelText(t.almanac.siteDive), 'site-1')
     await user.type(screen.getByLabelText(t.almanac.airTemp), '29.5')
     await user.type(screen.getByLabelText(t.almanac.wildlife), 'turtle, manta ray')
     await user.click(screen.getByRole('button', { name: t.almanac.submitRecord }))
 
     await waitFor(() => expect(rpc).toHaveBeenCalledWith('submit_almanac_record',
       expect.objectContaining({
-        p_event_id: 'event-1',
+        p_site_id: 'site-1',
         p_air_temp_c: 29.5,
         p_water_temp_c: null,
         p_wildlife: ['turtle', 'manta ray'],
@@ -135,19 +130,20 @@ describe('AlmanacPage', () => {
     expect(await screen.findByText(t.almanac.submitted)).toBeInTheDocument()
   })
 
-  it('lists only the toggled kind, and asks an adventure for its terrain', async () => {
+  it('offers only the active places of the toggled kind, and asks an adventure for its terrain', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByRole('button', { name: t.almanac.submitRecord })
 
+    // site-4 is retired, so it keeps its history but is not offered.
     const dives = screen.getByLabelText(t.almanac.siteDive) as HTMLSelectElement
-    expect([...dives.options].map(o => o.value)).toEqual(['', 'event-1', 'event-2'])
+    expect([...dives.options].map(o => o.value)).toEqual(['', 'site-1', 'site-2'])
     expect(screen.queryByLabelText(t.almanac.elevation)).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: EVENT_KIND_LABELS.adventure }))
 
     const adventures = screen.getByLabelText(t.almanac.siteAdventure) as HTMLSelectElement
-    expect([...adventures.options].map(o => o.value)).toEqual(['', 'event-3'])
+    expect([...adventures.options].map(o => o.value)).toEqual(['', 'site-3'])
     expect(screen.getByLabelText(t.almanac.elevation)).toBeInTheDocument()
   })
 
@@ -160,7 +156,7 @@ describe('AlmanacPage', () => {
     renderPage()
     await screen.findByRole('button', { name: t.almanac.submitRecord })
 
-    await user.selectOptions(screen.getByLabelText(t.almanac.siteDive), 'event-1')
+    await user.selectOptions(screen.getByLabelText(t.almanac.siteDive), 'site-1')
     await user.click(screen.getByRole('button', { name: t.almanac.submitRecord }))
 
     expect(await screen.findByText(t.almanac.submitFailed)).toBeInTheDocument()

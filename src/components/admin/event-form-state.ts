@@ -1,5 +1,5 @@
 import type { EventRow, EventKind } from '../../types/database'
-import { usesDateEnvelope, usesCourseDays, hasDiveFlags } from '../../lib/event-kinds'
+import { usesDateEnvelope, usesCourseDays, hasDiveFlags, recordsSiteConditions } from '../../lib/event-kinds'
 
 // Form-state shape, defaults, prefill helpers, and the FormState→DB-payload
 // converters used by the create + edit pages. Lives in its own file so the
@@ -18,6 +18,7 @@ export interface FormState {
   capacity: string
   price: string          // FK → prices.id; empty = no price linked
   prereq_cert_id: string // FK → cert_levels.id; empty = no cert required
+  site_id: string        // FK → dive_sites.id; empty = no site (always for courses)
   req_dives: string      // dives store bigint, courses store text — keep as string here
   dive_days: string      // bigint or empty
   addonIds: string[]     // FK multi → addons
@@ -57,6 +58,7 @@ export const EMPTY_FORM: FormState = {
   capacity: '',
   price: '',
   prereq_cert_id: '',
+  site_id: '',
   req_dives: '', dive_days: '',
   addonIds: [],
   featured_image: '',
@@ -115,6 +117,7 @@ export function formStateFromEvent(e: EventRow, rels: EventRelations = NO_RELATI
     capacity: e.capacity != null ? String(e.capacity) : '',
     price: e.price ?? '',
     prereq_cert_id: e.prereq_cert_id ?? '',
+    site_id: e.site_id ?? '',
     req_dives: e.req_dives != null ? String(e.req_dives) : '',
     dive_days: e.dive_days != null ? String(e.dive_days) : '',
     addonIds: rels.addonIds,
@@ -190,6 +193,9 @@ export function eventPayloadFromForm(form: FormState): Record<string, unknown> {
     price: form.price || null,
     capacity: form.capacity ? Number(form.capacity) : null,
     prereq_cert_id: form.prereq_cert_id || null,
+    // A course runs from the shop, so it never carries a site even if one was
+    // picked before the kind was switched.
+    site_id: recordsSiteConditions(form.type) ? (form.site_id || null) : null,
     req_dives: form.req_dives ? Number(form.req_dives) : null,
     dive_days: form.dive_days ? Number(form.dive_days) : null,
     cancel_date: form.cancel_date || null,

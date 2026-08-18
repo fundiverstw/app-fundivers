@@ -122,14 +122,3 @@ export function diffIsoDays(from: string, to: string): number {
   const [y2, m2, d2] = to.split('-').map(Number)
   return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86_400_000)
 }
-
-/**
- * The shop-timezone calendar day (`YYYY-MM-DD`) an instant falls on.
- *
- * `start_time` is a timestamp, but "which day did this happen on" is a
- * question about the shop's clock, not the viewer's — a Taipei event at 08:00
- * is still the previous day in UTC.
- */
-export function shopDayIso(instant: string | Date): string {
-  return new Date(instant).toLocaleDateString('en-CA', { timeZone: siteConfig.locale.timezone })
-}
