@@ -25,7 +25,8 @@ import {
   type AlmanacEventRecord,
   type AlmanacPendingRecord,
 } from '../types/database'
-import { hasTerrainConditions, type EventKind } from '../lib/event-kinds'
+import { hasTerrainConditions, SITE_CONDITION_KINDS, type EventKind } from '../lib/event-kinds'
+import { EVENT_KIND_LABELS } from '../lib/event-kind-labels'
 import { fetchEventsInRange, formatEventSpan, isPastEvent } from '../lib/events'
 import { todayIso, addIsoDays, parseIsoDate, shopDayIso } from '../lib/dates'
 import { supabase } from '../lib/supabase'
@@ -39,6 +40,7 @@ import {
   BTN_PRIMARY,
   BTN_SECONDARY,
   BTN_XS_PRIMARY,
+  BTN_XS_GHOST,
   BTN_XS_DANGER,
   ERROR_NOTE_LIGHT,
 } from '../styles/tokens'
@@ -69,6 +71,7 @@ interface OwnSubmission {
 }
 
 interface AlmanacFormState {
+  kind: EventKind
   event_id: string
   obs_date: string
   air_temp_c: string
@@ -86,6 +89,7 @@ interface AlmanacFormState {
 }
 
 const emptyForm: AlmanacFormState = {
+  kind: SITE_CONDITION_KINDS[0],
   event_id: '',
   obs_date: '',
   air_temp_c: '',
@@ -349,6 +353,14 @@ function ModerationQueue({
 
 // ─── Submission form ─────────────────────────────────────────────────────────
 
+/** What the event picker is called, per kind the almanac can observe. A full
+ *  Record so a new kind has to name itself rather than render a blank label. */
+const SITE_LABEL: Record<EventKind, string> = {
+  dive: t.almanac.siteDive,
+  course: t.almanac.siteCourse,
+  adventure: t.almanac.siteAdventure,
+}
+
 function AlmanacForm({
   events,
   onSubmit,
@@ -377,7 +389,14 @@ function AlmanacForm({
     setError(null)
   }
 
-  const selectedEvent = events.find(ev => ev.id === form.event_id)
+  // The toggle is the first choice: it narrows the picker to that kind and
+  // decides whether the terrain block is asked for at all.
+  const selectKind = (kind: EventKind) => {
+    setForm(prev => ({ ...prev, kind, event_id: '', obs_date: '' }))
+    setError(null)
+  }
+
+  const kindEvents = events.filter(ev => ev.kind === form.kind)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -405,17 +424,37 @@ function AlmanacForm({
     <form onSubmit={handleSubmit} className={`${CARD} p-4`}>
       <h2 className={`text-sm ${TEXT_HEADING}`}>{t.almanac.submit}</h2>
 
+      <div className="mt-3">
+        <span className={INPUT_LABEL}>{t.almanac.kind}</span>
+        <div className="flex gap-2" role="group" aria-label={t.almanac.kind}>
+          {SITE_CONDITION_KINDS.map(kind => (
+            <button
+              key={kind}
+              type="button"
+              aria-pressed={form.kind === kind}
+              className={form.kind === kind ? BTN_XS_PRIMARY : BTN_XS_GHOST}
+              onClick={() => selectKind(kind)}
+            >
+              {EVENT_KIND_LABELS[kind]}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <label className="mt-3 block">
-        <span className={INPUT_LABEL}>{t.almanac.event}</span>
+        <span className={INPUT_LABEL}>{SITE_LABEL[form.kind]}</span>
         <select className={INPUT} value={form.event_id} onChange={e => selectEvent(e.target.value)}>
           <option value="">{t.almanac.eventPlaceholder}</option>
-          {events.map(ev => (
+          {kindEvents.map(ev => (
             <option key={ev.id} value={ev.id}>
               {ev.title} — {formatEventSpan(ev, { style: 'compact' })}
             </option>
           ))}
         </select>
       </label>
+      {kindEvents.length === 0 && (
+        <p className={`mt-1 text-xs ${TEXT_SUBTLE}`}>{t.almanac.noPastEvents}</p>
+      )}
 
       <label className="mt-3 block">
         <span className={INPUT_LABEL}>{t.almanac.obsDate}</span>
@@ -532,7 +571,7 @@ function AlmanacForm({
         />
       </label>
 
-      {selectedEvent && hasTerrainConditions(selectedEvent.kind) && (
+      {hasTerrainConditions(form.kind) && (
         <>
           <h3 className={`mt-4 border-t border-white/10 pt-3 text-xs ${TEXT_HEADING}`}>
             {t.almanac.terrainHeading}
@@ -684,8 +723,7 @@ export function AlmanacPage() {
   }, [userId, loadEvents, loadOwnSubmissions, loadQueue])
 
   const handleSubmit = async (form: AlmanacFormState) => {
-    const selected = events.find(ev => ev.id === form.event_id)
-    const terrain = selected ? hasTerrainConditions(selected.kind) : false
+    const terrain = hasTerrainConditions(form.kind)
     const { error } = await supabase.rpc('submit_almanac_record', {
       p_event_id: form.event_id,
       p_obs_date: form.obs_date,

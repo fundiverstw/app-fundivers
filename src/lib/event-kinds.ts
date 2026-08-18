@@ -95,6 +95,23 @@ export function hasTerrainConditions(kind: EventKind): boolean {
   return kind === 'adventure'
 }
 
+/**
+ * True when the shop travels out to a site for it, so there are conditions at
+ * that site worth reporting — the almanac only collects observations for these
+ * kinds, and its dive/adventure toggle is this list. A course runs from the
+ * shop, so it has no site of its own to describe.
+ *
+ * Its own question rather than a reuse of `allowsTransport`, even though both
+ * answer "not a course" today: one decides whether the register form offers
+ * ride seats, the other whether a kind can be observed at all.
+ */
+export function recordsSiteConditions(kind: EventKind): boolean {
+  return kind !== 'course'
+}
+
+/** The kinds the almanac collects observations for, in vocabulary order. */
+export const SITE_CONDITION_KINDS: readonly EventKind[] = EVENT_KINDS.filter(recordsSiteConditions)
+
 /** Narrow an untrusted string (a request body's event_type) to a known kind. */
 export function isEventKind(value: unknown): value is EventKind {
   return typeof value === 'string' && (EVENT_KINDS as readonly string[]).includes(value)

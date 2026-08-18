@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { AlmanacPage } from './AlmanacPage'
 import { mockQueryBuilder } from '../../tests/test-utils'
 import { t } from '../i18n'
+import { EVENT_KIND_LABELS } from '../lib/event-kind-labels'
 
 const authState = { role: 'diver' as 'diver' | 'staff' }
 
@@ -25,9 +26,10 @@ const pastEvent = {
 }
 
 const sameDayEvent = { ...pastEvent, id: 'event-2', title: 'Longdong boat dive' }
+const pastAdventure = { ...pastEvent, id: 'event-3', type: 'adventure', title: 'Hehuanshan traverse' }
 
 vi.mock('../lib/events', () => ({
-  fetchEventsInRange: vi.fn(async () => [pastEvent, sameDayEvent]),
+  fetchEventsInRange: vi.fn(async () => [pastEvent, sameDayEvent, pastAdventure]),
   formatEventSpan: () => 'Sat, Aug 1',
   isPastEvent: () => true,
 }))
@@ -87,7 +89,7 @@ describe('AlmanacPage', () => {
     renderPage()
 
     await waitFor(() => expect(rpc).toHaveBeenCalledWith('almanac_records_for_events', {
-      p_event_ids: ['event-1', 'event-2'],
+      p_event_ids: ['event-1', 'event-2', 'event-3'],
     }))
     expect(rpc.mock.calls.filter(c => c[0] === 'almanac_records_for_events')).toHaveLength(1)
     expect(await screen.findByText(t.almanac.recordsHeading)).toBeInTheDocument()
@@ -118,7 +120,7 @@ describe('AlmanacPage', () => {
     renderPage()
     await screen.findByRole('button', { name: t.almanac.submitRecord })
 
-    await user.selectOptions(screen.getByLabelText(t.almanac.event), 'event-1')
+    await user.selectOptions(screen.getByLabelText(t.almanac.siteDive), 'event-1')
     await user.type(screen.getByLabelText(t.almanac.airTemp), '29.5')
     await user.type(screen.getByLabelText(t.almanac.wildlife), 'turtle, manta ray')
     await user.click(screen.getByRole('button', { name: t.almanac.submitRecord }))
@@ -133,6 +135,22 @@ describe('AlmanacPage', () => {
     expect(await screen.findByText(t.almanac.submitted)).toBeInTheDocument()
   })
 
+  it('lists only the toggled kind, and asks an adventure for its terrain', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByRole('button', { name: t.almanac.submitRecord })
+
+    const dives = screen.getByLabelText(t.almanac.siteDive) as HTMLSelectElement
+    expect([...dives.options].map(o => o.value)).toEqual(['', 'event-1', 'event-2'])
+    expect(screen.queryByLabelText(t.almanac.elevation)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: EVENT_KIND_LABELS.adventure }))
+
+    const adventures = screen.getByLabelText(t.almanac.siteAdventure) as HTMLSelectElement
+    expect([...adventures.options].map(o => o.value)).toEqual(['', 'event-3'])
+    expect(screen.getByLabelText(t.almanac.elevation)).toBeInTheDocument()
+  })
+
   it('surfaces a failed submission instead of reporting success', async () => {
     const user = userEvent.setup()
     rpc.mockImplementation(async (name: string) =>
@@ -142,7 +160,7 @@ describe('AlmanacPage', () => {
     renderPage()
     await screen.findByRole('button', { name: t.almanac.submitRecord })
 
-    await user.selectOptions(screen.getByLabelText(t.almanac.event), 'event-1')
+    await user.selectOptions(screen.getByLabelText(t.almanac.siteDive), 'event-1')
     await user.click(screen.getByRole('button', { name: t.almanac.submitRecord }))
 
     expect(await screen.findByText(t.almanac.submitFailed)).toBeInTheDocument()
