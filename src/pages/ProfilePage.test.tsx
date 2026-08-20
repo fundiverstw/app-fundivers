@@ -57,7 +57,12 @@ describe('ProfilePage', () => {
   it('saves an all-but-empty profile — no field is required', async () => {
     useAuthMock.mockReturnValue({
       user: { id: 'u1' },
-      profile: { id: 'u1', name: 'Ada Lovelace' },
+      // Every column of a freshly-signed-up row is NULL.
+      profile: {
+        id: 'u1', name: 'Ada Lovelace', nickname: null, date_of_birth: null,
+        nationality: null, gender: null, contact_method: null, contact_id: null,
+        cert_agency: null, cert_level: null, logged_dives: null,
+      },
     })
     from.mockReturnValue({
       ...mockQueryBuilder(),
