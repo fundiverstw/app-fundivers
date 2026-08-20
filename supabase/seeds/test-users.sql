@@ -237,11 +237,8 @@ begin
            else null end,
       jsonb_build_object(
         'gear',          case when i % 3 = 0
-                              then jsonb_build_object('rent', true, 'mode', 'full',
-                                                      'size_overrides', jsonb_build_object(
-                                                        'height_cm', 155 + (i * 3) % 35,
-                                                        'weight_kg', 50 + (i * 5) % 40,
-                                                        'shoe_size', 'EU ' || (38 + (i % 8))::text))
+                              then jsonb_build_object('rent', true, 'mode', 'a-la-carte',
+                                                      'items', jsonb_build_array('BCD', 'Wetsuit', 'Fins'))
                               else jsonb_build_object('rent', false) end,
         'total',         3600 + (i * 50),
         'deposit',       1800,

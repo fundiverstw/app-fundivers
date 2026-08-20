@@ -233,7 +233,9 @@ interface BookingDetails {
     items?: string[]                // chosen gear items
     assistance_note?: string        // diver picked "ask a human"; their note
                                     //   (when set, rent is false)
-    size_overrides?: { height_cm?, weight_kg?, shoe_size? }
+                                    // no sizes here: what fits a diver lives
+                                    //   on their profile, which is what the
+                                    //   pack list and the fit lookup read
   }
   room?: { option_id?: string | null; notes?: string | null }
   add_ons?: string[]                // addons.id list

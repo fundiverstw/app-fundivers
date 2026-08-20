@@ -1070,16 +1070,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         : !showGearRentChoice
           ? { rent: false }
           : gearChoice === 'rent'
-            ? {
-                rent: true,
-                mode: 'a-la-carte',
-                items: gearItems,
-                size_overrides: {
-                  height_cm: resolvedHeight,
-                  weight_kg: resolvedWeight,
-                  shoe_size: resolvedShoe,
-                },
-              }
+            ? { rent: true, mode: 'a-la-carte', items: gearItems }
             : gearChoice === 'help'
               ? { rent: false, assistance_note: gearHelpNote.trim() || 'Diver is unsure what gear they need and asked for help.' }
               : { rent: false },

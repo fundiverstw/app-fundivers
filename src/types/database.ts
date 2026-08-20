@@ -24,11 +24,6 @@ export interface BookingDetails {
      *  prominently in the gear field on the PDF and every admin view so
      *  staff can follow up. When present, `rent` is false. */
     assistance_note?: string
-    size_overrides?: {
-      height_cm?: number | null
-      weight_kg?: number | null
-      shoe_size?: string | null
-    }
   }
   room?: {
     option_id?: string | null
