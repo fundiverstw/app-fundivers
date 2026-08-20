@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseReqDives, eligibilityError, dobError } from './registration-eligibility'
+import { parseReqDives, eligibilityError } from './registration-eligibility'
 
 describe('parseReqDives', () => {
   it('passes through a finite number', () => {
@@ -18,35 +18,31 @@ describe('parseReqDives', () => {
   })
 })
 
-const certed: EligibilityProfileT = { cert_level: 'AOW', uncertified: false, logged_dives: 30 }
-type EligibilityProfileT = { cert_level: string | null; uncertified: boolean | null; logged_dives: number | null }
+const certed: EligibilityProfileT = { uncertified: false, logged_dives: 30 }
+type EligibilityProfileT = { uncertified: boolean | null; logged_dives: number | null }
 
 describe('eligibilityError — certification declaration', () => {
-  it('blocks when neither a cert level nor the uncertified flag is set', () => {
-    const err = eligibilityError({ cert_level: '', uncertified: false, logged_dives: 0 }, null, null)
-    expect(err).toMatch(/certification level|not certified/i)
+  it('lets a diver who declared no certification at all register', () => {
+    expect(eligibilityError({ uncertified: false, logged_dives: 0 }, null, null)).toBeNull()
   })
-  it('blocks when cert_level is whitespace only', () => {
-    expect(eligibilityError({ cert_level: '   ', uncertified: false, logged_dives: 0 }, null, null)).not.toBeNull()
+  it('lets an explicitly uncertified diver register', () => {
+    expect(eligibilityError({ uncertified: true, logged_dives: 0 }, null, null)).toBeNull()
   })
-  it('allows a named cert level', () => {
-    expect(eligibilityError(certed, null, null)).toBeNull()
-  })
-  it('allows an explicit uncertified declaration', () => {
-    expect(eligibilityError({ cert_level: null, uncertified: true, logged_dives: 0 }, null, null)).toBeNull()
+  it('has nothing to say about a profile it was given none of', () => {
+    expect(eligibilityError(null, null, null)).toBeNull()
   })
 })
 
 describe('eligibilityError — event prerequisites', () => {
   it('blocks an uncertified diver from a dive that requires a prereq cert, unless acknowledged', () => {
-    const prof = { cert_level: null, uncertified: true, logged_dives: 0 }
+    const prof = { uncertified: true, logged_dives: 0 }
     const ev = { prereq_cert_id: 'cl-aow', req_dives: null }
     expect(eligibilityError(prof, ev, null)).toMatch(/prerequisite/i)
     expect(eligibilityError(prof, ev, { prereq_acked_at: '2026-07-05T00:00:00Z' })).toBeNull()
   })
 
   it('blocks when logged dives fall short of req_dives, unless acknowledged', () => {
-    const prof = { cert_level: 'OW', uncertified: false, logged_dives: 5 }
+    const prof = { uncertified: false, logged_dives: 5 }
     const ev = { prereq_cert_id: null, req_dives: 20 }
     expect(eligibilityError(prof, ev, null)).toMatch(/prerequisite/i)
     expect(eligibilityError(prof, ev, { prereq_acked_at: '2026-07-05T00:00:00Z' })).toBeNull()
@@ -57,41 +53,17 @@ describe('eligibilityError — event prerequisites', () => {
     expect(eligibilityError(certed, ev, null)).toBeNull()
   })
 
-  it('does not rank free-text cert level against the prereq (only uncertified is a definite mismatch)', () => {
-    // A named (if low) cert level is trusted — no rank comparison is attempted.
-    const prof = { cert_level: 'OW', uncertified: false, logged_dives: 30 }
+  it('only treats an explicit uncertified declaration as a definite cert mismatch', () => {
+    // A diver who named a level, or named nothing, is trusted — no rank
+    // comparison is attempted against free text, and a blank is not a claim.
     const ev = { prereq_cert_id: 'cl-aow', req_dives: null }
-    expect(eligibilityError(prof, ev, null)).toBeNull()
+    expect(eligibilityError({ uncertified: false, logged_dives: 30 }, ev, null)).toBeNull()
+    expect(eligibilityError({ uncertified: null, logged_dives: 30 }, ev, null)).toBeNull()
   })
 
   it('treats a blank ack string as unacknowledged', () => {
-    const prof = { cert_level: 'OW', uncertified: false, logged_dives: 0 }
+    const prof = { uncertified: false, logged_dives: 0 }
     const ev = { prereq_cert_id: null, req_dives: 10 }
     expect(eligibilityError(prof, ev, { prereq_acked_at: '' })).not.toBeNull()
-  })
-})
-
-describe('dobError', () => {
-  it('blocks a patch whose date_of_birth slot is empty', () => {
-    expect(dobError({ date_of_birth: null })).not.toBeNull()
-    expect(dobError({ date_of_birth: '' })).not.toBeNull()
-    expect(dobError({ date_of_birth: '   ' })).not.toBeNull()
-  })
-
-  it('allows a patch carrying a date of birth', () => {
-    expect(dobError({ date_of_birth: '1987-05-03' })).toBeNull()
-  })
-
-  it('blocks on every path — the patch is not tagged with who it is for', () => {
-    // The on-behalf-of paths send the same full patch shape as a diver's own
-    // registration, so one rule covers admin, parent, guest and self.
-    expect(dobError({ name: 'Ana', date_of_birth: null })).not.toBeNull()
-  })
-
-  it('skips a patch with no date_of_birth slot (the group fan-out sends {})', () => {
-    // Additional group divers register with an empty patch — their stored
-    // profile is left untouched, and there is no DOB field in that flow.
-    expect(dobError({})).toBeNull()
-    expect(dobError({ name: 'Ana' })).toBeNull()
   })
 })

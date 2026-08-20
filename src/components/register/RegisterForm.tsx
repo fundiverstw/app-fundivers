@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { personName } from '../../lib/names'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
@@ -19,14 +19,13 @@ import { fetchRideSeats, canRequestRide, type RideSeats } from '../../lib/event-
 import { missingWaivers, fetchEventWaiverOverrides, fetchDiverSignatures, fetchWaivers } from '../../lib/waivers'
 import { WaiverSignDialog } from '../waivers/WaiverSignDialog'
 import type { WaiverDef } from '../../config/waivers'
-import { PasswordInput } from '../PasswordInput'
 import { uploadCertCard } from '../../lib/cert-card'
 import { uploadNitroxCard } from '../../lib/nitrox-card'
 import { uploadDeepCard } from '../../lib/deep-card'
 import { isHeicFile } from '../../lib/image-compress'
 import { TurnstileWidget } from './TurnstileWidget'
 import { WhatHappensNext } from './WhatHappensNext'
-import { DateField } from '../DateField'
+import { TextField } from './TextField'
 import { ShoeSizeField } from '../ShoeSizeField'
 import {
   registrationDraftKey,
@@ -400,10 +399,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // notice instead of letting the diver fill the whole form and dead-end on a
   // "captcha token required" error at submit.
   const turnstileSiteKey = (import.meta.env.VITE_TURNSTILE_SITE_KEY ?? '') as string
-  // On-behalf-of (admin or parent): relax the diver-facing required-field
-  // gates so the caller can register a diver whose profile is still
-  // incomplete (no cert card, missing full name, no transport choice, no
-  // policy ack). The target diver can complete their profile later.
+  // On-behalf-of (admin or parent): relax the gates that remain — cert card,
+  // transport choice, policy ack — so the caller can register a diver whose
+  // profile is still incomplete. The target diver can fill in the rest later.
   //
   // We also skip card-photo uploads in this mode entirely — admins upload
   // from AdminUsersPage, parents lack the storage-RLS access to write
@@ -585,12 +583,11 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // choose to defer the photo upload (see the disclaimer on step 2).
   const [certCardAck, setCertCardAck] = useState(false)
   const hasCertCardOnFile = !!profile?.cert_card_path
-  // Certification is mandatory for a diver's own registration: they must
-  // either name a level or declare themselves uncertified. The photo is
-  // deferrable — a named level with no card on file can proceed once the
-  // diver either picks a photo or acknowledges they'll bring the physical
-  // card (or be turned away, no refund).
-  const certDeclarationBlocked = !isOnBehalfOf && !uncertified && certLevel.trim() === ''
+  // Nothing here is mandatory — a diver who names no level and ticks no box
+  // registers all the same, and the shop asks at the counter. What a *claim*
+  // costs is evidence: name a level and the photo is deferrable only by
+  // acknowledging you'll bring the physical card (or be turned away, no
+  // refund).
   const needsCertPhoto = !uncertified && certLevel.trim() !== '' && !hasCertCardOnFile && !certFile
   const certPhotoBlocked = !isOnBehalfOf && needsCertPhoto && !certCardAck
 
@@ -618,28 +615,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const askBody   = rentedSizeSources.has('wetsuit') || rentedSizeSources.has('bcd')
   const askHeight = askBody && profile?.height_cm == null
   const askWeight = askBody && profile?.weight_kg == null
-  const shoeMissing   = askShoe   && !shoeSize.trim()
-  const heightMissing = askHeight && !(Number(heightCm) > 0)
-  const weightMissing = askWeight && !(Number(weightKg) > 0)
-  // Admins/parents acting on behalf can fill sizes later — only gate the
-  // diver's own registration (matches the cert / transport gating).
-  const sizesBlocked = !isOnBehalfOf && (shoeMissing || heightMissing || weightMissing)
 
   const [emergencyName, setEmergencyName]   = useState(profile?.emergency_contact_name  ?? '')
   const [emergencyPhone, setEmergencyPhone] = useState(profile?.emergency_contact_phone ?? '')
-
-  // Gender and nationality are mandatory on a diver's own profile — block the
-  // step-2 Next until both are set. Relaxed on the on-behalf-of paths (admin /
-  // parent), same as the other diver-facing required-field gates; the target
-  // diver completes their profile later.
-  //
-  // Date of birth is the exception: it gates on every path, including
-  // on-behalf-of. It can't be filled in later from anything the shop already
-  // holds, and the gear/insurance surfaces derive age from it — a booking with
-  // a null date_of_birth shows a blank age at the dive site.
-  const dobBlocked = dob.trim() === ''
-  const profileFieldsBlocked = dobBlocked
-    || (!isOnBehalfOf && (nationality.trim() === '' || gender.trim() === ''))
 
   // Guest-mode credentials — only collected when the visitor isn't signed in.
   // At submit, we signUp with these before inserting the booking.
@@ -1485,7 +1463,6 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               label={t.register.step2.nameLabel}
               value={fullName}
               onChange={setFullName}
-              required
               hint={t.register.step2.nameHint}
             />
             <TextField
@@ -1495,14 +1472,14 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               placeholder={t.register.step2.nicknamePlaceholder}
             />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <TextField label={t.register.step2.dobRequired} type="date" value={dob} onChange={setDob} required />
-              <TextField label={t.register.nationalityRequired} value={nationality} onChange={setNationality} required />
+              <TextField label={t.register.step2.dobLabel} type="date" value={dob} onChange={setDob} />
+              <TextField label={t.register.nationalityLabel} value={nationality} onChange={setNationality} />
             </div>
             <TextField label={t.register.step2.idLabel} value={idNumber} onChange={setIdNumber} />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="block">
-                <span className="block text-xs text-brand-900 font-medium mb-1">{t.register.genderRequired}</span>
+                <span className="block text-xs text-brand-900 font-medium mb-1">{t.register.genderLabel}</span>
                 <select
                   value={gender}
                   onChange={e => setGender(e.target.value)}
@@ -1552,17 +1529,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 </label>
               )}
               {!uncertified && (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <TextField label={t.register.certAgency} placeholder={t.register.certAgencyPlaceholder} value={certAgency} onChange={setCertAgency} />
-                    <TextField label={t.register.certLevel} placeholder={t.register.certLevelPlaceholder} value={certLevel} onChange={setCertLevel} />
-                  </div>
-                  {certDeclarationBlocked && (
-                    <p className="text-xs text-red-700 font-medium">
-                      {t.register.certDeclarationError}
-                    </p>
-                  )}
-                </>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <TextField label={t.register.certAgency} placeholder={t.register.certAgencyPlaceholder} value={certAgency} onChange={setCertAgency} />
+                  <TextField label={t.register.certLevel} placeholder={t.register.certLevelPlaceholder} value={certLevel} onChange={setCertLevel} />
+                </div>
               )}
               {!uncertified && certLevel.trim() !== '' && !hasCertCardOnFile && !isOnBehalfOf && (
                 <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
@@ -1791,7 +1761,6 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                     <div className="border-t border-surface-200 pt-2 space-y-2">
                       <p className="text-xs font-semibold text-brand-900">
                         {t.register.gear.sizesTitle}
-                        <span className="text-red-600"> *</span>
                       </p>
                       {askHeight && (
                         <label className="block text-xs text-brand-950 font-medium">
@@ -2177,9 +2146,6 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             disabled={
               pastBlocked ||
               (step === 2 && (
-                (!isOnBehalfOf && fullName.trim() === '') ||
-                profileFieldsBlocked ||
-                certDeclarationBlocked ||
                 certPhotoBlocked ||
                 prereqBlocked ||
                 (!isOnBehalfOf && nitroxBlocked) ||
@@ -2187,15 +2153,14 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 (isGuest && (guestEmail.trim() === '' || guestPassword.length < 8 || !guestAgreedTerms || !turnstileToken))
               )) ||
               (step === 3 && !isOnBehalfOf && needsTransport === null) ||
-              (step === 3 && !isOnBehalfOf && showGearRentChoice && gearChoice === null) ||
-              (step === 3 && sizesBlocked)
+              (step === 3 && !isOnBehalfOf && showGearRentChoice && gearChoice === null)
             }
             className="bg-brand-900 hover:bg-brand-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
           >
             {t.register.next}
           </button>
         ) : (
-          <button onClick={submit} disabled={saving || pastBlocked || sizesBlocked || (!isOnBehalfOf && !!cancelPolicy && !policyAcked)}
+          <button onClick={submit} disabled={saving || pastBlocked || (!isOnBehalfOf && !!cancelPolicy && !policyAcked)}
             className="bg-brand-900 hover:bg-brand-950 disabled:opacity-60 disabled:cursor-wait text-white text-sm font-semibold py-2 px-4 rounded-lg inline-flex items-center gap-2">
             {saving && (
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" />
@@ -2275,52 +2240,3 @@ function PaymentInstructionLine({ line }: { line: string }) {
 // rather than by wrapping: a date field renders a second, transparent native
 // input for the OS picker, and a wrapping label would claim that one too —
 // ambiguous for screen readers and for tests querying by label.
-function TextField({
-  label, value, onChange, type = 'text', required, placeholder, min, hint,
-}: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  type?: 'text' | 'email' | 'tel' | 'number' | 'date' | 'password'
-  required?: boolean
-  placeholder?: string
-  min?: number
-  hint?: string
-}) {
-  const id = useId()
-  return (
-    <div className="block">
-      <label htmlFor={id} className="block text-xs text-brand-900 font-medium mb-1">{label}</label>
-      {type === 'date' ? (
-        <DateField
-          id={id}
-          value={value}
-          onChange={onChange}
-          required={required}
-          className="w-full bg-white border border-surface-300 rounded-lg px-2 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
-        />
-      ) : type === 'password' ? (
-        <PasswordInput
-          id={id}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          required={required}
-          placeholder={placeholder}
-          className="w-full bg-white border border-surface-300 rounded-lg px-2 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
-        />
-      ) : (
-        <input
-          id={id}
-          type={type}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          required={required}
-          placeholder={placeholder}
-          min={min}
-          className="w-full bg-white border border-surface-300 rounded-lg px-2 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
-        />
-      )}
-      {hint && <span className="block text-xs text-brand-900/70 mt-1">{hint}</span>}
-    </div>
-  )
-}

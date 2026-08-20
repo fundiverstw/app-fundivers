@@ -95,12 +95,37 @@ so clicking any of them opens the same booking target.
 ## Register flow
 
 Clicking an event in the calendar opens `RegisterForm`
-(`src/components/register/RegisterForm.tsx`) — a three-step modal:
+(`src/components/register/RegisterForm.tsx`) — a four-step modal:
 
 1. **Event info** — confirm title, dates, base price. Disabled if the
    event is `fully_booked`.
-2. **Extras** — gear, room, add-ons, transport, nitrox course.
-3. **Payment** — payment method + notes, final price summary.
+2. **About you** — name, date of birth, nationality, gender, contact,
+   certification. Every one of them optional (see below).
+3. **Extras** — gear, room, add-ons, transport, nitrox course.
+4. **Payment** — payment method + notes, final price summary.
+
+### What the form insists on
+
+Not personal details. Name, date of birth, nationality, gender, contact
+handle, certification and gear sizes are all asked for and none of them
+block the booking — the shop chases what it still needs later, and
+`src/lib/profile-completeness.ts` says what that is. Four things do gate:
+
+- **An account.** A guest supplies an email, a password (8+) and the
+  terms checkbox, and solves the Turnstile captcha.
+- **Evidence for a claim.** Naming a cert level, or ticking nitrox /
+  deep, demands the card photo — or, for the main cert, the "I'll bring
+  the physical card" acknowledgment. Claiming nothing demands nothing.
+- **The booking's own decisions.** Whether a ride is needed, and whether
+  gear is rented — the shop can't reserve a seat or pack a set on a
+  blank.
+- **Acknowledgments.** Event prerequisites the diver doesn't meet, and
+  the cancellation policy.
+
+`supabase/functions/_shared/registration-eligibility.ts` is the
+server-side mirror, so a crafted request is held to the same short list.
+The on-behalf-of paths (admin, parent) relax the first three further
+still.
 
 ### Price composition
 

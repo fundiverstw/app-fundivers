@@ -548,7 +548,7 @@ describe('RegisterForm', () => {
     expect(details.charges.reduce((s, c) => s + c.amount, 0)).toBe(details.total)
   })
 
-  it('requires a shoe size to rent fins and saves it to the profile', async () => {
+  it('asks for a shoe size to rent fins and saves it to the profile, without demanding it', async () => {
     setupFrom()
     const user = userEvent.setup()
     // Owns everything except fins, and has no shoe size on file.
@@ -563,12 +563,12 @@ describe('RegisterForm', () => {
     await user.click(screen.getByLabelText(/i need to rent/i))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
 
-    // Fins is the only un-owned item, so it's pre-checked → shoe size required.
+    // Fins is the only un-owned item, so it's pre-checked → the size is asked
+    // for. A blank one would book anyway; this diver fills it in.
     expect(await screen.findByText(/we need your sizes/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /next/i })).toBeEnabled()
 
     await user.selectOptions(screen.getByLabelText('Shoe size value'), '40')
-    expect(screen.getByRole('button', { name: /next/i })).toBeEnabled()
 
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
@@ -577,7 +577,7 @@ describe('RegisterForm', () => {
     expect(body.body.profile_patch.shoe_size).toBe('EU 40 M')
   })
 
-  it('requires height and weight to rent a wetsuit', async () => {
+  it('asks for height and weight to rent a wetsuit, but books without them', async () => {
     setupFrom()
     const user = userEvent.setup()
     // Owns everything except the wetsuit, and has no height/weight on file.
@@ -594,10 +594,10 @@ describe('RegisterForm', () => {
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
 
     expect(await screen.findByText(/we need your sizes/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+    // Both blank, and the booking still moves.
+    expect(screen.getByRole('button', { name: /next/i })).toBeEnabled()
 
     await user.type(screen.getByLabelText(/height \(cm\)/i), '175')
-    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled() // weight still missing
     await user.type(screen.getByLabelText(/weight \(kg\)/i), '70')
     expect(screen.getByRole('button', { name: /next/i })).toBeEnabled()
   })
@@ -766,7 +766,6 @@ describe('RegisterForm', () => {
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
 
     expect(await screen.findByText(/we need your sizes/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
   })
 
   it('leaves boots unticked for a diver who owns rubber ones, who can still add felt', async () => {
@@ -899,20 +898,65 @@ describe('RegisterForm', () => {
     expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
   })
 
-  it('step 2 Next is gated on full-name being set (enforces the one required field)', async () => {
+  it('step 2 lets a wholly blank profile through — nothing personal is required', async () => {
     setupFrom()
     const user = userEvent.setup()
-    const blankProfile: Profile = { ...sampleProfile, name: null }
+    const blankProfile: Profile = {
+      ...sampleProfile,
+      name: null, date_of_birth: null, nationality: null, gender: null,
+      cert_level: null, cert_agency: null, cert_card_path: null, uncertified: false,
+    }
     render(
       <RegisterForm event={sampleEvent} profile={blankProfile} userId="u1"
         onClose={() => {}} onBooked={() => {}} />
     )
-    // Step 1 → 2: no name pre-filled, Next should be disabled
     await user.click(screen.getByRole('button', { name: /next/i }))
-    const next = screen.getByRole('button', { name: /next/i })
-    expect(next).toBeDisabled()
-    await user.type(screen.getByLabelText(/^legal name \*/i), 'Grace Hopper')
+    expect(screen.getByLabelText(/^legal name/i)).toHaveValue('')
+    expect(screen.getByLabelText(/date of birth/i)).toHaveValue('')
     expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
+  })
+
+  it('books an event end to end on a wholly blank profile', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    const blankProfile: Profile = {
+      ...sampleProfile,
+      name: null, date_of_birth: null, nationality: null, gender: null,
+      cert_level: null, cert_agency: null, cert_card_path: null, uncertified: false,
+      shoe_size: null, height_cm: null, weight_kg: null,
+    }
+    render(
+      <RegisterForm event={sampleEvent} profile={blankProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))  // 1 → 2
+    await user.click(screen.getByRole('button', { name: /next/i }))  // 2 → 3
+    // Transport and gear are decisions about this booking, not facts about the
+    // diver — they are still asked, and still the only thing step 3 wants.
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i need to rent/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))  // 3 → 4
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+    const { body } = invoke.mock.calls[0][1] as { body: { profile_patch: Record<string, unknown> } }
+    expect(body.profile_patch).toMatchObject({
+      name: null, date_of_birth: null, nationality: null, gender: null,
+      cert_level: null, shoe_size: null,
+    })
+  })
+
+  it('drops the required marker from every step-2 label', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    for (const label of [/^legal name/i, /date of birth/i, /nationality/i, /^gender/i]) {
+      expect(screen.getByLabelText(label).labels![0].textContent).not.toContain('*')
+    }
   })
 
   it('step 2 defers the cert photo behind the bring-your-card disclaimer', async () => {
@@ -933,7 +977,7 @@ describe('RegisterForm', () => {
     expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
   })
 
-  it('step 2 requires either a cert level or the uncertified declaration', async () => {
+  it('step 2 takes no answer to the certification question at all', async () => {
     setupFrom()
     const user = userEvent.setup()
     const blankCert: Profile = { ...sampleProfile, cert_level: null, cert_card_path: null }
@@ -942,11 +986,12 @@ describe('RegisterForm', () => {
         onClose={() => {}} onBooked={() => {}} />
     )
     await user.click(screen.getByRole('button', { name: /next/i }))
-    // No cert level and not uncertified → blocked with a prompt.
-    expect(screen.getByText(/enter your certification level, or tick/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+    // Neither a level nor the uncertified box, and no card demanded — a blank
+    // is not a claim, so there is nothing to prove.
+    expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
+    expect(screen.queryByText(/add proof of your certification/i)).not.toBeInTheDocument()
 
-    // Declaring "not certified yet" releases the gate and hides the cert inputs.
+    // Declaring "not certified yet" still hides the cert inputs.
     await user.click(screen.getByLabelText(/not certified yet/i))
     expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
     expect(screen.queryByLabelText(/cert level/i)).not.toBeInTheDocument()
@@ -1070,10 +1115,10 @@ describe('RegisterForm', () => {
     await user.type(screen.getByLabelText(/password/i, { selector: 'input' }), 'abcdefgh')
     await user.click(screen.getByLabelText(/I agree to the/i))
     await user.click(screen.getByRole('button', { name: /solve captcha/i }))
-    await user.type(screen.getByLabelText(/^legal name \*/i), 'Grace Hopper')
-    await user.type(screen.getByLabelText(/nationality \*/i), 'American')
-    await user.type(screen.getByLabelText(/date of birth \*/i), '19061209')
-    await user.selectOptions(screen.getByLabelText(/gender \*/i), 'female')
+    await user.type(screen.getByLabelText(/^legal name/i), 'Grace Hopper')
+    await user.type(screen.getByLabelText(/nationality/i), 'American')
+    await user.type(screen.getByLabelText(/date of birth/i), '19061209')
+    await user.selectOptions(screen.getByLabelText(/^gender/i), 'female')
     await user.click(screen.getByLabelText(/not certified yet/i))
     // Step 2 → 3 → 4 → confirm
     await user.click(screen.getByRole('button', { name: /next/i }))
@@ -1124,10 +1169,10 @@ describe('RegisterForm', () => {
     await user.type(screen.getByLabelText(/password/i, { selector: 'input' }), 'abcdefgh')
     await user.click(screen.getByLabelText(/I agree to the/i))
     await user.click(screen.getByRole('button', { name: /solve captcha/i }))
-    await user.type(screen.getByLabelText(/^legal name \*/i), 'Grace Hopper')
-    await user.type(screen.getByLabelText(/nationality \*/i), 'American')
-    await user.type(screen.getByLabelText(/date of birth \*/i), '19061209')
-    await user.selectOptions(screen.getByLabelText(/gender \*/i), 'female')
+    await user.type(screen.getByLabelText(/^legal name/i), 'Grace Hopper')
+    await user.type(screen.getByLabelText(/nationality/i), 'American')
+    await user.type(screen.getByLabelText(/date of birth/i), '19061209')
+    await user.selectOptions(screen.getByLabelText(/^gender/i), 'female')
     await user.click(screen.getByLabelText(/not certified yet/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
@@ -1187,7 +1232,7 @@ describe('RegisterForm', () => {
     await user.type(screen.getByLabelText(/email \*/i), 'new@diver.test')
     await user.type(screen.getByLabelText(/password/i, { selector: 'input' }), 'abcdefgh')
     await user.click(screen.getByLabelText(/I agree to the/i))
-    await user.type(screen.getByLabelText(/^legal name \*/i), 'Grace Hopper')
+    await user.type(screen.getByLabelText(/^legal name/i), 'Grace Hopper')
 
     // No captcha widget renders — the notice replaces it and there is no
     // token, so the only way forward is blocked.
@@ -1532,11 +1577,9 @@ describe('RegisterForm', () => {
     expect(onBooked).toHaveBeenCalledWith({ id: 'b-new', status: 'pending' })
   })
 
-  it('blocks step 2 until a date of birth is entered — on-behalf-of included', async () => {
+  it('moves past step 2 with no date of birth — the last field that gated every path', async () => {
     setupFrom()
     const user = userEvent.setup()
-    // DOB is the one profile field the on-behalf paths do NOT relax: it can't
-    // be recovered later and the gear/insurance surfaces derive age from it.
     const noDob: Profile = { ...sampleProfile, date_of_birth: null }
     render(
       <MemoryRouter>
@@ -1551,31 +1594,11 @@ describe('RegisterForm', () => {
     )
 
     await user.click(screen.getByRole('button', { name: /next/i }))
-    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
-
-    await user.type(screen.getByLabelText(/date of birth \*/i), '19870503')
     expect(screen.getByRole('button', { name: /next/i })).toBeEnabled()
-  })
 
-  it('blocks step 2 on a partial date of birth, which emits no value upstream', async () => {
-    setupFrom()
-    const user = userEvent.setup()
-    const noDob: Profile = { ...sampleProfile, date_of_birth: null }
-    render(
-      <MemoryRouter>
-        <RegisterFormBody
-          event={sampleEvent}
-          profile={noDob}
-          userId="diver-99"
-          actingOnBehalfOf="diver-99"
-          onSubmitSuccess={() => {}}
-        />
-      </MemoryRouter>
-    )
-
-    await user.click(screen.getByRole('button', { name: /next/i }))
-    await user.type(screen.getByLabelText(/date of birth \*/i), '1987')
-    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+    // A half-typed date emits nothing upstream, and that is no longer a block.
+    await user.type(screen.getByLabelText(/date of birth/i), '1987')
+    expect(screen.getByRole('button', { name: /next/i })).toBeEnabled()
   })
 
   it('sends the entered date of birth in the on-behalf-of profile patch', async () => {
@@ -1595,7 +1618,7 @@ describe('RegisterForm', () => {
     )
 
     await user.click(screen.getByRole('button', { name: /next/i }))
-    await user.type(screen.getByLabelText(/date of birth \*/i), '19870503')
+    await user.type(screen.getByLabelText(/date of birth/i), '19870503')
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
     await user.click(screen.getByLabelText(/i have all the required gear/i))
@@ -1637,7 +1660,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     // Full name left blank, cert_level pre-filled from profile with no
     // card on file — Next should still be enabled.
-    expect((screen.getByLabelText(/^legal name \*/i) as HTMLInputElement).value).toBe('')
+    expect((screen.getByLabelText(/^legal name/i) as HTMLInputElement).value).toBe('')
     expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
     await user.click(screen.getByRole('button', { name: /next/i }))
     // Step 3 — don't touch transport; Next should still be enabled.

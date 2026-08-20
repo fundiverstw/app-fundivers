@@ -51,6 +51,7 @@ interface MockOpts {
   groupKin?:       Array<{ id: string }>
   deleteUserError?: string
   // Eligibility-gate inputs (effective profile + event prereqs).
+  profileName?: string | null
   profileCertLevel?: string | null
   profileUncertified?: boolean
   profileLoggedDives?: number
@@ -84,7 +85,7 @@ function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites }
           return {
             role: opts.callerRole ?? 'diver',
             parent_account: opts.targetParentAccount ?? null,
-            name: 'Test',
+            name: opts.profileName === undefined ? 'Test' : opts.profileName,
             cert_level: opts.profileCertLevel === undefined ? 'AOW' : opts.profileCertLevel,
             uncertified: opts.profileUncertified ?? false,
             logged_dives: opts.profileLoggedDives ?? 25,
@@ -368,13 +369,21 @@ describe('handleRegistration — guest path security (audit C2)', () => {
 describe('handleRegistration — eligibility gate', () => {
   const authedSelf = { Authorization: 'Bearer self-jwt' }
 
-  it('blocks a self registration with neither a cert level nor the uncertified flag (422)', async () => {
+  it('registers a diver who declared no certification at all', async () => {
     const { deps, captured } = makeDeps({ profileCertLevel: null, profileUncertified: false })
     const res = await handleRegistration(postJson({ ...goodBody }, authedSelf), deps)
-    expect(res.status).toBe(422)
-    expect((await res.json()).error).toMatch(/certification level|not certified/i)
-    // Gate runs before the booking insert.
-    expect(captured.bookingInsert).toHaveLength(0)
+    expect(res.status).toBe(200)
+    expect(captured.bookingInsert).toHaveLength(1)
+  })
+
+  it('registers a diver whose profile patch carries no date of birth', async () => {
+    const { deps, captured } = makeDeps({ profileCertLevel: null, profileUncertified: false })
+    const res = await handleRegistration(
+      postJson({ ...goodBody, profile_patch: { name: 'Ana', date_of_birth: '' } }, authedSelf),
+      deps,
+    )
+    expect(res.status).toBe(200)
+    expect(captured.bookingInsert).toHaveLength(1)
   })
 
   it('allows a self registration once the diver is marked uncertified', async () => {
@@ -642,6 +651,21 @@ describe('handleRegistration — email behaviour', () => {
     }), deps)
     expect(captured.sendMailCalls).toHaveLength(1)
     expect(captured.sendMailCalls[0].to).toBe('fundiverstw@gmail.com')
+  })
+
+  it('names the diver by email when they registered without giving a name', async () => {
+    const { deps, captured } = makeDeps({ profileName: '' })
+    await handleRegistration(postJson({
+      ...goodBody,
+      email:    'nameless@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'tk',
+    }), deps)
+    expect(captured.sendMailCalls.length).toBeGreaterThan(0)
+    for (const msg of captured.sendMailCalls) {
+      expect(msg.subject).toContain('nameless@example.com')
+      expect(msg.subject).not.toMatch(/--$/)
+    }
   })
 
   it('waitlisted booking sends text-only email (no PDF attachment)', async () => {

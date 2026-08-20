@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { personName } from '../../lib/names'
 import { RENTAL_GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_RENTAL_GEAR_ALTERNATIVES, HAS_OWNED_ONLY_GEAR, isGearIncludedCourse, defaultRentalItems, toggleGearSelection } from '../../lib/gear'
 import { usesCourseDays, allowsTransport } from '../../lib/event-kinds'
@@ -12,7 +12,7 @@ import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/p
 import { fetchRideSeats, canRequestRide, type RideSeats } from '../../lib/event-vehicles'
 import { missingWaivers, fetchEventWaiverOverrides, fetchDiverSignatures, fetchWaivers, type WaiverEventRef } from '../../lib/waivers'
 import { WaiverSignDialog } from '../waivers/WaiverSignDialog'
-import { DateField } from '../DateField'
+import { TextField } from './TextField'
 import type { WaiverDef } from '../../config/waivers'
 import type { AppEvent, Booking, BookingDetails, Database, Profile } from '../../types/database'
 
@@ -246,15 +246,13 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   const hasBlockedPast = !viewerPrivileged && pastInCart.length > 0
 
   // Step gates — same spirit as solo flow, only the multi-applicable ones.
-  // Date of birth, gender and nationality are mandatory on the diver's
-  // profile, same as the solo flow. DOB reaches the server gate in
-  // create-registration, which rejects a patch whose date_of_birth slot is
-  // blank — so leaving it out here would fail the whole cart at submit.
-  // Certification is mandatory: name a level or declare uncertified. (Card
-  // photos aren't collected in the cart flow — the diver uploads from /profile
-  // or brings the physical card; the solo flow carries the photo disclaimer.)
-  const certDeclarationBlocked = !uncertified && certLevel.trim() === ''
-  const step2Blocked = fullName.trim() === '' || dob.trim() === '' || nationality.trim() === '' || gender.trim() === '' || certDeclarationBlocked || hasBlockedPast
+  // No personal detail is one of them: name, date of birth, nationality,
+  // gender and certification are all optional here and on the server, and the
+  // cart moves on whatever the diver chose to type. Only a past event in the
+  // cart still stops step 2. (Card photos aren't collected in the cart flow —
+  // the diver uploads from /profile or brings the physical card; the solo flow
+  // carries the photo disclaimer.)
+  const step2Blocked = hasBlockedPast
   const step3Blocked = cart.some(ev => choicesById[ev.id]?.needsTransport === null)
   const submitBlocked = cart.length === 0 || hasBlockedPast
 
@@ -513,13 +511,13 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
               <TextField
                 label={t.register.multi.fullNameLabel}
                 hint={t.register.multi.fullNameHint}
-                value={fullName} onChange={setFullName} required
+                value={fullName} onChange={setFullName}
               />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <TextField label={t.register.step2.dobRequired} type="date" value={dob} onChange={setDob} required />
-                <TextField label={t.register.nationalityRequired} value={nationality} onChange={setNationality} required />
+                <TextField label={t.register.step2.dobLabel} type="date" value={dob} onChange={setDob} />
+                <TextField label={t.register.nationalityLabel} value={nationality} onChange={setNationality} />
                 <label className="block">
-                  <span className="block text-xs text-brand-900 font-medium mb-1">{t.register.genderRequired}</span>
+                  <span className="block text-xs text-brand-900 font-medium mb-1">{t.register.genderLabel}</span>
                   <select
                     value={gender}
                     onChange={e => setGender(e.target.value)}
@@ -566,17 +564,10 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                 {t.register.notCertified}
               </label>
               {!uncertified && (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <TextField label={t.register.certAgency} placeholder={t.register.certAgencyPlaceholder} value={certAgency} onChange={setCertAgency} />
-                    <TextField label={t.register.certLevel} placeholder={t.register.certLevelPlaceholder} value={certLevel} onChange={setCertLevel} />
-                  </div>
-                  {certDeclarationBlocked && (
-                    <p className="text-xs text-red-300 font-medium">
-                      {t.register.certDeclarationError}
-                    </p>
-                  )}
-                </>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <TextField label={t.register.certAgency} placeholder={t.register.certAgencyPlaceholder} value={certAgency} onChange={setCertAgency} />
+                  <TextField label={t.register.certLevel} placeholder={t.register.certLevelPlaceholder} value={certLevel} onChange={setCertLevel} />
+                </div>
               )}
               <div className="grid grid-cols-2 gap-3">
                 <label className="flex items-center gap-2 text-sm text-brand-950 font-medium">
@@ -923,47 +914,3 @@ function Row({ label, value, currency }: { label: string; value: number; currenc
   )
 }
 
-function TextField({
-  label, value, onChange, type = 'text', required, placeholder, hint,
-}: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  type?: 'text' | 'email' | 'tel' | 'date' | 'password' | 'number'
-  required?: boolean
-  placeholder?: string
-  /** Rendered under the input, for a field whose label can't carry the whole
-   *  requirement on its own (which name to give, which format). */
-  hint?: string
-}) {
-  // Associates by id rather than by wrapping: a date field renders a second,
-  // transparent native input for the OS picker, and a wrapping label would
-  // claim that one too — ambiguous for screen readers and for tests querying
-  // by label.
-  const id = useId()
-  return (
-    <div className="block">
-      <label htmlFor={id} className="block text-xs text-brand-900 font-medium mb-1">{label}</label>
-      {type === 'date' ? (
-        <DateField
-          id={id}
-          value={value}
-          onChange={onChange}
-          required={required}
-          className="w-full bg-white border border-surface-300 rounded-lg px-2 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
-        />
-      ) : (
-        <input
-          id={id}
-          type={type}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          required={required}
-          placeholder={placeholder}
-          className="w-full bg-white border border-surface-300 rounded-lg px-2 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900"
-        />
-      )}
-      {hint && <span className="block text-xs text-brand-900/70 mt-1">{hint}</span>}
-    </div>
-  )
-}

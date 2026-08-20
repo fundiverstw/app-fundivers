@@ -16,7 +16,7 @@
 
 import { Buffer } from "node:buffer"
 import { sanitizeProfilePatch } from "../_shared/profile-patch.ts"
-import { dobError, eligibilityError } from "../_shared/registration-eligibility.ts"
+import { eligibilityError } from "../_shared/registration-eligibility.ts"
 import { usesDateEnvelope, usesCourseDays, type EventKind } from "../../../src/lib/event-kinds.ts"
 import { computeBookingMoney } from "../_shared/booking-charges.ts"
 import { corsHeaders, safeError } from "../_shared/responses.ts"
@@ -356,7 +356,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
   async function checkEligibility(uid: string): Promise<string | null> {
     const { data: prof } = await admin
       .from("profiles")
-      .select("cert_level, uncertified, logged_dives")
+      .select("uncertified, logged_dives")
       .eq("id", uid)
       .single()
     const { data: ev } = await admin
@@ -365,7 +365,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
       .eq("id", body.event_id)
       .maybeSingle()
     return eligibilityError(
-      prof as { cert_level: string | null; uncertified: boolean | null; logged_dives: number | null } | null,
+      prof as { uncertified: boolean | null; logged_dives: number | null } | null,
       ev as { prereq_cert_id: string | null; req_dives: number | string | null } | null,
       body.details as Record<string, unknown> | undefined,
     )
@@ -374,10 +374,6 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
   // 1. Profile update — column allowlist (security audit C2).
   const safePatch = sanitizeProfilePatch(body.profile_patch)
   if (createdGuest) safePatch.status = "pending"
-  // Date of birth gates every path, on-behalf-of included — checked before the
-  // update so a rejected registration doesn't blank a stored DOB on its way out.
-  const dobGate = dobError(safePatch)
-  if (dobGate) return rollback(dobGate, 422)
   const { error: profErr } = await admin
     .from("profiles")
     .update(safePatch)
@@ -670,14 +666,18 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
   //    skips for grouped bookings (a single group summary is sent instead).
   if (deps.transporter && !body.suppress_email) {
     try {
+      // A diver may register without ever typing a name. The email address is
+      // the one identifier every registration has, so it stands in — an empty
+      // subject line names nobody, and the shop has to know who booked.
+      const displayName = payload.name.trim() || registrantEmail
       const subjectName = payload.nickname
-        ? `${payload.name} (${payload.nickname})`
-        : payload.name
+        ? `${displayName} (${payload.nickname})`
+        : displayName
       const fromHeader = { name: deps.env.mailFromName, address: deps.env.mailFromAddress }
       if (isWaitlisted) {
         const subject = `waitlist--${payload.eventTitle}--${subjectName}`
         const companyText =
-          `${payload.name} has been added to the waitlist for ${payload.eventTitle}.`
+          `${displayName} has been added to the waitlist for ${payload.eventTitle}.`
         const diverText =
           `Thanks for signing up — ${payload.eventTitle} is currently full, so we've added you to the waitlist. ` +
           `If a spot opens up, you'll receive a notification with 24 hours to claim it. No payment is needed unless and until that happens.\n\n` +

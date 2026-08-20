@@ -3,6 +3,11 @@
 // Deno imports) lets create-registration enforce it before inserting a booking
 // AND lets the vitest unit suite pin the exact rules. A crafted request that
 // skips the form can't get past these.
+//
+// Personal details are not among them. Registering asks for an email and a
+// password; name, date of birth, nationality, gender and certification are all
+// optional, so nothing here rejects a booking for a blank field. What survives
+// is the acknowledgment of a prerequisite the diver does not meet.
 
 import { t } from "./i18n.ts"
 
@@ -19,26 +24,7 @@ export function parseReqDives(v: unknown): number | null {
   return null
 }
 
-/**
- * Mirrors the RegisterForm step-2 date-of-birth gate, which applies on every
- * path (self, guest, and on-behalf-of) — unlike the nationality/gender gates,
- * which the on-behalf paths relax.
- *
- * Keyed on the patch rather than the stored profile: a patch carrying a
- * date_of_birth slot means the form collected profile fields for this person,
- * so the slot must be filled. The additional-diver fan-out in RegisterForm
- * sends an empty patch (the group members' profiles stay untouched) and is
- * deliberately not gated here — there's no field in that flow to fix it in.
- */
-export function dobError(patch: Record<string, unknown>): string | null {
-  if (!("date_of_birth" in patch)) return null
-  const dob = patch.date_of_birth
-  if (typeof dob === "string" && dob.trim() !== "") return null
-  return t.emails.errors.dobRequired
-}
-
 export interface EligibilityProfile {
-  cert_level: string | null
   uncertified: boolean | null
   logged_dives: number | null
 }
@@ -52,26 +38,22 @@ export interface EligibilityEvent {
  * Returns a user-facing error string when the registration must be blocked, or
  * null when it may proceed.
  *
- * Rules:
- *  1. The diver must have declared a certification — either a non-empty
- *     cert_level or the uncertified flag. (Blank both = blocked.)
- *  2. Event prerequisites the diver doesn't meet on their self-reported
- *     profile must be acknowledged (details.prereq_acked_at) to proceed:
- *       - a prereq cert is required but the diver declared uncertified, or
- *       - the event needs more logged dives than the diver reports.
- *     Free-text cert level is NOT rank-compared (no reliable mapping); only
- *     the unambiguous uncertified-vs-prereq case is treated as a mismatch.
+ * The only rule left is the acknowledgment: event prerequisites the diver
+ * doesn't meet on their self-reported profile must be acknowledged
+ * (details.prereq_acked_at) to proceed —
+ *   - a prereq cert is required but the diver declared uncertified, or
+ *   - the event needs more logged dives than the diver reports.
+ * Free-text cert level is NOT rank-compared (no reliable mapping); only the
+ * unambiguous uncertified-vs-prereq case is treated as a mismatch. A diver who
+ * declared nothing at all is not a mismatch either — registering costs an email
+ * and a password, and the shop settles certification at the counter.
  */
 export function eligibilityError(
   profile: EligibilityProfile | null,
   event: EligibilityEvent | null,
   details: Record<string, unknown> | null | undefined,
 ): string | null {
-  const certLevel = (profile?.cert_level ?? "").trim()
   const uncertified = profile?.uncertified === true
-  if (!certLevel && !uncertified) {
-    return t.emails.errors.addCertLevel
-  }
 
   if (event) {
     const loggedDives = typeof profile?.logged_dives === "number" ? profile.logged_dives : 0

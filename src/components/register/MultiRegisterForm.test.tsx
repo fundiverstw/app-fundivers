@@ -106,51 +106,62 @@ describe('MultiRegisterForm parent diver picker', () => {
     await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
     await userEvent.setup().click(screen.getByRole('button', { name: /next/i }))  // 1→2
 
-    expect(screen.getByLabelText(/^legal name \*/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^legal name/i)).toBeInTheDocument()
     expect(screen.getByText(/exactly as it appears on your passport/i)).toBeInTheDocument()
   })
 
-  it('blocks step 2 until the diver names a cert level or declares uncertified', async () => {
+  it('carries an empty step 2 through — no personal detail is required', async () => {
     setupFrom([])
-    const blankCert: Profile = { ...parentProfile, cert_level: null, cert_agency: null }
+    const blank: Profile = {
+      ...parentProfile,
+      name: null, date_of_birth: null, nationality: null, gender: null,
+      cert_level: null, cert_agency: null, uncertified: false,
+    }
     const user = userEvent.setup()
     render(
       <MultiRegisterForm
         events={[sampleEvent('e1', 'Kenting')]}
-        profile={blankCert} userId="p1"
+        profile={blank} userId="p1"
         onClose={() => {}} onAllBooked={() => {}}
       />
     )
     await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
     await user.click(screen.getByRole('button', { name: /next/i }))  // 1→2
-    expect(screen.getByText(/enter your certification level, or tick/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
 
-    await user.click(screen.getByLabelText(/not certified yet/i))
+    expect(screen.getByLabelText(/^legal name/i)).toHaveValue('')
     expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
+    // The cert question can be left unanswered entirely — no scolding.
+    expect(screen.queryByText(/certification level/i)).not.toBeInTheDocument()
   })
 
-  it('blocks step 2 until a complete date of birth is entered', async () => {
+  it('books an entirely blank profile, sending the blanks as nulls', async () => {
     setupFrom([])
-    const noDob: Profile = { ...parentProfile, date_of_birth: null }
+    const blank: Profile = {
+      ...parentProfile,
+      name: null, date_of_birth: null, nationality: null, gender: null,
+      cert_level: null, cert_agency: null, uncertified: false,
+    }
     const user = userEvent.setup()
     render(
       <MultiRegisterForm
         events={[sampleEvent('e1', 'Kenting')]}
-        profile={noDob} userId="p1"
+        profile={blank} userId="p1"
         onClose={() => {}} onAllBooked={() => {}}
       />
     )
     await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
     await user.click(screen.getByRole('button', { name: /next/i }))  // 1→2
-    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: /next/i }))  // 2→3
+    await user.click(screen.getByLabelText(/No, I'll get there myself/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))  // 3→4
+    await user.click(screen.getByRole('button', { name: /confirm/i }))
 
-    // A partial entry emits nothing upstream, so the gate stays shut.
-    await user.type(screen.getByLabelText(/date of birth \*/i), '1987')
-    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
-
-    await user.type(screen.getByLabelText(/date of birth \*/i), '0503')
-    expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
+    await waitFor(() => expect(invoke).toHaveBeenCalled())
+    const body = invoke.mock.calls[0][1].body as Record<string, unknown>
+    const patch = body.profile_patch as Record<string, unknown>
+    expect(patch.date_of_birth).toBeNull()
+    expect(patch.nationality).toBeNull()
+    expect(patch.gender).toBeNull()
   })
 
   it('types the date of birth into a typeable field, not a raw native date input', async () => {
@@ -168,7 +179,7 @@ describe('MultiRegisterForm parent diver picker', () => {
     await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
-    const dobInput = screen.getByLabelText(/date of birth \*/i)
+    const dobInput = screen.getByLabelText(/date of birth/i)
     expect(dobInput).toHaveAttribute('type', 'text')
     expect(dobInput).toHaveAttribute('placeholder', 'YYYY-MM-DD')
   })
