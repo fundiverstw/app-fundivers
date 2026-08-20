@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { NotificationsPage } from './NotificationsPage'
 import { mockQueryBuilder } from '../../tests/test-utils'
+import { t } from '../i18n'
 
 const { from } = vi.hoisted(() => ({ from: vi.fn() }))
 vi.mock('../lib/supabase', () => ({
@@ -47,6 +48,40 @@ describe('NotificationsPage', () => {
     expect(screen.getByText('Welcome')).toBeInTheDocument()
     // Mark-all-read button surfaces only when at least one row is unread.
     expect(screen.getByRole('button', { name: /mark all read/i })).toBeInTheDocument()
+  })
+
+  it('makes a link pasted into the body tappable', async () => {
+    // The shop drops a Drive folder into the after-the-trip message; every
+    // diver on the event has to be able to open it from the inbox.
+    const folder = 'https://drive.google.com/drive/folders/1AbCdEf'
+    setup([{ ...sample[0], body: `Photos from Saturday: ${folder}` }])
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(await screen.findByText('Trip in 3 days'))
+
+    const link = screen.getByRole('link', { name: folder })
+    expect(link).toHaveAttribute('href', folder)
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+
+  it('offers an attached off-site link as its own button', async () => {
+    setup([{ ...sample[0], url: 'https://drive.google.com/drive/folders/1AbCdEf' }])
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(await screen.findByText('Trip in 3 days'))
+
+    expect(screen.getByRole('link', { name: t.notifications.openLink }))
+      .toHaveAttribute('href', 'https://drive.google.com/drive/folders/1AbCdEf')
+  })
+
+  it('does not offer a button for an in-app path — the row already goes there', async () => {
+    setup([{ ...sample[0], url: '/payments' }])
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(await screen.findByText('Trip in 3 days'))
+
+    expect(screen.queryByRole('link', { name: t.notifications.openLink })).not.toBeInTheDocument()
   })
 
   it('tapping an unread row expands it (showing the body) and marks it read', async () => {

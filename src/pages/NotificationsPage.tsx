@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchNotifications, markRead, markAllRead } from '../lib/notifications'
+import { Linkified } from '../components/Linkified'
 import type { Notification } from '../types/database'
 import { ON_DEEP_MUTED } from '../styles/tokens'
 import { t } from '../i18n'
@@ -96,10 +97,23 @@ export function NotificationsPage() {
                 </button>
 
                 {expanded && (
-                  <div className="border-t border-surface-200/60 bg-surface-50 px-3 pb-3 pt-2">
+                  <div className="border-t border-surface-200/60 bg-surface-50 px-3 pb-3 pt-2 space-y-2">
                     {n.body
-                      ? <p className="text-sm text-brand-950 whitespace-pre-wrap break-words">{n.body}</p>
+                      ? <Linkified text={n.body} className="text-sm text-brand-950 whitespace-pre-wrap break-words" />
                       : <p className="text-xs italic text-brand-900/70">{nt.noDetails}</p>}
+                    {/* An off-site link the sender attached — the shop's own
+                        pages are reached by the row itself, so only an external
+                        one earns a button. */}
+                    {isExternal(n.url) && (
+                      <a
+                        href={n.url!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-3 py-1.5 rounded-lg"
+                      >
+                        {nt.openLink}
+                      </a>
+                    )}
                   </div>
                 )}
               </div>
@@ -109,6 +123,13 @@ export function NotificationsPage() {
       </ul>
     </div>
   )
+}
+
+// notifications.url doubles as the in-app tap target ('/notifications',
+// '/payments'…) and, for an admin broadcast, an off-site link. Only the latter
+// is worth a button; an in-app path would just point at the page already open.
+function isExternal(url: string | null): boolean {
+  return !!url && /^https?:\/\//i.test(url)
 }
 
 function relativeTime(iso: string): string {

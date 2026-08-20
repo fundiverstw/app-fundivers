@@ -6,6 +6,7 @@ import {
   addDays,
   toHhmm,
   formatDayLabel,
+  broadcastLinkTargets,
   rescheduleNotificationText,
   cancellationNotificationText,
   refundApprovedNotificationText,
@@ -230,5 +231,27 @@ describe('toHhmm', () => {
     expect(toHhmm(null)).toBeNull()
     expect(toHhmm(undefined)).toBeNull()
     expect(toHhmm('garbage')).toBeNull()
+  })
+})
+
+describe('broadcastLinkTargets', () => {
+  it('sends the tap to the inbox and stores nothing when there is no link', () => {
+    expect(broadcastLinkTargets(undefined)).toEqual({ push: '/notifications', inbox: null })
+    expect(broadcastLinkTargets('   ')).toEqual({ push: '/notifications', inbox: null })
+  })
+
+  it('keeps an in-app path as the tap target', () => {
+    expect(broadcastLinkTargets('/calendar')).toEqual({ push: '/calendar', inbox: '/calendar' })
+  })
+
+  it('routes an off-site link through the inbox, where it can be rendered as an anchor', () => {
+    // The service worker refuses to navigate off-origin, so handing this to
+    // the push payload would drop the diver on the home page instead.
+    const drive = 'https://drive.google.com/drive/folders/1AbC'
+    expect(broadcastLinkTargets(drive)).toEqual({ push: '/notifications', inbox: drive })
+  })
+
+  it('treats a protocol-relative URL as off-site', () => {
+    expect(broadcastLinkTargets('//evil.test/x')).toEqual({ push: '/notifications', inbox: '//evil.test/x' })
   })
 })

@@ -823,6 +823,7 @@ export const zhTW: Messages = {
   },
   notifications: {
     title: '通知',
+    openLink: '開啟連結',
     markAllRead: '全部標記為已讀',
     loading: '載入中…',
     empty: '目前沒有通知。',

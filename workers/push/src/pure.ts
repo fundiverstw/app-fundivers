@@ -144,3 +144,27 @@ export function refundApprovedNotificationText(eventTitle: string | null): { tit
     body: `Your refund${forEvent} has been approved. Contact the shop if you have any questions.`,
   }
 }
+
+/**
+ * Splits one optional admin-supplied link into the two places it has to go.
+ *
+ * The service worker refuses to navigate to anything that isn't a same-origin
+ * path (audit M10, src/sw-notification-target.ts), so handing it an off-site
+ * URL doesn't open that URL — it silently drops the diver on the home page.
+ * A link to a Drive folder therefore has to travel in the inbox row, where it
+ * renders as a real anchor, while the push tap goes to the inbox to find it.
+ *
+ *   push  — where tapping the OS notification lands. Always a same-origin
+ *           path; an off-site link becomes /notifications.
+ *   inbox — what the notifications row stores. NULL when the admin gave no
+ *           link, so the row doesn't render a CTA pointing at itself.
+ */
+export function broadcastLinkTargets(rawLink: string | undefined | null): { push: string; inbox: string | null } {
+  const link = (rawLink ?? '').trim()
+  if (!link) return { push: '/notifications', inbox: null }
+  const sameOrigin = link.startsWith('/') && !link.startsWith('//')
+  return {
+    push:  sameOrigin ? link : '/notifications',
+    inbox: link,
+  }
+}

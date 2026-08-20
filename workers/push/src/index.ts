@@ -28,6 +28,7 @@ import {
   rescheduleNotificationText,
   cancellationNotificationText,
   refundApprovedNotificationText,
+  broadcastLinkTargets,
   type Booking,
 } from './pure'
 
@@ -368,18 +369,11 @@ export async function handleAdminBroadcast(req: Request, env: Env): Promise<Resp
   const MAX_BODY_LEN  = 500
   const title = (body.title ?? '').trim().slice(0, MAX_TITLE_LEN)
   const text  = (body.body  ?? '').trim().slice(0, MAX_BODY_LEN)
-  // Two URLs derived from one optional admin input:
-  //   • pushUrl     — where tapping the OS notification opens the app.
-  //                    Falls back to /notifications (the inbox) so the
-  //                    diver can re-read the body on tap; landing on a
-  //                    catch-all redirect to /calendar made the message
-  //                    feel "lost" the moment the system tray dismissed it.
-  //   • inboxUrl    — what the inbox row stores. NULL when the admin
-  //                    didn't set a link, so the row doesn't render an
-  //                    "Open link" CTA pointing at the inbox itself.
-  const adminLink = (body.url ?? '').trim()
-  const pushUrl   = adminLink || '/notifications'
-  const inboxUrl  = adminLink || null
+  // One optional admin link, two destinations — see broadcastLinkTargets.
+  // Falling back to /notifications (the inbox) lets the diver re-read the
+  // body on tap; landing on a catch-all redirect to /calendar made the
+  // message feel "lost" the moment the system tray dismissed it.
+  const { push: pushUrl, inbox: inboxUrl } = broadcastLinkTargets(body.url)
   if (!title || !text) return new Response('title and body are required', { status: 400 })
 
   const anonKey = env.SUPABASE_ANON_KEY

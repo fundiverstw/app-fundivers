@@ -117,6 +117,23 @@ Authorization: Bearer <admin user's session JWT>
 → { "sent": N, "skipped": M, "webhook": true | false | null }
 ```
 
+### Links in a notification
+
+Notification bodies are plain text and the inbox (`/notifications`)
+linkifies them on render (`src/lib/linkify.ts`), so a Drive folder
+pasted into an event broadcast is tappable for every diver on the
+event. Only `http(s)` runs become anchors, and they open in a new tab
+with `rel="noopener noreferrer"`.
+
+The optional `url` on `/admin-broadcast` is handled separately by
+`broadcastLinkTargets` (`workers/push/src/pure.ts`), because the
+service worker refuses to navigate anywhere but a same-origin path
+(audit M10, `src/sw-notification-target.ts`). An off-site link would
+therefore drop the diver on the home page, so it travels in the inbox
+row — where it renders as an "Open link" button — while the push tap
+goes to `/notifications` to find it. An in-app path stays the tap
+target as before.
+
 Set `SUPABASE_ANON_KEY` (worker secret) so the admin gate can run.
 Use the **legacy JWT-format anon key** (the `eyJ…` value of
 `VITE_SUPABASE_ANON_KEY`) — Supabase's auth API rejects the

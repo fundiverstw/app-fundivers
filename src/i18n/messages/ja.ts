@@ -822,6 +822,7 @@ export const ja: Messages = {
   },
   notifications: {
     title: 'お知らせ',
+    openLink: 'リンクを開く',
     markAllRead: 'すべて既読にする',
     loading: '読み込み中…',
     empty: 'お知らせはありません。',

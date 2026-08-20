@@ -831,6 +831,7 @@ export const en = {
   },
   notifications: {
     title: 'Notifications',
+    openLink: 'Open link',
     markAllRead: 'Mark all read',
     loading: 'Loading…',
     empty: 'No notifications yet.',
