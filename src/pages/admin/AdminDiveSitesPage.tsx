@@ -85,8 +85,8 @@ export function AdminDiveSitesPage() {
               <div className="min-w-0">
                 <p className="font-medium text-brand-900 text-sm truncate">
                   {site.name}
-                  <span className="ml-2 text-xs text-brand-900/60">{EVENT_KIND_LABELS[site.kind]}</span>
-                  {!site.active && <span className="ml-2 text-xs text-brand-900/60">{wv.inactive}</span>}
+                  <span className="ml-2 text-xs text-brand-900/70">{EVENT_KIND_LABELS[site.kind]}</span>
+                  {!site.active && <span className="ml-2 text-xs text-brand-900/70">{wv.inactive}</span>}
                 </p>
                 <p className="text-xs text-brand-900/70 truncate">
                   {[site.region, site.notes].filter(Boolean).join(' · ')}
