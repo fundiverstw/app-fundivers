@@ -28,6 +28,10 @@ import { t } from '../i18n'
 // number inputs, booleans for checkboxes). Numeric/enum coercion happens in
 // onSubmit so the input and output types of this schema are identical, which
 // keeps react-hook-form happy.
+// Every field is optional. A diver owes the shop an email and a password to
+// have an account; everything here is information the shop would *like*, and
+// a half-filled profile saves as readily as a full one. What is still blank
+// is reported to staff by lib/profile-completeness, not withheld from them.
 // Optional text fields use `.nullish()` (string | null | undefined) so
 // that pre-existing NULLs from a freshly-created profile don't fail
 // validation — react-hook-form passes them through as `null`, and the
@@ -35,33 +39,26 @@ import { t } from '../i18n'
 // which surfaced as a save that only worked once the user typed into
 // every empty field.
 const schema = z.object({
-  name: z.string().min(1, t.profile.required),
+  name: z.string().nullish(),
   nickname: z.string().nullish(),
-  date_of_birth: z.string().min(1, t.profile.required),
-  nationality: z.string().min(1, t.profile.required),
+  date_of_birth: z.string().nullish(),
+  nationality: z.string().nullish(),
   id_number: z.string().nullish(),
   emergency_contact_name: z.string().nullish(),
   emergency_contact_phone: z.string().nullish(),
-  cert_status: z.enum(['certified', 'uncertified'], { message: t.profile.chooseOne }),
+  cert_status: z.enum(['certified', 'uncertified']).nullish(),
   cert_agency: z.string().nullish(),
   cert_level: z.string().nullish(),
   medical_notes: z.string().nullish(),
   height_cm: z.union([z.string(), z.number()]).nullish(),
   weight_kg: z.union([z.string(), z.number()]).nullish(),
-  gender: z.string().min(1, t.profile.required),
-  contact_method: z.string().min(1, t.profile.required),
-  contact_id: z.string().min(1, t.profile.required),
+  gender: z.string().nullish(),
+  contact_method: z.string().nullish(),
+  contact_id: z.string().nullish(),
   nitrox_certified: z.boolean().nullish(),
   deep_certified: z.boolean().nullish(),
-  logged_dives: z
-    .union([z.string(), z.number()])
-    .refine(v => typeof v === 'number' || v.length > 0, { message: t.profile.required }),
+  logged_dives: z.union([z.string(), z.number()]).nullish(),
   last_dive_date: z.string().nullish(),
-}).superRefine((data, ctx) => {
-  // A certified diver must name their level; an uncertified one leaves it blank.
-  if (data.cert_status === 'certified' && !(data.cert_level ?? '').trim()) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['cert_level'], message: t.profile.required })
-  }
 })
 type FormData = z.infer<typeof schema>
 
@@ -70,12 +67,11 @@ function strOrNull(v: unknown): string | null {
   return String(v)
 }
 
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
       <label className="block text-xs text-brand-900 font-medium mb-1 uppercase tracking-wide">
         {label}
-        {required && <span className="text-red-600 ml-0.5" aria-label={t.profile.requiredAria}>*</span>}
       </label>
       {children}
     </div>
@@ -137,13 +133,13 @@ function CreditBalanceLine({ userId }: { userId: string }) {
 export function ProfileForm({ user, profile, onSaved }: {
   user: { id: string }
   profile: Profile
-  /** Fires after a successful save. PendingPage uses it to flip to a
-   *  "waiting for approval" screen once the diver has submitted their
-   *  required info. Optional — the regular /profile page ignores it. */
+  /** Fires after a successful save. PendingPage uses it to drop its
+   *  now-stale list of blank fields. Optional — the regular /profile page
+   *  ignores it. */
   onSaved?: () => void
 }) {
   const toast = useToast()
-  const { register, handleSubmit, reset, control, setValue, formState: { errors, isSubmitting, isDirty } } = useForm<FormData>({
+  const { register, handleSubmit, reset, control, setValue, formState: { isSubmitting, isDirty } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       ...(profile as unknown as FormData),
@@ -152,7 +148,7 @@ export function ProfileForm({ user, profile, onSaved }: {
       // (neither) starts unchosen so the diver is forced to pick.
       cert_status: profile.uncertified
         ? 'uncertified'
-        : (profile.cert_level ? 'certified' : (undefined as unknown as 'certified')),
+        : (profile.cert_level ? 'certified' : undefined),
     },
   })
 
@@ -262,7 +258,7 @@ export function ProfileForm({ user, profile, onSaved }: {
     // and there is no INSERT policy on profiles — upsert hits the INSERT
     // RLS check and 403s even when only updating an existing row.
     const { error } = await supabase.from('profiles').update({
-      name: data.name,
+      name: strOrNull(data.name),
       nickname: strOrNull(data.nickname),
       date_of_birth: strOrNull(data.date_of_birth),
       nationality: strOrNull(data.nationality),
@@ -300,12 +296,11 @@ export function ProfileForm({ user, profile, onSaved }: {
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">{t.profile.personalInfo}</h2>
-          <Field label={t.profile.nameLabel} required>
+          <Field label={t.profile.nameLabel}>
             <input {...register('name')} className={inputClass} />
             <p className="text-xs text-brand-900/70 mt-1">
               {t.profile.nameHint}
             </p>
-            {errors.name && <p className="text-red-600 text-xs mt-1">{errors.name.message}</p>}
           </Field>
           <Field label={t.profile.nicknameLabel}>
             <input
@@ -313,9 +308,8 @@ export function ProfileForm({ user, profile, onSaved }: {
               className={inputClass}
               placeholder={t.profile.nicknamePlaceholder}
             />
-            {errors.nickname && <p className="text-red-600 text-xs mt-1">{errors.nickname.message}</p>}
           </Field>
-          <Field label={t.profile.dobLabel} required>
+          <Field label={t.profile.dobLabel}>
             <Controller
               control={control}
               name="date_of_birth"
@@ -323,14 +317,12 @@ export function ProfileForm({ user, profile, onSaved }: {
                 <DateField value={field.value ?? ''} onChange={field.onChange} className={inputClass} />
               )}
             />
-            {errors.date_of_birth && <p className="text-red-600 text-xs mt-1">{errors.date_of_birth.message}</p>}
           </Field>
-          <Field label={t.profile.nationalityLabel} required>
+          <Field label={t.profile.nationalityLabel}>
             <input {...register('nationality')} className={inputClass} />
-            {errors.nationality && <p className="text-red-600 text-xs mt-1">{errors.nationality.message}</p>}
           </Field>
           <Field label={t.profile.idPassportLabel}><input {...register('id_number')} className={inputClass} /></Field>
-          <Field label={t.profile.genderLabel} required>
+          <Field label={t.profile.genderLabel}>
             <select {...register('gender')} className={inputClass}>
               <option value="">—</option>
               <option value="female">{t.register.genderFemale}</option>
@@ -338,13 +330,12 @@ export function ProfileForm({ user, profile, onSaved }: {
               <option value="other">{t.register.genderOther}</option>
               <option value="prefer_not_to_say">{t.register.genderPreferNot}</option>
             </select>
-            {errors.gender && <p className="text-red-600 text-xs mt-1">{errors.gender.message}</p>}
           </Field>
         </section>
 
         <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">{t.profile.preferredContact}</h2>
-          <Field label={t.profile.methodLabel} required>
+          <Field label={t.profile.methodLabel}>
             <select
               {...register('contact_method', { onChange: () => setDirtyExtras(true) })}
               className={inputClass}
@@ -355,15 +346,13 @@ export function ProfileForm({ user, profile, onSaved }: {
               <option value="phone">{t.profile.contactMethod.phone}</option>
               <option value="email">{t.profile.contactMethod.email}</option>
             </select>
-            {errors.contact_method && <p className="text-red-600 text-xs mt-1">{errors.contact_method.message}</p>}
           </Field>
-          <Field label={t.profile.handleLabel} required>
+          <Field label={t.profile.handleLabel}>
             <input
               {...register('contact_id', { onChange: () => setDirtyExtras(true) })}
               className={inputClass}
               placeholder={t.profile.contactHandlePlaceholder}
             />
-            {errors.contact_id && <p className="text-red-600 text-xs mt-1">{errors.contact_id.message}</p>}
           </Field>
         </section>
 
@@ -401,7 +390,7 @@ export function ProfileForm({ user, profile, onSaved }: {
 
         <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">{t.profile.certification}</h2>
-          <Field label={t.profile.certStatusLabel} required>
+          <Field label={t.profile.certStatusLabel}>
             <div className="flex flex-col gap-2">
               <label className="flex items-center gap-2 text-sm text-brand-900">
                 <input type="radio" value="certified" {...register('cert_status')} className="accent-brand-900" />
@@ -412,7 +401,6 @@ export function ProfileForm({ user, profile, onSaved }: {
                 {t.profile.uncertified}
               </label>
             </div>
-            {errors.cert_status && <p className="text-red-600 text-xs mt-1">{errors.cert_status.message}</p>}
           </Field>
 
           {isCertified && (
@@ -435,7 +423,7 @@ export function ProfileForm({ user, profile, onSaved }: {
                   ))}
                 </select>
               </Field>
-              <Field label={t.profile.levelLabel} required>
+              <Field label={t.profile.levelLabel}>
                 <select {...register('cert_level')} className={inputClass} disabled={!selectedAgency}>
                   <option value="">{selectedAgency ? t.profile.selectLevel : t.profile.pickAgencyFirst}</option>
                   {/* Keyed by name (unique inside a single-agency filter), not
@@ -447,13 +435,11 @@ export function ProfileForm({ user, profile, onSaved }: {
                     <option key={c.name} value={c.name}>{c.name}</option>
                   ))}
                 </select>
-                {errors.cert_level && <p className="text-red-600 text-xs mt-1">{errors.cert_level.message}</p>}
               </Field>
             </>
           )}
-          <Field label={t.profile.loggedDives} required>
+          <Field label={t.profile.loggedDives}>
             <input {...register('logged_dives')} type="number" min="0" className={inputClass} />
-            {errors.logged_dives && <p className="text-red-600 text-xs mt-1">{errors.logged_dives.message}</p>}
           </Field>
           <Field label={t.profile.lastDive}>
             <Controller
@@ -516,7 +502,7 @@ export function ProfileForm({ user, profile, onSaved }: {
 
         <button
           type="submit"
-          disabled={isSubmitting || !certStatus || certCardMissing || nitroxCardMissing || deepCardMissing || (!isDirty && !dirtyExtras)}
+          disabled={isSubmitting || certCardMissing || nitroxCardMissing || deepCardMissing || (!isDirty && !dirtyExtras)}
           className="w-full bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-semibold py-2 rounded-lg transition-colors disabled:opacity-50"
         >
           {isSubmitting ? t.profile.saving : t.profile.saveChanges}

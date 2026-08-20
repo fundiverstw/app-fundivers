@@ -3,16 +3,21 @@ import type { Profile } from '../types/database'
 
 // What "a complete diver profile" means, in one place.
 //
+// Nothing here is enforced. Signing up costs an email and a password, and the
+// diver-facing ProfileForm (src/pages/ProfilePage.tsx) saves whatever it is
+// given — so this list is what the shop still *wants*, reported to staff on
+// the admin screens and shown to the diver on /pending as a nudge. A gap is a
+// prompt, never a block.
+//
 // The DB has its own version of this: the maybe_set_application_submitted_at
 // trigger stamps profiles.application_submitted_at once name, date_of_birth,
 // cert_level, contact_method and contact_id are all filled. That stamp is a
 // one-way latch and it can't see the `uncertified` flag — a Discover diver who
 // legitimately has no cert_level never earns it — so it's a poor thing to drive
-// UI from. The admin screens ask this module instead, which reads the current
-// row and matches the required set the diver-facing ProfileForm enforces
-// (src/pages/ProfilePage.tsx). Optional fields — nickname, ID number, emergency
-// contact, sizing, medical notes — are absent by design: a blank one is not a
-// gap, and flagging it would make the indicator noise.
+// UI from. The admin screens ask this module instead. Fields nobody chases —
+// nickname, ID number, emergency contact, sizing, medical notes — are absent by
+// design: a blank one is not a gap, and flagging it would make the indicator
+// noise.
 
 export type ProfileGap =
   | 'name'

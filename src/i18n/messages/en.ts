@@ -495,9 +495,6 @@ export const en = {
   },
   profile: {
     title: 'My Profile',
-    required: 'Required',
-    chooseOne: 'Please choose one',
-    requiredAria: 'required',
     saved: 'Profile saved',
     saveError: (detail: string) => `Could not save profile: ${detail}`,
     password: {
@@ -1000,13 +997,20 @@ export const en = {
     messagePlaceholder: 'Write your message…',
     sendEmail: 'Send email',
   },
+  pending: {
+    reviewTitle: 'Account awaiting approval',
+    reviewBody: 'Your account is in the review queue and an admin will approve it shortly — you will get an email once you are in. Nothing below is required, but the more you tell us, the faster we can approve you.',
+    stillMissing: (fields: string) => `Still blank: ${fields}`,
+    rejectedTitle: 'Application not approved',
+    rejectedBodyPrefix: 'Your application was reviewed and not approved at this time. If you believe this is a mistake, please contact us at',
+    rejectedBodySuffix: '.',
+  },
   auth: {
     email: 'Email',
     password: 'Password',
     signIn: 'Sign in',
     invalidEmail: 'Invalid email',
     passwordMin: 'Password must be at least 8 characters',
-    passwordsNoMatch: 'Passwords do not match',
     agreeToContinue: 'Please agree to continue',
     signInPrompt: 'Sign in to your account',
     signingIn: 'Signing in…',

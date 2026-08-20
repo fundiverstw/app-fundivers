@@ -44,26 +44,17 @@ describe('SignupPage', () => {
     renderWithRouter(<SignupPage />)
     await user.type(byName('email'), 'ada@example.com')
     await user.type(byName('password'), 'short')
-    await user.type(byName('confirm'), 'short')
     await user.click(screen.getByRole('button', { name: /create account/i }))
 
     expect(await screen.findByText(/at least 8 characters/i)).toBeInTheDocument()
     expect(signUp).not.toHaveBeenCalled()
   })
 
-  it('rejects mismatched confirmation', async () => {
-    const user = userEvent.setup()
+  it('asks for an email and a password and nothing else', async () => {
     renderWithRouter(<SignupPage />)
-    await user.type(byName('email'), 'a@b.com')
-    await user.type(byName('password'), 'goodpassword')
-    await user.type(byName('confirm'), 'different1234')
-    // Terms box has to be checked for zod to even reach the .refine() check
-    // that compares password vs confirm.
-    await user.click(byName('agreedToTerms'))
-    await user.click(screen.getByRole('button', { name: /create account/i }))
-
-    expect(await screen.findByText(/passwords do not match/i)).toBeInTheDocument()
-    expect(signUp).not.toHaveBeenCalled()
+    const fields = [...document.querySelectorAll('input')]
+      .map(el => el.getAttribute('name'))
+    expect(fields).toEqual(['email', 'password', 'agreedToTerms'])
   })
 
   it('rejects submit without the terms-of-use checkbox', async () => {
@@ -71,7 +62,6 @@ describe('SignupPage', () => {
     renderWithRouter(<SignupPage />)
     await user.type(byName('email'), 'ada@example.com')
     await user.type(byName('password'), 'secret1234')
-    await user.type(byName('confirm'), 'secret1234')
     await user.click(screen.getByRole('button', { name: /create account/i }))
 
     expect(await screen.findByText(/please agree to continue/i)).toBeInTheDocument()
@@ -84,7 +74,6 @@ describe('SignupPage', () => {
     renderWithPending()
     await user.type(byName('email'), 'ada@example.com')
     await user.type(byName('password'), 'secret1234')
-    await user.type(byName('confirm'), 'secret1234')
     await user.click(byName('agreedToTerms'))
     await user.click(screen.getByRole('button', { name: /create account/i }))
 
@@ -102,7 +91,6 @@ describe('SignupPage', () => {
     renderWithRouter(<SignupPage />)
     await user.type(byName('email'), 'taken@example.com')
     await user.type(byName('password'), 'secret1234')
-    await user.type(byName('confirm'), 'secret1234')
     await user.click(byName('agreedToTerms'))
     await user.click(screen.getByRole('button', { name: /create account/i }))
 

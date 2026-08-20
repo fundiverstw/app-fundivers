@@ -487,9 +487,6 @@ export const zhTW: Messages = {
   },
   profile: {
     title: '我的個人資料',
-    required: '必填',
-    chooseOne: '請選擇一項',
-    requiredAria: '必填',
     saved: '個人資料已儲存',
     saveError: (detail: string) => `無法儲存個人資料：${detail}`,
     password: {
@@ -992,13 +989,20 @@ export const zhTW: Messages = {
     messagePlaceholder: '寫下您的訊息…',
     sendEmail: '寄送電子郵件',
   },
+  pending: {
+    reviewTitle: '帳號等待審核中',
+    reviewBody: '您的帳號已進入審核佇列，管理員會盡快核准，完成後您會收到電子郵件通知。以下欄位皆非必填，但填得越完整，我們就能越快核准。',
+    stillMissing: (fields: string) => `尚未填寫：${fields}`,
+    rejectedTitle: '申請未通過',
+    rejectedBodyPrefix: '您的申請已審核，這次未能通過。若您認為這是誤判，請透過以下方式與我們聯絡：',
+    rejectedBodySuffix: '。',
+  },
   auth: {
     email: '電子郵件',
     password: '密碼',
     signIn: '登入',
     invalidEmail: '電子郵件格式不正確',
     passwordMin: '密碼至少需 8 個字元',
-    passwordsNoMatch: '兩次輸入的密碼不一致',
     agreeToContinue: '請先同意後才能繼續',
     signInPrompt: '登入您的帳號',
     signingIn: '登入中…',

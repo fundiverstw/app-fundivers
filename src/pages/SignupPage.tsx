@@ -9,12 +9,14 @@ import { PasswordInput } from '../components/PasswordInput'
 import { CARD_ELEVATED, INPUT, INPUT_LABEL, BTN_PRIMARY, TEXT_ERROR, TEXT_LINK, TEXT_MUTED } from '../styles/tokens'
 import { t } from '../i18n'
 
+// Signing up costs an email address and a password, nothing else. Everything
+// the shop wants to know about a diver — name, cert, contact — is asked for
+// later on /pending and /profile, where none of it blocks the diver either.
 const schema = z.object({
   email: z.string().email(t.auth.invalidEmail),
   password: z.string().min(8, t.auth.passwordMin),
-  confirm: z.string(),
   agreedToTerms: z.literal(true, { message: t.auth.agreeToContinue }),
-}).refine(d => d.password === d.confirm, { message: t.auth.passwordsNoMatch, path: ['confirm'] })
+})
 type FormData = z.infer<typeof schema>
 
 export function SignupPage() {
@@ -62,12 +64,6 @@ export function SignupPage() {
             <label className={INPUT_LABEL}>{t.auth.password}</label>
             <PasswordInput {...register('password')} className={INPUT} />
             {errors.password && <p className={`${TEXT_ERROR} text-xs mt-1`}>{errors.password.message}</p>}
-          </div>
-
-          <div>
-            <label className={INPUT_LABEL}>{t.auth.confirmPassword}</label>
-            <PasswordInput {...register('confirm')} className={INPUT} />
-            {errors.confirm && <p className={`${TEXT_ERROR} text-xs mt-1`}>{errors.confirm.message}</p>}
           </div>
 
           <label className="flex items-start gap-2 text-xs text-brand-900">

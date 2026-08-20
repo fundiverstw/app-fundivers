@@ -54,12 +54,10 @@ beforeEach(() => {
 })
 
 describe('ProfilePage', () => {
-  it('shows required error when full name is cleared and submitted', async () => {
+  it('saves an all-but-empty profile — no field is required', async () => {
     useAuthMock.mockReturnValue({
       user: { id: 'u1' },
-      // uncertified so the cert-status gate is satisfied and Save can fire,
-      // isolating the name-required assertion.
-      profile: { id: 'u1', name: 'Ada Lovelace', uncertified: true },
+      profile: { id: 'u1', name: 'Ada Lovelace' },
     })
     from.mockReturnValue({
       ...mockQueryBuilder(),
@@ -70,11 +68,15 @@ describe('ProfilePage', () => {
 
     await waitFor(() => expect((input('name') as HTMLInputElement).value).toBe('Ada Lovelace'))
 
+    // Name cleared, cert question unanswered, contact blank — still saves.
     await user.clear(input('name'))
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
-    expect((await screen.findAllByText(/required/i)).length).toBeGreaterThan(0)
-    expect(update).not.toHaveBeenCalled()
+    await waitFor(() => expect(update).toHaveBeenCalledOnce())
+    const payload = update.mock.calls[0][0] as Record<string, unknown>
+    expect(payload.name).toBeNull()
+    expect(payload.contact_id).toBeNull()
+    expect(payload.uncertified).toBe(false)
   })
 
   it('submit is disabled when the form is clean', async () => {
@@ -96,8 +98,6 @@ describe('ProfilePage', () => {
         name: 'Ada',
         nickname: 'Ada',
         date_of_birth: '1815-12-10',
-        // gender + nationality are now required to save; seed them so this
-        // test exercises a valid submit rather than tripping the new gate.
         gender: 'female',
         contact_method: 'email',
         contact_id: 'ada@example.com',

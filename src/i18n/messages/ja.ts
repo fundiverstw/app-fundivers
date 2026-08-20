@@ -486,9 +486,6 @@ export const ja: Messages = {
   },
   profile: {
     title: 'マイプロフィール',
-    required: '必須',
-    chooseOne: 'いずれかを選択してください',
-    requiredAria: '必須',
     saved: 'プロフィールを保存しました',
     saveError: (detail: string) => `プロフィールを保存できませんでした：${detail}`,
     password: {
@@ -991,13 +988,20 @@ export const ja: Messages = {
     messagePlaceholder: 'メッセージを入力…',
     sendEmail: 'メールを送信',
   },
+  pending: {
+    reviewTitle: 'アカウントの承認待ち',
+    reviewBody: 'アカウントは審査待ちです。管理者がまもなく承認し、完了するとメールでお知らせします。以下の項目はすべて任意ですが、ご記入いただくほど承認が早くなります。',
+    stillMissing: (fields: string) => `未記入: ${fields}`,
+    rejectedTitle: '申請は承認されませんでした',
+    rejectedBodyPrefix: '申請を審査した結果、今回は承認されませんでした。お心当たりがない場合は、こちらまでご連絡ください:',
+    rejectedBodySuffix: '。',
+  },
   auth: {
     email: 'メールアドレス',
     password: 'パスワード',
     signIn: 'ログイン',
     invalidEmail: 'メールアドレスの形式が正しくありません',
     passwordMin: 'パスワードは8文字以上で入力してください',
-    passwordsNoMatch: 'パスワードが一致しません',
     agreeToContinue: '続行するには同意してください',
     signInPrompt: 'アカウントにログイン',
     signingIn: 'ログイン中…',

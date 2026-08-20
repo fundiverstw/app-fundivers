@@ -28,15 +28,20 @@ There are **two** entry points:
 
 1. `SignupPage` calls `supabase.auth.signUp({ email, password,
    options: { data: { agreed_to_terms_at } } })`.
-2. Supabase sends a confirmation email (Inbucket in local dev — see
-   `make mail`).
-3. The trigger writes `profiles(id = new.id)` with default
-   `role = 'diver'` and copies `agreed_to_terms_at` from
-   `raw_user_meta_data` into the profile column.
-4. User clicks the link, confirms, and can log in.
+2. The trigger writes `profiles(id = new.id)` with default
+   `role = 'diver'` and `status = 'pending'`, and copies
+   `agreed_to_terms_at` from `raw_user_meta_data` into the profile
+   column.
+3. Email confirmation is off, so `signUp` returns a session — the diver
+   lands straight on `/pending`.
 
-No auto-login after signup: the confirmation screen directs them back
-to `/login`.
+**An email address and a password are the whole of the ask.** No profile
+field is required, at signup or afterwards: `/pending` shows the profile
+form so a diver can fill in what they like, and saves whatever it is
+given. What is still blank is computed by `src/lib/profile-completeness.ts`
+and shown to the diver as a nudge and to staff on the admin screens — a
+gap is a prompt, never a block. Details the shop genuinely cannot dive
+without are collected at booking time by `RegisterForm`.
 
 ### `/register` and `/register/:id` — one-shot signup + booking
 

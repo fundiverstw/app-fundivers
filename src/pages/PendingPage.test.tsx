@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { PendingPage } from './PendingPage'
+import { t } from '../i18n'
 
 const { useAuthMock, signOut } = vi.hoisted(() => ({
   useAuthMock: vi.fn(),
@@ -10,6 +11,10 @@ const { useAuthMock, signOut } = vi.hoisted(() => ({
 
 vi.mock('../hooks/useAuth', () => ({
   useAuth: () => useAuthMock(),
+}))
+
+vi.mock('./ProfilePage', () => ({
+  ProfileForm: () => <div>PROFILE_FORM</div>,
 }))
 
 beforeEach(() => {
@@ -26,75 +31,67 @@ function renderPage() {
 }
 
 describe('PendingPage', () => {
-  it('renders the under-review copy for pending status', () => {
+  it('renders the awaiting-approval copy for pending status', () => {
     useAuthMock.mockReturnValue({ profile: { status: 'pending' }, signOut })
     renderPage()
-    expect(screen.getByRole('heading', { name: /under review/i })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: /not approved/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: t.pending.reviewTitle })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: t.pending.rejectedTitle })).not.toBeInTheDocument()
   })
 
   it('renders the rejected copy for rejected status', () => {
     useAuthMock.mockReturnValue({ profile: { status: 'rejected' }, signOut })
     renderPage()
-    expect(screen.getByRole('heading', { name: /not approved/i })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: /under review/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: t.pending.rejectedTitle })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: t.pending.reviewTitle })).not.toBeInTheDocument()
   })
 
   it('signs the user out when the button is clicked', () => {
     useAuthMock.mockReturnValue({ profile: { status: 'pending' }, signOut })
     renderPage()
-    fireEvent.click(screen.getByRole('button', { name: /sign out/i }))
+    fireEvent.click(screen.getByRole('button', { name: t.common.signOut }))
     expect(signOut).toHaveBeenCalled()
   })
 
-  it('shows the "application submitted" screen when the diver already filled in the required fields', () => {
+  it('offers the profile form to a diver who has filled in nothing at all', () => {
     useAuthMock.mockReturnValue({
       user: { id: 'u1' },
-      profile: {
-        id: 'u1', status: 'pending',
-        name: 'Ada', nickname: 'Ada',
-        date_of_birth: '1990-01-01',
-        cert_level: 'Open Water',
-        contact_method: 'email', contact_id: 'ada@example.com',
-      },
+      profile: { id: 'u1', status: 'pending' },
       signOut,
     })
     renderPage()
-    expect(screen.getByRole('heading', { name: /application submitted/i })).toBeInTheDocument()
-    // Form is hidden in this state.
-    expect(screen.queryByRole('button', { name: /save changes/i })).not.toBeInTheDocument()
+    // An empty profile is not an unfinished application — it waits for
+    // approval like any other.
+    expect(screen.getByRole('heading', { name: t.pending.reviewTitle })).toBeInTheDocument()
+    expect(screen.getByText('PROFILE_FORM')).toBeInTheDocument()
   })
 
-  it('treats an uncertified diver (no cert level) as complete', () => {
+  it('names the blanks the shop would still like filled', () => {
     useAuthMock.mockReturnValue({
       user: { id: 'u1' },
       profile: {
         id: 'u1', status: 'pending',
-        name: 'Ada', nickname: 'Ada',
-        date_of_birth: '1990-01-01',
-        cert_level: null, uncertified: true,
+        name: 'Ada', date_of_birth: '1990-01-01', nationality: 'British',
         contact_method: 'email', contact_id: 'ada@example.com',
+        uncertified: true,
       },
       signOut,
     })
     renderPage()
-    expect(screen.getByRole('heading', { name: /application submitted/i })).toBeInTheDocument()
+    expect(screen.getByText(t.pending.stillMissing(t.profile.genderLabel))).toBeInTheDocument()
   })
 
-  it('keeps a diver who has neither a cert level nor an uncertified flag on the form', () => {
+  it('says nothing about blanks when the profile is complete', () => {
     useAuthMock.mockReturnValue({
       user: { id: 'u1' },
       profile: {
         id: 'u1', status: 'pending',
-        name: 'Ada', nickname: 'Ada',
-        date_of_birth: '1990-01-01',
-        cert_level: null,
-        contact_method: 'email', contact_id: 'ada@example.com',
+        name: 'Ada', date_of_birth: '1990-01-01', nationality: 'British',
+        gender: 'female', contact_method: 'email', contact_id: 'ada@example.com',
+        uncertified: true,
       },
       signOut,
     })
     renderPage()
-    expect(screen.getByRole('heading', { name: /under review/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument()
+    expect(screen.queryByText(t.pending.stillMissing(t.profile.genderLabel))).not.toBeInTheDocument()
   })
 })
