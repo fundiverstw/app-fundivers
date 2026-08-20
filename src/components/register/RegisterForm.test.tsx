@@ -577,29 +577,45 @@ describe('RegisterForm', () => {
     expect(body.body.profile_patch.shoe_size).toBe('EU 40 M')
   })
 
-  it('asks for height and weight to rent a wetsuit, but books without them', async () => {
+  it('asks every diver for height and weight up front, and books without them', async () => {
     setupFrom()
     const user = userEvent.setup()
-    // Owns everything except the wetsuit, and has no height/weight on file.
-    const profile: Profile = {
-      ...sampleProfile,
-      height_cm: null,
-      weight_kg: null,
-      gear_owned: ownsAllBut('Wetsuit'),
-    }
+    const profile: Profile = { ...sampleProfile, height_cm: null, weight_kg: null }
+    render(<RegisterForm event={sampleEvent} profile={profile} userId="u1" onClose={() => {}} onBooked={() => {}} />)
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    // Asked on "About you", not behind a gear choice — the wetsuit that has to
+    // fit may be one the diver never gets a rental question about.
+    await user.type(await screen.findByLabelText(/height \(cm\)/i), '175')
+    await user.type(screen.getByLabelText(/weight \(kg\)/i), '70')
+    expect(screen.getByRole('button', { name: /next/i })).toBeEnabled()
+
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+    const body = invoke.mock.calls[0][1] as { body: { profile_patch: Record<string, unknown> } }
+    expect(body.body.profile_patch.height_cm).toBe(175)
+    expect(body.body.profile_patch.weight_kg).toBe(70)
+  })
+
+  it('books a diver who leaves height and weight blank', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    const profile: Profile = { ...sampleProfile, height_cm: null, weight_kg: null }
     render(<RegisterForm event={sampleEvent} profile={profile} userId="u1" onClose={() => {}} onBooked={() => {}} />)
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
-    await user.click(screen.getByLabelText(/i need to rent/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
     await user.click(screen.getByLabelText(/no, i don't need a ride/i))
-
-    expect(await screen.findByText(/we need your sizes/i)).toBeInTheDocument()
-    // Both blank, and the booking still moves.
-    expect(screen.getByRole('button', { name: /next/i })).toBeEnabled()
-
-    await user.type(screen.getByLabelText(/height \(cm\)/i), '175')
-    await user.type(screen.getByLabelText(/weight \(kg\)/i), '70')
-    expect(screen.getByRole('button', { name: /next/i })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+    const body = invoke.mock.calls[0][1] as { body: { profile_patch: Record<string, unknown> } }
+    expect(body.body.profile_patch.height_cm).toBeNull()
+    expect(body.body.profile_patch.weight_kg).toBeNull()
   })
 
   it('does not prompt for sizes when the profile already has them', async () => {
@@ -650,6 +666,49 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     expect(await screen.findByText(/gear is included with this course/i)).toBeInTheDocument()
     expect(screen.queryByLabelText(/i need to rent/i)).not.toBeInTheDocument()
+  })
+
+  it('Discover Scuba assumes a full rental set, so it asks for a shoe size', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    const dsd: AppEvent = { ...noExtrasEvent, type: 'course', title: 'Discover Scuba Diving (DSD)' }
+    // A try-diver owns nothing and has never given a shoe size.
+    const profile: Profile = { ...sampleProfile, shoe_size: null, gear_owned: [] }
+    render(
+      <RegisterForm event={dsd} profile={profile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    // No rental question is asked (the fee covers it) and the size still is,
+    // because a full set gets packed either way.
+    expect(await screen.findByText(/we'll prepare a full set/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/i need to rent/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/we need your sizes/i)).toBeInTheDocument()
+
+    await user.selectOptions(screen.getByLabelText('Shoe size value'), '40')
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+    const body = invoke.mock.calls[0][1] as { body: { profile_patch: Record<string, unknown>; details: { gear: Record<string, unknown> } } }
+    expect(body.body.profile_patch.shoe_size).toBe('EU 40 M')
+    expect(body.body.details.gear).toEqual({ rent: false, included: true })
+  })
+
+  it('leaves the shoe size unasked on a bundled course when the profile has one', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    const dsd: AppEvent = { ...noExtrasEvent, type: 'course', title: 'Try Dive' }
+    render(
+      <RegisterForm event={dsd} profile={{ ...sampleProfile, gear_owned: [] }} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    expect(await screen.findByText(/gear is included with this course/i)).toBeInTheDocument()
+    expect(screen.queryByText(/we need your sizes/i)).not.toBeInTheDocument()
   })
 
   it('Advanced Open Water course offers gear rental (gear is not bundled)', async () => {

@@ -317,6 +317,75 @@ describe('MultiRegisterForm parent diver picker', () => {
     expect(screen.getByText(t.register.gear.ownedOnlyHint)).toBeInTheDocument()
   })
 
+  it('asks for a shoe size when the cart holds a gear-included course', async () => {
+    setupFrom([])
+    const user = userEvent.setup()
+    const dsd: AppEvent = { ...sampleEvent('e1', 'Discover Scuba Diving'), type: 'course' }
+    render(
+      <MultiRegisterForm
+        events={[dsd]}
+        profile={parentProfile} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    // Nothing to rent -- the fee covers it -- but a full set still gets packed.
+    expect(screen.getByText(t.register.multi.gearIncluded)).toBeInTheDocument()
+    expect(screen.getByText(t.register.gear.sizesTitle)).toBeInTheDocument()
+
+    await user.selectOptions(screen.getByLabelText('Shoe size value'), '40')
+    await user.click(screen.getByLabelText(/No, I'll get there myself/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /confirm/i }))
+    await waitFor(() => expect(invoke).toHaveBeenCalled())
+    const body = (invoke.mock.calls[0][1] as { body: { profile_patch: Record<string, unknown>; details: { gear: unknown } } }).body
+    expect(body.profile_patch.shoe_size).toBe('EU 40 M')
+    expect(body.details.gear).toEqual({ rent: false, included: true })
+  })
+
+  it('leaves the shoe size unasked when no cart row puts anything on a foot', async () => {
+    setupFrom([])
+    const user = userEvent.setup()
+    render(
+      <MultiRegisterForm
+        events={[sampleEvent('e1', 'Kenting')]}
+        profile={parentProfile} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    expect(screen.queryByText(t.register.gear.sizesTitle)).not.toBeInTheDocument()
+  })
+
+  it('saves the height and weight typed on the about-you step', async () => {
+    setupFrom([])
+    const user = userEvent.setup()
+    render(
+      <MultiRegisterForm
+        events={[sampleEvent('e1', 'Kenting')]}
+        profile={{ ...parentProfile, height_cm: null, weight_kg: null }} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.type(screen.getByLabelText(/height \(cm\)/i), '180')
+    await user.type(screen.getByLabelText(/weight \(kg\)/i), '78')
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/No, I'll get there myself/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /confirm/i }))
+    await waitFor(() => expect(invoke).toHaveBeenCalled())
+    const body = (invoke.mock.calls[0][1] as { body: { profile_patch: Record<string, unknown> } }).body
+    expect(body.profile_patch.height_cm).toBe(180)
+    expect(body.profile_patch.weight_kg).toBe(78)
+  })
+
   it('shows an itemized price breakdown per event on the payment step', async () => {
     setupFrom([])
     const user = userEvent.setup()

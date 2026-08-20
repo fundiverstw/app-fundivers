@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { splitByTransport, transportHeadcount, gearTotals, dayKeyOffset, careItemsForBooking, careTotals, isCareGearItem, addonTotals, partitionByWaitlist, gearSizeBreakdown, isSizedGearItem, gearSizeSource, gearDayDiff, packedGearTypes } from './logistics'
+import { splitByTransport, transportHeadcount, gearTotals, dayKeyOffset, careItemsForBooking, careTotals, isCareGearItem, addonTotals, partitionByWaitlist, gearSizeBreakdown, isSizedGearItem, gearSizeSource, needsShoeSize, gearDayDiff, packedGearTypes } from './logistics'
 import type { Booking, Profile } from '../types/database'
 
 const row = (transportation: boolean | undefined, items: string[] = []) => ({
@@ -201,6 +201,15 @@ describe('gearSizeSource / isSizedGearItem', () => {
   it('packs both boot styles by shoe size', () => {
     expect(gearSizeSource('Boots (rubber sole)')).toBe('boots')
     expect(gearSizeSource('Boots (felt sole)')).toBe('boots')
+  })
+})
+
+describe('needsShoeSize', () => {
+  it('asks only when the set holds something worn on a foot', () => {
+    expect(needsShoeSize(['Fins'])).toBe(true)
+    expect(needsShoeSize(['Boots (felt sole)'])).toBe(true)
+    expect(needsShoeSize(['BCD', 'Wetsuit', 'Regulator'])).toBe(false)
+    expect(needsShoeSize([])).toBe(false)
   })
 })
 

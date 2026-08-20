@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { personName } from '../../lib/names'
-import { RENTAL_GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_RENTAL_GEAR_ALTERNATIVES, HAS_OWNED_ONLY_GEAR, isGearIncludedCourse, defaultRentalItems, toggleGearSelection } from '../../lib/gear'
+import { RENTAL_GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_RENTAL_GEAR_ALTERNATIVES, HAS_OWNED_ONLY_GEAR, FULL_GEAR_SET, isGearIncludedCourse, defaultRentalItems, toggleGearSelection } from '../../lib/gear'
+import { needsShoeSize } from '../../lib/logistics'
 import { usesCourseDays, allowsTransport } from '../../lib/event-kinds'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
@@ -13,6 +14,7 @@ import { fetchRideSeats, canRequestRide, type RideSeats } from '../../lib/event-
 import { missingWaivers, fetchEventWaiverOverrides, fetchDiverSignatures, fetchWaivers, type WaiverEventRef } from '../../lib/waivers'
 import { WaiverSignDialog } from '../waivers/WaiverSignDialog'
 import { TextField } from './TextField'
+import { ShoeSizeField } from '../ShoeSizeField'
 import type { WaiverDef } from '../../config/waivers'
 import type { AppEvent, Booking, BookingDetails, Database, Profile } from '../../types/database'
 
@@ -173,6 +175,9 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   const [fullName, setFullName]               = useState(profile?.name ?? '')
   const [dob, setDob]                         = useState(profile?.date_of_birth ?? '')
   const [nationality, setNationality]         = useState(profile?.nationality ?? '')
+  const [heightCm, setHeightCm]               = useState(profile?.height_cm != null ? String(profile.height_cm) : '')
+  const [weightKg, setWeightKg]               = useState(profile?.weight_kg != null ? String(profile.weight_kg) : '')
+  const [shoeSize, setShoeSize]               = useState(profile?.shoe_size ?? '')
   const [gender, setGender]                   = useState(profile?.gender ?? '')
   const [contactMethod, setContactMethod]     = useState<ContactMethod | ''>(profile?.contact_method ?? '')
   const [contactId, setContactId]             = useState(profile?.contact_id ?? '')
@@ -254,6 +259,17 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   // /profile or brings the physical card; the solo flow carries the photo
   // disclaimer.)
   const step3Blocked = cart.some(ev => choicesById[ev.id]?.needsTransport === null)
+
+  // What the shop packs across the whole cart, for the diver filling the form.
+  // Rows booked for a linked child are left out: the cart never writes to a
+  // child's profile, so a size typed here would land on the wrong diver.
+  const packedForSelf = cart.flatMap(ev => {
+    if ((forDiverByEvent[ev.id] ?? null) !== null) return []
+    if (usesCourseDays(ev.type) && isGearIncludedCourse(ev.title)) return [...FULL_GEAR_SET]
+    const c = choicesById[ev.id]
+    return c?.rentGear ? c.gearItems : []
+  })
+  const askShoe = needsShoeSize(packedForSelf) && !profile?.shoe_size
   const submitBlocked = cart.length === 0 || hasBlockedPast
 
   async function submit() {
@@ -261,10 +277,16 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
     setErr('')
 
     const nullish = (v: string) => v.trim() === '' ? null : v.trim()
+    // Measurements fall back to whatever is already on file: an emptied field
+    // means the diver skipped the question, never that they want the shop to
+    // forget the size it has been packing for them.
     const profilePatch: ProfileUpdate = {
       name:               nullish(fullName),
       date_of_birth:           nullish(dob),
       nationality:             nullish(nationality),
+      height_cm:               heightCm.trim() === '' ? (profile?.height_cm ?? null) : Number(heightCm),
+      weight_kg:               weightKg.trim() === '' ? (profile?.weight_kg ?? null) : Number(weightKg),
+      shoe_size:               shoeSize.trim() === '' ? (profile?.shoe_size ?? null) : shoeSize.trim(),
       gender:                  nullish(gender),
       contact_method:          (contactMethod || null) as ContactMethod | null,
       contact_id:              nullish(contactId),
@@ -516,6 +538,8 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <TextField label={t.register.step2.dobLabel} type="date" value={dob} onChange={setDob} />
                 <TextField label={t.register.nationalityLabel} value={nationality} onChange={setNationality} />
+                <TextField label={t.register.step2.heightLabel} type="number" step="0.1" value={heightCm} onChange={setHeightCm} hint={t.register.step2.sizesHint} />
+                <TextField label={t.register.step2.weightLabel} type="number" step="0.1" value={weightKg} onChange={setWeightKg} />
                 <label className="block">
                   <span className="block text-xs text-brand-900 font-medium mb-1">{t.register.genderLabel}</span>
                   <select
@@ -714,6 +738,21 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                 )
               })}
             </div>
+
+            {askShoe && (
+              <div className="border-t border-surface-200 pt-3 space-y-2">
+                <p className="text-xs font-semibold text-brand-900">
+                  {t.register.gear.sizesTitle}
+                </p>
+                <div className="text-xs text-brand-950 font-medium">
+                  {t.register.gear.shoeSize}
+                  <div className="mt-0.5">
+                    <ShoeSizeField initial={profile?.shoe_size ?? null} onChange={setShoeSize} />
+                  </div>
+                </div>
+                <p className="text-[11px] text-brand-950/70 font-medium">{t.register.gear.savedForNext}</p>
+              </div>
+            )}
           </section>
         )}
 

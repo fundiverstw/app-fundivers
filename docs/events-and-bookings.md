@@ -99,8 +99,9 @@ Clicking an event in the calendar opens `RegisterForm`
 
 1. **Event info** — confirm title, dates, base price. Disabled if the
    event is `fully_booked`.
-2. **About you** — name, date of birth, nationality, gender, contact,
-   certification. Every one of them optional (see below).
+2. **About you** — name, date of birth, nationality, gender, height,
+   weight, contact, certification. Every one of them optional (see
+   below).
 3. **Extras** — gear, room, add-ons, transport, nitrox course.
 4. **Payment** — payment method + notes, final price summary.
 
@@ -126,6 +127,25 @@ block the booking — the shop chases what it still needs later, and
 server-side mirror, so a crafted request is held to the same short list.
 The on-behalf-of paths (admin, parent) relax the first three further
 still.
+
+### Gear sizes
+
+Height and weight are asked of every diver on step 2, whatever the event
+— they are what `src/lib/gear-sizing.ts` matches a wetsuit and a BCD
+against on the logistics board, and the diver who needs the fit is often
+the one who never sees a rental question. Shoe size is narrower: it is
+asked only when something goes on a foot, and only when the profile
+hasn't already got one.
+
+A gear-included course — Discover Scuba / Try Dive, Open Water, anything
+`isGearIncludedCourse` recognises — is a diver who owns nothing, so the
+form assumes the full set (`FULL_GEAR_SET`) rather than asking, and the
+booking records `gear: { rent: false, included: true }`. That assumption
+is exactly why the size question still has to be put: nobody chose the
+items, but the shop still has to pack ones that fit. `needsShoeSize()`
+in `src/lib/logistics.ts` answers the question for both register flows,
+of the à-la-carte selection in one and of the assumed full set in the
+other.
 
 ### Price composition
 

@@ -6,7 +6,7 @@ import { PasswordInput } from '../PasswordInput'
 // RegisterForm and the multi-event cart each had their own copy, identical but
 // for the branches one of them happened to need.
 export function TextField({
-  label, value, onChange, type = 'text', required, placeholder, min, hint,
+  label, value, onChange, type = 'text', required, placeholder, min, step, hint,
 }: {
   label: string
   value: string
@@ -15,6 +15,9 @@ export function TextField({
   required?: boolean
   placeholder?: string
   min?: number
+  /** Passed straight to a number input -- '0.1' for a measurement the diver
+   *  may well give with a decimal, since the browser rejects a value off-step. */
+  step?: string
   /** Rendered under the input, for a field whose label can't carry the whole
    *  requirement on its own (which name to give, which format). */
   hint?: string
@@ -48,6 +51,7 @@ export function TextField({
           required={required}
           placeholder={placeholder}
           min={min}
+          step={step}
           className={inputClass}
         />
       )}

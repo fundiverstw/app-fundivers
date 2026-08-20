@@ -6,8 +6,8 @@ import { formatEventSpan, eventIsFull, isPastEvent } from '../../lib/events'
 import { useAuth } from '../../hooks/useAuth'
 import { computeEffectiveFullPaymentDeadline } from '../../lib/payment-deadlines'
 import { paymentInstructionsFor } from '../../lib/payment-instructions'
-import { RENTAL_GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_RENTAL_GEAR_ALTERNATIVES, HAS_OWNED_ONLY_GEAR, isGearIncludedCourse, defaultRentalItems, toggleGearSelection } from '../../lib/gear'
-import { gearSizeSource } from '../../lib/logistics'
+import { RENTAL_GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_RENTAL_GEAR_ALTERNATIVES, HAS_OWNED_ONLY_GEAR, FULL_GEAR_SET, isGearIncludedCourse, defaultRentalItems, toggleGearSelection } from '../../lib/gear'
+import { needsShoeSize } from '../../lib/logistics'
 import { usesCourseDays, allowsTransport } from '../../lib/event-kinds'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
@@ -603,18 +603,16 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const prereqMismatch = prereqCertMismatch || prereqDivesMismatch
   const prereqBlocked = prereqMismatch && !prereqAck
 
-  // Size requirements for the gear being rented (fins/boots → shoe size;
-  // wetsuit/BCD → height + weight). Resolved through gearSizeSource rather than
-  // by item name, so a shop that renames or splits an item ("Boots (felt
-  // sole)") still gets asked for the size that packs it. We only prompt for
-  // sizes the profile is missing; once present, the booking just reuses them.
+  // What the shop will pack for this diver. A gear-included course (DSD, Open
+  // Water) is a diver who owns nothing, so the full set is the assumption and
+  // there is no choice to offer -- but it still has to fit, which is the one
+  // thing an unasked question can't tell us.
   const rentingGear = showGearRentChoice && gearChoice === 'rent'
-  const rentedItems = rentingGear ? gearItems : []
-  const rentedSizeSources = new Set(rentedItems.map(gearSizeSource))
-  const askShoe   = (rentedSizeSources.has('fins') || rentedSizeSources.has('boots')) && !profile?.shoe_size
-  const askBody   = rentedSizeSources.has('wetsuit') || rentedSizeSources.has('bcd')
-  const askHeight = askBody && profile?.height_cm == null
-  const askWeight = askBody && profile?.weight_kg == null
+  const packedItems = gearIncluded ? FULL_GEAR_SET : (rentingGear ? gearItems : [])
+  // Height and weight are asked of everyone on step 2; shoe size is the one
+  // measurement narrow enough to ask only when something goes on a foot, and
+  // only when the profile hasn't already got it.
+  const askShoe = needsShoeSize(packedItems) && !profile?.shoe_size
 
   const [emergencyName, setEmergencyName]   = useState(profile?.emergency_contact_name  ?? '')
   const [emergencyPhone, setEmergencyPhone] = useState(profile?.emergency_contact_phone ?? '')
@@ -1478,6 +1476,11 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             <TextField label={t.register.step2.idLabel} value={idNumber} onChange={setIdNumber} />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <TextField label={t.register.step2.heightLabel} type="number" step="0.1" value={heightCm} onChange={setHeightCm} hint={t.register.step2.sizesHint} />
+              <TextField label={t.register.step2.weightLabel} type="number" step="0.1" value={weightKg} onChange={setWeightKg} />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="block">
                 <span className="block text-xs text-brand-900 font-medium mb-1">{t.register.genderLabel}</span>
                 <select
@@ -1711,9 +1714,16 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           )}
 
           {gearIncluded && (
-            <p className="text-sm text-brand-950 font-medium">
-              {t.register.gear.includedNote}
-            </p>
+            <div className="space-y-1">
+              <p className="text-sm text-brand-950 font-medium">
+                {t.register.gear.includedNote}
+              </p>
+              {askShoe && (
+                <p className="text-xs text-brand-950 font-medium">
+                  {t.register.gear.includedSizesNote}
+                </p>
+              )}
+            </div>
           )}
 
           {showGearRentChoice && (
@@ -1756,45 +1766,6 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                       </label>
                     ))}
                   </div>
-
-                  {(askShoe || askHeight || askWeight) && (
-                    <div className="border-t border-surface-200 pt-2 space-y-2">
-                      <p className="text-xs font-semibold text-brand-900">
-                        {t.register.gear.sizesTitle}
-                      </p>
-                      {askHeight && (
-                        <label className="block text-xs text-brand-950 font-medium">
-                          {t.register.gear.heightCm}
-                          <input
-                            type="number" min="1" step="0.1" inputMode="decimal"
-                            value={heightCm}
-                            onChange={e => setHeightCm(e.target.value)}
-                            className="mt-0.5 w-full bg-white border border-surface-300 rounded-lg px-2 py-1 text-sm text-brand-900"
-                          />
-                        </label>
-                      )}
-                      {askWeight && (
-                        <label className="block text-xs text-brand-950 font-medium">
-                          {t.register.gear.weightKg}
-                          <input
-                            type="number" min="1" step="0.1" inputMode="decimal"
-                            value={weightKg}
-                            onChange={e => setWeightKg(e.target.value)}
-                            className="mt-0.5 w-full bg-white border border-surface-300 rounded-lg px-2 py-1 text-sm text-brand-900"
-                          />
-                        </label>
-                      )}
-                      {askShoe && (
-                        <div className="text-xs text-brand-950 font-medium">
-                          {t.register.gear.shoeSize}
-                          <div className="mt-0.5">
-                            <ShoeSizeField initial={profile?.shoe_size ?? null} onChange={setShoeSize} />
-                          </div>
-                        </div>
-                      )}
-                      <p className="text-[11px] text-brand-950/70 font-medium">{t.register.gear.savedForNext}</p>
-                    </div>
-                  )}
                 </div>
               )}
               {gearChoice === 'help' && (
@@ -1811,6 +1782,21 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                   />
                 </div>
               )}
+            </div>
+          )}
+
+          {askShoe && (
+            <div className="border-t border-surface-200 pt-2 space-y-2">
+              <p className="text-xs font-semibold text-brand-900">
+                {t.register.gear.sizesTitle}
+              </p>
+              <div className="text-xs text-brand-950 font-medium">
+                {t.register.gear.shoeSize}
+                <div className="mt-0.5">
+                  <ShoeSizeField initial={profile?.shoe_size ?? null} onChange={setShoeSize} />
+                </div>
+              </div>
+              <p className="text-[11px] text-brand-950/70 font-medium">{t.register.gear.savedForNext}</p>
             </div>
           )}
 

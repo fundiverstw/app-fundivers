@@ -177,6 +177,19 @@ export function gearSizeSource(item: string): SizedGear | null {
   return GEAR_SIZE_SOURCE.find(s => lower.includes(s.match))?.source ?? null
 }
 
+/**
+ * Does preparing this set of items need the diver's shoe size? Fins and boots
+ * are the two the shop can't pull off the rack without it, and both register
+ * forms ask the same question — of an a-la-carte selection, and of the full
+ * set a gear-included course packs unasked.
+ */
+export function needsShoeSize(items: readonly string[]): boolean {
+  return items.some(item => {
+    const source = gearSizeSource(item)
+    return source === 'fins' || source === 'boots'
+  })
+}
+
 /** Is this item packed in sizes (so its chip is worth opening)? */
 export function isSizedGearItem(item: string): boolean {
   return gearSizeSource(item) !== null
