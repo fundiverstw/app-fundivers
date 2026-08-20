@@ -248,11 +248,11 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   // Step gates — same spirit as solo flow, only the multi-applicable ones.
   // No personal detail is one of them: name, date of birth, nationality,
   // gender and certification are all optional here and on the server, and the
-  // cart moves on whatever the diver chose to type. Only a past event in the
-  // cart still stops step 2. (Card photos aren't collected in the cart flow —
-  // the diver uploads from /profile or brings the physical card; the solo flow
-  // carries the photo disclaimer.)
-  const step2Blocked = hasBlockedPast
+  // cart moves on whatever the diver chose to type. A past event in the cart
+  // is the only thing left that stops step 2, and it stops step 1 too.
+  // (Card photos aren't collected in the cart flow — the diver uploads from
+  // /profile or brings the physical card; the solo flow carries the photo
+  // disclaimer.)
   const step3Blocked = cart.some(ev => choicesById[ev.id]?.needsTransport === null)
   const submitBlocked = cart.length === 0 || hasBlockedPast
 
@@ -850,7 +850,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
               onClick={() => setStep((step + 1) as Step)}
               disabled={
                 (step === 1 && (cart.length === 0 || hasBlockedPast)) ||
-                (step === 2 && step2Blocked) ||
+                (step === 2 && hasBlockedPast) ||
                 (step === 3 && step3Blocked)
               }
               className="bg-brand-900 hover:bg-brand-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
