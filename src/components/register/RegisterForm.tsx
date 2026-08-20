@@ -8,7 +8,7 @@ import { computeEffectiveFullPaymentDeadline } from '../../lib/payment-deadlines
 import { paymentInstructionsFor } from '../../lib/payment-instructions'
 import { RENTAL_GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_RENTAL_GEAR_ALTERNATIVES, HAS_OWNED_ONLY_GEAR, FULL_GEAR_SET, isGearIncludedCourse, defaultRentalItems, toggleGearSelection } from '../../lib/gear'
 import { needsShoeSize } from '../../lib/logistics'
-import { usesCourseDays, allowsTransport } from '../../lib/event-kinds'
+import { usesCourseDays } from '../../lib/event-kinds'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
 import { BTN_XS_GHOST } from '../../styles/tokens'
@@ -767,16 +767,18 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     return () => { cancelled = true }
   }, [creditEligible, primaryTargetId, additionalTargetKey])
 
-  // Load this dive's ride-seat tally to gate the transport opt-in. Best-effort:
-  // on failure rideSeats stays null and the gate fails open (option offered).
+  // Load this event's ride-seat tally to gate the transport opt-in. Asked of
+  // every kind: cars attach to any event, so skipping the lookup for one kind
+  // only hid a full car from the diver — who then got waitlisted by the DB
+  // trigger with nothing on screen having warned them. Best-effort: on failure
+  // rideSeats stays null and the gate fails open (option offered).
   useEffect(() => {
-    if (!allowsTransport(event.type)) return
     let cancelled = false
     fetchRideSeats(event.id)
       .then(seats => { if (!cancelled) setRideSeats(seats) })
       .catch(() => { /* fail open — no gate */ })
     return () => { cancelled = true }
-  }, [event.type, event.id])
+  }, [event.id])
 
   // Resolve the event's prerequisites (required cert name + minimum logged
   // dives) so step 2 can warn a diver who doesn't meet them. Best-effort: on

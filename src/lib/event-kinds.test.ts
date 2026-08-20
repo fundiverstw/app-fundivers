@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   EVENT_KINDS,
-  usesDateEnvelope, usesCourseDays, allowsTransport, hasDiveFlags, isEventKind,
+  usesDateEnvelope, usesCourseDays, heldAtShop, hasDiveFlags, isEventKind,
   DATE_ENVELOPE_KINDS, COURSE_DAY_KINDS, NON_COURSE_KINDS,
 } from './event-kinds'
 
@@ -21,9 +21,9 @@ describe('event kind helpers', () => {
     }
   })
 
-  it('offers transport for events that travel to a site, not for shop-run courses', () => {
-    expect(allowsTransport('dive')).toBe(true)
-    expect(allowsTransport('course')).toBe(false)
+  it('gives a shop-run course the shop address, and a travelling kind none', () => {
+    expect(heldAtShop('course')).toBe(true)
+    expect(heldAtShop('dive')).toBe(false)
   })
 
   it('gives adventures the dive temporal shape, not the course one', () => {
@@ -33,8 +33,8 @@ describe('event kind helpers', () => {
     expect(usesCourseDays('adventure')).toBe(false)
   })
 
-  it('offers transport for adventures — the shop drives to the site', () => {
-    expect(allowsTransport('adventure')).toBe(true)
+  it('does not hold adventures at the shop — the shop drives to the site', () => {
+    expect(heldAtShop('adventure')).toBe(false)
   })
 
   it('does not give adventures the diving-only fields', () => {

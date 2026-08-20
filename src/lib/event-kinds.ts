@@ -14,8 +14,8 @@
 // error and often no visible symptom (an event that is simply never fetched).
 //
 // Branch on what the code actually cares about instead — the temporal shape,
-// whether the shop drives divers there — so a new kind has to answer each
-// question explicitly rather than defaulting into someone else's path.
+// where the event is held — so a new kind has to answer each question
+// explicitly rather than defaulting into someone else's path.
 
 export const EVENT_KINDS = ['dive', 'course', 'adventure'] as const
 export type EventKind = typeof EVENT_KINDS[number]
@@ -52,12 +52,22 @@ export const COURSE_DAY_KINDS: readonly EventKind[] = EVENT_KINDS.filter(usesCou
 export const NON_COURSE_KINDS: readonly EventKind[] = EVENT_KINDS.filter(k => !usesCourseDays(k))
 
 /**
- * True when the shop may lay on transport, so the register form offers ride
- * seats and the admin gets the car-assignment panel. Courses run at the shop;
- * dives and adventures travel to a site.
+ * True when the event runs on the shop's own premises, so a calendar entry
+ * for it has no location of its own and takes the shop address.
+ *
+ * Deliberately NOT a question about rides. This helper used to be
+ * `allowsTransport`, and the claim that a course needs no transport was
+ * wrong in both directions: `event_vehicles` accepts any event, the
+ * `event_ride_tally` RPC matches ride days against `course_days` as
+ * explicitly as against a date envelope, and the shop does drive Open Water
+ * students out to the shore days. What the kind gate actually bought was a
+ * course register form that never fetched the seat tally, so a full car went
+ * unmentioned and the diver was waitlisted by the DB trigger without being
+ * told. Whether a ride is on offer is a question about the cars assigned to
+ * an event, and only the tally can answer it.
  */
-export function allowsTransport(kind: EventKind): boolean {
-  return kind !== 'course'
+export function heldAtShop(kind: EventKind): boolean {
+  return kind === 'course'
 }
 
 /**
@@ -101,9 +111,9 @@ export function hasTerrainConditions(kind: EventKind): boolean {
  * kinds, and its dive/adventure toggle is this list. A course runs from the
  * shop, so it has no site of its own to describe.
  *
- * Its own question rather than a reuse of `allowsTransport`, even though both
- * answer "not a course" today: one decides whether the register form offers
- * ride seats, the other whether a kind can be observed at all.
+ * Its own question rather than a reuse of `heldAtShop`'s inverse, even though
+ * both answer "not a course" today: one decides which address a calendar entry
+ * carries, the other whether a kind can be observed at all.
  */
 export function recordsSiteConditions(kind: EventKind): boolean {
   return kind !== 'course'

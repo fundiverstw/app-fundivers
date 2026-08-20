@@ -89,11 +89,24 @@ describe('EventTransportPanel (admin)', () => {
     expect(within(cars).getByText('Delica (7)')).toBeInTheDocument()
   })
 
-  it('renders the assigned-cars section for a course too, but not the trip-template blurb', async () => {
+  it('renders cars and the trip-template blurb for a course too', async () => {
     renderPanel({ event: { ...event, type: 'course' } as unknown as AppEvent })
     const cars = await screen.findByRole('group', { name: /assigned cars/i })
     expect(within(cars).getByText('Delica (7)')).toBeInTheDocument()
-    // The transport blurb is bound to the trip template — dives only.
+    // The blurb follows events.trip_template_id, which is per-event: a course
+    // that travels to its open-water days links one like any dive.
+    expect(await screen.findByLabelText('Transport info')).toBeInTheDocument()
+  })
+
+  it('says so instead when the event links no trip template', async () => {
+    from.mockImplementation((table: string) => {
+      if (table === 'events') return mockQueryBuilder({ data: { trip_template_id: null, start_date: '2031-05-01' } })
+      if (table === 'vehicles') return mockQueryBuilder({ data: vehicleRows })
+      if (table === 'event_vehicles') return mockQueryBuilder({ data: allocationRows })
+      return mockQueryBuilder({ data: [] })
+    })
+    renderPanel({ event: { ...event, type: 'course' } as unknown as AppEvent })
+    expect(await screen.findByText(/no trip template/i)).toBeInTheDocument()
     expect(screen.queryByLabelText('Transport info')).not.toBeInTheDocument()
   })
 })

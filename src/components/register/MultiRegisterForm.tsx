@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { personName } from '../../lib/names'
 import { RENTAL_GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_RENTAL_GEAR_ALTERNATIVES, HAS_OWNED_ONLY_GEAR, FULL_GEAR_SET, isGearIncludedCourse, defaultRentalItems, toggleGearSelection } from '../../lib/gear'
 import { needsShoeSize } from '../../lib/logistics'
-import { usesCourseDays, allowsTransport } from '../../lib/event-kinds'
+import { usesCourseDays } from '../../lib/event-kinds'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
 import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
@@ -92,14 +92,15 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
     return m
   }, [children])
 
-  // Ride-seat tally per dive in the cart — gates each event's "ride with the
-  // shop" option when the cars assigned to it are full. Best-effort per event.
+  // Ride-seat tally per event in the cart — gates each event's "ride with the
+  // shop" option when the cars assigned to it are full. Asked of every kind:
+  // cars attach to any event, and a kind that skips the lookup hides a full
+  // car from the diver. Best-effort per event.
   const [rideSeatsByEvent, setRideSeatsByEvent] = useState<Record<string, RideSeats>>({})
-  const rideEventKey = cart.filter(e => allowsTransport(e.type)).map(e => e.id).join(',')
+  const rideEventKey = cart.map(e => e.id).join(',')
   useEffect(() => {
     let cancelled = false
     for (const ev of cart) {
-      if (!allowsTransport(ev.type)) continue
       fetchRideSeats(ev.id)
         .then(seats => { if (!cancelled) setRideSeatsByEvent(prev => ({ ...prev, [ev.id]: seats })) })
         .catch(() => { /* fail open for that event */ })
@@ -320,7 +321,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
       const showNitroxAddon = ev.nitrox_required && !(targetProfile?.nitrox_certified ?? false)
 
       const evSeats = rideSeatsByEvent[ev.id]
-      const rideAllowed = !allowsTransport(ev.type) || !evSeats
+      const rideAllowed = !evSeats
         ? true
         : canRequestRide({ capacity: evSeats.capacity, claimed: evSeats.claimed, alreadyHasRide: false })
       // Display only — the DB recomputes the flag on insert (20260724010000).
@@ -630,7 +631,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                 const transportSurcharge = ev.transport_price ?? 0
                 const transportIncluded = transportSurcharge <= 0
                 const evSeats = rideSeatsByEvent[ev.id]
-                const rideAllowed = !allowsTransport(ev.type) || !evSeats
+                const rideAllowed = !evSeats
                   ? true
                   : canRequestRide({ capacity: evSeats.capacity, claimed: evSeats.claimed, alreadyHasRide: false })
                 // Opting into a full ride → a ride-waitlist request (booking

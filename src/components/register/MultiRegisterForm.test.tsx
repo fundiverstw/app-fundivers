@@ -451,10 +451,34 @@ describe('MultiRegisterForm parent diver picker', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
-    expect(await screen.findByText(/shop ride is full for this dive/i)).toBeInTheDocument()
+    expect(await screen.findByText(/shop ride is full for this event/i)).toBeInTheDocument()
     const ride = screen.getByLabelText(/yes, ride with the shop/i)
     expect(ride).not.toBeDisabled()
     await user.click(ride)
+    expect(screen.getByText(/on the ride waitlist/i)).toBeInTheDocument()
+  })
+
+  it('warns on a full car for a course row too, not only a dive', async () => {
+    setupFrom([])
+    rpc.mockImplementation((name: string) =>
+      Promise.resolve(name === 'event_ride_seats'
+        ? { data: [{ capacity: 4, claimed: 4 }], error: null }
+        : { data: [], error: null }))
+    const user = userEvent.setup()
+    const owCourse: AppEvent = { ...sampleEvent('e1', 'Open Water Course'), type: 'course' }
+    render(
+      <MultiRegisterForm
+        events={[owCourse]}
+        profile={parentProfile} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    expect(await screen.findByText(/shop ride is full for this event/i)).toBeInTheDocument()
+    await user.click(screen.getByLabelText(/yes, ride with the shop/i))
     expect(screen.getByText(/on the ride waitlist/i)).toBeInTheDocument()
   })
 

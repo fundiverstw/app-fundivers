@@ -259,6 +259,30 @@ describe('RegisterForm', () => {
     expect(opts.body.details.ride_waitlisted).toBe(true)
   })
 
+  it('warns a course registrant when the car assigned to the course is full', async () => {
+    setupFrom()
+    // Cars attach to any event, and the shop drives Open Water students to
+    // their shore days. The seat tally used to be skipped for courses, so a
+    // full car showed nothing here and the DB trigger waitlisted the diver
+    // after the fact.
+    rpc.mockImplementation((name: string) =>
+      Promise.resolve(name === 'event_ride_seats'
+        ? { data: [{ capacity: 7, claimed: 7 }], error: null }
+        : { data: 0, error: null }))
+    const user = userEvent.setup()
+    const owCourse: AppEvent = { ...noExtrasEvent, type: 'course', title: 'Open Water Course' }
+    render(
+      <RegisterForm event={owCourse} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    expect(await screen.findByText(/the shop ride is full/i)).toBeInTheDocument()
+    await user.click(screen.getByLabelText(/yes, i'll ride with the shop/i))
+    expect(screen.getByText(/added to the ride waitlist/i)).toBeInTheDocument()
+  })
+
   it('shows remaining ride seats when the assigned cars still have room', async () => {
     setupFrom()
     rpc.mockImplementation((name: string) =>

@@ -139,6 +139,14 @@ The same arithmetic backs the diver-facing "N ride seats left" on the
 registration form, via the `event_ride_seats` RPC — `capacity = seats −
 staff`, `claimed` = distinct divers holding a ride anywhere on the run.
 
+**A ride is never a question about the event's kind.** `event_vehicles`
+accepts any event, `event_ride_tally` matches ride days against
+`course_days` as explicitly as against a date envelope, and the shop
+drives Open Water students out to their shore days. Both register forms
+therefore fetch the tally for every kind. They did not always: courses
+used to skip the lookup, so a full car showed no warning and the DB
+trigger below waitlisted the diver with nothing on screen having said so.
+
 A ride requested when the run is full is not refused: the booking goes
 through flagged `details.ride_waitlisted`, and every admin gets an "add a
 car" notification. That flag is **computed by the database** on insert and

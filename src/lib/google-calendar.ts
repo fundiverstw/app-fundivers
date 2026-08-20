@@ -1,6 +1,6 @@
 import { siteConfig } from '../config/site'
 import { addIsoDays } from './dates'
-import { allowsTransport } from './event-kinds'
+import { heldAtShop } from './event-kinds'
 import { eventShareUrl } from './event-share'
 import type { AppEvent } from '../types/database'
 
@@ -65,9 +65,9 @@ function descriptionParam(event: CalendarLinkEvent): string {
 }
 
 /**
- * A Google Calendar template URL that pre-fills this event. Kinds the shop
- * drives divers away for (dives, adventures) carry no location — the meeting
- * point isn't modelled and the dive site isn't the shop; kinds that run on the
+ * A Google Calendar template URL that pre-fills this event. Kinds held away
+ * from the shop (dives, adventures) carry no location — the meeting point
+ * isn't modelled and the dive site isn't the shop; kinds that run on the
  * premises get the shop address.
  */
 export function googleCalendarUrl(event: CalendarLinkEvent): string {
@@ -77,7 +77,7 @@ export function googleCalendarUrl(event: CalendarLinkEvent): string {
     dates: spanParam(event),
     details: descriptionParam(event),
   })
-  if (!allowsTransport(event.type)) params.set('location', siteConfig.contact.address)
+  if (heldAtShop(event.type)) params.set('location', siteConfig.contact.address)
   // URLSearchParams serializes a space as '+', which only decodes back to a
   // space under form-encoding rules. '%20' reads the same either way, so the
   // title can't land in Google's compose box with plus signs in it.
