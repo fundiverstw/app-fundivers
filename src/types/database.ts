@@ -16,8 +16,7 @@ export interface BookingDetails {
      *  doesn't prompt the diver in this case; we just record the fact so
      *  the PDF can say "Included with course" instead of "No". */
     included?: boolean
-    /** Gear is rented à-la-carte only; `items` lists the chosen pieces. */
-    mode?: 'a-la-carte'
+    /** Gear is rented à-la-carte only: `items` lists the chosen pieces. */
     items?: string[]
     /** Set when the diver picked "I'm not sure — I need to ask a human" on
      *  the gear step. Free text describing their situation; surfaced

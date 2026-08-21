@@ -111,7 +111,6 @@ export interface RegistrationPdfPayload {
   /** True when the event itself bundles gear (e.g. OW course). Wins over
    *  rentGear in the PDF so the row reads "Included with course". */
   gearIncluded: boolean
-  gearMode: 'a-la-carte' | ''
   gearItems: string[]
   /** Free text the diver left when they picked "I need to ask a human" on the
    *  gear step. When set, it's shown as the gear value so staff see it. */

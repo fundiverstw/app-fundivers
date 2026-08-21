@@ -330,7 +330,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
       const details: BookingDetails = {
         gear: gearIncluded
           ? { rent: false, included: true }
-          : (c.rentGear ? { rent: true, mode: 'a-la-carte', items: c.gearItems } : { rent: false }),
+          : (c.rentGear ? { rent: true, items: c.gearItems } : { rent: false }),
         add_ons: [],
         transportation: c.needsTransport === true,
         ride_waitlisted: rideWaitlisted,

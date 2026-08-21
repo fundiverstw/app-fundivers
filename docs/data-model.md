@@ -229,8 +229,8 @@ interface BookingDetails {
   gear?: {
     rent: boolean
     included?: boolean              // event bundles gear (e.g. OW course)
-    mode?: 'a-la-carte'             // gear is rented à-la-carte only
-    items?: string[]                // chosen gear items
+    items?: string[]                // chosen gear items (à-la-carte is the
+                                    //   only way gear is rented)
     assistance_note?: string        // diver picked "ask a human"; their note
                                     //   (when set, rent is false)
                                     // no sizes here: what fits a diver lives
