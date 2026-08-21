@@ -14,7 +14,7 @@ function mk(id: string, type: AppEvent['type'], start: string, end?: string): Ap
     price: null, deposit_amount: null, currency: 'TWD',
     has_rooms: false, room_type_ids: [],
     has_addons: false, addon_ids: [],
-    gear_rental_info: null, nitrox_required: false, dive_days: null,
+    gear_rental_info: null, has_transport: true, nitrox_required: false, dive_days: null,
   }
 }
 

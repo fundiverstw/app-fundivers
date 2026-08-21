@@ -113,7 +113,7 @@ export class World {
       p_events: dates.map(day => ({
         kind: 'dive', admin_title: 'Scenario series dive', notes: '',
         start_date: day, end_date: day, start_time: '09:00:00',
-        fully_booked: false, featured: false, is_private: false,
+        fully_booked: false, featured: false, is_private: false, has_transport: true,
         is_boat_dive: false, is_trip: false, nitrox_required: false,
         ...event,
       })),

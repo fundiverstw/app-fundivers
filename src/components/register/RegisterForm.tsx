@@ -829,15 +829,17 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // Load this event's ride-seat tally to gate the transport opt-in. Asked of
   // every kind: cars attach to any event, so skipping the lookup for one kind
   // only hid a full car from the diver — who then got waitlisted by the DB
-  // trigger with nothing on screen having warned them. Best-effort: on failure
-  // rideSeats stays null and the gate fails open (option offered).
+  // trigger with nothing on screen having warned them. The one event that is
+  // never asked is one an admin has said carries nobody. Best-effort: on
+  // failure rideSeats stays null and the gate fails open (option offered).
   useEffect(() => {
+    if (!event.has_transport) return
     let cancelled = false
     fetchRideSeats(event.id)
       .then(seats => { if (!cancelled) setRideSeats(seats) })
       .catch(() => { /* fail open — no gate */ })
     return () => { cancelled = true }
-  }, [event.id])
+  }, [event.id, event.has_transport])
 
   // Resolve the event's prerequisites (required cert name + minimum logged
   // dives) so step 2 can warn a diver who doesn't meet them. Best-effort: on
@@ -1981,6 +1983,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             </div>
           )}
 
+          {event.has_transport && (
           <fieldset className="space-y-2">
             <legend className="text-sm font-semibold text-brand-900">{t.register.transport.legend}</legend>
             <label className="flex gap-2 text-sm font-medium items-start text-brand-950">
@@ -2020,6 +2023,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               </span>
             </label>
           </fieldset>
+          )}
 
           {showNitroxAddon && (
             <label className="flex gap-2 text-sm text-brand-950 font-medium items-start">
@@ -2297,7 +2301,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 (!isOnBehalfOf && deepBlocked) ||
                 (isGuest && (guestEmail.trim() === '' || guestPassword.length < 8 || !guestAgreedTerms || !turnstileToken))
               )) ||
-              (step === 3 && !isOnBehalfOf && needsTransport === null) ||
+              (step === 3 && !isOnBehalfOf && event.has_transport && needsTransport === null) ||
               (step === 3 && !isOnBehalfOf && showGearRentChoice && gearChoice === null)
             }
             className="bg-brand-900 hover:bg-brand-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"

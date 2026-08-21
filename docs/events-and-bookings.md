@@ -119,7 +119,9 @@ block the booking — the shop chases what it still needs later, and
   the physical card" acknowledgment. Claiming nothing demands nothing.
 - **The booking's own decisions.** Whether a ride is needed, and whether
   gear is rented — the shop can't reserve a seat or pack a set on a
-  blank.
+  blank. The ride question is skipped whole on an event whose
+  `has_transport` is false (a dry course held at the shop): a question
+  that was never put can't be left unanswered, and nothing gates on it.
 - **Acknowledgments.** Event prerequisites the diver doesn't meet, and
   the cancellation policy.
 

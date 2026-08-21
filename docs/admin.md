@@ -147,6 +147,25 @@ therefore fetch the tally for every kind. They did not always: courses
 used to skip the lookup, so a full car showed no warning and the DB
 trigger below waitlisted the diver with nothing on screen having said so.
 
+**It is a question about the event.** A dry course — EFR, an Equipment
+specialty, an O2 provider course — moves nobody, and asking a diver
+registering for one whether they want a ride to the site is a question
+with no right answer. The **Transport not needed for this event** switch
+in the vehicle section (`EventCarAssignment` on the edit page and the
+event's Transportation tab, `CreateEventVehiclePicker` on the new-event
+form) writes `events.has_transport`. With it off, both register forms
+render no transport fieldset and never fetch the seat tally, the step
+stops waiting for an answer, and `create-registration` forces
+`details.transportation` to false rather than trusting a request that
+answers a question the form never put. It is admin-set rather than
+inferred because "not strictly a diving course" is not a fact the kind or
+the title carries — and the last helper that guessed transport from the
+kind was wrong in both directions.
+
+Turning it off leaves any cars already assigned to the event in place;
+the section says how many are still there, so nothing is silently
+orphaned and switching back on restores what was picked.
+
 A ride requested when the run is full is not refused: the booking goes
 through flagged `details.ride_waitlisted`, and every admin gets an "add a
 car" notification. That flag is **computed by the database** on insert and

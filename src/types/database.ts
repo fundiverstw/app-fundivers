@@ -1335,6 +1335,10 @@ export interface Database {
           start_time: string | null
           course_days: string[] | null
           is_private: boolean
+          /** False when the shop drives nobody to this event — a dry course
+           *  held at the shop (20260821000000). The registration form then
+           *  puts no ride question and the event takes no cars. */
+          has_transport: boolean
           is_boat_dive: boolean | null
           is_trip: boolean | null
           nitrox_required: boolean
@@ -1374,6 +1378,7 @@ export interface Database {
           start_time?: string | null
           course_days?: string[] | null
           is_private?: boolean
+          has_transport?: boolean
           is_boat_dive?: boolean | null
           is_trip?: boolean | null
           nitrox_required?: boolean
@@ -2224,6 +2229,11 @@ export interface AppEvent {
    *  Wix calendars, upcoming feeds), registerable only via a direct link.
    *  Always false for courses. */
   is_private: boolean
+  /** Admin-set: does the shop drive anybody to this event? False for a dry
+   *  course held at the shop (EFR, Equipment, O2 provider) — the registration
+   *  form then puts no ride question at all and no car is assigned. True for
+   *  everything else, including the courses that do travel to open water. */
+  has_transport: boolean
   /**
    * Admin-set full-payment deadline (YYYY-MM-DD). When null the
    * registration form falls back to "7 days before start_date" — see

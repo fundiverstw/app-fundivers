@@ -4,11 +4,14 @@ import type { Vehicle } from '../../types/database'
 import { t } from '../../i18n'
 
 const tp = t.admin.transport
+const ev = t.admin.events
 
 interface Props {
   /** Reports the picked vehicle ids up so the create page can assign them to
-   *  the new event once its row exists. */
+   *  the new event once its row exists. Empty while transport is switched off. */
   onChange: (vehicleIds: string[]) => void
+  /** Reports the has_transport column the new event row should carry. */
+  onTransportChange: (hasTransport: boolean) => void
 }
 
 /**
@@ -17,10 +20,16 @@ interface Props {
  * persists them (event_vehicles) right after inserting the event. Cars serve any
  * number of events here (event-level allocation), so no date filtering. Edit
  * uses the DB-backed EventCarAssignment instead.
+ *
+ * The "transport not needed" switch is the same one EventCarAssignment carries
+ * on the edit side; here it feeds the new row's has_transport rather than an
+ * update. Off means the registration form asks no diver about a ride, so the
+ * car picker has nothing left to pick for and hides.
  */
-export function CreateEventVehiclePicker({ onChange }: Props) {
+export function CreateEventVehiclePicker({ onChange, onTransportChange }: Props) {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [hasTransport, setHasTransport] = useState(true)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -36,11 +45,17 @@ export function CreateEventVehiclePicker({ onChange }: Props) {
   }, [])
 
   // Report the current selection up in an effect (not inside the state updater),
-  // so it re-syncs to empty on remount (dive→course→dive type switch).
+  // so it re-syncs to empty on remount (dive→course→dive type switch). An event
+  // that carries nobody reports no cars, whatever is still ticked underneath.
   useEffect(() => {
-    onChange([...selected])
+    onChange(hasTransport ? [...selected] : [])
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected])
+  }, [selected, hasTransport])
+
+  useEffect(() => {
+    onTransportChange(hasTransport)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasTransport])
 
   function toggle(id: string) {
     setSelected(prev => {
@@ -58,15 +73,22 @@ export function CreateEventVehiclePicker({ onChange }: Props) {
     <div className="space-y-2">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-sm font-bold text-white uppercase tracking-wider">{tp.carsForEvent}</h2>
-        {selected.size > 0 && (
+        {hasTransport && selected.size > 0 && (
           <span className="text-xs text-white/70 font-semibold">{seats} passenger seat{seats === 1 ? '' : 's'}</span>
         )}
       </div>
-      <p className="text-xs text-white/60">
-        Cars assigned here set the ride-seat limit on the registration form — a diver can only
-        request a ride when a seat is free in one of them. You can change these later.
-      </p>
-      {loading ? (
+      <p className="text-xs text-white/60">{ev.carsBlurb}</p>
+      <label className="flex items-start gap-2 text-sm text-white/80 font-medium">
+        <input
+          type="checkbox"
+          checked={!hasTransport}
+          onChange={e => setHasTransport(!e.target.checked)}
+          className="accent-brand-900 mt-0.5"
+        />
+        <span className="flex-1">{tp.noTransportLabel}</span>
+      </label>
+      <p className="text-xs text-white/60 pl-6">{tp.noTransportHint}</p>
+      {!hasTransport ? null : loading ? (
         <p className="text-sm text-white/60">{tp.loadingCars}</p>
       ) : vehicles.length === 0 ? (
         <p className="text-sm text-brand-950 font-medium bg-white/70 rounded-md p-2">{tp.noActiveCars}</p>

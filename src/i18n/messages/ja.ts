@@ -2096,6 +2096,11 @@ export const ja: Messages = {
       eventRideShort: (shortfall: number, claimed: number, capacity: number) =>
         `座席が ${shortfall} 席不足 — 送迎希望 ${claimed} 名に対し、スタッフを除いた空席は ${capacity} 席です。`,
       carsForEvent: 'このイベントの車両',
+      noTransportLabel: 'このイベントに送迎は不要',
+      noTransportHint: 'ショップから移動しないコース（EFR、器材スペシャルティ、酸素プロバイダーなど）向けです。申込フォームで送迎の質問をせず、車両も割り当てません。',
+      noTransportOn: 'このイベントに送迎はありません。申込時に送迎の希望は尋ねません。',
+      noTransportCarsLeft: (n: number) => `車両が${n}台まだ割り当てられています。送迎がオフの間、誰も乗せません。`,
+      noTransportFailed: '保存できませんでした。もう一度お試しください。',
       loadingCars: '車両を読み込んでいます…',
       noActiveCars: '有効な車両がありません。',
       assignFailed: 'この車両を割り当てられませんでした — 既にこのイベントに割り当て済みの可能性があります。',

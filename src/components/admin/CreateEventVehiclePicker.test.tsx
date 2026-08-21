@@ -26,7 +26,7 @@ describe('CreateEventVehiclePicker', () => {
   it('lists only active cars and reports the picked ids with a running seat total', async () => {
     const onChange = vi.fn()
     const user = userEvent.setup()
-    render(<CreateEventVehiclePicker onChange={onChange} />)
+    render(<CreateEventVehiclePicker onChange={onChange} onTransportChange={() => {}} />)
 
     // Active cars render; the retired one is filtered out.
     expect(await screen.findByText(/Delica \(7 seats\)/)).toBeInTheDocument()
@@ -46,9 +46,32 @@ describe('CreateEventVehiclePicker', () => {
     expect(onChange).toHaveBeenLastCalledWith(['v2'])
   })
 
+  it('hides the car list and reports no cars once transport is switched off', async () => {
+    const onChange = vi.fn()
+    const onTransportChange = vi.fn()
+    const user = userEvent.setup()
+    render(<CreateEventVehiclePicker onChange={onChange} onTransportChange={onTransportChange} />)
+
+    await user.click(await screen.findByLabelText(/Delica/))
+    expect(onChange).toHaveBeenLastCalledWith(['v1'])
+
+    await user.click(screen.getByLabelText(/transport not needed/i))
+    expect(onTransportChange).toHaveBeenLastCalledWith(false)
+    // The picked car is withdrawn along with the question it answered.
+    expect(onChange).toHaveBeenLastCalledWith([])
+    expect(screen.queryByLabelText(/Delica/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/passenger seats/)).not.toBeInTheDocument()
+
+    // Turning it back on restores the picker and the earlier pick.
+    await user.click(screen.getByLabelText(/transport not needed/i))
+    expect(onTransportChange).toHaveBeenLastCalledWith(true)
+    expect(onChange).toHaveBeenLastCalledWith(['v1'])
+    expect(screen.getByLabelText(/Delica/)).toBeInTheDocument()
+  })
+
   it('shows an empty-fleet note when there are no active cars', async () => {
     fetchVehicles.mockResolvedValue([vehicle('v3', 'Retired', 4, false)])
-    render(<CreateEventVehiclePicker onChange={() => {}} />)
+    render(<CreateEventVehiclePicker onChange={() => {}} onTransportChange={() => {}} />)
     await waitFor(() => expect(screen.getByText(/no active cars in the fleet/i)).toBeInTheDocument())
   })
 })

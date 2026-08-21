@@ -49,7 +49,7 @@ function ev(overrides: Partial<AppEvent> & Pick<AppEvent, 'id' | 'type' | 'title
     has_addons: false,
     addon_ids: [],
     gear_rental_info: null,
-    nitrox_required: false,
+    has_transport: true, nitrox_required: false,
     dive_days: null,
     ...overrides,
   }

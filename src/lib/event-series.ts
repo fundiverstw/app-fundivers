@@ -63,6 +63,10 @@ export interface CreateEventsArgs {
   rule?: RecurrenceRule | null
   label?: string
   vehicleIds?: string[]
+  /** events.has_transport for every row the batch creates. Defaults to true —
+   *  the column's own default — and is passed explicitly because the RPC builds
+   *  rows with jsonb_populate_record, where an absent key lands as NULL. */
+  hasTransport?: boolean
   createdBy: string | null
 }
 
@@ -83,14 +87,18 @@ export interface CreateEventsResult {
  * undo.
  */
 export async function createEvents(args: CreateEventsArgs): Promise<CreateEventsResult> {
-  const { form, rule, label, vehicleIds = [], createdBy } = args
+  const { form, rule, label, vehicleIds = [], hasTransport = true, createdBy } = args
   const anchor = seriesAnchor(form)
   if (rule && !anchor) throw new Error('the event needs a date before it can repeat')
 
   const dates = rule && anchor ? occurrenceDates(rule, anchor) : []
+  // has_transport is not a form field: on the edit side it is owned by the
+  // vehicle section, which writes it straight to the row, so leaving it out of
+  // eventPayloadFromForm keeps an ordinary event save from clobbering it.
+  const rowFor = (f: FormState) => ({ ...eventPayloadFromForm(f), has_transport: hasTransport })
   const payloads = dates.length > 0
-    ? dates.map(date => eventPayloadFromForm(shiftFormToDate(form, date)))
-    : [eventPayloadFromForm(form)]
+    ? dates.map(date => rowFor(shiftFormToDate(form, date)))
+    : [rowFor(form)]
 
   const { data, error } = await supabase.rpc('create_events_with_relations', {
     p_events: payloads,

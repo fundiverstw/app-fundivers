@@ -60,6 +60,7 @@ interface MockOpts {
   // Money-recompute inputs: the event's linked prices row + dive_days.
   eventPriceId?: string | null
   eventDiveDays?: number
+  eventHasTransport?: boolean
   priceStartingAt?: number
   priceDeposit?: number
   priceTransport?: number
@@ -99,6 +100,7 @@ function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites }
             req_dives: opts.reqDives ?? null,
             price: opts.eventPriceId ?? null,
             dive_days: opts.eventDiveDays ?? 1,
+            has_transport: opts.eventHasTransport ?? true,
             ...(opts.eventPast
               ? { start_date: '2020-01-01', end_date: '2020-01-03', course_days: ['2020-01-01', '2020-01-02'] }
               : { start_date: '2030-06-01', end_date: '2030-06-03', course_days: ['2030-06-01', '2030-06-02', '2030-06-03'] }),
@@ -737,6 +739,41 @@ describe('handleRegistration — email behaviour', () => {
     }), deps)
     expect(captured.bookingInsert).toHaveLength(1)
     expect((captured.bookingInsert[0].details as { total: number }).total).toBe(3200)
+  })
+
+  it('refuses a ride on an event the shop drives nobody to, and bills no transport', async () => {
+    // The form puts no ride question on a dry course, so a request that answers
+    // one is answering a question that was never asked. A stray true would put
+    // the diver in the Needs-ride bucket and charge them for the van.
+    const { deps, captured } = makeDeps({
+      eventPriceId: 'p1', priceStartingAt: 3200, priceTransport: 800, eventHasTransport: false,
+    })
+    await handleRegistration(postJson({
+      ...goodBody,
+      email:    'g@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'tk',
+      details:  { transportation: true, total: 4000 },
+    }), deps)
+    const details = captured.bookingInsert[0].details as { transportation: boolean; total: number }
+    expect(details.transportation).toBe(false)
+    expect(details.total).toBe(3200)
+  })
+
+  it('still bills the ride when the event does carry divers', async () => {
+    const { deps, captured } = makeDeps({
+      eventPriceId: 'p1', priceStartingAt: 3200, priceTransport: 800,
+    })
+    await handleRegistration(postJson({
+      ...goodBody,
+      email:    'g@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'tk',
+      details:  { transportation: true, total: 0 },
+    }), deps)
+    const details = captured.bookingInsert[0].details as { transportation: boolean; total: number }
+    expect(details.transportation).toBe(true)
+    expect(details.total).toBe(4000)
   })
 
   it('recomputes details.deposit (face + card surcharge) from the catalog', async () => {

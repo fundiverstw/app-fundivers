@@ -141,3 +141,43 @@ describe('event_vehicles cascade', () => {
     expect(data?.length).toBe(0)
   })
 })
+
+// events.has_transport (20260821000000) — the admin switch that says the shop
+// drives nobody to this event, so the registration form puts no ride question.
+// A column rather than an inference: a course that travels to its open-water
+// days needs a van and a dry course at the shop needs none, and neither the
+// kind nor the title tells the two apart.
+describe('events.has_transport', () => {
+  it('defaults to true, so every event that already exists keeps asking', async () => {
+    const { data } = await admin.from('events').select('has_transport').eq('id', courseId).single()
+    expect((data as { has_transport: boolean }).has_transport).toBe(true)
+  })
+
+  it('rejects an explicit null — every event answers the question one way', async () => {
+    const { error } = await admin.from('events')
+      .update({ has_transport: null } as never).eq('id', courseId)
+    expect(error).not.toBeNull()
+  })
+
+  it('only admins can switch it; staff and divers are blocked', async () => {
+    const adminC = await userClient(adminUser.email, adminUser.password)
+    const { error: adminErr } = await adminC.from('events')
+      .update({ has_transport: false } as never).eq('id', courseId)
+    expect(adminErr).toBeNull()
+    const { data: after } = await admin.from('events')
+      .select('has_transport').eq('id', courseId).single()
+    expect((after as { has_transport: boolean }).has_transport).toBe(false)
+
+    const staffC = await userClient(staff.email, staff.password)
+    await staffC.from('events').update({ has_transport: true } as never).eq('id', courseId)
+    const diverC = await userClient(diver.email, diver.password)
+    await diverC.from('events').update({ has_transport: true } as never).eq('id', courseId)
+    // RLS on events denies the write silently (no matching row to update), so
+    // the assertion is on the value, not on an error.
+    const { data: unchanged } = await admin.from('events')
+      .select('has_transport').eq('id', courseId).single()
+    expect((unchanged as { has_transport: boolean }).has_transport).toBe(false)
+
+    await admin.from('events').update({ has_transport: true } as never).eq('id', courseId)
+  })
+})

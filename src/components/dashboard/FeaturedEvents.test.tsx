@@ -17,7 +17,7 @@ function event(overrides: Partial<AppEvent> & Pick<AppEvent, 'id' | 'type' | 'ti
     featured: true, fully_booked: false,
     price: 2800, currency: 'TWD',
     has_rooms: false, room_type_ids: [], has_addons: false, addon_ids: [],
-    gear_rental_info: null, nitrox_required: false, dive_days: 1,
+    gear_rental_info: null, has_transport: true, nitrox_required: false, dive_days: 1,
     ...overrides,
   }
 }

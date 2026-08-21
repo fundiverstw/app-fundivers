@@ -55,7 +55,7 @@ function event(overrides: Partial<AppEvent> & Pick<AppEvent, 'id' | 'type' | 'ti
     has_addons: false,
     addon_ids: [],
     gear_rental_info: null,
-    nitrox_required: false,
+    has_transport: true, nitrox_required: false,
     dive_days: null,
     ...overrides,
   }

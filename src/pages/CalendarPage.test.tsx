@@ -65,6 +65,7 @@ function buildEvent(overrides: Partial<AppEvent> = {}): AppEvent {
     end_time: overrides.end_time ?? null,
     featured: overrides.featured ?? false,
     fully_booked: overrides.fully_booked ?? false,
+    has_transport: overrides.has_transport ?? true,
     price: overrides.price ?? 1500,
     currency: overrides.currency ?? 'TWD',
   }

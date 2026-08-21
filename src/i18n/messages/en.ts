@@ -2130,6 +2130,11 @@ export const en = {
       eventRideShort: (shortfall: number, claimed: number, capacity: number) =>
         `Short ${shortfall} seat${shortfall === 1 ? '' : 's'} — ${claimed} diver${claimed === 1 ? '' : 's'} hold a ride but only ${capacity} seat${capacity === 1 ? '' : 's'} are free after staff.`,
       carsForEvent: 'Cars for this event',
+      noTransportLabel: 'Transport not needed for this event',
+      noTransportHint: 'For a course that never leaves the shop — EFR, Equipment, an O2 provider course. Registration then puts no ride question, and no car is assigned.',
+      noTransportOn: 'No transport for this event. Divers are not asked about a ride.',
+      noTransportCarsLeft: (n: number) => `${n} car${n === 1 ? ' is' : 's are'} still assigned. ${n === 1 ? 'It carries' : 'They carry'} nobody while this is off.`,
+      noTransportFailed: 'Could not save that. Try again.',
       loadingCars: 'Loading cars…',
       noActiveCars: 'No active cars in the fleet.',
       assignFailed: 'Could not assign that car — it may already be on this event.',

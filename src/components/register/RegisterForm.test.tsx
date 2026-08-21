@@ -66,7 +66,7 @@ const sampleEvent: AppEvent = {
   has_rooms: true, room_type_ids: ['room-a'],
   has_addons: true, addon_ids: ['addon-a'],
   gear_rental_info: 'Full set 1500/day',
-  nitrox_required: true, dive_days: 1,
+  has_transport: true, nitrox_required: true, dive_days: 1,
   cancelled_at: null,
   full_payment_deadline: '2027-05-08',
   cancel_policy: null,
@@ -83,7 +83,7 @@ const noExtrasEvent: AppEvent = {
   price: 4900, deposit_amount: null, transport_price: null, currency: 'TWD',
   has_rooms: false, room_type_ids: [],
   has_addons: false, addon_ids: [],
-  gear_rental_info: null, nitrox_required: false, dive_days: 0,
+  gear_rental_info: null, has_transport: true, nitrox_required: false, dive_days: 0,
   cancelled_at: null,
   full_payment_deadline: null,
   cancel_policy: null, cancel_date: null,
@@ -281,6 +281,36 @@ describe('RegisterForm', () => {
     expect(await screen.findByText(/the shop ride is full/i)).toBeInTheDocument()
     await user.click(screen.getByLabelText(/yes, i'll ride with the shop/i))
     expect(screen.getByText(/added to the ride waitlist/i)).toBeInTheDocument()
+  })
+
+  it('puts no ride question on an event the shop drives nobody to', async () => {
+    setupFrom()
+    // A dry course: EFR, an Equipment specialty, an O2 provider course. The
+    // admin ticked "transport not needed" in the vehicle section, so there is
+    // nothing to ask and step 3 must not stand there waiting for an answer.
+    const efr: AppEvent = {
+      ...noExtrasEvent, type: 'course', title: 'Emergency First Response (EFR)', has_transport: false,
+    }
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={efr} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    expect(screen.queryByText(/transportation/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/i'll ride with the shop/i)).not.toBeInTheDocument()
+    // Nothing was asked, so nothing blocks the step.
+    expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+    await waitFor(() => expect(invoke).toHaveBeenCalled())
+    const body = (invoke.mock.calls[0][1] as { body: { details: { transportation: boolean } } }).body
+    expect(body.details.transportation).toBe(false)
+    // And the seat tally is never asked for — there are no seats to count.
+    expect(rpc).not.toHaveBeenCalledWith('event_ride_seats', expect.anything())
   })
 
   it('shows remaining ride seats when the assigned cars still have room', async () => {

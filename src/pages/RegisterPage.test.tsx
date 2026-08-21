@@ -46,7 +46,7 @@ const testEvent = {
   fully_booked: false, price: 3000, deposit_amount: null, currency: 'TWD',
   featured: false, dive_days: 1, gear_rental_info: null,
   has_rooms: false, room_type_ids: [], has_addons: false, addon_ids: [],
-  nitrox_required: false,
+  has_transport: true, nitrox_required: false,
 }
 
 beforeEach(() => {

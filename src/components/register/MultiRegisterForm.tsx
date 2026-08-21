@@ -95,12 +95,14 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   // Ride-seat tally per event in the cart — gates each event's "ride with the
   // shop" option when the cars assigned to it are full. Asked of every kind:
   // cars attach to any event, and a kind that skips the lookup hides a full
-  // car from the diver. Best-effort per event.
+  // car from the diver. Only an event an admin has marked as carrying nobody
+  // is left out. Best-effort per event.
   const [rideSeatsByEvent, setRideSeatsByEvent] = useState<Record<string, RideSeats>>({})
   const rideEventKey = cart.map(e => e.id).join(',')
   useEffect(() => {
     let cancelled = false
     for (const ev of cart) {
+      if (!ev.has_transport) continue
       fetchRideSeats(ev.id)
         .then(seats => { if (!cancelled) setRideSeatsByEvent(prev => ({ ...prev, [ev.id]: seats })) })
         .catch(() => { /* fail open for that event */ })
@@ -259,7 +261,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   // (Card photos aren't collected in the cart flow — the diver uploads from
   // /profile or brings the physical card; the solo flow carries the photo
   // disclaimer.)
-  const step3Blocked = cart.some(ev => choicesById[ev.id]?.needsTransport === null)
+  const step3Blocked = cart.some(ev => ev.has_transport && choicesById[ev.id]?.needsTransport === null)
 
   // What the shop packs across the whole cart, for the diver filling the form.
   // Rows booked for a linked child are left out: the cart never writes to a
@@ -697,6 +699,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                         )}
                       </div>
                     )}
+                    {ev.has_transport && (
                     <fieldset className="space-y-1">
                       <legend className="text-xs font-semibold text-brand-900">{t.register.transport.legend}</legend>
                       <label className="flex items-start gap-2 text-sm font-medium text-brand-950">
@@ -729,6 +732,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                         <span className="flex-1">{t.register.multi.transportNo}</span>
                       </label>
                     </fieldset>
+                    )}
                     {showNitroxAddon && (
                       <label className="flex items-start gap-2 text-sm text-brand-950 font-medium">
                         <input type="checkbox" checked={c.addNitroxCourse} onChange={e => updateChoice(ev.id, { addNitroxCourse: e.target.checked })} className="accent-brand-900 mt-1" />

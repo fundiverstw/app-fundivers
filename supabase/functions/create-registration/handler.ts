@@ -405,7 +405,16 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
   {
     const d = body.details as Record<string, unknown>
     const { data: evMoney } = await admin
-      .from("events").select("price, dive_days").eq("id", body.event_id).maybeSingle()
+      .from("events").select("price, dive_days, has_transport").eq("id", body.event_id).maybeSingle()
+
+    // An event the shop drives nobody to puts no ride question, so a request
+    // that answers one is answering a question that was never asked. Force it
+    // off rather than trusting the body: a stray true would put the diver in
+    // the Needs-ride bucket on a course that never leaves the shop, and could
+    // bill them the transport surcharge for a van that isn't going anywhere.
+    if ((evMoney as { has_transport?: boolean } | null)?.has_transport === false) {
+      d.transportation = false
+    }
 
     let base = 0, depositAmount = 0, transportPrice = 0
     const priceId = (evMoney?.price as string | null | undefined) ?? null

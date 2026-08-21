@@ -38,7 +38,7 @@ vi.mock('../../lib/events', () => ({
 
 vi.mock('../../components/admin/AdminNotes', () => ({ AdminNotes: () => null }))
 
-const diveEvent = { id: 'e1', type: 'dive', title: 'Kenting fun dive', start_time: '2026-06-18T00:00:00Z', end_time: null }
+const diveEvent = { id: 'e1', type: 'dive', title: 'Kenting fun dive', has_transport: true, start_time: '2026-06-18T00:00:00Z', end_time: null }
 const bookings = [
   { id: 'b1', user_id: 'u1', event_id: 'e1', status: 'pending',
     details: { transportation: true,  gear: { rent: true, items: ['BCD'] } } },
@@ -403,7 +403,7 @@ describe('AdminLogisticsPage', () => {
     // people to brief and check off, so Ada must appear once — not twice.
     const twoEvents = [
       diveEvent,
-      { id: 'e2', type: 'dive', title: 'Green Island', start_time: '2026-06-18T06:00:00Z', end_time: null },
+      { id: 'e2', type: 'dive', title: 'Green Island', has_transport: true, start_time: '2026-06-18T06:00:00Z', end_time: null },
     ]
     const spanningBookings = [
       { id: 'b1', user_id: 'u1', event_id: 'e1', status: 'confirmed', details: { gear: { rent: false } } },
@@ -512,7 +512,7 @@ describe('AdminLogisticsPage', () => {
   const twoEventDay = () => {
     const events = [
       diveEvent,
-      { id: 'e2', type: 'course', title: 'Refresher Course', start_time: '2026-06-18T00:00:00Z', end_time: null },
+      { id: 'e2', type: 'course', title: 'Refresher Course', has_transport: true, start_time: '2026-06-18T00:00:00Z', end_time: null },
     ]
     fetchEventsInRange.mockResolvedValue(events)
     const twoBookings = [
@@ -576,6 +576,37 @@ describe('AdminLogisticsPage', () => {
     // and the Delica's spare seats are NOT offered to them.
     expect(within(overall).getByText(/Take 1 vehicle — 8 seats for 1 rider/i)).toBeInTheDocument()
     expect(within(overall).getByText(/No car assigned — 1 rider/i)).toBeInTheDocument()
+  })
+
+  it('leaves a dry course out of the day\'s runs entirely', async () => {
+    // events.has_transport false: nobody travels to it. Counted as a run, its
+    // on-duty instructor would be a rider needing a seat in a car that is not
+    // going anywhere, and the board would call the day short of vehicles.
+    const { twoBookings, threeProfiles } = twoEventDay()
+    fetchEventsInRange.mockResolvedValue([
+      diveEvent,
+      { id: 'e2', type: 'course', title: 'Emergency First Response', has_transport: false,
+        start_time: '2026-06-18T00:00:00Z', end_time: null },
+    ])
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: twoBookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: threeProfiles })
+      if (table === 'vehicles') return mockQueryBuilder({ data: [
+        { id: 'v1', created_at: '', name: 'Delica', passenger_seats: 8, active: true, created_by: null },
+      ] })
+      if (table === 'event_vehicles') return mockQueryBuilder({ data: [
+        { id: 'ev1', vehicle_id: 'v1', event_id: 'e1' },
+      ] })
+      return mockQueryBuilder({ data: [] })
+    })
+    renderPage()
+    await screen.findByText(/2 events · 3 divers/i)
+
+    const overall = screen.getByText(/^overall/i).closest('section')!
+    // One run — the dive's — and no carless second run for the course.
+    expect(await within(overall).findByText(/Take 1 vehicle — 8 seats for 1 rider/i)).toBeInTheDocument()
+    expect(within(overall).queryByText(/separate runs/i)).not.toBeInTheDocument()
+    expect(within(overall).queryByText(/No car assigned/i)).not.toBeInTheDocument()
   })
 
   it('lets an admin put two events on the same run', async () => {

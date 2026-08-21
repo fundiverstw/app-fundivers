@@ -28,7 +28,7 @@ const sampleEvent = (id: string, title: string): AppEvent => ({
   price: 2800, deposit_amount: null, transport_price: 0, currency: 'TWD',
   has_rooms: false, room_type_ids: [],
   has_addons: false, addon_ids: [],
-  gear_rental_info: null, nitrox_required: false, dive_days: 1,
+  gear_rental_info: null, has_transport: true, nitrox_required: false, dive_days: 1,
   cancelled_at: null,
   full_payment_deadline: null,
   cancel_policy: null, cancel_date: null,
@@ -480,6 +480,32 @@ describe('MultiRegisterForm parent diver picker', () => {
     expect(await screen.findByText(/shop ride is full for this event/i)).toBeInTheDocument()
     await user.click(screen.getByLabelText(/yes, ride with the shop/i))
     expect(screen.getByText(/on the ride waitlist/i)).toBeInTheDocument()
+  })
+
+  it('puts no ride question on a cart row the shop drives nobody to', async () => {
+    setupFrom([])
+    const user = userEvent.setup()
+    const dive: AppEvent = sampleEvent('e1', 'Kenting shore dive')
+    const efr: AppEvent = {
+      ...sampleEvent('e2', 'Emergency First Response (EFR)'), type: 'course', has_transport: false,
+    }
+    render(
+      <MultiRegisterForm
+        events={[dive, efr]}
+        profile={parentProfile} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    // One question for the dive, none for the dry course.
+    expect(screen.getAllByLabelText(/yes, ride with the shop/i)).toHaveLength(1)
+    // Answering the one row that asks is enough to move on.
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+    await user.click(screen.getByLabelText(/no, i'll get there myself/i))
+    expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
   })
 
   it('shows a disabled "Submitting…" state while the booking round-trip is pending', async () => {

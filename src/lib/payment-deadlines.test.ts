@@ -11,7 +11,7 @@ function event(overrides: Partial<AppEvent> = {}): AppEvent {
     price: 2000, deposit_amount: 500, currency: 'TWD',
     has_rooms: false, room_type_ids: [],
     has_addons: false, addon_ids: [],
-    gear_rental_info: null, nitrox_required: false,
+    gear_rental_info: null, has_transport: true, nitrox_required: false,
     dive_days: 1, cancelled_at: null,
     full_payment_deadline: null,
     ...overrides,

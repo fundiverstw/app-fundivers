@@ -330,7 +330,7 @@ describe('generated occurrences satisfy the events constraints', () => {
 describe('create_events_with_relations', () => {
   const baseEvent = (over: Record<string, unknown> = {}) => ({
     kind: 'dive', admin_title: 'atomic dive', notes: '', start_date: '2032-01-03',
-    fully_booked: false, featured: false, is_private: false,
+    fully_booked: false, featured: false, is_private: false, has_transport: true,
     is_boat_dive: false, is_trip: false, nitrox_required: false,
     ...over,
   })
@@ -352,6 +352,37 @@ describe('create_events_with_relations', () => {
       expect((row as { series_id: string | null }).series_id).toBeNull()
     } finally {
       await cleanupTitles('atomic-one')
+    }
+  })
+
+  // Every NOT NULL column has to be in the payload: jsonb_populate_record
+  // leaves an absent key NULL rather than falling back to the column default,
+  // so a forgotten key is an insert failure, not a silently wrong row.
+  it('refuses a payload that omits a NOT NULL column rather than writing a null', async () => {
+    const withoutTransport: Record<string, unknown> = baseEvent({ admin_title: 'atomic-null A' })
+    delete withoutTransport.has_transport
+    const { error } = await admin.rpc('create_events_with_relations', { p_events: [withoutTransport] })
+    try {
+      expect(error).not.toBeNull()
+    } finally {
+      await cleanupTitles('atomic-null')
+    }
+  })
+
+  it('carries has_transport through to every event in the batch', async () => {
+    const { data, error } = await admin.rpc('create_events_with_relations', {
+      p_events: [
+        baseEvent({ admin_title: 'atomic-dry A', start_date: '2032-03-06', has_transport: false }),
+        baseEvent({ admin_title: 'atomic-dry B', start_date: '2032-03-13', has_transport: false }),
+      ],
+    })
+    try {
+      expect(error).toBeNull()
+      const { data: rows } = await admin.from('events')
+        .select('has_transport').in('id', data as string[])
+      expect((rows ?? []).map(r => (r as { has_transport: boolean }).has_transport)).toEqual([false, false])
+    } finally {
+      await cleanupTitles('atomic-dry')
     }
   })
 

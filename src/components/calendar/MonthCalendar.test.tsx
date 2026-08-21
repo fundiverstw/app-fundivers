@@ -33,7 +33,7 @@ function mkEvent(over: Partial<AppEvent> & Pick<AppEvent, 'id' | 'start_time'>):
     capacity: null, confirmed_count: null,
     price: null, deposit_amount: null, currency: 'TWD',
     has_rooms: false, room_type_ids: [], has_addons: false, addon_ids: [],
-    gear_rental_info: null, nitrox_required: false, dive_days: null,
+    gear_rental_info: null, has_transport: true, nitrox_required: false, dive_days: null,
     cancelled_at: null, is_private: false,
     ...over,
   } as AppEvent
@@ -175,7 +175,7 @@ describe('MonthCalendar staff-busy overlay', () => {
       price: null, deposit_amount: null, transport_price: null, currency: 'TWD',
       has_rooms: false, room_type_ids: [],
       has_addons: false, addon_ids: [],
-      gear_rental_info: null, nitrox_required: false, dive_days: null,
+      gear_rental_info: null, has_transport: true, nitrox_required: false, dive_days: null,
       cancelled_at: null,
     }
     const { rerender } = render(
@@ -223,7 +223,7 @@ describe('MonthCalendar staff-busy overlay', () => {
       price: null, deposit_amount: null, transport_price: null, currency: 'TWD',
       has_rooms: false, room_type_ids: [],
       has_addons: false, addon_ids: [],
-      gear_rental_info: null, nitrox_required: false, dive_days: null,
+      gear_rental_info: null, has_transport: true, nitrox_required: false, dive_days: null,
       cancelled_at: null,
     }
     render(
@@ -304,7 +304,7 @@ describe('MonthCalendar course color buckets', () => {
       price: null, deposit_amount: null, transport_price: null, currency: 'TWD' as const,
       has_rooms: false, room_type_ids: [] as string[],
       has_addons: false, addon_ids: [] as string[],
-      gear_rental_info: null, nitrox_required: false, dive_days: null,
+      gear_rental_info: null, has_transport: true, nitrox_required: false, dive_days: null,
       cancelled_at: null,
     }
   }
@@ -422,7 +422,7 @@ describe('MonthCalendar course filter', () => {
       price: null, deposit_amount: null, transport_price: null, currency: 'TWD' as const,
       has_rooms: false, room_type_ids: [] as string[],
       has_addons: false, addon_ids: [] as string[],
-      gear_rental_info: null, nitrox_required: false, dive_days: null,
+      gear_rental_info: null, has_transport: true, nitrox_required: false, dive_days: null,
       cancelled_at: null,
     }
   }
@@ -492,7 +492,7 @@ describe('MonthCalendar dive color buckets', () => {
       price: null, deposit_amount: null, transport_price: null, currency: 'TWD' as const,
       has_rooms: false, room_type_ids: [] as string[],
       has_addons: false, addon_ids: [] as string[],
-      gear_rental_info: null, nitrox_required: false, dive_days: null,
+      gear_rental_info: null, has_transport: true, nitrox_required: false, dive_days: null,
       cancelled_at: null, dive_outing,
     }
   }
@@ -537,7 +537,7 @@ describe('MonthCalendar private dives', () => {
     featured: false, fully_booked: false, capacity: null, confirmed_count: null,
     price: null, deposit_amount: null, transport_price: null, currency: 'TWD',
     has_rooms: false, room_type_ids: [], has_addons: false, addon_ids: [],
-    gear_rental_info: null, nitrox_required: false, dive_days: null,
+    gear_rental_info: null, has_transport: true, nitrox_required: false, dive_days: null,
     cancelled_at: null, full_payment_deadline: null, cancel_policy: null, cancel_date: null,
   }
 
@@ -574,7 +574,7 @@ describe('MonthCalendar cancelled events', () => {
     featured: false, fully_booked: false, capacity: null, confirmed_count: null,
     price: null, deposit_amount: null, transport_price: null, currency: 'TWD',
     has_rooms: false, room_type_ids: [], has_addons: false, addon_ids: [],
-    gear_rental_info: null, nitrox_required: false, dive_days: null,
+    gear_rental_info: null, has_transport: true, nitrox_required: false, dive_days: null,
     cancelled_at: '2030-06-01T00:00:00Z', full_payment_deadline: null,
     cancel_policy: null, cancel_date: null, is_private: false,
   }
@@ -657,7 +657,7 @@ describe('MonthCalendar disablePastEvents', () => {
     featured: false, fully_booked: false, capacity: null, confirmed_count: null,
     price: null, deposit_amount: null, transport_price: null, currency: 'TWD',
     has_rooms: false, room_type_ids: [], has_addons: false, addon_ids: [],
-    gear_rental_info: null, nitrox_required: false, dive_days: null,
+    gear_rental_info: null, has_transport: true, nitrox_required: false, dive_days: null,
     cancelled_at: null, full_payment_deadline: null, cancel_policy: null, cancel_date: null,
     is_private: false,
   }

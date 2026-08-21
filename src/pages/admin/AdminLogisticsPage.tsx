@@ -604,8 +604,12 @@ export function AdminLogisticsPage() {
   // who travels with whom reshuffles this immediately.
   const groupByEventId = new Map((groups ?? []).map(g => [g.event.id, g]))
   const eventTitle = (ev: AppEvent) => ev.calendar_title || ev.title
+  // An event the shop drives nobody to (events.has_transport false — a dry
+  // course held at the shop) is not part of anybody's run. Left in, its on-duty
+  // instructor would count as a rider needing a seat in a car that was never
+  // going anywhere, and the board would report the day short of vehicles.
   const runInputs: RunInput[] = buildRuns(
-    (groups ?? []).map(g => g.event.id),
+    (groups ?? []).filter(g => g.event.has_transport).map(g => g.event.id),
     groupIdByEvent(rideGroups),
   ).map(run => {
     const members = run.eventIds.map(id => groupByEventId.get(id)).filter((g): g is EventGroup => !!g)

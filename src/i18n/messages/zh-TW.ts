@@ -2097,6 +2097,11 @@ export const zhTW: Messages = {
       eventRideShort: (shortfall: number, claimed: number, capacity: number) =>
         `座位不足 ${shortfall} 個 — ${claimed} 位潛水員需要共乘，扣除工作人員後只剩 ${capacity} 個座位。`,
       carsForEvent: '此活動的車輛',
+      noTransportLabel: '此活動不需要接送',
+      noTransportHint: '適用於不離開店內的課程，例如 EFR、器材專長、氧氣提供者課程。報名表將不詢問接送需求，也不會指派車輛。',
+      noTransportOn: '此活動沒有接送。報名時不會詢問接送需求。',
+      noTransportCarsLeft: (n: number) => `仍有 ${n} 台車輛指派給此活動。關閉接送期間，這些車輛不載任何人。`,
+      noTransportFailed: '無法儲存，請再試一次。',
       loadingCars: '車輛載入中…',
       noActiveCars: '車隊中沒有啟用的車輛。',
       assignFailed: '無法指派此車輛 — 可能已指派給此活動。',

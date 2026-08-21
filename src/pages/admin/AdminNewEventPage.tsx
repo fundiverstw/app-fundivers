@@ -27,6 +27,9 @@ export function AdminNewEventPage() {
   const { profile } = useAuth()
   // Cars picked in the form; assigned to every event the submit creates.
   const [vehicleIds, setVehicleIds] = useState<string[]>([])
+  // Whether the shop drives anybody to these events at all — off for a dry
+  // course, which then asks no diver about a ride.
+  const [hasTransport, setHasTransport] = useState(true)
   const [rule, setRule] = useState<RecurrenceRule | null>(null)
   const [seriesLabel, setSeriesLabel] = useState('')
 
@@ -39,6 +42,7 @@ export function AdminNewEventPage() {
         rule: repeating ? rule : null,
         label: seriesLabel,
         vehicleIds,
+        hasTransport,
         createdBy: profile?.id ?? null,
       })
       eventIds = result.eventIds
@@ -72,7 +76,7 @@ export function AdminNewEventPage() {
         onCancel={() => navigate('/admin/events')}
         renderCreateExtras={form => (
           <>
-            <CreateEventVehiclePicker onChange={setVehicleIds} />
+            <CreateEventVehiclePicker onChange={setVehicleIds} onTransportChange={setHasTransport} />
             <RecurrenceFields
               anchor={seriesAnchor(form)}
               onChange={(next, label) => { setRule(next); setSeriesLabel(label) }}

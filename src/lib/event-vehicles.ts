@@ -35,6 +35,27 @@ function allocationRow(
   }
 }
 
+/**
+ * Does the shop drive anybody to this event? Read straight off the event row
+ * rather than inferred: a course that travels to its open-water days needs a
+ * van and a dry course at the shop needs none, and nothing in the kind, the
+ * title or the fleet distinguishes the two.
+ */
+export async function fetchEventHasTransport(eventId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('events').select('has_transport').eq('id', eventId).maybeSingle()
+  if (error) throw error
+  return (data as { has_transport?: boolean } | null)?.has_transport ?? true
+}
+
+/** Admin-only (events RLS). Turning it off leaves any assigned cars in place —
+ *  they are what the event goes back to if it is turned on again. */
+export async function setEventHasTransport(eventId: string, value: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('events').update({ has_transport: value } as never).eq('id', eventId)
+  if (error) throw error
+}
+
 export async function assignVehicleToEvent(args: {
   vehicleId: string
   event: Pick<AppEvent, 'id' | 'type'>
