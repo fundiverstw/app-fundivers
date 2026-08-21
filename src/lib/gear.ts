@@ -135,6 +135,17 @@ export function toggleGearSelection(current: string[], item: string): string[] {
   return [...current.filter(i => !alternatives.has(i)), item]
 }
 
+/**
+ * Does this diver need to rent anything at all? A profile that already lists
+ * every slot the shop rents belongs to somebody who turns up carrying a full
+ * kit; anyone else is short at least one piece. Drives the pre-selected answer
+ * on a gear question the lead booker is answering for another diver, who isn't
+ * there to answer it themselves.
+ */
+export function needsRental(owned: string[] | null | undefined): boolean {
+  return defaultRentalItems(owned).length > 0
+}
+
 // One of every slot the shop rents — what "a full set" means once an item comes
 // in styles. Packing GEAR_ITEMS raw would put both boot styles on the van for
 // one diver, and a style the shop doesn't stock for rental at all.

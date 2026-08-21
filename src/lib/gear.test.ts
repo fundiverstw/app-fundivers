@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   isGearIncludedCourse, gearPackList, gearSlot, gearAlternatives,
-  defaultRentalItems, toggleGearSelection, FULL_GEAR_SET, GEAR_ITEMS,
+  defaultRentalItems, needsRental, toggleGearSelection, FULL_GEAR_SET, GEAR_ITEMS,
   GEAR_ALACARTE_PRICES, HAS_GEAR_ALTERNATIVES, RENTAL_GEAR_ITEMS,
   HAS_RENTAL_GEAR_ALTERNATIVES, HAS_OWNED_ONLY_GEAR,
   gearOwnGroups, gearBaseLabel, gearStyleLabel, ownedInSlot,
@@ -209,6 +209,26 @@ describe('ownedInSlot', () => {
   it('lists what the diver owns in a slot, in catalog order', () => {
     expect(ownedInSlot([FELT, 'BCD', RUBBER], [RUBBER, FELT])).toEqual([RUBBER, FELT])
     expect(ownedInSlot(['BCD'], [RUBBER, FELT])).toEqual([])
+  })
+})
+
+describe('needsRental', () => {
+  it('is true for a diver whose profile lists nothing', () => {
+    expect(needsRental([])).toBe(true)
+    expect(needsRental(null)).toBe(true)
+  })
+
+  it('is false once the diver owns every slot the shop rents', () => {
+    expect(needsRental(defaultRentalItems([]))).toBe(false)
+  })
+
+  it('stays true while any one slot is still missing', () => {
+    const allButFins = defaultRentalItems([]).filter(i => gearSlot(i) !== 'fins')
+    expect(needsRental(allButFins)).toBe(true)
+  })
+
+  it('counts an owned-only style as covering its slot', () => {
+    expect(needsRental(defaultRentalItems([]).map(i => i === FELT ? RUBBER : i))).toBe(false)
   })
 })
 

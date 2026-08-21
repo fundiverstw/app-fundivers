@@ -6,7 +6,7 @@ import { formatEventSpan, eventIsFull, isPastEvent } from '../../lib/events'
 import { useAuth } from '../../hooks/useAuth'
 import { computeEffectiveFullPaymentDeadline } from '../../lib/payment-deadlines'
 import { paymentInstructionsFor } from '../../lib/payment-instructions'
-import { RENTAL_GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_RENTAL_GEAR_ALTERNATIVES, HAS_OWNED_ONLY_GEAR, FULL_GEAR_SET, isGearIncludedCourse, defaultRentalItems, toggleGearSelection } from '../../lib/gear'
+import { RENTAL_GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_RENTAL_GEAR_ALTERNATIVES, HAS_OWNED_ONLY_GEAR, FULL_GEAR_SET, isGearIncludedCourse, defaultRentalItems, needsRental, toggleGearSelection } from '../../lib/gear'
 import { needsShoeSize } from '../../lib/logistics'
 import { usesCourseDays } from '../../lib/event-kinds'
 import { siteConfig } from '../../config/site'
@@ -112,6 +112,53 @@ async function fetchOwnBooking(
 type Step = 1 | 2 | 3 | 4
 type ContactMethod = 'whatsapp' | 'line' | 'phone' | 'email'
 type GearChoice = 'none' | 'rent' | 'help'
+
+/** One diver's answer to the gear question. */
+interface GearPick {
+  choice: GearChoice
+  items: string[]
+  helpNote: string
+  /** Only collected when that diver's profile hasn't got one already. */
+  shoeSize: string
+}
+
+/**
+ * The gear answer a diver's own profile implies. The lead booker answers for
+ * everyone they picked, and those divers aren't at the keyboard to say what
+ * they own — but their profile already lists it, so start each of them on
+ * "rent whatever your kit is missing" and let the lead adjust.
+ */
+/** The à-la-carte tick list, rendered once per diver the lead is booking. */
+function GearChecklist({ selected, onToggle }: { selected: string[]; onToggle: (item: string) => void }) {
+  return (
+    <div className="pl-6 space-y-2">
+      <p className="text-xs text-brand-950 font-medium">{t.register.checkItems}</p>
+      {HAS_RENTAL_GEAR_ALTERNATIVES && (
+        <p className="text-xs text-brand-950 font-medium">{t.register.gear.stylesHint}</p>
+      )}
+      {HAS_OWNED_ONLY_GEAR && (
+        <p className="text-xs text-brand-950 font-medium">{t.register.gear.ownedOnlyHint}</p>
+      )}
+      <div className="grid grid-cols-2 gap-1">
+        {RENTAL_GEAR_ITEMS.map(item => (
+          <label key={item} className="flex items-center gap-1 text-xs text-brand-950 font-medium">
+            <input type="checkbox" checked={selected.includes(item)} onChange={() => onToggle(item)} className="accent-brand-900" />
+            {item} ({GEAR_ALACARTE_PRICES[item]})
+          </label>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function defaultGearPick(diver: Profile): GearPick {
+  return {
+    choice: needsRental(diver.gear_owned) ? 'rent' : 'none',
+    items: defaultRentalItems(diver.gear_owned),
+    helpNote: '',
+    shoeSize: '',
+  }
+}
 
 export interface RegisterFormBodyProps {
   event: AppEvent
@@ -485,6 +532,18 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   )
   const defaultGearItems = useMemo(() => defaultRentalItems(profile?.gear_owned), [profile])
   const gearItems = editedGearItems ?? defaultGearItems
+  // Gear for the other divers in the lead's selection. Every one of them gets
+  // their own answer rather than a copy of the lead's: a parent who owns a full
+  // kit is not evidence that their child does, and the fanned-out bookings used
+  // to inherit the lead's picks wholesale — sending a child who owns nothing to
+  // the boat with nothing. Keyed by diver id; the wrapper remounts this form
+  // when the selection changes, so no entry outlives its diver.
+  const [additionalGear, setAdditionalGear] = useState<Record<string, GearPick>>(
+    () => Object.fromEntries(additionalTargets.map(tg => [tg.id, defaultGearPick(tg)])),
+  )
+  const gearPickFor = (tg: Profile): GearPick => additionalGear[tg.id] ?? defaultGearPick(tg)
+  const patchGearPick = (id: string, patch: Partial<GearPick>) =>
+    setAdditionalGear(prev => ({ ...prev, [id]: { ...prev[id], ...patch } }))
   // Rental gear needs sizes on file: shoe size for fins/boots, height + weight
   // for Wetsuit/BCD. When the diver's profile is missing the relevant size we
   // collect it here and save it back to their profile on submit.
@@ -889,33 +948,56 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // What we send is only what we show them: the DB recomputes the flag on insert
   // (20260724010000), so a stale or forged value can't hide a full run.
   const rideWaitlisted = needsTransport === true && !rideAllowed
-  const subTotal = base + gearCost + roomCost + addonsCost + transportCost + ((showNitroxAddon && addNitroxCourse) ? NITROX_COURSE_FEE : 0)
+  const payingDepositOnly = hasDeposit && payDepositOnly
+  // Everything on this booking that costs the same whoever is diving: the event
+  // fee, the room, the add-ons, the ride and the nitrox course. Gear is the one
+  // line that turns on the individual diver, so it stays out of here.
+  const sharedCost = base + roomCost + addonsCost + transportCost + ((showNitroxAddon && addNitroxCourse) ? NITROX_COURSE_FEE : 0)
 
+  // Every money figure one booking resolves to, given what that diver rents.
+  //
   // The card/PayPal surcharge applies only to what actually goes on the card
   // *now*: the deposit when the diver pays deposit-only, otherwise the whole
   // subtotal. Charging 5% of the full amount when only the deposit is on the
   // card over-charges — the remainder is paid later, off the card.
-  const depositFace = hasDeposit ? Math.min(event.deposit_amount ?? 0, subTotal) : 0
-  const payingDepositOnly = hasDeposit && payDepositOnly
-  const fullSurcharge    = Math.round(subTotal * paymentSurcharge)
-  const depositSurcharge = Math.round(depositFace * paymentSurcharge)
-  const total = subTotal + (payingDepositOnly ? depositSurcharge : fullSurcharge)
-  // "How much to pay now" figures for each option:
-  const fullNow        = subTotal + fullSurcharge            // pay full now (surcharge on everything)
-  const depositNow     = depositFace + depositSurcharge      // pay deposit now (surcharge on the deposit only)
-  const remainderLater = Math.max(0, subTotal - depositFace) // balance due later, no card surcharge
+  function moneyFor(gearAmount: number) {
+    const subTotal = sharedCost + gearAmount
+    const depositFace = hasDeposit ? Math.min(event.deposit_amount ?? 0, subTotal) : 0
+    const fullSurcharge    = Math.round(subTotal * paymentSurcharge)
+    const depositSurcharge = Math.round(depositFace * paymentSurcharge)
+    return {
+      subTotal,
+      total: subTotal + (payingDepositOnly ? depositSurcharge : fullSurcharge),
+      // "How much to pay now" figures for each option:
+      fullNow:        subTotal + fullSurcharge,            // pay full now (surcharge on everything)
+      depositNow:     depositFace + depositSurcharge,      // pay deposit now (surcharge on the deposit only)
+      remainderLater: Math.max(0, subTotal - depositFace), // balance due later, no card surcharge
+    }
+  }
 
-  // Every diver in a single-event family submit gets the same booking details,
-  // so each booking's total is identical — the lead owes the per-diver figure
-  // times the number of divers. Surface that cumulative figure when the lead
-  // pays for the group; otherwise each diver is billed their own amount and the
-  // per-diver figures stand alone.
+  const { subTotal, total, fullNow, depositNow, remainderLater } = moneyFor(gearCost)
+
+  // What each of the other divers costs, priced off their own gear answer. The
+  // lead owes the sum of the bookings, not their own figure times a headcount —
+  // a diver who brings their own kit is cheaper than one renting a full set.
+  const additionalMoney = additionalTargets.map(tg => {
+    const pick = gearPickFor(tg)
+    const cost = (showGearRentChoice && pick.choice === 'rent')
+      ? pick.items.reduce((s, item) => s + (GEAR_ALACARTE_PRICES[item] ?? 0) * diveDays, 0)
+      : 0
+    return { target: tg, pick, ...moneyFor(cost) }
+  })
+
   const groupCount       = 1 + additionalTargets.length
   const showGroupTotals  = leadPays && groupCount > 1
-  const groupTotal       = total * groupCount
-  const groupFullNow     = fullNow * groupCount
-  const groupDepositNow  = depositNow * groupCount
-  const groupRemainder   = remainderLater * groupCount
+  const sumWith = (own: number, pick: (m: typeof additionalMoney[number]) => number) =>
+    additionalMoney.reduce((s, m) => s + pick(m), own)
+  const groupTotal       = sumWith(total, m => m.total)
+  const groupFullNow     = sumWith(fullNow, m => m.fullNow)
+  const groupDepositNow  = sumWith(depositNow, m => m.depositNow)
+  const groupRemainder   = sumWith(remainderLater, m => m.remainderLater)
+  // Only call the lead's own figure a per-diver price when it really is one.
+  const uniformGroup     = additionalMoney.every(m => m.total === total)
 
   // Account credit applied at checkout pays the booking down deposit-first, so
   // it trims what's owed now and the leftover balance. When the toggle is off
@@ -954,13 +1036,11 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // Itemized breakdown of every charge that makes up `total`. Drives both the
   // on-screen summary and the snapshot written into details.charges, so what
   // the diver sees is exactly what gets frozen onto the booking.
-  const charges = useMemo(() => {
+  function chargesFor(rentedItems: string[], money: { total: number; subTotal: number }) {
     const room = (showRooms && roomId) ? rooms.find(r => r.id === roomId) ?? null : null
     return buildCharges({
       base,
-      gear: (showGearRentChoice && gearChoice === 'rent')
-        ? gearItems.map(item => ({ item, amount: (GEAR_ALACARTE_PRICES[item] ?? 0) * diveDays }))
-        : [],
+      gear: rentedItems.map(item => ({ item, amount: (GEAR_ALACARTE_PRICES[item] ?? 0) * diveDays })),
       gearDays: diveDays,
       room: room ? { label: room.display_title ?? room.admin_title ?? 'Room', amount: roomCost } : null,
       addons: showAddons
@@ -972,12 +1052,15 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       transport: transportCost,
       nitroxCourse: (showNitroxAddon && addNitroxCourse) ? NITROX_COURSE_FEE : 0,
       surcharge: paymentSurcharge > 0
-        ? { label: t.chargeLines.surcharge(siteConfig.business.cardSurchargePercent, payingDepositOnly), amount: total - subTotal }
+        ? { label: t.chargeLines.surcharge(siteConfig.business.cardSurchargePercent, payingDepositOnly), amount: money.total - money.subTotal }
         : null,
     })
-  }, [base, showGearRentChoice, gearChoice, gearItems, diveDays, showRooms, roomId, rooms, roomCost,
-      showAddons, addonIds, addons, transportCost, showNitroxAddon, addNitroxCourse,
-      paymentSurcharge, payingDepositOnly, total, subTotal])
+  }
+
+  const charges = chargesFor(
+    (showGearRentChoice && gearChoice === 'rent') ? gearItems : [],
+    { total, subTotal },
+  )
 
   function toggleItem(item: string) {
     // First toggle promotes the rendered default (or existing list) into
@@ -1064,16 +1147,19 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       emergency_contact_phone: nullish(emergencyPhone),
     }
 
-    const details: BookingDetails = {
-      gear: gearIncluded
+    const gearDetail = (choice: GearChoice | null, items: string[], helpNote: string): BookingDetails['gear'] =>
+      gearIncluded
         ? { rent: false, included: true }
         : !showGearRentChoice
           ? { rent: false }
-          : gearChoice === 'rent'
-            ? { rent: true, items: gearItems }
-            : gearChoice === 'help'
-              ? { rent: false, assistance_note: gearHelpNote.trim() || 'Diver is unsure what gear they need and asked for help.' }
-              : { rent: false },
+          : choice === 'rent'
+            ? { rent: true, items }
+            : choice === 'help'
+              ? { rent: false, assistance_note: helpNote.trim() || 'Diver is unsure what gear they need and asked for help.' }
+              : { rent: false }
+
+    const details: BookingDetails = {
+      gear: gearDetail(gearChoice, gearItems, gearHelpNote),
       room: (showRooms && roomId) ? { option_id: roomId, notes: roomNotes || null } : undefined,
       add_ons: showAddons ? [...addonIds] : [],
       transportation: needsTransport === true,
@@ -1107,6 +1193,18 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         ? new Date().toISOString()
         : initialDetails?.prereq_acked_at,
     }
+
+    // Each additional diver's booking differs from the lead's in exactly the
+    // gear they rent and the money that follows from it. Everything else —
+    // room, add-ons, ride, payment method, acknowledgements — is a property of
+    // the trip the lead booked, so it carries over unchanged.
+    const detailsForTarget = (m: typeof additionalMoney[number]): BookingDetails => ({
+      ...details,
+      gear: gearDetail(m.pick.choice, m.pick.items, m.pick.helpNote),
+      charges: chargesFor((showGearRentChoice && m.pick.choice === 'rent') ? m.pick.items : [], m),
+      total: m.total,
+      deposit: hasDeposit ? m.depositNow : undefined,
+    })
 
     if (existingBooking) {
       // Admin edit path stays direct — admin already has the row, no
@@ -1219,13 +1317,14 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       }
     }
     // Fan out one create-registration per additional diver picked. Same
-    // group_id, same details/notes, empty profile_patch (the parent's
-    // typed-in values were already applied to themselves; child profiles
-    // stay untouched). Promise.allSettled so a single child failure
-    // doesn't blow away the others.
+    // group_id and notes; details carry that diver's own gear and the money it
+    // comes to. Empty profile_patch (the parent's typed-in values were already
+    // applied to themselves; child profiles stay untouched). Promise.allSettled
+    // so a single child failure doesn't blow away the others.
     let allOk = true
     if (additionalTargets.length > 0) {
-      const calls = additionalTargets.map(async (target) => {
+      const calls = additionalMoney.map(async (m) => {
+        const target = m.target
         const { data: d, error: e } = await invokeWithRetry<{ booking_id: string; status?: string }>(
           'create-registration',
           {
@@ -1233,8 +1332,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               target_user_id: target.id,
               event_type:     event.type,
               event_id:       event.id,
-              profile_patch:  {},
-              details,
+              // Nothing of the lead's typed-in profile touches another diver's
+              // row. The one exception is a shoe size the lead supplied because
+              // this diver has none on file and something is going on their
+              // feet — a blank filled in, not a value overwritten.
+              profile_patch:  m.pick.shoeSize.trim() ? { shoe_size: m.pick.shoeSize.trim() } : {},
+              details:        detailsForTarget(m),
               notes:          notes || null,
               ...(groupId ? { group_id: groupId, suppress_email: true } : {}),
               ...(leadPays && leadPayerId ? { payer_id: leadPayerId } : {}),
@@ -1743,23 +1846,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 </label>
               </div>
               {gearChoice === 'rent' && (
-                <div className="pl-6 space-y-2">
-                  <p className="text-xs text-brand-950 font-medium">{t.register.checkItems}</p>
-                  {HAS_RENTAL_GEAR_ALTERNATIVES && (
-                    <p className="text-xs text-brand-950 font-medium">{t.register.gear.stylesHint}</p>
-                  )}
-                  {HAS_OWNED_ONLY_GEAR && (
-                    <p className="text-xs text-brand-950 font-medium">{t.register.gear.ownedOnlyHint}</p>
-                  )}
-                  <div className="grid grid-cols-2 gap-1">
-                    {RENTAL_GEAR_ITEMS.map(item => (
-                      <label key={item} className="flex items-center gap-1 text-xs text-brand-950 font-medium">
-                        <input type="checkbox" checked={gearItems.includes(item)} onChange={() => toggleItem(item)} className="accent-brand-900" />
-                        {item} ({GEAR_ALACARTE_PRICES[item]})
-                      </label>
-                    ))}
-                  </div>
-                </div>
+                <GearChecklist selected={gearItems} onToggle={toggleItem} />
               )}
               {gearChoice === 'help' && (
                 <div className="pl-6 space-y-1">
@@ -1777,6 +1864,72 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               )}
             </div>
           )}
+
+          {(showGearRentChoice || gearIncluded) && additionalTargets.map(tg => {
+            const pick = gearPickFor(tg)
+            const name = personName(tg.name, tg.nickname) || t.register.results.diverFallback
+            const packedForTarget = gearIncluded
+              ? FULL_GEAR_SET
+              : (pick.choice === 'rent' ? pick.items : [])
+            return (
+              <div key={tg.id} className="space-y-2 border-t border-surface-200 pt-3">
+                <p className="text-sm font-semibold text-brand-900">{t.register.gear.forDiver(name)}</p>
+                {showGearRentChoice && (
+                  <>
+                    <p className="text-xs text-brand-950 font-medium">{t.register.gear.forDiverBlurb}</p>
+                    <div className="space-y-1">
+                      {(['none', 'rent', 'help'] as const).map(choice => (
+                        <label key={choice} className="flex items-start gap-2 text-sm text-brand-950 font-medium">
+                          <input
+                            type="radio"
+                            name={`gear-choice-${tg.id}`}
+                            checked={pick.choice === choice}
+                            onChange={() => patchGearPick(tg.id, { choice })}
+                            className="accent-brand-900 mt-1"
+                          />
+                          <span className="flex-1">
+                            {choice === 'none' && t.register.gear.optNoneOther}
+                            {choice === 'rent' && t.register.gear.optRentOther}
+                            {choice === 'help' && t.register.gear.optHelpOther}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {showGearRentChoice && pick.choice === 'rent' && (
+                  <GearChecklist
+                    selected={pick.items}
+                    onToggle={item => patchGearPick(tg.id, { items: toggleGearSelection(pick.items, item) })}
+                  />
+                )}
+                {showGearRentChoice && pick.choice === 'help' && (
+                  <div className="pl-6 space-y-1">
+                    <p className="text-xs text-brand-950 font-medium">{t.register.gear.helpBlurb}</p>
+                    <textarea
+                      value={pick.helpNote}
+                      onChange={e => patchGearPick(tg.id, { helpNote: e.target.value })}
+                      rows={3}
+                      placeholder={t.register.gear.helpPlaceholder}
+                      className="w-full bg-white border border-surface-300 rounded-lg px-2 py-1 text-sm text-brand-900"
+                    />
+                  </div>
+                )}
+                {needsShoeSize(packedForTarget) && !tg.shoe_size && (
+                  <div className="pl-6 space-y-1">
+                    <p className="text-xs font-semibold text-brand-900">{t.register.gear.sizesTitleOther}</p>
+                    <div className="text-xs text-brand-950 font-medium">
+                      {t.register.gear.shoeSize}
+                      <div className="mt-0.5">
+                        <ShoeSizeField initial={null} onChange={v => patchGearPick(tg.id, { shoeSize: v })} />
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-brand-950/70 font-medium">{t.register.gear.savedForNextOther}</p>
+                  </div>
+                )}
+              </div>
+            )
+          })}
 
           {askShoe && (
             <div className="border-t border-surface-200 pt-2 space-y-2">
@@ -1943,7 +2096,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           <div className="text-sm text-brand-950 font-medium bg-surface-50 rounded-lg p-3 space-y-1">
             {charges.map((c, i) => <Row key={`${c.kind}-${i}`} label={c.label} value={c.amount} currency={event.currency} />)}
             <div className="border-t border-surface-200 pt-1 mt-1">
-              <Row label={showGroupTotals ? t.register.payment.perDiver : t.register.payment.total} value={total} currency={event.currency} bold />
+              <Row label={showGroupTotals && uniformGroup ? t.register.payment.perDiver : t.register.payment.total} value={total} currency={event.currency} bold />
             </div>
             {creditNow > 0 && (
               <div className="border-t border-surface-200 pt-1 mt-1 space-y-0.5">
@@ -1956,6 +2109,19 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             )}
             {showGroupTotals && (
               <div className="border-t border-surface-200 pt-1 mt-1 space-y-0.5">
+                {!uniformGroup && (
+                  <>
+                    <Row label={personName(profile?.name, profile?.nickname) || t.register.results.diverFallback} value={total} currency={event.currency} />
+                    {additionalMoney.map(m => (
+                      <Row
+                        key={m.target.id}
+                        label={personName(m.target.name, m.target.nickname) || t.register.results.diverFallback}
+                        value={m.total}
+                        currency={event.currency}
+                      />
+                    ))}
+                  </>
+                )}
                 <Row label={t.register.payment.groupTotal(groupCount)} value={groupTotal} currency={event.currency} bold />
                 <p className="text-xs text-brand-900/80">{t.register.payment.groupSharing}</p>
               </div>

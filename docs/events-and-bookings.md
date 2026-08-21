@@ -147,6 +147,13 @@ in `src/lib/logistics.ts` answers the question for both register flows,
 of the à-la-carte selection in one and of the assumed full set in the
 other.
 
+The same question is put for each additional diver the lead is booking,
+because they are the ones most likely to have no size on file. A shoe
+size the lead supplies there is the **only** thing that reaches another
+diver's profile — `profile_patch` is otherwise empty for a fanned-out
+booking — and it is only asked for when that profile hasn't got one, so
+it fills a blank rather than overwriting a value.
+
 ### Price composition
 
 ```
@@ -240,10 +247,20 @@ that single PDF to the shop and the lead — N divers, one email each
 way, instead of N separate PDFs. Solo registrations (one booking) are
 unchanged: they still get the per-diver `buildPdfBase64` PDF.
 
-This is why the **cost summary** on `RegisterForm`'s payment step shows
-a *group total* (per-diver figure × diver count) when the lead pays for
-everyone: each sibling booking carries the same per-diver `total`, so
-what the lead owes is the sum.
+The sibling bookings are not copies of each other. Everything that is a
+property of the *trip* — room, add-ons, ride, payment method, the
+acknowledgements — carries over from the lead's form unchanged, but the
+gear question is asked once per diver, and the money follows it. Each
+additional diver's question starts on the answer their own profile
+implies (`needsRental` / `defaultRentalItems` over their `gear_owned`),
+because a parent who owns a full kit is no evidence that their child
+does; the lead can change any of it before confirming.
+
+This is why the **cost summary** on `RegisterForm`'s payment step sums
+the bookings rather than multiplying one of them. It still calls the
+lead's figure a *per-diver* price when every booking really does come to
+the same amount; when they differ it names each diver and their own
+total above the group line.
 
 The partial unique index `bookings_one_active_per_user_idx`
 (`(user_id, event_id)` where the booking isn't cancelled) prevents a diver

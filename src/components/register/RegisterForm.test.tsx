@@ -9,7 +9,7 @@ import {
   type RegistrationDraft,
 } from '../../lib/registration-draft'
 import { siteConfig } from '../../config/site'
-import { GEAR_ITEMS } from '../../lib/gear'
+import { GEAR_ITEMS, FULL_GEAR_SET, GEAR_ALACARTE_PRICES } from '../../lib/gear'
 import { t } from '../../i18n'
 import type { AppEvent, EOAddon, EORoom, Profile } from '../../types/database'
 
@@ -1901,7 +1901,9 @@ describe('RegisterForm', () => {
     })
 
     it('shows the cumulative group total when the lead pays for everyone', async () => {
-      setupFromWithChildren([childProfile])
+      // Both divers own a full kit, so both bookings cost the same and the
+      // summary can honestly call the lead's figure a per-diver price.
+      setupFromWithChildren([{ ...childProfile, gear_owned: ownsAllBut() }])
       const user = userEvent.setup()
       render(
         <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
@@ -1923,6 +1925,176 @@ describe('RegisterForm', () => {
       expect(perDiver).toHaveTextContent('TWD 2,800')
       const groupRow = screen.getByText(/group total \(2 divers\)/i).closest('div')!
       expect(groupRow).toHaveTextContent('TWD 5,600')
+    })
+
+    it('prices each diver on their own gear rather than copying the lead', async () => {
+      // The parent owns a full kit; the child owns nothing, so the child's
+      // question starts on "rent" with every rental slot ticked.
+      setupFromWithChildren([{ ...childProfile, gear_owned: [] }])
+      const user = userEvent.setup()
+      render(
+        <RegisterForm event={sampleEvent} profile={{ ...sampleProfile, gear_owned: ownsAllBut() }}
+          userId="u1" onClose={() => {}} onBooked={() => {}} />
+      )
+      await waitFor(() => expect(screen.getByText(/who is this booking for/i)).toBeInTheDocument())
+      await user.click(screen.getByRole('checkbox', { name: /bee junior/i }))
+      await user.click(screen.getByRole('button', { name: /continue/i }))
+
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+      await user.click(screen.getByLabelText(/i have all the required gear/i))
+
+      // The child gets their own gear question, headed by their name.
+      expect(screen.getByText(/gear for bee junior \(bee jr\)/i)).toBeInTheDocument()
+      const fullSet = FULL_GEAR_SET.reduce((s, i) => s + (GEAR_ALACARTE_PRICES[i] ?? 0), 0)
+
+      await user.click(screen.getByRole('button', { name: /next/i }))
+
+      // Totals differ, so the summary drops the "per diver" claim and itemizes.
+      expect(screen.queryByText('Per diver')).not.toBeInTheDocument()
+      const childRow = screen.getByText('Bee Junior (Bee Jr)').closest('div')!
+      expect(childRow).toHaveTextContent(`TWD ${(2800 + fullSet).toLocaleString()}`)
+      const groupRow = screen.getByText(/group total \(2 divers\)/i).closest('div')!
+      expect(groupRow).toHaveTextContent(`TWD ${(2800 + 2800 + fullSet).toLocaleString()}`)
+
+      await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+      await waitFor(() => expect(invoke).toHaveBeenCalledTimes(3))
+      const bodies = invoke.mock.calls
+        .filter(c => c[0] === 'create-registration')
+        .map(c => (c[1] as { body: Record<string, unknown> }).body)
+      const selfBody  = bodies.find(b => !b.target_user_id)!
+      const childBody = bodies.find(b => b.target_user_id === 'child-1')!
+      const gearOf = (b: Record<string, unknown>) =>
+        (b.details as { gear: { rent: boolean; items?: string[] } }).gear
+      expect(gearOf(selfBody).rent).toBe(false)
+      expect(gearOf(childBody).rent).toBe(true)
+      expect(gearOf(childBody).items).toEqual(FULL_GEAR_SET)
+      // And the money follows the gear, per booking.
+      expect((childBody.details as { total: number }).total).toBe(2800 + fullSet)
+      expect((selfBody.details as { total: number }).total).toBe(2800)
+    })
+
+    it("asks the lead for a child's shoe size, and patches only that", async () => {
+      // The child owns nothing and has no shoe size, so fins are going on feet
+      // the shop has no measurement for.
+      setupFromWithChildren([{ ...childProfile, gear_owned: [], shoe_size: null }])
+      const user = userEvent.setup()
+      render(
+        <RegisterForm event={sampleEvent} profile={{ ...sampleProfile, gear_owned: ownsAllBut() }}
+          userId="u1" onClose={() => {}} onBooked={() => {}} />
+      )
+      await waitFor(() => expect(screen.getByText(/who is this booking for/i)).toBeInTheDocument())
+      await user.click(screen.getByRole('checkbox', { name: /bee junior/i }))
+      await user.click(screen.getByRole('button', { name: /continue/i }))
+
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+      await user.click(screen.getByLabelText(/i have all the required gear/i))
+      // The lead rents nothing, so the only shoe-size picker is the child's.
+      await user.selectOptions(screen.getByLabelText('Shoe size value'), '36')
+
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+      await waitFor(() => expect(invoke).toHaveBeenCalledTimes(3))
+      const bodies = invoke.mock.calls
+        .filter(c => c[0] === 'create-registration')
+        .map(c => (c[1] as { body: Record<string, unknown> }).body)
+      const childBody = bodies.find(b => b.target_user_id === 'child-1')!
+      // Only the blank gets filled — nothing else of the lead's form goes near
+      // the child's profile.
+      expect(childBody.profile_patch).toEqual({ shoe_size: 'EU 36 M' })
+    })
+
+    it('asks a size for each child on a course that packs the gear unasked', async () => {
+      // No rental question is put on a gear-included course, but a full set is
+      // still packed for every diver — including the ones the lead added.
+      const dsd: AppEvent = { ...noExtrasEvent, type: 'course', title: 'Discover Scuba Diving (DSD)' }
+      setupFromWithChildren([{ ...childProfile, gear_owned: [], shoe_size: null }])
+      const user = userEvent.setup()
+      render(
+        <RegisterForm event={dsd} profile={{ ...sampleProfile, shoe_size: 'EU 42 M' }}
+          userId="u1" onClose={() => {}} onBooked={() => {}} />
+      )
+      await waitFor(() => expect(screen.getByText(/who is this booking for/i)).toBeInTheDocument())
+      await user.click(screen.getByRole('checkbox', { name: /bee junior/i }))
+      await user.click(screen.getByRole('button', { name: /continue/i }))
+
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+      // The lead already has a size on file; the child's is the one asked for.
+      expect(screen.getByText(/gear for bee junior \(bee jr\)/i)).toBeInTheDocument()
+      expect(screen.queryByText(/they have all the required gear/i)).not.toBeInTheDocument()
+      await user.selectOptions(screen.getByLabelText('Shoe size value'), '36')
+
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+      await waitFor(() => expect(invoke).toHaveBeenCalledTimes(3))
+      const childBody = invoke.mock.calls
+        .filter(c => c[0] === 'create-registration')
+        .map(c => (c[1] as { body: Record<string, unknown> }).body)
+        .find(b => b.target_user_id === 'child-1')!
+      expect(childBody.profile_patch).toEqual({ shoe_size: 'EU 36 M' })
+      expect((childBody.details as { gear: { included: boolean } }).gear.included).toBe(true)
+    })
+
+    it("leaves a child's profile alone when nothing goes on their feet", async () => {
+      setupFromWithChildren([{ ...childProfile, gear_owned: ownsAllBut(), shoe_size: null }])
+      const user = userEvent.setup()
+      render(
+        <RegisterForm event={sampleEvent} profile={{ ...sampleProfile, gear_owned: ownsAllBut() }}
+          userId="u1" onClose={() => {}} onBooked={() => {}} />
+      )
+      await waitFor(() => expect(screen.getByText(/who is this booking for/i)).toBeInTheDocument())
+      await user.click(screen.getByRole('checkbox', { name: /bee junior/i }))
+      await user.click(screen.getByRole('button', { name: /continue/i }))
+
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+      await user.click(screen.getByLabelText(/i have all the required gear/i))
+      expect(screen.queryByLabelText('Shoe size value')).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+      await waitFor(() => expect(invoke).toHaveBeenCalledTimes(3))
+      const childBody = invoke.mock.calls
+        .filter(c => c[0] === 'create-registration')
+        .map(c => (c[1] as { body: Record<string, unknown> }).body)
+        .find(b => b.target_user_id === 'child-1')!
+      expect(childBody.profile_patch).toEqual({})
+    })
+
+    it('lets the lead change what an additional diver rents', async () => {
+      setupFromWithChildren([{ ...childProfile, gear_owned: [] }])
+      const user = userEvent.setup()
+      render(
+        <RegisterForm event={sampleEvent} profile={{ ...sampleProfile, gear_owned: ownsAllBut() }}
+          userId="u1" onClose={() => {}} onBooked={() => {}} />
+      )
+      await waitFor(() => expect(screen.getByText(/who is this booking for/i)).toBeInTheDocument())
+      await user.click(screen.getByRole('checkbox', { name: /bee junior/i }))
+      await user.click(screen.getByRole('button', { name: /continue/i }))
+
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+      await user.click(screen.getByLabelText(/i have all the required gear/i))
+      // Only the child's checklist is on the page — the lead rents nothing.
+      await user.click(screen.getByLabelText((text: string) => text.includes('Dive computer')))
+
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+      await waitFor(() => expect(invoke).toHaveBeenCalledTimes(3))
+      const childBody = invoke.mock.calls
+        .filter(c => c[0] === 'create-registration')
+        .map(c => (c[1] as { body: Record<string, unknown> }).body)
+        .find(b => b.target_user_id === 'child-1')!
+      const items = (childBody.details as { gear: { items: string[] } }).gear.items
+      expect(items).not.toContain('Dive computer')
+      expect(items).toContain('BCD')
     })
 
     it('surfaces per-diver results when an additional child call fails', async () => {
