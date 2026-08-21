@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   EVENT_KINDS,
-  usesDateEnvelope, usesCourseDays, heldAtShop, hasDiveFlags, isEventKind,
+  usesDateEnvelope, usesCourseDays, heldAtShop, usesTripTemplate, hasDiveFlags, isEventKind,
   DATE_ENVELOPE_KINDS, COURSE_DAY_KINDS, NON_COURSE_KINDS,
 } from './event-kinds'
 
@@ -24,6 +24,15 @@ describe('event kind helpers', () => {
   it('gives a shop-run course the shop address, and a travelling kind none', () => {
     expect(heldAtShop('course')).toBe(true)
     expect(heldAtShop('dive')).toBe(false)
+  })
+
+  // eventPayloadFromForm writes trip_template_id: null for a course, so the
+  // link is unreachable there rather than merely absent — and an admin should
+  // not be told to go and manage something they cannot reach.
+  it('offers a trip template to the kinds whose form has the picker', () => {
+    expect(usesTripTemplate('dive')).toBe(true)
+    expect(usesTripTemplate('adventure')).toBe(true)
+    expect(usesTripTemplate('course')).toBe(false)
   })
 
   it('gives adventures the dive temporal shape, not the course one', () => {

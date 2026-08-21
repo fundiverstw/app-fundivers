@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   CORAL_HUES, CORAL_LEVELS, CORAL_TYPES, CORAL_SURVEY_METHODS,
   BLEACHED_AT_OR_BELOW, colonyScore, isBleached, summarizeSurvey,
-  colonyProblem, colonyFromDraft, emptyColonyDraft,
+  colonyProblem, colonyFromDraft, emptyColonyDraft, headerProblem, SURVEY_LIMITS,
   type CoralColony, type ColonyDraft,
 } from './coral-survey'
 
@@ -152,5 +152,44 @@ describe('colonyFromDraft', () => {
   it('refuses a row the validator rejects', () => {
     expect(colonyFromDraft(draft({ coral_type: '' }))).toBeNull()
     expect(colonyFromDraft(draft({ lightest_level: '6', darkest_level: '1' }))).toBeNull()
+  })
+})
+
+describe('headerProblem', () => {
+  it('accepts a header with nothing filled in — every field is optional', () => {
+    expect(headerProblem({})).toBeNull()
+    expect(headerProblem({ depth_m: null, water_temp_c: null, transect_length_m: null })).toBeNull()
+  })
+
+  it('accepts values inside the ranges the schema allows', () => {
+    expect(headerProblem({ depth_m: 0 })).toBeNull()
+    expect(headerProblem({ depth_m: 100 })).toBeNull()
+    expect(headerProblem({ water_temp_c: -2 })).toBeNull()
+    expect(headerProblem({ water_temp_c: 40 })).toBeNull()
+    expect(headerProblem({ transect_length_m: 500 })).toBeNull()
+  })
+
+  it('names the field that is out of range', () => {
+    expect(headerProblem({ depth_m: 120 })).toBe('depth_m')
+    expect(headerProblem({ depth_m: -1 })).toBe('depth_m')
+    expect(headerProblem({ water_temp_c: 45 })).toBe('water_temp_c')
+    expect(headerProblem({ transect_length_m: 900 })).toBe('transect_length_m')
+  })
+
+  // The schema wants a transect longer than zero, not merely non-negative:
+  // a transect of no length is not a transect.
+  it('refuses a zero-length transect while allowing a zero depth', () => {
+    expect(headerProblem({ transect_length_m: 0 })).toBe('transect_length_m')
+    expect(headerProblem({ depth_m: 0 })).toBeNull()
+  })
+
+  it('reports the first offending field when several are wrong', () => {
+    expect(headerProblem({ depth_m: 120, water_temp_c: 99 })).toBe('depth_m')
+  })
+
+  it('states the same bounds the migration does', () => {
+    expect(SURVEY_LIMITS.depth_m).toEqual({ min: 0, max: 100 })
+    expect(SURVEY_LIMITS.water_temp_c).toEqual({ min: -2, max: 40 })
+    expect(SURVEY_LIMITS.transect_length_m).toEqual({ min: 0, max: 500 })
   })
 })

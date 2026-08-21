@@ -122,12 +122,6 @@ interface GearPick {
   shoeSize: string
 }
 
-/**
- * The gear answer a diver's own profile implies. The lead booker answers for
- * everyone they picked, and those divers aren't at the keyboard to say what
- * they own — but their profile already lists it, so start each of them on
- * "rent whatever your kit is missing" and let the lead adjust.
- */
 /** The à-la-carte tick list, rendered once per diver the lead is booking. */
 function GearChecklist({ selected, onToggle }: { selected: string[]; onToggle: (item: string) => void }) {
   return (
@@ -151,6 +145,12 @@ function GearChecklist({ selected, onToggle }: { selected: string[]; onToggle: (
   )
 }
 
+/**
+ * The gear answer a diver's own profile implies. The lead booker answers for
+ * everyone they picked, and those divers aren't at the keyboard to say what
+ * they own — but their profile already lists it, so start each of them on
+ * "rent whatever your kit is missing" and let the lead adjust.
+ */
 function defaultGearPick(diver: Profile): GearPick {
   return {
     choice: needsRental(diver.gear_owned) ? 'rent' : 'none',

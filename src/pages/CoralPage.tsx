@@ -15,7 +15,7 @@ import { useAuth } from '../hooks/useAuth'
 import { t } from '../i18n'
 import {
   CORAL_HUES, CORAL_LEVELS, CORAL_TYPES, CORAL_SURVEY_METHODS, MAX_COLONIES,
-  colonyProblem, colonyFromDraft, emptyColonyDraft, summarizeSurvey,
+  colonyProblem, colonyFromDraft, emptyColonyDraft, summarizeSurvey, headerProblem,
   type ColonyDraft, type CoralSurveyMethod, type CoralType,
 } from '../lib/coral-survey'
 import {
@@ -23,6 +23,7 @@ import {
 } from '../lib/coral-surveys'
 import { fetchDiveSites } from '../lib/dive-sites'
 import { todayIso, addIsoDays } from '../lib/dates'
+import { numOrNull } from '../lib/num'
 import type { CoralSurveyRow, DiveSite } from '../types/database'
 import {
   CARD, TEXT_BODY, TEXT_SUBTLE, TEXT_HEADING, INPUT, INPUT_LABEL,
@@ -44,13 +45,6 @@ const METHOD_LABEL: Record<CoralSurveyMethod, string> = {
   random: tc.methodRandom,
   transect: tc.methodTransect,
   quadrat: tc.methodQuadrat,
-}
-
-function parseNum(v: string): number | null {
-  const trimmed = v.trim()
-  if (trimmed === '') return null
-  const n = Number(trimmed)
-  return Number.isFinite(n) ? n : null
 }
 
 interface SurveyFormState {
@@ -80,7 +74,7 @@ const blankForm = (): SurveyFormState => ({
 /** The figures a survey reduces to, rendered the same way in the queue and the
  *  history so a staff member and a diver read the same summary. */
 function SurveySummaryLine({ survey }: { survey: CoralSurveyRow }) {
-  const summary = summarizeSurvey(survey.colonies ?? [])
+  const summary = summarizeSurvey(survey.colonies)
   if (summary.count === 0) return null
   return (
     <p className={`text-xs ${TEXT_SUBTLE}`}>
@@ -94,8 +88,7 @@ function SurveySummaryLine({ survey }: { survey: CoralSurveyRow }) {
 }
 
 function ColonyTable({ survey }: { survey: CoralSurveyRow }) {
-  const colonies = survey.colonies ?? []
-  if (colonies.length === 0) return null
+  if (survey.colonies.length === 0) return null
   return (
     <div className="overflow-x-auto mt-2">
       <table className="w-full text-xs table-fixed">
@@ -116,8 +109,8 @@ function ColonyTable({ survey }: { survey: CoralSurveyRow }) {
           </tr>
         </thead>
         <tbody>
-          {colonies.map(colony => (
-            <tr key={colony.ordinal ?? `${colony.coral_type}-${colony.lightest_level}`} className={TEXT_BODY}>
+          {survey.colonies.map(colony => (
+            <tr key={colony.ordinal} className={TEXT_BODY}>
               <td className="py-1">{colony.ordinal}</td>
               <td className="py-1">{TYPE_LABEL[colony.coral_type]}</td>
               <td className="py-1">{colony.lightest_hue}{colony.lightest_level}</td>
@@ -140,6 +133,29 @@ function SurveyHeaderLine({ survey }: { survey: CoralSurveyRow }) {
     METHOD_LABEL[survey.survey_method],
   ].filter(Boolean)
   return <p className={`text-xs ${TEXT_SUBTLE}`}>{parts.join(' · ')}</p>
+}
+
+/**
+ * One survey as both lists show it. The queue passes its review controls as
+ * children; the history passes none.
+ */
+function SurveyItem({ survey, children }: {
+  survey: CoralSurveyRow
+  children?: React.ReactNode
+}) {
+  return (
+    <li className="border-t border-surface-200 pt-3 first:border-t-0 first:pt-0">
+      <p className={`text-sm font-semibold ${TEXT_BODY}`}>
+        {survey.site_name}
+        {survey.diver_display ? ` — ${survey.diver_display}` : ''}
+      </p>
+      <SurveyHeaderLine survey={survey} />
+      <SurveySummaryLine survey={survey} />
+      <ColonyTable survey={survey} />
+      {survey.notes && <p className={`text-xs ${TEXT_BODY} mt-1`}>{survey.notes}</p>}
+      {children}
+    </li>
+  )
 }
 
 function ModerationQueue({
@@ -174,15 +190,7 @@ function ModerationQueue({
       ) : (
         <ul className="mt-2 space-y-3">
           {surveys.map(survey => (
-            <li key={survey.id} className="border-t border-surface-200 pt-3 first:border-t-0 first:pt-0">
-              <p className={`text-sm font-semibold ${TEXT_BODY}`}>
-                {survey.site_name}
-                {survey.diver_display ? ` — ${survey.diver_display}` : ''}
-              </p>
-              <SurveyHeaderLine survey={survey} />
-              <SurveySummaryLine survey={survey} />
-              <ColonyTable survey={survey} />
-              {survey.notes && <p className={`text-xs ${TEXT_BODY} mt-1`}>{survey.notes}</p>}
+            <SurveyItem key={survey.id} survey={survey}>
               <input
                 className={`${INPUT} mt-2`}
                 placeholder={tc.staffNotesPlaceholder}
@@ -208,7 +216,7 @@ function ModerationQueue({
                   {tc.reject}
                 </button>
               </div>
-            </li>
+            </SurveyItem>
           ))}
         </ul>
       )}
@@ -338,11 +346,13 @@ function SurveyForm({
 }) {
   const [form, setForm] = useState<SurveyFormState>(blankForm)
   const [error, setError] = useState<string | null>(null)
+  const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   const update = <K extends keyof SurveyFormState>(field: K, value: SurveyFormState[K]) => {
     setForm(prev => ({ ...prev, [field]: value }))
     setError(null)
+    setSubmitted(false)
   }
 
   const setColony = (index: number, next: ColonyDraft) => {
@@ -351,6 +361,7 @@ function SurveyForm({
       colonies: prev.colonies.map((c, i) => (i === index ? next : c)),
     }))
     setError(null)
+    setSubmitted(false)
   }
 
   const addColony = () =>
@@ -369,6 +380,20 @@ function SurveyForm({
     if (!form.site_id) { setError(tc.siteRequired); return }
     if (!form.surveyed_on) { setError(tc.dateRequired); return }
 
+    const badField = headerProblem({
+      depth_m: numOrNull(form.depth_m),
+      water_temp_c: numOrNull(form.water_temp_c),
+      transect_length_m: form.method === 'transect' ? numOrNull(form.transect_length_m) : null,
+    })
+    if (badField) {
+      setError(
+        badField === 'depth_m' ? tc.problemDepth
+          : badField === 'water_temp_c' ? tc.problemWaterTemp
+            : tc.problemTransectLength,
+      )
+      return
+    }
+
     // Report the first bad row by number. "Something is wrong somewhere" in a
     // form of twenty colonies is not a message anybody can act on.
     for (const [index, draft] of form.colonies.entries()) {
@@ -385,9 +410,14 @@ function SurveyForm({
 
     setSubmitting(true)
     setError(null)
+    setSubmitted(false)
     try {
       await onSubmit(form)
       setForm(blankForm())
+      // A filed survey is pending, so it appears in neither the diver's
+      // approved history nor (for a diver) the review queue. Without this the
+      // form simply blanks itself, which reads as the submission being lost.
+      setSubmitted(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : tc.submitFailed)
     } finally {
@@ -530,6 +560,7 @@ function SurveyForm({
       </label>
 
       {error && <p className={ERROR_NOTE_LIGHT}>{error}</p>}
+      {submitted && <p className={`text-xs ${TEXT_SUBTLE} mt-2`}>{tc.submitted}</p>}
 
       <button type="submit" className={`${BTN_PRIMARY} mt-3`} disabled={submitting}>
         {submitting ? tc.submitting : tc.submitButton}
@@ -547,16 +578,7 @@ function HistoryList({ surveys }: { surveys: CoralSurveyRow[] }) {
       ) : (
         <ul className="mt-2 space-y-3">
           {surveys.map(survey => (
-            <li key={survey.id} className="border-t border-surface-200 pt-3 first:border-t-0 first:pt-0">
-              <p className={`text-sm font-semibold ${TEXT_BODY}`}>
-                {survey.site_name}
-                {survey.diver_display ? ` — ${survey.diver_display}` : ''}
-              </p>
-              <SurveyHeaderLine survey={survey} />
-              <SurveySummaryLine survey={survey} />
-              <ColonyTable survey={survey} />
-              {survey.notes && <p className={`text-xs ${TEXT_BODY} mt-1`}>{survey.notes}</p>}
-            </li>
+            <SurveyItem key={survey.id} survey={survey} />
           ))}
         </ul>
       )}
@@ -611,10 +633,10 @@ export function CoralPage() {
       surveyedOn: form.surveyed_on,
       colonies,
       surveyedAt: form.surveyed_at || null,
-      depthM: parseNum(form.depth_m),
-      waterTempC: parseNum(form.water_temp_c),
+      depthM: numOrNull(form.depth_m),
+      waterTempC: numOrNull(form.water_temp_c),
       method: form.method,
-      transectLengthM: form.method === 'transect' ? parseNum(form.transect_length_m) : null,
+      transectLengthM: form.method === 'transect' ? numOrNull(form.transect_length_m) : null,
       notes: form.notes.trim() || null,
     })
     await loadPending()

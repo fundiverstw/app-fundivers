@@ -133,11 +133,22 @@ export function EventCarAssignment({ event, isAdmin, createdBy }: Props) {
       )}
 
       {!hasTransport ? (
-        allocations.length > 0 && (
-          <p className="text-xs text-amber-700 font-semibold pl-1">
-            {tp.noTransportCarsLeft(allocations.length)}
-          </p>
-        )
+        <>
+          {/* Turning the switch off does not rewrite bookings that already
+              hold a ride, and this event has just left the Logistics rides
+              board. Somebody has to be told, or the two admin surfaces
+              disagree in silence. */}
+          {(seats?.claimed ?? 0) > 0 && (
+            <p className="text-xs text-amber-700 font-semibold pl-1">
+              {tp.noTransportRidersLeft(seats!.claimed)}
+            </p>
+          )}
+          {allocations.length > 0 && (
+            <p className="text-xs text-amber-700 font-semibold pl-1">
+              {tp.noTransportCarsLeft(allocations.length)}
+            </p>
+          )}
+        </>
       ) : (
         <>
           <EventVehicleGroup

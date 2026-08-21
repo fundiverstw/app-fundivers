@@ -194,8 +194,17 @@ export async function extendSeries(
 
   // p_series_id rather than p_series: these join the existing batch instead of
   // starting another one. Same single transaction as the initial create.
+  // has_transport is not a form field (the vehicle section owns it), so it has
+  // to be carried across explicitly: jsonb_populate_record leaves an absent key
+  // NULL rather than falling back to the column default, and NOT NULL then
+  // refuses the whole batch. Taken from the occurrence being continued, so a
+  // series an admin marked as carrying nobody stays that way.
+  const hasTransport = last.has_transport ?? true
   const { data, error } = await supabase.rpc('create_events_with_relations', {
-    p_events: dates.map(date => eventPayloadFromForm(shiftFormToDate(template, date))),
+    p_events: dates.map(date => ({
+      ...eventPayloadFromForm(shiftFormToDate(template, date)),
+      has_transport: hasTransport,
+    })),
     p_room_ids: template.roomIds,
     p_addon_ids: template.addonIds,
     p_destination_ids: template.destinationIds,

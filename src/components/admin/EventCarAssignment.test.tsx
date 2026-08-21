@@ -76,6 +76,23 @@ describe('EventCarAssignment', () => {
     expect(screen.getByText(/carries nobody while this is off/i)).toBeInTheDocument()
   })
 
+  it('warns that divers who already asked for a ride are no longer planned for', async () => {
+    fetchEventHasTransport.mockResolvedValue(false)
+    fetchRideSeats.mockResolvedValue({ capacity: 7, claimed: 3, available: 4, seats: 7, staff: 0 })
+    render(<EventCarAssignment event={event} isAdmin createdBy="admin-1" />)
+
+    expect(await screen.findByText(/3 divers already asked for a ride/i)).toBeInTheDocument()
+  })
+
+  it('says nothing about riders when nobody asked for one', async () => {
+    fetchEventHasTransport.mockResolvedValue(false)
+    fetchRideSeats.mockResolvedValue({ capacity: 0, claimed: 0, available: 0, seats: 0, staff: 0 })
+    render(<EventCarAssignment event={event} isAdmin createdBy="admin-1" />)
+
+    await screen.findByLabelText(/transport not needed/i)
+    expect(screen.queryByText(/already asked for a ride/i)).not.toBeInTheDocument()
+  })
+
   it('rolls the tick back when the write fails', async () => {
     setEventHasTransport.mockRejectedValue(new Error('denied'))
     const user = userEvent.setup()

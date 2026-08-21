@@ -4,6 +4,7 @@ import { splitByTransport } from '../../lib/logistics'
 import { TransportGroup } from './TransportGroup'
 import { EventCarAssignment } from './EventCarAssignment'
 import { setBookingTransportation } from '../../lib/booking-transport'
+import { usesTripTemplate } from '../../lib/event-kinds'
 import type { AppEvent, Booking, BookingDetails, Profile } from '../../types/database'
 import { t } from '../../i18n'
 
@@ -196,6 +197,11 @@ function TransportTextEditor({ event, isAdmin }: { event: AppEvent; isAdmin: boo
       setSaving(false)
     }
   }
+
+  // Nothing linked and nothing linkable: a course has no trip template and no
+  // way to acquire one, so the section would be a heading over advice that
+  // cannot be followed.
+  if (ref === null && !usesTripTemplate(event.type)) return null
 
   if (!isAdmin) {
     if (!event.details?.transportation) return null

@@ -1,10 +1,19 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   seriesAnchor, shiftFormToDate, occurrenceDate, sortOccurrences,
-  laterOccurrences, sharedPatchFromForm,
+  laterOccurrences, sharedPatchFromForm, createEvents, extendSeries,
 } from './event-series'
 import { EMPTY_FORM, type FormState } from '../components/admin/event-form-state'
+import { formStateFromEvent } from '../components/admin/event-form-state'
 import type { EventRow } from '../types/database'
+
+const { rpc, from } = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn() }))
+vi.mock('./supabase', () => ({
+  supabase: {
+    rpc: (...a: unknown[]) => rpc(...a),
+    from: (...a: unknown[]) => from(...a),
+  },
+}))
 
 const dive = (over: Partial<FormState> = {}): FormState => ({
   ...EMPTY_FORM,
@@ -205,5 +214,59 @@ describe('sharedPatchFromForm', () => {
     expect(patch.course_name).toBe('Open Water')
     expect(patch.included).toBe('gear')
     expect(patch).not.toHaveProperty('course_days')
+  })
+})
+
+// Both call paths build their own `p_events` payloads for
+// create_events_with_relations, which populates rows with
+// jsonb_populate_record: a key the caller omits lands as NULL rather than as
+// the column default, so a NOT NULL column left out fails the whole batch.
+// extendSeries had no coverage and a new column broke it silently.
+describe('event payloads carry every NOT NULL column', () => {
+  const row = (over: Partial<EventRow> = {}): EventRow => ({
+    id: 'e1', kind: 'dive', admin_title: 'Saturday boat dive',
+    start_date: '2026-08-01', end_date: '2026-08-01', notes: '',
+    series_id: 'series-1', has_transport: true,
+    ...over,
+  } as EventRow)
+
+  beforeEach(() => {
+    rpc.mockReset(); from.mockReset()
+    rpc.mockResolvedValue({ data: ['new-1', 'new-2'], error: null })
+  })
+
+  const payloads = () =>
+    (rpc.mock.calls.at(-1)![1] as { p_events: Array<Record<string, unknown>> }).p_events
+
+  it('createEvents sends has_transport on every occurrence', async () => {
+    await createEvents({
+      form: dive(),
+      rule: { freq: 'weekly', interval: 1, weekdays: [6], count: 3 },
+      hasTransport: false,
+      createdBy: null,
+    })
+    expect(payloads()).toHaveLength(3)
+    expect(payloads().every(p => p.has_transport === false)).toBe(true)
+  })
+
+  it('createEvents defaults has_transport to true when the caller says nothing', async () => {
+    await createEvents({ form: dive(), createdBy: null })
+    expect(payloads()[0].has_transport).toBe(true)
+  })
+
+  it('extendSeries carries has_transport from the occurrence it continues', async () => {
+    const last = row({ id: 'e2', start_date: '2026-08-15', has_transport: false })
+    from.mockImplementation((table: string) => {
+      if (table === 'event_series') {
+        return { select: () => ({ eq: () => ({ maybeSingle: () =>
+          Promise.resolve({ data: { id: 'series-1', kind: 'dive', freq: 'weekly', interval: 1, weekdays: [6] }, error: null }) }) }) }
+      }
+      return { select: () => ({ eq: () => Promise.resolve({ data: [last], error: null }) }) }
+    })
+
+    await extendSeries('series-1', 2, r => formStateFromEvent(r))
+
+    expect(payloads()).toHaveLength(2)
+    expect(payloads().every(p => p.has_transport === false)).toBe(true)
   })
 })

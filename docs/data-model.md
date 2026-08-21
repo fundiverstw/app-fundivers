@@ -92,7 +92,7 @@ collapsed into `events` and the reference tables renamed (`EO_prices` →
 
 **Never branch on `kind === 'dive'`.** The vocabulary and the questions
 live in `src/lib/event-kinds.ts` — `usesDateEnvelope`, `usesCourseDays`,
-`allowsTransport`, `isInstructorLed`, `hasDiveFlags`, plus the
+`heldAtShop`, `isInstructorLed`, `hasDiveFlags`, plus the
 `DATE_ENVELOPE_KINDS` / `COURSE_DAY_KINDS` value lists that queries filter
 on. That file is deliberately import-free so the Deno edge functions and
 the push worker share it, and `src/types/database.ts` carries a

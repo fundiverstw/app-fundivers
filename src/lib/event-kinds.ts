@@ -66,6 +66,17 @@ export const NON_COURSE_KINDS: readonly EventKind[] = EVENT_KINDS.filter(k => !u
  * told. Whether a ride is on offer is a question about the cars assigned to
  * an event, and only the tally can answer it.
  */
+/**
+ * Can an event of this kind carry a trip template? The admin event form only
+ * offers the picker for the kinds that answer yes, and eventPayloadFromForm
+ * writes `trip_template_id: null` for the rest — so for a course the link is
+ * not merely absent, it is unreachable, and telling an admin to go and manage
+ * it is advice they cannot act on.
+ */
+export function usesTripTemplate(kind: EventKind): boolean {
+  return kind !== 'course'
+}
+
 export function heldAtShop(kind: EventKind): boolean {
   return kind === 'course'
 }

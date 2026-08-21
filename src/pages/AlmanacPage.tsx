@@ -30,6 +30,7 @@ import { hasTerrainConditions, SITE_CONDITION_KINDS, type EventKind } from '../l
 import { EVENT_KIND_LABELS } from '../lib/event-kind-labels'
 import { fetchDiveSites } from '../lib/dive-sites'
 import { todayIso, addIsoDays, parseIsoDate } from '../lib/dates'
+import { numOrNull } from '../lib/num'
 import { supabase } from '../lib/supabase'
 import {
   CARD,
@@ -100,12 +101,6 @@ const emptyForm: AlmanacFormState = {
   elevation_m: '',
   route_condition: '',
   summit_visible: false,
-}
-
-function parseNum(v: string): number | null {
-  if (!v.trim()) return null
-  const n = Number(v)
-  return Number.isFinite(n) ? n : null
 }
 
 function formatNum(v: number | null, decimals = 1): string {
@@ -695,16 +690,16 @@ export function AlmanacPage() {
     const { error } = await supabase.rpc('submit_almanac_record', {
       p_site_id: form.site_id,
       p_obs_date: form.obs_date,
-      p_air_temp_c: parseNum(form.air_temp_c),
-      p_water_temp_c: parseNum(form.water_temp_c),
-      p_visibility_m: parseNum(form.visibility_m),
+      p_air_temp_c: numOrNull(form.air_temp_c),
+      p_water_temp_c: numOrNull(form.water_temp_c),
+      p_visibility_m: numOrNull(form.visibility_m),
       p_current_strength: form.current_strength || null,
-      p_wave_height_m: parseNum(form.wave_height_m),
-      p_wave_period_s: parseNum(form.wave_period_s),
+      p_wave_height_m: numOrNull(form.wave_height_m),
+      p_wave_period_s: numOrNull(form.wave_period_s),
       p_weather: form.weather || null,
       p_wildlife: parseWildlife(form.wildlife),
       p_coral_health: form.coral_health || null,
-      p_elevation_m: terrain ? parseNum(form.elevation_m) : null,
+      p_elevation_m: terrain ? numOrNull(form.elevation_m) : null,
       p_route_condition: terrain ? form.route_condition || null : null,
       p_summit_visible: terrain ? form.summit_visible : null,
     })

@@ -189,7 +189,12 @@ begin
     raise exception 'not authenticated' using errcode = '42501';
   end if;
 
-  if p_obs_date > current_date then
+  -- Compared against tomorrow rather than today: the client sends a date in the
+  -- shop's timezone and the database clock is UTC, so between midnight and
+  -- 08:00 in Taipei a same-day record looks like a future one. A day of slack
+  -- absorbs every offset on earth and still refuses a date nobody could have
+  -- observed.
+  if p_obs_date > current_date + 1 then
     raise exception 'almanac_obs_date_in_future' using errcode = '23514';
   end if;
 

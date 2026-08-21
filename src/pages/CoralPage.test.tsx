@@ -173,6 +173,107 @@ describe('CoralPage', () => {
     expect(submitCoralSurvey).not.toHaveBeenCalled()
   })
 
+  it('drops a colony row, and offers no remove button on the last one', async () => {
+    const user = userEvent.setup()
+    render(<CoralPage />)
+    await screen.findByLabelText('Dive site')
+
+    // A survey needs at least one colony, so the sole row cannot be removed.
+    expect(screen.queryByRole('button', { name: /^remove$/i })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /add a colony/i }))
+    expect(screen.getAllByRole('button', { name: /^remove$/i })).toHaveLength(2)
+
+    await user.selectOptions(screen.getByLabelText('Dive site'), 'site-1')
+    await fillColony(user, 1)
+    await fillColony(user, 2, { type: 'plate' })
+    await user.click(screen.getAllByRole('button', { name: /^remove$/i })[0])
+
+    await user.click(screen.getByRole('button', { name: /submit survey/i }))
+    await waitFor(() => expect(submitCoralSurvey).toHaveBeenCalled())
+    const { colonies } = submitCoralSurvey.mock.calls[0][0]
+    expect(colonies).toHaveLength(1)
+    expect(colonies[0].coral_type).toBe('plate')
+  })
+
+  it('sends a transect length only when the method is a transect', async () => {
+    const user = userEvent.setup()
+    render(<CoralPage />)
+    await screen.findByLabelText('Dive site')
+
+    await user.selectOptions(screen.getByLabelText('Dive site'), 'site-1')
+    await user.selectOptions(screen.getByLabelText('Method'), 'transect')
+    await user.type(screen.getByLabelText(/transect length/i), '25')
+    await fillColony(user, 1)
+    await user.click(screen.getByRole('button', { name: /submit survey/i }))
+
+    await waitFor(() => expect(submitCoralSurvey).toHaveBeenCalled())
+    expect(submitCoralSurvey.mock.calls[0][0]).toMatchObject({
+      method: 'transect', transectLengthM: 25,
+    })
+
+    // Switching back to a method that has no transect withdraws the figure
+    // rather than carrying it into a survey it does not describe.
+    submitCoralSurvey.mockClear()
+    await user.selectOptions(screen.getByLabelText('Method'), 'quadrat')
+    await user.selectOptions(screen.getByLabelText('Dive site'), 'site-1')
+    await fillColony(user, 1)
+    await user.click(screen.getByRole('button', { name: /submit survey/i }))
+
+    await waitFor(() => expect(submitCoralSurvey).toHaveBeenCalled())
+    expect(submitCoralSurvey.mock.calls[0][0]).toMatchObject({
+      method: 'quadrat', transectLengthM: null,
+    })
+  })
+
+  it('surfaces a failed submit and keeps what the diver typed', async () => {
+    submitCoralSurvey.mockRejectedValue(new Error('coral_survey_already_reviewed'))
+    const user = userEvent.setup()
+    render(<CoralPage />)
+    await screen.findByLabelText('Dive site')
+
+    await user.selectOptions(screen.getByLabelText('Dive site'), 'site-1')
+    await fillColony(user, 1)
+    await user.click(screen.getByRole('button', { name: /submit survey/i }))
+
+    expect(await screen.findByText(/coral_survey_already_reviewed/)).toBeInTheDocument()
+    // The form is not reset, so a diver can correct and resubmit.
+    expect(screen.getByLabelText('Dive site')).toHaveValue('site-1')
+    expect(screen.getByLabelText('Colony 1 Growth form')).toHaveValue('branching')
+  })
+
+  it('catches an out-of-range depth before the round trip', async () => {
+    const user = userEvent.setup()
+    render(<CoralPage />)
+    await screen.findByLabelText('Dive site')
+
+    await user.selectOptions(screen.getByLabelText('Dive site'), 'site-1')
+    await user.type(screen.getByLabelText('Depth (m)'), '120')
+    await fillColony(user, 1)
+    await user.click(screen.getByRole('button', { name: /submit survey/i }))
+
+    expect(await screen.findByText(/depth must be between 0 and 100/i)).toBeInTheDocument()
+    expect(submitCoralSurvey).not.toHaveBeenCalled()
+  })
+
+  // A filed survey is pending, so it shows up in neither the approved history
+  // nor a diver's review queue. Without a word, the form blanking itself reads
+  // as the submission being lost.
+  it('confirms that a filed survey is awaiting review', async () => {
+    const user = userEvent.setup()
+    render(<CoralPage />)
+    await screen.findByLabelText('Dive site')
+
+    await user.selectOptions(screen.getByLabelText('Dive site'), 'site-1')
+    await fillColony(user, 1)
+    await user.click(screen.getByRole('button', { name: /submit survey/i }))
+
+    expect(await screen.findByText(/survey filed/i)).toBeInTheDocument()
+    // And it clears as soon as the diver starts another one.
+    await user.selectOptions(screen.getByLabelText('Dive site'), 'site-2')
+    expect(screen.queryByText(/survey filed/i)).not.toBeInTheDocument()
+  })
+
   it('shows an approved survey with its colonies and bleaching summary', async () => {
     fetchCoralSurveys.mockResolvedValue([survey()])
     render(<CoralPage />)

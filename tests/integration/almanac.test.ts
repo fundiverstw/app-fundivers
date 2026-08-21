@@ -25,6 +25,9 @@ let siteId: string
 const TODAY = new Date().toLocaleDateString('en-CA')
 const YESTERDAY = new Date(Date.now() - 86_400_000).toLocaleDateString('en-CA')
 const TOMORROW = new Date(Date.now() + 86_400_000).toLocaleDateString('en-CA')
+// The guard allows a day of slack, because the client sends a shop-timezone
+// date and the database clock is UTC. Two days out is unambiguously future.
+const NEXT_WEEK = new Date(Date.now() + 7 * 86_400_000).toLocaleDateString('en-CA')
 
 async function clearRecords() {
   await admin.from('almanac_records').delete().eq('site_id', siteId)
@@ -97,14 +100,26 @@ describe('almanac_records writes', () => {
     expect(revised.data!.wildlife).toEqual([])
   })
 
-  it('refuses an observation dated in the future', async () => {
+  it('refuses a date nobody could have observed', async () => {
     const client = await userClient(diver.email, diver.password)
     const { error } = await client.rpc('submit_almanac_record', {
       p_site_id: siteId,
-      p_obs_date: TOMORROW,
+      p_obs_date: NEXT_WEEK,
       p_air_temp_c: 30,
     })
     expect(error?.message).toContain('almanac_obs_date_in_future')
+  })
+
+  // The client sends a date in the shop's timezone and the database clock is
+  // UTC, so a same-day record filed before 08:00 in Taipei arrives dated
+  // "tomorrow". Refusing it would break every early-morning submission.
+  it('accepts tomorrow, absorbing the shop-to-database timezone offset', async () => {
+    await clearRecords()
+    const client = await userClient(diver.email, diver.password)
+    const { error } = await client.rpc('submit_almanac_record', {
+      p_site_id: siteId, p_obs_date: TOMORROW, p_water_temp_c: 26,
+    })
+    expect(error).toBeNull()
   })
 
   it('refuses to revise a record staff have already ruled on', async () => {

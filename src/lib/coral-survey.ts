@@ -106,6 +106,37 @@ export function summarizeSurvey(colonies: readonly CoralColony[]): SurveySummary
   }
 }
 
+/** The ranges the schema enforces on a survey header, mirrored so a diver
+ *  hears about a typo from the form rather than from a Postgres constraint. */
+export const SURVEY_LIMITS = {
+  depth_m: { min: 0, max: 100 },
+  water_temp_c: { min: -2, max: 40 },
+  transect_length_m: { min: 0, max: 500 },
+} as const
+
+export type SurveyField = keyof typeof SURVEY_LIMITS
+
+/**
+ * Is this header value out of range? Returns the offending field, or null when
+ * every supplied value is inside the bounds the database will accept. Blank is
+ * always fine: these fields are optional.
+ */
+export function headerProblem(values: {
+  depth_m?: number | null
+  water_temp_c?: number | null
+  transect_length_m?: number | null
+}): SurveyField | null {
+  for (const field of Object.keys(SURVEY_LIMITS) as SurveyField[]) {
+    const value = values[field]
+    if (value === null || value === undefined) continue
+    const { min, max } = SURVEY_LIMITS[field]
+    // The schema wants a transect longer than zero, not merely non-negative.
+    const tooLow = field === 'transect_length_m' ? value <= min : value < min
+    if (tooLow || value > max) return field
+  }
+  return null
+}
+
 /** A colony row the form is still filling in: every field optional and the
  *  levels held as strings, because a `<select>` yields text. */
 export interface ColonyDraft {

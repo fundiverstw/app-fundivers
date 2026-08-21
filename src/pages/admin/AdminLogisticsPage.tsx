@@ -608,8 +608,13 @@ export function AdminLogisticsPage() {
   // course held at the shop) is not part of anybody's run. Left in, its on-duty
   // instructor would count as a rider needing a seat in a car that was never
   // going anywhere, and the board would report the day short of vehicles.
+  //
+  // Compared against false rather than read as truthy: an offline snapshot
+  // taken before this column existed carries no key at all, and treating
+  // undefined as "no transport" would empty the rides board instead of
+  // degrading to the behavior it had before.
   const runInputs: RunInput[] = buildRuns(
-    (groups ?? []).filter(g => g.event.has_transport).map(g => g.event.id),
+    (groups ?? []).filter(g => g.event.has_transport !== false).map(g => g.event.id),
     groupIdByEvent(rideGroups),
   ).map(run => {
     const members = run.eventIds.map(id => groupByEventId.get(id)).filter((g): g is EventGroup => !!g)

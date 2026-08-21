@@ -88,6 +88,9 @@ describe('sanitizeProfilePatch — allowed keys (SPA registration-form contract)
     'cert_card_path',
     'emergency_contact_name',
     'emergency_contact_phone',
+    'height_cm',
+    'weight_kg',
+    'shoe_size',
   ]
 
   it('every SPA-emitted key survives the sanitizer', () => {

@@ -30,6 +30,9 @@ let siteId: string
 const TODAY = new Date().toLocaleDateString('en-CA')
 const YESTERDAY = new Date(Date.now() - 86_400_000).toLocaleDateString('en-CA')
 const TOMORROW = new Date(Date.now() + 86_400_000).toLocaleDateString('en-CA')
+// The guard allows a day of slack, because the client sends a shop-timezone
+// date and the database clock is UTC. Two days out is unambiguously future.
+const NEXT_WEEK = new Date(Date.now() + 7 * 86_400_000).toLocaleDateString('en-CA')
 
 const colony = (over: Record<string, unknown> = {}) => ({
   coral_type: 'branching',
@@ -144,12 +147,24 @@ describe('submit_coral_survey', () => {
     expect(colonies[0].ordinal).toBe(1)
   })
 
-  it('refuses a future date', async () => {
+  it('refuses a date nobody could have observed', async () => {
+    const client = await userClient(diver.email, diver.password)
+    const { error } = await client.rpc('submit_coral_survey', {
+      p_site_id: siteId, p_surveyed_on: NEXT_WEEK, p_colonies: [colony()],
+    } as never)
+    expect(error).not.toBeNull()
+  })
+
+  // The client sends a date in the shop's timezone and the database clock is
+  // UTC, so a same-day survey filed before 08:00 in Taipei arrives dated
+  // "tomorrow". Refusing it would break every early-morning submission.
+  it('accepts tomorrow, absorbing the shop-to-database timezone offset', async () => {
+    await clearSurveys()
     const client = await userClient(diver.email, diver.password)
     const { error } = await client.rpc('submit_coral_survey', {
       p_site_id: siteId, p_surveyed_on: TOMORROW, p_colonies: [colony()],
     } as never)
-    expect(error).not.toBeNull()
+    expect(error).toBeNull()
   })
 
   // Not an observation that the reef is empty; a form somebody abandoned.

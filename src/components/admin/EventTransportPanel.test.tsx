@@ -98,7 +98,22 @@ describe('EventTransportPanel (admin)', () => {
     expect(await screen.findByLabelText('Transport info')).toBeInTheDocument()
   })
 
-  it('says so instead when the event links no trip template', async () => {
+  it('tells a dive with no linked template where to manage the copy', async () => {
+    from.mockImplementation((table: string) => {
+      if (table === 'events') return mockQueryBuilder({ data: { trip_template_id: null, start_date: '2031-05-01' } })
+      if (table === 'vehicles') return mockQueryBuilder({ data: vehicleRows })
+      if (table === 'event_vehicles') return mockQueryBuilder({ data: allocationRows })
+      return mockQueryBuilder({ data: [] })
+    })
+    renderPanel()
+    expect(await screen.findByText(/no trip template/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText('Transport info')).not.toBeInTheDocument()
+  })
+
+  // The admin event form writes trip_template_id: null for a course, so the
+  // link is not merely absent but unreachable — and the hint would be advice
+  // nobody can act on.
+  it('drops the section entirely for a course with no template, rather than advising the impossible', async () => {
     from.mockImplementation((table: string) => {
       if (table === 'events') return mockQueryBuilder({ data: { trip_template_id: null, start_date: '2031-05-01' } })
       if (table === 'vehicles') return mockQueryBuilder({ data: vehicleRows })
@@ -106,7 +121,9 @@ describe('EventTransportPanel (admin)', () => {
       return mockQueryBuilder({ data: [] })
     })
     renderPanel({ event: { ...event, type: 'course' } as unknown as AppEvent })
-    expect(await screen.findByText(/no trip template/i)).toBeInTheDocument()
+    // The cars section still renders — a course can still take a van.
+    expect(await screen.findByRole('group', { name: /assigned cars/i })).toBeInTheDocument()
+    expect(screen.queryByText(/no trip template/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Transport info')).not.toBeInTheDocument()
   })
 })

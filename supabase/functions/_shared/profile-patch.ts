@@ -19,6 +19,14 @@
 
 export const PROFILE_PATCH_ALLOW: ReadonlySet<string> = new Set<string>([
   'name',
+  // Body measurements the diver supplies about themselves. Distinct from the
+  // staff-assigned rack sizes (fin_size / bcd_size / wetsuit_size), which the
+  // block_self_gear_size_change trigger keeps a diver out of: these are what
+  // the fit lookup matches against, and the register form is where they are
+  // asked for.
+  'height_cm',
+  'weight_kg',
+  'shoe_size',
   'nickname',
   'date_of_birth',
   'nationality',

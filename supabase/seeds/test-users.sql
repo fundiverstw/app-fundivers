@@ -237,7 +237,7 @@ begin
            else null end,
       jsonb_build_object(
         'gear',          case when i % 3 = 0
-                              then jsonb_build_object('rent', true, 'mode', 'a-la-carte',
+                              then jsonb_build_object('rent', true,
                                                       'items', jsonb_build_array('BCD', 'Wetsuit', 'Fins'))
                               else jsonb_build_object('rent', false) end,
         'total',         3600 + (i * 50),

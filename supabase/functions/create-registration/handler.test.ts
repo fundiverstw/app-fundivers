@@ -368,6 +368,45 @@ describe('handleRegistration — guest path security (audit C2)', () => {
   })
 })
 
+describe('handleRegistration — body measurements reach the profile', () => {
+  // The register form asks every diver for height and weight, and asks for a
+  // shoe size whenever something goes on their feet. All three are dropped
+  // silently unless the sanitizer allows them, and a request-body assertion in
+  // the SPA test cannot see that happen.
+  it('applies height, weight and shoe size from the patch', async () => {
+    const { deps, captured } = makeDeps({})
+    await handleRegistration(postJson({
+      ...goodBody,
+      email:    'g@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'tk',
+      profile_patch: { height_cm: 170, weight_kg: 65, shoe_size: 'EU 40 M' },
+    }), deps)
+    const patch = captured.profileUpdate.at(-1) as Record<string, unknown>
+    expect(patch.height_cm).toBe(170)
+    expect(patch.weight_kg).toBe(65)
+    expect(patch.shoe_size).toBe('EU 40 M')
+  })
+
+  // The staff-assigned rack sizes stay out: block_self_gear_size_change guards
+  // them in the database, and the sanitizer should not be the thing that has to
+  // be relied on to reach that trigger.
+  it('still drops the staff-assigned rack sizes', async () => {
+    const { deps, captured } = makeDeps({})
+    await handleRegistration(postJson({
+      ...goodBody,
+      email:    'g@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'tk',
+      profile_patch: { fin_size: 'L', bcd_size: 'M', wetsuit_size: 'L' },
+    }), deps)
+    const patch = captured.profileUpdate.at(-1) as Record<string, unknown>
+    expect(patch.fin_size).toBeUndefined()
+    expect(patch.bcd_size).toBeUndefined()
+    expect(patch.wetsuit_size).toBeUndefined()
+  })
+})
+
 describe('handleRegistration — eligibility gate', () => {
   const authedSelf = { Authorization: 'Bearer self-jwt' }
 
