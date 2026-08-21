@@ -3,6 +3,7 @@ import { TrustedPartnersIcon } from '../icons/TrustedPartnersIcon'
 import { PackagesIcon } from '../icons/PackagesIcon'
 import { ScheduledTripsIcon } from '../icons/ScheduledTripsIcon'
 import { MapIcon } from '../icons/MapIcon'
+import { CoralIcon } from '../icons/CoralIcon'
 import { AlmanacIcon } from '../icons/AlmanacIcon'
 import { t } from '../../i18n'
 import { CARD, TEXT_BODY, TEXT_SUBTLE } from '../../styles/tokens'
@@ -27,6 +28,7 @@ const destinations: Destination[] = [
   { to: '/packages',         label: t.shell.packages,        icon: <PackagesIcon /> },
   { to: '/scheduled-trips',  label: t.shell.scheduledTrips,  icon: <ScheduledTripsIcon /> },
   { to: '/almanac',          label: t.dashboard.almanac,     icon: <AlmanacIcon /> },
+  { to: '/coral',            label: t.coral.title,           icon: <CoralIcon /> },
 ]
 
 interface QuickLinksProps {

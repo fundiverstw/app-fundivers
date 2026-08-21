@@ -13,6 +13,7 @@ into source.
 | [payments.md](./payments.md)                           | Deposit vs balance semantics, payments ledger, refund flow |
 | [admin.md](./admin.md)                                 | Admin routes, event memos, user search, role-view toggle |
 | [dive-site-maps.md](./dive-site-maps.md)               | Diver-contributed 3D seafloor maps: the implicit 1 m lattice, honest-gap surfacing, contribution model. Admin-only, not yet persisted |
+| [coral-surveys.md](./coral-surveys.md)                 | Crowdsourced coral monitoring against the CoralWatch Coral Health Chart: survey plus colony rows, RPC-only writes, staff moderation, the bleaching arithmetic |
 | [packages.md](./packages.md)                           | Partner-shop registration network: product tiers, add-on/room estimate, recommendation email, kickback ledger |
 | [push-notifications.md](./push-notifications.md)       | Web Push: VAPID, service worker, Cloudflare cron sender, `/admin-broadcast`, `/notify-duty`, CORS |
 | [offline.md](./offline.md)                             | Ten days of the logistics day board kept on staff devices: what is stored, what is deliberately redacted, how a read falls back |
