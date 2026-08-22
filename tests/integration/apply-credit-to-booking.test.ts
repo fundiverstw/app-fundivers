@@ -62,7 +62,7 @@ async function makeCredit(userId: string, amount: number, bookingId: string | nu
 }
 
 function openCredits(userId: string) {
-  return admin.from('credits').select('amount, booking_id, status').eq('user_id', userId).eq('status', 'open')
+  return admin.from('credits').select('amount, booking_id, status, source, currency').eq('user_id', userId).eq('status', 'open')
 }
 function paidPayments(bookingId: string) {
   return admin.from('payments').select('amount, method, status').eq('booking_id', bookingId).eq('status', 'paid')
@@ -92,6 +92,44 @@ describe('apply_credit_to_booking', () => {
     const open = await openCredits(diver.id)
     expect(open.data).toHaveLength(1)
     expect(Number(open.data![0].amount)).toBe(4000)
+  })
+
+  // A carry-forward row is the leftover of a credit the RPC only partly spent.
+  // It used to inherit nothing that said so, and the cancellation guards keyed
+  // on "any credit tied to this booking", so a carry-forward pinned to a
+  // booking could silently swallow that booking's refund.
+  it('labels the carried-forward remainder as carry_forward, not a money return', async () => {
+    const diver = await freshDiver()
+    const dive = await freshDive()
+    const bookingId = await makeBooking(diver.id, dive, { total: 3000 })
+    await makeCredit(diver.id, 5000)
+
+    const diverApi = await userClient(diver.email, diver.password)
+    await diverApi.rpc('apply_credit_to_booking', { p_booking_id: bookingId, p_amount: 1000 })
+
+    const open = await openCredits(diver.id)
+    expect(open.data).toHaveLength(1)
+    expect(open.data![0].source).toBe('carry_forward')
+  })
+
+  // The offsetting payment row used to take the payments table's TWD default
+  // regardless of what currency the credit was actually denominated in.
+  it('denominates the offsetting payment in the currency of the credit it spends', async () => {
+    const diver = await freshDiver()
+    const dive = await freshDive()
+    const bookingId = await makeBooking(diver.id, dive, { total: 3000 })
+    const { error } = await admin.from('credits').insert({
+      user_id: diver.id, amount: 3000, reason: 'test credit',
+      created_by: adminUser.id, currency: 'JPY',
+    } as never)
+    if (error) throw new Error(error.message)
+
+    const diverApi = await userClient(diver.email, diver.password)
+    await diverApi.rpc('apply_credit_to_booking', { p_booking_id: bookingId, p_amount: 3000 })
+
+    const { data } = await admin.from('payments')
+      .select('currency').eq('booking_id', bookingId).eq('method', 'account_credit')
+    expect(data![0].currency).toBe('JPY')
   })
 
   it('nets refunds out of what counts as paid, so credit can clear the whole balance', async () => {

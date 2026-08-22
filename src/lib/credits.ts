@@ -14,6 +14,13 @@ import type { AppEvent, Credit, CreditInsert } from '../types/database'
  * action so the two-sided audit trail stays explicit.
  */
 
+/** The two credit sources that mean "this booking's money has been given
+ *  back". Only these suppress a further automatic refund; a goodwill credit or
+ *  a carry-forward row tied to the same booking is unrelated money. Kept in
+ *  step with the credits_source_check constraint (20260822100000) and with the
+ *  same list inside bookings_return_account_credit_on_cancel. */
+export const RETURN_SOURCES = ['event_cancellation', 'booking_cancellation_return'] as const
+
 export async function fetchCreditsForUser(userId: string): Promise<Credit[]> {
   const { data, error } = await supabase
     .from('credits')
@@ -159,6 +166,7 @@ export async function createCredit(input: {
     reason:     input.reason,
     created_by: input.created_by,
     status:     'open',
+    source:     'manual',
   }
   const { data, error } = await supabase
     .from('credits')
@@ -223,10 +231,15 @@ export async function issueCancellationCredits(args: {
 
   const paidByBooking = netPaidByBooking(payments ?? [])
 
+  // Only a credit that already RETURNED this booking's money blocks a second
+  // issue. The old check was "does this booking carry ANY credit row?", which
+  // let an unrelated goodwill credit of 200 suppress the whole refund of a
+  // 3000 booking. See credits.source (20260822100000).
   const { data: existing, error: eErr } = await supabase
     .from('credits')
     .select('booking_id')
     .in('booking_id', bookingIds)
+    .in('source', RETURN_SOURCES)
   if (eErr) throw eErr
   const alreadyCredited = new Set((existing ?? []).map(c => c.booking_id))
 
@@ -244,9 +257,11 @@ export async function issueCancellationCredits(args: {
       user_id:    b.user_id,
       booking_id: b.id,
       amount:     paidByBooking.get(b.id)!,
+      currency:   siteConfig.locale.currency,
       reason,
       created_by: createdBy,
       status:     'open',
+      source:     'event_cancellation',
     }))
 
   if (!rows.length) return { issued: 0, totalAmount: 0 }

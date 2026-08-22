@@ -862,6 +862,10 @@ export interface Database {
           created_by: string | null
           settled_at: string | null
           settled_note: string | null
+          /** Where the credit came from. Only the two *_cancellation* / *_return
+           *  values mean "this booking's money has been given back", and only
+           *  those suppress a further automatic refund. */
+          source: CreditSource
         }
         Insert: {
           id?: string
@@ -875,6 +879,7 @@ export interface Database {
           created_by?: string | null
           settled_at?: string | null
           settled_note?: string | null
+          source?: CreditSource
         }
         Update: {
           id?: string
@@ -887,6 +892,7 @@ export interface Database {
           created_by?: string | null
           settled_at?: string | null
           settled_note?: string | null
+          source?: CreditSource
         }
         Relationships: []
       }
@@ -2058,6 +2064,18 @@ export type Booking = Database['public']['Tables']['bookings']['Row']
 export type Payment = Database['public']['Tables']['payments']['Row']
 export type BookingAmendment = Database['public']['Tables']['booking_amendments']['Row']
 export type AdminAuditLog = Database['public']['Tables']['admin_audit_log']['Row']
+/**
+ * Where a credit row came from. Pinned to the DB's credits_source_check
+ * (20260822100000). The two "money returned" values are the ones that block a
+ * second automatic refund for the same booking — see RETURN_SOURCES in
+ * src/lib/credits.ts.
+ */
+export type CreditSource =
+  | 'manual'
+  | 'event_cancellation'
+  | 'booking_cancellation_return'
+  | 'carry_forward'
+
 export type Credit = Database['public']['Tables']['credits']['Row']
 export type CreditInsert = Database['public']['Tables']['credits']['Insert']
 export type EventRow = Database['public']['Tables']['events']['Row']

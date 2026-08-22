@@ -141,7 +141,9 @@ describe('issueCancellationCredits', () => {
         ],
         error: null,
       },
-      credits: { data: [{ booking_id: 'b2' }], error: null }, // b2 already credited → skip
+      // b2 already had its money returned → skip. The query is filtered to
+      // the two RETURN_SOURCES, so this stands in for a matching row.
+      credits: { data: [{ booking_id: 'b2' }], error: null },
     })
 
     const { issueCancellationCredits } = await import('./credits')
@@ -154,9 +156,11 @@ describe('issueCancellationCredits', () => {
         user_id: 'u1',
         booking_id: 'b1',
         amount: 5000,
+        currency: siteConfig.locale.currency,
         reason: 'Refund credit for cancelled event: Green Island Fun Dive (May 18, 2026)',
         created_by: 'admin1',
         status: 'open',
+        source: 'event_cancellation',
       },
     ])
   })
@@ -292,7 +296,7 @@ describe('createCredit', () => {
     await createCredit({ user_id: 'u1', amount: 1500, reason: 'Goodwill', created_by: 'admin' })
     expect(insert).toHaveBeenCalledWith({
       user_id: 'u1', booking_id: null, amount: 1500, currency: siteConfig.locale.currency,
-      reason: 'Goodwill', created_by: 'admin', status: 'open',
+      reason: 'Goodwill', created_by: 'admin', status: 'open', source: 'manual',
     })
   })
 
