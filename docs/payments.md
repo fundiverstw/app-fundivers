@@ -1,623 +1,279 @@
 # Payments and credits
 
-Everything about money: what a diver owes, what they have paid, what the
-shop owes them back, and what happens to each of those when something is
-cancelled. This is the single reference for the payment and credit
-system — if a rule about money is not written here, it is not a rule.
+What a diver owes, what they have paid, what the shop owes them back, and
+what happens to each when something is cancelled.
 
-- [The four sources of truth](#the-four-sources-of-truth)
-- [What a booking owes](#what-a-booking-owes)
-- [The payments ledger](#the-payments-ledger)
-- [Recording, voiding and group payments](#recording-voiding-and-group-payments)
-- [The credits ledger](#the-credits-ledger)
-- [Account credit: the diver's spendable balance](#account-credit-the-divers-spendable-balance)
-- [Spending credit](#spending-credit)
-- [Cancellation: what happens to the money](#cancellation-what-happens-to-the-money)
-- [Why a cancelled booking reads "settled"](#why-a-cancelled-booking-reads-settled)
-- [Reconciliation and reporting](#reconciliation-and-reporting)
-- [Payment reminders](#payment-reminders)
-- [Known gaps and sharp edges](#known-gaps-and-sharp-edges)
-- [Invariants](#invariants)
+**The app moves no money.** There is no payment processor. Bank
+transfers, cash and card payments happen off-app and are recorded by
+hand. Account credit is the one exception — it is purely internal, and
+the only "payment" the app creates itself.
 
----
+## The model
 
-## The four sources of truth
+Four append-only sources. Nothing is ever edited in place: a refund is a
+new `payments` row, a discount a new `booking_amendments` row.
 
-There is no single ledger table. A diver's money position is assembled
-from four independent, append-only sources:
-
-| Source | Table | Written by | Means |
-| --- | --- | --- | --- |
-| **Charge snapshot** | `bookings.details` (`total`, `deposit`, `charges`) | The register form, at booking time. Frozen afterward. | What was quoted. |
-| **Adjustments** | `booking_amendments` | Admin, signed rows (`+` surcharge / `−` discount). | What changed after booking. |
-| **Money received** | `payments` | Admin, or a SECURITY DEFINER RPC. | What actually arrived. |
-| **Money owed back** | `credits` | Admin, or a SECURITY DEFINER RPC / trigger. | What the shop owes the diver. |
-
-Nothing is ever edited in place. A refund is a new `payments` row, not a
-mutation of the original. A discount is a new `booking_amendments` row,
-not a rewrite of `details.total`. That is what makes the Audits page able
-to reconstruct history.
-
-The app **does not move money**. There is no payment processor. Bank
-transfers, cash and card payments happen off-app and are recorded by hand.
-The one exception is account credit, which is purely internal and is the
-only "payment" the app creates itself.
-
-## What a booking owes
+| Source | Table | Means |
+| --- | --- | --- |
+| Charge snapshot | `bookings.details` (`total`, `deposit`, `charges`) | What was quoted. Frozen at booking. |
+| Adjustments | `booking_amendments` | Signed rows: `+` surcharge, `−` discount. |
+| Money received | `payments` | What actually arrived. |
+| Money owed back | `credits` | What the shop owes the diver. |
 
 ```
 owed        = details.total + Σ booking_amendments.amount
-paid        = Σ payments.amount signed by status (see below)
+paid        = Σ payments.amount signed by status
 credit      = Σ open credits.amount tied to THIS booking
-balance     = owed − paid − credit          (bookingBalance)
+balance     = owed − paid − credit                   (bookingBalance)
 depositDue  = max(0, min(details.deposit, owed) − paid)
 ```
 
-`bookingBalance(owed, paid, credit)` in `src/lib/booking-balance.ts`
-returns one of three states:
+`bookingBalance()` returns `due`, `settled`, or `credit`. The `credit`
+state covers both an awarded credit larger than what is owed and a plain
+overpayment — an overpayment is money owed back, so there is no separate
+"overpaid" concept.
 
-- `due` — the diver still owes money.
-- `settled` — exactly covered.
-- `credit` — net in the diver's favor. This covers **both** an awarded
-  credit larger than what is owed **and** a plain overpayment. An
-  overpayment is money owed back, so it is credit; there is no separate
-  "overpaid" state.
+**The deposit is clamped to `owed`.** `details.deposit` is frozen and
+amendments never reduce it, so a discount can push it above the remaining
+balance. Without the clamp a diver who paid their discounted total in
+full would still be shown a deposit due, and their booking would never
+auto-confirm.
 
-**The deposit is clamped to what is owed** (`depositDue`). `details.deposit`
-is frozen at booking time and amendments never touch it, so a discount can
-push the frozen deposit above the remaining balance. Without the clamp a
-diver who paid their whole discounted total would still see a deposit
-demanding the difference — money nobody owed — and their booking would
-never auto-confirm. Every promotion/demotion rule uses the clamped figure.
-
-### The card/PayPal surcharge
-
-Credit card and PayPal carry a 5% surcharge; cash and bank transfer pass
-through at face value. It is computed in `RegisterForm` and folded into
-the `total` / `deposit` snapshots — **not** a separate ledger line, though
-it does appear as a `surcharge` line in `details.charges` for display.
-
-The surcharge applies only to the amount actually put on the card *now*:
-
-- **Pay full now** → 5% of the whole subtotal.
-- **Pay deposit only** → 5% of the **deposit only**. The remainder is paid
-  later, off the card, and carries no surcharge. So
-  `total = subtotal + 5% × deposit`, and the stored `deposit` is
-  surcharge-inclusive (it is what is charged to secure the spot).
-
-`MultiRegisterForm` always pays in full, so its surcharge is always on the
-whole subtotal.
+**Card/PayPal surcharge** (`business.cardSurchargePercent`) applies only
+to what actually goes on the card *now*: the whole subtotal when paying
+in full, the deposit only when paying deposit-only. It is folded into the
+`total`/`deposit` snapshots, not a separate ledger line.
 
 ## The payments ledger
 
-`public.payments` — one row per movement of money, never edited.
-
-| Column | Notes |
-| --- | --- |
-| `user_id` | The diver the money is attributed to. Not necessarily who handed it over (see group payments). |
-| `booking_id` | Nullable, `ON DELETE SET NULL` — the ledger outlives the booking. |
-| `amount` | Always positive. Direction lives in `status`. |
-| `status` | `pending` / `paid` / `refunded` / `voided`. |
-| `method` | `bank_transfer` / `cash` / `credit_card` / `paypal` / `account_credit`. |
-| `note`, `recorded_by` | Free text and the admin who entered it. |
-
-### Status semantics
-
-| Status | Counts toward `paid`? | Meaning |
+| Status | Counts toward `paid` | Meaning |
 | --- | --- | --- |
-| `pending` | No | Recorded intent; a transfer not yet confirmed. |
+| `pending` | no | Recorded intent; not yet confirmed. |
 | `paid` | **+amount** | Money received. |
-| `refunded` | **−amount** | Money sent back. Its own row; the original `paid` row stays. |
-| `voided` | No | "This payment never really happened." Kept for the audit trail. |
+| `refunded` | **−amount** | Money sent back. Its own row. |
+| `voided` | no | "Never really happened." Kept for the audit trail. |
 
-`netPaid()` / `netPaidByBooking()` in `src/lib/payments.ts` are the single
-implementation of that signing rule, and `public.booking_net_paid(uuid)`
-is its SQL twin used by the money RPCs. **Every** surface that renders a
-paid figure must go through one of them. When they disagree, a partly
-refunded booking looks more paid to the RPC than to the screen, and credit
-applications silently under-apply with no error to explain it.
+`netPaid()` / `netPaidByBooking()` (`src/lib/payments.ts`) and
+`public.booking_net_paid()` are the only implementations of that signing
+rule. Every surface that shows a paid figure must use one. When they
+disagree, a partly refunded booking looks more paid to the RPC than to
+the screen and credit applications silently under-apply.
 
-`booking_net_paid` is SECURITY DEFINER with no ownership check and is
-deliberately revoked from `public`/`anon`/`authenticated` — only the
-SECURITY DEFINER RPCs that do their own authorization call it.
+RLS: **admins only** write `payments`. A diver's only path to the ledger
+is `apply_credit_to_booking`.
 
-### Who may write
+**Promotion rule:** a `pending` booking becomes `confirmed` as soon as
+the deposit (clamped to `owed`) is covered. `recordPayment`,
+`apply_credit_to_booking` and `record_group_payment` each implement it and
+must stay identical; `voidPayment` mirrors it in reverse.
 
-RLS: **admins only** insert or update `payments`. Divers may `SELECT`
-their own; parents may select their children's; staff may select all.
-A diver therefore cannot create a payment row directly — the only path
-for a diver to affect the ledger is `apply_credit_to_booking`.
-
-## Recording, voiding and group payments
-
-`recordPayment()` (`src/lib/booking-payments.ts`) inserts one `paid` row,
-stamping `method` from `details.payment_method`, and then applies the
-**promotion rule**:
-
-> A `pending` booking becomes `confirmed` as soon as the deposit is
-> covered — `depositCovered(deposit, owed, paid)`.
-
-`voidPayment()` is the exact mirror: it flips a row to `voided` and, if
-that drops paid back below the deposit threshold **and** the booking is
-currently `confirmed`, demotes it to `pending`. Bookings an admin
-confirmed by hand for unrelated reasons are not demoted — only the
-auto-promotion is undone.
-
-Both take an optional `owed` (the amended balance). Without it they fall
-back to the raw frozen total and are blind to amendments; callers that
-have the amendment rows should always pass it.
-
-`apply_credit_to_booking` and `record_group_payment` reimplement the same
-promotion rule in SQL. All three must stay in step.
-
-### Group payments (lead booker)
-
-When a parent registers a family group they can be the single payer. Every
-booking in the group is stamped `bookings.payer_id = the lead`.
-
-- `payer_id` is **per booking** on purpose, so an admin can revert one
-  diver to paying their own way ("Bill to this diver instead" clears it).
-  A `BEFORE` trigger restricts `payer_id` to the diver themselves or their
-  `parent_account`, and is authoritative even under the service role.
-- The lead's Payments page rolls siblings up by `group_id` into one
-  combined owed/paid/balance. A covered diver sees "Covered by [lead]"
-  with no balance and no refund or apply-credit controls.
-- `record_group_payment(p_lead, p_amount, p_group_id)` (admin-only,
-  SECURITY DEFINER) distributes one lump across the group's non-cancelled
-  bookings: **deposits first** so every spot confirms, then balances,
-  oldest first. It inserts one ordinary `payments` row per touched booking
-  (note `Group payment`), so every balance calculation elsewhere is
-  unchanged — "group paid" is just their sum.
-- It nets each booking's own open credit out before collecting cash, for
-  the same reason `apply_credit_to_booking` does: that credit already
-  offsets the balance on screen, so charging cash against it too would
-  collect the money twice.
-- Reverting a diver later does not move already-recorded payments. The
-  money was applied to that diver's event.
+**Group payments.** `bookings.payer_id` marks a lead booker, per booking
+so an admin can revert one diver. `record_group_payment` distributes one
+lump across the group — deposits first, then balances, oldest first —
+inserting one ordinary `payments` row per booking, so all the math above
+is unchanged. It nets each booking's own open credit out first, or cash
+would be collected against money already offsetting the balance.
 
 ## The credits ledger
 
-`public.credits` — money the shop owes a diver. The opposite direction
-from `payments`, and the mirror-image table.
+`public.credits` — money the shop owes a diver. `status` is `open`
+(spendable, still owed) or `settled` (paid back, or spent).
 
-| Column | Notes |
+`source` records where the row came from:
+
+| `source` | Written by |
 | --- | --- |
-| `user_id` | Whose credit it is. |
-| `booking_id` | Nullable, `ON DELETE SET NULL`. Set → the credit offsets *that* booking's balance. Null → general account credit. |
-| `amount` | `CHECK (amount > 0)`. |
-| `currency` | Defaults to `TWD` at the DB level; `createCredit()` passes `siteConfig.locale.currency`. |
-| `status` | `open` or `settled`. Nothing else. |
-| `source` | Where it came from: `manual`, `event_cancellation`, `booking_cancellation_return`, `carry_forward`. |
-| `reason` | Why it exists. Shown to the diver and in the audit feed. |
-| `settled_at`, `settled_note` | Stamped when it is consumed or paid out. |
+| `manual` | An admin, on the Users page |
+| `event_cancellation` | `issueCancellationCredits` — the shop called off an event |
+| `booking_cancellation_return` | The return-on-cancel trigger, or an admin resolving the holding queue |
+| `carry_forward` | The unspent remainder of a partly-consumed credit |
 
-**`source` is what makes "has this booking's money already been given back?"
-answerable.** Only `event_cancellation` and `booking_cancellation_return` mean
-that; they are the two values (`RETURN_SOURCES` in `src/lib/credits.ts`) that
-suppress a second automatic refund. A `manual` goodwill award or a
-`carry_forward` remainder tied to the same booking is unrelated money and must
-never block one. Before the column existed the guard was "does this booking
-carry *any* credit row?", so a 200 goodwill credit silently swallowed the whole
-3000 refund a diver was owed.
+Only the two middle values (`RETURN_SOURCES` in `src/lib/credits.ts`)
+mean *this booking's money has been given back*, and only they suppress a
+further automatic refund. A goodwill award or a carry-forward remainder
+tied to the same booking is unrelated money and must never block one.
 
-**`open`** means spendable and still owed. **`settled`** means resolved —
-either paid back out of band or spent on a booking. Settling a credit does
-**not** create a payment row: the two sides are recorded as separate
-explicit actions so the audit trail shows both. (`apply_credit_to_booking`
-is the exception; it does both halves in one transaction, which is what
-makes it safe.)
+### Account credit
 
-Admins can issue, settle and reopen credits from the credits panel on
-`AdminUsersPage`. RLS: admins write; divers read their own; parents read
-their children's; staff read all.
-
-### Where credits come from
-
-1. **Event cancellation** — `issueCancellationCredits()`, automatic.
-2. **Booking cancellation returning spent credit** — the
-   `bookings_return_account_credit_on_cancel` trigger, automatic.
-3. **Carry-forward** — the unspent remainder of a credit row that only
-   partly covered an application (see [Spending credit](#spending-credit)).
-4. **By hand** — an admin issues one for any reason on the Users page.
-
-## Account credit: the diver's spendable balance
-
-The figure on the Profile page and at the top of the Payments page is
-**not** simply the sum of open credit rows. `diverCreditBalance()`
-(`src/lib/credits.ts`) is:
+The figure on the Profile and Payments pages is **not** the sum of open
+credit rows:
 
 ```
-account credit
-  = Σ open credits NOT tied to one of the diver's active bookings
-  + Σ over each active booking: max(0, paid + openCreditForBooking − owed)
+account credit = Σ open credits NOT tied to an active booking
+               + Σ over active bookings: max(0, paid + tiedCredit − owed)
 ```
 
-In words: **general credit, plus every overpayment.** Two consequences
-worth internalizing:
+General credit **plus every overpayment**. A credit tied to a *cancelled*
+booking counts as general credit — that is how a cancellation credit
+lands back in the spendable pool. Bookings someone else pays for
+(`payer_id`) are dropped from both terms: that money is the lead's.
 
-- A credit tied to a **cancelled** booking counts as general credit,
-  because cancelled bookings are excluded from the active set. That is how
-  a cancellation credit lands back in the spendable pool.
-- Paying more than a booking owes is credit. There is no separate
-  overpayment concept anywhere in the app.
+`diverCreditBalance()` is the only definition. Note the **spendable
+pool** is different and smaller: `openCreditBalance()`, actual credit
+rows only, because the RPC consumes rows. An overpayment shows as account
+credit but cannot be moved by the RPC — that takes an admin.
 
-**Lead-payer exclusion.** Bookings someone else pays for (`payer_id` set to
-another person) are dropped from *both* terms. Money recorded under a
-child's `user_id` by a group payment belongs to the lead, not the child,
-so a child's overpayment must not appear as the child's credit.
+### Spending credit
 
-Every surface computes this identically — `ProfilePage`
-(`fetchDiverCreditBalance`), `PaymentsPage`, `AdminUsersPage`, and
-`assembleDiverAuditTrail`. If you add a fourth, use `diverCreditBalance`.
+One RPC: `apply_credit_to_booking(p_booking_id, p_amount)`, SECURITY
+DEFINER, because divers cannot write `credits` or `payments`. Callable by
+the diver for their own booking, a parent for their child's, an admin for
+anyone's. The credit spent is always the **booking owner's**.
 
-### Spendable pool vs account credit
+1. Refuses a **cancelled** booking — its frozen total is not money owed,
+   and burning credit into it would destroy it.
+2. `due = owed − netPaid − credit already tied to this booking`. Self-tied
+   credit already offsets this booking on screen.
+3. Pool = the diver's open credit **excluding** rows tied to this booking.
+4. Applies `least(requested, due, pool)`; returns it. Never raises for
+   "not enough credit".
+5. Consumes rows oldest-first. The row straddling the boundary is settled
+   in full and its remainder re-issued as `carry_forward`.
+6. Inserts one `account_credit` payment in the credit's currency.
+7. Applies the promotion rule.
 
-These are different numbers and the distinction matters:
+Callers must refetch. `plannedCreditApplication()` replays this logic
+client-side so the "use my credit" button promises what it will deliver.
 
-- **Account credit** (above) includes overpayments, which have no credit
-  row to consume.
-- **Spendable pool** = `openCreditBalance(credits)` — only actual open
-  credit rows, because `apply_credit_to_booking` consumes rows.
-
-An overpayment therefore shows in the diver's account credit but cannot be
-applied to another booking by the RPC. Moving it takes an admin: void or
-refund the overpayment on the source booking, then issue a credit.
-
-## Spending credit
-
-One RPC does all of it: **`apply_credit_to_booking(p_booking_id, p_amount)`**,
-SECURITY DEFINER, because divers cannot write `credits` or `payments`
-under RLS. Callers: the per-booking control on `PaymentsPage`, the
-registrant card on `AdminEventDetailPage`, the credits panel on
-`AdminUsersPage`, and the register form at checkout.
-
-**Who may call it for whom**
-
-| Caller | Allowed against |
-| --- | --- |
-| The diver | Their own booking |
-| A parent (`profiles.parent_account = caller`) | Their child's booking |
-| An admin | Anyone's booking |
-
-The credit spent is always the **booking owner's**, never the caller's.
-A parent paying for a child spends the child's credit.
-
-**What it does, in one transaction**
-
-1. Refuses a **cancelled** booking outright. A cancelled booking still
-   carries a positive frozen `details.total`, so without this guard the
-   RPC would compute a fake "balance due" and burn spendable credit into a
-   dive that will never happen. The UIs already hide cancelled bookings
-   from apply-credit surfaces, but the guard lives in the RPC because that
-   is the only place authoritative for every caller (including a stale
-   client acting on a booking cancelled after the page loaded).
-2. Computes `due = owed − netPaid − credit already tied to this booking`.
-   Self-credit is excluded because it already offsets this booking's
-   balance on screen; counting it as spendable would double-spend it.
-3. Computes the available pool: the diver's open credit **excluding**
-   rows tied to this booking.
-4. Applies `least(requested, due, available)`. Returns that figure — `0`
-   when there is nothing to do. Never raises for "not enough credit".
-5. Consumes open rows **oldest first**. A row fully covered is settled.
-   The row straddling the boundary is settled in full and its unspent
-   remainder is inserted as a **fresh open row** carrying the original
-   reason and `booking_id`, stamped `source = 'carry_forward'` so it can
-   never be mistaken for money already returned.
-6. Inserts one `payments` row: `method='account_credit'`, `status='paid'`,
-   note `Applied account credit`, denominated in the currency of the credit
-   it spent.
-7. Promotes a `pending` booking to `confirmed` if the deposit (clamped to
-   owed) is now covered.
-
-Callers must refetch afterward — the RPC touches credits, payments and
-possibly the booking status.
-
-### Applying credit at registration
-
-The register form offers "apply my credit" (default on) for each diver
-whose credit the submit can reach — the primary target plus any family
-picks. It calls the same RPC **after** the booking lands, best-effort: the
-booking has already succeeded, so a credit hiccup must not fail
-registration. `details.credit_applied` snapshots the figure for the
-confirmation PDF.
-
-The form only offers a target's credit if it can *read* that target's
-credit rows, and the RPC authorizes the spend independently, so the offer
-cannot be used to reach someone else's balance.
+At registration the form applies credit *after* the booking lands
+(best-effort — the booking already succeeded).
 
 ## Cancellation: what happens to the money
 
-This is the part that trips people up. **There are four different
-cancellations and they do not do the same thing to money.**
+**There are four cancellations and they do not do the same thing.**
 
-| # | What happened | Who does it | Booking rows | Money effect |
-| --- | --- | --- | --- | --- |
-| 1 | **Shop cancels the event** | Admin, event detail page | Bookings stay as they are; the *event* gets `cancelled_at` | **Automatic.** Every non-cancelled registrant gets an open credit worth their full net paid. |
-| 2 | **Diver requests a refund, admin approves** | Diver asks, admin approves on the Refunds page or the registrant card | Booking → `cancelled` | **Manual.** Approval only cancels the booking. The refund itself moves off-app; the admin must record a `refunded` payment row. |
-| 3 | **Admin cancels one booking** | Admin, registrant card | Booking → `cancelled` | **Manual**, same as #2. |
-| 4 | **Diver cancels their own booking** | Diver, Bookings or Calendar page | Booking → `cancelled` | **Manual**, same as #2. |
+| What happened | Booking rows | Money effect |
+| --- | --- | --- |
+| **Shop cancels the event** | Bookings unchanged; `events.cancelled_at` set | **Automatic** — every non-cancelled registrant gets an open credit worth their full net paid |
+| **Refund request approved** | Booking → `cancelled` | **Manual** |
+| **Admin cancels one booking** | Booking → `cancelled` | **Manual** |
+| **Diver cancels their own booking** | Booking → `cancelled` | **Manual** |
 
-In **all four**, the `bookings_return_account_credit_on_cancel` trigger
-additionally returns any **account credit** that was spent on the booking
-(cases 2–4, where the booking row itself flips to `cancelled`).
+In the three manual cases the `bookings_return_account_credit_on_cancel`
+trigger does return any **account credit** spent on the booking — that is
+the one method whose refund is purely internal. Bank transfer, cash and
+card moved off-app, so only a person can move them back.
 
-### 1. Shop cancels the event
-
-`cancelEventAndFollowUp()` (`src/lib/event-cancellation.ts`), used by both
-the single-event cancel and "cancel the rest of this series" so the two
-cannot drift:
-
-1. Stamp `events.cancelled_at`.
-2. Notify every non-cancelled registrant — push, in-app inbox, email.
-   Fire-and-forget; a notification failure must never block a
-   cancellation that already committed.
-3. `issueCancellationCredits()` — for each **non-cancelled** booking on
-   the event, insert an open credit worth that booking's **net paid**
-   (`paid − refunded`), with a reason naming the event and its date
-   formatted in the shop timezone.
-
-Notes:
-
-- Bookings with nothing paid get no credit.
-- **Idempotent per booking**: a booking that already carries *any* credit
-  row is skipped, so cancel → restore → cancel never double-issues.
-- Restoring an event deliberately leaves issued credits alone. An admin
-  reopens or settles them by hand on the Users page.
-- Crediting runs **after** the cancel has committed, so a failure cannot
-  un-cancel the event. The admin gets a toast telling them to issue the
-  credits manually.
-- The bookings are **not** marked cancelled. They stay `pending` /
-  `confirmed` against a cancelled event, and the credit is what makes the
-  diver whole.
-
-### 2–4. A booking is cancelled
-
-The only automatic money movement is the trigger
-`bookings_return_account_credit_on_cancel` (AFTER UPDATE OF status,
-`* → 'cancelled'`):
-
-- It sums payments on the booking with `method = 'account_credit'`, netting
-  `paid` against `refunded` so a manual reversal is not double-counted.
-- If that is positive **and** the booking carries no credit row yet, it
-  inserts a fresh **open** credit tied to the booking, reason
-  `Account credit returned for cancelled booking: <event>`.
-- Because `diverCreditBalance` treats a credit on a cancelled booking as
-  general credit, the money lands straight back in the spendable pool.
-
-**Off-app methods are deliberately not handled.** Bank transfer, cash and
-card money moved outside the app, so only a human can move it back. The
-app records that with a `refunded` payment row once the transfer is made.
-
-**Consequence — and the thing most likely to confuse an admin:**
+**The consequence, and the thing most likely to confuse an admin:**
 
 > When a diver who paid by bank transfer or cash cancels, **nothing
 > happens to their money automatically.** No credit appears. The booking
-> shows a settled balance. The paid amount sits on a cancelled booking
-> and the shop still holds it.
+> shows a settled balance. The shop still holds the cash.
 
-Resolving it is an explicit admin decision, and there are exactly two
-correct endings:
+Exactly two endings are correct:
 
-- **Give the money back** → record a `refunded` payment row on that
-  booking for the amount returned. Net paid goes to zero; the books
-  balance.
-- **Keep it as store credit** → issue an open credit for the amount,
-  stamped `source = 'booking_cancellation_return'`. It becomes spendable
-  account credit, and the stamp stops any later automatic issuer paying
-  the same money out again.
+- **Give it back** → record a `refunded` payment row. Net paid goes to
+  zero.
+- **Keep it as store credit** → issue an open credit stamped
+  `booking_cancellation_return`, so no later automatic issuer pays the
+  same money out again.
 
-Doing neither leaves the money invisible on every screen. Doing **both**
-pays the diver twice.
+Doing neither hides the money. Doing **both** pays the diver twice.
 
 ### Finding it: the holding queue
 
 `/admin/refunds` carries a second list, **"Cancelled bookings still
-holding money"** — every cancelled booking whose net paid is positive and
-which carries no credit saying the money was returned. It is the only
-surface in the app that can see this money, because every other one goes
-quiet: `bookingBalance` short-circuits a cancelled booking to "settled",
-`diverCreditBalance` drops cancelled bookings from the active set, and the
+holding money"** — every cancelled booking with positive net paid and no
+credit saying the money came back. It is the only surface that can see
+this money: `bookingBalance` short-circuits a cancelled booking to
+"settled", `diverCreditBalance` drops cancelled bookings, and the
 refund-request queue lists only *non*-cancelled bookings.
 
-Each row offers exactly the two endings above — **Refunded off-app** and
-**Keep as credit** — and disappears once one is taken. An empty list means
-every cancellation is accounted for. The selector is
-`selectUnreconciled()` in `src/lib/unreconciled-cancellations.ts`; it uses
-the same `RETURN_SOURCES` rule as the automatic issuers, so the list and
-they can never disagree about what counts as already refunded.
+Each row offers the two endings above and disappears once one is taken.
+An empty list means every cancellation is accounted for. Approving a
+refund request moves a booking straight into this queue — correct, since
+the approval cancelled the booking but the cash has not moved.
 
-Approving a refund request moves a booking straight from the first queue
-into this one — which is correct: the approval cancelled the booking, but
-the cash has not moved yet.
+### Event cancellation, in detail
 
-### The refund request flow
+`cancelEventAndFollowUp()` stamps `cancelled_at`, notifies every
+registrant (fire-and-forget), then `issueCancellationCredits()` issues
+each non-cancelled booking an open credit worth its **net paid**.
+Bookings with nothing paid get none. Idempotent per booking on
+`RETURN_SOURCES`, so cancel → restore → cancel never double-issues.
+Crediting runs after the cancel commits, so a failure cannot un-cancel
+the event — the admin is told to issue them by hand.
 
-1. Diver presses **Request refund** on the Bookings or Payments page. This
-   only stamps `bookings.refund_requested_at`.
-2. The request appears on `/admin/refunds` (a cross-event queue) and as a
-   banner on the registrant card.
-3. **Approve** → booking → `cancelled`, diver notified. Money moves
-   off-app; record the `refunded` row afterward. Approving drops it off
-   the queue because the queue lists only non-cancelled bookings.
-4. **Reject** → clears `refund_requested_at`, leaving the booking
-   untouched, so an accidental request is fully undone and the diver can
-   ask again.
+### Who may cancel what
 
-A diver may only self-cancel a booking that is `pending` with nothing
-paid and no refund request already awaiting a decision — `canSelfCancel()`
-in `src/lib/booking-status.ts`. Once money is on it, both the Bookings page
-and the calendar's event modal offer **Request refund** / a pointer to My
-Bookings instead of a cancel button.
+A diver may self-cancel only a `pending` booking with nothing paid and no
+refund request outstanding — `canSelfCancel()`. Otherwise both the
+Bookings page and the calendar modal offer **Request refund** instead.
+This is a product rule, not a security boundary: the DB guard
+`bookings_guard_diver_status` lets a diver cancel any of their own
+bookings (it only stops self-confirming and re-homing). So the rule must
+be applied at **every** diver-facing cancel control, through the shared
+helper.
 
-This is a product rule, not a security boundary: the database guard
-`bookings_guard_diver_status` lets a diver move their own booking to
-`cancelled` from anywhere (it only stops them self-confirming or re-homing
-it onto another event). That is exactly why the rule has to be applied at
-**every** diver-facing cancel control through the shared helper — the
-calendar modal used to cancel any booked event on one tap, without even
-loading payments, which was the easiest way for a diver to strand their
-own money.
+**Cancellation policies** (`cancellation_policies`, attached per event)
+are text the diver acknowledges at registration. Nothing computes a
+forfeiture from them; an admin enacts whatever they say by hand.
 
-### Cancellation policies
+### Why a cancelled booking reads "settled"
 
-`cancellation_policies` rows are **text the diver acknowledges at
-registration**, attached per event via `events.cancel_policy`. They are
-informational: nothing in the code computes a forfeiture, a fee or a
-partial refund from them. Whatever the policy says, an admin enacts by
-hand with a `refunded` row (full or partial) and/or a credit.
+`bookingBalance(..., { cancelled: true })` short-circuits to zero. A
+cancelled booking keeps its frozen total, so netting it normally would
+show the diver owing the rest of an event that will not happen, and would
+double-count any cancellation credit.
 
-## Why a cancelled booking reads "settled"
+**"Settled" here means "nothing further is owed on this event", not "the
+money has been dealt with."**
 
-`bookingBalance(owed, paid, credit, { cancelled: true })` short-circuits
-to `{ net: 0, amount: 0, state: 'settled' }`.
+## Reporting
 
-This is deliberate. A cancelled booking keeps its frozen `details.total`,
-so netting it normally would show the diver still "owing" the unpaid rest
-of an event that will not happen — and, where a cancellation credit exists,
-would count the refund twice (once as the credit, once as the paid money
-that credit represents).
+| Surface | Netting |
+| --- | --- |
+| `/admin/audits` | Reconciles with the same `bookingBalance()` as the app. Its totals block is deliberately gross. |
+| `/admin/accounting` export | `paid` +, `refunded` −, `voided` shown but excluded. |
+| `/admin/dashboard` | Same signed rule, cash only. |
+| Revenue by staff | Base price × confirmed heads — deliberately not `netPaid`. See [admin.md](./admin.md#revenue-by-staff). |
 
-**"Settled" on a cancelled booking means "nothing further is owed on this
-event", not "the money has been dealt with."** Pass `cancelled` at every
-site that renders a cancelled booking's balance. Most surfaces exclude
-cancelled bookings from balance sums entirely.
+**Account credit is not revenue.** An `account_credit` row settles a
+booking without anything arriving — the cash arrived earlier, on the
+booking that generated the credit. Counting it books the same money
+twice. `isExternalPayment()` is the predicate every cash-revenue
+aggregation applies; credit applied is reported *beside* cash (its own
+dashboard KPI, its own export column and summary line). Balance math is
+the opposite and counts it in full — this is a reporting predicate, not a
+change to `netPaid`.
 
-The diver's Payments page keeps cancelled bookings in their own read-only
-section rather than hiding them, so the payment history — what was paid,
-what came back, what credit was returned — stays visible instead of
-looking like the money vanished.
+**Reminders** fire at 21/14/7/3/1 days out, skipping cancelled bookings:
+`depositDue > 0` → deposit message; else `balanceDue > 0` → balance
+message; else nothing. See [push-notifications.md](./push-notifications.md).
 
-## Reconciliation and reporting
-
-| Surface | What it shows | Netting rule |
-| --- | --- | --- |
-| `/admin/audits` | Per-diver, per-registration merged feed of every payment, credit, amendment and field change, oldest first | Reconciles each registration with the same `bookingBalance()` as the app, so it can never silently disagree. Its `totals` block is deliberately **gross** (paid and refunded listed separately). |
-| `/admin/accounting` export | Audit-style CSVs: every payment row regardless of status, each labeled | `paid` positive, `refunded` negative, `voided` shown but excluded from sums. |
-| `/admin/dashboard` | Revenue by month/method/event type/nationality/cert level, plus a separate **Credit applied** KPI | Same signed rule (`netOf`), over cash payments only. |
-| Revenue by staff | Base price × confirmed heads | Deliberately **not** `netPaid` — it counts what the work was worth, not what has been banked, and reads only the `base` line of `details.charges`. See [admin.md](./admin.md#revenue-by-staff). |
-
-### Account credit is not revenue
-
-An `account_credit` payment settles a booking without anything arriving at
-the shop — the cash arrived earlier, on whatever booking generated the
-credit. Counting it as revenue books the same money twice: 3000 comes in
-for a dive, the dive is called off, the resulting 3000 credit is spent on
-the next dive, and a naive sum reports 6000 of takings against 3000 of real
-money.
-
-`isExternalPayment()` in `src/lib/payments.ts` is the predicate every
-cash-revenue aggregation must apply. Credit applied is reported *beside*
-cash, never inside it:
-
-- the dashboard has its own **Credit applied** KPI;
-- the accounting export's by-event sheet has a **Credit Applied** column,
-  and the summary an "Account credit applied (not cash)" line;
-- the transactions sheet still lists every row, credit included — the
-  export stays audit-complete.
-
-Note the asymmetry: **balance** math counts an account-credit row in full,
-because it really did settle that booking. This is a reporting predicate,
-not a change to `netPaid`.
-
-## Payment reminders
-
-The push cron (`selectReminders()` in `src/lib/push-reminders.ts`) fires
-at 21, 14, 7, 3 and 1 days before the event, using exactly the rules
-above:
-
-- Skips cancelled bookings.
-- `balanceDue = max(0, total − netPaid − credit on this booking)`.
-- `depositDue > 0` → send the **deposit** message.
-- `depositDue == 0 && balanceDue > 0` → send the **balance** message.
-- `balanceDue == 0` → send nothing.
-
-The PWA encodes the same rule in `PaymentsPage` and `BookingsPage`. See
-[push-notifications.md](./push-notifications.md).
-
-## Known gaps and sharp edges
-
-Documented so nobody rediscovers them as bugs:
+## Known gaps
 
 1. **The confirmation PDF's credit line is a prediction.** Credit is
-   applied *after* the booking lands (the RPC needs a booking id), but the
-   PDF is rendered inside `create-registration` before that. So
-   `details.credit_applied` is the client's forecast, not the RPC's return
-   value. It is right in the ordinary case; when the apply fails the diver
-   is told so on the success screen and the credit stays open for them to
-   spend from the Payments page, but the emailed PDF has already gone out
-   claiming otherwise.
-
-2. **`credits.currency` / `payments.currency` default to `TWD` at the DB
-   level.** Every writer now names a currency explicitly — the TypeScript
-   ones from `siteConfig.locale.currency`, the SQL ones by inheriting the
-   currency of the money they are moving — so the default is only a
-   last-resort fallback. It still bites in one place: `record_group_payment`
-   recording the *first* money on a booking has nothing to inherit from and
-   falls through to the column default. `events` carries no currency column
-   (`AppEvent.currency` is resolved client-side from config), so SQL has no
-   other source. A fork on another currency should change the column
-   defaults in its own baseline.
-
-3. **Restoring a cancelled event leaves its credits issued.** Deliberate —
-   the shop reopens or settles them by hand on the Users page — but it does
-   mean a cancel/restore cycle can leave divers holding credit for an event
+   applied after the booking lands, but the PDF renders inside
+   `create-registration` before that. When the apply fails the diver is
+   told on the success screen, but the emailed PDF has already gone.
+2. **`credits.currency` / `payments.currency` default to `TWD`.** Every
+   writer names a currency explicitly now, except `record_group_payment`
+   recording the *first* money on a booking, which has nothing to inherit
+   from (`events` carries no currency column). A fork on another currency
+   should change the column defaults in its own baseline.
+3. **Restoring a cancelled event leaves its credits issued** — deliberate,
+   but a cancel/restore cycle leaves divers holding credit for an event
    that is running again.
-
-### Recently closed
-
-Kept as a short record of what these surfaces used to get wrong, because
-each was a live money bug rather than a design choice:
-
-- The calendar's event modal cancelled any booked event on one tap,
-  without loading payments — the easiest way for a diver to strand money.
-  Now gated by `canSelfCancel()`, the same helper the Bookings page uses.
-- Nothing surfaced money left on a cancelled booking. Now the
-  [holding queue](#finding-it-the-holding-queue).
-- The cancellation guards keyed on "any credit tied to this booking", so an
-  unrelated goodwill award suppressed the whole refund. Now keyed on
-  `credits.source`.
-- Applied account credit was summed as revenue, double-counting cash.
-- The card surcharge *rate* was a hardcoded `0.05` in four places while
-  every label read `business.cardSurchargePercent`, so a fork configured
-  for 3% displayed "+3%" and charged 5%.
-- The one-tap "use my credit" button promised
-  `min(openCreditBalance, totalOwed)`, which could exceed what the RPC
-  would apply. Now `plannedCreditApplication()` replays the RPC.
 
 ## Invariants
 
-Anything you add to this system has to keep all of these true.
-
 1. **Never edit money rows in place.** New row, always.
 2. **Sum paid through `netPaid` / `netPaidByBooking` / `booking_net_paid`.**
-   Nowhere else.
-3. **`owed` is `details.total` plus amendments.** Never the raw total
-   alone, in TypeScript or SQL.
-4. **Clamp the deposit to `owed`** wherever you compare against it,
-   including the auto-confirm rule.
-5. **The three promotion rules stay identical** — `recordPayment`,
-   `apply_credit_to_booking`, `record_group_payment` — and `voidPayment`
+3. **`owed` is `details.total` plus amendments** — in TypeScript and SQL.
+4. **Clamp the deposit to `owed`** wherever you compare against it.
+5. **The three promotion rules stay identical**, and `voidPayment`
    mirrors them.
-6. **Credit tied to a booking is never spendable against that same
-   booking.** It already offsets it.
+6. **A booking's own credit is never spendable against that booking.**
 7. **A cancelled booking has no live balance** and refuses credit.
-8. **`diverCreditBalance` is the only definition of account credit,**
-   and it always excludes lead-covered bookings.
-9. **Guards belong in the RPC or trigger, not only in the UI.** The
-   SECURITY DEFINER functions are the sole path a diver can move money,
-   and a stale client is a real caller. Where a rule is a product rule
-   rather than a security boundary — `canSelfCancel` — it must still be
-   applied at *every* control that offers the action, through the shared
-   helper.
-
-10. **Every automatic credit says where it came from,** and only
-    `RETURN_SOURCES` blocks a further refund. Adding a new issuer means
-    adding a `source` value, not reusing `manual`.
-
-11. **Cash-revenue sums apply `isExternalPayment`.** Balance math does
-    not.
-12. **Every constraint, trigger and RLS policy here gets an integration
-    test** against the live local stack — see `tests/integration/`
-    (`credits`, `apply-credit-to-booking`, `balance-consistency`,
-    `return-account-credit-on-cancel`, `guard-diver-booking-status`,
-    `lead-payer`) and `tests/scenario/event-cancellation.test.ts`.
+8. **`diverCreditBalance` is the only definition of account credit,** and
+   always excludes lead-covered bookings.
+9. **Guards belong in the RPC or trigger, not only the UI.** Where a rule
+   is a product rule rather than a security boundary (`canSelfCancel`),
+   apply it at *every* control that offers the action.
+10. **Every automatic credit records its `source`.** A new issuer means a
+    new value, not `manual`.
+11. **Cash-revenue sums apply `isExternalPayment`.** Balance math does not.
+12. **Constraints, triggers and RLS policies get integration tests** —
+    `tests/integration/{credits,apply-credit-to-booking,balance-consistency,return-account-credit-on-cancel,guard-diver-booking-status,lead-payer}`
+    and `tests/scenario/event-cancellation.test.ts`.

@@ -64,7 +64,7 @@ CREATE INDEX IF NOT EXISTS "credits_booking_source_idx"
 
 -- apply_credit_to_booking: verbatim copy of the definition in
 -- 20260729000000_parent_apply_credit_at_registration.sql except that the
--- carry-forward row is now labelled 'carry_forward' (so it can never suppress
+-- carry-forward row is now labeled 'carry_forward' (so it can never suppress
 -- a cancellation refund) and the offsetting payment row inherits the currency
 -- of the credit it spends instead of falling through to the column default.
 CREATE OR REPLACE FUNCTION public.apply_credit_to_booking(p_booking_id uuid, p_amount numeric)
