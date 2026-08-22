@@ -32,6 +32,52 @@ afterAll(async () => {
 })
 
 describe('admin_audit_log', () => {
+  // Settling a cancellation is the one money decision that records no payment
+  // and no credit — the whole point is that nothing moves. So the audit log is
+  // the ONLY trace of it, and it has to carry enough to reconstruct who kept
+  // how much, and when.
+  it('logs an admin settling a cancelled booking, with before and after', async () => {
+    const dive = await freshDive()
+    const { data: inserted } = await admin.from('bookings').insert({
+      user_id: diver.id, event_id: dive, status: 'cancelled', details: { total: 3000 },
+    }).select().single()
+    const bookingId = inserted!.id
+
+    const adminSb = await userClient(adminUser.email, adminUser.password)
+    const settledAt = new Date().toISOString()
+    const { error } = await adminSb.from('bookings').update({
+      cancellation_settled_at:   settledAt,
+      cancellation_settled_by:   adminUser.id,
+      cancellation_settled_note: 'Shop kept TWD 500 as a cancellation fee',
+    } as never).eq('id', bookingId)
+    expect(error).toBeNull()
+
+    const { data: audit } = await admin
+      .from('admin_audit_log')
+      .select('*')
+      .eq('target_table', 'bookings')
+      .eq('target_id', bookingId)
+      .eq('action', 'update')
+      .order('created_at', { ascending: false })
+      .limit(1)
+    expect(audit).toHaveLength(1)
+
+    const row = audit![0] as {
+      actor_id: string
+      before: Record<string, unknown>
+      after: Record<string, unknown>
+    }
+    // Who did it, what it looked like before, and what was kept.
+    expect(row.actor_id).toBe(adminUser.id)
+    expect(row.before.cancellation_settled_at).toBeNull()
+    // Postgres renders the offset as +00:00 where JS renders Z — compare the
+    // instant, not the spelling.
+    expect(new Date(row.after.cancellation_settled_at as string).getTime())
+      .toBe(new Date(settledAt).getTime())
+    expect(row.after.cancellation_settled_by).toBe(adminUser.id)
+    expect(row.after.cancellation_settled_note).toMatch(/cancellation fee/i)
+  })
+
   it('logs a booking status change performed by an admin', async () => {
     // Set up a booking owned by the diver.
     const dive = await freshDive()

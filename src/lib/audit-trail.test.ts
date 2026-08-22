@@ -323,3 +323,58 @@ describe('signedDisplayAmount', () => {
     expect(signedDisplayAmount(e)).toBeNull()
   })
 })
+
+// Settling a cancellation is the one money decision that writes no payment and
+// no credit — nothing moving is the point. The booking's audit-log row is
+// therefore its only trace, so the feed has to name the columns that changed
+// and keep the raw before/after for the drawer.
+describe('a settled cancellation is traceable in the feed', () => {
+  const logRow = {
+    id: 'log-1',
+    created_at: '2026-08-22T10:00:00.000Z',
+    actor_id: 'admin-1',
+    action: 'update',
+    target_table: 'bookings',
+    target_id: 'b1',
+    before: { id: 'b1', status: 'cancelled', cancellation_settled_at: null, cancellation_settled_note: null },
+    after: {
+      id: 'b1', status: 'cancelled',
+      cancellation_settled_at: '2026-08-22T10:00:00.000Z',
+      cancellation_settled_by: 'admin-1',
+      cancellation_settled_note: 'Shop kept TWD 500 as a cancellation fee',
+    },
+  } as unknown as import('../types/database').AdminAuditLog
+
+  it('names the settled columns as what changed', () => {
+    const [entry] = auditLogEntries([logRow])
+    expect(entry.kind).toBe('booking_update')
+    expect(entry.bookingId).toBe('b1')
+    expect(entry.actorId).toBe('admin-1')
+    expect(entry.changed).toEqual([
+      'cancellation_settled_at', 'cancellation_settled_by', 'cancellation_settled_note',
+    ])
+  })
+
+  it('keeps the raw before/after so the amount kept is recoverable', () => {
+    const [entry] = auditLogEntries([logRow])
+    const raw = entry.raw as { after: Record<string, unknown> }
+    expect(raw.after.cancellation_settled_note).toMatch(/500/)
+  })
+
+  it('lands on the registration it belongs to, not just the diver', () => {
+    const booking = { id: 'b1', user_id: 'd1', event_id: 'e1', status: 'cancelled', details: { total: 3000 } }
+    const trail = assembleDiverAuditTrail({
+      profile: { id: 'd1' } as never,
+      bookings: [booking] as never,
+      events: new Map(),
+      payments: [{ id: 'p1', booking_id: 'b1', user_id: 'd1', amount: 500, status: 'paid', created_at: '2026-08-01T00:00:00.000Z', currency: 'TWD', method: 'cash', note: null, recorded_by: 'admin-1' }] as never,
+      credits: [],
+      amendmentsByBooking: new Map(),
+      auditLog: [logRow],
+    })
+    const [reg] = trail.registrations
+    // The fee is what is still on the booking; the log row explains why.
+    expect(reg.paid).toBe(500)
+    expect(reg.entries.some(e => e.kind === 'booking_update')).toBe(true)
+  })
+})
