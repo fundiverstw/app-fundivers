@@ -93,16 +93,27 @@ that trip will never happen, so credit spent there would be destroyed.
 
 Four of them, and only one returns money by itself.
 
-| What happened | Money returned automatically? |
+| What happened | Credited automatically |
 | --- | --- |
-| Shop cancels the event | **Yes** — every registrant gets credit worth their full net paid |
-| Refund request approved | No |
-| Admin cancels one booking | No |
-| Diver cancels their own booking | No |
+| Shop cancels the event | **Full net paid**, to every registrant |
+| Diver asked to cancel **on or before** the event's cancel-by date | **Full net paid** |
+| Diver asked **after** the cancel-by date | Only the **account credit** they had spent |
+| Admin cancels a booking nobody asked about | Only the **account credit** |
 
-In the bottom three a trigger does return any **account credit** spent on
-the booking — that money never left the app. Cash and transfers did, so
-only a person can move them back.
+Whatever is not credited stays on the booking for a human — a forfeiture
+never happens automatically.
+
+**The deadline is `events.cancel_date`, and the moment that counts is
+`refund_requested_at`** — when the *diver* asked, not when an admin
+approved, so a slow approval cannot cost them their refund. An event with
+no cancel-by date has no deadline to miss. `cancellation_in_time()`
+decides, judging the shop's calendar day via `shop_timezone()` — SQL
+cannot read `fundive.config.ts`, so a fork restates the zone there and an
+integration test fails the build if the two disagree.
+
+Account credit is the one thing the app can always hand back on its own,
+because it never left the app. Cash and transfers did, so only a person
+can move those.
 
 Cancelling an event does **not** cancel its bookings. The credit is what
 settles things with the diver. Issuing runs after the cancel commits, so
