@@ -449,6 +449,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
       transportPrice,
       gearItems: gear?.rent ? (gear.items ?? []) : [],
       gearPrices: siteConfig.business.gearPrices,
+      cardSurchargeRate: siteConfig.business.cardSurchargePercent / 100,
       roomAddedPrice,
       addonsTotal,
       needsTransport: d.transportation === true,

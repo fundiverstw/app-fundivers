@@ -211,6 +211,11 @@ export const en = {
     eventsSelected: (n: number) => `${n} event${n === 1 ? '' : 's'} selected`,
     priceFrom: (amount: string) => `From ${amount}`,
     cancelBooking: 'Cancel booking',
+    // Shown instead of the cancel button once money is on the booking: the app
+    // moves no money, so a paid booking has to go through the refund queue.
+    bookedAlready: "You're on this one.",
+    cancelViaBookings: 'To cancel or ask for a refund, open My Bookings.',
+    goToBookings: 'Go to My Bookings',
     shareWithFriends: 'Share link with friends',
     addToGoogleCalendar: 'Add to Google Calendar',
     busy: 'Busy',

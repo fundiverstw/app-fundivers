@@ -75,8 +75,14 @@ export function chargesTotal(lines: ChargeLine[]): number {
   return lines.reduce((s, l) => s + l.amount, 0)
 }
 
-const surchargeRate = (method: BookingDetails['payment_method']): number =>
-  method === 'credit_card' || method === 'paypal' ? 0.05 : 0
+/** The card/PayPal surcharge as a multiplier. Card and PayPal carry it; cash
+ *  and bank transfer pass through at face value. The rate comes from
+ *  business.cardSurchargePercent, the same field that labels it everywhere —
+ *  a fork that sets 3 must be charged 3%, not shown "+3%" and charged 5%. */
+export const CARD_SURCHARGE_RATE = siteConfig.business.cardSurchargePercent / 100
+
+export const surchargeRate = (method: BookingDetails['payment_method']): number =>
+  method === 'credit_card' || method === 'paypal' ? CARD_SURCHARGE_RATE : 0
 
 export interface ResolveChargesInput {
   details: BookingDetails | null | undefined
@@ -123,7 +129,6 @@ export function resolveCharges(input: ResolveChargesInput): ChargeLine[] {
     const depositOnly = !!details.pay_deposit_only
     const surchargeBase = depositOnly ? Math.min(event.deposit_amount ?? 0, subTotal) : subTotal
     surcharge = {
-      // The rate is business.cardSurchargePercent; it used to be a hardcoded 5%.
       label: t.chargeLines.surcharge(siteConfig.business.cardSurchargePercent, depositOnly),
       amount: Math.round(surchargeBase * rate),
     }

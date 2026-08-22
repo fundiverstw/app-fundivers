@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { siteConfig } from '../config/site'
-import { STATUS_STYLES } from '../lib/booking-status'
+import { STATUS_STYLES, canSelfCancel } from '../lib/booking-status'
 import { PageLoading } from '../components/ui/Spinner'
 import { format } from 'date-fns'
 import { shopZoned } from '../lib/dates'
@@ -254,7 +254,7 @@ function Card({
   const details = (row.details ?? {}) as Booking['details']
   const total = Number((details as { total?: number } | undefined)?.total ?? 0)
   const deposit = Number((details as { deposit?: number } | undefined)?.deposit ?? 0)
-  const canCancel = row.status === 'pending' && row.paidSum === 0 && !row.refund_requested_at
+  const canCancel = canSelfCancel(row, row.paidSum)
   const canRefund = row.paidSum > 0 && row.status !== 'cancelled' && !row.refund_requested_at
   const currency = row.event?.currency ?? siteConfig.locale.currency
   const amendmentLines = row.amendments.map(a => ({ label: a.note, amount: a.amount }))

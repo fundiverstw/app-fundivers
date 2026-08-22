@@ -204,6 +204,11 @@ export const zhTW: Messages = {
     eventsSelected: (n: number) => `已選 ${n} 個活動`,
     priceFrom: (amount: string) => `${amount} 起`,
     cancelBooking: '取消報名',
+    // Shown instead of the cancel button once money is on the booking: the app
+    // moves no money, so a paid booking has to go through the refund queue.
+    bookedAlready: '你已報名這一場。',
+    cancelViaBookings: '如需取消或申請退費，請前往「我的報名」。',
+    goToBookings: '前往我的報名',
     shareWithFriends: '分享連結給朋友',
     addToGoogleCalendar: '加入 Google 日曆',
     busy: '忙碌',

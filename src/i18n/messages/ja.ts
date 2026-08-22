@@ -203,6 +203,11 @@ export const ja: Messages = {
     eventsSelected: (n: number) => `${n}件のイベントを選択中`,
     priceFrom: (amount: string) => `${amount}〜`,
     cancelBooking: '予約をキャンセル',
+    // Shown instead of the cancel button once money is on the booking: the app
+    // moves no money, so a paid booking has to go through the refund queue.
+    bookedAlready: 'この予約は受付済みです。',
+    cancelViaBookings: 'キャンセルまたは返金の申請は「マイ予約」から行ってください。',
+    goToBookings: 'マイ予約へ',
     shareWithFriends: 'リンクを友達に共有',
     addToGoogleCalendar: 'Google カレンダーに追加',
     busy: '予定あり',

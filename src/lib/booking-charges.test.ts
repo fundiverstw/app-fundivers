@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildCharges, chargesTotal, resolveCharges, NITROX_COURSE_FEE } from './booking-charges'
+import { buildCharges, chargesTotal, resolveCharges, surchargeRate, CARD_SURCHARGE_RATE, NITROX_COURSE_FEE } from './booking-charges'
 import { GEAR_ALACARTE_PRICES, FULL_GEAR_SET } from './gear'
 import type { AppEvent, BookingDetails } from '../types/database'
 import { siteConfig } from '../config/site'
@@ -142,6 +142,7 @@ describe('resolveCharges', () => {
 describe('computeBookingMoney parity with client resolveCharges', () => {
   const gearPrices = GEAR_ALACARTE_PRICES
   const nitroxCourseFee = siteConfig.business.nitroxCourseFee
+  const cardSurchargeRate = siteConfig.business.cardSurchargePercent / 100
 
   it('matches a fully-loaded bank-transfer booking (no surcharge)', () => {
     const event = { price: 2800, transport_price: 1300, dive_days: 2, deposit_amount: 1000 } as AppEvent
@@ -162,7 +163,7 @@ describe('computeBookingMoney parity with client resolveCharges', () => {
       base: 2800, diveDays: 2, depositAmount: 1000, transportPrice: 1300,
       gearItems: ['BCD', 'Dive computer'], gearPrices,
       roomAddedPrice: 1500, addonsTotal: 300,
-      needsTransport: true, nitroxCourse: true, nitroxCourseFee,
+      needsTransport: true, nitroxCourse: true, nitroxCourseFee, cardSurchargeRate,
       paymentMethod: 'bank_transfer', payDepositOnly: false,
     })
     expect(money.total).toBe(clientTotal)
@@ -176,7 +177,7 @@ describe('computeBookingMoney parity with client resolveCharges', () => {
     const money = computeBookingMoney({
       base: 1000, diveDays: 1, depositAmount: 500, transportPrice: 0,
       gearItems: [], gearPrices, roomAddedPrice: 0, addonsTotal: 0,
-      needsTransport: false, nitroxCourse: false, nitroxCourseFee,
+      needsTransport: false, nitroxCourse: false, nitroxCourseFee, cardSurchargeRate,
       paymentMethod: 'credit_card', payDepositOnly: false,
     })
     expect(money.total).toBe(clientTotal) // 1000 + 50
@@ -190,7 +191,7 @@ describe('computeBookingMoney parity with client resolveCharges', () => {
     const money = computeBookingMoney({
       base: 1000, diveDays: 1, depositAmount: 500, transportPrice: 0,
       gearItems: [], gearPrices, roomAddedPrice: 0, addonsTotal: 0,
-      needsTransport: false, nitroxCourse: false, nitroxCourseFee,
+      needsTransport: false, nitroxCourse: false, nitroxCourseFee, cardSurchargeRate,
       paymentMethod: 'credit_card', payDepositOnly: true,
     })
     expect(money.total).toBe(clientTotal) // 1000 + 25
@@ -201,11 +202,50 @@ describe('computeBookingMoney parity with client resolveCharges', () => {
     const money = computeBookingMoney({
       base: 3200, diveDays: 1, depositAmount: 0, transportPrice: 0,
       gearItems: [], gearPrices, roomAddedPrice: 0, addonsTotal: 0,
-      needsTransport: false, nitroxCourse: false, nitroxCourseFee,
+      needsTransport: false, nitroxCourse: false, nitroxCourseFee, cardSurchargeRate,
       paymentMethod: 'cash', payDepositOnly: false,
     })
     expect(money.total).toBe(3200)
     expect(money.deposit).toBeNull()
+  })
+})
+
+// The rate ACTUALLY CHARGED must track the same config field as the label.
+// It did not: cardSurchargePercent drove every "+N%" string while all four
+// charge sites multiplied by a hardcoded 0.05, so a shop configured for 3%
+// showed "+3%" everywhere and billed 5%.
+describe('card surcharge rate tracks the configured percent', () => {
+  const pct = siteConfig.business.cardSurchargePercent
+
+  it('exports the config percent as a multiplier', () => {
+    expect(CARD_SURCHARGE_RATE).toBe(pct / 100)
+  })
+
+  it('charges it on card and PayPal, and nothing on cash or transfer', () => {
+    expect(surchargeRate('credit_card')).toBe(pct / 100)
+    expect(surchargeRate('paypal')).toBe(pct / 100)
+    expect(surchargeRate('cash')).toBe(0)
+    expect(surchargeRate('bank_transfer')).toBe(0)
+    expect(surchargeRate(undefined)).toBe(0)
+  })
+
+  it('resolveCharges bills the configured percent, not a literal 5%', () => {
+    const event = { price: 2000, transport_price: 0, dive_days: 1, deposit_amount: 0 } as AppEvent
+    const lines = resolveCharges({ details: { payment_method: 'credit_card' }, event })
+    const surcharge = lines.find(l => l.kind === 'surcharge')
+    expect(surcharge?.amount).toBe(Math.round(2000 * (pct / 100)))
+  })
+
+  it('the server-side money math bills the rate it is handed', () => {
+    const at = (rate: number) => computeBookingMoney({
+      base: 2000, diveDays: 1, depositAmount: 0, transportPrice: 0,
+      gearItems: [], gearPrices: GEAR_ALACARTE_PRICES, roomAddedPrice: 0, addonsTotal: 0,
+      needsTransport: false, nitroxCourse: false,
+      nitroxCourseFee: siteConfig.business.nitroxCourseFee,
+      paymentMethod: 'credit_card', cardSurchargeRate: rate, payDepositOnly: false,
+    }).total
+    expect(at(0.03)).toBe(2060)
+    expect(at(0.05)).toBe(2100)
   })
 })
 

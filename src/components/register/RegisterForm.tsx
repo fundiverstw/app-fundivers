@@ -12,7 +12,7 @@ import { usesCourseDays } from '../../lib/event-kinds'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
 import { BTN_XS_GHOST } from '../../styles/tokens'
-import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
+import { buildCharges, surchargeRate, NITROX_COURSE_FEE } from '../../lib/booking-charges'
 import { fetchCreditsForUser, openCreditBalance, applyCreditToBooking } from '../../lib/credits'
 import { invokeWithRetry, edgeErrorMessage } from '../../lib/edge-invoke'
 import { fetchRideSeats, canRequestRide, type RideSeats } from '../../lib/event-vehicles'
@@ -925,10 +925,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     for (const a of addons) if (addonIds.has(a.id)) total += a.price ?? 0
     return total
   }, [addons, addonIds])
-  // Both PayPal and credit card incur a 5% surcharge (PayPal absorbs ~3% on
-  // paypal.me transfers; the card processor's fee is similar). Cash and
+  // Both PayPal and credit card incur the shop's card surcharge (PayPal absorbs
+  // ~3% on paypal.me transfers; the card processor's fee is similar). Cash and
   // local bank transfer pass through at face value.
-  const paymentSurcharge = payment === 'credit_card' || payment === 'paypal' ? 0.05 : 0
+  const paymentSurcharge = surchargeRate(payment)
   const base = event.price ?? 0
   // Transport pricing comes from the linked prices row. NULL or 0 means
   // it's bundled into the base price — the form hides the opt-in checkbox

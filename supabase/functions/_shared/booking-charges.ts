@@ -27,14 +27,17 @@ export interface BookingMoneyInput {
   nitroxCourse: boolean
   nitroxCourseFee: number
   paymentMethod: string | null | undefined
+  // business.cardSurchargePercent / 100 — the multiplier, not the percent.
+  cardSurchargeRate: number
   payDepositOnly: boolean
 }
 
-// Card and PayPal both carry a 5% surcharge; cash / bank transfer pass through.
-// Hardcoded 0.05 to match RegisterForm and resolveCharges (the config
-// cardSurchargePercent only drives the display label, not the rate).
-function surchargeRate(method: string | null | undefined): number {
-  return method === 'credit_card' || method === 'paypal' ? 0.05 : 0
+// Card and PayPal both carry the shop's card surcharge; cash / bank transfer
+// pass through. The rate is passed in (business.cardSurchargePercent / 100) so
+// this stays dependency-free and cannot drift from the label the diver was
+// shown, which reads the same config field.
+function surchargeRate(method: string | null | undefined, rate: number): number {
+  return method === 'credit_card' || method === 'paypal' ? rate : 0
 }
 
 export interface BookingMoney {
@@ -64,7 +67,7 @@ export function computeBookingMoney(input: BookingMoneyInput): BookingMoney {
     transportCost +
     nitroxCost
 
-  const rate = surchargeRate(input.paymentMethod)
+  const rate = surchargeRate(input.paymentMethod, input.cardSurchargeRate)
   const hasDeposit = input.depositAmount > 0
   const depositFace = hasDeposit ? Math.min(input.depositAmount, subTotal) : 0
   const payingDepositOnly = hasDeposit && input.payDepositOnly

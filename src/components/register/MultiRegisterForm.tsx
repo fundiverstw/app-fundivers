@@ -5,7 +5,7 @@ import { needsShoeSize } from '../../lib/logistics'
 import { usesCourseDays } from '../../lib/event-kinds'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
-import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
+import { buildCharges, surchargeRate, NITROX_COURSE_FEE } from '../../lib/booking-charges'
 import { supabase } from '../../lib/supabase'
 import { invokeWithRetry } from '../../lib/edge-invoke'
 import { formatEventSpan, isPastEvent } from '../../lib/events'
@@ -203,7 +203,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
 
   // Per-event price breakdown derived from the diver's choices.
   const eventBreakdowns = useMemo(() => {
-    const surcharge = payment === 'credit_card' || payment === 'paypal' ? 0.05 : 0
+    const surcharge = surchargeRate(payment)
     return cart.map(ev => {
       const c = choicesById[ev.id] ?? { rentGear: false, gearItems: [], needsTransport: null, addNitroxCourse: false }
       const base       = ev.price ?? 0

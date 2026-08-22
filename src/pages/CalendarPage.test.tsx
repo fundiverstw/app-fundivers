@@ -71,9 +71,12 @@ function buildEvent(overrides: Partial<AppEvent> = {}): AppEvent {
   }
 }
 
-function setupBookings(bookings: unknown[], inserted?: unknown) {
-  from.mockImplementation(() => ({
-    ...mockQueryBuilder({ data: bookings }),
+// `payments` is dispatched separately: the cancel control reads net paid per
+// booking to decide whether a diver may self-cancel, so a test that wants a
+// paid booking has to be able to hand back payment rows, not booking rows.
+function setupBookings(bookings: unknown[], inserted?: unknown, payments: unknown[] = []) {
+  from.mockImplementation((table: string) => ({
+    ...mockQueryBuilder({ data: table === 'payments' ? payments : bookings }),
     insert: (...a: unknown[]) => {
       insert(...a)
       return {
@@ -151,7 +154,8 @@ describe('CalendarPage', () => {
   it('Cancel booking updates status to cancelled', async () => {
     const ev = buildEvent({ id: 'dive_xyz', type: 'dive' })
     fetchEventsInRange.mockResolvedValue([ev])
-    setupBookings([{ id: 'b1', user_id: 'u1', event_id: 'dive_xyz', status: 'confirmed' }])
+    // Pending with nothing paid — the only shape a diver may cancel themselves.
+    setupBookings([{ id: 'b1', user_id: 'u1', event_id: 'dive_xyz', status: 'pending', refund_requested_at: null }])
 
     const user = userEvent.setup()
     renderWithRouter(<CalendarPage />)
@@ -162,6 +166,62 @@ describe('CalendarPage', () => {
 
     await waitFor(() => expect(update).toHaveBeenCalledOnce())
     expect(update.mock.calls[0][0]).toEqual({ status: 'cancelled' })
+  })
+
+  // The modal used to cancel ANY booked event on one tap, with no confirmation
+  // and without ever loading payments. A diver who had paid could strand their
+  // own money: a cancelled booking reads "settled" everywhere and drops out of
+  // account credit, so nothing showed the shop still held the cash.
+  it('offers no cancel button once money is on the booking', async () => {
+    const ev = buildEvent({ id: 'dive_xyz', type: 'dive' })
+    fetchEventsInRange.mockResolvedValue([ev])
+    setupBookings(
+      [{ id: 'b1', user_id: 'u1', event_id: 'dive_xyz', status: 'pending', refund_requested_at: null }],
+      undefined,
+      [{ booking_id: 'b1', amount: 3000, status: 'paid' }],
+    )
+
+    const user = userEvent.setup()
+    renderWithRouter(<CalendarPage />)
+    await screen.findAllByText(ev.title)
+    await user.click(screen.getAllByText(ev.title)[0])
+
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /cancel booking/i })).not.toBeInTheDocument())
+    expect(screen.getByText(/open my bookings/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /go to my bookings/i })).toHaveAttribute('href', '/bookings')
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('offers no cancel button for a confirmed booking', async () => {
+    const ev = buildEvent({ id: 'dive_xyz', type: 'dive' })
+    fetchEventsInRange.mockResolvedValue([ev])
+    setupBookings([{ id: 'b1', user_id: 'u1', event_id: 'dive_xyz', status: 'confirmed', refund_requested_at: null }])
+
+    const user = userEvent.setup()
+    renderWithRouter(<CalendarPage />)
+    await screen.findAllByText(ev.title)
+    await user.click(screen.getAllByText(ev.title)[0])
+
+    expect(await screen.findByRole('link', { name: /go to my bookings/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /cancel booking/i })).not.toBeInTheDocument()
+  })
+
+  it('offers no cancel button while a refund request is pending', async () => {
+    const ev = buildEvent({ id: 'dive_xyz', type: 'dive' })
+    fetchEventsInRange.mockResolvedValue([ev])
+    setupBookings([{
+      id: 'b1', user_id: 'u1', event_id: 'dive_xyz', status: 'pending',
+      refund_requested_at: '2026-06-01T00:00:00Z',
+    }])
+
+    const user = userEvent.setup()
+    renderWithRouter(<CalendarPage />)
+    await screen.findAllByText(ev.title)
+    await user.click(screen.getAllByText(ev.title)[0])
+
+    expect(await screen.findByRole('link', { name: /go to my bookings/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /cancel booking/i })).not.toBeInTheDocument()
   })
 
   it('disables Register for a fully-booked event', async () => {
