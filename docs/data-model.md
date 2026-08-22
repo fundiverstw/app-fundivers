@@ -242,7 +242,7 @@ interface BookingDetails {
   room?: { option_id?: string | null; notes?: string | null }
   add_ons?: string[]                // addons.id list
   transportation?: boolean
-  payment_method?: 'bank_transfer' | 'credit_card' | 'cash'
+  payment_method?: 'bank_transfer' | 'credit_card' | 'paypal' | 'cash'
   pay_deposit_only?: boolean        // deposit-only-at-registration flag
   nitrox_course_addon?: boolean
   charges?: ChargeLine[]            // itemized snapshot — see below

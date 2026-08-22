@@ -10,7 +10,7 @@ into source.
 | [data-model.md](./data-model.md)                       | Every table, the unified `events` model, the catalog reference tables |
 | [authentication.md](./authentication.md)               | Sign-up trigger, `useAuth`, role gating, `ProtectedRoute` / `AdminRoute` |
 | [events-and-bookings.md](./events-and-bookings.md)     | Calendar rendering, register-form wizard, `bookings.details` JSONB shape |
-| [payments.md](./payments.md)                           | Deposit vs balance semantics, payments ledger, refund flow |
+| [payments.md](./payments.md)                           | Payments and credits end to end: owed/paid/balance math, the credits ledger, spending credit, and what each kind of cancellation does to the money |
 | [admin.md](./admin.md)                                 | Admin routes, event memos, user search, role-view toggle |
 | [dive-site-maps.md](./dive-site-maps.md)               | Diver-contributed 3D seafloor maps: the implicit 1 m lattice, honest-gap surfacing, contribution model. Admin-only, not yet persisted |
 | [coral-surveys.md](./coral-surveys.md)                 | Crowdsourced coral monitoring against the CoralWatch Coral Health Chart: survey plus colony rows, RPC-only writes, staff moderation, the bleaching arithmetic |
