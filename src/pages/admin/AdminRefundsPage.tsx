@@ -8,20 +8,35 @@ import { errorMessage } from '../../lib/errors'
 import { useToast } from '../../hooks/useToast'
 import { fetchEventsForBookings } from '../../lib/events'
 import { notifyRefundApproved, rejectRefundRequest } from '../../lib/refunds'
+import {
+  fetchUnreconciledCancellations, recordCancellationRefund, convertCancellationToCredit,
+  type UnreconciledCancellation,
+} from '../../lib/unreconciled-cancellations'
+import { useAuth } from '../../hooks/useAuth'
 import { Spinner } from '../../components/ui/Spinner'
-import { CARD_ELEVATED, BTN_PRIMARY, BTN_GHOST, TEXT_MUTED } from '../../styles/tokens'
+import { CARD_ELEVATED, BTN_PRIMARY, BTN_GHOST, BTN_XS_PRIMARY, BTN_XS_GHOST, TEXT_MUTED } from '../../styles/tokens'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
 import type { Booking } from '../../types/database'
 
 const rf = t.admin.refunds
 
-// Cross-event queue of open refund requests. A diver requesting a refund only
-// stamps `bookings.refund_requested_at`; before this page the sole admin
-// surface was a banner buried in one registrant's card on the event detail
-// page, so requests were easy to miss. "Open" == request stamped and the
-// booking not yet cancelled (approving a refund cancels the booking, which is
-// what drops it off this list). Money movement itself is off-app.
+// Two queues, both about money the shop still has to act on.
+//
+// 1. Open refund REQUESTS. A diver requesting a refund only stamps
+//    `bookings.refund_requested_at`; before this page the sole admin surface
+//    was a banner buried in one registrant's card on the event detail page, so
+//    requests were easy to miss. "Open" == request stamped and the booking not
+//    yet cancelled (approving a refund cancels the booking, which is what drops
+//    it off this list). Money movement itself is off-app.
+//
+// 2. Cancelled bookings that STILL HOLD MONEY. Approving a refund — like every
+//    other booking cancellation — only cancels the booking; the cash moved
+//    off-app and nothing records that it came back. Every other surface then
+//    goes quiet: a cancelled booking reads "settled", and it drops out of the
+//    diver's account credit. This second list is the only place that money is
+//    visible, and it clears when an admin picks one of the two endings. See
+//    src/lib/unreconciled-cancellations.ts.
 
 interface RefundRow {
   bookingId: string
@@ -80,19 +95,68 @@ async function loadRefundRequests(): Promise<RefundRow[]> {
   })
 }
 
+const HOLDING_LABELS = { eventFallback: rf.eventFallback, diverFallback: rf.colDiver }
+
 export function AdminRefundsPage() {
   const toast = useToast()
+  const { profile } = useAuth()
   const [rows, setRows] = useState<RefundRow[] | null>(null)
+  const [holding, setHolding] = useState<UnreconciledCancellation[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [acting, setActing] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
-    loadRefundRequests()
-      .then(r => { if (alive) setRows(r) })
+    Promise.all([loadRefundRequests(), fetchUnreconciledCancellations(HOLDING_LABELS)])
+      .then(([requests, unreconciled]) => {
+        if (!alive) return
+        setRows(requests)
+        setHolding(unreconciled)
+      })
       .catch(e => { if (alive) setError(errorMessage(e)) })
     return () => { alive = false }
   }, [])
+
+  // Approving a refund cancels the booking, which moves it straight from the
+  // requests queue into the holding list — the money is still with the shop
+  // until someone records that it went back.
+  async function refreshHolding() {
+    try {
+      setHolding(await fetchUnreconciledCancellations(HOLDING_LABELS))
+    } catch (e) {
+      toast.error(errorMessage(e))
+    }
+  }
+
+  async function markRefunded(row: UnreconciledCancellation) {
+    if (!profile?.id) return
+    setActing(row.bookingId)
+    try {
+      await recordCancellationRefund({ row, recordedBy: profile.id, note: rf.refundNote })
+      setHolding(prev => (prev ?? []).filter(r => r.bookingId !== row.bookingId))
+      toast.success(rf.markRefundedDone)
+    } catch (e) {
+      toast.error(errorMessage(e))
+    } finally {
+      setActing(null)
+    }
+  }
+
+  async function keepAsCredit(row: UnreconciledCancellation) {
+    if (!profile?.id) return
+    setActing(row.bookingId)
+    try {
+      await convertCancellationToCredit({
+        row, createdBy: profile.id, reason: rf.creditReason(row.eventTitle),
+      })
+      setHolding(prev => (prev ?? []).filter(r => r.bookingId !== row.bookingId))
+      toast.success(rf.toCreditDone)
+    } catch (e) {
+      toast.error(errorMessage(e))
+    } finally {
+      setActing(null)
+    }
+  }
 
   async function approve(bookingId: string) {
     setActing(bookingId)
@@ -106,6 +170,7 @@ export function AdminRefundsPage() {
       void notifyRefundApproved(bookingId).catch(() => {})
       setRows(prev => (prev ?? []).filter(r => r.bookingId !== bookingId))
       toast.success(rf.approved)
+      void refreshHolding()
     } catch (e) {
       toast.error(errorMessage(e))
     } finally {
@@ -131,7 +196,7 @@ export function AdminRefundsPage() {
   if (error) {
     return <div className="max-w-3xl mx-auto"><p className="text-sm text-red-200 bg-red-900/40 border border-accent rounded-lg p-3">{error}</p></div>
   }
-  if (!rows) {
+  if (!rows || !holding) {
     return (
       <div className="max-w-3xl mx-auto flex justify-center py-16">
         <Spinner className="w-6 h-6 border-2 border-surface-300" />
@@ -152,6 +217,11 @@ export function AdminRefundsPage() {
           {t.admin.history.dashboardLink}
         </Link>
       </header>
+
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider">{rf.requestsHeading}</h2>
+        <p className={`text-xs ${TEXT_MUTED}`}>{rf.requestsBlurb}</p>
+      </section>
 
       {rows.length === 0 ? (
         <div className={`${CARD_ELEVATED} p-6 text-center`}>
@@ -186,6 +256,49 @@ export function AdminRefundsPage() {
                   className={`${BTN_GHOST} whitespace-nowrap`}
                 >
                   {rf.reject}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <section className="space-y-2 pt-2">
+        <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider">{rf.holdingHeading}</h2>
+        <p className={`text-xs ${TEXT_MUTED}`}>{rf.holdingBlurb}</p>
+      </section>
+
+      {holding.length === 0 ? (
+        <div className={`${CARD_ELEVATED} p-6 text-center`}>
+          <p className={TEXT_MUTED}>{rf.holdingEmpty}</p>
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {holding.map(r => (
+            <li key={r.bookingId} className={`${CARD_ELEVATED} p-4 flex items-center justify-between gap-3`}>
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-brand-950 truncate">{r.diverName}</div>
+                <div className={`text-xs ${TEXT_MUTED} truncate`}>{r.eventTitle}</div>
+                <div className={`text-xs ${TEXT_MUTED} mt-0.5`}>
+                  {rf.colHolding}: <span className="tabular-nums text-amber-800 font-semibold">{money(r.amount, r.currency)}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => markRefunded(r)}
+                  disabled={acting === r.bookingId}
+                  className={`${BTN_XS_GHOST} whitespace-nowrap`}
+                >
+                  {rf.markRefunded}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => keepAsCredit(r)}
+                  disabled={acting === r.bookingId}
+                  className={`${BTN_XS_PRIMARY} whitespace-nowrap`}
+                >
+                  {rf.toCredit}
                 </button>
               </div>
             </li>

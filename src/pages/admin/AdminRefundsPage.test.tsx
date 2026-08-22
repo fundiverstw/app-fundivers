@@ -4,16 +4,20 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { AdminRefundsPage } from './AdminRefundsPage'
 
-const { from, updateEq, updatePatch, toastSuccess } = vi.hoisted(() => ({
+const { from, updateEq, updatePatch, toastSuccess, insert } = vi.hoisted(() => ({
   from: vi.fn(),
   updateEq: vi.fn(),
   updatePatch: vi.fn(),
   toastSuccess: vi.fn(),
+  insert: vi.fn(),
 }))
 
 vi.mock('../../lib/supabase', () => ({ supabase: { from: (...a: unknown[]) => from(...a) } }))
 vi.mock('../../hooks/useToast', () => ({
   useToast: () => ({ success: toastSuccess, error: vi.fn(), info: vi.fn() }),
+}))
+vi.mock('../../hooks/useAuth', () => ({
+  useAuth: () => ({ profile: { id: 'admin1', role: 'admin' } }),
 }))
 vi.mock('../../lib/events', () => ({
   fetchEventsForBookings: vi.fn(async () => new Map([
@@ -24,6 +28,7 @@ vi.mock('../../lib/events', () => ({
 function query(result: Record<string, unknown>) {
   const b: Record<string, unknown> = {}
   for (const m of ['select', 'not', 'neq', 'order', 'in', 'eq']) b[m] = () => b
+  b.insert = (row: unknown) => { insert(row); return Promise.resolve({ error: null }) }
   b.update = (patch: unknown) => { updatePatch(patch); return { eq: (...a: unknown[]) => { updateEq(...a); return Promise.resolve({ error: null }) } } }
   b.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) => Promise.resolve(result).then(res, rej)
   return b
@@ -40,7 +45,7 @@ const payments = [
 ]
 
 beforeEach(() => {
-  from.mockReset(); updateEq.mockReset(); updatePatch.mockReset(); toastSuccess.mockReset()
+  from.mockReset(); updateEq.mockReset(); updatePatch.mockReset(); toastSuccess.mockReset(); insert.mockReset()
   from.mockImplementation((table: string) => {
     switch (table) {
       case 'bookings': return query({ data: bookings, error: null })
@@ -94,5 +99,68 @@ describe('AdminRefundsPage', () => {
     await user.click(screen.getByRole('button', { name: /reject/i }))
     expect(toastSuccess).toHaveBeenCalled()
     await waitFor(() => expect(screen.queryByText('Alice Diver')).not.toBeInTheDocument())
+  })
+})
+
+// The second queue: money left on a cancelled booking. Nothing else in the app
+// shows it — a cancelled booking reads "settled" and drops out of the diver's
+// account credit — so this list is the only place an admin can see that the
+// shop is still holding a diver's cash, and the only place to resolve it.
+describe('AdminRefundsPage · cancelled bookings still holding money', () => {
+  const cancelled = [
+    { id: 'b9', user_id: 'd1', event_id: 'ev1', status: 'cancelled', refund_requested_at: null, details: { total: 3000 } },
+  ]
+
+  function setupHolding(credits: unknown[] = []) {
+    from.mockImplementation((table: string) => {
+      switch (table) {
+        case 'bookings': return query({ data: cancelled, error: null })
+        case 'profiles': return query({ data: profiles, error: null })
+        case 'payments': return query({ data: [{ booking_id: 'b9', amount: 3000, status: 'paid' }], error: null })
+        case 'credits':  return query({ data: credits, error: null })
+        default:         return query({ data: [], error: null })
+      }
+    })
+  }
+
+  it('lists the booking with the amount the shop still holds', async () => {
+    setupHolding()
+    renderPage()
+    expect(await screen.findByText(/cancelled bookings still holding money/i)).toBeInTheDocument()
+    const item = (await screen.findAllByText('Alice Diver')).at(-1)!.closest('li')!
+    expect(within(item).getByText(/TWD\s*3,000/)).toBeInTheDocument()
+  })
+
+  it('records a refunded payment for the full amount when the money went back', async () => {
+    setupHolding()
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: /refunded off-app/i }))
+
+    await waitFor(() => expect(insert).toHaveBeenCalledOnce())
+    expect(insert.mock.calls[0][0]).toMatchObject({
+      booking_id: 'b9', user_id: 'd1', amount: 3000, status: 'refunded',
+    })
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /refunded off-app/i })).not.toBeInTheDocument())
+  })
+
+  it('issues an open credit stamped as a money return when the shop keeps it', async () => {
+    setupHolding()
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: /keep as credit/i }))
+
+    await waitFor(() => expect(insert).toHaveBeenCalledOnce())
+    expect(insert.mock.calls[0][0]).toMatchObject({
+      booking_id: 'b9', user_id: 'd1', amount: 3000, status: 'open',
+      source: 'booking_cancellation_return',
+    })
+  })
+
+  it('says nothing is outstanding once the money has been returned', async () => {
+    setupHolding([{ booking_id: 'b9', source: 'event_cancellation' }])
+    renderPage()
+    expect(await screen.findByText(/every cancelled booking is accounted for/i)).toBeInTheDocument()
   })
 })

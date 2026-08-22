@@ -231,11 +231,15 @@ export function CalendarPage() {
                   display_title trigger). No separate badge needed. */}
             </div>
             {selected.details && <EventDetails details={selected.details} />}
+            {/* Raw amber palette below, not the theme tokens: the "you already
+                booked this" notice has to stay legible on both the light and
+                dark modal surfaces, and the *-100 / *-900 status pair is the
+                one combination index.css does not remap. */}
             {isBooked(selected) && !canCancelHere(selected) ? (
-              <div className="rounded-xl border border-brand-100/25 bg-brand-100/10 px-3 py-3 space-y-1">
-                <p className="text-sm font-semibold text-white">{t.calendar.bookedAlready}</p>
-                <p className="text-xs text-brand-100/80">{t.calendar.cancelViaBookings}</p>
-                <Link to="/bookings" className="text-xs font-semibold text-amber-300 hover:text-amber-200 inline-block">
+              <div className="rounded-xl border border-amber-400 bg-amber-100 px-3 py-3 space-y-1">
+                <p className="text-sm font-semibold text-amber-900">{t.calendar.bookedAlready}</p>
+                <p className="text-xs text-amber-900">{t.calendar.cancelViaBookings}</p>
+                <Link to="/bookings" className="text-xs font-semibold text-amber-900 underline hover:text-amber-950 inline-block">
                   {t.calendar.goToBookings}
                 </Link>
               </div>
