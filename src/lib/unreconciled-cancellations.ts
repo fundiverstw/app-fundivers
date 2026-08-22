@@ -23,10 +23,16 @@ import type { AppEvent, Booking, Credit, Payment } from '../types/database'
 //
 //   • the money went back  → record a `refunded` payment row
 //   • the shop keeps it as store credit → issue an open credit
+//   • the shop keeps the cash (a cancellation fee) → stamp the booking settled
 //
-// Both are one-way and mutually exclusive: doing neither hides the money,
-// doing both pays the diver twice. Each action makes the row drop off the
-// list, so an empty list means every cancellation is accounted for.
+// The first two work by recording a money movement. The third moves nothing —
+// the money is already counted as revenue on that event — so it records an
+// acknowledgement instead: without one, a kept fee is indistinguishable from
+// money nobody has dealt with, and its row would sit here forever.
+//
+// The endings are mutually exclusive. Doing none hides the money; doing two
+// pays the diver twice. Each makes the row drop off, so an empty list means
+// every cancellation is accounted for.
 
 export interface UnreconciledCancellation {
   bookingId: string
@@ -44,14 +50,15 @@ type ProfileLite = { id: string; name: string | null; nickname: string | null }
 /**
  * Pure selector: which cancelled bookings still hold money?
  *
- * A booking qualifies when it is cancelled, its net paid is positive, and no
- * credit tied to it says the money was already returned. Credits with any
- * other source (a goodwill award, a carry-forward remainder) are unrelated
- * money and deliberately do NOT clear the row — the same rule the automatic
- * issuers use, so this list and they can never disagree.
+ * A booking qualifies when it is cancelled, its net paid is positive, no
+ * credit tied to it says the money was already returned, and no admin has
+ * stamped it settled. Credits with any other source (a goodwill award, a
+ * carry-forward remainder) are unrelated money and deliberately do NOT clear
+ * the row — the same rule the automatic issuers use, so this list and they can
+ * never disagree.
  */
 export function selectUnreconciled(input: {
-  bookings: Array<Pick<Booking, 'id' | 'user_id' | 'event_id' | 'status'>>
+  bookings: Array<Pick<Booking, 'id' | 'user_id' | 'event_id' | 'status' | 'cancellation_settled_at'>>
   payments: Array<Pick<Payment, 'booking_id' | 'amount' | 'status'>>
   credits: Array<Pick<Credit, 'booking_id' | 'source'>>
   events: Map<string, AppEvent>
@@ -68,7 +75,11 @@ export function selectUnreconciled(input: {
   const nameById = new Map(input.profiles.map(p => [p.id, personName(p.name, p.nickname)]))
 
   return input.bookings
-    .filter(b => b.status === 'cancelled' && !returned.has(b.id) && (paidByBooking.get(b.id) ?? 0) > 0)
+    .filter(b =>
+      b.status === 'cancelled'
+      && !b.cancellation_settled_at
+      && !returned.has(b.id)
+      && (paidByBooking.get(b.id) ?? 0) > 0)
     .map(b => ({
       bookingId: b.id,
       userId: b.user_id,
@@ -87,8 +98,9 @@ export async function fetchUnreconciledCancellations(labels: {
 }): Promise<UnreconciledCancellation[]> {
   const { data: bookings, error } = await supabase
     .from('bookings')
-    .select('id, user_id, event_id, status')
+    .select('id, user_id, event_id, status, cancellation_settled_at')
     .eq('status', 'cancelled')
+    .is('cancellation_settled_at', null)
   if (error) throw error
   if (!bookings?.length) return []
 
@@ -152,5 +164,29 @@ export async function convertCancellationToCredit(args: {
     created_by: args.createdBy,
     source:     'booking_cancellation_return',
   })
+  if (error) throw error
+}
+
+/**
+ * The shop keeps the money — a cancellation fee, or a forfeited booking.
+ *
+ * Moves nothing: the cash is already recorded as a paid payment on that event,
+ * so the books are right. What is missing is a record that someone *decided*
+ * this, which is what takes the row off the list. The note captures the amount
+ * so the Audits feed shows what was kept, not just that a flag flipped.
+ */
+export async function settleCancellationAsKept(args: {
+  row: UnreconciledCancellation
+  settledBy: string
+  note: string
+}): Promise<void> {
+  const { error } = await supabase
+    .from('bookings')
+    .update({
+      cancellation_settled_at:   new Date().toISOString(),
+      cancellation_settled_by:   args.settledBy,
+      cancellation_settled_note: args.note,
+    } as never)
+    .eq('id', args.row.bookingId)
   if (error) throw error
 }

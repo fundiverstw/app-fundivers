@@ -93,6 +93,53 @@ describe('bookings: diver status/event guard', () => {
     expect(String(error?.message ?? '')).toMatch(/moved to a different event/i)
   })
 
+  // Settling a cancellation says "the shop keeps this money" and takes the
+  // booking off the only list that shows money the shop is still holding. The
+  // "bookings: self update" RLS policy gates the ROW, not the columns, so
+  // without the guard a diver could stamp their own booking and erase their
+  // own stranded cash from the admin's view.
+  it('rejects a diver settling their own cancelled booking', async () => {
+    const id = await stageBooking(await freshDive())
+    const api = await userClient(diver.email, diver.password)
+    await api.from('bookings').update({ status: 'cancelled' }).eq('id', id)
+
+    const { error } = await api.from('bookings')
+      .update({ cancellation_settled_at: new Date().toISOString() } as never).eq('id', id)
+    expect(error).not.toBeNull()
+    expect(String(error?.message ?? '')).toMatch(/staff-only/i)
+
+    const { data: row } = await admin.from('bookings')
+      .select('cancellation_settled_at').eq('id', id).single()
+    expect((row as { cancellation_settled_at: string | null }).cancellation_settled_at).toBeNull()
+  })
+
+  it('rejects a diver settling via the note or the actor column', async () => {
+    const id = await stageBooking(await freshDive())
+    const api = await userClient(diver.email, diver.password)
+    for (const patch of [{ cancellation_settled_note: 'mine now' }, { cancellation_settled_by: diver.id }]) {
+      const { error } = await api.from('bookings').update(patch as never).eq('id', id)
+      expect(error).not.toBeNull()
+      expect(String(error?.message ?? '')).toMatch(/staff-only/i)
+    }
+  })
+
+  it('lets an admin settle a cancelled booking', async () => {
+    const adminUser = await createTestUser(admin, { role: 'admin' })
+    try {
+      const id = await stageBooking(await freshDive())
+      const adminApi = await userClient(adminUser.email, adminUser.password)
+      await adminApi.from('bookings').update({ status: 'cancelled' }).eq('id', id)
+      const { error } = await adminApi.from('bookings').update({
+        cancellation_settled_at: new Date().toISOString(),
+        cancellation_settled_by: adminUser.id,
+        cancellation_settled_note: 'Shop kept TWD 500 as a cancellation fee',
+      } as never).eq('id', id)
+      expect(error).toBeNull()
+    } finally {
+      await deleteTestUser(admin, adminUser.id).catch(() => {})
+    }
+  })
+
   it('lets an admin confirm a booking through the app (authenticated admin session)', async () => {
     const adminUser = await createTestUser(admin, { role: 'admin' })
     try {

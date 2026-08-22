@@ -523,6 +523,15 @@ function LineCard({
               <span className="text-emerald-700 font-semibold">{currency} {credit.toLocaleString()}</span>
             </div>
           )}
+          {/* The shop kept part of what this diver paid. They are told outright,
+              on the booking it came off — a withheld fee that only surfaces as
+              a refund that never arrives is how a diver finds out by noticing. */}
+          {isCancelled && booking.cancellation_settled_at && paid > 0 && (
+            <div className={`flex justify-between ${TEXT_BODY}`}>
+              <span>{t.bookings.cancellationFeeKept}</span>
+              <span className="text-amber-800 font-semibold">{currency} {paid.toLocaleString()}</span>
+            </div>
+          )}
           {total > 0 && (
             <div className={`flex justify-between font-semibold pt-1 border-t border-surface-200 ${TEXT_BODY}`}>
               <span>{t.bookings.balance}</span>

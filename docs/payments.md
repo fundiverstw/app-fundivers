@@ -112,13 +112,32 @@ with*. Its frozen total is not a debt, and netting it would double-count
 any cancellation credit.
 
 So when a diver who paid cash cancels, the shop still holds their money
-and no other screen shows it. Exactly two endings are correct — record a
-`refunded` payment, or issue a credit — and doing both pays them twice.
+and no other screen shows it. Three endings are correct, and exactly one
+must be chosen:
+
+| Ending | Recorded as |
+| --- | --- |
+| Money went back | A `refunded` payment |
+| Diver keeps it as credit | An open credit, `booking_cancellation_return` |
+| Shop keeps it (a cancellation fee) | `bookings.cancellation_settled_at` |
+
+The first two move money. The third does not — the cash is already
+counted as revenue on that event — so it records an acknowledgement
+instead. Without one, a kept fee is indistinguishable from money nobody
+has dealt with, and its row would never leave the list.
+
+The kept amount is **shown to the diver** on the booking it came off, and
+to staff on the same booking's payments block. It is derived from what is
+still on the booking rather than stored, so a later refund cannot
+contradict it. Settling is staff-only, enforced by
+`bookings_guard_diver_status` — the self-update RLS policy gates the row,
+not the columns, so without that a diver could erase their own stranded
+money from the list.
 
 `/admin/refunds` lists these under **Cancelled bookings still holding
-money**, with a button for each ending. It is the only surface that can
-see them: balances read settled, account credit skips cancelled bookings,
-and the refund queue lists only non-cancelled ones.
+money**, with a button per ending. It is the only surface that can see
+them: balances read settled, account credit skips cancelled bookings, and
+the refund queue lists only non-cancelled ones.
 
 ## Reporting
 
@@ -143,15 +162,3 @@ heads, deliberately not what has been banked.
 8. Every automatic credit records its `source`.
 9. Cash-revenue sums apply `isExternalPayment`. Balance math does not.
 10. Constraints, triggers and RLS policies get integration tests.
-
-## Known gaps
-
-- A confirmation PDF's credit line is a prediction: credit is applied
-  after the booking lands, but the PDF renders before that.
-- `credits.currency` / `payments.currency` default to `TWD`. Every writer
-  names a currency explicitly except a group payment recording the first
-  money on a booking. Forks on another currency should change the
-  defaults in their own baseline.
-- Restoring a cancelled event leaves its credits issued.
-- Keeping a cancellation fee has no dedicated action, so the booking
-  stays on the holding list.

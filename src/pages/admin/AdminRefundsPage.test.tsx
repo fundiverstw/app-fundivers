@@ -27,7 +27,7 @@ vi.mock('../../lib/events', () => ({
 
 function query(result: Record<string, unknown>) {
   const b: Record<string, unknown> = {}
-  for (const m of ['select', 'not', 'neq', 'order', 'in', 'eq']) b[m] = () => b
+  for (const m of ['select', 'not', 'neq', 'order', 'in', 'eq', 'is']) b[m] = () => b
   b.insert = (row: unknown) => { insert(row); return Promise.resolve({ error: null }) }
   b.update = (patch: unknown) => { updatePatch(patch); return { eq: (...a: unknown[]) => { updateEq(...a); return Promise.resolve({ error: null }) } } }
   b.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) => Promise.resolve(result).then(res, rej)
@@ -156,6 +156,25 @@ describe('AdminRefundsPage · cancelled bookings still holding money', () => {
       booking_id: 'b9', user_id: 'd1', amount: 3000, status: 'open',
       source: 'booking_cancellation_return',
     })
+  })
+
+  it('records an acknowledgement, and no money movement, when the shop keeps it', async () => {
+    setupHolding()
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: /keep as fee/i }))
+
+    // Stamps the booking; inserts nothing. The cash is already recorded as a
+    // paid payment on that event, so the books are right — what was missing is
+    // a record that somebody decided to keep it.
+    await waitFor(() => expect(updatePatch).toHaveBeenCalled())
+    const patch = updatePatch.mock.calls.at(-1)![0] as Record<string, unknown>
+    expect(patch.cancellation_settled_by).toBe('admin1')
+    expect(patch.cancellation_settled_at).toEqual(expect.any(String))
+    expect(patch.cancellation_settled_note).toMatch(/cancellation fee/i)
+    expect(insert).not.toHaveBeenCalled()
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /keep as fee/i })).not.toBeInTheDocument())
   })
 
   it('says nothing is outstanding once the money has been returned', async () => {

@@ -16,12 +16,13 @@ const events = new Map<string, AppEvent>([
 ])
 const profiles = [{ id: 'd1', name: 'Alice Diver', nickname: null }]
 
-type B = Pick<Booking, 'id' | 'user_id' | 'event_id' | 'status'>
+type B = Pick<Booking, 'id' | 'user_id' | 'event_id' | 'status' | 'cancellation_settled_at'>
 type P = Pick<Payment, 'booking_id' | 'amount' | 'status'>
 type C = Pick<Credit, 'booking_id' | 'source'>
 
 const booking = (over: Partial<B> = {}): B =>
-  ({ id: 'b1', user_id: 'd1', event_id: 'ev1', status: 'cancelled', ...over }) as B
+  ({ id: 'b1', user_id: 'd1', event_id: 'ev1', status: 'cancelled',
+     cancellation_settled_at: null, ...over }) as B
 
 function run(opts: { bookings?: B[]; payments?: P[]; credits?: C[] } = {}) {
   return selectUnreconciled({
@@ -100,6 +101,19 @@ describe('selectUnreconciled', () => {
       credits: [], events, profiles, ...LABELS,
     })
     expect(rows[0]).toMatchObject({ diverName: 'Diver', eventTitle: 'Event' })
+  })
+
+  // Third ending: the shop keeps the money as a cancellation fee. Nothing
+  // moves — the cash is already revenue on that event — so only an explicit
+  // acknowledgement can take the row off the list. Without it a kept fee is
+  // indistinguishable from money nobody has dealt with, and the row would sit
+  // there every season until the list stopped being worth reading.
+  it('clears once an admin says the shop keeps the money', () => {
+    expect(run({ bookings: [booking({ cancellation_settled_at: '2026-08-22T00:00:00Z' })] })).toHaveLength(0)
+  })
+
+  it('still lists a booking that was never acknowledged', () => {
+    expect(run({ bookings: [booking({ cancellation_settled_at: null })] })).toHaveLength(1)
   })
 
   it('sorts biggest first, so the costliest mistake is at the top', () => {

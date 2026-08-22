@@ -28,7 +28,7 @@ const bp = t.admin.bookingPayments
  * registrant) and on AdminUsersPage (one block per active booking).
  */
 export function BookingPaymentsBlock({
-  payments, owed, paid, credit = 0, pending, cancelled, readOnly, onRecord, onVoid, onMarkDepositPaid,
+  payments, owed, paid, credit = 0, pending, cancelled, feeKept = 0, readOnly, onRecord, onVoid, onMarkDepositPaid,
   charges, amendments, currency, payerNote,
 }: {
   payments: Payment[]
@@ -52,6 +52,14 @@ export function BookingPaymentsBlock({
   /** The booking is still 'pending' — gates the "Mark deposit paid" button. */
   pending: boolean
   cancelled: boolean
+  /** Money the shop kept on this cancelled booking, once an admin has said so
+   *  (a cancellation fee). Shown outright: withholding part of what a diver
+   *  paid should never be something only the ledger knows.
+   *
+   *  Callers derive it from what is still on the booking rather than reading a
+   *  stored figure — the money left on a settled cancelled booking IS the fee,
+   *  so a later refund keeps the two in step instead of contradicting. */
+  feeKept?: number
   readOnly: boolean
   onRecord: (amount: number, note: string) => Promise<void>
   /** Revert a paid payment that was recorded by mistake. Optional — when
@@ -167,6 +175,12 @@ export function BookingPaymentsBlock({
               <p className="text-emerald-300">
                 {bp.shopOwesDiver(currency ?? siteConfig.locale.currencyLabel, bal.amount.toLocaleString())}
               </p>
+            )}
+            {feeKept > 0 && (
+              <div className="flex justify-between text-amber-300">
+                <span className="font-medium">{t.bookings.cancellationFeeKept}</span>
+                <span className="font-semibold">{feeKept.toLocaleString()}</span>
+              </div>
             )}
           </>
         )

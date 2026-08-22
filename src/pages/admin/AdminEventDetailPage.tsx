@@ -1544,6 +1544,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
             payerNote={coveredByLead ? ed.paidBy(r.payerName!) : (isLeadOwn ? ed.leadPayerForGroup : undefined)}
             pending={r.booking.status === 'pending'}
             cancelled={r.booking.status === 'cancelled'}
+            feeKept={r.booking.status === 'cancelled' && r.booking.cancellation_settled_at ? totalPaid : 0}
             readOnly={!!readOnly}
             onRecord={onRecordPayment}
             onVoid={onVoidPayment}

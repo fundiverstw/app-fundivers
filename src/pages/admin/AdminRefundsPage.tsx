@@ -10,7 +10,7 @@ import { fetchEventsForBookings } from '../../lib/events'
 import { notifyRefundApproved, rejectRefundRequest } from '../../lib/refunds'
 import {
   fetchUnreconciledCancellations, recordCancellationRefund, convertCancellationToCredit,
-  type UnreconciledCancellation,
+  settleCancellationAsKept, type UnreconciledCancellation,
 } from '../../lib/unreconciled-cancellations'
 import { useAuth } from '../../hooks/useAuth'
 import { Spinner } from '../../components/ui/Spinner'
@@ -35,7 +35,8 @@ const rf = t.admin.refunds
 //    off-app and nothing records that it came back. Every other surface then
 //    goes quiet: a cancelled booking reads "settled", and it drops out of the
 //    diver's account credit. This second list is the only place that money is
-//    visible, and it clears when an admin picks one of the two endings. See
+//    visible, and it clears when an admin picks one of the three endings:
+//    refunded, kept as credit, or kept as a cancellation fee. See
 //    src/lib/unreconciled-cancellations.ts.
 
 interface RefundRow {
@@ -97,6 +98,8 @@ async function loadRefundRequests(): Promise<RefundRow[]> {
 
 const HOLDING_LABELS = { eventFallback: rf.eventFallback, diverFallback: rf.colDiver }
 
+const money = (n: number, cur: string) => `${cur} ${Math.round(n).toLocaleString()}`
+
 export function AdminRefundsPage() {
   const toast = useToast()
   const { profile } = useAuth()
@@ -135,6 +138,28 @@ export function AdminRefundsPage() {
       await recordCancellationRefund({ row, recordedBy: profile.id, note: rf.refundNote })
       setHolding(prev => (prev ?? []).filter(r => r.bookingId !== row.bookingId))
       toast.success(rf.markRefundedDone)
+    } catch (e) {
+      toast.error(errorMessage(e))
+    } finally {
+      setActing(null)
+    }
+  }
+
+  // The shop keeps the money. Records no movement — the cash is already on the
+  // booking as revenue — only that someone decided it, which is what lets the
+  // row leave the list. The diver is shown the kept amount on their own
+  // booking, so this is an acknowledgement, not a quiet write-off.
+  async function keepAsFee(row: UnreconciledCancellation) {
+    if (!profile?.id) return
+    setActing(row.bookingId)
+    try {
+      await settleCancellationAsKept({
+        row,
+        settledBy: profile.id,
+        note: rf.feeNote(money(row.amount, row.currency)),
+      })
+      setHolding(prev => (prev ?? []).filter(r => r.bookingId !== row.bookingId))
+      toast.success(rf.keepAsFeeDone)
     } catch (e) {
       toast.error(errorMessage(e))
     } finally {
@@ -203,8 +228,6 @@ export function AdminRefundsPage() {
       </div>
     )
   }
-
-  const money = (n: number, cur: string) => `${cur} ${Math.round(n).toLocaleString()}`
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
@@ -291,6 +314,14 @@ export function AdminRefundsPage() {
                   className={`${BTN_XS_GHOST} whitespace-nowrap`}
                 >
                   {rf.markRefunded}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => keepAsFee(r)}
+                  disabled={acting === r.bookingId}
+                  className={`${BTN_XS_GHOST} whitespace-nowrap`}
+                >
+                  {rf.keepAsFee}
                 </button>
                 <button
                   type="button"
