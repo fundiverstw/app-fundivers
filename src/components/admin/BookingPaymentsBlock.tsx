@@ -29,7 +29,7 @@ const bp = t.admin.bookingPayments
  */
 export function BookingPaymentsBlock({
   payments, owed, paid, credit = 0, pending, cancelled, feeKept = 0, readOnly, onRecord, onVoid, onMarkDepositPaid,
-  charges, amendments, currency, payerNote,
+  charges, amendments, currency, payerNote, creditOwnerName,
 }: {
   payments: Payment[]
   owed: number
@@ -38,6 +38,11 @@ export function BookingPaymentsBlock({
    *  payer (e.g. "Paid by Alex"). Surfaced so staff see at a glance that the
    *  balance belongs to a group rather than this diver alone. */
   payerNote?: string
+  /** Set when a lead booker pays for this booking. A negative balance is then
+   *  the LEAD's money: `diverCreditBalance` drops lead-covered bookings from
+   *  this diver's account credit, so telling the admin it is "included in their
+   *  account credit" would contradict the figure on the People page. */
+  creditOwnerName?: string
   /** Open (unsettled) credit awarded to the diver for THIS event. Offsets what
    *  they owe in the Balance figure below. Settled credits don't count. */
   credit?: number
@@ -173,7 +178,9 @@ export function BookingPaymentsBlock({
             )}
             {bal.state === 'credit' && (
               <p className="text-emerald-300">
-                {bp.shopOwesDiver(currency ?? siteConfig.locale.currencyLabel, bal.amount.toLocaleString())}
+                {creditOwnerName
+                  ? bp.shopOwesPayer(creditOwnerName, currency ?? siteConfig.locale.currencyLabel, bal.amount.toLocaleString())
+                  : bp.shopOwesDiver(currency ?? siteConfig.locale.currencyLabel, bal.amount.toLocaleString())}
               </p>
             )}
             {feeKept > 0 && (

@@ -2220,6 +2220,10 @@ export const ja: Messages = {
       amountCredit: (amount: string) => `クレジット ${amount}`,
       shopOwesDiver: (currency: string, amount: string) =>
         `ショップはこのダイバーに ${currency} ${amount} を返金する必要があります — アカウントクレジットに含まれています。`,
+      // A booking someone else pays for: the money is the payer's, and the
+      // diver's own account credit deliberately excludes it.
+      shopOwesPayer: (payer: string, currency: string, amount: string) =>
+        `ショップは ${payer} に ${currency} ${amount} を返金する必要があります — このダイバーではなく、支払者のアカウントクレジットに計上されます。`,
       noPayments: 'まだ支払いの記録がありません。',
       paymentFallback: '支払い',
       voiding: '無効化中…',

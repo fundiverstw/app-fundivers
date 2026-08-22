@@ -2221,6 +2221,10 @@ export const zhTW: Messages = {
       amountCredit: (amount: string) => `結餘 ${amount}`,
       shopOwesDiver: (currency: string, amount: string) =>
         `店家應退還這位潛水員 ${currency} ${amount} — 已計入其帳戶結餘。`,
+      // A booking someone else pays for: the money is the payer's, and the
+      // diver's own account credit deliberately excludes it.
+      shopOwesPayer: (payer: string, currency: string, amount: string) =>
+        `店家應退還 ${payer} ${currency} ${amount} — 計入該付款人的帳戶結餘，而非這位潛水員的。`,
       noPayments: '尚未記錄任何付款。',
       paymentFallback: '付款',
       voiding: '作廢中…',

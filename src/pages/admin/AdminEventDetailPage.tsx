@@ -1542,6 +1542,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
             amendments={r.amendments.map(a => ({ label: a.note, amount: a.amount }))}
             currency={currency}
             payerNote={coveredByLead ? ed.paidBy(r.payerName!) : (isLeadOwn ? ed.leadPayerForGroup : undefined)}
+            creditOwnerName={coveredByLead ? r.payerName! : undefined}
             pending={r.booking.status === 'pending'}
             cancelled={r.booking.status === 'cancelled'}
             feeKept={r.booking.status === 'cancelled' && r.booking.cancellation_settled_at ? totalPaid : 0}

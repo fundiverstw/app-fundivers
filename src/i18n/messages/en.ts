@@ -2254,6 +2254,10 @@ export const en = {
       amountCredit: (amount: string) => `${amount} credit`,
       shopOwesDiver: (currency: string, amount: string) =>
         `The shop owes this diver ${currency} ${amount} — included in their account credit.`,
+      // A booking someone else pays for: the money is the payer's, and the
+      // diver's own account credit deliberately excludes it.
+      shopOwesPayer: (payer: string, currency: string, amount: string) =>
+        `The shop owes ${payer} ${currency} ${amount} — counted in their account credit, not this diver's.`,
       noPayments: 'No payments recorded yet.',
       paymentFallback: 'Payment',
       voiding: 'Voiding…',
