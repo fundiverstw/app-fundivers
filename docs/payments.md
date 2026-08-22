@@ -1,5 +1,15 @@
 # Payments and credits
 
+<!--
+  docs/payments.pdf is generated from this file. Regenerate it after editing:
+
+    npx marked --gfm -i docs/payments.md -o /tmp/body.html
+    cat scripts/doc-print.css.html /tmp/body.html > /tmp/doc.html
+    printf '</body></html>' >> /tmp/doc.html
+    google-chrome --headless --no-pdf-header-footer \
+      --print-to-pdf=docs/payments.pdf file:///tmp/doc.html
+-->
+
 What a diver owes, what they have paid, what the shop owes them back, and
 what happens to each when something is cancelled.
 

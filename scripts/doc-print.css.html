@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  Print stylesheet for turning a docs/*.md file into a PDF. Prepended to the
+  HTML that `marked` emits; see the recipe at the top of docs/payments.md.
+  Not used by the app - it exists so a tracked doc PDF can be regenerated
+  from its markdown source instead of quietly drifting from it. (The bytes
+  differ run to run: Chrome stamps a creation date. The rendered content
+  does not.)
+-->
+<title>Payments and credits — FunDive</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 16mm; }
+  :root {
+    --ink:      #17242f;
+    --muted:    #5b6b78;
+    --rule:     #d6dee4;
+    --accent:   #0f5f7a;
+    --code-bg:  #f2f5f7;
+    --warn-bg:  #fdf6e6;
+    --warn-bar: #c8961f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font: 10.2pt/1.55 "Source Sans 3", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    margin: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  h1 {
+    font-size: 21pt; line-height: 1.15; margin: 0 0 2mm;
+    letter-spacing: -0.01em;
+  }
+  h1 + p { color: var(--muted); font-size: 11pt; margin-top: 0; }
+  h2 {
+    font-size: 13.5pt; margin: 6mm 0 2.2mm; padding-top: 1.6mm;
+    border-top: 1.5pt solid var(--accent);
+    break-after: avoid; page-break-after: avoid;
+  }
+  h3 {
+    font-size: 11pt; margin: 4mm 0 1.4mm; color: var(--accent);
+    break-after: avoid; page-break-after: avoid;
+  }
+  p, pre, blockquote { break-inside: avoid-page; }
+  /* Tables may split across pages — forcing them whole left a third of a page
+     blank whenever one did not fit. Rows stay intact and the header repeats. */
+  tr { break-inside: avoid-page; }
+  thead { display: table-header-group; }
+  p { margin: 0 0 2.3mm; }
+  ul, ol { margin: 0 0 2.3mm; padding-left: 5mm; }
+  li { margin-bottom: 1.2mm; }
+  li > p { margin-bottom: 1mm; }
+  a { color: var(--accent); text-decoration: none; }
+  strong { font-weight: 650; }
+
+  code {
+    font-family: "DejaVu Sans Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.87em;
+    background: var(--code-bg);
+    padding: 0.5pt 2pt;
+    border-radius: 2pt;
+  }
+  pre {
+    background: var(--code-bg);
+    border-left: 2.5pt solid var(--accent);
+    padding: 2.5mm 3mm;
+    margin: 0 0 3mm;
+    font-size: 8.6pt; line-height: 1.45;
+    overflow-x: hidden;
+    white-space: pre-wrap;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+
+  blockquote {
+    margin: 3mm 0;
+    padding: 2.5mm 3.5mm;
+    background: var(--warn-bg);
+    border-left: 3pt solid var(--warn-bar);
+  }
+  blockquote p:last-child { margin-bottom: 0; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 3mm;
+    font-size: 9.2pt;
+    table-layout: auto;
+  }
+  th, td {
+    border: 0.5pt solid var(--rule);
+    padding: 1.4mm 2mm;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: #eef3f6;
+    font-weight: 650;
+    font-size: 8.8pt;
+    letter-spacing: 0.02em;
+  }
+  tbody tr:nth-child(even) td { background: #fafcfd; }
+  td code, th code { font-size: 0.85em; }
+
+  hr { border: 0; border-top: 0.5pt solid var(--rule); margin: 6mm 0; }
+</style>
+</head>
+<body>
