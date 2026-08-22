@@ -588,6 +588,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const [additionalCredits, setAdditionalCredits] = useState<Record<string, number>>({})
   const [useAccountCredit, setUseAccountCredit] = useState(true)
   const [creditApplied, setCreditApplied] = useState(0)
+  // The credit apply runs after the booking lands and can fail on its own.
+  // Swallowing it silently left the diver believing their credit was spent —
+  // and their confirmation PDF, rendered before the apply, saying so too.
+  const [creditFailed, setCreditFailed] = useState(false)
   // Default to full payment per product spec. Only meaningful when the event
   // has a deposit_amount — otherwise the radio is hidden entirely.
   const [payDepositOnly, setPayDepositOnly] = useState<boolean>(initialDetails?.pay_deposit_only ?? false)
@@ -1391,6 +1395,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         setCreditApplied(await applyCreditToBooking({ bookingId: data.booking_id, amount: availableCredit }))
       } catch (e) {
         console.error('account credit apply failed:', e)
+        setCreditApplied(0)
+        setCreditFailed(true)
       }
     }
 
@@ -1426,6 +1432,11 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         {creditApplied > 0 && (
           <p className="text-sm font-semibold text-emerald-800 bg-emerald-50 border border-emerald-400 rounded-lg p-3">
             {t.register.done.creditApplied(event.currency, creditApplied.toLocaleString())}
+          </p>
+        )}
+        {creditFailed && (
+          <p className="text-sm font-semibold text-amber-900 bg-amber-50 border border-amber-400 rounded-lg p-3">
+            {t.register.done.creditNotApplied}
           </p>
         )}
         <WhatHappensNext waitlisted={waitlisted} />

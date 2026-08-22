@@ -297,6 +297,7 @@ export const en = {
       waitlistTitle: "You're on the waitlist",
       submittedTitle: 'Registration submitted',
       creditApplied: (currency: string, amount: string) => `Applied ${currency} ${amount} account credit to this booking.`,
+      creditNotApplied: "Your booking is confirmed, but your account credit could not be applied just now. It is still on your account — apply it from the Payments page.",
       done: 'Done',
     },
     header: {

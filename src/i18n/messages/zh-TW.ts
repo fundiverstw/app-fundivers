@@ -289,6 +289,7 @@ export const zhTW: Messages = {
       waitlistTitle: '您已加入候補名單',
       submittedTitle: '報名已送出',
       creditApplied: (currency: string, amount: string) => `已將 ${currency} ${amount} 帳戶儲值折抵至此筆報名。`,
+      creditNotApplied: '報名已成立，但目前無法折抵你的帳戶儲值。儲值仍保留在你的帳戶中，可至付款頁面自行折抵。',
       done: '完成',
     },
     header: {

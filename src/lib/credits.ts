@@ -72,6 +72,52 @@ export function diverCreditBalance(
   return general + perBooking
 }
 
+/**
+ * How much credit a one-tap "apply to my balances" would ACTUALLY spend.
+ *
+ * The button used to promise `min(openCreditBalance, totalOwed)`, which
+ * overstates twice over: the sweep only touches the diver's own solo bookings
+ * (not the groups they lead, which `totalOwed` includes), and
+ * `openCreditBalance` counts credit tied to a booking the RPC refuses to
+ * re-spend on itself. A diver holding a 3000 credit awarded against the very
+ * booking they owe 2000 on was offered "Use 2000" and got nothing back.
+ *
+ * This replays what `apply_credit_to_booking` will do, target by target, in
+ * the order the sweep visits them: for each, the spendable pool is every open
+ * row NOT tied to that booking, the take is clamped to what is still due, and
+ * rows drain oldest-first so a later target sees the pool the earlier ones
+ * left behind. `due` must already net the booking's own tied credit, exactly
+ * as the RPC's `v_due` does.
+ *
+ * Returns the total that will be applied — 0 when the button should not show.
+ */
+export function plannedCreditApplication(
+  credits: Credit[],
+  targets: ReadonlyArray<{ id: string; due: number }>,
+): number {
+  const pool = credits
+    .filter(c => c.status === 'open')
+    .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))
+    .map(c => ({ bookingId: c.booking_id, amount: Number(c.amount) }))
+
+  let applied = 0
+  for (const target of targets) {
+    if (target.due <= 0) continue
+    const available = pool.reduce((s, c) => c.bookingId === target.id ? s : s + c.amount, 0)
+    let take = Math.min(target.due, available)
+    if (take <= 0) continue
+    applied += take
+    for (const row of pool) {
+      if (take <= 0) break
+      if (row.bookingId === target.id) continue
+      const used = Math.min(row.amount, take)
+      row.amount -= used
+      take -= used
+    }
+  }
+  return applied
+}
+
 /** Load everything needed to compute a diver's account credit (credits +
  *  bookings + payments + amendments) and return the net figure. Used by the
  *  diver's own profile, which doesn't otherwise load booking/payment data. */

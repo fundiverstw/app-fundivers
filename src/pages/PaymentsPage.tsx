@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { personName } from '../lib/names'
 import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
-import { fetchCreditsForUser, openCreditForBooking, openCreditBalance, diverCreditBalance, applyCreditToBooking } from '../lib/credits'
+import { fetchCreditsForUser, openCreditForBooking, openCreditBalance, diverCreditBalance, applyCreditToBooking, plannedCreditApplication } from '../lib/credits'
 import { useToast } from '../hooks/useToast'
 import { bookingBalance, depositDue } from '../lib/booking-balance'
 import { netPaid } from '../lib/payments'
@@ -182,10 +182,7 @@ export function PaymentsPage() {
   async function applyCreditToBalances() {
     setApplyingAll(true)
     try {
-      const targets = lines
-        .filter(l => uid && l.booking.user_id === uid && !l.booking.payer_id
-          && l.booking.status !== 'cancelled' && l.due > 0)
-        .sort((a, b) => new Date(a.booking.created_at).getTime() - new Date(b.booking.created_at).getTime())
+      const targets = sweepTargets
       let total = 0
       for (const l of targets) {
         total += await applyCreditToBooking({ bookingId: l.booking.id, amount: l.due })
@@ -231,12 +228,15 @@ export function PaymentsPage() {
   const totalDepositDue = payable.reduce((s, l) => s + l.depositDue, 0)
   const totalPaid = payable.reduce((s, l) => s + l.paid, 0)
   const currency = lines.find(l => l.event)?.event?.currency ?? siteConfig.locale.currency
-  // Open credit the diver can actually spend via the RPC (awarded credit rows,
-  // excluding overpayment-derived balance which has no row to consume). The
-  // top-level apply button only surfaces when there's both a pool and a due
-  // own-booking to spend it against.
-  const spendablePool = openCreditBalance(creditRows)
-  const hasDueOwn = ownLines.some(l => l.due > 0)
+  // The bookings the one-tap sweep will actually visit, in the order it visits
+  // them: the diver's own solo bookings with a balance, oldest first.
+  const sweepTargets = ownLines
+    .filter(l => l.due > 0)
+    .sort((a, b) => new Date(a.booking.created_at).getTime() - new Date(b.booking.created_at).getTime())
+  // What that sweep will really spend. Not min(pool, totalOwed): the sweep
+  // skips groups this diver leads, and the RPC refuses to spend a booking's
+  // own tied credit against itself.
+  const sweepAmount = plannedCreditApplication(creditRows, sweepTargets.map(l => ({ id: l.booking.id, due: l.due })))
 
   if (loading) {
     return <PageLoading />
@@ -251,7 +251,7 @@ export function PaymentsPage() {
           <p className="text-sm font-semibold text-emerald-900">
             {t.payments.accountCredit(`${currency} ${openCredit.toLocaleString()}`)}
           </p>
-          {spendablePool > 0 && hasDueOwn ? (
+          {sweepAmount > 0 ? (
             <>
               <p className="text-xs text-emerald-900">
                 {t.payments.useCreditHint}
@@ -264,7 +264,7 @@ export function PaymentsPage() {
               >
                 {applyingAll
                   ? t.payments.applying
-                  : t.payments.useCreditButton(`${currency} ${Math.min(spendablePool, totalOwed).toLocaleString()}`)}
+                  : t.payments.useCreditButton(`${currency} ${sweepAmount.toLocaleString()}`)}
               </button>
             </>
           ) : (
