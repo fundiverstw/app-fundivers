@@ -124,7 +124,7 @@ describe('buildByEventCsv', () => {
     const rows = csv.trimEnd().split('\r\n')
     const eventRow = rows.find(r => r.startsWith('dive,'))!
     // Paid=2, Refunded=1, Voided=1, DistinctDivers=2, Gross=1500, Refunded=200, Net=1300
-    expect(eventRow).toBe('dive,Long Dong Bay,2026-03-14,dive-1,2,1,1,2,1500,200,1300')
+    expect(eventRow).toBe('dive,Long Dong Bay,2026-03-14,dive-1,2,1,1,2,1500,200,1300,0')
     const total = rows.find(r => r.startsWith('TOTAL'))!
     expect(total).toContain(',1500,200,1300')
   })
@@ -167,5 +167,41 @@ describe('buildAccountingCsvs', () => {
     expect(Object.keys(files).sort()).toEqual([
       'by-event-2026.csv', 'summary-2026.csv', 'transactions-2026.csv',
     ])
+  })
+})
+
+// The books must not count an internal transfer as takings: cash arrives once,
+// becomes credit when its event is called off, and is spent again later.
+describe('account credit is excluded from cash totals', () => {
+  const rows = [
+    txn({ paymentId: 'p1', amount: 1000, method: 'bank_transfer' }),
+    txn({ paymentId: 'p2', amount: 800, method: 'account_credit' }),
+  ]
+
+  it('leaves net revenue as cash only, and reports the credit separately', () => {
+    const csv = buildSummaryCsv(rows, 2026)
+    expect(csv).toContain('Overview,Net revenue,,1000')
+    expect(csv).toContain('Overview,Account credit applied (not cash),1,800')
+  })
+
+  it('gives the account-credit method line its own amount rather than a bare zero', () => {
+    expect(buildSummaryCsv(rows, 2026)).toContain('Payment method,account_credit,1,800')
+  })
+
+  it('reports it as a separate by-event column, not inside Gross Paid or Net', () => {
+    const lines = buildByEventCsv(rows).trim().split('\r\n')
+    // Gross Paid, Refunded, Net, Credit Applied are the last four columns.
+    expect(lines.find(l => l.startsWith('dive,'))).toContain(',1000,0,1000,800')
+  })
+
+  it('still lists every row in the transactions sheet', () => {
+    const csv = buildTransactionsCsv(rows)
+    expect(csv).toContain('account_credit')
+    expect(csv.trim().split('\r\n')).toHaveLength(3) // header + 2 rows
+  })
+
+  it('labels the amount column with the configured currency', () => {
+    expect(buildSummaryCsv(rows, 2026).split('\r\n')[0])
+      .toBe(`Category,Item,Count,Amount (${siteConfig.locale.currency})`)
   })
 })

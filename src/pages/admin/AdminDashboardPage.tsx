@@ -158,6 +158,11 @@ export function AdminDashboardPage() {
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard label={db.revenueThisMonth} value={TWD(k.netRevenueThisMonth)} />
         <StatCard label={db.revenueYear(year)} value={TWD(k.netRevenueYear)} />
+        {/* Credit applied is an internal transfer, not takings. It sits beside
+            revenue rather than inside it: counting it as revenue reports the
+            same cash twice, once on arrival and again when the credit it
+            became is spent. */}
+        <StatCard label={db.creditAppliedYear(year)} value={TWD(k.creditAppliedYear)} sub={db.creditAppliedSub} />
         <StatCard label={db.bookingsThisMonth} value={k.bookingsThisMonth} sub={db.confirmedSub(k.confirmedBookingsThisMonth)} />
         <StatCard label={db.activeDivers} value={k.activeDivers} />
         <StatCard label={db.pendingApplications} value={k.pendingApplications} />

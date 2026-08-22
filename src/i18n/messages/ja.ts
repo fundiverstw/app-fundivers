@@ -2446,6 +2446,8 @@ export const ja: Messages = {
       revenueLink: 'スタッフ別の売上 →',
       revenueThisMonth: '今月の売上',
       revenueYear: (year: number) => `${year}年の売上`,
+      creditAppliedYear: (year: number) => `${year}年のクレジット利用額`,
+      creditAppliedSub: '現金収入ではなく、以前に入金済み',
       bookingsThisMonth: '今月の予約数',
       confirmedSub: (n: number) => `確定 ${n} 件`,
       activeDivers: 'アクティブなダイバー',

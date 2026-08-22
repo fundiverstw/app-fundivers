@@ -143,3 +143,34 @@ describe('computeDashboard', () => {
     expect(many.revenueByNationality.at(-1)?.label).toBe('Other')
   })
 })
+
+// An 'account_credit' payment settles a booking without money arriving. Summing
+// it as revenue books the same cash twice: once when the diver actually paid,
+// again when the credit that money became is spent on the next booking.
+describe('account credit is reported beside revenue, never inside it', () => {
+  const withCredit = computeDashboard({
+    ...input,
+    payments: [
+      ...input.payments,
+      { user_id: 'd2', booking_id: 'b2', amount: 800, status: 'paid', method: 'account_credit', created_at: '2026-06-06T00:00:00+08:00' },
+    ],
+  })
+
+  it('leaves every revenue figure unchanged', () => {
+    expect(withCredit.kpis.netRevenueThisMonth).toBe(1300)
+    expect(withCredit.kpis.netRevenueYear).toBe(1300)
+    expect(withCredit.revenueByMonth.find(p => p.label === '2026-06')!.value).toBe(1300)
+  })
+
+  it('reports the credit spent as its own KPI', () => {
+    expect(withCredit.kpis.creditAppliedYear).toBe(800)
+    expect(computeDashboard(input).kpis.creditAppliedYear).toBe(0)
+  })
+
+  it('keeps it out of the by-method, by-event-type and per-diver breakdowns', () => {
+    expect(withCredit.revenueByMethod.map(p => p.label)).not.toContain('account_credit')
+    const course = withCredit.revenueByEventType.find(p => p.label === EVENT_KIND_LABELS.course)
+    expect(course?.value ?? 0).toBe(500)
+    expect(withCredit.revenueByNationality.find(p => p.label === 'Japan')!.value).toBe(500)
+  })
+})

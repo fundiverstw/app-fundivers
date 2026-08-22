@@ -2447,6 +2447,8 @@ export const zhTW: Messages = {
       revenueLink: '各員工營收 →',
       revenueThisMonth: '本月營收',
       revenueYear: (year: number) => `${year} 年營收`,
+      creditAppliedYear: (year: number) => `${year} 年折抵儲值`,
+      creditAppliedSub: '非現金收入，先前已入帳',
       bookingsThisMonth: '本月報名數',
       confirmedSub: (n: number) => `已確認 ${n} 筆`,
       activeDivers: '活躍潛水員',

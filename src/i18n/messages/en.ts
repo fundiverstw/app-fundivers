@@ -2482,6 +2482,8 @@ export const en = {
       revenueLink: 'Revenue by staff →',
       revenueThisMonth: 'Revenue this month',
       revenueYear: (year: number) => `Revenue ${year}`,
+      creditAppliedYear: (year: number) => `Credit applied ${year}`,
+      creditAppliedSub: 'Not cash — banked earlier',
       bookingsThisMonth: 'Bookings this month',
       confirmedSub: (n: number) => `${n} confirmed`,
       activeDivers: 'Active divers',

@@ -40,3 +40,25 @@ export function netPaidByBooking(
   }
   return byBooking
 }
+
+/**
+ * The one payment method that moves no real money: applying account credit
+ * inserts a `paid` row so the booking's balance clears, but nothing arrives at
+ * the shop — the cash arrived earlier, on whatever booking generated the
+ * credit.
+ */
+export const INTERNAL_PAYMENT_METHOD = 'account_credit'
+
+/**
+ * Did this payment move money in or out of the shop?
+ *
+ * Cash-revenue aggregations must ask this. Summing every `paid` row
+ * double-counts: 3000 arrives as cash on a dive, the dive is cancelled, the
+ * diver's 3000 credit is spent on the next dive, and a naive sum reports 6000
+ * of revenue against 3000 of real money. Balance math is the opposite — there
+ * an account-credit row absolutely counts, because it really did settle that
+ * booking — which is why this is a reporting predicate, not a netPaid change.
+ */
+export function isExternalPayment(payment: { method: string | null }): boolean {
+  return payment.method !== INTERNAL_PAYMENT_METHOD
+}

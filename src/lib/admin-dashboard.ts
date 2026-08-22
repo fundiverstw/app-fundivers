@@ -4,7 +4,13 @@
 //
 // Money is netted the same way as the accounting export: `paid` counts
 // positive, `refunded` negative, `voided` is excluded entirely.
+//
+// Revenue counts only payments that moved real money. An 'account_credit' row
+// settles a booking without anything arriving at the shop, so summing it as
+// revenue reports the same cash twice — once when it came in, again when the
+// credit it became is spent. Credit applied is reported on its own instead.
 import { canonicalCertLevel } from './cert-level'
+import { isExternalPayment } from './payments'
 import { siteConfig } from '../config/site'
 import { EVENT_KIND_LABELS } from './event-kind-labels'
 import type { Booking, Payment, EventKind } from '../types/database'
@@ -26,6 +32,9 @@ export interface Dashboard {
   kpis: {
     netRevenueThisMonth: number
     netRevenueYear: number
+    /** Account credit spent this calendar year. Not revenue — an internal
+     *  transfer of money banked earlier — but worth seeing beside it. */
+    creditAppliedYear: number
     bookingsThisMonth: number
     confirmedBookingsThisMonth: number
     activeDivers: number
@@ -110,7 +119,11 @@ function topWithOther(entries: Array<[string, number]>, n: number): MoneyPoint[]
 }
 
 export function computeDashboard(input: DashboardInput): Dashboard {
-  const { nowIso, payments, bookings, profiles, events, confirmed } = input
+  const { nowIso, payments: allPayments, bookings, profiles, events, confirmed } = input
+  // Every revenue series below reads `payments`; only the credit-applied KPI
+  // reads the internal rows, so the split happens once, here.
+  const payments = allPayments.filter(isExternalPayment)
+  const creditPayments = allPayments.filter(p => !isExternalPayment(p))
   const thisMonth = taipeiMonth(nowIso)
   const today = taipeiDate(nowIso)
   const year = Number(thisMonth.slice(0, 4))
@@ -131,6 +144,7 @@ export function computeDashboard(input: DashboardInput): Dashboard {
   const revenueByMonth = monthKeys.map(k => ({ label: k, value: netOf(payments.filter(p => taipeiMonth(p.created_at) === k)) }))
   const netRevenueThisMonth = netOf(payments.filter(p => taipeiMonth(p.created_at) === thisMonth))
   const netRevenueYear = netOf(payments)
+  const creditAppliedYear = netOf(creditPayments)
 
   const revenueByMethod = [...groupBy(payments, p => p.method ?? '(unspecified)').entries()]
     .map(([label, ps]) => ({ label, value: netOf(ps) }))
@@ -208,6 +222,7 @@ export function computeDashboard(input: DashboardInput): Dashboard {
     kpis: {
       netRevenueThisMonth,
       netRevenueYear,
+      creditAppliedYear,
       bookingsThisMonth,
       confirmedBookingsThisMonth,
       activeDivers,
