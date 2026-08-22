@@ -57,10 +57,19 @@ awarded credit or from simply overpaying. There is no separate
 ## Credits
 
 Every credit records a `source`: `manual`, `event_cancellation`,
-`booking_cancellation_return`, or `carry_forward`. Only the middle two
-mean *this booking's money has been given back*, and only they block a
-further automatic refund — a goodwill award tied to the same booking must
-not.
+`booking_cancellation_return`, `carry_forward`, or `return_reclaimed`.
+Only `event_cancellation` and `booking_cancellation_return`
+(`RETURN_SOURCES`) mean *this booking's money is given back right now*,
+and only they block a further automatic refund — a goodwill award, a
+carry-forward remainder or a reclaimed return must not.
+
+**Cancelling and restoring is a round trip.** The cancel hands the
+booking's account credit back; restoring takes it back again, because the
+credit backs the booking once more — settling what is still open, and
+reducing the booking's account-credit payment by anything already spent
+elsewhere. Reclaimed rows become `return_reclaimed` so the two triggers
+agree on state: without that, a second cancel skips refunding *and* a
+second restore reclaims the same money twice.
 
 **Account credit** — the balance a diver sees — is *open credits not tied
 to an active booking, plus every overpayment*. So a credit tied to a

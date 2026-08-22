@@ -2089,6 +2089,11 @@ export type CreditSource =
   | 'event_cancellation'
   | 'booking_cancellation_return'
   | 'carry_forward'
+  /** A `booking_cancellation_return` that was taken back when the booking was
+   *  restored. Terminal, and deliberately NOT one of RETURN_SOURCES: the money
+   *  is applied to the booking again, so the next cancellation must refund it
+   *  afresh rather than treating it as already given back. */
+  | 'return_reclaimed'
 
 export type Credit = Database['public']['Tables']['credits']['Row']
 export type CreditInsert = Database['public']['Tables']['credits']['Insert']

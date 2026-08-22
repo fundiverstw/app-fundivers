@@ -14,11 +14,12 @@ import type { AppEvent, Credit, CreditInsert } from '../types/database'
  * action so the two-sided audit trail stays explicit.
  */
 
-/** The two credit sources that mean "this booking's money has been given
- *  back". Only these suppress a further automatic refund; a goodwill credit or
- *  a carry-forward row tied to the same booking is unrelated money. Kept in
- *  step with the credits_source_check constraint (20260822100000) and with the
- *  same list inside bookings_return_account_credit_on_cancel. */
+/** The two credit sources that mean "this booking's money is given back RIGHT
+ *  NOW". Only these suppress a further automatic refund; a goodwill credit, a
+ *  carry-forward row, or a refund already reclaimed by restoring the booking
+ *  (`return_reclaimed`) is not money currently owed back. Kept in step with the
+ *  credits_source_check constraint (20260822100000, widened in 20260822120000)
+ *  and with the same list inside bookings_return_account_credit_on_cancel. */
 export const RETURN_SOURCES = ['event_cancellation', 'booking_cancellation_return'] as const
 
 export async function fetchCreditsForUser(userId: string): Promise<Credit[]> {

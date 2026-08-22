@@ -14,6 +14,10 @@
 //      only returns what is still outstanding.
 //   5. The returned credit is spendable again — it lands back in the diver's
 //      open balance rather than staying pinned to the dead booking.
+//   6. Restoring the booking takes the refund BACK, because the credit is once
+//      again applied to it. Without that, cancel → restore left the booking
+//      carrying both the account-credit payment and the credit that refunded
+//      it, and the diver's balance double-counted the same money.
 import { describe, it, expect, afterAll, beforeAll } from 'vitest'
 import {
   adminClient, userClient,
@@ -239,5 +243,134 @@ describe('account credit returned on booking cancellation', () => {
     })
     expect(error).toBeNull()
     expect(Number(applied)).toBe(3000)
+  })
+})
+
+
+// The mirror of the trigger above. A booking that goes cancelled → confirmed
+// has the credit applied to it again, so the refund the cancellation issued has
+// to come back. Production hit this: a booking cancelled on Aug 20 and restored
+// on Aug 22 read "Owed 3,100 / Paid 6,700 / Balance 7,200 credit" when the true
+// figure was 3,600.
+describe('returned credit is reclaimed when the booking is restored', () => {
+  async function restore(bookingId: string, status = 'confirmed'): Promise<void> {
+    const { error } = await admin.from('bookings').update({ status }).eq('id', bookingId)
+    if (error) throw new Error(`restore failed: ${error.message}`)
+  }
+
+  function paymentsFor(bookingId: string) {
+    return admin.from('payments').select('amount, status, method').eq('booking_id', bookingId)
+  }
+
+  it('settles the returned credit, leaving the booking paid as it was', async () => {
+    const diver = await freshDiver()
+    const dive = await freshDive()
+    const bookingId = await makeBooking(diver.id, dive, 3000)
+    await makePayment(diver.id, bookingId, 3000, 'account_credit')
+
+    await cancel(bookingId)
+    const afterCancel = await creditsFor(bookingId)
+    expect(afterCancel.data).toHaveLength(1)
+    expect(afterCancel.data![0].status).toBe('open')
+
+    await restore(bookingId)
+
+    const { data } = await creditsFor(bookingId)
+    expect(data).toHaveLength(1)
+    expect(data![0].status).toBe('settled')
+
+    // The booking still shows its 3,000 account-credit payment and nothing
+    // offsetting it — exactly where it stood before the cancellation.
+    const pays = await paymentsFor(bookingId)
+    expect(pays.data).toHaveLength(1)
+    expect(pays.data![0].status).toBe('paid')
+  })
+
+  it('reclaims nothing it did not hand back', async () => {
+    const diver = await freshDiver()
+    const dive = await freshDive()
+    const bookingId = await makeBooking(diver.id, dive, 3000)
+    await makePayment(diver.id, bookingId, 3000, 'bank_transfer')
+    // An unrelated goodwill award tied to the same booking.
+    const { error } = await admin.from('credits').insert({
+      user_id: diver.id, booking_id: bookingId, amount: 400,
+      reason: 'Goodwill', created_by: adminUser.id, source: 'manual',
+    } as never)
+    if (error) throw new Error(error.message)
+
+    await cancel(bookingId)
+    await restore(bookingId)
+
+    // Off-app money was never returned, so there is nothing to reclaim and the
+    // goodwill credit is untouched.
+    const { data } = await creditsFor(bookingId)
+    expect(data).toHaveLength(1)
+    expect(data![0].status).toBe('open')
+    expect(Number(data![0].amount)).toBe(400)
+  })
+
+  // Reclaiming has to retire the refund, not just settle it. While it still
+  // read as 'booking_cancellation_return' the two triggers disagreed: the next
+  // cancellation skipped issuing (it looked already refunded) and the next
+  // restore reclaimed the same money a second time, inventing a refund payment
+  // out of nothing.
+  it('survives a second cancel and restore without inventing money', async () => {
+    const diver = await freshDiver()
+    const dive = await freshDive()
+    const bookingId = await makeBooking(diver.id, dive, 3000)
+    await makePayment(diver.id, bookingId, 3000, 'account_credit')
+
+    await cancel(bookingId)
+    await restore(bookingId)
+    await cancel(bookingId)
+
+    // The refund is issued again, because the first one was taken back.
+    const mid = await creditsFor(bookingId)
+    expect(mid.data!.filter(c => c.status === 'open')).toHaveLength(1)
+
+    await restore(bookingId)
+
+    const { data } = await creditsFor(bookingId)
+    expect(data!.every(c => c.status === 'settled')).toBe(true)
+    // No phantom refund: the account-credit payment still stands in full.
+    const pays = await paymentsFor(bookingId)
+    expect(pays.data!.filter(p => p.status === 'refunded')).toHaveLength(0)
+    const net = pays.data!.reduce(
+      (s, p) => s + (p.status === 'paid' ? Number(p.amount) : p.status === 'refunded' ? -Number(p.amount) : 0), 0)
+    expect(net).toBe(3000)
+  })
+
+  it('records a refund for the part already spent on another booking', async () => {
+    const diver = await freshDiver()
+    const diveA = await freshDive()
+    const diveB = await freshDive()
+    const bookingA = await makeBooking(diver.id, diveA, 3000)
+    await makePayment(diver.id, bookingA, 3000, 'account_credit')
+    await cancel(bookingA)
+
+    // The diver spends 1,200 of the returned 3,000 on another booking.
+    const bookingB = await makeBooking(diver.id, diveB, 1200)
+    const diverApi = await userClient(diver.email, diver.password)
+    const { data: applied } = await diverApi.rpc('apply_credit_to_booking', {
+      p_booking_id: bookingB, p_amount: 1200,
+    })
+    expect(Number(applied)).toBe(1200)
+
+    await restore(bookingA)
+
+    // The 1,800 still open is reclaimed; the 1,200 that left cannot be, so
+    // booking A's account-credit payment is reduced by exactly that much.
+    const { data: credits } = await creditsFor(bookingA)
+    expect(credits!.every(c => c.status === 'settled')).toBe(true)
+
+    const pays = await paymentsFor(bookingA)
+    const refunded = pays.data!.filter(p => p.status === 'refunded')
+    expect(refunded).toHaveLength(1)
+    expect(Number(refunded[0].amount)).toBe(1200)
+
+    // Net paid on A is now 1,800 — the credit that genuinely still backs it.
+    const net = pays.data!.reduce(
+      (s, p) => s + (p.status === 'paid' ? Number(p.amount) : p.status === 'refunded' ? -Number(p.amount) : 0), 0)
+    expect(net).toBe(1800)
   })
 })
