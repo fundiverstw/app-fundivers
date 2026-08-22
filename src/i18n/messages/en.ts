@@ -2517,7 +2517,7 @@ export const en = {
       holdingBlurb: 'Cancelling a booking does not move money — the app moves none. Each of these was paid off-app and needs one of the two endings: give it back, or keep it as store credit. Doing neither hides it; doing both pays twice.',
       holdingEmpty: 'Every cancelled booking is accounted for.',
       colHolding: 'Unresolved',
-      markRefunded: 'Refunded off-app',
+      markRefunded: 'Refunded',
       markRefundedDone: 'Recorded as refunded',
       toCredit: 'Keep as credit',
       toCreditDone: 'Issued as account credit',

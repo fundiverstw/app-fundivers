@@ -135,14 +135,14 @@ describe('AdminRefundsPage · cancelled bookings still holding money', () => {
     setupHolding()
     const user = userEvent.setup()
     renderPage()
-    await user.click(await screen.findByRole('button', { name: /refunded off-app/i }))
+    await user.click(await screen.findByRole('button', { name: /^refunded$/i }))
 
     await waitFor(() => expect(insert).toHaveBeenCalledOnce())
     expect(insert.mock.calls[0][0]).toMatchObject({
       booking_id: 'b9', user_id: 'd1', amount: 3000, status: 'refunded',
     })
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: /refunded off-app/i })).not.toBeInTheDocument())
+      expect(screen.queryByRole('button', { name: /^refunded$/i })).not.toBeInTheDocument())
   })
 
   it('issues an open credit stamped as a money return when the shop keeps it', async () => {

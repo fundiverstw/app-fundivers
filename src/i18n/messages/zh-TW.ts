@@ -2482,7 +2482,7 @@ export const zhTW: Messages = {
       holdingBlurb: '取消預訂不會移動任何款項——本系統不經手金流。以下每筆都是系統外收取的款項，必須二擇一：退還，或轉為帳戶儲值。兩者都不做會讓款項消失；兩者都做則會付款兩次。',
       holdingEmpty: '所有已取消的預訂都已處理完畢。',
       colHolding: '未處理',
-      markRefunded: '已於系統外退款',
+      markRefunded: '已退款',
       markRefundedDone: '已登錄為退款',
       toCredit: '轉為儲值',
       toCreditDone: '已轉為帳戶儲值',

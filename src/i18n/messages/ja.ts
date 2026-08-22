@@ -2481,7 +2481,7 @@ export const ja: Messages = {
       holdingBlurb: '予約をキャンセルしても入金は動きません——本アプリは金銭を移動しません。以下はいずれもアプリ外で受け取った入金で、返金するか、アカウントクレジットとして残すかのどちらかが必要です。どちらもしなければ入金は見えなくなり、両方すれば二重払いになります。',
       holdingEmpty: 'キャンセル済み予約はすべて処理済みです。',
       colHolding: '未処理',
-      markRefunded: 'アプリ外で返金済み',
+      markRefunded: '返金済み',
       markRefundedDone: '返金として記録しました',
       toCredit: 'クレジットとして残す',
       toCreditDone: 'アカウントクレジットを発行しました',
