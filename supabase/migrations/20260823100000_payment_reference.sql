@@ -190,5 +190,9 @@ end;
 $function$;
 
 ALTER FUNCTION "public"."record_group_payment"("p_lead" "uuid", "p_amount" numeric, "p_reference" "text", "p_group_id" "uuid") OWNER TO "postgres";
-REVOKE ALL ON FUNCTION "public"."record_group_payment"("p_lead" "uuid", "p_amount" numeric, "p_reference" "text", "p_group_id" "uuid") FROM PUBLIC;
+-- Dropping the old signature dropped its grants with it, and Supabase's
+-- default privileges hand every new function to anon. Revoke explicitly:
+-- an unauthenticated caller must not reach an admin-only RPC at all, not
+-- merely be turned away by its first line.
+REVOKE ALL ON FUNCTION "public"."record_group_payment"("p_lead" "uuid", "p_amount" numeric, "p_reference" "text", "p_group_id" "uuid") FROM PUBLIC, "anon";
 GRANT ALL ON FUNCTION "public"."record_group_payment"("p_lead" "uuid", "p_amount" numeric, "p_reference" "text", "p_group_id" "uuid") TO "authenticated";
