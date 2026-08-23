@@ -35,6 +35,7 @@ export type StatementKind =
   | 'payment_pending'
   | 'credit_issued'
   | 'credit_settled'
+  | 'account_charge'
   | 'cancellation'
 
 export interface StatementLine {
@@ -106,6 +107,7 @@ const KIND_ORDER: Record<StatementKind, number> = {
   payment_pending: 5,
   cancellation: 6,
   credit_issued: 7,
+  account_charge: 7,
   credit_settled: 8,
 }
 
@@ -266,15 +268,18 @@ export function buildDiverStatement(input: StatementInput): DiverStatement {
   // lead pays for are the lead's money, and drop out with the booking.
   for (const c of input.credits) {
     if (c.booking_id && !ownIds.has(c.booking_id)) continue
+    // The ledger is signed: a negative row is an account charge (goods off the
+    // shelf, a lost fin), not a credit. It moves the balance the other way and
+    // must not be labelled as money the shop owes.
     const amount = Number(c.amount)
     drafts.push({
       id: `credit:${c.id}:issued`,
       sourceId: c.id,
       at: c.created_at,
-      kind: 'credit_issued',
+      kind: amount < 0 ? 'account_charge' : 'credit_issued',
       bookingId: c.booking_id,
       delta: amount,
-      amount,
+      amount: Math.abs(amount),
       actorId: c.created_by,
       note: c.reason,
       method: null,
@@ -289,7 +294,7 @@ export function buildDiverStatement(input: StatementInput): DiverStatement {
         kind: 'credit_settled',
         bookingId: c.booking_id,
         delta: -amount,
-        amount,
+        amount: Math.abs(amount),
         actorId: c.settled_by,
         note: c.settled_note,
         method: null,
@@ -317,6 +322,8 @@ export function buildDiverStatement(input: StatementInput): DiverStatement {
     return s + Number(details.total ?? 0) + amendmentsDelta(input.amendmentsByBooking.get(b.id) ?? [])
   }, 0)
   const paid = netPaid(input.payments.filter(p => p.booking_id && activeIds.has(p.booking_id)))
+  // Signed on purpose, so `balance = paid - charged + openCredit` still holds
+  // when the diver carries an account charge.
   const openCredit = input.credits
     .filter(c => c.status === 'open' && (!c.booking_id || ownIds.has(c.booking_id)))
     .reduce((s, c) => s + Number(c.amount), 0)

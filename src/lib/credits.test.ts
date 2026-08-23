@@ -271,9 +271,9 @@ describe('openCreditBalance', () => {
   })
 })
 
-// createCredit / settleCredit / reopenCredit all end in
-// .insert|update(...).select('*').single(); this stub captures the write
-// payload and resolves the chain to a canned row.
+// createCredit / createAccountCharge end in
+// .insert(...).select('*').single(); this stub captures the write payload and
+// resolves the chain to a canned row.
 function setupCreditWrite(result: { data: unknown; error?: unknown }) {
   const single = () => Promise.resolve({ data: result.data, error: result.error ?? null })
   const select = vi.fn(() => ({ single }))
@@ -314,37 +314,72 @@ describe('createCredit', () => {
   })
 })
 
-describe('settleCredit', () => {
-  it('marks the credit settled with a note and a timestamp', async () => {
-    const { update } = setupCreditWrite({ data: { ...settledRow, status: 'settled' } })
-    const { settleCredit } = await import('./credits')
-    const result = await settleCredit({ creditId: 'c9', note: 'Refunded by bank transfer' })
-    expect(result.status).toBe('settled')
-    const payload = update.mock.calls[0][0] as { status: string; settled_note: string; settled_at: string }
-    expect(payload.status).toBe('settled')
-    expect(payload.settled_note).toBe('Refunded by bank transfer')
-    expect(typeof payload.settled_at).toBe('string')
+describe('createAccountCharge', () => {
+  it('stores the charge as a negative row, untied, stamped admin_charge', async () => {
+    const { insert } = setupCreditWrite({ data: settledRow })
+    const { createAccountCharge } = await import('./credits')
+    await createAccountCharge({ user_id: 'u1', amount: 1200, reason: 'Mask bought in the shop', created_by: 'admin' })
+    expect(insert).toHaveBeenCalledWith({
+      user_id: 'u1', booking_id: null, amount: -1200, currency: siteConfig.locale.currency,
+      reason: 'Mask bought in the shop', created_by: 'admin', status: 'open', source: 'admin_charge',
+    })
   })
 
-  it('throws when the update returns no row', async () => {
-    setupCreditWrite({ data: null })
-    const { settleCredit } = await import('./credits')
-    await expect(settleCredit({ creditId: 'c9', note: 'x' })).rejects.toBeTruthy()
+  // The caller says how much to charge; the sign is the function's business.
+  // A caller passing -1200 "to be helpful" must not end up issuing credit.
+  it('refuses a non-positive amount rather than flipping it into a credit', async () => {
+    const { insert } = setupCreditWrite({ data: settledRow })
+    const { createAccountCharge } = await import('./credits')
+    await expect(createAccountCharge({ user_id: 'u1', amount: -1200, reason: 'r', created_by: 'a' }))
+      .rejects.toThrow(/positive/)
+    expect(insert).not.toHaveBeenCalled()
+  })
+
+  it('refuses a blank reason — an unexplained charge is unanswerable later', async () => {
+    const { insert } = setupCreditWrite({ data: settledRow })
+    const { createAccountCharge } = await import('./credits')
+    await expect(createAccountCharge({ user_id: 'u1', amount: 100, reason: '  ', created_by: 'a' }))
+      .rejects.toThrow(/reason/)
+    expect(insert).not.toHaveBeenCalled()
   })
 })
 
-describe('reopenCredit', () => {
-  it('clears the settled fields and flips status back to open', async () => {
-    const { update } = setupCreditWrite({ data: settledRow })
-    const { reopenCredit } = await import('./credits')
-    await reopenCredit('c9')
-    expect(update).toHaveBeenCalledWith({ status: 'open', settled_at: null, settled_note: null })
+describe('a charge on the ledger', () => {
+  const row = (over: Record<string, unknown>) => ({
+    id: 'x', user_id: 'u1', booking_id: null, currency: 'TWD', reason: 'r',
+    status: 'open', created_at: '2026-08-01T00:00:00Z', created_by: 'a',
+    settled_at: null, settled_note: null, settled_by: null, source: 'manual',
+    ...over,
+  }) as unknown as import('../types/database').Credit
+
+  it('nets against credit in the spendable balance', async () => {
+    const { openCreditBalance } = await import('./credits')
+    expect(openCreditBalance([
+      row({ amount: 3000 }),
+      row({ id: 'y', amount: -1200, source: 'admin_charge' }),
+    ])).toBe(1800)
   })
 
-  it('throws when the update returns no row', async () => {
-    setupCreditWrite({ data: null })
-    const { reopenCredit } = await import('./credits')
-    await expect(reopenCredit('c9')).rejects.toBeTruthy()
+  it('never leaves a negative amount to spend', async () => {
+    const { openCreditBalance } = await import('./credits')
+    expect(openCreditBalance([
+      row({ amount: 500 }),
+      row({ id: 'y', amount: -1200, source: 'admin_charge' }),
+    ])).toBe(0)
+  })
+
+  it('reduces the account credit a diver can put toward bookings', async () => {
+    const { diverCreditBalance } = await import('./credits')
+    const credits = [row({ amount: 3000 }), row({ id: 'y', amount: -1200, source: 'admin_charge' })]
+    expect(diverCreditBalance(credits, [{ id: 'b1', owed: 0, paid: 0 }])).toBe(1800)
+  })
+
+  it('is never itself drained by a credit sweep', async () => {
+    const { plannedCreditApplication } = await import('./credits')
+    const credits = [row({ amount: 3000 }), row({ id: 'y', amount: -1200, source: 'admin_charge' })]
+    // 1,800 spendable against a 5,000 balance — not 3,000, and not 4,200 from
+    // "consuming" the charge.
+    expect(plannedCreditApplication(credits, [{ id: 'b1', due: 5000 }])).toBe(1800)
   })
 })
 

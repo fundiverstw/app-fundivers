@@ -248,3 +248,37 @@ describe('ordering', () => {
     expect(s.lines.find(l => l.kind === 'credit_settled')).toMatchObject({ actorId: 'admin-9', delta: -1000 })
   })
 })
+
+describe('an account charge', () => {
+  const charge = (over: Partial<Credit> & { id: string }) =>
+    credit({ source: 'admin_charge', reason: 'Mask bought in the shop', ...over })
+
+  it('reads as a charge, not a credit, and pushes the balance down', () => {
+    const s = build({ credits: [charge({ id: 'c1', amount: -1200, created_at: T(4) })] })
+    expect(s.lines).toHaveLength(1)
+    expect(s.lines[0]).toMatchObject({ kind: 'account_charge', delta: -1200, amount: 1200, balance: -1200 })
+  })
+
+  it('nets against credit in the closing balance and the totals', () => {
+    const s = build({
+      credits: [
+        credit({ id: 'c1', amount: 3000, created_at: T(3) }),
+        charge({ id: 'c2', amount: -1200, created_at: T(4) }),
+      ],
+    })
+    expect(s.balance).toBe(1800)
+    expect(s.totals.openCredit).toBe(1800)
+    // The identity the summary block is built on still holds with a charge.
+    expect(s.balance).toBe(s.totals.paid - s.totals.charged + s.totals.openCredit)
+  })
+
+  it('can put a diver who owes nothing on any booking into the red', () => {
+    const s = build({
+      bookings: [booking({ id: 'b1', details: { total: 3000 } })],
+      payments: [payment({ id: 'p1', booking_id: 'b1', amount: 3000 })],
+      credits: [charge({ id: 'c1', amount: -1200, created_at: T(6) })],
+    })
+    expect(s.balance).toBe(-1200)
+    expect(s.lines.at(-1)).toMatchObject({ kind: 'account_charge', balance: -1200 })
+  })
+})

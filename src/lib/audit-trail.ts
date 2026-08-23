@@ -35,6 +35,7 @@ export type AuditKind =
   | 'payment_pending'
   | 'credit_issued'
   | 'credit_settled'
+  | 'account_charge'
   | 'amendment'
   | 'booking_insert'
   | 'booking_update'
@@ -112,10 +113,12 @@ export function creditEntries(credits: Credit[]): AuditEntry[] {
       id:        `credit:${c.id}:issued`,
       at:        c.created_at,
       source:    'credit',
-      kind:      'credit_issued',
+      // A negative row is an account charge, not a credit. Same table, other
+      // direction: see src/lib/credits.ts.
+      kind:      Number(c.amount) < 0 ? 'account_charge' : 'credit_issued',
       bookingId: c.booking_id,
       userId:    c.user_id,
-      amount:    Number(c.amount),
+      amount:    Math.abs(Number(c.amount)),
       currency:  c.currency,
       actorId:   c.created_by,
       note:      c.reason,
@@ -132,7 +135,7 @@ export function creditEntries(credits: Credit[]): AuditEntry[] {
         kind:      'credit_settled',
         bookingId: c.booking_id,
         userId:    c.user_id,
-        amount:    Number(c.amount),
+        amount:    Math.abs(Number(c.amount)),
         currency:  c.currency,
         actorId:   c.settled_by,
         note:      c.settled_note,
@@ -397,6 +400,8 @@ export function signedDisplayAmount(entry: AuditEntry): number | null {
     // reads as a negative like a payment. Settling that credit consumes the
     // favorable balance again, so credit_settled stays positive (default).
     case 'credit_issued':    return -entry.amount
+    // A charge is the diver owing more, which reads positive here.
+    case 'account_charge':   return entry.amount
     case 'payment_refunded': return entry.amount
     case 'amendment':        return entry.amount
     default:                 return entry.amount

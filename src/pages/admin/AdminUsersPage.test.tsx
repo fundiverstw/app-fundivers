@@ -36,7 +36,7 @@ vi.mock('../../lib/credits', () => ({
   openCreditForBooking: () => null,
   openCreditBalance: () => 0,
   diverCreditBalance: () => 0,
-  createCredit: vi.fn(), settleCredit: vi.fn(), reopenCredit: vi.fn(), applyCreditToBooking: vi.fn(),
+  createCredit: vi.fn(), createAccountCharge: vi.fn(), applyCreditToBooking: vi.fn(),
 }))
 
 const profiles = [
@@ -137,6 +137,29 @@ describe('AdminUsersPage deep link', () => {
     expect(screen.getByText('-2,000')).toBeInTheDocument()
     expect(screen.getByText(/ref CASH-77/)).toBeInTheDocument()
     expect(screen.getByText(/by Bea Boss/)).toBeInTheDocument()
+  })
+
+  // Both ledger actions demand a reason. An unexplained movement on someone's
+  // balance is the thing nobody can answer questions about weeks later.
+  it('will not issue a charge without a reason, and passes the reason through', async () => {
+    const { createAccountCharge } = await import('../../lib/credits')
+    const charge = vi.mocked(createAccountCharge)
+    charge.mockResolvedValue({ id: 'c1', amount: -1200 } as never)
+
+    const user = userEvent.setup()
+    renderAt('/admin/users?diver=u2')
+
+    await user.click(await screen.findByRole('button', { name: t.admin.users.issueChargeLink }))
+    await user.type(screen.getByLabelText(t.admin.users.amountPlaceholder), '1200')
+    await user.click(screen.getByRole('button', { name: t.admin.users.issueCharge }))
+    expect(charge).not.toHaveBeenCalled()
+    expect(screen.getByText(t.admin.users.chargeReasonRequired)).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText(t.admin.users.chargeReasonPlaceholder), 'Mask bought in the shop')
+    await user.click(screen.getByRole('button', { name: t.admin.users.issueCharge }))
+    await waitFor(() => expect(charge).toHaveBeenCalledWith(expect.objectContaining({
+      user_id: 'u2', amount: 1200, reason: 'Mask bought in the shop',
+    })))
   })
 
   it('shows no roster until the admin searches, with a prompt instead', async () => {

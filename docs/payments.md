@@ -82,10 +82,30 @@ A negative balance is **credit to the diver**, whether it came from an
 awarded credit or from simply overpaying. There is no separate
 "overpaid" concept.
 
-## Credits
+## Credits and charges
 
-Every credit records a `source`: `manual`, `event_cancellation`,
-`booking_cancellation_return`, `carry_forward`, or `return_reclaimed`.
+`credits` is a **signed** account ledger. A positive row is a credit — money
+the shop owes the diver. A negative row is a charge (`source =
+'admin_charge'`) — money the diver owes the shop for something with no event
+behind it, a mask off the rack or a lost fin. One table, because every
+balance in the app is already `sum(amount) where status = 'open'`, so a signed
+row nets itself into all of them at once.
+
+Two constraints keep the sign honest: only `admin_charge` may be negative and
+it must be, and a charge is never tied to a booking — a charge against a
+specific trip is a `booking_amendments` surcharge. Charges net out of the
+spendable pool but are never consumed by the credit sweep; settling one would
+erase the debt *and* hand the money back.
+
+**Nothing closes a ledger row by hand.** Closing is automatic — the
+apply-credit RPC settles what it spends, the restore-reclaim trigger settles
+what it takes back. Correcting a balance means issuing the opposite row, with
+a required reason, so both halves stay on the statement instead of one
+disappearing behind a note.
+
+Every row records a `source`: `manual`, `event_cancellation`,
+`booking_cancellation_return`, `carry_forward`, `return_reclaimed`, or
+`admin_charge`.
 Only `event_cancellation` and `booking_cancellation_return`
 (`RETURN_SOURCES`) mean *this booking's money is given back right now*,
 and only they block a further automatic refund — a goodwill award, a
@@ -99,8 +119,8 @@ elsewhere. Reclaimed rows become `return_reclaimed` so the two triggers
 agree on state: without that, a second cancel skips refunding *and* a
 second restore reclaims the same money twice.
 
-**Account credit** — the balance a diver sees — is *open credits not tied
-to an active booking, plus every overpayment*. So a credit tied to a
+**Account credit** — the balance a diver sees — is *open ledger rows not
+tied to an active booking, plus every overpayment*, floored at zero. So a credit tied to a
 cancelled booking is spendable again, and bookings a lead booker pays for
 count toward the lead, not the diver.
 
@@ -233,4 +253,6 @@ heads, deliberately not what has been banked.
 9. Cash-revenue sums apply `isExternalPayment`. Balance math does not.
 10. A money-moving payment names its real-world transaction, and
     attribution is stamped from the act, never taken from the caller.
-11. Constraints, triggers and RLS policies get integration tests.
+11. The ledger is signed; only `admin_charge` is negative, and never tied
+    to a booking.
+12. Constraints, triggers and RLS policies get integration tests.

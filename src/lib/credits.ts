@@ -5,20 +5,33 @@ import { siteConfig } from '../config/site'
 import type { AppEvent, Credit, CreditInsert } from '../types/database'
 
 /**
- * "Credits" are money the business owes a diver — typically issued when
- * an event is cancelled (weather, low signups). They sit at status='open'
- * until an admin settles them, either by paying the diver back externally
- * or by manually recording a payment when the diver applies the credit
- * to a new booking. We intentionally do NOT auto-create a paid payment
- * row on settle — the corresponding payment is recorded as a separate
- * action so the two-sided audit trail stays explicit.
+ * The diver's account ledger: a signed list of everything owed between them
+ * and the shop that is not attached to a booking.
+ *
+ * POSITIVE rows are credits — money the business owes a diver, typically
+ * issued when an event is cancelled (weather, low signups). NEGATIVE rows are
+ * charges (`source = 'admin_charge'`) — money the diver owes the shop for
+ * something with no event behind it, a mask off the rack or a lost fin.
+ *
+ * Rows sit at status='open' until something closes them. Closing is automatic:
+ * `apply_credit_to_booking` settles credits as it spends them, and the
+ * restore-reclaim trigger settles what it takes back. There is deliberately no
+ * manual settle — an admin correcting a balance issues the opposite row, which
+ * leaves both halves visible in the statement instead of making one disappear
+ * behind a note.
+ *
+ * Because the amount is signed, every `sum(amount) where status = 'open'` in
+ * this file nets charges against credits for free. What is NOT free is the
+ * clamping: "how much can this diver spend" can never be negative, so the two
+ * spendable figures floor at zero while the statement's balance stays signed.
  */
 
 /** The two credit sources that mean "this booking's money is given back RIGHT
  *  NOW". Only these suppress a further automatic refund; a goodwill credit, a
  *  carry-forward row, or a refund already reclaimed by restoring the booking
  *  (`return_reclaimed`) is not money currently owed back. Kept in step with the
- *  credits_source_check constraint (20260822100000, widened in 20260822120000)
+ *  credits_source_check constraint (20260822100000, widened in 20260822120000
+ *  and again in 20260823130000)
  *  and with the same list inside bookings_return_account_credit_on_cancel. */
 export const RETURN_SOURCES = ['event_cancellation', 'booking_cancellation_return'] as const
 
@@ -32,8 +45,12 @@ export async function fetchCreditsForUser(userId: string): Promise<Credit[]> {
   return (data ?? []) as Credit[]
 }
 
+/** Spendable account credit from the ledger alone: open credits less open
+ *  charges, floored at zero. A diver who owes the shop more than they hold has
+ *  nothing to spend, not a negative amount to spend. */
 export function openCreditBalance(credits: Credit[]): number {
-  return credits.filter(c => c.status === 'open').reduce((s, c) => s + Number(c.amount), 0)
+  const net = credits.filter(c => c.status === 'open').reduce((s, c) => s + Number(c.amount), 0)
+  return Math.max(0, net)
 }
 
 /** Sum of *open* credits tied to a specific booking — the live credit that
@@ -77,7 +94,12 @@ export function diverCreditBalance(
     (s, b) => s + Math.max(0, b.paid + openCreditForBooking(credits, b.id) - b.owed),
     0,
   )
-  return general + perBooking
+  // Floored for the same reason each booking's term is: this answers "how much
+  // can they spend". Account charges make `general` able to go negative, and a
+  // diver who owes the shop 500 can spend nothing, not minus 500. The signed
+  // position is `buildDiverStatement`'s balance, which deliberately does not
+  // clamp.
+  return Math.max(0, general + perBooking)
 }
 
 /**
@@ -111,13 +133,17 @@ export function plannedCreditApplication(
   let applied = 0
   for (const target of targets) {
     if (target.due <= 0) continue
+    // Availability nets account charges, exactly as the RPC's v_avail does…
     const available = pool.reduce((s, c) => c.bookingId === target.id ? s : s + c.amount, 0)
-    let take = Math.min(target.due, available)
+    let take = Math.min(target.due, Math.max(0, available))
     if (take <= 0) continue
     applied += take
     for (const row of pool) {
       if (take <= 0) break
       if (row.bookingId === target.id) continue
+      // …but only credits are drained. Draining a charge would settle a debt
+      // and hand the money back, since `min(negative, take)` is negative.
+      if (row.amount <= 0) continue
       const used = Math.min(row.amount, take)
       row.amount -= used
       take -= used
@@ -178,21 +204,43 @@ export async function createCredit(input: {
   return data as Credit
 }
 
-export async function settleCredit(args: {
-  creditId: string
-  note: string
+/**
+ * Charge a diver for something with no event behind it — goods off the shelf,
+ * a lost weight belt, a tank fill. Stored as a negative row on the same
+ * ledger, so it nets against their credit everywhere at once.
+ *
+ * Never tied to a booking: `credits_charge_untied` refuses that, because a
+ * charge against a specific trip is a `booking_amendments` surcharge, and one
+ * living here would be double-counted by `openCreditForBooking`.
+ *
+ * `amount` is passed POSITIVE — the caller says how much to charge, and the
+ * sign is this function's business.
+ */
+export async function createAccountCharge(input: {
+  user_id: string
+  amount: number
+  reason: string
+  currency?: string
+  created_by: string
 }): Promise<Credit> {
+  if (!(input.amount > 0)) throw new Error('a charge amount must be positive')
+  if (input.reason.trim().length < 3) throw new Error('a charge needs a reason')
+  const row: CreditInsert = {
+    user_id:    input.user_id,
+    booking_id: null,
+    amount:     -Math.abs(input.amount),
+    currency:   input.currency ?? siteConfig.locale.currency,
+    reason:     input.reason.trim(),
+    created_by: input.created_by,
+    status:     'open',
+    source:     'admin_charge',
+  }
   const { data, error } = await supabase
     .from('credits')
-    .update({
-      status:       'settled',
-      settled_at:   new Date().toISOString(),
-      settled_note: args.note,
-    })
-    .eq('id', args.creditId)
+    .insert(row)
     .select('*')
     .single()
-  if (error || !data) throw error ?? new Error('credit update returned no row')
+  if (error || !data) throw error ?? new Error('charge insert returned no row')
   return data as Credit
 }
 
@@ -293,15 +341,4 @@ export async function applyCreditToBooking(args: {
   })
   if (error) throw error
   return Number(data ?? 0)
-}
-
-export async function reopenCredit(creditId: string): Promise<Credit> {
-  const { data, error } = await supabase
-    .from('credits')
-    .update({ status: 'open', settled_at: null, settled_note: null })
-    .eq('id', creditId)
-    .select('*')
-    .single()
-  if (error || !data) throw error ?? new Error('credit update returned no row')
-  return data as Credit
 }

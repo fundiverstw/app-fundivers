@@ -20,7 +20,7 @@ import { shoeAsJp } from '../../lib/shoe-size'
 import { contactMethodLabel } from '../../lib/contact-labels'
 import { profileGapLabels } from '../../lib/profile-completeness'
 import { personName } from '../../lib/names'
-import { fetchCreditsForUser, openCreditForBooking, openCreditBalance, diverCreditBalance, createCredit, settleCredit, reopenCredit, applyCreditToBooking } from '../../lib/credits'
+import { fetchCreditsForUser, openCreditForBooking, openCreditBalance, diverCreditBalance, createCredit, createAccountCharge, applyCreditToBooking } from '../../lib/credits'
 import { netPaid, netPaidByBooking } from '../../lib/payments'
 import { buildDiverStatement, type DiverStatement, type StatementLine } from '../../lib/diver-statement'
 import { fetchActorNames, actorLabel, type ActorNames } from '../../lib/actor-names'
@@ -305,21 +305,25 @@ export function AdminUsersPage() {
     }
   }
 
-  async function handleSettleCredit(userId: string, creditId: string, note: string) {
+  // The mirror of issuing credit: a negative row on the same ledger. Kept as
+  // its own handler rather than a signed argument to the one above, so neither
+  // caller can flip the sign by accident.
+  async function handleCreateCharge(userId: string, amount: number, reason: string) {
+    if (!profile?.id) return
     try {
-      const credit = await settleCredit({ creditId, note })
+      const charge = await createAccountCharge({
+        user_id: userId, amount, reason, created_by: profile.id,
+      })
       setExtrasCache(prev => {
         const next = new Map(prev)
         const cur = next.get(userId)
         if (!cur) return prev
-        next.set(userId, withDerived(cur, {
-          credits: cur.credits.map(c => c.id === credit.id ? credit : c),
-        }))
+        next.set(userId, withDerived(cur, { credits: [charge, ...cur.credits] }))
         return next
       })
-      toast.success(us.creditSettled)
+      toast.success(us.chargeIssued(amount.toLocaleString()))
     } catch (err) {
-      toast.error(us.couldNotSettleCredit(errorMessage(err)))
+      toast.error(us.couldNotIssueCharge(errorMessage(err)))
       throw err
     }
   }
@@ -338,25 +342,6 @@ export function AdminUsersPage() {
       .select('*')
       .order('name', { ascending: true })
     setUsers((data ?? []) as Profile[])
-  }
-
-  async function handleReopenCredit(userId: string, creditId: string) {
-    try {
-      const credit = await reopenCredit(creditId)
-      setExtrasCache(prev => {
-        const next = new Map(prev)
-        const cur = next.get(userId)
-        if (!cur) return prev
-        next.set(userId, withDerived(cur, {
-          credits: cur.credits.map(c => c.id === credit.id ? credit : c),
-        }))
-        return next
-      })
-      toast.success(us.creditReopened)
-    } catch (err) {
-      toast.error(us.couldNotReopenCredit(errorMessage(err)))
-      throw err
-    }
   }
 
   async function handleDeleteUser(target: Profile) {
@@ -498,9 +483,8 @@ export function AdminUsersPage() {
             onVoidPayment={(bookingId, paymentId) => handleVoidPayment(u.id, bookingId, paymentId)}
             onMarkDepositPaid={(bookingId) => handleMarkDepositPaid(u.id, bookingId)}
             onCreateCredit={(amount, reason, bookingId) => handleCreateCredit(u.id, amount, reason, bookingId)}
+            onCreateCharge={(amount, reason) => handleCreateCharge(u.id, amount, reason)}
             onApplyCredit={(bookingId, amount) => handleApplyCredit(u.id, bookingId, amount)}
-            onSettleCredit={(creditId, note) => handleSettleCredit(u.id, creditId, note)}
-            onReopenCredit={(creditId) => handleReopenCredit(u.id, creditId)}
             onDelete={() => handleDeleteUser(u)}
             onChangeRole={(role) => handleChangeRole(u, role)}
             onIssueTempPassword={() => handleIssueTempPassword(u)}
@@ -521,7 +505,7 @@ export function AdminUsersPage() {
 
 function UserCard({
   user, allUsers, onFamilyChanged, open, extras, loading, editing, onToggle, onEdit, onCancelEdit, onProfileSaved,
-  onRecordPayment, onVoidPayment, onMarkDepositPaid, onCreateCredit, onApplyCredit, onSettleCredit, onReopenCredit, onDelete, onChangeRole, onIssueTempPassword, isAdmin, isSelf,
+  onRecordPayment, onVoidPayment, onMarkDepositPaid, onCreateCredit, onCreateCharge, onApplyCredit, onDelete, onChangeRole, onIssueTempPassword, isAdmin, isSelf,
 }: {
   user: Profile
   allUsers: Profile[]
@@ -538,9 +522,8 @@ function UserCard({
   onVoidPayment: (bookingId: string, paymentId: string) => Promise<void>
   onMarkDepositPaid: (bookingId: string) => Promise<void>
   onCreateCredit: (amount: number, reason: string, bookingId: string | null) => Promise<void>
+  onCreateCharge: (amount: number, reason: string) => Promise<void>
   onApplyCredit: (bookingId: string, amount: number) => Promise<void>
-  onSettleCredit: (creditId: string, note: string) => Promise<void>
-  onReopenCredit: (creditId: string) => Promise<void>
   onDelete: () => Promise<void>
   onChangeRole: (role: Profile['role']) => Promise<void>
   onIssueTempPassword: () => Promise<string>
@@ -733,9 +716,8 @@ function UserCard({
                   onVoidPayment={onVoidPayment}
                   onMarkDepositPaid={onMarkDepositPaid}
                   onCreateCredit={onCreateCredit}
+                  onCreateCharge={onCreateCharge}
                   onApplyCredit={onApplyCredit}
-                  onSettleCredit={onSettleCredit}
-                  onReopenCredit={onReopenCredit}
                   isAdmin={isAdmin}
                 />
               )}
@@ -818,15 +800,14 @@ function ProfileDetails({ user }: { user: Profile }) {
   )
 }
 
-function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid, onCreateCredit, onApplyCredit, onSettleCredit, onReopenCredit, isAdmin }: {
+function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid, onCreateCredit, onCreateCharge, onApplyCredit, isAdmin }: {
   extras: UserExtras
   onRecordPayment: (bookingId: string, amount: number, note: string, reference: string) => Promise<void>
   onVoidPayment: (bookingId: string, paymentId: string) => Promise<void>
   onMarkDepositPaid: (bookingId: string) => Promise<void>
   onCreateCredit: (amount: number, reason: string, bookingId: string | null) => Promise<void>
+  onCreateCharge: (amount: number, reason: string) => Promise<void>
   onApplyCredit: (bookingId: string, amount: number) => Promise<void>
-  onSettleCredit: (creditId: string, note: string) => Promise<void>
-  onReopenCredit: (creditId: string) => Promise<void>
   isAdmin: boolean
 }) {
   const activeBookings = extras.bookings.filter(b => b.status !== 'cancelled')
@@ -903,9 +884,8 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
           applyTargets={applyTargets}
           readOnly={!isAdmin}
           onCreate={onCreateCredit}
+          onCharge={onCreateCharge}
           onApply={onApplyCredit}
-          onSettle={onSettleCredit}
-          onReopen={onReopenCredit}
         />
       </Section>
     </div>
@@ -933,7 +913,7 @@ const signed = (n: number) => `${n < 0 ? '-' : '+'}${money(n)}`
  *              another. Only shown when it differs from the balance, which is
  *              exactly when the difference matters.
  */
-function BalancePanel({ statement, spendable, credits, bookings, actorNames, applyTargets, readOnly, onCreate, onApply, onSettle, onReopen }: {
+function BalancePanel({ statement, spendable, credits, bookings, actorNames, applyTargets, readOnly, onCreate, onCharge, onApply }: {
   statement: DiverStatement
   spendable: number
   credits: Credit[]
@@ -942,9 +922,8 @@ function BalancePanel({ statement, spendable, credits, bookings, actorNames, app
   applyTargets: Array<{ id: string; label: string; due: number }>
   readOnly: boolean
   onCreate: (amount: number, reason: string, bookingId: string | null) => Promise<void>
+  onCharge: (amount: number, reason: string) => Promise<void>
   onApply: (bookingId: string, amount: number) => Promise<void>
-  onSettle: (creditId: string, note: string) => Promise<void>
-  onReopen: (creditId: string) => Promise<void>
 }) {
   const { balance, totals } = statement
   const state = balance > 0 ? 'credit' : balance < 0 ? 'owed' : 'settled'
@@ -992,21 +971,18 @@ function BalancePanel({ statement, spendable, credits, bookings, actorNames, app
 
       <StatementList
         lines={statement.lines}
-        credits={credits}
         actorNames={actorNames}
         eventTitle={eventTitle}
-        readOnly={readOnly}
-        onSettle={onSettle}
-        onReopen={onReopen}
       />
 
-      <CreditsPanel
+      <LedgerActions
         credits={credits}
         spendable={spendable}
         bookings={bookings}
         applyTargets={applyTargets}
         readOnly={readOnly}
         onCreate={onCreate}
+        onCharge={onCharge}
         onApply={onApply}
       />
     </div>
@@ -1016,32 +992,14 @@ function BalancePanel({ statement, spendable, credits, bookings, actorNames, app
 const KIND_LABEL: Record<StatementLine['kind'], string> = us.statementKinds
 
 /** One statement line: what happened, who did it, the change, the balance
- *  after. Settle / Re-open live on the credit lines themselves rather than in
- *  a second list of the same credits further down the card. */
-function StatementList({ lines, credits, actorNames, eventTitle, readOnly, onSettle, onReopen }: {
+ *  after. Read-only by design — nothing here can be edited or reversed in
+ *  place. Correcting a balance means issuing the opposite row, which leaves
+ *  both halves on the record instead of quietly rewriting one. */
+function StatementList({ lines, actorNames, eventTitle }: {
   lines: StatementLine[]
-  credits: Credit[]
   actorNames: ActorNames
   eventTitle: (bookingId: string | null) => string | null
-  readOnly: boolean
-  onSettle: (creditId: string, note: string) => Promise<void>
-  onReopen: (creditId: string) => Promise<void>
 }) {
-  const [busyId, setBusyId] = useState<string | null>(null)
-
-  async function handleSettle(c: Credit) {
-    const note = window.prompt(us.settlePrompt(Number(c.amount).toLocaleString(), c.reason), '')
-    if (note === null) return
-    setBusyId(c.id)
-    try { await onSettle(c.id, note.trim()) } finally { setBusyId(null) }
-  }
-
-  async function handleReopen(c: Credit) {
-    if (!window.confirm(us.reopenConfirm(Number(c.amount).toLocaleString(), c.reason))) return
-    setBusyId(c.id)
-    try { await onReopen(c.id) } finally { setBusyId(null) }
-  }
-
   if (lines.length === 0) {
     return <p className="text-brand-950 font-medium italic pt-1 border-t border-surface-200">{us.statementEmpty}</p>
   }
@@ -1057,9 +1015,6 @@ function StatementList({ lines, credits, actorNames, eventTitle, readOnly, onSet
       </div>
       <ul className="space-y-1">
         {[...lines].reverse().map(l => {
-          const credit = l.kind === 'credit_issued' || l.kind === 'credit_settled'
-            ? credits.find(c => c.id === l.sourceId) ?? null
-            : null
           const title = eventTitle(l.bookingId)
           return (
             <li key={l.id} className="flex items-baseline justify-between gap-2">
@@ -1073,16 +1028,6 @@ function StatementList({ lines, credits, actorNames, eventTitle, readOnly, onSet
                   {t.admin.actor.by(actorLabel(actorNames, l.actorId, t.admin.actor))}
                 </span>
               </span>
-              {!readOnly && credit && credit.status === 'open' && (
-                <button type="button" disabled={busyId === credit.id} onClick={() => handleSettle(credit)} className={`shrink-0 ${BTN_XS_GHOST}`}>
-                  {busyId === credit.id ? '…' : us.settle}
-                </button>
-              )}
-              {!readOnly && credit && credit.status === 'settled' && l.kind === 'credit_settled' && (
-                <button type="button" disabled={busyId === credit.id} onClick={() => handleReopen(credit)} className={`shrink-0 ${BTN_XS_GHOST}`}>
-                  {busyId === credit.id ? '…' : us.reopen}
-                </button>
-              )}
               <span className={`shrink-0 w-16 text-right tabular-nums font-semibold ${
                 l.inert ? 'text-brand-950 opacity-60' : l.delta < 0 ? 'text-red-600' : 'text-emerald-700'
               }`}>
@@ -1102,51 +1047,27 @@ function StatementList({ lines, credits, actorNames, eventTitle, readOnly, onSet
 }
 
 /**
- * Credit actions: spend existing credit against an unpaid booking, or issue a
- * new one. The credits themselves are no longer listed here -- every credit
- * appears in the statement above, in the order it happened and with the
- * balance it produced, and Settle / Re-open hang off those lines. Listing them
- * twice in one card was how the same credit came to be read as two.
+ * The three things an admin can do to a diver's ledger: spend credit they
+ * already hold against an unpaid booking, hand them credit, or charge them.
+ *
+ * Issuing and charging are the same form with the sign flipped, and both
+ * REQUIRE a reason — an unexplained movement on someone's balance is the thing
+ * nobody can answer questions about six weeks later. A charge takes no booking:
+ * a charge against a specific trip is a balance adjustment on the event page,
+ * where it belongs to that booking's total.
  */
-function CreditsPanel({ credits, spendable, bookings, applyTargets, readOnly, onCreate, onApply }: {
+function LedgerActions({ credits, spendable, bookings, applyTargets, readOnly, onCreate, onCharge, onApply }: {
   credits: Credit[]
   spendable: number
   bookings: Array<Booking & { event: AppEvent | null; charges: ChargeLine[] }>
   applyTargets: Array<{ id: string; label: string; due: number }>
   readOnly: boolean
   onCreate: (amount: number, reason: string, bookingId: string | null) => Promise<void>
+  onCharge: (amount: number, reason: string) => Promise<void>
   onApply: (bookingId: string, amount: number) => Promise<void>
 }) {
-  const [showForm, setShowForm] = useState(false)
-  const [amountStr, setAmountStr] = useState('')
-  const [reason, setReason] = useState('')
-  const [linkedBooking, setLinkedBooking] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [form, setForm] = useState<'credit' | 'charge' | null>(null)
   const pool = openCreditBalance(credits)
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    const amount = parseInt(amountStr, 10)
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setError(t.admin.bookingPayments.amountMustBePositive)
-      return
-    }
-    if (reason.trim().length < 3) {
-      setError(us.reasonRequired)
-      return
-    }
-    setSubmitting(true)
-    try {
-      await onCreate(amount, reason.trim(), linkedBooking || null)
-      setAmountStr(''); setReason(''); setLinkedBooking(''); setShowForm(false)
-    } catch (err) {
-      setError(errorMessage(err))
-    } finally {
-      setSubmitting(false)
-    }
-  }
 
   if (readOnly) return null
 
@@ -1162,66 +1083,122 @@ function CreditsPanel({ credits, spendable, bookings, applyTargets, readOnly, on
       )}
 
       <div className="pt-1 border-t border-surface-200">
-        {!showForm ? (
-          <button
-            type="button"
-            onClick={() => setShowForm(true)}
-            className={BTN_XS_GHOST}
-          >
-            {us.issueCreditLink}
-          </button>
+        {form === null ? (
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setForm('credit')} className={BTN_XS_GHOST}>
+              {us.issueCreditLink}
+            </button>
+            <button type="button" onClick={() => setForm('charge')} className={BTN_XS_GHOST}>
+              {us.issueChargeLink}
+            </button>
+          </div>
         ) : (
-          <form onSubmit={submit} className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <input
-                type="number" inputMode="numeric" min={1} step={1}
-                value={amountStr}
-                onChange={e => setAmountStr(e.target.value)}
-                placeholder={us.amountPlaceholder}
-                className="w-24 bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
-              />
-              <select
-                value={linkedBooking}
-                onChange={e => setLinkedBooking(e.target.value)}
-                className="flex-1 bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
-              >
-                <option value="">{us.noLinkedBooking}</option>
-                {bookings.map(b => (
-                  <option key={b.id} value={b.id}>
-                    {b.event?.title ?? t.payments.eventFallback}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <input
-              type="text"
-              value={reason}
-              onChange={e => setReason(e.target.value)}
-              placeholder={us.reasonPlaceholder}
-              maxLength={500}
-              className="w-full bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
-            />
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={submitting}
-                className="text-xs bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded"
-              >
-                {submitting ? us.issuing : us.issueCredit}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setShowForm(false); setError(null); setAmountStr(''); setReason(''); setLinkedBooking('') }}
-                className={BTN_XS_GHOST}
-              >
-                {t.admin.catalog.cancel}
-              </button>
-            </div>
-            {error && <p className="text-red-600">{error}</p>}
-          </form>
+          <LedgerEntryForm
+            kind={form}
+            bookings={bookings}
+            onCancel={() => setForm(null)}
+            onSubmit={async (amount, reason, bookingId) => {
+              if (form === 'charge') await onCharge(amount, reason)
+              else await onCreate(amount, reason, bookingId)
+              setForm(null)
+            }}
+          />
         )}
       </div>
     </div>
+  )
+}
+
+function LedgerEntryForm({ kind, bookings, onCancel, onSubmit }: {
+  kind: 'credit' | 'charge'
+  bookings: Array<Booking & { event: AppEvent | null; charges: ChargeLine[] }>
+  onCancel: () => void
+  onSubmit: (amount: number, reason: string, bookingId: string | null) => Promise<void>
+}) {
+  const [amountStr, setAmountStr] = useState('')
+  const [reason, setReason] = useState('')
+  const [linkedBooking, setLinkedBooking] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const isCharge = kind === 'charge'
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    const amount = parseInt(amountStr, 10)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError(t.admin.bookingPayments.amountMustBePositive)
+      return
+    }
+    if (reason.trim().length < 3) {
+      setError(isCharge ? us.chargeReasonRequired : us.reasonRequired)
+      return
+    }
+    setSubmitting(true)
+    try {
+      await onSubmit(amount, reason.trim(), linkedBooking || null)
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-1.5">
+      <div className="flex items-center gap-2">
+        <input
+          type="number" inputMode="numeric" min={1} step={1}
+          value={amountStr}
+          onChange={e => setAmountStr(e.target.value)}
+          placeholder={us.amountPlaceholder}
+          aria-label={us.amountPlaceholder}
+          className="w-24 bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
+        />
+        {/* A credit can offset one booking's balance; a charge never can --
+            see LedgerActions. */}
+        {!isCharge && (
+          <select
+            value={linkedBooking}
+            onChange={e => setLinkedBooking(e.target.value)}
+            className="flex-1 bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
+          >
+            <option value="">{us.noLinkedBooking}</option>
+            {bookings.map(b => (
+              <option key={b.id} value={b.id}>
+                {b.event?.title ?? t.payments.eventFallback}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+      {/* Validated in `submit` rather than with `required`, so the message
+          names which field and reads like the amount check beside it. */}
+      <input
+        type="text"
+        value={reason}
+        onChange={e => setReason(e.target.value)}
+        placeholder={isCharge ? us.chargeReasonPlaceholder : us.creditReasonPlaceholder}
+        aria-label={isCharge ? us.chargeReasonPlaceholder : us.creditReasonPlaceholder}
+        maxLength={500}
+        className="w-full bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
+      />
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={submitting}
+          className="text-xs bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded"
+        >
+          {submitting
+            ? (isCharge ? us.charging : us.issuing)
+            : (isCharge ? us.issueCharge : us.issueCredit)}
+        </button>
+        <button type="button" onClick={onCancel} className={BTN_XS_GHOST}>
+          {t.admin.catalog.cancel}
+        </button>
+      </div>
+      {error && <p className="text-red-600">{error}</p>}
+    </form>
   )
 }
 

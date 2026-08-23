@@ -50,6 +50,7 @@ const KIND_META: Record<AuditKind, { label: string; tone: string }> = {
   payment_pending:  { label: au.kinds.paymentPending, tone: 'text-brand-100/70' },
   credit_issued:    { label: au.kinds.creditIssued,   tone: 'text-reef-300' },
   credit_settled:   { label: au.kinds.creditSettled,  tone: 'text-brand-100/70' },
+  account_charge:   { label: au.kinds.accountCharge,  tone: 'text-amber-300' },
   amendment:        { label: au.kinds.amendment,      tone: 'text-amber-300' },
   booking_insert:   { label: au.kinds.bookingCreated, tone: 'text-brand-50/90' },
   booking_update:   { label: au.kinds.bookingChanged, tone: 'text-brand-50/90' },

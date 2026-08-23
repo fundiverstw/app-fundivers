@@ -220,3 +220,106 @@ describe('credits settled_by stamp', () => {
     expect((await read(c)).settled_by).toBe(adminUser.id)
   })
 })
+
+// An account charge is the negative half of the same ledger. Three things must
+// hold or a diver ends up spending money they owe: the sign is pinned to the
+// source, a charge is never tied to a booking, and the credit sweep nets it
+// without ever consuming it.
+describe('account charges', () => {
+  async function ledgerRow(over: Record<string, unknown>) {
+    return admin.from('credits').insert({
+      user_id: diver.id, currency: 'TWD', reason: 'test', status: 'open',
+      created_by: adminUser.id, ...over,
+    } as never)
+  }
+
+  it('accepts a negative row when it is stamped admin_charge', async () => {
+    const { error } = await ledgerRow({ amount: -1200, source: 'admin_charge' })
+    expect(error).toBeNull()
+  })
+
+  it('refuses a negative row under any other source', async () => {
+    const { error } = await ledgerRow({ amount: -1200, source: 'manual' })
+    expect(error).not.toBeNull()
+    expect(error!.message).toMatch(/credits_amount_check/)
+  })
+
+  it('refuses a POSITIVE admin_charge — a charge that credits the diver', async () => {
+    const { error } = await ledgerRow({ amount: 1200, source: 'admin_charge' })
+    expect(error).not.toBeNull()
+    expect(error!.message).toMatch(/credits_amount_check/)
+  })
+
+  it('refuses a charge tied to a booking — that is a balance adjustment', async () => {
+    const b = await freshBooking()
+    const { error } = await ledgerRow({ amount: -1200, source: 'admin_charge', booking_id: b })
+    expect(error).not.toBeNull()
+    expect(error!.message).toMatch(/credits_charge_untied/)
+  })
+})
+
+describe('apply_credit_to_booking with a charge on the ledger', () => {
+  async function freshDiver(): Promise<TestUser> {
+    const d = await createTestUser(admin, { role: 'diver' })
+    cleanupUsers.push(d.id)
+    return d
+  }
+
+  async function bookingFor(user: TestUser, total: number): Promise<string> {
+    const eventId = await createTestDive(admin)
+    cleanupDives.push(eventId)
+    const { data, error } = await admin.from('bookings').insert({
+      user_id: user.id, event_id: eventId, status: 'confirmed',
+      details: { total, deposit: 0 },
+    } as never).select('id').single()
+    if (error) throw new Error(error.message)
+    return (data as { id: string }).id
+  }
+
+  async function ledger(user: TestUser, amount: number, source: string) {
+    const { error } = await admin.from('credits').insert({
+      user_id: user.id, amount, currency: 'TWD', reason: 'test',
+      status: 'open', created_by: adminUser.id, source,
+    } as never)
+    if (error) throw new Error(error.message)
+  }
+
+  it('spends only what is left after the charge', async () => {
+    const d = await freshDiver()
+    await ledger(d, 3000, 'manual')
+    await ledger(d, -1200, 'admin_charge')
+    const b = await bookingFor(d, 5000)
+
+    const asAdmin = await userClient(adminUser.email, adminUser.password)
+    const { data, error } = await asAdmin.rpc('apply_credit_to_booking', { p_booking_id: b, p_amount: 99999 })
+    expect(error).toBeNull()
+    expect(Number(data)).toBe(1800)
+  })
+
+  // Consuming it would settle the debt AND hand the money back, because
+  // least(-1200, remaining) is -1200.
+  it('leaves the charge open and untouched', async () => {
+    const d = await freshDiver()
+    await ledger(d, 3000, 'manual')
+    await ledger(d, -1200, 'admin_charge')
+    const b = await bookingFor(d, 5000)
+
+    const asAdmin = await userClient(adminUser.email, adminUser.password)
+    await asAdmin.rpc('apply_credit_to_booking', { p_booking_id: b, p_amount: 99999 })
+
+    const { data } = await admin.from('credits')
+      .select('amount, status').eq('user_id', d.id).eq('source', 'admin_charge')
+    expect(data).toEqual([{ amount: -1200, status: 'open' }])
+  })
+
+  it('spends nothing when the charge swallows the whole pool', async () => {
+    const d = await freshDiver()
+    await ledger(d, 500, 'manual')
+    await ledger(d, -1200, 'admin_charge')
+    const b = await bookingFor(d, 5000)
+
+    const asAdmin = await userClient(adminUser.email, adminUser.password)
+    const { data } = await asAdmin.rpc('apply_credit_to_booking', { p_booking_id: b, p_amount: 99999 })
+    expect(Number(data)).toBe(0)
+  })
+})
