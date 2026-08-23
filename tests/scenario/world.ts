@@ -157,7 +157,7 @@ export class World {
   async pay(args: { bookingId: string; diver: TestUser; amount: number }): Promise<this> {
     const { error } = await this.admin.from('payments').insert({
       booking_id: args.bookingId, user_id: args.diver.id,
-      amount: args.amount, status: 'paid', method: 'cash',
+      amount: args.amount, status: 'paid', method: 'cash', reference: `R-${args.amount}`,
     } as never)
     if (error) throw new Error(`world.pay: ${error.message}`)
     return this
@@ -295,7 +295,7 @@ export class World {
   async payForGroup(args: { lead: TestUser; amount: number; groupId: string }): Promise<number> {
     const db = await this.as(this.adminUser)
     const { data, error } = await db.rpc('record_group_payment', {
-      p_lead: args.lead.id, p_amount: args.amount, p_group_id: args.groupId,
+      p_lead: args.lead.id, p_amount: args.amount, p_reference: 'GRP-1', p_group_id: args.groupId,
     })
     if (error) throw new Error(`world.payForGroup: ${error.message}`)
     return Number(data)

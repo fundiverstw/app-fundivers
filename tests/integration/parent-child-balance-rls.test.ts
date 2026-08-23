@@ -50,7 +50,7 @@ beforeAll(async () => {
 
   // The four balance inputs: a total (above), a payment, a discount, a credit.
   const { error: payErr } = await admin.from('payments').insert({
-    booking_id: bookingId, user_id: child.id, amount: 1000, status: 'paid', method: 'cash',
+    booking_id: bookingId, user_id: child.id, amount: 1000, status: 'paid', method: 'cash', reference: 'R-1000',
   })
   if (payErr) throw payErr
 

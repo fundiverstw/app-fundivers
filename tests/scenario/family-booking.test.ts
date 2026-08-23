@@ -128,7 +128,7 @@ describe('scenario: who is allowed to pay for whom', () => {
 
     const asParent = await w.as(parent)
     const { error } = await asParent.rpc('record_group_payment', {
-      p_lead: parent.id, p_amount: 4000, p_group_id: groupId,
+      p_lead: parent.id, p_amount: 4000, p_reference: 'GRP-1', p_group_id: groupId,
     })
     expect(error).not.toBeNull()
     // And no money moved.

@@ -66,6 +66,7 @@ async function makePayment(
 ): Promise<void> {
   const { error } = await admin.from('payments').insert({
     user_id: userId, booking_id: bookingId, amount, status, method, note: 'test payment',
+    reference: method === 'account_credit' ? null : `R-${amount}`,
   })
   if (error) throw new Error(`makePayment failed: ${error.message}`)
 }

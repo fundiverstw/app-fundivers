@@ -40,7 +40,7 @@ function money(n: number, cur: string): string {
 
 const TEXT_LINK_MUTED = 'text-reef-300/80 hover:text-reef-200'
 
-// Per-kind label + colour tone. Labels are localized; tones map to the
+// Per-kind label + color tone. Labels are localized; tones map to the
 // dark-glass text tokens (green = money in, amber = owes more / returned,
 // muted = neutral/reversed).
 const KIND_META: Record<AuditKind, { label: string; tone: string }> = {
@@ -94,7 +94,8 @@ function EntryRow({ entry, currency, actorName }: EntryRowProps) {
       <div className={`text-xs ${TEXT_SUBTLE} mt-0.5`}>
         {format(shopZoned(new Date(entry.at)), 'yyyy-MM-dd HH:mm')}
         {entry.method ? ` · ${entry.method}` : ''}
-        {entry.actorId ? ` · ${au.byActor(actorName(entry.actorId))}` : ''}
+        {entry.actorId ? ` · ${t.admin.actor.by(actorName(entry.actorId))}` : ''}
+        {entry.reference ? ` · ${t.admin.bookingPayments.refShort(entry.reference)}` : ''}
       </div>
       {entry.note && <div className={`text-xs ${TEXT_MUTED} mt-1`}>{entry.note}</div>}
       {entry.changed && entry.changed.length > 0 && (
@@ -289,7 +290,8 @@ export function AdminAuditsPage() {
     [profiles],
   )
   const actorName = (id: string | null): string =>
-    (id && nameById.get(id)) || (id ? `${au.unknownActor} (${id.slice(0, 8)})` : au.unknownActor)
+    (id && nameById.get(id))
+    || (id ? t.admin.actor.unknown(id.slice(0, 8)) : t.admin.actor.system)
 
   // Bumped on every select() so a slower earlier fetch can't overwrite a later
   // selection's trail (click diver A then B quickly, A resolves last).

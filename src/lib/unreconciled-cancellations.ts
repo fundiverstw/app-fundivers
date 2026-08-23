@@ -43,6 +43,13 @@ export interface UnreconciledCancellation {
   /** Net paid still sitting on the booking (paid − refunded). Always > 0. */
   amount: number
   currency: string
+  /** Who cancelled it and when (`bookings.cancelled_at` / `cancelled_by`).
+   *  Null on cancellations older than 20260823120000 that the admin audit log
+   *  never witnessed. Shown on the holding list because the person who
+   *  stranded the money is usually the person who can say what happened to
+   *  it. */
+  cancelledAt: string | null
+  cancelledBy: string | null
 }
 
 type ProfileLite = { id: string; name: string | null; nickname: string | null }
@@ -58,7 +65,7 @@ type ProfileLite = { id: string; name: string | null; nickname: string | null }
  * never disagree.
  */
 export function selectUnreconciled(input: {
-  bookings: Array<Pick<Booking, 'id' | 'user_id' | 'event_id' | 'status' | 'cancellation_settled_at'>>
+  bookings: Array<Pick<Booking, 'id' | 'user_id' | 'event_id' | 'status' | 'cancellation_settled_at' | 'cancelled_at' | 'cancelled_by'>>
   payments: Array<Pick<Payment, 'booking_id' | 'amount' | 'status'>>
   credits: Array<Pick<Credit, 'booking_id' | 'source'>>
   events: Map<string, AppEvent>
@@ -88,6 +95,8 @@ export function selectUnreconciled(input: {
       eventTitle: (b.event_id ? input.events.get(b.event_id)?.title : null) ?? input.eventFallback,
       amount: paidByBooking.get(b.id)!,
       currency: siteConfig.locale.currency,
+      cancelledAt: b.cancelled_at,
+      cancelledBy: b.cancelled_by,
     }))
     .sort((a, b) => b.amount - a.amount)
 }
@@ -98,7 +107,7 @@ export async function fetchUnreconciledCancellations(labels: {
 }): Promise<UnreconciledCancellation[]> {
   const { data: bookings, error } = await supabase
     .from('bookings')
-    .select('id, user_id, event_id, status, cancellation_settled_at')
+    .select('id, user_id, event_id, status, cancellation_settled_at, cancelled_at, cancelled_by')
     .eq('status', 'cancelled')
     .is('cancellation_settled_at', null)
   if (error) throw error
@@ -134,7 +143,13 @@ export async function recordCancellationRefund(args: {
   row: UnreconciledCancellation
   recordedBy: string
   note: string
+  /** The transfer that sent the money back. A refund is the one movement a
+   *  diver is most likely to query, so it is the last place to accept "trust
+   *  me" -- `payments_reference_required` rejects the row without it. */
+  reference: string
 }): Promise<void> {
+  const reference = args.reference.trim()
+  if (!reference) throw new Error('a refund reference is required')
   const { error } = await supabase.from('payments').insert({
     user_id:     args.row.userId,
     booking_id:  args.row.bookingId,
@@ -142,6 +157,7 @@ export async function recordCancellationRefund(args: {
     currency:    args.row.currency,
     status:      'refunded',
     note:        args.note,
+    reference,
     recorded_by: args.recordedBy,
   })
   if (error) throw error

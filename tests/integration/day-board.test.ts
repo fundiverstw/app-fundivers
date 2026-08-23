@@ -89,6 +89,7 @@ beforeAll(async () => {
     amount: 1000,
     method: 'cash',
     status: 'paid',
+    reference: 'R-1000',
   } as never)
   if (paymentError) throw new Error(`payment insert failed: ${paymentError.message}`)
 

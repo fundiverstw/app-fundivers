@@ -488,7 +488,7 @@ export interface Database {
       // booking and confirms pending siblings whose deposit is now covered.
       // Returns the amount actually applied (clamped to outstanding balances).
       record_group_payment: {
-        Args: { p_lead: string; p_amount: number; p_group_id?: string | null }
+        Args: { p_lead: string; p_amount: number; p_reference: string; p_group_id?: string | null }
         Returns: number
       }
       // Defined in 20260603040000_signup_throttling_and_orphan_log.sql.
@@ -729,6 +729,14 @@ export interface Database {
           cancellation_settled_at: string | null
           cancellation_settled_by: string | null
           cancellation_settled_note: string | null
+          /** When this booking moved to cancelled, and whose session did it.
+           *  Both stamped by `trg_bookings_stamp_cancellation`
+           *  (20260823120000) from the status transition itself, so a caller
+           *  cannot forge either. Null on cancellations the admin audit log
+           *  never witnessed — a diver cancelling their own spot before that
+           *  migration, or any service-role write. */
+          cancelled_at: string | null
+          cancelled_by: string | null
           /** Shared id linking all bookings submitted together by a parent
            *  as a group registration. Null on solo registrations. Added in
            *  20260514030000_parent_child_accounts.sql; populated by the
@@ -836,6 +844,12 @@ export interface Database {
           status: 'pending' | 'paid' | 'refunded' | 'voided'
           method: string | null
           note: string | null
+          /** Receipt / bank transfer / online payment transaction id this row
+           *  is evidence of. Required on money-moving rows by
+           *  `payments_reference_required` (20260823100000); null on
+           *  `account_credit` rows, which move no money, and on every row
+           *  recorded before that constraint existed. */
+          reference: string | null
           recorded_by: string | null
         }
         Insert: {
@@ -848,6 +862,7 @@ export interface Database {
           status?: 'pending' | 'paid' | 'refunded' | 'voided'
           method?: string | null
           note?: string | null
+          reference?: string | null
           recorded_by?: string | null
         }
         Update: {
@@ -859,6 +874,7 @@ export interface Database {
           status?: 'pending' | 'paid' | 'refunded' | 'voided'
           method?: string | null
           note?: string | null
+          reference?: string | null
           recorded_by?: string | null
         }
         Relationships: []
@@ -876,6 +892,10 @@ export interface Database {
           created_by: string | null
           settled_at: string | null
           settled_note: string | null
+          /** Whose session closed this credit. Stamped by
+           *  `trg_credits_stamp_settled_by` (20260823110000) — never written
+           *  by callers, and null on credits settled before it existed. */
+          settled_by: string | null
           /** Where the credit came from. Only the two *_cancellation* / *_return
            *  values mean "this booking's money has been given back", and only
            *  those suppress a further automatic refund. */
@@ -893,6 +913,7 @@ export interface Database {
           created_by?: string | null
           settled_at?: string | null
           settled_note?: string | null
+          settled_by?: string | null
           source?: CreditSource
         }
         Update: {
@@ -906,6 +927,7 @@ export interface Database {
           created_by?: string | null
           settled_at?: string | null
           settled_note?: string | null
+          settled_by?: string | null
           source?: CreditSource
         }
         Relationships: []

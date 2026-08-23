@@ -138,7 +138,7 @@ describe('payments RLS', () => {
     // Seed a payment via service role (no app path writes payments today).
     const { data: booking } = await admin.from('bookings').select('id').eq('user_id', diverA.id).single()
     await admin.from('payments').insert({
-      user_id: diverA.id, booking_id: booking!.id, amount: 1000, currency: 'TWD', status: 'paid',
+      user_id: diverA.id, booking_id: booking!.id, amount: 1000, currency: 'TWD', status: 'paid', reference: 'R-1000',
     })
 
     const diverSb = await userClient(diverA.email, diverA.password)

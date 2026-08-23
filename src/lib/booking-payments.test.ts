@@ -173,7 +173,7 @@ describe('recordPayment', () => {
       details: { deposit: 5000, total: 10000, payment_method: 'bank_transfer' },
     }
     const { newStatus } = await recordPayment({
-      booking, existingPayments: [], amount: 5000, note: 'Deposit', recordedBy: 'admin',
+      booking, existingPayments: [], amount: 5000, note: 'Deposit', reference: 'TXN-1', recordedBy: 'admin',
     })
     expect(newStatus).toBe('confirmed')
     expect(bookingsUpdate).toHaveBeenCalledWith({ status: 'confirmed' })
@@ -189,7 +189,7 @@ describe('recordPayment', () => {
       details: { deposit: 5000, payment_method: 'bank_transfer' },
     }
     const { newStatus } = await recordPayment({
-      booking, existingPayments: [prior], amount: 2000, note: 'Balance', recordedBy: 'admin',
+      booking, existingPayments: [prior], amount: 2000, note: 'Balance', reference: 'TXN-1', recordedBy: 'admin',
     })
     expect(newStatus).toBe('confirmed')
   })
@@ -203,7 +203,7 @@ describe('recordPayment', () => {
       details: { deposit: 5000, payment_method: 'bank_transfer' },
     }
     const { newStatus } = await recordPayment({
-      booking, existingPayments: [], amount: 2000, note: 'Partial', recordedBy: 'admin',
+      booking, existingPayments: [], amount: 2000, note: 'Partial', reference: 'TXN-1', recordedBy: 'admin',
     })
     expect(newStatus).toBe('pending')
     expect(bookingsUpdate).not.toHaveBeenCalled()
@@ -221,7 +221,7 @@ describe('recordPayment', () => {
       details: { total: 2600, deposit: 3000, payment_method: 'cash' },
     }
     const { newStatus } = await recordPayment({
-      booking, existingPayments: [], amount: 2600, note: 'Balance', recordedBy: 'admin',
+      booking, existingPayments: [], amount: 2600, note: 'Balance', reference: 'TXN-1', recordedBy: 'admin',
     })
     expect(newStatus).toBe('confirmed')
   })
@@ -237,7 +237,7 @@ describe('recordPayment', () => {
       details: { deposit: 5000, payment_method: 'cash' },
     }
     const { newStatus } = await recordPayment({
-      booking, existingPayments: [], amount: 10, note: 'Token', recordedBy: 'admin',
+      booking, existingPayments: [], amount: 10, note: 'Token', reference: 'TXN-1', recordedBy: 'admin',
     })
     expect(newStatus).toBe('pending')
   })
@@ -252,7 +252,7 @@ describe('recordPayment', () => {
       details: { deposit: 5000, payment_method: 'bank_transfer' },
     }
     const { newStatus } = await recordPayment({
-      booking, existingPayments: [voided], amount: 2000, note: 'Partial', recordedBy: 'admin',
+      booking, existingPayments: [voided], amount: 2000, note: 'Partial', reference: 'TXN-1', recordedBy: 'admin',
     })
     expect(newStatus).toBe('pending')
     expect(bookingsUpdate).not.toHaveBeenCalled()
@@ -267,7 +267,7 @@ describe('recordPayment', () => {
       details: { deposit: 0, payment_method: 'cash' },
     }
     const { newStatus } = await recordPayment({
-      booking, existingPayments: [], amount: 1000, note: 'Full', recordedBy: 'admin',
+      booking, existingPayments: [], amount: 1000, note: 'Full', reference: 'TXN-1', recordedBy: 'admin',
     })
     expect(newStatus).toBe('confirmed')
   })
@@ -281,7 +281,7 @@ describe('recordPayment', () => {
       details: { deposit: 5000, payment_method: 'bank_transfer' },
     }
     const { newStatus } = await recordPayment({
-      booking, existingPayments: [], amount: 5000, note: 'Extra', recordedBy: 'admin',
+      booking, existingPayments: [], amount: 5000, note: 'Extra', reference: 'TXN-1', recordedBy: 'admin',
     })
     expect(newStatus).toBe('confirmed')
     expect(bookingsUpdate).not.toHaveBeenCalled()
@@ -295,10 +295,10 @@ describe('recordPayment', () => {
       id: 'b1', user_id: 'u1', status: 'pending',
       details: { deposit: 5000, payment_method: 'bank_transfer' },
     }
-    await recordPayment({ booking, existingPayments: [], amount: 2000, note: 'Partial', recordedBy: 'admin-9' })
+    await recordPayment({ booking, existingPayments: [], amount: 2000, note: 'Partial', reference: 'TXN-1', recordedBy: 'admin-9' })
     expect(insert).toHaveBeenCalledWith({
       user_id: 'u1', booking_id: 'b1', amount: 2000, status: 'paid',
-      method: 'bank_transfer', note: 'Partial', recorded_by: 'admin-9',
+      method: 'bank_transfer', note: 'Partial', reference: 'TXN-1', recorded_by: 'admin-9',
     })
   })
 
@@ -309,7 +309,7 @@ describe('recordPayment', () => {
     const booking: Pick<Booking, 'id' | 'user_id' | 'status' | 'details'> = {
       id: 'b1', user_id: 'u1', status: 'pending', details: { deposit: 5000 },
     }
-    await recordPayment({ booking, existingPayments: [], amount: 2000, note: 'Partial', recordedBy: 'admin' })
+    await recordPayment({ booking, existingPayments: [], amount: 2000, note: 'Partial', reference: 'TXN-1', recordedBy: 'admin' })
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({ method: null }))
   })
 
@@ -319,7 +319,7 @@ describe('recordPayment', () => {
 
     await expect(recordPayment({
       booking: { id: 'b1', user_id: 'u1', status: 'pending', details: { deposit: 5000 } },
-      existingPayments: [], amount: 2000, note: 'x', recordedBy: 'admin',
+      existingPayments: [], amount: 2000, note: 'x', reference: 'TXN-1', recordedBy: 'admin',
     })).rejects.toBeTruthy()
   })
 
@@ -332,10 +332,23 @@ describe('recordPayment', () => {
       details: { deposit: 5000, payment_method: 'bank_transfer' },
     }
     const { payment, newStatus } = await recordPayment({
-      booking, existingPayments: [], amount: 5000, note: 'Deposit', recordedBy: 'admin',
+      booking, existingPayments: [], amount: 5000, note: 'Deposit', reference: 'TXN-1', recordedBy: 'admin',
     })
     expect(newStatus).toBe('pending')
     expect(payment.id).toBe('p-new')
+  })
+
+  it('refuses a blank reference before touching the database', async () => {
+    const { insert } = setupForRecord({ ...basePaid, id: 'p-new' })
+    const { recordPayment } = await import('./booking-payments')
+
+    const booking: Pick<Booking, 'id' | 'user_id' | 'status' | 'details'> = {
+      id: 'b1', user_id: 'u1', status: 'pending', details: { deposit: 1000, total: 3000 },
+    }
+    await expect(recordPayment({
+      booking, existingPayments: [], amount: 2000, note: 'Partial', reference: '   ', recordedBy: 'admin',
+    })).rejects.toThrow(/reference/)
+    expect(insert).not.toHaveBeenCalled()
   })
 })
 
@@ -344,10 +357,10 @@ describe('recordGroupPayment', () => {
     rpc.mockResolvedValue({ data: 6000, error: null })
     const { recordGroupPayment } = await import('./booking-payments')
 
-    const applied = await recordGroupPayment({ leadId: 'lead-1', amount: 6000, groupId: 'g1' })
+    const applied = await recordGroupPayment({ leadId: 'lead-1', amount: 6000, reference: 'TXN-9', groupId: 'g1' })
     expect(applied).toBe(6000)
     expect(rpc).toHaveBeenCalledWith('record_group_payment', {
-      p_lead: 'lead-1', p_amount: 6000, p_group_id: 'g1',
+      p_lead: 'lead-1', p_amount: 6000, p_reference: 'TXN-9', p_group_id: 'g1',
     })
   })
 
@@ -355,15 +368,15 @@ describe('recordGroupPayment', () => {
     rpc.mockResolvedValue({ data: null, error: null })
     const { recordGroupPayment } = await import('./booking-payments')
 
-    expect(await recordGroupPayment({ leadId: 'lead-1', amount: 1000 })).toBe(0)
+    expect(await recordGroupPayment({ leadId: 'lead-1', amount: 1000, reference: 'TXN-9' })).toBe(0)
     expect(rpc).toHaveBeenCalledWith('record_group_payment', {
-      p_lead: 'lead-1', p_amount: 1000, p_group_id: null,
+      p_lead: 'lead-1', p_amount: 1000, p_reference: 'TXN-9', p_group_id: null,
     })
   })
 
   it('throws when the RPC returns an error', async () => {
     rpc.mockResolvedValue({ data: null, error: { message: 'admin only' } })
     const { recordGroupPayment } = await import('./booking-payments')
-    await expect(recordGroupPayment({ leadId: 'lead-1', amount: 1000 })).rejects.toBeTruthy()
+    await expect(recordGroupPayment({ leadId: 'lead-1', amount: 1000, reference: 'TXN-9' })).rejects.toBeTruthy()
   })
 })

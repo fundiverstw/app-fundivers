@@ -29,9 +29,14 @@ const bp = t.admin.bookingPayments
  */
 export function BookingPaymentsBlock({
   payments, owed, paid, credit = 0, pending, cancelled, feeKept = 0, readOnly, onRecord, onVoid, onMarkDepositPaid,
-  charges, amendments, currency, payerNote, creditOwnerName,
+  charges, amendments, currency, payerNote, creditOwnerName, actorName,
+  cancelledAt, cancelledBy,
 }: {
   payments: Payment[]
+  /** Resolves `recorded_by` to a display name. Optional -- omitted on
+   *  surfaces that have not fetched admin profiles -- and when omitted the
+   *  attribution line is simply left off rather than showing a raw uuid. */
+  actorName?: (id: string | null) => string
   owed: number
   paid: number
   /** When this booking is part of a lead-paid group, a short note naming the
@@ -57,6 +62,13 @@ export function BookingPaymentsBlock({
   /** The booking is still 'pending' — gates the "Mark deposit paid" button. */
   pending: boolean
   cancelled: boolean
+  /** When the booking was cancelled and whose session did it
+   *  (`bookings.cancelled_at` / `cancelled_by`, 20260823120000). Shown on a
+   *  cancelled booking so the largest act anyone can perform on a diver's
+   *  money is not the one act with no name against it. Null on cancellations
+   *  the schema never witnessed. */
+  cancelledAt?: string | null
+  cancelledBy?: string | null
   /** Money the shop kept on this cancelled booking, once an admin has said so
    *  (a cancellation fee). Shown outright: withholding part of what a diver
    *  paid should never be something only the ledger knows.
@@ -66,7 +78,7 @@ export function BookingPaymentsBlock({
    *  so a later refund keeps the two in step instead of contradicting. */
   feeKept?: number
   readOnly: boolean
-  onRecord: (amount: number, note: string) => Promise<void>
+  onRecord: (amount: number, note: string, reference: string) => Promise<void>
   /** Revert a paid payment that was recorded by mistake. Optional — when
    *  omitted, the per-row Void button is hidden (e.g. on read-only or
    *  diver-facing surfaces). The caller owns the supabase write. */
@@ -77,6 +89,7 @@ export function BookingPaymentsBlock({
 }) {
   const [amountStr, setAmountStr] = useState('')
   const [note, setNote] = useState('')
+  const [reference, setReference] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [voidingId, setVoidingId] = useState<string | null>(null)
@@ -95,13 +108,14 @@ export function BookingPaymentsBlock({
     }
   }
 
-  async function submit(amount: number, defaultNote: string) {
+  async function submit(amount: number, defaultNote: string, ref: string) {
     setError(null)
     setSubmitting(true)
     try {
-      await onRecord(amount, defaultNote)
+      await onRecord(amount, defaultNote, ref)
       setAmountStr('')
       setNote('')
+      setReference('')
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -116,7 +130,13 @@ export function BookingPaymentsBlock({
       setError(bp.amountMustBePositive)
       return
     }
-    await submit(amount, note.trim() || bp.paymentFallback)
+    // Checked here as well as in the database so the admin gets a sentence
+    // instead of a constraint violation, and gets it before the round trip.
+    if (!reference.trim()) {
+      setError(bp.referenceRequired)
+      return
+    }
+    await submit(amount, note.trim() || bp.paymentFallback, reference.trim())
   }
 
   async function handleVoid(p: Payment) {
@@ -183,6 +203,12 @@ export function BookingPaymentsBlock({
                   : bp.shopOwesDiver(currency ?? siteConfig.locale.currencyLabel, bal.amount.toLocaleString())}
               </p>
             )}
+            {cancelled && cancelledAt && (
+              <p className="text-brand-950 opacity-80">
+                {bp.cancelledOn(format(shopZoned(new Date(cancelledAt)), 'MMM d'))}
+                {actorName ? ` · ${t.admin.actor.by(actorName(cancelledBy ?? null))}` : ''}
+              </p>
+            )}
             {feeKept > 0 && (
               <div className="flex justify-between text-amber-300">
                 <span className="font-medium">{t.bookings.cancellationFeeKept}</span>
@@ -208,6 +234,13 @@ export function BookingPaymentsBlock({
                   {format(shopZoned(new Date(p.created_at)), 'MMM d')} · {p.note ?? bp.paymentFallback}
                   {p.method && <span className="opacity-70"> ({p.method.replace('_', ' ')})</span>}
                   {p.status !== 'paid' && <span className="text-red-600"> · {p.status}</span>}
+                  {(p.reference || actorName) && (
+                    <span className="block opacity-70 font-normal break-words">
+                      {p.reference ? bp.refShort(p.reference) : ''}
+                      {p.reference && actorName ? ' · ' : ''}
+                      {actorName ? t.admin.actor.by(actorName(p.recorded_by)) : ''}
+                    </span>
+                  )}
                 </span>
                 {/* Void is only meaningful on rows that *are* counted as paid
                     today. Refunded / voided / pending rows show no button. */}
@@ -263,6 +296,15 @@ export function BookingPaymentsBlock({
                 {submitting ? bp.recording : bp.recordPayment}
               </button>
             </div>
+            <input
+              type="text"
+              value={reference}
+              onChange={e => setReference(e.target.value)}
+              placeholder={bp.referencePlaceholder}
+              maxLength={200}
+              aria-label={bp.reference}
+              className="w-full bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
+            />
             <input
               type="text"
               value={note}

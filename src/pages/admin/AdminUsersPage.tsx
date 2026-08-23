@@ -22,6 +22,8 @@ import { profileGapLabels } from '../../lib/profile-completeness'
 import { personName } from '../../lib/names'
 import { fetchCreditsForUser, openCreditForBooking, openCreditBalance, diverCreditBalance, createCredit, settleCredit, reopenCredit, applyCreditToBooking } from '../../lib/credits'
 import { netPaid, netPaidByBooking } from '../../lib/payments'
+import { buildDiverStatement, type DiverStatement, type StatementLine } from '../../lib/diver-statement'
+import { fetchActorNames, actorLabel, type ActorNames } from '../../lib/actor-names'
 import { issueTempPassword } from '../../lib/admin-password'
 import { ProfileForm } from '../ProfilePage'
 import { DiverNotes } from '../../components/admin/DiverNotes'
@@ -40,8 +42,15 @@ interface UserExtras {
   payments: Payment[]
   amendments: Map<string, BookingAmendment[]>
   credits: Credit[]
-  paidSum: number
-  pendingSum: number
+  /** Running-balance history: every charge, payment, credit and cancellation
+   *  in order, each with the change it made and the balance after it. */
+  statement: DiverStatement
+  /** Names for the admins behind those lines. */
+  actorNames: ActorNames
+  /** Spendable account credit -- what "Apply credit" can actually consume,
+   *  which is the statement balance floored per booking. Shown alongside the
+   *  statement's closing balance, not instead of it: they differ whenever an
+   *  active booking is still underpaid. */
   openCreditBalance: number
 }
 
@@ -152,22 +161,52 @@ export function AdminUsersPage() {
         charges: resolveCharges({ details: b.details as BookingDetails, event, ...catalog }),
       }
     })
-    const paidSum = netPaid(payments)
-    const pendingSum = payments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0)
+    const statement = buildDiverStatement({ bookings, payments, credits, amendmentsByBooking: amendments })
+    const actorNames = await fetchActorNames([
+      ...statement.lines.map(l => l.actorId),
+      ...bookings.map(b => b.cancellation_settled_by),
+    ])
 
     return {
       bookings: hydrated,
       payments,
       amendments,
       credits,
-      paidSum,
-      pendingSum,
+      statement,
+      actorNames,
       // Account credit = awarded credits + overpayments across active bookings.
       openCreditBalance: diverCreditBalance(credits, activeCreditRows(hydrated, payments, amendments)),
     }
   }
 
-  async function handleRecordPayment(userId: string, bookingId: string, amount: number, note: string) {
+  // Every optimistic update re-derives the same four things from the arrays
+  // it just changed, because they are all views of the same data: the running
+  // statement, the spendable-credit figure, and the actor names the statement
+  // is annotated with. Patching them one at a time is how the old code let a
+  // recorded payment update `paidSum` and leave the credit figure stale.
+  //
+  // The acting admin is folded into the name map: the row they just wrote is
+  // attributed to them, and they are not necessarily already in there.
+  function withDerived(
+    cur: UserExtras,
+    changed: Partial<Pick<UserExtras, 'bookings' | 'payments' | 'credits' | 'amendments'>>,
+  ): UserExtras {
+    const bookings   = changed.bookings   ?? cur.bookings
+    const payments   = changed.payments   ?? cur.payments
+    const credits    = changed.credits    ?? cur.credits
+    const amendments = changed.amendments ?? cur.amendments
+    const actorNames = new Map(cur.actorNames)
+    if (profile?.id) actorNames.set(profile.id, personName(profile.name, profile.nickname))
+    return {
+      ...cur,
+      bookings, payments, credits, amendments,
+      statement: buildDiverStatement({ bookings, payments, credits, amendmentsByBooking: amendments }),
+      actorNames,
+      openCreditBalance: diverCreditBalance(credits, activeCreditRows(bookings, payments, amendments)),
+    }
+  }
+
+  async function handleRecordPayment(userId: string, bookingId: string, amount: number, note: string, reference: string) {
     if (!profile?.id) return
     const extras = extrasCache.get(userId)
     if (!extras) return
@@ -179,7 +218,7 @@ export function AdminUsersPage() {
       const { payment, newStatus } = await recordPayment({
         booking,
         existingPayments: existingForBooking,
-        amount, note,
+        amount, note, reference,
         recordedBy: profile.id,
         owed: Number((booking.details as { total?: number } | null)?.total ?? 0)
           + amendmentsDelta(extras.amendments.get(bookingId) ?? []),
@@ -192,16 +231,10 @@ export function AdminUsersPage() {
         const updatedBookings = cur.bookings.map(b =>
           b.id === bookingId ? { ...b, status: newStatus } : b
         )
-        const updatedPayments = [payment, ...cur.payments]
-        next.set(userId, {
-          ...cur,
+        next.set(userId, withDerived(cur, {
           bookings: updatedBookings,
-          payments: updatedPayments,
-          paidSum: netPaid(updatedPayments),
-          pendingSum: updatedPayments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0),
-          // A payment change can push the diver into/out of overpayment, which counts as credit.
-          openCreditBalance: diverCreditBalance(cur.credits, activeCreditRows(updatedBookings, updatedPayments, cur.amendments)),
-        })
+          payments: [payment, ...cur.payments],
+        }))
         return next
       })
       toast.success(promoted ? us.paymentRecordedConfirmed : us.paymentRecorded)
@@ -224,10 +257,9 @@ export function AdminUsersPage() {
         const next = new Map(prev)
         const cur = next.get(userId)
         if (!cur) return prev
-        next.set(userId, {
-          ...cur,
-          bookings: cur.bookings.map(b => b.id === bookingId ? { ...b, status: 'confirmed' } : b),
-        })
+        next.set(userId, withDerived(cur, {
+          bookings: cur.bookings.map(b => b.id === bookingId ? { ...b, status: 'confirmed' as const } : b),
+        }))
         return next
       })
       toast.success(us.depositMarked)
@@ -263,12 +295,7 @@ export function AdminUsersPage() {
         const next = new Map(prev)
         const cur = next.get(userId)
         if (!cur) return prev
-        const updatedCredits = [credit, ...cur.credits]
-        next.set(userId, {
-          ...cur,
-          credits: updatedCredits,
-          openCreditBalance: diverCreditBalance(updatedCredits, activeCreditRows(cur.bookings, cur.payments, cur.amendments)),
-        })
+        next.set(userId, withDerived(cur, { credits: [credit, ...cur.credits] }))
         return next
       })
       toast.success(us.creditIssued(amount.toLocaleString()))
@@ -285,12 +312,9 @@ export function AdminUsersPage() {
         const next = new Map(prev)
         const cur = next.get(userId)
         if (!cur) return prev
-        const updatedCredits = cur.credits.map(c => c.id === credit.id ? credit : c)
-        next.set(userId, {
-          ...cur,
-          credits: updatedCredits,
-          openCreditBalance: diverCreditBalance(updatedCredits, activeCreditRows(cur.bookings, cur.payments, cur.amendments)),
-        })
+        next.set(userId, withDerived(cur, {
+          credits: cur.credits.map(c => c.id === credit.id ? credit : c),
+        }))
         return next
       })
       toast.success(us.creditSettled)
@@ -323,12 +347,9 @@ export function AdminUsersPage() {
         const next = new Map(prev)
         const cur = next.get(userId)
         if (!cur) return prev
-        const updatedCredits = cur.credits.map(c => c.id === credit.id ? credit : c)
-        next.set(userId, {
-          ...cur,
-          credits: updatedCredits,
-          openCreditBalance: diverCreditBalance(updatedCredits, activeCreditRows(cur.bookings, cur.payments, cur.amendments)),
-        })
+        next.set(userId, withDerived(cur, {
+          credits: cur.credits.map(c => c.id === credit.id ? credit : c),
+        }))
         return next
       })
       toast.success(us.creditReopened)
@@ -415,16 +436,10 @@ export function AdminUsersPage() {
         const updatedBookings = cur.bookings.map(b =>
           b.id === bookingId ? { ...b, status: newStatus } : b
         )
-        const updatedPayments = cur.payments.map(p => p.id === payment.id ? payment : p)
-        next.set(userId, {
-          ...cur,
+        next.set(userId, withDerived(cur, {
           bookings: updatedBookings,
-          payments: updatedPayments,
-          paidSum: netPaid(updatedPayments),
-          pendingSum: updatedPayments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0),
-          // A payment change can push the diver into/out of overpayment, which counts as credit.
-          openCreditBalance: diverCreditBalance(cur.credits, activeCreditRows(updatedBookings, updatedPayments, cur.amendments)),
-        })
+          payments: cur.payments.map(p => p.id === payment.id ? payment : p),
+        }))
         return next
       })
       toast.success(reverted ? us.paymentVoidedReverted : us.paymentVoided)
@@ -479,7 +494,7 @@ export function AdminUsersPage() {
             onEdit={() => setEditingId(u.id)}
             onCancelEdit={() => setEditingId(null)}
             onProfileSaved={() => { refetchUser(u.id); setEditingId(null) }}
-            onRecordPayment={(bookingId, amount, note) => handleRecordPayment(u.id, bookingId, amount, note)}
+            onRecordPayment={(bookingId, amount, note, reference) => handleRecordPayment(u.id, bookingId, amount, note, reference)}
             onVoidPayment={(bookingId, paymentId) => handleVoidPayment(u.id, bookingId, paymentId)}
             onMarkDepositPaid={(bookingId) => handleMarkDepositPaid(u.id, bookingId)}
             onCreateCredit={(amount, reason, bookingId) => handleCreateCredit(u.id, amount, reason, bookingId)}
@@ -519,7 +534,7 @@ function UserCard({
   onEdit: () => void
   onCancelEdit: () => void
   onProfileSaved: () => void
-  onRecordPayment: (bookingId: string, amount: number, note: string) => Promise<void>
+  onRecordPayment: (bookingId: string, amount: number, note: string, reference: string) => Promise<void>
   onVoidPayment: (bookingId: string, paymentId: string) => Promise<void>
   onMarkDepositPaid: (bookingId: string) => Promise<void>
   onCreateCredit: (amount: number, reason: string, bookingId: string | null) => Promise<void>
@@ -805,7 +820,7 @@ function ProfileDetails({ user }: { user: Profile }) {
 
 function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid, onCreateCredit, onApplyCredit, onSettleCredit, onReopenCredit, isAdmin }: {
   extras: UserExtras
-  onRecordPayment: (bookingId: string, amount: number, note: string) => Promise<void>
+  onRecordPayment: (bookingId: string, amount: number, note: string, reference: string) => Promise<void>
   onVoidPayment: (bookingId: string, paymentId: string) => Promise<void>
   onMarkDepositPaid: (bookingId: string) => Promise<void>
   onCreateCredit: (amount: number, reason: string, bookingId: string | null) => Promise<void>
@@ -866,7 +881,8 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
                     pending={b.status === 'pending'}
                     cancelled={false}
                     readOnly={!isAdmin}
-                    onRecord={(amount, note) => onRecordPayment(b.id, amount, note)}
+                    actorName={(id: string | null) => actorLabel(extras.actorNames, id, t.admin.actor)}
+                    onRecord={(amount, note, reference) => onRecordPayment(b.id, amount, note, reference)}
                     onVoid={(paymentId) => onVoidPayment(b.id, paymentId)}
                     onMarkDepositPaid={() => onMarkDepositPaid(b.id)}
                   />
@@ -877,11 +893,13 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
         )}
       </Section>
 
-      <Section title={us.secAccountCredits}>
-        <CreditsPanel
+      <Section title={us.secBalance} defaultOpen>
+        <BalancePanel
+          statement={extras.statement}
+          spendable={extras.openCreditBalance}
           credits={extras.credits}
-          openBalance={extras.openCreditBalance}
           bookings={extras.bookings}
+          actorNames={extras.actorNames}
           applyTargets={applyTargets}
           readOnly={!isAdmin}
           onCreate={onCreateCredit}
@@ -890,33 +908,37 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
           onReopen={onReopenCredit}
         />
       </Section>
-
-      <Section title={us.secTotals}>
-        <div className="flex justify-between text-xs">
-          <span className="text-brand-900 font-medium">{t.payments.paid}</span>
-          <span className="text-brand-900 font-semibold">{extras.paidSum.toLocaleString()}</span>
-        </div>
-        {extras.pendingSum > 0 && (
-          <div className="flex justify-between text-xs">
-            <span className="text-brand-900 font-medium">{us.totalsPending}</span>
-            <span className="text-red-600">{extras.pendingSum.toLocaleString()}</span>
-          </div>
-        )}
-        {extras.openCreditBalance > 0 && (
-          <div className="flex justify-between text-xs">
-            <span className="text-brand-900 font-medium">{us.openCreditOwed}</span>
-            <span className="text-emerald-700 font-semibold">{extras.openCreditBalance.toLocaleString()}</span>
-          </div>
-        )}
-      </Section>
     </div>
   )
 }
 
-function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, onCreate, onApply, onSettle, onReopen }: {
+const money = (n: number) => Math.abs(Math.round(n)).toLocaleString()
+const signed = (n: number) => `${n < 0 ? '-' : '+'}${money(n)}`
+
+/**
+ * Balance, and the history that produced it.
+ *
+ * These were two sections -- "Account credits" and "Totals across all
+ * bookings" -- which is why nobody could reconcile them: one showed credit
+ * owed, the other showed money paid, and the arithmetic tying them together
+ * existed nowhere on screen. One section now, read like a bank statement.
+ *
+ * TWO figures, deliberately, because they answer different questions:
+ *
+ *   Balance    where the diver stands overall. Free to be negative -- a diver
+ *              who owes money has a negative balance, and hiding that is what
+ *              made the old "Account credits: 0" so uninformative.
+ *   Spendable  what "Apply credit" can actually consume today. Floored per
+ *              booking, so a shortfall on one booking cannot be lent to
+ *              another. Only shown when it differs from the balance, which is
+ *              exactly when the difference matters.
+ */
+function BalancePanel({ statement, spendable, credits, bookings, actorNames, applyTargets, readOnly, onCreate, onApply, onSettle, onReopen }: {
+  statement: DiverStatement
+  spendable: number
   credits: Credit[]
-  openBalance: number
   bookings: Array<Booking & { event: AppEvent | null; charges: ChargeLine[] }>
+  actorNames: ActorNames
   applyTargets: Array<{ id: string; label: string; due: number }>
   readOnly: boolean
   onCreate: (amount: number, reason: string, bookingId: string | null) => Promise<void>
@@ -924,14 +946,184 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
   onSettle: (creditId: string, note: string) => Promise<void>
   onReopen: (creditId: string) => Promise<void>
 }) {
+  const { balance, totals } = statement
+  const state = balance > 0 ? 'credit' : balance < 0 ? 'owed' : 'settled'
+  const eventTitle = (bookingId: string | null): string | null =>
+    bookingId ? bookings.find(b => b.id === bookingId)?.event?.title ?? null : null
+
+  return (
+    <div className="text-xs space-y-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-brand-900 font-medium">
+          {state === 'credit' ? us.balanceCredit : state === 'owed' ? us.balanceOwed : us.balanceSettled}
+        </span>
+        <span className={`font-semibold text-sm tabular-nums ${
+          state === 'credit' ? 'text-emerald-700' : state === 'owed' ? 'text-red-600' : 'text-brand-900'
+        }`}>
+          {state === 'settled' ? '0' : money(balance)}
+        </span>
+      </div>
+      <p className="text-brand-950">{us.balanceExplainer}</p>
+
+      <dl className="grid grid-cols-3 gap-2 pt-1 border-t border-surface-200">
+        <div>
+          <dt className="text-brand-900 font-medium opacity-70">{us.totalCharged}</dt>
+          <dd className="text-brand-900 font-semibold tabular-nums">{money(totals.charged)}</dd>
+        </div>
+        <div>
+          <dt className="text-brand-900 font-medium opacity-70">{t.payments.paid}</dt>
+          <dd className="text-brand-900 font-semibold tabular-nums">{money(totals.paid)}</dd>
+        </div>
+        <div>
+          <dt className="text-brand-900 font-medium opacity-70">{us.totalOpenCredit}</dt>
+          <dd className="text-brand-900 font-semibold tabular-nums">{money(totals.openCredit)}</dd>
+        </div>
+      </dl>
+
+      {spendable !== balance && (
+        <div className="pt-1 border-t border-surface-200 space-y-0.5">
+          <div className="flex justify-between">
+            <span className="text-brand-900 font-medium">{us.spendableCredit}</span>
+            <span className="text-emerald-700 font-semibold tabular-nums">{money(spendable)}</span>
+          </div>
+          <p className="text-brand-950">{us.spendableNote}</p>
+        </div>
+      )}
+
+      <StatementList
+        lines={statement.lines}
+        credits={credits}
+        actorNames={actorNames}
+        eventTitle={eventTitle}
+        readOnly={readOnly}
+        onSettle={onSettle}
+        onReopen={onReopen}
+      />
+
+      <CreditsPanel
+        credits={credits}
+        spendable={spendable}
+        bookings={bookings}
+        applyTargets={applyTargets}
+        readOnly={readOnly}
+        onCreate={onCreate}
+        onApply={onApply}
+      />
+    </div>
+  )
+}
+
+const KIND_LABEL: Record<StatementLine['kind'], string> = us.statementKinds
+
+/** One statement line: what happened, who did it, the change, the balance
+ *  after. Settle / Re-open live on the credit lines themselves rather than in
+ *  a second list of the same credits further down the card. */
+function StatementList({ lines, credits, actorNames, eventTitle, readOnly, onSettle, onReopen }: {
+  lines: StatementLine[]
+  credits: Credit[]
+  actorNames: ActorNames
+  eventTitle: (bookingId: string | null) => string | null
+  readOnly: boolean
+  onSettle: (creditId: string, note: string) => Promise<void>
+  onReopen: (creditId: string) => Promise<void>
+}) {
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  async function handleSettle(c: Credit) {
+    const note = window.prompt(us.settlePrompt(Number(c.amount).toLocaleString(), c.reason), '')
+    if (note === null) return
+    setBusyId(c.id)
+    try { await onSettle(c.id, note.trim()) } finally { setBusyId(null) }
+  }
+
+  async function handleReopen(c: Credit) {
+    if (!window.confirm(us.reopenConfirm(Number(c.amount).toLocaleString(), c.reason))) return
+    setBusyId(c.id)
+    try { await onReopen(c.id) } finally { setBusyId(null) }
+  }
+
+  if (lines.length === 0) {
+    return <p className="text-brand-950 font-medium italic pt-1 border-t border-surface-200">{us.statementEmpty}</p>
+  }
+
+  return (
+    <div className="pt-1 border-t border-surface-200 space-y-1">
+      <div className="flex justify-between text-brand-900 font-medium opacity-70">
+        <span>{us.statementHeading}</span>
+        <span className="flex gap-3">
+          <span className="w-16 text-right">{us.colChange}</span>
+          <span className="w-16 text-right">{us.colBalance}</span>
+        </span>
+      </div>
+      <ul className="space-y-1">
+        {[...lines].reverse().map(l => {
+          const credit = l.kind === 'credit_issued' || l.kind === 'credit_settled'
+            ? credits.find(c => c.id === l.sourceId) ?? null
+            : null
+          const title = eventTitle(l.bookingId)
+          return (
+            <li key={l.id} className="flex items-baseline justify-between gap-2">
+              <span className={`flex-1 min-w-0 ${l.inert ? 'text-brand-950 opacity-60' : 'text-brand-950 font-medium'}`}>
+                {format(shopZoned(new Date(l.at)), 'MMM d')} · {KIND_LABEL[l.kind]}
+                {title && <span className="opacity-70">{us.reEvent(title)}</span>}
+                {l.approximateDate && <span className="opacity-70"> · {us.approxDate}</span>}
+                <span className="block opacity-70 font-normal break-words">
+                  {l.note ? `${l.note} · ` : ''}
+                  {l.reference ? `${t.admin.bookingPayments.refShort(l.reference)} · ` : ''}
+                  {t.admin.actor.by(actorLabel(actorNames, l.actorId, t.admin.actor))}
+                </span>
+              </span>
+              {!readOnly && credit && credit.status === 'open' && (
+                <button type="button" disabled={busyId === credit.id} onClick={() => handleSettle(credit)} className={`shrink-0 ${BTN_XS_GHOST}`}>
+                  {busyId === credit.id ? '…' : us.settle}
+                </button>
+              )}
+              {!readOnly && credit && credit.status === 'settled' && l.kind === 'credit_settled' && (
+                <button type="button" disabled={busyId === credit.id} onClick={() => handleReopen(credit)} className={`shrink-0 ${BTN_XS_GHOST}`}>
+                  {busyId === credit.id ? '…' : us.reopen}
+                </button>
+              )}
+              <span className={`shrink-0 w-16 text-right tabular-nums font-semibold ${
+                l.inert ? 'text-brand-950 opacity-60' : l.delta < 0 ? 'text-red-600' : 'text-emerald-700'
+              }`}>
+                {l.inert ? us.noMoneyMoved : signed(l.delta)}
+              </span>
+              <span className={`shrink-0 w-16 text-right tabular-nums ${
+                l.balance < 0 ? 'text-red-600' : 'text-brand-900'
+              }`}>
+                {l.balance < 0 ? `-${money(l.balance)}` : money(l.balance)}
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
+/**
+ * Credit actions: spend existing credit against an unpaid booking, or issue a
+ * new one. The credits themselves are no longer listed here -- every credit
+ * appears in the statement above, in the order it happened and with the
+ * balance it produced, and Settle / Re-open hang off those lines. Listing them
+ * twice in one card was how the same credit came to be read as two.
+ */
+function CreditsPanel({ credits, spendable, bookings, applyTargets, readOnly, onCreate, onApply }: {
+  credits: Credit[]
+  spendable: number
+  bookings: Array<Booking & { event: AppEvent | null; charges: ChargeLine[] }>
+  applyTargets: Array<{ id: string; label: string; due: number }>
+  readOnly: boolean
+  onCreate: (amount: number, reason: string, bookingId: string | null) => Promise<void>
+  onApply: (bookingId: string, amount: number) => Promise<void>
+}) {
   const [showForm, setShowForm] = useState(false)
   const [amountStr, setAmountStr] = useState('')
   const [reason, setReason] = useState('')
   const [linkedBooking, setLinkedBooking] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [settlingId, setSettlingId] = useState<string | null>(null)
-  const spendable = openCreditBalance(credits)
+  const pool = openCreditBalance(credits)
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -956,76 +1148,11 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
     }
   }
 
-  async function handleSettle(c: Credit) {
-    const note = window.prompt(us.settlePrompt(Number(c.amount).toLocaleString(), c.reason), '')
-    if (note === null) return
-    setSettlingId(c.id)
-    try { await onSettle(c.id, note.trim()) } finally { setSettlingId(null) }
-  }
-
-  async function handleReopen(c: Credit) {
-    if (!window.confirm(us.reopenConfirm(Number(c.amount).toLocaleString(), c.reason))) return
-    setSettlingId(c.id)
-    try { await onReopen(c.id) } finally { setSettlingId(null) }
-  }
+  if (readOnly) return null
 
   return (
-    <div className="text-xs space-y-2">
-      <div className="flex justify-between">
-        <span className="text-brand-900 font-medium">{us.creditOwedIncl}</span>
-        <span className={`font-semibold ${openBalance > 0 ? 'text-emerald-700' : 'text-brand-900'}`}>
-          {openBalance.toLocaleString()}
-        </span>
-      </div>
-
-      {credits.length === 0 ? (
-        <p className="text-brand-950 font-medium italic">{us.noCredits}</p>
-      ) : (
-        <ul className="space-y-1 pt-1 border-t border-surface-200">
-          {credits.map(c => {
-            const linked = c.booking_id ? bookings.find(b => b.id === c.booking_id) : null
-            return (
-              <li key={c.id} className="flex items-baseline justify-between gap-2">
-                <span className="text-brand-950 font-medium flex-1">
-                  {format(shopZoned(new Date(c.created_at)), 'MMM d')} · {c.reason}
-                  {linked?.event && <span className="opacity-70">{us.reEvent(linked.event.title)}</span>}
-                  {c.status === 'settled' && c.settled_note && (
-                    <span className="opacity-70">{us.settledWithNote(c.settled_note)}</span>
-                  )}
-                  {c.status === 'settled' && !c.settled_note && (
-                    <span className="opacity-70">{us.settledPlain}</span>
-                  )}
-                </span>
-                {!readOnly && c.status === 'open' && (
-                  <button
-                    type="button"
-                    disabled={settlingId === c.id}
-                    onClick={() => handleSettle(c)}
-                    className={`shrink-0 ${BTN_XS_GHOST}`}
-                  >
-                    {settlingId === c.id ? '…' : us.settle}
-                  </button>
-                )}
-                {!readOnly && c.status === 'settled' && (
-                  <button
-                    type="button"
-                    disabled={settlingId === c.id}
-                    onClick={() => handleReopen(c)}
-                    className={`shrink-0 ${BTN_XS_GHOST}`}
-                  >
-                    {settlingId === c.id ? '…' : us.reopen}
-                  </button>
-                )}
-                <span className={`shrink-0 font-semibold ${c.status === 'settled' ? 'text-brand-950 line-through' : 'text-emerald-700'}`}>
-                  {Number(c.amount).toLocaleString()}
-                </span>
-              </li>
-            )
-          })}
-        </ul>
-      )}
-
-      {!readOnly && spendable > 0 && applyTargets.length > 0 && (
+    <div className="space-y-2">
+      {pool > 0 && applyTargets.length > 0 && (
         <ApplyToBookingForm
           spendable={spendable}
           targets={applyTargets}
@@ -1034,68 +1161,66 @@ function CreditsPanel({ credits, openBalance, bookings, applyTargets, readOnly, 
         />
       )}
 
-      {!readOnly && (
-        <div className="pt-1 border-t border-surface-200">
-          {!showForm ? (
-            <button
-              type="button"
-              onClick={() => setShowForm(true)}
-              className={BTN_XS_GHOST}
-            >
-              {us.issueCreditLink}
-            </button>
-          ) : (
-            <form onSubmit={submit} className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <input
-                  type="number" inputMode="numeric" min={1} step={1}
-                  value={amountStr}
-                  onChange={e => setAmountStr(e.target.value)}
-                  placeholder={us.amountPlaceholder}
-                  className="w-24 bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
-                />
-                <select
-                  value={linkedBooking}
-                  onChange={e => setLinkedBooking(e.target.value)}
-                  className="flex-1 bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
-                >
-                  <option value="">{us.noLinkedBooking}</option>
-                  {bookings.map(b => (
-                    <option key={b.id} value={b.id}>
-                      {b.event?.title ?? t.payments.eventFallback}
-                    </option>
-                  ))}
-                </select>
-              </div>
+      <div className="pt-1 border-t border-surface-200">
+        {!showForm ? (
+          <button
+            type="button"
+            onClick={() => setShowForm(true)}
+            className={BTN_XS_GHOST}
+          >
+            {us.issueCreditLink}
+          </button>
+        ) : (
+          <form onSubmit={submit} className="space-y-1.5">
+            <div className="flex items-center gap-2">
               <input
-                type="text"
-                value={reason}
-                onChange={e => setReason(e.target.value)}
-                placeholder={us.reasonPlaceholder}
-                maxLength={500}
-                className="w-full bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
+                type="number" inputMode="numeric" min={1} step={1}
+                value={amountStr}
+                onChange={e => setAmountStr(e.target.value)}
+                placeholder={us.amountPlaceholder}
+                className="w-24 bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
               />
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="text-xs bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded"
-                >
-                  {submitting ? us.issuing : us.issueCredit}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setShowForm(false); setError(null); setAmountStr(''); setReason(''); setLinkedBooking('') }}
-                  className={BTN_XS_GHOST}
-                >
-                  {t.admin.catalog.cancel}
-                </button>
-              </div>
-              {error && <p className="text-red-600">{error}</p>}
-            </form>
-          )}
-        </div>
-      )}
+              <select
+                value={linkedBooking}
+                onChange={e => setLinkedBooking(e.target.value)}
+                className="flex-1 bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
+              >
+                <option value="">{us.noLinkedBooking}</option>
+                {bookings.map(b => (
+                  <option key={b.id} value={b.id}>
+                    {b.event?.title ?? t.payments.eventFallback}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <input
+              type="text"
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              placeholder={us.reasonPlaceholder}
+              maxLength={500}
+              className="w-full bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
+            />
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={submitting}
+                className="text-xs bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded"
+              >
+                {submitting ? us.issuing : us.issueCredit}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowForm(false); setError(null); setAmountStr(''); setReason(''); setLinkedBooking('') }}
+                className={BTN_XS_GHOST}
+              >
+                {t.admin.catalog.cancel}
+              </button>
+            </div>
+            {error && <p className="text-red-600">{error}</p>}
+          </form>
+        )}
+      </div>
     </div>
   )
 }

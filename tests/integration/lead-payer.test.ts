@@ -138,7 +138,7 @@ describe('record_group_payment', () => {
   it('is admin-only', async () => {
     const g = await freshGroup()
     const asParent = await userClient(parent.email, parent.password)
-    const { error } = await asParent.rpc('record_group_payment', { p_lead: parent.id, p_amount: 1000, p_group_id: g.gid })
+    const { error } = await asParent.rpc('record_group_payment', { p_lead: parent.id, p_amount: 1000, p_reference: 'GRP-1', p_group_id: g.gid })
     expect(error).not.toBeNull()
     // No payment landed.
     expect((await paidSum(g.own)).data ?? []).toHaveLength(0)
@@ -148,7 +148,7 @@ describe('record_group_payment', () => {
     const g = await freshGroup()
     const asAdmin = await userClient(adminUser.email, adminUser.password)
     // Sum of deposits = 6000.
-    const { data, error } = await asAdmin.rpc('record_group_payment', { p_lead: parent.id, p_amount: 6000, p_group_id: g.gid })
+    const { data, error } = await asAdmin.rpc('record_group_payment', { p_lead: parent.id, p_amount: 6000, p_reference: 'GRP-1', p_group_id: g.gid })
     expect(error).toBeNull()
     expect(Number(data)).toBe(6000)
 
@@ -164,7 +164,7 @@ describe('record_group_payment', () => {
     const g = await freshGroup()
     const asAdmin = await userClient(adminUser.email, adminUser.password)
     // Way more than the 18000 owed across the group.
-    const { data } = await asAdmin.rpc('record_group_payment', { p_lead: parent.id, p_amount: 999999, p_group_id: g.gid })
+    const { data } = await asAdmin.rpc('record_group_payment', { p_lead: parent.id, p_amount: 999999, p_reference: 'GRP-1', p_group_id: g.gid })
     expect(Number(data)).toBe(18000)
     for (const id of [g.own, g.a, g.b]) {
       const total = (await paidSum(id)).data!.reduce((s, p) => s + Number(p.amount), 0)
@@ -175,7 +175,7 @@ describe('record_group_payment', () => {
   it('deposits-first, oldest-first when the lump only covers one deposit', async () => {
     const g = await freshGroup()
     const asAdmin = await userClient(adminUser.email, adminUser.password)
-    const { data } = await asAdmin.rpc('record_group_payment', { p_lead: parent.id, p_amount: 2000, p_group_id: g.gid })
+    const { data } = await asAdmin.rpc('record_group_payment', { p_lead: parent.id, p_amount: 2000, p_reference: 'GRP-1', p_group_id: g.gid })
     expect(Number(data)).toBe(2000)
     // Oldest (parent's own) gets the deposit and confirms; the others stay pending.
     expect((await paidSum(g.own)).data!.reduce((s, p) => s + Number(p.amount), 0)).toBe(2000)
@@ -195,7 +195,7 @@ describe('record_group_payment', () => {
     const outGroup = await makeBooking({ userId: childB.id, diveId: otherDive, details, payerId: parent.id })
 
     const asAdmin = await userClient(adminUser.email, adminUser.password)
-    const { data } = await asAdmin.rpc('record_group_payment', { p_lead: parent.id, p_amount: 99999, p_group_id: gid })
+    const { data } = await asAdmin.rpc('record_group_payment', { p_lead: parent.id, p_amount: 99999, p_reference: 'GRP-1', p_group_id: gid })
     expect(Number(data)).toBe(6000)   // only the one in-group booking
     expect((await paidSum(inGroup)).data!.reduce((s, p) => s + Number(p.amount), 0)).toBe(6000)
     expect((await paidSum(outGroup)).data ?? []).toHaveLength(0)
@@ -203,7 +203,7 @@ describe('record_group_payment', () => {
 
   it('rejects a non-positive amount', async () => {
     const asAdmin = await userClient(adminUser.email, adminUser.password)
-    const { error } = await asAdmin.rpc('record_group_payment', { p_lead: parent.id, p_amount: 0 })
+    const { error } = await asAdmin.rpc('record_group_payment', { p_lead: parent.id, p_amount: 0, p_reference: 'GRP-1' })
     expect(error).not.toBeNull()
   })
 })

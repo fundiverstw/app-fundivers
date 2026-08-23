@@ -754,6 +754,7 @@ describe('AdminEventDetailPage', () => {
     expect(screen.queryByRole('button', { name: /mark deposit paid/i })).not.toBeInTheDocument()
 
     await user.type(screen.getByPlaceholderText(/paid amount/i), '3000')
+    await user.type(screen.getByLabelText(/^reference$/i), 'TW-BANK-4417')
     await user.type(screen.getByPlaceholderText(/note \(optional/i), 'Partial #1')
     await user.click(screen.getByRole('button', { name: /^record payment$/i }))
 
@@ -761,6 +762,7 @@ describe('AdminEventDetailPage', () => {
     const insertedPayment = paymentInsert.mock.calls[0]?.[0] as Record<string, unknown>
     expect(insertedPayment).toMatchObject({
       user_id: 'u1', booking_id: 'b1', amount: 3000, status: 'paid', note: 'Partial #1',
+      reference: 'TW-BANK-4417',
     })
 
     // Booking is already confirmed; no status update should fire.
@@ -1106,8 +1108,14 @@ describe('AdminEventDetailPage', () => {
     await user.click(screen.getByRole('button', { name: /Parent Pat/ }))
     const amount = await screen.findByPlaceholderText(/amount received/i)
     await user.type(amount, '2000')
-    await user.click(screen.getByRole('button', { name: /^record$/i }))
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith('record_group_payment', { p_lead: 'u1', p_amount: 2000, p_group_id: 'g1' }))
+    // Two reference fields sit on the lead's card -- one per form -- so scope
+    // to the group form rather than matching the label globally.
+    const groupForm = amount.closest('form')!
+    await user.type(within(groupForm).getByLabelText(/^reference$/i), 'GRP-8891')
+    await user.click(within(groupForm).getByRole('button', { name: /^record$/i }))
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('record_group_payment', {
+      p_lead: 'u1', p_amount: 2000, p_reference: 'GRP-8891', p_group_id: 'g1',
+    }))
 
     // Expand the child's card and bill it back to the diver → clears payer_id.
     await user.click(screen.getByRole('button', { name: /Kid Casey/ }))

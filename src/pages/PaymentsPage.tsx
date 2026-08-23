@@ -553,9 +553,13 @@ function LineCard({
             <div className="space-y-1">
               <p className={`text-xs ${TEXT_MUTED} uppercase tracking-wider`}>{t.payments.paymentHistory}</p>
               {payments.map(p => (
-                <div key={p.id} className="flex justify-between text-xs">
-                  <span className={TEXT_MUTED}>
+                <div key={p.id} className="flex justify-between text-xs gap-2">
+                  {/* The reference is the diver's half of the receipt: it is
+                      what lets them match a line here to their own bank or
+                      PayPal statement without asking the shop. */}
+                  <span className={`${TEXT_MUTED} min-w-0 break-words`}>
                     {format(shopZoned(new Date(p.created_at)), 'MMM d')}{p.method && ` · ${p.method}`}
+                    {p.reference && ` · ${t.admin.bookingPayments.refShort(p.reference)}`}
                   </span>
                   <span className={`${PAYMENT_STATUS_STYLES[p.status]} capitalize`}>
                     {currency} {p.amount.toLocaleString()} · {p.status}

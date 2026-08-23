@@ -32,7 +32,7 @@ const PRIVILEGED_RPCS: ReadonlyArray<{ name: string; args: Record<string, unknow
   { name: 'record_signup_attempt',  args: { p_ip_hash: '\\x00' } },
   { name: 'log_orphan_auth_user',   args: { p_user_id: '00000000-0000-0000-0000-000000000000', p_email: 'probe@example.invalid', p_reason: 'probe' } },
   { name: 'admin_delete_user',      args: { p_user_id: '00000000-0000-0000-0000-000000000000' } },
-  { name: 'record_group_payment',   args: { p_lead: '00000000-0000-0000-0000-000000000000', p_amount: 1, p_group_id: '00000000-0000-0000-0000-000000000000' } },
+  { name: 'record_group_payment',   args: { p_lead: '00000000-0000-0000-0000-000000000000', p_amount: 1, p_reference: 'GRP-1', p_group_id: '00000000-0000-0000-0000-000000000000' } },
   { name: 'apply_credit_to_booking', args: { p_booking_id: '00000000-0000-0000-0000-000000000000', p_amount: 1 } },
   { name: 'accept_waitlist_offer',  args: { p_offer_id: '00000000-0000-0000-0000-000000000000' } },
   { name: 'offer_next_waitlist_spot', args: { p_event_id: '00000000-0000-0000-0000-000000000000' } },

@@ -67,6 +67,9 @@ export interface AuditEntry {
   /** Payment method, when the source is a payment (`account_credit` marks a
    *  payment auto-created by applying store credit). */
   method: string | null
+  /** Receipt / transfer / online transaction id, for payment rows. Null on
+   *  everything else and on payments predating `payments.reference`. */
+  reference: string | null
   /** For `*_update` log rows: the column names whose values changed. */
   changed: string[] | null
   /** The full underlying row (payment/credit/amendment) or `{ before, after }`
@@ -96,6 +99,7 @@ export function paymentEntries(payments: Payment[]): AuditEntry[] {
     actorId:   p.recorded_by,
     note:      p.note,
     method:    p.method,
+    reference: p.reference,
     changed:   null,
     raw:       p,
   }))
@@ -116,6 +120,7 @@ export function creditEntries(credits: Credit[]): AuditEntry[] {
       actorId:   c.created_by,
       note:      c.reason,
       method:    null,
+      reference: null,
       changed:   null,
       raw:       c,
     })
@@ -129,9 +134,10 @@ export function creditEntries(credits: Credit[]): AuditEntry[] {
         userId:    c.user_id,
         amount:    Number(c.amount),
         currency:  c.currency,
-        actorId:   null,
+        actorId:   c.settled_by,
         note:      c.settled_note,
         method:    null,
+        reference: null,
         changed:   null,
         raw:       c,
       })
@@ -153,6 +159,7 @@ export function amendmentEntries(amendments: BookingAmendment[]): AuditEntry[] {
     actorId:   a.created_by,
     note:      a.note,
     method:    null,
+    reference: null,
     changed:   null,
     raw:       a,
   }))
@@ -193,6 +200,7 @@ export function auditLogEntries(rows: AdminAuditLog[]): AuditEntry[] {
       actorId:   r.actor_id,
       note:      null,
       method:    null,
+      reference: null,
       changed:   r.action === 'update' ? diffChangedColumns(r.before, r.after) : null,
       raw:       { before: r.before, after: r.after },
     })
@@ -384,10 +392,10 @@ export function signedDisplayAmount(entry: AuditEntry): number | null {
   if (entry.amount == null) return null
   switch (entry.kind) {
     case 'payment_paid':     return -entry.amount
-    // Issuing a credit is money in the diver's favour — it reduces what they
+    // Issuing a credit is money in the diver's favor — it reduces what they
     // owe (a booking-tied open credit is subtracted in bookingBalance), so it
     // reads as a negative like a payment. Settling that credit consumes the
-    // favourable balance again, so credit_settled stays positive (default).
+    // favorable balance again, so credit_settled stays positive (default).
     case 'credit_issued':    return -entry.amount
     case 'payment_refunded': return entry.amount
     case 'amendment':        return entry.amount

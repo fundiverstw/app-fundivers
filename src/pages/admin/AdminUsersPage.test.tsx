@@ -86,7 +86,7 @@ describe('AdminUsersPage deep link', () => {
     from.mockImplementation((table: string) => {
       if (table === 'profiles') return mockQueryBuilder({ data: profiles })
       if (table === 'bookings') {
-        return mockQueryBuilder({ data: [{ id: 'b1', user_id: 'u2', event_id: 'ev-1', status: 'confirmed', details: { total: 3000 } }] })
+        return mockQueryBuilder({ data: [{ id: 'b1', user_id: 'u2', event_id: 'ev-1', status: 'confirmed', created_at: '2026-08-01T00:00:00Z', details: { total: 3000 } }] })
       }
       return mockQueryBuilder({ data: [] })
     })
@@ -95,6 +95,48 @@ describe('AdminUsersPage deep link', () => {
 
     const link = await screen.findByRole('link', { name: 'Green Island Fun Dive' })
     expect(link).toHaveAttribute('href', '/admin/events/ev-1')
+  })
+
+  // The two sections this replaced -- "Account credits" and "Totals across all
+  // bookings" -- each showed a total with no arithmetic tying one to the other,
+  // which is how a double-counted refund sat unnoticed. One statement now,
+  // every line carrying its change and the balance standing after it.
+  it('renders the balance as a running statement, attributed line by line', async () => {
+    vi.mocked(fetchEventsForBookings).mockResolvedValue(
+      new Map([['ev-1', { id: 'ev-1', title: 'Green Island Fun Dive' }]]) as never,
+    )
+    from.mockImplementation((table: string) => {
+      if (table === 'profiles') {
+        return mockQueryBuilder({ data: [...profiles, { id: 'admin-2', name: 'Bea Boss', nickname: null }] })
+      }
+      if (table === 'bookings') {
+        return mockQueryBuilder({ data: [{
+          id: 'b1', user_id: 'u2', event_id: 'ev-1', status: 'confirmed',
+          created_at: '2026-08-01T00:00:00Z', details: { total: 3000 },
+        }] })
+      }
+      if (table === 'payments') {
+        return mockQueryBuilder({ data: [{
+          id: 'p1', created_at: '2026-08-05T00:00:00Z', user_id: 'u2', booking_id: 'b1',
+          amount: 1000, currency: 'TWD', status: 'paid', method: 'cash',
+          note: null, reference: 'CASH-77', recorded_by: 'admin-2',
+        }] })
+      }
+      return mockQueryBuilder({ data: [] })
+    })
+
+    renderAt('/admin/users?diver=u2')
+
+    // Charged 3,000, paid 1,000 -> the diver owes 2,000, which the old
+    // credit-only figure could not express at all.
+    expect(await screen.findByText(t.admin.users.balanceOwed)).toBeInTheDocument()
+    expect(await screen.findByText('+1,000')).toBeInTheDocument()
+    // Twice on the booking line: the change it made, and the balance it left.
+    expect(screen.getAllByText('-3,000')).toHaveLength(2)
+    // …and once more as the balance after the payment.
+    expect(screen.getByText('-2,000')).toBeInTheDocument()
+    expect(screen.getByText(/ref CASH-77/)).toBeInTheDocument()
+    expect(screen.getByText(/by Bea Boss/)).toBeInTheDocument()
   })
 
   it('shows no roster until the admin searches, with a prompt instead', async () => {

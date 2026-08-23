@@ -28,9 +28,37 @@ Both append-only. Nothing is ever edited in place: a refund is a new
 | `payments` | Money received. `pending` / `paid` / `refunded` / `voided`. |
 | `credits` | Money owed back to a diver. `open` or `settled`. |
 
+Every row names the session that wrote it — `recorded_by`, `created_by`,
+`settled_by`, `cancelled_by` — and the accounting views resolve those to
+names, so a disputed figure traces to a person rather than to "the app".
+The trigger-stamped ones (`settled_by`, `cancelled_at`, `cancelled_by`)
+are derived from the transition and ignore whatever a caller sends, so
+none can be forged or backdated.
+
 Alongside them, `bookings.details` carries the `total` and `deposit`
 **frozen at booking time**, so later price changes never alter what
 someone was quoted.
+
+## Every payment names a transaction
+
+A row that moved real money carries a `reference`: a receipt number, a
+bank transfer id, a PayPal or other online transaction id. Without one,
+"Paid 3,600" is a claim nobody can check against a bank statement, and a
+diver holding a receipt has nothing to match it to.
+
+`payments_reference_required` enforces it. Three kinds of row are exempt
+for the same reason — there is no external transaction to point at:
+`account_credit` (moves no money; the cash arrived earlier), `pending` (a
+promise, not a receipt), and `voided` (an admin taking back a mistake).
+
+The constraint is `NOT VALID`: payments predating it keep an honest blank
+rather than a back-dated fiction, and every write from here on is checked.
+Divers see the reference on their own payment list — their half of the
+receipt.
+
+**"Mark deposit paid" records no payment at all** — it confirms a spot and
+moves no figure — so it has nothing to reference; the audit log still
+names who pressed it.
 
 ## What a booking owes
 
@@ -159,6 +187,28 @@ money**, with a button per ending. It is the only surface that can see
 them: balances read settled, account credit skips cancelled bookings, and
 the refund queue lists only non-cancelled ones.
 
+## Reading a diver's balance
+
+The diver profile shows one figure and the history that produced it — a
+statement, each line carrying the change it made and the balance standing
+after it (`buildDiverStatement`).
+
+**Credit-positive**: a positive balance is money the shop owes the diver.
+The closing balance is deliberately **unclamped**, the one place it
+differs from `diverCreditBalance` — that function answers "how much can
+this diver spend", so it floors each active booking at zero. A diver
+1,000 short on one dive and 500 ahead on another can spend 500, not −500;
+a statement cannot floor anything or its lines stop adding up. Both are
+shown, and they agree unless some active booking is underpaid.
+
+Three rules make it reconcile. A cancelled booking's charge **and
+payments** are reversed at `cancelled_at`, and anything recorded against
+it afterwards has no effect; a credit tied to a cancelled booking still
+counts, because that is how a refund-as-credit reaches the diver; and a
+booking a lead booker pays for is dropped, being the lead's money. Which
+leaves the identity the summary block is built on: `balance = paid −
+charged + open credit`.
+
 ## Reporting
 
 Applied account credit is **not revenue**. The cash arrived earlier, on
@@ -181,4 +231,6 @@ heads, deliberately not what has been banked.
 7. `diverCreditBalance` is the only definition of account credit.
 8. Every automatic credit records its `source`.
 9. Cash-revenue sums apply `isExternalPayment`. Balance math does not.
-10. Constraints, triggers and RLS policies get integration tests.
+10. A money-moving payment names its real-world transaction, and
+    attribution is stamped from the act, never taken from the caller.
+11. Constraints, triggers and RLS policies get integration tests.

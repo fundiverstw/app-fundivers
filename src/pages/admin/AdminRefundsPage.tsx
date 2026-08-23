@@ -13,6 +13,7 @@ import {
   settleCancellationAsKept, type UnreconciledCancellation,
 } from '../../lib/unreconciled-cancellations'
 import { useAuth } from '../../hooks/useAuth'
+import { fetchActorNames, actorLabel, type ActorNames } from '../../lib/actor-names'
 import { Spinner } from '../../components/ui/Spinner'
 import { CARD_ELEVATED, BTN_PRIMARY, BTN_GHOST, BTN_XS_PRIMARY, BTN_XS_GHOST, TEXT_MUTED } from '../../styles/tokens'
 import { siteConfig } from '../../config/site'
@@ -107,6 +108,7 @@ export function AdminRefundsPage() {
   const [holding, setHolding] = useState<UnreconciledCancellation[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [acting, setActing] = useState<string | null>(null)
+  const [actorNames, setActorNames] = useState<ActorNames>(new Map())
 
   useEffect(() => {
     let alive = true
@@ -115,6 +117,9 @@ export function AdminRefundsPage() {
         if (!alive) return
         setRows(requests)
         setHolding(unreconciled)
+        void fetchActorNames(unreconciled.map(r => r.cancelledBy))
+          .then(names => { if (alive) setActorNames(names) })
+          .catch(() => {})
       })
       .catch(e => { if (alive) setError(errorMessage(e)) })
     return () => { alive = false }
@@ -125,17 +130,28 @@ export function AdminRefundsPage() {
   // until someone records that it went back.
   async function refreshHolding() {
     try {
-      setHolding(await fetchUnreconciledCancellations(HOLDING_LABELS))
+      const next = await fetchUnreconciledCancellations(HOLDING_LABELS)
+      setHolding(next)
+      setActorNames(await fetchActorNames(next.map(r => r.cancelledBy)))
     } catch (e) {
       toast.error(errorMessage(e))
     }
   }
 
+  // The one ending that moves money, so it is the one that has to name the
+  // transfer. Prompted rather than typed inline because this list is a queue of
+  // one-tap decisions -- a permanent input on every row would read as something
+  // to fill in before deciding, which it is not.
   async function markRefunded(row: UnreconciledCancellation) {
     if (!profile?.id) return
+    const reference = window.prompt(rf.refundReferencePrompt(money(row.amount, row.currency)), '')
+    if (reference === null) return
+    if (!reference.trim()) { toast.error(rf.referenceRequired); return }
     setActing(row.bookingId)
     try {
-      await recordCancellationRefund({ row, recordedBy: profile.id, note: rf.refundNote })
+      await recordCancellationRefund({
+        row, recordedBy: profile.id, note: rf.refundNote, reference: reference.trim(),
+      })
       setHolding(prev => (prev ?? []).filter(r => r.bookingId !== row.bookingId))
       toast.success(rf.markRefundedDone)
     } catch (e) {
@@ -304,6 +320,10 @@ export function AdminRefundsPage() {
                 <div className={`text-xs ${TEXT_MUTED} truncate`}>{r.eventTitle}</div>
                 <div className={`text-xs ${TEXT_MUTED} mt-0.5`}>
                   {rf.colHolding}: <span className="tabular-nums text-amber-800 font-semibold">{money(r.amount, r.currency)}</span>
+                  {r.cancelledAt && (
+                    <> · {t.admin.bookingPayments.cancelledOn(format(shopZoned(new Date(r.cancelledAt)), 'PP'))}
+                    {' '}{t.admin.actor.by(actorLabel(actorNames, r.cancelledBy, t.admin.actor))}</>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">

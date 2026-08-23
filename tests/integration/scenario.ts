@@ -76,6 +76,7 @@ export class BookingScenario {
     const { error } = await this.admin.from('payments').insert({
       booking_id: this.bookingId, user_id: this.diver.id,
       amount, status: 'paid', method,
+      reference: method === 'account_credit' ? null : `R-${amount}`,
     } as never)
     if (error) throw new Error(`scenario.pay: ${error.message}`)
     return this
@@ -86,6 +87,7 @@ export class BookingScenario {
     const { error } = await this.admin.from('payments').insert({
       booking_id: this.bookingId, user_id: this.diver.id,
       amount, status: 'refunded', method,
+      reference: method === 'account_credit' ? null : `R-${amount}`,
     } as never)
     if (error) throw new Error(`scenario.refund: ${error.message}`)
     return this

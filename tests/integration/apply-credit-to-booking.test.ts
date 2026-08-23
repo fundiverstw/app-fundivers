@@ -142,8 +142,8 @@ describe('apply_credit_to_booking', () => {
     const dive = await freshDive()
     const booking = await makeBooking(diver.id, dive, { total: 3000 }, 'confirmed')
     await admin.from('payments').insert([
-      { booking_id: booking, user_id: diver.id, amount: 1000, status: 'paid', method: 'cash' },
-      { booking_id: booking, user_id: diver.id, amount: 300, status: 'refunded', method: 'cash' },
+      { booking_id: booking, user_id: diver.id, amount: 1000, status: 'paid', method: 'cash', reference: 'R-1000' },
+      { booking_id: booking, user_id: diver.id, amount: 300, status: 'refunded', method: 'cash', reference: 'R-300' },
     ] as never)
     await makeCredit(diver.id, 5000)
 
@@ -171,8 +171,8 @@ describe('apply_credit_to_booking', () => {
     const dive = await freshDive()
     const booking = await makeBooking(diver.id, dive, { total: 5000 }, 'confirmed')
     await admin.from('payments').insert([
-      { booking_id: booking, user_id: diver.id, amount: 1000, status: 'paid',     method: 'cash' },
-      { booking_id: booking, user_id: diver.id, amount: 250,  status: 'refunded', method: 'cash' },
+      { booking_id: booking, user_id: diver.id, amount: 1000, status: 'paid',     method: 'cash', reference: 'R-1000' },
+      { booking_id: booking, user_id: diver.id, amount: 250,  status: 'refunded', method: 'cash', reference: 'R-250' },
       { booking_id: booking, user_id: diver.id, amount: 900,  status: 'pending',  method: 'cash' },
       { booking_id: booking, user_id: diver.id, amount: 400,  status: 'voided',   method: 'cash' },
     ] as never)
@@ -293,7 +293,7 @@ describe('apply_credit_to_booking', () => {
     const dive = await freshDive()
     const bookingId = await makeBooking(diver.id, dive, { total: 1000 })
     await admin.from('payments').insert({
-      user_id: diver.id, booking_id: bookingId, amount: 1000, status: 'paid', method: 'cash', recorded_by: adminUser.id,
+      user_id: diver.id, booking_id: bookingId, amount: 1000, status: 'paid', method: 'cash', reference: 'R-1000', recorded_by: adminUser.id,
     })
     await makeCredit(diver.id, 5000)
 

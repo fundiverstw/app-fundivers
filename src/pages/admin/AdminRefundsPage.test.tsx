@@ -133,16 +133,43 @@ describe('AdminRefundsPage · cancelled bookings still holding money', () => {
 
   it('records a refunded payment for the full amount when the money went back', async () => {
     setupHolding()
+    vi.stubGlobal('prompt', vi.fn(() => 'BANK-77'))
     const user = userEvent.setup()
     renderPage()
     await user.click(await screen.findByRole('button', { name: /^refunded$/i }))
 
     await waitFor(() => expect(insert).toHaveBeenCalledOnce())
     expect(insert.mock.calls[0][0]).toMatchObject({
-      booking_id: 'b9', user_id: 'd1', amount: 3000, status: 'refunded',
+      booking_id: 'b9', user_id: 'd1', amount: 3000, status: 'refunded', reference: 'BANK-77',
     })
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: /^refunded$/i })).not.toBeInTheDocument())
+  })
+
+  // A refund is the movement a diver is most likely to query later, so it is
+  // the one that must never be recorded on trust alone.
+  it('records nothing when the admin dismisses the reference prompt', async () => {
+    setupHolding()
+    vi.stubGlobal('prompt', vi.fn(() => null))
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: /^refunded$/i }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /^refunded$/i })).toBeInTheDocument())
+    expect(insert).not.toHaveBeenCalled()
+  })
+
+  it('records nothing when the reference is left blank', async () => {
+    setupHolding()
+    vi.stubGlobal('prompt', vi.fn(() => '   '))
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: /^refunded$/i }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /^refunded$/i })).toBeInTheDocument())
+    expect(insert).not.toHaveBeenCalled()
   })
 
   it('issues an open credit stamped as a money return when the shop keeps it', async () => {

@@ -35,6 +35,11 @@ export async function recordPayment(args: {
   existingPayments: Payment[]
   amount: number
   note: string
+  /** Receipt number, bank transfer reference or online payment transaction
+   *  id. Required: `payments_reference_required` (20260823100000) rejects a
+   *  money-moving row without one, so the check here is only to fail with a
+   *  sentence an admin can act on instead of a constraint name. */
+  reference: string
   recordedBy: string
   /** What the diver owes — details.total PLUS the amendment ledger. Callers
    *  that have the amendments should pass it; without it this falls back to
@@ -42,6 +47,8 @@ export async function recordPayment(args: {
   owed?: number
 }): Promise<{ payment: Payment; newStatus: Booking['status'] }> {
   const { booking, existingPayments, amount, note, recordedBy } = args
+  const reference = args.reference.trim()
+  if (!reference) throw new Error('a payment reference is required')
   const details = (booking.details ?? {}) as BookingDetails
   const method = details.payment_method ?? null
 
@@ -54,6 +61,7 @@ export async function recordPayment(args: {
       status:      'paid',
       method,
       note,
+      reference,
       recorded_by: recordedBy,
     })
     .select('*')
@@ -94,11 +102,15 @@ export async function recordPayment(args: {
 export async function recordGroupPayment(args: {
   leadId: string
   amount: number
+  /** As for `recordPayment` -- the RPC writes one real-money row per sibling
+   *  booking and refuses a blank reference. */
+  reference: string
   groupId?: string | null
 }): Promise<number> {
   const { data, error } = await supabase.rpc('record_group_payment', {
     p_lead: args.leadId,
     p_amount: args.amount,
+    p_reference: args.reference.trim(),
     p_group_id: args.groupId ?? null,
   })
   if (error) throw error

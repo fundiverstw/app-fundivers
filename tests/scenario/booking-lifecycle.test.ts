@@ -71,7 +71,7 @@ describe('scenario: a diver books, pays a deposit, then settles up', () => {
 
     await w.admin.from('payments').insert({
       booking_id: bookingId, user_id: diver.id,
-      amount: 500, status: 'refunded', method: 'cash',
+      amount: 500, status: 'refunded', method: 'cash', reference: 'R-500',
     } as never)
 
     const f = await owedPaid(bookingId)

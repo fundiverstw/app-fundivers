@@ -25,6 +25,7 @@ import { notifyEventCancelled } from '../../lib/event-cancellation'
 import { issueCancellationCredits, applyCreditToBooking } from '../../lib/credits'
 import { fetchAmendmentsForBookings, addAmendment, formAmount, amendmentsDelta } from '../../lib/booking-amendments'
 import { recordPayment as recordPaymentRow, voidPayment as voidPaymentRow, recordGroupPayment } from '../../lib/booking-payments'
+import { fetchActorNames, actorLabel, type ActorNames } from '../../lib/actor-names'
 import { personName } from '../../lib/names'
 import { requestEventDiverExport } from '../../lib/admin-event-export'
 import { BookingPaymentsBlock } from '../../components/admin/BookingPaymentsBlock'
@@ -112,6 +113,10 @@ export function AdminEventDetailPage() {
   const [deleteInFlight, setDeleteInFlight] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [view, setView] = useState<'registrants' | 'transportation' | 'balances'>('registrants')
+  // Names for the admins behind each money row. Fetched separately from the
+  // registrant profiles: whoever recorded a payment or cancelled a booking is
+  // usually staff, and staff are not registrants.
+  const [actorNames, setActorNames] = useState<ActorNames>(new Map())
 
   useEffect(() => {
     if (!id) return
@@ -162,6 +167,15 @@ export function AdminEventDetailPage() {
         arr.push(p)
         paymentsByBooking.set(p.booking_id, arr)
       }
+
+      void fetchActorNames([
+        ...(paymentsRes.data ?? []).map(p => p.recorded_by),
+        ...[...amendmentsByBooking.values()].flat().map(a => a.created_by),
+        ...credits.map(c => c.created_by),
+        ...credits.map(c => c.settled_by),
+        ...bookings.map(b => b.cancelled_by),
+        ...bookings.map(b => b.cancellation_settled_by),
+      ]).then(names => { if (!cancelled) setActorNames(names) }).catch(() => {})
 
       // Resolve any add-on / room IDs referenced in the bookings to display
       // names so the admin doesn't see raw UUIDs.
@@ -291,8 +305,8 @@ export function AdminEventDetailPage() {
   // Record one lump payment from the lead booker, distributed across the
   // group's bookings (deposits first, then balances). Refetch to reflect the
   // new payment rows + any auto-confirmed siblings.
-  async function recordGroupPaymentFor(leadId: string, groupId: string | null, amount: number) {
-    const applied = await recordGroupPayment({ leadId, amount, groupId })
+  async function recordGroupPaymentFor(leadId: string, groupId: string | null, amount: number, reference: string) {
+    const applied = await recordGroupPayment({ leadId, amount, reference, groupId })
     if (applied > 0) toast.success(ed.recordedAcrossGroup(applied.toLocaleString()))
     else toast.info(ed.nothingOutstanding)
     setRefreshKey(k => k + 1)
@@ -343,13 +357,13 @@ export function AdminEventDetailPage() {
     }
   }
 
-  async function recordPayment(r: Registrant, amount: number, note: string) {
+  async function recordPayment(r: Registrant, amount: number, note: string, reference: string) {
     if (!profile?.id) return
     try {
       const { payment, newStatus } = await recordPaymentRow({
         booking: r.booking,
         existingPayments: r.payments,
-        amount, note,
+        amount, note, reference,
         recordedBy: profile.id,
         owed: registrantBalance(r).owed,
       })
@@ -477,6 +491,7 @@ export function AdminEventDetailPage() {
       key={r.booking.id}
       r={r}
       waiverMissing={missingByDiver[r.booking.user_id] ?? []}
+      actorName={(actorId: string | null) => actorLabel(actorNames, actorId, t.admin.actor)}
       waiverState={waiverState}
       addonNames={addonNames}
       roomNames={roomNames}
@@ -486,13 +501,13 @@ export function AdminEventDetailPage() {
       onRejectRefund={rejectRefund}
       onEdit={() => setEditing(r)}
       onAddAmendment={submitAmendment}
-      onRecordPayment={(amount, note) => recordPayment(r, amount, note)}
+      onRecordPayment={(amount, note, reference) => recordPayment(r, amount, note, reference)}
       onApplyCredit={(amount) => applyCredit(r, amount)}
       onVoidPayment={(paymentId) => voidPayment(r, paymentId)}
       onMarkDepositPaid={() => updateStatus(r.booking.id, 'confirmed')}
       onBillToDiver={() => billToDiver(r.booking.id)}
-      onRecordGroupPayment={(amount) =>
-        recordGroupPaymentFor(r.booking.payer_id ?? r.booking.user_id, r.booking.group_id, amount)}
+      onRecordGroupPayment={(amount, reference) =>
+        recordGroupPaymentFor(r.booking.payer_id ?? r.booking.user_id, r.booking.group_id, amount, reference)}
       onMarkWaiversInPerson={() => handleMarkWaiversInPerson(r)}
       readOnly={!isAdmin}
     />
@@ -1180,19 +1195,21 @@ const BOOKING_STATUSES: Booking['status'][] = ['pending', 'confirmed', 'waitlist
  *  booking so it's offered exactly once per group. */
 function GroupPaymentInline({ currency, onRecord }: {
   currency: string
-  onRecord: (amount: number) => Promise<void>
+  onRecord: (amount: number, reference: string) => Promise<void>
 }) {
   const [amountStr, setAmountStr] = useState('')
+  const [reference, setReference] = useState('')
   const [busy, setBusy] = useState(false)
   const amount = Math.max(0, parseInt(amountStr || '0', 10) || 0)
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    if (amount <= 0) return
+    if (amount <= 0 || !reference.trim()) return
     setBusy(true)
     try {
-      await onRecord(amount)
+      await onRecord(amount, reference.trim())
       setAmountStr('')
+      setReference('')
     } finally {
       setBusy(false)
     }
@@ -1213,12 +1230,21 @@ function GroupPaymentInline({ currency, onRecord }: {
         />
         <button
           type="submit"
-          disabled={busy || amount <= 0}
+          disabled={busy || amount <= 0 || !reference.trim()}
           className="text-xs bg-violet-700 hover:bg-violet-800 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded shrink-0"
         >
           {busy ? t.admin.bookingPayments.recording : ed.record}
         </button>
       </div>
+      <input
+        type="text"
+        value={reference}
+        onChange={e => setReference(e.target.value)}
+        placeholder={t.admin.bookingPayments.referencePlaceholder}
+        maxLength={200}
+        aria-label={t.admin.bookingPayments.reference}
+        className="w-full bg-white border border-violet-300 rounded px-2 py-1 text-xs text-brand-900"
+      />
     </form>
   )
 }
@@ -1275,7 +1301,7 @@ function registrantBalance(r: Registrant) {
   return { owed, paid, bal: bookingBalance(owed, paid, r.credit, { cancelled: r.booking.status === 'cancelled' }) }
 }
 
-function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, currency, onStatusChange, onApproveRefund, onRejectRefund, onEdit, onAddAmendment, onRecordPayment, onApplyCredit, onVoidPayment, onMarkDepositPaid, onBillToDiver, onRecordGroupPayment, onMarkWaiversInPerson, readOnly }: {
+function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, currency, actorName, onStatusChange, onApproveRefund, onRejectRefund, onEdit, onAddAmendment, onRecordPayment, onApplyCredit, onVoidPayment, onMarkDepositPaid, onBillToDiver, onRecordGroupPayment, onMarkWaiversInPerson, readOnly }: {
   r: Registrant
   waiverMissing: WaiverDef[]
   waiverState: 'loading' | 'ready' | 'error'
@@ -1287,12 +1313,13 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
   onRejectRefund: (id: string) => void
   onEdit: () => void
   onAddAmendment: (id: string, sign: '+' | '-', amount: number, note: string) => Promise<void>
-  onRecordPayment: (amount: number, note: string) => Promise<void>
+  actorName: (id: string | null) => string
+  onRecordPayment: (amount: number, note: string, reference: string) => Promise<void>
   onApplyCredit: (amount: number) => Promise<void>
   onVoidPayment: (paymentId: string) => Promise<void>
   onMarkDepositPaid: () => Promise<void>
   onBillToDiver: () => Promise<void>
-  onRecordGroupPayment: (amount: number) => Promise<void>
+  onRecordGroupPayment: (amount: number, reference: string) => Promise<void>
   onMarkWaiversInPerson: () => void | Promise<void>
   readOnly?: boolean
 }) {
@@ -1546,7 +1573,10 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
             pending={r.booking.status === 'pending'}
             cancelled={r.booking.status === 'cancelled'}
             feeKept={r.booking.status === 'cancelled' && r.booking.cancellation_settled_at ? totalPaid : 0}
+            cancelledAt={r.booking.cancelled_at}
+            cancelledBy={r.booking.cancelled_by}
             readOnly={!!readOnly}
+            actorName={actorName}
             onRecord={onRecordPayment}
             onVoid={onVoidPayment}
             onMarkDepositPaid={onMarkDepositPaid}

@@ -1,7 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { BookingPaymentsBlock } from './BookingPaymentsBlock'
 import type { ChargeLine } from '../../lib/booking-charges'
+import type { Payment } from '../../types/database'
 
 const noop = async () => {}
 
@@ -88,5 +90,68 @@ describe('BookingPaymentsBlock — Balance', () => {
     // Breakdown total equals Owed, and the 550 overpayment reads as credit.
     expect(screen.getByText('TWD 8,150')).toBeInTheDocument()
     expect(screen.getByText('550 credit')).toBeInTheDocument()
+  })
+})
+
+
+describe('BookingPaymentsBlock — payment reference', () => {
+  const editable = { ...baseProps, readOnly: false }
+
+  // Without a reference, "Paid 3,600" is a claim nobody can check against a
+  // bank statement -- which is the whole reason a diver's payment can end up
+  // disputed with no way to settle it.
+  it('refuses to record a payment with no receipt or transaction number', async () => {
+    const onRecord = vi.fn(async () => {})
+    const user = userEvent.setup()
+    render(<BookingPaymentsBlock {...editable} onRecord={onRecord} />)
+
+    await user.type(screen.getByPlaceholderText(/paid amount/i), '3600')
+    await user.click(screen.getByRole('button', { name: /^record payment$/i }))
+
+    expect(onRecord).not.toHaveBeenCalled()
+    expect(screen.getByText(/receipt or transaction number is required/i)).toBeInTheDocument()
+  })
+
+  it('passes the trimmed reference through when one is given', async () => {
+    const onRecord = vi.fn(async () => {})
+    const user = userEvent.setup()
+    render(<BookingPaymentsBlock {...editable} onRecord={onRecord} />)
+
+    await user.type(screen.getByPlaceholderText(/paid amount/i), '3600')
+    await user.type(screen.getByLabelText(/^reference$/i), '  PAYPAL-8H21K  ')
+    await user.click(screen.getByRole('button', { name: /^record payment$/i }))
+
+    expect(onRecord).toHaveBeenCalledWith(3600, 'Payment', 'PAYPAL-8H21K')
+  })
+
+  it('shows the reference and the admin who recorded each payment', () => {
+    const payments = [{
+      id: 'p1', created_at: '2026-08-14T02:00:00Z', user_id: 'u1', booking_id: 'b1',
+      amount: 3600, currency: 'TWD', status: 'paid', method: 'bank_transfer',
+      note: 'Balance', reference: 'TW-4417', recorded_by: 'admin-2',
+    }] as Payment[]
+    render(
+      <BookingPaymentsBlock
+        {...baseProps}
+        payments={payments}
+        actorName={(id) => (id === 'admin-2' ? 'Bea Boss' : 'system')}
+      />,
+    )
+    expect(screen.getByText(/ref TW-4417/)).toBeInTheDocument()
+    expect(screen.getByText(/by Bea Boss/)).toBeInTheDocument()
+  })
+
+  it('names who cancelled a booking, on the booking they cancelled', () => {
+    render(
+      <BookingPaymentsBlock
+        {...baseProps}
+        cancelled
+        cancelledAt="2026-08-20T02:00:00Z"
+        cancelledBy="admin-3"
+        actorName={(id) => (id === 'admin-3' ? 'Cal Crew' : 'system')}
+      />,
+    )
+    expect(screen.getByText(/Cancelled Aug 20/)).toBeInTheDocument()
+    expect(screen.getByText(/by Cal Crew/)).toBeInTheDocument()
   })
 })

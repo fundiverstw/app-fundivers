@@ -60,7 +60,7 @@ async function booking(userId: string, eventId: string, opts: {
 
 async function pay(userId: string, bookingId: string, amount: number, method: string): Promise<void> {
   const { error } = await admin.from('payments').insert({
-    user_id: userId, booking_id: bookingId, amount, status: 'paid', method, note: 'test',
+    user_id: userId, booking_id: bookingId, amount, status: 'paid', method, note: 'test', reference: `R-${amount}`,
   })
   if (error) throw new Error(error.message)
 }
@@ -175,7 +175,7 @@ describe('credit on a diver cancellation', () => {
     const b = await booking(diver.id, dive, { requestedDaysAgo: 0 })
     await pay(diver.id, b, 5000, 'bank_transfer')
     const { error } = await admin.from('payments').insert({
-      user_id: diver.id, booking_id: b, amount: 1500, status: 'refunded', method: 'bank_transfer', note: 'partial',
+      user_id: diver.id, booking_id: b, amount: 1500, status: 'refunded', method: 'bank_transfer', note: 'partial', reference: 'R-1500',
     })
     if (error) throw new Error(error.message)
 
