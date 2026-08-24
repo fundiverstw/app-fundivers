@@ -173,7 +173,7 @@ Two layers:
    gates (admin / parent / unrelated diver), authed self path,
    rollback (booking failure deletes guest, doesn't delete existing,
    profile-update failure also rolls back, pre-existing booking
-   rejection), email behaviour (null transporter, throwing
+   rejection), email behavior (null transporter, throwing
    transporter, dedup to company, waitlisted text-only path), and
    the happy path's `{booking_id, status, session}` envelope.
 
@@ -522,7 +522,7 @@ Test in `Content-Security-Policy-Report-Only` first, since the
 `supabase/functions/notify-application-decision/index.ts`. The status
 flip now goes through the caller's authed Supabase client (not the
 service-role client) so the existing `audit_admin_write` trigger on
-profiles sees `auth.uid()` = the admin's id, recognises them via
+profiles sees `auth.uid()` = the admin's id, recognizes them via
 `is_admin()`, and writes the audit row automatically — no extra
 explicit INSERT needed. Pinned by a new case in
 `tests/integration/admin-audit-log.test.ts` that exercises the path
@@ -902,7 +902,7 @@ Lightweight idempotency. Two admin clicks send two emails.
 
 ### L2. `notify-waitlist-offer` only authenticates by service-role Bearer
 
-**Status: FIXED 2026-06-03.** Two defence-in-depth checks added before
+**Status: FIXED 2026-06-03.** Two defense-in-depth checks added before
 the email send: offers whose `offered_at` is older than 1h return
 `{ ok: true, sent: false, reason: "offer is stale" }`, and offers
 with `notified_at` already set return
@@ -912,7 +912,7 @@ next call hits the second guard. A leaked service-role key replaying
 an old `offer_id` no longer triggers the email path.
 
 If the service-role key ever leaks, an attacker can replay any
-`offer_id` to mass-email waitlisted divers. Defence-in-depth: reject
+`offer_id` to mass-email waitlisted divers. Defense-in-depth: reject
 offers older than 1h, reject offers already `notified_at`.
 
 ### L3. PostgREST raw error strings rendered in toasts
@@ -940,7 +940,7 @@ manually today by the form's step-Next disabled checks
 `assertUploadSize` precheck on the upload helpers. The server-side
 gates (Turnstile, per-IP rate limit, event existence check, profile
 patch allowlist) are the actual security boundary; the client
-schema would be UX hardening, not a defence gap. A full
+schema would be UX hardening, not a defense gap. A full
 react-hook-form + zod rewrite of the 1400-line form remains
 worthwhile but is out of scope for this security-tier sweep.
 

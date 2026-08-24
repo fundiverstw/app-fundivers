@@ -21,7 +21,7 @@ divers will fill that gap themselves.
 
 | Decision | Why |
 | --- | --- |
-| Positions are **site-local metres**, not lat/lng | A hand-drawn map has a scale bar but no coordinates, and a diver knows "twelve metres past the Dragon Head", not their WGS84 position. `frame.origin` is optional; a map without one is still usable. |
+| Positions are **site-local meters**, not lat/lng | A hand-drawn map has a scale bar but no coordinates, and a diver knows "twelve meters past the Dragon Head", not their WGS84 position. `frame.origin` is optional; a map without one is still usable. |
 | Depth carries its **datum** and its **time** | A dive computer reads depth below whatever surface it is under, so a contribution is `instantaneous` and moves with the tide. Only a reading with `observed_at` can later be reduced to TWCD2021. `canReduceToDatum()` says which; `unreducibleSoundings()` lists what can never be. |
 | `ObservationSource` includes **`placeholder`** | Scaffolding is not observation. Placeholder records are stripped by `observedOnly()` before anything is measured, counted or rendered as seabed. |
 | Features can be **volumetric** | `VOLUMETRIC_FEATURES` names arch / swim_through / overhang / cave — the kinds a depth grid cannot express at any resolution. This is the research claim made executable. |
@@ -33,11 +33,11 @@ Divers correct depths on a **1 m lattice**, and the lattice is **implicit** —
 no record exists for a position until somebody puts a reading there.
 
 Storing it would not work: a 500 m site at 1 m spacing is 250,000 positions,
-and a kilometre-wide one is over a million. As rows they are a million writes of
+and a kilometer-wide one is over a million. As rows they are a million writes of
 nothing; as meshes, a million draw calls; as input to the triangulation, a
 multi-second stall on a phone.
 
-- `snapToLattice(at)` rounds a tap to the nearest metre.
+- `snapToLattice(at)` rounds a tap to the nearest meter.
 - `latticeId(at)` derives a stable id from the coordinate, so two divers
   correcting the same position produce the same id and can be reconciled
   rather than duplicated.
@@ -56,12 +56,12 @@ falls with its size.**
   `cutoffEdge_m` (60 m). Past the cutoff a triangle is **dropped**, not drawn
   at zero opacity, so no material tweak can reveal it.
 - Vertices are **not shared** between triangles. Sharing would average a
-  well-sampled triangle's confidence with its guesswork neighbour's and quietly
+  well-sampled triangle's confidence with its guesswork neighbor's and quietly
   make the gaps look covered.
 - `coverageFraction()` is reported in the caption, so the render never has to be
   taken on trust.
 - The depth ramp is monotonic in **luminance** as well as hue, so it survives
-  greyscale and colour-blindness.
+  greyscale and color-blindness.
 
 A grid spaced wider than `cutoffEdge_m` renders as nothing at all — that bug
 happened, and `site-seeds.test.ts` now pins the spacing below the cutoff.
@@ -76,9 +76,9 @@ readable message when WebGL is unavailable.
   whatever the site's size) rather than an error — a diver needs a seabed to tap
   before anyone has measured anything.
 - **Vertical exaggeration** defaults to 3× and is **stated in the caption**. At
-  true scale, tens of metres of relief across hundreds of metres of width
+  true scale, tens of meters of relief across hundreds of meters of width
   flattens into nothing.
-- **Picking is screen-space**, not ray-vs-sphere: markers a metre across in a
+- **Picking is screen-space**, not ray-vs-sphere: markers a meter across in a
   500 m scene are a few pixels, and a tap means "nearest marker within ~24 px".
   A pointer that moves more than 6 px between down and up is a camera drag, not
   a tap.
@@ -117,7 +117,7 @@ disturbing what is there.
 
 ### Privacy: not quite git
 
-Attribution is modelled on a commit, with one deliberate difference. Git
+Attribution is modeled on a commit, with one deliberate difference. Git
 publishes an author's email because it is a tool for developers who accepted
 that trade. A dive-site map is read by strangers, so **only the display name
 travels with a published contribution**; the email stays in `profiles`,

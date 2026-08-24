@@ -103,7 +103,7 @@ the full list. Representative slices:
 | `duties.test.ts`                                           | Duty assignee trigger (must be staff or admin) |
 | `cert-levels-rls.test.ts`                                  | Reference data: read-open, write-admin |
 | `admin-audit-log.test.ts`                                  | Admin mutations land in the audit log |
-| `pii-retention.test.ts`                                    | TOS-acceptance + retention behaviours |
+| `pii-retention.test.ts`                                    | TOS-acceptance + retention behaviors |
 | `seed-integrity.test.ts`                                   | `supabase/seed.sql` still loads cleanly |
 | `cert-cards-storage.test.ts`                               | Storage bucket policies for cert-card uploads |
 | `profile-gear-sizes-rpc.test.ts`                           | RPC for atomic gear-size update |

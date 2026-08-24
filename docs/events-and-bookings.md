@@ -140,7 +140,7 @@ asked only when something goes on a foot, and only when the profile
 hasn't already got one.
 
 A gear-included course — Discover Scuba / Try Dive, Open Water, anything
-`isGearIncludedCourse` recognises — is a diver who owns nothing, so the
+`isGearIncludedCourse` recognizes — is a diver who owns nothing, so the
 form assumes the full set (`FULL_GEAR_SET`) rather than asking, and the
 booking records `gear: { rent: false, included: true }`. That assumption
 is exactly why the size question still has to be put: nobody chose the
@@ -295,7 +295,7 @@ unchanged: they still get the per-diver `buildPdfBase64` PDF.
 
 The sibling bookings are not copies of each other. Everything that is a
 property of the *trip* — room, add-ons, ride, payment method, the
-acknowledgements — carries over from the lead's form unchanged, but the
+acknowledgments — carries over from the lead's form unchanged, but the
 gear question is asked once per diver, and the money follows it. Each
 additional diver's question starts on the answer their own profile
 implies (`needsRental` / `defaultRentalItems` over their `gear_owned`),

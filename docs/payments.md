@@ -250,7 +250,7 @@ must be chosen:
 | Shop keeps it (a cancellation fee) | `bookings.cancellation_settled_at` |
 
 The first two move money. The third does not — the cash is already
-counted as revenue on that event — so it records an acknowledgement
+counted as revenue on that event — so it records an acknowledgment
 instead. Without one, a kept fee is indistinguishable from money nobody
 has dealt with, and its row would never leave the list.
 

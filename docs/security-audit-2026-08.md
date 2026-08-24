@@ -135,7 +135,7 @@ logged. A limiter that has lost its database should not become an outage of
 its own.
 
 `dive_log_export_requests` is left alone — the SPA reads it to render a
-countdown, so folding it in would be a behaviour change dressed as a refactor.
+countdown, so folding it in would be a behavior change dressed as a refactor.
 
 ### M3 — Child-account creation *(fixed)*
 
@@ -157,7 +157,7 @@ every surface that shows a diver's email.
 ### L1 — Group membership was self-asserted *(fixed)*
 
 `bookings.group_id` was client-generated and unvalidated, and
-`send-group-summary` authorises on "you hold a booking in this group". The
+`send-group-summary` authorizes on "you hold a booking in this group". The
 group PDF carries every member's name, date of birth, nationality and
 certification, so `group_id` was a capability token by accident — unguessable
 only because the client mints it with `crypto.randomUUID()`.

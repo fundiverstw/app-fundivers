@@ -109,7 +109,7 @@ checkbox should be added to signup).
 | `event_id` | n/a | which event was booked (FK → `events`) |
 | `status` | n/a | `pending` / `confirmed` / `waitlisted` / `cancelled` |
 | `notes` | sensitive | diver-supplied free text — may contain medical / personal info |
-| `details` | sensitive | JSONB with room choice, add-ons, gear preferences, transport, payment method, deposit acknowledgements |
+| `details` | sensitive | JSONB with room choice, add-ons, gear preferences, transport, payment method, deposit acknowledgments |
 | `created_at`, `updated_at` | n/a | |
 | `group_id` | n/a | links sibling bookings from one parent registration |
 | `cancelled_at` | n/a | |
@@ -364,7 +364,7 @@ enforced in code:
 | "Offline option — contact admin to keep PII off the app" | ⚠️ documented, no UX hook | text invites diver to email; no in-app prompt. Operator needs an internal process for receiving the message and recording the consent state. |
 | "We're a dive shop, not a tech company" | ✅ disclosure | accurate framing; lawyer should confirm acceptable under PDPA. |
 | Sub-processor list (Supabase, Cloudflare, Gmail, Web Push) | ✅ matches §5 | |
-| "Asia-Pacific data centres" | ✅ Supabase project is `aws-0-ap-east-1` (Hong Kong) per `.env.local` | operator to confirm exact region; covers the PDPA Article 21 cross-border-transfer obligation. |
+| "Asia-Pacific data centers" | ✅ Supabase project is `aws-0-ap-east-1` (Hong Kong) per `.env.local` | operator to confirm exact region; covers the PDPA Article 21 cross-border-transfer obligation. |
 | "Encrypted connections" | ✅ HTTPS everywhere (Cloudflare-fronted) | |
 | "Role-based access controls" | ✅ RLS + role gates | |
 | "Routine deletion of stale information" | ✅ `purge_stale_pii` covers all three card paths + bookings notes after the broaden | |
@@ -427,7 +427,7 @@ enforced in code:
 > - Push notifications: your browser's push service (Apple, Google, Mozilla)
 >
 > Your data sits on those providers' servers — most of it in
-> Asia-Pacific data centres. By using the app you're OK with that
+> Asia-Pacific data centers. By using the app you're OK with that
 > arrangement. If you'd rather we kept your information entirely off
 > these platforms, see the offline option in "What we collect" above.
 >
