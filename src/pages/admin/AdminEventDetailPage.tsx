@@ -184,6 +184,7 @@ export function AdminEventDetailPage() {
         ...credits.map(c => c.settled_by),
         ...bookings.map(b => b.cancelled_by),
         ...bookings.map(b => b.cancellation_settled_by),
+        ...bookings.map(b => b.created_by),
       ]).then(names => { if (!cancelled) setActorNames(names) }).catch(() => {})
 
       // Resolve any add-on / room IDs referenced in the bookings to display
@@ -1341,6 +1342,10 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
   const [expanded, setExpanded] = useState(false)
   const diverName = r.profile?.name ?? t.admin.transport.noProfile
 
+  const addedBy = r.booking.created_by && r.booking.created_by !== r.booking.user_id
+    ? actorName(r.booking.created_by)
+    : null
+
   // Balance nets open credit-for-this-event against what's owed. 'overpaid' is
   // kept distinct from 'credit' so a plain overpayment is never mislabelled as
   // an awarded account credit.
@@ -1456,6 +1461,13 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
           )}
           {isLeadOwn && (
             <span className="ml-2 text-xs font-semibold text-violet-300">{ed.leadPayer}</span>
+          )}
+          {/* Somebody other than the diver put them on this event — an admin
+              using Add diver, or a parent registering a child. No badge means
+              they registered themselves; a booking made before created_by
+              existed has nobody to name and reads the same way. */}
+          {addedBy && (
+            <span className="ml-2 text-xs font-semibold text-sky-300">{ed.addedBy(addedBy)}</span>
           )}
         </span>
         <span className="shrink-0 flex items-center gap-1.5">

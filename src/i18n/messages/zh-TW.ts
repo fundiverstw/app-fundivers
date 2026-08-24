@@ -1643,6 +1643,7 @@ export const zhTW: Messages = {
       waitlistConfirmEmailFailed: '已確認報名，但通知信寄送失敗，請自行聯繫潛水員。',
       paidBy: (name: string) => `由 ${name} 支付`,
       leadPayer: '主要付款人',
+      addedBy: (name: string) => `由 ${name} 代為報名`,
       paidAmount: (amount: string) => `已付 ${amount}`,
       settled: '已結清',
       dueAmount: (amount: string) => `尚欠 ${amount}`,

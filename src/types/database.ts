@@ -737,6 +737,12 @@ export interface Database {
            *  migration, or any service-role write. */
           cancelled_at: string | null
           cancelled_by: string | null
+          /** Who created this booking — the diver themselves, a parent, or an
+           *  admin using Add diver. Stamped by trg_bookings_stamp_created_by
+           *  and never writable by a caller. Equal to `user_id` means they
+           *  registered themselves; null means nobody knows (the guest path,
+           *  or a booking predating 20260826000000). */
+          created_by: string | null
           /** Shared id linking all bookings submitted together by a parent
            *  as a group registration. Null on solo registrations. Added in
            *  20260514030000_parent_child_accounts.sql; populated by the

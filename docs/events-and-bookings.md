@@ -205,6 +205,8 @@ The form does **not** write to `bookings` directly. It invokes the
      has-it-passed check and to read the right dates for the emailed copy
      (`usesCourseDays(event_type)` picks `course_days` over the envelope)
    - `notes` — free-text field from the form
+   - `created_by` — who is doing the registering, taken from the verified
+     Bearer token, never from the body. See below.
    - `details` JSONB — see
      [data-model.md § BookingDetails](./data-model.md#bookingdetails-jsonb-shape).
      `total` / `deposit` / `charges` are snapshots, and the function
@@ -226,6 +228,37 @@ the just-created auth user so the diver can retry cleanly.
 The **admin edit path** (`existingBooking` set) skips the edge
 function and updates `bookings.notes` / `bookings.details` directly
 under the admin's RLS — no PDF, no account creation.
+
+### Who registered this diver
+
+`bookings.created_by` answers it, and the admin event page shows
+**"Added by <name>"** on any registrant whose booking somebody else
+made. No badge means they signed themselves up — the ordinary case, and
+the silence is what makes the badge worth scanning for.
+
+It is stamped, never accepted from a caller, for the same reason
+`cancelled_by` is: a value a diver can write is a value a diver can
+dispute. `trg_bookings_stamp_created_by` gives the three insert paths
+three different answers, because only one of them runs as the person
+doing it:
+
+| Path | What is recorded |
+| --- | --- |
+| `authenticated` (PostgREST) | Forced to `auth.uid()`, ignoring anything sent |
+| SECURITY DEFINER RPC | Falls back to `auth.uid()` — the JWT claim survives even though `current_user` is the owner |
+| service_role (the edge function) | The value supplied, already resolved from a verified Bearer token |
+
+An UPDATE never moves it: who made a booking is a fact about the past.
+
+Reading it: `created_by = user_id` is "registered themselves". **Null is
+not the same as self** — it means nobody can be named, which covers the
+guest path (no account existed until the request that made the booking)
+and every booking predating the column. Both render as no badge, so the
+distinction only matters if you query it directly.
+
+Note that PostgREST admits only two on-behalf inserts — self, and a
+parent registering a child. An admin cannot reach `bookings` directly at
+all, which is why Add diver goes through `create-registration`.
 
 ### Group registrations — one consolidated PDF
 

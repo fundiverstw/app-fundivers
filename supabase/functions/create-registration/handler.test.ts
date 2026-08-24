@@ -539,6 +539,28 @@ describe('handleRegistration — target_user_id (on-behalf-of) path security', (
     expect(captured.bookingInsert[0].payer_id).toBe('parent-uid')
   })
 
+  it('records the admin caller as who added the booking', async () => {
+    // The badge on the registrant row reads this. It comes from the verified
+    // Bearer token, never from the body: the insert runs as service_role, where
+    // the stamping trigger has no auth.uid() of its own to fall back on.
+    const { deps, captured } = makeDeps({ callerRole: 'admin', callerUserId: 'admin-uid' })
+    await handleRegistration(postJson({
+      ...goodBody,
+      target_user_id: 'some-target-uid',
+      created_by:     'somebody-else',
+    }, { Authorization: 'Bearer admin-jwt' }), deps)
+    expect(captured.bookingInsert[0].created_by).toBe('admin-uid')
+  })
+
+  it('records a self-registration as made by the diver themselves', async () => {
+    const { deps, captured } = makeDeps({ callerRole: 'diver', callerUserId: 'self-uid' })
+    await handleRegistration(postJson(goodBody, { Authorization: 'Bearer self-jwt' }), deps)
+    // created_by === user_id is what every surface reads as "registered
+    // themselves", so it must be set, not left null.
+    expect(captured.bookingInsert[0].created_by).toBe('self-uid')
+    expect(captured.bookingInsert[0].user_id).toBe('self-uid')
+  })
+
   it('drops a payer_id that is neither the registrant nor the caller', async () => {
     const { deps, captured } = makeDeps({
       callerRole: 'diver',

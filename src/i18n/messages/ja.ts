@@ -1642,6 +1642,7 @@ export const ja: Messages = {
       waitlistConfirmEmailFailed: '確定しましたが、メールを送信できませんでした。直接ご連絡ください。',
       paidBy: (name: string) => `${name} が支払い`,
       leadPayer: '幹事（支払い担当）',
+      addedBy: (name: string) => `${name} が代理登録`,
       paidAmount: (amount: string) => `${amount} 支払い済み`,
       settled: '精算済み',
       dueAmount: (amount: string) => `残額 ${amount}`,

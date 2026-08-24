@@ -526,6 +526,12 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
       details:  body.details,
       group_id: body.group_id ?? null,
       payer_id: payerId,
+      // Who is doing the registering. This runs as service_role, where the
+      // stamping trigger has no auth.uid() to read, so the value it takes is
+      // the one resolved above from a verified Bearer token — never anything
+      // the client sent. Null on the guest path: the registrant had no account
+      // until this request created one.
+      created_by: callerId,
       ...fk,
     })
     .select()

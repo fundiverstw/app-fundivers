@@ -1663,6 +1663,7 @@ export const en = {
       waitlistConfirmEmailFailed: 'Confirmed, but the email failed. Tell the diver yourself.',
       paidBy: (name: string) => `Paid by ${name}`,
       leadPayer: 'Lead payer',
+      addedBy: (name: string) => `Added by ${name}`,
       paidAmount: (amount: string) => `Paid ${amount}`,
       settled: 'Settled',
       dueAmount: (amount: string) => `${amount} due`,

@@ -1069,6 +1069,37 @@ describe('AdminEventDetailPage', () => {
     await waitFor(() => expect(toastError).toHaveBeenCalledWith(expect.stringMatching(/Export failed.*smtp down/)))
   })
 
+  it('names who added a diver, and says nothing when they registered themselves', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
+    ]))
+    const bookings = [
+      // Added by the shop.
+      { id: 'b-added', user_id: 'u2', payer_id: null, created_by: 'u9', status: 'confirmed', created_at: '2026-04-20',
+        event_id: 'dive_x', notes: null, refund_requested_at: null, details: { total: 3000 } },
+      // Signed themselves up.
+      { id: 'b-self', user_id: 'u1', payer_id: null, created_by: 'u1', status: 'confirmed', created_at: '2026-04-20',
+        event_id: 'dive_x', notes: null, refund_requested_at: null, details: { total: 3000 } },
+    ]
+    const profiles = [
+      { id: 'u1', name: 'Solo Sam', nickname: null, cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, contact_method: null, contact_id: null },
+      { id: 'u2', name: 'Walkin Wu', nickname: null, cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, contact_method: null, contact_id: null },
+      { id: 'u9', name: 'Admin Ada', nickname: null, cert_agency: null, cert_level: null, nitrox_certified: false, logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null, contact_method: null, contact_id: null },
+    ]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: bookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    renderAt('/admin/events/dive_x')
+
+    expect(await screen.findByText(/Added by Admin Ada/i)).toBeInTheDocument()
+    // Exactly one badge: the self-registered row is the silent case, which is
+    // what makes the badge worth scanning for.
+    expect(screen.getAllByText(/^Added by/i)).toHaveLength(1)
+  })
+
   it('shows lead-payer badges, records one group payment, and can bill a covered diver back to themselves', async () => {
     fetchEventsForBookings.mockResolvedValue(new Map([
       ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
