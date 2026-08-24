@@ -32,6 +32,27 @@ describe('EventWaiverOverrides', () => {
     expect(screen.getByText(/boat travel & scuba diving liability release/i)).toBeInTheDocument()
   })
 
+  it('paints the selected side with a fill the dark retrofit leaves alone', async () => {
+    // The regression this locks: the selected half used to be bg-white +
+    // text-brand-900, and index.css re-points both to dark-theme values, so it
+    // rendered as a dark fill under near-white ink -- the same thing the
+    // unselected half already was. Which side is chosen has to be legible
+    // without comparing two near-identical greys.
+    vi.spyOn(waivers, 'fetchEventWaiverOverrides').mockResolvedValue([])
+    render(<EventWaiverOverrides event={owCourse} isAdmin createdBy="admin1" />)
+
+    const ceRow = (await screen.findByText(/continuing education liability release/i)).closest('li')!
+    const chosen   = within(ceRow).getByRole('button', { name: /required/i })
+    const unchosen = within(ceRow).getByRole('button', { name: /exempt/i })
+
+    expect(chosen).toHaveAttribute('aria-pressed', 'true')
+    expect(unchosen).toHaveAttribute('aria-pressed', 'false')
+    expect(chosen.className).toContain('bg-reef-500')
+    expect(chosen.className).toContain('text-slate-950')
+    expect(chosen.className).not.toContain('bg-white')
+    expect(unchosen.className).not.toContain('bg-reef-500')
+  })
+
   it('persists an exempt override when a rule-required waiver is toggled off', async () => {
     vi.spyOn(waivers, 'fetchEventWaiverOverrides').mockResolvedValue([])
     const setSpy = vi.spyOn(waivers, 'setEventWaiverOverride').mockResolvedValue()

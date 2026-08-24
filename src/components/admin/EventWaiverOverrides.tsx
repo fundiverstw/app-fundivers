@@ -96,7 +96,7 @@ export function EventWaiverOverrides({ event, isAdmin, createdBy }: {
                   </span>
                 </span>
                 {isAdmin && (
-                  <span className="shrink-0 inline-flex rounded-lg overflow-hidden border border-white/20">
+                  <span className="shrink-0 inline-flex rounded-lg overflow-hidden border border-white/20 divide-x divide-white/20">
                     <SegBtn active={required} disabled={busyCode === def.code} onClick={() => setRequired(def, true)}>{ew.required}</SegBtn>
                     <SegBtn active={!required} disabled={busyCode === def.code} onClick={() => setRequired(def, false)}>{ew.exempt}</SegBtn>
                   </span>
@@ -120,8 +120,16 @@ function SegBtn({ active, disabled, onClick, children }: {
       aria-pressed={active}
       disabled={disabled}
       onClick={onClick}
+      // bg-white/text-brand-900 is what this used to be, and the dark retrofit
+      // in index.css re-points both -- a dark navy fill under near-white ink,
+      // which is what the unselected half already looks like. A bright fill
+      // with text-slate-950 is the one pairing that block deliberately leaves
+      // alone, and dimming the unselected label puts a second difference on
+      // the same control.
       className={`px-3 py-1 text-xs font-semibold transition-colors disabled:opacity-50 ${
-        active ? 'bg-white text-brand-900' : 'bg-transparent text-white hover:bg-white/10'
+        active
+          ? 'bg-reef-500 text-slate-950'
+          : 'bg-transparent text-white/60 hover:bg-white/10 hover:text-white'
       }`}
     >
       {children}
