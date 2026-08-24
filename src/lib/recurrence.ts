@@ -186,7 +186,7 @@ export function occurrenceDates(rule: RecurrenceRule, anchorIso: string): string
     month1 += interval
     while (month1 > 12) { month1 -= 12; year += 1 }
     const date = nthWeekdayOfMonth(year, month1, weekday, position)
-    // Skipped, never nudged to a neighbouring week: the shop asked for a
+    // Skipped, never nudged to a neighboring week: the shop asked for a
     // specific weekday-in-month, and a dive silently moved by a week is worse
     // than one missing from the batch that they can add by hand.
     if (date) out.push(date)

@@ -1,4 +1,4 @@
-// Audit M4 — shared CORS + error-sanitisation helpers for every
+// Audit M4 — shared CORS + error-sanitization helpers for every
 // edge function entry point. Previously each `index.ts` shipped
 // CORS `*` and echoed `err.message` verbatim (which on Postgres /
 // PostgREST is the raw SQL error — constraint names, column names,

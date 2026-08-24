@@ -7,8 +7,8 @@ const d = c.destinations
 
 // The dive-location catalog (Green Island, Palau, Kenting…). Dives link to
 // these via the event_destinations junction (the EventForm "Destinations"
-// picker). `divetype` drives the calendar's local-vs-trip colour bucket:
-// only 'Shore Diving' destinations colour a dive local (green) — see
+// picker). `divetype` drives the calendar's local-vs-trip color bucket:
+// only 'Shore Diving' destinations color a dive local (green) — see
 // src/lib/event-colors.ts.
 const fields: CatalogField<TravelDestination>[] = [
   { key: 'admin_title',        label: c.adminTitle, type: 'text', required: true, placeholder: d.adminTitlePh },

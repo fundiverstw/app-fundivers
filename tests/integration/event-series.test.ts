@@ -473,7 +473,7 @@ describe('create_events_with_relations', () => {
   })
 
   // SECURITY INVOKER: the events / event_series RLS policies do the
-  // authorisation, so there is no second gate here to drift out of step.
+  // authorization, so there is no second gate here to drift out of step.
   it('lets an admin call it and refuses a staff user', async () => {
     const asAdmin = await userClient(adminUser.email, adminUser.password)
     const ok = await asAdmin.rpc('create_events_with_relations', {

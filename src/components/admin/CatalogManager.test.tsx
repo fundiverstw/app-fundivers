@@ -165,7 +165,7 @@ describe('CatalogManager — boolean fields', () => {
     return { inserts, updates }
   }
 
-  it('serialises an unchecked box as false and a ticked one as true', async () => {
+  it('serializes an unchecked box as false and a ticked one as true', async () => {
     const { inserts } = renderFlags([])
     const user = userEvent.setup()
 

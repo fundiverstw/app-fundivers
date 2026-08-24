@@ -7,7 +7,7 @@ import {
 describe('parseRegisterScheduledTripInput', () => {
   const ok = { scheduled_trip_id: 's1', addon_ids: ['a1', 'a2'], room_id: 'r1', notes: 'hi' }
 
-  it('accepts and normalises a valid body', () => {
+  it('accepts and normalizes a valid body', () => {
     const res = parseRegisterScheduledTripInput(ok)
     expect('request' in res && res.request).toEqual({
       scheduledTripId: 's1', addonIds: ['a1', 'a2'], roomId: 'r1', notes: 'hi',

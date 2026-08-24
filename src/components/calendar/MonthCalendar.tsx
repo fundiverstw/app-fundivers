@@ -69,8 +69,8 @@ const COURSE_DOT: Record<CourseColor, string> = {
 
 
 // Fill for kinds that don't own one of the two bespoke palettes above.
-// A full Record so a new kind must choose a colour: falling through to the
-// course palette would colour it by regex-matching its title against course
+// A full Record so a new kind must choose a color: falling through to the
+// course palette would color it by regex-matching its title against course
 // names, which lands somewhere arbitrary.
 const KIND_BAR: Record<EventKind, { base: string; hover: string }> = {
   dive:   { base: DIVE_LOCAL_BAR, hover: DIVE_LOCAL_BAR_HOVER },
@@ -124,7 +124,7 @@ const OWN_DUTY_STRIPE = 'repeating-linear-gradient(45deg, transparent 0 6px, #7c
 
 // Event/busy bar row height and the gap between stacked bars. Sized to seat the
 // text-xs pill label comfortably now that the app runs a larger base font — the
-// bar height doubles as the label's line-height so the title vertical-centres.
+// bar height doubles as the label's line-height so the title vertical-centers.
 const TRACK_HEIGHT = 24
 const TRACK_GAP = 3
 
@@ -878,7 +878,7 @@ function FilterLegend({
       {/* One toggle per non-course kind. Courses get the category dropdown
           beside this instead, since they filter by course type rather than by
           kind. Dives keep their split dot (local | trip-or-boat); any other
-          kind shows its single pill colour. */}
+          kind shows its single pill color. */}
       {NON_COURSE_KINDS.map(kind => {
         const shown = !hiddenKinds.has(kind)
         return (

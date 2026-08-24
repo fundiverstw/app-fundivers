@@ -6,7 +6,7 @@
 //    PostgrestError / FunctionsHttpError shapes, which aren't instanceof
 //    Error but do carry a useful `.message` field.
 //
-// 2. Audit L3 sanitisation. PostgREST / Postgres errors arrive with a
+// 2. Audit L3 sanitization. PostgREST / Postgres errors arrive with a
 //    SQLSTATE `code` and a `message` that often discloses schema details
 //    — column names, constraint names, occasionally row contents
 //    ("duplicate key value violates unique constraint

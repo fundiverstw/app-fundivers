@@ -12,7 +12,7 @@ describe('site seeds', () => {
 
   it('sizes the canvas to how far a dive ranges, not how far it swims', () => {
     // Wide enough for an out-and-back shore dive to stay on the map, and no
-    // wider: every extra metre of field costs precision at a fixed screen size.
+    // wider: every extra meter of field costs precision at a fixed screen size.
     expect(SITE_EXTENT_M * 2).toBe(500)
   })
 
@@ -28,11 +28,11 @@ describe('site seeds', () => {
 })
 
 describe('the implicit lattice', () => {
-  it('is spaced one metre', () => {
+  it('is spaced one meter', () => {
     expect(LATTICE_SPACING_M).toBe(1)
   })
 
-  it('snaps a tap to the nearest metre', () => {
+  it('snaps a tap to the nearest meter', () => {
     expect(snapToLattice({ x: 12.4, y: -7.6 })).toEqual({ x: 12, y: -8 })
     expect(snapToLattice({ x: -0.4, y: 0.5 })).toEqual({ x: -0, y: 1 })
   })
@@ -42,11 +42,11 @@ describe('the implicit lattice', () => {
     expect(latticeId({ x: 12, y: -8 })).toBe('lat:12:-8')
   })
 
-  it('gives neighbouring metres different ids', () => {
+  it('gives neighboring meters different ids', () => {
     expect(latticeId({ x: 12, y: -8 })).not.toBe(latticeId({ x: 13, y: -8 }))
   })
 
-  it('costs nothing at rest — a kilometre of lattice stores no records', () => {
+  it('costs nothing at rest — a kilometer of lattice stores no records', () => {
     // The point of an implicit lattice: a 1 km site at 1 m spacing is over a
     // million positions and zero rows until somebody records something.
     expect(newSiteMap('x', 'X').soundings).toHaveLength(0)

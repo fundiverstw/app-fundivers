@@ -164,7 +164,7 @@ export function AdminRefundsPage() {
   // The shop keeps the money. Records no movement — the cash is already on the
   // booking as revenue — only that someone decided it, which is what lets the
   // row leave the list. The diver is shown the kept amount on their own
-  // booking, so this is an acknowledgement, not a quiet write-off.
+  // booking, so this is an acknowledgment, not a quiet write-off.
   async function keepAsFee(row: UnreconciledCancellation) {
     if (!profile?.id) return
     setActing(row.bookingId)

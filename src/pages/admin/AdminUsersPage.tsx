@@ -729,7 +729,7 @@ function UserCard({
   )
 }
 
-// Sits at the top of the expanded diver, above the sections it summarises, so
+// Sits at the top of the expanded diver, above the sections it summarizes, so
 // an admin sees at a glance whether anything is outstanding before scrolling
 // the field-by-field chips.
 function IncompleteBanner({ user }: { user: Profile }) {

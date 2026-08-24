@@ -95,7 +95,7 @@ async function loadSeason(
   if (peopleRes.error) throw peopleRes.error
   if (priceRes.error) throw priceRes.error
 
-  // The catalogue price only backstops bookings taken before charges were
+  // The catalog price only backstops bookings taken before charges were
   // snapshotted; a booking with its own base line never consults it.
   const priceById = new Map((priceRes.data ?? []).map(p => [p.id, Number(p.starting_at) || 0]))
 

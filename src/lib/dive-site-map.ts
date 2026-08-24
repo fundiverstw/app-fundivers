@@ -2,22 +2,22 @@
 //
 // Three decisions shape everything here.
 //
-// 1. POSITIONS ARE SITE-LOCAL METRES, not latitude/longitude. A hand-drawn
+// 1. POSITIONS ARE SITE-LOCAL METERS, not latitude/longitude. A hand-drawn
 //    site map carries a scale bar and a compass rose but no coordinates, and a
-//    diver contributing a sounding knows "twelve metres past the Dragon Head",
-//    not their WGS84 position. So the frame is metres east/north of a site
+//    diver contributing a sounding knows "twelve meters past the Dragon Head",
+//    not their WGS84 position. So the frame is meters east/north of a site
 //    origin, and georeferencing is a separate, optional transform (`SiteFrame.
 //    origin`) applied when — and only when — someone has actually surveyed the
 //    origin. A map with no origin is still a usable map.
 //
-// 2. DEPTH CARRIES ITS DATUM, AND ITS TIME. `depth_m` is metres below the
+// 2. DEPTH CARRIES ITS DATUM, AND ITS TIME. `depth_m` is meters below the
 //    datum named in `datum`, positive downward (matching
 //    `dive_logs.max_depth_m`). A dive computer reads depth below whatever
 //    surface it is under at that moment, so a diver's contribution is
 //    `instantaneous` and moves with the tide; only a reading with a known
 //    `observed_at` can later be reduced to `TWCD2021`. A depth read off an
 //    undated hand-drawn map can never be, and says `unknown`. Mixing datums
-//    silently is how a chart ends up a metre out, so `datum` is required and
+//    silently is how a chart ends up a meter out, so `datum` is required and
 //    has no default.
 //
 // 3. FEATURES ARE NOT ALL 2.5D. A bathymetric grid stores one depth per
@@ -56,21 +56,21 @@ export type ObservationSource = 'hand_drawn' | 'diver' | 'survey' | 'placeholder
 export type DepthDatum = 'unknown' | 'TWCD2021' | 'instantaneous'
 
 export interface Provenance {
-  /** The person or organisation who made this observation or drawing. */
+  /** The person or organization who made this observation or drawing. */
   author: string
   year?: number
   /** Free text, reproduced wherever the map is displayed. Hand-drawn sources
    *  routinely carry their own accuracy disclaimer and it must not be dropped. */
   note?: string
-  /** Licence or permission status. A map may be digitised for study before it
+  /** License or permission status. A map may be digitized for study before it
    *  may be published, so the two states are distinct. */
-  licence?: string
+  license?: string
 }
 
 export interface Sounding {
   id: string
   at: Vec2
-  /** Metres below `datum`, positive downward. */
+  /** Meters below `datum`, positive downward. */
   depth_m: number
   datum: DepthDatum
   /** When the depth was read, ISO 8601.
@@ -90,7 +90,7 @@ export interface Sounding {
   /** The scaffold point this reading replaces, when a diver corrected one of
    *  the starting grid points rather than adding a new position. */
   supersedes?: string
-  /** Metres of horizontal uncertainty, when known. A hand-drawn sounding has
+  /** Meters of horizontal uncertainty, when known. A hand-drawn sounding has
    *  no meaningful figure; a diver contribution positioned from a surface
    *  float does. */
   uncertainty_m?: number
@@ -142,7 +142,7 @@ export interface RouteBearing {
   from: Vec2
   /** Degrees true, 0–359. */
   degrees: number
-  /** Metres, when the source implies a distance. */
+  /** Meters, when the source implies a distance. */
   distance_m?: number
   label?: string
 }
@@ -163,7 +163,7 @@ export interface SiteFrame {
 
 export interface DiveSiteMap {
   id: string
-  /** How far the site extends from its origin, in metres, when nothing has
+  /** How far the site extends from its origin, in meters, when nothing has
    *  been recorded yet. Gives an empty site a canvas without inventing data. */
   extent_m?: number
   /** Local name as the shop uses it, plus an optional romanisation. Both are
@@ -183,7 +183,7 @@ export interface DiveSiteMap {
 // Divers correct depths on a 1 m lattice. The lattice is IMPLICIT: no record
 // exists for a position until somebody puts a reading there.
 //
-// Storing it would not work. A site a kilometre across at 1 m spacing is over
+// Storing it would not work. A site a kilometer across at 1 m spacing is over
 // a million positions; as rows they are a million writes of nothing, as meshes
 // a million draw calls, and as input to a triangulation a multi-second stall on
 // a phone. Implied, the same lattice costs nothing at rest — only the part on
@@ -229,7 +229,7 @@ function pointsOf(map: DiveSiteMap): Vec2[] {
   return out
 }
 
-/** The extent of everything on the map, in site-local metres. Returns null for
+/** The extent of everything on the map, in site-local meters. Returns null for
  *  an empty map so the caller renders an empty state rather than a degenerate
  *  viewBox, which SVG draws as a single stretched pixel. */
 export function boundsOf(map: DiveSiteMap): Bounds | null {

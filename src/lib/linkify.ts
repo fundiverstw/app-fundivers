@@ -7,7 +7,7 @@
 // reflow the whitespace and eat any stray asterisk, so this stays a splitter —
 // it never builds HTML, and the caller decides what an anchor looks like.
 //
-// Recognised: http:// and https:// URLs, plus a bare www. host (rendered with
+// Recognized: http:// and https:// URLs, plus a bare www. host (rendered with
 // https:// prepended). Nothing else — a `javascript:` or `data:` run is text,
 // which is the safe failure mode.
 

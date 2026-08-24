@@ -3,7 +3,7 @@ import { adminClient, anonClient, createTestUser, deleteTestUser, type TestUser 
 
 // take_action_slot is the ceiling behind every mail-sending edge function an
 // ordinary diver can reach. The edge functions are thin wrappers over it, so
-// the behaviour that matters is pinned here.
+// the behavior that matters is pinned here.
 // See 20260813000000_shared_user_action_rate_limit.sql.
 
 const admin = adminClient()

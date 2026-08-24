@@ -89,7 +89,7 @@ export function DateField({
       </span>
       {/* A real native date input, laid over the calendar icon at zero opacity.
           Tapping the icon taps this, so a mobile browser opens its own picker
-          through ordinary behaviour — nothing depends on showPicker(), whose
+          through ordinary behavior — nothing depends on showPicker(), whose
           support and its activation / visibility rules are uneven across
           mobile. It replaced a throwaway hidden input built on click, which
           never reliably opened a picker on a phone.
@@ -98,7 +98,7 @@ export function DateField({
           from a click anywhere on the field, so ask explicitly there.
 
           Being a real input also makes it safe inside a wrapping field
-          <label>: a label skips its activation behaviour for events targeting
+          <label>: a label skips its activation behavior for events targeting
           interactive content within it, so the tap is not re-dispatched onto
           the text input. The <span role="button"> this replaced was not
           interactive content, so it was re-dispatched — focusing the text

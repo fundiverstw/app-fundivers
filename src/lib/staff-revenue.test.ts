@@ -82,7 +82,7 @@ describe('eventSpan', () => {
 })
 
 describe('bookingBase', () => {
-  it('takes the snapshotted base line over the live catalogue price', () => {
+  it('takes the snapshotted base line over the live catalog price', () => {
     const details = { charges: [{ kind: 'base', amount: 14400 }] }
     expect(bookingBase(details, 15400)).toBe(14400)
   })
@@ -100,7 +100,7 @@ describe('bookingBase', () => {
     expect(bookingBase(details, 15400)).toBe(15400)
   })
 
-  it('falls back to the catalogue price for a booking with no snapshot', () => {
+  it('falls back to the catalog price for a booking with no snapshot', () => {
     expect(bookingBase(null, 15400)).toBe(15400)
     expect(bookingBase({ charges: [] }, 15400)).toBe(15400)
     expect(bookingBase({ charges: [{ kind: 'gear', amount: 400 }] }, 15400)).toBe(15400)

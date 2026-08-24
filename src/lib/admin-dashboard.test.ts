@@ -3,12 +3,12 @@ import { computeDashboard, calendarYearMonths, type DashboardInput } from './adm
 import { EVENT_KIND_LABELS } from './event-kind-labels'
 
 describe('calendarYearMonths', () => {
-  it('returns Jan→Dec so the peak season sits in the centre columns', () => {
+  it('returns Jan→Dec so the peak season sits in the center columns', () => {
     const keys = calendarYearMonths(2026)
     expect(keys).toHaveLength(12)
     expect(keys[0]).toBe('2026-01')
     expect(keys[11]).toBe('2026-12')
-    // Jun/Jul/Aug occupy the centre of a 12-column chart (indices 5,6,7).
+    // Jun/Jul/Aug occupy the center of a 12-column chart (indices 5,6,7).
     expect(keys.slice(5, 8)).toEqual(['2026-06', '2026-07', '2026-08'])
   })
 })

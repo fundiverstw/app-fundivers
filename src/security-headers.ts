@@ -4,7 +4,7 @@
 // unit-tested without standing up a Worker runtime.
 //
 // Directives kept tight on purpose:
-//   * frame-ancestors 'none'      — clickjacking defence on the admin panel
+//   * frame-ancestors 'none'      — clickjacking defense on the admin panel
 //   * script-src 'self' …         — only same-origin + Turnstile widget
 //   * connect-src 'self' …        — same-origin, Supabase, Turnstile,
 //                                    Open-Meteo (admin weather BI fetch)

@@ -25,7 +25,7 @@ const DAY_MS = 86_400_000
 export function globalRuleMatches(def: WaiverDef, event: WaiverEventRef): boolean {
   const scope = WAIVER_SCOPE_BY_KIND[event.type]
   if (def.appliesTo !== scope && def.appliesTo !== 'all') return false
-  // Course colours narrow a course-scoped rule to particular course types;
+  // Course colors narrow a course-scoped rule to particular course types;
   // they have no meaning for kinds that aren't courses.
   if (usesCourseDays(event.type) && def.courseColors && def.courseColors.length > 0) {
     return def.courseColors.includes(courseColor(event.title))

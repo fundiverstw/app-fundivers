@@ -136,7 +136,7 @@ describe('selectUnreconciled', () => {
 
   // Third ending: the shop keeps the money as a cancellation fee. Nothing
   // moves — the cash is already revenue on that event — so only an explicit
-  // acknowledgement can take the row off the list. Without it a kept fee is
+  // acknowledgment can take the row off the list. Without it a kept fee is
   // indistinguishable from money nobody has dealt with, and the row would sit
   // there every season until the list stopped being worth reading.
   it('clears once an admin says the shop keeps the money', () => {

@@ -20,16 +20,16 @@ export interface Triangle {
   a: number
   b: number
   c: number
-  /** Longest edge in metres — the span the triangle interpolates across. */
+  /** Longest edge in meters — the span the triangle interpolates across. */
   maxEdge_m: number
   /** 0 (pure guesswork) to 1 (well supported). */
   confidence: number
 }
 
 export interface SurfaceOptions {
-  /** Longest edge, in metres, still drawn at full confidence. */
+  /** Longest edge, in meters, still drawn at full confidence. */
   solidEdge_m?: number
-  /** Longest edge, in metres, beyond which a triangle is not drawn at all. */
+  /** Longest edge, in meters, beyond which a triangle is not drawn at all. */
   cutoffEdge_m?: number
 }
 
@@ -102,7 +102,7 @@ export type Rgb = [number, number, number]
  * Shallow-to-deep ramp, pale cyan through to deep blue.
  *
  * Monotonic in lightness as well as hue, so it survives being read in
- * greyscale or by a colour-blind diver — the depth ordering is carried by
+ * greyscale or by a color-blind diver — the depth ordering is carried by
  * brightness, and hue only reinforces it.
  */
 export function depthColor(depth_m: number, range: DepthRange): Rgb {
@@ -135,7 +135,7 @@ export interface SurfaceGeometry {
  *
  * Vertices are NOT shared between triangles: confidence belongs to a triangle,
  * and sharing a vertex would average a well-supported triangle's opacity with
- * its guesswork neighbour's, quietly making the gaps look better covered than
+ * its guesswork neighbor's, quietly making the gaps look better covered than
  * they are.
  */
 export function buildSurface(map: DiveSiteMap, opts: SurfaceOptions = {}): SurfaceGeometry | null {

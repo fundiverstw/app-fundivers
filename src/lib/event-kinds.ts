@@ -10,7 +10,7 @@
 // Almost every kind check in this codebase used to be written as
 // `type === 'dive' ? … : …`, where the else-branch silently meant "course".
 // That reads fine with two kinds and becomes a trap the moment there is a
-// third: a new kind inherits course behaviour everywhere, with no compile
+// third: a new kind inherits course behavior everywhere, with no compile
 // error and often no visible symptom (an event that is simply never fetched).
 //
 // Branch on what the code actually cares about instead — the temporal shape,

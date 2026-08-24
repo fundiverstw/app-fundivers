@@ -17,13 +17,13 @@ import type { DiveSiteMap } from './dive-site-map'
 // contributions are positioned relative to each other until then.
 
 /**
- * Half-width of a new site's canvas, in metres — a 500 m square.
+ * Half-width of a new site's canvas, in meters — a 500 m square.
  *
  * Sized to how far a dive RANGES, not how far it swims. A shore dive covering a
- * kilometre of path is usually an out-and-back that never gets more than two or
- * three hundred metres from the entry, so a kilometre-wide field is mostly
+ * kilometer of path is usually an out-and-back that never gets more than two or
+ * three hundred meters from the entry, so a kilometer-wide field is mostly
  * empty water. That emptiness is not free: the wider the field, the fewer
- * metres per screen pixel, and the harder it is to tap the metre you meant.
+ * meters per screen pixel, and the harder it is to tap the meter you meant.
  */
 export const SITE_EXTENT_M = 250
 
@@ -41,7 +41,7 @@ export function newSiteMap(id: string, name: string, name_en?: string): DiveSite
     frame: {},
     provenance: {
       author: 'FunDivers TW',
-      licence: 'Contributions by divers, reviewed before publication',
+      license: 'Contributions by divers, reviewed before publication',
     },
     soundings: [],
     features: [],

@@ -84,7 +84,7 @@ describe('private events are not public', () => {
     expect(await seesPrivate(anonClient())).toBe(false)
   })
 
-  it('a logged-out visitor can still read the public catalogue', async () => {
+  it('a logged-out visitor can still read the public catalog', async () => {
     const { data } = await anonClient().from('events').select('id').eq('id', publicEventId)
     expect(data).toHaveLength(1)
   })

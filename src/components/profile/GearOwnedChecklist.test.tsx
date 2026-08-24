@@ -74,7 +74,7 @@ describe('GearOwnedChecklist', () => {
     expect(styles()).toHaveTextContent('rubber sole, felt sole')
   })
 
-  it('starts ticked, closed and summarised for a diver who already owns a pair', () => {
+  it('starts ticked, closed and summarized for a diver who already owns a pair', () => {
     render(<Harness initial={[RUBBER]} />)
     expect(box('Boots').checked).toBe(true)
     expect(styles()).toHaveTextContent('rubber sole')

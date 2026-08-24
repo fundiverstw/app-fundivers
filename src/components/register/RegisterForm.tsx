@@ -462,7 +462,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // Account credit can be applied at checkout by any signed-in caller — the
   // spend is self-gating. The form only offers a target's credit if it can
   // READ that target's credit rows (RLS: a diver reads their own, a parent
-  // their child's, an admin anyone's), and apply_credit_to_booking authorises
+  // their child's, an admin anyone's), and apply_credit_to_booking authorizes
   // exactly the same set (migration 20260729000000). So admins and parents
   // can apply a diver's credit here too, not just a diver for themselves.
   // Guests (no account yet) and edits are excluded; edits settle on Payments.
@@ -1202,7 +1202,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
     // Each additional diver's booking differs from the lead's in exactly the
     // gear they rent and the money that follows from it. Everything else —
-    // room, add-ons, ride, payment method, acknowledgements — is a property of
+    // room, add-ons, ride, payment method, acknowledgments — is a property of
     // the trip the lead booked, so it carries over unchanged.
     const detailsForTarget = (m: typeof additionalMoney[number]): BookingDetails => ({
       ...details,
@@ -1237,7 +1237,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     // (creates the account with email_confirm: true) when email/password
     // are provided; authed callers' Bearer JWT identifies the user.
     // When actingOnBehalfOf is set, the caller (admin or parent) JWT is
-    // used to authorise, but the booking lands on target_user_id.
+    // used to authorize, but the booking lands on target_user_id.
     const { data, error } = await invokeWithRetry<{ booking_id: string; status?: string; session: { access_token: string; refresh_token: string } | null }>(
       'create-registration',
       {
@@ -1353,7 +1353,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         if (e) throw new Error(await readFunctionsError(e, false))
         if (!d?.booking_id) throw new Error(t.register.errors.registrationFailedShort)
         // Apply this diver's OWN account credit to their own booking when the
-        // opt-in is on (the caller — parent or admin — is authorised by
+        // opt-in is on (the caller — parent or admin — is authorized by
         // apply_credit_to_booking). Best-effort: the booking already landed.
         if (creditEligible && useAccountCredit && (additionalCredits[target.id] ?? 0) > 0) {
           try { await applyCreditToBooking({ bookingId: d.booking_id, amount: additionalCredits[target.id] }) }
@@ -1386,7 +1386,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
     // Spend the primary target's account credit against the brand-new booking
     // when opted in — the target's own credit whether the caller is the diver,
-    // a parent booking for their child, or an admin (all authorised by
+    // a parent booking for their child, or an admin (all authorized by
     // apply_credit_to_booking). Best-effort: the booking already succeeded, so
     // a credit hiccup shouldn't fail registration — it can still be applied
     // from Payments later.

@@ -19,7 +19,7 @@ import { StatCard, ChartCard, GroupedColumnChart } from '../../components/admin/
 // from Open-Meteo) against booking volume, month by month, across the current
 // year and the two prior — so an admin can see whether the season's weather
 // tracked its performance. Calendar-year axis keeps the peak season (Jun–Aug)
-// in the centre. Asia/Taipei throughout.
+// in the center. Asia/Taipei throughout.
 
 function taipeiDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-CA', { timeZone: siteConfig.locale.timezone, year: 'numeric', month: '2-digit', day: '2-digit' })

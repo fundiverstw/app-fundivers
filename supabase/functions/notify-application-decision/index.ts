@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
 
   // Audit H6 — run the status flip through the CALLER's JWT (not
   // service-role) so the profiles audit trigger sees auth.uid() =
-  // the admin's id, recognises them via is_admin(), and writes a row
+  // the admin's id, recognizes them via is_admin(), and writes a row
   // to admin_audit_log automatically. The admin RLS policy on
   // profiles (20260521020000_admin_profile_edit.sql) permits this
   // update; the column-lock trigger from C1 passes admin through.

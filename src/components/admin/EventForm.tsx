@@ -938,7 +938,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 // Wraps its child in the <label>, which suits the mixed bag of controls this
 // form puts inside it (inputs, selects, custom pickers) — not all of them take
 // an id. A DateField's transparent picker input rides along inside, but a
-// label skips its activation behaviour for events targeting interactive
+// label skips its activation behavior for events targeting interactive
 // content, so the tap is never re-dispatched onto the labelled control.
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (

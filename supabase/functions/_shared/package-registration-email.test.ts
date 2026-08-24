@@ -9,7 +9,7 @@ describe('parseRegisterPackageInput', () => {
     addon_ids: ['a1', 'a2'], room_id: 'r1', notes: 'hi',
   }
 
-  it('accepts and normalises a valid body', () => {
+  it('accepts and normalizes a valid body', () => {
     const res = parseRegisterPackageInput(ok)
     expect('request' in res && res.request).toEqual({
       packageId: 'p1', tierId: 't1', preferredStart: '2026-08-01', preferredEnd: '2026-08-05',

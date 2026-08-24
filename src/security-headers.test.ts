@@ -6,7 +6,7 @@ import { CSP_HEADER, SECURITY_HEADERS, applySecurityHeaders } from './security-h
 // reminder that this is the production policy.
 
 describe('CSP_HEADER', () => {
-  it('frames are denied via frame-ancestors none (clickjack defence)', () => {
+  it('frames are denied via frame-ancestors none (clickjack defense)', () => {
     expect(CSP_HEADER).toContain("frame-ancestors 'none'")
   })
 

@@ -45,8 +45,8 @@ interface DiveSiteSceneProps {
    *  reported: open seabed is not editable, so raycasting it would produce
    *  hits no caller acts on. */
   onPick?: (hit: { soundingId: string; at: Vec2 }) => void
-  /** Vertical exaggeration. A dive site is tens of metres deep across hundreds
-   *  of metres wide, so at true scale the relief that matters to a diver — the
+  /** Vertical exaggeration. A dive site is tens of meters deep across hundreds
+   *  of meters wide, so at true scale the relief that matters to a diver — the
    *  drop-off, the ridge, the gully — flattens into nothing. Exaggerating is
    *  standard practice for bathymetry; the figure is stated in the caption so
    *  nobody reads the slope as a real gradient. */
@@ -143,7 +143,7 @@ export function DiveSiteScene({
 
     geometry.computeBoundingBox()
     const box = geometry.boundingBox ?? new THREE.Box3()
-    const centre = box.getCenter(new THREE.Vector3())
+    const center = box.getCenter(new THREE.Vector3())
     const size = box.getSize(new THREE.Vector3())
     const radius = Math.max(size.x, size.z) / 2 || 30
 
@@ -160,7 +160,7 @@ export function DiveSiteScene({
         ),
         new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.12 }),
       )
-      ring.position.set(centre.x, 0, centre.z)
+      ring.position.set(center.x, 0, center.z)
       scene.add(ring)
     }
 
@@ -239,13 +239,13 @@ export function DiveSiteScene({
     const fit = (span / 2) / Math.tan((FOV * Math.PI) / 360)
     const distance = fit * 1.45
     camera.position.set(
-      centre.x + distance * 0.45,
+      center.x + distance * 0.45,
       Math.max(distance * 0.45, deepest * 0.6),
-      centre.z + distance * 0.8,
+      center.z + distance * 0.8,
     )
 
     const controls = new OrbitControls(camera, renderer.domElement)
-    controls.target.copy(centre)
+    controls.target.copy(center)
     controls.enableDamping = true
     controls.dampingFactor = 0.08
     controls.maxPolarAngle = Math.PI * 0.49
@@ -296,7 +296,7 @@ export function DiveSiteScene({
         return
       }
 
-      // Otherwise the tap lands on the seabed and snaps to the nearest metre.
+      // Otherwise the tap lands on the seabed and snaps to the nearest meter.
       const ndc = new THREE.Vector2(
         (tapX / rect.width) * 2 - 1,
         -(tapY / rect.height) * 2 + 1,
@@ -341,7 +341,7 @@ export function DiveSiteScene({
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
 
-    // Metres per second, scaled to the site: a fixed speed crawls across a
+    // Meters per second, scaled to the site: a fixed speed crawls across a
     // large site and overshoots a small one.
     const travelSpeed = Math.max(radius * 0.8, 20)
     const forward = new THREE.Vector3()

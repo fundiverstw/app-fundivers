@@ -1,6 +1,6 @@
 // Registration-form PDF builder. Ported near-verbatim from the Wix
 // backend file wix-site/backend/sendRegistrationPdf.web.js — layout and
-// colours deliberately match so divers get the same-looking PDF in email
+// colors deliberately match so divers get the same-looking PDF in email
 // whether the booking came through Wix or the PWA.
 //
 // Uses jsPDF directly (Deno 2 edge runtime supports `npm:` specifiers).
@@ -69,7 +69,7 @@ function setFontFor(doc: jsPDF, text: string, style: "normal" | "bold" | "italic
   else doc.setFont("helvetica", style)
 }
 
-// Brand colours (matching the LaTeX registration form).
+// Brand colors (matching the LaTeX registration form).
 const C = {
   ocean:      [11, 83, 148],    // #0B5394
   oceanLight: [214, 233, 248],  // #D6E9F8
@@ -461,7 +461,7 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   }
 
   // Cancellation policy — full text plus the cancel-by date and the diver's
-  // acknowledgement timestamp from the registration form.
+  // acknowledgment timestamp from the registration form.
   if (p.cancellationPolicyText) {
     y += 6
     const heading = p.cancellationPolicyTitle

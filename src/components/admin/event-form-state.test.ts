@@ -206,7 +206,7 @@ describe('formStateFromEvent — dive', () => {
     })).display_title).toBe('Green Island')
   })
 
-  it('normalises the start_time column to HH:mm and blanks an unparseable one', () => {
+  it('normalizes the start_time column to HH:mm and blanks an unparseable one', () => {
     expect(formStateFromEvent(dive({ start_time: '9:05:00' })).start_time).toBe('09:05')
     expect(formStateFromEvent(dive({ start_time: '14:00' })).start_time).toBe('14:00')
     expect(formStateFromEvent(dive({ start_time: null })).start_time).toBe('')
@@ -316,7 +316,7 @@ describe('formStateFromEvent — course', () => {
 })
 
 describe('eventPayloadFromForm — dive', () => {
-  it('serialises a fully-populated dive form to the events row shape (no relation columns)', () => {
+  it('serializes a fully-populated dive form to the events row shape (no relation columns)', () => {
     const payload = eventPayloadFromForm({
       ...EMPTY_FORM,
       type: 'dive',
@@ -451,7 +451,7 @@ describe('eventPayloadFromForm — dive', () => {
 })
 
 describe('eventPayloadFromForm — course', () => {
-  it('serialises a fully-populated course form to the events row shape (dive fields nulled)', () => {
+  it('serializes a fully-populated course form to the events row shape (dive fields nulled)', () => {
     const payload = eventPayloadFromForm({
       ...EMPTY_FORM,
       type: 'course',

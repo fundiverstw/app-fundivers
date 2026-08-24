@@ -29,7 +29,7 @@ export interface RegisterPackageRequest {
 
 const isYmd = (s: unknown): s is string => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s)
 
-// Validate + normalise the diver-supplied body. Returns an error string (caller
+// Validate + normalize the diver-supplied body. Returns an error string (caller
 // turns it into a 400) or the trimmed request.
 export function parseRegisterPackageInput(
   body: RegisterPackageInput,

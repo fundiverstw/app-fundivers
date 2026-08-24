@@ -29,7 +29,7 @@ export function generateTempPassword(): string {
 interface AuthUser { id: string; email?: string | null }
 
 // Narrow, structurally-satisfied interfaces for the injected deps. `any` on
-// the query-builder chain is deliberate — modelling PostgrestQueryBuilder's
+// the query-builder chain is deliberate — modeling PostgrestQueryBuilder's
 // generics buys nothing here (matches create-registration/handler.ts).
 export interface SupabaseAdminClient {
   auth: {

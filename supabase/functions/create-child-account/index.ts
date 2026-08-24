@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
   // Courtesy email to the child. Mirrors the admin-create-diver wording —
   // we don't expose credentials. If the child wants direct app access they
   // reach out to the shop. It names the parent so a recipient who doesn't
-  // recognise them has something to push back on.
+  // recognize them has something to push back on.
   const parentLabel = [parentProfile.name, parentProfile.nickname ? `(${parentProfile.nickname})` : null]
     .filter(Boolean).join(" ") || "Another diver"
   let emailSent = false

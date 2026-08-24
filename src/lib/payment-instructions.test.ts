@@ -12,7 +12,7 @@ import { t } from '../i18n'
 
 // Copy assertions go through the catalog: these blocks render in whatever
 // shop-facing language the deployment picked, so pinning English prose here
-// would test the language rather than the behaviour. What stays hardcoded is
+// would test the language rather than the behavior. What stays hardcoded is
 // what must be true in EVERY language — the shop's config values appear, the
 // invoice address is echoed verbatim, and no raw bank details leak.
 const p = t.paymentInstructions

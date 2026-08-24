@@ -84,7 +84,7 @@ function taipeiMonth(iso: string): string {
 
 /** The twelve 'YYYY-MM' keys of a calendar year, Jan→Dec. Using the calendar
  *  year (rather than a trailing window) puts the mid-year peak season
- *  (Jun–Aug) in the centre columns of any 12-point time series. */
+ *  (Jun–Aug) in the center columns of any 12-point time series. */
 export function calendarYearMonths(year: number): string[] {
   return Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`)
 }

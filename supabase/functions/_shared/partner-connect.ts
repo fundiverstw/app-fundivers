@@ -17,7 +17,7 @@ export interface PartnerConnectRequest {
   note: string
 }
 
-// Validate + normalise the diver-supplied body. Returns an error string
+// Validate + normalize the diver-supplied body. Returns an error string
 // (caller turns it into a 400) or the trimmed request.
 export function parsePartnerConnectInput(
   body: PartnerConnectInput,

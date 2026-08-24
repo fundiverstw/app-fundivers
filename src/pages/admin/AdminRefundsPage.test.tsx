@@ -185,7 +185,7 @@ describe('AdminRefundsPage · cancelled bookings still holding money', () => {
     })
   })
 
-  it('records an acknowledgement, and no money movement, when the shop keeps it', async () => {
+  it('records an acknowledgment, and no money movement, when the shop keeps it', async () => {
     setupHolding()
     const user = userEvent.setup()
     renderPage()

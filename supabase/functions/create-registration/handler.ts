@@ -83,7 +83,7 @@ export const RATE_LIMIT_PER_24H = 50
 
 // ----- Narrow interfaces for injected deps. The real supabase-js
 //       client conforms structurally; tests pass vi.fn-backed shims.
-//       `any` on chain returns is deliberate — modelling the full
+//       `any` on chain returns is deliberate — modeling the full
 //       PostgrestQueryBuilder generic is more pain than value here.
 
 export interface SupabaseAdminClient {
@@ -475,7 +475,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
   }
 
   // A group is whatever set of bookings shares a client-generated group_id, and
-  // send-group-summary authorises on exactly that: hold a booking in the group
+  // send-group-summary authorizes on exactly that: hold a booking in the group
   // and you may pull the group's PDF, which carries every member's name, date
   // of birth, nationality and certification. That made group_id a capability
   // token by accident rather than by design — unguessable today only because

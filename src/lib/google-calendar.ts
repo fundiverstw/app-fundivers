@@ -67,7 +67,7 @@ function descriptionParam(event: CalendarLinkEvent): string {
 /**
  * A Google Calendar template URL that pre-fills this event. Kinds held away
  * from the shop (dives, adventures) carry no location — the meeting point
- * isn't modelled and the dive site isn't the shop; kinds that run on the
+ * isn't modeled and the dive site isn't the shop; kinds that run on the
  * premises get the shop address.
  */
 export function googleCalendarUrl(event: CalendarLinkEvent): string {

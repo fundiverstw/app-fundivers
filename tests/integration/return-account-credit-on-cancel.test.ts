@@ -220,7 +220,7 @@ describe('account credit returned on booking cancellation', () => {
     await cancel(bookingId)
     // A second write that leaves the status cancelled must not re-issue. The
     // idempotency guard covers this too, but the WHEN clause is the first line
-    // of defence and this pins it.
+    // of defense and this pins it.
     const { error } = await admin.from('bookings')
       .update({ status: 'cancelled', notes: 'touched' }).eq('id', bookingId)
     if (error) throw new Error(error.message)

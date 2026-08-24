@@ -216,7 +216,7 @@ insert into public.events (
 ) on conflict (id) do nothing;
 
 -- 25 bookings on the crowded dive — mixed statuses so the cards
--- render the full status / payment colour palette in dev.
+-- render the full status / payment color palette in dev.
 do $$
 declare
   statuses text[] := array['confirmed','confirmed','confirmed','confirmed',

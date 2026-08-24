@@ -2,7 +2,7 @@
 // Components compose these instead of hard-coding class strings, so re-skinning
 // means editing one file rather than chasing every component.
 //
-// Colour language (riced dark ocean — matches site-fundivers):
+// Color language (riced dark ocean — matches site-fundivers):
 //   • Deep ocean-night — the fixed body gradient behind everything (index.css).
 //     Pages are transparent so the water + corner glows show through.
 //   • Frosted glass (`.glass`) — translucent blurred panels floating on the
@@ -72,8 +72,8 @@ export const BTN_SECONDARY = 'py-2 rounded-lg text-sm font-medium text-brand-50 
 // where a full-height BTN_* would dominate. inline-flex so a <Link> and a
 // <button> line up identically.
 // Geometry for the app's small buttons. Exported so surfaces that need their
-// own colours — a button sitting on a light status-palette banner, where the
-// BTN_XS_* dark-surface colours would be invisible — still get the same size,
+// own colors — a button sitting on a light status-palette banner, where the
+// BTN_XS_* dark-surface colors would be invisible — still get the same size,
 // padding and radius as every other small button.
 export const BTN_XS_BASE = 'inline-flex items-center justify-center text-xs font-semibold px-3 py-1 rounded-lg transition-colors disabled:opacity-50'
 export const BTN_XS_PRIMARY = `${BTN_XS_BASE} bg-reef-500 hover:bg-reef-400 text-slate-950`

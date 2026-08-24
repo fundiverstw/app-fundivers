@@ -3,12 +3,12 @@
 export type BalanceState =
   | 'due'      // diver still owes money (red)
   | 'settled'  // owed exactly covered by paid + credit
-  | 'credit'   // net in the diver's favour — the shop owes them this much,
+  | 'credit'   // net in the diver's favor — the shop owes them this much,
                // whether from an awarded credit or from paying more than owed
                // (an overpayment is money owed back, i.e. a credit) (green)
 
 export interface BookingBalance {
-  /** owed − paid − credit. Positive = diver owes; negative = in diver's favour. */
+  /** owed − paid − credit. Positive = diver owes; negative = in diver's favor. */
   net: number
   /** Absolute amount to display. */
   amount: number

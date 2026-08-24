@@ -15,7 +15,7 @@ describe('isoDate', () => {
   it('uses UTC: a late-evening UTC instant keeps the UTC calendar day', () => {
     // 23:30 UTC on the 15th. In timezones west of UTC the local day would
     // still be the 15th, but east of UTC the local day rolls to the 16th —
-    // asserting the 15th locks the UTC behaviour regardless of host TZ.
+    // asserting the 15th locks the UTC behavior regardless of host TZ.
     expect(isoDate(new Date('2027-05-15T23:30:00.000Z'))).toBe('2027-05-15')
   })
 

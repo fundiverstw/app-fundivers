@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
   if (oErr || !offer) return json({ error: "offer not found" }, 404)
   if (offer.status !== "pending") return json({ ok: true, sent: false, reason: "offer not pending" })
 
-  // Audit L2 — defence in depth against a leaked service-role key
+  // Audit L2 — defense in depth against a leaked service-role key
   // being used to mass-replay legitimate offer_ids. Reject offers
   // older than 1h (the worker fires within seconds of offer creation;
   // a 1h+ gap means something abnormal) and offers already marked

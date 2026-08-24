@@ -328,7 +328,7 @@ describe('gearSizeBreakdown', () => {
     expect(gearSizeBreakdown(rows, 'Fins').map(g => g.size)).toEqual(['9', '38', '42'])
   })
 
-  it('reads boots off the shoe size, normalised to JP so one pair counts once', () => {
+  it('reads boots off the shoe size, normalized to JP so one pair counts once', () => {
     // Same foot expressed two ways: EU 41 M and JP 26 both convert to JP 26.
     const rows = [
       sized('b1', 'Ada', ['Boots'], { shoe_size: 'EU 41 M' }),

@@ -58,7 +58,7 @@ describe('attend days', () => {
     expect(bookingsOnDay(all, '2026-07-04').map(b => b.id)).toEqual(['full', 'secondHalf'])
   })
 
-  it('recognises a continuation booking', () => {
+  it('recognizes a continuation booking', () => {
     expect(isCourseContinuation(booking({ continues_booking_id: 'b0' }))).toBe(true)
     expect(isCourseContinuation(booking({}))).toBe(false)
   })

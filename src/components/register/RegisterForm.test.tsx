@@ -507,7 +507,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
 
     // The TARGET diver's credit is spent against the on-behalf booking — the
-    // parent/admin caller is authorised by apply_credit_to_booking.
+    // parent/admin caller is authorized by apply_credit_to_booking.
     await waitFor(() => expect(rpc).toHaveBeenCalledWith(
       'apply_credit_to_booking', { p_booking_id: 'b-new', p_amount: 2000 },
     ))

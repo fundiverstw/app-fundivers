@@ -102,7 +102,7 @@ describe('DateField', () => {
   it('survives a browser with no showPicker at all — the tap alone opens the picker', async () => {
     const proto = HTMLInputElement.prototype as unknown as { showPicker?: () => void }
     const origShowPicker = proto.showPicker
-    // @ts-expect-error deliberately modelling a browser without the API
+    // @ts-expect-error deliberately modeling a browser without the API
     delete proto.showPicker
     try {
       const user = userEvent.setup()

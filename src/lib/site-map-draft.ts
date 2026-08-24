@@ -24,7 +24,7 @@ export interface Draft {
   pending: Vec2[]
   soundings: Sounding[]
   features: SiteFeature[]
-  /** Depth applied to the next placed sounding, in metres. */
+  /** Depth applied to the next placed sounding, in meters. */
   depth_m: number
   /** Kind applied to the next committed feature. */
   featureKind: FeatureKind
@@ -132,7 +132,7 @@ export function isEmpty(draft: Draft): boolean {
 /**
  * Who a contribution is attributed to.
  *
- * Modelled on a commit author, with one deliberate difference: git publishes an
+ * Modeled on a commit author, with one deliberate difference: git publishes an
  * author's email because it is a tool for developers who chose that trade.
  * A dive-site map is read by strangers, so only the DISPLAY name travels with a
  * published contribution. The email stays in `profiles`, reachable by an admin
@@ -224,8 +224,8 @@ export function withDraft(map: DiveSiteMap, draft: Draft): DiveSiteMap {
 /**
  * The scaffold point a tap is correcting, if any.
  *
- * A diver aiming at a grid point will miss it by a metre or two, and a reading
- * dropped one metre from the point it was meant to replace leaves both on the
+ * A diver aiming at a grid point will miss it by a meter or two, and a reading
+ * dropped one meter from the point it was meant to replace leaves both on the
  * map: the flat placeholder AND the correction, arguing with each other.
  * Snapping means a tap near a point adopts THAT point's position, so the
  * correction lands exactly where the thing it supersedes was.

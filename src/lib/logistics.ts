@@ -34,7 +34,7 @@ type DiverRow = { booking: Booking; profile: Profile | null }
 // gets one back. Two sources feed it:
 //   - a gear item the diver rented à-la-carte (Dive computer), and
 //   - add-ons whose catalog title matches a care pattern (lights, cameras).
-// Add-ons have no category column, so we classify by title and normalise the
+// Add-ons have no category column, so we classify by title and normalize the
 // duration variants ("Light Rental (2 Days)") down to one canonical label.
 const CARE_GEAR_ITEMS = ['Dive computer'] as const
 const CARE_ADDON_PATTERNS: Array<{ label: string; test: RegExp }> = [
@@ -232,7 +232,7 @@ export interface GearSizeGroup {
  * trailing `size: null` group rather than being dropped, because an unknown
  * size is the thing the shop most needs to chase before the van leaves.
  *
- * Boots are keyed off the diver's shoe size, normalised to JP the same way the
+ * Boots are keyed off the diver's shoe size, normalized to JP the same way the
  * gear card shows it, so one pair of boots isn't counted twice under "US 9" and
  * "JP 27". Sizes are grouped case-insensitively and shown in rack order.
  */

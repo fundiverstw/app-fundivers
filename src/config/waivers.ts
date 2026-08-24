@@ -30,7 +30,7 @@ export type WaiverAppliesTo = 'dives' | 'courses' | 'adventures' | 'all' | 'none
 
 // The `applies_to` value that names each kind. A full Record so a new kind has
 // to be given a scope: the old shape read "dive, else course", which silently
-// scoped any third kind under the course rules — including the course-colour
+// scoped any third kind under the course rules — including the course-color
 // filter, which it can never match.
 export const WAIVER_SCOPE_BY_KIND: Record<EventKind, WaiverAppliesTo> = {
   dive:   'dives',
@@ -52,7 +52,7 @@ export interface WaiverDef {
   /** When courses are in scope, restrict to these classifier buckets (from
    *  courseColor()). Omit to apply to every course. Ignored for `dives`. */
   courseColors?: CourseColor[]
-  /** Free-form label for the shop's own organisation ('en', 'zh-TW', 日本語…).
+  /** Free-form label for the shop's own organization ('en', 'zh-TW', 日本語…).
    *  Not tied to the app locale — the shop attaches the right waiver by hand. */
   language?: string | null
   /** The text form shown before signing. Null when the waiver is a PDF. */

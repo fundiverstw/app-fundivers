@@ -25,7 +25,7 @@ import { fiscalYearRange } from '../../lib/accounting-export'
 // Admin BI dashboard. Pulls the current calendar year of payments + bookings,
 // all profiles, and upcoming events, then computes every metric client-side
 // (see src/lib/admin-dashboard.ts). The calendar-year axis (Jan→Dec) keeps the
-// peak season (Jun–Aug) centred in the monthly charts. RLS already restricts
+// peak season (Jun–Aug) centered in the monthly charts. RLS already restricts
 // these tables to admins. Asia/Taipei throughout.
 
 function taipeiDate(iso: string): string {

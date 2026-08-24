@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 //
 // The shop authors its own Terms of Use, so the body is untrusted-ish text that
 // ends up on a public page. Rather than pull in a Markdown-to-HTML library plus
-// a sanitiser — two dependencies and an XSS surface — we never build an HTML
+// a sanitizer — two dependencies and an XSS surface — we never build an HTML
 // string at all. `dangerouslySetInnerHTML` appears nowhere in this codebase and
 // this component does not change that.
 //

@@ -312,7 +312,7 @@ export interface Database {
       // so a modified client can't consent to a version it was never shown.
       // Returns the version actually recorded (20260711100000).
       // Defined in 20260805000000_create_events_atomically.sql. SECURITY
-      // INVOKER — the events / event_series RLS policies authorise the caller.
+      // INVOKER — the events / event_series RLS policies authorize the caller.
       // Creates one or many events, their junction rows, and optionally the
       // recurrence series, in a single transaction. Returns the new event ids
       // in the order given.
@@ -1172,7 +1172,7 @@ export interface Database {
       // `code` + integer `version` are what waiver_signatures / event_waivers
       // reference. Exactly one of `body` / `pdf_path` is set — a text form, or an
       // uploaded PDF in the waiver-pdfs bucket. `language` is a free-form label
-      // for the shop's own organisation, not tied to the app locale.
+      // for the shop's own organization, not tied to the app locale.
       waivers: {
         Row: {
           id: string

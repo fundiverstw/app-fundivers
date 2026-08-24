@@ -55,7 +55,7 @@ const SUMMARY_CHIP =
 const WAITLIST_CHIP =
   'text-xs px-2 py-0.5 rounded-full border border-violet-400/40 bg-violet-500/10 text-violet-100 font-medium'
 
-// Hover for a name chip that goes somewhere. Each chip stays in its own colour
+// Hover for a name chip that goes somewhere. Each chip stays in its own color
 // family — washing the violet waitlist chip in the neutral hover would leave
 // its ink on a fill from a different palette.
 const CHIP_LINK_HOVER = 'hover:border-white/40 hover:bg-white/10'
@@ -97,7 +97,7 @@ function PersonChip({ name, profileId, linked, className, hover, children }: {
 /**
  * The eyebrow label above each Overall block. Small, dim and letter-spaced by
  * design: it must sit clearly *below* the section's <h2> in the hierarchy, so
- * it deliberately shares none of the heading's size, colour or case. `care`
+ * it deliberately shares none of the heading's size, color or case. `care`
  * carries the amber warning tone — light amber, since the label sits on the
  * dark glass rather than on the amber chips' light fill.
  */
@@ -756,7 +756,7 @@ export function AdminLogisticsPage() {
             )}
             {/* Two columns from sm up — the blocks are short, so one column left
                 half the board empty on anything wider than a phone. items-start
-                keeps a tall block (the fleet plan) from stretching its neighbour. */}
+                keeps a tall block (the fleet plan) from stretching its neighbor. */}
             <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2 items-start">
               {allRows.length > 0 && (
                 <div className="space-y-1">

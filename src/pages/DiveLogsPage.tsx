@@ -333,7 +333,7 @@ export function DiveLogsPage() {
  * The gear toggles to offer: the shop's current list, plus anything already
  * saved on this dive that has since left it.
  *
- * `toggleGear` preserves entries it doesn't recognise, so dropping an item
+ * `toggleGear` preserves entries it doesn't recognize, so dropping an item
  * from the config used to leave it stuck on old dives with no button to
  * remove it — recorded, invisible, and exported to CSV anyway.
  */
