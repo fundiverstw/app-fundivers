@@ -53,6 +53,18 @@ describe('RecurrenceFields', () => {
     expect(sat).toHaveAttribute('aria-pressed', 'true')
   })
 
+  it('paints a selected weekday with a fill the dark retrofit leaves alone', async () => {
+    const user = userEvent.setup()
+    render(<RecurrenceFields anchor={SAT} onChange={vi.fn()} />)
+    await user.click(screen.getByRole('checkbox'))
+
+    const on  = screen.getByRole('button', { name: 'Sat' })
+    const off = screen.getByRole('button', { name: 'Mon' })
+    expect(on).toHaveAttribute('aria-pressed', 'true')
+    expect(on.className).toContain('bg-reef-500')
+    expect(off.className).not.toContain('bg-reef-500')
+  })
+
   it('adds a second weekday to the pattern', async () => {
     const onChange = vi.fn()
     const user = userEvent.setup()

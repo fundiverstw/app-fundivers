@@ -67,6 +67,22 @@ describe('EventTransportPanel (admin)', () => {
     expect(within(group).queryByText('Cancelled Cara')).not.toBeInTheDocument()
   })
 
+  it('paints the chosen ride option with a fill the dark retrofit leaves alone', async () => {
+    // Both halves used to resolve to a dark fill under near-white ink: the
+    // retrofit re-points the inactive bg-white/text-brand-900, and the active
+    // bg-brand-900 was already dark. Which one is chosen has to be readable
+    // without comparing two navies.
+    renderPanel()
+    const group = screen.getByRole('group', { name: /ride choices/i })
+    const row = within(group).getByText('Ada').closest('li') as HTMLElement
+    const chosen   = within(row).getByRole('button', { name: 'Needs ride' })
+    const unchosen = within(row).getByRole('button', { name: 'Self' })
+
+    expect(chosen.className).toContain('bg-reef-500')
+    expect(chosen.className).toContain('text-slate-950')
+    expect(unchosen.className).not.toContain('bg-reef-500')
+  })
+
   it('flips a diver and reports the new details up', async () => {
     const { onRideChanged } = renderPanel()
     const group = screen.getByRole('group', { name: /ride choices/i })

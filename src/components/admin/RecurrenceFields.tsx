@@ -133,7 +133,7 @@ export function RecurrenceFields({ anchor, onChange }: RecurrenceFieldsProps) {
                       title={locked ? rc.anchorWeekdayLocked : undefined}
                       className={`px-2 py-1 rounded border text-xs font-semibold ${
                         on
-                          ? 'bg-surface-700 text-white border-surface-700'
+                          ? 'bg-reef-500 text-slate-950 border-reef-500'
                           : 'bg-white text-brand-900 border-surface-300'
                       } ${locked ? 'opacity-70 cursor-default' : ''}`}
                     >

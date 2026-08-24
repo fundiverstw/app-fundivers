@@ -138,7 +138,11 @@ function SegBtn({ active, disabled, onClick, children }: {
       disabled={disabled}
       onClick={onClick}
       className={`px-3 py-1 text-xs font-semibold transition-colors disabled:opacity-50 ${
-        active ? 'bg-brand-900 text-white' : 'bg-white text-brand-900 hover:bg-surface-50'
+        // The dark retrofit re-points the inactive half's bg-white and
+        // text-brand-900, landing it dark-fill/light-ink -- the same shape as an
+        // active bg-brand-900. A bright fill the retrofit leaves alone is what
+        // separates them; text-slate-950 keeps the ink dark in both themes.
+        active ? 'bg-reef-500 text-slate-950' : 'bg-white text-brand-900 hover:bg-surface-50'
       }`}
     >
       {children}

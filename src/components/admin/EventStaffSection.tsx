@@ -222,7 +222,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
                       onClick={() => toggleDay(day)}
                       className={`px-2 py-1 rounded border font-medium ${
                         on
-                          ? 'bg-surface-700 text-white border-surface-700'
+                          ? 'bg-reef-500 text-slate-950 border-reef-500'
                           : 'bg-white text-brand-900 border-surface-300 hover:bg-surface-50'
                       }`}
                     >
