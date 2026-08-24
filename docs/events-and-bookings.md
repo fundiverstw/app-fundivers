@@ -248,7 +248,18 @@ doing it:
 | SECURITY DEFINER RPC | Falls back to `auth.uid()` — the JWT claim survives even though `current_user` is the owner |
 | service_role (the edge function) | The value supplied, already resolved from a verified Bearer token |
 
+One exception, ahead of all three: a **course continuation** inherits the
+`created_by` of the booking it continues. It is the same registration
+split across two event rows, so naming the admin who split it would be
+true of the row and false about the registration — a diver who signed
+themselves up for a course must not read as "Added by <admin>" on the
+half they finish it in. The inheritance sits after the `authenticated`
+branch, so a diver who forges `continues_booking_id` to borrow somebody
+else's origin is still stamped as themselves.
+
 An UPDATE never moves it: who made a booking is a fact about the past.
+Deleting a profile sets it null (`ON DELETE SET NULL`) rather than
+pinning the booking in place.
 
 Reading it: `created_by = user_id` is "registered themselves". **Null is
 not the same as self** — it means nobody can be named, which covers the

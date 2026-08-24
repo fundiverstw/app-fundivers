@@ -3,9 +3,10 @@
 //
 // Three insert paths need three different answers — a diver or admin posting
 // straight to PostgREST, a SECURITY DEFINER RPC, and create-registration
-// running as service_role after it has verified a Bearer token — and only the
-// first two can be exercised here. The edge-function path is covered by
-// create-registration's own handler test.
+// running as service_role after it has verified a Bearer token. All three are
+// exercised here (service_role stands in for the edge function, whose own
+// resolution of the caller is covered by create-registration's handler test),
+// plus the one exception: a course continuation inherits its origin.
 import { describe, it, expect, afterAll, beforeAll } from 'vitest'
 import {
   adminClient, userClient,
@@ -20,6 +21,7 @@ let child: TestUser
 let adminUser: TestUser
 const bookingIds: string[] = []
 const diveIds: string[] = []
+const courseIds: string[] = []
 
 beforeAll(async () => {
   diver = await createTestUser(admin, { role: 'diver' })
@@ -34,6 +36,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (bookingIds.length) await admin.from('bookings').delete().in('id', bookingIds)
   for (const id of diveIds) await deleteTestDive(admin, id)
+  for (const id of courseIds) await admin.from('events' as never).delete().eq('id', id)
   for (const u of [child, diver, other, adminUser]) {
     if (u) await deleteTestUser(admin, u.id).catch(() => {})
   }
@@ -42,6 +45,17 @@ afterAll(async () => {
 async function freshDive(): Promise<string> {
   const id = await createTestDive(admin)
   diveIds.push(id)
+  return id
+}
+
+async function freshCourse(days: string[]): Promise<string> {
+  const id = crypto.randomUUID()
+  const { error } = await admin.from('events' as never).insert({
+    id, kind: 'course', display_title: 'created_by test course',
+    start_time: '09:00:00', course_days: days,
+  } as never)
+  if (error) throw new Error(`freshCourse failed: ${error.message}`)
+  courseIds.push(id)
   return id
 }
 
@@ -94,7 +108,9 @@ describe('bookings.created_by', () => {
     const dive = await freshDive()
     const sb = await userClient(diver.email, diver.password)
     const { data, error } = await sb.from('bookings')
-      .insert({ user_id: diver.id, event_id: dive, status: 'pending', created_by: adminUser.id })
+      // Cast because `created_by` is deliberately absent from the Insert type
+      // — writing it is exactly what this test is proving the DB ignores.
+      .insert({ user_id: diver.id, event_id: dive, status: 'pending', created_by: adminUser.id } as never)
       .select('id').single()
     expect(error).toBeNull()
     const id = track((data as { id: string }).id)
@@ -111,7 +127,7 @@ describe('bookings.created_by', () => {
 
     const diverSb = await userClient(diver.email, diver.password)
     const { error } = await diverSb.from('bookings')
-      .update({ status: 'cancelled', created_by: diver.id }).eq('id', id)
+      .update({ status: 'cancelled', created_by: diver.id } as never).eq('id', id)
     expect(error).toBeNull()
 
     // Who created it is a fact about the past. Cancelling does not rewrite it,
@@ -131,6 +147,57 @@ describe('bookings.created_by', () => {
     const id = track((data as { id: string }).id)
 
     expect(await createdByOf(id)).toBe(other.id)
+  })
+
+  it('gives a course continuation the origin of the booking it continues', async () => {
+    // create_course_continuation is admin-only and SECURITY DEFINER, so the
+    // trigger would otherwise stamp the admin who split the booking. That is
+    // true of the row and false about the registration: this diver signed
+    // themselves up for the course, and the half they finish it in has to say
+    // so too.
+    const june = await freshCourse(['2026-06-06', '2026-06-07'])
+    const july = await freshCourse(['2026-07-04', '2026-07-05'])
+    const sb = await userClient(diver.email, diver.password)
+    const { data: src, error: srcErr } = await sb.from('bookings')
+      // Pending, not confirmed: a diver-made booking may only start there
+      // (bookings_status_on_insert), and a continuation only refuses a
+      // cancelled source.
+      .insert({ user_id: diver.id, event_id: june, status: 'pending', details: { total: 12000 } })
+      .select('id').single()
+    expect(srcErr).toBeNull()
+    const source = track((src as { id: string }).id)
+    expect(await createdByOf(source)).toBe(diver.id)
+
+    const api = await userClient(adminUser.email, adminUser.password)
+    const { data: contId, error } = await api.rpc('create_course_continuation', {
+      p_source_booking: source, p_event_id: july, p_days: ['2026-07-05'],
+    })
+    expect(error).toBeNull()
+    track(contId as string)
+
+    expect(await createdByOf(contId as string)).toBe(diver.id)
+  })
+
+  it('carries an admin-made origin across a continuation too', async () => {
+    // The mirror case: the shop put this diver on the course, so both halves
+    // say the shop did.
+    const june = await freshCourse(['2026-06-13', '2026-06-14'])
+    const july = await freshCourse(['2026-07-11', '2026-07-12'])
+    const { data: src } = await admin.from('bookings')
+      .insert({ user_id: diver.id, event_id: june, status: 'confirmed',
+                details: { total: 12000 }, created_by: other.id } as never)
+      .select('id').single()
+    const source = track((src as { id: string }).id)
+
+    const api = await userClient(adminUser.email, adminUser.password)
+    const { data: contId, error } = await api.rpc('create_course_continuation', {
+      p_source_booking: source, p_event_id: july, p_days: ['2026-07-12'],
+    })
+    expect(error).toBeNull()
+    track(contId as string)
+
+    // Not adminUser, who made the continuation -- the origin outranks them.
+    expect(await createdByOf(contId as string)).toBe(other.id)
   })
 
   it('leaves it null when nobody can be named', async () => {

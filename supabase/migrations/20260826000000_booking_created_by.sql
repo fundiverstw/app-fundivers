@@ -19,6 +19,10 @@
 --                               already verified the Bearer token and resolved
 --                               the caller, so its explicit value is trusted
 --
+-- A course continuation is the exception to all three: it is the same
+-- registration on a second event row, so it inherits the origin of the booking
+-- it continues instead of naming the admin who split it.
+--
 -- Null means nobody knows: every booking predating this, and the guest path,
 -- where the person registering had no account until the request that made it.
 -- Read created_by = user_id as "registered themselves".
@@ -29,9 +33,13 @@ ALTER TABLE "public"."bookings"
 ALTER TABLE "public"."bookings"
   DROP CONSTRAINT IF EXISTS "bookings_created_by_fkey";
 
+-- SET NULL, matching cancelled_by / payer_id / admin_audit_log.actor_id: a
+-- deleted profile must not pin somebody else's booking in place. bookings.user_id
+-- cascades, so a deletion takes that person's own bookings with it, but the ones
+-- they created FOR OTHERS outlive them and keep an honest blank instead.
 ALTER TABLE "public"."bookings"
   ADD CONSTRAINT "bookings_created_by_fkey"
-  FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id");
+  FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
 COMMENT ON COLUMN "public"."bookings"."created_by" IS
   'Who created this booking. Stamped by trg_bookings_stamp_created_by; never written by callers except create-registration, which runs as service_role after verifying the Bearer token. Equal to user_id when the diver registered themselves; null on the guest path and on bookings predating 20260826000000.';
@@ -62,6 +70,8 @@ CREATE OR REPLACE FUNCTION "public"."bookings_stamp_created_by"() RETURNS "trigg
     LANGUAGE "plpgsql"
     SET "search_path" TO 'public'
     AS $$
+declare
+  v_continues text;
 begin
   if tg_op = 'INSERT' then
     -- SECURITY INVOKER on purpose: current_user has to reflect the real caller.
@@ -70,9 +80,33 @@ begin
     -- themselves that we overwrite.
     if current_user = 'authenticated' then
       new.created_by := auth.uid();
-    else
-      new.created_by := coalesce(new.created_by, auth.uid());
+      return new;
     end if;
+
+    -- A course continuation is the same registration split across two event
+    -- rows, so it inherits its origin rather than naming the admin who did the
+    -- splitting. Without this, a diver who signed themselves up for a course
+    -- reads as "Added by <admin>" on the half they finish it in -- true of the
+    -- row, false about the registration.
+    --
+    -- Reachable only from the definer RPC that writes this column
+    -- (create_course_continuation, admin-gated) because the authenticated
+    -- branch above returns first: a diver who forged continues_booking_id to
+    -- inherit somebody else's origin still gets stamped as themselves.
+    --
+    -- Read through to_jsonb rather than as new.continues_booking_id, because
+    -- course continuations are a feature FunDive has not taken yet and plpgsql
+    -- resolves a field reference at execution time -- a direct one would raise
+    -- on every booking insert wherever the column is absent. This reads as null
+    -- there, and starts working by itself if the column ever arrives.
+    v_continues := to_jsonb(new) ->> 'continues_booking_id';
+    if v_continues is not null then
+      select b.created_by into new.created_by
+        from public.bookings b where b.id = v_continues::uuid;
+      return new;
+    end if;
+
+    new.created_by := coalesce(new.created_by, auth.uid());
     return new;
   end if;
 

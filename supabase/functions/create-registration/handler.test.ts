@@ -321,6 +321,22 @@ describe('handleRegistration — guest path security (audit C2)', () => {
     expect(captured.profileUpdate[0].name).toBe('Mallory')
   })
 
+  it('records nobody as having added a guest registration', async () => {
+    // The third case the column documents: the registrant had no account until
+    // this request created one, so there is no id to name. Null is not "self" --
+    // it is "nobody knows", and it must not fall back to the new user either,
+    // which would be a claim the shop cannot stand behind.
+    const { deps, captured } = makeDeps()
+    await handleRegistration(postJson({
+      ...goodBody,
+      email:    'guest@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'tk',
+      created_by: 'somebody-else',
+    }), deps)
+    expect(captured.bookingInsert[0].created_by).toBeNull()
+  })
+
   it('forces status="pending" on guest path even if patch contained "active"', async () => {
     const { deps, captured } = makeDeps()
     await handleRegistration(postJson({
