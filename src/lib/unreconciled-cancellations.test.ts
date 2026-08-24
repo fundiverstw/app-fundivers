@@ -18,7 +18,7 @@ const profiles = [{ id: 'd1', name: 'Alice Diver', nickname: null }]
 
 type B = Pick<Booking, 'id' | 'user_id' | 'event_id' | 'status' | 'cancellation_settled_at'>
 type P = Pick<Payment, 'booking_id' | 'amount' | 'status'>
-type C = Pick<Credit, 'booking_id' | 'source'>
+type C = Pick<Credit, 'booking_id' | 'source' | 'amount'>
 
 const booking = (over: Partial<B> = {}): B =>
   ({ id: 'b1', user_id: 'd1', event_id: 'ev1', status: 'cancelled',
@@ -75,10 +75,41 @@ describe('selectUnreconciled', () => {
     expect(run({ payments: [{ booking_id: 'b1', amount: 3000, status: 'voided' }] as P[] })).toHaveLength(0)
   })
 
-  it('clears once a credit says the money was returned', () => {
+  it('clears once a credit has returned all of the money', () => {
     for (const source of ['event_cancellation', 'booking_cancellation_return'] as const) {
-      expect(run({ credits: [{ booking_id: 'b1', source }] as C[] })).toHaveLength(0)
+      expect(run({ credits: [{ booking_id: 'b1', source, amount: 3000 }] as C[] })).toHaveLength(0)
     }
+  })
+
+  // The reason this subtracts rather than testing for the mere existence of a
+  // return credit. A late canceller gets their account credit back and their
+  // cash does not; a non-refundable-deposit policy returns everything above the
+  // deposit. Both leave real money behind, and an existence test dropped the
+  // row — hidden by exactly the credit that proved only part of it was settled.
+  it('keeps a part-returned booking, carrying only the remainder', () => {
+    const rows = run({
+      payments: [{ booking_id: 'b1', amount: 10000, status: 'paid' }] as P[],
+      credits: [{ booking_id: 'b1', source: 'booking_cancellation_return', amount: 3000 }] as C[],
+    })
+    expect(rows).toHaveLength(1)
+    expect(rows[0].amount).toBe(7000)
+  })
+
+  it('sums several returned credits against the same booking', () => {
+    const rows = run({
+      payments: [{ booking_id: 'b1', amount: 10000, status: 'paid' }] as P[],
+      credits: [
+        { booking_id: 'b1', source: 'booking_cancellation_return', amount: 3000 },
+        { booking_id: 'b1', source: 'event_cancellation', amount: 2000 },
+      ] as C[],
+    })
+    expect(rows[0].amount).toBe(5000)
+  })
+
+  it('clears when more was returned than was ever paid', () => {
+    expect(run({
+      credits: [{ booking_id: 'b1', source: 'event_cancellation', amount: 9999 }] as C[],
+    })).toHaveLength(0)
   })
 
   it('does NOT clear for an unrelated credit tied to the same booking', () => {
@@ -86,12 +117,12 @@ describe('selectUnreconciled', () => {
     // Treating it as "already returned" is exactly the bug that let a booking
     // with a 200 award swallow a 3000 refund.
     for (const source of ['manual', 'carry_forward'] as const) {
-      expect(run({ credits: [{ booking_id: 'b1', source }] as C[] })).toHaveLength(1)
+      expect(run({ credits: [{ booking_id: 'b1', source, amount: 3000 }] as C[] })).toHaveLength(1)
     }
   })
 
   it('ignores a returned credit that belongs to a different booking', () => {
-    expect(run({ credits: [{ booking_id: 'b-other', source: 'event_cancellation' }] as C[] })).toHaveLength(1)
+    expect(run({ credits: [{ booking_id: 'b-other', source: 'event_cancellation', amount: 3000 }] as C[] })).toHaveLength(1)
   })
 
   it('falls back to labels for an unknown event or diver', () => {

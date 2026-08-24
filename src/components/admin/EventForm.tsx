@@ -16,6 +16,7 @@ import { EVENT_KINDS } from '../../types/database'
 import { DATE_ENVELOPE_KINDS, COURSE_DAY_KINDS } from '../../lib/event-kinds'
 import { newestPerGroup, type PastEventOption } from '../../lib/event-preload'
 import { BTN_XS_GHOST, ERROR_NOTE } from '../../styles/tokens'
+import { keepsDepositOnCancel } from '../../lib/cancellation-policies'
 import { t } from '../../i18n'
 
 // Shared form for creating and editing an EO_dive / EO_course. Owns all
@@ -800,8 +801,18 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
             </Select>
             {/* Whether the deposit comes back is decided here, at the moment
                 the policy is chosen, because nothing downstream asks again:
-                cancelling the booking issues the credit on its own. */}
-            {cancelPolicies.find(p => p.id === form.cancel_policy)?.deposit_refundable === false && (
+                cancelling the booking issues the credit on its own.
+
+                Gated on the tier actually carrying a deposit. The trigger
+                withholds details.deposit, which create-registration copies from
+                prices.deposit_amount; on a tier that leaves it null the
+                retention is a promise of nothing, and saying otherwise here is
+                how an admin comes to believe a cancellation was handled when it
+                refunded in full. */}
+            {keepsDepositOnCancel(
+              cancelPolicies.find(p => p.id === form.cancel_policy),
+              prices.find(p => p.id === form.price)?.deposit_amount,
+            ) && (
               <p className="text-xs text-amber-800 font-semibold mt-1">{ef.depositNonRefundable}</p>
             )}
           </Field>

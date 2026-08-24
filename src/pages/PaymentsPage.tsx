@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { personName } from '../lib/names'
 import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
-import { fetchCreditsForUser, openCreditForBooking, openCreditBalance, diverCreditBalance, applyCreditToBooking, plannedCreditApplication, cancellationKept } from '../lib/credits'
+import { fetchCreditsForUser, openCreditForBooking, openCreditBalance, diverCreditBalance, applyCreditToBooking, plannedCreditApplication, cancellationKept, RETURN_SOURCES } from '../lib/credits'
 import { useToast } from '../hooks/useToast'
 import { bookingBalance, depositDue } from '../lib/booking-balance'
 import { netPaid } from '../lib/payments'
@@ -37,8 +37,11 @@ interface BookingLine {
   credit: number
   /** What the shop kept off a cancelled booking: net paid less anything
    *  returned as a cancellation credit. Zero unless a person or a
-   *  non-refundable-deposit policy settled it. */
-  feeKept: number
+   *  non-refundable-deposit policy settled it. **Null when this viewer
+   *  cannot read the booking's credits** — a lead booker who is not the
+   *  owner's parent sees no credit rows at all, and treating that silence
+   *  as "nothing came back" would report the whole payment as kept. */
+  feeKept: number | null
   due: number
   depositDue: number
   /** Display name of the diver this booking belongs to (for the lead's
@@ -88,7 +91,10 @@ export function PaymentsPage() {
       bookingIds.length
         ? supabase.from('payments').select('*').in('booking_id', bookingIds)
         : Promise.resolve({ data: [] as Payment[] }),
-      supabase.from('profiles').select('id, name, nickname').in('id', personIds),
+      // parent_account decides whether this viewer may read a booking owner's
+      // credits at all (the "credits: parent select children" policy), which is
+      // what separates "nothing was returned" from "I cannot see it".
+      supabase.from('profiles').select('id, name, nickname, parent_account').in('id', personIds),
       eventIds.length
         ? fetchEventsForBookings(eventIds)
         : Promise.resolve(new Map<string, AppEvent>()),
@@ -99,6 +105,19 @@ export function PaymentsPage() {
     const nameById = new Map<string, string>(
       (profilesRes.data ?? []).map(p => [p.id, personName(p.name, p.nickname) || '(diver)']),
     )
+    const parentOf = new Map<string, string | null>(
+      (profilesRes.data ?? []).map(p => [p.id, p.parent_account]),
+    )
+
+    // Cancellation credits are written against the booking OWNER, not whoever
+    // paid, so the viewer's own credit rows say nothing about a booking they
+    // merely lead. Fetch by booking instead; RLS narrows it to the owners this
+    // viewer is allowed to see.
+    const { data: returnedRows } = bookingIds.length
+      ? await supabase.from('credits').select('booking_id, amount, source')
+          .in('booking_id', bookingIds).in('source', RETURN_SOURCES)
+      : { data: [] }
+    const returnedCredits = (returnedRows ?? []) as Array<Pick<Credit, 'booking_id' | 'amount' | 'source'>>
 
     const paymentsByBooking = new Map<string, Payment[]>()
     for (const p of payRows) {
@@ -130,7 +149,9 @@ export function PaymentsPage() {
         deposit,
         paid,
         credit,
-        feeKept: cancellationKept(paid, credits, b.id),
+        feeKept: (b.user_id === uid || parentOf.get(b.user_id) === uid)
+          ? cancellationKept(paid, returnedCredits, b.id)
+          : null,
         due: Math.max(0, owed - paid - credit),
         depositDue: depositDue(deposit, owed, paid),
         ownerName: nameById.get(b.user_id) ?? '(diver)',
@@ -531,7 +552,7 @@ function LineCard({
           {/* The shop kept part of what this diver paid. They are told outright,
               on the booking it came off — a withheld fee that only surfaces as
               a refund that never arrives is how a diver finds out by noticing. */}
-          {isCancelled && booking.cancellation_settled_at && feeKept > 0 && (
+          {isCancelled && booking.cancellation_settled_at && !!feeKept && feeKept > 0 && (
             <div className={`flex justify-between ${TEXT_BODY}`}>
               <span>{t.bookings.cancellationFeeKept}</span>
               <span className="text-amber-800 font-semibold">{currency} {feeKept.toLocaleString()}</span>

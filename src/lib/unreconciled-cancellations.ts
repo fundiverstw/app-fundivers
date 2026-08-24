@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { netPaidByBooking } from './payments'
-import { RETURN_SOURCES } from './credits'
+import { cancellationKept } from './credits'
 import { fetchEventsForBookings } from './events'
 import { personName } from './names'
 import { siteConfig } from '../config/site'
@@ -33,6 +33,12 @@ import type { AppEvent, Booking, Credit, Payment } from '../types/database'
 // The endings are mutually exclusive. Doing none hides the money; doing two
 // pays the diver twice. Each makes the row drop off, so an empty list means
 // every cancellation is accounted for.
+//
+// A booking can also be PART settled — a late canceller gets their account
+// credit back and their cash does not, a policy withholds a non-refundable
+// deposit and returns the rest. The list carries the remainder in that case,
+// not the whole payment, so the amount an admin acts on is the amount still
+// open.
 
 export interface UnreconciledCancellation {
   bookingId: string
@@ -40,7 +46,10 @@ export interface UnreconciledCancellation {
   diverName: string
   eventId: string | null
   eventTitle: string
-  /** Net paid still sitting on the booking (paid − refunded). Always > 0. */
+  /** What is still unaccounted for: net paid less anything already handed
+   *  back as a cancellation credit. Always > 0. Not the same as net paid —
+   *  a policy that withholds a non-refundable deposit returns part of a
+   *  booking and leaves the rest here. */
   amount: number
   currency: string
   /** Who cancelled it and when (`bookings.cancelled_at` / `cancelled_by`).
@@ -57,43 +66,46 @@ type ProfileLite = { id: string; name: string | null; nickname: string | null }
 /**
  * Pure selector: which cancelled bookings still hold money?
  *
- * A booking qualifies when it is cancelled, its net paid is positive, no
- * credit tied to it says the money was already returned, and no admin has
- * stamped it settled. Credits with any other source (a goodwill award, a
- * carry-forward remainder) are unrelated money and deliberately do NOT clear
- * the row — the same rule the automatic issuers use, so this list and they can
- * never disagree.
+ * A booking qualifies when it is cancelled, no admin has stamped it settled,
+ * and money is still unaccounted for: net paid less whatever a cancellation
+ * credit already handed back. Credits with any other source (a goodwill award,
+ * a carry-forward remainder) are unrelated money and deliberately do NOT count
+ * as returned — the same rule the automatic issuers use, so this list and they
+ * can never disagree.
+ *
+ * The subtraction replaced a test for whether a return credit merely EXISTED.
+ * That was right while a cancellation was all-or-nothing, and wrong the moment
+ * one could be part-returned: a late canceller who paid 7,000 cash and 3,000
+ * account credit gets the 3,000 back, and the row then vanished from this list
+ * carrying 7,000 nobody had decided about — hidden by exactly the credit that
+ * proved only part of it was settled.
  */
 export function selectUnreconciled(input: {
   bookings: Array<Pick<Booking, 'id' | 'user_id' | 'event_id' | 'status' | 'cancellation_settled_at' | 'cancelled_at' | 'cancelled_by'>>
   payments: Array<Pick<Payment, 'booking_id' | 'amount' | 'status'>>
-  credits: Array<Pick<Credit, 'booking_id' | 'source'>>
+  credits: Array<Pick<Credit, 'booking_id' | 'source' | 'amount'>>
   events: Map<string, AppEvent>
   profiles: ProfileLite[]
   eventFallback: string
   diverFallback: string
 }): UnreconciledCancellation[] {
   const paidByBooking = netPaidByBooking(input.payments)
-  const returned = new Set(
-    input.credits
-      .filter(c => c.booking_id && (RETURN_SOURCES as readonly string[]).includes(c.source))
-      .map(c => c.booking_id as string),
-  )
+  const outstanding = (id: string) =>
+    cancellationKept(paidByBooking.get(id) ?? 0, input.credits, id)
   const nameById = new Map(input.profiles.map(p => [p.id, personName(p.name, p.nickname)]))
 
   return input.bookings
     .filter(b =>
       b.status === 'cancelled'
       && !b.cancellation_settled_at
-      && !returned.has(b.id)
-      && (paidByBooking.get(b.id) ?? 0) > 0)
+      && outstanding(b.id) > 0)
     .map(b => ({
       bookingId: b.id,
       userId: b.user_id,
       diverName: nameById.get(b.user_id) || input.diverFallback,
       eventId: b.event_id,
       eventTitle: (b.event_id ? input.events.get(b.event_id)?.title : null) ?? input.eventFallback,
-      amount: paidByBooking.get(b.id)!,
+      amount: outstanding(b.id),
       currency: siteConfig.locale.currency,
       cancelledAt: b.cancelled_at,
       cancelledBy: b.cancelled_by,
@@ -119,7 +131,7 @@ export async function fetchUnreconciledCancellations(labels: {
 
   const [paymentsRes, creditsRes, profilesRes, events] = await Promise.all([
     supabase.from('payments').select('booking_id, amount, status').in('booking_id', bookingIds),
-    supabase.from('credits').select('booking_id, source').in('booking_id', bookingIds),
+    supabase.from('credits').select('booking_id, source, amount').in('booking_id', bookingIds),
     supabase.from('profiles').select('id, name, nickname').in('id', userIds),
     fetchEventsForBookings(eventIds),
   ])
@@ -130,7 +142,7 @@ export async function fetchUnreconciledCancellations(labels: {
   return selectUnreconciled({
     bookings,
     payments: paymentsRes.data ?? [],
-    credits: (creditsRes.data ?? []) as Array<Pick<Credit, 'booking_id' | 'source'>>,
+    credits: (creditsRes.data ?? []) as Array<Pick<Credit, 'booking_id' | 'source' | 'amount'>>,
     events,
     profiles: profilesRes.data ?? [],
     ...labels,

@@ -108,6 +108,78 @@ describe('PaymentsPage', () => {
     expect(screen.getByText(/Dive B/)).toBeInTheDocument()
   })
 
+  // The kept figure is net paid MINUS what a cancellation credit handed back,
+  // and the credit is written against the booking OWNER. Both halves of that
+  // sentence are load-bearing on this page, which also lists bookings the
+  // viewer merely pays for as lead.
+  describe('kept as a cancellation fee', () => {
+    const cancelled = (over: Record<string, unknown> = {}) => ({
+      id: 'b1', user_id: 'u1', payer_id: null, event_id: 'd1', status: 'cancelled',
+      notes: null, created_at: new Date().toISOString(),
+      details: { total: 15400, deposit: 5000 },
+      cancellation_settled_at: new Date().toISOString(), ...over,
+    })
+    const paid15400 = [{
+      id: 'p1', user_id: 'u1', booking_id: 'b1', amount: 15400, currency: 'TWD', status: 'paid',
+      method: 'Bank', note: 'Paid in full', created_at: new Date().toISOString(), recorded_by: null,
+    }]
+    const returned10400 = [{
+      id: 'c1', user_id: 'u1', booking_id: 'b1', amount: 10400, status: 'settled',
+      source: 'booking_cancellation_return', currency: 'TWD', reason: 'r',
+      created_at: new Date().toISOString(), created_by: null, settled_by: null,
+    }]
+    const evMap = () => new Map<string, AppEvent>([
+      ['d1', event({ id: 'd1', type: 'course', title: 'Open Water Course', price: 15400 })],
+    ])
+
+    it('reports only the withheld deposit, not the whole payment', async () => {
+      const user = userEvent.setup()
+      setupFrom([cancelled()], paid15400, returned10400)
+      fetchEventsForBookings.mockResolvedValue(evMap())
+      renderWithRouter(<PaymentsPage />)
+
+      await user.click(await screen.findByText(/Open Water Course/))
+      const row = (await screen.findByText(/Kept as a cancellation fee/i)).parentElement!
+      expect(row.textContent).toMatch(/5,000/)
+      expect(row.textContent).not.toMatch(/15,400/)
+    })
+
+    it('says nothing on a booking whose credits this viewer cannot read', async () => {
+      // A lead booker who is not the owner's parent sees no credit rows at all.
+      // Reading that silence as "nothing came back" would tell them the shop
+      // kept 15,400 when it kept 5,000 — the overstatement, inverted.
+      setupFrom(
+        [cancelled({ user_id: 'other', payer_id: 'u1' })],
+        [{ ...paid15400[0], user_id: 'other' }],
+        [],
+        [{ id: 'other', name: 'Someone Else', nickname: null, parent_account: null }],
+      )
+      fetchEventsForBookings.mockResolvedValue(evMap())
+      const user = userEvent.setup()
+      renderWithRouter(<PaymentsPage />)
+
+      await user.click(await screen.findByText(/Open Water Course/))
+      expect(await screen.findByText(/Total paid/i)).toBeInTheDocument()
+      expect(screen.queryByText(/Kept as a cancellation fee/i)).not.toBeInTheDocument()
+    })
+
+    it('still reports it for a child, whose credits a parent may read', async () => {
+      setupFrom(
+        [cancelled({ user_id: 'kid', payer_id: 'u1' })],
+        [{ ...paid15400[0], user_id: 'kid' }],
+        [{ ...returned10400[0], user_id: 'kid' }],
+        [{ id: 'kid', name: 'Kid Diver', nickname: null, parent_account: 'u1' }],
+      )
+      fetchEventsForBookings.mockResolvedValue(evMap())
+      const user = userEvent.setup()
+      renderWithRouter(<PaymentsPage />)
+
+      await user.click(await screen.findByText(/Open Water Course/))
+      const row = (await screen.findByText(/Kept as a cancellation fee/i)).parentElement!
+      expect(row.textContent).toMatch(/5,000/)
+    })
+  })
+
   it('shows no deposit due once a discounted booking is paid in full', async () => {
     // The reported bug, verbatim: a diver saw "Total 2600 · Paid 2600 ·
     // Balance settled" sitting beside "Deposit 400 due". The deposit is frozen

@@ -231,6 +231,18 @@ counted as revenue on that event — so it records an acknowledgement
 instead. Without one, a kept fee is indistinguishable from money nobody
 has dealt with, and its row would never leave the list.
 
+**The list carries the remainder, not the whole payment.** A cancellation
+can be part settled: a late canceller gets their account credit back and
+their cash does not, a policy withholds a non-refundable deposit and
+returns the rest. `selectUnreconciled` subtracts what a cancellation
+credit already handed back, so the figure an admin acts on is the figure
+still open. Testing whether a return credit merely *existed* was right
+while a cancellation was all-or-nothing and wrong the moment one could be
+part-returned — a diver who paid 7,000 cash and 3,000 account credit and
+cancelled late got the 3,000 back, and the row then vanished carrying
+7,000 nobody had decided about, hidden by exactly the credit that proved
+only part of it was settled.
+
 The kept amount is **shown to the diver** on the booking it came off, and
 to staff on the same booking's payments block. It is derived from what is
 still on the booking rather than stored, so a later refund cannot
@@ -239,7 +251,11 @@ back as a cancellation credit. Counting the returned credit at any status
 matters — a diver spending it elsewhere settles the row but changes
 nothing about what was kept — and a booking that was partly credited and
 partly kept, which is exactly what a non-refundable deposit produces,
-would otherwise report the whole net paid as kept. Settling is staff-only, enforced by
+would otherwise report the whole net paid as kept. The diver's Payments
+page shows it only for bookings whose credits that viewer may read — a
+lead booker who is not the owner's parent sees no credit rows at all, and
+reading that silence as "nothing came back" would report their whole
+payment as kept. Settling is staff-only, enforced by
 `bookings_guard_diver_status` — the self-update RLS policy gates the row,
 not the columns, so without that a diver could erase their own stranded
 money from the list.
