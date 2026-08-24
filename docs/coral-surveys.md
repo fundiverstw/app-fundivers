@@ -108,5 +108,5 @@ validation never fires its submit handler — silently, with no message.
 
 The three crowdsourcing components — the almanac, the site-map editor and this
 — are the subject of the PADI Foundation application in
-`ignore/padi-foundation-grant.md`, which states what each is for and what the
+`ignore/proposals/padi-foundation-grant.md`, which states what each is for and what the
 study measures about the quality of the data each collects.

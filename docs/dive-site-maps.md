@@ -10,7 +10,7 @@ migration, and the workbench holds contributions in page state only.
 
 ## Why this exists
 
-The research case is in `ignore/namr-collaboration-proposal.md`. In short:
+The research case is in `ignore/proposals/namr-collaboration-proposal.md`. In short:
 NODASS publishes a 200 m seafloor grid, and a depth grid stores one value per
 horizontal position, so it structurally cannot hold the overhangs, arches and
 swim-throughs divers navigate by. Sites like 龍洞 4號 are still dived from
