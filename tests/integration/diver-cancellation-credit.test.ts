@@ -69,12 +69,14 @@ async function booking(userId: string, eventId: string, opts: {
   requestedDaysAgo?: number | null
   total?: number
   deposit?: number
+  payerId?: string
 } = {}): Promise<string> {
   const requested = opts.requestedDaysAgo == null
     ? null
     : new Date(Date.now() - opts.requestedDaysAgo * 86_400_000).toISOString()
   const { data, error } = await admin.from('bookings').insert({
     user_id: userId, event_id: eventId, status: 'confirmed',
+    payer_id: opts.payerId ?? null,
     details: { total: opts.total ?? 5000, ...(opts.deposit ? { deposit: opts.deposit } : {}) },
     refund_requested_at: requested,
   } as never).select('id').single()
@@ -95,7 +97,7 @@ async function cancel(bookingId: string): Promise<void> {
 }
 
 function creditsFor(bookingId: string) {
-  return admin.from('credits').select('amount, status, reason, source').eq('booking_id', bookingId)
+  return admin.from('credits').select('user_id, amount, status, reason, source').eq('booking_id', bookingId)
 }
 
 async function settleStamp(bookingId: string) {
@@ -342,5 +344,103 @@ describe('a non-refundable deposit', () => {
     const stamp = await settleStamp(b)
     expect(stamp.cancellation_settled_at).toBeNull()
     expect(stamp.cancellation_settled_note).toBeNull()
+  })
+})
+
+// A lead booker's money is the lead's. diverCreditBalance already drops
+// payer-covered bookings from the diver's spendable pool and counts them toward
+// the lead; the cancellation credit used to ignore that and pay the diver, and
+// once the booking was cancelled nothing re-routed it — the money landed in the
+// child's spendable pool and the parent's balance never mentioned it.
+//
+// bookings_validate_payer restricts payer_id to the diver or their parent
+// account, so "lead booker" here always means the parent.
+describe('a booking someone else paid for', () => {
+  async function familyPair(): Promise<{ parent: TestUser; child: TestUser }> {
+    const parent = await freshDiver()
+    const child = await freshDiver()
+    const { error } = await admin.from('profiles')
+      .update({ parent_account: parent.id } as never).eq('id', child.id)
+    if (error) throw new Error(error.message)
+    return { parent, child }
+  }
+
+  it('returns the money to the lead booker, not the diver', async () => {
+    const { parent: lead, child: diver } = await familyPair()
+    const dive = await diveWithDeadline(3)
+    const b = await booking(diver.id, dive, { requestedDaysAgo: 0, payerId: lead.id })
+    await pay(diver.id, b, 5000, 'bank_transfer')
+
+    await cancel(b)
+
+    const { data } = await creditsFor(b)
+    expect(data).toHaveLength(1)
+    expect(data![0].user_id).toBe(lead.id)
+    expect(Number(data![0].amount)).toBe(5000)
+    expect(data![0].reason).toMatch(/lead booker/i)
+  })
+
+  it('sends store credit back to the diver whose pool it left, and the cash to the lead', async () => {
+    const { parent: lead, child: diver } = await familyPair()
+    const dive = await diveWithDeadline(3)
+    const b = await booking(diver.id, dive, { requestedDaysAgo: 0, payerId: lead.id })
+    await pay(diver.id, b, 3000, 'bank_transfer')
+    await pay(diver.id, b, 2000, 'account_credit')
+
+    await cancel(b)
+
+    // apply_credit_to_booking only ever spends the booking OWNER's rows, so the
+    // 2,000 of store credit was the diver's. Handing it to the lead would move
+    // one person's credit to another.
+    const { data } = await creditsFor(b)
+    const byUser = Object.fromEntries((data ?? []).map(c => [c.user_id, Number(c.amount)]))
+    expect(byUser[diver.id]).toBe(2000)
+    expect(byUser[lead.id]).toBe(3000)
+  })
+
+  it('still returns everything to the diver on a late cancellation, since only their credit comes back', async () => {
+    const { parent: lead, child: diver } = await familyPair()
+    const dive = await diveWithDeadline(-2)
+    const b = await booking(diver.id, dive, { requestedDaysAgo: 0, payerId: lead.id })
+    await pay(diver.id, b, 3000, 'bank_transfer')
+    await pay(diver.id, b, 2000, 'account_credit')
+
+    await cancel(b)
+
+    const { data } = await creditsFor(b)
+    expect(data).toHaveLength(1)
+    expect(data![0].user_id).toBe(diver.id)
+    expect(Number(data![0].amount)).toBe(2000)
+  })
+
+  it('keeps one row when the diver pays for themselves', async () => {
+    const diver = await freshDiver()
+    const dive = await diveWithDeadline(3)
+    const b = await booking(diver.id, dive, { requestedDaysAgo: 0, payerId: diver.id })
+    await pay(diver.id, b, 5000, 'bank_transfer')
+
+    await cancel(b)
+
+    const { data } = await creditsFor(b)
+    expect(data).toHaveLength(1)
+    expect(data![0].user_id).toBe(diver.id)
+    expect(data![0].reason).not.toMatch(/lead booker/i)
+  })
+
+  it('reclaims the lead\'s credit, not the diver\'s, when the booking is restored', async () => {
+    const { parent: lead, child: diver } = await familyPair()
+    const dive = await diveWithDeadline(3)
+    const b = await booking(diver.id, dive, { requestedDaysAgo: 0, payerId: lead.id })
+    await pay(diver.id, b, 5000, 'bank_transfer')
+    await cancel(b)
+
+    const { error } = await admin.from('bookings').update({ status: 'confirmed' }).eq('id', b)
+    if (error) throw new Error(error.message)
+
+    const { data } = await creditsFor(b)
+    expect(data).toHaveLength(1)
+    expect(data![0].user_id).toBe(lead.id)
+    expect(data![0].status).toBe('settled')
+    expect(data![0].source).toBe('return_reclaimed')
   })
 })

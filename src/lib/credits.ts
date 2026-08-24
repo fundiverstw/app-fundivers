@@ -292,7 +292,7 @@ export async function issueCancellationCredits(args: {
 
   const { data: bookings, error: bErr } = await supabase
     .from('bookings')
-    .select('id, user_id')
+    .select('id, user_id, payer_id')
     .eq('event_id', event.id)
     .neq('status', 'cancelled')
   if (bErr) throw bErr
@@ -302,12 +302,18 @@ export async function issueCancellationCredits(args: {
 
   const { data: payments, error: pErr } = await supabase
     .from('payments')
-    .select('booking_id, amount, status')
+    .select('booking_id, amount, status, method')
     .in('booking_id', bookingIds)
     .in('status', ['paid', 'refunded'])
   if (pErr) throw pErr
 
   const paidByBooking = netPaidByBooking(payments ?? [])
+  // Store credit came out of the BOOKING OWNER's pool — apply_credit_to_booking
+  // only ever spends v_booking.user_id's rows — so it goes back there even when
+  // a lead paid the rest. Mirrors bookings_credit_on_cancel (20260825000000).
+  const accountByBooking = netPaidByBooking(
+    (payments ?? []).filter(p => (p as { method?: string | null }).method === 'account_credit'),
+  )
 
   // Only a credit that already RETURNED this booking's money blocks a second
   // issue. The old check was "does this booking carry ANY credit row?", which
@@ -331,16 +337,26 @@ export async function issueCancellationCredits(args: {
 
   const rows: CreditInsert[] = bookings
     .filter(b => !alreadyCredited.has(b.id) && (paidByBooking.get(b.id) ?? 0) > 0)
-    .map(b => ({
-      user_id:    b.user_id,
-      booking_id: b.id,
-      amount:     paidByBooking.get(b.id)!,
-      currency:   siteConfig.locale.currency,
-      reason,
-      created_by: createdBy,
-      status:     'open',
-      source:     'event_cancellation',
-    }))
+    .flatMap(b => {
+      const amount = paidByBooking.get(b.id)!
+      const base = {
+        booking_id: b.id,
+        currency:   siteConfig.locale.currency,
+        created_by: createdBy,
+        status:     'open' as const,
+        source:     'event_cancellation' as const,
+      }
+      const payer = b.payer_id ?? b.user_id
+      if (payer === b.user_id) return [{ ...base, user_id: b.user_id, amount, reason }]
+
+      const own = Math.min(amount, Math.max(0, accountByBooking.get(b.id) ?? 0))
+      return [
+        ...(own > 0 ? [{ ...base, user_id: b.user_id, amount: own,
+          reason: `${reason} (store credit returned to the diver who spent it)` }] : []),
+        ...(amount - own > 0 ? [{ ...base, user_id: payer, amount: amount - own,
+          reason: `${reason} (returned to the lead booker who paid)` }] : []),
+      ]
+    })
 
   if (!rows.length) return { issued: 0, totalAmount: 0 }
 

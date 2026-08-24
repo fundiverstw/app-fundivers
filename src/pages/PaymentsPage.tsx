@@ -52,6 +52,26 @@ interface BookingLine {
   coveredByName: string | null
 }
 
+/**
+ * May this viewer be told what the shop kept off a booking?
+ *
+ * Only if they can read the booking's return credits, because the figure is
+ * net paid MINUS those, and silence would read as "nothing came back" — the
+ * whole payment reported as kept. Credits go to whoever the money belonged to:
+ * the payer when a lead covered the booking, the owner otherwise
+ * (bookings_credit_on_cancel, 20260825000000), and RLS shows a viewer their own
+ * rows plus their children's. So the question is whether the viewer is that
+ * person, or their parent.
+ */
+function keptVisibleTo(
+  uid: string,
+  booking: Pick<Booking, 'user_id' | 'payer_id'>,
+  parentOf: Map<string, string | null>,
+): boolean {
+  const owner = booking.payer_id ?? booking.user_id
+  return owner === uid || parentOf.get(owner) === uid
+}
+
 const PAYMENT_STATUS_STYLES: Record<Payment['status'], string> = {
   pending: 'text-red-600',
   paid: 'text-brand-900 font-semibold',
@@ -149,7 +169,7 @@ export function PaymentsPage() {
         deposit,
         paid,
         credit,
-        feeKept: (b.user_id === uid || parentOf.get(b.user_id) === uid)
+        feeKept: keptVisibleTo(uid, b, parentOf)
           ? cancellationKept(paid, returnedCredits, b.id)
           : null,
         due: Math.max(0, owed - paid - credit),

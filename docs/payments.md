@@ -200,6 +200,29 @@ Account credit is the one thing the app can always hand back on its own,
 because it never left the app. Cash and transfers did, so only a person
 can move those.
 
+### Who a cancellation credit goes to
+
+Whoever the money belonged to. A booking with `payer_id` set is paid by
+someone else — `bookings_validate_payer` allows only the diver or their
+parent account — and the app already treats that money as the payer's:
+`diverCreditBalance` drops those bookings from the diver's spendable pool
+and counts them toward the lead. The credit follows the same rule, so a
+parent who paid gets the refund back rather than watching it land in their
+child's spendable balance with nothing on the parent's own statement.
+
+**Account credit is the exception, and it splits the refund in two.**
+Store credit spent on a booking came out of the *booking owner's* pool —
+`apply_credit_to_booking` only ever consumes `v_booking.user_id`'s rows,
+whoever triggered it — so returning it to the payer would move one
+person's credit to another. The account-credit part goes back to the
+owner, everything else to the payer, and with no `payer_id` the two halves
+are the same person and it stays one row.
+
+The restore path follows the same money: `bookings_reclaim_returned_credit`
+`_on_restore` finds rows by `booking_id`, which is owner-agnostic, and
+mints any unspent tail under the row it came off rather than under the
+booking owner.
+
 Cancelling an event does **not** cancel its bookings. The credit is what
 settles things with the diver. Issuing runs after the cancel commits, so
 a failure cannot un-cancel the event.

@@ -145,14 +145,15 @@ describe('PaymentsPage', () => {
     })
 
     it('says nothing on a booking whose credits this viewer cannot read', async () => {
-      // A lead booker who is not the owner's parent sees no credit rows at all.
-      // Reading that silence as "nothing came back" would tell them the shop
-      // kept 15,400 when it kept 5,000 — the overstatement, inverted.
+      // The viewer's own booking, but a parent paid for it, so the credit went
+      // to the parent and this diver sees no credit rows at all. Reading that
+      // silence as "nothing came back" would tell them the shop kept 15,400
+      // when it kept 5,000 — the overstatement, inverted.
       setupFrom(
-        [cancelled({ user_id: 'other', payer_id: 'u1' })],
-        [{ ...paid15400[0], user_id: 'other' }],
+        [cancelled({ payer_id: 'mum' })],
+        paid15400,
         [],
-        [{ id: 'other', name: 'Someone Else', nickname: null, parent_account: null }],
+        [{ id: 'mum', name: 'A Parent', nickname: null, parent_account: null }],
       )
       fetchEventsForBookings.mockResolvedValue(evMap())
       const user = userEvent.setup()
