@@ -35,7 +35,7 @@ const LOGO_PATH = new URL("./fd_logo.png", import.meta.url)
 // `pdf-cjk.ttf` is Noto Sans TC (Latin + kana + ~15k ideographs). A fork whose
 // divers have Japanese names should replace it, at the same path, with Noto Sans
 // JP — the two are not supersets of one another (TC lacks 桜, JP lacks ~4.5k TC
-// ideographs). Licence: pdf-cjk.LICENSE.txt (SIL OFL 1.1).
+// ideographs). License: pdf-cjk.LICENSE.txt (SIL OFL 1.1).
 const CJK_FONT_PATH = new URL("./pdf-cjk.ttf", import.meta.url)
 const CJK_FAMILY = "NotoCJK"
 const CJK_VFS_NAME = "pdf-cjk.ttf"

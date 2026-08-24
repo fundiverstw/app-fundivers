@@ -151,7 +151,7 @@ is tree-shaken out of production builds.
 - **No georeferencing.** Every site has `frame.origin` absent until somebody
   surveys one.
 - **Nothing from Lin Ko-Chuan's map.** His 2015 drawing of 龍洞 4號 is
-  copyrighted and watermarked, and digitising it needs his permission. Longdong
+  copyrighted and watermarked, and digitizing it needs his permission. Longdong
   4 here starts genuinely empty.
 
 ## Dependencies
