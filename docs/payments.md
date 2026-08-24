@@ -151,6 +151,43 @@ Four of them, and only one returns money by itself.
 Whatever is not credited stays on the booking for a human — a forfeiture
 never happens automatically.
 
+### The one deposit that does not come back
+
+`cancellation_policies.deposit_refundable` is the exception, and the only
+one. When it is false, the event's frozen deposit is withheld from the
+credit and the diver gets the rest.
+
+It marks a deposit the shop has already spent and cannot recover: a PADI
+eLearning code bought the moment a student registers, a prepaid room.
+Refunding that is not returning the diver's money, it is paying them out
+of the shop's own.
+
+The flag rides with the **policy**, not the event, so the text a diver
+acknowledged at registration and the money the trigger returns cannot
+drift apart. Three of the shop's policies say it in words already —
+*Course with Elearning*, *Local Multi-day Trip*, *International Trip* —
+and those are the three the migration backfills.
+
+The withholding applies to the late branch too. A non-refundable deposit
+is gone whatever it was paid with — PADI does not refund the code because
+the payment happened to be store credit — and capping both branches keeps
+out the perverse case where cancelling late returns more than cancelling
+in time. The kept amount is clamped to `owed` as well as to net paid,
+mirroring `depositDue`: keeping 5,000 of a 3,000 booking is a windfall,
+not a deposit.
+
+When the deposit is the only thing left on the booking, the trigger
+stamps `cancellation_settled_at` itself, with no `cancellation_settled_by`
+— no person decided it, the policy did. Without that stamp the money
+would be invisible: the return credit already keeps the booking off the
+holding list, so nobody would ever be told what was kept.
+
+**A shop cancellation still refunds in full**, deposit included.
+`issueCancellationCredits` does not read the flag, on purpose: the policy
+text promises a diver whose course the *shop* called off that they keep
+the eLearning to use at any PADI shop, which is a different settlement
+from keeping their money.
+
 **The deadline is `events.cancel_date`, and the moment that counts is
 `refund_requested_at`** — when the *diver* asked, not when an admin
 approved, so a slow approval cannot cost them their refund. An event with
@@ -197,7 +234,12 @@ has dealt with, and its row would never leave the list.
 The kept amount is **shown to the diver** on the booking it came off, and
 to staff on the same booking's payments block. It is derived from what is
 still on the booking rather than stored, so a later refund cannot
-contradict it. Settling is staff-only, enforced by
+contradict it: `cancellationKept()` is net paid less whatever was handed
+back as a cancellation credit. Counting the returned credit at any status
+matters — a diver spending it elsewhere settles the row but changes
+nothing about what was kept — and a booking that was partly credited and
+partly kept, which is exactly what a non-refundable deposit produces,
+would otherwise report the whole net paid as kept. Settling is staff-only, enforced by
 `bookings_guard_diver_status` — the self-update RLS policy gates the row,
 not the columns, so without that a diver could erase their own stranded
 money from the list.

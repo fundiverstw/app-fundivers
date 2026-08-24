@@ -1369,6 +1369,9 @@ export const ja: Messages = {
       titlePh: '例：標準キャンセルポリシー',
       policyText: 'ポリシー本文 *',
       policyTextPh: 'ダイバーが予約前に確認するキャンセル条件。',
+      depositNonRefundableLabel: 'デポジットは返金不可',
+      depositNonRefundableHint: 'PADIのeラーニングコードや前払いの部屋など、ショップが取り戻せない費用がデポジットに含まれる場合にチェックします。この規定が付いたイベントの予約をキャンセルすると、デポジットは保留され、残額のみがクレジットになります。',
+      depositKeptBadge: 'デポジット保留',
       activeLabel: '有効（イベントで選択可能）',
     },
     vehicles: {
@@ -1864,6 +1867,7 @@ export const ja: Messages = {
       schedule: 'スケジュール',
       cancelByDate: 'キャンセル期限日',
       cancelPolicy: 'キャンセル規定',
+      depositNonRefundable: 'この規定ではデポジットは返金不可です。キャンセル時はデポジットを保留し、残額のみをクレジットにします。',
       paymentDeadlineBlurb: '登録フォームと送信される PDF にダイバー向けに表示されます。空欄の場合は「開始日の 7 日前」が適用されます。',
       fullPaymentDeadline: '全額支払い期限',
       noAddons: 'オプションが登録されていません。',

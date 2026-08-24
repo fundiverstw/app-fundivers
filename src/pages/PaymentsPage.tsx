@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { personName } from '../lib/names'
 import { fetchEventsForBookings, formatEventSpan } from '../lib/events'
-import { fetchCreditsForUser, openCreditForBooking, openCreditBalance, diverCreditBalance, applyCreditToBooking, plannedCreditApplication } from '../lib/credits'
+import { fetchCreditsForUser, openCreditForBooking, openCreditBalance, diverCreditBalance, applyCreditToBooking, plannedCreditApplication, cancellationKept } from '../lib/credits'
 import { useToast } from '../hooks/useToast'
 import { bookingBalance, depositDue } from '../lib/booking-balance'
 import { netPaid } from '../lib/payments'
@@ -35,6 +35,10 @@ interface BookingLine {
   paid: number
   /** Open credit awarded for this event — offsets what's owed. */
   credit: number
+  /** What the shop kept off a cancelled booking: net paid less anything
+   *  returned as a cancellation credit. Zero unless a person or a
+   *  non-refundable-deposit policy settled it. */
+  feeKept: number
   due: number
   depositDue: number
   /** Display name of the diver this booking belongs to (for the lead's
@@ -126,6 +130,7 @@ export function PaymentsPage() {
         deposit,
         paid,
         credit,
+        feeKept: cancellationKept(paid, credits, b.id),
         due: Math.max(0, owed - paid - credit),
         depositDue: depositDue(deposit, owed, paid),
         ownerName: nameById.get(b.user_id) ?? '(diver)',
@@ -434,7 +439,7 @@ function LineCard({
   onRefund: (id: string) => void
   onApplyCredit: (id: string, amount: number) => void
 }) {
-  const { booking, event, charges, amendments, total, owed, deposit, paid, credit, due, depositDue, payments } = line
+  const { booking, event, charges, amendments, total, owed, deposit, paid, credit, feeKept, due, depositDue, payments } = line
   const label = event?.title ?? t.payments.eventFallback
   const refundRequested = !!booking.refund_requested_at
   // Mirror BookingsPage: no refund request on an already-cancelled booking —
@@ -526,10 +531,10 @@ function LineCard({
           {/* The shop kept part of what this diver paid. They are told outright,
               on the booking it came off — a withheld fee that only surfaces as
               a refund that never arrives is how a diver finds out by noticing. */}
-          {isCancelled && booking.cancellation_settled_at && paid > 0 && (
+          {isCancelled && booking.cancellation_settled_at && feeKept > 0 && (
             <div className={`flex justify-between ${TEXT_BODY}`}>
               <span>{t.bookings.cancellationFeeKept}</span>
-              <span className="text-amber-800 font-semibold">{currency} {paid.toLocaleString()}</span>
+              <span className="text-amber-800 font-semibold">{currency} {feeKept.toLocaleString()}</span>
             </div>
           )}
           {total > 0 && (

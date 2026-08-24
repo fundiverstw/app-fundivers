@@ -1382,6 +1382,9 @@ export const en = {
       titlePh: 'e.g. Standard cancellation',
       policyText: 'Policy text *',
       policyTextPh: 'The cancellation terms the diver acknowledges before booking.',
+      depositNonRefundableLabel: 'Deposit is non-refundable',
+      depositNonRefundableHint: "Tick when the deposit is money the shop cannot get back — a PADI eLearning code, a prepaid room. Cancelling a booking on an event with this policy keeps the deposit and credits only the rest.",
+      depositKeptBadge: 'Deposit kept',
       activeLabel: 'Active (available to pick on events)',
     },
     vehicles: {
@@ -1886,6 +1889,7 @@ export const en = {
       schedule: 'Schedule',
       cancelByDate: 'Cancel-by date',
       cancelPolicy: 'Cancel policy',
+      depositNonRefundable: 'Deposit is non-refundable under this policy — cancelling keeps it and credits only the rest.',
       paymentDeadlineBlurb: 'Shown to divers on the registration form and in the emailed PDF. Leave blank to fall back to "7 days before start date".',
       fullPaymentDeadline: 'Full payment deadline',
       noAddons: 'No add-ons defined.',

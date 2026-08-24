@@ -20,8 +20,8 @@ vi.mock('../../hooks/useToast', () => ({
 }))
 
 const rows: CancellationPolicy[] = [
-  { id: 'p1', title: 'Standard', cancellation_policy: 'Full refund up to 7 days before.', language: 'English', active: true },
-  { id: 'p2', title: 'Peak season', cancellation_policy: 'Non-refundable.', language: null, active: false },
+  { id: 'p1', title: 'Standard', cancellation_policy: 'Full refund up to 7 days before.', language: 'English', active: true, deposit_refundable: true },
+  { id: 'p2', title: 'Peak season', cancellation_policy: 'Non-refundable.', language: null, active: false, deposit_refundable: false },
 ]
 
 beforeEach(() => {
@@ -41,6 +41,32 @@ describe('AdminCancellationPoliciesPage', () => {
     expect(screen.getByText(/\(inactive\)/i)).toBeInTheDocument()
   })
 
+  it('badges the policies whose deposit the shop keeps', async () => {
+    renderPage()
+    await screen.findByText('Peak season')
+    expect(screen.getByText(/deposit kept/i)).toBeInTheDocument()
+    // The refundable one carries no badge, so the list reads as an exception
+    // list rather than a column of labels.
+    expect(screen.getAllByText(/deposit kept/i)).toHaveLength(1)
+  })
+
+  it('saves a non-refundable deposit as deposit_refundable false', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Standard')
+    await user.click(screen.getByRole('button', { name: /new policy/i }))
+
+    await user.type(screen.getByLabelText(/^title/i), 'Course with eLearning')
+    await user.type(screen.getByLabelText(/policy text/i), 'The deposit is non-refundable.')
+    await user.click(screen.getByRole('checkbox', { name: /deposit is non-refundable/i }))
+    await user.click(screen.getByRole('button', { name: /^save$/i }))
+
+    await waitFor(() => expect(saveCancellationPolicy).toHaveBeenCalledWith(
+      expect.objectContaining({ deposit_refundable: false }),
+      undefined,
+    ))
+  })
+
   it('creates a policy through the form', async () => {
     const user = userEvent.setup()
     renderPage()
@@ -54,7 +80,7 @@ describe('AdminCancellationPoliciesPage', () => {
     await waitFor(() => expect(saveCancellationPolicy).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Weekend trips', cancellation_policy: '50% refund up to 3 days before.',
-        language: null, active: true,
+        language: null, active: true, deposit_refundable: true,
       }),
       undefined,
     ))

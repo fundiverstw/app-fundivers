@@ -63,6 +63,35 @@ export function openCreditForBooking(credits: Credit[], bookingId: string): numb
 }
 
 /**
+ * How much of a cancelled booking's money the shop kept.
+ *
+ * Shown to the diver on the booking it came off, so it has to be the amount
+ * that actually stayed behind: net paid less whatever was handed back as a
+ * cancellation credit. Before the non-refundable deposit existed the two were
+ * never mixed — a booking was either settled as kept in full or returned in
+ * full — so every surface simply printed net paid. A policy that withholds the
+ * deposit and credits the rest breaks that, and printing net paid would tell a
+ * diver the shop kept 15,400 of which 10,400 is sitting in their own credit
+ * balance.
+ *
+ * Counts returned credits regardless of status: the diver spending that credit
+ * elsewhere settles the row but changes nothing about what was kept. A later
+ * refund lowers net paid instead, so the figure still cannot contradict the
+ * ledger.
+ */
+export function cancellationKept(
+  netPaid: number,
+  credits: Array<Pick<Credit, 'booking_id' | 'source' | 'amount'>>,
+  bookingId: string,
+): number {
+  const returned = credits
+    .filter(c => c.booking_id === bookingId
+      && (RETURN_SOURCES as readonly string[]).includes(c.source))
+    .reduce((s, c) => s + Number(c.amount), 0)
+  return Math.max(0, netPaid - returned)
+}
+
+/**
  * Total money the shop owes a diver — their "account credit". Two sources:
  *  1. Open awarded credits not tied to one of `bookings` (general credits,
  *     incl. cancellation credits whose booking is excluded as cancelled).

@@ -30,7 +30,7 @@ import { personName } from '../../lib/names'
 import { requestEventDiverExport } from '../../lib/admin-event-export'
 import { BookingPaymentsBlock } from '../../components/admin/BookingPaymentsBlock'
 import { resolveCharges, type ChargeLine } from '../../lib/booking-charges'
-import { openCreditForBooking } from '../../lib/credits'
+import { openCreditForBooking, cancellationKept, RETURN_SOURCES } from '../../lib/credits'
 import { bookingBalance } from '../../lib/booking-balance'
 import { netPaid } from '../../lib/payments'
 import { EventTransportPanel } from '../../components/admin/EventTransportPanel'
@@ -54,6 +54,9 @@ interface Registrant {
   charges: ChargeLine[]
   /** Open (unsettled) credit awarded to this diver for this event. */
   credit: number
+  /** What the shop kept off a cancelled booking: net paid less anything
+   *  returned as a cancellation credit. */
+  feeKept: number
   /** Diver's open account credit NOT already tied to this booking — the
    *  pool spendable against this booking's balance. */
   spendable: number
@@ -141,18 +144,24 @@ export function AdminEventDetailPage() {
       const userIds = [...new Set(bookings.flatMap(b => [b.user_id, b.payer_id]).filter((x): x is string => !!x))]
       const bookingIds = bookings.map(b => b.id)
 
-      const [profilesRes, paymentsRes, amendmentsByBooking, diverNotesRes, creditsRes] = await Promise.all([
+      const [profilesRes, paymentsRes, amendmentsByBooking, diverNotesRes, creditsRes, returnedRes] = await Promise.all([
         supabase.from('profiles').select('*').in('id', userIds),
         supabase.from('payments').select('*').in('booking_id', bookingIds),
         fetchAmendmentsForBookings(bookingIds),
         supabase.from('diver_notes').select('*').in('profile_id', userIds).order('created_at', { ascending: false }),
         supabase.from('credits').select('*').in('user_id', userIds).eq('status', 'open'),
+        // Separate from the open-credit query, which the spendable pool depends
+        // on: what a cancellation handed back stays handed back once the diver
+        // spends it, so the kept figure has to count settled rows too.
+        supabase.from('credits').select('booking_id, amount, source')
+          .in('booking_id', bookingIds).in('source', RETURN_SOURCES),
       ])
       if (cancelled) return
 
       // Every open credit row for these divers (event-tied or general), so we
       // can both offset this event's balance and size the spendable pool.
       const credits = (creditsRes.data ?? []) as Credit[]
+      const returnedCredits = (returnedRes.data ?? []) as Array<Pick<Credit, 'booking_id' | 'amount' | 'source'>>
       const profileMap = new Map((profilesRes.data ?? []).map(p => [p.id, p]))
       const diverNotesByUser = new Map<string, DiverNote[]>()
       for (const n of diverNotesRes.data ?? []) {
@@ -208,6 +217,7 @@ export function AdminEventDetailPage() {
         diverNotes: diverNotesByUser.get(b.user_id) ?? [],
         charges: resolveCharges({ details: b.details as BookingDetails, event: ev, roomPrices, addonPrices }),
         credit: openCreditForBooking(credits, b.id),
+        feeKept: cancellationKept(netPaid(paymentsByBooking.get(b.id) ?? []), returnedCredits, b.id),
         spendable: credits
           .filter(c => c.user_id === b.user_id && c.booking_id !== b.id)
           .reduce((s, c) => s + Number(c.amount), 0),
@@ -1572,7 +1582,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
             creditOwnerName={coveredByLead ? r.payerName! : undefined}
             pending={r.booking.status === 'pending'}
             cancelled={r.booking.status === 'cancelled'}
-            feeKept={r.booking.status === 'cancelled' && r.booking.cancellation_settled_at ? totalPaid : 0}
+            feeKept={r.booking.status === 'cancelled' && r.booking.cancellation_settled_at ? r.feeKept : 0}
             cancelledAt={r.booking.cancelled_at}
             cancelledBy={r.booking.cancelled_by}
             readOnly={!!readOnly}

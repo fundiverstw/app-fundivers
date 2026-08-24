@@ -90,6 +90,9 @@ export function AdminCancellationPoliciesPage() {
                 <p className="font-medium text-brand-900 text-sm truncate">
                   {p.title || cp.untitled}{!p.active && <span className="ml-2 text-xs text-brand-900/60">{wv.inactive}</span>}
                   {p.language ? <span className="ml-2 text-xs text-brand-900/60">{p.language}</span> : null}
+                  {!p.deposit_refundable && (
+                    <span className="ml-2 text-xs font-semibold bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded">{cp.depositKeptBadge}</span>
+                  )}
                 </p>
                 <p className="text-xs text-brand-900/70 truncate">{p.cancellation_policy}</p>
               </div>
@@ -138,6 +141,7 @@ function PolicyForm({
   const [language, setLanguage] = useState(policy?.language ?? '')
   const [body, setBody] = useState(policy?.cancellation_policy ?? '')
   const [active, setActive] = useState(policy?.active ?? true)
+  const [depositRefundable, setDepositRefundable] = useState(policy?.deposit_refundable ?? true)
   const [submitting, setSubmitting] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
@@ -151,6 +155,7 @@ function PolicyForm({
         language: language.trim() || null,
         cancellation_policy: body.trim(),
         active,
+        deposit_refundable: depositRefundable,
       }
       await saveCancellationPolicy(values, policy?.id)
       await onSaved()
@@ -175,6 +180,18 @@ function PolicyForm({
           <textarea className={`${FIELD} text-xs`} rows={8} value={body} onChange={e => setBody(e.target.value)}
             placeholder={cp.policyTextPh} />
         </Labelled>
+        {/* The one field on this page that moves money. Ticking it off makes
+            bookings_credit_on_cancel withhold the deposit from every
+            cancellation credit on an event using this policy, so the wording
+            says what it does rather than naming the column. */}
+        <label className="flex items-start gap-2 text-sm text-brand-900">
+          <input type="checkbox" checked={!depositRefundable}
+            onChange={e => setDepositRefundable(!e.target.checked)} className="accent-brand-900 mt-0.5" />
+          <span>
+            {cp.depositNonRefundableLabel}
+            <span className="block text-xs text-brand-900/70">{cp.depositNonRefundableHint}</span>
+          </span>
+        </label>
         <label className="flex items-center gap-2 text-sm text-brand-900">
           <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} className="accent-brand-900" />
           {cp.activeLabel}

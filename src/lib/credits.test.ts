@@ -69,6 +69,41 @@ describe('openCreditForBooking', () => {
   })
 })
 
+describe('cancellationKept', () => {
+  // Net paid alone used to answer this, because a cancelled booking was either
+  // kept whole or returned whole. A non-refundable deposit splits it.
+  const credits = [
+    { id: 'c1', booking_id: 'b1', amount: 10400, status: 'open', source: 'booking_cancellation_return' },
+    { id: 'c2', booking_id: 'b2', amount: 3000, status: 'settled', source: 'booking_cancellation_return' },
+    { id: 'c3', booking_id: 'b3', amount: 2000, status: 'open', source: 'manual' },
+  ] as unknown as import('../types/database').Credit[]
+
+  it('is net paid less what was returned as a cancellation credit', async () => {
+    const { cancellationKept } = await import('./credits')
+    expect(cancellationKept(15400, credits, 'b1')).toBe(5000)
+  })
+
+  it('still counts a returned credit the diver has already spent', async () => {
+    const { cancellationKept } = await import('./credits')
+    expect(cancellationKept(3000, credits, 'b2')).toBe(0)
+  })
+
+  it('ignores credits that did not return this booking money', async () => {
+    const { cancellationKept } = await import('./credits')
+    expect(cancellationKept(2000, credits, 'b3')).toBe(2000)
+  })
+
+  it('is the whole net paid when nothing came back', async () => {
+    const { cancellationKept } = await import('./credits')
+    expect(cancellationKept(5000, credits, 'b9')).toBe(5000)
+  })
+
+  it('never goes negative when more was credited than paid', async () => {
+    const { cancellationKept } = await import('./credits')
+    expect(cancellationKept(9000, credits, 'b1')).toBe(0)
+  })
+})
+
 describe('diverCreditBalance', () => {
   it('counts an overpayment as credit owed to the diver', async () => {
     const { diverCreditBalance } = await import('./credits')

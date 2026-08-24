@@ -798,6 +798,12 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
                 <option key={p.id} value={p.id}>{p.title ?? p.id}</option>
               ))}
             </Select>
+            {/* Whether the deposit comes back is decided here, at the moment
+                the policy is chosen, because nothing downstream asks again:
+                cancelling the booking issues the credit on its own. */}
+            {cancelPolicies.find(p => p.id === form.cancel_policy)?.deposit_refundable === false && (
+              <p className="text-xs text-amber-800 font-semibold mt-1">{ef.depositNonRefundable}</p>
+            )}
           </Field>
         </div>
       </Section>

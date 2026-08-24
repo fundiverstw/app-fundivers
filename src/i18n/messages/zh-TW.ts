@@ -1370,6 +1370,9 @@ export const zhTW: Messages = {
       titlePh: '例如：標準取消政策',
       policyText: '政策文字 *',
       policyTextPh: '潛水員預訂前需確認的取消條款。',
+      depositNonRefundableLabel: '訂金不可退還',
+      depositNonRefundableHint: '當訂金是店家無法收回的成本時勾選，例如 PADI 線上課程序號或已預付的房間。使用此政策的活動取消訂位時，訂金將被保留，只有其餘金額轉為額度。',
+      depositKeptBadge: '保留訂金',
       activeLabel: '啟用（可於活動中選擇）',
     },
     vehicles: {
@@ -1865,6 +1868,7 @@ export const zhTW: Messages = {
       schedule: '課程流程',
       cancelByDate: '取消期限日期',
       cancelPolicy: '取消政策',
+      depositNonRefundable: '依此政策訂金不可退還，取消時將保留訂金，只有其餘金額轉為額度。',
       paymentDeadlineBlurb: '會顯示在報名表單與寄出的 PDF 中。留空則預設為「開始日期前 7 天」。',
       fullPaymentDeadline: '全額付款期限',
       noAddons: '尚未定義任何附加項目。',

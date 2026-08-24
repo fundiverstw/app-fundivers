@@ -12,7 +12,7 @@ import { fetchAmendmentsForBookings, amendmentsDelta } from '../lib/booking-amen
 import { uniqueUuids } from '../lib/uuid'
 import { resolveCharges, type ChargeLine } from '../lib/booking-charges'
 import { fetchChargeCatalog } from '../lib/booking-charge-catalog'
-import { fetchCreditsForUser, openCreditForBooking } from '../lib/credits'
+import { fetchCreditsForUser, openCreditForBooking, cancellationKept } from '../lib/credits'
 import { bookingBalance, depositCovered } from '../lib/booking-balance'
 import { netPaid } from '../lib/payments'
 import { ShareEventButton } from '../components/ShareEventButton'
@@ -32,6 +32,10 @@ type Row = Booking & {
   charges: ChargeLine[]
   /** Open credit awarded for this event — offsets what's owed. */
   credit: number
+  /** What the shop kept off a cancelled booking: net paid less anything
+   *  returned as a cancellation credit. Zero unless a person or a
+   *  non-refundable-deposit policy settled it. */
+  feeKept: number
   amendments: BookingAmendment[]
   /** Live (status='pending', not expired) waitlist offer on this booking,
    *  if any. Drives the "Spot opened — Accept this spot" banner. */
@@ -120,6 +124,7 @@ export function BookingsPage() {
         paidSum,
         charges: resolveCharges({ details: b.details as BookingDetails, event, ...catalog }),
         credit: openCreditForBooking(credits, b.id),
+        feeKept: cancellationKept(paidSum, credits, b.id),
         amendments: amendmentsByBooking.get(b.id) ?? [],
         offer,
         offerRemainingLabel: offer ? formatRemaining(offer.expires_at, nowMs) : null,
@@ -335,10 +340,10 @@ function Card({
           {/* The shop kept part of what this diver paid. Told outright, on the
               booking it came off — a withheld fee that only surfaces as a
               refund that never arrives is how a diver finds out by noticing. */}
-          {row.status === 'cancelled' && row.cancellation_settled_at && row.paidSum > 0 && (
+          {row.status === 'cancelled' && row.cancellation_settled_at && row.feeKept > 0 && (
             <div className={`flex justify-between ${TEXT_BODY}`}>
               <span>{t.bookings.cancellationFeeKept}</span>
-              <span className="text-amber-800 font-semibold">{currency} {row.paidSum.toLocaleString()}</span>
+              <span className="text-amber-800 font-semibold">{currency} {row.feeKept.toLocaleString()}</span>
             </div>
           )}
           {total > 0 && (
