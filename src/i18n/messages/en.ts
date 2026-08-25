@@ -2365,7 +2365,7 @@ export const en = {
     },
     partners: {
       newPartner: '+ New partner',
-      intro: "Dive shops abroad the shop vouches for. Divers see the name, region, blurb and website on the Trusted Partners tab, and can message any partner that has a contact email; the email stays here and is never shown to divers. These are also the shops that host Packages. Retire a partner (untick Active) to hide it without deleting the record.",
+      intro: "Dive shops abroad the shop vouches for. Every active partner is listed on the diver-facing Trusted Partners tab — name, region, blurb and website. Add a contact email and divers can message that partner too; the email stays here and is never shown to them. These are also the shops that host Packages. Retire a partner (untick Active) to hide it without deleting the record.",
       none: "No partners yet — add the shop's first one.",
       retired: '(retired)',
       deleted: 'Partner deleted',

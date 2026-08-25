@@ -57,7 +57,7 @@ describe('TrustedPartnersPage', () => {
 
   it('lists trusted partners and messages one through the edge function', async () => {
     fetchPartnersMock.mockResolvedValue([
-      { id: 'p1', name: 'Blue Manta', region: 'Anilao', blurb: 'Great muck diving' },
+      { id: 'p1', name: 'Blue Manta', region: 'Anilao', blurb: 'Great muck diving', contactable: true },
     ])
     contactMock.mockResolvedValue(undefined)
     const user = userEvent.setup()
@@ -76,8 +76,8 @@ describe('TrustedPartnersPage', () => {
 
   it('links to a partner website when one is set', async () => {
     fetchPartnersMock.mockResolvedValue([
-      { id: 'p1', name: 'Blue Manta', region: 'Anilao', blurb: null, website: 'https://bluemanta.example' },
-      { id: 'p2', name: 'No Site Co', region: 'Bali', blurb: null, website: null },
+      { id: 'p1', name: 'Blue Manta', region: 'Anilao', blurb: null, website: 'https://bluemanta.example', contactable: true },
+      { id: 'p2', name: 'No Site Co', region: 'Bali', blurb: null, website: null, contactable: true },
     ])
     renderPage()
 
@@ -85,6 +85,22 @@ describe('TrustedPartnersPage', () => {
     expect(link).toHaveAttribute('href', 'https://bluemanta.example')
     // The partner without a website shows no link.
     expect(screen.getAllByRole('link', { name: /visit their site/i })).toHaveLength(1)
+  })
+
+  // A partner the shop has no email for is still vouched for, so it is still
+  // listed — it just can't be messaged from here.
+  it('lists a partner with no contact email but offers no message button for it', async () => {
+    fetchPartnersMock.mockResolvedValue([
+      { id: 'p1', name: 'Blue Manta', region: 'Anilao', blurb: null, website: null, contactable: true },
+      { id: 'p2', name: 'Postbox Free Divers', region: 'Bali', blurb: 'Worth the trip.', website: 'https://pfd.example', contactable: false },
+    ])
+    renderPage()
+
+    expect(await screen.findByText('Postbox Free Divers')).toBeInTheDocument()
+    expect(screen.getByText('Worth the trip.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /visit their site/i })).toHaveAttribute('href', 'https://pfd.example')
+    // Only the contactable partner gets a Message button.
+    expect(screen.getAllByRole('button', { name: /^message$/i })).toHaveLength(1)
   })
 
   it('stays on the form when the request fails', async () => {

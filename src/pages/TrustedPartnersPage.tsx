@@ -19,7 +19,8 @@ const tp = t.partners
 // partner from the shop address, cc's the shop, and replies-to the diver), or,
 // if their destination isn't listed, ask the shop for a recommendation (the
 // partner-connect edge function). Partner emails never reach the client — the
-// list comes from list_trusted_partners(), which withholds them.
+// list comes from list_trusted_partners(), which withholds them and reports
+// only whether one exists, as `contactable`.
 export function TrustedPartnersPage() {
   const { profile } = useAuth()
   const toast = useToast()
@@ -118,8 +119,10 @@ export function TrustedPartnersPage() {
   )
 }
 
-// One partner, with an inline compose box. The message routes through the edge
-// function — the diver never sees the partner's email.
+// One partner, with an inline compose box where the shop holds an address for
+// them. The message routes through the edge function — the diver never sees the
+// partner's email. A partner without one is still vouched for and still listed;
+// it just has no Message button, so the website is the way in.
 function PartnerRow({ partner }: { partner: TrustedPartner }) {
   const toast = useToast()
   const [open, setOpen] = useState(false)
@@ -159,7 +162,7 @@ function PartnerRow({ partner }: { partner: TrustedPartner }) {
             </a>
           )}
         </div>
-        {!sent && (
+        {!sent && partner.contactable && (
           <button
             type="button"
             onClick={() => setOpen(o => !o)}

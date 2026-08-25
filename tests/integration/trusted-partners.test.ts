@@ -6,7 +6,8 @@
 // (also hosts Packages). Security contract: a diver must NOT read a partner's
 // contact email. RLS grants direct table access to admins only; divers read the
 // public projection (name/region/blurb/website, no email) via the SECURITY
-// DEFINER RPC, which returns only active partners that have a contact email.
+// DEFINER RPC, which returns every active partner plus a `contactable` boolean
+// standing in for the withheld email (20260827000000).
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import {
   adminClient, userClient, createTestUser, deleteTestUser, type TestUser,
@@ -17,8 +18,8 @@ let diver: TestUser
 let adminUser: TestUser
 const cleanup: string[] = []
 
-// Insert a trusted partner. `contactEmail` null models a package-only partner
-// that can't be messaged (so it's absent from the diver directory).
+// Insert a trusted partner. `contactEmail` null models a partner the shop holds
+// no address for — still listed, just not contactable.
 async function createPartner(
   name: string, contactEmail: string | null, active = true, extra: Record<string, unknown> = {},
 ): Promise<string> {
@@ -65,15 +66,16 @@ describe('trusted_partners access', () => {
     expect(bm!.region).toBe('Anilao')                 // coalesce(location, country)
     expect(bm!.blurb).toBe('Great muck diving.')      // vouch_notes
     expect(bm!.website).toBe('https://bluemanta.example')
+    expect(bm!.contactable).toBe(true)               // has an email, without exposing it
     // Retired partners are withheld.
     expect(rows.some(r => r.name === 'Retired Co')).toBe(false)
   })
 
-  it('only lists partners that are active AND have a contact email', async () => {
+  it('lists every active partner, flagging which ones can be messaged', async () => {
     const reachable = await createPartner('Manta Point Dive Co', 'mp@example.test', true, { location: 'Komodo' })
-    // No contact email → can't be messaged → not listed.
+    // No contact email → still vouched for, still listed, just not contactable.
     const noEmail = await createPartner('Unreachable Shop', null, true)
-    // Inactive → withheld.
+    // Inactive → withheld. Active is the only thing that decides visibility.
     const inactive = await createPartner('Closed Shop', 'closed@example.test', false)
 
     const diverClient = await userClient(diver.email, diver.password)
@@ -81,8 +83,8 @@ describe('trusted_partners access', () => {
     expect(error).toBeNull()
     const rows = (data ?? []) as Array<Record<string, unknown>>
 
-    expect(rows.some(r => r.id === reachable)).toBe(true)
-    expect(rows.some(r => r.id === noEmail)).toBe(false)
+    expect(rows.find(r => r.id === reachable)?.contactable).toBe(true)
+    expect(rows.find(r => r.id === noEmail)?.contactable).toBe(false)
     expect(rows.some(r => r.id === inactive)).toBe(false)
   })
 

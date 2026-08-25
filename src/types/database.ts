@@ -176,13 +176,14 @@ export interface Database {
         Returns: undefined
       }
       // Public projection of the unified trusted_partners table (20260707220000):
-      // active partners that have a contact email, mapped to region =
-      // coalesce(location, country), blurb = vouch_notes. No email/kickback —
-      // divers list them without direct table access; the email stays
-      // server-side (resolved by the contact-trusted-partner edge fn).
+      // every active partner, mapped to region = coalesce(location, country),
+      // blurb = vouch_notes. No email/kickback — divers list them without direct
+      // table access; the email stays server-side (resolved by the
+      // contact-trusted-partner edge fn) and `contactable` (20260827000000) just
+      // says whether there is one to resolve.
       list_trusted_partners: {
         Args: Record<string, never>
-        Returns: Array<{ id: string; name: string; region: string | null; blurb: string | null; website: string | null }>
+        Returns: Array<{ id: string; name: string; region: string | null; blurb: string | null; website: string | null; contactable: boolean }>
       }
       // Owner-privileged projection of published packages joined to the vouched
       // partner shop — diver-safe columns only (no kickback rate). Divers have

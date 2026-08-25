@@ -8,8 +8,10 @@ import type { TrustedPartner, TrustedPartnerRow, TrustedPartnerInsert } from '..
 // through the contact-trusted-partner edge function, which resolves the email
 // server-side.
 
-// Diver-facing: the active, reachable partners — name/region/blurb/website only
-// (no email/kickback). Every active partner that has a contact email appears.
+// Diver-facing: every active partner — name/region/blurb/website only (no
+// email/kickback), plus `contactable`, which says whether the shop holds an
+// address the message form can reach. Marked active means shown to divers, with
+// or without an email (20260827000000).
 export async function fetchTrustedPartners(): Promise<TrustedPartner[]> {
   const { data, error } = await supabase.rpc('list_trusted_partners')
   if (error) throw error
