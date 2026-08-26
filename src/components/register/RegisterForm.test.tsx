@@ -393,18 +393,23 @@ describe('RegisterForm', () => {
     await user.click(screen.getByLabelText(/i have all the required gear/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
-    // Step 4 surfaces the opt-in (on by default) showing the available credit.
+    // Step 4 surfaces the opt-in showing the available credit. It starts
+    // unticked — spending credit is the diver's decision, not the form's.
     expect(await screen.findByText(/use my account credit/i)).toBeInTheDocument()
     expect(screen.getByText(/TWD 2,000 available/i)).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: /use my account credit/i })).not.toBeChecked()
+    // Untouched, the diver owes the gross total and no after-credit line shows.
+    expect(screen.queryByText(/you'll pay \(after credit\)/i)).not.toBeInTheDocument()
 
-    // With the toggle on, the total reflects the credit: 2,800 − 2,000 = 800.
+    // Ticking it deducts the credit: 2,800 − 2,000 = 800.
+    await user.click(screen.getByRole('checkbox', { name: /use my account credit/i }))
     expect(screen.getByText(/you'll pay \(after credit\)/i)).toBeInTheDocument()
     expect(screen.getByText(/^TWD\s*800$/)).toBeInTheDocument()
 
-    // Unchecking restores the gross total and hides the after-credit line.
+    // Unticking restores the gross total and hides the after-credit line again.
     await user.click(screen.getByRole('checkbox', { name: /use my account credit/i }))
     expect(screen.queryByText(/you'll pay \(after credit\)/i)).not.toBeInTheDocument()
-    // Re-check so the confirm path still spends the credit.
+    // Re-tick so the confirm path still spends the credit.
     await user.click(screen.getByRole('checkbox', { name: /use my account credit/i }))
 
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
@@ -458,6 +463,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
 
     expect(await screen.findByText(/apply each diver.s account credit/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('checkbox', { name: /apply each diver.s account credit/i }))
 
     await user.click(screen.getByRole('button', { name: /confirm/i }))
 
@@ -503,6 +509,7 @@ describe('RegisterForm', () => {
     // The card names the target diver (not "my") and shows their balance.
     expect(await screen.findByText(/apply reef kid.s account credit/i)).toBeInTheDocument()
     expect(screen.getByText(/TWD 2,000 available/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('checkbox', { name: /apply reef kid.s account credit/i }))
 
     await user.click(screen.getByRole('button', { name: /confirm booking/i }))
 

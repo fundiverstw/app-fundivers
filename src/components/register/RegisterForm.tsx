@@ -580,13 +580,14 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const [payForEveryone, setPayForEveryone] = useState(true)
   const leadPays = !!leadPayerId && payForEveryone
   // Spendable account credit for a self-booking diver, plus their opt-in to
-  // apply it at checkout (default on — use credit before paying out of pocket).
+  // apply it at checkout (default off — spending credit is the diver's call,
+  // so the box is ticked deliberately, never by the form on their behalf).
   // creditApplied records what the RPC actually consumed, for the success view.
   const [availableCredit, setAvailableCredit] = useState(0)
   // Spendable credit for each additional family pick (group submit), keyed by
   // target id, so each diver's own credit can be applied to their own booking.
   const [additionalCredits, setAdditionalCredits] = useState<Record<string, number>>({})
-  const [useAccountCredit, setUseAccountCredit] = useState(true)
+  const [useAccountCredit, setUseAccountCredit] = useState(false)
   const [creditApplied, setCreditApplied] = useState(0)
   // The credit apply runs after the booking lands and can fail on its own.
   // Swallowing it silently left the diver believing their credit was spent —
