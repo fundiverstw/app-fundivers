@@ -95,3 +95,16 @@ export const ERROR_NOTE_LIGHT = 'text-xs text-red-200 bg-red-900/30 border borde
 // header is blurred glass; the bottom tab bar is opaque (see `.waybar-solid`).
 export const NAV_BAR    = 'waybar border-b border-white/10 px-4 py-3 flex items-center justify-between'
 export const NAV_BOTTOM = 'fixed bottom-0 left-0 right-0 waybar-solid border-t border-white/10 flex justify-around py-2 z-40'
+
+// ── Charts ─────────────────────────────────────────────────────────
+// Data marks are one hue, not a categorical set: every plot in the app shows a
+// single series, where the reader's job is magnitude, not identity. Role is
+// carried by opacity within that hue (a box is a wash, a dot is solid), so
+// nothing has to be told apart by color.
+//
+// CHART_INK sets `currentColor` for the marks; CHART_RING is the card surface,
+// used as the 2px ring that keeps overlapping dots countable without drawing a
+// border around them. Both are stroke/text utilities rather than raw hex so a
+// fork retheming the palette moves the plots with it.
+export const CHART_INK  = 'text-reef-300'
+export const CHART_RING = 'stroke-brand-950'

@@ -182,6 +182,21 @@ export const ja: Messages = {
     recordsLoading: 'アルマナックを読み込み中…',
     recordsFailed: '観察を読み込めませんでした。',
     yourSubmissions: 'あなたの投稿',
+    // Site/date lookup
+    lookupHeading: '場所と日付で調べる',
+    lookupSite: '場所',
+    lookupDate: '日付',
+    lookupPrompt: '場所と日付を選ぶと、その日に記録されたすべてのデータを表示します。',
+    lookupClear: 'クリア',
+    lookupLoading: 'その日のデータを読み込んでいます…',
+    lookupFailed: 'その日のデータを読み込めませんでした。',
+    noDayRecords: 'その場所のその日の記録はありません。',
+    measured: '計測値',
+    called: 'コンディション',
+    whoReported: '誰が何を報告したか',
+    avgPrefix: '平均',
+    plotAria: (metric: string, n: number, min: string, max: string) =>
+      `${metric}：観察 ${n} 件、${min} 〜 ${max}`,
     // Staff review queue
     moderation: '審査待ち',
     queueEmpty: '審査待ちの観察はありません。',

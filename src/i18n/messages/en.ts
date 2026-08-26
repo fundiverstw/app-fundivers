@@ -190,6 +190,21 @@ export const en = {
     recordsLoading: 'Loading the almanac…',
     recordsFailed: 'Could not load observations.',
     yourSubmissions: 'Your submissions',
+    // Site/date lookup
+    lookupHeading: 'Look up a place and a day',
+    lookupSite: 'Place',
+    lookupDate: 'Date',
+    lookupPrompt: 'Pick a place and a date to see everything filed for that day.',
+    lookupClear: 'Clear',
+    lookupLoading: 'Reading that day…',
+    lookupFailed: 'Could not load that day.',
+    noDayRecords: 'Nothing filed for that place on that day.',
+    measured: 'Readings',
+    called: 'Conditions',
+    whoReported: 'Who reported what',
+    avgPrefix: 'avg',
+    plotAria: (metric: string, n: number, min: string, max: string) =>
+      `${metric}: ${n} observation${n === 1 ? '' : 's'}, ${min} to ${max}`,
     // Staff review queue
     moderation: 'Review queue',
     queueEmpty: 'Nothing waiting for review.',

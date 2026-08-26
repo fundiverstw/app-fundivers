@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AlmanacPage } from './AlmanacPage'
 import { mockQueryBuilder } from '../../tests/test-utils'
@@ -131,6 +131,66 @@ describe('AlmanacPage', () => {
     expect(within(augCard).getByText('Bat Cave')).toBeInTheDocument()
     expect(within(augCard).getByText('Dragon Head')).toBeInTheDocument()
     expect(within(augCard).getByText(t.almanac.observationCount(2))).toBeInTheDocument()
+  })
+
+  it('reads one place on one day once both halves of the lookup are answered', async () => {
+    const user = userEvent.setup()
+    mockRpc({ almanac_records_in_range: [approvedRecord] })
+    renderPage()
+    await user.click(await screen.findByRole('tab', { name: t.almanac.tabView }))
+
+    // A half-answered lookup is not a lookup: the browse list stays up.
+    await user.selectOptions(screen.getByLabelText(t.almanac.lookupSite), 'site-1')
+    expect(screen.getByText(t.almanac.recordsHeading)).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText(t.almanac.lookupDate), { target: { value: '2026-08-01' } })
+
+    // The day is read as its own one-day window, so a lookup can reach past
+    // the 90 days the page itself holds.
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('almanac_records_in_range',
+      { p_from: '2026-08-01', p_to: '2026-08-01' }))
+    expect(await screen.findByText(t.almanac.whoReported)).toBeInTheDocument()
+    expect(screen.queryByText(t.almanac.recordsHeading)).not.toBeInTheDocument()
+  })
+
+  it('says nothing was filed rather than showing an empty report', async () => {
+    const user = userEvent.setup()
+    mockRpc({ almanac_records_in_range: [{ ...approvedRecord, site_id: 'site-2' }] })
+    renderPage()
+    await user.click(await screen.findByRole('tab', { name: t.almanac.tabView }))
+
+    await user.selectOptions(screen.getByLabelText(t.almanac.lookupSite), 'site-1')
+    fireEvent.change(screen.getByLabelText(t.almanac.lookupDate), { target: { value: '2026-08-01' } })
+
+    // The day held a record, but for another place.
+    expect(await screen.findByText(t.almanac.noDayRecords)).toBeInTheDocument()
+  })
+
+  it('gives the browse list back when the lookup is cleared', async () => {
+    const user = userEvent.setup()
+    mockRpc({ almanac_records_in_range: [approvedRecord] })
+    renderPage()
+    await user.click(await screen.findByRole('tab', { name: t.almanac.tabView }))
+
+    await user.selectOptions(screen.getByLabelText(t.almanac.lookupSite), 'site-1')
+    fireEvent.change(screen.getByLabelText(t.almanac.lookupDate), { target: { value: '2026-08-01' } })
+    expect(await screen.findByText(t.almanac.whoReported)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: t.almanac.lookupClear }))
+
+    expect(await screen.findByText(t.almanac.recordsHeading)).toBeInTheDocument()
+    expect(screen.queryByText(t.almanac.whoReported)).not.toBeInTheDocument()
+  })
+
+  // A place the shop retired keeps the days it was dived, so the lookup still
+  // offers it even though the submission form has stopped.
+  it('offers retired places for lookup, unlike the submission form', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(await screen.findByRole('tab', { name: t.almanac.tabView }))
+
+    const picker = screen.getByLabelText(t.almanac.lookupSite) as HTMLSelectElement
+    expect([...picker.options].map(o => o.value)).toContain('site-4')
   })
 
   it('submits the form through the RPC, parsing numbers and wildlife', async () => {

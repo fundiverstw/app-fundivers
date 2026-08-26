@@ -183,6 +183,21 @@ export const zhTW: Messages = {
     recordsLoading: '載入環境日誌中…',
     recordsFailed: '無法載入觀察。',
     yourSubmissions: '你的提交',
+    // Site/date lookup
+    lookupHeading: '依地點與日期查詢',
+    lookupSite: '地點',
+    lookupDate: '日期',
+    lookupPrompt: '選擇地點與日期，即可看到當天提交的所有資料。',
+    lookupClear: '清除',
+    lookupLoading: '正在讀取當天的資料…',
+    lookupFailed: '無法讀取當天的資料。',
+    noDayRecords: '該地點在該日期沒有任何記錄。',
+    measured: '量測數值',
+    called: '狀況判斷',
+    whoReported: '誰記錄了什麼',
+    avgPrefix: '平均',
+    plotAria: (metric: string, n: number, min: string, max: string) =>
+      `${metric}：${n} 筆觀察，${min} 至 ${max}`,
     // Staff review queue
     moderation: '審核佇列',
     queueEmpty: '沒有待審核的觀察。',

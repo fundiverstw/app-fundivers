@@ -49,6 +49,9 @@ import {
   BTN_XS_DANGER,
   ERROR_NOTE_LIGHT,
 } from '../styles/tokens'
+import { ReadingGrid } from '../components/almanac/ReadingGrid'
+import { formatNum, readingsOf, type Reading } from '../lib/almanac-readings'
+import { SiteDayReport } from '../components/almanac/SiteDayReport'
 import { CalendarIcon } from '../components/icons/CalendarIcon'
 import { ChevronDownIcon } from '../components/icons/ChevronDownIcon'
 import { ChevronUpIcon } from '../components/icons/ChevronUpIcon'
@@ -108,10 +111,6 @@ const emptyForm: AlmanacFormState = {
   summit_visible: false,
 }
 
-function formatNum(v: number | null, decimals = 1): string {
-  return v === null ? '—' : v.toFixed(decimals)
-}
-
 /** A `date` column rendered as the day it stores, not a UTC-shifted one. */
 function formatObsDate(iso: string): string {
   return format(parseIsoDate(iso), 'MMM d, yyyy')
@@ -119,46 +118,6 @@ function formatObsDate(iso: string): string {
 
 function parseWildlife(raw: string): string[] {
   return raw.split(',').map(s => s.trim()).filter(Boolean)
-}
-
-// ─── Readings ────────────────────────────────────────────────────────────────
-
-/** The readings a record carries, as label/value pairs — blank ones dropped. */
-type Reading = { label: string; value: string }
-
-function readingsOf(record: AlmanacEventRecord | AlmanacPendingRecord): Reading[] {
-  const readings: Reading[] = []
-  const push = (label: string, value: string | null) => {
-    if (value !== null) readings.push({ label, value })
-  }
-  push(t.almanac.airTemp, record.air_temp_c === null ? null : `${formatNum(record.air_temp_c)}°C`)
-  push(t.almanac.waterTemp, record.water_temp_c === null ? null : `${formatNum(record.water_temp_c)}°C`)
-  push(t.almanac.visibility, record.visibility_m === null ? null : `${formatNum(record.visibility_m)}m`)
-  push(t.almanac.current, record.current_strength && t.almanac.currentStrengths[record.current_strength])
-  push(t.almanac.weather, record.weather && t.almanac.weathers[record.weather])
-  push(t.almanac.waveHeight, record.wave_height_m === null ? null : `${formatNum(record.wave_height_m)}m`)
-  push(t.almanac.wavePeriod, record.wave_period_s === null ? null : `${formatNum(record.wave_period_s)}s`)
-  push(t.almanac.coralHealth, record.coral_health && t.almanac.coralHealths[record.coral_health])
-  push(t.almanac.wildlife, record.wildlife?.length ? record.wildlife.join(', ') : null)
-  push(t.almanac.elevation, record.elevation_m === null ? null : `${record.elevation_m}m`)
-  push(t.almanac.routeCondition, record.route_condition && t.almanac.routeConditions[record.route_condition])
-  push(t.almanac.summitVisible, record.summit_visible === null
-    ? null
-    : record.summit_visible ? t.almanac.yes : t.almanac.no)
-  return readings
-}
-
-function ReadingGrid({ readings }: { readings: Reading[] }) {
-  return (
-    <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-      {readings.map(({ label, value }) => (
-        <div key={label} className="contents">
-          <dt className={TEXT_SUBTLE}>{label}</dt>
-          <dd className={TEXT_BODY}>{value}</dd>
-        </div>
-      ))}
-    </dl>
-  )
 }
 
 // ─── Approved history ────────────────────────────────────────────────────────
@@ -633,6 +592,13 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 export function AlmanacPage() {
   const { user, profile, loading: authLoading } = useAuth()
   const [tab, setTab] = useState<'enter' | 'view'>('enter')
+  // The site/date lookup on the View tab. Both have to be answered before
+  // there is a day to read, so an unfinished pair leaves the browse list up.
+  const [lookupSite, setLookupSite] = useState('')
+  const [lookupDate, setLookupDate] = useState('')
+  const [dayRecords, setDayRecords] = useState<AlmanacEventRecord[] | null>(null)
+  const [dayLoading, setDayLoading] = useState(false)
+  const [dayError, setDayError] = useState<string | null>(null)
   const [sites, setSites] = useState<DiveSite[]>([])
   const [records, setRecords] = useState<AlmanacEventRecord[]>([])
   const [ownSubmissions, setOwnSubmissions] = useState<OwnSubmission[]>([])
@@ -705,6 +671,37 @@ export function AlmanacPage() {
     return () => { cancelled = true }
   }, [userId, loadSites, loadRecords, loadOwnSubmissions, loadQueue])
 
+  // One day at a time, straight from the range RPC with both ends on the same
+  // date: a lookup can reach further back than the page's own window, and a
+  // single day is a small enough read to fetch on every change of either field.
+  useEffect(() => {
+    if (!lookupSite || !lookupDate) return
+    let cancelled = false
+    const load = async () => {
+      setDayLoading(true)
+      setDayError(null)
+      try {
+        const { data, error } = await supabase.rpc('almanac_records_in_range', {
+          p_from: lookupDate, p_to: lookupDate,
+        })
+        if (error) throw error
+        if (!cancelled) {
+          setDayRecords((data ?? []).filter((r: AlmanacEventRecord) => r.site_id === lookupSite))
+        }
+      } catch (err) {
+        console.error('Failed to load that almanac day:', err)
+        if (!cancelled) {
+          setDayError(t.almanac.lookupFailed)
+          setDayRecords(null)
+        }
+      } finally {
+        if (!cancelled) setDayLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [lookupSite, lookupDate])
+
   const handleSubmit = async (form: AlmanacFormState) => {
     const terrain = hasTerrainConditions(form.kind)
     const { error } = await supabase.rpc('submit_almanac_record', {
@@ -753,6 +750,10 @@ export function AlmanacPage() {
 
   const days = daysOf(records)
   const siteNames = new Map(sites.map(site => [site.id, site.name]))
+  // Half a lookup is no lookup — and clearing one empties the fields a render
+  // before the effect drops the day it had loaded, so the report has to key off
+  // the fields rather than off the records still in hand.
+  const lookingUp = !!lookupSite && !!lookupDate
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4 pt-2 pb-8">
@@ -809,16 +810,74 @@ export function AlmanacPage() {
           )}
         </>
       ) : (
-        <section>
-          <h2 className={`mb-2 text-sm ${TEXT_HEADING}`}>{t.almanac.recordsHeading}</h2>
-          {days.length === 0 ? (
-            <p className={`${CARD} p-4 text-center text-sm ${TEXT_SUBTLE}`}>{t.almanac.noRecordsYet}</p>
-          ) : (
-            <div className="space-y-2">
-              {days.map(day => <DayCard key={day.date} day={day} />)}
-            </div>
+        <>
+          <section className={`${CARD} p-4`}>
+            <h2 className={`text-sm ${TEXT_HEADING}`}>{t.almanac.lookupHeading}</h2>
+            <p className={`mt-1 text-xs ${TEXT_SUBTLE}`}>{t.almanac.lookupPrompt}</p>
+
+            <label className="mt-3 block">
+              <span className={INPUT_LABEL}>{t.almanac.lookupSite}</span>
+              {/* Retired places stay in the list: the form stops offering them,
+                  but the days they were dived are still there to read. */}
+              <select className={INPUT} value={lookupSite} onChange={e => setLookupSite(e.target.value)}>
+                <option value="">{t.almanac.sitePlaceholder}</option>
+                {sites.map(site => (
+                  <option key={site.id} value={site.id}>
+                    {site.region ? `${site.name} — ${site.region}` : site.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="mt-3 block">
+              <span className={INPUT_LABEL}>{t.almanac.lookupDate}</span>
+              <input
+                type="date"
+                className={INPUT}
+                max={todayIso()}
+                value={lookupDate}
+                onChange={e => setLookupDate(e.target.value)}
+              />
+            </label>
+
+            {(lookupSite || lookupDate) && (
+              <button
+                type="button"
+                className={`${BTN_XS_GHOST} mt-3`}
+                onClick={() => { setLookupSite(''); setLookupDate('') }}
+              >
+                {t.almanac.lookupClear}
+              </button>
+            )}
+          </section>
+
+          {lookingUp && dayError && <p className={ERROR_NOTE_LIGHT}>{dayError}</p>}
+
+          {lookingUp && dayLoading && (
+            <p className={`text-center text-sm ${TEXT_SUBTLE}`}>{t.almanac.lookupLoading}</p>
           )}
-        </section>
+
+          {lookingUp && !dayLoading && dayRecords !== null && (
+            <SiteDayReport
+              siteName={siteNames.get(lookupSite) ?? '—'}
+              dateLabel={formatObsDate(lookupDate)}
+              records={dayRecords}
+            />
+          )}
+
+          {!lookingUp && (
+            <section>
+              <h2 className={`mb-2 text-sm ${TEXT_HEADING}`}>{t.almanac.recordsHeading}</h2>
+              {days.length === 0 ? (
+                <p className={`${CARD} p-4 text-center text-sm ${TEXT_SUBTLE}`}>{t.almanac.noRecordsYet}</p>
+              ) : (
+                <div className="space-y-2">
+                  {days.map(day => <DayCard key={day.date} day={day} />)}
+                </div>
+              )}
+            </section>
+          )}
+        </>
       )}
     </div>
   )
