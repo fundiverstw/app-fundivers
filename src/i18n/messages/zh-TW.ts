@@ -1141,7 +1141,7 @@ export const zhTW: Messages = {
       gearSizing: { title: '器材尺寸', blurb: '防寒衣、BCD 與蛙鞋型號及各尺寸適合的身形範圍 — 支援後勤裝備查詢。' },
       packages: { title: '套裝行程', blurb: '發布合作店家的套裝行程（價格方案＋附加項目）供潛水員報名；追蹤報名與預期對實付回饋。' },
       scheduledTrips: { title: '預定行程', blurb: '店家自有的指定日期行程（價格＋目錄附加項目／房型）供潛水員報名；追蹤報名。' },
-      trustedPartners: { title: '合作夥伴', blurb: '潛水員可從「合作夥伴」分頁直接聯絡的海外潛店；電子郵件僅管理員可見。' },
+      trustedPartners: { title: '合作夥伴', blurb: '本店掛保證的海外潛店。「啟用」的都會列在「合作夥伴」分頁，其中留有電子郵件的還可讓潛水員直接聯絡；電子郵件僅管理員可見。' },
       notifications: { title: '通知', blurb: '立即發送推播（並可選擇 LINE 轉發）給所有已開啟通知的裝置。' },
       accounting: { title: '營收與文件', blurb: '查看本年度每位支薪員工帶出的營收，並下載會計年度記帳 ZIP。' },
       waivers: { title: '免責聲明', blurb: '編寫潛水員需簽署的表單 — 文字或您自行上傳的 PDF，任何語言皆可。可在活動的編輯表單中為個別活動附加或豁免。' },

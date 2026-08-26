@@ -1152,7 +1152,7 @@ export const en = {
       gearSizing: { title: 'Gear sizing', blurb: 'Wetsuit, BCD and fin models with the body ranges each size fits — powers the logistics packing lookup.' },
       packages: { title: 'Packages', blurb: 'Publish partner-shop packages (price tiers + add-ons) divers register for; track registrations and expected-vs-paid kickbacks.' },
       scheduledTrips: { title: 'Scheduled Trips', blurb: 'The shop’s own dated trips (price + catalog add-ons/rooms) divers register for; track registrations.' },
-      trustedPartners: { title: 'Trusted Partners', blurb: 'Dive shops abroad divers can message directly from the Trusted Partners tab; the email stays admin-only.' },
+      trustedPartners: { title: 'Trusted Partners', blurb: 'Dive shops abroad the shop vouches for. Divers see every active partner on the Trusted Partners tab, and can message the ones with an email on file; the email stays admin-only.' },
       notifications: { title: 'Notifications', blurb: 'Send an immediate push (and optional LINE relay) to every opted-in device.' },
       accounting: { title: 'Revenue & documents', blurb: 'See what each paid crew member generated this season, and download a fiscal-year bookkeeping ZIP.' },
       waivers: { title: 'Waivers', blurb: 'Author the forms divers e-sign — as text or your own uploaded PDF, in any language. Attach or exempt them per-event from an event’s edit form.' },
