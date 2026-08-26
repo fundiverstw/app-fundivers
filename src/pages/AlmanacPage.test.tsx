@@ -80,13 +80,35 @@ describe('AlmanacPage', () => {
   })
 
   it('reads the history as one date window, not one call per place', async () => {
+    const user = userEvent.setup()
     mockRpc({ almanac_records_in_range: [approvedRecord] })
     renderPage()
 
     await waitFor(() => expect(rpc).toHaveBeenCalledWith('almanac_records_in_range',
       expect.objectContaining({ p_from: expect.any(String), p_to: expect.any(String) })))
     expect(rpc.mock.calls.filter(c => c[0] === 'almanac_records_in_range')).toHaveLength(1)
-    expect(await screen.findByText(t.almanac.recordsHeading)).toBeInTheDocument()
+    await user.click(await screen.findByRole('tab', { name: t.almanac.tabView }))
+    expect(screen.getByText(t.almanac.recordsHeading)).toBeInTheDocument()
+  })
+
+  // Filing and reading are separate errands, so the page opens on the form and
+  // keeps the history one button away rather than below a long scroll.
+  it('opens on the form and shows the history only under View data', async () => {
+    const user = userEvent.setup()
+    mockRpc({ almanac_records_in_range: [approvedRecord] })
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: t.almanac.submitRecord })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: t.almanac.tabEnter })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByText(t.almanac.recordsHeading)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: t.almanac.tabView }))
+    expect(screen.getByText(t.almanac.recordsHeading)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: t.almanac.submitRecord })).not.toBeInTheDocument()
+
+    // And back — the form is still there, not a one-way trip.
+    await user.click(screen.getByRole('tab', { name: t.almanac.tabEnter }))
+    expect(screen.getByRole('button', { name: t.almanac.submitRecord })).toBeInTheDocument()
   })
 
   it('groups the history by calendar date, merging sites that share a day', async () => {
@@ -99,6 +121,7 @@ describe('AlmanacPage', () => {
       ],
     })
     renderPage()
+    await user.click(await screen.findByRole('tab', { name: t.almanac.tabView }))
 
     const days = await screen.findAllByText(/Aug 1, 2026|Jul 30, 2026/)
     expect(days).toHaveLength(2)

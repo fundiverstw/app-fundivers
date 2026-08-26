@@ -129,6 +129,9 @@ export const ja: Messages = {
   almanac: {
     title: 'アルマナック',
     blurb: '過去のイベントでみんなが記録したコンディション。見たものを投稿するか、他の人の記録を読んでください。',
+    sectionsAria: 'アルマナックのセクション',
+    tabEnter: 'データを入力',
+    tabView: 'データを見る',
     noRecordsYet: '承認済みの観察はまだありません — 最初の観察を共有しましょう。',
     noSites: '選択できる場所がまだありません。管理者が「管理」から追加します。',
     submit: '観察を投稿',

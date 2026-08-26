@@ -130,6 +130,9 @@ export const zhTW: Messages = {
   almanac: {
     title: '環境日誌',
     blurb: '過往活動的群眾環境記錄。提交你看到的狀況，或閱讀其他人的記錄。',
+    sectionsAria: '環境日誌分頁',
+    tabEnter: '輸入資料',
+    tabView: '查看資料',
     noRecordsYet: '還沒有通過審核的觀察 — 成為第一個分享的人。',
     noSites: '目前沒有可選擇的地點 — 由管理員在「管理」中新增。',
     submit: '提交觀察',

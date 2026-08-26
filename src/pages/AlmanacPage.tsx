@@ -6,9 +6,12 @@
  * staff rule on each submission; approved records are what the crowd reads.
  *
  * The three sections mirror those three roles: the review queue (staff only),
- * the submission form, and the approved history grouped by event.
+ * the submission form, and the approved history grouped by event. Filing and
+ * reading are opposite errands, so the form and the history are two tabs
+ * rather than one long scroll; the queue sits above both, since a staff member
+ * with something to rule on should not have to go looking for it.
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { format } from 'date-fns'
 import { useAuth } from '../hooks/useAuth'
 import { t } from '../i18n'
@@ -52,6 +55,8 @@ import { ChevronUpIcon } from '../components/icons/ChevronUpIcon'
 
 // How much of the almanac's history the page reads back.
 const LOOKBACK_DAYS = 90
+
+const PILL = 'px-3 py-1.5 rounded-lg text-sm font-semibold'
 
 /** A submission of the signed-in diver's that the crowd cannot see yet. */
 interface OwnSubmission {
@@ -611,8 +616,23 @@ const STATUS_LABEL: Record<AlmanacStatus, string> = {
   rejected: t.almanac.statusRejected,
 }
 
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`${PILL} ${active ? 'bg-brand-600 text-white' : 'bg-white/70 text-brand-900 hover:bg-white/90'}`}
+    >
+      {children}
+    </button>
+  )
+}
+
 export function AlmanacPage() {
   const { user, profile, loading: authLoading } = useAuth()
+  const [tab, setTab] = useState<'enter' | 'view'>('enter')
   const [sites, setSites] = useState<DiveSite[]>([])
   const [records, setRecords] = useState<AlmanacEventRecord[]>([])
   const [ownSubmissions, setOwnSubmissions] = useState<OwnSubmission[]>([])
@@ -745,52 +765,61 @@ export function AlmanacPage() {
 
       {isStaff && !loadError && <ModerationQueue records={pending} onModerate={handleModerate} />}
 
-      {sites.length === 0 ? (
-        <p className={`${CARD} p-4 text-center text-sm ${TEXT_SUBTLE}`}>{t.almanac.noSites}</p>
+      <div className="flex gap-2" role="tablist" aria-label={t.almanac.sectionsAria}>
+        <TabButton active={tab === 'enter'} onClick={() => setTab('enter')}>{t.almanac.tabEnter}</TabButton>
+        <TabButton active={tab === 'view'} onClick={() => setTab('view')}>{t.almanac.tabView}</TabButton>
+      </div>
+
+      {tab === 'enter' ? (
+        <>
+          {sites.length === 0 ? (
+            <p className={`${CARD} p-4 text-center text-sm ${TEXT_SUBTLE}`}>{t.almanac.noSites}</p>
+          ) : (
+            <AlmanacForm sites={sites} onSubmit={handleSubmit} />
+          )}
+
+          {submitStatus && (
+            <p className="rounded-lg bg-emerald-500/15 p-2 text-center text-xs text-emerald-200">
+              {submitStatus}
+            </p>
+          )}
+
+          {ownSubmissions.length > 0 && (
+            <section>
+              <h2 className={`mb-2 text-sm ${TEXT_HEADING}`}>{t.almanac.yourSubmissions}</h2>
+              <ul className="space-y-2">
+                {ownSubmissions.map(sub => (
+                  <li key={sub.id} className={`${CARD} flex items-center justify-between gap-2 p-3`}>
+                    <div>
+                      <div className={`text-sm ${TEXT_BODY}`}>
+                        {siteNames.get(sub.site_id) ?? '—'}
+                      </div>
+                      <div className={`text-xs ${TEXT_SUBTLE}`}>
+                        {formatObsDate(sub.obs_date)}
+                        {sub.staff_notes ? ` · ${sub.staff_notes}` : ''}
+                      </div>
+                    </div>
+                    <span className={`text-[10px] uppercase tracking-wide ${TEXT_SUBTLE}`}>
+                      {STATUS_LABEL[sub.status]}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </>
       ) : (
-        <AlmanacForm sites={sites} onSubmit={handleSubmit} />
-      )}
-
-      {submitStatus && (
-        <p className="rounded-lg bg-emerald-500/15 p-2 text-center text-xs text-emerald-200">
-          {submitStatus}
-        </p>
-      )}
-
-      {ownSubmissions.length > 0 && (
         <section>
-          <h2 className={`mb-2 text-sm ${TEXT_HEADING}`}>{t.almanac.yourSubmissions}</h2>
-          <ul className="space-y-2">
-            {ownSubmissions.map(sub => (
-              <li key={sub.id} className={`${CARD} flex items-center justify-between gap-2 p-3`}>
-                <div>
-                  <div className={`text-sm ${TEXT_BODY}`}>
-                    {siteNames.get(sub.site_id) ?? '—'}
-                  </div>
-                  <div className={`text-xs ${TEXT_SUBTLE}`}>
-                    {formatObsDate(sub.obs_date)}
-                    {sub.staff_notes ? ` · ${sub.staff_notes}` : ''}
-                  </div>
-                </div>
-                <span className={`text-[10px] uppercase tracking-wide ${TEXT_SUBTLE}`}>
-                  {STATUS_LABEL[sub.status]}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <h2 className={`mb-2 text-sm ${TEXT_HEADING}`}>{t.almanac.recordsHeading}</h2>
+          {days.length === 0 ? (
+            <p className={`${CARD} p-4 text-center text-sm ${TEXT_SUBTLE}`}>{t.almanac.noRecordsYet}</p>
+          ) : (
+            <div className="space-y-2">
+              {days.map(day => <DayCard key={day.date} day={day} />)}
+            </div>
+          )}
         </section>
       )}
-
-      <section>
-        <h2 className={`mb-2 text-sm ${TEXT_HEADING}`}>{t.almanac.recordsHeading}</h2>
-        {days.length === 0 ? (
-          <p className={`${CARD} p-4 text-center text-sm ${TEXT_SUBTLE}`}>{t.almanac.noRecordsYet}</p>
-        ) : (
-          <div className="space-y-2">
-            {days.map(day => <DayCard key={day.date} day={day} />)}
-          </div>
-        )}
-      </section>
     </div>
   )
 }

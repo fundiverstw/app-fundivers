@@ -137,6 +137,9 @@ export const en = {
   almanac: {
     title: 'Almanac',
     blurb: 'Crowdsourced conditions from past events. File what you saw, or read what everyone else saw.',
+    sectionsAria: 'Almanac sections',
+    tabEnter: 'Enter data',
+    tabView: 'View data',
     noRecordsYet: 'No approved observations yet — be the first to share what you saw.',
     noSites: 'No places to choose from yet — an admin adds them under Manage.',
     submit: 'Submit observation',
