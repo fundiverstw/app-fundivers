@@ -7,6 +7,7 @@ import {
 } from '../../lib/dive-sites'
 import { SITE_KINDS, type DiveSite, type SiteKind } from '../../types/database'
 import { EVENT_KIND_LABELS } from '../../lib/event-kind-labels'
+import { TEXT_WARNING } from '../../styles/tokens'
 import { numOrNull } from '../../lib/num'
 import { t } from '../../i18n'
 
@@ -128,7 +129,7 @@ export function AdminDiveSitesPage() {
                   {!site.active && <span className="ml-2 text-xs text-brand-900/70">{wv.inactive}</span>}
                   {/* Amber, not red: unverified is a queue, not a fault. */}
                   {!site.verified && (
-                    <span className="ml-2 text-xs font-semibold text-amber-700">{ds.unverifiedBadge}</span>
+                    <span className={`ml-2 text-xs ${TEXT_WARNING}`}>{ds.unverifiedBadge}</span>
                   )}
                 </p>
                 {/* Every other name on the row, because the duplicate an admin

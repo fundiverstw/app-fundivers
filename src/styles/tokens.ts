@@ -43,6 +43,10 @@ export const TEXT_MUTED   = 'text-brand-100/70'
 export const TEXT_SUBTLE  = 'text-brand-100/55'
 export const TEXT_LINK    = 'text-reef-300 font-semibold hover:text-reef-200 hover:underline'
 export const TEXT_ERROR   = 'text-red-300 font-semibold'
+// Something needs attention but nothing is wrong — a queue, not a fault. Amber
+// on the light-ish surfaces this app paints on: raw amber-700/800 reads at
+// under 3:1 there, which the contrast sweep refuses.
+export const TEXT_WARNING = 'text-amber-300 font-semibold'
 
 // ── Text hierarchy on the deep navy chrome ─────────────────────────
 export const ON_DEEP_BODY    = 'text-white/80'
