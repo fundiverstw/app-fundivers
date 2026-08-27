@@ -4,7 +4,7 @@
 // net received is paid minus refunded — pending and voided rows don't count.
 //
 // Every balance surface (the diver's Payments/Bookings pages, the admin event/
-// users/logistics views, issueCancellationCredits, and the Audits
+// users/logistics views, the cancellation refund, and the Audits
 // reconciliation) must sum paid the same way, or a refund would make them
 // silently disagree — the diver pages would read an overpayment as spendable
 // credit while the Audits page shows it settled.

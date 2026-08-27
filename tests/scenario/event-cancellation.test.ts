@@ -15,18 +15,6 @@ const l: Ledger = ledger()
 beforeAll(async () => { w = await world(l) })
 afterAll(async () => { await teardownWorld(l) })
 
-/** The credit issue the app performs after a cancellation commits. */
-async function creditPaidAmount(args: {
-  w: World; diver: { id: string }; bookingId: string; amount: number
-}) {
-  const { error } = await args.w.admin.from('credits').insert({
-    user_id: args.diver.id, booking_id: args.bookingId,
-    amount: args.amount, status: 'open', reason: 'event cancelled',
-    created_by: args.w.adminUser.id,
-  } as never)
-  if (error) throw new Error(`creditPaidAmount: ${error.message}`)
-}
-
 describe('scenario: a paid-up dive is cancelled', () => {
   it('leaves each diver a credit for exactly what they had paid', async () => {
     const ada = await w.person('diver')
@@ -38,10 +26,9 @@ describe('scenario: a paid-up dive is cancelled', () => {
     await w.pay({ bookingId: adaBooking, diver: ada, amount: 3000 })
     await w.pay({ bookingId: graceBooking, diver: grace, amount: 1000 })
 
+    // One write. Marking the event cancels the registrations under it, and
+    // cancelling a registration is already what refunds it.
     await w.cancelEvent(eventId)
-    await creditPaidAmount({ w, diver: ada, bookingId: adaBooking, amount: 3000 })
-    await creditPaidAmount({ w, diver: grace, bookingId: graceBooking, amount: 1000 })
-    await w.admin.from('bookings').update({ status: 'cancelled' } as never).eq('event_id', eventId)
 
     // Each diver is owed back what they actually paid — not the ticket price.
     const adaCredits = await w.creditsOf(ada)
@@ -50,7 +37,10 @@ describe('scenario: a paid-up dive is cancelled', () => {
     expect(graceCredits.map(c => Number(c.amount))).toEqual([1000])
     expect(graceCredits[0].status).toBe('open')
 
+    // Neither is left owing the balance of a dive that will not happen: Grace
+    // paid 1,000 of 3,000 and owes nothing further.
     expect(await w.bookingStatus(adaBooking)).toBe('cancelled')
+    expect(await w.bookingStatus(graceBooking)).toBe('cancelled')
   })
 
   it("a diver's credit spends against a different dive, and cannot be spent twice", async () => {
@@ -60,13 +50,9 @@ describe('scenario: a paid-up dive is cancelled', () => {
 
     const oldBooking = await w.book({ diver, eventId: cancelledEvent, total: 2000, deposit: 500 })
     await w.pay({ bookingId: oldBooking, diver, amount: 2000 })
+    // The cancellation issues the credit itself, tied to the dead booking —
+    // which is no obstacle to spending it somewhere else.
     await w.cancelEvent(cancelledEvent)
-    await w.admin.from('bookings').update({ status: 'cancelled' } as never).eq('id', oldBooking)
-    // A general credit — untied, so it can follow the diver to another dive.
-    await w.admin.from('credits').insert({
-      user_id: diver.id, booking_id: null, amount: 2000, status: 'open',
-      reason: 'event cancelled', created_by: w.adminUser.id,
-    } as never)
 
     const newBooking = await w.book({ diver, eventId: nextEvent, total: 3000, deposit: 1000 })
     const db = await w.as(diver)
