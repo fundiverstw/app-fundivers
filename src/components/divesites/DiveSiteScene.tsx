@@ -3,10 +3,12 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { buildSurface, coverageFraction, type SurfaceOptions } from '../../lib/dive-site-surface'
 import {
-  isVolumetric, observedOnly, singleDatum, snapToLattice, latticeId,
+  isVolumetric, observedOnly, singleDatum,
   LATTICE_SPACING_M, type DiveSiteMap, type Vec2,
 } from '../../lib/dive-site-map'
 import { BASE_DEPTH_M, SITE_EXTENT_M } from '../../lib/site-seeds'
+import type { GridHandle } from '../../lib/site-map-grid'
+import { beginGrab, dragTo, movedGrab, type Grab } from '../../lib/site-map-grab'
 import { t } from '../../i18n'
 import { CARD, TEXT_HEADING, TEXT_MUTED, TEXT_SUBTLE } from '../../styles/tokens'
 
@@ -41,10 +43,17 @@ interface DiveSiteSceneProps {
   map: DiveSiteMap
   options?: SurfaceOptions
   height?: number
-  /** Called when the diver taps one of the point markers. Only markers are
-   *  reported: open seabed is not editable, so raycasting it would produce
-   *  hits no caller acts on. */
-  onPick?: (hit: { soundingId: string; at: Vec2 }) => void
+  /** The grabbable field. Absent means read-only: the scene draws no handles
+   *  and every drag orbits the camera. */
+  handles?: readonly GridHandle[]
+  /** A handle being pulled. Fires continuously while the pointer moves and
+   *  once more with `done`, so a caller can show the figure live and only
+   *  record something when the diver lets go.
+   *
+   *  The scene moves the dot itself as the pointer moves rather than waiting
+   *  to be told: re-rendering React on every frame would rebuild this whole
+   *  effect, tearing the WebGL context down and back up mid-gesture. */
+  onHandleDrag?: (e: { id: string; at: Vec2; depth_m: number; done: boolean }) => void
   /** Vertical exaggeration. A dive site is tens of meters deep across hundreds
    *  of meters wide, so at true scale the relief that matters to a diver — the
    *  drop-off, the ridge, the gully — flattens into nothing. Exaggerating is
@@ -54,7 +63,7 @@ interface DiveSiteSceneProps {
 }
 
 export function DiveSiteScene({
-  map, options, height = 420, verticalExaggeration = 3, onPick,
+  map, options, height = 420, verticalExaggeration = 3, handles, onHandleDrag,
 }: DiveSiteSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null)
   const roseRef = useRef<SVGGElement | null>(null)
@@ -196,7 +205,10 @@ export function DiveSiteScene({
         dots.push(new THREE.Vector3(x, baseY, -y))
       }
     }
-    if (dots.length) {
+    // Suppressed while editing: the grabbable field below sits at the depth
+    // each point actually holds, and a second lattice flat on the base plane
+    // underneath it reads as a second seabed.
+    if (dots.length && !handles) {
       const lattice = new THREE.Points(
         new THREE.BufferGeometry().setFromPoints(dots),
         new THREE.PointsMaterial({
@@ -208,6 +220,29 @@ export function DiveSiteScene({
         }),
       )
       scene.add(lattice)
+    }
+
+    // The handles. One mesh each rather than a Points cloud, because each has
+    // to be moved on its own while it is being pulled, and hit-tested by how
+    // near the pointer came to it on screen.
+    const handleRadius = Math.max(radius * 0.010, 0.5)
+    const grabbable: THREE.Mesh[] = []
+    for (const h of handles ?? []) {
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(handleRadius, 8, 8),
+        new THREE.MeshBasicMaterial({
+          // Scaffold is drawn faintly and measured points brightly, so what
+          // somebody actually recorded is never confused with the flat field
+          // it is sitting in.
+          color: h.measured ? 0xffffff : 0x9fc2d6,
+          transparent: true,
+          opacity: h.measured ? 0.95 : 0.45,
+        }),
+      )
+      dot.position.set(h.at.x, -h.depth_m * verticalExaggeration, -h.at.y)
+      dot.userData.handle = h
+      scene.add(dot)
+      grabbable.push(dot)
     }
 
     for (const f of observed.features) {
@@ -251,65 +286,94 @@ export function DiveSiteScene({
     controls.maxPolarAngle = Math.PI * 0.49
     controls.update()
 
-    // A drag that ends where it started is a tap; anything further is the
-    // diver rotating the camera and must not drop a reading.
-    const raycaster = new THREE.Raycaster()
-    let downAt: { x: number; y: number } | null = null
-    const TAP_SLOP_PX = 6
-    const PICK_RADIUS_PX = 24
+    // Pulling a point of seabed to the depth it actually is.
+    //
+    // A drag that starts ON a handle moves that handle; a drag that starts
+    // anywhere else orbits the camera. No mode switch, because the handles are
+    // drawn: you can see what is grabbable, and empty water is for looking
+    // around. It is how Blender behaves for the same reason — you take hold of
+    // a vertex, or you move the view.
+    const PICK_RADIUS_PX = 26
+    let grab: Grab | null = null
+    let grabbed: THREE.Mesh | null = null
 
-    function onPointerDown(e: PointerEvent) {
-      downAt = { x: e.clientX, y: e.clientY }
+    /** How many meters of depth one pixel of drag is worth, at the distance
+     *  the grabbed point sits from the camera. Fixed pixels-to-meters would
+     *  make a zoomed-out pull unusably coarse and a zoomed-in one unusably
+     *  fine. */
+    function metersPerPixel(point: THREE.Vector3, heightPx: number): number {
+      const distance = camera.position.distanceTo(point)
+      const worldHeight = 2 * distance * Math.tan((camera.fov * Math.PI) / 360)
+      return worldHeight / heightPx / verticalExaggeration
     }
 
-    function onPointerUp(e: PointerEvent) {
-      const from = downAt
-      downAt = null
-      if (!onPick || !from) return
-      if (Math.hypot(e.clientX - from.x, e.clientY - from.y) > TAP_SLOP_PX) return
-
+    function handleUnder(e: PointerEvent): THREE.Mesh | null {
       const rect = renderer.domElement.getBoundingClientRect()
-      const tapX = e.clientX - rect.left
-      const tapY = e.clientY - rect.top
-
-      // An existing reading wins if the tap is near one: correcting a value
-      // somebody recorded is a different act from adding a new one.
+      const px = e.clientX - rect.left
+      const py = e.clientY - rect.top
       let nearest: THREE.Mesh | null = null
       let nearestPx = PICK_RADIUS_PX
       const projected = new THREE.Vector3()
-      for (const marker of pickable) {
-        projected.copy(marker.position).project(camera)
+      for (const dot of grabbable) {
+        projected.copy(dot.position).project(camera)
         if (projected.z > 1) continue
-        const px = ((projected.x + 1) / 2) * rect.width
-        const py = ((1 - projected.y) / 2) * rect.height
-        const d = Math.hypot(px - tapX, py - tapY)
+        const sx = ((projected.x + 1) / 2) * rect.width
+        const sy = ((1 - projected.y) / 2) * rect.height
+        const d = Math.hypot(sx - px, sy - py)
         if (d < nearestPx) {
-          nearest = marker
+          nearest = dot
           nearestPx = d
         }
       }
-      if (nearest) {
-        onPick({
-          soundingId: nearest.userData.soundingId as string,
-          at: { x: nearest.position.x, y: -nearest.position.z },
-        })
+      return nearest
+    }
+
+    function onPointerDown(e: PointerEvent) {
+      if (!onHandleDrag) return
+      const dot = handleUnder(e)
+      if (!dot) return
+      grabbed = dot
+      grab = beginGrab(dot.userData.handle as GridHandle, e.clientY)
+      // Otherwise the camera orbits with the finger and the point runs away
+      // from it.
+      controls.enabled = false
+      renderer.domElement.setPointerCapture(e.pointerId)
+      e.preventDefault()
+    }
+
+    function onPointerMove(e: PointerEvent) {
+      if (!grab || !grabbed || !onHandleDrag) return
+      const rect = renderer.domElement.getBoundingClientRect()
+      grab = dragTo(grab, e.clientY, metersPerPixel(grabbed.position, rect.height))
+      grabbed.position.y = -grab.depth_m * verticalExaggeration
+      onHandleDrag({ id: grab.id, at: grab.at, depth_m: grab.depth_m, done: false })
+    }
+
+    function endGrab(e: PointerEvent) {
+      if (!grab || !grabbed) return
+      const finished = grab
+      const dot = grabbed
+      grab = null
+      grabbed = null
+      controls.enabled = true
+      if (renderer.domElement.hasPointerCapture(e.pointerId)) {
+        renderer.domElement.releasePointerCapture(e.pointerId)
+      }
+      // A grab that said nothing leaves no trace: every mis-tap while orbiting
+      // would otherwise become a reading with somebody's name on it.
+      if (!movedGrab(finished)) {
+        dot.position.y = -finished.from_m * verticalExaggeration
         return
       }
-
-      // Otherwise the tap lands on the seabed and snaps to the nearest meter.
-      const ndc = new THREE.Vector2(
-        (tapX / rect.width) * 2 - 1,
-        -(tapY / rect.height) * 2 + 1,
-      )
-      raycaster.setFromCamera(ndc, camera)
-      const hit = raycaster.intersectObject(mesh, false)[0]
-      if (!hit) return
-      const at = snapToLattice({ x: hit.point.x, y: -hit.point.z })
-      onPick({ soundingId: latticeId(at), at })
+      onHandleDrag?.({ id: finished.id, at: finished.at, depth_m: finished.depth_m, done: true })
     }
 
     renderer.domElement.addEventListener('pointerdown', onPointerDown)
-    renderer.domElement.addEventListener('pointerup', onPointerUp)
+    renderer.domElement.addEventListener('pointermove', onPointerMove)
+    renderer.domElement.addEventListener('pointerup', endGrab)
+    // A pointer that leaves the window mid-drag must not strand the camera
+    // disabled with a point stuck under a finger that is no longer there.
+    renderer.domElement.addEventListener('pointercancel', endGrab)
 
     // Keyboard traversal. Listening on the window rather than the canvas means
     // no click-to-focus dance, but it also means the depth field would eat a
@@ -403,7 +467,9 @@ export function DiveSiteScene({
       cancelAnimationFrame(frame)
       window.removeEventListener('resize', onResize)
       renderer.domElement.removeEventListener('pointerdown', onPointerDown)
-      renderer.domElement.removeEventListener('pointerup', onPointerUp)
+      renderer.domElement.removeEventListener('pointermove', onPointerMove)
+      renderer.domElement.removeEventListener('pointerup', endGrab)
+      renderer.domElement.removeEventListener('pointercancel', endGrab)
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
       controls.dispose()
@@ -418,7 +484,7 @@ export function DiveSiteScene({
       renderer.dispose()
       if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement)
     }
-  }, [map, observed, surface, showBase, extent, height, supported, verticalExaggeration, onPick])
+  }, [map, observed, surface, showBase, extent, height, supported, verticalExaggeration, handles, onHandleDrag])
 
   if (!surface && !showBase) {
     return (

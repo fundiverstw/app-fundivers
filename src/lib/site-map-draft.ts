@@ -69,10 +69,28 @@ export function placeSounding(
   observedAt: string,
   supersedes?: string,
 ): Draft {
+  return placeSoundingAt(draft, at, draft.depth_m, observedAt, supersedes)
+}
+
+/**
+ * Place a reading at a depth the caller names, rather than at whatever the
+ * draft's current setting happens to be.
+ *
+ * What a drag produces: the depth comes out of the gesture, so there is no
+ * "current depth" for it to read. `placeSounding` is this with the draft's
+ * setting filled in, which is what the tap-a-target flow needs.
+ */
+export function placeSoundingAt(
+  draft: Draft,
+  at: Vec2,
+  depth_m: number,
+  observedAt: string,
+  supersedes?: string,
+): Draft {
   const sounding: Sounding = {
     id: nextId('draft-s'),
     at,
-    depth_m: draft.depth_m,
+    depth_m,
     datum: 'instantaneous',
     observed_at: observedAt,
     source: 'diver',

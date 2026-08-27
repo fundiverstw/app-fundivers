@@ -58,7 +58,7 @@ export const en = {
     undo: 'Undo',
     submit: 'Submit',
     draftCount: (n: number) => n === 0 ? 'Nothing added yet.' : `${n} contribution${n === 1 ? '' : 's'} ready to submit.`,
-    hintDepth3d: 'Drag to orbit, WASD or arrow keys to move. Set the depth you saw, then tap the seabed — taps snap to a 1 m grid. Only a subset of grid positions is drawn; the spacing is always 1 m.',
+    hintDrag: 'Drag a point of the seabed down to make it deeper, up to make it shallower. Drag anywhere else to look around.',
     problemDepth: 'A depth must be between 1 and 100 m.',
     attributedTo: (name: string) => `This submission will be recorded under ${name}. Your name is shown on the site's history; your email is not published.`,
     submitNote: 'Contributions are reviewed before they appear on the site map. Your depths are recorded with the time, so they can be tide-corrected later.',
