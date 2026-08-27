@@ -46,6 +46,15 @@ export const en = {
     drawnBy: (author: string, year?: number) => year ? `Drawn by ${author}, ${year}` : `Drawn by ${author}`,
     datumUnknown: 'Depths as drawn — no vertical datum stated, not tide-corrected.',
     datumInstantaneous: 'Depths as measured below the surface on the day — not tide-corrected, so they shift with the tide.',
+    handleSpacing: (step_m: number) => step_m === 1
+      ? 'Points are 1 m apart — each one is a square metre of seabed.'
+      : `Points are ${step_m} m apart here: the site has grown past what can be drawn at 1 m. Readings are still recorded to the metre.`,
+    extendHeading: 'Extend the site',
+    extendNote: (patch_m: number) => `Adds a flat ${patch_m} m strip of unedited seabed to pull at.`,
+    extendNorth: 'North',
+    extendSouth: 'South',
+    extendEast: 'East',
+    extendWest: 'West',
     notEnoughSoundings: 'Not enough soundings yet to build a surface — three or more are needed.',
     soundingsWontJoin: (cutoff_m: number) => `These readings will not join into a surface yet — they sit in a straight line, or more than ${cutoff_m} m apart. Pull a point nearer the others.`,
     webglUnavailable: '3D view unavailable on this device. The flat map shows the same data.',

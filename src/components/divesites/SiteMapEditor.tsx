@@ -5,7 +5,10 @@ import {
   validate, toContribution, withDraft,
   type Contributor, type Draft, type SiteContribution,
 } from '../../lib/site-map-draft'
-import { editableGrid } from '../../lib/site-map-grid'
+import {
+  editableGrid, expand, gridStep, gridBounds, PATCH_M, NO_EXPANSION,
+  type Direction, type Expansion,
+} from '../../lib/site-map-grid'
 import { setGrabDepth, type Grab } from '../../lib/site-map-grab'
 import { DiveSiteScene } from './DiveSiteScene'
 import { t } from '../../i18n'
@@ -38,6 +41,10 @@ import {
 // the drag callback and tore the whole WebGL scene down and back up.
 const systemNow = () => new Date().toISOString()
 
+const EXTEND_LABEL = {
+  north: 'extendNorth', south: 'extendSouth', east: 'extendEast', west: 'extendWest',
+} as const
+
 interface SiteMapEditorProps {
   map: DiveSiteMap
   /** The signed-in diver, for display only. The server stamps the authoritative
@@ -57,9 +64,14 @@ export function SiteMapEditor({
   // purpose: writing it into the draft on every frame would rebuild the map
   // the scene is rendering, tearing the WebGL context down mid-gesture.
   const [live, setLive] = useState<{ id: string; at: Vec2; depth_m: number } | null>(null)
+  // Ground the diver has asked for but not yet written anything on. Held here
+  // rather than stored: an empty patch is not data, and once a point on it is
+  // pulled the reading itself is what says the site reaches that far.
+  const [expansion, setExpansion] = useState<Expansion>(NO_EXPANSION)
 
   const preview = useMemo(() => withDraft(map, draft), [map, draft])
-  const handles = useMemo(() => editableGrid(preview), [preview])
+  const handles = useMemo(() => editableGrid(preview, expansion), [preview, expansion])
+  const step = gridStep(gridBounds(preview, expansion))
   const problems = validate(draft)
   const count = contributionCount(draft)
 
@@ -123,6 +135,27 @@ export function SiteMapEditor({
       <div className="space-y-1 px-4 py-3">
         <p className={`text-sm ${TEXT_HEADING}`}>{t.siteMap.draftCount(count)}</p>
         <p className={`text-xs ${TEXT_MUTED}`}>{t.siteMap.hintDrag}</p>
+        {/* Said here as well as under the view: this is the screen where a
+            diver decides which point to pull, and what a point is worth is the
+            thing they need to know to decide. */}
+        <p className={`text-xs ${TEXT_MUTED}`}>{t.siteMap.handleSpacing(step)}</p>
+
+        <div className="pt-2">
+          <p className={`text-xs ${TEXT_HEADING}`}>{t.siteMap.extendHeading}</p>
+          <p className={`text-xs ${TEXT_SUBTLE}`}>{t.siteMap.extendNote(PATCH_M)}</p>
+          <div className="mt-1 flex flex-wrap gap-2">
+            {(['north', 'south', 'east', 'west'] as Direction[]).map(direction => (
+              <button
+                key={direction}
+                type="button"
+                className={BTN_XS_GHOST}
+                onClick={() => setExpansion(e => expand(e, direction))}
+              >
+                {t.siteMap[EXTEND_LABEL[direction]]}
+              </button>
+            ))}
+          </div>
+        </div>
         {problems.includes('implausible_depth') && (
           <p className={`text-xs ${TEXT_SUBTLE}`}>{t.siteMap.problemDepth}</p>
         )}

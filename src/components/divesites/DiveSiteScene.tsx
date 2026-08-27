@@ -64,6 +64,16 @@ interface DiveSiteSceneProps {
   verticalExaggeration?: number
 }
 
+/** Metres between the drawn handles, read off the field itself rather than
+ *  recomputed from bounds — what is on screen is what gets labelled. */
+function handleSpacingOf(handles?: readonly GridHandle[]): number {
+  if (!handles || handles.length < 2) return LATTICE_SPACING_M
+  const xs = [...new Set(handles.map(h => h.at.x))].sort((a, b) => a - b)
+  let min = Infinity
+  for (let i = 1; i < xs.length; i++) min = Math.min(min, xs[i] - xs[i - 1])
+  return Number.isFinite(min) ? min : LATTICE_SPACING_M
+}
+
 export function DiveSiteScene({
   map, options, height = 420, verticalExaggeration = 3, handles, onHandleDrag,
 }: DiveSiteSceneProps) {
@@ -79,7 +89,15 @@ export function DiveSiteScene({
   // Built separately and drawn as a ghost: folding it into `surface` would let
   // guesswork count toward coverage, which is the one number here that has to
   // stay honest.
-  const extent = map.extent_m ?? SITE_EXTENT_M
+  // Frame on what is actually there. A site is one small patch extended in the
+  // direction the diver swam, so a stored 500 m extent would put a 20 m patch
+  // in the middle of an empty sea — while editing AND while reading.
+  const reach = (handles?.length
+    ? handles.map(h => Math.max(Math.abs(h.at.x), Math.abs(h.at.y)))
+    : observed.soundings.map(sd => Math.max(Math.abs(sd.at.x), Math.abs(sd.at.y))))
+  const extent = reach.length
+    ? Math.max(...reach, LATTICE_SPACING_M)
+    : map.extent_m ?? SITE_EXTENT_M
   // The flat base stands in whenever there is no surface, not only when there
   // are fewer than three readings. Three that will not triangulate — collinear,
   // or every edge past the cutoff — used to replace the whole view with a line
@@ -91,6 +109,10 @@ export function DiveSiteScene({
   // having three, and saying "three are needed" to someone who has four is
   // both wrong and a dead end.
   const wontJoin = !surface && observed.soundings.length >= 3
+  // Stated, never assumed. A field thinned because the site outgrew what can be
+  // drawn still has to say what its dots are worth, or a diver reads a reading
+  // as landing somewhere it does not.
+  const handleStep = handleSpacingOf(handles)
   const coverage = surface ? coverageFraction(surface.triangles) : 0
   const datum = singleDatum(observed)
 
@@ -230,27 +252,40 @@ export function DiveSiteScene({
       scene.add(lattice)
     }
 
-    // The handles. One mesh each rather than a Points cloud, because each has
-    // to be moved on its own while it is being pulled, and hit-tested by how
-    // near the pointer came to it on screen.
-    const handleRadius = Math.max(radius * 0.010, 0.5)
-    const grabbable: THREE.Mesh[] = []
-    for (const h of handles ?? []) {
-      const dot = new THREE.Mesh(
-        new THREE.SphereGeometry(handleRadius, 8, 8),
-        new THREE.MeshBasicMaterial({
-          // Scaffold is drawn faintly and measured points brightly, so what
-          // somebody actually recorded is never confused with the flat field
-          // it is sitting in.
-          color: h.measured ? 0xffffff : 0x9fc2d6,
-          transparent: true,
-          opacity: h.measured ? 0.95 : 0.45,
-        }),
-      )
-      dot.position.set(h.at.x, -h.depth_m * verticalExaggeration, -h.at.y)
-      dot.userData.handle = h
-      scene.add(dot)
-      grabbable.push(dot)
+    // The handles, as one Points cloud rather than a mesh each.
+    //
+    // At the 1 m spacing the model is built on there are thousands of them —
+    // a 60 m square is 3,721 — and that many draw calls is a slideshow. One
+    // buffer is one call, and pulling a handle is a write to three floats in
+    // it.
+    const field = handles ?? []
+    const handlePositions = new Float32Array(field.length * 3)
+    const handleColors = new Float32Array(field.length * 3)
+    field.forEach((h, i) => {
+      handlePositions[i * 3] = h.at.x
+      handlePositions[i * 3 + 1] = -h.depth_m * verticalExaggeration
+      handlePositions[i * 3 + 2] = -h.at.y
+      // Scaffold is drawn faintly and measured points brightly, so what
+      // somebody actually recorded is never confused with the flat field it is
+      // sitting in.
+      const tone = h.measured ? 1 : 0.42
+      handleColors[i * 3] = tone
+      handleColors[i * 3 + 1] = tone
+      handleColors[i * 3 + 2] = h.measured ? tone : 0.55
+    })
+    let handleCloud: THREE.Points | null = null
+    if (field.length) {
+      const geom = new THREE.BufferGeometry()
+      geom.setAttribute('position', new THREE.BufferAttribute(handlePositions, 3))
+      geom.setAttribute('color', new THREE.BufferAttribute(handleColors, 3))
+      handleCloud = new THREE.Points(geom, new THREE.PointsMaterial({
+        size: Math.max(radius * 0.018, 0.35),
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.9,
+        sizeAttenuation: true,
+      }))
+      scene.add(handleCloud)
     }
 
     for (const f of observed.features) {
@@ -303,7 +338,7 @@ export function DiveSiteScene({
     // a vertex, or you move the view.
     const PICK_RADIUS_PX = 26
     let grab: Grab | null = null
-    let grabbed: THREE.Mesh | null = null
+    let grabbedIndex = -1
 
     /** How many meters of depth one pixel of drag is worth, at the distance
      *  the grabbed point sits from the camera. Fixed pixels-to-meters would
@@ -315,33 +350,44 @@ export function DiveSiteScene({
       return worldHeight / heightPx / verticalExaggeration
     }
 
-    function handleUnder(e: PointerEvent): THREE.Mesh | null {
+    /** Index of the handle nearest the pointer, or -1. Projecting the whole
+     *  field costs a millisecond and happens once per gesture, not per frame. */
+    function handleUnder(e: PointerEvent): number {
       const rect = renderer.domElement.getBoundingClientRect()
       const px = e.clientX - rect.left
       const py = e.clientY - rect.top
-      let nearest: THREE.Mesh | null = null
+      let nearest = -1
       let nearestPx = PICK_RADIUS_PX
       const projected = new THREE.Vector3()
-      for (const dot of grabbable) {
-        projected.copy(dot.position).project(camera)
+      for (let i = 0; i < field.length; i++) {
+        projected.set(
+          handlePositions[i * 3], handlePositions[i * 3 + 1], handlePositions[i * 3 + 2],
+        ).project(camera)
         if (projected.z > 1) continue
         const sx = ((projected.x + 1) / 2) * rect.width
         const sy = ((1 - projected.y) / 2) * rect.height
         const d = Math.hypot(sx - px, sy - py)
         if (d < nearestPx) {
-          nearest = dot
+          nearest = i
           nearestPx = d
         }
       }
       return nearest
     }
 
+    function moveHandle(index: number, depth_m: number) {
+      handlePositions[index * 3 + 1] = -depth_m * verticalExaggeration
+      if (handleCloud) handleCloud.geometry.attributes.position.needsUpdate = true
+    }
+
+    const grabbedPoint = new THREE.Vector3()
+
     function onPointerDown(e: PointerEvent) {
       if (!onHandleDrag) return
-      const dot = handleUnder(e)
-      if (!dot) return
-      grabbed = dot
-      grab = beginGrab(dot.userData.handle as GridHandle, e.clientY)
+      const index = handleUnder(e)
+      if (index < 0) return
+      grabbedIndex = index
+      grab = beginGrab(field[index], e.clientY)
       // Otherwise the camera orbits with the finger and the point runs away
       // from it.
       controls.enabled = false
@@ -350,19 +396,24 @@ export function DiveSiteScene({
     }
 
     function onPointerMove(e: PointerEvent) {
-      if (!grab || !grabbed || !onHandleDrag) return
+      if (!grab || grabbedIndex < 0 || !onHandleDrag) return
       const rect = renderer.domElement.getBoundingClientRect()
-      grab = dragTo(grab, e.clientY, metersPerPixel(grabbed.position, rect.height))
-      grabbed.position.y = -grab.depth_m * verticalExaggeration
+      grabbedPoint.set(
+        handlePositions[grabbedIndex * 3],
+        handlePositions[grabbedIndex * 3 + 1],
+        handlePositions[grabbedIndex * 3 + 2],
+      )
+      grab = dragTo(grab, e.clientY, metersPerPixel(grabbedPoint, rect.height))
+      moveHandle(grabbedIndex, grab.depth_m)
       onHandleDrag({ id: grab.id, at: grab.at, depth_m: grab.depth_m, done: false })
     }
 
     function endGrab(e: PointerEvent) {
-      if (!grab || !grabbed) return
+      if (!grab || grabbedIndex < 0) return
       const finished = grab
-      const dot = grabbed
+      const index = grabbedIndex
       grab = null
-      grabbed = null
+      grabbedIndex = -1
       controls.enabled = true
       if (renderer.domElement.hasPointerCapture(e.pointerId)) {
         renderer.domElement.releasePointerCapture(e.pointerId)
@@ -370,7 +421,7 @@ export function DiveSiteScene({
       // A grab that said nothing leaves no trace: every mis-tap while orbiting
       // would otherwise become a reading with somebody's name on it.
       if (!movedGrab(finished)) {
-        dot.position.y = -finished.from_m * verticalExaggeration
+        moveHandle(index, finished.from_m)
         return
       }
       onHandleDrag?.({ id: finished.id, at: finished.at, depth_m: finished.depth_m, done: true })
@@ -522,6 +573,9 @@ export function DiveSiteScene({
       )}
       <figcaption className="space-y-1 px-4 py-3">
         <p className={`text-sm ${TEXT_HEADING}`}>{map.name}</p>
+        {!!handles?.length && (
+          <p className={`text-xs ${TEXT_MUTED}`}>{t.siteMap.handleSpacing(handleStep)}</p>
+        )}
         {!surface && (
           <p className={`text-xs ${TEXT_MUTED}`}>
             {wontJoin

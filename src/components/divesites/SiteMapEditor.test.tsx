@@ -5,7 +5,7 @@ import { SiteMapEditor } from './SiteMapEditor'
 import { newSiteMap } from '../../lib/site-seeds'
 import { t } from '../../i18n'
 import type { Vec2 } from '../../lib/dive-site-map'
-import type { GridHandle } from '../../lib/site-map-grid'
+import { PATCH_M, type GridHandle } from '../../lib/site-map-grid'
 
 type DragEvent = { id: string; at: Vec2; depth_m: number; done: boolean }
 
@@ -165,5 +165,75 @@ describe('SiteMapEditor', () => {
   it('tells the diver how the gesture works, since nothing on screen says so', () => {
     renderEditor()
     expect(screen.getByText(sm.hintDrag)).toBeInTheDocument()
+  })
+})
+
+describe('SiteMapEditor — one metre, and room to grow', () => {
+  it('says what a point is worth, on the screen where the pulling happens', () => {
+    renderEditor()
+    expect(screen.getByText(t.siteMap.handleSpacing(1))).toBeInTheDocument()
+  })
+
+  it('spaces the field it hands the scene one metre apart', () => {
+    renderEditor()
+    const xs = [...new Set(sceneProps.current!.handles.map(h => h.at.x))].sort((a, b) => a - b)
+    expect(xs.length).toBeGreaterThan(1)
+    for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBe(1)
+  })
+
+  it('starts as one patch, not a canvas with the dive in a corner of it', () => {
+    renderEditor()
+    const ys = sceneProps.current!.handles.map(h => h.at.y)
+    expect(Math.max(...ys)).toBe(PATCH_M / 2)
+    expect(Math.min(...ys)).toBe(-PATCH_M / 2)
+  })
+
+  it.each([
+    ['north', (h: GridHandle[]) => Math.max(...h.map(x => x.at.y)), PATCH_M / 2 + PATCH_M],
+    ['south', (h: GridHandle[]) => Math.min(...h.map(x => x.at.y)), -PATCH_M / 2 - PATCH_M],
+    ['east', (h: GridHandle[]) => Math.max(...h.map(x => x.at.x)), PATCH_M / 2 + PATCH_M],
+    ['west', (h: GridHandle[]) => Math.min(...h.map(x => x.at.x)), -PATCH_M / 2 - PATCH_M],
+  ])('adds a flat patch to the %s', async (direction, edgeOf, expected) => {
+    const user = userEvent.setup()
+    renderEditor()
+    const label = t.siteMap[`extend${direction[0].toUpperCase()}${direction.slice(1)}` as 'extendNorth']
+
+    await user.click(screen.getByRole('button', { name: label }))
+
+    const handles = [...sceneProps.current!.handles]
+    expect(edgeOf(handles)).toBe(expected)
+    // Flat and unedited: extending gives ground to pull at, not readings.
+    expect(handles.every(h => !h.measured)).toBe(true)
+  })
+
+  it('records nothing by extending — an empty patch is not data', async () => {
+    const user = userEvent.setup()
+    renderEditor()
+    await user.click(screen.getByRole('button', { name: t.siteMap.extendNorth }))
+    expect(screen.getByText(sm.draftCount(0))).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: sm.submit })).toBeDisabled()
+  })
+
+  it('keeps extending the same edge, a patch at a time', async () => {
+    const user = userEvent.setup()
+    renderEditor()
+    const north = screen.getByRole('button', { name: t.siteMap.extendNorth })
+    await user.click(north)
+    await user.click(north)
+    expect(Math.max(...sceneProps.current!.handles.map(h => h.at.y)))
+      .toBe(PATCH_M / 2 + 2 * PATCH_M)
+  })
+
+  it('lets a point on the new ground be pulled like any other', async () => {
+    const user = userEvent.setup()
+    renderEditor()
+    await user.click(screen.getByRole('button', { name: t.siteMap.extendNorth }))
+
+    const far = { x: 0, y: PATCH_M / 2 + PATCH_M }
+    pull(`lat:${far.x}:${far.y}`, far, 21.5)
+
+    expect(screen.getByText(sm.draftCount(1))).toBeInTheDocument()
+    expect(sceneProps.current!.handles.find(h => h.at.y === far.y && h.at.x === 0))
+      .toMatchObject({ depth_m: 21.5, measured: true })
   })
 })

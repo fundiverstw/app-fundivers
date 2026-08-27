@@ -39,6 +39,15 @@ export const zhTW: Messages = {
     drawnBy: (author: string, year?: number) => year ? `繪製：${author}，${year}` : `繪製：${author}`,
     datumUnknown: '深度依原圖標示，未註明垂直基準，也未經潮汐校正。',
     datumInstantaneous: '深度為當天水面下的實測值，未經潮汐校正，會隨潮位變動。',
+    handleSpacing: (step_m: number) => step_m === 1
+      ? '點與點相距 1 公尺，每個點代表一平方公尺的海底。'
+      : `此處點距為 ${step_m} 公尺：範圍已超過 1 公尺間距所能繪製的大小。記錄本身仍以公尺為單位。`,
+    extendHeading: '擴展範圍',
+    extendNote: (patch_m: number) => `往該方向加上 ${patch_m} 公尺尚未編輯的平坦海底。`,
+    extendNorth: '北',
+    extendSouth: '南',
+    extendEast: '東',
+    extendWest: '西',
     notEnoughSoundings: '測深點還不夠，至少需要三點才能建立海底面。',
     soundingsWontJoin: (cutoff_m: number) => `這些記錄還無法連成曲面——它們排成一直線，或彼此相距超過 ${cutoff_m} 公尺。請把某個點拉近其他點。`,
     webglUnavailable: '此裝置無法顯示 3D 檢視，平面地圖呈現相同資料。',

@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { editableGrid, handleSpacing, handleAt, HANDLES_MAX } from './site-map-grid'
+import {
+  editableGrid, gridBounds, gridStep, expand, handleAt,
+  PATCH_M, HANDLES_MAX, NO_EXPANSION, type Expansion,
+} from './site-map-grid'
 import { latticeId, snapToLattice, LATTICE_SPACING_M, type DiveSiteMap, type Sounding } from './dive-site-map'
 import { BASE_DEPTH_M, newSiteMap } from './site-seeds'
 
 const site = (over: Partial<DiveSiteMap> = {}): DiveSiteMap => ({
   ...newSiteMap('s1', 'Test Site'),
-  extent_m: 20,
   ...over,
 })
 
@@ -14,32 +16,87 @@ const sounding = (x: number, y: number, depth_m: number, over: Partial<Sounding>
   source: 'diver', observed_at: '2026-08-27T00:00:00Z', ...over,
 })
 
-describe('handleSpacing', () => {
-  it('lands on whole lattice steps, so a handle never sits between two', () => {
-    for (const extent of [10, 37, 250, 1000]) {
-      const step = handleSpacing(extent)
-      expect(step % LATTICE_SPACING_M).toBe(0)
-      expect(step).toBeGreaterThanOrEqual(LATTICE_SPACING_M)
-    }
+describe('gridBounds', () => {
+  it('starts as one patch on the origin', () => {
+    expect(gridBounds(site())).toEqual({
+      minX: -PATCH_M / 2, maxX: PATCH_M / 2, minY: -PATCH_M / 2, maxY: PATCH_M / 2,
+    })
   })
 
-  it('keeps a big site inside a drawable number of handles', () => {
-    const step = handleSpacing(1000)
-    const perSide = Math.floor(2000 / step) + 1
-    expect(perSide * perSide).toBeLessThanOrEqual(HANDLES_MAX)
+  // A diver has to be able to grab their own readings, wherever they left them.
+  it('always covers what has already been measured', () => {
+    const b = gridBounds(site({ soundings: [sounding(140, -60, 12)] }))
+    expect(b.maxX).toBeGreaterThanOrEqual(140)
+    expect(b.minY).toBeLessThanOrEqual(-60)
   })
 
-  it('does not thin a small site below the lattice it is measured on', () => {
-    expect(handleSpacing(5)).toBe(LATTICE_SPACING_M)
+  it('ignores placeholder scaffold when deciding how far the site reaches', () => {
+    const b = gridBounds(site({ soundings: [sounding(500, 0, 9, { source: 'placeholder' })] }))
+    expect(b.maxX).toBe(PATCH_M / 2)
+  })
+
+  it('grows the edge that was extended, and only that edge', () => {
+    const b = gridBounds(site(), { ...NO_EXPANSION, north: 2 })
+    expect(b.maxY).toBe(PATCH_M / 2 + 2 * PATCH_M)
+    expect(b.minY).toBe(-PATCH_M / 2)
+    expect(b.minX).toBe(-PATCH_M / 2)
+    expect(b.maxX).toBe(PATCH_M / 2)
+  })
+
+  it('puts north at +y, the way the compass rose is drawn', () => {
+    const north = gridBounds(site(), { ...NO_EXPANSION, north: 1 })
+    const south = gridBounds(site(), { ...NO_EXPANSION, south: 1 })
+    expect(north.maxY).toBeGreaterThan(PATCH_M / 2)
+    expect(south.minY).toBeLessThan(-PATCH_M / 2)
+  })
+
+  it('extends east and west along x', () => {
+    expect(gridBounds(site(), { ...NO_EXPANSION, east: 1 }).maxX).toBe(PATCH_M / 2 + PATCH_M)
+    expect(gridBounds(site(), { ...NO_EXPANSION, west: 1 }).minX).toBe(-PATCH_M / 2 - PATCH_M)
+  })
+})
+
+describe('expand', () => {
+  it('adds a patch to one compass point at a time', () => {
+    const once: Expansion = expand(NO_EXPANSION, 'north')
+    expect(once).toEqual({ north: 1, south: 0, east: 0, west: 0 })
+    expect(expand(once, 'north')).toMatchObject({ north: 2 })
+  })
+
+  it('will not shrink a site past nothing', () => {
+    expect(expand(NO_EXPANSION, 'south', -3)).toMatchObject({ south: 0 })
+  })
+})
+
+describe('gridStep', () => {
+  // The figure the whole model is built on. A field drawn at any other spacing
+  // would quietly redefine what a reading means.
+  it('is one meter for a site anyone is actually going to map', () => {
+    expect(gridStep(gridBounds(site()))).toBe(LATTICE_SPACING_M)
+    expect(gridStep(gridBounds(site(), { north: 2, south: 2, east: 2, west: 2 })))
+      .toBe(LATTICE_SPACING_M)
+  })
+
+  it('thins only when the field has grown past what can be drawn', () => {
+    const huge = { minX: -1000, maxX: 1000, minY: -1000, maxY: 1000 }
+    const step = gridStep(huge)
+    expect(step).toBeGreaterThan(LATTICE_SPACING_M)
+    const across = (huge.maxX - huge.minX) / step + 1
+    expect(across * across).toBeLessThanOrEqual(HANDLES_MAX * 1.05)
   })
 })
 
 describe('editableGrid', () => {
-  it('covers an unmeasured site with a flat field to pull at', () => {
+  it('covers an unmeasured patch with a flat field to pull at', () => {
     const handles = editableGrid(site())
     expect(handles.length).toBeGreaterThan(0)
     expect(handles.every(h => h.depth_m === BASE_DEPTH_M)).toBe(true)
     expect(handles.every(h => !h.measured)).toBe(true)
+  })
+
+  it('spaces them one meter apart', () => {
+    const xs = [...new Set(editableGrid(site()).map(h => h.at.x))].sort((a, b) => a - b)
+    for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBe(LATTICE_SPACING_M)
   })
 
   it('gives every handle the lattice id of its own position', () => {
@@ -49,20 +106,24 @@ describe('editableGrid', () => {
     }
   })
 
-  it('shows a measured depth at its position, and says it was measured', () => {
-    const handles = editableGrid(site({ soundings: [sounding(4, 6, 24.3)] }))
-    const at46 = handleAt(handles, latticeId({ x: 4, y: 6 }))!
-    expect(at46.depth_m).toBe(24.3)
-    expect(at46.measured).toBe(true)
+  it('draws the extended ground too', () => {
+    const before = editableGrid(site()).length
+    const after = editableGrid(site(), { ...NO_EXPANSION, north: 1 })
+    expect(after.length).toBeGreaterThan(before)
+    expect(Math.max(...after.map(h => h.at.y))).toBe(PATCH_M / 2 + PATCH_M)
   })
 
-  // A diver who recorded a depth at 1 m resolution has to be able to grab that
-  // reading again. Dropping it for being off the drawn field would make their
-  // own contribution uneditable by them.
+  it('shows a measured depth at its position, and says it was measured', () => {
+    const handles = editableGrid(site({ soundings: [sounding(4, 6, 24.3)] }))
+    expect(handleAt(handles, latticeId({ x: 4, y: 6 }))).toMatchObject({
+      depth_m: 24.3, measured: true,
+    })
+  })
+
   it('keeps a measured point that falls between the drawn handles', () => {
-    const big = site({ extent_m: 1000, soundings: [sounding(3, 7, 18)] })
-    expect(handleSpacing(1000)).toBeGreaterThan(LATTICE_SPACING_M)
-    expect(handleAt(editableGrid(big), latticeId({ x: 3, y: 7 }))).toMatchObject({
+    const far = site({ soundings: [sounding(701, 3, 18)] })
+    expect(gridStep(gridBounds(far))).toBeGreaterThan(LATTICE_SPACING_M)
+    expect(handleAt(editableGrid(far), latticeId({ x: 701, y: 3 }))).toMatchObject({
       depth_m: 18, measured: true,
     })
   })
@@ -90,6 +151,11 @@ describe('editableGrid', () => {
       soundings: [sounding(4, 6, 12), sounding(4, 6, 24), sounding(4.4, 6.1, 30)],
     }))
     expect(handles.filter(h => h.id === latticeId({ x: 4, y: 6 }))).toHaveLength(1)
+  })
+
+  it('stays inside what can be drawn, however far the site is extended', () => {
+    const handles = editableGrid(site(), { north: 40, south: 40, east: 40, west: 40 })
+    expect(handles.length).toBeLessThanOrEqual(HANDLES_MAX * 1.1)
   })
 
   it('finds nothing for a position nobody drew', () => {

@@ -2,29 +2,37 @@ import {
   latticeId, snapToLattice, LATTICE_SPACING_M,
   type DiveSiteMap, type Vec2,
 } from './dive-site-map'
-import { BASE_DEPTH_M, SITE_EXTENT_M } from './site-seeds'
+import { BASE_DEPTH_M } from './site-seeds'
 
-// The handles a diver actually grabs.
+// The handles a diver grabs, one per metre of seabed.
 //
 // The surface is a triangulation of measured points, so on an unmeasured site
-// there is nothing on screen to take hold of — which is why the old editor had
-// to work the other way round: type a depth into a box, then tap the seabed to
-// stamp it. Five different depths meant typing five times.
+// there is nothing on screen to take hold of — which is why the editor used to
+// work the other way round: type a depth into a box, then tap to stamp it.
+// A field of handles turns that into what it should be: the seabed starts flat
+// and you pull the bits that are wrong.
 //
-// A regular field of handles turns that into what it should have been: the
-// seabed starts flat at BASE_DEPTH_M and you pull the bits of it that are
-// wrong. That is not a new idea bolted on; `placeholder` in the data model is
-// already documented as "the starting scaffold a new site opens with, so a
-// diver has something to drag rather than an empty canvas", and the flat base
-// exists precisely so that it reads as unmeasured.
+// ONE METRE APART, and the figure is stated wherever the field is drawn. That
+// is the resolution the whole model is built on: LATTICE_SPACING_M is 1 m, ids
+// are derived from the coordinate, and two divers who measure the same square
+// metre are correcting one another rather than stacking readings. A field drawn
+// at any other spacing would quietly redefine what a reading means.
 //
-// Handles are lattice positions, so their ids are derived from their
-// coordinates and two divers who pull the same square metre are correcting one
-// another rather than stacking readings. Nothing here is stored: a handle
-// nobody has moved has no row, and pulling one is what brings it into being.
+// Which is why a site is not a 500 m canvas. At 1 m a 500 m square is 250,000
+// handles — undrawable — so the old field was thinned to about 18 m and the
+// spacing stopped meaning anything. A site instead starts as one small patch at
+// true resolution and is EXTENDED in the direction the diver actually swam.
+// `SITE_EXTENT_M`'s own reasoning already pointed here: "the wider the field,
+// the fewer meters per screen pixel, and the harder it is to tap the meter you
+// meant".
 
-/** Drawing more than this is unreadable, and slower than it is useful. */
-export const HANDLES_MAX = 900
+/** One press of Extend: a 20 m strip, which is about a minute of swimming. */
+export const PATCH_M = 20
+
+/** Handles drawn before the field has to be thinned. A Points cloud makes
+ *  thousands cheap; past this the dots merge into a haze and the frame rate
+ *  goes with them. */
+export const HANDLES_MAX = 12_000
 
 export interface GridHandle {
   /** The lattice id, so a pull becomes a correction of whatever is there. */
@@ -36,36 +44,90 @@ export interface GridHandle {
   measured: boolean
 }
 
-/**
- * Spacing that keeps the field readable on a site of this size.
- *
- * Always a whole number of lattice steps, so every handle lands on a real
- * lattice position rather than between two of them — a handle at 3.5 m would
- * snap on grab and jump out from under the finger that grabbed it.
- */
-export function handleSpacing(extent_m: number, max = HANDLES_MAX): number {
-  const span = extent_m * 2
-  const perSide = Math.max(1, Math.floor(Math.sqrt(max)) - 1)
-  const raw = span / perSide
-  return Math.max(LATTICE_SPACING_M, Math.ceil(raw / LATTICE_SPACING_M) * LATTICE_SPACING_M)
+export interface Bounds {
+  minX: number
+  maxX: number
+  minY: number
+  maxY: number
+}
+
+/** Patches added beyond what the readings themselves cover, per compass point. */
+export interface Expansion {
+  north: number
+  south: number
+  east: number
+  west: number
+}
+
+export const NO_EXPANSION: Expansion = { north: 0, south: 0, east: 0, west: 0 }
+
+export type Direction = keyof Expansion
+
+export function expand(expansion: Expansion, direction: Direction, patches = 1): Expansion {
+  return { ...expansion, [direction]: Math.max(0, expansion[direction] + patches) }
 }
 
 /**
- * Every handle for a site: a regular field across the canvas, plus one for
- * each measured point.
+ * The ground the field covers.
+ *
+ * The starting patch sits on the origin, and anything already measured is
+ * always inside — a diver has to be able to grab their own readings, wherever
+ * on the site they left them. Extending grows one edge, so a site ends up the
+ * shape of the dive rather than a square with the dive in one corner.
+ */
+export function gridBounds(map: DiveSiteMap, expansion: Expansion = NO_EXPANSION): Bounds {
+  const half = PATCH_M / 2
+  const bounds: Bounds = { minX: -half, maxX: half, minY: -half, maxY: half }
+
+  for (const s of map.soundings) {
+    if (s.source === 'placeholder') continue
+    const at = snapToLattice(s.at)
+    bounds.minX = Math.min(bounds.minX, at.x)
+    bounds.maxX = Math.max(bounds.maxX, at.x)
+    bounds.minY = Math.min(bounds.minY, at.y)
+    bounds.maxY = Math.max(bounds.maxY, at.y)
+  }
+
+  // North is +y, matching the compass rose the scene draws.
+  bounds.maxY += expansion.north * PATCH_M
+  bounds.minY -= expansion.south * PATCH_M
+  bounds.maxX += expansion.east * PATCH_M
+  bounds.minX -= expansion.west * PATCH_M
+  return bounds
+}
+
+/**
+ * Metres between drawn handles — 1 m, and only ever more when a field has grown
+ * past what can be drawn.
+ *
+ * Reported rather than hidden so the label can state the truth. A thinned field
+ * that still claimed 1 m would be telling a diver their reading lands somewhere
+ * it does not.
+ */
+export function gridStep(bounds: Bounds, max = HANDLES_MAX): number {
+  const across = (bounds.maxX - bounds.minX) / LATTICE_SPACING_M + 1
+  const down = (bounds.maxY - bounds.minY) / LATTICE_SPACING_M + 1
+  const step = Math.ceil(Math.sqrt((across * down) / max))
+  return Math.max(LATTICE_SPACING_M, step * LATTICE_SPACING_M)
+}
+
+/**
+ * Every handle: the field at its spacing, plus one for each measured point.
  *
  * The measured ones are added whatever the spacing, because a diver who
- * recorded a depth at 1 m resolution must be able to grab that reading again.
- * Dropping it for being off the drawn field would make their own contribution
- * uneditable by them.
+ * recorded a depth has to be able to grab that reading again. Dropping it for
+ * being off a thinned field would make their own contribution uneditable by
+ * them.
  */
-export function editableGrid(map: DiveSiteMap, max = HANDLES_MAX): GridHandle[] {
-  const extent = map.extent_m ?? SITE_EXTENT_M
-  const step = handleSpacing(extent, max)
+export function editableGrid(
+  map: DiveSiteMap, expansion: Expansion = NO_EXPANSION, max = HANDLES_MAX,
+): GridHandle[] {
+  const bounds = gridBounds(map, expansion)
+  const step = gridStep(bounds, max)
 
   const byId = new Map<string, GridHandle>()
-  for (let x = -extent; x <= extent; x += step) {
-    for (let y = -extent; y <= extent; y += step) {
+  for (let x = bounds.minX; x <= bounds.maxX; x += step) {
+    for (let y = bounds.minY; y <= bounds.maxY; y += step) {
       const at = snapToLattice({ x, y })
       const id = latticeId(at)
       byId.set(id, { id, at, depth_m: BASE_DEPTH_M, measured: false })

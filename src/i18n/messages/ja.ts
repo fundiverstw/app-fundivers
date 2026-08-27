@@ -38,6 +38,15 @@ export const ja: Messages = {
     drawnBy: (author: string, year?: number) => year ? `作図：${author}、${year}` : `作図：${author}`,
     datumUnknown: '水深は原図のまま。垂直基準の記載はなく、潮汐補正もされていません。',
     datumInstantaneous: '水深はその日の水面からの実測値です。潮汐補正がないため、潮位により変動します。',
+    handleSpacing: (step_m: number) => step_m === 1
+      ? '点の間隔は 1 m です。1点が海底 1平方メートルにあたります。'
+      : `ここでは点の間隔は ${step_m} m です。1 m では描き切れない広さになりました。記録自体は 1 m 単位のままです。`,
+    extendHeading: 'サイトを広げる',
+    extendNote: (patch_m: number) => `未編集の平らな海底を ${patch_m} m 分つけ足します。`,
+    extendNorth: '北',
+    extendSouth: '南',
+    extendEast: '東',
+    extendWest: '西',
     notEnoughSoundings: '水深点が足りません。海底面の作成には 3 点以上が必要です。',
     soundingsWontJoin: (cutoff_m: number) => `これらの記録はまだ面になりません。一直線に並んでいるか、互いに ${cutoff_m} m 以上離れています。近くの点を動かしてみてください。`,
     webglUnavailable: 'この端末では 3D 表示を利用できません。平面地図に同じデータが表示されます。',
