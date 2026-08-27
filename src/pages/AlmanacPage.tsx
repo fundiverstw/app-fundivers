@@ -30,10 +30,11 @@ import {
   type AlmanacEventRecord,
   type AlmanacPendingRecord,
   type DiveSite,
+  type SiteKind,
 } from '../types/database'
 import { hasTerrainConditions, SITE_CONDITION_KINDS, type EventKind } from '../lib/event-kinds'
 import { EVENT_KIND_LABELS } from '../lib/event-kind-labels'
-import { fetchDiveSites } from '../lib/dive-sites'
+import { fetchDiveSites, siteName } from '../lib/dive-sites'
 import { todayIso, addIsoDays, parseIsoDate } from '../lib/dates'
 import { numOrNull } from '../lib/num'
 import { supabase } from '../lib/supabase'
@@ -55,6 +56,7 @@ import { ReadingGrid } from '../components/almanac/ReadingGrid'
 import { formatNum, readingsOf, type Reading } from '../lib/almanac-readings'
 import { SiteDayReport } from '../components/almanac/SiteDayReport'
 import { TrashKindPicker } from '../components/almanac/TrashKindPicker'
+import { AddPlaceForm } from '../components/sites/AddPlaceForm'
 import { CalendarIcon } from '../components/icons/CalendarIcon'
 import { ChevronDownIcon } from '../components/icons/ChevronDownIcon'
 import { ChevronUpIcon } from '../components/icons/ChevronUpIcon'
@@ -322,13 +324,18 @@ const SITE_LABEL: Record<EventKind, string> = {
 function AlmanacForm({
   sites,
   onSubmit,
+  onSitesChanged,
 }: {
   sites: DiveSite[]
   onSubmit: (form: AlmanacFormState) => Promise<void>
+  /** Re-read the catalog after a diver adds to it, so the place they just
+   *  entered is in the picker they are standing in front of. */
+  onSitesChanged: () => Promise<void>
 }) {
   const [form, setForm] = useState<AlmanacFormState>(blankForm)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [addingPlace, setAddingPlace] = useState(false)
 
   const updateField = <K extends keyof AlmanacFormState>(field: K, value: AlmanacFormState[K]) => {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -339,6 +346,16 @@ function AlmanacForm({
   // that kind and decides whether the terrain block is asked for at all.
   const selectKind = (kind: EventKind) => {
     setForm(prev => ({ ...prev, kind, site_id: '' }))
+    setError(null)
+  }
+
+  // Whether they added the place or picked the one the search offered
+  // instead, the diver ends up with it selected and the form back on screen —
+  // they came here to file an observation, not to curate a catalog.
+  const selectNewPlace = async (siteId: string) => {
+    await onSitesChanged()
+    setForm(prev => ({ ...prev, site_id: siteId }))
+    setAddingPlace(false)
     setError(null)
   }
 
@@ -388,19 +405,38 @@ function AlmanacForm({
         </div>
       </div>
 
-      <label className="mt-3 block">
-        <span className={INPUT_LABEL}>{SITE_LABEL[form.kind]}</span>
-        <select className={INPUT} value={form.site_id} onChange={e => updateField('site_id', e.target.value)}>
-          <option value="">{t.almanac.sitePlaceholder}</option>
-          {kindSites.map(site => (
-            <option key={site.id} value={site.id}>
-              {site.region ? `${site.name} — ${site.region}` : site.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      {kindSites.length === 0 && (
-        <p className={`mt-1 text-xs ${TEXT_SUBTLE}`}>{t.almanac.noSites}</p>
+      {addingPlace ? (
+        <div className="mt-3">
+          <AddPlaceForm
+            kind={form.kind as SiteKind}
+            onCancel={() => setAddingPlace(false)}
+            onAdded={async id => { await selectNewPlace(id) }}
+            onPick={async id => { await selectNewPlace(id) }}
+          />
+        </div>
+      ) : (
+        <>
+          <label className="mt-3 block">
+            <span className={INPUT_LABEL}>{SITE_LABEL[form.kind]}</span>
+            <select className={INPUT} value={form.site_id} onChange={e => updateField('site_id', e.target.value)}>
+              <option value="">{t.almanac.sitePlaceholder}</option>
+              {kindSites.map(site => (
+                <option key={site.id} value={site.id}>
+                  {site.region ? `${siteName(site)} — ${site.region}` : siteName(site)}
+                </option>
+              ))}
+            </select>
+          </label>
+          {kindSites.length === 0 && (
+            <p className={`mt-1 text-xs ${TEXT_SUBTLE}`}>{t.almanac.noSites}</p>
+          )}
+          {/* Beside the picker, not buried in an admin screen: the diver who
+              needs this is the one looking at a list that does not contain
+              where they were. */}
+          <button type="button" className={`mt-1 ${BTN_XS_GHOST}`} onClick={() => setAddingPlace(true)}>
+            {t.sites.addHeading}
+          </button>
+        </>
       )}
 
       <label className="mt-3 block">
@@ -813,11 +849,12 @@ export function AlmanacPage() {
 
       {tab === 'enter' ? (
         <>
-          {sites.length === 0 ? (
-            <p className={`${CARD} p-4 text-center text-sm ${TEXT_SUBTLE}`}>{t.almanac.noSites}</p>
-          ) : (
-            <AlmanacForm sites={sites} onSubmit={handleSubmit} />
-          )}
+          {/* The form renders even with an empty catalog. It used to be
+              replaced by "no places yet", which was right while only an admin
+              could add one and is exactly backwards now: a diver looking at a
+              list that does not contain where they were is the person this
+              feature is for. */}
+          <AlmanacForm sites={sites} onSubmit={handleSubmit} onSitesChanged={loadSites} />
 
           {submitStatus && (
             <p className="rounded-lg bg-emerald-500/15 p-2 text-center text-xs text-emerald-200">

@@ -1,9 +1,13 @@
 import { useEffect, useState, type ReactNode, type FormEvent } from 'react'
 import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
-import { fetchDiveSites, saveDiveSite, deleteDiveSite, type DiveSiteInsert } from '../../lib/dive-sites'
+import {
+  fetchDiveSites, saveDiveSite, deleteDiveSite, verifyDiveSite, mergeDiveSites,
+  siteName, otherSiteNames, type DiveSiteInsert,
+} from '../../lib/dive-sites'
 import { SITE_KINDS, type DiveSite, type SiteKind } from '../../types/database'
 import { EVENT_KIND_LABELS } from '../../lib/event-kind-labels'
+import { numOrNull } from '../../lib/num'
 import { t } from '../../i18n'
 
 const ds = t.admin.diveSites
@@ -23,6 +27,10 @@ export function AdminDiveSitesPage() {
   const [editing, setEditing] = useState<DiveSite | null>(null)
   const [creating, setCreating] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<DiveSite | null>(null)
+  const [merging, setMerging] = useState<DiveSite | null>(null)
+  // Anything a diver added lands here unverified, so the list can start with
+  // the ones that need a decision rather than making staff hunt for them.
+  const [onlyUnverified, setOnlyUnverified] = useState(false)
 
   async function reload() {
     try {
@@ -48,6 +56,27 @@ export function AdminDiveSitesPage() {
     return () => { cancelled = true }
   }, [])
 
+  async function handleVerify(site: DiveSite) {
+    try {
+      await verifyDiveSite(site.id, !site.verified)
+      toast.success(site.verified ? ds.unverified : ds.verified)
+      await reload()
+    } catch (err) {
+      toast.error(errorMessage(err))
+    }
+  }
+
+  async function handleMerge(keep: DiveSite, merge: DiveSite) {
+    try {
+      await mergeDiveSites(keep.id, merge.id)
+      toast.success(ds.merged)
+      setMerging(null)
+      await reload()
+    } catch (err) {
+      toast.error(errorMessage(err))
+    }
+  }
+
   async function handleDelete(site: DiveSite) {
     try {
       await deleteDiveSite(site.id)
@@ -58,6 +87,9 @@ export function AdminDiveSitesPage() {
       toast.error(errorMessage(err))
     }
   }
+
+  const unverifiedCount = sites.filter(s => !s.verified).length
+  const shown = onlyUnverified ? sites.filter(s => !s.verified) : sites
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
@@ -70,29 +102,49 @@ export function AdminDiveSitesPage() {
       </div>
       <p className="text-sm text-white/80">{ds.intro}</p>
 
+      <div className="flex gap-2" role="tablist" aria-label={ds.title}>
+        <FilterPill active={!onlyUnverified} onClick={() => setOnlyUnverified(false)}>{ds.allFilter}</FilterPill>
+        <FilterPill active={onlyUnverified} onClick={() => setOnlyUnverified(true)}>
+          {ds.unverifiedFilter}{unverifiedCount > 0 ? ` (${unverifiedCount})` : ''}
+        </FilterPill>
+      </div>
+
       {loadError && (
         <p className="text-sm text-red-200 bg-red-900/50 border border-accent rounded-md p-2">{loadError}</p>
       )}
 
       {loading ? (
         <p className="text-sm text-white/70">{wv.loading}</p>
-      ) : sites.length === 0 ? (
+      ) : shown.length === 0 ? (
         <p className="text-sm text-white/70">{ds.none}</p>
       ) : (
         <ul className="space-y-2">
-          {sites.map(site => (
+          {shown.map(site => (
             <li key={site.id} className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="font-medium text-brand-900 text-sm truncate">
-                  {site.name}
+                  {siteName(site)}
                   <span className="ml-2 text-xs text-brand-900/70">{EVENT_KIND_LABELS[site.kind]}</span>
                   {!site.active && <span className="ml-2 text-xs text-brand-900/70">{wv.inactive}</span>}
+                  {/* Amber, not red: unverified is a queue, not a fault. */}
+                  {!site.verified && (
+                    <span className="ml-2 text-xs font-semibold text-amber-700">{ds.unverifiedBadge}</span>
+                  )}
                 </p>
+                {/* Every other name on the row, because the duplicate an admin
+                    is hunting for is usually the same place under a spelling
+                    that sorts nowhere near it. */}
                 <p className="text-xs text-brand-900/70 truncate">
-                  {[site.region, site.notes].filter(Boolean).join(' · ')}
+                  {[...otherSiteNames(site), site.region, site.notes].filter(Boolean).join(' · ')}
                 </p>
               </div>
               <div className="flex gap-2 shrink-0">
+                <button type="button" onClick={() => handleVerify(site)}
+                  className="text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1 rounded-lg">
+                  {site.verified ? ds.unverify : ds.verify}
+                </button>
+                <button type="button" onClick={() => setMerging(site)}
+                  className="text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white px-3 py-1 rounded-lg">{ds.mergeLabel}</button>
                 <button type="button" onClick={() => setEditing(site)}
                   className="text-xs font-semibold bg-brand-900 hover:bg-brand-950 text-white px-3 py-1 rounded-lg">{wv.edit}</button>
                 <button type="button" onClick={() => setConfirmDelete(site)}
@@ -109,6 +161,15 @@ export function AdminDiveSitesPage() {
           onClose={() => { setCreating(false); setEditing(null) }}
           onSaved={async () => { setCreating(false); setEditing(null); toast.success(ds.saved); await reload() }}
           onError={m => toast.error(m)}
+        />
+      )}
+
+      {merging && (
+        <MergeModal
+          from={merging}
+          candidates={sites.filter(x => x.id !== merging.id && x.kind === merging.kind)}
+          onClose={() => setMerging(null)}
+          onConfirm={keep => handleMerge(keep, merging)}
         />
       )}
 
@@ -134,8 +195,12 @@ function SiteForm({
   onError: (m: string) => void
 }) {
   const [name, setName] = useState(site?.name ?? '')
+  const [nameZh, setNameZh] = useState(site?.name_zh_tw ?? '')
+  const [nameJa, setNameJa] = useState(site?.name_ja ?? '')
   const [kind, setKind] = useState<SiteKind>(site?.kind ?? SITE_KINDS[0])
   const [region, setRegion] = useState(site?.region ?? '')
+  const [latitude, setLatitude] = useState(site?.latitude?.toString() ?? '')
+  const [longitude, setLongitude] = useState(site?.longitude?.toString() ?? '')
   const [notes, setNotes] = useState(site?.notes ?? '')
   const [active, setActive] = useState(site?.active ?? true)
   const [submitting, setSubmitting] = useState(false)
@@ -143,13 +208,20 @@ function SiteForm({
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!name.trim()) { onError(ds.nameRequired); return }
+    const lat = numOrNull(latitude)
+    const lon = numOrNull(longitude)
+    if ((lat === null) !== (lon === null)) { onError(ds.coordsBoth); return }
     setSubmitting(true)
     try {
       const values: DiveSiteInsert = {
         name: name.trim(),
+        name_zh_tw: nameZh.trim() || null,
+        name_ja: nameJa.trim() || null,
         kind,
         region: region.trim() || null,
         notes: notes.trim() || null,
+        latitude: lat,
+        longitude: lon,
         active,
       }
       await saveDiveSite(values, site?.id)
@@ -168,6 +240,15 @@ function SiteForm({
         <Labelled label={ds.nameLabel}>
           <input className={FIELD} value={name} onChange={e => setName(e.target.value)} placeholder={ds.namePh} />
         </Labelled>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Labelled label={ds.nameZhLabel}>
+            <input className={FIELD} value={nameZh} onChange={e => setNameZh(e.target.value)} />
+          </Labelled>
+          <Labelled label={ds.nameJaLabel}>
+            <input className={FIELD} value={nameJa} onChange={e => setNameJa(e.target.value)} />
+          </Labelled>
+        </div>
+        <p className="text-xs text-brand-900/70">{ds.namesHint}</p>
         <Labelled label={ds.kindLabel}>
           <select className={FIELD} value={kind} onChange={e => setKind(e.target.value as SiteKind)}>
             {SITE_KINDS.map(k => (
@@ -178,6 +259,16 @@ function SiteForm({
         <Labelled label={ds.regionLabel}>
           <input className={FIELD} value={region} onChange={e => setRegion(e.target.value)} placeholder={ds.regionPh} />
         </Labelled>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Labelled label={ds.latitudeLabel}>
+            <input type="number" step="any" className={FIELD} value={latitude}
+              onChange={e => setLatitude(e.target.value)} placeholder="25.1263" />
+          </Labelled>
+          <Labelled label={ds.longitudeLabel}>
+            <input type="number" step="any" className={FIELD} value={longitude}
+              onChange={e => setLongitude(e.target.value)} placeholder="121.8321" />
+          </Labelled>
+        </div>
         <Labelled label={ds.notesLabel}>
           <textarea className={`${FIELD} text-xs`} rows={3} value={notes} onChange={e => setNotes(e.target.value)}
             placeholder={ds.notesPh} />
@@ -195,6 +286,68 @@ function SiteForm({
           </button>
         </div>
       </form>
+    </Modal>
+  )
+}
+
+function FilterPill({ active, onClick, children }: {
+  active: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${
+        active ? 'bg-brand-600 text-white' : 'bg-white/70 text-brand-900 hover:bg-white/90'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+/**
+ * Folding a duplicate into the real place.
+ *
+ * The survivor is chosen rather than assumed: which of two rows is "the real
+ * one" depends on which the shop's events already point at, and only a person
+ * knows that. Restricted to places of the same kind, because a hiking trail
+ * and a reef that share a name are not the same place under two spellings.
+ */
+function MergeModal({ from, candidates, onClose, onConfirm }: {
+  from: DiveSite
+  candidates: DiveSite[]
+  onClose: () => void
+  onConfirm: (keep: DiveSite) => void
+}) {
+  const [keepId, setKeepId] = useState('')
+  const keep = candidates.find(c => c.id === keepId) ?? null
+
+  return (
+    <Modal labelledBy="site-merge-title" onClose={onClose}>
+      <h2 id="site-merge-title" className="text-lg font-bold text-brand-900">{ds.mergeTitle}</h2>
+      <p className="text-sm text-brand-900/80">{ds.mergeBody(siteName(from))}</p>
+      <Labelled label={ds.mergePick}>
+        <select className={FIELD} value={keepId} onChange={e => setKeepId(e.target.value)}>
+          <option value="">—</option>
+          {candidates.map(c => (
+            <option key={c.id} value={c.id}>
+              {[siteName(c), ...otherSiteNames(c), c.region].filter(Boolean).join(' · ')}
+            </option>
+          ))}
+        </select>
+      </Labelled>
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onClose} className="text-sm font-semibold text-brand-900 px-3 py-1.5">{wv.cancel}</button>
+        <button type="button" disabled={!keep} onClick={() => keep && onConfirm(keep)}
+          className="text-sm font-semibold bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white px-4 py-1.5 rounded-lg">
+          {ds.mergeInto}
+        </button>
+      </div>
     </Modal>
   )
 }

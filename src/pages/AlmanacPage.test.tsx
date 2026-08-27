@@ -23,7 +23,11 @@ const sites = [
   { id: 'site-4', name: 'Closed Cove', kind: 'dive', region: null, active: false },
 ]
 
-vi.mock('../lib/dive-sites', () => ({
+// Only the fetch is stubbed. siteName and the rest are pure and shared with
+// the add-a-place form, and stubbing them would hide the language fallback the
+// picker depends on.
+vi.mock('../lib/dive-sites', async importOriginal => ({
+  ...(await importOriginal<typeof import('../lib/dive-sites')>()),
   fetchDiveSites: vi.fn(async () => sites),
 }))
 
@@ -335,5 +339,29 @@ describe('AlmanacPage', () => {
       p_status: 'approved',
       p_staff_notes: null,
     }))
+  })
+})
+
+describe('AlmanacPage — adding a place', () => {
+  it('offers to add one right beside the picker, not in an admin screen', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByRole('button', { name: t.almanac.submitRecord })
+
+    await user.click(screen.getByRole('button', { name: t.sites.addHeading }))
+    expect(screen.getByLabelText(t.sites.nameEn)).toBeInTheDocument()
+    // The picker steps aside while they are adding, so there is one question
+    // on screen rather than two that contradict each other.
+    expect(screen.queryByLabelText(t.almanac.siteDive)).not.toBeInTheDocument()
+  })
+
+  it('puts the picker back, with nothing lost, if they change their mind', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByRole('button', { name: t.almanac.submitRecord })
+
+    await user.click(screen.getByRole('button', { name: t.sites.addHeading }))
+    await user.click(screen.getByRole('button', { name: t.sites.cancel }))
+    expect(screen.getByLabelText(t.almanac.siteDive)).toBeInTheDocument()
   })
 })
