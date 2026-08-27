@@ -370,6 +370,8 @@ export interface Database {
           elevation_m: number | null
           route_condition: AlmanacRouteCondition | null
           summit_visible: boolean | null
+          trash_count: number | null
+          trash_kinds: AlmanacTrashKind[] | null
           diver_display: string | null
         }>
       }
@@ -396,6 +398,8 @@ export interface Database {
           elevation_m: number | null
           route_condition: AlmanacRouteCondition | null
           summit_visible: boolean | null
+          trash_count: number | null
+          trash_kinds: AlmanacTrashKind[] | null
           diver_display: string | null
         }>
       }
@@ -416,6 +420,8 @@ export interface Database {
           p_elevation_m?: number | null
           p_route_condition?: AlmanacRouteCondition | null
           p_summit_visible?: boolean | null
+          p_trash_count?: number | null
+          p_trash_kinds?: AlmanacTrashKind[] | null
         }
         Returns: string
       }
@@ -1844,6 +1850,8 @@ export interface Database {
           elevation_m: number | null
           route_condition: 'dry' | 'wet' | 'muddy' | 'icy' | 'snow' | 'rockfall' | null
           summit_visible: boolean | null
+          trash_count: number | null
+          trash_kinds: string[]
           status: 'pending' | 'approved' | 'rejected'
           approved_by: string | null
           approved_at: string | null
@@ -1868,6 +1876,8 @@ export interface Database {
           elevation_m?: number | null
           route_condition?: 'dry' | 'wet' | 'muddy' | 'icy' | 'snow' | 'rockfall' | null
           summit_visible?: boolean | null
+          trash_count?: number | null
+          trash_kinds?: string[]
           status?: 'pending' | 'approved' | 'rejected'
           approved_by?: string | null
           approved_at?: string | null
@@ -2243,6 +2253,16 @@ export const ALMANAC_CORAL_HEALTHS = ['excellent', 'good', 'fair', 'poor', 'blea
 export type AlmanacCoralHealth = typeof ALMANAC_CORAL_HEALTHS[number]
 export const ALMANAC_ROUTE_CONDITIONS = ['dry', 'wet', 'muddy', 'icy', 'snow', 'rockfall'] as const
 export type AlmanacRouteCondition = typeof ALMANAC_ROUTE_CONDITIONS[number]
+// Marine-debris materials, following the split the ICC cleanup datasheets use
+// so the shop's numbers can be read beside everyone else's. Fishing gear is
+// its own entry despite being mostly plastic: nets, line and traps come from a
+// different source than consumer litter, and a dive shop is the one best
+// placed to notice them. Pinned to almanac_records_trash_kinds_check.
+export const ALMANAC_TRASH_KINDS = [
+  'plastic', 'fishing_gear', 'styrofoam', 'glass',
+  'metal', 'rubber', 'fabric', 'paper', 'other',
+] as const
+export type AlmanacTrashKind = typeof ALMANAC_TRASH_KINDS[number]
 // The dive_sites vocabulary: the event kinds the shop travels to a site for.
 // Pinned to the DB's `dive_sites_kind_check`, and asserted against
 // SITE_CONDITION_KINDS in dive-sites.test.ts — the two answer the same

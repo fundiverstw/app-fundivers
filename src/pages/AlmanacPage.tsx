@@ -2,7 +2,8 @@
  * Almanac — crowdsourced environmental observations attached to past events.
  *
  * A diver files what they saw on the day (temperatures, visibility, current,
- * weather, wildlife, coral, and terrain readings for the kinds that climb);
+ * weather, wildlife, coral, trash, and terrain readings for the kinds that
+ * climb);
  * staff rule on each submission; approved records are what the crowd reads.
  *
  * The three sections mirror those three roles: the review queue (staff only),
@@ -24,6 +25,7 @@ import {
   type AlmanacWeather,
   type AlmanacCoralHealth,
   type AlmanacRouteCondition,
+  type AlmanacTrashKind,
   type AlmanacStatus,
   type AlmanacEventRecord,
   type AlmanacPendingRecord,
@@ -52,6 +54,7 @@ import {
 import { ReadingGrid } from '../components/almanac/ReadingGrid'
 import { formatNum, readingsOf, type Reading } from '../lib/almanac-readings'
 import { SiteDayReport } from '../components/almanac/SiteDayReport'
+import { TrashKindPicker } from '../components/almanac/TrashKindPicker'
 import { CalendarIcon } from '../components/icons/CalendarIcon'
 import { ChevronDownIcon } from '../components/icons/ChevronDownIcon'
 import { ChevronUpIcon } from '../components/icons/ChevronUpIcon'
@@ -60,6 +63,8 @@ import { ChevronUpIcon } from '../components/icons/ChevronUpIcon'
 const LOOKBACK_DAYS = 90
 
 const PILL = 'px-3 py-1.5 rounded-lg text-sm font-semibold'
+
+const TRASH_HINT_ID = 'almanac-trash-count-hint'
 
 /** A submission of the signed-in diver's that the crowd cannot see yet. */
 interface OwnSubmission {
@@ -86,6 +91,8 @@ interface AlmanacFormState {
   elevation_m: string
   route_condition: AlmanacRouteCondition | ''
   summit_visible: boolean
+  trash_count: string
+  trash_kinds: AlmanacTrashKind[]
 }
 
 // The date defaults to today: without an outing to derive it from, "when were
@@ -109,6 +116,8 @@ const emptyForm: AlmanacFormState = {
   elevation_m: '',
   route_condition: '',
   summit_visible: false,
+  trash_count: '',
+  trash_kinds: [],
 }
 
 /** A `date` column rendered as the day it stores, not a UTC-shifted one. */
@@ -509,6 +518,35 @@ function AlmanacForm({
         />
       </label>
 
+      <h3 className={`mt-4 border-t border-white/10 pt-3 text-xs ${TEXT_HEADING}`}>
+        {t.almanac.trashHeading}
+      </h3>
+      <div className="mt-3">
+        <label className="block">
+          <span className={INPUT_LABEL}>{t.almanac.trashCount}</span>
+          <input
+            type="number" step="1" min="0" className={INPUT}
+            placeholder={t.almanac.trashCountPh}
+            aria-describedby={TRASH_HINT_ID}
+            value={form.trash_count}
+            onChange={e => updateField('trash_count', e.target.value)}
+          />
+        </label>
+        {/* Outside the label, described into it: inside, the hint became part
+            of the field's accessible name and a screen reader announced the
+            whole paragraph as the label. Blank and 0 are different answers and
+            the form has to say so, or a clean site reads as an unsurveyed one
+            in every average. */}
+        <p id={TRASH_HINT_ID} className={`mt-1 text-xs ${TEXT_SUBTLE}`}>{t.almanac.trashCountHint}</p>
+      </div>
+      <div className="mt-3">
+        <TrashKindPicker
+          selected={form.trash_kinds}
+          onChange={next => updateField('trash_kinds', next)}
+          disabled={form.trash_count.trim() === '0'}
+        />
+      </div>
+
       {hasTerrainConditions(form.kind) && (
         <>
           <h3 className={`mt-4 border-t border-white/10 pt-3 text-xs ${TEXT_HEADING}`}>
@@ -715,6 +753,8 @@ export function AlmanacPage() {
       p_wave_period_s: numOrNull(form.wave_period_s),
       p_weather: form.weather || null,
       p_wildlife: parseWildlife(form.wildlife),
+      p_trash_count: numOrNull(form.trash_count),
+      p_trash_kinds: form.trash_kinds,
       p_coral_health: form.coral_health || null,
       p_elevation_m: terrain ? numOrNull(form.elevation_m) : null,
       p_route_condition: terrain ? form.route_condition || null : null,

@@ -91,5 +91,8 @@ export function tallyByCount<T extends string>(values: readonly (T | null)[]): T
 
 /** The non-null values of one numeric column across a stack of records. */
 export function valuesOf<R>(records: readonly R[], pick: (record: R) => number | null): number[] {
-  return records.map(pick).filter((v): v is number => v !== null)
+  // Finiteness rather than `!== null`, so a column a query forgot to select
+  // reads as "nobody filed this" instead of reaching `summarize` as undefined
+  // and taking the whole report down on `.toFixed`.
+  return records.map(pick).filter((v): v is number => Number.isFinite(v))
 }

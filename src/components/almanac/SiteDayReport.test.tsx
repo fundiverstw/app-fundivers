@@ -23,6 +23,8 @@ const base: AlmanacEventRecord = {
   elevation_m: null,
   route_condition: null,
   summit_visible: null,
+  trash_count: null,
+  trash_kinds: [],
   diver_display: 'Mei',
 }
 
@@ -37,6 +39,44 @@ function renderReport(records: AlmanacEventRecord[]) {
 }
 
 describe('SiteDayReport', () => {
+  it('plots the trash count and tallies what it was made of', () => {
+    renderReport([
+      { ...base, trash_count: 12, trash_kinds: ['plastic', 'fishing_gear'] },
+      { ...base, id: 'record-2', diver_display: 'Jun', trash_count: 4, trash_kinds: ['plastic'] },
+    ])
+
+    const readings = screen.getByText(t.almanac.measured).closest('section')!
+    const trash = within(readings).getByText(t.almanac.trashCount).closest('div')!.parentElement!
+    expect(within(trash).getByText('8')).toBeInTheDocument()
+
+    const conditions = screen.getByText(t.almanac.called).closest('section')!
+    const kinds = within(conditions).getByText(t.almanac.trashKindsLabel).closest('div')!
+    expect(within(kinds).getByText(t.almanac.trashKinds.plastic).parentElement).toHaveTextContent('2')
+    expect(within(kinds).getByText(t.almanac.trashKinds.fishing_gear).parentElement).toHaveTextContent('1')
+  })
+
+  // "Nobody looked" and "everyone looked and it was clean" are different
+  // findings, and averaging one as the other is the failure this feature
+  // exists to avoid.
+  it('reads a day of zeroes as a clean site, not as an unsurveyed one', () => {
+    renderReport([
+      { ...base, trash_count: 0 },
+      { ...base, id: 'record-2', diver_display: 'Jun', trash_count: 0 },
+    ])
+
+    const readings = screen.getByText(t.almanac.measured).closest('section')!
+    expect(within(readings).getByText(t.almanac.trashCount)).toBeInTheDocument()
+    const who = screen.getByText(t.almanac.whoReported).closest('section')!
+    expect(within(who).getAllByText(t.almanac.trashNone)).toHaveLength(2)
+  })
+
+  it('leaves trash out entirely when nobody answered', () => {
+    renderReport([base])
+
+    const readings = screen.getByText(t.almanac.measured).closest('section')!
+    expect(within(readings).queryByText(t.almanac.trashCount)).not.toBeInTheDocument()
+  })
+
   it('leads with how much data the day is and who filed it', () => {
     const { container } = renderReport(day)
 

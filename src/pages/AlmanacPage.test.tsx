@@ -213,6 +213,62 @@ describe('AlmanacPage', () => {
     expect(await screen.findByText(t.almanac.submitted)).toBeInTheDocument()
   })
 
+  it('files the trash count and the materials alongside it', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByRole('button', { name: t.almanac.submitRecord })
+
+    await user.selectOptions(screen.getByLabelText(t.almanac.siteDive), 'site-1')
+    await user.type(screen.getByLabelText(t.almanac.trashCount), '12')
+    await user.click(screen.getByLabelText(t.almanac.trashKinds.plastic))
+    await user.click(screen.getByLabelText(t.almanac.trashKinds.fishing_gear))
+    await user.click(screen.getByRole('button', { name: t.almanac.submitRecord }))
+
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('submit_almanac_record',
+      expect.objectContaining({
+        p_trash_count: 12,
+        p_trash_kinds: ['plastic', 'fishing_gear'],
+      })))
+  })
+
+  // A blank count is "did not look". Left as-is it must reach the RPC as null.
+  it('sends null for a count the diver never touched', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByRole('button', { name: t.almanac.submitRecord })
+
+    await user.selectOptions(screen.getByLabelText(t.almanac.siteDive), 'site-1')
+    await user.click(screen.getByRole('button', { name: t.almanac.submitRecord }))
+
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('submit_almanac_record',
+      expect.objectContaining({ p_trash_count: null })))
+  })
+
+  // 0 is "looked, saw none" — the reading a clean site produces, and the one
+  // that must survive the trip to the RPC as a number rather than a blank.
+  it('sends a zero count as the reading it is, not as no answer', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByRole('button', { name: t.almanac.submitRecord })
+
+    await user.selectOptions(screen.getByLabelText(t.almanac.siteDive), 'site-1')
+    await user.type(screen.getByLabelText(t.almanac.trashCount), '0')
+    await user.click(screen.getByRole('button', { name: t.almanac.submitRecord }))
+
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('submit_almanac_record',
+      expect.objectContaining({ p_trash_count: 0 })))
+  })
+
+  it('stops asking what kind once the diver says there was none', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByRole('button', { name: t.almanac.submitRecord })
+
+    expect(screen.getByLabelText(t.almanac.trashKinds.plastic)).not.toBeDisabled()
+    await user.type(screen.getByLabelText(t.almanac.trashCount), '0')
+    expect(screen.getByLabelText(t.almanac.trashKinds.plastic)).toBeDisabled()
+  })
+
   it('offers only the active places of the toggled kind, and asks an adventure for its terrain', async () => {
     const user = userEvent.setup()
     renderPage()

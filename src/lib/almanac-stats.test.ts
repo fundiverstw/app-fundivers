@@ -98,3 +98,14 @@ describe('valuesOf', () => {
     expect(valuesOf(records, r => r.temp)).toEqual([28, 26])
   })
 })
+
+describe('valuesOf robustness', () => {
+  it('drops a column a query never selected instead of crashing the report', () => {
+    const records = [{ n: 3 }, {}, { n: 5 }] as Array<{ n?: number }>
+    expect(valuesOf(records, r => r.n as number | null)).toEqual([3, 5])
+  })
+
+  it('drops NaN, which would poison every statistic it touched', () => {
+    expect(valuesOf([{ n: 1 }, { n: NaN }, { n: 2 }], r => r.n)).toEqual([1, 2])
+  })
+})
