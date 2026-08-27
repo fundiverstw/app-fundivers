@@ -738,6 +738,13 @@ export interface Database {
            *  migration, or any service-role write. */
           cancelled_at: string | null
           cancelled_by: string | null
+          /** Status to put this booking back to when its event is restored.
+           *  Non-null marks a booking cancelled BY its event rather than by a
+           *  person, which is both how restore picks the rows and the only
+           *  record of a 'waitlisted' spot nothing else could reconstruct.
+           *  Written solely by `trg_events_cancel_bookings` (20260827100000);
+           *  the diver-status guard rejects a caller setting it. */
+          status_before_event_cancel: string | null
           /** Who created this booking — the diver themselves, a parent, or an
            *  admin using Add diver. Stamped by trg_bookings_stamp_created_by
            *  and never writable by a caller. Equal to `user_id` means they
