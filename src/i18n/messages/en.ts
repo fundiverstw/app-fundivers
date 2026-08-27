@@ -47,6 +47,7 @@ export const en = {
     datumUnknown: 'Depths as drawn — no vertical datum stated, not tide-corrected.',
     datumInstantaneous: 'Depths as measured below the surface on the day — not tide-corrected, so they shift with the tide.',
     notEnoughSoundings: 'Not enough soundings yet to build a surface — three or more are needed.',
+    soundingsWontJoin: (cutoff_m: number) => `These readings will not join into a surface yet — they sit in a straight line, or more than ${cutoff_m} m apart. Pull a point nearer the others.`,
     webglUnavailable: '3D view unavailable on this device. The flat map shows the same data.',
     compassNorth: 'N',
     coverage: (pct: number) => `${pct}% of the drawn surface sits between soundings close enough to trust.`,

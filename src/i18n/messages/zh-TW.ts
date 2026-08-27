@@ -40,6 +40,7 @@ export const zhTW: Messages = {
     datumUnknown: '深度依原圖標示，未註明垂直基準，也未經潮汐校正。',
     datumInstantaneous: '深度為當天水面下的實測值，未經潮汐校正，會隨潮位變動。',
     notEnoughSoundings: '測深點還不夠，至少需要三點才能建立海底面。',
+    soundingsWontJoin: (cutoff_m: number) => `這些記錄還無法連成曲面——它們排成一直線，或彼此相距超過 ${cutoff_m} 公尺。請把某個點拉近其他點。`,
     webglUnavailable: '此裝置無法顯示 3D 檢視，平面地圖呈現相同資料。',
     compassNorth: '北',
     coverage: (pct: number) => `所繪海底面中，有 ${pct}% 位於足夠密集的測深點之間。`,

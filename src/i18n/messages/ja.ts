@@ -39,6 +39,7 @@ export const ja: Messages = {
     datumUnknown: '水深は原図のまま。垂直基準の記載はなく、潮汐補正もされていません。',
     datumInstantaneous: '水深はその日の水面からの実測値です。潮汐補正がないため、潮位により変動します。',
     notEnoughSoundings: '水深点が足りません。海底面の作成には 3 点以上が必要です。',
+    soundingsWontJoin: (cutoff_m: number) => `これらの記録はまだ面になりません。一直線に並んでいるか、互いに ${cutoff_m} m 以上離れています。近くの点を動かしてみてください。`,
     webglUnavailable: 'この端末では 3D 表示を利用できません。平面地図に同じデータが表示されます。',
     compassNorth: '北',
     coverage: (pct: number) => `描画された海底面のうち ${pct}% は、十分に近い水深点の間にあります。`,

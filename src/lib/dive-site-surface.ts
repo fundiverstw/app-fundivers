@@ -33,7 +33,10 @@ export interface SurfaceOptions {
   cutoffEdge_m?: number
 }
 
-const DEFAULTS: Required<SurfaceOptions> = {
+/** Exported because the view has to be able to say WHY a set of readings will
+ *  not join into a surface, and "more than 60 m apart" is the actionable half
+ *  of that answer. */
+export const SURFACE_DEFAULTS: Required<SurfaceOptions> = {
   solidEdge_m: 15,
   cutoffEdge_m: 60,
 }
@@ -50,7 +53,7 @@ function dist(a: Vec2, b: Vec2): number {
  * should be able to tell "solid" from "half guessed" without a legend lesson.
  */
 export function confidenceForEdge(maxEdge_m: number, opts: SurfaceOptions = {}): number {
-  const { solidEdge_m, cutoffEdge_m } = { ...DEFAULTS, ...opts }
+  const { solidEdge_m, cutoffEdge_m } = { ...SURFACE_DEFAULTS, ...opts }
   if (maxEdge_m <= solidEdge_m) return 1
   if (maxEdge_m >= cutoffEdge_m) return 0
   return 1 - (maxEdge_m - solidEdge_m) / (cutoffEdge_m - solidEdge_m)

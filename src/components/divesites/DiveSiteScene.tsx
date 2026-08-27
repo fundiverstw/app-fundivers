@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { buildSurface, coverageFraction, type SurfaceOptions } from '../../lib/dive-site-surface'
+import {
+  buildSurface, coverageFraction, SURFACE_DEFAULTS, type SurfaceOptions,
+} from '../../lib/dive-site-surface'
 import {
   isVolumetric, observedOnly, singleDatum,
   LATTICE_SPACING_M, type DiveSiteMap, type Vec2,
@@ -78,17 +80,23 @@ export function DiveSiteScene({
   // guesswork count toward coverage, which is the one number here that has to
   // stay honest.
   const extent = map.extent_m ?? SITE_EXTENT_M
-  // Below three readings there is nothing to triangulate, so the view falls
-  // back to a flat base plane. Two triangles, whatever the site's size — the
-  // lattice it represents is implicit and is never built as geometry.
-  const showBase = observed.soundings.length < 3
+  // The flat base stands in whenever there is no surface, not only when there
+  // are fewer than three readings. Three that will not triangulate — collinear,
+  // or every edge past the cutoff — used to replace the whole view with a line
+  // of text, which took the handles away with it: the diver could not add the
+  // fourth reading that would have fixed it. Two triangles, whatever the site's
+  // size; the lattice it stands for is implicit and never built as geometry.
+  const showBase = !surface
+  // Three readings that produced no triangles is a different problem from not
+  // having three, and saying "three are needed" to someone who has four is
+  // both wrong and a dead end.
+  const wontJoin = !surface && observed.soundings.length >= 3
   const coverage = surface ? coverageFraction(surface.triangles) : 0
   const datum = singleDatum(observed)
 
   useEffect(() => {
     const mount = mountRef.current
     if (!mount || !supported) return
-    if (!surface && !showBase) return
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
 
@@ -486,14 +494,6 @@ export function DiveSiteScene({
     }
   }, [map, observed, surface, showBase, extent, height, supported, verticalExaggeration, handles, onHandleDrag])
 
-  if (!surface && !showBase) {
-    return (
-      <div className={`${CARD} p-6 text-center`}>
-        <p className={TEXT_MUTED}>{t.siteMap.notEnoughSoundings}</p>
-      </div>
-    )
-  }
-
   return (
     <figure className={`${CARD} overflow-hidden`}>
       {supported ? (
@@ -522,6 +522,13 @@ export function DiveSiteScene({
       )}
       <figcaption className="space-y-1 px-4 py-3">
         <p className={`text-sm ${TEXT_HEADING}`}>{map.name}</p>
+        {!surface && (
+          <p className={`text-xs ${TEXT_MUTED}`}>
+            {wontJoin
+              ? t.siteMap.soundingsWontJoin(SURFACE_DEFAULTS.cutoffEdge_m)
+              : t.siteMap.notEnoughSoundings}
+          </p>
+        )}
         <p className={`text-xs ${TEXT_MUTED}`}>
           {t.siteMap.drawnBy(map.provenance.author, map.provenance.year)}
         </p>
