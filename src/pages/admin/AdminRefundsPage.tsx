@@ -16,7 +16,7 @@ import { fetchOverRefunded, type OverRefunded } from '../../lib/over-refunded'
 import { useAuth } from '../../hooks/useAuth'
 import { fetchActorNames, actorLabel, type ActorNames } from '../../lib/actor-names'
 import { Spinner } from '../../components/ui/Spinner'
-import { CARD_ELEVATED, BTN_PRIMARY, BTN_GHOST, BTN_XS_PRIMARY, BTN_XS_GHOST, TEXT_MUTED } from '../../styles/tokens'
+import { CARD_ELEVATED, BTN_PRIMARY, BTN_GHOST, BTN_XS_PRIMARY, BTN_XS_GHOST, TEXT_MUTED, TEXT_WARNING } from '../../styles/tokens'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
 import type { Booking } from '../../types/database'
@@ -389,7 +389,7 @@ export function AdminRefundsPage() {
                   {rf.colReturned}: <span className="tabular-nums">{money(r.returned, r.currency)}</span>
                   {' · '}
                   {rf.colExcess}:{' '}
-                  <span className="tabular-nums text-amber-800 font-semibold">{money(r.excess, r.currency)}</span>
+                  <span className={`tabular-nums ${TEXT_WARNING} font-semibold`}>{money(r.excess, r.currency)}</span>
                 </div>
               </li>
             ))}

@@ -62,7 +62,6 @@ export const ja: Messages = {
     featuredTrips: 'おすすめツアー',
     quickLinks: '見つける',
     siteMaps: 'ダイビングサイトマップ',
-    comingSoon: '近日公開',
     waitlist: 'キャンセル待ち',
     almanac: 'アルマナック',
   },
@@ -125,6 +124,19 @@ export const ja: Messages = {
     summaryColonies: (n: number) => `${n} 群体`,
     summaryMean: (score: string) => `平均色 ${score}`,
     summaryBleached: (n: number, pct: number) => `白化 ${n}（${pct}%）`,
+  },
+  siteMaps: {
+    title: '潜水地点マップ',
+    blurb: '各地点の海底の様子を、ダイバーが一つずつ記録した水深から組み立てています。自動生成は一切なく、すべて誰かが実測した値です。',
+    place: '場所',
+    noPlaces: 'まだ地点が登録されていません。アルマナックから追加するとここに表示されます。',
+    viewsAria: 'マップ表示',
+    tabContribute: '記録する',
+    tabSurface: '海底面',
+    coverage: (depths: number, features: number) =>
+      `これまでに水深 ${depths} 件、地形 ${features} 件が記録されています。`,
+    filed: '記録を登録しました。ありがとうございます。',
+    filingFailed: (msg: string) => `記録を登録できませんでした：${msg}`,
   },
   sites: {
     addPlace: 'この場所を追加',

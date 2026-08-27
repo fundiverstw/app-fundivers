@@ -17,21 +17,15 @@ interface DashboardPageProps {
 // behind the fixed bottom nav), and the version / beta badge floats in the
 // bottom-right corner above the nav.
 export function DashboardPage({ quickLinks = false }: DashboardPageProps) {
-  const { user, profile } = useAuth()
+  const { user } = useAuth()
 
-  // Dive-site maps are admin-only for now. Divers see the tile greyed out
-  // rather than hidden: the feature is coming, and a tile that appears from
-  // nowhere later is harder to notice than one that lights up.
-  const siteMapTo = profile?.role === 'admin' && import.meta.env.DEV
-    ? '/dev/site-map'
-    : undefined
 
   return (
     <div className="relative -m-4 -mb-24 min-h-[calc(100vh-3rem)] overflow-hidden">
       <div className="relative z-10 mx-auto flex w-full max-w-md flex-col gap-4 px-4 pt-6 pb-28">
         {user && <WelcomeBanner user={user} />}
         <FeaturedEvents />
-        {quickLinks && <QuickLinks siteMapTo={siteMapTo} />}
+        {quickLinks && <QuickLinks />}
       </div>
 
       {/* Powered-by mark — bottom-right, clear of the bottom nav, on one row: the

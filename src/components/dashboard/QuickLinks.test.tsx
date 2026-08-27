@@ -24,18 +24,11 @@ describe('QuickLinks', () => {
     expect(screen.getByText(/almanac/i)).toBeInTheDocument()
   })
 
-  it('shows the dive site maps tile as not yet available', () => {
+  // Was a greyed-out "coming soon" tile back when the map lived behind a
+  // development-only route. It is a page now, open to every signed-in diver.
+  it('links to the dive site maps like any other destination', () => {
     renderLinks()
-    expect(screen.getByText(/dive site maps/i)).toBeInTheDocument()
-    expect(screen.getByText(/soon/i)).toBeInTheDocument()
-    // No href yet — the bathymetry page does not exist, and a link to a route
-    // with no match would land the diver on the catch-all redirect.
-    expect(screen.queryByRole('link', { name: /dive site maps/i })).not.toBeInTheDocument()
-  })
-
-  it('makes the map tile a link once a destination exists', () => {
-    render(<MemoryRouter><QuickLinks siteMapTo="/dev/site-map" /></MemoryRouter>)
-    expect(screen.getByRole('link', { name: /dive site maps/i })).toHaveAttribute('href', '/dev/site-map')
+    expect(screen.getByRole('link', { name: /dive site maps/i })).toHaveAttribute('href', '/site-maps')
     expect(screen.queryByText(/soon/i)).not.toBeInTheDocument()
   })
 

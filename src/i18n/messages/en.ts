@@ -70,7 +70,6 @@ export const en = {
     featuredTrips: 'Featured trips',
     quickLinks: 'Explore',
     siteMaps: 'Dive Site Maps',
-    comingSoon: 'Soon',
     waitlist: 'waitlist',
     almanac: 'Almanac',
   },
@@ -133,6 +132,19 @@ export const en = {
     summaryColonies: (n: number) => `${n} ${n === 1 ? 'colony' : 'colonies'}`,
     summaryMean: (score: string) => `mean shade ${score}`,
     summaryBleached: (n: number, pct: number) => `${n} bleached (${pct}%)`,
+  },
+  siteMaps: {
+    title: 'Dive site maps',
+    blurb: 'What the seabed looks like at each place, built from depths divers file one at a time. Nothing here is generated — every reading was measured by somebody.',
+    place: 'Place',
+    noPlaces: 'No places in the catalog yet. Add one from the almanac and it will appear here.',
+    viewsAria: 'Map views',
+    tabContribute: 'Contribute',
+    tabSurface: 'Surface',
+    coverage: (depths: number, features: number) =>
+      `${depths} depths and ${features} features recorded so far.`,
+    filed: 'Readings filed. Thank you.',
+    filingFailed: (msg: string) => `Could not file those readings: ${msg}`,
   },
   sites: {
     addPlace: 'Add this place',

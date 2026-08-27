@@ -55,23 +55,16 @@ describe('DashboardPage', () => {
     expect(screen.getByText(/dive site maps/i)).toBeInTheDocument()
   })
 
-  it('greys the dive-site map tile out for a diver, rather than hiding it', () => {
-    useAuthMock.mockReturnValue({ user: { user_metadata: {} }, profile: { role: 'diver' } })
-    render(<MemoryRouter><DashboardPage quickLinks /></MemoryRouter>)
-    expect(screen.getByText(/dive site maps/i)).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /dive site maps/i })).not.toBeInTheDocument()
-  })
-
-  it('leaves it closed to staff as well — admin only for now', () => {
-    useAuthMock.mockReturnValue({ user: { user_metadata: {} }, profile: { role: 'staff' } })
-    render(<MemoryRouter><DashboardPage quickLinks /></MemoryRouter>)
-    expect(screen.queryByRole('link', { name: /dive site maps/i })).not.toBeInTheDocument()
-  })
-
-  it('opens it to an admin', () => {
-    useAuthMock.mockReturnValue({ user: { user_metadata: {} }, profile: { role: 'admin' } })
-    render(<MemoryRouter><DashboardPage quickLinks /></MemoryRouter>)
-    expect(screen.getByRole('link', { name: /dive site maps/i })).toBeInTheDocument()
+  // The tile was admin-and-dev-server-only while the map had nowhere to store
+  // anything. It reads and collects real observations now, so it is open to
+  // whoever can dive — which is the whole point of crowdsourcing a seabed.
+  it('opens the dive-site maps to every signed-in diver, whatever their role', () => {
+    for (const role of ['diver', 'staff', 'admin']) {
+      useAuthMock.mockReturnValue({ user: { user_metadata: {} }, profile: { role } })
+      const { unmount } = render(<MemoryRouter><DashboardPage quickLinks /></MemoryRouter>)
+      expect(screen.getByRole('link', { name: /dive site maps/i })).toHaveAttribute('href', '/site-maps')
+      unmount()
+    }
   })
 
   it('omits them unless asked, so an embedder without room for them can opt out', () => {

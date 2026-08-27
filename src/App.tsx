@@ -33,7 +33,6 @@ import { ScheduledTripsPage } from './pages/ScheduledTripsPage'
 import { ScheduledTripDetailPage } from './pages/ScheduledTripDetailPage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { DashboardPage } from './pages/DashboardPage'
-import { DiveSiteMapPreviewPage } from './pages/dev/DiveSiteMapPreviewPage'
 import { DutiesPage } from './pages/DutiesPage'
 import { AdminEventsPage } from './pages/admin/AdminEventsPage'
 import { AdminEventDetailPage } from './pages/admin/AdminEventDetailPage'
@@ -68,6 +67,12 @@ import { AdminCancellationPoliciesPage } from './pages/admin/AdminCancellationPo
 import { AdminDiveSitesPage } from './pages/admin/AdminDiveSitesPage'
 
 // Almanac page
+// Lazy like its neighbours, and more so: this page pulls in the WebGL scene,
+// which has no business in the bundle every diver downloads to look at their
+// bookings.
+const SiteMapPage = lazy(() =>
+  import('./pages/SiteMapPage').then(m => ({ default: m.SiteMapPage }))
+)
 const AlmanacPage = lazy(() =>
   import('./pages/AlmanacPage').then(m => ({ default: m.AlmanacPage }))
 )
@@ -92,11 +97,6 @@ export default function App() {
       <ToastProvider>
       <UpdateBannerHost />
       <Routes>
-        {/* Dev-only, and outside the auth guards so the renderer can be looked
-            at without a session. Tree-shaken out of a production build. */}
-        {import.meta.env.DEV && (
-          <Route path="/dev/site-map" element={<div className="min-h-screen p-4 text-brand-50"><DiveSiteMapPreviewPage /></div>} />
-        )}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -131,6 +131,7 @@ export default function App() {
               <Route path="/dashboard" element={<DashboardPage quickLinks />} />
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/almanac" element={<AlmanacPage />} />
+              <Route path="/site-maps" element={<SiteMapPage />} />
               <Route path="/coral" element={<CoralPage />} />
               <Route path="/records" element={<RecordsPage />}>
                 <Route index element={<Navigate to="bookings" replace />} />

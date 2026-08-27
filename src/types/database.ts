@@ -375,6 +375,23 @@ export interface Database {
           diver_display: string | null
         }>
       }
+      // Dive-site maps: file one batch of depths and features against a place.
+      // An RPC because `diver_id`, `source` and `verified` are claims about a
+      // record its author must not be the one making.
+      submit_site_map_contribution: {
+        Args: {
+          p_site_id: string
+          p_soundings?: unknown
+          p_features?: unknown
+          p_note?: string | null
+        }
+        Returns: string
+      }
+      // Dive-site maps: staff confirm a contribution. Admin-only.
+      verify_site_map_contribution: {
+        Args: { p_contribution_id: string; p_verified?: boolean }
+        Returns: void
+      }
       // Dive sites: names close enough to what the caller typed that they may
       // be the same place, best first. Every name in every language plus every
       // alias is compared, so 蝙蝠洞 finds the row named Bat Cave.
@@ -1894,6 +1911,110 @@ export interface Database {
           active?: boolean
         }
         Update: Partial<Database['public']['Tables']['dive_sites']['Insert']>
+        Relationships: []
+      }
+      dive_site_maps: {
+        Row: {
+          site_id: string
+          created_at: string
+          updated_at: string
+          extent_m: number | null
+          origin_lat: number | null
+          origin_lng: number | null
+          rotation_deg: number | null
+          provenance: Record<string, unknown>
+          bearings: unknown[]
+          entries: unknown[]
+        }
+        Insert: {
+          site_id: string
+          extent_m?: number | null
+          origin_lat?: number | null
+          origin_lng?: number | null
+          rotation_deg?: number | null
+          provenance?: Record<string, unknown>
+          bearings?: unknown[]
+          entries?: unknown[]
+        }
+        Update: Partial<Database['public']['Tables']['dive_site_maps']['Insert']>
+        Relationships: []
+      }
+      dive_site_contributions: {
+        Row: {
+          id: string
+          site_id: string
+          diver_id: string | null
+          created_at: string
+          note: string | null
+          /** Staff have checked the readings. False on anything a diver filed
+           *  until someone does; the readings are live either way. */
+          verified: boolean
+        }
+        Insert: {
+          id?: string
+          site_id: string
+          diver_id?: string | null
+          note?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['dive_site_contributions']['Insert']>
+        Relationships: []
+      }
+      dive_site_soundings: {
+        Row: {
+          /** Derived from the coordinate (`lat:x:y`), so two divers measuring
+           *  the same square metre reconcile instead of duplicating. */
+          id: string
+          site_id: string
+          x: number
+          y: number
+          depth_m: number
+          datum: 'unknown' | 'TWCD2021' | 'instantaneous'
+          observed_at: string | null
+          source: 'hand_drawn' | 'diver' | 'survey' | 'placeholder'
+          contribution_id: string | null
+          supersedes: string | null
+          uncertainty_m: number | null
+          created_at: string
+        }
+        Insert: {
+          id: string
+          site_id: string
+          x: number
+          y: number
+          depth_m: number
+          datum?: 'unknown' | 'TWCD2021' | 'instantaneous'
+          observed_at?: string | null
+          source: 'hand_drawn' | 'diver' | 'survey' | 'placeholder'
+          contribution_id?: string | null
+          supersedes?: string | null
+          uncertainty_m?: number | null
+        }
+        Update: Partial<Database['public']['Tables']['dive_site_soundings']['Insert']>
+        Relationships: []
+      }
+      dive_site_features: {
+        Row: {
+          id: string
+          site_id: string
+          kind: string
+          shape: 'point' | 'path' | 'area'
+          points: Array<{ x: number; y: number }>
+          label: string | null
+          source: 'hand_drawn' | 'diver' | 'survey' | 'placeholder'
+          contribution_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id: string
+          site_id: string
+          kind: string
+          shape: 'point' | 'path' | 'area'
+          points: Array<{ x: number; y: number }>
+          label?: string | null
+          source: 'hand_drawn' | 'diver' | 'survey' | 'placeholder'
+          contribution_id?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['dive_site_features']['Insert']>
         Relationships: []
       }
       dive_site_aliases: {

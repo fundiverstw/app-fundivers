@@ -6,9 +6,9 @@ import { MapIcon } from '../icons/MapIcon'
 import { CoralIcon } from '../icons/CoralIcon'
 import { AlmanacIcon } from '../icons/AlmanacIcon'
 import { t } from '../../i18n'
-import { CARD, TEXT_BODY, TEXT_SUBTLE } from '../../styles/tokens'
+import { CARD, TEXT_BODY } from '../../styles/tokens'
 
-// These four lived as bare icons in the diver header, where they were unlabelled
+// These lived as bare icons in the diver header, where they were unlabelled
 // and competed with the notification bell for the same strip. On the home page
 // there is room to name each one.
 //
@@ -29,16 +29,14 @@ const destinations: Destination[] = [
   { to: '/scheduled-trips',  label: t.shell.scheduledTrips,  icon: <ScheduledTripsIcon /> },
   { to: '/almanac',          label: t.dashboard.almanac,     icon: <AlmanacIcon /> },
   { to: '/coral',            label: t.coral.title,           icon: <CoralIcon /> },
+  // Was a greyed-out "coming soon" tile with a prop deciding whether it linked
+  // anywhere, back when the map lived behind a development-only route. It is a
+  // page now, open to every signed-in diver, so it is a destination like the
+  // rest.
+  { to: '/site-maps',        label: t.dashboard.siteMaps,    icon: <MapIcon /> },
 ]
 
-interface QuickLinksProps {
-  /** Where the dive-site map tile goes. Undefined when the viewer may not open
-   *  it yet — the tile then renders greyed out rather than as a link to a page
-   *  they would be turned away from. */
-  siteMapTo?: string
-}
-
-export function QuickLinks({ siteMapTo }: QuickLinksProps = {}) {
+export function QuickLinks() {
   return (
     <nav aria-label={t.dashboard.quickLinks} className="grid grid-cols-2 gap-2 sm:grid-cols-3">
       {destinations.map(({ to, label, icon }) => (
@@ -47,20 +45,6 @@ export function QuickLinks({ siteMapTo }: QuickLinksProps = {}) {
           <span className="text-xs leading-tight">{label}</span>
         </Link>
       ))}
-      {siteMapTo ? (
-        <Link to={siteMapTo} className={`${TILE} ${TEXT_BODY}`}>
-          <MapIcon />
-          <span className="text-xs leading-tight">{t.dashboard.siteMaps}</span>
-        </Link>
-      ) : (
-        <div className={`${TILE} ${TEXT_SUBTLE} cursor-not-allowed opacity-60`} aria-disabled="true">
-          <MapIcon />
-          <span className="text-xs leading-tight">{t.dashboard.siteMaps}</span>
-          <span className="text-[10px] uppercase tracking-wide opacity-80">
-            {t.dashboard.comingSoon}
-          </span>
-        </div>
-      )}
     </nav>
   )
 }

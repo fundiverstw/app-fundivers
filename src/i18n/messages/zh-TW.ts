@@ -63,7 +63,6 @@ export const zhTW: Messages = {
     featuredTrips: '精選行程',
     quickLinks: '探索',
     siteMaps: '潛點地圖',
-    comingSoon: '即將推出',
     waitlist: '候補',
     almanac: '環境日誌',
   },
@@ -126,6 +125,19 @@ export const zhTW: Messages = {
     summaryColonies: (n: number) => `${n} 個群體`,
     summaryMean: (score: string) => `平均色階 ${score}`,
     summaryBleached: (n: number, pct: number) => `白化 ${n} 個（${pct}%）`,
+  },
+  siteMaps: {
+    title: '潛點地圖',
+    blurb: '各潛點海底的樣貌，由潛水員逐筆記錄的水深組成。這裡沒有任何自動生成的資料——每一筆都是有人實際量到的。',
+    place: '地點',
+    noPlaces: '目錄中尚無地點。請從潛水年鑑新增，之後就會出現在這裡。',
+    viewsAria: '地圖檢視',
+    tabContribute: '記錄',
+    tabSurface: '海底',
+    coverage: (depths: number, features: number) =>
+      `目前已記錄 ${depths} 筆水深、${features} 項地形。`,
+    filed: '已送出記錄，感謝你。',
+    filingFailed: (msg: string) => `無法送出記錄：${msg}`,
   },
   sites: {
     addPlace: '新增此地點',
