@@ -137,6 +137,51 @@ describe('admin_audit_log', () => {
     expect(audit ?? []).toEqual([])
   })
 
+  // The tables that move money were the ones nobody was watching. Asked why
+  // three divers held refund credit against bookings whose payments had been
+  // voided, the database had nothing to say -- not who, not when, not from
+  // what state.
+  it('logs a payment being voided, with the state it was voided from', async () => {
+    const dive = await freshDive()
+    const { data: booking } = await admin.from('bookings').insert({
+      user_id: diver.id, event_id: dive, status: 'confirmed', details: { total: 3000 },
+    }).select('id').single()
+    const { data: payment } = await admin.from('payments').insert({
+      user_id: diver.id, booking_id: booking!.id, amount: 3000, status: 'paid',
+      method: 'bank_transfer', note: 'test', reference: 'R-1',
+    }).select('id').single()
+
+    const adminSb = await userClient(adminUser.email, adminUser.password)
+    const { error } = await adminSb.from('payments')
+      .update({ status: 'voided' }).eq('id', payment!.id)
+    expect(error).toBeNull()
+
+    const { data: log } = await admin.from('admin_audit_log')
+      .select('*').eq('target_table', 'payments').eq('target_id', payment!.id)
+      .order('created_at', { ascending: false }).limit(1).single()
+    expect(log!.actor_id).toBe(adminUser.id)
+    expect(log!.action).toBe('update')
+    expect((log!.before as { status: string }).status).toBe('paid')
+    expect((log!.after as { status: string }).status).toBe('voided')
+  })
+
+  it('logs an admin issuing a credit', async () => {
+    const adminSb = await userClient(adminUser.email, adminUser.password)
+    const { data: credit, error } = await adminSb.from('credits').insert({
+      user_id: diver.id, amount: 500, currency: 'TWD',
+      reason: 'goodwill', status: 'open', source: 'manual', created_by: adminUser.id,
+    }).select('id').single()
+    expect(error).toBeNull()
+
+    const { data: log } = await admin.from('admin_audit_log')
+      .select('*').eq('target_table', 'credits').eq('target_id', credit!.id).single()
+    expect(log!.actor_id).toBe(adminUser.id)
+    expect(log!.action).toBe('insert')
+    expect(Number((log!.after as { amount: string }).amount)).toBe(500)
+
+    await admin.from('credits').delete().eq('id', credit!.id)
+  })
+
   it('diver cannot read the audit log (RLS)', async () => {
     const diverSb = await userClient(diver.email, diver.password)
     const { data } = await diverSb.from('admin_audit_log').select('id').limit(1)

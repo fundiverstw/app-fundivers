@@ -12,6 +12,7 @@ import {
   fetchUnreconciledCancellations, recordCancellationRefund, convertCancellationToCredit,
   settleCancellationAsKept, type UnreconciledCancellation,
 } from '../../lib/unreconciled-cancellations'
+import { fetchOverRefunded, type OverRefunded } from '../../lib/over-refunded'
 import { useAuth } from '../../hooks/useAuth'
 import { fetchActorNames, actorLabel, type ActorNames } from '../../lib/actor-names'
 import { Spinner } from '../../components/ui/Spinner'
@@ -106,17 +107,25 @@ export function AdminRefundsPage() {
   const { profile } = useAuth()
   const [rows, setRows] = useState<RefundRow[] | null>(null)
   const [holding, setHolding] = useState<UnreconciledCancellation[] | null>(null)
+  const [overRefunded, setOverRefunded] = useState<OverRefunded[]>([])
   const [error, setError] = useState<string | null>(null)
   const [acting, setActing] = useState<string | null>(null)
   const [actorNames, setActorNames] = useState<ActorNames>(new Map())
 
   useEffect(() => {
     let alive = true
-    Promise.all([loadRefundRequests(), fetchUnreconciledCancellations(HOLDING_LABELS)])
-      .then(([requests, unreconciled]) => {
+    Promise.all([
+      loadRefundRequests(),
+      fetchUnreconciledCancellations(HOLDING_LABELS),
+      // Best-effort: this list is a warning, not part of the queue, and it must
+      // not be the reason an admin cannot work the refunds they came for.
+      fetchOverRefunded(HOLDING_LABELS).catch(() => [] as OverRefunded[]),
+    ])
+      .then(([requests, unreconciled, over]) => {
         if (!alive) return
         setRows(requests)
         setHolding(unreconciled)
+        setOverRefunded(over)
         void fetchActorNames(unreconciled.map(r => r.cancelledBy))
           .then(names => { if (alive) setActorNames(names) })
           .catch(() => {})
@@ -355,6 +364,37 @@ export function AdminRefundsPage() {
             </li>
           ))}
         </ul>
+      )}
+
+      {/* Read-only on purpose. The other two lists are queues of decisions the
+          app can carry out; this one names a contradiction between two rows
+          and cannot know which of them is the wrong one. Voiding the credit
+          would be wrong half the time, and it may already have been spent. */}
+      {overRefunded.length > 0 && (
+        <>
+          <section className="space-y-2 pt-2">
+            <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider">
+              {rf.overRefundedHeading}
+            </h2>
+            <p className={`text-xs ${TEXT_MUTED}`}>{rf.overRefundedBlurb}</p>
+          </section>
+          <ul className="space-y-3">
+            {overRefunded.map(r => (
+              <li key={r.bookingId} className={`${CARD_ELEVATED} p-4`}>
+                <div className="font-semibold text-brand-950 truncate">{r.diverName}</div>
+                <div className={`text-xs ${TEXT_MUTED} truncate`}>{r.eventTitle}</div>
+                <div className={`text-xs ${TEXT_MUTED} mt-0.5`}>
+                  {rf.colReceived}: <span className="tabular-nums">{money(r.netPaid, r.currency)}</span>
+                  {' · '}
+                  {rf.colReturned}: <span className="tabular-nums">{money(r.returned, r.currency)}</span>
+                  {' · '}
+                  {rf.colExcess}:{' '}
+                  <span className="tabular-nums text-amber-800 font-semibold">{money(r.excess, r.currency)}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </div>
   )
