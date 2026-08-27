@@ -76,3 +76,37 @@ describe('ReadingStrip', () => {
     )
   })
 })
+
+describe('ReadingStrip — readings that share a value', () => {
+  it('fans them across the track so the day does not read as thinner than it was', () => {
+    const { container } = renderStrip([28, 28, 28, 30])
+
+    const dots = [...container.querySelectorAll('circle')]
+    const at28 = dots.filter(d => d.getAttribute('cx') === dots[0].getAttribute('cx'))
+    expect(at28).toHaveLength(3)
+    // Same reading, so the same position along the track — the axis still
+    // means what it says.
+    expect(new Set(at28.map(d => d.getAttribute('cx'))).size).toBe(1)
+    // Three distinct heights, so three readings are visibly three.
+    expect(new Set(at28.map(d => d.getAttribute('cy'))).size).toBe(3)
+  })
+
+  it('leaves a lone reading on the centre line', () => {
+    const { container } = renderStrip([27, 28, 29])
+    const cys = [...container.querySelectorAll('circle')].map(d => d.getAttribute('cy'))
+    expect(new Set(cys).size).toBe(1)
+  })
+
+  it('keeps a big stack inside the track instead of spilling out of it', () => {
+    const { container } = renderStrip(Array.from({ length: 12 }, () => 26))
+    const cys = [...container.querySelectorAll('circle')].map(d => Number(d.getAttribute('cy')))
+    expect(Math.min(...cys)).toBeGreaterThanOrEqual(4)
+    expect(Math.max(...cys)).toBeLessThanOrEqual(26)
+  })
+
+  it('draws the same day the same way every time it is looked at', () => {
+    const once = renderStrip([28, 28, 30]).container.innerHTML
+    const twice = renderStrip([28, 28, 30]).container.innerHTML
+    expect(once).toBe(twice)
+  })
+})

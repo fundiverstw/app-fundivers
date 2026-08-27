@@ -21,6 +21,31 @@ const CY = H / 2
 const DOT_R = 4
 const BOX_H = 12
 const MEDIAN_H = 18
+/** Vertical room a stack of same-value dots may fan across. */
+const BAND = H - DOT_R * 2 - 2
+/** Comfortable gap between two dots; the fan tightens below this rather than
+ *  spilling out of the track. */
+const FAN_GAP = 9
+
+/**
+ * Where to put dots that share an x.
+ *
+ * A strip plot carries its meaning on one axis, so two divers who logged the
+ * same temperature land on the same pixel and the day reads as thinner than it
+ * was — five readings showing as three. They are spread ACROSS the track
+ * rather than along it: nudging a dot sideways would misstate the reading it
+ * stands for, where nudging it up says nothing except "there is more than one
+ * of me here".
+ *
+ * Deterministic, not random: the same day has to draw the same way every time
+ * it is looked at.
+ */
+function fanOffsets(count: number): number[] {
+  if (count < 2) return [0]
+  const step = Math.min(FAN_GAP, BAND / (count - 1))
+  const span = step * (count - 1)
+  return Array.from({ length: count }, (_, i) => -span / 2 + i * step)
+}
 
 interface Props {
   label: string
@@ -40,6 +65,19 @@ export function ReadingStrip({ label, summary, total, format }: Props) {
   const hi = min === max ? max + 0.5 : max
   const x = (v: number) => PAD + ((v - lo) / (hi - lo)) * (W - PAD * 2)
   const box = n >= BOX_MIN_N
+
+  const centres = values.map(() => CY)
+  const sharing = new Map<string, number[]>()
+  values.forEach((v, i) => {
+    const key = x(v).toFixed(1)
+    const seen = sharing.get(key)
+    if (seen) seen.push(i)
+    else sharing.set(key, [i])
+  })
+  for (const indexes of sharing.values()) {
+    const offsets = fanOffsets(indexes.length)
+    indexes.forEach((index, k) => { centres[index] = CY + offsets[k] })
+  }
   // The day's own count is already in the header; repeating it under every
   // metric is noise. It earns its place only where this metric has fewer
   // readings than the day has observations — someone left it blank.
@@ -82,7 +120,7 @@ export function ReadingStrip({ label, summary, total, format }: Props) {
           {values.map((v, i) => (
             <circle
               key={`${v}-${i}`}
-              cx={x(v)} cy={CY} r={DOT_R}
+              cx={x(v)} cy={centres[i]} r={DOT_R}
               fill="currentColor"
               strokeWidth={2}
               className={CHART_RING}
