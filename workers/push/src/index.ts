@@ -743,11 +743,14 @@ export async function handleAdminEventCancellation(req: Request, env: Env): Prom
 
   const { title, body: text } = cancellationNotificationText(eventTitle)
 
+  // Everyone who was ON this event. Cancelling it cancels its bookings, so a
+  // plain "not cancelled" filter reaches nobody; status_before_event_cancel
+  // separates the divers the event took down from those already gone.
   const { data: bookings } = await service
     .from('bookings')
     .select('user_id')
     .eq('event_id', eventId)
-    .neq('status', 'cancelled')
+    .or('status.neq.cancelled,status_before_event_cancel.not.is.null')
   const recipientIds = unique((bookings ?? []).map(b => b.user_id))
   if (!recipientIds.length) return Response.json({ sent: 0, skipped: 0, recipients: 0 })
 

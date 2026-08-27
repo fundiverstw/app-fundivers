@@ -56,11 +56,15 @@ Deno.serve(async (req) => {
     eventTitle = (data?.display_title ?? data?.admin_title ?? eventTitle) as string
   }
 
+  // Everyone who was ON this event, which is not the same as everyone whose
+  // booking is live: cancelling the event cancels its bookings, so by the time
+  // this runs they all read 'cancelled'. status_before_event_cancel is what
+  // separates a diver the event took down from one who had already pulled out.
   const { data: bookings, error: bErr } = await admin
     .from("bookings")
     .select("user_id")
     .eq("event_id", eventId)
-    .neq("status", "cancelled")
+    .or("status.neq.cancelled,status_before_event_cancel.not.is.null")
   if (bErr) return json({ error: safeError(bErr, "bookings lookup failed") }, 500)
 
   const recipientIds = [...new Set((bookings ?? []).map(b => b.user_id))]

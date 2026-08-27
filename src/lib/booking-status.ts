@@ -25,6 +25,26 @@ export function isWaitlistPromotion(from: Booking['status'], to: Booking['status
 }
 
 /**
+ * Was this booking on the event, as opposed to withdrawn before it?
+ *
+ * Cancelling an event cancels every booking on it (20260827100000), which is
+ * what makes the balances die with the event. The cost is that `status` alone
+ * stops separating "this diver was registered" from "this diver had already
+ * pulled out" — on a cancelled event both read 'cancelled'.
+ *
+ * Anything asking WHO WAS ON THIS EVENT has to ask this instead: the roster,
+ * the balances view, the headcount, and the cancellation notifications (which
+ * express the same test as a PostgREST filter, since they run in the edge
+ * function and the push worker). Anything asking whether a booking still owes
+ * money keeps asking `status`, which is now right on its own.
+ */
+export function wasOnEvent(
+  booking: Pick<Booking, 'status' | 'status_before_event_cancel'>,
+): boolean {
+  return booking.status !== 'cancelled' || !!booking.status_before_event_cancel
+}
+
+/**
  * May a diver cancel this booking themselves?
  *
  * Only while it is still a queue entry nobody has paid against. Once money is

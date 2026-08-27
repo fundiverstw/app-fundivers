@@ -1585,8 +1585,6 @@ export const zhTW: Messages = {
       eventRestored: '活動已復原',
       creditedDivers: (n: number, currency: string, amount: string) =>
         `已為 ${n} 位潛水員發放 ${currency} ${amount} 結餘`,
-      autoCreditFailed: (msg: string) =>
-        `活動已取消，但自動發放結餘失敗：${msg}。請至成員頁面手動發放結餘。`,
       couldNotCancelEvent: (msg: string) => `無法取消活動：${msg}`,
       couldNotRestoreEvent: (msg: string) => `無法復原活動：${msg}`,
       eventDeleted: '活動已刪除',
@@ -2058,7 +2056,6 @@ export const zhTW: Messages = {
       appliedCount: (n: number) => `已更新後續 ${n} 筆活動。`,
       cancelledCount: (n: number) => `已取消 ${n} 筆活動。`,
       creditedCount: (n: number) => `已為 ${n} 位潛水員退回已付款額度。`,
-      creditFailures: (n: number) => `其中 ${n} 筆已取消但額度未能發出——請於使用者頁面手動處理。`,
       stoppedEarly: (done: number, detail: string) => `已處理 ${done} 筆後中止：${detail}`,
       extendedCount: (n: number) => `已新增 ${n} 筆活動。`,
       extendRange: (max: number) => `新增筆數請在 1 到 ${max} 之間。`,

@@ -1584,8 +1584,6 @@ export const ja: Messages = {
       eventRestored: 'イベントを復元しました',
       creditedDivers: (n: number, currency: string, amount: string) =>
         `${n} 名のダイバーに ${currency} ${amount} のクレジットを発行しました`,
-      autoCreditFailed: (msg: string) =>
-        `イベントは中止しましたが、クレジットの自動発行に失敗しました：${msg}。メンバーページから手動で発行してください。`,
       couldNotCancelEvent: (msg: string) => `イベントを中止できませんでした：${msg}`,
       couldNotRestoreEvent: (msg: string) => `イベントを復元できませんでした：${msg}`,
       eventDeleted: 'イベントを削除しました',
@@ -2057,7 +2055,6 @@ export const ja: Messages = {
       appliedCount: (n: number) => `以降の ${n} 件を更新しました。`,
       cancelledCount: (n: number) => `${n} 件を中止しました。`,
       creditedCount: (n: number) => `${n} 名に支払済み額をクレジットしました。`,
-      creditFailures: (n: number) => `うち ${n} 件は中止済みですがクレジットに失敗しました。ユーザーページから手動で処理してください。`,
       stoppedEarly: (done: number, detail: string) => `${done} 件処理後に停止しました：${detail}`,
       extendedCount: (n: number) => `${n} 件を追加しました。`,
       extendRange: (max: number) => `追加数は 1 から ${max} の間で指定してください。`,

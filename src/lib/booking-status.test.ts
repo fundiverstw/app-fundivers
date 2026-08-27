@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { canSelfCancel, isWaitlistPromotion, STATUS_STYLES } from './booking-status'
+import { canSelfCancel, isWaitlistPromotion, wasOnEvent, STATUS_STYLES } from './booking-status'
 import type { Booking } from '../types/database'
 
 const STATUSES: Booking['status'][] = ['pending', 'confirmed', 'waitlisted', 'cancelled']
@@ -68,5 +68,29 @@ describe('canSelfCancel', () => {
 
   it('treats a net-negative paid sum (over-refunded) as nothing paid', () => {
     expect(canSelfCancel(pending, -50)).toBe(true)
+  })
+})
+
+describe('wasOnEvent', () => {
+  it('counts every booking that is not cancelled', () => {
+    for (const status of STATUSES.filter(s => s !== 'cancelled')) {
+      expect(wasOnEvent({ status, status_before_event_cancel: null })).toBe(true)
+    }
+  })
+
+  it('counts a booking its own event cancelled, whatever it was before', () => {
+    for (const before of ['confirmed', 'pending', 'waitlisted']) {
+      expect(wasOnEvent({ status: 'cancelled', status_before_event_cancel: before })).toBe(true)
+    }
+  })
+
+  it('drops a diver who pulled out before the event was called off', () => {
+    expect(wasOnEvent({ status: 'cancelled', status_before_event_cancel: null })).toBe(false)
+  })
+
+  // A query that forgets to select the column must not silently promote every
+  // cancelled booking back onto the roster.
+  it("reads a missing column as not the event's doing", () => {
+    expect(wasOnEvent({ status: 'cancelled' } as never)).toBe(false)
   })
 })

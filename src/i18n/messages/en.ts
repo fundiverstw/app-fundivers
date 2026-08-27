@@ -1601,8 +1601,6 @@ export const en = {
       eventRestored: 'Event restored',
       creditedDivers: (n: number, currency: string, amount: string) =>
         `Credited ${n} diver${n === 1 ? '' : 's'} ${currency} ${amount}`,
-      autoCreditFailed: (msg: string) =>
-        `Event cancelled, but auto-crediting failed: ${msg}. Issue credits manually on the Users page.`,
       couldNotCancelEvent: (msg: string) => `Could not cancel event: ${msg}`,
       couldNotRestoreEvent: (msg: string) => `Could not restore event: ${msg}`,
       eventDeleted: 'Event deleted',
@@ -2091,7 +2089,6 @@ export const en = {
       appliedCount: (n: number) => `Updated ${n} later occurrences.`,
       cancelledCount: (n: number) => `Cancelled ${n} occurrences.`,
       creditedCount: (n: number) => `Credited ${n} divers what they had paid.`,
-      creditFailures: (n: number) => `${n} of them are cancelled but their credits failed — issue those by hand from the Users page.`,
       stoppedEarly: (done: number, detail: string) => `Stopped after ${done}: ${detail}`,
       extendedCount: (n: number) => `Added ${n} more occurrences.`,
       extendRange: (max: number) => `Add between 1 and ${max} occurrences.`,

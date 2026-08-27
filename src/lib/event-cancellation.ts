@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { issueCancellationCredits } from './credits'
+import { RETURN_SOURCES } from './credits'
 import type { AppEvent } from '../types/database'
 
 // Push worker base URL (same host as the other /admin-* endpoints). Empty
@@ -38,46 +38,61 @@ async function postCancellationPush(eventId: string, eventType: AppEvent['type']
 }
 
 export interface CancelEventResult {
-  /** Divers issued a cancellation credit. */
+  /** Divers holding a cancellation credit for this event. */
   credited: number
   creditedAmount: number
-  /** Set when the credits failed AFTER the cancellation committed — the event
-   *  IS cancelled, and the shop has to issue those credits by hand. */
-  creditError: unknown
 }
 
 /**
- * Cancel one event and do everything that has to follow: notify the
- * registrants, then credit each of them what they paid.
+ * Cancel one event and do everything that has to follow.
  *
- * Extracted so the "cancel the rest of this series" action cannot drift from
- * the single-event one. A bulk UPDATE over the remaining occurrences would be
- * two lines and silently skip both follow-ups — divers on the later dates would
- * find their dive gone with no message and no refund.
+ * The money is no longer this function's business. Cancelling the event
+ * cancels the bookings on it (20260827100000), and cancelling a booking is
+ * already what issues its refund — so the credits are written by the same
+ * trigger that has always handled a single cancellation, inside the same
+ * transaction as the cancel. They can no longer half-happen, which is what the
+ * old `creditError` existed to report.
  *
- * Throws only if the cancellation itself fails. The notify is fire-and-forget
- * by design, and a credit failure is reported rather than thrown because the
- * cancellation has already committed and cannot be undone by rejecting here.
+ * What is left is the notify, which the DB has no business doing, and a read
+ * of what the cancellation actually produced so the admin sees a figure that
+ * came from the ledger rather than from this client's arithmetic.
+ *
+ * Still extracted so the "cancel the rest of this series" action cannot drift
+ * from the single-event one: a bulk UPDATE would skip the notify silently.
  */
 export async function cancelEventAndFollowUp(args: {
-  event: AppEvent
-  createdBy: string | null
+  eventId: string
+  eventType: AppEvent['type']
   at?: string
 }): Promise<CancelEventResult> {
-  const { event, createdBy, at } = args
+  const { eventId, eventType, at } = args
   const { error } = await supabase
     .from('events')
     .update({ cancelled_at: at ?? new Date().toISOString() } as never)
-    .eq('id', event.id)
+    .eq('id', eventId)
   if (error) throw error
 
-  notifyEventCancelled(event.id, event.type).catch(() => { /* best-effort */ })
+  notifyEventCancelled(eventId, eventType).catch(() => { /* best-effort */ })
 
-  if (!createdBy) return { credited: 0, creditedAmount: 0, creditError: null }
-  try {
-    const { issued, totalAmount } = await issueCancellationCredits({ event, createdBy })
-    return { credited: issued, creditedAmount: totalAmount, creditError: null }
-  } catch (creditError) {
-    return { credited: 0, creditedAmount: 0, creditError }
+  return countCancellationCredits(eventId)
+}
+
+/** What the cancellation handed back, read from the ledger it landed in. */
+async function countCancellationCredits(eventId: string): Promise<CancelEventResult> {
+  const { data: bookings } = await supabase
+    .from('bookings').select('id').eq('event_id', eventId)
+  const bookingIds = (bookings ?? []).map(b => b.id)
+  if (!bookingIds.length) return { credited: 0, creditedAmount: 0 }
+
+  const { data: credits } = await supabase
+    .from('credits')
+    .select('amount')
+    .in('booking_id', bookingIds)
+    .in('source', RETURN_SOURCES)
+    .eq('status', 'open')
+  const rows = credits ?? []
+  return {
+    credited: rows.length,
+    creditedAmount: rows.reduce((s, c) => s + Number(c.amount), 0),
   }
 }

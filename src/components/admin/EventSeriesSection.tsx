@@ -86,12 +86,9 @@ export function EventSeriesSection({ eventId, onChanged }: {
     if (!selfDate) return
     if (!window.confirm(sr.confirmCancelRest(later.length))) return
     void run('cancel', async () => {
-      const result = await cancelLaterOccurrences({
-        seriesId: sid, fromDate: selfDate, createdBy: profile?.id ?? null,
-      })
+      const result = await cancelLaterOccurrences({ seriesId: sid, fromDate: selfDate })
       toast.success(sr.cancelledCount(result.cancelled))
       if (result.credited > 0) toast.success(sr.creditedCount(result.credited))
-      if (result.creditFailures > 0) toast.error(sr.creditFailures(result.creditFailures))
       if (result.stoppedBy) toast.error(sr.stoppedEarly(result.cancelled, errorMessage(result.stoppedBy)))
     })
   }

@@ -10,7 +10,7 @@ import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
 import { fetchEventsForBookings, formatEventSpan } from '../../lib/events'
 import { notifyRefundApproved, rejectRefundRequest } from '../../lib/refunds'
-import { isWaitlistPromotion } from '../../lib/booking-status'
+import { isWaitlistPromotion, wasOnEvent } from '../../lib/booking-status'
 import { notifyWaitlistConfirmed } from '../../lib/booking-notifications'
 import { AdminNotes } from '../../components/admin/AdminNotes'
 import { EventSeriesSection } from '../../components/admin/EventSeriesSection'
@@ -21,8 +21,8 @@ import { EventStaffSection } from '../../components/admin/EventStaffSection'
 import { RegisterForm } from '../../components/register/RegisterForm'
 import { shoeAsJp } from '../../lib/shoe-size'
 import { uniqueUuids } from '../../lib/uuid'
-import { notifyEventCancelled } from '../../lib/event-cancellation'
-import { issueCancellationCredits, applyCreditToBooking } from '../../lib/credits'
+import { cancelEventAndFollowUp } from '../../lib/event-cancellation'
+import { applyCreditToBooking } from '../../lib/credits'
 import { fetchAmendmentsForBookings, addAmendment, formAmount, amendmentsDelta } from '../../lib/booking-amendments'
 import { recordPayment as recordPaymentRow, voidPayment as voidPaymentRow, recordGroupPayment } from '../../lib/booking-payments'
 import { fetchActorNames, actorLabel, type ActorNames } from '../../lib/actor-names'
@@ -435,30 +435,32 @@ export function AdminEventDetailPage() {
     setCancelInFlight(true)
     setCancelError(null)
     try {
-      const { error } = await supabase
-        .from('events')
-        .update({ cancelled_at: value } as never)
-        .eq('id', id)
-      if (error) throw error
-      setEvent(prev => (prev ? { ...prev, cancelled_at: value } : prev))
-      setCancelModalOpen(false)
-      // Notify registrants on cancel only (not restore) — email + in-app +
-      // push, best-effort so a notification failure never blocks the cancel.
-      if (value) notifyEventCancelled(id, event.type).catch(() => { /* best-effort */ })
-      toast.success(value ? ed.eventCancelled : ed.eventRestored)
-      // Auto-credit each registrant what they've paid. The cancel already
-      // committed, so a failure here can't un-cancel it — surface it instead
-      // so the admin knows to issue the credits by hand on the Users page.
-      if (value && event && profile?.id) {
-        try {
-          const { issued, totalAmount } = await issueCancellationCredits({ event, createdBy: profile.id })
-          if (issued > 0) {
-            toast.success(ed.creditedDivers(issued, event.currency, totalAmount.toLocaleString()))
-          }
-        } catch (err) {
-          toast.error(ed.autoCreditFailed(errorMessage(err)))
+      if (value) {
+        // Cancel, notify (cancel only, never restore), and report what the
+        // cancellation handed back. The credits themselves are the database's
+        // now: cancelling the event cancels its bookings and each booking
+        // refunds itself, in the same transaction as the cancel.
+        const { credited, creditedAmount } = await cancelEventAndFollowUp({
+          eventId: id, eventType: event.type, at: value,
+        })
+        toast.success(ed.eventCancelled)
+        if (credited > 0) {
+          toast.success(ed.creditedDivers(credited, event.currency, creditedAmount.toLocaleString()))
         }
+      } else {
+        const { error } = await supabase
+          .from('events')
+          .update({ cancelled_at: null } as never)
+          .eq('id', id)
+        if (error) throw error
+        toast.success(ed.eventRestored)
       }
+      setCancelModalOpen(false)
+      // Both directions rewrite the event, every registrant's status and their
+      // credits server-side. Re-read rather than patch a local copy: the
+      // optimistic version was a second source of truth that the refetch
+      // immediately overwrote anyway.
+      setRefreshKey(k => k + 1)
     } catch (err) {
       const msg = errorMessage(err)
       setCancelError(msg)
@@ -494,8 +496,12 @@ export function AdminEventDetailPage() {
   // cancelled (or cancelled then re-registered, leaving a stale cancelled row)
   // isn't attending. They stay reachable in a collapsed disclosure so an admin
   // can still restore one via its status dropdown.
-  const activeRegistrants = registrants.filter(r => r.booking.status !== 'cancelled')
-  const cancelledRegistrants = registrants.filter(r => r.booking.status === 'cancelled')
+  // Split by who was ON the event, not by whose booking is live: cancelling
+  // the event cancels all of them, and a roster reading "Registrants (0)" on
+  // the one event whose money the shop now has to work through is the least
+  // useful moment to hide it.
+  const activeRegistrants = registrants.filter(r => wasOnEvent(r.booking))
+  const cancelledRegistrants = registrants.filter(r => !wasOnEvent(r.booking))
 
   const renderRegistrant = (r: Registrant) => (
     <RegistrantCard
@@ -735,7 +741,7 @@ export function AdminEventDetailPage() {
       {cancelModalOpen && (
         <CancelEventModal
           alreadyCancelled={!!event?.cancelled_at}
-          activeBookingCount={registrants.filter(r => r.booking.status !== 'cancelled').length}
+          activeBookingCount={registrants.filter(r => wasOnEvent(r.booking)).length}
           inFlight={cancelInFlight}
           error={cancelError}
           onClose={() => setCancelModalOpen(false)}

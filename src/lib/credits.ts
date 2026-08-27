@@ -2,7 +2,7 @@ import { supabase } from './supabase'
 import { fetchAmendmentsForBookings, amendmentsDelta } from './booking-amendments'
 import { netPaidByBooking } from './payments'
 import { siteConfig } from '../config/site'
-import type { AppEvent, Credit, CreditInsert } from '../types/database'
+import type { Credit, CreditInsert } from '../types/database'
 
 /**
  * The diver's account ledger: a signed list of everything owed between them
@@ -271,99 +271,6 @@ export async function createAccountCharge(input: {
     .single()
   if (error || !data) throw error ?? new Error('charge insert returned no row')
   return data as Credit
-}
-
-/**
- * Auto-issue an open credit to every non-cancelled registrant of an event
- * the admin just cancelled, each worth what that diver has actually paid net
- * of any prior refund (paid − refunded). The credit's reason names the specific
- * event so the diver and admin both see why it appeared.
- *
- * Idempotent per booking: a booking that already carries any credit is
- * skipped, so cancel → restore → cancel never double-issues (restoring an
- * event intentionally leaves issued credits untouched). Bookings with
- * nothing paid get no credit.
- */
-export async function issueCancellationCredits(args: {
-  event: AppEvent
-  createdBy: string
-}): Promise<{ issued: number; totalAmount: number }> {
-  const { event, createdBy } = args
-
-  const { data: bookings, error: bErr } = await supabase
-    .from('bookings')
-    .select('id, user_id, payer_id')
-    .eq('event_id', event.id)
-    .neq('status', 'cancelled')
-  if (bErr) throw bErr
-  if (!bookings?.length) return { issued: 0, totalAmount: 0 }
-
-  const bookingIds = bookings.map(b => b.id)
-
-  const { data: payments, error: pErr } = await supabase
-    .from('payments')
-    .select('booking_id, amount, status, method')
-    .in('booking_id', bookingIds)
-    .in('status', ['paid', 'refunded'])
-  if (pErr) throw pErr
-
-  const paidByBooking = netPaidByBooking(payments ?? [])
-  // Store credit came out of the BOOKING OWNER's pool — apply_credit_to_booking
-  // only ever spends v_booking.user_id's rows — so it goes back there even when
-  // a lead paid the rest. Mirrors bookings_credit_on_cancel (20260825000000).
-  const accountByBooking = netPaidByBooking(
-    (payments ?? []).filter(p => (p as { method?: string | null }).method === 'account_credit'),
-  )
-
-  // Only a credit that already RETURNED this booking's money blocks a second
-  // issue. The old check was "does this booking carry ANY credit row?", which
-  // let an unrelated goodwill credit of 200 suppress the whole refund of a
-  // 3000 booking. See credits.source (20260822100000).
-  const { data: existing, error: eErr } = await supabase
-    .from('credits')
-    .select('booking_id')
-    .in('booking_id', bookingIds)
-    .in('source', RETURN_SOURCES)
-  if (eErr) throw eErr
-  const alreadyCredited = new Set((existing ?? []).map(c => c.booking_id))
-
-  // Format in the shop's timezone so the date in the reason matches the event's
-  // calendar day regardless of where this runs — start_time is a UTC instant,
-  // and a naive local format shifts the day in other runtimes.
-  const eventDate = new Date(event.start_time).toLocaleDateString('en-US', {
-    year: 'numeric', month: 'short', day: 'numeric', timeZone: siteConfig.locale.timezone,
-  })
-  const reason = `Refund credit for cancelled event: ${event.title} (${eventDate})`
-
-  const rows: CreditInsert[] = bookings
-    .filter(b => !alreadyCredited.has(b.id) && (paidByBooking.get(b.id) ?? 0) > 0)
-    .flatMap(b => {
-      const amount = paidByBooking.get(b.id)!
-      const base = {
-        booking_id: b.id,
-        currency:   siteConfig.locale.currency,
-        created_by: createdBy,
-        status:     'open' as const,
-        source:     'event_cancellation' as const,
-      }
-      const payer = b.payer_id ?? b.user_id
-      if (payer === b.user_id) return [{ ...base, user_id: b.user_id, amount, reason }]
-
-      const own = Math.min(amount, Math.max(0, accountByBooking.get(b.id) ?? 0))
-      return [
-        ...(own > 0 ? [{ ...base, user_id: b.user_id, amount: own,
-          reason: `${reason} (store credit returned to the diver who spent it)` }] : []),
-        ...(amount - own > 0 ? [{ ...base, user_id: payer, amount: amount - own,
-          reason: `${reason} (returned to the lead booker who paid)` }] : []),
-      ]
-    })
-
-  if (!rows.length) return { issued: 0, totalAmount: 0 }
-
-  const { error: iErr } = await supabase.from('credits').insert(rows)
-  if (iErr) throw iErr
-
-  return { issued: rows.length, totalAmount: rows.reduce((s, r) => s + r.amount, 0) }
 }
 
 /**

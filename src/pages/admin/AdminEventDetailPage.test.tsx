@@ -300,16 +300,20 @@ describe('AdminEventDetailPage', () => {
   })
 
   it('cancels an event via the confirmation modal and updates events.cancelled_at', async () => {
-    fetchEventsForBookings.mockResolvedValue(new Map([
+    // The page re-reads the event after cancelling rather than patching a
+    // local copy, so the stub has to answer the way the database would.
+    let cancelledAt: string | null = null
+    fetchEventsForBookings.mockImplementation(async () => new Map([
       ['dive_x', {
         id: 'dive_x', type: 'dive', title: 'Kenting',
         start_time: new Date().toISOString(), end_time: null, currency: 'TWD',
-        cancelled_at: null,
+        cancelled_at: cancelledAt,
       }],
     ]))
 
-    const updateSpy = vi.fn().mockReturnValue({
-      eq: () => Promise.resolve({ error: null }),
+    const updateSpy = vi.fn().mockImplementation((payload: Record<string, unknown>) => {
+      cancelledAt = (payload.cancelled_at as string | null) ?? null
+      return { eq: () => Promise.resolve({ error: null }) }
     })
     from.mockImplementation((table: string) => {
       if (table === 'events') {

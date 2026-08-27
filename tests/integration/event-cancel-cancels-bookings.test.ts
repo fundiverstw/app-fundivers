@@ -232,6 +232,28 @@ describe('restoring an event puts its bookings back', () => {
     expect(credits[0].source).toBe('return_reclaimed')
   })
 
+  it('works when an admin cancels through their own session, not the service key', async () => {
+    // The real path. The trigger is SECURITY DEFINER so it writes past RLS,
+    // but nothing proves that from a service-role client, which bypasses RLS
+    // before the trigger ever runs.
+    const diver = await freshDiver()
+    const dive = await freshDive()
+    const booking = await makeBooking(diver.id, dive, 3000)
+    await pay(diver.id, booking, 3000)
+
+    const adminApi = await userClient(adminUser.email, adminUser.password)
+    const { error } = await adminApi.from('events')
+      .update({ cancelled_at: new Date().toISOString() } as never).eq('id', dive)
+    expect(error).toBeNull()
+
+    expect(await bookingRow(booking)).toMatchObject({
+      status: 'cancelled', status_before_event_cancel: 'confirmed',
+    })
+    const credits = await creditsFor(booking)
+    expect(credits).toHaveLength(1)
+    expect(Number(credits[0].amount)).toBe(3000)
+  })
+
   it('leaves a diver who cancelled on their own still cancelled', async () => {
     const diver = await freshDiver()
     const dive = await freshDive()

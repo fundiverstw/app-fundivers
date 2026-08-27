@@ -3,7 +3,6 @@ import { addIsoDays, diffIsoDays } from './dates'
 import { usesCourseDays } from './event-kinds'
 import { occurrenceDates, datesAfter, type RecurrenceRule } from './recurrence'
 import { eventPayloadFromForm, type FormState } from '../components/admin/event-form-state'
-import { fetchEventsForBookings } from './events'
 import { cancelEventAndFollowUp } from './event-cancellation'
 import type { EventRow, EventSeries } from '../types/database'
 
@@ -276,8 +275,6 @@ export interface CancelLaterResult {
   cancelled: number
   credited: number
   creditedAmount: number
-  /** Occurrences whose credits failed after their cancellation committed. */
-  creditFailures: number
   /** Set when the run stopped early; the count above is what did land. */
   stoppedBy: unknown
 }
@@ -285,28 +282,19 @@ export interface CancelLaterResult {
 export async function cancelLaterOccurrences(args: {
   seriesId: string
   fromDate: string
-  createdBy: string | null
 }): Promise<CancelLaterResult> {
-  const { seriesId, fromDate, createdBy } = args
+  const { seriesId, fromDate } = args
   const targets = laterOccurrences(await fetchSeriesOccurrences(seriesId), fromDate)
 
-  // The credit maths needs a built AppEvent (currency, price, the whole
-  // envelope), not the raw row — so go through the same builder every other
-  // surface uses rather than hand-rolling a conversion here.
-  const built = await fetchEventsForBookings(targets.map(r => r.id))
-
   const result: CancelLaterResult = {
-    cancelled: 0, credited: 0, creditedAmount: 0, creditFailures: 0, stoppedBy: null,
+    cancelled: 0, credited: 0, creditedAmount: 0, stoppedBy: null,
   }
   for (const row of targets) {
-    const event = built.get(row.id)
-    if (!event) continue
     try {
-      const one = await cancelEventAndFollowUp({ event, createdBy })
+      const one = await cancelEventAndFollowUp({ eventId: row.id, eventType: row.kind })
       result.cancelled += 1
       result.credited += one.credited
       result.creditedAmount += one.creditedAmount
-      if (one.creditError) result.creditFailures += 1
     } catch (err) {
       result.stoppedBy = err
       break

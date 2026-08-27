@@ -98,16 +98,14 @@ describe('EventSeriesSection', () => {
 
   it('cancels the later occurrences after a confirm, and reports the credits', async () => {
     const cancel = vi.spyOn(series, 'cancelLaterOccurrences').mockResolvedValue({
-      cancelled: 2, credited: 3, creditedAmount: 9000, creditFailures: 0, stoppedBy: null,
+      cancelled: 2, credited: 3, creditedAmount: 9000, stoppedBy: null,
     })
     window.confirm = vi.fn(() => true)
     const user = userEvent.setup()
     renderAt()
 
     await user.click(await screen.findByRole('button', { name: /cancel the next 2/i }))
-    expect(cancel).toHaveBeenCalledWith(expect.objectContaining({
-      seriesId: 's1', fromDate: '2026-08-08', createdBy: 'a1',
-    }))
+    expect(cancel).toHaveBeenCalledWith({ seriesId: 's1', fromDate: '2026-08-08' })
     expect(toastSuccess).toHaveBeenCalledWith(expect.stringMatching(/cancelled 2/i))
     expect(toastSuccess).toHaveBeenCalledWith(expect.stringMatching(/credited 3/i))
   })
@@ -122,18 +120,18 @@ describe('EventSeriesSection', () => {
     expect(cancel).not.toHaveBeenCalled()
   })
 
-  // A cancellation that committed but whose credits failed must be shouted
-  // about — the divers are owed money the shop now has to issue by hand.
-  it('surfaces credit failures and an early stop', async () => {
+  // Credits can no longer half-happen — they are written by the same
+  // transaction as the cancel — but the run itself can still stop partway, and
+  // the shop has to know where it got to.
+  it('reports an early stop with the count that did land', async () => {
     vi.spyOn(series, 'cancelLaterOccurrences').mockResolvedValue({
-      cancelled: 1, credited: 0, creditedAmount: 0, creditFailures: 1, stoppedBy: new Error('nope'),
+      cancelled: 1, credited: 0, creditedAmount: 0, stoppedBy: new Error('nope'),
     })
     window.confirm = vi.fn(() => true)
     const user = userEvent.setup()
     renderAt()
 
     await user.click(await screen.findByRole('button', { name: /cancel the next 2/i }))
-    expect(toastError).toHaveBeenCalledWith(expect.stringMatching(/credits failed/i))
     expect(toastError).toHaveBeenCalledWith(expect.stringMatching(/stopped after 1/i))
   })
 

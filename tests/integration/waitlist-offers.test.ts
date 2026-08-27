@@ -297,8 +297,13 @@ describe('a cancelled event hands out no waitlist spots', () => {
     const { error } = await db.rpc('accept_waitlist_offer', { p_offer_id: offer!.id })
     expect(error).not.toBeNull()
 
-    const { data: after } = await admin.from('bookings').select('status').eq('id', waiter.id).single()
-    expect(after!.status).toBe('waitlisted')
+    // Not promoted. The booking now reads 'cancelled' rather than
+    // 'waitlisted' because cancelling the event cancels the registrations on
+    // it — and it remembers the spot it held, so restoring the event puts the
+    // diver back on the waitlist rather than into a seat.
+    const { data: after } = await admin.from('bookings')
+      .select('status, status_before_event_cancel').eq('id', waiter.id).single()
+    expect(after).toMatchObject({ status: 'cancelled', status_before_event_cancel: 'waitlisted' })
   })
 
   it('still promotes the next waitlister on an event that is NOT cancelled', async () => {

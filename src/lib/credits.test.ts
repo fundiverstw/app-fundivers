@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { siteConfig } from '../config/site'
-import type { AppEvent } from '../types/database'
 
 const { from, rpc, creditsInsert } = vi.hoisted(() => ({
   from: vi.fn(),
@@ -17,36 +16,6 @@ beforeEach(() => {
   rpc.mockReset()
   creditsInsert.mockReset().mockResolvedValue({ error: null })
 })
-
-// Chainable + awaitable stand-in: every filter method returns the same
-// object, and awaiting it yields the table's canned result.
-function tableBuilder(result: unknown, insert?: typeof creditsInsert) {
-  const b: Record<string, unknown> = {}
-  for (const m of ['select', 'eq', 'neq', 'in', 'order']) b[m] = () => b
-  b.then = (f: (r: unknown) => unknown) => Promise.resolve(result).then(f)
-  if (insert) b.insert = insert
-  return b
-}
-
-function setup(opts: {
-  bookings?: { data: unknown; error?: unknown }
-  payments?: { data: unknown; error?: unknown }
-  credits?: { data: unknown; error?: unknown }
-}) {
-  from.mockImplementation((table: string) => {
-    if (table === 'bookings') return tableBuilder(opts.bookings ?? { data: [], error: null })
-    if (table === 'payments') return tableBuilder(opts.payments ?? { data: [], error: null })
-    if (table === 'credits') return tableBuilder(opts.credits ?? { data: [], error: null }, creditsInsert)
-    throw new Error(`unexpected table: ${table}`)
-  })
-}
-
-const event = {
-  id: 'evt1',
-  type: 'dive',
-  title: 'Green Island Fun Dive',
-  start_time: '2026-05-18T00:00:00+08:00',
-} as unknown as AppEvent
 
 describe('openCreditForBooking', () => {
   const credits = [
@@ -160,108 +129,6 @@ describe('diverCreditBalance', () => {
     // b2 is covered → excluded from per-booking; its tied credit is then treated
     // as general (counted once): result 200, not 300+200.
     expect(diverCreditBalance(credits, bookings, new Set(['b2']))).toBe(200)
-  })
-})
-
-describe('issueCancellationCredits', () => {
-  it('credits each registrant their paid total, skipping zero-paid and already-credited bookings', async () => {
-    setup({
-      bookings: { data: [{ id: 'b1', user_id: 'u1' }, { id: 'b2', user_id: 'u2' }, { id: 'b3', user_id: 'u3' }], error: null },
-      payments: {
-        data: [
-          { booking_id: 'b1', amount: 3000, status: 'paid' },
-          { booking_id: 'b1', amount: 2000, status: 'paid' },
-          { booking_id: 'b2', amount: 4000, status: 'paid' },
-          // b3 paid nothing → no credit
-        ],
-        error: null,
-      },
-      // b2 already had its money returned → skip. The query is filtered to
-      // the two RETURN_SOURCES, so this stands in for a matching row.
-      credits: { data: [{ booking_id: 'b2' }], error: null },
-    })
-
-    const { issueCancellationCredits } = await import('./credits')
-    const res = await issueCancellationCredits({ event, createdBy: 'admin1' })
-
-    expect(res).toEqual({ issued: 1, totalAmount: 5000 })
-    const rows = creditsInsert.mock.calls[0][0]
-    expect(rows).toEqual([
-      {
-        user_id: 'u1',
-        booking_id: 'b1',
-        amount: 5000,
-        currency: siteConfig.locale.currency,
-        reason: 'Refund credit for cancelled event: Green Island Fun Dive (May 18, 2026)',
-        created_by: 'admin1',
-        status: 'open',
-        source: 'event_cancellation',
-      },
-    ])
-  })
-
-  it('credits the amount paid net of a prior refund, not the gross', async () => {
-    setup({
-      bookings: { data: [{ id: 'b1', user_id: 'u1' }], error: null },
-      payments: {
-        data: [
-          { booking_id: 'b1', amount: 3000, status: 'paid' },
-          { booking_id: 'b1', amount: 1000, status: 'refunded' }, // already returned
-        ],
-        error: null,
-      },
-    })
-    const { issueCancellationCredits } = await import('./credits')
-    const res = await issueCancellationCredits({ event, createdBy: 'admin1' })
-    // 3000 paid − 1000 already refunded = 2000, not the 3000 gross.
-    expect(res).toEqual({ issued: 1, totalAmount: 2000 })
-    expect(creditsInsert.mock.calls[0][0][0].amount).toBe(2000)
-  })
-
-  it('no-ops when the event has no non-cancelled bookings', async () => {
-    setup({ bookings: { data: [], error: null } })
-    const { issueCancellationCredits } = await import('./credits')
-    const res = await issueCancellationCredits({ event, createdBy: 'admin1' })
-    expect(res).toEqual({ issued: 0, totalAmount: 0 })
-    expect(creditsInsert).not.toHaveBeenCalled()
-  })
-
-  it('no-ops (no insert) when every registrant has either paid nothing or already been credited', async () => {
-    setup({
-      bookings: { data: [{ id: 'b1', user_id: 'u1' }], error: null },
-      payments: { data: [], error: null },
-    })
-    const { issueCancellationCredits } = await import('./credits')
-    const res = await issueCancellationCredits({ event, createdBy: 'admin1' })
-    expect(res).toEqual({ issued: 0, totalAmount: 0 })
-    expect(creditsInsert).not.toHaveBeenCalled()
-  })
-
-  it('throws when the bookings lookup fails', async () => {
-    setup({ bookings: { data: null, error: { message: 'boom' } } })
-    const { issueCancellationCredits } = await import('./credits')
-    await expect(issueCancellationCredits({ event, createdBy: 'admin1' })).rejects.toEqual({ message: 'boom' })
-  })
-
-  it('filters bookings by event_id for course events', async () => {
-    const eqSpy = vi.fn()
-    from.mockImplementation((table: string) => {
-      if (table === 'bookings') {
-        return {
-          select: () => ({
-            eq: (col: string, val: string) => {
-              eqSpy(col, val)
-              return { neq: () => Promise.resolve({ data: [], error: null }) }
-            },
-          }),
-        }
-      }
-      throw new Error(`unexpected table: ${table}`)
-    })
-    const courseEvent = { ...event, type: 'course', id: 'crs9' } as unknown as AppEvent
-    const { issueCancellationCredits } = await import('./credits')
-    await issueCancellationCredits({ event: courseEvent, createdBy: 'admin1' })
-    expect(eqSpy).toHaveBeenCalledWith('event_id', 'crs9')
   })
 })
 
