@@ -913,7 +913,10 @@ const signed = (n: number) => `${n < 0 ? '-' : '+'}${money(n)}`
  *              another. Only shown when it differs from the balance, which is
  *              exactly when the difference matters.
  */
-function BalancePanel({ statement, spendable, credits, bookings, actorNames, applyTargets, readOnly, onCreate, onCharge, onApply }: {
+// Exported for its own test. The panel is the one place the statement's
+// arithmetic becomes something a person reads, and driving it through the whole
+// users page would test the page's mocks rather than the panel.
+export function BalancePanel({ statement, spendable, credits, bookings, actorNames, applyTargets, readOnly, onCreate, onCharge, onApply }: {
   statement: DiverStatement
   spendable: number
   credits: Credit[]
