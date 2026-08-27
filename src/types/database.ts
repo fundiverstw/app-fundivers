@@ -375,6 +375,58 @@ export interface Database {
           diver_display: string | null
         }>
       }
+      // Dive sites: names close enough to what the caller typed that they may
+      // be the same place, best first. Every name in every language plus every
+      // alias is compared, so 蝙蝠洞 finds the row named Bat Cave.
+      find_similar_dive_sites: {
+        Args: {
+          p_name: string
+          p_kind?: SiteKind | null
+          p_threshold?: number
+          p_limit?: number
+        }
+        Returns: Array<{
+          id: string
+          name: string
+          name_zh_tw: string | null
+          name_ja: string | null
+          kind: SiteKind
+          region: string | null
+          verified: boolean
+          active: boolean
+          /** Which of the site's names matched — shown so a diver can see WHY
+           *  a suggestion came back, which is the difference between trusting
+           *  it and ignoring it. */
+          matched_name: string
+          score: number
+        }>
+      }
+      // Dive sites: add one. An RPC rather than an INSERT policy because
+      // `verified` and `created_by` are claims the row's author must not make.
+      create_dive_site: {
+        Args: {
+          p_name: string
+          p_kind: SiteKind
+          p_name_zh_tw?: string | null
+          p_name_ja?: string | null
+          p_region?: string | null
+          p_latitude?: number | null
+          p_longitude?: number | null
+          p_aliases?: string[] | null
+        }
+        Returns: string
+      }
+      // Dive sites: staff confirm (or un-confirm) a place. Admin-only.
+      verify_dive_site: {
+        Args: { p_site_id: string; p_verified?: boolean }
+        Returns: void
+      }
+      // Dive sites: fold a duplicate into the real place, carrying its
+      // observations across and keeping its names as aliases. Admin-only.
+      merge_dive_sites: {
+        Args: { p_keep: string; p_merge: string }
+        Returns: void
+      }
       // Almanac: the staff review queue — every record still awaiting a
       // ruling. Raises for a caller who is not staff/admin.
       almanac_pending_records: {
@@ -1811,10 +1863,20 @@ export interface Database {
           id: string
           created_at: string
           updated_at: string
+          /** The English name, and the identifier every surface falls back to. */
           name: string
+          name_zh_tw: string | null
+          name_ja: string | null
           kind: SiteKind
           region: string | null
           notes: string | null
+          latitude: number | null
+          longitude: number | null
+          /** Staff have confirmed this is a real, correctly-named place. False
+           *  on anything a diver added until someone checks it. Written only by
+           *  `verify_dive_site` / `create_dive_site` (20260827300000). */
+          verified: boolean
+          created_by: string | null
           active: boolean
         }
         Insert: {
@@ -1822,12 +1884,39 @@ export interface Database {
           created_at?: string
           updated_at?: string
           name: string
+          name_zh_tw?: string | null
+          name_ja?: string | null
           kind: SiteKind
           region?: string | null
           notes?: string | null
+          latitude?: number | null
+          longitude?: number | null
           active?: boolean
         }
         Update: Partial<Database['public']['Tables']['dive_sites']['Insert']>
+        Relationships: []
+      }
+      dive_site_aliases: {
+        Row: {
+          id: string
+          site_id: string
+          /** Another spelling this place answers to. Never displayed — it
+           *  exists so that typing it finds the site that already exists
+           *  instead of creating its twin. */
+          name: string
+          locale: 'en' | 'zh-TW' | 'ja' | null
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          site_id: string
+          name: string
+          locale?: 'en' | 'zh-TW' | 'ja' | null
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['dive_site_aliases']['Insert']>
         Relationships: []
       }
       almanac_records: {
