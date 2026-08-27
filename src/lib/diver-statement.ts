@@ -85,6 +85,15 @@ export interface DiverStatement {
     paid: number
     /** Open credit not consumed by an active booking's balance. */
     openCredit: number
+    /** Net paid on this diver's CANCELLED bookings.
+     *
+     *  Not part of `balance` — it is where the rest of the summary's money
+     *  went. `charged` and `paid` cover live bookings only, because a cancelled
+     *  booking's charge and its payments leave together; the refund then
+     *  arrives as credit. Without this figure the two of them square exactly
+     *  while a credit sits beside them with no visible source, which reads as
+     *  an error rather than as a cancellation. */
+    fromCancelled: number
   }
 }
 
@@ -328,5 +337,10 @@ export function buildDiverStatement(input: StatementInput): DiverStatement {
     .filter(c => c.status === 'open' && (!c.booking_id || ownIds.has(c.booking_id)))
     .reduce((s, c) => s + Number(c.amount), 0)
 
-  return { lines, balance: running, totals: { charged, paid, openCredit } }
+  const cancelledIds = new Set(bookings.filter(b => b.status === 'cancelled').map(b => b.id))
+  const fromCancelled = netPaid(
+    input.payments.filter(p => p.booking_id && cancelledIds.has(p.booking_id)),
+  )
+
+  return { lines, balance: running, totals: { charged, paid, openCredit, fromCancelled } }
 }

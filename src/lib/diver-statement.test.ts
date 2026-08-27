@@ -282,3 +282,72 @@ describe('an account charge', () => {
     expect(s.lines.at(-1)).toMatchObject({ kind: 'account_charge', balance: -1200 })
   })
 })
+
+// The summary block reads as one accounting identity, so its figures have to
+// account over one set of bookings. They do not: `charged` and `paid` cover
+// live bookings, and `openCredit` covers every credit the diver holds. A
+// cancelled event's charge and payments leave together and the refund stays,
+// which puts a credit on screen beside a Charged and a Paid that square to the
+// penny — "22,450 / 22,450 / 5,000", which reads as a bug rather than as a
+// cancellation. `fromCancelled` is the missing provenance.
+describe('summary totals over a diver with a cancelled event', () => {
+  // Marius Drop, 2026-08-27: three live bookings paid to the cent, two courses
+  // whose events were called off with 2,500 paid on each.
+  const bookings = [
+    booking({ id: 'live-1', details: { total: 4300 } }),
+    booking({ id: 'live-2', details: { total: 2950 } }),
+    booking({ id: 'live-3', details: { total: 15200 } }),
+    booking({ id: 'off-1', status: 'cancelled', cancelled_at: T(27), details: { total: 5440 } }),
+    booking({ id: 'off-2', status: 'cancelled', cancelled_at: T(27), details: { total: 7240 } }),
+  ]
+  const payments = [
+    payment({ id: 'p1', booking_id: 'live-1', amount: 4300 }),
+    payment({ id: 'p2', booking_id: 'live-2', amount: 2950 }),
+    payment({ id: 'p3', booking_id: 'live-3', amount: 15200 }),
+    payment({ id: 'p4', booking_id: 'off-1', amount: 2500 }),
+    payment({ id: 'p5', booking_id: 'off-2', amount: 2500 }),
+  ]
+  const credits = [
+    credit({ id: 'c1', booking_id: 'off-1', amount: 2500, source: 'event_cancellation', created_at: T(28) }),
+    credit({ id: 'c2', booking_id: 'off-2', amount: 2500, source: 'event_cancellation', created_at: T(28) }),
+  ]
+  const built = () => buildDiverStatement({
+    bookings, payments, credits, amendmentsByBooking: new Map(),
+  })
+
+  it('closes at what the shop owes, and the identity still holds', () => {
+    const s = built()
+    expect(s.totals.charged).toBe(22450)
+    expect(s.totals.paid).toBe(22450)
+    expect(s.totals.openCredit).toBe(5000)
+    expect(s.balance).toBe(5000)
+    expect(s.balance).toBe(s.totals.paid - s.totals.charged + s.totals.openCredit)
+  })
+
+  it('names where the credit came from, so it is not money out of nowhere', () => {
+    expect(built().totals.fromCancelled).toBe(5000)
+  })
+
+  it('stays quiet for a diver with nothing cancelled', () => {
+    const s = buildDiverStatement({
+      bookings: bookings.slice(0, 3),
+      payments: payments.slice(0, 3),
+      credits: [],
+      amendmentsByBooking: new Map(),
+    })
+    expect(s.totals.fromCancelled).toBe(0)
+    expect(s.balance).toBe(0)
+  })
+
+  it('counts only what the shop still holds, not a payment already refunded', () => {
+    const s = buildDiverStatement({
+      bookings,
+      payments: [...payments, payment({ id: 'p6', booking_id: 'off-1', amount: 2500, status: 'refunded' })],
+      credits: [credits[1]],
+      amendmentsByBooking: new Map(),
+    })
+    // off-1's cash went back off-app, so only off-2's 2,500 became credit.
+    expect(s.totals.fromCancelled).toBe(2500)
+    expect(s.totals.openCredit).toBe(2500)
+  })
+})

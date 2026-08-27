@@ -959,6 +959,16 @@ function BalancePanel({ statement, spendable, credits, bookings, actorNames, app
         </div>
       </dl>
 
+      {totals.fromCancelled > 0 && (
+        <div className="pt-1 border-t border-surface-200 space-y-0.5">
+          <div className="flex justify-between">
+            <span className="text-brand-900 font-medium">{us.fromCancelled}</span>
+            <span className="text-brand-900 font-semibold tabular-nums">{money(totals.fromCancelled)}</span>
+          </div>
+          <p className="text-brand-950">{us.fromCancelledNote}</p>
+        </div>
+      )}
+
       {spendable !== balance && (
         <div className="pt-1 border-t border-surface-200 space-y-0.5">
           <div className="flex justify-between">
