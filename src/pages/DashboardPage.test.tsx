@@ -52,19 +52,21 @@ describe('DashboardPage', () => {
     useAuthMock.mockReturnValue({ user: { user_metadata: {} }, profile: null })
     render(<MemoryRouter><DashboardPage quickLinks /></MemoryRouter>)
     expect(screen.getByRole('link', { name: /trusted partners/i })).toBeInTheDocument()
-    expect(screen.getByText(/dive site maps/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /almanac/i })).toBeInTheDocument()
   })
 
-  // The tile was admin-and-dev-server-only while the map had nowhere to store
-  // anything. It reads and collects real observations now, so it is open to
-  // whoever can dive — which is the whole point of crowdsourcing a seabed.
-  it('opens the dive-site maps to every signed-in diver, whatever their role', () => {
-    for (const role of ['diver', 'staff', 'admin']) {
+  // Staff-facing for now: the editor is one tap from writing a depth onto a
+  // shared map, so the people doing it are the people who can also undo it.
+  it('shows the dive-site maps to an admin and to nobody else', () => {
+    for (const role of ['diver', 'staff']) {
       useAuthMock.mockReturnValue({ user: { user_metadata: {} }, profile: { role } })
       const { unmount } = render(<MemoryRouter><DashboardPage quickLinks /></MemoryRouter>)
-      expect(screen.getByRole('link', { name: /dive site maps/i })).toHaveAttribute('href', '/site-maps')
+      expect(screen.queryByText(/dive site maps/i)).not.toBeInTheDocument()
       unmount()
     }
+    useAuthMock.mockReturnValue({ user: { user_metadata: {} }, profile: { role: 'admin' } })
+    render(<MemoryRouter><DashboardPage quickLinks /></MemoryRouter>)
+    expect(screen.getByRole('link', { name: /dive site maps/i })).toHaveAttribute('href', '/site-maps')
   })
 
   it('omits them unless asked, so an embedder without room for them can opt out', () => {

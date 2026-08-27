@@ -24,12 +24,18 @@ describe('QuickLinks', () => {
     expect(screen.getByText(/almanac/i)).toBeInTheDocument()
   })
 
-  // Was a greyed-out "coming soon" tile back when the map lived behind a
-  // development-only route. It is a page now, open to every signed-in diver.
-  it('links to the dive site maps like any other destination', () => {
+  // Staff-facing for now, so a diver is not shown it at all rather than shown
+  // it and refused. It used to render greyed out with "coming soon", which was
+  // honest while the page did not exist.
+  it('keeps the dive site maps out of a diver’s tiles entirely', () => {
     renderLinks()
-    expect(screen.getByRole('link', { name: /dive site maps/i })).toHaveAttribute('href', '/site-maps')
+    expect(screen.queryByText(/dive site maps/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/soon/i)).not.toBeInTheDocument()
+  })
+
+  it('gives an admin the dive site maps tile', () => {
+    render(<MemoryRouter><QuickLinks isAdmin /></MemoryRouter>)
+    expect(screen.getByRole('link', { name: /dive site maps/i })).toHaveAttribute('href', '/site-maps')
   })
 
   it('stacks two-up on a phone and three-up from the sm breakpoint', () => {

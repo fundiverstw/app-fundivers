@@ -131,7 +131,6 @@ export default function App() {
               <Route path="/dashboard" element={<DashboardPage quickLinks />} />
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/almanac" element={<AlmanacPage />} />
-              <Route path="/site-maps" element={<SiteMapPage />} />
               <Route path="/coral" element={<CoralPage />} />
               <Route path="/records" element={<RecordsPage />}>
                 <Route index element={<Navigate to="bookings" replace />} />
@@ -171,6 +170,13 @@ export default function App() {
             </Route>
             {/* Write/manage routes — admin only */}
             <Route element={<AdminRoute />}>
+              {/* Dive-site maps are staff-facing for now. The editor puts
+                  whoever opens it one tap from writing a depth onto a shared
+                  map, so until the shop has seen what that produces, the people
+                  doing it are the people who can also undo it. Outside
+                  AdminShell: it is a diver-shaped page that happens to be
+                  restricted, not part of the admin console. */}
+              <Route path="/site-maps" element={<SiteMapPage />} />
               <Route element={<AdminShell />}>
                 <Route path="/admin/new" element={<AdminManagePage />} />
                 <Route path="/admin/new/event" element={<AdminNewEventPage />} />

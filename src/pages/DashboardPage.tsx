@@ -17,7 +17,7 @@ interface DashboardPageProps {
 // behind the fixed bottom nav), and the version / beta badge floats in the
 // bottom-right corner above the nav.
 export function DashboardPage({ quickLinks = false }: DashboardPageProps) {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
 
 
   return (
@@ -25,7 +25,7 @@ export function DashboardPage({ quickLinks = false }: DashboardPageProps) {
       <div className="relative z-10 mx-auto flex w-full max-w-md flex-col gap-4 px-4 pt-6 pb-28">
         {user && <WelcomeBanner user={user} />}
         <FeaturedEvents />
-        {quickLinks && <QuickLinks />}
+        {quickLinks && <QuickLinks isAdmin={profile?.role === 'admin'} />}
       </div>
 
       {/* Powered-by mark — bottom-right, clear of the bottom nav, on one row: the

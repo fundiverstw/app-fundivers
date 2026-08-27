@@ -3,9 +3,9 @@
 // The renderer and editor existed behind a development-only route where every
 // depth a diver placed was lost on reload. What we lock in about the storage
 // that replaced it:
-//   1. Any signed-in diver can file readings; the tables refuse a direct write,
-//      because `diver_id`, `source` and `verified` are claims about a record
-//      that its author must not be the one making.
+//   1. Staff file readings; a diver can neither file them nor read them back.
+//      The map is admin-only for now, and that has to mean the data and not
+//      just the button — the tables are one PostgREST call from any session.
 //   2. A contribution is marked unverified, and every reading points back at
 //      the batch it arrived on, so it stays attributable forever.
 //   3. The lattice reconciles: two divers measuring the same square metre
@@ -20,7 +20,7 @@ import {
 const admin = adminClient()
 let adminUser: TestUser
 let diver: TestUser
-let other: TestUser
+let otherAdmin: TestUser
 let siteId: string
 
 const sounding = (id: string, x: number, y: number, depth_m: number) => ({
@@ -31,7 +31,7 @@ const sounding = (id: string, x: number, y: number, depth_m: number) => ({
 beforeAll(async () => {
   adminUser = await createTestUser(admin, { role: 'admin' })
   diver = await createTestUser(admin, { role: 'diver' })
-  other = await createTestUser(admin, { role: 'diver' })
+  otherAdmin = await createTestUser(admin, { role: 'admin' })
   const { data, error } = await admin.from('dive_sites')
     .insert({ name: `Map Site ${crypto.randomUUID().slice(0, 8)}`, kind: 'dive' } as never)
     .select('id').single()
@@ -41,7 +41,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await admin.from('dive_sites').delete().eq('id', siteId)
-  for (const u of [adminUser, diver, other]) if (u) await deleteTestUser(admin, u.id)
+  for (const u of [adminUser, diver, otherAdmin]) if (u) await deleteTestUser(admin, u.id)
 })
 
 async function fileAs(user: TestUser, soundings: unknown[], features: unknown[] = []) {
@@ -52,14 +52,24 @@ async function fileAs(user: TestUser, soundings: unknown[], features: unknown[] 
 }
 
 describe('filing readings', () => {
-  it('records a batch, marks it unverified, and credits the diver', async () => {
-    const { data, error } = await fileAs(diver, [sounding('lat:3:4', 3, 4, 12.5)])
+  // Closed at the RPC, not just in the nav. A SECURITY DEFINER function runs
+  // past RLS by design, so without its own check a diver who found the
+  // endpoint could file into a map they cannot even read.
+  it('refuses a diver, both filing and reading', async () => {
+    expect((await fileAs(diver, [sounding('lat:5:5', 5, 5, 9)])).error).not.toBeNull()
+
+    const db = await userClient(diver.email, diver.password)
+    const { data: rows } = await db.from('dive_site_soundings').select('*').eq('site_id', siteId)
+    expect(rows ?? []).toHaveLength(0)
+  })
+
+  it('records a batch and credits the staff member who filed it', async () => {
+    const { data, error } = await fileAs(adminUser, [sounding('lat:3:4', 3, 4, 12.5)])
     expect(error).toBeNull()
 
     const { data: contribution } = await admin.from('dive_site_contributions')
       .select('*').eq('id', data as string).single()
-    expect(contribution!.diver_id).toBe(diver.id)
-    expect(contribution!.verified).toBe(false)
+    expect(contribution!.diver_id).toBe(adminUser.id)
 
     const { data: rows } = await admin.from('dive_site_soundings')
       .select('*').eq('site_id', siteId).eq('id', 'lat:3:4')
@@ -77,9 +87,9 @@ describe('filing readings', () => {
   })
 
   // The reason the id is derived from the coordinate rather than generated.
-  it('lets a second diver correct the same square metre instead of duplicating it', async () => {
-    await fileAs(diver, [sounding('lat:10:10', 10, 10, 8)])
-    const second = await fileAs(other, [sounding('lat:10:10', 10, 10, 24)])
+  it('lets a second person correct the same square metre instead of duplicating it', async () => {
+    await fileAs(adminUser, [sounding('lat:10:10', 10, 10, 8)])
+    const second = await fileAs(otherAdmin, [sounding('lat:10:10', 10, 10, 24)])
     expect(second.error).toBeNull()
 
     const { data: rows } = await admin.from('dive_site_soundings')
@@ -89,11 +99,11 @@ describe('filing readings', () => {
     // And the correction is credited to whoever made it.
     const { data: contribution } = await admin.from('dive_site_contributions')
       .select('diver_id').eq('id', rows![0].contribution_id!).single()
-    expect(contribution!.diver_id).toBe(other.id)
+    expect(contribution!.diver_id).toBe(otherAdmin.id)
   })
 
   it('keeps a feature’s geometry, whichever shape it is', async () => {
-    const { error } = await fileAs(diver, [], [
+    const { error } = await fileAs(adminUser, [], [
       { id: 'f-point', kind: 'rock', geometry: { shape: 'point', at: { x: 1, y: 2 } } },
       { id: 'f-path', kind: 'wall', label: 'Dragon Head',
         geometry: { shape: 'path', points: [{ x: 0, y: 0 }, { x: 5, y: 5 }] } },
@@ -113,7 +123,7 @@ describe('filing readings', () => {
   })
 
   it('refuses an empty contribution', async () => {
-    const { error } = await fileAs(diver, [], [])
+    const { error } = await fileAs(adminUser, [], [])
     expect(error).not.toBeNull()
   })
 
@@ -147,7 +157,7 @@ describe('filing readings', () => {
 
 describe('checking a contribution', () => {
   it('is admin-only', async () => {
-    const { data: id } = await fileAs(diver, [sounding('lat:20:20', 20, 20, 9)])
+    const { data: id } = await fileAs(adminUser, [sounding('lat:20:20', 20, 20, 9)])
     const db = await userClient(diver.email, diver.password)
     expect((await db.rpc('verify_site_map_contribution', {
       p_contribution_id: id as string,
@@ -165,8 +175,8 @@ describe('checking a contribution', () => {
 })
 
 describe('reading a map back', () => {
-  it('is readable by any signed-in diver, and by nobody signed out', async () => {
-    const db = await userClient(other.email, other.password)
+  it('is readable by staff', async () => {
+    const db = await userClient(otherAdmin.email, otherAdmin.password)
     const { data, error } = await db.from('dive_site_soundings').select('*').eq('site_id', siteId)
     expect(error).toBeNull()
     expect((data ?? []).length).toBeGreaterThan(0)
@@ -179,7 +189,7 @@ describe('reading a map back', () => {
       .select('id').single()
     const doomed = (site as { id: string }).id
 
-    const db = await userClient(diver.email, diver.password)
+    const db = await userClient(adminUser.email, adminUser.password)
     await db.rpc('submit_site_map_contribution', {
       p_site_id: doomed, p_soundings: [sounding('lat:1:1', 1, 1, 5)],
     })

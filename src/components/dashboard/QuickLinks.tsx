@@ -29,17 +29,21 @@ const destinations: Destination[] = [
   { to: '/scheduled-trips',  label: t.shell.scheduledTrips,  icon: <ScheduledTripsIcon /> },
   { to: '/almanac',          label: t.dashboard.almanac,     icon: <AlmanacIcon /> },
   { to: '/coral',            label: t.coral.title,           icon: <CoralIcon /> },
-  // Was a greyed-out "coming soon" tile with a prop deciding whether it linked
-  // anywhere, back when the map lived behind a development-only route. It is a
-  // page now, open to every signed-in diver, so it is a destination like the
-  // rest.
+]
+
+// Dive-site maps are staff-facing for now, so the tile is not shown at all to
+// a diver rather than shown and refused. It used to render greyed out with
+// "coming soon", which was honest while the page did not exist; the page
+// exists now, and dangling it in front of someone who cannot open it would be
+// a worse answer than not mentioning it.
+const adminDestinations: Destination[] = [
   { to: '/site-maps',        label: t.dashboard.siteMaps,    icon: <MapIcon /> },
 ]
 
-export function QuickLinks() {
+export function QuickLinks({ isAdmin = false }: { isAdmin?: boolean } = {}) {
   return (
     <nav aria-label={t.dashboard.quickLinks} className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-      {destinations.map(({ to, label, icon }) => (
+      {[...destinations, ...(isAdmin ? adminDestinations : [])].map(({ to, label, icon }) => (
         <Link key={to} to={to} className={`${TILE} ${TEXT_BODY}`}>
           {icon}
           <span className="text-xs leading-tight">{label}</span>

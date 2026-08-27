@@ -11,6 +11,12 @@
  * the almanac files conditions against — so a map and an observation are about
  * the same Bat Cave, and a site nobody has mapped yet opens as an empty canvas
  * rather than as an error.
+ *
+ * Staff-facing for now, behind AdminRoute and admin-only RLS (20260827600000).
+ * The editor puts whoever opens it one tap from writing a depth onto a map
+ * everyone else reads, so until the shop has seen what that produces, the
+ * people doing it are the people who can also undo it. Nothing here assumes
+ * that: opening it to divers is a policy swap and a route guard.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
