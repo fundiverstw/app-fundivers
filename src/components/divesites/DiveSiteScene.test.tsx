@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { DiveSiteScene } from './DiveSiteScene'
-import type { DiveSiteMap, Sounding } from '../../lib/dive-site-map'
+import type { DiveSiteMap, EntryPoint, Sounding } from '../../lib/dive-site-map'
 import { SURFACE_DEFAULTS } from '../../lib/dive-site-surface'
 import { t } from '../../i18n'
 
@@ -95,5 +95,41 @@ describe('DiveSiteScene when the readings will not join', () => {
     expect(screen.queryByText(t.siteMap.notEnoughSoundings)).not.toBeInTheDocument()
     expect(screen.queryByText(t.siteMap.soundingsWontJoin(SURFACE_DEFAULTS.cutoffEdge_m)))
       .not.toBeInTheDocument()
+  })
+})
+
+
+// An entry point is drawn in WebGL, which happy-dom has none of. What is
+// testable here is the caption, and the caption is what tells a reader what
+// the green ring in the water means.
+describe('DiveSiteScene — ways into the water', () => {
+  const entry = (id: string, x: number, y: number): EntryPoint =>
+    ({ id, at: { x, y }, source: 'diver' })
+
+  it('says nothing about entries on a site nobody has marked one on', () => {
+    render(<DiveSiteScene map={mapWith([sounding('a', 0, 0, 5)])} />)
+    expect(screen.queryByText(/way(s)? into the water/i)).not.toBeInTheDocument()
+  })
+
+  it('says how many are marked, and what the mark on the water means', () => {
+    const map = { ...mapWith([sounding('a', 0, 0, 5)]), entries: [entry('e1', 4, -2)] }
+    render(<DiveSiteScene map={map} />)
+    expect(screen.getByText(t.siteMap.entriesMarked(1))).toBeInTheDocument()
+  })
+
+  it('counts every one of them, because a site has as many ways in as it has', () => {
+    const map = {
+      ...mapWith([sounding('a', 0, 0, 5)]),
+      entries: [entry('e1', 4, -2), entry('e2', -30, 8), entry('e3', 12, 40)],
+    }
+    render(<DiveSiteScene map={map} />)
+    expect(screen.getByText(t.siteMap.entriesMarked(3))).toBeInTheDocument()
+  })
+
+  // The one plane in the scene that is not an inference: every depth is
+  // measured down from it, and every handle starts on it.
+  it('names the sheet overhead, so it is read as sea level and not as haze', () => {
+    render(<DiveSiteScene map={mapWith([sounding('a', 0, 0, 5)])} />)
+    expect(screen.getByText(t.siteMap.seaLevelLegend)).toBeInTheDocument()
   })
 })

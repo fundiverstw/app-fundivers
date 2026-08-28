@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import {
@@ -14,7 +14,10 @@ import {
   beginGrab, dragTo, movedGrab, nearestWithin, type Grab, type ScreenPoint,
 } from '../../lib/site-map-grab'
 import { t } from '../../i18n'
-import { BADGE_READOUT, CARD, TEXT_HEADING, TEXT_MUTED, TEXT_SUBTLE } from '../../styles/tokens'
+import {
+  BADGE_READOUT, BTN_XS_GHOST, CARD, OVERLAY_PANEL,
+  TEXT_HEADING, TEXT_MUTED, TEXT_SUBTLE,
+} from '../../styles/tokens'
 
 // The WebGL view. All arithmetic lives in lib/dive-site-surface.ts and
 // lib/site-map-grab.ts, which are unit-tested; this file is the part that
@@ -34,6 +37,16 @@ import { BADGE_READOUT, CARD, TEXT_HEADING, TEXT_MUTED, TEXT_SUBTLE } from '../.
 //    they would drag a point, watch the view snap back to its default framing,
 //    and have to fly back to where they were before pulling the next one. That
 //    is what made a continuous gesture feel like a series of separate clicks.
+//  • The camera may go UNDER the seabed and look up. A bathymetric viewer that
+//    clamps at the horizon is showing a chart; a diver reads a site from
+//    inside it, looking up at the surface to see where the light is and where
+//    they got in. It is also the only angle from which a point pulled down a
+//    long way is separable from the flat sheet it was pulled out of.
+
+/** Green, which nothing else in the scene is: soundings are white, volumetric
+ *  features amber, a held handle teal. An entry has to be findable at a glance
+ *  from anywhere in the site. */
+const ENTRY_COLOR = 0x86e08a
 
 // Probed once per session rather than per mount: creating a throwaway canvas
 // context is not free, and the answer cannot change while the tab is open.
@@ -64,6 +77,14 @@ interface DiveSiteSceneProps {
    *  to be told: a React render per frame would rebuild the handle field
    *  mid-gesture. */
   onHandleDrag?: (e: { id: string; at: Vec2; depth_m: number; done: boolean }) => void
+  /** What taking hold of a handle means. `pull` drags it to a depth; `mark`
+   *  designates the position and leaves the depth alone. A mode, and named
+   *  one, because designating where you get into the water and measuring how
+   *  deep it is there are different acts on the same point of seabed. */
+  gesture?: HandleGesture
+  /** A handle marked while `gesture` is `mark`. Toggling is the caller's job:
+   *  the scene reports the tap, the draft decides what it means. */
+  onHandleMark?: (handle: GridHandle) => void
   /** Vertical exaggeration. A dive site is tens of meters deep across hundreds
    *  of meters wide, so at true scale the relief that matters to a diver — the
    *  drop-off, the ridge, the gully — flattens into nothing. Exaggerating is
@@ -71,6 +92,9 @@ interface DiveSiteSceneProps {
    *  nobody reads the slope as a real gradient. */
   verticalExaggeration?: number
 }
+
+/** What taking hold of a handle does. */
+export type HandleGesture = 'pull' | 'mark'
 
 /** What survives a data change: the view a diver has arranged for themselves. */
 interface Rig {
@@ -87,6 +111,10 @@ interface Rig {
   travelSpeed: number
   /** Half-width of the drawn site, for sizing markers against it. */
   radius: number
+  /** Middle of the drawn ground, and the y the deepest reading sits at — what
+   *  a viewpoint button needs to put the camera somewhere worth being. */
+  center: THREE.Vector3
+  floorY: number
 }
 
 /** Metres between the drawn handles, read off the field itself rather than
@@ -121,6 +149,7 @@ function clearGroup(group: THREE.Group) {
 
 export function DiveSiteScene({
   map, options, height = 420, verticalExaggeration = 3, handles, onHandleDrag,
+  gesture = 'pull', onHandleMark,
 }: DiveSiteSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null)
   const roseRef = useRef<SVGGElement | null>(null)
@@ -157,6 +186,33 @@ export function DiveSiteScene({
   const datum = singleDatum(observed)
   const editable = !!handles
 
+  /**
+   * Put the camera somewhere worth being, in one press.
+   *
+   * Orbiting to a useful angle by hand is a chore on a site that is mostly
+   * flat water, and getting under the seabed to look up — now that the clamp
+   * is gone — means dragging past the horizon and hoping. These are the two
+   * angles the view is actually read from: the plan, and the diver's.
+   */
+  const viewFrom = useCallback((where: 'above' | 'seabed') => {
+    const rig = rigRef.current
+    if (!rig) return
+    const { camera, controls, center, radius, floorY } = rig
+    if (where === 'above') {
+      const distance = Math.max(radius * 2.2, 30)
+      camera.position.set(center.x, distance, center.z + distance * 0.35)
+      controls.target.set(center.x, floorY, center.z)
+    } else {
+      // Just off the bottom, and always under the water however flat the site
+      // is: an eye level at sea level on an unedited site would look along the
+      // surface rather than up at it.
+      const eye = Math.min(floorY + Math.max(radius * 0.08, 1), -Math.max(radius * 0.1, 2))
+      camera.position.set(center.x, eye, center.z + Math.max(radius * 0.5, 6))
+      controls.target.set(center.x, 0, center.z)
+    }
+    controls.update()
+  }, [])
+
   // The rig: built once, and outliving every reading placed in it.
   useEffect(() => {
     const mount = mountRef.current
@@ -185,12 +241,20 @@ export function DiveSiteScene({
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
     controls.dampingFactor = 0.08
-    controls.maxPolarAngle = Math.PI * 0.49
+    // The whole sphere, less a sliver at each pole. The old ceiling of 0.49pi
+    // stopped the camera at the horizon, which meant a diver could never get
+    // under the seabed and look up at the surface — the angle this is read
+    // from in the water, and the one that separates a point pulled down from
+    // the flat sheet above it. The slivers are kept back because at exactly
+    // straight up or straight down the up-vector flips and the view rolls.
+    controls.minPolarAngle = Math.PI * 0.02
+    controls.maxPolarAngle = Math.PI * 0.98
     controls.update()
 
     const rig: Rig = {
       renderer, scene, camera, controls, content, handleLayer,
       travelSpeed: 20, radius: 30,
+      center: new THREE.Vector3(), floorY: 0,
     }
     rigRef.current = rig
 
@@ -198,11 +262,16 @@ export function DiveSiteScene({
     // no click-to-focus dance, but it also means the depth field would eat a
     // "w" as a movement — hence the editable-target guard.
     const held = new Set<string>()
-    const MOVE_KEYS: Record<string, [number, number]> = {
-      w: [0, 1], arrowup: [0, 1],
-      s: [0, -1], arrowdown: [0, -1],
-      a: [-1, 0], arrowleft: [-1, 0],
-      d: [1, 0], arrowright: [1, 0],
+    // [strafe, forward, rise]. Rising and sinking are here for the same reason
+    // the polar clamp went: getting to the seabed and looking up should not
+    // require orbiting there sideways.
+    const MOVE_KEYS: Record<string, [number, number, number]> = {
+      w: [0, 1, 0], arrowup: [0, 1, 0],
+      s: [0, -1, 0], arrowdown: [0, -1, 0],
+      a: [-1, 0, 0], arrowleft: [-1, 0, 0],
+      d: [1, 0, 0], arrowright: [1, 0, 0],
+      e: [0, 0, 1],
+      q: [0, 0, -1],
     }
 
     function isTyping(target: EventTarget | null): boolean {
@@ -244,9 +313,10 @@ export function DiveSiteScene({
         strafe.copy(forward).cross(UP).normalize()
         travel.set(0, 0, 0)
         for (const k of held) {
-          const [sx, sf] = MOVE_KEYS[k]
+          const [sx, sf, sy] = MOVE_KEYS[k]
           travel.addScaledVector(forward, sf)
           travel.addScaledVector(strafe, sx)
+          travel.addScaledVector(UP, sy)
         }
         if (travel.lengthSq() > 0) {
           travel.normalize().multiplyScalar(rig.travelSpeed * dt)
@@ -353,6 +423,12 @@ export function DiveSiteScene({
         roughness: 0.85,
         metalness: 0.05,
         flatShading: true,
+        // The unedited site is one flat sheet at the surface with every handle
+        // sitting in it, so a sheet that writes depth hides the first point
+        // anybody pulls down behind the thing they pulled it out of. Once
+        // readings exist the surface is drawn from them and there is nothing
+        // above the seabed to hide anything.
+        depthWrite: !!surface,
       }),
     ))
     content.add(new THREE.Mesh(
@@ -366,9 +442,32 @@ export function DiveSiteScene({
     const size = box.getSize(new THREE.Vector3())
     const radius = Math.max(size.x, size.z) / 2 || 30
     rig.radius = radius
+    rig.center.copy(center)
+    rig.floorY = box.min.y
     // Meters per second, scaled to the site: a fixed speed crawls across a
     // large site and overshoots a small one.
     rig.travelSpeed = Math.max(radius * 0.8, 20)
+
+    // Sea level, drawn.
+    //
+    // Every depth on this map is measured down from it and every handle starts
+    // on it, so it is the one plane in the scene that is not an inference —
+    // and until it was drawn, looking up from the seabed showed nothing at
+    // all. Lifted a hair above zero because the unedited seabed sits exactly
+    // at zero too, and two coplanar surfaces flicker against each other.
+    const water = new THREE.Mesh(
+      new THREE.PlaneGeometry(radius * 4, radius * 4),
+      new THREE.MeshBasicMaterial({
+        color: 0x8fd8f0,
+        transparent: true,
+        opacity: 0.12,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+    )
+    water.rotation.x = -Math.PI / 2
+    water.position.set(center.x, 0.02, center.z)
+    content.add(water)
 
     // Depth posts every 10 m, dropped from the surface to the deepest point, so
     // "how deep is this" is answerable by eye instead of by legend.
@@ -446,6 +545,41 @@ export function DiveSiteScene({
       content.add(marker)
     }
 
+    // Ways into the water, drawn at the surface with a line dropped to the
+    // seabed under them.
+    //
+    // At the surface because that is where an entry is: it is the step, the
+    // slipway or the gap in the rocks you climb down, not a place on the
+    // bottom. The drop line is what makes it legible from underneath — from
+    // the seabed looking up, an entry is the one mark that says which patch of
+    // bright water overhead is the one you came in through.
+    const entryRadius = Math.max(radius * 0.05, 1.2)
+    for (const entry of observed.entries) {
+      const below = observed.soundings.reduce<{ d: number; depth: number }>((best, sd) => {
+        const d = Math.hypot(sd.at.x - entry.at.x, sd.at.y - entry.at.y)
+        return d < best.d ? { d, depth: sd.depth_m } : best
+      }, { d: Infinity, depth: 0 })
+
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(entryRadius, entryRadius * 0.16, 8, 24),
+        new THREE.MeshBasicMaterial({ color: ENTRY_COLOR, transparent: true, opacity: 0.95 }),
+      )
+      ring.rotation.x = -Math.PI / 2
+      ring.position.set(entry.at.x, 0.05, -entry.at.y)
+      content.add(ring)
+
+      const drop = below.depth * verticalExaggeration
+      if (drop > 0.1) {
+        content.add(new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(entry.at.x, 0, -entry.at.y),
+            new THREE.Vector3(entry.at.x, -drop, -entry.at.y),
+          ]),
+          new THREE.LineBasicMaterial({ color: ENTRY_COLOR, transparent: true, opacity: 0.5 }),
+        ))
+      }
+    }
+
     // Frame on the ground, not on the readings. Pulling a point changes what
     // the seabed looks like but not how far the site reaches, so the view holds
     // still through a whole session of pulling; asking for more ground is an
@@ -483,7 +617,7 @@ export function DiveSiteScene({
     clearGroup(handleLayer)
 
     const field = handles ?? []
-    if (!field.length || !onHandleDrag) return
+    if (!field.length || !(onHandleDrag || onHandleMark)) return
 
     const positions = new Float32Array(field.length * 3)
     const colors = new Float32Array(field.length * 3)
@@ -599,6 +733,15 @@ export function DiveSiteScene({
       const index = nearestWithin(screen, px, py, PICK_RADIUS_PX)
       if (index < 0) return
 
+      if (gesture === 'mark') {
+        // A tap, not a drag: an entry is a place, and there is nothing to pull
+        // it to. Swallowed all the same, or the same gesture also orbits.
+        e.stopPropagation()
+        e.preventDefault()
+        onHandleMark?.(field[index])
+        return
+      }
+
       grabbedIndex = index
       grab = beginGrab(field[index], e.clientY)
       showMarker(index, true)
@@ -640,7 +783,7 @@ export function DiveSiteScene({
       if (index === hoveredIndex) return
       hoveredIndex = index
       showMarker(index, false)
-      dom.style.cursor = index >= 0 ? 'grab' : ''
+      dom.style.cursor = index < 0 ? '' : gesture === 'mark' ? 'crosshair' : 'grab'
     }
 
     function endGrab(e: PointerEvent) {
@@ -690,7 +833,7 @@ export function DiveSiteScene({
       hideBadge()
       clearGroup(handleLayer)
     }
-  }, [supported, handles, onHandleDrag, verticalExaggeration])
+  }, [supported, handles, onHandleDrag, onHandleMark, gesture, verticalExaggeration])
 
   return (
     <figure className={`${CARD} overflow-hidden`}>
@@ -703,6 +846,14 @@ export function DiveSiteScene({
             aria-hidden="true"
             className={`pointer-events-none absolute left-0 top-0 ${BADGE_READOUT}`}
           />
+          <div className={`absolute left-3 top-3 flex gap-1 ${OVERLAY_PANEL}`}>
+            <button type="button" className={BTN_XS_GHOST} onClick={() => viewFrom('above')}>
+              {t.siteMap.viewFromAbove}
+            </button>
+            <button type="button" className={BTN_XS_GHOST} onClick={() => viewFrom('seabed')}>
+              {t.siteMap.viewFromSeabed}
+            </button>
+          </div>
           <svg
             viewBox="-64 -64 128 128"
             className="pointer-events-none absolute right-3 top-3 h-16 w-16 opacity-90"
@@ -726,6 +877,9 @@ export function DiveSiteScene({
       )}
       <figcaption className="space-y-1 px-4 py-3">
         <p className={`text-sm ${TEXT_HEADING}`}>{map.name}</p>
+        {!!observed.entries.length && (
+          <p className={`text-xs ${TEXT_MUTED}`}>{t.siteMap.entriesMarked(observed.entries.length)}</p>
+        )}
         {!!handles?.length && (
           <p className={`text-xs ${TEXT_MUTED}`}>{t.siteMap.handleSpacing(handleStep)}</p>
         )}
@@ -753,6 +907,7 @@ export function DiveSiteScene({
           {surface ? t.siteMap.coverage(Math.round(coverage * 100)) : t.siteMap.scaffoldOnly}
         </p>
         <p className={`text-xs ${TEXT_SUBTLE}`}>{t.siteMap.exaggeration(verticalExaggeration)}</p>
+        <p className={`text-xs ${TEXT_SUBTLE}`}>{t.siteMap.seaLevelLegend}</p>
         <p className={`text-xs ${TEXT_SUBTLE}`}>{t.siteMap.fadeLegend}</p>
         <p className={`text-xs ${TEXT_SUBTLE}`}>{t.siteMap.schematicLegend}</p>
       </figcaption>

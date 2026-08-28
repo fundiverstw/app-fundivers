@@ -73,6 +73,21 @@ export const en = {
     problemDepth: 'A depth must be between 1 and 100 m.',
     attributedTo: (name: string) => `This submission will be recorded under ${name}. Your name is shown on the site's history; your email is not published.`,
     submitNote: 'Contributions are reviewed before they appear on the site map. Your depths are recorded with the time, so they can be tide-corrected later.',
+    toolAria: 'What a tap on the seabed does',
+    toolDepths: 'Depths',
+    toolEntries: 'Entry points',
+    hintMarkEntry: 'Tap the point you get into the water at, and again to unmark it. A site has as many ways in as it has — name each one so a diver knows which is which. Drag anywhere else to look around.',
+    entriesHeading: 'Ways into the water',
+    entryAt: (x: number, y: number) => `${Math.abs(x)} m ${x < 0 ? 'W' : 'E'}, ${Math.abs(y)} m ${y < 0 ? 'S' : 'N'}`,
+    entryLabelPlaceholder: 'Name it — slipway, steps, the gully',
+    entryLabelAria: (place: string) => `Name for the entry at ${place}`,
+    entryRemove: 'Unmark',
+    entriesMarked: (n: number) => n === 1
+      ? 'One way into the water is marked: a green ring at the surface, with a line dropped to the seabed under it.'
+      : `${n} ways into the water are marked: green rings at the surface, each with a line dropped to the seabed under it.`,
+    viewFromAbove: 'From above',
+    viewFromSeabed: 'From the seabed',
+    seaLevelLegend: 'The pale sheet overhead is sea level. Every depth here is measured down from it, and every point starts on it.',
     datumNamed: (datum: string) => `Depths reduced to ${datum}.`,
   },
   dashboard: {

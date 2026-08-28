@@ -12,6 +12,9 @@
 //      produce the same id and the newer reading replaces the older, rather
 //      than stacking two depths on one spot.
 //   4. Features keep their geometry, whichever shape they are.
+//   5. Entry points are records like the rest (20260828000000), not a jsonb
+//      field on the map: a site has as many ways in as it has, and each one
+//      names the diver who marked it.
 import { describe, it, expect, afterAll, beforeAll } from 'vitest'
 import {
   adminClient, userClient, createTestUser, deleteTestUser, type TestUser,
@@ -44,10 +47,15 @@ afterAll(async () => {
   for (const u of [adminUser, diver, otherAdmin]) if (u) await deleteTestUser(admin, u.id)
 })
 
-async function fileAs(user: TestUser, soundings: unknown[], features: unknown[] = []) {
+const entry = (id: string, x: number, y: number, label?: string) =>
+  ({ id, at: { x, y }, ...(label ? { label } : {}), source: 'diver' })
+
+async function fileAs(
+  user: TestUser, soundings: unknown[], features: unknown[] = [], entries: unknown[] = [],
+) {
   const db = await userClient(user.email, user.password)
   return db.rpc('submit_site_map_contribution', {
-    p_site_id: siteId, p_soundings: soundings, p_features: features,
+    p_site_id: siteId, p_soundings: soundings, p_features: features, p_entries: entries,
   })
 }
 
@@ -123,7 +131,7 @@ describe('filing readings', () => {
   })
 
   it('refuses an empty contribution', async () => {
-    const { error } = await fileAs(adminUser, [], [])
+    const { error } = await fileAs(adminUser, [], [], [])
     expect(error).not.toBeNull()
   })
 
@@ -197,5 +205,72 @@ describe('reading a map back', () => {
 
     const { data: left } = await admin.from('dive_site_soundings').select('id').eq('site_id', doomed)
     expect(left).toHaveLength(0)
+  })
+})
+
+
+// Entry points used to be a jsonb array on the map row, on the reasoning that
+// they came off a hand-drawn plan and nobody would ever write one. Divers mark
+// them now, so they are records: attributable, reconcilable, and as many per
+// site as the site has ways into the water.
+describe('ways into the water', () => {
+  it('files one on its own, with no depth attached to it', async () => {
+    const { data, error } = await fileAs(adminUser, [], [], [entry('ent:2:3', 2, 3, 'Slipway')])
+    expect(error).toBeNull()
+
+    const { data: rows } = await admin.from('dive_site_entries')
+      .select('*').eq('site_id', siteId).eq('id', 'ent:2:3')
+    expect(rows).toHaveLength(1)
+    expect(rows![0]).toMatchObject({
+      label: 'Slipway', source: 'diver', contribution_id: data as string,
+    })
+    expect(Number(rows![0].x)).toBe(2)
+    expect(Number(rows![0].y)).toBe(3)
+  })
+
+  it('keeps every one a site has, rather than one at a time', async () => {
+    await fileAs(adminUser, [], [], [
+      entry('ent:40:0', 40, 0, 'Steps'),
+      entry('ent:0:40', 0, 40, 'The gully'),
+    ])
+    const { data: rows } = await admin.from('dive_site_entries')
+      .select('id').eq('site_id', siteId)
+    const ids = (rows ?? []).map(r => r.id)
+    expect(ids).toEqual(expect.arrayContaining(['ent:40:0', 'ent:0:40']))
+  })
+
+  // Same reconciliation the soundings get: the id is the lattice position, so
+  // the second diver to mark a slipway is confirming it, not adding another.
+  it('lets a second person correct the name instead of duplicating the place', async () => {
+    await fileAs(adminUser, [], [], [entry('ent:9:9', 9, 9, 'Rocks')])
+    await fileAs(otherAdmin, [], [], [entry('ent:9:9', 9, 9, 'North steps')])
+
+    const { data: rows } = await admin.from('dive_site_entries')
+      .select('label').eq('site_id', siteId).eq('id', 'ent:9:9')
+    expect(rows).toHaveLength(1)
+    expect(rows![0].label).toBe('North steps')
+  })
+
+  it('refuses a diver, both filing and reading', async () => {
+    expect((await fileAs(diver, [], [], [entry('ent:5:5', 5, 5)])).error).not.toBeNull()
+
+    const db = await userClient(diver.email, diver.password)
+    const { data: rows } = await db.from('dive_site_entries').select('*').eq('site_id', siteId)
+    expect(rows ?? []).toHaveLength(0)
+  })
+
+  it('refuses a diver writing the table directly', async () => {
+    const db = await userClient(diver.email, diver.password)
+    expect((await db.from('dive_site_entries').insert({
+      id: 'ent:99:99', site_id: siteId, x: 99, y: 99, source: 'survey',
+    } as never)).error).not.toBeNull()
+  })
+
+  // The column it replaced is gone, so there is only ever one answer to
+  // "where do you get in".
+  it('has no jsonb twin left on the map row', async () => {
+    const { data } = await admin.from('dive_site_maps').select('*').eq('site_id', siteId).single()
+    expect(data).not.toBeNull()
+    expect('entries' in (data as object)).toBe(false)
   })
 })

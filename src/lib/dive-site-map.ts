@@ -147,10 +147,24 @@ export interface RouteBearing {
   label?: string
 }
 
+/**
+ * Somewhere a diver can get into the water.
+ *
+ * A site has as many as it has ways in — a slipway, a set of steps, a gap in
+ * the rocks reachable only at low water — and which one was used decides what
+ * the rest of the dive looks like. So an entry is an observation like a depth
+ * is: it carries who said so and which submission it arrived on, and two
+ * divers who mark the same square metre are agreeing rather than each adding
+ * one. The id is derived from the coordinate for exactly that reason.
+ */
 export interface EntryPoint {
   id: string
   at: Vec2
+  /** What the divers call it. User-generated content, never translated. */
   label?: string
+  source: ObservationSource
+  /** The submission this came in on. See `Sounding.contribution_id`. */
+  contribution_id?: string
 }
 
 export interface SiteFrame {
@@ -207,6 +221,13 @@ export function snapToLattice(at: Vec2, spacing_m = LATTICE_SPACING_M): Vec2 {
 export function latticeId(at: Vec2, spacing_m = LATTICE_SPACING_M): string {
   const p = snapToLattice(at, spacing_m)
   return `lat:${p.x}:${p.y}`
+}
+
+/** Stable id for an entry point, on the same lattice and for the same reason:
+ *  two divers marking one slipway must produce one entry, not two. */
+export function entryId(at: Vec2, spacing_m = LATTICE_SPACING_M): string {
+  const p = snapToLattice(at, spacing_m)
+  return `ent:${p.x}:${p.y}`
 }
 
 export interface Bounds {
@@ -308,6 +329,7 @@ export function countsBySource(map: DiveSiteMap): Record<ObservationSource, numb
   const counts: Record<ObservationSource, number> = { hand_drawn: 0, diver: 0, survey: 0, placeholder: 0 }
   for (const s of map.soundings) counts[s.source] += 1
   for (const f of map.features) counts[f.source] += 1
+  for (const e of map.entries) counts[e.source] += 1
   return counts
 }
 
@@ -341,5 +363,6 @@ export function observedOnly(map: DiveSiteMap): DiveSiteMap {
     ...map,
     soundings: map.soundings.filter(s => isObserved(s.source)),
     features: map.features.filter(f => isObserved(f.source)),
+    entries: map.entries.filter(e => isObserved(e.source)),
   }
 }

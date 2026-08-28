@@ -3,6 +3,7 @@ import {
   boundsOf, viewBoxFor, toSvg, pathData, bearingEnd, scaleBarMetres,
   depthLabel, singleDatum, countsBySource, isVolumetric, VOLUMETRIC_FEATURES,
   canReduceToDatum, unreducibleSoundings, isObserved, observedOnly,
+  entryId, latticeId,
   type DiveSiteMap,
 } from './dive-site-map'
 
@@ -27,7 +28,7 @@ describe('boundsOf', () => {
   it('spans soundings, entries, bearings and feature geometry together', () => {
     const map = emptyMap()
     map.soundings = [{ id: 's', at: { x: 5, y: 5 }, depth_m: 12, datum: 'unknown', source: 'hand_drawn' }]
-    map.entries = [{ id: 'e', at: { x: -10, y: 0 } }]
+    map.entries = [{ id: 'e', at: { x: -10, y: 0 }, source: 'hand_drawn' }]
     map.bearings = [{ id: 'b', from: { x: 0, y: 20 }, degrees: 90 }]
     map.features = [{
       id: 'f', kind: 'wall', source: 'hand_drawn',
@@ -221,5 +222,37 @@ describe('placeholder scaffold', () => {
     ]
     expect(countsBySource(map)).toEqual({ hand_drawn: 0, diver: 0, survey: 0, placeholder: 1 })
     expect(countsBySource(observedOnly(map)).placeholder).toBe(0)
+  })
+})
+
+
+describe('entry points', () => {
+  // Same rule the lattice enforces on depths, for the same reason: a site has
+  // one slipway, not one per diver who noticed it.
+  it('keys an entry off the coordinate, so two divers marking one slipway agree', () => {
+    expect(entryId({ x: 4, y: -6 })).toBe(entryId({ x: 4.2, y: -5.9 }))
+    expect(entryId({ x: 4, y: -6 })).not.toBe(entryId({ x: 5, y: -6 }))
+  })
+
+  it('does not collide with the id of the sounding on the same square metre', () => {
+    expect(entryId({ x: 4, y: 6 })).not.toBe(latticeId({ x: 4, y: 6 }))
+  })
+
+  it('counts toward what a diver contributed', () => {
+    const map = emptyMap()
+    map.entries = [
+      { id: 'e1', at: { x: 0, y: 0 }, source: 'diver' },
+      { id: 'e2', at: { x: 8, y: 0 }, source: 'hand_drawn' },
+    ]
+    expect(countsBySource(map)).toMatchObject({ diver: 1, hand_drawn: 1 })
+  })
+
+  it('is dropped from the observed map when it is only scaffold', () => {
+    const map = emptyMap()
+    map.entries = [
+      { id: 'e1', at: { x: 0, y: 0 }, source: 'diver' },
+      { id: 'e2', at: { x: 8, y: 0 }, source: 'placeholder' },
+    ]
+    expect(observedOnly(map).entries.map(e => e.id)).toEqual(['e1'])
   })
 })

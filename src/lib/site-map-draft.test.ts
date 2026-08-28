@@ -3,6 +3,7 @@ import {
   emptyDraft, setTool, setFeatureKind, placeSounding, addVertex,
   canCommitPath, commitPath, undo, contributionCount, isEmpty, validate,
   toContribution, withDraft, contributionsByDiver, MAX_PLAUSIBLE_DEPTH_M,
+  markEntry, nameEntry,
 } from './site-map-draft'
 import type { DiveSiteMap } from './dive-site-map'
 
@@ -222,5 +223,74 @@ describe('correcting a point that was already pulled', () => {
     let d = placeSounding(emptyDraft(), { x: 0, y: 0 }, 23, NOW, 'lat:0:0')
     d = placeSounding(d, { x: 20, y: 0 }, 19, NOW, 'lat:20:0')
     expect(d.soundings).toHaveLength(2)
+  })
+})
+
+
+describe('marking ways into the water', () => {
+  it('records where a diver got in, attributed like every other observation', () => {
+    const d = markEntry(emptyDraft(), { x: 4, y: -2 })
+    expect(d.entries).toHaveLength(1)
+    expect(d.entries[0]).toMatchObject({ at: { x: 4, y: -2 }, source: 'diver' })
+  })
+
+  it('snaps to the lattice, so the id is the place rather than the tap', () => {
+    const a = markEntry(emptyDraft(), { x: 4.2, y: -1.9 })
+    const b = markEntry(emptyDraft(), { x: 3.8, y: -2.1 })
+    expect(a.entries[0].id).toBe(b.entries[0].id)
+    expect(a.entries[0].at).toEqual({ x: 4, y: -2 })
+  })
+
+  // The gesture that places one is a tap on a point of seabed, and taps land
+  // where they were not meant to.
+  it('unmarks a point already marked rather than marking it twice', () => {
+    const once = markEntry(emptyDraft(), { x: 4, y: -2 })
+    const twice = markEntry(once, { x: 4, y: -2 })
+    expect(twice.entries).toHaveLength(0)
+  })
+
+  it('takes as many as the site has ways in', () => {
+    let d = markEntry(emptyDraft(), { x: 0, y: 0 })
+    d = markEntry(d, { x: 30, y: 12 })
+    d = markEntry(d, { x: -18, y: 4 })
+    expect(d.entries).toHaveLength(3)
+    expect(new Set(d.entries.map(e => e.id)).size).toBe(3)
+  })
+
+  it('names one, because a slipway and a scramble are not interchangeable', () => {
+    const d = markEntry(emptyDraft(), { x: 4, y: -2 })
+    const named = nameEntry(d, d.entries[0].id, '  Slipway  ')
+    expect(named.entries[0].label).toBe('Slipway')
+  })
+
+  it('leaves no empty label behind when the name is cleared', () => {
+    let d = markEntry(emptyDraft(), { x: 4, y: -2 })
+    d = nameEntry(d, d.entries[0].id, 'Steps')
+    d = nameEntry(d, d.entries[0].id, '   ')
+    expect('label' in d.entries[0]).toBe(false)
+  })
+
+  it('is a contribution on its own — a way in is something the site did not know', () => {
+    const d = markEntry(emptyDraft(), { x: 4, y: -2 })
+    expect(contributionCount(d)).toBe(1)
+    expect(isEmpty(d)).toBe(false)
+    expect(validate(d)).toEqual([])
+    expect(toContribution(d, 'site-1')?.entries).toHaveLength(1)
+  })
+
+  it('comes off first on undo, before a reading somebody pulled for', () => {
+    let d = placeSounding(emptyDraft(), { x: 0, y: 0 }, 12, NOW)
+    d = markEntry(d, { x: 4, y: -2 })
+    expect(undo(d).entries).toHaveLength(0)
+    expect(undo(d).soundings).toHaveLength(1)
+  })
+
+  it('replaces a stored entry on the same spot in the preview, not doubles it', () => {
+    const map = baseMap()
+    map.entries = [{ id: 'ent:4:-2', at: { x: 4, y: -2 }, label: 'Old name', source: 'hand_drawn' }]
+    const d = nameEntry(markEntry(emptyDraft(), { x: 4, y: -2 }), 'ent:4:-2', 'Slipway')
+    const preview = withDraft(map, d)
+    expect(preview.entries).toHaveLength(1)
+    expect(preview.entries[0].label).toBe('Slipway')
   })
 })

@@ -66,6 +66,21 @@ export const zhTW: Messages = {
     problemDepth: '深度必須介於 1 至 100 公尺之間。',
     attributedTo: (name: string) => `這次送出將記錄在 ${name} 名下。潛點的修訂紀錄會顯示你的名字，但不會公開你的電子郵件。`,
     submitNote: '貢獻內容經審核後才會顯示在潛點地圖上。深度會連同時間一併記錄，以便日後進行潮汐校正。',
+    toolAria: '點擊海底時的動作',
+    toolDepths: '深度',
+    toolEntries: '入水點',
+    hintMarkEntry: '點一下你入水的位置，再點一次可取消。一個潛點有幾條下水的路，就可以標幾個入水點——請幫每一個取名，讓潛水員分得出哪個是哪個。拖曳其他地方可以轉動視角。',
+    entriesHeading: '可以下水的地方',
+    entryAt: (x: number, y: number) => `${Math.abs(x)} 公尺${x < 0 ? '西' : '東'}、${Math.abs(y)} 公尺${y < 0 ? '南' : '北'}`,
+    entryLabelPlaceholder: '取個名字——斜坡、階梯、溝道',
+    entryLabelAria: (place: string) => `${place} 這個入水點的名稱`,
+    entryRemove: '取消標記',
+    entriesMarked: (n: number) => n === 1
+      ? '已標記 1 個入水點：水面上的綠色圓環，下方有一條線落到海底。'
+      : `已標記 ${n} 個入水點：水面上的綠色圓環，各有一條線落到海底。`,
+    viewFromAbove: '從上方看',
+    viewFromSeabed: '從海底看',
+    seaLevelLegend: '頭頂那層淡色的面就是海平面。這裡的深度都是從它往下量，每一個點也都從它開始。',
     datumNamed: (datum: string) => `深度已歸算至 ${datum}。`,
   },
   dashboard: {

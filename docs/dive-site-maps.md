@@ -4,9 +4,11 @@ Diver-contributed seafloor maps, in 3D. **Admin-only for now** — the tile on
 the diver home page is greyed out for everyone else, and will be opened up once
 the model has been tested against a real site.
 
-Status: the model, the renderer and the contribution editor exist and are
-covered by tests. **Nothing is persisted yet** — there is no table and no
-migration, and the workbench holds contributions in page state only.
+Status: the model, the renderer and the contribution editor exist, are covered
+by tests, and are **persisted** — five tables and an RPC, from
+`20260827500000_dive_site_maps.sql` and `20260828000000_dive_site_entries.sql`.
+The page is `/site-maps`, behind `AdminRoute`; there is no dev-only workbench
+any more.
 
 ## Why this exists
 
@@ -26,6 +28,7 @@ divers will fill that gap themselves.
 | `ObservationSource` includes **`placeholder`** | Scaffolding is not observation. Placeholder records are stripped by `observedOnly()` before anything is measured, counted or rendered as seabed. |
 | Features can be **volumetric** | `VOLUMETRIC_FEATURES` names arch / swim_through / overhang / cave — the kinds a depth grid cannot express at any resolution. This is the research claim made executable. |
 | Records carry **`contribution_id`** | Attribution works like a commit: history, per-diver counts and reverting all follow. |
+| **Entry points are records**, not a field on the map | A site has as many ways in as it has — a slipway, a set of steps, a gap in the rocks that only works at low water — and which one was used decides the rest of the dive. So an entry carries who marked it and which submission it arrived on, and `entryId(at)` keys it off the same lattice: two divers marking one slipway are agreeing, not each adding one. |
 
 ### The editing lattice
 
@@ -79,9 +82,23 @@ readable message when WebGL is unavailable.
   true scale, tens of meters of relief across hundreds of meters of width
   flattens into nothing.
 - **Picking is screen-space**, not ray-vs-sphere: markers a meter across in a
-  500 m scene are a few pixels, and a tap means "nearest marker within ~24 px".
-  A pointer that moves more than 6 px between down and up is a camera drag, not
-  a tap.
+  500 m scene are a few pixels, so a grab means "nearest handle within ~26 px"
+  (`nearestWithin`, in `site-map-grab.ts`, which is why the rule is testable
+  without a GPU). A grab that hits nothing orbits the camera instead.
+- **The renderer, camera and controls outlive the data.** Rebuilding them when
+  a reading lands threw the diver's viewpoint away after every pull, which is
+  what made a continuous gesture feel like a series of clicks. The camera is
+  reframed only when the *ground* changes — keyed on `${map.id}:${extent}`.
+- **The camera may go under the seabed and look up.** The polar clamp is
+  0.02π–0.98π, not a horizon: a diver reads a site from inside it, and it is
+  the only angle from which a point pulled down a long way separates from the
+  flat sheet above it. `q` / `e` sink and rise; two overlay buttons jump to the
+  plan view and to a diver's-eye view just off the bottom.
+- **Sea level is drawn** as a pale translucent sheet at y = 0. It is the one
+  plane in the scene that is not an inference — every depth is measured down
+  from it and every handle starts on it — and without it, looking up from the
+  seabed showed nothing at all. The unedited seabed does not write depth, or
+  the first point anybody pulls would hide behind the sheet it came out of.
 - **Volumetric features are wireframe markers.** Position is real; shape is
   schematic, and a solid mesh would imply a survey nobody has done.
 - **Compass** is an SVG overlay, not scene geometry, so it stays crisp and its
@@ -98,11 +115,16 @@ A draft is deliberately **separate** from the map it will be added to: a
 contribution is a proposal, reviewable before it lands and discardable without
 disturbing what is there.
 
-- `applyPick()` holds the rule that **only existing points are editable**. A tap
-  that hits nothing is ignored rather than dropping a reading into open water.
-  Free placement sounds more capable and is worse: points land wherever a finger
-  happened to be in a perspective view, they supersede nothing, and the site
-  accumulates a lattice of corrections plus a scatter of near-duplicates.
+- **The depth comes out of the gesture.** The seabed starts flat at the
+  surface, every metre of it is a handle, and a diver pulls the ones that are
+  wrong down to where they belong (`site-map-grab.ts`). Down is deeper. The old
+  flow — type a figure, then tap to stamp it — made the number the subject and
+  the place an afterthought; the typed field survives, bound to the point just
+  pulled, for the diver who read 24.3 off a computer.
+- **Two tools, and only two.** Pulling depths is one act; saying where you got
+  into the water is another, and they cannot share a gesture. `markEntry()`
+  toggles, because the gesture that places an entry is a tap and taps land
+  where they were not meant to.
 - Corrections carry `supersedes`, so the flat original does not survive
   underneath its own fix, and correcting the same point twice replaces the
   earlier value rather than stacking.
@@ -136,14 +158,15 @@ Both home pages render the tiles — the diver `/dashboard` and the admin
 diver home, so gating the only entry point behind a page they don't visit made
 the feature admin-only in name and unreachable in practice.
 
-The workbench itself is `/dev/site-map`, dev-only via `import.meta.env.DEV` and
-outside the auth guards so the renderer can be looked at without a session. It
-is tree-shaken out of production builds.
+The page is `/site-maps`, behind `AdminRoute`, and the tables are
+admin-only in RLS as well — "not available yet" has to mean the data and not
+just the button, since the tables are one PostgREST call from any session
+(`20260827600000_site_maps_admin_only.sql`). The RPC carries its own
+`is_admin()` check: `security definer` runs past RLS by design, so a diver who
+found the endpoint could otherwise file into a map they cannot read.
 
 ## What is not built
 
-- **No persistence.** No table, no migration, no RLS. `onSubmit` hands back a
-  `SiteContribution` and the workbench keeps it in page state.
 - **No contour or feature drawing.** The draft model supports both
   (`addVertex`, `commitPath`, every `FeatureKind`), but the 2D editor that drove
   them was removed with the flat view, and tracing an outline on an orbiting

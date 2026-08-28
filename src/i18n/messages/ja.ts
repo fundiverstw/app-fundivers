@@ -65,6 +65,21 @@ export const ja: Messages = {
     problemDepth: '水深は 1〜100 m の範囲で入力してください。',
     attributedTo: (name: string) => `この投稿は ${name} として記録されます。サイトの履歴には名前が表示されますが、メールアドレスは公開されません。`,
     submitNote: '投稿は確認後にサイトマップへ反映されます。水深は時刻とともに記録され、後から潮汐補正できます。',
+    toolAria: '海底をタップしたときの動作',
+    toolDepths: '水深',
+    toolEntries: 'エントリー地点',
+    hintMarkEntry: '入水する地点をタップしてください。もう一度タップすると解除されます。サイトには入れる場所の数だけエントリーがあります。どれがどれか分かるよう、それぞれに名前を付けてください。それ以外の場所をドラッグすると視点が動きます。',
+    entriesHeading: '入水できる場所',
+    entryAt: (x: number, y: number) => `東西 ${Math.abs(x)} m ${x < 0 ? '西' : '東'}、南北 ${Math.abs(y)} m ${y < 0 ? '南' : '北'}`,
+    entryLabelPlaceholder: '名前（スロープ、階段、ガリーなど）',
+    entryLabelAria: (place: string) => `${place} のエントリー名`,
+    entryRemove: '解除',
+    entriesMarked: (n: number) => n === 1
+      ? '入水できる場所が1か所記録されています。水面の緑のリングと、その下の海底まで伸びる線で示しています。'
+      : `入水できる場所が${n}か所記録されています。水面の緑のリングと、その下の海底まで伸びる線で示しています。`,
+    viewFromAbove: '真上から',
+    viewFromSeabed: '海底から',
+    seaLevelLegend: '頭上の淡い面が海面です。ここでの水深はすべてそこから下向きに測り、すべての点は海面から始まります。',
     datumNamed: (datum: string) => `水深は ${datum} に換算済み。`,
   },
   dashboard: {

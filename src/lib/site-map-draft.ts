@@ -1,5 +1,6 @@
+import { entryId, snapToLattice } from './dive-site-map'
 import type {
-  DiveSiteMap, FeatureKind, SiteFeature, Sounding, Vec2,
+  DiveSiteMap, EntryPoint, FeatureKind, SiteFeature, Sounding, Vec2,
 } from './dive-site-map'
 
 // What a diver builds before they submit anything.
@@ -16,7 +17,7 @@ import type {
 // refuses to submit soundings that lack one, which is why the field is
 // captured at placement rather than asked for at the end.
 
-export type EditorTool = 'sounding' | 'contour' | 'feature'
+export type EditorTool = 'sounding' | 'entry' | 'contour' | 'feature'
 
 export interface Draft {
   tool: EditorTool
@@ -24,6 +25,7 @@ export interface Draft {
   pending: Vec2[]
   soundings: Sounding[]
   features: SiteFeature[]
+  entries: EntryPoint[]
   /** Kind applied to the next committed feature. */
   featureKind: FeatureKind
 }
@@ -34,6 +36,7 @@ export function emptyDraft(overrides: Partial<Draft> = {}): Draft {
     pending: [],
     soundings: [],
     features: [],
+    entries: [],
     featureKind: 'rock',
     ...overrides,
   }
@@ -87,6 +90,48 @@ export function placeSounding(
   return { ...draft, soundings: [...kept, sounding] }
 }
 
+/**
+ * Mark, or unmark, a way into the water.
+ *
+ * Toggling rather than adding, because the gesture that places one is a tap on
+ * a point of seabed and taps land where they were not meant to. An entry that
+ * can only be added is an entry somebody has to ask staff to remove.
+ *
+ * The id comes off the lattice, so marking a slipway another diver already
+ * marked corrects their record instead of stacking a second entry on it.
+ */
+export function markEntry(draft: Draft, at: Vec2, label?: string): Draft {
+  const point = snapToLattice(at)
+  const id = entryId(point)
+  const existing = draft.entries.find(e => e.id === id)
+  if (existing) return { ...draft, entries: draft.entries.filter(e => e.id !== id) }
+  return {
+    ...draft,
+    entries: [...draft.entries, {
+      id,
+      at: point,
+      ...(label ? { label } : {}),
+      source: 'diver',
+    }],
+  }
+}
+
+/** Name an entry already marked. A slipway and a scramble down the rocks are
+ *  not interchangeable, and the label is the only thing that says which. */
+export function nameEntry(draft: Draft, id: string, label: string): Draft {
+  const trimmed = label.trim()
+  return {
+    ...draft,
+    entries: draft.entries.map(e => {
+      if (e.id !== id) return e
+      const renamed: EntryPoint = { id: e.id, at: e.at, source: e.source }
+      if (e.contribution_id) renamed.contribution_id = e.contribution_id
+      if (trimmed) renamed.label = trimmed
+      return renamed
+    }),
+  }
+}
+
 export function addVertex(draft: Draft, at: Vec2): Draft {
   return { ...draft, pending: [...draft.pending, at] }
 }
@@ -118,12 +163,13 @@ export function commitPath(draft: Draft, label?: string): Draft {
 export function undo(draft: Draft): Draft {
   if (draft.pending.length) return { ...draft, pending: draft.pending.slice(0, -1) }
   if (draft.features.length) return { ...draft, features: draft.features.slice(0, -1) }
+  if (draft.entries.length) return { ...draft, entries: draft.entries.slice(0, -1) }
   if (draft.soundings.length) return { ...draft, soundings: draft.soundings.slice(0, -1) }
   return draft
 }
 
 export function contributionCount(draft: Draft): number {
-  return draft.soundings.length + draft.features.length
+  return draft.soundings.length + draft.features.length + draft.entries.length
 }
 
 export function isEmpty(draft: Draft): boolean {
@@ -158,6 +204,7 @@ export interface SiteContribution {
   contributor?: Contributor
   soundings: Sounding[]
   features: SiteFeature[]
+  entries: EntryPoint[]
   note?: string
 }
 
@@ -194,6 +241,7 @@ export function toContribution(
     contributor: opts.contributor,
     soundings: draft.soundings,
     features: draft.features,
+    entries: draft.entries,
     note: opts.note,
   }
 }
@@ -208,6 +256,7 @@ export function contributionsByDiver(map: DiveSiteMap): Map<string, number> {
   }
   map.soundings.forEach(s => bump(s.contribution_id))
   map.features.forEach(f => bump(f.contribution_id))
+  map.entries.forEach(e => bump(e.contribution_id))
   return counts
 }
 
@@ -219,5 +268,11 @@ export function withDraft(map: DiveSiteMap, draft: Draft): DiveSiteMap {
     ...map,
     soundings: [...map.soundings, ...draft.soundings],
     features: [...map.features, ...draft.features],
+    // Draft entries replace a stored one on the same lattice position rather
+    // than doubling it, matching what the database does on submission.
+    entries: [
+      ...map.entries.filter(e => !draft.entries.some(d => d.id === e.id)),
+      ...draft.entries,
+    ],
   }
 }

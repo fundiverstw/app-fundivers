@@ -13,6 +13,8 @@ const { sceneProps } = vi.hoisted(() => ({
   sceneProps: { current: null as null | {
     handles: readonly GridHandle[]
     onHandleDrag: (e: DragEvent) => void
+    onHandleMark: (h: GridHandle) => void
+    gesture: 'pull' | 'mark'
   } },
 }))
 
@@ -20,7 +22,12 @@ const { sceneProps } = vi.hoisted(() => ({
 // to this component is a stream of drag events, so the stub exposes exactly
 // that and the test drives it the way a finger would.
 vi.mock('./DiveSiteScene', () => ({
-  DiveSiteScene: (props: { handles: readonly GridHandle[]; onHandleDrag: (e: DragEvent) => void }) => {
+  DiveSiteScene: (props: {
+    handles: readonly GridHandle[]
+    onHandleDrag: (e: DragEvent) => void
+    onHandleMark: (h: GridHandle) => void
+    gesture: 'pull' | 'mark'
+  }) => {
     sceneProps.current = props
     return <div data-testid="scene" />
   },
@@ -47,6 +54,14 @@ function pull(id: string, at: Vec2, to: number, frames = [12, 18]) {
 
 function moveTo(id: string, at: Vec2, depth_m: number) {
   act(() => sceneProps.current!.onHandleDrag({ id, at, depth_m, done: false }))
+}
+
+/** One tap in entry mode. The scene reports the handle; what it means is the
+ *  draft's business, which is the thing under test. */
+function tap(at: Vec2) {
+  act(() => sceneProps.current!.onHandleMark({
+    id: `lat:${at.x}:${at.y}`, at, depth_m: 0, measured: false,
+  }))
 }
 
 beforeEach(() => { sceneProps.current = null })
@@ -252,5 +267,104 @@ describe('SiteMapEditor — one metre, and room to grow', () => {
     expect(screen.getByText(sm.draftCount(1))).toBeInTheDocument()
     expect(sceneProps.current!.handles.find(h => h.at.y === far.y && h.at.x === 0))
       .toMatchObject({ depth_m: 21.5, measured: true })
+  })
+})
+
+
+// A site has as many ways in as it has: a slipway, a set of steps, a gap in
+// the rocks that only works at low water. Which one was used decides what the
+// rest of the dive looks like, so it is a thing to record, not a preference.
+describe('SiteMapEditor — designating a way into the water', () => {
+  async function armEntries() {
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: sm.toolEntries }))
+    return user
+  }
+
+  it('tells the scene that a tap now means a place, not a depth', async () => {
+    renderEditor()
+    expect(sceneProps.current!.gesture).toBe('pull')
+    await armEntries()
+    expect(sceneProps.current!.gesture).toBe('mark')
+  })
+
+  it('records the point tapped as an entry', async () => {
+    renderEditor()
+    await armEntries()
+    tap({ x: 4, y: -2 })
+
+    expect(screen.getByText(sm.draftCount(1))).toBeInTheDocument()
+    expect(screen.getByText(sm.entryAt(4, -2))).toBeInTheDocument()
+  })
+
+  it('takes several, because a site has several', async () => {
+    renderEditor()
+    await armEntries()
+    tap({ x: 4, y: -2 })
+    tap({ x: -6, y: 8 })
+
+    expect(screen.getByText(sm.draftCount(2))).toBeInTheDocument()
+    expect(screen.getByText(sm.entryAt(4, -2))).toBeInTheDocument()
+    expect(screen.getByText(sm.entryAt(-6, 8))).toBeInTheDocument()
+  })
+
+  it('takes a mis-tap back when the same point is tapped again', async () => {
+    renderEditor()
+    await armEntries()
+    tap({ x: 4, y: -2 })
+    tap({ x: 4, y: -2 })
+
+    expect(screen.getByText(sm.draftCount(0))).toBeInTheDocument()
+  })
+
+  it('names one, so a diver knows which way in is which', async () => {
+    renderEditor()
+    const user = await armEntries()
+    tap({ x: 4, y: -2 })
+
+    await user.type(screen.getByLabelText(sm.entryLabelAria(sm.entryAt(4, -2))), 'Slipway')
+
+    expect(screen.getByRole('button', { name: sm.submit })).toBeEnabled()
+  })
+
+  it('submits an entry on its own, with no depth attached to it', async () => {
+    const onSubmit = renderEditor()
+    const user = await armEntries()
+    tap({ x: 4, y: -2 })
+    await user.type(screen.getByLabelText(sm.entryLabelAria(sm.entryAt(4, -2))), 'Slipway')
+    await user.click(screen.getByRole('button', { name: sm.submit }))
+
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+    const contribution = onSubmit.mock.calls[0][0]
+    expect(contribution.soundings).toHaveLength(0)
+    expect(contribution.entries).toEqual([
+      expect.objectContaining({ at: { x: 4, y: -2 }, label: 'Slipway', source: 'diver' }),
+    ])
+  })
+
+  it('unmarks one from the list without hunting for it in the water', async () => {
+    renderEditor()
+    const user = await armEntries()
+    tap({ x: 4, y: -2 })
+    await user.click(screen.getByRole('button', { name: sm.entryRemove }))
+
+    expect(screen.getByText(sm.draftCount(0))).toBeInTheDocument()
+  })
+
+  // The depth field corrects the point last pulled. In entry mode there is no
+  // such point, and a stale figure sitting there invites a correction nobody
+  // asked for.
+  it('puts the depth field away while entries are being marked', async () => {
+    renderEditor()
+    expect(screen.getByLabelText(sm.depthField)).toBeInTheDocument()
+    await armEntries()
+    expect(screen.queryByLabelText(sm.depthField)).not.toBeInTheDocument()
+  })
+
+  it('says what the tap does, since the gesture changed under the diver', async () => {
+    renderEditor()
+    await armEntries()
+    expect(screen.getByText(sm.hintMarkEntry)).toBeInTheDocument()
+    expect(screen.queryByText(sm.hintDrag)).not.toBeInTheDocument()
   })
 })
