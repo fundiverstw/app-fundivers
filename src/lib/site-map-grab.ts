@@ -76,3 +76,41 @@ export function cancelGrab(grab: Grab): Grab {
 export function movedGrab(grab: Grab): boolean {
   return Math.abs(grab.depth_m - grab.from_m) >= DEPTH_STEP_M / 2
 }
+
+/** A point of the field as it lands on screen, in pixels from the canvas
+ *  corner. `behind` is a point the camera is facing away from — it projects to
+ *  a plausible-looking coordinate that is nowhere near where it appears. */
+export interface ScreenPoint {
+  x: number
+  y: number
+  behind?: boolean
+}
+
+/**
+ * Which point a finger is on: the nearest one within `radius_px`, or -1.
+ *
+ * Nearest rather than first-hit, because at 1 m spacing several points sit
+ * inside a fingertip and picking whichever the loop reached first would mean
+ * grabbing a neighbor of the one being aimed at. The radius is generous on
+ * purpose — a miss orbits the camera, which is recoverable, while a grab of
+ * the wrong point writes a reading in the wrong square metre.
+ */
+export function nearestWithin(
+  points: readonly ScreenPoint[],
+  px: number,
+  py: number,
+  radius_px: number,
+): number {
+  let nearest = -1
+  let nearestPx = radius_px
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i]
+    if (p.behind) continue
+    const d = Math.hypot(p.x - px, p.y - py)
+    if (d < nearestPx) {
+      nearest = i
+      nearestPx = d
+    }
+  }
+  return nearest
+}

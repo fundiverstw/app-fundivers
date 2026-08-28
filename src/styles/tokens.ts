@@ -85,6 +85,12 @@ export const BTN_XS_GHOST   = `${BTN_XS_BASE} border border-white/20 text-brand-
 export const BTN_XS_DANGER  = `${BTN_XS_BASE} bg-red-500/15 hover:bg-red-500/25 text-red-200 border border-red-400/40`
 
 // ── Inputs ─────────────────────────────────────────────────────────
+/** A value read off a gesture, floating over the thing it describes — the
+ *  depth under a finger while a point of seabed is being pulled. Carries the
+ *  primary control's fill so it reads as the app speaking, not as part of the
+ *  scene it sits on. */
+export const BADGE_READOUT = 'rounded-md px-2 py-0.5 text-xs font-semibold bg-reef-500 text-slate-950'
+
 export const INPUT       = 'w-full bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-brand-50 placeholder:text-brand-100/40 focus:outline-none focus:border-reef-400'
 export const INPUT_LABEL = 'block text-sm text-brand-100 mb-1'
 

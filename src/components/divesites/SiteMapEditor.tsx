@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { DiveSiteMap, Vec2 } from '../../lib/dive-site-map'
 import {
-  emptyDraft, placeSoundingAt, undo, contributionCount,
+  emptyDraft, placeSounding, undo, contributionCount,
   validate, toContribution, withDraft,
   type Contributor, type Draft, type SiteContribution,
 } from '../../lib/site-map-draft'
@@ -78,7 +78,7 @@ export function SiteMapEditor({
   const onHandleDrag = useCallback((e: { id: string; at: Vec2; depth_m: number; done: boolean }) => {
     setLive({ id: e.id, at: e.at, depth_m: e.depth_m })
     if (!e.done) return
-    setDraft(d => placeSoundingAt(d, e.at, e.depth_m, now(), e.id))
+    setDraft(d => placeSounding(d, e.at, e.depth_m, now(), e.id))
   }, [now])
 
   // Typing a figure corrects the point just pulled, rather than arming a value
@@ -87,7 +87,7 @@ export function SiteMapEditor({
     if (!live) return
     const corrected = setGrabDepth({ ...live, from_m: live.depth_m, originY: 0 } as Grab, depth_m)
     setLive({ ...live, depth_m: corrected.depth_m })
-    setDraft(d => placeSoundingAt(d, live.at, corrected.depth_m, now(), live.id))
+    setDraft(d => placeSounding(d, live.at, corrected.depth_m, now(), live.id))
   }
 
   function submit() {

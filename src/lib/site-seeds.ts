@@ -27,9 +27,17 @@ import type { DiveSiteMap } from './dive-site-map'
  */
 export const SITE_EXTENT_M = 250
 
-/** The depth an uncorrected lattice position is drawn at. A placeholder, not an
- *  estimate — the field is flat precisely so that it looks unmeasured. */
-export const BASE_DEPTH_M = 10
+/**
+ * The depth an uncorrected lattice position is drawn at: sea level.
+ *
+ * Not an estimate, and now not even a plausible one. A field that started ten
+ * meters down was a guess wearing the clothes of a reading — it looked like
+ * seabed, so a diver had to decide whether each point was already about right.
+ * At the surface there is nothing to agree with: the site is a flat sheet of
+ * water, and every point of seabed exists only once somebody has pulled it
+ * down to the depth they read there.
+ */
+export const BASE_DEPTH_M = 0
 
 /** A new site: identity and a canvas. */
 export function newSiteMap(id: string, name: string, name_en?: string): DiveSiteMap {

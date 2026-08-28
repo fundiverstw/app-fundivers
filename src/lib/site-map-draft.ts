@@ -24,8 +24,6 @@ export interface Draft {
   pending: Vec2[]
   soundings: Sounding[]
   features: SiteFeature[]
-  /** Depth applied to the next placed sounding, in meters. */
-  depth_m: number
   /** Kind applied to the next committed feature. */
   featureKind: FeatureKind
 }
@@ -36,7 +34,6 @@ export function emptyDraft(overrides: Partial<Draft> = {}): Draft {
     pending: [],
     soundings: [],
     features: [],
-    depth_m: 10,
     featureKind: 'rock',
     ...overrides,
   }
@@ -55,32 +52,18 @@ export function setTool(draft: Draft, tool: EditorTool): Draft {
   return { ...draft, tool, pending: [] }
 }
 
-export function setDepth(draft: Draft, depth_m: number): Draft {
-  return { ...draft, depth_m }
-}
-
 export function setFeatureKind(draft: Draft, featureKind: FeatureKind): Draft {
   return { ...draft, featureKind }
 }
 
-export function placeSounding(
-  draft: Draft,
-  at: Vec2,
-  observedAt: string,
-  supersedes?: string,
-): Draft {
-  return placeSoundingAt(draft, at, draft.depth_m, observedAt, supersedes)
-}
-
 /**
- * Place a reading at a depth the caller names, rather than at whatever the
- * draft's current setting happens to be.
+ * Place a reading at the depth the drag ended on.
  *
- * What a drag produces: the depth comes out of the gesture, so there is no
- * "current depth" for it to read. `placeSounding` is this with the draft's
- * setting filled in, which is what the tap-a-target flow needs.
+ * The depth is an argument rather than a setting on the draft because it comes
+ * out of the gesture. Arming a figure and then tapping a target was the older
+ * flow, and it made the number the subject and the place an afterthought.
  */
-export function placeSoundingAt(
+export function placeSounding(
   draft: Draft,
   at: Vec2,
   depth_m: number,
@@ -237,57 +220,4 @@ export function withDraft(map: DiveSiteMap, draft: Draft): DiveSiteMap {
     soundings: [...map.soundings, ...draft.soundings],
     features: [...map.features, ...draft.features],
   }
-}
-
-/**
- * The scaffold point a tap is correcting, if any.
- *
- * A diver aiming at a grid point will miss it by a meter or two, and a reading
- * dropped one meter from the point it was meant to replace leaves both on the
- * map: the flat placeholder AND the correction, arguing with each other.
- * Snapping means a tap near a point adopts THAT point's position, so the
- * correction lands exactly where the thing it supersedes was.
- */
-export function snapTarget(
-  at: Vec2,
-  candidates: Sounding[],
-  radius_m: number,
-): Sounding | null {
-  let best: Sounding | null = null
-  let bestDistance = radius_m
-  for (const c of candidates) {
-    if (c.source !== 'placeholder') continue
-    const d = Math.hypot(c.at.x - at.x, c.at.y - at.y)
-    if (d <= bestDistance) {
-      best = c
-      bestDistance = d
-    }
-  }
-  return best
-}
-
-/** Scaffold points a diver has already corrected in this draft — hidden from
- *  the canvas so the flat original does not sit under its own replacement. */
-export function supersededIds(draft: Draft): Set<string> {
-  return new Set(draft.soundings.map(s => s.supersedes).filter((x): x is string => !!x))
-}
-
-export interface Pick {
-  /** The existing point the tap landed on, if any. */
-  soundingId?: string
-  at: Vec2
-}
-
-/**
- * Apply a tap to the draft.
- *
- * Only existing points are editable: a tap that hits nothing is ignored rather
- * than dropping a reading into open water. Free placement sounds more capable
- * and is worse — points land wherever a finger happened to be in a perspective
- * view, they supersede nothing, and the site accumulates a lattice of
- * corrections plus a scatter of near-duplicates arguing with it.
- */
-export function applyPick(draft: Draft, pick: Pick, observedAt: string): Draft {
-  if (!pick.soundingId) return draft
-  return placeSounding(draft, pick.at, observedAt, pick.soundingId)
 }

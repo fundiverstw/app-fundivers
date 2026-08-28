@@ -60,6 +60,23 @@ describe('SiteMapEditor', () => {
     expect(handles.every(h => !h.measured)).toBe(true)
   })
 
+  // Nothing on an unedited site pretends to be seabed: it is a sheet of water,
+  // and every metre of bottom exists only where somebody pulled one down.
+  it('starts the whole field at the surface, with nothing to be shaped from', () => {
+    renderEditor()
+    expect(sceneProps.current!.handles.every(h => h.depth_m === 0)).toBe(true)
+  })
+
+  // The scene drops a grab that went nowhere, but if one ever reaches the
+  // draft it must not be submittable: the surface is where the point started,
+  // not a depth anybody read.
+  it('will not submit a reading left at the surface', () => {
+    renderEditor()
+    pull('lat:4:6', { x: 4, y: 6 }, 0, [])
+    expect(screen.getByText(sm.problemDepth)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: sm.submit })).toBeDisabled()
+  })
+
   // The point of the rewrite: the depth comes out of the gesture, so nobody
   // types a number before touching the seabed.
   it('records a reading from the pull itself, on release', () => {

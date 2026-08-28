@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
-  beginGrab, dragTo, setGrabDepth, cancelGrab, movedGrab, DEPTH_STEP_M,
+  beginGrab, dragTo, setGrabDepth, cancelGrab, movedGrab, nearestWithin,
+  DEPTH_STEP_M, type ScreenPoint,
 } from './site-map-grab'
 import { MAX_PLAUSIBLE_DEPTH_M } from './site-map-draft'
 import type { GridHandle } from './site-map-grid'
+import { BASE_DEPTH_M } from './site-seeds'
 
 const handle: GridHandle = { id: 'lat:4:6', at: { x: 4, y: 6 }, depth_m: 10, measured: false }
 
@@ -44,6 +46,20 @@ describe('dragging a point of seabed', () => {
     expect(dragTo(grabAt(), 5000, 1).depth_m).toBe(MAX_PLAUSIBLE_DEPTH_M)
   })
 
+  // Every point of an unedited site is at the surface, so this is what the
+  // first pull on a new site actually does.
+  it('turns a pull down from the surface into the depth pulled to', () => {
+    const surface: GridHandle = { ...handle, depth_m: BASE_DEPTH_M }
+    expect(beginGrab(surface, 100).depth_m).toBe(0)
+    expect(dragTo(beginGrab(surface, 100), 340, M_PER_PX).depth_m).toBe(24)
+  })
+
+  it('has nowhere to go upward from the surface, so an upward drag says nothing', () => {
+    const surface: GridHandle = { ...handle, depth_m: BASE_DEPTH_M }
+    expect(dragTo(beginGrab(surface, 100), 20, M_PER_PX).depth_m).toBe(0)
+    expect(movedGrab(dragTo(beginGrab(surface, 100), 20, M_PER_PX))).toBe(false)
+  })
+
   it('starts from the depth the handle already had', () => {
     const measured = { ...handle, depth_m: 24.3, measured: true }
     const grab = beginGrab(measured, 100)
@@ -82,5 +98,31 @@ describe('a grab that said nothing', () => {
     expect(pulled.depth_m).toBe(18)
     expect(cancelGrab(pulled).depth_m).toBe(10)
     expect(movedGrab(cancelGrab(pulled))).toBe(false)
+  })
+})
+
+
+describe('finding the point under a finger', () => {
+  const points: ScreenPoint[] = [
+    { x: 100, y: 100 },
+    { x: 108, y: 100 },
+    { x: 400, y: 400 },
+  ]
+
+  it('takes the nearest point inside the radius, not the first one found', () => {
+    expect(nearestWithin(points, 110, 100, 26)).toBe(1)
+    expect(nearestWithin(points, 98, 100, 26)).toBe(0)
+  })
+
+  // A miss orbits the camera, which is recoverable. A grab of the wrong point
+  // writes a reading in the wrong square metre, which nobody notices.
+  it('grabs nothing in open water rather than the closest thing anywhere', () => {
+    expect(nearestWithin(points, 250, 250, 26)).toBe(-1)
+    expect(nearestWithin([], 100, 100, 26)).toBe(-1)
+  })
+
+  it('ignores points the camera is facing away from', () => {
+    const behind: ScreenPoint[] = [{ x: 100, y: 100, behind: true }]
+    expect(nearestWithin(behind, 100, 100, 26)).toBe(-1)
   })
 })

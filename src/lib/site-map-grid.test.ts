@@ -94,6 +94,14 @@ describe('editableGrid', () => {
     expect(handles.every(h => !h.measured)).toBe(true)
   })
 
+  // A field that started ten meters down was a guess wearing the clothes of a
+  // reading. At the surface there is nothing to agree with, so shaping the
+  // seabed can only be done by pulling each point down to where it really is.
+  it('starts every point at the surface, with no depth to be talked out of', () => {
+    expect(BASE_DEPTH_M).toBe(0)
+    expect(editableGrid(site()).every(h => h.depth_m === 0)).toBe(true)
+  })
+
   it('spaces them one meter apart', () => {
     const xs = [...new Set(editableGrid(site()).map(h => h.at.x))].sort((a, b) => a - b)
     for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBe(LATTICE_SPACING_M)

@@ -10,22 +10,30 @@ import {
 } from '../../lib/dive-site-map'
 import { BASE_DEPTH_M, SITE_EXTENT_M } from '../../lib/site-seeds'
 import type { GridHandle } from '../../lib/site-map-grid'
-import { beginGrab, dragTo, movedGrab, type Grab } from '../../lib/site-map-grab'
+import {
+  beginGrab, dragTo, movedGrab, nearestWithin, type Grab, type ScreenPoint,
+} from '../../lib/site-map-grab'
 import { t } from '../../i18n'
-import { CARD, TEXT_HEADING, TEXT_MUTED, TEXT_SUBTLE } from '../../styles/tokens'
+import { BADGE_READOUT, CARD, TEXT_HEADING, TEXT_MUTED, TEXT_SUBTLE } from '../../styles/tokens'
 
-// The WebGL view. All arithmetic lives in lib/dive-site-surface.ts, which is
-// unit-tested; this file is the part that cannot be tested in a DOM without a
-// GPU, so it is kept as thin as possible and fails to a readable message rather
-// than a blank canvas when WebGL is unavailable.
+// The WebGL view. All arithmetic lives in lib/dive-site-surface.ts and
+// lib/site-map-grab.ts, which are unit-tested; this file is the part that
+// cannot be tested in a DOM without a GPU, so it is kept as thin as possible
+// and fails to a readable message rather than a blank canvas when WebGL is
+// unavailable.
 //
-// Two rendering decisions are load-bearing rather than cosmetic:
+// Three rendering decisions are load-bearing rather than cosmetic:
 //
 //  • The surface carries PER-VERTEX ALPHA from triangle confidence, so water
 //    nobody has sounded is visibly missing instead of quietly interpolated.
 //  • Volumetric features (arches, swim-throughs) are drawn as WIREFRAME
 //    markers, never as solid surfaces. Their position is real; their shape is
 //    schematic, and a solid mesh would imply a survey that has not happened.
+//  • The renderer, camera and controls OUTLIVE the data. Rebuilding them when
+//    a reading lands would throw the diver's viewpoint away after every pull:
+//    they would drag a point, watch the view snap back to its default framing,
+//    and have to fly back to where they were before pulling the next one. That
+//    is what made a continuous gesture feel like a series of separate clicks.
 
 // Probed once per session rather than per mount: creating a throwaway canvas
 // context is not free, and the answer cannot change while the tab is open.
@@ -53,8 +61,8 @@ interface DiveSiteSceneProps {
    *  record something when the diver lets go.
    *
    *  The scene moves the dot itself as the pointer moves rather than waiting
-   *  to be told: re-rendering React on every frame would rebuild this whole
-   *  effect, tearing the WebGL context down and back up mid-gesture. */
+   *  to be told: a React render per frame would rebuild the handle field
+   *  mid-gesture. */
   onHandleDrag?: (e: { id: string; at: Vec2; depth_m: number; done: boolean }) => void
   /** Vertical exaggeration. A dive site is tens of meters deep across hundreds
    *  of meters wide, so at true scale the relief that matters to a diver — the
@@ -62,6 +70,23 @@ interface DiveSiteSceneProps {
    *  standard practice for bathymetry; the figure is stated in the caption so
    *  nobody reads the slope as a real gradient. */
   verticalExaggeration?: number
+}
+
+/** What survives a data change: the view a diver has arranged for themselves. */
+interface Rig {
+  renderer: THREE.WebGLRenderer
+  scene: THREE.Scene
+  camera: THREE.PerspectiveCamera
+  controls: OrbitControls
+  /** Everything derived from the map — cleared and rebuilt when it changes. */
+  content: THREE.Group
+  /** The grabbable field, rebuilt on its own so a pull does not touch the
+   *  surface underneath it. */
+  handleLayer: THREE.Group
+  /** Meters per second of keyboard travel, scaled to the site by the content. */
+  travelSpeed: number
+  /** Half-width of the drawn site, for sizing markers against it. */
+  radius: number
 }
 
 /** Metres between the drawn handles, read off the field itself rather than
@@ -74,21 +99,43 @@ function handleSpacingOf(handles?: readonly GridHandle[]): number {
   return Number.isFinite(min) ? min : LATTICE_SPACING_M
 }
 
+/** Free a subtree's GPU memory. Points and lines hold buffers exactly as
+ *  meshes do, and content is rebuilt often enough that leaking them shows. */
+function disposeSubtree(root: THREE.Object3D) {
+  root.traverse(obj => {
+    const holder = obj as unknown as {
+      geometry?: THREE.BufferGeometry
+      material?: THREE.Material | THREE.Material[]
+    }
+    holder.geometry?.dispose()
+    const m = holder.material
+    if (Array.isArray(m)) m.forEach(x => x.dispose())
+    else m?.dispose()
+  })
+}
+
+function clearGroup(group: THREE.Group) {
+  disposeSubtree(group)
+  group.clear()
+}
+
 export function DiveSiteScene({
   map, options, height = 420, verticalExaggeration = 3, handles, onHandleDrag,
 }: DiveSiteSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null)
   const roseRef = useRef<SVGGElement | null>(null)
+  const badgeRef = useRef<HTMLDivElement | null>(null)
+  const rigRef = useRef<Rig | null>(null)
+  // What the camera was last framed on. Reframing on any data change would
+  // yank the view every time a point was pulled; reframing on nothing would
+  // leave newly extended ground off screen with no way to find it.
+  const framedRef = useRef('')
   const supported = hasWebGL()
 
   // Scaffold is not data: a placeholder contour must never lend the surface
   // coverage it has not earned.
   const observed = useMemo(() => observedOnly(map), [map])
   const surface = useMemo(() => buildSurface(observed, options), [observed, options])
-  // The scaffold gets its own surface so a new site has something to look at.
-  // Built separately and drawn as a ghost: folding it into `surface` would let
-  // guesswork count toward coverage, which is the one number here that has to
-  // stay honest.
   // Frame on what is actually there. A site is one small patch extended in the
   // direction the diver swam, so a stored 500 m extent would put a 20 m patch
   // in the middle of an empty sea — while editing AND while reading.
@@ -98,13 +145,6 @@ export function DiveSiteScene({
   const extent = reach.length
     ? Math.max(...reach, LATTICE_SPACING_M)
     : map.extent_m ?? SITE_EXTENT_M
-  // The flat base stands in whenever there is no surface, not only when there
-  // are fewer than three readings. Three that will not triangulate — collinear,
-  // or every edge past the cutoff — used to replace the whole view with a line
-  // of text, which took the handles away with it: the diver could not add the
-  // fourth reading that would have fixed it. Two triangles, whatever the site's
-  // size; the lattice it stands for is implicit and never built as geometry.
-  const showBase = !surface
   // Three readings that produced no triangles is a different problem from not
   // having three, and saying "three are needed" to someone who has four is
   // both wrong and a dead end.
@@ -115,324 +155,44 @@ export function DiveSiteScene({
   const handleStep = handleSpacingOf(handles)
   const coverage = surface ? coverageFraction(surface.triangles) : 0
   const datum = singleDatum(observed)
+  const editable = !!handles
 
+  // The rig: built once, and outliving every reading placed in it.
   useEffect(() => {
     const mount = mountRef.current
     if (!mount || !supported) return
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-
     const width = mount.clientWidth || 640
-    renderer.setSize(width, height)
+    renderer.setSize(width, mount.clientHeight || 420)
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     mount.appendChild(renderer.domElement)
 
     const scene = new THREE.Scene()
-
-    const baseY = -BASE_DEPTH_M * verticalExaggeration
-    const geometry = new THREE.BufferGeometry()
-
-    if (surface) {
-      const scaled = Float32Array.from(surface.positions)
-      for (let i = 1; i < scaled.length; i += 3) scaled[i] *= verticalExaggeration
-      geometry.setAttribute('position', new THREE.BufferAttribute(scaled, 3))
-      const rgba = new Float32Array(surface.alphas.length * 4)
-      for (let v = 0; v < surface.alphas.length; v++) {
-        rgba[v * 4] = surface.colors[v * 3]
-        rgba[v * 4 + 1] = surface.colors[v * 3 + 1]
-        rgba[v * 4 + 2] = surface.colors[v * 3 + 2]
-        rgba[v * 4 + 3] = surface.alphas[v]
-      }
-      geometry.setAttribute('color', new THREE.BufferAttribute(rgba, 4))
-      geometry.setIndex(new THREE.BufferAttribute(surface.indices, 1))
-    } else {
-      const e = extent
-      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
-        -e, baseY, -e,   e, baseY, -e,   e, baseY, e,   -e, baseY, e,
-      ]), 3))
-      const flat = new Float32Array(16)
-      for (let v = 0; v < 4; v++) {
-        flat[v * 4] = 0.55; flat[v * 4 + 1] = 0.68; flat[v * 4 + 2] = 0.78
-        flat[v * 4 + 3] = 0.35
-      }
-      geometry.setAttribute('color', new THREE.BufferAttribute(flat, 4))
-      geometry.setIndex(new THREE.BufferAttribute(new Uint32Array([0, 1, 2, 0, 2, 3]), 1))
-    }
-    geometry.computeVertexNormals()
-    geometry.computeBoundingSphere()
-
-    const mesh = new THREE.Mesh(
-      geometry,
-      new THREE.MeshStandardMaterial({
-        vertexColors: true,
-        transparent: true,
-        side: THREE.DoubleSide,
-        roughness: 0.85,
-        metalness: 0.05,
-        flatShading: true,
-      }),
-    )
-    scene.add(mesh)
-
-    const wire = new THREE.Mesh(
-      geometry,
-      new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.08 }),
-    )
-    scene.add(wire)
-
-    geometry.computeBoundingBox()
-    const box = geometry.boundingBox ?? new THREE.Box3()
-    const center = box.getCenter(new THREE.Vector3())
-    const size = box.getSize(new THREE.Vector3())
-    const radius = Math.max(size.x, size.z) / 2 || 30
-
-    // Depth posts every 10 m, dropped from the surface to the deepest point, so
-    // "how deep is this" is answerable by eye instead of by legend.
-    const deepest = -(box.min.y)
-    for (let d = 10 * verticalExaggeration; d <= deepest; d += 10 * verticalExaggeration) {
-      const ring = new THREE.LineLoop(
-        new THREE.BufferGeometry().setFromPoints(
-          Array.from({ length: 33 }, (_, i) => {
-            const a = (i / 32) * Math.PI * 2
-            return new THREE.Vector3(Math.cos(a) * radius * 1.15, -d, Math.sin(a) * radius * 1.15)
-          }),
-        ),
-        new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.12 }),
-      )
-      ring.position.set(center.x, 0, center.z)
-      scene.add(ring)
-    }
-
-    // Contributed readings are individual markers — there are few of them.
-    const markerRadius = Math.max(radius * 0.012, 0.6)
-    const pickable: THREE.Mesh[] = []
-    for (const s of observed.soundings) {
-      const marker = new THREE.Mesh(
-        new THREE.SphereGeometry(markerRadius, 10, 10),
-        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 }),
-      )
-      marker.position.set(s.at.x, -s.depth_m * verticalExaggeration, -s.at.y)
-      marker.userData.soundingId = s.id
-      scene.add(marker)
-      pickable.push(marker)
-    }
-
-    // The lattice is drawn, not stored. Every position is 1 m from the next,
-    // so a 1 km field holds a million of them — far too many to draw. Only a
-    // readable subset is shown, thinned by whatever step keeps the count near
-    // LATTICE_DOTS_MAX, and the label states the true spacing so the drawing
-    // is never mistaken for the resolution.
-    const LATTICE_DOTS_MAX = 4000
-    const latticeSpan = extent * 2
-    const stepsAcross = Math.max(1, Math.floor(latticeSpan / LATTICE_SPACING_M))
-    const step = Math.max(
-      LATTICE_SPACING_M,
-      Math.ceil(stepsAcross / Math.sqrt(LATTICE_DOTS_MAX)) * LATTICE_SPACING_M,
-    )
-    const dots: THREE.Vector3[] = []
-    for (let x = -extent; x <= extent; x += step) {
-      for (let y = -extent; y <= extent; y += step) {
-        dots.push(new THREE.Vector3(x, baseY, -y))
-      }
-    }
-    // Suppressed while editing: the grabbable field below sits at the depth
-    // each point actually holds, and a second lattice flat on the base plane
-    // underneath it reads as a second seabed.
-    if (dots.length && !handles) {
-      const lattice = new THREE.Points(
-        new THREE.BufferGeometry().setFromPoints(dots),
-        new THREE.PointsMaterial({
-          color: 0xbcd4e2,
-          size: Math.max(latticeSpan * 0.004, 0.5),
-          transparent: true,
-          opacity: 0.55,
-          sizeAttenuation: true,
-        }),
-      )
-      scene.add(lattice)
-    }
-
-    // The handles, as one Points cloud rather than a mesh each.
-    //
-    // At the 1 m spacing the model is built on there are thousands of them —
-    // a 60 m square is 3,721 — and that many draw calls is a slideshow. One
-    // buffer is one call, and pulling a handle is a write to three floats in
-    // it.
-    const field = handles ?? []
-    const handlePositions = new Float32Array(field.length * 3)
-    const handleColors = new Float32Array(field.length * 3)
-    field.forEach((h, i) => {
-      handlePositions[i * 3] = h.at.x
-      handlePositions[i * 3 + 1] = -h.depth_m * verticalExaggeration
-      handlePositions[i * 3 + 2] = -h.at.y
-      // Scaffold is drawn faintly and measured points brightly, so what
-      // somebody actually recorded is never confused with the flat field it is
-      // sitting in.
-      const tone = h.measured ? 1 : 0.42
-      handleColors[i * 3] = tone
-      handleColors[i * 3 + 1] = tone
-      handleColors[i * 3 + 2] = h.measured ? tone : 0.55
-    })
-    let handleCloud: THREE.Points | null = null
-    if (field.length) {
-      const geom = new THREE.BufferGeometry()
-      geom.setAttribute('position', new THREE.BufferAttribute(handlePositions, 3))
-      geom.setAttribute('color', new THREE.BufferAttribute(handleColors, 3))
-      handleCloud = new THREE.Points(geom, new THREE.PointsMaterial({
-        size: Math.max(radius * 0.018, 0.35),
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.9,
-        sizeAttenuation: true,
-      }))
-      scene.add(handleCloud)
-    }
-
-    for (const f of observed.features) {
-      if (!isVolumetric(f.kind) || f.geometry.shape !== 'point') continue
-      const at = f.geometry.at
-      const nearest = observed.soundings.reduce<{ d: number; depth: number }>((best, s) => {
-        const d = Math.hypot(s.at.x - at.x, s.at.y - at.y)
-        return d < best.d ? { d, depth: s.depth_m } : best
-      }, { d: Infinity, depth: 0 })
-      const marker = new THREE.Mesh(
-        new THREE.TorusGeometry(radius * 0.09, radius * 0.012, 8, 32, Math.PI),
-        new THREE.MeshBasicMaterial({ color: 0xffd27f, wireframe: true, transparent: true, opacity: 0.9 }),
-      )
-      marker.position.set(at.x, -nearest.depth * verticalExaggeration + radius * 0.06, -at.y)
-      scene.add(marker)
-    }
+    const content = new THREE.Group()
+    const handleLayer = new THREE.Group()
+    scene.add(content, handleLayer)
 
     scene.add(new THREE.AmbientLight(0xffffff, 1.1))
     const key = new THREE.DirectionalLight(0xffffff, 1.4)
-    key.position.set(radius, radius * 2, radius)
+    key.position.set(60, 120, 60)
     scene.add(key)
 
-    // Fit the whole site in frame from its actual extent. Deriving the camera
-    // distance from depth instead breaks on a flat site, where the relief is
-    // nearly zero and the camera ends up inside the seabed.
     const FOV = 50
-    const camera = new THREE.PerspectiveCamera(FOV, width / height, 0.1, radius * 40)
-    const span = Math.max(size.x, size.z, size.y, 1)
-    const fit = (span / 2) / Math.tan((FOV * Math.PI) / 360)
-    const distance = fit * 1.45
-    camera.position.set(
-      center.x + distance * 0.45,
-      Math.max(distance * 0.45, deepest * 0.6),
-      center.z + distance * 0.8,
-    )
+    const camera = new THREE.PerspectiveCamera(FOV, width / (mount.clientHeight || 420), 0.1, 8000)
+    camera.position.set(40, 40, 60)
 
     const controls = new OrbitControls(camera, renderer.domElement)
-    controls.target.copy(center)
     controls.enableDamping = true
     controls.dampingFactor = 0.08
     controls.maxPolarAngle = Math.PI * 0.49
     controls.update()
 
-    // Pulling a point of seabed to the depth it actually is.
-    //
-    // A drag that starts ON a handle moves that handle; a drag that starts
-    // anywhere else orbits the camera. No mode switch, because the handles are
-    // drawn: you can see what is grabbable, and empty water is for looking
-    // around. It is how Blender behaves for the same reason — you take hold of
-    // a vertex, or you move the view.
-    const PICK_RADIUS_PX = 26
-    let grab: Grab | null = null
-    let grabbedIndex = -1
-
-    /** How many meters of depth one pixel of drag is worth, at the distance
-     *  the grabbed point sits from the camera. Fixed pixels-to-meters would
-     *  make a zoomed-out pull unusably coarse and a zoomed-in one unusably
-     *  fine. */
-    function metersPerPixel(point: THREE.Vector3, heightPx: number): number {
-      const distance = camera.position.distanceTo(point)
-      const worldHeight = 2 * distance * Math.tan((camera.fov * Math.PI) / 360)
-      return worldHeight / heightPx / verticalExaggeration
+    const rig: Rig = {
+      renderer, scene, camera, controls, content, handleLayer,
+      travelSpeed: 20, radius: 30,
     }
-
-    /** Index of the handle nearest the pointer, or -1. Projecting the whole
-     *  field costs a millisecond and happens once per gesture, not per frame. */
-    function handleUnder(e: PointerEvent): number {
-      const rect = renderer.domElement.getBoundingClientRect()
-      const px = e.clientX - rect.left
-      const py = e.clientY - rect.top
-      let nearest = -1
-      let nearestPx = PICK_RADIUS_PX
-      const projected = new THREE.Vector3()
-      for (let i = 0; i < field.length; i++) {
-        projected.set(
-          handlePositions[i * 3], handlePositions[i * 3 + 1], handlePositions[i * 3 + 2],
-        ).project(camera)
-        if (projected.z > 1) continue
-        const sx = ((projected.x + 1) / 2) * rect.width
-        const sy = ((1 - projected.y) / 2) * rect.height
-        const d = Math.hypot(sx - px, sy - py)
-        if (d < nearestPx) {
-          nearest = i
-          nearestPx = d
-        }
-      }
-      return nearest
-    }
-
-    function moveHandle(index: number, depth_m: number) {
-      handlePositions[index * 3 + 1] = -depth_m * verticalExaggeration
-      if (handleCloud) handleCloud.geometry.attributes.position.needsUpdate = true
-    }
-
-    const grabbedPoint = new THREE.Vector3()
-
-    function onPointerDown(e: PointerEvent) {
-      if (!onHandleDrag) return
-      const index = handleUnder(e)
-      if (index < 0) return
-      grabbedIndex = index
-      grab = beginGrab(field[index], e.clientY)
-      // Otherwise the camera orbits with the finger and the point runs away
-      // from it.
-      controls.enabled = false
-      renderer.domElement.setPointerCapture(e.pointerId)
-      e.preventDefault()
-    }
-
-    function onPointerMove(e: PointerEvent) {
-      if (!grab || grabbedIndex < 0 || !onHandleDrag) return
-      const rect = renderer.domElement.getBoundingClientRect()
-      grabbedPoint.set(
-        handlePositions[grabbedIndex * 3],
-        handlePositions[grabbedIndex * 3 + 1],
-        handlePositions[grabbedIndex * 3 + 2],
-      )
-      grab = dragTo(grab, e.clientY, metersPerPixel(grabbedPoint, rect.height))
-      moveHandle(grabbedIndex, grab.depth_m)
-      onHandleDrag({ id: grab.id, at: grab.at, depth_m: grab.depth_m, done: false })
-    }
-
-    function endGrab(e: PointerEvent) {
-      if (!grab || grabbedIndex < 0) return
-      const finished = grab
-      const index = grabbedIndex
-      grab = null
-      grabbedIndex = -1
-      controls.enabled = true
-      if (renderer.domElement.hasPointerCapture(e.pointerId)) {
-        renderer.domElement.releasePointerCapture(e.pointerId)
-      }
-      // A grab that said nothing leaves no trace: every mis-tap while orbiting
-      // would otherwise become a reading with somebody's name on it.
-      if (!movedGrab(finished)) {
-        moveHandle(index, finished.from_m)
-        return
-      }
-      onHandleDrag?.({ id: finished.id, at: finished.at, depth_m: finished.depth_m, done: true })
-    }
-
-    renderer.domElement.addEventListener('pointerdown', onPointerDown)
-    renderer.domElement.addEventListener('pointermove', onPointerMove)
-    renderer.domElement.addEventListener('pointerup', endGrab)
-    // A pointer that leaves the window mid-drag must not strand the camera
-    // disabled with a point stuck under a finger that is no longer there.
-    renderer.domElement.addEventListener('pointercancel', endGrab)
+    rigRef.current = rig
 
     // Keyboard traversal. Listening on the window rather than the canvas means
     // no click-to-focus dance, but it also means the depth field would eat a
@@ -452,9 +212,9 @@ export function DiveSiteScene({
     }
 
     function onKeyDown(e: KeyboardEvent) {
-      const key = e.key.toLowerCase()
-      if (!(key in MOVE_KEYS) || isTyping(e.target)) return
-      held.add(key)
+      const k = e.key.toLowerCase()
+      if (!(k in MOVE_KEYS) || isTyping(e.target)) return
+      held.add(k)
       // Arrow keys scroll the page otherwise, which fights the traversal.
       e.preventDefault()
     }
@@ -464,16 +224,13 @@ export function DiveSiteScene({
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
 
-    // Meters per second, scaled to the site: a fixed speed crawls across a
-    // large site and overshoots a small one.
-    const travelSpeed = Math.max(radius * 0.8, 20)
     const forward = new THREE.Vector3()
     const strafe = new THREE.Vector3()
     const travel = new THREE.Vector3()
     const UP = new THREE.Vector3(0, 1, 0)
     let last = performance.now()
-
     let frame = 0
+
     function animate() {
       frame = requestAnimationFrame(animate)
       const now = performance.now()
@@ -486,13 +243,13 @@ export function DiveSiteScene({
         forward.normalize()
         strafe.copy(forward).cross(UP).normalize()
         travel.set(0, 0, 0)
-        for (const key of held) {
-          const [sx, sf] = MOVE_KEYS[key]
+        for (const k of held) {
+          const [sx, sf] = MOVE_KEYS[k]
           travel.addScaledVector(forward, sf)
           travel.addScaledVector(strafe, sx)
         }
         if (travel.lengthSq() > 0) {
-          travel.normalize().multiplyScalar(travelSpeed * dt)
+          travel.normalize().multiplyScalar(rig.travelSpeed * dt)
           camera.position.add(travel)
           controls.target.add(travel)
         }
@@ -516,40 +273,436 @@ export function DiveSiteScene({
 
     const onResize = () => {
       const w = mount.clientWidth || width
-      camera.aspect = w / height
+      const h = mount.clientHeight || 420
+      camera.aspect = w / h
       camera.updateProjectionMatrix()
-      renderer.setSize(w, height)
+      renderer.setSize(w, h)
     }
     window.addEventListener('resize', onResize)
 
     return () => {
       cancelAnimationFrame(frame)
       window.removeEventListener('resize', onResize)
-      renderer.domElement.removeEventListener('pointerdown', onPointerDown)
-      renderer.domElement.removeEventListener('pointermove', onPointerMove)
-      renderer.domElement.removeEventListener('pointerup', endGrab)
-      renderer.domElement.removeEventListener('pointercancel', endGrab)
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
       controls.dispose()
-      scene.traverse(obj => {
-        if (obj instanceof THREE.Mesh) {
-          obj.geometry.dispose()
-          const m = obj.material
-          if (Array.isArray(m)) m.forEach(x => x.dispose())
-          else m.dispose()
-        }
-      })
+      disposeSubtree(scene)
       renderer.dispose()
       if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement)
+      rigRef.current = null
+      framedRef.current = ''
     }
-  }, [map, observed, surface, showBase, extent, height, supported, verticalExaggeration, handles, onHandleDrag])
+  }, [supported])
+
+  // The canvas follows the height it was given without rebuilding the rig.
+  useEffect(() => {
+    const rig = rigRef.current
+    const mount = mountRef.current
+    if (!rig || !mount) return
+    const w = mount.clientWidth || 640
+    rig.camera.aspect = w / height
+    rig.camera.updateProjectionMatrix()
+    rig.renderer.setSize(w, height)
+  }, [height, supported])
+
+  // Everything the map says. Rebuilt when a reading lands; the viewpoint is not.
+  useEffect(() => {
+    const rig = rigRef.current
+    if (!rig) return
+    const { content, camera, controls } = rig
+    clearGroup(content)
+
+    const baseY = -BASE_DEPTH_M * verticalExaggeration
+    const geometry = new THREE.BufferGeometry()
+
+    if (surface) {
+      const scaled = Float32Array.from(surface.positions)
+      for (let i = 1; i < scaled.length; i += 3) scaled[i] *= verticalExaggeration
+      geometry.setAttribute('position', new THREE.BufferAttribute(scaled, 3))
+      const rgba = new Float32Array(surface.alphas.length * 4)
+      for (let v = 0; v < surface.alphas.length; v++) {
+        rgba[v * 4] = surface.colors[v * 3]
+        rgba[v * 4 + 1] = surface.colors[v * 3 + 1]
+        rgba[v * 4 + 2] = surface.colors[v * 3 + 2]
+        rgba[v * 4 + 3] = surface.alphas[v]
+      }
+      geometry.setAttribute('color', new THREE.BufferAttribute(rgba, 4))
+      geometry.setIndex(new THREE.BufferAttribute(surface.indices, 1))
+    } else {
+      const e = extent
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+        -e, baseY, -e, e, baseY, -e, e, baseY, e, -e, baseY, e,
+      ]), 3))
+      const flat = new Float32Array(16)
+      for (let v = 0; v < 4; v++) {
+        flat[v * 4] = 0.55; flat[v * 4 + 1] = 0.68; flat[v * 4 + 2] = 0.78
+        flat[v * 4 + 3] = 0.35
+      }
+      geometry.setAttribute('color', new THREE.BufferAttribute(flat, 4))
+      geometry.setIndex(new THREE.BufferAttribute(new Uint32Array([0, 1, 2, 0, 2, 3]), 1))
+    }
+    geometry.computeVertexNormals()
+    geometry.computeBoundingSphere()
+
+    content.add(new THREE.Mesh(
+      geometry,
+      new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        transparent: true,
+        side: THREE.DoubleSide,
+        roughness: 0.85,
+        metalness: 0.05,
+        flatShading: true,
+      }),
+    ))
+    content.add(new THREE.Mesh(
+      geometry,
+      new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.08 }),
+    ))
+
+    geometry.computeBoundingBox()
+    const box = geometry.boundingBox ?? new THREE.Box3()
+    const center = box.getCenter(new THREE.Vector3())
+    const size = box.getSize(new THREE.Vector3())
+    const radius = Math.max(size.x, size.z) / 2 || 30
+    rig.radius = radius
+    // Meters per second, scaled to the site: a fixed speed crawls across a
+    // large site and overshoots a small one.
+    rig.travelSpeed = Math.max(radius * 0.8, 20)
+
+    // Depth posts every 10 m, dropped from the surface to the deepest point, so
+    // "how deep is this" is answerable by eye instead of by legend.
+    const deepest = -(box.min.y)
+    for (let d = 10 * verticalExaggeration; d <= deepest; d += 10 * verticalExaggeration) {
+      const ring = new THREE.LineLoop(
+        new THREE.BufferGeometry().setFromPoints(
+          Array.from({ length: 33 }, (_, i) => {
+            const a = (i / 32) * Math.PI * 2
+            return new THREE.Vector3(Math.cos(a) * radius * 1.15, -d, Math.sin(a) * radius * 1.15)
+          }),
+        ),
+        new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.12 }),
+      )
+      ring.position.set(center.x, 0, center.z)
+      content.add(ring)
+    }
+
+    // Contributed readings are individual markers — there are few of them.
+    const markerRadius = Math.max(radius * 0.012, 0.6)
+    for (const s of observed.soundings) {
+      const marker = new THREE.Mesh(
+        new THREE.SphereGeometry(markerRadius, 10, 10),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 }),
+      )
+      marker.position.set(s.at.x, -s.depth_m * verticalExaggeration, -s.at.y)
+      content.add(marker)
+    }
+
+    // The lattice is drawn, not stored. Every position is 1 m from the next,
+    // so a 1 km field holds a million of them — far too many to draw. Only a
+    // readable subset is shown, thinned by whatever step keeps the count near
+    // LATTICE_DOTS_MAX, and the label states the true spacing so the drawing
+    // is never mistaken for the resolution. Suppressed while editing: the
+    // grabbable field sits at the depth each point actually holds, and a second
+    // lattice flat on the base plane underneath it reads as a second seabed.
+    if (!editable) {
+      const LATTICE_DOTS_MAX = 4000
+      const latticeSpan = extent * 2
+      const stepsAcross = Math.max(1, Math.floor(latticeSpan / LATTICE_SPACING_M))
+      const step = Math.max(
+        LATTICE_SPACING_M,
+        Math.ceil(stepsAcross / Math.sqrt(LATTICE_DOTS_MAX)) * LATTICE_SPACING_M,
+      )
+      const dots: THREE.Vector3[] = []
+      for (let x = -extent; x <= extent; x += step) {
+        for (let y = -extent; y <= extent; y += step) dots.push(new THREE.Vector3(x, baseY, -y))
+      }
+      if (dots.length) {
+        content.add(new THREE.Points(
+          new THREE.BufferGeometry().setFromPoints(dots),
+          new THREE.PointsMaterial({
+            color: 0xbcd4e2,
+            size: Math.max(latticeSpan * 0.004, 0.5),
+            transparent: true,
+            opacity: 0.55,
+            sizeAttenuation: true,
+          }),
+        ))
+      }
+    }
+
+    for (const f of observed.features) {
+      if (!isVolumetric(f.kind) || f.geometry.shape !== 'point') continue
+      const at = f.geometry.at
+      const nearest = observed.soundings.reduce<{ d: number; depth: number }>((best, s) => {
+        const d = Math.hypot(s.at.x - at.x, s.at.y - at.y)
+        return d < best.d ? { d, depth: s.depth_m } : best
+      }, { d: Infinity, depth: 0 })
+      const marker = new THREE.Mesh(
+        new THREE.TorusGeometry(radius * 0.09, radius * 0.012, 8, 32, Math.PI),
+        new THREE.MeshBasicMaterial({ color: 0xffd27f, wireframe: true, transparent: true, opacity: 0.9 }),
+      )
+      marker.position.set(at.x, -nearest.depth * verticalExaggeration + radius * 0.06, -at.y)
+      content.add(marker)
+    }
+
+    // Frame on the ground, not on the readings. Pulling a point changes what
+    // the seabed looks like but not how far the site reaches, so the view holds
+    // still through a whole session of pulling; asking for more ground is an
+    // explicit act, and it moves the camera to show what was asked for.
+    const frameKey = `${map.id}:${extent}`
+    if (framedRef.current !== frameKey) {
+      framedRef.current = frameKey
+      const span = Math.max(size.x, size.z, size.y, 1)
+      const fit = (span / 2) / Math.tan((camera.fov * Math.PI) / 360)
+      const distance = fit * 1.45
+      camera.position.set(
+        center.x + distance * 0.45,
+        Math.max(distance * 0.45, deepest * 0.6),
+        center.z + distance * 0.8,
+      )
+      camera.far = Math.max(radius * 40, 1000)
+      camera.updateProjectionMatrix()
+      controls.target.copy(center)
+      controls.update()
+    }
+  }, [supported, map.id, observed, surface, extent, editable, verticalExaggeration])
+
+  // The grabbable field, and the gesture that pulls it.
+  //
+  // A drag that starts ON a handle moves that handle; a drag that starts
+  // anywhere else orbits the camera. No mode switch, because the handles are
+  // drawn: you can see what is grabbable, and empty water is for looking
+  // around. It is how Blender behaves for the same reason — you take hold of a
+  // vertex, or you move the view.
+  useEffect(() => {
+    const rig = rigRef.current
+    const mount = mountRef.current
+    if (!rig || !mount) return
+    const { handleLayer, camera, controls, renderer } = rig
+    clearGroup(handleLayer)
+
+    const field = handles ?? []
+    if (!field.length || !onHandleDrag) return
+
+    const positions = new Float32Array(field.length * 3)
+    const colors = new Float32Array(field.length * 3)
+    field.forEach((h, i) => {
+      positions[i * 3] = h.at.x
+      positions[i * 3 + 1] = -h.depth_m * verticalExaggeration
+      positions[i * 3 + 2] = -h.at.y
+      // Scaffold is drawn faintly and measured points brightly, so what
+      // somebody actually recorded is never confused with the flat field it is
+      // sitting in.
+      const tone = h.measured ? 1 : 0.42
+      colors[i * 3] = tone
+      colors[i * 3 + 1] = tone
+      colors[i * 3 + 2] = h.measured ? tone : 0.55
+    })
+
+    const geom = new THREE.BufferGeometry()
+    geom.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    geom.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+    const cloud = new THREE.Points(geom, new THREE.PointsMaterial({
+      size: Math.max(rig.radius * 0.02, 0.45),
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.9,
+      sizeAttenuation: true,
+    }))
+    handleLayer.add(cloud)
+
+    // The point under the finger, ringed so a grab is visibly a grab. Without
+    // it a drag is indistinguishable from a failed one until the depth
+    // changes, which is most of what made this feel like clicking.
+    const spacing = handleSpacingOf(field)
+    const marker = new THREE.Mesh(
+      new THREE.SphereGeometry(Math.max(spacing * 0.5, 0.3), 12, 12),
+      new THREE.MeshBasicMaterial({ color: 0x7fe3d0, transparent: true, opacity: 0.85 }),
+    )
+    marker.visible = false
+    handleLayer.add(marker)
+
+    const dom = renderer.domElement
+    const screen: ScreenPoint[] = field.map(() => ({ x: 0, y: 0, behind: false }))
+    const projected = new THREE.Vector3()
+    const grabbedPoint = new THREE.Vector3()
+
+    const PICK_RADIUS_PX = 26
+    /** Hover picking runs on pointer movement; once every few frames is enough
+     *  for a cursor and costs nothing on a field of thousands. */
+    const HOVER_INTERVAL_MS = 40
+
+    let grab: Grab | null = null
+    let grabbedIndex = -1
+    let hoveredIndex = -1
+    let lastHover = 0
+
+    function projectField() {
+      const rect = dom.getBoundingClientRect()
+      for (let i = 0; i < field.length; i++) {
+        projected.set(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]).project(camera)
+        screen[i].behind = projected.z > 1
+        screen[i].x = ((projected.x + 1) / 2) * rect.width
+        screen[i].y = ((1 - projected.y) / 2) * rect.height
+      }
+    }
+
+    function pointerAt(e: PointerEvent): { px: number; py: number } {
+      const rect = dom.getBoundingClientRect()
+      return { px: e.clientX - rect.left, py: e.clientY - rect.top }
+    }
+
+    function showMarker(index: number, held: boolean) {
+      if (index < 0) {
+        marker.visible = false
+        return
+      }
+      marker.position.set(positions[index * 3], positions[index * 3 + 1], positions[index * 3 + 2])
+      marker.visible = true
+      const material = marker.material as THREE.MeshBasicMaterial
+      material.color.setHex(held ? 0xffd27f : 0x7fe3d0)
+      material.opacity = held ? 0.95 : 0.6
+    }
+
+    function showBadge(depth_m: number, px: number, py: number) {
+      const badge = badgeRef.current
+      if (!badge) return
+      badge.textContent = t.siteMap.depthReadout(depth_m)
+      badge.style.transform = `translate(${Math.round(px) + 14}px, ${Math.round(py) - 30}px)`
+      badge.hidden = false
+    }
+
+    function hideBadge() {
+      if (badgeRef.current) badgeRef.current.hidden = true
+    }
+
+    /** How many meters of depth one pixel of drag is worth, at the distance
+     *  the grabbed point sits from the camera. Fixed pixels-to-meters would
+     *  make a zoomed-out pull unusably coarse and a zoomed-in one unusably
+     *  fine. */
+    function metersPerPixel(point: THREE.Vector3, heightPx: number): number {
+      const distance = camera.position.distanceTo(point)
+      const worldHeight = 2 * distance * Math.tan((camera.fov * Math.PI) / 360)
+      return worldHeight / heightPx / verticalExaggeration
+    }
+
+    function moveHandle(index: number, depth_m: number) {
+      positions[index * 3 + 1] = -depth_m * verticalExaggeration
+      geom.attributes.position.needsUpdate = true
+      marker.position.y = positions[index * 3 + 1]
+    }
+
+    function onPointerDown(e: PointerEvent) {
+      const { px, py } = pointerAt(e)
+      projectField()
+      const index = nearestWithin(screen, px, py, PICK_RADIUS_PX)
+      if (index < 0) return
+
+      grabbedIndex = index
+      grab = beginGrab(field[index], e.clientY)
+      showMarker(index, true)
+      showBadge(grab.depth_m, px, py)
+      dom.style.cursor = 'grabbing'
+      // Swallowed rather than merely disabling the controls: OrbitControls is
+      // attached to the same canvas and was constructed first, so by the time
+      // a listener on the canvas could disable it, it has already taken the
+      // gesture. Capturing on the wrapper gets there first.
+      e.stopPropagation()
+      e.preventDefault()
+      controls.enabled = false
+      dom.setPointerCapture(e.pointerId)
+    }
+
+    function onPointerMove(e: PointerEvent) {
+      const { px, py } = pointerAt(e)
+
+      if (grab && grabbedIndex >= 0) {
+        const rect = dom.getBoundingClientRect()
+        grabbedPoint.set(
+          positions[grabbedIndex * 3],
+          positions[grabbedIndex * 3 + 1],
+          positions[grabbedIndex * 3 + 2],
+        )
+        grab = dragTo(grab, e.clientY, metersPerPixel(grabbedPoint, rect.height))
+        moveHandle(grabbedIndex, grab.depth_m)
+        showBadge(grab.depth_m, px, py)
+        onHandleDrag?.({ id: grab.id, at: grab.at, depth_m: grab.depth_m, done: false })
+        e.stopPropagation()
+        return
+      }
+
+      const now = performance.now()
+      if (now - lastHover < HOVER_INTERVAL_MS) return
+      lastHover = now
+      projectField()
+      const index = nearestWithin(screen, px, py, PICK_RADIUS_PX)
+      if (index === hoveredIndex) return
+      hoveredIndex = index
+      showMarker(index, false)
+      dom.style.cursor = index >= 0 ? 'grab' : ''
+    }
+
+    function endGrab(e: PointerEvent) {
+      if (!grab || grabbedIndex < 0) return
+      const finished = grab
+      const index = grabbedIndex
+      grab = null
+      grabbedIndex = -1
+      hoveredIndex = -1
+      controls.enabled = true
+      marker.visible = false
+      hideBadge()
+      dom.style.cursor = ''
+      if (dom.hasPointerCapture(e.pointerId)) dom.releasePointerCapture(e.pointerId)
+      // A grab that said nothing leaves no trace: every mis-tap while orbiting
+      // would otherwise become a reading with somebody's name on it.
+      if (!movedGrab(finished)) {
+        moveHandle(index, finished.from_m)
+        return
+      }
+      onHandleDrag?.({ id: finished.id, at: finished.at, depth_m: finished.depth_m, done: true })
+    }
+
+    function onPointerLeave() {
+      if (grab) return
+      hoveredIndex = -1
+      marker.visible = false
+      dom.style.cursor = ''
+    }
+
+    mount.addEventListener('pointerdown', onPointerDown, true)
+    mount.addEventListener('pointermove', onPointerMove, true)
+    mount.addEventListener('pointerup', endGrab, true)
+    // A pointer that leaves the window mid-drag must not strand the camera
+    // disabled with a point stuck under a finger that is no longer there.
+    mount.addEventListener('pointercancel', endGrab, true)
+    mount.addEventListener('pointerleave', onPointerLeave)
+
+    return () => {
+      mount.removeEventListener('pointerdown', onPointerDown, true)
+      mount.removeEventListener('pointermove', onPointerMove, true)
+      mount.removeEventListener('pointerup', endGrab, true)
+      mount.removeEventListener('pointercancel', endGrab, true)
+      mount.removeEventListener('pointerleave', onPointerLeave)
+      controls.enabled = true
+      dom.style.cursor = ''
+      hideBadge()
+      clearGroup(handleLayer)
+    }
+  }, [supported, handles, onHandleDrag, verticalExaggeration])
 
   return (
     <figure className={`${CARD} overflow-hidden`}>
       {supported ? (
         <div className="relative">
           <div ref={mountRef} style={{ height }} className="w-full" />
+          <div
+            ref={badgeRef}
+            hidden
+            aria-hidden="true"
+            className={`pointer-events-none absolute left-0 top-0 ${BADGE_READOUT}`}
+          />
           <svg
             viewBox="-64 -64 128 128"
             className="pointer-events-none absolute right-3 top-3 h-16 w-16 opacity-90"

@@ -1,11 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
-  emptyDraft, setTool, setDepth, setFeatureKind, placeSounding, addVertex,
+  emptyDraft, setTool, setFeatureKind, placeSounding, addVertex,
   canCommitPath, commitPath, undo, contributionCount, isEmpty, validate,
-  toContribution, withDraft, contributionsByDiver, snapTarget, supersededIds,
-  applyPick, MAX_PLAUSIBLE_DEPTH_M,
+  toContribution, withDraft, contributionsByDiver, MAX_PLAUSIBLE_DEPTH_M,
 } from './site-map-draft'
-import type { DiveSiteMap, Sounding } from './dive-site-map'
+import type { DiveSiteMap } from './dive-site-map'
 
 const NOW = '2026-08-11T02:15:00Z'
 
@@ -18,18 +17,20 @@ function baseMap(): DiveSiteMap {
 
 describe('placing soundings', () => {
   it('stamps each one instantaneous, timed, and attributed to the diver', () => {
-    const d = placeSounding(setDepth(emptyDraft(), 18), { x: 4, y: -2 }, NOW)
+    const d = placeSounding(emptyDraft(), { x: 4, y: -2 }, 18, NOW)
     expect(d.soundings).toHaveLength(1)
     expect(d.soundings[0]).toMatchObject({
       depth_m: 18, datum: 'instantaneous', observed_at: NOW, source: 'diver',
     })
   })
 
-  it('keeps using the set depth until it is changed', () => {
-    let d = setDepth(emptyDraft(), 12)
-    d = placeSounding(d, { x: 0, y: 0 }, NOW)
-    d = placeSounding(d, { x: 5, y: 5 }, NOW)
-    d = placeSounding(setDepth(d, 20), { x: 9, y: 9 }, NOW)
+  // The depth belongs to the gesture that produced it, not to the draft. A
+  // draft-wide "current depth" was what made this a matter of arming a number
+  // and then aiming at a target.
+  it('takes each depth from the placement rather than from a mode', () => {
+    let d = placeSounding(emptyDraft(), { x: 0, y: 0 }, 12, NOW)
+    d = placeSounding(d, { x: 5, y: 5 }, 12, NOW)
+    d = placeSounding(d, { x: 9, y: 9 }, 20, NOW)
     expect(d.soundings.map(s => s.depth_m)).toEqual([12, 12, 20])
   })
 })
@@ -94,7 +95,7 @@ describe('undo', () => {
   })
 
   it('then removes committed shapes, then soundings', () => {
-    let d = placeSounding(emptyDraft(), { x: 0, y: 0 }, NOW)
+    let d = placeSounding(emptyDraft(), { x: 0, y: 0 }, 12, NOW)
     d = setTool(d, 'contour')
     d = commitPath(addVertex(addVertex(d, { x: 0, y: 0 }), { x: 5, y: 0 }))
     d = undo(d)
@@ -116,28 +117,30 @@ describe('validation', () => {
   })
 
   it('rejects a draft with a shape still being drawn', () => {
-    let d = placeSounding(emptyDraft(), { x: 0, y: 0 }, NOW)
+    let d = placeSounding(emptyDraft(), { x: 0, y: 0 }, 12, NOW)
     d = addVertex(setTool(d, 'contour'), { x: 1, y: 1 })
     expect(validate(d)).toContain('unfinished_shape')
   })
 
   it('rejects a sounding with no time, because it could never be tide-corrected', () => {
-    const d = placeSounding(emptyDraft(), { x: 0, y: 0 }, NOW)
+    const d = placeSounding(emptyDraft(), { x: 0, y: 0 }, 12, NOW)
     d.soundings[0].observed_at = undefined
     expect(validate(d)).toContain('sounding_without_time')
   })
 
   it('rejects depths that are impossible rather than merely deep', () => {
-    expect(validate(placeSounding(setDepth(emptyDraft(), 0), { x: 0, y: 0 }, NOW)))
+    // Zero is the surface, which is where every point starts: a reading there
+    // is a grab that was released without going anywhere, not a depth.
+    expect(validate(placeSounding(emptyDraft(), { x: 0, y: 0 }, 0, NOW)))
       .toContain('implausible_depth')
-    expect(validate(placeSounding(setDepth(emptyDraft(), MAX_PLAUSIBLE_DEPTH_M + 1), { x: 0, y: 0 }, NOW)))
+    expect(validate(placeSounding(emptyDraft(), { x: 0, y: 0 }, MAX_PLAUSIBLE_DEPTH_M + 1, NOW)))
       .toContain('implausible_depth')
-    expect(validate(placeSounding(setDepth(emptyDraft(), 40), { x: 0, y: 0 }, NOW)))
+    expect(validate(placeSounding(emptyDraft(), { x: 0, y: 0 }, 40, NOW)))
       .not.toContain('implausible_depth')
   })
 
   it('passes a finished, timed, plausible draft', () => {
-    const d = placeSounding(setDepth(emptyDraft(), 22), { x: 0, y: 0 }, NOW)
+    const d = placeSounding(emptyDraft(), { x: 0, y: 0 }, 22, NOW)
     expect(validate(d)).toEqual([])
   })
 })
@@ -148,7 +151,7 @@ describe('toContribution', () => {
   })
 
   it('packages the draft against its site once it is valid', () => {
-    const d = placeSounding(setDepth(emptyDraft(), 22), { x: 3, y: 4 }, NOW)
+    const d = placeSounding(emptyDraft(), { x: 3, y: 4 }, 22, NOW)
     const contribution = toContribution(d, 'site-1', { note: 'viz was poor' })!
     expect(contribution.site_id).toBe('site-1')
     expect(contribution.soundings).toHaveLength(1)
@@ -156,7 +159,7 @@ describe('toContribution', () => {
   })
 
   it('attributes the submission to the diver, by display name only', () => {
-    const d = placeSounding(setDepth(emptyDraft(), 22), { x: 3, y: 4 }, NOW)
+    const d = placeSounding(emptyDraft(), { x: 3, y: 4 }, 22, NOW)
     const contribution = toContribution(d, 'site-1', {
       contributor: { id: 'u1', name: 'Ada' },
     })!
@@ -169,7 +172,7 @@ describe('toContribution', () => {
 describe('withDraft', () => {
   it('previews the map with the draft applied without mutating either', () => {
     const map = baseMap()
-    const d = placeSounding(emptyDraft(), { x: 1, y: 1 }, NOW)
+    const d = placeSounding(emptyDraft(), { x: 1, y: 1 }, 9, NOW)
     const preview = withDraft(map, d)
     expect(preview.soundings).toHaveLength(1)
     expect(map.soundings).toHaveLength(0)
@@ -202,72 +205,22 @@ describe('contributionsByDiver', () => {
   })
 })
 
-describe('correcting scaffold points', () => {
-  const grid: Sounding[] = [
-    { id: 'g1', at: { x: 0, y: 0 }, depth_m: 10, datum: 'unknown', source: 'placeholder' },
-    { id: 'g2', at: { x: 20, y: 0 }, depth_m: 10, datum: 'unknown', source: 'placeholder' },
-    { id: 'real', at: { x: 40, y: 0 }, depth_m: 14, datum: 'unknown', source: 'diver' },
-  ]
-
-  it('snaps a near-miss tap onto the point it was aimed at', () => {
-    expect(snapTarget({ x: 2, y: 1 }, grid, 10)?.id).toBe('g1')
-  })
-
-  it('takes the nearer point when a tap falls between two', () => {
-    expect(snapTarget({ x: 12, y: 0 }, grid, 10)?.id).toBe('g2')
-  })
-
-  it('snaps to nothing when the tap is in open water', () => {
-    expect(snapTarget({ x: 10, y: 40 }, grid, 10)).toBeNull()
-  })
-
-  it('never snaps onto somebody real reading', () => {
-    expect(snapTarget({ x: 40, y: 0 }, grid, 10)).toBeNull()
-  })
-
-  it('records which scaffold point a correction replaces', () => {
-    const d = placeSounding(setDepth(emptyDraft(), 23), { x: 0, y: 0 }, NOW, 'g1')
-    expect(d.soundings[0].supersedes).toBe('g1')
-    expect(supersededIds(d)).toEqual(new Set(['g1']))
+describe('correcting a point that was already pulled', () => {
+  it('records which lattice position a correction replaces', () => {
+    const d = placeSounding(emptyDraft(), { x: 0, y: 0 }, 23, NOW, 'lat:0:0')
+    expect(d.soundings[0].supersedes).toBe('lat:0:0')
   })
 
   it('replaces an earlier correction of the same point instead of stacking', () => {
-    let d = placeSounding(setDepth(emptyDraft(), 23), { x: 0, y: 0 }, NOW, 'g1')
-    d = placeSounding(setDepth(d, 26), { x: 0, y: 0 }, NOW, 'g1')
+    let d = placeSounding(emptyDraft(), { x: 0, y: 0 }, 23, NOW, 'lat:0:0')
+    d = placeSounding(d, { x: 0, y: 0 }, 26, NOW, 'lat:0:0')
     expect(d.soundings).toHaveLength(1)
     expect(d.soundings[0].depth_m).toBe(26)
   })
 
   it('keeps corrections of different points side by side', () => {
-    let d = placeSounding(setDepth(emptyDraft(), 23), { x: 0, y: 0 }, NOW, 'g1')
-    d = placeSounding(d, { x: 20, y: 0 }, NOW, 'g2')
+    let d = placeSounding(emptyDraft(), { x: 0, y: 0 }, 23, NOW, 'lat:0:0')
+    d = placeSounding(d, { x: 20, y: 0 }, 19, NOW, 'lat:20:0')
     expect(d.soundings).toHaveLength(2)
-    expect(supersededIds(d)).toEqual(new Set(['g1', 'g2']))
-  })
-
-  it('leaves a free-water reading with nothing superseded', () => {
-    const d = placeSounding(emptyDraft(), { x: 5, y: 5 }, NOW)
-    expect(d.soundings[0].supersedes).toBeUndefined()
-    expect(supersededIds(d).size).toBe(0)
-  })
-})
-
-describe('applyPick', () => {
-  it('corrects the point that was tapped', () => {
-    const d = applyPick(setDepth(emptyDraft(), 24), { soundingId: 'g1', at: { x: 0, y: 0 } }, NOW)
-    expect(d.soundings).toHaveLength(1)
-    expect(d.soundings[0]).toMatchObject({ depth_m: 24, supersedes: 'g1' })
-  })
-
-  it('ignores a tap that hit no point, rather than dropping a reading in open water', () => {
-    const before = setDepth(emptyDraft(), 24)
-    expect(applyPick(before, { at: { x: 5, y: 5 } }, NOW)).toEqual(before)
-  })
-
-  it('lets the same point be corrected again, replacing the earlier value', () => {
-    let d = applyPick(setDepth(emptyDraft(), 24), { soundingId: 'g1', at: { x: 0, y: 0 } }, NOW)
-    d = applyPick(setDepth(d, 26), { soundingId: 'g1', at: { x: 0, y: 0 } }, NOW)
-    expect(d.soundings).toHaveLength(1)
-    expect(d.soundings[0].depth_m).toBe(26)
   })
 })
