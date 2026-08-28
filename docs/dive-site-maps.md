@@ -114,6 +114,13 @@ readable message when WebGL is unavailable.
   speed cannot both nudge the camera a metre and cross a 40 m water column at
   3× exaggeration. The arithmetic is in `src/lib/site-map-travel.ts` and
   unit-tested; the scene only supplies the camera and the clock.
+- **The overlay controls are sized for 320 px**, which is the width this is
+  most likely to be read at. `PAD_KEY` is square for a glyph and `PAD_KEY_WIDE`
+  grows to its word with a margin either side — "Down" does not fit in 36 px,
+  and neither does 下潛 — and the viewpoint buttons say "Above" / "Seabed" with
+  the sentence in their `aria-label`, because spelled out they ran under the
+  compass rose. Measured in a real browser rather than guessed; happy-dom
+  renders none of this.
 - The pad exists because **a phone has no keyboard.** It presses the same held
   set the keys do, keeps the press on `setPointerCapture` so a thumb sliding
   off does not leave the camera flying, and answers Enter / Space as a hold so

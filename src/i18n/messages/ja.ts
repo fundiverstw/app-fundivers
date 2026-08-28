@@ -77,8 +77,11 @@ export const ja: Messages = {
     entriesMarked: (n: number) => n === 1
       ? '入水できる場所が1か所記録されています。水面の緑のリングと、その下の海底まで伸びる線で示しています。'
       : `入水できる場所が${n}か所記録されています。水面の緑のリングと、その下の海底まで伸びる線で示しています。`,
-    viewFromAbove: '真上から',
-    viewFromSeabed: '海底から',
+    viewpointAria: '視点',
+    viewFromAbove: '真上',
+    viewFromAboveAria: '真上からサイトを見る',
+    viewFromSeabed: '海底',
+    viewFromSeabedAria: '海底から見上げる',
     seaLevelLegend: '頭上の淡い面が海面です。ここでの水深はすべてそこから下向きに測り、すべての点は海面から始まります。',
     padAria: 'カメラを動かす',
     padForward: '前へ進む',

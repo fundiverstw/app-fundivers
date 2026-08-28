@@ -78,8 +78,11 @@ export const zhTW: Messages = {
     entriesMarked: (n: number) => n === 1
       ? '已標記 1 個入水點：水面上的綠色圓環，下方有一條線落到海底。'
       : `已標記 ${n} 個入水點：水面上的綠色圓環，各有一條線落到海底。`,
-    viewFromAbove: '從上方看',
-    viewFromSeabed: '從海底看',
+    viewpointAria: '視角',
+    viewFromAbove: '上方',
+    viewFromAboveAria: '從上方俯視整個潛點',
+    viewFromSeabed: '海底',
+    viewFromSeabedAria: '從海底往上看',
     seaLevelLegend: '頭頂那層淡色的面就是海平面。這裡的深度都是從它往下量，每一個點也都從它開始。',
     padAria: '移動鏡頭',
     padForward: '往前游',

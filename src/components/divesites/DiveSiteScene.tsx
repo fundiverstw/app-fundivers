@@ -18,7 +18,7 @@ import {
 } from '../../lib/site-map-travel'
 import { t } from '../../i18n'
 import {
-  BADGE_READOUT, BTN_XS_GHOST, CARD, OVERLAY_PANEL, PAD_KEY,
+  BADGE_READOUT, BTN_XS_GHOST, CARD, OVERLAY_PANEL, PAD_KEY, PAD_KEY_WIDE,
   TEXT_HEADING, TEXT_MUTED, TEXT_SUBTLE,
 } from '../../styles/tokens'
 
@@ -238,12 +238,12 @@ export function DiveSiteScene({
   /** One key of the pad. Held rather than clicked — travel is a thing you do
    *  for a while — with the keyboard equivalent wired to the same hold, so it
    *  is not a control only a mouse can work. */
-  function padKey(dir: Travel, content: string, label?: string) {
+  function padKey(dir: Travel, content: string, shape: string, label?: string) {
     return (
       <button
         type="button"
         aria-label={label}
-        className={PAD_KEY}
+        className={shape}
         onPointerDown={e => {
           // Captured, or a finger that slides off the key never reports its
           // release and the camera keeps going.
@@ -908,11 +908,28 @@ export function DiveSiteScene({
             aria-hidden="true"
             className={`pointer-events-none absolute left-0 top-0 ${BADGE_READOUT}`}
           />
-          <div className={`absolute left-3 top-3 flex gap-1 ${OVERLAY_PANEL}`}>
-            <button type="button" className={BTN_XS_GHOST} onClick={() => viewFrom('above')}>
+          {/* Named in one word each, with the sentence in the label. Spelled
+              out — "From the seabed" — the pair ran under the compass rose at
+              320 px, which is the width this is most likely to be read at. */}
+          <div
+            className={`absolute left-3 top-3 flex gap-1 ${OVERLAY_PANEL}`}
+            role="group"
+            aria-label={t.siteMap.viewpointAria}
+          >
+            <button
+              type="button"
+              className={BTN_XS_GHOST}
+              aria-label={t.siteMap.viewFromAboveAria}
+              onClick={() => viewFrom('above')}
+            >
               {t.siteMap.viewFromAbove}
             </button>
-            <button type="button" className={BTN_XS_GHOST} onClick={() => viewFrom('seabed')}>
+            <button
+              type="button"
+              className={BTN_XS_GHOST}
+              aria-label={t.siteMap.viewFromSeabedAria}
+              onClick={() => viewFrom('seabed')}
+            >
               {t.siteMap.viewFromSeabed}
             </button>
           </div>
@@ -923,21 +940,21 @@ export function DiveSiteScene({
           >
             <div className="grid grid-cols-3 gap-1">
               <span />
-              {padKey('forward', '\u25B2', t.siteMap.padForward)}
+              {padKey('forward', '\u25B2', PAD_KEY, t.siteMap.padForward)}
               <span />
-              {padKey('left', '\u25C0', t.siteMap.padLeft)}
+              {padKey('left', '\u25C0', PAD_KEY, t.siteMap.padLeft)}
               <span />
-              {padKey('right', '\u25B6', t.siteMap.padRight)}
+              {padKey('right', '\u25B6', PAD_KEY, t.siteMap.padRight)}
               <span />
-              {padKey('back', '\u25BC', t.siteMap.padBack)}
+              {padKey('back', '\u25BC', PAD_KEY, t.siteMap.padBack)}
               <span />
             </div>
             {/* Worded rather than arrowed: a triangle beside four other
                 triangles reads as another way to swim along the bottom, and
                 this pair is the one that changes how deep you are. */}
             <div className="grid gap-1">
-              {padKey('up', t.siteMap.padUp)}
-              {padKey('down', t.siteMap.padDown)}
+              {padKey('up', t.siteMap.padUp, PAD_KEY_WIDE)}
+              {padKey('down', t.siteMap.padDown, PAD_KEY_WIDE)}
             </div>
           </div>
           <svg

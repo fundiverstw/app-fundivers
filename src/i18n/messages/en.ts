@@ -85,8 +85,11 @@ export const en = {
     entriesMarked: (n: number) => n === 1
       ? 'One way into the water is marked: a green ring at the surface, with a line dropped to the seabed under it.'
       : `${n} ways into the water are marked: green rings at the surface, each with a line dropped to the seabed under it.`,
-    viewFromAbove: 'From above',
-    viewFromSeabed: 'From the seabed',
+    viewpointAria: 'Viewpoint',
+    viewFromAbove: 'Above',
+    viewFromAboveAria: 'Look at the site from above',
+    viewFromSeabed: 'Seabed',
+    viewFromSeabedAria: 'Look up from the seabed',
     seaLevelLegend: 'The pale sheet overhead is sea level. Every depth here is measured down from it, and every point starts on it.',
     padAria: 'Move the camera',
     padForward: 'Swim forward',
