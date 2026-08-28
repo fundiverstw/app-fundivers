@@ -51,6 +51,17 @@ import {
  *  from anywhere in the site. */
 const ENTRY_COLOR = 0x86e08a
 
+/**
+ * How much of its own square metre a marker sphere may take up.
+ *
+ * The lattice is the thing being read. A ball sized to fill the space between
+ * two handles hides the neighbours a diver is choosing between — which is the
+ * one thing they need to see to aim at the right metre — and reads as a blob
+ * of seabed rather than as a mark on it. Under a third of the spacing, a
+ * marker sits inside its own cell with the grid still legible around it.
+ */
+const MARKER_OF_SPACING = 0.3
+
 // Probed once per session rather than per mount: creating a throwaway canvas
 // context is not free, and the answer cannot change while the tab is open.
 let webglSupport: boolean | null = null
@@ -142,6 +153,23 @@ function handleSpacingOf(handles?: readonly GridHandle[]): number {
   let min = Infinity
   for (let i = 1; i < xs.length; i++) min = Math.min(min, xs[i] - xs[i - 1])
   return Number.isFinite(min) ? min : LATTICE_SPACING_M
+}
+
+/**
+ * Metres between the lattice dots a read-only site draws.
+ *
+ * The lattice is 1 m and implicit, so a 500 m site holds a quarter of a
+ * million positions — undrawable. Only a subset is shown, thinned by whatever
+ * step keeps the count near LATTICE_DOTS_MAX, and the caption states the true
+ * spacing so the drawing is never mistaken for the resolution.
+ */
+const LATTICE_DOTS_MAX = 4000
+function latticeStep(extent_m: number): number {
+  const stepsAcross = Math.max(1, Math.floor((extent_m * 2) / LATTICE_SPACING_M))
+  return Math.max(
+    LATTICE_SPACING_M,
+    Math.ceil(stepsAcross / Math.sqrt(LATTICE_DOTS_MAX)) * LATTICE_SPACING_M,
+  )
 }
 
 /** Free a subtree's GPU memory. Points and lines hold buffers exactly as
@@ -548,8 +576,14 @@ export function DiveSiteScene({
       content.add(ring)
     }
 
+    // Metres between the dots that are actually on screen: the editing field's
+    // own spacing, or the thinned lattice a read-only site draws. Everything
+    // marked on the seabed is sized against this rather than against the site,
+    // so a marker means the same thing on a 20 m patch and a 500 m coastline.
+    const drawnSpacing = editable ? handleStep : latticeStep(extent)
+
     // Contributed readings are individual markers — there are few of them.
-    const markerRadius = Math.max(radius * 0.012, 0.6)
+    const markerRadius = drawnSpacing * MARKER_OF_SPACING
     for (const s of observed.soundings) {
       const marker = new THREE.Mesh(
         new THREE.SphereGeometry(markerRadius, 10, 10),
@@ -559,24 +593,17 @@ export function DiveSiteScene({
       content.add(marker)
     }
 
-    // The lattice is drawn, not stored. Every position is 1 m from the next,
-    // so a 1 km field holds a million of them — far too many to draw. Only a
-    // readable subset is shown, thinned by whatever step keeps the count near
-    // LATTICE_DOTS_MAX, and the label states the true spacing so the drawing
-    // is never mistaken for the resolution. Suppressed while editing: the
-    // grabbable field sits at the depth each point actually holds, and a second
-    // lattice flat on the base plane underneath it reads as a second seabed.
+    // The lattice is drawn, not stored — see `latticeStep`, which is what
+    // thins it. Suppressed while editing: the grabbable field sits at the
+    // depth each point actually holds, and a second lattice flat on the base
+    // plane underneath it reads as a second seabed.
     if (!editable) {
-      const LATTICE_DOTS_MAX = 4000
       const latticeSpan = extent * 2
-      const stepsAcross = Math.max(1, Math.floor(latticeSpan / LATTICE_SPACING_M))
-      const step = Math.max(
-        LATTICE_SPACING_M,
-        Math.ceil(stepsAcross / Math.sqrt(LATTICE_DOTS_MAX)) * LATTICE_SPACING_M,
-      )
       const dots: THREE.Vector3[] = []
-      for (let x = -extent; x <= extent; x += step) {
-        for (let y = -extent; y <= extent; y += step) dots.push(new THREE.Vector3(x, baseY, -y))
+      for (let x = -extent; x <= extent; x += drawnSpacing) {
+        for (let y = -extent; y <= extent; y += drawnSpacing) {
+          dots.push(new THREE.Vector3(x, baseY, -y))
+        }
       }
       if (dots.length) {
         content.add(new THREE.Points(
@@ -662,7 +689,7 @@ export function DiveSiteScene({
       controls.target.copy(center)
       controls.update()
     }
-  }, [supported, map.id, observed, surface, extent, editable, verticalExaggeration])
+  }, [supported, map.id, observed, surface, extent, editable, handleStep, verticalExaggeration])
 
   // The grabbable field, and the gesture that pulls it.
   //
@@ -713,7 +740,7 @@ export function DiveSiteScene({
     // changes, which is most of what made this feel like clicking.
     const spacing = handleSpacingOf(field)
     const marker = new THREE.Mesh(
-      new THREE.SphereGeometry(Math.max(spacing * 0.5, 0.3), 12, 12),
+      new THREE.SphereGeometry(Math.max(spacing * MARKER_OF_SPACING, 0.15), 12, 12),
       new THREE.MeshBasicMaterial({ color: 0x7fe3d0, transparent: true, opacity: 0.85 }),
     )
     marker.visible = false

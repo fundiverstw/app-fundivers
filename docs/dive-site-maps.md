@@ -99,6 +99,12 @@ readable message when WebGL is unavailable.
   from it and every handle starts on it — and without it, looking up from the
   seabed showed nothing at all. The unedited seabed does not write depth, or
   the first point anybody pulls would hide behind the sheet it came out of.
+- **Everything marked on the seabed is sized against the dots on screen**, not
+  against the site: `MARKER_OF_SPACING` (0.3) of the drawn spacing, which is
+  the editing field's 1 m while editing and `latticeStep(extent)` while
+  reading. A sphere sized to fill the space between two handles hides the
+  neighbours a diver is choosing between, which is the one thing they need to
+  see to aim at the right metre.
 - **Volumetric features are wireframe markers.** Position is real; shape is
   schematic, and a solid mesh would imply a survey nobody has done.
 - **Compass** is an SVG overlay, not scene geometry, so it stays crisp and its
