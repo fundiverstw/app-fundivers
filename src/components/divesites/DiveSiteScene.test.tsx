@@ -133,3 +133,15 @@ describe('DiveSiteScene — ways into the water', () => {
     expect(screen.getByText(t.siteMap.seaLevelLegend)).toBeInTheDocument()
   })
 })
+
+
+// The pad itself sits inside the WebGL branch, which happy-dom never reaches;
+// what a press means is covered in lib/site-map-travel.test.ts. What belongs
+// here is that the view says the controls exist at all — a camera that can
+// descend forever is no use to somebody who does not know it can.
+describe('DiveSiteScene — getting about', () => {
+  it('says how the camera is moved, and that depth has its own controls', () => {
+    render(<DiveSiteScene map={mapWith([sounding('a', 0, 0, 5)])} />)
+    expect(screen.getByText(t.siteMap.travelLegend)).toBeInTheDocument()
+  })
+})

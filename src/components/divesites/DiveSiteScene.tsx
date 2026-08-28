@@ -13,9 +13,12 @@ import type { GridHandle } from '../../lib/site-map-grid'
 import {
   beginGrab, dragTo, movedGrab, nearestWithin, type Grab, type ScreenPoint,
 } from '../../lib/site-map-grab'
+import {
+  travelDirection, travelForKey, travelSpeed, TRAVEL_RAMP_S, type Travel,
+} from '../../lib/site-map-travel'
 import { t } from '../../i18n'
 import {
-  BADGE_READOUT, BTN_XS_GHOST, CARD, OVERLAY_PANEL,
+  BADGE_READOUT, BTN_XS_GHOST, CARD, OVERLAY_PANEL, PAD_KEY,
   TEXT_HEADING, TEXT_MUTED, TEXT_SUBTLE,
 } from '../../styles/tokens'
 
@@ -96,6 +99,16 @@ interface DiveSiteSceneProps {
 /** What taking hold of a handle does. */
 export type HandleGesture = 'pull' | 'mark'
 
+/**
+ * How far down the depth rings go on a site with nothing measured on it.
+ *
+ * The camera can now descend past the seabed, and water with no marks in it
+ * gives no sense of how far it has gone. Forty metres is where recreational
+ * diving stops, so it is the column worth drawing whether or not anybody has
+ * recorded a depth in it yet.
+ */
+const WATER_COLUMN_M = 40
+
 /** What survives a data change: the view a diver has arranged for themselves. */
 interface Rig {
   renderer: THREE.WebGLRenderer
@@ -115,6 +128,10 @@ interface Rig {
    *  a viewpoint button needs to put the camera somewhere worth being. */
   center: THREE.Vector3
   floorY: number
+  /** Directions currently being asked for. Held on the rig rather than in the
+   *  effect's closure because the on-screen pad presses the same set the
+   *  keyboard does, and one loop moves the camera for both. */
+  held: Set<Travel>
 }
 
 /** Metres between the drawn handles, read off the field itself rather than
@@ -213,6 +230,37 @@ export function DiveSiteScene({
     controls.update()
   }, [])
 
+  // The pad presses the same directions the keyboard does. Held on the rig, so
+  // a press survives every re-render the editor does underneath it.
+  const press = useCallback((dir: Travel) => { rigRef.current?.held.add(dir) }, [])
+  const release = useCallback((dir: Travel) => { rigRef.current?.held.delete(dir) }, [])
+
+  /** One key of the pad. Held rather than clicked — travel is a thing you do
+   *  for a while — with the keyboard equivalent wired to the same hold, so it
+   *  is not a control only a mouse can work. */
+  function padKey(dir: Travel, content: string, label?: string) {
+    return (
+      <button
+        type="button"
+        aria-label={label}
+        className={PAD_KEY}
+        onPointerDown={e => {
+          // Captured, or a finger that slides off the key never reports its
+          // release and the camera keeps going.
+          e.currentTarget.setPointerCapture(e.pointerId)
+          press(dir)
+        }}
+        onPointerUp={() => release(dir)}
+        onPointerCancel={() => release(dir)}
+        onKeyDown={e => { if (e.key === ' ' || e.key === 'Enter') press(dir) }}
+        onKeyUp={() => release(dir)}
+        onBlur={() => release(dir)}
+      >
+        {content}
+      </button>
+    )
+  }
+
   // The rig: built once, and outliving every reading placed in it.
   useEffect(() => {
     const mount = mountRef.current
@@ -255,24 +303,14 @@ export function DiveSiteScene({
       renderer, scene, camera, controls, content, handleLayer,
       travelSpeed: 20, radius: 30,
       center: new THREE.Vector3(), floorY: 0,
+      held: new Set(),
     }
     rigRef.current = rig
 
     // Keyboard traversal. Listening on the window rather than the canvas means
     // no click-to-focus dance, but it also means the depth field would eat a
     // "w" as a movement — hence the editable-target guard.
-    const held = new Set<string>()
-    // [strafe, forward, rise]. Rising and sinking are here for the same reason
-    // the polar clamp went: getting to the seabed and looking up should not
-    // require orbiting there sideways.
-    const MOVE_KEYS: Record<string, [number, number, number]> = {
-      w: [0, 1, 0], arrowup: [0, 1, 0],
-      s: [0, -1, 0], arrowdown: [0, -1, 0],
-      a: [-1, 0, 0], arrowleft: [-1, 0, 0],
-      d: [1, 0, 0], arrowright: [1, 0, 0],
-      e: [0, 0, 1],
-      q: [0, 0, -1],
-    }
+    const held = rig.held
 
     function isTyping(target: EventTarget | null): boolean {
       const el = target as HTMLElement | null
@@ -281,24 +319,32 @@ export function DiveSiteScene({
     }
 
     function onKeyDown(e: KeyboardEvent) {
-      const k = e.key.toLowerCase()
-      if (!(k in MOVE_KEYS) || isTyping(e.target)) return
-      held.add(k)
+      const dir = travelForKey(e.key)
+      if (!dir || isTyping(e.target)) return
+      held.add(dir)
       // Arrow keys scroll the page otherwise, which fights the traversal.
       e.preventDefault()
     }
     function onKeyUp(e: KeyboardEvent) {
-      held.delete(e.key.toLowerCase())
+      const dir = travelForKey(e.key)
+      if (dir) held.delete(dir)
+    }
+    // A key held while the window loses focus never reports its release, and
+    // the camera flies off on its own until something else is pressed.
+    function onBlur() {
+      held.clear()
     }
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', onBlur)
 
     const forward = new THREE.Vector3()
     const strafe = new THREE.Vector3()
     const travel = new THREE.Vector3()
-    const UP = new THREE.Vector3(0, 1, 0)
     let last = performance.now()
     let frame = 0
+    // Seconds of unbroken travel, which is what the speed ramp is measured on.
+    let travelling = 0
 
     function animate() {
       frame = requestAnimationFrame(animate)
@@ -307,22 +353,31 @@ export function DiveSiteScene({
       last = now
 
       if (held.size) {
+        // Forward follows the whole look direction, pitch included. Flattening
+        // it made W a pan across the site and left no way to swim down but the
+        // dedicated keys; pointing the camera at the bottom and holding one is
+        // how a diver descends, and now how the camera does.
         camera.getWorldDirection(forward)
-        forward.y = 0
-        forward.normalize()
-        strafe.copy(forward).cross(UP).normalize()
-        travel.set(0, 0, 0)
-        for (const k of held) {
-          const [sx, sf, sy] = MOVE_KEYS[k]
-          travel.addScaledVector(forward, sf)
-          travel.addScaledVector(strafe, sx)
-          travel.addScaledVector(UP, sy)
-        }
+        // Strafe comes off the camera's own right vector rather than off
+        // `forward`, which vanishes when you look straight down — and is
+        // flattened, so left and right never roll the horizon.
+        strafe.setFromMatrixColumn(camera.matrix, 0)
+        strafe.y = 0
+        if (strafe.lengthSq() < 1e-6) strafe.set(1, 0, 0)
+        strafe.normalize()
+
+        const heading = travelDirection(held, forward, strafe)
+        travel.set(heading.x, heading.y, heading.z)
         if (travel.lengthSq() > 0) {
-          travel.normalize().multiplyScalar(rig.travelSpeed * dt)
+          travelling = Math.min(travelling + dt, TRAVEL_RAMP_S)
+          travel.multiplyScalar(travelSpeed(rig.travelSpeed, travelling) * dt)
           camera.position.add(travel)
           controls.target.add(travel)
+        } else {
+          travelling = 0
         }
+      } else {
+        travelling = 0
       }
 
       controls.update()
@@ -355,6 +410,7 @@ export function DiveSiteScene({
       window.removeEventListener('resize', onResize)
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', onBlur)
       controls.dispose()
       disposeSubtree(scene)
       renderer.dispose()
@@ -469,10 +525,16 @@ export function DiveSiteScene({
     water.position.set(center.x, 0.02, center.z)
     content.add(water)
 
-    // Depth posts every 10 m, dropped from the surface to the deepest point, so
-    // "how deep is this" is answerable by eye instead of by legend.
+    // Depth posts every 10 m, dropped from the surface, so "how deep is this"
+    // is answerable by eye instead of by legend.
+    //
+    // They go on past the deepest reading, down a full recreational water
+    // column. The camera can descend below the seabed now, and black water
+    // with no marks in it says nothing about how far it has gone — on a site
+    // nobody has measured, these rings are the only depth cue there is.
     const deepest = -(box.min.y)
-    for (let d = 10 * verticalExaggeration; d <= deepest; d += 10 * verticalExaggeration) {
+    const ringFloor = Math.max(deepest, WATER_COLUMN_M * verticalExaggeration)
+    for (let d = 10 * verticalExaggeration; d <= ringFloor; d += 10 * verticalExaggeration) {
       const ring = new THREE.LineLoop(
         new THREE.BufferGeometry().setFromPoints(
           Array.from({ length: 33 }, (_, i) => {
@@ -854,6 +916,30 @@ export function DiveSiteScene({
               {t.siteMap.viewFromSeabed}
             </button>
           </div>
+          <div
+            className={`absolute bottom-3 left-3 flex items-end gap-2 ${OVERLAY_PANEL}`}
+            role="group"
+            aria-label={t.siteMap.padAria}
+          >
+            <div className="grid grid-cols-3 gap-1">
+              <span />
+              {padKey('forward', '\u25B2', t.siteMap.padForward)}
+              <span />
+              {padKey('left', '\u25C0', t.siteMap.padLeft)}
+              <span />
+              {padKey('right', '\u25B6', t.siteMap.padRight)}
+              <span />
+              {padKey('back', '\u25BC', t.siteMap.padBack)}
+              <span />
+            </div>
+            {/* Worded rather than arrowed: a triangle beside four other
+                triangles reads as another way to swim along the bottom, and
+                this pair is the one that changes how deep you are. */}
+            <div className="grid gap-1">
+              {padKey('up', t.siteMap.padUp)}
+              {padKey('down', t.siteMap.padDown)}
+            </div>
+          </div>
           <svg
             viewBox="-64 -64 128 128"
             className="pointer-events-none absolute right-3 top-3 h-16 w-16 opacity-90"
@@ -908,6 +994,7 @@ export function DiveSiteScene({
         </p>
         <p className={`text-xs ${TEXT_SUBTLE}`}>{t.siteMap.exaggeration(verticalExaggeration)}</p>
         <p className={`text-xs ${TEXT_SUBTLE}`}>{t.siteMap.seaLevelLegend}</p>
+        <p className={`text-xs ${TEXT_SUBTLE}`}>{t.siteMap.travelLegend}</p>
         <p className={`text-xs ${TEXT_SUBTLE}`}>{t.siteMap.fadeLegend}</p>
         <p className={`text-xs ${TEXT_SUBTLE}`}>{t.siteMap.schematicLegend}</p>
       </figcaption>

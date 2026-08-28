@@ -96,6 +96,11 @@ export const BADGE_READOUT = 'rounded-md px-2 py-0.5 text-xs font-semibold bg-re
  *  rather than trusting whatever the camera happens to be pointing at. */
 export const OVERLAY_PANEL = 'rounded-lg bg-brand-950/70 p-1 backdrop-blur-sm'
 
+/** One key of the on-screen movement pad over a rendered scene. Square and
+ *  thumb-sized because a phone has no W A S D, and `touch-none` because the
+ *  browser would otherwise read a held key as a scroll and take the gesture. */
+export const PAD_KEY = 'flex h-9 w-9 select-none touch-none items-center justify-center rounded-md border border-white/20 text-sm font-semibold text-brand-50 hover:bg-white/10 active:bg-white/20'
+
 export const INPUT       = 'w-full bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-brand-50 placeholder:text-brand-100/40 focus:outline-none focus:border-reef-400'
 export const INPUT_LABEL = 'block text-sm text-brand-100 mb-1'
 

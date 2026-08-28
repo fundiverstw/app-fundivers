@@ -105,9 +105,28 @@ readable message when WebGL is unavailable.
   "N" is translatable. Rotated via the SVG `transform` attribute — CSS
   `transform-origin` on a `<g>` resolves against that group's bounding box and
   swings the rose off-axis.
-- **WASD / arrow keys** move camera and orbit target together. Speed scales with
-  site size; the handler ignores events from inputs, or typing a depth would fly
-  the camera.
+- **WASD / arrow keys, or the on-screen pad**, move camera and orbit target
+  together, along the direction the camera is *looking* — pitch included, so
+  aiming at the bottom and holding one descends. `q` / `e` change depth on
+  their own, in world up and down, because that is the one direction on this
+  map with a fixed meaning. Speed scales with site size and **ramps** over
+  about a second of continuous press (`TRAVEL_RAMP_S`, `TRAVEL_RAMP_MAX`): one
+  speed cannot both nudge the camera a metre and cross a 40 m water column at
+  3× exaggeration. The arithmetic is in `src/lib/site-map-travel.ts` and
+  unit-tested; the scene only supplies the camera and the clock.
+- The pad exists because **a phone has no keyboard.** It presses the same held
+  set the keys do, keeps the press on `setPointerCapture` so a thumb sliding
+  off does not leave the camera flying, and answers Enter / Space as a hold so
+  it is not a control only a mouse can work. `held` lives on the rig, not in
+  the effect closure, so a press survives the re-renders the editor does
+  underneath it.
+- **Depth rings go past the deepest reading**, down a full recreational water
+  column (`WATER_COLUMN_M`, 40 m). The camera can descend below the seabed now,
+  and unmarked black water says nothing about how far it has gone — on a site
+  nobody has measured these rings are the only depth cue there is.
+- The keyboard handler **ignores events from inputs**, or typing a depth would
+  fly the camera, and clears everything held on window blur, or a key released
+  out of focus never reports it.
 
 ## Contributing — `src/lib/site-map-draft.ts`
 
