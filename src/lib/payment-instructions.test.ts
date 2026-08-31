@@ -5,60 +5,120 @@ import {
   SHOP_ADDRESS,
   SHOP_PHONE,
   SHOP_MAPS_URL,
-  PAYPAL_LINK,
 } from './payment-instructions'
+import type { PaymentMethodDetails } from './payment-method-format'
 import { siteConfig } from '../config/site'
 import { t } from '../i18n'
 
 // Copy assertions go through the catalog: these blocks render in whatever
 // shop-facing language the deployment picked, so pinning English prose here
 // would test the language rather than the behavior. What stays hardcoded is
-// what must be true in EVERY language — the shop's config values appear, the
-// invoice address is echoed verbatim, and no raw bank details leak.
+// what must be true in EVERY language — the shop's own values appear, the
+// invoice address is echoed verbatim, and an unconfigured method says so
+// instead of showing a diver an empty account.
 const p = t.paymentInstructions
 
+function method(over: Partial<PaymentMethodDetails> = {}): PaymentMethodDetails {
+  return {
+    key: 'bank_transfer',
+    label: 'Domestic bank transfer',
+    surcharge_percent: 0,
+    collects_invoice_email: false,
+    shows_shop_contact: false,
+    ...over,
+  }
+}
+
 describe('paymentInstructionsFor', () => {
-  it('cash → in-person at the shop, including address + phone + map link', () => {
-    const i = paymentInstructionsFor('cash')
-    expect(i.title).toBe(p.cashTitle)
+  it('titles the block with the shop-authored name, no surcharge suffix when there is none', () => {
+    expect(paymentInstructionsFor(method()).title).toBe(p.howToPay('Domestic bank transfer'))
+  })
+
+  it('suffixes the method name with its own surcharge, not a shop-wide one', () => {
+    const i = paymentInstructionsFor(method({ label: 'Credit card', surcharge_percent: 3 }))
+    expect(i.title).toBe(p.howToPay('Credit card (+3%)'))
+  })
+
+  it('prints the shop bank details it was given', () => {
+    const i = paymentInstructionsFor(method({
+      bank_name: 'CTBC Bank',
+      bank_branch: 'Yonghe',
+      bank_code: '822',
+      account_number: '1234-5678-9012',
+      account_holder: 'FunDivers TW',
+      swift_bic: 'CTCBTWTP',
+    }))
+    expect(i.lines).toContain(p.bankName('CTBC Bank'))
+    expect(i.lines).toContain(p.bankBranch('Yonghe'))
+    expect(i.lines).toContain(p.bankCode('822'))
+    expect(i.lines).toContain(p.accountNumber('1234-5678-9012'))
+    expect(i.lines).toContain(p.accountHolder('FunDivers TW'))
+    expect(i.lines).toContain(p.swift('CTCBTWTP'))
+  })
+
+  it('omits every blank transfer row rather than printing an empty label', () => {
+    const i = paymentInstructionsFor(method({
+      account_number: '1234',
+      bank_name: '   ',
+      swift_bic: null,
+    }))
+    expect(i.lines).toContain(p.accountNumber('1234'))
+    expect(i.lines.some(l => l === p.bankName('') || l === p.bankName('   '))).toBe(false)
+    expect(i.lines.some(l => l.startsWith(p.swift('')))).toBe(false)
+  })
+
+  it('says details are coming when the shop has published none — never a bare memo instruction', () => {
+    const i = paymentInstructionsFor(method({ notes: 'Put your name in the memo.' }))
+    expect(i.lines).toContain('Put your name in the memo.')
+    expect(i.lines).toContain(p.bankDetailsPending)
+  })
+
+  it('drops the pending line as soon as anything payable is published', () => {
+    const i = paymentInstructionsFor(method({ account_number: '1234-5678' }))
+    expect(i.lines).not.toContain(p.bankDetailsPending)
+  })
+
+  it('renders each notes line separately, skipping blank lines', () => {
+    const i = paymentInstructionsFor(method({
+      account_number: '1',
+      notes: 'First line.\n\n  Second line.  ',
+    }))
+    expect(i.lines).toContain('First line.')
+    expect(i.lines).toContain('Second line.')
+    expect(i.lines).not.toContain('')
+  })
+
+  it('links an online payment URL', () => {
+    const i = paymentInstructionsFor(method({ pay_url: 'https://paypal.me/example' }))
+    expect(i.lines).toContain(p.payOnline('https://paypal.me/example'))
+  })
+
+  it('appends the shop contact from config when the method is paid in person', () => {
+    const i = paymentInstructionsFor(method({ key: 'cash', label: 'Cash', shows_shop_contact: true }))
     const body = i.lines.join(' ')
     expect(body).toContain(SHOP_PHONE)
     expect(body).toContain(SHOP_ADDRESS)
     expect(body).toContain(SHOP_MAPS_URL)
-    expect(body).toContain(p.cashLine)
+    // Paying at the counter needs no bank account, so it must not nag for one.
+    expect(i.lines).not.toContain(p.bankDetailsPending)
   })
 
-  it('bank_transfer → tells the diver the bank details arrive by email (no raw account details)', () => {
-    const i = paymentInstructionsFor('bank_transfer')
-    expect(i.title).toBe(p.bankTitle)
-    expect(i.lines).toEqual([p.bankLine])
-    // The real account number/name/branch must not be embedded, in any language.
-    expect(i.lines.join(' ')).not.toMatch(/code:|account:|branch:/i)
-  })
-
-  it('paypal → paypal.me link + name-in-note instruction', () => {
-    const i = paymentInstructionsFor('paypal')
-    expect(i.title).toBe(p.paypalTitle(`+${siteConfig.business.cardSurchargePercent}%`))
-    const body = i.lines.join(' ')
-    expect(body).toContain(PAYPAL_LINK)
-    expect(body).toContain(p.paypalNote)
-  })
-
-  it('credit_card with no invoice email → falls back to the registered-email wording', () => {
-    const i = paymentInstructionsFor('credit_card')
-    expect(i.title).toBe(p.cardTitle(`+${siteConfig.business.cardSurchargePercent}%`))
+  it('falls back to the registered-email wording with no invoice email', () => {
+    const i = paymentInstructionsFor(method({ collects_invoice_email: true }))
     expect(i.lines.join(' ')).toContain(p.invoiceTo(p.registeredEmail))
   })
 
-  it('credit_card with invoice email → shows that address verbatim', () => {
-    const i = paymentInstructionsFor('credit_card', { invoiceEmail: 'invoices@example.com' })
+  it('shows a supplied invoice email verbatim', () => {
+    const i = paymentInstructionsFor(
+      method({ collects_invoice_email: true }), { invoiceEmail: 'invoices@example.com' })
     const body = i.lines.join(' ')
     expect(body).toContain(p.invoiceTo('invoices@example.com'))
     expect(body).not.toContain(p.registeredEmail)
   })
 
-  it('credit_card whitespace-only invoice email → falls back to registered email', () => {
-    const i = paymentInstructionsFor('credit_card', { invoiceEmail: '   ' })
+  it('falls back to registered email on a whitespace-only invoice email', () => {
+    const i = paymentInstructionsFor(
+      method({ collects_invoice_email: true }), { invoiceEmail: '   ' })
     expect(i.lines.join(' ')).toContain(p.invoiceTo(p.registeredEmail))
   })
 })

@@ -1,6 +1,7 @@
 import { GEAR_ALACARTE_PRICES } from './gear'
 import { siteConfig } from '../config/site'
-import type { AppEvent, BookingDetails } from '../types/database'
+import { surchargeRateFor, type PaymentMethodDetails } from './payment-method-format'
+import type { AppEvent, BookingDetails, PaymentMethod } from '../types/database'
 import { t } from '../i18n'
 
 // Flat fee for adding a Nitrox course to a dive registration, from shop config.
@@ -75,14 +76,22 @@ export function chargesTotal(lines: ChargeLine[]): number {
   return lines.reduce((s, l) => s + l.amount, 0)
 }
 
-/** The card/PayPal surcharge as a multiplier. Card and PayPal carry it; cash
- *  and bank transfer pass through at face value. The rate comes from
- *  business.cardSurchargePercent, the same field that labels it everywhere —
- *  a fork that sets 3 must be charged 3%, not shown "+3%" and charged 5%. */
-export const CARD_SURCHARGE_RATE = siteConfig.business.cardSurchargePercent / 100
-
-export const surchargeRate = (method: BookingDetails['payment_method']): number =>
-  method === 'credit_card' || method === 'paypal' ? CARD_SURCHARGE_RATE : 0
+/** The line item for a method's surcharge, or null when it carries none. Every
+ *  method has its own rate (payment_methods.surcharge_percent), so a shop can
+ *  charge 3% on cards, nothing on transfers, and whatever it likes on a method
+ *  it invented. */
+export function surchargeLine(
+  method: PaymentMethodDetails | null | undefined,
+  base: number,
+  depositOnly: boolean,
+): { label: string; amount: number } | null {
+  const rate = surchargeRateFor(method)
+  if (!method || rate <= 0) return null
+  return {
+    label: t.chargeLines.surcharge(method.label, Number(method.surcharge_percent), depositOnly),
+    amount: Math.round(base * rate),
+  }
+}
 
 export interface ResolveChargesInput {
   details: BookingDetails | null | undefined
@@ -92,6 +101,9 @@ export interface ResolveChargesInput {
   roomPrices?: Map<string, { label: string; amount: number }>
   /** addon _id -> resolved label + price. Same — only for old bookings. */
   addonPrices?: Map<string, { label: string; amount: number }>
+  /** payment_methods.key -> the row, for the surcharge line's rate and label.
+   *  Absent (or a key the shop has since deleted) means no surcharge line. */
+  paymentMethods?: Map<string, PaymentMethod>
 }
 
 /**
@@ -123,16 +135,12 @@ export function resolveCharges(input: ResolveChargesInput): ChargeLine[] {
     + addons.reduce((s, a) => s + a.amount, 0)
     + transport + nitroxCourse
 
-  const rate = surchargeRate(details.payment_method)
-  let surcharge: { label: string; amount: number } | null = null
-  if (rate > 0) {
-    const depositOnly = !!details.pay_deposit_only
-    const surchargeBase = depositOnly ? Math.min(event.deposit_amount ?? 0, subTotal) : subTotal
-    surcharge = {
-      label: t.chargeLines.surcharge(siteConfig.business.cardSurchargePercent, depositOnly),
-      amount: Math.round(surchargeBase * rate),
-    }
-  }
+  const method = details.payment_method
+    ? input.paymentMethods?.get(details.payment_method) ?? null
+    : null
+  const depositOnly = !!details.pay_deposit_only
+  const surchargeBase = depositOnly ? Math.min(event.deposit_amount ?? 0, subTotal) : subTotal
+  const surcharge = surchargeLine(method, surchargeBase, depositOnly)
 
   const lines = buildCharges({ base, gear, gearDays: days, room, addons, transport, nitroxCourse, surcharge })
 

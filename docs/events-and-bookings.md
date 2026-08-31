@@ -169,15 +169,18 @@ total = base_price
                          and we render "Included with base price")
       + nitrox_course   (business.nitroxCourseFee if required-and-not-
                          certified and ticked)
-total *= 1 + business.cardSurchargePercent/100
-                        (if payment_method === 'credit_card')
+      + surcharge       (subtotal × the chosen payment method's
+                         surcharge_percent; 0 for a method that
+                         carries none)
 ```
 
-Every figure in that formula is shop config, not a literal: gear prices
+Every figure in that formula is shop data, not a literal: gear prices
 (`GEAR_ALACARTE_PRICES` in `src/lib/gear.ts`) and `NITROX_COURSE_FEE` (in
 `src/lib/booking-charges.ts`) both read `business.*` from
-`fundive.config.ts`. Gear is à-la-carte only — there is no full-set
-package. **Transport** is a per-event integer on the linked
+`fundive.config.ts`, and the surcharge comes off the chosen
+`payment_methods` row (see [payments.md §
+Payment methods](./payments.md#payment-methods)). Gear is à-la-carte only
+— there is no full-set package. **Transport** is a per-event integer on the linked
 `prices.transport` row, surfaced on `AppEvent` as `transport_price`.
 
 `buildCharges()` in `src/lib/booking-charges.ts` turns these into an

@@ -1,72 +1,65 @@
-// Edge-function copy of the per-method "How to pay" instructions. Mirror of the
-// *logic* in src/lib/payment-instructions.ts — shop values are read from the
-// same fundive.config.ts and the copy from the same message catalog (both pure
-// data, so Deno reads them fine), which means neither can drift between the two.
+// Edge-function binding of the shared "How to pay" renderer. Mirror of
+// src/lib/payment-instructions.ts — same shop config, same message catalog,
+// same src/lib/payment-method-format.ts renderer — so the PDF cannot drift
+// from what the diver saw on the register form.
 
 import { siteConfig } from "../../../fundive.config.ts"
 import { t } from "./i18n.ts"
+import {
+  paymentMethodInstructions,
+  type PaymentInstructions,
+  type PaymentMethodDetails,
+  type PaymentMethodLabels,
+  type ShopContact,
+} from "../../../src/lib/payment-method-format.ts"
+
+export type { PaymentInstructions, PaymentMethodDetails }
 
 export const SHOP_PHONE    = siteConfig.contact.phone
 export const SHOP_ADDRESS  = siteConfig.contact.address
 export const SHOP_MAPS_URL = siteConfig.contact.mapsUrl
 
-export const PAYPAL_LINK = siteConfig.contact.paypalLink
-
-const CARD_SURCHARGE = `+${siteConfig.business.cardSurchargePercent}%`
-
-// PDF wire labels are the SPA's payment_method values passed straight
-// through (no more bank_transfer→bank or credit_card→paypal remapping).
-// Strings widened so anything unrecognized still hits the `null` branch.
-export type PdfPaymentMethod = "bank_transfer" | "credit_card" | "paypal" | "cash" | string
-
-export interface PaymentInstructions {
-  title: string
-  lines: string[]
+const SHOP: ShopContact = {
+  phone:   SHOP_PHONE,
+  address: SHOP_ADDRESS,
+  mapsUrl: SHOP_MAPS_URL,
 }
 
+function labels(): PaymentMethodLabels {
+  const p = t.paymentInstructions
+  return {
+    howToPay:           p.howToPay,
+    bankName:           p.bankName,
+    bankBranch:         p.bankBranch,
+    bankCode:           p.bankCode,
+    accountNumber:      p.accountNumber,
+    accountHolder:      p.accountHolder,
+    swift:              p.swift,
+    payOnline:          p.payOnline,
+    phone:              p.phone,
+    address:            p.address,
+    map:                p.map,
+    invoiceTo:          p.invoiceTo,
+    registeredEmail:    p.registeredEmail,
+    bankDetailsPending: p.bankDetailsPending,
+  }
+}
+
+/**
+ * Build the block for the method snapshotted onto the PDF payload. Null when
+ * the booking's payment_method no longer resolves to a row (a method the shop
+ * deleted) — the PDF then simply omits the section rather than inventing one.
+ */
 export function paymentInstructionsFor(
-  method: PdfPaymentMethod,
+  method: PaymentMethodDetails | null | undefined,
   opts: { invoiceEmail?: string | null } = {},
 ): PaymentInstructions | null {
-  const p = t.paymentInstructions
-  switch (method) {
-    case "cash":
-      return {
-        title: p.cashTitle,
-        lines: [
-          p.cashLine,
-          p.phone(SHOP_PHONE),
-          p.address(SHOP_ADDRESS),
-          p.map(SHOP_MAPS_URL),
-        ],
-      }
-    case "bank_transfer":
-      return {
-        title: p.bankTitle,
-        lines: [p.bankLine],
-      }
-    case "paypal":
-      return {
-        title: p.paypalTitle(CARD_SURCHARGE),
-        lines: [
-          p.paypalLine,
-          PAYPAL_LINK,
-          p.paypalNote,
-        ],
-      }
-    case "credit_card": {
-      const target = (opts.invoiceEmail && opts.invoiceEmail.trim()) || p.registeredEmail
-      return {
-        title: p.cardTitle(CARD_SURCHARGE),
-        lines: [
-          p.cardLine,
-          p.invoiceTo(target),
-        ],
-      }
-    }
-    default:
-      return null
-  }
+  if (!method) return null
+  return paymentMethodInstructions(method, {
+    labels: labels(),
+    shop: SHOP,
+    invoiceEmail: opts.invoiceEmail,
+  })
 }
 
 /**

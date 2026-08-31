@@ -38,7 +38,10 @@ export interface BookingDetails {
    *  to add a car or arrange transport. Distinct from the event-capacity
    *  waitlist (booking.status). */
   ride_waitlisted?: boolean
-  payment_method?: 'bank_transfer' | 'credit_card' | 'paypal' | 'cash'
+  /** The `key` of a public.payment_methods row. Free text on purpose: a shop
+   *  can add methods, and a booking keeps resolving through the key it was
+   *  made with even after the method is renamed. */
+  payment_method?: string
   /** Optional billing email when the diver picks credit_card — they receive
    *  the invoice with the card-payment link at this address. Empty / undefined
    *  means fall back to the registered account email. Only set when
@@ -1845,6 +1848,61 @@ export interface Database {
         Update: never
         Relationships: []
       }
+      // Shop-authored payment methods (20260831130000_shop_authored_payment_methods.sql).
+      // `key` is the stable value stored on bookings.details.payment_method;
+      // everything else — the label, the surcharge, the bank account printed on
+      // the register form and the PDF — is admin-editable. Values are
+      // shop-authored and therefore never translated; only the field labels
+      // around them come from the message catalog.
+      payment_methods: {
+        Row: {
+          id: string
+          created_at: string
+          created_by: string | null
+          key: string
+          label: string
+          blurb: string | null
+          /** Percentage added to the booking subtotal when this method is
+           *  chosen. Replaced the old business.cardSurchargePercent config. */
+          surcharge_percent: number
+          bank_name: string | null
+          bank_branch: string | null
+          bank_code: string | null
+          account_number: string | null
+          account_holder: string | null
+          swift_bic: string | null
+          pay_url: string | null
+          notes: string | null
+          collects_invoice_email: boolean
+          /** Appends the shop's phone / address / map from fundive.config.ts. */
+          shows_shop_contact: boolean
+          sort_order: number
+          active: boolean
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          created_by?: string | null
+          key: string
+          label: string
+          blurb?: string | null
+          surcharge_percent?: number
+          bank_name?: string | null
+          bank_branch?: string | null
+          bank_code?: string | null
+          account_number?: string | null
+          account_holder?: string | null
+          swift_bic?: string | null
+          pay_url?: string | null
+          notes?: string | null
+          collects_invoice_email?: boolean
+          shows_shop_contact?: boolean
+          sort_order?: number
+          active?: boolean
+        }
+        Update: Partial<Database['public']['Tables']['payment_methods']['Insert']>
+        Relationships: []
+      }
       cancellation_policies: {
         Row: {
           id: string
@@ -2401,6 +2459,8 @@ export type EOAddon = Database['public']['Tables']['addons']['Row']
 export type TripTemplateEntry = Database['public']['Tables']['trip_templates']['Row']
 export type TravelDestination = Database['public']['Tables']['travel_destinations']['Row']
 export type CancellationPolicy = Database['public']['Tables']['cancellation_policies']['Row']
+export type PaymentMethod = Database['public']['Tables']['payment_methods']['Row']
+export type PaymentMethodInsert = Database['public']['Tables']['payment_methods']['Insert']
 export type CertLevel = Database['public']['Tables']['cert_levels']['Row']
 export type AdminNote = Database['public']['Tables']['admin_notes']['Row']
 export type DiverNote = Database['public']['Tables']['diver_notes']['Row']

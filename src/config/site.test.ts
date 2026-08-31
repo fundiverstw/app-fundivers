@@ -21,7 +21,7 @@ describe('siteConfig', () => {
     const urls = [
       siteConfig.urls.site, siteConfig.urls.app,
       siteConfig.contact.mapsUrl, siteConfig.contact.lineUrl,
-      siteConfig.contact.whatsappUrl, siteConfig.contact.paypalLink,
+      siteConfig.contact.whatsappUrl,
     ]
     for (const u of urls) expect(u).toMatch(/^https?:\/\//)
   })

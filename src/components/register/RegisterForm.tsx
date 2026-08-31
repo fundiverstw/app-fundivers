@@ -12,7 +12,9 @@ import { usesCourseDays } from '../../lib/event-kinds'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
 import { BTN_XS_GHOST, INPUT_REGISTER } from '../../styles/tokens'
-import { buildCharges, surchargeRate, NITROX_COURSE_FEE } from '../../lib/booking-charges'
+import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
+import { surchargeRateFor, paymentMethodLabel } from '../../lib/payment-method-format'
+import { fetchActivePaymentMethods } from '../../lib/payment-methods'
 import { fetchCreditsForUser, openCreditBalance, applyCreditToBooking } from '../../lib/credits'
 import { invokeWithRetry, edgeErrorMessage } from '../../lib/edge-invoke'
 import { readSignupFailure } from '../../lib/signup-errors'
@@ -38,7 +40,7 @@ import {
   clearRegistrationDraft,
   type RegistrationDraft,
 } from '../../lib/registration-draft'
-import type { AppEvent, Booking, BookingDetails, CancellationPolicy, Database, EOAddon, EORoom, Profile } from '../../types/database'
+import type { AppEvent, Booking, BookingDetails, CancellationPolicy, Database, EOAddon, EORoom, PaymentMethod as PaymentMethodRow, Profile } from '../../types/database'
 
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
 
@@ -582,9 +584,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const [missingW, setMissingW] = useState<WaiverDef[] | null>(null)
   const [signingW, setSigningW] = useState<WaiverDef | null>(null)
   const [addNitroxCourse, setAddNitroxCourse] = useState(initialDetails?.nitrox_course_addon ?? false)
-  const [payment, setPayment] = useState<'bank_transfer' | 'credit_card' | 'paypal' | 'cash'>(
-    initialDetails?.payment_method ?? 'bank_transfer'
-  )
+  // The shop's payment methods, in its own order. null while loading — the
+  // step-4 radio list can't be rendered from a hardcoded union any more.
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodRow[] | null>(null)
+  const [payment, setPayment] = useState<string>(initialDetails?.payment_method ?? '')
   const [creditCardInvoiceEmail, setCreditCardInvoiceEmail] = useState<string>(
     initialDetails?.credit_card_invoice_email ?? ''
   )
@@ -782,7 +785,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     setAddonIds(new Set(d.addonIds))
     setNeedsTransport(d.needsTransport)
     setAddNitroxCourse(d.addNitroxCourse)
-    setPayment(d.payment as 'bank_transfer' | 'credit_card' | 'paypal' | 'cash')
+    setPayment(d.payment)
     setCreditCardInvoiceEmail(d.creditCardInvoiceEmail)
     setPayForEveryone(d.payForEveryone)
     setUseAccountCredit(d.useAccountCredit)
@@ -795,6 +798,25 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     if (draftKey) clearRegistrationDraft(draftKey)
     setResumeResolved(true)
   }
+
+  // The shop's payment methods. Selecting the first one only when the diver has
+  // no choice yet (a fresh form, or a booking made under a method since removed)
+  // — never clobbering the method they picked or the one they're editing.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const methods = await fetchActivePaymentMethods()
+        if (cancelled) return
+        setPaymentMethods(methods)
+        setPayment(current =>
+          methods.some(m => m.key === current) ? current : methods[0]?.key ?? '')
+      } catch {
+        if (!cancelled) setPaymentMethods([])
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -948,10 +970,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     for (const a of addons) if (addonIds.has(a.id)) total += a.price ?? 0
     return total
   }, [addons, addonIds])
-  // Both PayPal and credit card incur the shop's card surcharge (PayPal absorbs
-  // ~3% on paypal.me transfers; the card processor's fee is similar). Cash and
-  // local bank transfer pass through at face value.
-  const paymentSurcharge = surchargeRate(payment)
+  // Whatever surcharge the shop attached to the chosen method. Unknown until
+  // the methods load, and 0 for a method that carries none.
+  const selectedMethod = paymentMethods?.find(m => m.key === payment) ?? null
+  const paymentSurcharge = surchargeRateFor(selectedMethod)
   const base = event.price ?? 0
   // Transport pricing comes from the linked prices row. NULL or 0 means
   // it's bundled into the base price — the form hides the opt-in checkbox
@@ -1076,8 +1098,11 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         : [],
       transport: transportCost,
       nitroxCourse: (showNitroxAddon && addNitroxCourse) ? NITROX_COURSE_FEE : 0,
-      surcharge: paymentSurcharge > 0
-        ? { label: t.chargeLines.surcharge(siteConfig.business.cardSurchargePercent, payingDepositOnly), amount: money.total - money.subTotal }
+      surcharge: paymentSurcharge > 0 && selectedMethod
+        ? {
+            label: t.chargeLines.surcharge(selectedMethod.label, Number(selectedMethod.surcharge_percent), payingDepositOnly),
+            amount: money.total - money.subTotal,
+          }
         : null,
     })
   }
@@ -1190,7 +1215,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       transportation: needsTransport === true,
       ride_waitlisted: rideWaitlisted,
       payment_method: payment,
-      credit_card_invoice_email: payment === 'credit_card' && creditCardInvoiceEmail.trim()
+      credit_card_invoice_email: selectedMethod?.collects_invoice_email && creditCardInvoiceEmail.trim()
         ? creditCardInvoiceEmail.trim()
         : undefined,
       pay_deposit_only: hasDeposit ? payDepositOnly : false,
@@ -2107,23 +2132,25 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             </label>
           )}
 
-          <div className="space-y-2">
-            {(['bank_transfer', 'paypal', 'credit_card', 'cash'] as const).map(method => (
-              <label key={method} className="flex gap-2 text-sm text-brand-950 font-medium items-start">
-                <input type="radio" name="payment" checked={payment === method} onChange={() => setPayment(method)} className="accent-brand-900 mt-1" />
-                <span className="flex-1">
-                  <span className="block">
-                    {method === 'bank_transfer' && t.register.payment.methodBankTransfer}
-                    {method === 'paypal' && t.register.payment.methodPaypal(siteConfig.business.cardSurchargePercent)}
-                    {method === 'credit_card' && t.register.payment.methodCreditCard(siteConfig.business.cardSurchargePercent)}
-                    {method === 'cash' && t.register.payment.methodCash}
+          {paymentMethods === null ? (
+            <p className="text-sm text-brand-900/70">{t.register.payment.methodsLoading}</p>
+          ) : paymentMethods.length === 0 ? (
+            <p className="text-sm text-brand-900/80">{t.register.payment.methodsNone}</p>
+          ) : (
+            <div className="space-y-2">
+              {paymentMethods.map(method => (
+                <label key={method.key} className="flex gap-2 text-sm text-brand-950 font-medium items-start">
+                  <input type="radio" name="payment" checked={payment === method.key} onChange={() => setPayment(method.key)} className="accent-brand-900 mt-1" />
+                  <span className="flex-1">
+                    <span className="block">{paymentMethodLabel(method)}</span>
+                    {method.blurb && <span className="block text-xs text-brand-900/80">{method.blurb}</span>}
                   </span>
-                </span>
-              </label>
-            ))}
-          </div>
+                </label>
+              ))}
+            </div>
+          )}
 
-          {payment === 'credit_card' && (
+          {selectedMethod?.collects_invoice_email && (
             <label className="block">
               <span className="block text-xs text-brand-900 font-medium mb-1">
                 {t.register.payment.invoiceEmailLabel}
@@ -2138,10 +2165,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             </label>
           )}
 
-          <PaymentInstructionsBlock
-            method={payment}
-            invoiceEmail={payment === 'credit_card' ? creditCardInvoiceEmail.trim() || null : null}
-          />
+          {selectedMethod && (
+            <PaymentInstructionsBlock
+              method={selectedMethod}
+              invoiceEmail={selectedMethod.collects_invoice_email ? creditCardInvoiceEmail.trim() || null : null}
+            />
+          )}
 
           <div className="text-sm text-brand-950 font-medium bg-surface-50 rounded-lg p-3 space-y-1">
             {charges.map((c, i) => <Row key={`${c.kind}-${i}`} label={c.label} value={c.amount} currency={event.currency} />)}
@@ -2394,7 +2423,7 @@ function formatDeadline(yyyyMmDd: string): string {
 function PaymentInstructionsBlock({
   method, invoiceEmail,
 }: {
-  method: 'bank_transfer' | 'credit_card' | 'paypal' | 'cash'
+  method: PaymentMethodRow
   invoiceEmail?: string | null
 }) {
   const instr = paymentInstructionsFor(method, { invoiceEmail })

@@ -8,7 +8,6 @@ import {
   registrationDraftKey, saveRegistrationDraft, loadRegistrationDraft,
   type RegistrationDraft,
 } from '../../lib/registration-draft'
-import { siteConfig } from '../../config/site'
 import { GEAR_ITEMS, FULL_GEAR_SET, GEAR_ALACARTE_PRICES } from '../../lib/gear'
 import { t } from '../../i18n'
 import type { AppEvent, EOAddon, EORoom, Profile } from '../../types/database'
@@ -127,8 +126,27 @@ const WAIVER_ROWS = [
   { id: '3', created_at: '', created_by: null, code: 'continuing_education', title: 'Continuing Education Liability Release', language: null, body: 'x', pdf_path: null, cadence: 'per_event', version: 1, applies_to: 'courses', course_colors: ['ow', 'aow', 'rescue', 'specialty'], active: true },
 ]
 
+// The shop's payment methods, which the form now reads from the DB instead of
+// a hardcoded union. Labels and surcharges are the shop's, so the assertions
+// below name these rows rather than catalog strings.
+const PAYMENT_METHOD_ROWS = [
+  { key: 'bank_transfer', label: 'Local bank transfer', surcharge_percent: 0, sort_order: 10,
+    bank_name: 'CTBC Bank', bank_code: '822', account_number: '1234-5678-9012', account_holder: 'The Shop' },
+  { key: 'paypal', label: 'PayPal', surcharge_percent: 5, sort_order: 20, pay_url: 'https://paypal.me/example' },
+  { key: 'credit_card', label: 'Credit card', surcharge_percent: 5, sort_order: 30, collects_invoice_email: true },
+  { key: 'cash', label: 'Cash', surcharge_percent: 0, sort_order: 40, shows_shop_contact: true },
+].map((m, i) => ({
+  id: `pm${i}`, created_at: '', created_by: null, blurb: null,
+  bank_name: null, bank_branch: null, bank_code: null,
+  account_number: null, account_holder: null, swift_bic: null,
+  pay_url: null, notes: null,
+  collects_invoice_email: false, shows_shop_contact: false, active: true,
+  ...m,
+}))
+
 function setupFrom(updated: unknown = { id: 'b-existing' }) {
   from.mockImplementation((table: string) => {
+    if (table === 'payment_methods') return mockQueryBuilder({ data: PAYMENT_METHOD_ROWS })
     if (table === 'rooms')     return mockQueryBuilder({ data: sampleRooms })
     if (table === 'addons') return mockQueryBuilder({ data: sampleAddons })
     if (table === 'waivers') return mockQueryBuilder({ data: WAIVER_ROWS })
@@ -381,6 +399,7 @@ describe('RegisterForm', () => {
       created_at: new Date().toISOString(), settled_at: null, settled_note: null,
     }
     from.mockImplementation((table: string) => {
+      if (table === 'payment_methods') return mockQueryBuilder({ data: PAYMENT_METHOD_ROWS })
       if (table === 'rooms')     return mockQueryBuilder({ data: sampleRooms })
       if (table === 'addons') return mockQueryBuilder({ data: sampleAddons })
       if (table === 'credits')      return mockQueryBuilder({ data: [openCredit] })
@@ -443,6 +462,7 @@ describe('RegisterForm', () => {
       created_at: new Date().toISOString(), settled_at: null, settled_note: null,
     }
     from.mockImplementation((table: string) => {
+      if (table === 'payment_methods') return mockQueryBuilder({ data: PAYMENT_METHOD_ROWS })
       if (table === 'rooms')     return mockQueryBuilder({ data: sampleRooms })
       if (table === 'addons') return mockQueryBuilder({ data: sampleAddons })
       // Every credits read returns an open 2,000 credit, so both the parent
@@ -487,6 +507,7 @@ describe('RegisterForm', () => {
       created_at: new Date().toISOString(), settled_at: null, settled_note: null,
     }
     from.mockImplementation((table: string) => {
+      if (table === 'payment_methods') return mockQueryBuilder({ data: PAYMENT_METHOD_ROWS })
       if (table === 'rooms')     return mockQueryBuilder({ data: sampleRooms })
       if (table === 'addons')    return mockQueryBuilder({ data: sampleAddons })
       if (table === 'waivers')   return mockQueryBuilder({ data: WAIVER_ROWS })
@@ -1125,6 +1146,7 @@ describe('RegisterForm', () => {
   it('warns and gates on an event logged-dive prerequisite until acknowledged', async () => {
     from.mockImplementation((table: string) => {
       if (table === 'events')     return mockQueryBuilder({ data: { prereq_cert_id: null, req_dives: 20 } })
+      if (table === 'payment_methods') return mockQueryBuilder({ data: PAYMENT_METHOD_ROWS })
       if (table === 'rooms')     return mockQueryBuilder({ data: sampleRooms })
       if (table === 'addons') return mockQueryBuilder({ data: sampleAddons })
       return mockQueryBuilder()
@@ -1321,6 +1343,7 @@ describe('RegisterForm', () => {
       error: Object.assign(new Error('Edge Function returned a non-2xx status code'), { name: 'FunctionsHttpError', context: ctx }),
     })
     from.mockImplementation((table: string) => {
+      if (table === 'payment_methods') return mockQueryBuilder({ data: PAYMENT_METHOD_ROWS })
       if (table === 'rooms')     return mockQueryBuilder({ data: sampleRooms })
       if (table === 'addons') return mockQueryBuilder({ data: sampleAddons })
       if (table === 'bookings')     return mockQueryBuilder({ data: { id: 'b-existing', status: 'pending' } })
@@ -1452,6 +1475,7 @@ describe('RegisterForm', () => {
       cancellation_policy: 'Deposit non-refundable. 14 days notice for partial refund.',
     }
     from.mockImplementation((table: string) => {
+      if (table === 'payment_methods') return mockQueryBuilder({ data: PAYMENT_METHOD_ROWS })
       if (table === 'rooms')              return mockQueryBuilder({ data: sampleRooms })
       if (table === 'addons')          return mockQueryBuilder({ data: sampleAddons })
       if (table === 'cancellation_policies') return mockQueryBuilder({ data: policyRow })
@@ -1509,14 +1533,15 @@ describe('RegisterForm', () => {
     await user.click(screen.getByLabelText(/i have all the required gear/i))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
-    // Default = bank_transfer → "details by email" block (no raw account info).
+    // Default = the shop's first method → its published account details.
     expect(screen.getByText(/how to pay — local bank transfer/i)).toBeInTheDocument()
-    expect(screen.getByText(/bank transfer details shortly/i)).toBeInTheDocument()
+    expect(screen.getByText(/1234-5678-9012/)).toBeInTheDocument()
+    expect(screen.getByText(/CTBC Bank/)).toBeInTheDocument()
 
-    // Switch to PayPal → paypal.me link block.
+    // Switch to PayPal → the shop's payment link, and its own surcharge.
     await user.click(screen.getByLabelText(/^paypal/i))
-    expect(screen.getByText(/how to pay — paypal/i)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: siteConfig.contact.paypalLink })).toBeInTheDocument()
+    expect(screen.getByText(/how to pay — paypal \(\+5%\)/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'https://paypal.me/example' })).toBeInTheDocument()
 
     // Switch to credit card → invoice-email block, defaults to registered email copy.
     await user.click(screen.getByLabelText(/credit card/i))
@@ -1843,6 +1868,7 @@ describe('RegisterForm', () => {
 
     function setupFromWithChildren(children: Profile[]) {
       from.mockImplementation((table: string) => {
+        if (table === 'payment_methods') return mockQueryBuilder({ data: PAYMENT_METHOD_ROWS })
         if (table === 'rooms')     return mockQueryBuilder({ data: sampleRooms })
         if (table === 'addons') return mockQueryBuilder({ data: sampleAddons })
         if (table === 'profiles')     return mockQueryBuilder({ data: children })

@@ -11,6 +11,7 @@ import { corsHeaders, safeError } from "../_shared/responses.ts"
 import { takeActionSlot, rateLimitedBody, type RpcClient } from "../_shared/rate-limit.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 import type { GroupRegistrationPdfPayload, GroupDiverColumn } from "../_shared/pdf.ts"
+import type { PaymentMethodDetails } from "../../../src/lib/payment-method-format.ts"
 import { t } from "../_shared/i18n.ts"
 import { usesDateEnvelope, type EventKind } from "../../../src/lib/event-kinds.ts"
 import { EVENT_KIND_LABELS } from "../_shared/event-kind-labels.ts"
@@ -195,9 +196,14 @@ export async function handleGroupSummary(req: Request, deps: Deps): Promise<Resp
   }
 
   // The lead settles once, so the group shares one payment method — take it
-  // from the first booking (the client sends the same method on every call).
+  // from the first booking (the client sends the same method on every call) and
+  // resolve the shop's row for it, which carries the bank details the PDF prints.
   const firstDetails = bookings[0].details ?? {}
-  const paymentMethod = (firstDetails.payment_method as string | null) ?? "bank_transfer"
+  const methodKey = (firstDetails.payment_method as string | null) ?? null
+  const { data: methodRow } = methodKey
+    ? await admin.from("payment_methods").select("*").eq("key", methodKey).maybeSingle()
+    : { data: null }
+  const paymentMethod = (methodRow ?? null) as PaymentMethodDetails | null
   const creditCardInvoiceEmail = (firstDetails.credit_card_invoice_email as string | null) ?? null
 
   const payload: GroupRegistrationPdfPayload = {

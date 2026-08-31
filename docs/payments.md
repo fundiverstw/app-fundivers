@@ -60,6 +60,56 @@ receipt.
 moves no figure — so it has nothing to reference; the audit log still
 names who pressed it.
 
+## Payment methods
+
+How a diver can pay is shop data, not a code enum. Each row in
+`payment_methods` carries a stable `key` — the value written to
+`bookings.details.payment_method`, never reused for a different method —
+plus everything the diver is shown: the `label`, an optional one-line
+`blurb`, the transfer details (`bank_name`, `bank_branch`, `bank_code`,
+`account_number`, `account_holder`, `swift_bic`), a `pay_url` for online
+payment, free-form `notes`, and `sort_order` / `active` for what appears
+on the register form and in what order.
+
+Admins edit them at **Manage → Payment methods**
+(`/admin/payment-methods`). The bank fields are structured columns rather
+than one free-text blob so the app can label them in the deployment's
+language; only the values are shop-authored, and those are never
+translated.
+
+Two flags change how a method behaves rather than how it reads:
+
+| Flag | Effect |
+| --- | --- |
+| `collects_invoice_email` | The register form asks where to send the invoice, and the "How to pay" block echoes that address back |
+| `shows_shop_contact`     | Appends the shop's phone / address / map from `fundive.config.ts`, so paying in person needs no duplicated contact details |
+
+**The surcharge is per-method.** `surcharge_percent` is what the diver is
+both shown and billed — it replaced a single shop-wide
+`business.cardSurchargePercent` that applied to a hardcoded card/PayPal
+pair. A shop can now charge 3% on cards, nothing on a domestic transfer,
+and whatever it likes on a method it invented.
+
+The client previews the surcharge, but `create-registration` recomputes it
+from the row it reads server-side, so a crafted request cannot nominate a
+cheaper rate than the shop published (see
+[§ What a booking owes](#what-a-booking-owes)).
+
+One renderer builds the "How to pay" block for both the register form and
+the emailed PDF: `paymentMethodInstructions()` in
+`src/lib/payment-method-format.ts`, which is import-free so the Deno edge
+functions share it. The two thin bindings that inject the catalog and the
+shop contact are `src/lib/payment-instructions.ts` and
+`supabase/functions/_shared/payment-instructions.ts`; a parity test pins
+them together. Blank transfer rows are omitted, and a transfer method with
+nothing published yet says details are coming rather than showing a diver
+an empty account.
+
+Deleting a method is the one destructive edit: bookings keep the key they
+recorded, but their "How to pay" details stop resolving — the PDF then
+omits the block and no surcharge is recomputed. Untick **Active** instead
+to retire a method while keeping old bookings whole.
+
 ## What a booking owes
 
 ```

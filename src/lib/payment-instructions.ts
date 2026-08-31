@@ -1,74 +1,61 @@
 // Per-method "How to pay" copy shown on the registration form's step 4 and
-// embedded in the emailed PDF. Shop values come from fundive.config.ts; the copy
-// comes from the message catalog. The edge function keeps a parallel copy of the
-// *logic* under supabase/functions/_shared/payment-instructions.ts — both read
-// the same config and the same catalog, so neither the shop values nor the copy
-// can drift.
+// embedded in the emailed PDF. The method itself is shop-authored (the
+// payment_methods table); this module only binds the deployment's field labels
+// and shop contact details to the shared renderer. The edge function keeps a
+// parallel binding under supabase/functions/_shared/payment-instructions.ts —
+// both feed the same renderer, so neither the values nor the copy can drift.
 
 import { siteConfig } from '../config/site'
 import { t } from '../i18n'
+import {
+  paymentMethodInstructions,
+  type PaymentInstructions,
+  type PaymentMethodDetails,
+  type PaymentMethodLabels,
+  type ShopContact,
+} from './payment-method-format'
+
+export type { PaymentInstructions } from './payment-method-format'
 
 export const SHOP_PHONE    = siteConfig.contact.phone
 export const SHOP_ADDRESS  = siteConfig.contact.address
 export const SHOP_MAPS_URL = siteConfig.contact.mapsUrl
 
-export const PAYPAL_LINK = siteConfig.contact.paypalLink
-
-const CARD_SURCHARGE = `+${siteConfig.business.cardSurchargePercent}%`
-
-export type PaymentMethod = 'bank_transfer' | 'credit_card' | 'paypal' | 'cash'
-
-export interface PaymentInstructions {
-  title: string
-  lines: string[]
+const SHOP: ShopContact = {
+  phone:    SHOP_PHONE,
+  address:  SHOP_ADDRESS,
+  mapsUrl:  SHOP_MAPS_URL,
 }
 
-/**
- * Build the per-method instruction block. `invoiceEmail` only applies to
- * credit_card — when set, the block tells the diver where the card-payment
- * invoice will land; otherwise it falls back to "your registered email".
- */
+export function paymentMethodLabels(): PaymentMethodLabels {
+  const p = t.paymentInstructions
+  return {
+    howToPay:           p.howToPay,
+    bankName:           p.bankName,
+    bankBranch:         p.bankBranch,
+    bankCode:           p.bankCode,
+    accountNumber:      p.accountNumber,
+    accountHolder:      p.accountHolder,
+    swift:              p.swift,
+    payOnline:          p.payOnline,
+    phone:              p.phone,
+    address:            p.address,
+    map:                p.map,
+    invoiceTo:          p.invoiceTo,
+    registeredEmail:    p.registeredEmail,
+    bankDetailsPending: p.bankDetailsPending,
+  }
+}
+
 export function paymentInstructionsFor(
-  method: PaymentMethod,
+  method: PaymentMethodDetails,
   opts: { invoiceEmail?: string | null } = {},
 ): PaymentInstructions {
-  const p = t.paymentInstructions
-  switch (method) {
-    case 'cash':
-      return {
-        title: p.cashTitle,
-        lines: [
-          p.cashLine,
-          p.phone(SHOP_PHONE),
-          p.address(SHOP_ADDRESS),
-          p.map(SHOP_MAPS_URL),
-        ],
-      }
-    case 'bank_transfer':
-      return {
-        title: p.bankTitle,
-        lines: [p.bankLine],
-      }
-    case 'paypal':
-      return {
-        title: p.paypalTitle(CARD_SURCHARGE),
-        lines: [
-          p.paypalLine,
-          PAYPAL_LINK,
-          p.paypalNote,
-        ],
-      }
-    case 'credit_card': {
-      const target = (opts.invoiceEmail && opts.invoiceEmail.trim()) || p.registeredEmail
-      return {
-        title: p.cardTitle(CARD_SURCHARGE),
-        lines: [
-          p.cardLine,
-          p.invoiceTo(target),
-        ],
-      }
-    }
-  }
+  return paymentMethodInstructions(method, {
+    labels: paymentMethodLabels(),
+    shop: SHOP,
+    invoiceEmail: opts.invoiceEmail,
+  })
 }
 
 /**

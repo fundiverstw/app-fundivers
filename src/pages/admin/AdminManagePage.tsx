@@ -10,6 +10,7 @@ import { PackagesIcon } from '../../components/icons/PackagesIcon'
 import { MapPinIcon } from '../../components/icons/MapPinIcon'
 import { LayoutIcon } from '../../components/icons/LayoutIcon'
 import { TagIcon } from '../../components/icons/TagIcon'
+import { CreditCardIcon } from '../../components/icons/CreditCardIcon'
 import { BedIcon } from '../../components/icons/BedIcon'
 import { PlusSquareIcon } from '../../components/icons/PlusSquareIcon'
 import { TruckIcon } from '../../components/icons/TruckIcon'
@@ -66,6 +67,7 @@ const GROUPS: ManageGroup[] = [
     cards: [
       { to: '/admin/dive-sites', icon: <MapPinIcon />, ...m.diveSites },
       { to: '/admin/prices', icon: <TagIcon />, ...m.prices },
+      { to: '/admin/payment-methods', icon: <CreditCardIcon />, ...m.paymentMethods },
       { to: '/admin/rooms', icon: <BedIcon />, ...m.rooms },
       { to: '/admin/addons', icon: <PlusSquareIcon />, ...m.addons },
       { to: '/admin/vehicles', icon: <TruckIcon />, ...m.vehicles },

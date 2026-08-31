@@ -32,7 +32,6 @@ export const siteConfigSchema = z.object({
     mapsUrl: url,
     lineUrl: url,
     whatsappUrl: url,
-    paypalLink: url,
   }),
   urls: z.object({
     site: origin,
@@ -66,7 +65,6 @@ export const siteConfigSchema = z.object({
     gearItems: z.array(z.string().min(1)).min(1),
     gearPrices: z.record(z.string(), z.number().nonnegative()),
     paymentDeadlineFallbackDays: z.number().int().positive(),
-    cardSurchargePercent: z.number().nonnegative(),
     nitroxCourseFee: z.number().nonnegative(),
     eventDurationHours: z.number().positive().optional(),
     tripKeywords: z.array(z.string().min(1)),

@@ -23,11 +23,7 @@ import { corsHeaders, safeError } from "../_shared/responses.ts"
 import { clientIp, sha256Hex } from "../_shared/request-identity.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 import type { RegistrationPdfPayload } from "../_shared/pdf.ts"
-
-// Matches RegisterForm.tsx's payment_method enum verbatim.
-function paymentWireLabel(m: string | null | undefined): string {
-  return m ?? ""
-}
+import type { PaymentMethodDetails } from "../../../src/lib/payment-method-format.ts"
 
 export interface RegistrationBody {
   email?:    string
@@ -142,6 +138,22 @@ export interface Deps {
  * compare is correct. Used to reject diver/guest registrations for events that
  * already happened; admins/staff bypass this server-side check too.
  */
+/**
+ * The shop's payment method for the key the diver chose. Read server-side for
+ * two reasons: the surcharge must be the shop's published rate rather than
+ * anything the client asserted, and the PDF's "How to pay" block prints the
+ * bank details straight off this row. Null for a key that no longer resolves —
+ * the money math then charges no surcharge and the PDF omits the block.
+ */
+async function loadPaymentMethod(
+  admin: SupabaseAdminClient, key: string | null | undefined,
+): Promise<PaymentMethodDetails | null> {
+  if (!key) return null
+  const { data } = await admin
+    .from("payment_methods").select("*").eq("key", key).maybeSingle()
+  return (data ?? null) as PaymentMethodDetails | null
+}
+
 async function eventHasPassed(admin: SupabaseAdminClient, eventType: EventKind, eventId: string): Promise<boolean> {
   const cols  = usesDateEnvelope(eventType) ? "start_date, end_date" : "course_days"
   const { data } = await admin.from("events").select(cols).eq("id", eventId).maybeSingle()
@@ -423,6 +435,10 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
         (s: number, a: { price: number | null }) => s + (a.price ?? 0), 0)
     }
 
+    // The surcharge is the shop's, never the client's: read it off the
+    // payment_methods row the diver named. An unknown key carries none.
+    const chosenMethod = await loadPaymentMethod(admin, d.payment_method as string | null | undefined)
+
     const gear = d.gear as { rent?: boolean; items?: string[] } | undefined
     const money = computeBookingMoney({
       base,
@@ -431,13 +447,12 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
       transportPrice,
       gearItems: gear?.rent ? (gear.items ?? []) : [],
       gearPrices: siteConfig.business.gearPrices,
-      cardSurchargeRate: siteConfig.business.cardSurchargePercent / 100,
+      surchargeRate: Number(chosenMethod?.surcharge_percent ?? 0) / 100,
       roomAddedPrice,
       addonsTotal,
       needsTransport: d.transportation === true,
       nitroxCourse: !!d.nitrox_course_addon,
       nitroxCourseFee: siteConfig.business.nitroxCourseFee,
-      paymentMethod: d.payment_method as string | null | undefined,
       payDepositOnly: !!d.pay_deposit_only,
     })
     body.details = { ...d, total: money.total, deposit: money.deposit }
@@ -643,7 +658,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     needsRide:       !!details.transportation,
     transportIncluded,
     notes:           booking.notes ?? null,
-    paymentMethod:   paymentWireLabel(details.payment_method as string | null | undefined),
+    paymentMethod:   await loadPaymentMethod(admin, details.payment_method as string | null | undefined),
     creditCardInvoiceEmail: (details.credit_card_invoice_email as string | null | undefined) ?? null,
     deposit:         (details.deposit as number | null) ?? null,
     total:           (details.total as number | null) ?? null,

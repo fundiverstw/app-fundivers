@@ -34,6 +34,7 @@ Write/manage routes — gated by `AdminRoute` (admin only):
 | `/admin/travel`                         | `AdminTravelPage`       | Manage `trip_templates` rows |
 | `/admin/destinations`                   | `AdminDestinationsPage` | Manage `travel_destinations` rows |
 | `/admin/prices`                         | `AdminPricesPage`       | Manage `prices` rows |
+| `/admin/payment-methods`                | `AdminPaymentMethodsPage` | How divers can pay: the method list, each one's bank account / payment link / surcharge — see [payments.md § Payment methods](./payments.md#payment-methods) |
 | `/admin/users`                          | `AdminUsersPage`        | Searchable diver directory with full profile cards |
 | `/admin/duty`                           | `AdminDutyPage`         | Assign staff/admin to events; fires push to assignee |
 | `/admin/notifications`                  | `AdminNotificationsPage` | Compose + send a one-off Web-Push broadcast to all subscribed devices |

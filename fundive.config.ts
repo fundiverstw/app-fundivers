@@ -20,7 +20,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const siteConfig = {
-  configVersion: 9,
+  configVersion: 10,
 
   identity: {
     appName: 'FunDive',
@@ -38,7 +38,6 @@ export const siteConfig = {
     mapsUrl: 'https://maps.app.goo.gl/tDgtMirMrNX9QEjAA',
     lineUrl: 'https://line.me/R/ti/p/%40lga0216c',
     whatsappUrl: 'https://wa.me/886909083683',
-    paypalLink: 'https://paypal.me/fundiverstw',
   },
 
   // No trailing slashes.
@@ -100,7 +99,6 @@ export const siteConfig = {
       'Boots (felt sole)': 50, 'Dive computer': 250,
     },
     paymentDeadlineFallbackDays: 7,
-    cardSurchargePercent: 5,
     nitroxCourseFee: 6000,
     // Length of a single-day event in the "Add to Google Calendar" link.
     eventDurationHours: 8,

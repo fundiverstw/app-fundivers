@@ -5,7 +5,9 @@ import { needsShoeSize } from '../../lib/logistics'
 import { usesCourseDays } from '../../lib/event-kinds'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
-import { buildCharges, surchargeRate, NITROX_COURSE_FEE } from '../../lib/booking-charges'
+import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
+import { surchargeRateFor, paymentMethodLabel } from '../../lib/payment-method-format'
+import { fetchActivePaymentMethods } from '../../lib/payment-methods'
 import { supabase } from '../../lib/supabase'
 import { invokeWithRetry } from '../../lib/edge-invoke'
 import { formatEventSpan, isPastEvent } from '../../lib/events'
@@ -20,11 +22,10 @@ import { INPUT_REGISTER } from '../../styles/tokens'
 import { numOrNullStr } from '../../lib/units'
 import { ShoeSizeField } from '../ShoeSizeField'
 import type { WaiverDef } from '../../config/waivers'
-import type { AppEvent, Booking, BookingDetails, Database, Profile } from '../../types/database'
+import type { AppEvent, Booking, BookingDetails, Database, PaymentMethod, Profile } from '../../types/database'
 
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
 
-type PaymentMethod = 'bank_transfer' | 'credit_card' | 'paypal' | 'cash'
 type ContactMethod = 'whatsapp' | 'line' | 'phone' | 'email'
 
 // Per-event choices in step 3. Rooms and add-ons aren't surfaced in the
@@ -196,8 +197,29 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   const [emergencyName, setEmergencyName]     = useState(profile?.emergency_contact_name ?? '')
   const [emergencyPhone, setEmergencyPhone]   = useState(profile?.emergency_contact_phone ?? '')
 
-  const [payment, setPayment] = useState<PaymentMethod>('bank_transfer')
+  // The shop's payment methods (null while loading) and the diver's pick.
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[] | null>(null)
+  const [payment, setPayment] = useState<string>('')
   const [creditCardInvoiceEmail, setCreditCardInvoiceEmail] = useState('')
+  const selectedMethod = paymentMethods?.find(m => m.key === payment) ?? null
+
+  // The shop's payment methods. Preselect the first only when the diver hasn't
+  // picked one that still exists.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const methods = await fetchActivePaymentMethods()
+        if (cancelled) return
+        setPaymentMethods(methods)
+        setPayment(current =>
+          methods.some(m => m.key === current) ? current : methods[0]?.key ?? '')
+      } catch {
+        if (!cancelled) setPaymentMethods([])
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
   // When the cart books for linked children, the parent (lead booker) can be
   // the single payer for the whole group. Default on — the parent is already
   // paying the full cart upfront here.
@@ -207,7 +229,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
 
   // Per-event price breakdown derived from the diver's choices.
   const eventBreakdowns = useMemo(() => {
-    const surcharge = surchargeRate(payment)
+    const surcharge = surchargeRateFor(selectedMethod)
     return cart.map(ev => {
       const c = choicesById[ev.id] ?? { rentGear: false, gearItems: [], needsTransport: null, addNitroxCourse: false }
       const base       = ev.price ?? 0
@@ -235,11 +257,13 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
         gearDays: days,
         transport: transportCost,
         nitroxCourse: nitroxFee,
-        surcharge: surchargeCost > 0 ? { label: t.chargeLines.surcharge(siteConfig.business.cardSurchargePercent, false), amount: surchargeCost } : null,
+        surcharge: surchargeCost > 0 && selectedMethod
+          ? { label: t.chargeLines.surcharge(selectedMethod.label, Number(selectedMethod.surcharge_percent), false), amount: surchargeCost }
+          : null,
       })
       return { base, gearCost, transportCost, nitroxFee, surchargeCost, total, charges }
     })
-  }, [cart, choicesById, payment, profile, forDiverByEvent, childById])
+  }, [cart, choicesById, selectedMethod, profile, forDiverByEvent, childById])
 
   const grandTotal = eventBreakdowns.reduce((s, b) => s + b.total, 0)
 
@@ -341,7 +365,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
         transportation: c.needsTransport === true,
         ride_waitlisted: rideWaitlisted,
         payment_method: payment,
-        credit_card_invoice_email: payment === 'credit_card' && creditCardInvoiceEmail.trim()
+        credit_card_invoice_email: selectedMethod?.collects_invoice_email && creditCardInvoiceEmail.trim()
           ? creditCardInvoiceEmail.trim()
           : undefined,
         pay_deposit_only: false,
@@ -780,21 +804,25 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
         {step === 4 && (
           <section className="space-y-3">
             <h2 className="text-lg font-bold text-brand-900">{t.register.payment.title}</h2>
-            <div className="space-y-2">
-              {(['bank_transfer', 'paypal', 'credit_card', 'cash'] as const).map(method => (
-                <label key={method} className="flex gap-2 text-sm text-brand-950 font-medium items-start">
-                  <input type="radio" name="payment" checked={payment === method} onChange={() => setPayment(method)} className="accent-brand-900 mt-1" />
-                  <span className="flex-1">
-                    {method === 'bank_transfer' && t.register.payment.methodBankTransfer}
-                    {method === 'paypal' && t.register.payment.methodPaypal(siteConfig.business.cardSurchargePercent)}
-                    {method === 'credit_card' && t.register.payment.methodCreditCard(siteConfig.business.cardSurchargePercent)}
-                    {method === 'cash' && t.register.payment.methodCash}
-                  </span>
-                </label>
-              ))}
-            </div>
+            {paymentMethods === null ? (
+              <p className="text-sm text-brand-900/70">{t.register.payment.methodsLoading}</p>
+            ) : paymentMethods.length === 0 ? (
+              <p className="text-sm text-brand-900/80">{t.register.payment.methodsNone}</p>
+            ) : (
+              <div className="space-y-2">
+                {paymentMethods.map(method => (
+                  <label key={method.key} className="flex gap-2 text-sm text-brand-950 font-medium items-start">
+                    <input type="radio" name="payment" checked={payment === method.key} onChange={() => setPayment(method.key)} className="accent-brand-900 mt-1" />
+                    <span className="flex-1">
+                      <span className="block">{paymentMethodLabel(method)}</span>
+                      {method.blurb && <span className="block text-xs text-brand-900/80">{method.blurb}</span>}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
 
-            {payment === 'credit_card' && (
+            {selectedMethod?.collects_invoice_email && (
               <label className="block">
                 <span className="block text-xs text-brand-900 font-medium mb-1">{t.register.payment.invoiceEmailLabel}</span>
                 <input
@@ -824,7 +852,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
               </label>
             )}
 
-            <PaymentInstructionsBlock method={payment} />
+            {selectedMethod && <PaymentInstructionsBlock method={selectedMethod} />}
 
             <div className="text-sm text-brand-950 font-medium bg-surface-50 rounded-lg p-3 space-y-2">
               {cart.map((ev, i) => {

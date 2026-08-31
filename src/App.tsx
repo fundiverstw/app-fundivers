@@ -64,6 +64,7 @@ import { AdminVehiclesPage } from './pages/admin/AdminVehiclesPage'
 import { AdminWaiversPage } from './pages/admin/AdminWaiversPage'
 import { AdminTermsPage } from './pages/admin/AdminTermsPage'
 import { AdminCancellationPoliciesPage } from './pages/admin/AdminCancellationPoliciesPage'
+import { AdminPaymentMethodsPage } from './pages/admin/AdminPaymentMethodsPage'
 import { AdminDiveSitesPage } from './pages/admin/AdminDiveSitesPage'
 
 // Almanac page
@@ -199,6 +200,7 @@ export default function App() {
                 <Route path="/admin/waivers" element={<AdminWaiversPage />} />
                 <Route path="/admin/terms" element={<AdminTermsPage />} />
                 <Route path="/admin/cancellation-policies" element={<AdminCancellationPoliciesPage />} />
+                <Route path="/admin/payment-methods" element={<AdminPaymentMethodsPage />} />
                 <Route path="/admin/dive-sites" element={<AdminDiveSitesPage />} />
                 <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
                 <Route path="/admin/refunds" element={<AdminRefundsPage />} />

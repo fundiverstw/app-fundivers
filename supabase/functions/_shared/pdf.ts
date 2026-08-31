@@ -9,12 +9,12 @@ import { jsPDF } from "npm:jspdf@2.5.1"
 import { Buffer } from "node:buffer"
 import { needsCjkFont, payloadNeedsCjkFont } from "./pdf-fonts.ts"
 import { paymentInstructionsFor, paymentConfirmationReminder } from "./payment-instructions.ts"
+import { paymentMethodLabel, type PaymentMethodDetails } from "../../../src/lib/payment-method-format.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 import { t } from "./i18n.ts"
 
 // Shop currency label shown on money rows in the PDF.
 const CUR = siteConfig.locale.currencyLabel
-const PCT = siteConfig.business.cardSurchargePercent
 const d = t.pdf
 
 // Bundled alongside this file in the edge function deploy. Forks replace this
@@ -124,10 +124,13 @@ export interface RegistrationPdfPayload {
    *  renders "Included with base price" instead of yes/no. */
   transportIncluded: boolean
   notes: string | null
-  paymentMethod: 'bank_transfer' | 'credit_card' | 'paypal' | 'cash' | string
-  /** Where to send the credit-card invoice. Only meaningful when
-   *  paymentMethod === 'credit_card'. Null falls back to "your registered
-   *  email" copy in the instructions block. */
+  /** The shop's payment_methods row for the key on the booking. Null when the
+   *  key no longer resolves — the Method row and the "How to pay" block are
+   *  then omitted rather than guessed at. */
+  paymentMethod: PaymentMethodDetails | null
+  /** Where to send the invoice. Only meaningful for a method that collects one
+   *  (payment_methods.collects_invoice_email). Null falls back to "your
+   *  registered email" copy in the instructions block. */
   creditCardInvoiceEmail: string | null
   deposit: number | string | null
   total: number | null
@@ -336,14 +339,9 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   // ── Payment ───────────────────────────────────────────
   altState.alt = false
   y = section(doc, y, d.payment)
-  // The surcharge is business.cardSurchargePercent — it was a hardcoded "+5%",
-  // which silently lied on any fork configured with a different rate.
-  const methodLabel =
-    p.paymentMethod === "bank_transfer" ? d.bankTransfer
-    : p.paymentMethod === "paypal"      ? d.paypalMethod(PCT)
-    : p.paymentMethod === "credit_card" ? d.creditCardMethod(PCT)
-    : p.paymentMethod === "cash"        ? d.cash
-    : (p.paymentMethod || "")
+  // The method's name and its surcharge both come off the shop's own row, so a
+  // shop that charges 3% is never shown "+5%".
+  const methodLabel = p.paymentMethod ? paymentMethodLabel(p.paymentMethod) : ""
   y = row(doc, y, d.method, methodLabel, altState)
   // Itemized charge breakdown — each line sums into the highlighted Total
   // below, so staff and divers can trace exactly what was charged.
@@ -532,8 +530,8 @@ export interface GroupRegistrationPdfPayload {
   /** Lead booker the summary is addressed to. */
   generatedFor: string
   leadEmail: string
-  /** Raw payment method (bank_transfer | credit_card | paypal | cash). */
-  paymentMethod: string
+  /** The shop's payment_methods row the group settles through. */
+  paymentMethod: PaymentMethodDetails | null
   creditCardInvoiceEmail: string | null
   /** Sum of every booking's total — what the lead owes for the group. */
   groupTotal: number

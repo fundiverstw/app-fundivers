@@ -1,10 +1,32 @@
 import { describe, it, expect } from 'vitest'
-import { buildCharges, chargesTotal, resolveCharges, surchargeRate, CARD_SURCHARGE_RATE, NITROX_COURSE_FEE } from './booking-charges'
+import { buildCharges, chargesTotal, resolveCharges, surchargeLine, NITROX_COURSE_FEE } from './booking-charges'
+import { surchargeRateFor } from './payment-method-format'
+import type { PaymentMethod } from '../types/database'
 import { GEAR_ALACARTE_PRICES, FULL_GEAR_SET } from './gear'
 import type { AppEvent, BookingDetails } from '../types/database'
 import { siteConfig } from '../config/site'
 import { t } from '../i18n'
 import { computeBookingMoney } from '../../supabase/functions/_shared/booking-charges'
+
+// The shop's payment methods are DB rows now, so the tests that used to name a
+// hardcoded 'credit_card' arm build the row they mean and hand it in.
+function method(over: Partial<PaymentMethod> & { key: string; label: string }): PaymentMethod {
+  return {
+    id: over.key, created_at: '2026-01-01T00:00:00Z', created_by: null,
+    blurb: null, surcharge_percent: 0,
+    bank_name: null, bank_branch: null, bank_code: null,
+    account_number: null, account_holder: null, swift_bic: null,
+    pay_url: null, notes: null,
+    collects_invoice_email: false, shows_shop_contact: false,
+    sort_order: 0, active: true,
+    ...over,
+  } as PaymentMethod
+}
+
+const CARD = method({ key: 'credit_card', label: 'Credit card', surcharge_percent: 5 })
+const CASH = method({ key: 'cash', label: 'Cash' })
+const TRANSFER = method({ key: 'bank_transfer', label: 'Domestic bank transfer' })
+const METHODS = new Map([CARD, CASH, TRANSFER].map(m => [m.key, m]))
 
 describe('buildCharges', () => {
   it('always emits a base line and drops zero/empty lines', () => {
@@ -77,20 +99,39 @@ describe('resolveCharges', () => {
     expect(lines.find(l => l.kind === 'gear')?.label).toBe('Gear: BCD (x2 days)')
   })
 
-  it('recomputes the 5% card surcharge on the full subtotal', () => {
+  it("recomputes the method's own surcharge on the full subtotal", () => {
     const details: BookingDetails = { payment_method: 'credit_card' }
-    const lines = resolveCharges({ details, event: { price: 1000, transport_price: 0, dive_days: 1, deposit_amount: 500 } as AppEvent })
+    const lines = resolveCharges({
+      details,
+      event: { price: 1000, transport_price: 0, dive_days: 1, deposit_amount: 500 } as AppEvent,
+      paymentMethods: METHODS,
+    })
     expect(lines.find(l => l.kind === 'surcharge')).toEqual({
-      kind: 'surcharge', label: 'Card/PayPal surcharge (5%)', amount: 50,
+      kind: 'surcharge', label: t.chargeLines.surcharge('Credit card', 5, false), amount: 50,
     })
   })
 
-  it('charges the card surcharge on the deposit only when paying deposit-only', () => {
+  it('charges the surcharge on the deposit only when paying deposit-only', () => {
     const details: BookingDetails = { payment_method: 'credit_card', pay_deposit_only: true }
-    const lines = resolveCharges({ details, event: { price: 1000, transport_price: 0, dive_days: 1, deposit_amount: 500 } as AppEvent })
-    expect(lines.find(l => l.kind === 'surcharge')).toEqual({
-      kind: 'surcharge', label: 'Card/PayPal surcharge (5% of deposit)', amount: 25,
+    const lines = resolveCharges({
+      details,
+      event: { price: 1000, transport_price: 0, dive_days: 1, deposit_amount: 500 } as AppEvent,
+      paymentMethods: METHODS,
     })
+    expect(lines.find(l => l.kind === 'surcharge')).toEqual({
+      kind: 'surcharge', label: t.chargeLines.surcharge('Credit card', 5, true), amount: 25,
+    })
+  })
+
+  // A method the shop has since deleted must not inherit another method's rate.
+  it('adds no surcharge line for a payment method that no longer resolves', () => {
+    const details: BookingDetails = { payment_method: 'crypto' }
+    const lines = resolveCharges({
+      details,
+      event: { price: 1000, transport_price: 0, dive_days: 1, deposit_amount: 0 } as AppEvent,
+      paymentMethods: METHODS,
+    })
+    expect(lines.some(l => l.kind === 'surcharge')).toBe(false)
   })
 
   it('falls back to the raw id label when a room/add-on price is unknown', () => {
@@ -142,7 +183,6 @@ describe('resolveCharges', () => {
 describe('computeBookingMoney parity with client resolveCharges', () => {
   const gearPrices = GEAR_ALACARTE_PRICES
   const nitroxCourseFee = siteConfig.business.nitroxCourseFee
-  const cardSurchargeRate = siteConfig.business.cardSurchargePercent / 100
 
   it('matches a fully-loaded bank-transfer booking (no surcharge)', () => {
     const event = { price: 2800, transport_price: 1300, dive_days: 2, deposit_amount: 1000 } as AppEvent
@@ -163,8 +203,8 @@ describe('computeBookingMoney parity with client resolveCharges', () => {
       base: 2800, diveDays: 2, depositAmount: 1000, transportPrice: 1300,
       gearItems: ['BCD', 'Dive computer'], gearPrices,
       roomAddedPrice: 1500, addonsTotal: 300,
-      needsTransport: true, nitroxCourse: true, nitroxCourseFee, cardSurchargeRate,
-      paymentMethod: 'bank_transfer', payDepositOnly: false,
+      needsTransport: true, nitroxCourse: true, nitroxCourseFee, surchargeRate: 0,
+      payDepositOnly: false,
     })
     expect(money.total).toBe(clientTotal)
     expect(money.deposit).toBe(1000) // face 1000, no surcharge
@@ -173,12 +213,12 @@ describe('computeBookingMoney parity with client resolveCharges', () => {
   it('matches a full card payment (5% on the whole subtotal)', () => {
     const event = { price: 1000, transport_price: 0, dive_days: 1, deposit_amount: 500 } as AppEvent
     const details: BookingDetails = { payment_method: 'credit_card' }
-    const clientTotal = chargesTotal(resolveCharges({ details, event }))
+    const clientTotal = chargesTotal(resolveCharges({ details, event, paymentMethods: METHODS }))
     const money = computeBookingMoney({
       base: 1000, diveDays: 1, depositAmount: 500, transportPrice: 0,
       gearItems: [], gearPrices, roomAddedPrice: 0, addonsTotal: 0,
-      needsTransport: false, nitroxCourse: false, nitroxCourseFee, cardSurchargeRate,
-      paymentMethod: 'credit_card', payDepositOnly: false,
+      needsTransport: false, nitroxCourse: false, nitroxCourseFee, surchargeRate: surchargeRateFor(CARD),
+      payDepositOnly: false,
     })
     expect(money.total).toBe(clientTotal) // 1000 + 50
     expect(money.deposit).toBe(525)       // face 500 + 5% (25)
@@ -187,12 +227,12 @@ describe('computeBookingMoney parity with client resolveCharges', () => {
   it('matches a deposit-only card payment (surcharge on the deposit only)', () => {
     const event = { price: 1000, transport_price: 0, dive_days: 1, deposit_amount: 500 } as AppEvent
     const details: BookingDetails = { payment_method: 'credit_card', pay_deposit_only: true }
-    const clientTotal = chargesTotal(resolveCharges({ details, event }))
+    const clientTotal = chargesTotal(resolveCharges({ details, event, paymentMethods: METHODS }))
     const money = computeBookingMoney({
       base: 1000, diveDays: 1, depositAmount: 500, transportPrice: 0,
       gearItems: [], gearPrices, roomAddedPrice: 0, addonsTotal: 0,
-      needsTransport: false, nitroxCourse: false, nitroxCourseFee, cardSurchargeRate,
-      paymentMethod: 'credit_card', payDepositOnly: true,
+      needsTransport: false, nitroxCourse: false, nitroxCourseFee, surchargeRate: surchargeRateFor(CARD),
+      payDepositOnly: true,
     })
     expect(money.total).toBe(clientTotal) // 1000 + 25
     expect(money.deposit).toBe(525)       // face 500 + 5% (25)
@@ -202,38 +242,34 @@ describe('computeBookingMoney parity with client resolveCharges', () => {
     const money = computeBookingMoney({
       base: 3200, diveDays: 1, depositAmount: 0, transportPrice: 0,
       gearItems: [], gearPrices, roomAddedPrice: 0, addonsTotal: 0,
-      needsTransport: false, nitroxCourse: false, nitroxCourseFee, cardSurchargeRate,
-      paymentMethod: 'cash', payDepositOnly: false,
+      needsTransport: false, nitroxCourse: false, nitroxCourseFee, surchargeRate: 0,
+      payDepositOnly: false,
     })
     expect(money.total).toBe(3200)
     expect(money.deposit).toBeNull()
   })
 })
 
-// The rate ACTUALLY CHARGED must track the same config field as the label.
-// It did not: cardSurchargePercent drove every "+N%" string while all four
-// charge sites multiplied by a hardcoded 0.05, so a shop configured for 3%
-// showed "+3%" everywhere and billed 5%.
-describe('card surcharge rate tracks the configured percent', () => {
-  const pct = siteConfig.business.cardSurchargePercent
-
-  it('exports the config percent as a multiplier', () => {
-    expect(CARD_SURCHARGE_RATE).toBe(pct / 100)
+// The rate ACTUALLY CHARGED must be the one the diver was shown. It used to be
+// a single shop-wide config percent applied to a hardcoded card/PayPal pair;
+// every method now carries its own, so a shop can charge 3% on cards and
+// nothing on a transfer without either figure being a literal in the code.
+describe('surcharge comes from the chosen method', () => {
+  it('reads the rate off the method, not a shop-wide constant', () => {
+    expect(surchargeRateFor(method({ key: 'k', label: 'L', surcharge_percent: 3 }))).toBe(0.03)
+    expect(surchargeRateFor(CASH)).toBe(0)
+    expect(surchargeRateFor(null)).toBe(0)
+    expect(surchargeRateFor(undefined)).toBe(0)
   })
 
-  it('charges it on card and PayPal, and nothing on cash or transfer', () => {
-    expect(surchargeRate('credit_card')).toBe(pct / 100)
-    expect(surchargeRate('paypal')).toBe(pct / 100)
-    expect(surchargeRate('cash')).toBe(0)
-    expect(surchargeRate('bank_transfer')).toBe(0)
-    expect(surchargeRate(undefined)).toBe(0)
+  it('labels the line with the method the diver picked', () => {
+    const line = surchargeLine(method({ key: 'ppl', label: 'PayPal', surcharge_percent: 3 }), 2000, false)
+    expect(line).toEqual({ label: t.chargeLines.surcharge('PayPal', 3, false), amount: 60 })
   })
 
-  it('resolveCharges bills the configured percent, not a literal 5%', () => {
-    const event = { price: 2000, transport_price: 0, dive_days: 1, deposit_amount: 0 } as AppEvent
-    const lines = resolveCharges({ details: { payment_method: 'credit_card' }, event })
-    const surcharge = lines.find(l => l.kind === 'surcharge')
-    expect(surcharge?.amount).toBe(Math.round(2000 * (pct / 100)))
+  it('emits no line for a method that carries no surcharge', () => {
+    expect(surchargeLine(CASH, 2000, false)).toBeNull()
+    expect(surchargeLine(null, 2000, false)).toBeNull()
   })
 
   it('the server-side money math bills the rate it is handed', () => {
@@ -242,36 +278,30 @@ describe('card surcharge rate tracks the configured percent', () => {
       gearItems: [], gearPrices: GEAR_ALACARTE_PRICES, roomAddedPrice: 0, addonsTotal: 0,
       needsTransport: false, nitroxCourse: false,
       nitroxCourseFee: siteConfig.business.nitroxCourseFee,
-      paymentMethod: 'credit_card', cardSurchargeRate: rate, payDepositOnly: false,
+      surchargeRate: rate, payDepositOnly: false,
     }).total
     expect(at(0.03)).toBe(2060)
     expect(at(0.05)).toBe(2100)
   })
 })
 
-// The card surcharge rate lives in business.cardSurchargePercent. It was
-// hardcoded as "5%" in four separate places (this module, pdf.ts, and two
-// catalog keys), so a fork on a different rate silently showed divers, and
-// printed on their PDF, a percentage the shop does not charge.
-describe('card surcharge label tracks the configured rate', () => {
-  it('interpolates the config percent, not a literal 5', () => {
-    const pct = siteConfig.business.cardSurchargePercent
-    expect(t.chargeLines.surcharge(pct, false)).toContain(`${pct}%`)
-    expect(t.chargeLines.surcharge(pct, true)).toContain(`${pct}%`)
-    // Distinguishable: the deposit-only variant says so.
-    expect(t.chargeLines.surcharge(pct, true)).not.toBe(t.chargeLines.surcharge(pct, false))
+// The surcharge percentage must be interpolated from the method, never baked
+// into a catalog string — a shop on 3% showing "+5%" is a lie on the PDF.
+describe('surcharge label interpolates the rate it is given', () => {
+  it('carries the percent through and distinguishes the deposit-only variant', () => {
+    expect(t.chargeLines.surcharge('Credit card', 7, false)).toContain('7%')
+    expect(t.chargeLines.surcharge('Credit card', 7, true)).toContain('7%')
+    expect(t.chargeLines.surcharge('Credit card', 7, true))
+      .not.toBe(t.chargeLines.surcharge('Credit card', 7, false))
   })
 
   it('no catalog string bakes a surcharge percentage in', () => {
-    const suspects = [
-      t.chargeLines.surcharge(7, false),
-      t.chargeLines.surcharge(7, true),
-      t.register.payment.methodPaypal(7),
-      t.register.payment.methodCreditCard(7),
-    ]
-    for (const s of suspects) {
-      expect(s).toContain('7%')
-      expect(s).not.toMatch(/\b5%/)
+    for (const line of [
+      t.chargeLines.surcharge('Credit card', 7, false),
+      t.chargeLines.surcharge('Credit card', 7, true),
+    ]) {
+      expect(line).toContain('7%')
+      expect(line).not.toMatch(/\b5%/)
     }
   })
 })

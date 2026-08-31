@@ -65,9 +65,25 @@ function setupFrom(children: Profile[]) {
   from.mockImplementation((table: string) => {
     if (table === 'profiles') return mockQueryBuilder({ data: children })
     if (table === 'waivers') return mockQueryBuilder({ data: WAIVER_ROWS })
+    if (table === 'payment_methods') return mockQueryBuilder({ data: PAYMENT_METHOD_ROWS })
     return mockQueryBuilder()
   })
 }
+
+// The shop's payment methods, read from the DB rather than a hardcoded union.
+const PAYMENT_METHOD_ROWS = [
+  { key: 'bank_transfer', label: 'Local bank transfer', surcharge_percent: 0, sort_order: 10,
+    account_number: '1234-5678-9012' },
+  { key: 'credit_card', label: 'Credit card', surcharge_percent: 5, sort_order: 20,
+    collects_invoice_email: true },
+].map((m, i) => ({
+  id: `pm${i}`, created_at: '', created_by: null, blurb: null,
+  bank_name: null, bank_branch: null, bank_code: null,
+  account_number: null, account_holder: null, swift_bic: null,
+  pay_url: null, notes: null,
+  collects_invoice_email: false, shows_shop_contact: false, active: true,
+  ...m,
+}))
 
 beforeEach(() => {
   from.mockReset(); invoke.mockReset(); rpc.mockReset()
@@ -408,6 +424,34 @@ describe('MultiRegisterForm parent diver picker', () => {
     expect(screen.getByText('Grand total')).toBeInTheDocument()
     const fees = screen.getAllByText(/TWD 2,800/)
     expect(fees.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it("lists the shop's payment methods and bills the chosen one's own surcharge", async () => {
+    setupFrom([])
+    const user = userEvent.setup()
+    render(
+      <MultiRegisterForm
+        events={[sampleEvent('e1', 'Kenting')]}
+        profile={parentProfile} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(from).toHaveBeenCalledWith('payment_methods'))
+
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/No, I'll get there myself/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    // The first method is preselected and prints the account the shop published.
+    expect(screen.getByText(/how to pay — local bank transfer/i)).toBeInTheDocument()
+    expect(screen.getByText(/1234-5678-9012/)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/invoice email/i)).not.toBeInTheDocument()
+
+    // Switching to the surcharged method adds 5% of 2,800 to the grand total.
+    await user.click(screen.getByLabelText(/credit card/i))
+    expect(screen.getAllByText(/TWD 2,940/).length).toBeGreaterThan(0)
+    expect(screen.getByLabelText(/invoice email/i)).toBeInTheDocument()
   })
 
   it('warns the lead booker about their missing waivers on the payment step', async () => {

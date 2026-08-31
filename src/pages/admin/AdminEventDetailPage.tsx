@@ -38,7 +38,7 @@ import { missingWaivers, fetchEventWaiverOverrides, fetchSignaturesForDivers, fe
 import type { WaiverDef } from '../../config/waivers'
 import { ShareEventButton } from '../../components/ShareEventButton'
 import { AddToGoogleCalendarButton } from '../../components/AddToGoogleCalendarButton'
-import type { AppEvent, Booking, BookingAmendment, BookingDetails, Credit, DiverNote, Payment, Profile, EventKind } from '../../types/database'
+import type { AppEvent, Booking, BookingAmendment, BookingDetails, Credit, DiverNote, Payment, PaymentMethod, Profile, EventKind } from '../../types/database'
 import { BTN_SECONDARY, BTN_XS_BASE, BTN_XS_GHOST, ERROR_NOTE_LIGHT } from '../../styles/tokens'
 import { t } from '../../i18n'
 
@@ -191,13 +191,19 @@ export function AdminEventDetailPage() {
       // names so the admin doesn't see raw UUIDs.
       const addonIds = uniqueUuids(bookings.flatMap(b => (b.details as BookingDetails).add_ons ?? []))
       const roomIds = uniqueUuids(bookings.map(b => (b.details as BookingDetails).room?.option_id))
-      const [addonRes, roomRes] = await Promise.all([
+      const methodKeys = [...new Set(bookings
+        .map(b => (b.details as BookingDetails).payment_method)
+        .filter((k): k is string => !!k))]
+      const [addonRes, roomRes, methodRes] = await Promise.all([
         addonIds.length
           ? supabase.from('addons').select('id, display_title, admin_title, price').in('id', addonIds)
           : Promise.resolve({ data: [] as { id: string; display_title: string | null; admin_title: string | null; price: number | null }[] }),
         roomIds.length
           ? supabase.from('rooms').select('id, display_title, admin_title, added_price').in('id', roomIds)
           : Promise.resolve({ data: [] as { id: string; display_title: string | null; admin_title: string | null; added_price: number | null }[] }),
+        methodKeys.length
+          ? supabase.from('payment_methods').select('*').in('key', methodKeys)
+          : Promise.resolve({ data: [] as PaymentMethod[] }),
       ])
       if (cancelled) return
       const addonNameMap = new Map((addonRes.data ?? []).map(a => [a.id, a.display_title || a.admin_title || a.id]))
@@ -209,6 +215,7 @@ export function AdminEventDetailPage() {
       // the itemized charge snapshot existed (see resolveCharges).
       const addonPrices = new Map((addonRes.data ?? []).map(a => [a.id, { label: addonNameMap.get(a.id) ?? a.id, amount: a.price ?? 0 }]))
       const roomPrices = new Map((roomRes.data ?? []).map(r => [r.id, { label: roomNameMap.get(r.id) ?? r.id, amount: r.added_price ?? 0 }]))
+      const paymentMethods = new Map(((methodRes.data ?? []) as PaymentMethod[]).map(m => [m.key, m]))
 
       setRegistrants(bookings.map(b => ({
         booking: b,
@@ -216,7 +223,7 @@ export function AdminEventDetailPage() {
         payments: paymentsByBooking.get(b.id) ?? [],
         amendments: amendmentsByBooking.get(b.id) ?? [],
         diverNotes: diverNotesByUser.get(b.user_id) ?? [],
-        charges: resolveCharges({ details: b.details as BookingDetails, event: ev, roomPrices, addonPrices }),
+        charges: resolveCharges({ details: b.details as BookingDetails, event: ev, roomPrices, addonPrices, paymentMethods }),
         credit: openCreditForBooking(credits, b.id),
         feeKept: cancellationKept(netPaid(paymentsByBooking.get(b.id) ?? []), returnedCredits, b.id),
         spendable: credits
