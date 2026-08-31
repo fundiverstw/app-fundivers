@@ -22,26 +22,38 @@ types in `src/types/database.ts`.
 
 ## Sign-up flow
 
-There are **two** entry points:
+There are **two** entry points, and neither one has an approval step.
 
 ### `/signup` — direct account creation
 
-1. `SignupPage` calls `supabase.auth.signUp({ email, password,
-   options: { data: { agreed_to_terms_at } } })`.
-2. The trigger writes `profiles(id = new.id)` with default
-   `role = 'diver'` and `status = 'pending'`, and copies
-   `agreed_to_terms_at` from `raw_user_meta_data` into the profile
-   column.
-3. Email confirmation is off, so `signUp` returns a session — the diver
-   lands straight on `/pending`.
+**A passport name, an email address and a password are the whole of the ask**,
+plus a Cloudflare Turnstile challenge the diver never usually has to touch.
 
-**An email address and a password are the whole of the ask.** No profile
-field is required, at signup or afterwards: `/pending` shows the profile
-form so a diver can fill in what they like, and saves whatever it is
-given. What is still blank is computed by `src/lib/profile-completeness.ts`
-and shown to the diver as a nudge and to staff on the admin screens — a
-gap is a prompt, never a block. Details the shop genuinely cannot dive
-without are collected at booking time by `RegisterForm`.
+1. `SignupPage` posts to the **`create-account` edge function**.
+2. The function verifies the Turnstile token server-side, spends a per-IP
+   budget (`record_signup_attempt`, shared with the `/register` funnel), then
+   calls `auth.admin.createUser({ email_confirm: true })` and signs the diver
+   in.
+3. The `handle_new_user` trigger writes `profiles(id = new.id)` with
+   `role = 'diver'`, **`status = 'active'`**, the `name` from
+   `raw_user_meta_data`, and a server-stamped `agreed_to_terms_at`.
+4. The SPA installs the returned session and the diver lands on `/calendar`.
+
+Why an edge function rather than `supabase.auth.signUp()`:
+
+- **Captcha.** Supabase's own captcha setting arms *every* auth endpoint,
+  sign-in and password-reset included. Verifying the token here puts the
+  challenge on signup alone.
+- **No confirmation email.** `email_confirm: true` marks the address confirmed
+  at creation, so there is no click-the-link step between signing up and
+  diving — regardless of the project's "Confirm email" dashboard toggle.
+- **Rate limiting.** `record_signup_attempt` is a service-role RPC.
+
+No profile field beyond the name is required, at signup or afterwards.
+`ProfileForm` on `/profile` saves whatever it is given; what is still blank is
+computed by `src/lib/profile-completeness.ts` and shown to staff on the admin
+screens — a gap is a prompt, never a block. Details the shop genuinely cannot
+dive without are collected at booking time by `RegisterForm`.
 
 ### `/register` and `/register/:id` — one-shot signup + booking
 
@@ -49,17 +61,41 @@ Public funnel for visitors arriving from fundiverstw.com or a Wix
 calendar deep-link. `RegisterPage` renders `RegisterForm`. On submit
 the form invokes the **`create-registration` edge function**, which:
 
-- Guest path (caller has no Bearer JWT): `auth.admin.createUser({
-  email_confirm: true })` — bypasses the click-to-confirm gate so a
-  typo'd email is rejected loudly instead of silently dropping the
-  account; immediately signs in so the SPA holds the session without
-  a second round-trip.
+- Guest path (caller has no Bearer JWT): the same Turnstile + per-IP gates,
+  then `auth.admin.createUser({ email_confirm: true })` — bypasses the
+  click-to-confirm gate so a typo'd email is rejected loudly instead of
+  silently dropping the account; immediately signs in so the SPA holds the
+  session without a second round-trip.
 - Authed path (Bearer JWT): identifies the user via `auth.getUser()`.
 
 In both cases the function then updates `profiles`, inserts the
 `bookings` row, and emails a registration PDF to the diver and the
 company inbox via Gmail SMTP. See
 `supabase/functions/create-registration/index.ts`.
+
+### What `status` is for now
+
+`profiles.status` (`pending` | `active` | `rejected`) is a **suspension
+lever**, not a queue. Signing up no longer produces a `pending` row, so in
+normal operation nothing sits in that state. An admin can still move a live
+profile to `pending` or `rejected` from `/admin/applications` ("Accounts on
+hold"), and doing so still severs diver-side `bookings` and
+`push_subscriptions` inserts through the `is_active_user()` RLS helper and
+bounces the diver to `/pending`.
+
+Before migration `20260831120000` every new account started at `pending` and
+waited for a human. Divers read the wait as the site being broken, and the shop
+was approving essentially everyone, so the queue bought no safety.
+
+### Terms re-acceptance
+
+`RequireCurrentTerms` used to redirect every authenticated route to
+`/terms?reaccept=1` the moment `profiles.agreed_to_terms_version` fell behind
+the live `terms.version`. It now renders a **banner** above the page instead,
+linking to the same flow. The banner is not dismissible — it stays until the
+diver accepts, so the shop still gets its consent — but nothing behind it is
+blocked meanwhile. Signup is unaffected: `/signup` takes consent to the current
+version before the account exists.
 
 ## Sign-in flow
 
