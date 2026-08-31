@@ -194,8 +194,9 @@ export function ProfileForm({ user, profile, onSaved }: {
   const deepCardMissing = !!deepCertifiedWatched && !deepCardPath
   const certStatus = useWatch({ control, name: 'cert_status' }) as 'certified' | 'uncertified' | undefined
   const isCertified = certStatus === 'certified'
-  // A certified diver must have a cert-card photo on file; an uncertified one
-  // never does.
+  // A certified diver is reminded to put a cert-card photo on file; an
+  // uncertified one has nothing to show. Only ever a reminder — it does not
+  // gate the save.
   const certCardMissing = isCertified && !certCardPath
   // Distinct orgs in the order returned by the rank-sorted query (PADI rows
   // come first because they're the seed; agency rows follow). Always
@@ -500,26 +501,34 @@ export function ProfileForm({ user, profile, onSaved }: {
         </section>
 
         {certCardMissing && (
-          <p className="text-xs text-red-700 bg-red-50 border border-accent rounded p-2">
-            {t.profile.certCardRequired}
+          <p className="text-xs text-amber-900 bg-amber-50 border border-amber-300 rounded p-2">
+            {t.profile.certCardReminder}
           </p>
         )}
 
         {nitroxCardMissing && (
-          <p className="text-xs text-red-700 bg-red-50 border border-accent rounded p-2">
-            {t.profile.nitroxCardRequired}
+          <p className="text-xs text-amber-900 bg-amber-50 border border-amber-300 rounded p-2">
+            {t.profile.nitroxCardReminder}
           </p>
         )}
 
         {deepCardMissing && (
-          <p className="text-xs text-red-700 bg-red-50 border border-accent rounded p-2">
-            {t.profile.deepCardRequired}
+          <p className="text-xs text-amber-900 bg-amber-50 border border-amber-300 rounded p-2">
+            {t.profile.deepCardReminder}
           </p>
         )}
 
         <button
           type="submit"
-          disabled={isSubmitting || certCardMissing || nitroxCardMissing || deepCardMissing || (!isDirty && !dirtyExtras)}
+          // Only two reasons left to disable Save: a submit already in
+          // flight, and nothing having changed. A missing cert card used to
+          // sit in this list, which meant a diver who came to correct their
+          // phone number could not save it until they had found and
+          // photographed a plastic card — so the notices above are reminders
+          // now, not gates. Nothing about the profile is required to store it;
+          // what a specific trip genuinely cannot go without is collected at
+          // booking time by RegisterForm, which still asks.
+          disabled={isSubmitting || (!isDirty && !dirtyExtras)}
           className="w-full bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-semibold py-2 rounded-lg transition-colors disabled:opacity-50"
         >
           {isSubmitting ? t.profile.saving : t.profile.saveChanges}

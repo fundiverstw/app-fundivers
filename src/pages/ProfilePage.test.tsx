@@ -107,8 +107,8 @@ describe('ProfilePage', () => {
         contact_method: 'email',
         contact_id: 'ada@example.com',
         cert_level: 'Open Water',
-        // cert_level=set + no cert_card_path now blocks Save (new gate).
-        // The test isn't exercising that gate, so seed a card path.
+        // Seeded so the missing-card reminder stays out of this test's way.
+        // It no longer gates Save either way.
         cert_card_path: 'u1/existing.jpg',
         logged_dives: 0,
       },
@@ -361,7 +361,12 @@ describe('ProfilePage', () => {
     await waitFor(() => expect(deleteCertCard).toHaveBeenCalledWith('u1/existing.jpg'))
   })
 
-  it('disables Save when cert_level is set but no cert card is on file', async () => {
+  // A missing cert card used to disable Save, so a diver who came to correct
+  // their phone number could not save it until they had found and photographed
+  // a plastic card. It is a reminder now — nothing about the profile is
+  // required in order to store it.
+  it('reminds about a missing cert card without blocking Save', async () => {
+    const user = userEvent.setup()
     useAuthMock.mockReturnValue({
       user: { id: 'u1' },
       profile: {
@@ -376,16 +381,18 @@ describe('ProfilePage', () => {
         logged_dives: 0,
       },
     })
-    // CertCardSection's load also resolves cert_card_path=null, so the
-    // missing-card banner appears and Save stays disabled until a photo
-    // is uploaded via the section.
     from.mockReturnValue(mockQueryBuilder({ data: { cert_card_path: null } }))
 
     renderWithRouter(<ProfilePage />)
     await waitFor(() => {
-      expect(screen.getByText(/upload a photo of your highest certification card/i)).toBeInTheDocument()
+      expect(screen.getByText(t.profile.certCardReminder)).toBeInTheDocument()
     })
+
+    // Save is disabled only because nothing has changed yet — touching any
+    // field enables it, card or no card.
     expect(screen.getByRole('button', { name: /save changes/i })).toBeDisabled()
+    await user.type(input('nickname'), 'x')
+    expect(screen.getByRole('button', { name: /save changes/i })).toBeEnabled()
   })
 
   it('does not render the form (and thus cannot submit) when there is no authenticated user', () => {

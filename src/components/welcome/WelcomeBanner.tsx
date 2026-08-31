@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import type { User } from '@supabase/supabase-js'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
@@ -7,6 +8,10 @@ import { t } from '../../i18n'
 // (welcomed_at stamped), this banner shows on the dashboard for the
 // next day so divers have a softer reminder of where to go without
 // the modal blocking the screen.
+//
+// It repeats the modal's one instruction — go and fill in your profile — for
+// the diver who tapped "Later", and carries the same link so acting on it is
+// never a hunt through the nav.
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000
 
 export function WelcomeBanner({ user }: { user: User }) {
@@ -31,6 +36,9 @@ export function WelcomeBanner({ user }: { user: User }) {
         <p className="text-brand-100/80 font-medium text-xs mt-0.5">
           {t.welcome.bannerBody}
         </p>
+        <Link to="/profile" className="inline-block mt-1 text-xs font-semibold text-reef-300 hover:text-reef-200 underline">
+          {t.welcome.bannerAction}
+        </Link>
       </div>
     </div>
   )
