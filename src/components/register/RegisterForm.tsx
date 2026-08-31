@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { personName } from '../../lib/names'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
@@ -700,6 +700,11 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const [guestPassword, setGuestPassword] = useState('')
   const [guestAgreedTerms, setGuestAgreedTerms] = useState(false)
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  // The challenge script could not be fetched, so no token will ever arrive.
+  // Without this the guest is stuck on step 2 behind a Next button that never
+  // enables — same "contact us" fallback as a missing site key.
+  const [captchaDead, setCaptchaDead] = useState(false)
+  const onCaptchaUnavailable = useCallback(() => setCaptchaDead(true), [])
 
   // Local resume: autosave the diver's in-progress answers to localStorage so a
   // dropped connection or closed tab doesn't force a restart of the four-step
@@ -1569,8 +1574,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                   <a href="/terms" target="_blank" rel="noreferrer" className="text-brand-700 hover:underline">{t.register.account.termsLink}</a>.
                 </span>
               </label>
-              {turnstileSiteKey ? (
-                <TurnstileWidget siteKey={turnstileSiteKey} onToken={setTurnstileToken} />
+              {turnstileSiteKey && !captchaDead ? (
+                <TurnstileWidget
+                  siteKey={turnstileSiteKey}
+                  onToken={setTurnstileToken}
+                  onUnavailable={onCaptchaUnavailable}
+                />
               ) : (
                 <p role="alert" className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
                   {t.register.account.unavailable}

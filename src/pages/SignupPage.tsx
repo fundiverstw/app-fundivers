@@ -51,6 +51,9 @@ export function SignupPage() {
   // next step is a link to sign in, not a retry of the same form.
   const [emailTaken, setEmailTaken] = useState(false)
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  // The challenge script never loaded. Distinct from "no token yet": that
+  // resolves on its own, this never will.
+  const [captchaDead, setCaptchaDead] = useState(false)
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -61,6 +64,7 @@ export function SignupPage() {
   // Stable identity so TurnstileWidget's effect doesn't tear down and re-render
   // the challenge on every keystroke in the form above it.
   const onToken = useCallback((token: string | null) => setTurnstileToken(token), [])
+  const onCaptchaUnavailable = useCallback(() => setCaptchaDead(true), [])
 
   async function onSubmit(data: FormData) {
     setServerError('')
@@ -108,10 +112,12 @@ export function SignupPage() {
     navigate('/calendar', { replace: true })
   }
 
-  // Without a site key the widget never renders and no token can ever arrive,
-  // so submitting would fail server-side every time. Say so up front instead of
-  // letting the diver fill the form in and then bounce off a captcha error.
-  const captchaUnavailable = !siteKey
+  // Two ways the challenge can be impossible rather than merely pending: no
+  // site key was built in, or its script could not be fetched. Either way no
+  // token will ever arrive and every submit would be rejected server-side, so
+  // say so and point at a human — rather than leaving a filled-in form behind
+  // a button that never enables.
+  const captchaUnavailable = !siteKey || captchaDead
 
   return (
     <div className="min-h-screen bg-brand-900 flex items-center justify-center p-4">
@@ -167,7 +173,7 @@ export function SignupPage() {
             </label>
             {errors.agreedToTerms && <p className={`${TEXT_ERROR} text-xs`}>{errors.agreedToTerms.message}</p>}
 
-            <TurnstileWidget siteKey={siteKey} onToken={onToken} />
+            <TurnstileWidget siteKey={siteKey} onToken={onToken} onUnavailable={onCaptchaUnavailable} />
 
             {serverError && (
               <p className={`${TEXT_ERROR} text-sm`}>

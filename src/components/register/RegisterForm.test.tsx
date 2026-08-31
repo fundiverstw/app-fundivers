@@ -52,8 +52,14 @@ vi.mock('../../hooks/useAuth', () => ({
 // loading Cloudflare's script: clicking the button hands a token to the form,
 // the same contract the real widget fulfils via its onToken callback.
 vi.mock('./TurnstileWidget', () => ({
-  TurnstileWidget: ({ onToken }: { onToken: (t: string) => void }) => (
-    <button type="button" onClick={() => onToken('test-turnstile-token')}>solve captcha</button>
+  TurnstileWidget: ({ onToken, onUnavailable }: {
+    onToken: (t: string) => void
+    onUnavailable?: () => void
+  }) => (
+    <>
+      <button type="button" onClick={() => onToken('test-turnstile-token')}>solve captcha</button>
+      <button type="button" onClick={() => onUnavailable?.()}>break captcha</button>
+    </>
   ),
 }))
 
@@ -1357,6 +1363,32 @@ describe('RegisterForm', () => {
     // token, so the only way forward is blocked.
     expect(screen.queryByRole('button', { name: /solve captcha/i })).not.toBeInTheDocument()
     expect(screen.getByText(/registration is temporarily unavailable/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+  })
+
+  // Same dead end reached the other way: the key is present but the challenge
+  // script never loads (offline, blocking extension, corporate proxy). Without
+  // the swap the guest is stuck on step 2 behind a Next button that can never
+  // enable, with nothing explaining why.
+  it('guest path: when the captcha script cannot load, shows the same unavailable notice', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter>
+        <RegisterFormBody event={sampleEvent} profile={null} onSubmitSuccess={() => {}} />
+      </MemoryRouter>
+    )
+
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.type(screen.getByLabelText(/email \*/i), 'new@diver.test')
+    await user.type(screen.getByLabelText(/password/i, { selector: 'input' }), 'abcdefgh')
+    await user.click(screen.getByLabelText(/I agree to the/i))
+    await user.type(screen.getByLabelText(/^legal name/i), 'Grace Hopper')
+
+    await user.click(screen.getByRole('button', { name: /break captcha/i }))
+
+    expect(screen.getByText(/registration is temporarily unavailable/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /solve captcha/i })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
   })
 

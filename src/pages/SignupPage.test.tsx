@@ -28,8 +28,14 @@ vi.mock('../lib/use-terms', () => ({
 // Stand-in for the Turnstile challenge: a button the test can "solve", the
 // same shape RegisterForm's suite uses.
 vi.mock('../components/register/TurnstileWidget', () => ({
-  TurnstileWidget: ({ onToken }: { onToken: (t: string) => void }) => (
-    <button type="button" onClick={() => onToken('test-turnstile-token')}>solve captcha</button>
+  TurnstileWidget: ({ onToken, onUnavailable }: {
+    onToken: (t: string) => void
+    onUnavailable?: () => void
+  }) => (
+    <>
+      <button type="button" onClick={() => onToken('test-turnstile-token')}>solve captcha</button>
+      <button type="button" onClick={() => onUnavailable?.()}>break captcha</button>
+    </>
   ),
 }))
 
@@ -271,6 +277,28 @@ describe('SignupPage error messages', () => {
 
     await screen.findByText(t.auth.signupFailed)
     expect(screen.getByRole('button', { name: /create account/i })).toBeDisabled()
+  })
+})
+
+// The worst version of "signup is broken": a filled-in form behind a button
+// that can never enable, with nothing on screen saying why.
+describe('SignupPage when the captcha script cannot load', () => {
+  it('swaps in the contact-us copy instead of leaving a dead button', async () => {
+    const user = userEvent.setup()
+    renderWithRouter(<SignupPage />)
+    expect(screen.getByRole('button', { name: /create account/i })).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: /break captcha/i }))
+
+    expect(screen.getByText(t.auth.captchaUnavailable)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /create account/i })).not.toBeInTheDocument()
+  })
+
+  it('still offers the way to sign in', async () => {
+    const user = userEvent.setup()
+    renderWithRouter(<SignupPage />)
+    await user.click(screen.getByRole('button', { name: /break captcha/i }))
+    expect(screen.getByRole('link', { name: /sign in/i })).toHaveAttribute('href', '/login')
   })
 })
 
