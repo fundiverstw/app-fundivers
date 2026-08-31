@@ -21,6 +21,7 @@ import { DateField } from '../components/DateField'
 import { BTN_DANGER } from '../styles/tokens'
 import type { Profile, CertLevel } from '../types/database'
 import { ShoeSizeField } from '../components/ShoeSizeField'
+import { HeightField, WeightField } from '../components/MeasureField'
 import { PasswordInput } from '../components/PasswordInput'
 import { t } from '../i18n'
 
@@ -50,8 +51,6 @@ const schema = z.object({
   cert_agency: z.string().nullish(),
   cert_level: z.string().nullish(),
   medical_notes: z.string().nullish(),
-  height_cm: z.union([z.string(), z.number()]).nullish(),
-  weight_kg: z.union([z.string(), z.number()]).nullish(),
   gender: z.string().nullish(),
   contact_method: z.string().nullish(),
   contact_id: z.string().nullish(),
@@ -243,6 +242,12 @@ export function ProfileForm({ user, profile, onSaved }: {
   // Canonical shoe size ('' = unset); the ShoeSizeField below owns the
   // unit/gender/value picker and reports the canonical string up.
   const [shoeSize, setShoeSize] = useState<string>(profile.shoe_size ?? '')
+  // Canonical cm / kg. HeightField and WeightField own the metric/imperial
+  // toggle and report metric up, so what lands in the column is what always
+  // landed there — these sit outside react-hook-form for the same reason the
+  // shoe size does: the widget, not the input element, is the source of truth.
+  const [heightCm, setHeightCm] = useState<number | null>(profile.height_cm ?? null)
+  const [weightKg, setWeightKg] = useState<number | null>(profile.weight_kg ?? null)
   const [dirtyExtras, setDirtyExtras] = useState(false)
 
   function setGearOwnedDirty(next: string[]) {
@@ -269,8 +274,8 @@ export function ProfileForm({ user, profile, onSaved }: {
       cert_agency: data.cert_status === 'uncertified' ? null : strOrNull(data.cert_agency),
       cert_level: data.cert_status === 'uncertified' ? null : strOrNull(data.cert_level),
       medical_notes: strOrNull(data.medical_notes),
-      height_cm: numOrNull(data.height_cm),
-      weight_kg: numOrNull(data.weight_kg),
+      height_cm: heightCm,
+      weight_kg: weightKg,
       shoe_size: shoeSizeCanonical,
       gender: strOrNull(data.gender),
       contact_method: (method === 'whatsapp' || method === 'line' || method === 'phone' || method === 'email') ? method : null,
@@ -358,8 +363,20 @@ export function ProfileForm({ user, profile, onSaved }: {
 
         <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-3">
           <h2 className="text-sm font-semibold text-brand-900 uppercase tracking-wider">{t.profile.sizing}</h2>
-          <Field label={t.profile.heightCm}><input {...register('height_cm')} type="number" step="0.1" className={inputClass} /></Field>
-          <Field label={t.profile.weightKg}><input {...register('weight_kg')} type="number" step="0.1" className={inputClass} /></Field>
+          <Field label={t.profile.height}>
+            <HeightField
+              valueCm={heightCm}
+              onChange={cm => { setHeightCm(cm); setDirtyExtras(true) }}
+              inputClassName={inputClass}
+            />
+          </Field>
+          <Field label={t.profile.weight}>
+            <WeightField
+              valueKg={weightKg}
+              onChange={kg => { setWeightKg(kg); setDirtyExtras(true) }}
+              inputClassName={inputClass}
+            />
+          </Field>
           <div>
             <label className="block text-xs text-brand-900 font-medium mb-1 uppercase tracking-wide">{t.profile.shoeSize}</label>
             <ShoeSizeField

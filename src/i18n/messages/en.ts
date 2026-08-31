@@ -712,6 +712,8 @@ export const en = {
       email: 'Email',
     },
     sizing: 'Sizing',
+    height: 'Height',
+    weight: 'Weight',
     heightCm: 'Height (cm)',
     weightKg: 'Weight (kg)',
     shoeSize: 'Shoe size',
@@ -1036,6 +1038,7 @@ export const en = {
     hidePassword: 'Hide password',
     showPassword: 'Show password',
     shoeSizeUnit: 'Shoe size unit',
+    unitSystem: 'Measurement units',
     shoeSizeGender: 'Shoe size gender',
     shoeSizeValue: 'Shoe size value',
     recordsSections: 'Records sections',
@@ -1043,6 +1046,15 @@ export const en = {
   },
   records: {
     bookingsTab: 'Bookings',
+  },
+  units: {
+    metricShort: 'cm/kg',
+    imperialShort: 'ft/lb',
+    heightFeet: 'Height (feet)',
+    heightInches: 'Height (inches)',
+    weightLb: 'Weight (lb)',
+    ft: 'ft',
+    in: 'in',
   },
   trips: {
     title: 'Scheduled Trips',

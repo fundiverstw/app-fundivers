@@ -65,6 +65,12 @@ export interface SiteLocale {
   currencyLabel: string
   /** The single language the whole app renders in for this deployment. */
   language: SupportedLanguage
+  /** Which units the height / weight fields open in. Storage is always metric
+   *  (profiles.height_cm, profiles.weight_kg) — this only picks the side of the
+   *  toggle a diver sees first, and they can flip it per browser. Deliberately
+   *  separate from `language`: this shop renders in English from Taiwan, where
+   *  everyone is metric, so the language is no guide to the unit. */
+  units: 'metric' | 'imperial'
 }
 
 export interface SiteTheme {
@@ -157,6 +163,6 @@ export interface SiteConfig {
 // Bump when the SiteConfig contract changes in a way that requires forks to
 // migrate their fundive.config.ts. The build compares this against
 // siteConfig.configVersion and fails loudly on a mismatch.
-export const CONFIG_CONTRACT_VERSION = 8
+export const CONFIG_CONTRACT_VERSION = 9
 
 export const siteConfig: SiteConfig = raw

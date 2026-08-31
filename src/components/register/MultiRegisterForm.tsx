@@ -14,6 +14,8 @@ import { fetchRideSeats, canRequestRide, type RideSeats } from '../../lib/event-
 import { missingWaivers, fetchEventWaiverOverrides, fetchDiverSignatures, fetchWaivers, type WaiverEventRef } from '../../lib/waivers'
 import { WaiverSignDialog } from '../waivers/WaiverSignDialog'
 import { TextField } from './TextField'
+import { HeightField, WeightField } from '../MeasureField'
+import { MeasureRow, MEASURE_INPUT, numOrNullStr } from './MeasureRow'
 import { ShoeSizeField } from '../ShoeSizeField'
 import type { WaiverDef } from '../../config/waivers'
 import type { AppEvent, Booking, BookingDetails, Database, Profile } from '../../types/database'
@@ -541,8 +543,20 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <TextField label={t.register.step2.dobLabel} type="date" value={dob} onChange={setDob} />
                 <TextField label={t.register.nationalityLabel} value={nationality} onChange={setNationality} />
-                <TextField label={t.register.step2.heightLabel} type="number" step="0.1" value={heightCm} onChange={setHeightCm} hint={t.register.step2.sizesHint} />
-                <TextField label={t.register.step2.weightLabel} type="number" step="0.1" value={weightKg} onChange={setWeightKg} />
+                <MeasureRow label={t.register.step2.heightLabel} hint={t.register.step2.sizesHint}>
+                  <HeightField
+                    valueCm={numOrNullStr(heightCm)}
+                    onChange={cm => setHeightCm(cm == null ? '' : String(cm))}
+                    inputClassName={MEASURE_INPUT}
+                  />
+                </MeasureRow>
+                <MeasureRow label={t.register.step2.weightLabel}>
+                  <WeightField
+                    valueKg={numOrNullStr(weightKg)}
+                    onChange={kg => setWeightKg(kg == null ? '' : String(kg))}
+                    inputClassName={MEASURE_INPUT}
+                  />
+                </MeasureRow>
                 <label className="block">
                   <span className="block text-xs text-brand-900 font-medium mb-1">{t.register.genderLabel}</span>
                   <select

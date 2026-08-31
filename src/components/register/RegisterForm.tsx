@@ -26,6 +26,8 @@ import { isHeicFile } from '../../lib/image-compress'
 import { TurnstileWidget } from './TurnstileWidget'
 import { WhatHappensNext } from './WhatHappensNext'
 import { TextField } from './TextField'
+import { HeightField, WeightField } from '../MeasureField'
+import { MeasureRow, MEASURE_INPUT, numOrNullStr } from './MeasureRow'
 import { ShoeSizeField } from '../ShoeSizeField'
 import {
   registrationDraftKey,
@@ -1586,8 +1588,20 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             <TextField label={t.register.step2.idLabel} value={idNumber} onChange={setIdNumber} />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <TextField label={t.register.step2.heightLabel} type="number" step="0.1" value={heightCm} onChange={setHeightCm} hint={t.register.step2.sizesHint} />
-              <TextField label={t.register.step2.weightLabel} type="number" step="0.1" value={weightKg} onChange={setWeightKg} />
+              <MeasureRow label={t.register.step2.heightLabel} hint={t.register.step2.sizesHint}>
+                <HeightField
+                  valueCm={numOrNullStr(heightCm)}
+                  onChange={cm => setHeightCm(cm == null ? '' : String(cm))}
+                  inputClassName={MEASURE_INPUT}
+                />
+              </MeasureRow>
+              <MeasureRow label={t.register.step2.weightLabel}>
+                <WeightField
+                  valueKg={numOrNullStr(weightKg)}
+                  onChange={kg => setWeightKg(kg == null ? '' : String(kg))}
+                  inputClassName={MEASURE_INPUT}
+                />
+              </MeasureRow>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

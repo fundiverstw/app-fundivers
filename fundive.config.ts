@@ -20,7 +20,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const siteConfig = {
-  configVersion: 8,
+  configVersion: 9,
 
   identity: {
     appName: 'FunDive',
@@ -56,6 +56,9 @@ export const siteConfig = {
     // `as const` narrows the literal to the SupportedLanguage union (this file
     // is type-checked against SiteConfig via src/config/site.ts).
     language: 'en' as const,
+    // Which side of the height / weight toggle opens first. Storage is
+    // metric either way; this shop is in Taiwan, so metric.
+    units: 'metric' as const,
   },
 
   // Used by the PWA manifest (vite.config.ts) and the index.html theme-color.

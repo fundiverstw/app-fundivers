@@ -704,6 +704,8 @@ export const zhTW: Messages = {
       email: '電子郵件',
     },
     sizing: '尺寸',
+    height: '身高',
+    weight: '體重',
     heightCm: '身高（公分）',
     weightKg: '體重（公斤）',
     shoeSize: '鞋號',
@@ -1028,6 +1030,7 @@ export const zhTW: Messages = {
     hidePassword: '隱藏密碼',
     showPassword: '顯示密碼',
     shoeSizeUnit: '鞋碼單位',
+    unitSystem: '測量單位',
     shoeSizeGender: '鞋碼性別',
     shoeSizeValue: '鞋碼尺寸',
     recordsSections: '紀錄分類',
@@ -1035,6 +1038,15 @@ export const zhTW: Messages = {
   },
   records: {
     bookingsTab: '報名紀錄',
+  },
+  units: {
+    metricShort: '公分/公斤',
+    imperialShort: '英尺/磅',
+    heightFeet: '身高（英尺）',
+    heightInches: '身高（英吋）',
+    weightLb: '體重（磅）',
+    ft: '英尺',
+    in: '英吋',
   },
   trips: {
     title: '預定行程',

@@ -703,6 +703,8 @@ export const ja: Messages = {
       email: 'メールアドレス',
     },
     sizing: 'サイズ',
+    height: '身長',
+    weight: '体重',
     heightCm: '身長（cm）',
     weightKg: '体重（kg）',
     shoeSize: '足のサイズ',
@@ -1027,6 +1029,7 @@ export const ja: Messages = {
     hidePassword: 'パスワードを隠す',
     showPassword: 'パスワードを表示',
     shoeSizeUnit: '靴のサイズ表記',
+    unitSystem: '単位系',
     shoeSizeGender: '靴のサイズ区分',
     shoeSizeValue: '靴のサイズ',
     recordsSections: '記録のセクション',
@@ -1034,6 +1037,15 @@ export const ja: Messages = {
   },
   records: {
     bookingsTab: '予約',
+  },
+  units: {
+    metricShort: 'cm/kg',
+    imperialShort: 'ft/lb',
+    heightFeet: '身長（フィート）',
+    heightInches: '身長（インチ）',
+    weightLb: '体重（ポンド）',
+    ft: 'ft',
+    in: 'in',
   },
   trips: {
     title: '予定ツアー',
