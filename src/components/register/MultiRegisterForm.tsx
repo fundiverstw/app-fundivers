@@ -15,7 +15,9 @@ import { missingWaivers, fetchEventWaiverOverrides, fetchDiverSignatures, fetchW
 import { WaiverSignDialog } from '../waivers/WaiverSignDialog'
 import { TextField } from './TextField'
 import { HeightField, WeightField } from '../MeasureField'
-import { MeasureRow, MEASURE_INPUT, numOrNullStr } from './MeasureRow'
+import { MeasureRow } from './MeasureRow'
+import { INPUT_REGISTER } from '../../styles/tokens'
+import { numOrNullStr } from '../../lib/units'
 import { ShoeSizeField } from '../ShoeSizeField'
 import type { WaiverDef } from '../../config/waivers'
 import type { AppEvent, Booking, BookingDetails, Database, Profile } from '../../types/database'
@@ -547,14 +549,14 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                   <HeightField
                     valueCm={numOrNullStr(heightCm)}
                     onChange={cm => setHeightCm(cm == null ? '' : String(cm))}
-                    inputClassName={MEASURE_INPUT}
+                    inputClassName={INPUT_REGISTER}
                   />
                 </MeasureRow>
                 <MeasureRow label={t.register.step2.weightLabel}>
                   <WeightField
                     valueKg={numOrNullStr(weightKg)}
                     onChange={kg => setWeightKg(kg == null ? '' : String(kg))}
-                    inputClassName={MEASURE_INPUT}
+                    inputClassName={INPUT_REGISTER}
                   />
                 </MeasureRow>
                 <label className="block">

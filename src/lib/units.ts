@@ -126,3 +126,14 @@ export function sameWeight(kg: number | null, lb: number | null): boolean {
   if (kg == null || lb == null) return kg == null && lb == null
   return kgToLb(kg) === lb
 }
+
+/**
+ * Both registration forms hold measurements as form strings — that is what
+ * their localStorage draft persists — so this is the one place that turns a
+ * blank or unparseable one into the null the measurement fields expect.
+ */
+export function numOrNullStr(v: string): number | null {
+  if (v.trim() === '') return null
+  const n = Number(v)
+  return Number.isNaN(n) ? null : n
+}

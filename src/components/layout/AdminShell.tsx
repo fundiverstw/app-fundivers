@@ -48,13 +48,11 @@ export function AdminShell() {
   useEffect(() => {
     if (profile?.role !== 'admin') return
     let cancelled = false
-    // Counts every pending diver, exactly like the queue this badge links to
-    // (AdminApplicationsPage). It used to also require a non-null
-    // application_submitted_at; that stamp never lands for a diver who stopped
-    // short of filling their profile in, so the badge read 0 while people sat
-    // waiting for approval — the one signal an admin gets that anyone is
-    // there. Any condition added here must be added to the queue too, or the
-    // badge goes back to lying.
+    // Counts every on-hold diver, exactly like the queue this badge links to
+    // (AdminApplicationsPage). Any condition added here must be added to the
+    // queue too, or the badge lies. It reads 0 in normal operation now that
+    // signing up no longer parks anyone at 'pending' — a non-zero badge means
+    // an admin has suspended someone and not yet resolved it.
     supabase
       .from('profiles')
       .select('id', { count: 'exact', head: true })

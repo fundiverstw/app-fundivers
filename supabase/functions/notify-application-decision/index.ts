@@ -111,19 +111,22 @@ Deno.serve(async (req) => {
         host: "smtp.gmail.com", port: 465, secure: true,
         auth: { user: GMAIL_USER, pass: GMAIL_PASS },
       })
+      // Signing up needs no approval, so neither decision is ever a verdict
+      // on a new application any more — both are about an account an admin put
+      // on hold. The copy says so.
       const subject = body.decision === "approve"
-        ? `${siteConfig.identity.shopName} — your account is approved`
-        : `${siteConfig.identity.shopName} — application not approved`
+        ? `${siteConfig.identity.shopName} — your account is active again`
+        : `${siteConfig.identity.shopName} — your account has been closed`
       const text = body.decision === "approve"
-        ? `Welcome aboard! Your account has been approved. You can now log in at ${siteConfig.urls.app} and book events.\n\n— ${siteConfig.identity.shopName}`
-        : `Hi,\n\nYour ${siteConfig.identity.shopName} application was reviewed and not approved at this time.${
+        ? `Good news — your account is active again. You can log in at ${siteConfig.urls.app} and book events as usual.\n\n— ${siteConfig.identity.shopName}`
+        : `Hi,\n\nYour ${siteConfig.identity.shopName} account has been closed.${
             body.reason ? `\n\nReason: ${body.reason}` : ""
           }\n\nIf you believe this is a mistake, reply to this email and we'll take another look.\n\n— ${siteConfig.identity.shopName}`
       await transporter.sendMail({
         from: { name: siteConfig.identity.shopName, address: GMAIL_USER },
         to:      targetEmail,
-        // Copy the company on rejections only — approvals are routine and
-        // don't need a business-side notification.
+        // Copy the company on closures only — a reinstatement is routine and
+        // doesn't need a business-side notification.
         ...(body.decision === "reject" ? { bcc: COMPANY_EMAIL } : {}),
         subject,
         text,

@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { AdminApplicationsPage } from './AdminApplicationsPage'
+import { t } from '../../i18n'
+
+const ap = t.admin.applications
 import { mockQueryBuilder } from '../../../tests/test-utils'
 
 const { from, invoke, fetchEventsForBookings } = vi.hoisted(() => ({
@@ -45,14 +48,14 @@ function renderPage() {
 }
 
 describe('AdminApplicationsPage', () => {
-  it('renders empty-state when no pending applications', async () => {
+  it('renders empty-state when no account is on hold', async () => {
     from.mockReturnValue(mockQueryBuilder({ data: [] }))
     renderPage()
-    expect(await screen.findByText(/no pending new user requests/i)).toBeInTheDocument()
-    expect(screen.getByText('0 pending')).toBeInTheDocument()
+    expect(await screen.findByText(ap.none)).toBeInTheDocument()
+    expect(screen.getByText(ap.pendingCount(0))).toBeInTheDocument()
   })
 
-  it('lists pending profiles newest first and shows the count', async () => {
+  it('lists on-hold profiles newest first and shows the count', async () => {
     from.mockReturnValueOnce(mockQueryBuilder({
       data: [
         { id: 'u1', name: 'Alice', created_at: '2026-04-30T00:00:00Z', status: 'pending' },
@@ -62,7 +65,7 @@ describe('AdminApplicationsPage', () => {
     renderPage()
     expect(await screen.findByText('Alice')).toBeInTheDocument()
     expect(screen.getByText('Bob')).toBeInTheDocument()
-    expect(screen.getByText('2 pending')).toBeInTheDocument()
+    expect(screen.getByText(ap.pendingCount(2))).toBeInTheDocument()
   })
 
   // Regression: the query also required `application_submitted_at is not null`.
@@ -70,7 +73,7 @@ describe('AdminApplicationsPage', () => {
   // both contact fields are filled in, so a diver who signed up and stopped
   // short never got it — and was invisible on the only screen that can approve
   // them. On production that hid every single pending diver, all 26 of them.
-  it('lists a pending diver who never completed their profile', async () => {
+  it('lists an on-hold diver who never completed their profile', async () => {
     const calls: Array<{ method: string; args: unknown[] }> = []
     const builder: Record<string, unknown> = {}
     for (const m of ['select', 'eq', 'not', 'is', 'order', 'limit']) {
@@ -86,7 +89,7 @@ describe('AdminApplicationsPage', () => {
     renderPage()
 
     expect(await screen.findByText('Leo')).toBeInTheDocument()
-    expect(screen.getByText('1 pending')).toBeInTheDocument()
+    expect(screen.getByText(ap.pendingCount(1))).toBeInTheDocument()
     // Nothing may narrow the queue beyond status='pending'.
     expect(calls.some(c => c.args.some(a => a === 'application_submitted_at' && c.method === 'not'))).toBe(false)
   })
@@ -180,7 +183,7 @@ describe('AdminApplicationsPage', () => {
     expect(screen.getByText('leo@example.com')).toBeInTheDocument()
   })
 
-  it('approve calls notify-application-decision and removes the row', async () => {
+  it('reinstating calls notify-application-decision and removes the row', async () => {
     from.mockReturnValueOnce(mockQueryBuilder({
       data: [{ id: 'u1', name: 'Alice', created_at: '2026-04-30T00:00:00Z', status: 'pending' }],
     }))
@@ -191,19 +194,19 @@ describe('AdminApplicationsPage', () => {
     renderPage()
     fireEvent.click(await screen.findByText('Alice'))
 
-    fireEvent.click(await screen.findByRole('button', { name: /approve/i }))
+    fireEvent.click(await screen.findByRole('button', { name: ap.approve }))
 
     await waitFor(() => expect(invoke).toHaveBeenCalledWith(
       'notify-application-decision',
       { body: { user_id: 'u1', decision: 'approve' } },
     ))
     await waitFor(() => expect(toastSuccess).toHaveBeenCalled())
-    expect(toastSuccess.mock.calls[0][0]).toMatch(/approved/i)
+    expect(toastSuccess.mock.calls[0][0]).toContain(ap.approved)
     expect(toastSuccess.mock.calls[0][0]).toMatch(/email sent/i)
     expect(screen.queryByText('Alice')).not.toBeInTheDocument()
   })
 
-  it('reject sends the typed reason in the body', async () => {
+  it('closing an account sends the typed reason in the body', async () => {
     from.mockReturnValueOnce(mockQueryBuilder({
       data: [{ id: 'u1', name: 'Alice', created_at: '2026-04-30T00:00:00Z', status: 'pending' }],
     }))
@@ -214,10 +217,10 @@ describe('AdminApplicationsPage', () => {
     fireEvent.click(await screen.findByText('Alice'))
 
     fireEvent.change(
-      await screen.findByPlaceholderText(/optional rejection reason/i),
+      await screen.findByPlaceholderText(ap.rejectReasonPlaceholder),
       { target: { value: 'incomplete profile' } },
     )
-    fireEvent.click(screen.getByRole('button', { name: /reject/i }))
+    fireEvent.click(screen.getByRole('button', { name: ap.reject }))
 
     await waitFor(() => expect(invoke).toHaveBeenCalledWith(
       'notify-application-decision',
@@ -234,7 +237,7 @@ describe('AdminApplicationsPage', () => {
 
     renderPage()
     fireEvent.click(await screen.findByText('Alice'))
-    fireEvent.click(await screen.findByRole('button', { name: /approve/i }))
+    fireEvent.click(await screen.findByRole('button', { name: ap.approve }))
 
     await waitFor(() => expect(toastError).toHaveBeenCalled())
     expect(toastError.mock.calls[0][0]).toMatch(/forbidden/i)

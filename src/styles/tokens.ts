@@ -115,6 +115,10 @@ export const PAD_KEY_WIDE = `${PAD_KEY_BASE} min-w-9 whitespace-nowrap px-2 text
 
 export const INPUT       = 'w-full bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-brand-50 placeholder:text-brand-100/40 focus:outline-none focus:border-reef-400'
 export const INPUT_LABEL = 'block text-sm text-brand-100 mb-1'
+// The light-on-white input the two registration forms use. Their steps render
+// on a white card rather than the dark app chrome, so INPUT above (which is
+// built for the dark surfaces) is not the right thing there.
+export const INPUT_REGISTER = 'w-full bg-white border border-surface-300 rounded-lg px-2 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900'
 
 // ── Inline error notes ─────────────────────────────────────────────
 // Small validation / load-failure <p> banners. Both variants sit on the dark

@@ -11,7 +11,7 @@ import { needsShoeSize } from '../../lib/logistics'
 import { usesCourseDays } from '../../lib/event-kinds'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
-import { BTN_XS_GHOST } from '../../styles/tokens'
+import { BTN_XS_GHOST, INPUT_REGISTER } from '../../styles/tokens'
 import { buildCharges, surchargeRate, NITROX_COURSE_FEE } from '../../lib/booking-charges'
 import { fetchCreditsForUser, openCreditBalance, applyCreditToBooking } from '../../lib/credits'
 import { invokeWithRetry, edgeErrorMessage } from '../../lib/edge-invoke'
@@ -27,7 +27,8 @@ import { TurnstileWidget } from './TurnstileWidget'
 import { WhatHappensNext } from './WhatHappensNext'
 import { TextField } from './TextField'
 import { HeightField, WeightField } from '../MeasureField'
-import { MeasureRow, MEASURE_INPUT, numOrNullStr } from './MeasureRow'
+import { MeasureRow } from './MeasureRow'
+import { numOrNullStr } from '../../lib/units'
 import { ShoeSizeField } from '../ShoeSizeField'
 import {
   registrationDraftKey,
@@ -1592,14 +1593,14 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 <HeightField
                   valueCm={numOrNullStr(heightCm)}
                   onChange={cm => setHeightCm(cm == null ? '' : String(cm))}
-                  inputClassName={MEASURE_INPUT}
+                  inputClassName={INPUT_REGISTER}
                 />
               </MeasureRow>
               <MeasureRow label={t.register.step2.weightLabel}>
                 <WeightField
                   valueKg={numOrNullStr(weightKg)}
                   onChange={kg => setWeightKg(kg == null ? '' : String(kg))}
-                  inputClassName={MEASURE_INPUT}
+                  inputClassName={INPUT_REGISTER}
                 />
               </MeasureRow>
             </div>

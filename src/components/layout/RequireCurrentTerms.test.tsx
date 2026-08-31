@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { RequireCurrentTerms } from './RequireCurrentTerms'
+import { t } from '../../i18n'
 
 // The live terms version comes from the DB now, so the guard's dependency is a
 // hook, not a constant. `LIVE_VERSION` stands in for whatever the shop published.
@@ -66,26 +67,51 @@ describe('RequireCurrentTerms', () => {
     expect(screen.getByText('DASHBOARD')).toBeInTheDocument()
   })
 
-  it('bounces to /terms when version is stale', () => {
+  // Prompts, but does not block. A diver opening the app to check the boat
+  // time gets the boat time, with the terms notice above it — the full-screen
+  // redirect this replaced showed them a legal document instead.
+  it('shows the banner over the page when the version is stale', () => {
     useAuthMock.mockReturnValue({
       profile: { id: 'u1', agreed_to_terms_version: LIVE_VERSION - 1 },
       loading: false,
     })
     routedRender()
-    expect(screen.getByText('TERMS-PAGE')).toBeInTheDocument()
-    expect(screen.queryByText('DASHBOARD')).not.toBeInTheDocument()
+    expect(screen.getByText(t.terms.bannerText)).toBeInTheDocument()
+    expect(screen.getByText('DASHBOARD')).toBeInTheDocument()
   })
 
-  it('bounces to /terms when version is null (never consented)', () => {
+  it('shows the banner when the version is null (never consented)', () => {
     useAuthMock.mockReturnValue({
       profile: { id: 'u1', agreed_to_terms_version: null },
       loading: false,
     })
     routedRender()
-    expect(screen.getByText('TERMS-PAGE')).toBeInTheDocument()
+    expect(screen.getByText(t.terms.bannerText)).toBeInTheDocument()
+    expect(screen.getByText('DASHBOARD')).toBeInTheDocument()
   })
 
-  it('does NOT trap a stale user on /terms (must allow re-acceptance UI to render)', () => {
+  it('points the banner at the re-acceptance flow', () => {
+    useAuthMock.mockReturnValue({
+      profile: { id: 'u1', agreed_to_terms_version: null },
+      loading: false,
+    })
+    routedRender()
+    expect(screen.getByRole('link', { name: t.terms.bannerAction }))
+      .toHaveAttribute('href', '/terms?reaccept=1')
+  })
+
+  it('shows no banner when the version is current', () => {
+    useAuthMock.mockReturnValue({
+      profile: { id: 'u1', agreed_to_terms_version: LIVE_VERSION },
+      loading: false,
+    })
+    routedRender()
+    expect(screen.queryByText(t.terms.bannerText)).not.toBeInTheDocument()
+  })
+
+  // The banner would otherwise sit above the very document it is asking the
+  // diver to read.
+  it('does not repeat the banner on /terms itself', () => {
     useAuthMock.mockReturnValue({
       profile: { id: 'u1', agreed_to_terms_version: 0 },
       loading: false,
@@ -100,12 +126,15 @@ describe('RequireCurrentTerms', () => {
       </MemoryRouter>,
     )
     expect(screen.getByText('TERMS-PAGE')).toBeInTheDocument()
+    expect(screen.queryByText(t.terms.bannerText)).not.toBeInTheDocument()
   })
+
   // A hiccup reading one DB row must not lock every diver out of the whole app.
-  it('fails open when the terms version is unknown (still loading or read failed)', () => {
+  it('shows nothing when the terms version is unknown (still loading or read failed)', () => {
     useAuthMock.mockReturnValue({ profile: { id: 'u1', agreed_to_terms_version: 0 }, loading: false })
     useTermsMock.mockReturnValue({ terms: null, loading: false })
     routedRender()
     expect(screen.getByText('DASHBOARD')).toBeInTheDocument()
+    expect(screen.queryByText(t.terms.bannerText)).not.toBeInTheDocument()
   })
 })

@@ -1,6 +1,7 @@
 import { useId } from 'react'
 import { DateField } from '../DateField'
 import { PasswordInput } from '../PasswordInput'
+import { INPUT_REGISTER } from '../../styles/tokens'
 
 // The labelled input both registration flows are built from — the solo
 // RegisterForm and the multi-event cart each had their own copy, identical but
@@ -27,7 +28,7 @@ export function TextField({
   // claim that one too — ambiguous for screen readers and for tests querying
   // by label.
   const id = useId()
-  const inputClass = 'w-full bg-white border border-surface-300 rounded-lg px-2 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900'
+  const inputClass = INPUT_REGISTER
   return (
     <div className="block">
       <label htmlFor={id} className="block text-xs text-brand-900 font-medium mb-1">{label}</label>

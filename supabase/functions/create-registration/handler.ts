@@ -20,31 +20,13 @@ import { eligibilityError } from "../_shared/registration-eligibility.ts"
 import { usesDateEnvelope, usesCourseDays, type EventKind } from "../../../src/lib/event-kinds.ts"
 import { computeBookingMoney } from "../_shared/booking-charges.ts"
 import { corsHeaders, safeError } from "../_shared/responses.ts"
+import { clientIp, sha256Hex } from "../_shared/request-identity.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 import type { RegistrationPdfPayload } from "../_shared/pdf.ts"
 
 // Matches RegisterForm.tsx's payment_method enum verbatim.
 function paymentWireLabel(m: string | null | undefined): string {
   return m ?? ""
-}
-
-// Prefer Cloudflare's authoritative header when fronted by CF
-// (which Workers/Pages are); fall through to the next-best-effort
-// XFF / X-Real-IP chain. Returns null if nothing usable was sent.
-function clientIp(req: Request): string | null {
-  const cf = req.headers.get("cf-connecting-ip")
-  if (cf) return cf
-  const xff = req.headers.get("x-forwarded-for")
-  if (xff) return xff.split(",")[0]!.trim() || null
-  return req.headers.get("x-real-ip")
-}
-
-async function sha256Hex(input: string): Promise<string> {
-  const bytes  = new TextEncoder().encode(input)
-  const digest = await crypto.subtle.digest("SHA-256", bytes)
-  return Array.from(new Uint8Array(digest))
-    .map(b => b.toString(16).padStart(2, "0"))
-    .join("")
 }
 
 export interface RegistrationBody {

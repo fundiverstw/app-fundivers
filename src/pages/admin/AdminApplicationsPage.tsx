@@ -16,14 +16,19 @@ const ap = t.admin.applications
 const cm = t.admin.completeness
 import type { AppEvent, Booking, Profile } from '../../types/database'
 
-// Admin queue for the manual-verification gate. Lists every profile in
-// status='pending' (newest first), with their first booking expanded
-// inline so the admin has the application context they need to decide.
+// Every account an admin has put on hold, newest first, with the diver's
+// first booking expanded inline so the decision is an informed one.
 //
-// Approve  → calls notify-application-decision edge function:
-//             flips status to 'active' + emails the diver.
-// Reject   → same function with decision='reject':
-//             flips status to 'rejected' + emails with optional reason.
+// This was the approval queue every new signup passed through. Accounts are
+// active from creation now (20260831120000), so nothing arrives here by
+// signing up — the only way in is an admin moving a live profile to 'pending'
+// or 'rejected', which is a suspension. The mechanism is unchanged, only who
+// it applies to:
+//
+// Reinstate     → notify-application-decision with decision='approve':
+//                 flips status back to 'active' + emails the diver.
+// Close account → same function with decision='reject':
+//                 flips status to 'rejected' + emails with optional reason.
 
 interface PendingExtras {
   booking: (Booking & { event: AppEvent | null }) | null

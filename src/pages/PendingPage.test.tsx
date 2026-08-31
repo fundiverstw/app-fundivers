@@ -13,10 +13,6 @@ vi.mock('../hooks/useAuth', () => ({
   useAuth: () => useAuthMock(),
 }))
 
-vi.mock('./ProfilePage', () => ({
-  ProfileForm: () => <div>PROFILE_FORM</div>,
-}))
-
 beforeEach(() => {
   useAuthMock.mockReset()
   signOut.mockReset()
@@ -31,18 +27,18 @@ function renderPage() {
 }
 
 describe('PendingPage', () => {
-  it('renders the awaiting-approval copy for pending status', () => {
+  it('renders the on-hold copy for pending status', () => {
     useAuthMock.mockReturnValue({ profile: { status: 'pending' }, signOut })
     renderPage()
-    expect(screen.getByRole('heading', { name: t.pending.reviewTitle })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: t.pending.holdTitle })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: t.pending.rejectedTitle })).not.toBeInTheDocument()
   })
 
-  it('renders the rejected copy for rejected status', () => {
+  it('renders the closed copy for rejected status', () => {
     useAuthMock.mockReturnValue({ profile: { status: 'rejected' }, signOut })
     renderPage()
     expect(screen.getByRole('heading', { name: t.pending.rejectedTitle })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: t.pending.reviewTitle })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: t.pending.holdTitle })).not.toBeInTheDocument()
   })
 
   it('signs the user out when the button is clicked', () => {
@@ -52,46 +48,27 @@ describe('PendingPage', () => {
     expect(signOut).toHaveBeenCalled()
   })
 
-  it('offers the profile form to a diver who has filled in nothing at all', () => {
+  // The one useful action for a suspended account is talking to a human.
+  it('gives the shop address to write to, in both states', () => {
+    for (const status of ['pending', 'rejected'] as const) {
+      useAuthMock.mockReturnValue({ profile: { status }, signOut })
+      const { unmount } = renderPage()
+      expect(screen.getByRole('link', { name: /@/ })).toHaveAttribute('href', expect.stringMatching(/^mailto:/))
+      unmount()
+    }
+  })
+
+  // Signup no longer lands anyone here, so the page must not imply that
+  // filling a form in is what gets the account back — the profile form and
+  // its "still blank" nag both belonged to the old approval queue.
+  it('offers no profile form to fill in', () => {
     useAuthMock.mockReturnValue({
       user: { id: 'u1' },
       profile: { id: 'u1', status: 'pending' },
       signOut,
     })
     renderPage()
-    // An empty profile is not an unfinished application — it waits for
-    // approval like any other.
-    expect(screen.getByRole('heading', { name: t.pending.reviewTitle })).toBeInTheDocument()
-    expect(screen.getByText('PROFILE_FORM')).toBeInTheDocument()
-  })
-
-  it('names the blanks the shop would still like filled', () => {
-    useAuthMock.mockReturnValue({
-      user: { id: 'u1' },
-      profile: {
-        id: 'u1', status: 'pending',
-        name: 'Ada', date_of_birth: '1990-01-01', nationality: 'British',
-        contact_method: 'email', contact_id: 'ada@example.com',
-        uncertified: true,
-      },
-      signOut,
-    })
-    renderPage()
-    expect(screen.getByText(t.pending.stillMissing(t.profile.genderLabel))).toBeInTheDocument()
-  })
-
-  it('says nothing about blanks when the profile is complete', () => {
-    useAuthMock.mockReturnValue({
-      user: { id: 'u1' },
-      profile: {
-        id: 'u1', status: 'pending',
-        name: 'Ada', date_of_birth: '1990-01-01', nationality: 'British',
-        gender: 'female', contact_method: 'email', contact_id: 'ada@example.com',
-        uncertified: true,
-      },
-      signOut,
-    })
-    renderPage()
-    expect(screen.queryByText(t.pending.stillMissing(t.profile.genderLabel))).not.toBeInTheDocument()
+    expect(document.querySelector('form')).toBeNull()
+    expect(document.querySelector('input')).toBeNull()
   })
 })
