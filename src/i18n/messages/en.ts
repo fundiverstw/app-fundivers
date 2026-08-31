@@ -1247,6 +1247,8 @@ export const en = {
     nameRequired: 'Enter the name on your passport',
     captchaUnavailable: 'Sign-up is temporarily unavailable. Please contact us and we will set your account up for you.',
     captchaPending: 'Just a moment — checking your browser…',
+    captchaFailed: 'We could not verify your browser. Please reload the page and try again.',
+    eventGone: 'That event is no longer available. Please pick another from the calendar.',
     emailTaken: 'An account with that email already exists.',
     emailTakenAction: 'Sign in instead',
     tooManyAttempts: 'Too many sign-up attempts from this connection. Please try again in a few minutes.',

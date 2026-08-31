@@ -15,6 +15,7 @@ import { BTN_XS_GHOST, INPUT_REGISTER } from '../../styles/tokens'
 import { buildCharges, surchargeRate, NITROX_COURSE_FEE } from '../../lib/booking-charges'
 import { fetchCreditsForUser, openCreditBalance, applyCreditToBooking } from '../../lib/credits'
 import { invokeWithRetry, edgeErrorMessage } from '../../lib/edge-invoke'
+import { readSignupFailure } from '../../lib/signup-errors'
 import { fetchRideSeats, canRequestRide, type RideSeats } from '../../lib/event-vehicles'
 import { missingWaivers, fetchEventWaiverOverrides, fetchDiverSignatures, fetchWaivers } from '../../lib/waivers'
 import { WaiverSignDialog } from '../waivers/WaiverSignDialog'
@@ -87,12 +88,21 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked, existi
 
 // The server's message, then a softener over the most common case (email
 // already taken) pointing at the inline sign-in banner.
+// Guest failures go through the shared signup mapper, so a captcha or
+// rate-limit rejection reads the same here as it does on /signup instead of
+// surfacing the handler's log string. A taken address keeps this form's own
+// longer copy, which names the "Sign in" control at the top of the page.
+//
+// Authed callers are a different audience: the errors they hit are booking
+// errors (duplicate booking, event full, event passed), authored by the
+// handler as diver-facing sentences, and the duplicate-booking recovery below
+// matches on them. Those stay verbatim.
 async function readFunctionsError(error: { message: string; context?: unknown }, isGuest: boolean): Promise<string> {
-  const msg = await edgeErrorMessage(error)
-  if (isGuest && /already.*registered|already.*exists/i.test(msg)) {
-    return t.register.errors.emailExists
+  if (isGuest) {
+    const failure = await readSignupFailure(error as Error & { context?: unknown }, t.register.errors.registrationFailed)
+    return failure.emailTaken ? t.register.errors.emailExists : failure.message
   }
-  return msg
+  return edgeErrorMessage(error)
 }
 
 // Read back a diver's own active booking for an event — used to recover from a

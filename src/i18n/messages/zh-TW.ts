@@ -1239,6 +1239,8 @@ export const zhTW: Messages = {
     nameRequired: '請輸入護照上的姓名',
     captchaUnavailable: '目前無法註冊，請直接與我們聯絡，我們會為您建立帳號。',
     captchaPending: '請稍候 — 正在驗證您的瀏覽器…',
+    captchaFailed: '無法驗證您的瀏覽器，請重新整理頁面後再試一次。',
+    eventGone: '這個活動已不再開放，請從行事曆選擇其他活動。',
     emailTaken: '這個電子郵件已經註冊過了。',
     emailTakenAction: '直接登入',
     tooManyAttempts: '此連線的註冊次數過多，請幾分鐘後再試。',

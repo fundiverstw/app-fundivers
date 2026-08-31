@@ -4,7 +4,8 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { supabase } from '../lib/supabase'
-import { invokeWithRetry, isTransientInvokeError } from '../lib/edge-invoke'
+import { invokeWithRetry } from '../lib/edge-invoke'
+import { readSignupFailure } from '../lib/signup-errors'
 import { Logo } from '../components/Logo'
 import { PasswordInput } from '../components/PasswordInput'
 import { TurnstileWidget } from '../components/register/TurnstileWidget'
@@ -82,7 +83,9 @@ export function SignupPage() {
     })
 
     if (error) {
-      setServerError(await signupErrorMessage(error, () => setEmailTaken(true)))
+      const failure = await readSignupFailure(error, t.auth.signupFailed)
+      setServerError(failure.message)
+      setEmailTaken(failure.emailTaken)
       // The token is single-use — Cloudflare rejects a replay — so a retry
       // needs a fresh challenge.
       setTurnstileToken(null)
@@ -201,30 +204,4 @@ export function SignupPage() {
       </div>
     </div>
   )
-}
-
-/**
- * A create-account failure as something a diver can act on.
- *
- * Every branch here exists because the raw string was worse: supabase-js hands
- * back "Edge Function returned a non-2xx status code" for anything the function
- * rejected, and the function's own body — "captcha verification failed",
- * "too many signup attempts" — is buried in a Response inside `.context`.
- * Surfacing either verbatim is how the old form came to "throw errors".
- */
-async function signupErrorMessage(
-  error: Error & { context?: unknown },
-  markEmailTaken: () => void,
-): Promise<string> {
-  if (isTransientInvokeError(error)) return t.auth.offline
-
-  const ctx = error.context
-  if (ctx && typeof (ctx as Response).json === 'function') {
-    try {
-      const body = await (ctx as Response).json() as { error?: string; code?: string }
-      if (body.code === 'email_exists') { markEmailTaken(); return t.auth.emailTaken }
-      if ((ctx as Response).status === 429) return t.auth.tooManyAttempts
-    } catch { /* body wasn't JSON — fall through to the generic message */ }
-  }
-  return t.auth.signupFailed
 }

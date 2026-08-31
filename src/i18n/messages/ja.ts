@@ -1238,6 +1238,8 @@ export const ja: Messages = {
     nameRequired: 'パスポート上の氏名を入力してください',
     captchaUnavailable: '現在アカウント登録をご利用いただけません。お問い合わせいただければこちらで作成いたします。',
     captchaPending: '少々お待ちください — ブラウザーを確認しています…',
+    captchaFailed: 'ブラウザーを確認できませんでした。ページを再読み込みして、もう一度お試しください。',
+    eventGone: 'このイベントは現在ご利用いただけません。カレンダーから別のイベントをお選びください。',
     emailTaken: 'このメールアドレスのアカウントはすでに存在します。',
     emailTakenAction: 'ログインする',
     tooManyAttempts: 'この接続からの登録試行が多すぎます。数分後にもう一度お試しください。',

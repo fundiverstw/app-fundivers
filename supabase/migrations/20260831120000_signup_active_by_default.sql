@@ -18,23 +18,32 @@
 -- here means the profile is born with it rather than being patched a moment
 -- later by a client the RLS layer would have to trust.
 --
--- Two notes on what is deliberately NOT copied from raw_user_meta_data:
---   * agreed_to_terms_at is still server-stamped with now(). The client sends
---     the key to signal consent happened; the timestamp value is theirs to lie
---     about, so we ignore it (audit L10, non-repudiation).
+-- Everything else here is carried forward unchanged from
+-- 20260711100000_shop_authored_terms.sql, and must stay that way — all three
+-- are things the client is deliberately not trusted with:
+--   * agreed_to_terms_at is server-stamped with now(). The client sends the
+--     key to signal that consent happened; the timestamp value is theirs to
+--     lie about, so it is ignored (audit L10, non-repudiation).
+--   * agreed_to_terms_version is read from public.terms, NOT from the payload.
+--     A modified client that named a version above the real one would never be
+--     re-prompted by the terms banner again. Whether they consented is a
+--     client fact (it is a checkbox); which version they consented to is not.
+--     Pinned by tests/integration/terms-consent-versioning.test.ts.
 --   * status is not read from metadata at all. It is a server decision.
---     Accepting it from the client would let anyone self-promote past a
---     rejection by signing up again with a crafted payload.
+--     Accepting it from the client would let anyone sign up past a closure
+--     with a crafted payload.
 
 CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
 declare
-  consented  bool := new.raw_user_meta_data ? 'agreed_to_terms_at';
-  client_ver int  := nullif(new.raw_user_meta_data ->> 'agreed_to_terms_version', '')::int;
-  full_name  text := nullif(btrim(coalesce(new.raw_user_meta_data ->> 'name', '')), '');
+  consented bool := new.raw_user_meta_data ? 'agreed_to_terms_at';
+  live_ver  int;
+  full_name text := nullif(btrim(coalesce(new.raw_user_meta_data ->> 'name', '')), '');
 begin
+  select version into live_ver from public.terms;
+
   insert into public.profiles (id, email, name, status, agreed_to_terms_at, agreed_to_terms_version)
   values (
     new.id,
@@ -42,7 +51,7 @@ begin
     full_name,
     'active',
     case when consented then now() else null end,
-    case when consented then coalesce(client_ver, 1) else null end
+    case when consented then coalesce(live_ver, 1) else null end
   );
   return new;
 end;

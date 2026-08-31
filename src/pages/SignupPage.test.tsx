@@ -238,8 +238,19 @@ describe('SignupPage error messages', () => {
     expect(await screen.findByText(t.auth.offline)).toBeInTheDocument()
   })
 
-  it('never shows the raw edge-function status string', async () => {
-    invokeWithRetry.mockResolvedValue(httpError(400, { error: 'captcha verification failed' }))
+  it('translates a captcha rejection instead of echoing the wire string', async () => {
+    invokeWithRetry.mockResolvedValue(httpError(403, { error: 'captcha verification failed' }))
+    const user = userEvent.setup()
+    renderWithCalendar()
+    await fillIn(user)
+    await user.click(screen.getByRole('button', { name: /create account/i }))
+
+    expect(await screen.findByText(t.auth.captchaFailed)).toBeInTheDocument()
+    expect(screen.queryByText(/captcha verification failed/i)).not.toBeInTheDocument()
+  })
+
+  it('never shows the raw edge-function status string for an unrecognized failure', async () => {
+    invokeWithRetry.mockResolvedValue(httpError(500, { error: 'rate-limit check failed' }))
     const user = userEvent.setup()
     renderWithCalendar()
     await fillIn(user)
@@ -247,7 +258,7 @@ describe('SignupPage error messages', () => {
 
     expect(await screen.findByText(t.auth.signupFailed)).toBeInTheDocument()
     expect(screen.queryByText(/non-2xx/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/captcha verification failed/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/rate-limit check failed/i)).not.toBeInTheDocument()
   })
 
   // A Turnstile token is single-use, so a retry needs a fresh challenge.

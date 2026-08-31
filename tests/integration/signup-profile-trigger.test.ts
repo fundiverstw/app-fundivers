@@ -63,15 +63,35 @@ describe('handle_new_user', () => {
   })
 })
 
+async function liveTermsVersion(): Promise<number | null> {
+  const { data } = await admin.from('terms').select('version').maybeSingle()
+  return data?.version ?? null
+}
+
 describe('handle_new_user consent', () => {
-  it('records consent and the version the diver was shown', async () => {
+  it('records consent against the live terms version', async () => {
     const { profile } = await signUp({
       name: 'Ada',
       agreed_to_terms_at: '2020-01-01T00:00:00.000Z',
       agreed_to_terms_version: 4,
     })
     expect(profile.agreed_to_terms_at).not.toBeNull()
-    expect(profile.agreed_to_terms_version).toBe(4)
+    expect(profile.agreed_to_terms_version).toBe((await liveTermsVersion()) ?? 1)
+  })
+
+  // Which version a diver consented to is a server fact, read from
+  // public.terms — a client that named a version above the real one would
+  // never see the re-acceptance banner again. Pinned in full by
+  // terms-consent-versioning.test.ts; asserted here so a future edit to this
+  // trigger cannot quietly drop the clamp.
+  it('ignores an inflated version from the signup payload', async () => {
+    const live = (await liveTermsVersion()) ?? 1
+    const { profile } = await signUp({
+      name: 'Ada',
+      agreed_to_terms_at: new Date().toISOString(),
+      agreed_to_terms_version: live + 999,
+    })
+    expect(profile.agreed_to_terms_version).toBe(live)
   })
 
   // Non-repudiation (audit L10): the client's timestamp is a claim, not
@@ -89,9 +109,9 @@ describe('handle_new_user consent', () => {
     expect(new Date(profile.agreed_to_terms_at!).getUTCFullYear()).not.toBe(2020)
   })
 
-  it('defaults to version 1 when consent arrived without one', async () => {
+  it('records the live version when the payload carried none', async () => {
     const { profile } = await signUp({ name: 'Ada', agreed_to_terms_at: new Date().toISOString() })
-    expect(profile.agreed_to_terms_version).toBe(1)
+    expect(profile.agreed_to_terms_version).toBe((await liveTermsVersion()) ?? 1)
   })
 
   it('leaves consent null when the diver never agreed', async () => {

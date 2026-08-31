@@ -6,15 +6,19 @@ import {
   type TestUser,
 } from './helpers'
 
-// Pins the manual-verification gate from migration
-// 20260501100000_profile_status.sql:
+// Pins profiles.status as a suspension lever:
 //
-//   - New profiles default to status='pending' (the trigger lets the column
-//     default fill in).
+//   - New profiles are created 'active' (20260831120000). Signing up is not an
+//     application any more, so nothing lands in 'pending' by itself — an admin
+//     puts it there.
 //   - is_active_user() returns true only when the caller's profile is active.
 //   - bookings + push_subscriptions inserts under a user JWT require
-//     is_active_user(); pending users get blocked. Service-role bypass is
+//     is_active_user(); a suspended diver gets blocked. Service-role bypass is
 //     unaffected (covered by the create-registration flow elsewhere).
+//
+// That second half is the reason the column survived the signup redesign, so
+// it is the half most worth keeping honest: dropping the queue must not have
+// dropped the shop's ability to cut someone off.
 
 const admin = adminClient()
 let pendingUser: TestUser
@@ -36,16 +40,16 @@ afterAll(async () => {
 })
 
 describe('profiles.status defaults', () => {
-  it('handle_new_user trigger creates profiles as pending', async () => {
+  it('handle_new_user trigger creates profiles active, not pending', async () => {
     const { data: user } = await admin.auth.admin.createUser({
-      email: `pending_default_${Math.random().toString(36).slice(2, 8)}@example.test`,
+      email: `active_default_${Math.random().toString(36).slice(2, 8)}@example.test`,
       password: 'test-password-123',
       email_confirm: true,
     })
     const id = user.user!.id
     try {
       const { data } = await admin.from('profiles').select('status').eq('id', id).single()
-      expect(data?.status).toBe('pending')
+      expect(data?.status).toBe('active')
     } finally {
       await admin.auth.admin.deleteUser(id)
     }

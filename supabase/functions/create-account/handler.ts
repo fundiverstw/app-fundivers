@@ -61,7 +61,11 @@ export interface Deps {
         }): Promise<{ data: { user: CreatedUser | null }; error: { message: string; code?: string; status?: number } | null }>
       }
     }
-    rpc(fn: string, args: Record<string, unknown>): Promise<{ data: unknown; error: { message: string; code?: string } | null }>
+    // PromiseLike, not Promise: supabase-js's rpc() returns a
+    // PostgrestFilterBuilder, which is a thenable with no `catch` or
+    // `finally`. Typing it as a Promise compiles under vitest and then fails
+    // `make check-edge` against the real client.
+    rpc(fn: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message: string; code?: string } | null }>
   }
   anon: {
     auth: {
