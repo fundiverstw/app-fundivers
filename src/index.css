@@ -193,6 +193,35 @@ img, video, canvas {
     border-color: color-mix(in oklab, var(--color-reef-400) 55%, transparent);
   }
 
+  /* Cloudflare renders the Turnstile challenge as a fixed 300x65 iframe — it
+     does not shrink, and nothing in the page can make it. On the signup card
+     that is wider than the room available on a 320px phone (the card leaves
+     240px between its own padding and the page's), which pushed a horizontal
+     scrollbar onto the whole document.
+
+     Scale it down to fit rather than letting it overflow. The transform is
+     purely visual, so the wrapper also carries the scaled height and clips —
+     otherwise the untransformed 300x65 layout box would still reserve the
+     space it no longer occupies. Above this width the widget fits as-is and
+     the wrapper does nothing.
+
+     Recompute both numbers together if the card's padding changes:
+     scale = available / 300, height = round(65 * scale). 0.78 rather than the
+     0.8 that exactly fills 240px, so the widget's own right-hand edge — the
+     Cloudflare mark and its Privacy / Help links — is not shaved by the clip. */
+  .turnstile-fit {
+    overflow: hidden;
+  }
+  @media (max-width: 370px) {
+    .turnstile-fit {
+      height: 51px;
+    }
+    .turnstile-fit > .cf-turnstile {
+      transform: scale(0.78);
+      transform-origin: 0 0;
+    }
+  }
+
   /* Neon-glow accent border — the "active window" look. Pair with a card. */
   .glow-teal {
     box-shadow: 0 0 0 1px rgba(44, 208, 197, 0.35),

@@ -173,7 +173,9 @@ export function SignupPage() {
             </label>
             {errors.agreedToTerms && <p className={`${TEXT_ERROR} text-xs`}>{errors.agreedToTerms.message}</p>}
 
-            <TurnstileWidget siteKey={siteKey} onToken={onToken} onUnavailable={onCaptchaUnavailable} />
+            <div className="turnstile-fit">
+              <TurnstileWidget siteKey={siteKey} onToken={onToken} onUnavailable={onCaptchaUnavailable} />
+            </div>
 
             {serverError && (
               <p className={`${TEXT_ERROR} text-sm`}>
