@@ -246,6 +246,54 @@ describe('createAccountCharge', () => {
   })
 })
 
+describe('createAccountRefund', () => {
+  it('writes the same negative untied row as a charge, stamped admin_refund', async () => {
+    const { insert } = setupCreditWrite({ data: settledRow })
+    const { createAccountRefund } = await import('./credits')
+    await createAccountRefund({ user_id: 'u1', amount: 3000, reason: 'Bank transfer #4821', created_by: 'admin' })
+    expect(insert).toHaveBeenCalledWith({
+      user_id: 'u1', booking_id: null, amount: -3000, currency: siteConfig.locale.currency,
+      reason: 'Bank transfer #4821', created_by: 'admin', status: 'open', source: 'admin_refund',
+    })
+  })
+
+  // The whole reason a refund is not just a charge with a different reason
+  // string: a payout the shop made must never surface as a sale.
+  it('never stamps admin_charge, whatever the reason says', async () => {
+    const { insert } = setupCreditWrite({ data: settledRow })
+    const { createAccountRefund } = await import('./credits')
+    await createAccountRefund({ user_id: 'u1', amount: 500, reason: 'Cash back', created_by: 'a' })
+    expect(insert).toHaveBeenCalledWith(expect.not.objectContaining({ source: 'admin_charge' }))
+  })
+
+  it('refuses a non-positive amount rather than flipping it into a credit', async () => {
+    const { insert } = setupCreditWrite({ data: settledRow })
+    const { createAccountRefund } = await import('./credits')
+    await expect(createAccountRefund({ user_id: 'u1', amount: -3000, reason: 'r', created_by: 'a' }))
+      .rejects.toThrow(/positive/)
+    expect(insert).not.toHaveBeenCalled()
+  })
+
+  it('refuses a blank reason — a payout nobody can trace is the worst kind', async () => {
+    const { insert } = setupCreditWrite({ data: settledRow })
+    const { createAccountRefund } = await import('./credits')
+    await expect(createAccountRefund({ user_id: 'u1', amount: 100, reason: '  ', created_by: 'a' }))
+      .rejects.toThrow(/reason/)
+    expect(insert).not.toHaveBeenCalled()
+  })
+
+  // A refund is spent money: it must reduce what the diver can spend, exactly
+  // as a charge does. The ledger being signed is what makes that free.
+  it('nets out of spendable credit like any other negative row', async () => {
+    const { openCreditBalance } = await import('./credits')
+    const rows = [
+      { status: 'open', amount: 3000, source: 'manual', booking_id: null },
+      { status: 'open', amount: -3000, source: 'admin_refund', booking_id: null },
+    ] as unknown as import('../types/database').Credit[]
+    expect(openCreditBalance(rows)).toBe(0)
+  })
+})
+
 describe('a charge on the ledger', () => {
   const row = (over: Record<string, unknown>) => ({
     id: 'x', user_id: 'u1', booking_id: null, currency: 'TWD', reason: 'r',

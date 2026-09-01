@@ -283,6 +283,39 @@ describe('an account charge', () => {
   })
 })
 
+// A refund is the same negative row as a charge and the opposite story: the
+// shop handed money back rather than sold something. The statement is where
+// that difference has to survive, because the arithmetic cannot carry it.
+describe('an account refund', () => {
+  const refund = (over: Partial<Credit> & { id: string }) =>
+    credit({ source: 'admin_refund', reason: 'Bank transfer #4821', ...over })
+  const charge = (over: Partial<Credit> & { id: string }) =>
+    credit({ source: 'admin_charge', reason: 'Mask bought in the shop', ...over })
+
+  it('reads as a refund rather than a charge, and takes the credit back off', () => {
+    const s = build({
+      credits: [
+        credit({ id: 'c1', amount: 3000, created_at: T(3) }),
+        refund({ id: 'c2', amount: -3000, created_at: T(4) }),
+      ],
+    })
+    expect(s.lines.map(l => l.kind)).toEqual(['credit_issued', 'account_refund'])
+    expect(s.lines[1]).toMatchObject({ delta: -3000, amount: 3000, balance: 0 })
+    expect(s.balance).toBe(0)
+  })
+
+  it('is told apart from a charge by its source, not by its sign', () => {
+    const s = build({
+      credits: [
+        charge({ id: 'c1', amount: -1200, created_at: T(4) }),
+        refund({ id: 'c2', amount: -1200, created_at: T(5) }),
+      ],
+    })
+    expect(s.lines.map(l => l.kind)).toEqual(['account_charge', 'account_refund'])
+    expect(s.balance).toBe(-2400)
+  })
+})
+
 // The summary block reads as one accounting identity, so its figures have to
 // account over one set of bookings. They do not: `charged` and `paid` cover
 // live bookings, and `openCredit` covers every credit the diver holds. A

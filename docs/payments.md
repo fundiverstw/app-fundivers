@@ -132,20 +132,36 @@ A negative balance is **credit to the diver**, whether it came from an
 awarded credit or from simply overpaying. There is no separate
 "overpaid" concept.
 
-## Credits and charges
+## Credits, charges and refunds
 
 `credits` is a **signed** account ledger. A positive row is a credit — money
-the shop owes the diver. A negative row is a charge (`source =
-'admin_charge'`) — money the diver owes the shop for something with no event
-behind it, a mask off the rack or a lost fin. One table, because every
+the shop owes the diver. A negative row is one of the two ways that debt ends
+without the diver booking anything: a charge (`source = 'admin_charge'`) —
+money the diver owes the shop for something with no event behind it, a mask
+off the rack or a lost fin — or a refund (`source = 'admin_refund'`) — credit
+the shop has handed back in cash or by transfer. One table, because every
 balance in the app is already `sum(amount) where status = 'open'`, so a signed
 row nets itself into all of them at once.
 
-Two constraints keep the sign honest: only `admin_charge` may be negative and
-it must be, and a charge is never tied to a booking — a charge against a
-specific trip is a `booking_amendments` surcharge. Charges net out of the
-spendable pool but are never consumed by the credit sweep; settling one would
-erase the debt *and* hand the money back.
+**A charge and a refund are the same arithmetic and opposite stories.** Both
+write the same negative untied row, and they stay separate sources because
+`buildDiverStatement` is where the difference has to survive: a payout the
+shop made must not read as goods the diver bought. Admins reach them from the
+same place — Balance → *Issue charge* / *Issue refund* on a diver's card —
+and both require a reason. A refund names how the money went back ("bank
+transfer #4821"); the form warns, and does not refuse, when the amount exceeds
+the credit the diver holds.
+
+Only credit with **no booking behind it** is refunded this way. A cancelled
+booking's money goes back as a `refunded` payment row against that booking
+(the refunds page), which keeps it netted out of that event's take.
+
+Two constraints keep the sign honest: only `admin_charge` and `admin_refund`
+may be negative and they must be, and neither is ever tied to a booking — a
+charge against a specific trip is a `booking_amendments` surcharge. Both net
+out of the spendable pool but are never consumed by the credit sweep, which
+drains only positive rows; consuming one would erase it *and* hand the money
+back.
 
 **Nothing closes a ledger row by hand.** Closing is automatic — the
 apply-credit RPC settles what it spends, the restore-reclaim trigger settles
@@ -154,8 +170,8 @@ a required reason, so both halves stay on the statement instead of one
 disappearing behind a note.
 
 Every row records a `source`: `manual`, `event_cancellation`,
-`booking_cancellation_return`, `carry_forward`, `return_reclaimed`, or
-`admin_charge`.
+`booking_cancellation_return`, `carry_forward`, `return_reclaimed`,
+`admin_charge`, or `admin_refund`.
 Only `event_cancellation` and `booking_cancellation_return`
 (`RETURN_SOURCES`) mean *this booking's money is given back right now*,
 and only they block a further automatic refund — a goodwill award, a
@@ -384,6 +400,6 @@ heads, deliberately not what has been banked.
 9. Cash-revenue sums apply `isExternalPayment`. Balance math does not.
 10. A money-moving payment names its real-world transaction, and
     attribution is stamped from the act, never taken from the caller.
-11. The ledger is signed; only `admin_charge` is negative, and never tied
-    to a booking.
+11. The ledger is signed; only `admin_charge` and `admin_refund` are
+    negative, and neither is ever tied to a booking.
 12. Constraints, triggers and RLS policies get integration tests.

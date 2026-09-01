@@ -10,8 +10,12 @@ import type { Credit, CreditInsert } from '../types/database'
  *
  * POSITIVE rows are credits — money the business owes a diver, typically
  * issued when an event is cancelled (weather, low signups). NEGATIVE rows are
- * charges (`source = 'admin_charge'`) — money the diver owes the shop for
- * something with no event behind it, a mask off the rack or a lost fin.
+ * the two ways that debt goes away without the diver booking anything: a
+ * charge (`source = 'admin_charge'`) — money the diver owes the shop for
+ * something with no event behind it, a mask off the rack or a lost fin — and a
+ * refund (`source = 'admin_refund'`) — credit the shop has handed back in
+ * cash. They are arithmetically the same row and mean opposite things about
+ * who paid whom, so they are kept apart everywhere a person reads them.
  *
  * Rows sit at status='open' until something closes them. Closing is automatic:
  * `apply_credit_to_booking` settles credits as it spends them, and the
@@ -30,8 +34,8 @@ import type { Credit, CreditInsert } from '../types/database'
  *  NOW". Only these suppress a further automatic refund; a goodwill credit, a
  *  carry-forward row, or a refund already reclaimed by restoring the booking
  *  (`return_reclaimed`) is not money currently owed back. Kept in step with the
- *  credits_source_check constraint (20260822100000, widened in 20260822120000
- *  and again in 20260823130000)
+ *  credits_source_check constraint (20260822100000, widened in 20260822120000,
+ *  20260823130000 and 20260901000000)
  *  and with the same list inside bookings_return_account_credit_on_cancel. */
 export const RETURN_SOURCES = ['event_cancellation', 'booking_cancellation_return'] as const
 
@@ -234,26 +238,33 @@ export async function createCredit(input: {
 }
 
 /**
- * Charge a diver for something with no event behind it — goods off the shelf,
- * a lost weight belt, a tank fill. Stored as a negative row on the same
- * ledger, so it nets against their credit everywhere at once.
+ * The two ways a diver's ledger goes DOWN by an admin's hand. Both write the
+ * same shape — a negative row, never tied to a booking — and differ only in
+ * what they say happened, which is the only thing anyone reading the balance
+ * six weeks later has to go on.
  *
- * Never tied to a booking: `credits_charge_untied` refuses that, because a
- * charge against a specific trip is a `booking_amendments` surcharge, and one
- * living here would be double-counted by `openCreditForBooking`.
+ * Never tied to a booking: `credits_charge_untied` refuses that. A charge
+ * against a specific trip is a `booking_amendments` surcharge, a refund of a
+ * specific booking's money is a `refunded` payment row against it, and either
+ * one living here would be double-counted by `openCreditForBooking`.
  *
- * `amount` is passed POSITIVE — the caller says how much to charge, and the
- * sign is this function's business.
+ * `amount` is passed POSITIVE — the caller says how much, and the sign is this
+ * function's business. Callers below name their source rather than passing a
+ * signed figure, so no caller can flip a credit into a debit by accident.
  */
-export async function createAccountCharge(input: {
-  user_id: string
-  amount: number
-  reason: string
-  currency?: string
-  created_by: string
-}): Promise<Credit> {
-  if (!(input.amount > 0)) throw new Error('a charge amount must be positive')
-  if (input.reason.trim().length < 3) throw new Error('a charge needs a reason')
+async function insertNegativeLedgerRow(
+  input: {
+    user_id: string
+    amount: number
+    reason: string
+    currency?: string
+    created_by: string
+  },
+  source: 'admin_charge' | 'admin_refund',
+  noun: string,
+): Promise<Credit> {
+  if (!(input.amount > 0)) throw new Error(`a ${noun} amount must be positive`)
+  if (input.reason.trim().length < 3) throw new Error(`a ${noun} needs a reason`)
   const row: CreditInsert = {
     user_id:    input.user_id,
     booking_id: null,
@@ -262,15 +273,53 @@ export async function createAccountCharge(input: {
     reason:     input.reason.trim(),
     created_by: input.created_by,
     status:     'open',
-    source:     'admin_charge',
+    source,
   }
   const { data, error } = await supabase
     .from('credits')
     .insert(row)
     .select('*')
     .single()
-  if (error || !data) throw error ?? new Error('charge insert returned no row')
+  if (error || !data) throw error ?? new Error(`${noun} insert returned no row`)
   return data as Credit
+}
+
+/**
+ * Charge a diver for something with no event behind it — goods off the shelf,
+ * a lost weight belt, a tank fill. Stored as a negative row on the same
+ * ledger, so it nets against their credit everywhere at once.
+ */
+export async function createAccountCharge(input: {
+  user_id: string
+  amount: number
+  reason: string
+  currency?: string
+  created_by: string
+}): Promise<Credit> {
+  return insertNegativeLedgerRow(input, 'admin_charge', 'charge')
+}
+
+/**
+ * Hand a diver back credit they were holding, as cash or a transfer — the
+ * shop paying out rather than the diver spending. The money moves off-app;
+ * this is the row that stops the app still offering credit that is already in
+ * the diver's pocket.
+ *
+ * Arithmetically a charge, and deliberately not the same function: a payout
+ * the shop made must not read as goods the diver bought, in the statement or
+ * in anyone's account of where the money went. Only credit with no booking
+ * behind it belongs here — a cancelled booking's money is refunded as a
+ * `refunded` payment row against that booking (see
+ * `recordCancellationRefund`), which keeps it netted out of that event's take.
+ */
+export async function createAccountRefund(input: {
+  user_id: string
+  amount: number
+  reason: string
+  currency?: string
+  created_by: string
+}): Promise<Credit> {
+  return insertNegativeLedgerRow(input, 'admin_refund', 'refund')
 }
 
 /**

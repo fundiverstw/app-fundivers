@@ -20,7 +20,7 @@ import { shoeAsJp } from '../../lib/shoe-size'
 import { contactMethodLabel } from '../../lib/contact-labels'
 import { profileGapLabels } from '../../lib/profile-completeness'
 import { personName } from '../../lib/names'
-import { fetchCreditsForUser, openCreditForBooking, openCreditBalance, diverCreditBalance, createCredit, createAccountCharge, applyCreditToBooking } from '../../lib/credits'
+import { fetchCreditsForUser, openCreditForBooking, openCreditBalance, diverCreditBalance, createCredit, createAccountCharge, createAccountRefund, applyCreditToBooking } from '../../lib/credits'
 import { netPaid, netPaidByBooking } from '../../lib/payments'
 import { buildDiverStatement, type DiverStatement, type StatementLine } from '../../lib/diver-statement'
 import { fetchActorNames, actorLabel, type ActorNames } from '../../lib/actor-names'
@@ -328,6 +328,29 @@ export function AdminUsersPage() {
     }
   }
 
+  // Arithmetically `handleCreateCharge` — the same negative row on the same
+  // ledger. Separate because the two say opposite things about who paid whom,
+  // and a payout the shop made must not surface as goods the diver bought.
+  async function handleCreateRefund(userId: string, amount: number, reason: string) {
+    if (!profile?.id) return
+    try {
+      const refund = await createAccountRefund({
+        user_id: userId, amount, reason, created_by: profile.id,
+      })
+      setExtrasCache(prev => {
+        const next = new Map(prev)
+        const cur = next.get(userId)
+        if (!cur) return prev
+        next.set(userId, withDerived(cur, { credits: [refund, ...cur.credits] }))
+        return next
+      })
+      toast.success(us.refundIssued(amount.toLocaleString()))
+    } catch (err) {
+      toast.error(us.couldNotIssueRefund(errorMessage(err)))
+      throw err
+    }
+  }
+
   async function refetchUser(userId: string) {
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
     if (!data) return
@@ -484,6 +507,7 @@ export function AdminUsersPage() {
             onMarkDepositPaid={(bookingId) => handleMarkDepositPaid(u.id, bookingId)}
             onCreateCredit={(amount, reason, bookingId) => handleCreateCredit(u.id, amount, reason, bookingId)}
             onCreateCharge={(amount, reason) => handleCreateCharge(u.id, amount, reason)}
+            onCreateRefund={(amount, reason) => handleCreateRefund(u.id, amount, reason)}
             onApplyCredit={(bookingId, amount) => handleApplyCredit(u.id, bookingId, amount)}
             onDelete={() => handleDeleteUser(u)}
             onChangeRole={(role) => handleChangeRole(u, role)}
@@ -505,7 +529,7 @@ export function AdminUsersPage() {
 
 function UserCard({
   user, allUsers, onFamilyChanged, open, extras, loading, editing, onToggle, onEdit, onCancelEdit, onProfileSaved,
-  onRecordPayment, onVoidPayment, onMarkDepositPaid, onCreateCredit, onCreateCharge, onApplyCredit, onDelete, onChangeRole, onIssueTempPassword, isAdmin, isSelf,
+  onRecordPayment, onVoidPayment, onMarkDepositPaid, onCreateCredit, onCreateCharge, onCreateRefund, onApplyCredit, onDelete, onChangeRole, onIssueTempPassword, isAdmin, isSelf,
 }: {
   user: Profile
   allUsers: Profile[]
@@ -523,6 +547,7 @@ function UserCard({
   onMarkDepositPaid: (bookingId: string) => Promise<void>
   onCreateCredit: (amount: number, reason: string, bookingId: string | null) => Promise<void>
   onCreateCharge: (amount: number, reason: string) => Promise<void>
+  onCreateRefund: (amount: number, reason: string) => Promise<void>
   onApplyCredit: (bookingId: string, amount: number) => Promise<void>
   onDelete: () => Promise<void>
   onChangeRole: (role: Profile['role']) => Promise<void>
@@ -717,6 +742,7 @@ function UserCard({
                   onMarkDepositPaid={onMarkDepositPaid}
                   onCreateCredit={onCreateCredit}
                   onCreateCharge={onCreateCharge}
+                  onCreateRefund={onCreateRefund}
                   onApplyCredit={onApplyCredit}
                   isAdmin={isAdmin}
                 />
@@ -800,13 +826,14 @@ function ProfileDetails({ user }: { user: Profile }) {
   )
 }
 
-function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid, onCreateCredit, onCreateCharge, onApplyCredit, isAdmin }: {
+function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid, onCreateCredit, onCreateCharge, onCreateRefund, onApplyCredit, isAdmin }: {
   extras: UserExtras
   onRecordPayment: (bookingId: string, amount: number, note: string, reference: string) => Promise<void>
   onVoidPayment: (bookingId: string, paymentId: string) => Promise<void>
   onMarkDepositPaid: (bookingId: string) => Promise<void>
   onCreateCredit: (amount: number, reason: string, bookingId: string | null) => Promise<void>
   onCreateCharge: (amount: number, reason: string) => Promise<void>
+  onCreateRefund: (amount: number, reason: string) => Promise<void>
   onApplyCredit: (bookingId: string, amount: number) => Promise<void>
   isAdmin: boolean
 }) {
@@ -885,6 +912,7 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
           readOnly={!isAdmin}
           onCreate={onCreateCredit}
           onCharge={onCreateCharge}
+          onRefund={onCreateRefund}
           onApply={onApplyCredit}
         />
       </Section>
@@ -916,7 +944,7 @@ const signed = (n: number) => `${n < 0 ? '-' : '+'}${money(n)}`
 // Exported for its own test. The panel is the one place the statement's
 // arithmetic becomes something a person reads, and driving it through the whole
 // users page would test the page's mocks rather than the panel.
-export function BalancePanel({ statement, spendable, credits, bookings, actorNames, applyTargets, readOnly, onCreate, onCharge, onApply }: {
+export function BalancePanel({ statement, spendable, credits, bookings, actorNames, applyTargets, readOnly, onCreate, onCharge, onRefund, onApply }: {
   statement: DiverStatement
   spendable: number
   credits: Credit[]
@@ -926,6 +954,7 @@ export function BalancePanel({ statement, spendable, credits, bookings, actorNam
   readOnly: boolean
   onCreate: (amount: number, reason: string, bookingId: string | null) => Promise<void>
   onCharge: (amount: number, reason: string) => Promise<void>
+  onRefund: (amount: number, reason: string) => Promise<void>
   onApply: (bookingId: string, amount: number) => Promise<void>
 }) {
   const { balance, totals } = statement
@@ -996,6 +1025,7 @@ export function BalancePanel({ statement, spendable, credits, bookings, actorNam
         readOnly={readOnly}
         onCreate={onCreate}
         onCharge={onCharge}
+        onRefund={onRefund}
         onApply={onApply}
       />
     </div>
@@ -1060,16 +1090,23 @@ function StatementList({ lines, actorNames, eventTitle }: {
 }
 
 /**
- * The three things an admin can do to a diver's ledger: spend credit they
- * already hold against an unpaid booking, hand them credit, or charge them.
+ * The four things an admin can do to a diver's ledger: spend credit they
+ * already hold against an unpaid booking, hand them credit, charge them, or
+ * pay credit back out to them.
  *
- * Issuing and charging are the same form with the sign flipped, and both
- * REQUIRE a reason — an unexplained movement on someone's balance is the thing
- * nobody can answer questions about six weeks later. A charge takes no booking:
- * a charge against a specific trip is a balance adjustment on the event page,
- * where it belongs to that booking's total.
+ * All three write forms are the one form, and every one of them REQUIRES a
+ * reason — an unexplained movement on someone's balance is the thing nobody
+ * can answer questions about six weeks later.
+ *
+ * A charge and a refund are the SAME arithmetic: a negative row on the ledger.
+ * They stay separate buttons because they are opposite stories — the diver
+ * bought something, versus the shop handed money back — and a statement that
+ * could not tell them apart would report every payout as a sale. Neither takes
+ * a booking: a charge against a specific trip is a balance adjustment on the
+ * event page, and a specific booking's money is refunded against that booking
+ * from the refunds page, where it nets out of that event's take.
  */
-function LedgerActions({ credits, spendable, bookings, applyTargets, readOnly, onCreate, onCharge, onApply }: {
+function LedgerActions({ credits, spendable, bookings, applyTargets, readOnly, onCreate, onCharge, onRefund, onApply }: {
   credits: Credit[]
   spendable: number
   bookings: Array<Booking & { event: AppEvent | null; charges: ChargeLine[] }>
@@ -1077,9 +1114,10 @@ function LedgerActions({ credits, spendable, bookings, applyTargets, readOnly, o
   readOnly: boolean
   onCreate: (amount: number, reason: string, bookingId: string | null) => Promise<void>
   onCharge: (amount: number, reason: string) => Promise<void>
+  onRefund: (amount: number, reason: string) => Promise<void>
   onApply: (bookingId: string, amount: number) => Promise<void>
 }) {
-  const [form, setForm] = useState<'credit' | 'charge' | null>(null)
+  const [form, setForm] = useState<LedgerEntryKind | null>(null)
   const pool = openCreditBalance(credits)
 
   if (readOnly) return null
@@ -1097,21 +1135,26 @@ function LedgerActions({ credits, spendable, bookings, applyTargets, readOnly, o
 
       <div className="pt-1 border-t border-surface-200">
         {form === null ? (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => setForm('credit')} className={BTN_XS_GHOST}>
               {us.issueCreditLink}
             </button>
             <button type="button" onClick={() => setForm('charge')} className={BTN_XS_GHOST}>
               {us.issueChargeLink}
             </button>
+            <button type="button" onClick={() => setForm('refund')} className={BTN_XS_GHOST}>
+              {us.issueRefundLink}
+            </button>
           </div>
         ) : (
           <LedgerEntryForm
             kind={form}
             bookings={bookings}
+            spendable={spendable}
             onCancel={() => setForm(null)}
             onSubmit={async (amount, reason, bookingId) => {
               if (form === 'charge') await onCharge(amount, reason)
+              else if (form === 'refund') await onRefund(amount, reason)
               else await onCreate(amount, reason, bookingId)
               setForm(null)
             }}
@@ -1122,9 +1165,28 @@ function LedgerActions({ credits, spendable, bookings, applyTargets, readOnly, o
   )
 }
 
-function LedgerEntryForm({ kind, bookings, onCancel, onSubmit }: {
-  kind: 'credit' | 'charge'
+/** Credit issued, charge added, or refund paid out. The last two are the same
+ *  negative row and differ only in what they say happened -- see LedgerActions. */
+type LedgerEntryKind = 'credit' | 'charge' | 'refund'
+
+// One form, three headings. Kept as a table rather than nested ternaries at
+// each use so a fourth kind is a row here and nothing else.
+const ENTRY_COPY: Record<LedgerEntryKind, {
+  submit: string; busy: string; reasonPlaceholder: string; reasonRequired: string
+}> = {
+  credit: { submit: us.issueCredit, busy: us.issuing,   reasonPlaceholder: us.creditReasonPlaceholder, reasonRequired: us.reasonRequired },
+  charge: { submit: us.issueCharge, busy: us.charging,  reasonPlaceholder: us.chargeReasonPlaceholder, reasonRequired: us.chargeReasonRequired },
+  refund: { submit: us.issueRefund, busy: us.refunding, reasonPlaceholder: us.refundReasonPlaceholder, reasonRequired: us.refundReasonRequired },
+}
+
+function LedgerEntryForm({ kind, bookings, spendable, onCancel, onSubmit }: {
+  kind: LedgerEntryKind
   bookings: Array<Booking & { event: AppEvent | null; charges: ChargeLine[] }>
+  /** What the diver can actually spend today. Only read by the refund form,
+   *  which warns -- and does not refuse -- when an admin records paying back
+   *  more than that. The shop may well have handed over more than the ledger
+   *  knew about; what it must not do is record it without noticing. */
+  spendable: number
   onCancel: () => void
   onSubmit: (amount: number, reason: string, bookingId: string | null) => Promise<void>
 }) {
@@ -1133,7 +1195,9 @@ function LedgerEntryForm({ kind, bookings, onCancel, onSubmit }: {
   const [linkedBooking, setLinkedBooking] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const isCharge = kind === 'charge'
+  const copy = ENTRY_COPY[kind]
+  const typed = parseInt(amountStr, 10)
+  const overCredit = kind === 'refund' && Number.isFinite(typed) && typed > spendable
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -1144,7 +1208,7 @@ function LedgerEntryForm({ kind, bookings, onCancel, onSubmit }: {
       return
     }
     if (reason.trim().length < 3) {
-      setError(isCharge ? us.chargeReasonRequired : us.reasonRequired)
+      setError(copy.reasonRequired)
       return
     }
     setSubmitting(true)
@@ -1159,6 +1223,7 @@ function LedgerEntryForm({ kind, bookings, onCancel, onSubmit }: {
 
   return (
     <form onSubmit={submit} className="space-y-1.5">
+      {kind === 'refund' && <p className="text-brand-950">{us.refundNote}</p>}
       <div className="flex items-center gap-2">
         <input
           type="number" inputMode="numeric" min={1} step={1}
@@ -1168,9 +1233,9 @@ function LedgerEntryForm({ kind, bookings, onCancel, onSubmit }: {
           aria-label={us.amountPlaceholder}
           className="w-24 bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
         />
-        {/* A credit can offset one booking's balance; a charge never can --
-            see LedgerActions. */}
-        {!isCharge && (
+        {/* A credit can offset one booking's balance; a charge and a refund
+            never can -- see LedgerActions. */}
+        {kind === 'credit' && (
           <select
             value={linkedBooking}
             onChange={e => setLinkedBooking(e.target.value)}
@@ -1185,14 +1250,18 @@ function LedgerEntryForm({ kind, bookings, onCancel, onSubmit }: {
           </select>
         )}
       </div>
+      {/* A warning, not a validation error: the amount is still submittable.
+          Paying back more than the ledger holds leaves the diver owing the
+          difference, which is sometimes right and never accidental. */}
+      {overCredit && <p className="text-amber-700">{us.refundOverCredit(spendable.toLocaleString())}</p>}
       {/* Validated in `submit` rather than with `required`, so the message
           names which field and reads like the amount check beside it. */}
       <input
         type="text"
         value={reason}
         onChange={e => setReason(e.target.value)}
-        placeholder={isCharge ? us.chargeReasonPlaceholder : us.creditReasonPlaceholder}
-        aria-label={isCharge ? us.chargeReasonPlaceholder : us.creditReasonPlaceholder}
+        placeholder={copy.reasonPlaceholder}
+        aria-label={copy.reasonPlaceholder}
         maxLength={500}
         className="w-full bg-white border border-surface-300 rounded px-2 py-1 text-xs text-brand-900"
       />
@@ -1202,9 +1271,7 @@ function LedgerEntryForm({ kind, bookings, onCancel, onSubmit }: {
           disabled={submitting}
           className="text-xs bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded"
         >
-          {submitting
-            ? (isCharge ? us.charging : us.issuing)
-            : (isCharge ? us.issueCharge : us.issueCredit)}
+          {submitting ? copy.busy : copy.submit}
         </button>
         <button type="button" onClick={onCancel} className={BTN_XS_GHOST}>
           {t.admin.catalog.cancel}

@@ -992,7 +992,8 @@ export interface Database {
           /** Where this ledger row came from. Only the two *_cancellation* /
            *  *_return values mean "this booking's money has been given back",
            *  and only those suppress a further automatic refund.
-           *  `admin_charge` inverts the row's sign — see CreditSource. */
+           *  `admin_charge` / `admin_refund` invert the row's sign — see
+           *  CreditSource. */
           source: CreditSource
         }
         Insert: {
@@ -2443,10 +2444,14 @@ export type CreditSource =
    *  afresh rather than treating it as already given back. */
   | 'return_reclaimed'
   /** An account charge: money the diver owes the shop for something with no
-   *  event behind it. The ONE source whose `amount` is negative, and the one
-   *  that is never tied to a booking — both enforced by
+   *  event behind it. Negative, and never tied to a booking — both enforced by
    *  `credits_amount_check` / `credits_charge_untied` (20260823130000). */
   | 'admin_charge'
+  /** An account refund: store credit the shop has handed back as cash or a
+   *  transfer. Arithmetically identical to `admin_charge` — negative, untied,
+   *  same constraints (20260901000000) — and separate from it so a payout the
+   *  shop made does not read as goods the diver bought. */
+  | 'admin_refund'
 
 export type Credit = Database['public']['Tables']['credits']['Row']
 export type CreditInsert = Database['public']['Tables']['credits']['Insert']

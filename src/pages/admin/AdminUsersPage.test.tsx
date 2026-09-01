@@ -36,7 +36,7 @@ vi.mock('../../lib/credits', () => ({
   openCreditForBooking: () => null,
   openCreditBalance: () => 0,
   diverCreditBalance: () => 0,
-  createCredit: vi.fn(), createAccountCharge: vi.fn(), applyCreditToBooking: vi.fn(),
+  createCredit: vi.fn(), createAccountCharge: vi.fn(), createAccountRefund: vi.fn(), applyCreditToBooking: vi.fn(),
 }))
 
 const profiles = [
@@ -160,6 +160,30 @@ describe('AdminUsersPage deep link', () => {
     await waitFor(() => expect(charge).toHaveBeenCalledWith(expect.objectContaining({
       user_id: 'u2', amount: 1200, reason: 'Mask bought in the shop',
     })))
+  })
+
+  // Same arithmetic as the charge above, and it must not reach the same
+  // writer: an admin handing back store credit is not the diver buying a mask.
+  it('records a refund through its own writer, and demands to know how it was paid back', async () => {
+    const { createAccountRefund, createAccountCharge } = await import('../../lib/credits')
+    const refund = vi.mocked(createAccountRefund)
+    refund.mockResolvedValue({ id: 'c2', amount: -3000 } as never)
+
+    const user = userEvent.setup()
+    renderAt('/admin/users?diver=u2')
+
+    await user.click(await screen.findByRole('button', { name: t.admin.users.issueRefundLink }))
+    await user.type(screen.getByLabelText(t.admin.users.amountPlaceholder), '3000')
+    await user.click(screen.getByRole('button', { name: t.admin.users.issueRefund }))
+    expect(refund).not.toHaveBeenCalled()
+    expect(screen.getByText(t.admin.users.refundReasonRequired)).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText(t.admin.users.refundReasonPlaceholder), 'Bank transfer #4821')
+    await user.click(screen.getByRole('button', { name: t.admin.users.issueRefund }))
+    await waitFor(() => expect(refund).toHaveBeenCalledWith(expect.objectContaining({
+      user_id: 'u2', amount: 3000, reason: 'Bank transfer #4821',
+    })))
+    expect(vi.mocked(createAccountCharge)).not.toHaveBeenCalled()
   })
 
   it('shows no roster until the admin searches, with a prompt instead', async () => {

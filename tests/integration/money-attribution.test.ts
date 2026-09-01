@@ -256,6 +256,26 @@ describe('account charges', () => {
     expect(error).not.toBeNull()
     expect(error!.message).toMatch(/credits_charge_untied/)
   })
+
+  // A refund — credit paid back out in cash — is the same negative untied row,
+  // so it has to clear the same three constraints and no more.
+  it('accepts a negative row when it is stamped admin_refund', async () => {
+    const { error } = await ledgerRow({ amount: -3000, source: 'admin_refund' })
+    expect(error).toBeNull()
+  })
+
+  it('refuses a POSITIVE admin_refund — a payout that credits the diver again', async () => {
+    const { error } = await ledgerRow({ amount: 3000, source: 'admin_refund' })
+    expect(error).not.toBeNull()
+    expect(error!.message).toMatch(/credits_amount_check/)
+  })
+
+  it('refuses a refund tied to a booking — that is a refunded payment row', async () => {
+    const b = await freshBooking()
+    const { error } = await ledgerRow({ amount: -3000, source: 'admin_refund', booking_id: b })
+    expect(error).not.toBeNull()
+    expect(error!.message).toMatch(/credits_charge_untied/)
+  })
 })
 
 describe('apply_credit_to_booking with a charge on the ledger', () => {
@@ -321,5 +341,23 @@ describe('apply_credit_to_booking with a charge on the ledger', () => {
     const asAdmin = await userClient(adminUser.email, adminUser.password)
     const { data } = await asAdmin.rpc('apply_credit_to_booking', { p_booking_id: b, p_amount: 99999 })
     expect(Number(data)).toBe(0)
+  })
+
+  // The RPC knows nothing about `admin_refund` and does not need to: it nets
+  // every open row into its pool and drains only positive ones. Money already
+  // handed back can neither be spent again nor re-credited by spending.
+  it('treats a refund the same way — netted out of the pool, never consumed', async () => {
+    const d = await freshDiver()
+    await ledger(d, 3000, 'manual')
+    await ledger(d, -3000, 'admin_refund')
+    const b = await bookingFor(d, 5000)
+
+    const asAdmin = await userClient(adminUser.email, adminUser.password)
+    const { data } = await asAdmin.rpc('apply_credit_to_booking', { p_booking_id: b, p_amount: 99999 })
+    expect(Number(data)).toBe(0)
+
+    const { data: rows } = await admin.from('credits')
+      .select('amount, status').eq('user_id', d.id).eq('source', 'admin_refund')
+    expect(rows).toEqual([{ amount: -3000, status: 'open' }])
   })
 })

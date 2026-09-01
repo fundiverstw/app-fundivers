@@ -36,6 +36,7 @@ export type StatementKind =
   | 'credit_issued'
   | 'credit_settled'
   | 'account_charge'
+  | 'account_refund'
   | 'cancellation'
 
 export interface StatementLine {
@@ -117,6 +118,7 @@ const KIND_ORDER: Record<StatementKind, number> = {
   cancellation: 6,
   credit_issued: 7,
   account_charge: 7,
+  account_refund: 7,
   credit_settled: 8,
 }
 
@@ -277,15 +279,21 @@ export function buildDiverStatement(input: StatementInput): DiverStatement {
   // lead pays for are the lead's money, and drop out with the booking.
   for (const c of input.credits) {
     if (c.booking_id && !ownIds.has(c.booking_id)) continue
-    // The ledger is signed: a negative row is an account charge (goods off the
-    // shelf, a lost fin), not a credit. It moves the balance the other way and
-    // must not be labelled as money the shop owes.
+    // The ledger is signed: a negative row is not a credit. It moves the
+    // balance the other way and must not be labelled as money the shop owes.
+    // Which of the two it is comes from the source, not the sign — a charge
+    // (goods off the shelf, a lost fin) and a refund (credit handed back in
+    // cash) are the same arithmetic and opposite stories, and a statement that
+    // called every payout a purchase would be worse than one that showed
+    // neither.
     const amount = Number(c.amount)
     drafts.push({
       id: `credit:${c.id}:issued`,
       sourceId: c.id,
       at: c.created_at,
-      kind: amount < 0 ? 'account_charge' : 'credit_issued',
+      kind: c.source === 'admin_refund' ? 'account_refund'
+          : amount < 0 ? 'account_charge'
+          : 'credit_issued',
       bookingId: c.booking_id,
       delta: amount,
       amount: Math.abs(amount),
