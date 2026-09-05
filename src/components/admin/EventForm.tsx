@@ -34,6 +34,7 @@ type PreloadRow = Pick<EventRow, 'id' | 'kind' | 'admin_title' | 'display_title'
 
 const ef = t.admin.eventForm
 const cat = t.admin.catalog
+const cxl = t.admin.cxlPolicies
 
 const CUR = siteConfig.locale.currencyLabel
 
@@ -68,10 +69,16 @@ const EMPTY_PRICE_FORM: PriceFormState = {
 interface RoomFormState   { admin_title: string; display_title: string; added_price: string }
 interface AddonFormState  { admin_title: string; display_title: string; price: string }
 interface TravelFormState { admin_title: string; included: string; not_included: string; transportation: string }
+interface DestinationFormState { admin_title: string; country: string }
+interface PolicyFormState { title: string; cancellation_policy: string; deposit_refundable: boolean }
 
 const EMPTY_ROOM_FORM:   RoomFormState   = { admin_title: '', display_title: '', added_price: '' }
 const EMPTY_ADDON_FORM:  AddonFormState  = { admin_title: '', display_title: '', price: '' }
 const EMPTY_TRAVEL_FORM: TravelFormState = { admin_title: '', included: '', not_included: '', transportation: '' }
+const EMPTY_DESTINATION_FORM: DestinationFormState = { admin_title: '', country: '' }
+// Refundable by default: withholding a deposit is the exception, and a policy
+// created in a hurry should not quietly keep divers' money.
+const EMPTY_POLICY_FORM: PolicyFormState = { title: '', cancellation_policy: '', deposit_refundable: true }
 
 export interface EventFormProps {
   mode: 'create' | 'edit'
@@ -129,6 +136,16 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
   const [travelForm, setTravelForm] = useState<TravelFormState>(EMPTY_TRAVEL_FORM)
   const [travelSubmitting, setTravelSubmitting] = useState(false)
   const [travelError, setTravelError] = useState<string | null>(null)
+
+  const [showNewDestination, setShowNewDestination] = useState(false)
+  const [destinationForm, setDestinationForm] = useState<DestinationFormState>(EMPTY_DESTINATION_FORM)
+  const [destinationSubmitting, setDestinationSubmitting] = useState(false)
+  const [destinationError, setDestinationError] = useState<string | null>(null)
+
+  const [showNewPolicy, setShowNewPolicy] = useState(false)
+  const [policyForm, setPolicyForm] = useState<PolicyFormState>(EMPTY_POLICY_FORM)
+  const [policySubmitting, setPolicySubmitting] = useState(false)
+  const [policyError, setPolicyError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -405,6 +422,64 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
     }
   }
 
+  async function submitNewDestination() {
+    setDestinationError(null)
+    if (!destinationForm.admin_title.trim()) { setDestinationError(t.admin.waivers.titleRequired); return }
+    setDestinationSubmitting(true)
+    try {
+      const id = crypto.randomUUID()
+      const payload = {
+        id,
+        admin_title: destinationForm.admin_title.trim(),
+        country: destinationForm.country.trim() || null,
+      }
+      const { error: insErr } = await supabase.from('travel_destinations').insert(payload as never)
+      if (insErr) throw insErr
+      setDestinations(ds => [...ds, payload as unknown as TravelDestination].sort(
+        (a, b) => (a.admin_title ?? '').localeCompare(b.admin_title ?? '')
+      ))
+      // Added while filling in this event, so it is one of this event's.
+      setForm(f => ({ ...f, destinationIds: [...f.destinationIds, id] }))
+      setDestinationForm(EMPTY_DESTINATION_FORM)
+      setShowNewDestination(false)
+    } catch (err) {
+      setDestinationError(errorMessage(err))
+    } finally {
+      setDestinationSubmitting(false)
+    }
+  }
+
+  async function submitNewPolicy() {
+    setPolicyError(null)
+    if (!policyForm.title.trim()) { setPolicyError(t.admin.waivers.titleRequired); return }
+    // The text is what the diver acknowledges, so a policy without it says
+    // nothing while looking like it says something.
+    if (!policyForm.cancellation_policy.trim()) { setPolicyError(cxl.textRequired); return }
+    setPolicySubmitting(true)
+    try {
+      const id = crypto.randomUUID()
+      const payload = {
+        id,
+        title: policyForm.title.trim(),
+        cancellation_policy: policyForm.cancellation_policy.trim(),
+        deposit_refundable: policyForm.deposit_refundable,
+        active: true,
+      }
+      const { error: insErr } = await supabase.from('cancellation_policies').insert(payload as never)
+      if (insErr) throw insErr
+      setCancelPolicies(ps => [...ps, payload as unknown as CancellationPolicy].sort(
+        (a, b) => (a.title ?? '').localeCompare(b.title ?? '')
+      ))
+      set('cancel_policy', id)
+      setPolicyForm(EMPTY_POLICY_FORM)
+      setShowNewPolicy(false)
+    } catch (err) {
+      setPolicyError(errorMessage(err))
+    } finally {
+      setPolicySubmitting(false)
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -676,7 +751,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
               value={form.featured_image}
               onChange={v => set('featured_image', v)}
             />
-            <div className="space-y-1">
+            <div className="space-y-1 flex flex-col">
               <span className="text-xs font-medium text-white/80">{ef.destinations}</span>
               {destinations.length === 0 ? (
                 <p className="text-sm text-brand-950 font-medium">{ef.noDestinations}</p>
@@ -690,6 +765,44 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
                       label={d.country ? `${d.admin_title ?? d.id} — ${d.country}` : (d.admin_title ?? d.id)}
                     />
                   ))}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowNewDestination(s => !s)}
+                className={`mt-2 self-start ${BTN_XS_GHOST}`}
+              >
+                {showNewDestination ? ef.cancelNewDestination : ef.newDestination}
+              </button>
+              {showNewDestination && (
+                <div className="mt-2 space-y-3 rounded-lg border border-amber-300/40 bg-white/5 p-3">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-200">{ef.newDestinationTitle}</h3>
+                  <Field label={ef.titleRequiredLabel}>
+                    <Input value={destinationForm.admin_title} onChange={v => setDestinationForm(f => ({ ...f, admin_title: v }))} />
+                  </Field>
+                  <Field label={ef.destinationCountry}>
+                    <Input value={destinationForm.country} onChange={v => setDestinationForm(f => ({ ...f, country: v }))} />
+                  </Field>
+                  {destinationError && (
+                    <p className={ERROR_NOTE}>{destinationError}</p>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={submitNewDestination}
+                      disabled={destinationSubmitting}
+                      className="flex-1 py-2 rounded-lg text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-50 transition-colors"
+                    >
+                      {destinationSubmitting ? cat.saving : ef.saveDestination}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowNewDestination(false); setDestinationForm(EMPTY_DESTINATION_FORM); setDestinationError(null) }}
+                      className="px-3 py-2 rounded-lg text-sm font-medium text-white/80 hover:text-white border border-white/30"
+                    >
+                      {cat.cancel}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -856,6 +969,50 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
             )}
           </Field>
         </div>
+        <button
+          type="button"
+          onClick={() => setShowNewPolicy(s => !s)}
+          className={`self-start ${BTN_XS_GHOST}`}
+        >
+          {showNewPolicy ? ef.cancelNewPolicy : ef.newCancelPolicy}
+        </button>
+        {showNewPolicy && (
+          <div className="space-y-3 rounded-lg border border-amber-300/40 bg-white/5 p-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-200">{ef.newCancelPolicyTitle}</h3>
+            <Field label={cxl.titleLabel}>
+              <Input value={policyForm.title} onChange={v => setPolicyForm(f => ({ ...f, title: v }))} />
+            </Field>
+            <Field label={cxl.policyText}>
+              <Textarea value={policyForm.cancellation_policy} onChange={v => setPolicyForm(f => ({ ...f, cancellation_policy: v }))} />
+            </Field>
+            <Checkbox
+              checked={!policyForm.deposit_refundable}
+              onChange={v => setPolicyForm(f => ({ ...f, deposit_refundable: !v }))}
+              label={cxl.depositNonRefundableLabel}
+            />
+            <p className="text-xs text-white/60">{cxl.depositNonRefundableHint}</p>
+            {policyError && (
+              <p className={ERROR_NOTE}>{policyError}</p>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={submitNewPolicy}
+                disabled={policySubmitting}
+                className="flex-1 py-2 rounded-lg text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-50 transition-colors"
+              >
+                {policySubmitting ? cat.saving : ef.saveCancelPolicy}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowNewPolicy(false); setPolicyForm(EMPTY_POLICY_FORM); setPolicyError(null) }}
+                className="px-3 py-2 rounded-lg text-sm font-medium text-white/80 hover:text-white border border-white/30"
+              >
+                {cat.cancel}
+              </button>
+            </div>
+          </div>
+        )}
       </Section>
 
       <Section title={ef.sectionPaymentDeadline}>

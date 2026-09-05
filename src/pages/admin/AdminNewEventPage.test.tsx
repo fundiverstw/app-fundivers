@@ -310,6 +310,94 @@ describe('AdminNewEventPage', () => {
     )
   })
 
+  it('inserts a new destination from the sub-form and auto-ticks it', async () => {
+    const destInsert = vi.fn().mockReturnValue({
+      then: (cb: (r: { error: null }) => void) => Promise.resolve({ error: null }).then(cb),
+    })
+    from.mockImplementation((table: string) => {
+      if (table === 'travel_destinations') {
+        const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
+        b.insert = destInsert
+        return b
+      }
+      return mockQueryBuilder({ data: [] })
+    })
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByLabelText(/admin title \(required, internal\)/i)
+
+    await user.click(screen.getByRole('button', { name: /new destination/i }))
+    await user.type(screen.getByLabelText('Title (required)'), 'Green Island')
+    await user.type(screen.getByLabelText(/^country$/i), 'Taiwan')
+    await user.click(screen.getByRole('button', { name: /save destination/i }))
+
+    await waitFor(() => expect(destInsert).toHaveBeenCalled())
+    const payload = (destInsert.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
+    expect(payload.admin_title).toBe('Green Island')
+    expect(payload.country).toBe('Taiwan')
+
+    // Added while filling this event in, so it belongs to this event.
+    await waitFor(() =>
+      expect((screen.getByLabelText(/Green Island — Taiwan/) as HTMLInputElement).checked).toBe(true)
+    )
+  })
+
+  it('inserts a new cancellation policy from the sub-form and selects it', async () => {
+    const policyInsert = vi.fn().mockReturnValue({
+      then: (cb: (r: { error: null }) => void) => Promise.resolve({ error: null }).then(cb),
+    })
+    from.mockImplementation((table: string) => {
+      if (table === 'cancellation_policies') {
+        const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
+        b.insert = policyInsert
+        return b
+      }
+      return mockQueryBuilder({ data: [] })
+    })
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByLabelText(/admin title \(required, internal\)/i)
+
+    await user.click(screen.getByRole('button', { name: /new cancellation policy/i }))
+    await user.type(screen.getByLabelText(/title \*/i), 'Standard cancellation')
+    await user.type(screen.getByLabelText(/policy text \*/i), 'Free up to 7 days before.')
+    await user.click(screen.getByRole('button', { name: /save policy/i }))
+
+    await waitFor(() => expect(policyInsert).toHaveBeenCalled())
+    const payload = (policyInsert.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
+    expect(payload.title).toBe('Standard cancellation')
+    expect(payload.cancellation_policy).toBe('Free up to 7 days before.')
+    // Refundable unless the admin says otherwise — the default must not
+    // quietly keep divers' deposits.
+    expect(payload.deposit_refundable).toBe(true)
+    expect(payload.active).toBe(true)
+
+    const select = await screen.findByLabelText(/cancel policy/i) as HTMLSelectElement
+    await waitFor(() => expect(select.value).toBe(payload.id))
+  })
+
+  it('will not write a cancellation policy with no text for the diver to acknowledge', async () => {
+    const policyInsert = vi.fn()
+    from.mockImplementation((table: string) => {
+      if (table === 'cancellation_policies') {
+        const b = mockQueryBuilder({ data: [] }) as Record<string, unknown>
+        b.insert = policyInsert
+        return b
+      }
+      return mockQueryBuilder({ data: [] })
+    })
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByLabelText(/admin title \(required, internal\)/i)
+
+    await user.click(screen.getByRole('button', { name: /new cancellation policy/i }))
+    await user.type(screen.getByLabelText(/title \*/i), 'Titled but empty')
+    await user.click(screen.getByRole('button', { name: /save policy/i }))
+
+    expect(await screen.findByText(/enter the policy text/i)).toBeInTheDocument()
+    expect(policyInsert).not.toHaveBeenCalled()
+  })
+
   it('inserts a new trip template from the sub-form and selects it as the reference', async () => {
     const travelInsert = vi.fn().mockReturnValue({
       then: (cb: (r: { error: null }) => void) => Promise.resolve({ error: null }).then(cb),
