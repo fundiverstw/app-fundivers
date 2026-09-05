@@ -36,6 +36,10 @@ export const RATE_LIMITS = {
   // One per group registration. Higher because a parent booking a family
   // across several events legitimately submits a few in one sitting.
   group_summary: { limit: 20, window: '24 hours' },
+  // A whole-database CSV export. An admin takes one before a risky change or on
+  // a schedule of their own — a handful a day is generous, and each one reads
+  // every row in the project.
+  database_backup: { limit: 5, window: '24 hours' },
 } as const satisfies Record<string, RateLimit>
 
 export type RateLimitedAction = keyof typeof RATE_LIMITS

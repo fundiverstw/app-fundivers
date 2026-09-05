@@ -22,6 +22,7 @@ import { TrustedPartnersIcon } from '../../components/icons/TrustedPartnersIcon'
 import { BellIcon } from '../../components/icons/BellIcon'
 import { DownloadIcon } from '../../components/icons/DownloadIcon'
 import { AuditIcon } from '../../components/icons/AuditIcon'
+import { DatabaseIcon } from '../../components/icons/DatabaseIcon'
 
 // Hub for the admin "Manage" tab. The catalog/settings pages have grown past a
 // scannable flat list, so cards are chunked into labelled sections and shown as
@@ -80,6 +81,12 @@ const GROUPS: ManageGroup[] = [
       { to: '/admin/waivers', icon: <FileSignatureIcon />, ...m.waivers },
       { to: '/admin/terms', icon: <FileTextIcon />, ...m.terms },
       { to: '/admin/cancellation-policies', icon: <ShieldCheckIcon />, ...m.cancellationPolicies },
+    ],
+  },
+  {
+    title: m.groups.data,
+    cards: [
+      { to: '/admin/backup', icon: <DatabaseIcon />, ...m.backup },
     ],
   },
   {

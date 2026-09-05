@@ -38,6 +38,7 @@ Write/manage routes — gated by `AdminRoute` (admin only):
 | `/admin/users`                          | `AdminUsersPage`        | Searchable diver directory with full profile cards |
 | `/admin/duty`                           | `AdminDutyPage`         | Assign staff/admin to events; fires push to assignee |
 | `/admin/notifications`                  | `AdminNotificationsPage` | Compose + send a one-off Web-Push broadcast to all subscribed devices |
+| `/admin/backup`                         | `AdminBackupPage`       | Download the whole database as one CSV-per-table ZIP — see [Database backup](#database-backup) |
 
 All routes are also wrapped by `ProtectedRoute` — see
 [authentication.md](./authentication.md#role-gating).
@@ -383,6 +384,38 @@ Reachable from **Business performance** (`/admin/dashboard`), which
 links to it beside the historical-perspective link, and from the
 Manage hub. Staff get it as a nav item, since the dashboard is
 admin-only.
+
+## Database backup
+
+`/admin/backup` hands an admin a copy of the shop's data to keep off the
+Supabase project: every public table as a CSV, zipped, with a
+`manifest.csv` of row counts and a `README.txt` saying what is and is not
+in there.
+
+The work happens in the `export-database-backup` edge function, which
+runs as `service_role` (so RLS never trims a backup) and refuses anyone
+whose profile role is not `admin` — staff included, since the archive
+carries every diver's personal details, payments and waiver signatures.
+It is rate-limited to five a day per admin through the shared
+`take_action_slot` limiter.
+
+Two things make it a backup rather than a dump of whatever the schema
+happened to look like when someone last edited a list:
+
+- **`backup_table_inventory()`** (migration `20260905000000`) names the
+  tables, so a table added tomorrow is in tomorrow's backup. It returns
+  each table's columns — an empty table still exports its header — and
+  its primary key, which the function pages by (PostgREST caps a read at
+  1000 rows, and paging without an ORDER BY can repeat or skip rows).
+- **It refuses rather than truncates.** Past `MAX_TOTAL_ROWS` the
+  function returns 413 instead of a silently partial archive.
+
+What it is not: a restore point. There is no schema, no function, no
+policy, no storage object (certification cards, signed waiver PDFs,
+dive-site maps) and no `auth.users` — credentials live outside the
+shop's own tables. `make backup-prod` is the pg_dump to take before a
+risky migration; this is the copy a shop owner can keep on a laptop and
+open in a spreadsheet.
 
 ## Role-view toggle
 
