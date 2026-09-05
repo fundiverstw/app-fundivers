@@ -1,0 +1,182 @@
+# Manual production deploy. Trigger from the GitHub Actions UI:
+#   Actions → "Deploy" → Run workflow → pick a target.
+#
+# Mirrors `make deploy` (deploy-app + deploy-push + deploy-functions) but runs
+# from a clean checkout of main instead of whatever a laptop happens to have in
+# its working tree. `make deploy` is still the primary route and reads its creds
+# from .env.production; this exists so a deploy does not depend on one machine.
+#
+# WHAT IT DOES NOT DO: schema. Migrations are their own workflow
+# (supabase-push.yml) and their own decision — code that expects a column
+# deploys after the column exists, never in the same button press.
+#
+# Required repository secrets (Settings → Secrets → Actions):
+#   CLOUDFLARE_API_TOKEN     — token with the "Edit Cloudflare Workers" template
+#   CLOUDFLARE_ACCOUNT_ID    — Cloudflare dashboard sidebar
+#   VITE_SUPABASE_URL        — baked into the SPA bundle at build time
+#   VITE_SUPABASE_ANON_KEY   — baked into the SPA bundle at build time
+#   VITE_TURNSTILE_SITE_KEY  — baked in; the build FAILS without it, by design
+#   VITE_VAPID_PUBLIC_KEY    — optional; the push UI hides itself if absent
+#   VITE_PUSH_WORKER_URL     — optional; admin push actions degrade off
+#   SUPABASE_ACCESS_TOKEN    — personal access token (sbp_…), for edge functions
+#   SUPABASE_PROJECT_REF     — project ref slug, for edge functions
+#
+# Safety, and why each piece is here:
+#   * workflow_dispatch only — nothing deploys because a commit landed.
+#   * Jobs run only when dispatched from main, so a PR branch cannot be shipped
+#     by choosing it in the ref picker.
+#   * environment: production — whatever reviewers or wait timers are set in
+#     Settings → Environments gate every job.
+#   * The checks job runs lint + tsc + unit tests first and every deploy job
+#     waits on it. CI already ran on the commit; this catches the case where
+#     main moved under a stale tab. `skip_checks` exists for a rollback that
+#     has to go out now, and says so in the run's own name.
+#   * permissions: contents: read — a compromised action cannot write to the
+#     repo with the runner token.
+#   * Actions are SHA-pinned; the trailing `# vX.Y.Z` comments are for humans,
+#     since tags move and SHAs do not.
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: What to deploy
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - spa
+          - push-worker
+          - edge-functions
+      skip_checks:
+        description: Skip lint/tsc/unit tests (emergency rollback only)
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+# Never two deploys at once, and never cancel one half-way: a cancelled
+# `wrangler deploy` is a deploy whose outcome nobody knows.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    name: Checks
+    if: ${{ github.ref == 'refs/heads/main' && !inputs.skip_checks }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm ci
+        working-directory: workers/push
+      - run: npm run lint
+      - run: npx tsc -b
+      - run: npx vitest run --project unit
+
+  spa:
+    name: SPA (Cloudflare Worker)
+    # `always()` so a skipped checks job does not skip the deploy with it;
+    # a FAILED checks job still stops everything.
+    needs: checks
+    if: >-
+      ${{ always() && github.ref == 'refs/heads/main'
+      && needs.checks.result != 'failure' && needs.checks.result != 'cancelled'
+      && (inputs.target == 'all' || inputs.target == 'spa') }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # The VITE_* values are baked into the bundle here, not read at runtime,
+      # so a missing secret ships a broken app. vite.config.ts fails the build
+      # on the three that break a core flow rather than letting that happen.
+      - name: Build
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL:       ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY:  ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY }}
+          VITE_VAPID_PUBLIC_KEY:   ${{ secrets.VITE_VAPID_PUBLIC_KEY }}
+          VITE_PUSH_WORKER_URL:    ${{ secrets.VITE_PUSH_WORKER_URL }}
+
+      # The repo's own pinned wrangler, run exactly as `make deploy-app` runs
+      # it — one less third-party action in the path to production.
+      - name: wrangler deploy
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  push-worker:
+    name: Push cron (Cloudflare Worker)
+    needs: checks
+    if: >-
+      ${{ always() && github.ref == 'refs/heads/main'
+      && needs.checks.result != 'failure' && needs.checks.result != 'cancelled'
+      && (inputs.target == 'all' || inputs.target == 'push-worker') }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: workers/push/package-lock.json
+      - run: npm ci
+        working-directory: workers/push
+
+      # The worker's runtime secrets (VAPID keys, service-role key) live in
+      # Cloudflare, set once with `wrangler secret put` — a deploy does not
+      # carry them, and this workflow never sees them.
+      - name: wrangler deploy
+        run: npx wrangler deploy
+        working-directory: workers/push
+        env:
+          CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  edge-functions:
+    name: Supabase edge functions
+    needs: checks
+    if: >-
+      ${{ always() && github.ref == 'refs/heads/main'
+      && needs.checks.result != 'failure' && needs.checks.result != 'cancelled'
+      && (inputs.target == 'all' || inputs.target == 'edge-functions') }}
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v2.1.1
+        with:
+          # Pinned rather than `latest`: resolving the tag goes through the
+          # GitHub Releases API, which is rate-limited on shared runners
+          # ("Failed to resolve latest Supabase CLI release: rate limit
+          # exceeded"). Matches the supabase devDependency in package.json.
+          version: 2.113.0
+
+      # Deploys everything under supabase/functions/ — the CLI ships only what
+      # changed. Their secrets (GMAIL_*, etc.) are set with
+      # `supabase secrets set` and are not touched by a deploy.
+      - name: Deploy all edge functions
+        run: supabase functions deploy --project-ref "$PROJECT_REF"
+        env:
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}

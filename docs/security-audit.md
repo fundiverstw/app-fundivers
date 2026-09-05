@@ -562,6 +562,17 @@ to prod. Dependabot (`.github/dependabot.yml`) opens a weekly PR
 when any pinned action publishes a new tag so the SHA pins stay
 current without manual `git ls-remote` polling.
 
+**Still true after 2026-09-05**, when the deploy and migration-push
+workflows came back as manual buttons (they had been dropped in favour of
+local `make deploy` / `make push`). Same guards: `workflow_dispatch` only,
+`if: github.ref == 'refs/heads/main'`, `environment: production`,
+top-level `permissions: contents: read`, SHA-pinned actions. Two changes
+to what is described above: the functions deploy is now a job inside
+`deploy.yml` rather than its own `supabase-deploy-functions.yml`, and the
+Cloudflare steps run the repo's own pinned `wrangler` devDependency
+instead of `cloudflare/wrangler-action`, which removes a third-party
+action from the path that holds `CLOUDFLARE_API_TOKEN`.
+
 **Where:** `.github/workflows/deploy.yml`,
 `.github/workflows/supabase-push.yml`,
 `.github/workflows/supabase-deploy-functions.yml`.

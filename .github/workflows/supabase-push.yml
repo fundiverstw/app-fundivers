@@ -1,0 +1,97 @@
+# Manual migration push. Trigger from the GitHub Actions UI:
+#   Actions → "Push Supabase migrations" → Run workflow.
+#
+# Mirrors `make push` (supabase db push) against the linked cloud project, from
+# a clean checkout of main. `make push` from a developer's machine is still the
+# primary route; this exists so pushing does not depend on one laptop having
+# the DB password.
+#
+# DRY RUN IS THE DEFAULT, and it is the point of having this in CI at all: the
+# run prints which migrations the cloud is missing and stops. Reading that list
+# before anything is applied is the review step that a local `make push` does
+# not have. Untick it to apply.
+#
+# Migrations are FORWARD-ONLY and immutable once pushed — the registry checksums
+# them. There is no undo button here: a bad migration is fixed by writing
+# another one, and a truly bad one by a point-in-time restore from the Supabase
+# dashboard. Which is why this workflow does not deploy code as well; ship the
+# schema, look at it, then run the Deploy workflow.
+#
+# Required repository secrets (Settings → Secrets → Actions):
+#   SUPABASE_ACCESS_TOKEN   — personal access token (sbp_…), created at
+#                             https://supabase.com/dashboard/account/tokens
+#   SUPABASE_PROJECT_REF    — the project ref slug from the dashboard URL
+#   SUPABASE_DB_PASSWORD    — the project's Postgres password
+#
+# Safety: workflow_dispatch only, main only (a PR branch cannot push its
+# migrations to production by being chosen in the ref picker), environment:
+# production for the protection rules in Settings, no cancel-in-progress
+# (a half-applied migration run is the one thing worse than a slow one), and
+# SHA-pinned actions.
+name: Push Supabase migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Dry run — list what would be applied, apply nothing
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-push
+  cancel-in-progress: false
+
+jobs:
+  push:
+    name: supabase db push
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v2.1.1
+        with:
+          # Pinned rather than `latest`: resolving the tag goes through the
+          # GitHub Releases API, which is rate-limited on shared runners.
+          # Matches the supabase devDependency in package.json.
+          version: 2.113.0
+
+      - name: Link project
+        run: supabase link --project-ref "$PROJECT_REF" --password "$DB_PASSWORD"
+        env:
+          PROJECT_REF:  ${{ secrets.SUPABASE_PROJECT_REF }}
+          DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      # Read-only, and printed whichever mode this is in: the local column
+      # against the remote one is how you see what is about to happen, and
+      # afterwards, that it did.
+      - name: Migration history (local vs cloud)
+        run: supabase migration list --linked --password "$DB_PASSWORD"
+        env:
+          DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Push migrations (dry run)
+        if: ${{ inputs.dry_run }}
+        run: supabase db push --dry-run --password "$DB_PASSWORD"
+        env:
+          DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Push migrations
+        if: ${{ !inputs.dry_run }}
+        run: supabase db push --password "$DB_PASSWORD"
+        env:
+          DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Migration history after the push
+        if: ${{ !inputs.dry_run }}
+        run: supabase migration list --linked --password "$DB_PASSWORD"
+        env:
+          DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
