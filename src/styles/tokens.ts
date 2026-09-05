@@ -132,6 +132,15 @@ export const ERROR_NOTE_LIGHT = 'text-xs text-red-200 bg-red-900/30 border borde
 export const NAV_BAR    = 'waybar border-b border-white/10 px-4 py-3 flex items-center justify-between'
 export const NAV_BOTTOM = 'fixed bottom-0 left-0 right-0 waybar-solid border-t border-white/10 flex justify-around py-2 z-40'
 
+// A page-level bar for a selection in progress (the calendar's multi-event
+// cart). It has to clear NAV_BOTTOM: anchored at bottom-0 like the nav it
+// renders underneath an opaque bar that paints later, and is unreachable.
+export const ACTION_BAR = 'fixed inset-x-0 bottom-16 z-50 waybar-solid border-t border-white/10 px-4 py-3'
+
+// Bottom padding a page adds while ACTION_BAR is up, so the last rows of a
+// list stay scrollable into view instead of sitting under the bar.
+export const ACTION_BAR_CLEARANCE = 'pb-32'
+
 // ── Charts ─────────────────────────────────────────────────────────
 // Data marks are one hue, not a categorical set: every plot in the app shows a
 // single series, where the reader's job is magnitude, not identity. Role is

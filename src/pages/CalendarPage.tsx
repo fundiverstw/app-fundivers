@@ -13,7 +13,7 @@ import { AddToGoogleCalendarButton } from '../components/AddToGoogleCalendarButt
 import { canSelfCancel } from '../lib/booking-status'
 import { netPaidByBooking } from '../lib/payments'
 import { t } from '../i18n'
-import { BTN_XS_GHOST } from '../styles/tokens'
+import { BTN_XS_GHOST, ACTION_BAR, ACTION_BAR_CLEARANCE } from '../styles/tokens'
 import type { AppEvent, Booking } from '../types/database'
 import { EVENT_KIND_DOT, EVENT_KIND_LABELS } from '../lib/event-kind-labels'
 
@@ -128,7 +128,7 @@ export function CalendarPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className={`max-w-2xl mx-auto ${mode === 'multi' ? ACTION_BAR_CLEARANCE : ''}`}>
       {user && mode === 'single' && (
         <button
           type="button"
@@ -179,7 +179,7 @@ export function CalendarPage() {
       />
 
       {mode === 'multi' && (
-        <div className="fixed inset-x-0 bottom-0 bg-brand-900/95 backdrop-blur-md border-t border-brand-950 px-4 py-3 z-40">
+        <div className={ACTION_BAR}>
           <div className="max-w-lg mx-auto flex items-center justify-between gap-3">
             <div className="text-white text-sm">
               <p className="font-semibold">
