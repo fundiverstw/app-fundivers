@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { supabase } from '../../lib/supabase'
 import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
+import { sendPushBroadcast, pushWorkerUrl } from '../../lib/push-broadcast'
 import { ERROR_NOTE_LIGHT } from '../../styles/tokens'
 import { t } from '../../i18n'
 
@@ -15,10 +15,6 @@ const n = t.admin.notifications
 // Primary use cases: ad-hoc announcements ("trip cancelled — typhoon")
 // and end-to-end smoke tests of the push pipeline when scheduled
 // reminders haven't arrived as expected.
-
-function pushWorkerUrl(): string {
-  return ((import.meta.env.VITE_PUSH_WORKER_URL as string | undefined) ?? '').replace(/\/$/, '')
-}
 
 export function AdminNotificationsPage() {
   const toast = useToast()
@@ -35,40 +31,14 @@ export function AdminNotificationsPage() {
       setSubmitError(n.titleBodyRequired)
       return
     }
-    const workerUrl = pushWorkerUrl()
-    if (!workerUrl) {
+    if (!pushWorkerUrl()) {
       setSubmitError(n.workerNotConfigured)
       return
     }
     setSubmitting(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error(n.notSignedIn)
-      // Send url only when the admin filled it in. The worker reads
-      // an empty/absent url as "no link" — push tap opens the inbox so
-      // the diver can re-read the body, and the inbox row doesn't
-      // render an "Open link" button.
-      const trimmedLink = link.trim()
-      const res = await fetch(`${workerUrl}/admin-broadcast`, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          title: title.trim(),
-          body:  body.trim(),
-          ...(trimmedLink ? { url: trimmedLink } : {}),
-        }),
-      })
-      if (!res.ok) {
-        const text = await res.text().catch(() => '')
-        throw new Error(text || n.broadcastFailed(res.status))
-      }
-      const result = await res.json() as { sent?: number; skipped?: number; webhook?: boolean | null }
-      const sent = result.sent ?? 0
-      const skipped = result.skipped ?? 0
-      toast.success(n.sentToast(sent, skipped, result.webhook ?? null))
+      const result = await sendPushBroadcast({ title, body, url: link })
+      toast.success(n.sentToast(result.sent, result.skipped, result.webhook))
       setTitle('')
       setBody('')
       setLink('')

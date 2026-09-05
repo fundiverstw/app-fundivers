@@ -12,6 +12,7 @@ into source.
 | [events-and-bookings.md](./events-and-bookings.md)     | Calendar rendering, register-form wizard, `bookings.details` JSONB shape |
 | [payments.md](./payments.md)                           | Money rules: owed/paid/balance math, the two ledgers, spending credit, and what each kind of cancellation does to the money. Print-ready copy: [payments.pdf](./payments.pdf) (generated — see the recipe at the top of the markdown) |
 | [admin.md](./admin.md)                                 | Admin routes, event memos, user search, role-view toggle |
+| [shutdown.md](./shutdown.md)                           | Closing down: settle up, take the data out, and switch the app, the services and the accounts off in an order that strands nothing |
 | [dive-site-maps.md](./dive-site-maps.md)               | Diver-contributed 3D seafloor maps: the implicit 1 m lattice, honest-gap surfacing, contribution model. Admin-only, not yet persisted |
 | [coral-surveys.md](./coral-surveys.md)                 | Crowdsourced coral monitoring against the CoralWatch Coral Health Chart: survey plus colony rows, RPC-only writes, staff moderation, the bleaching arithmetic |
 | [packages.md](./packages.md)                           | Partner-shop registration network: product tiers, add-on/room estimate, recommendation email, kickback ledger |

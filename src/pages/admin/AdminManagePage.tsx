@@ -23,6 +23,7 @@ import { BellIcon } from '../../components/icons/BellIcon'
 import { DownloadIcon } from '../../components/icons/DownloadIcon'
 import { AuditIcon } from '../../components/icons/AuditIcon'
 import { DatabaseIcon } from '../../components/icons/DatabaseIcon'
+import { PowerIcon } from '../../components/icons/PowerIcon'
 
 // Hub for the admin "Manage" tab. The catalog/settings pages have grown past a
 // scannable flat list, so cards are chunked into labelled sections and shown as
@@ -87,6 +88,7 @@ const GROUPS: ManageGroup[] = [
     title: m.groups.data,
     cards: [
       { to: '/admin/backup', icon: <DatabaseIcon />, ...m.backup },
+      { to: '/admin/shutdown', icon: <PowerIcon />, ...m.shutdown },
     ],
   },
   {

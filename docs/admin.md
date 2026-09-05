@@ -39,6 +39,7 @@ Write/manage routes — gated by `AdminRoute` (admin only):
 | `/admin/duty`                           | `AdminDutyPage`         | Assign staff/admin to events; fires push to assignee |
 | `/admin/notifications`                  | `AdminNotificationsPage` | Compose + send a one-off Web-Push broadcast to all subscribed devices |
 | `/admin/backup`                         | `AdminBackupPage`       | Download the whole database as one CSV-per-table ZIP — see [Database backup](#database-backup) |
+| `/admin/shutdown`                       | `AdminShutdownPage`     | Guided shut-down: readiness checks, exports, a farewell push, and the ordered switch-off list — see [Closing down](#closing-down) |
 
 All routes are also wrapped by `ProtectedRoute` — see
 [authentication.md](./authentication.md#role-gating).
@@ -416,6 +417,39 @@ dive-site maps) and no `auth.users` — credentials live outside the
 shop's own tables. `make backup-prod` is the pg_dump to take before a
 risky migration; this is the copy a shop owner can keep on a laptop and
 open in a spreadsheet.
+
+## Closing down
+
+`/admin/shutdown` (Manage → Close down the shop) is the guided path to
+switching the app and its infrastructure off. It deletes nothing itself —
+the destructive steps live in the Supabase and Cloudflare dashboards,
+where they are already guarded — but it is the thing that stands between
+an admin and a two-click project deletion:
+
+1. **Readiness checks**, computed live from the database: how recently a
+   backup was taken (read from `admin_audit_log`, which
+   `export-database-backup` writes to on success), events still on the
+   calendar, money owed to the shop, **unspent diver credit** (money the
+   shop holds for someone — deleting the project erases the record, not
+   the obligation), and how many diver accounts would go. Each warning
+   links to the page that resolves it. The arithmetic is
+   `src/lib/shutdown-readiness.ts`, pure and unit-tested.
+2. **The exports that outlive the project** — links to the CSV backup and
+   the bookkeeping / waiver ZIPs, plus a note about retention periods.
+3. **A farewell push** to every subscribed device, prefilled, through the
+   same `/admin-broadcast` endpoint the notifications page uses
+   (`src/lib/push-broadcast.ts`, extracted so the two cannot drift).
+4. **The ordered switch-off checklist** — domain, app worker, push
+   worker, Turnstile, Supabase project, Gmail app password, repository,
+   accounts. Ticks persist in `localStorage`, because closing a shop
+   takes more than one sitting.
+
+Two details worth keeping: the figures are read with
+`fetchAllRows` (`src/lib/fetch-all.ts`) rather than a plain select,
+because PostgREST caps a response at 1000 rows silently and "money still
+owed" is not a number to under-report; and the long-form walkthrough —
+account closure, DNS, storage buckets, what to keep for tax purposes —
+lives in [`shutdown.md`](./shutdown.md), which the page links out to.
 
 ## Role-view toggle
 

@@ -56,6 +56,7 @@ import { AdminDashboardPage } from './pages/admin/AdminDashboardPage'
 import { AdminRefundsPage } from './pages/admin/AdminRefundsPage'
 import { AdminAuditsPage } from './pages/admin/AdminAuditsPage'
 import { AdminBackupPage } from './pages/admin/AdminBackupPage'
+import { AdminShutdownPage } from './pages/admin/AdminShutdownPage'
 import { AdminHistoryPage } from './pages/admin/AdminHistoryPage'
 import { AdminPackagesPage } from './pages/admin/AdminPackagesPage'
 import { AdminScheduledTripsPage } from './pages/admin/AdminScheduledTripsPage'
@@ -194,6 +195,7 @@ export default function App() {
                 <Route path="/admin/duty" element={<AdminDutyPage />} />
                 <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
                 <Route path="/admin/backup" element={<AdminBackupPage />} />
+                <Route path="/admin/shutdown" element={<AdminShutdownPage />} />
                 <Route path="/admin/packages" element={<AdminPackagesPage />} />
                 <Route path="/admin/scheduled-trips" element={<AdminScheduledTripsPage />} />
                 <Route path="/admin/trusted-partners" element={<AdminTrustedPartnersPage />} />

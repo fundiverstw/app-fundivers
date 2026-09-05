@@ -44,6 +44,7 @@ function makeDeps(opts: {
   const zipped: Record<string, string> = {}
   const rangesAsked: Array<{ table: string; from: number; to: number }> = []
   const ordersAsked: Array<{ table: string; column: string }> = []
+  const auditInserts: Array<Record<string, unknown>> = []
 
   const admin: Deps["admin"] = {
     rpc: vi.fn(async (fn: string, args?: Record<string, unknown>) => {
@@ -64,6 +65,9 @@ function makeDeps(opts: {
     }),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     from: vi.fn((table: string): any => {
+      if (table === "admin_audit_log") {
+        return { insert: async (row: Record<string, unknown>) => { auditInserts.push(row); return { error: null } } }
+      }
       if (table === "profiles" && callerRole !== undefined) {
         // The role check runs before any table read; the data read of the same
         // table goes through select('*') below.
@@ -108,7 +112,7 @@ function makeDeps(opts: {
     now: () => new Date("2026-09-05T08:30:00.000Z"),
   }
 
-  return { deps, zipped, rangesAsked, ordersAsked }
+  return { deps, zipped, rangesAsked, ordersAsked, auditInserts }
 }
 
 describe("export-database-backup handler", () => {
@@ -131,6 +135,31 @@ describe("export-database-backup handler", () => {
     // A cell carrying a comma and quotes survives the round trip.
     expect(zipped["profiles.csv"]).toBe(`id,name\r\n${ADMIN},"Ada, ""the admin"""\r\n`)
     expect(zipped["manifest.csv"]).toBe("table,rows\r\nbookings,1\r\nprofiles,1\r\naudit,0\r\n")
+  })
+
+  it("records the backup once it exists, so \"your last backup\" is not a backup that failed", async () => {
+    const { deps, auditInserts } = makeDeps()
+    const res = await handleDatabaseBackup(makeReq(), deps)
+    const body = await res.json() as Record<string, unknown>
+
+    expect(auditInserts).toHaveLength(1)
+    expect(auditInserts[0]).toMatchObject({
+      actor_id:     ADMIN,
+      action:       "insert",
+      target_table: "database_backup",
+      target_id:    body.filename,
+      after:        { tables: 3, rows: 2 },
+    })
+  })
+
+  it("records nothing when the export never got as far as an archive", async () => {
+    const denied = makeDeps({ callerRole: "staff" })
+    await handleDatabaseBackup(makeReq(), denied.deps)
+    expect(denied.auditInserts).toHaveLength(0)
+
+    const broken = makeDeps({ readError: { message: "boom", code: "42501" } })
+    await handleDatabaseBackup(makeReq(), broken.deps)
+    expect(broken.auditInserts).toHaveLength(0)
   })
 
   it("keeps an empty table as a header-only CSV rather than dropping it", async () => {

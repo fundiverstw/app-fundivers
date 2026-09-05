@@ -129,9 +129,25 @@ export async function handleDatabaseBackup(req: Request, deps: Deps): Promise<Re
 
   const zipped = deps.zip(files)
   const shopSlug = siteConfig.identity.shortName.replace(/[^\w.-]+/g, "-").toLowerCase() || "shop"
+  const filename = `${shopSlug}-backup-${generatedAt.slice(0, 10)}.zip`
+
+  // Logged only once the archive exists, so "your last backup" means a backup
+  // that was actually built — the rate limiter's row is claimed before any of
+  // the work and would read as one that failed halfway. The shutdown page
+  // reads this to tell an admin whether their data is safely off the project.
+  const { error: auditErr } = await admin.from("admin_audit_log").insert({
+    actor_id:     callerId,
+    action:       "insert",
+    target_table: "database_backup",
+    target_id:    filename,
+    before:       null,
+    after:        { tables: counts.length, rows: rowTotal },
+  })
+  if (auditErr) console.error("backup audit insert failed:", safeError(auditErr, "audit failed"))
+
   return json({
     ok:          true,
-    filename:    `${shopSlug}-backup-${generatedAt.slice(0, 10)}.zip`,
+    filename,
     table_count: counts.length,
     row_count:   rowTotal,
     zip_base64:  Buffer.from(zipped).toString("base64"),
