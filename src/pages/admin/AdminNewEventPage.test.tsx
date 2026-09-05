@@ -6,7 +6,20 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { AdminNewEventPage } from './AdminNewEventPage'
 import { mockQueryBuilder, getDateInputByLabel } from '../../../tests/test-utils'
 
-const { from, rpc } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }))
+const { from, rpc, createDiveSite, findSimilarDiveSites } = vi.hoisted(() => ({
+  from: vi.fn(),
+  rpc: vi.fn(),
+  createDiveSite: vi.fn(),
+  findSimilarDiveSites: vi.fn(),
+}))
+vi.mock('../../lib/dive-sites', async () => {
+  const actual = await vi.importActual<typeof import('../../lib/dive-sites')>('../../lib/dive-sites')
+  return {
+    ...actual,
+    createDiveSite: (...a: unknown[]) => createDiveSite(...a),
+    findSimilarDiveSites: (...a: unknown[]) => findSimilarDiveSites(...a),
+  }
+})
 vi.mock('../../lib/supabase', () => ({
   supabase: { from: (...a: unknown[]) => from(...a), rpc: (...a: unknown[]) => rpc(...a) },
 }))
@@ -17,6 +30,9 @@ vi.mock('../../hooks/useAuth', () => ({
 beforeEach(() => {
   from.mockReset()
   rpc.mockReset()
+  createDiveSite.mockReset()
+  findSimilarDiveSites.mockReset()
+  findSimilarDiveSites.mockResolvedValue([])
   // create_events_with_relations writes the event, its junctions and its cars in
   // one transaction, returning the new ids.
   rpc.mockResolvedValue({ data: ['new-event-1'], error: null })
@@ -378,5 +394,37 @@ describe('AdminNewEventPage', () => {
     // The id comes back from the RPC — the client no longer mints one.
     expect(events[0].id).toBeUndefined()
     expect(await screen.findByText('EVENT_DETAIL')).toBeInTheDocument()
+  })
+})
+
+describe('AdminNewEventPage — adding a dive site mid-form', () => {
+  it('offers the add-a-place form under the site picker and selects what it creates', async () => {
+    // The catalog starts with one site; the admin is writing up a dive to
+    // somewhere else, and should not have to leave the half-filled form.
+    const sites = [{ id: 's1', name: 'Bat Cave', kind: 'dive', region: 'Longdong', active: true }]
+    from.mockImplementation((table: string) => {
+      if (table === 'dive_sites') return mockQueryBuilder({ data: sites })
+      return mockQueryBuilder({ data: [] })
+    })
+    createDiveSite.mockResolvedValue('s2')
+
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByRole('heading', { name: /new event/i })
+
+    await user.click(screen.getByRole('button', { name: /add new site/i }))
+    await user.type(await screen.findByLabelText(/name \(english\)/i), 'Iron House')
+
+    // Adding writes the site, re-reads the catalog and picks the new row.
+    sites.push({ id: 's2', name: 'Iron House', kind: 'dive', region: null as unknown as string, active: true })
+    await user.click(screen.getByRole('button', { name: /add this place/i }))
+
+    await waitFor(() => expect(createDiveSite).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Iron House', kind: 'dive' }),
+    ))
+    const select = await screen.findByLabelText(/^site$/i) as HTMLSelectElement
+    await waitFor(() => expect(select.value).toBe('s2'))
+    // And the form is back, not left sitting on the add screen.
+    expect(screen.queryByRole('button', { name: /add this place/i })).not.toBeInTheDocument()
   })
 })

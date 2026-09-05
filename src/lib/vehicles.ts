@@ -37,6 +37,14 @@ export async function saveVehicle(values: VehicleInsert, id?: string): Promise<v
   }
 }
 
+/** Insert one and hand the row back, so a caller adding a car mid-form can tick
+ *  it without re-reading the fleet or guessing at the id it was given. */
+export async function createVehicle(values: VehicleInsert): Promise<Vehicle> {
+  const { data, error } = await supabase.from('vehicles').insert(values).select().single()
+  if (error) throw error
+  return data as Vehicle
+}
+
 export async function deleteVehicle(id: string): Promise<void> {
   const { error } = await supabase.from('vehicles').delete().eq('id', id)
   if (error) throw error

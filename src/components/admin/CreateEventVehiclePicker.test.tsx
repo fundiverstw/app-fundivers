@@ -4,9 +4,13 @@ import userEvent from '@testing-library/user-event'
 import { CreateEventVehiclePicker } from './CreateEventVehiclePicker'
 import type { Vehicle } from '../../types/database'
 
-const { fetchVehicles } = vi.hoisted(() => ({ fetchVehicles: vi.fn() }))
+const { fetchVehicles, createVehicle } = vi.hoisted(() => ({
+  fetchVehicles: vi.fn(),
+  createVehicle: vi.fn(),
+}))
 vi.mock('../../lib/vehicles', () => ({
   fetchVehicles: (...a: unknown[]) => fetchVehicles(...a),
+  createVehicle: (...a: unknown[]) => createVehicle(...a),
 }))
 
 const vehicle = (id: string, name: string, seats: number, active = true): Vehicle => ({
@@ -15,6 +19,7 @@ const vehicle = (id: string, name: string, seats: number, active = true): Vehicl
 
 beforeEach(() => {
   fetchVehicles.mockReset()
+  createVehicle.mockReset()
   fetchVehicles.mockResolvedValue([
     vehicle('v1', 'Delica', 7),
     vehicle('v2', 'Bus', 12),
@@ -73,5 +78,66 @@ describe('CreateEventVehiclePicker', () => {
     fetchVehicles.mockResolvedValue([vehicle('v3', 'Retired', 4, false)])
     render(<CreateEventVehiclePicker onChange={() => {}} onTransportChange={() => {}} />)
     await waitFor(() => expect(screen.getByText(/no active cars in the fleet/i)).toBeInTheDocument())
+  })
+})
+
+describe('CreateEventVehiclePicker — adding a car mid-form', () => {
+  it('adds it to the fleet and ticks it for this event', async () => {
+    createVehicle.mockResolvedValue(vehicle('v9', 'Hired van', 9))
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    render(<CreateEventVehiclePicker onChange={onChange} onTransportChange={() => {}} />)
+    await screen.findByText(/Delica \(7 seats\)/)
+
+    await user.click(screen.getByRole('button', { name: /add vehicle/i }))
+    await user.type(screen.getByLabelText(/^name$/i), 'Hired van')
+    await user.type(screen.getByLabelText(/passenger seats/i), '9')
+    await user.click(screen.getByRole('button', { name: /add to fleet/i }))
+
+    await waitFor(() => expect(createVehicle).toHaveBeenCalledWith({
+      name: 'Hired van', passenger_seats: 9, active: true,
+    }))
+    // The car was added FOR this event, so it arrives ticked and counted.
+    expect(await screen.findByText(/Hired van \(9 seats\)/)).toBeInTheDocument()
+    await waitFor(() => expect(onChange).toHaveBeenLastCalledWith(['v9']))
+    expect(screen.getByText(/9 passenger seats/)).toBeInTheDocument()
+    // The form closes behind it.
+    expect(screen.queryByRole('button', { name: /add to fleet/i })).not.toBeInTheDocument()
+  })
+
+  it('refuses a nameless car and a car with no seats, without writing anything', async () => {
+    const user = userEvent.setup()
+    render(<CreateEventVehiclePicker onChange={() => {}} onTransportChange={() => {}} />)
+    await screen.findByText(/Delica \(7 seats\)/)
+
+    await user.click(screen.getByRole('button', { name: /add vehicle/i }))
+    await user.click(screen.getByRole('button', { name: /add to fleet/i }))
+    expect(await screen.findByText(/give the vehicle a name/i)).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText(/^name$/i), 'Nameless')
+    await user.click(screen.getByRole('button', { name: /add to fleet/i }))
+    expect(await screen.findByText(/at least one passenger seat/i)).toBeInTheDocument()
+    expect(createVehicle).not.toHaveBeenCalled()
+  })
+
+  it('keeps the typed car on screen when the write fails', async () => {
+    createVehicle.mockRejectedValue(new Error('permission denied'))
+    const user = userEvent.setup()
+    render(<CreateEventVehiclePicker onChange={() => {}} onTransportChange={() => {}} />)
+    await screen.findByText(/Delica \(7 seats\)/)
+
+    await user.click(screen.getByRole('button', { name: /add vehicle/i }))
+    await user.type(screen.getByLabelText(/^name$/i), 'Hired van')
+    await user.type(screen.getByLabelText(/passenger seats/i), '9')
+    await user.click(screen.getByRole('button', { name: /add to fleet/i }))
+
+    expect(await screen.findByText(/could not add the vehicle/i)).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Hired van')).toBeInTheDocument()
+  })
+
+  it('offers the add form even when the fleet is empty', async () => {
+    fetchVehicles.mockResolvedValue([])
+    render(<CreateEventVehiclePicker onChange={() => {}} onTransportChange={() => {}} />)
+    expect(await screen.findByRole('button', { name: /add vehicle/i })).toBeInTheDocument()
   })
 })

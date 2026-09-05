@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { fetchVehicles } from '../../lib/vehicles'
+import { fetchVehicles, createVehicle } from '../../lib/vehicles'
+import { errorMessage } from '../../lib/errors'
+import { BTN_XS_GHOST, BTN_XS_PRIMARY, ERROR_NOTE_LIGHT } from '../../styles/tokens'
 import type { Vehicle } from '../../types/database'
 import { t } from '../../i18n'
 
@@ -31,6 +33,13 @@ export function CreateEventVehiclePicker({ onChange, onTransportChange }: Props)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [hasTransport, setHasTransport] = useState(true)
   const [loading, setLoading] = useState(true)
+  // Adding a car from here, rather than sending the admin to Manage → Vehicles
+  // and back: leaving this page abandons a half-filled event form.
+  const [adding, setAdding] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newSeats, setNewSeats] = useState('')
+  const [savingVehicle, setSavingVehicle] = useState(false)
+  const [addError, setAddError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -56,6 +65,28 @@ export function CreateEventVehiclePicker({ onChange, onTransportChange }: Props)
     onTransportChange(hasTransport)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasTransport])
+
+  async function addVehicle() {
+    const name = newName.trim()
+    const seats = Number(newSeats)
+    if (!name) { setAddError(tp.newVehicleNameRequired); return }
+    if (!Number.isFinite(seats) || seats < 1) { setAddError(tp.newVehicleSeatsRequired); return }
+    setSavingVehicle(true)
+    setAddError(null)
+    try {
+      const vehicle = await createVehicle({ name, passenger_seats: seats, active: true })
+      // A car added here was added for this event, so it arrives ticked.
+      setVehicles(prev => [vehicle, ...prev])
+      setSelected(prev => new Set(prev).add(vehicle.id))
+      setNewName('')
+      setNewSeats('')
+      setAdding(false)
+    } catch (err) {
+      setAddError(tp.newVehicleFailed(errorMessage(err)))
+    } finally {
+      setSavingVehicle(false)
+    }
+  }
 
   function toggle(id: string) {
     setSelected(prev => {
@@ -90,23 +121,71 @@ export function CreateEventVehiclePicker({ onChange, onTransportChange }: Props)
       <p className="text-xs text-white/60 pl-6">{tp.noTransportHint}</p>
       {!hasTransport ? null : loading ? (
         <p className="text-sm text-white/60">{tp.loadingCars}</p>
-      ) : vehicles.length === 0 ? (
-        <p className="text-sm text-brand-950 font-medium bg-white/70 rounded-md p-2">{tp.noActiveCars}</p>
       ) : (
-        <div className="space-y-1 max-h-56 overflow-y-auto bg-white/70 backdrop-blur-md border border-surface-200 rounded-md p-2">
-          {vehicles.map(v => (
-            <label key={v.id} className="flex items-center gap-2 text-sm text-brand-950 font-medium">
-              <input
-                type="checkbox"
-                checked={selected.has(v.id)}
-                onChange={() => toggle(v.id)}
-                className="accent-brand-900"
-              />
-              <span>{v.name} ({v.passenger_seats} seat{v.passenger_seats === 1 ? '' : 's'})</span>
-            </label>
-          ))}
-        </div>
+        <>
+          {vehicles.length === 0 ? (
+            <p className="text-sm text-brand-950 font-medium bg-white/70 rounded-md p-2">{tp.noActiveCars}</p>
+          ) : (
+            <div className="space-y-1 max-h-56 overflow-y-auto bg-white/70 backdrop-blur-md border border-surface-200 rounded-md p-2">
+              {vehicles.map(v => (
+                <label key={v.id} className="flex items-center gap-2 text-sm text-brand-950 font-medium">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(v.id)}
+                    onChange={() => toggle(v.id)}
+                    className="accent-brand-900"
+                  />
+                  <span>{v.name} ({v.passenger_seats} seat{v.passenger_seats === 1 ? '' : 's'})</span>
+                </label>
+              ))}
+            </div>
+          )}
+
+          {adding ? (
+            <div className="space-y-2 bg-white/70 backdrop-blur-md border border-surface-200 rounded-md p-2">
+              <label className="block space-y-1">
+                <span className="text-xs font-medium text-brand-950">{tp.newVehicleName}</span>
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={e => setNewName(e.target.value)}
+                  placeholder={tp.newVehicleNamePh}
+                  className={FIELD}
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs font-medium text-brand-950">{tp.newVehicleSeats}</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={newSeats}
+                  onChange={e => setNewSeats(e.target.value)}
+                  className={FIELD}
+                />
+              </label>
+              {addError && <p className={ERROR_NOTE_LIGHT}>{addError}</p>}
+              <div className="flex gap-2">
+                <button type="button" onClick={() => void addVehicle()} disabled={savingVehicle} className={BTN_XS_PRIMARY}>
+                  {savingVehicle ? tp.savingVehicle : tp.saveVehicle}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAdding(false); setAddError(null) }}
+                  className={BTN_XS_GHOST}
+                >
+                  {t.common.cancel}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setAdding(true)} className={BTN_XS_GHOST}>
+              {tp.addVehicle}
+            </button>
+          )}
+        </>
       )}
     </div>
   )
 }
+
+const FIELD = 'w-full bg-white border border-surface-300 rounded-md px-2 py-1 text-sm text-brand-950 focus:outline-none focus:border-brand-900'

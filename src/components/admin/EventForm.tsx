@@ -3,7 +3,8 @@ import { supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
 import { fetchEventRelations } from '../../lib/event-relations'
 import { siteConfig } from '../../config/site'
-import type { CancellationPolicy, CertLevel, DiveSite, TripTemplateEntry, EOAddon, EventRow, EOPrice, EORoom, TravelDestination } from '../../types/database'
+import type { CancellationPolicy, CertLevel, DiveSite, SiteKind, TripTemplateEntry, EOAddon, EventRow, EOPrice, EORoom, TravelDestination } from '../../types/database'
+import { AddPlaceForm } from '../sites/AddPlaceForm'
 import {
   EMPTY_FORM,
   formStateFromEvent,
@@ -99,6 +100,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
   const [tripTemplates, setTripTemplates] = useState<TripTemplateEntry[]>([])
   const [destinations, setDestinations] = useState<TravelDestination[]>([])
   const [diveSites, setDiveSites] = useState<DiveSite[]>([])
+  const [addingSite, setAddingSite] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Past events for the preload picker, sorted most-recent-first.
@@ -264,6 +266,16 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
 
   function removeCourseDay(index: number) {
     setForm(f => ({ ...f, courseDays: f.courseDays.filter((_, i) => i !== index) }))
+  }
+
+  /** A place added from inside the form is the place this event runs at, so it
+   *  is selected as soon as it exists — and the list is re-read rather than
+   *  patched, so the row carries whatever the catalog actually stored. */
+  async function selectNewSite(siteId: string) {
+    const { data } = await supabase.from('dive_sites').select('*').eq('active', true).order('name')
+    setDiveSites((data ?? []) as DiveSite[])
+    set('site_id', siteId)
+    setAddingSite(false)
   }
 
   function toggleId(key: 'addonIds' | 'roomIds' | 'destinationIds', id: string) {
@@ -591,16 +603,43 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
           </Field>
         </div>
         {recordsSiteConditions(form.type) && (
-          <Field label={ef.site}>
-            <Select value={form.site_id} onChange={v => set('site_id', v)}>
-              <option value="">{ef.none}</option>
-              {diveSites.filter(site => site.kind === form.type).map(site => (
-                <option key={site.id} value={site.id}>
-                  {site.region ? `${site.name} — ${site.region}` : site.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          addingSite ? (
+            // The same form divers use from the almanac, and for the same
+            // reason: an admin writing up a dive to somewhere new should not
+            // have to abandon a half-filled event form to add the place — and
+            // the duplicate search it carries is exactly what keeps "Batcave"
+            // out of a catalog that already has Bat Cave.
+            <AddPlaceForm
+              kind={form.type as SiteKind}
+              onCancel={() => setAddingSite(false)}
+              onAdded={id => void selectNewSite(id)}
+              onPick={id => void selectNewSite(id)}
+            />
+          ) : (
+            <>
+              <Field label={ef.site}>
+                <Select value={form.site_id} onChange={v => set('site_id', v)}>
+                  <option value="">{ef.none}</option>
+                  {diveSites.filter(site => site.kind === form.type).map(site => (
+                    <option key={site.id} value={site.id}>
+                      {site.region ? `${site.name} — ${site.region}` : site.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              {/* Outside the Field on purpose: Field wraps its children in a
+                  <label>, which would hand the button the select's accessible
+                  name ("Site — None —") instead of its own. Same placement as
+                  the other "+ New …" buttons here. */}
+              <button
+                type="button"
+                onClick={() => setAddingSite(true)}
+                className={`-mt-2 self-start ${BTN_XS_GHOST}`}
+              >
+                {ef.addSite}
+              </button>
+            </>
+          )
         )}
         <Field label={ef.requiredCert}>
           <Select value={form.prereq_cert_id} onChange={v => set('prereq_cert_id', v)}>
