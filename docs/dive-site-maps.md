@@ -157,6 +157,21 @@ disturbing what is there.
   into the water is another, and they cannot share a gesture. `markEntry()`
   toggles, because the gesture that places an entry is a tap and taps land
   where they were not meant to.
+- **A selection states one depth over many points.** Most of a dive is flat —
+  a sand bottom at 8 m, a ledge at 12 — and pulling four hundred points to the
+  same figure one at a time is the reason nobody would fill a site in. In
+  select mode a tap toggles a point and a drag draws a box (`withinBox` /
+  `isTap`, screen-space, in `site-map-grab.ts`); pulling any selected point, or
+  typing a figure, writes that depth at every one of them through
+  `placeSoundings()`. Nothing is interpolated: each position gets its own
+  reading at the depth the diver stated, which is the claim a diver who swam
+  the stretch is entitled to make. Selecting takes the whole canvas, so the
+  camera moves on the pad and the keys while it is armed.
+- **Undo reverses an act, not a record.** `Draft.batches` holds the ids each
+  placement produced, so taking back a forty-point statement is one press. A
+  correction that supersedes an earlier reading forgets the dead id, and a
+  batch emptied that way is dropped — an undo must never land on an act with
+  nothing left in it and appear to do nothing.
 - Corrections carry `supersedes`, so the flat original does not survive
   underneath its own fix, and correcting the same point twice replaces the
   earlier value rather than stacking.
@@ -168,6 +183,37 @@ disturbing what is there.
   derive the real contributor from the session; trusting a client-supplied id
   would let anyone attribute a reading to another diver — the same class of hole
   the booking guard trigger closed.
+
+### Base routes — `src/lib/site-map-routes.ts`
+
+An empty site is a flat sheet of water, which is honest and is also a blank
+page. A **base route** is the shape a shore dive, a wall, a sand flat or a gully
+usually has, laid under the handle field so the first diver corrects a shape
+instead of building one from nothing. Four shapes ship as code constants beside
+the site seeds; a shop that wants different ones forks the constant.
+
+- **A route is a function, not records.** `Scaffold` is `{ footprint, depthAt }`
+  and `editableGrid()` seeds every handle inside the footprint from it, at the
+  full 1 m resolution. Storing a depth per position would be thousands of rows
+  nobody measured sitting in the same table as readings somebody did — and the
+  lattice is implicit for exactly that reason.
+- **It contributes nothing.** Scaffold handles stay `measured: false`, the
+  surface and the coverage figure are built from observed records only, and a
+  diver who picks a shape and submits nothing has added nothing to the site. A
+  pull over a scaffolded point is an ordinary reading with a name and a time on
+  it, and it starts from the shape rather than from the surface.
+- **The suggested entry is a `placeholder` record**, drawn faintly, excluded
+  from `observedOnly()` and from the "ways into the water" caption. It sits on
+  the lattice, so a diver who agrees taps it and their own entry replaces the
+  suggestion at the same id.
+- **A route brings its own ground**: `gridBounds()` takes in the footprint, so
+  picking a 60 m shape does not then ask for three presses of Extend to reach
+  the rest of it.
+- **Offered only while the site holds no observed soundings.** A shape laid
+  under somebody else's measurements is not scaffolding any more.
+- Nothing is traced from a real site. The shop's own sites are precisely what
+  the divers are being asked to measure, and a template of one would be a
+  survey nobody did.
 
 ### Privacy: not quite git
 

@@ -114,3 +114,46 @@ export function nearestWithin(
   }
   return nearest
 }
+
+/** A rubber-band rectangle in canvas pixels, corners in any order. */
+export interface Box {
+  x0: number
+  y0: number
+  x1: number
+  y1: number
+}
+
+/** How far a pointer may travel and still count as a tap rather than a box.
+ *  A finger never lands perfectly still, and a two-pixel wobble that selected
+ *  a rectangle of nothing instead of the point under it would read as the tap
+ *  being ignored. */
+export const TAP_SLOP_PX = 5
+
+export function isTap(box: Box): boolean {
+  return Math.abs(box.x1 - box.x0) <= TAP_SLOP_PX && Math.abs(box.y1 - box.y0) <= TAP_SLOP_PX
+}
+
+/**
+ * Which points a dragged rectangle encloses.
+ *
+ * Screen-space, like the picking: what a diver drags a box around is what they
+ * can see, and two points a metre apart in the water are a rectangle apart on
+ * screen or overlapping depending only on where the camera is. Points behind
+ * the camera are excluded for the reason `nearestWithin` excludes them — they
+ * project to a plausible coordinate that is nowhere near where they appear,
+ * so a box drawn over the near seabed would quietly also take in the ground
+ * behind the diver's head.
+ */
+export function withinBox(points: readonly ScreenPoint[], box: Box): number[] {
+  const minX = Math.min(box.x0, box.x1)
+  const maxX = Math.max(box.x0, box.x1)
+  const minY = Math.min(box.y0, box.y1)
+  const maxY = Math.max(box.y0, box.y1)
+  const inside: number[] = []
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i]
+    if (p.behind) continue
+    if (p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY) inside.push(i)
+  }
+  return inside
+}

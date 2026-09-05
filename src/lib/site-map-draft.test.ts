@@ -3,7 +3,7 @@ import {
   emptyDraft, setTool, setFeatureKind, placeSounding, addVertex,
   canCommitPath, commitPath, undo, contributionCount, isEmpty, validate,
   toContribution, withDraft, contributionsByDiver, MAX_PLAUSIBLE_DEPTH_M,
-  markEntry, nameEntry,
+  markEntry, nameEntry, placeSoundings,
 } from './site-map-draft'
 import type { DiveSiteMap } from './dive-site-map'
 
@@ -292,5 +292,106 @@ describe('marking ways into the water', () => {
     const preview = withDraft(map, d)
     expect(preview.entries).toHaveLength(1)
     expect(preview.entries[0].label).toBe('Slipway')
+  })
+})
+
+
+// Most of a real dive is flat — a sand bottom at 8 m, a ledge at 12 — and
+// pulling four hundred points to the same figure one at a time is the reason
+// nobody would fill in a site. A selection says it once.
+describe('stating one depth over a selection', () => {
+  const ledge = [
+    { id: 'lat:0:0', at: { x: 0, y: 0 } },
+    { id: 'lat:1:0', at: { x: 1, y: 0 } },
+    { id: 'lat:2:0', at: { x: 2, y: 0 } },
+  ]
+
+  it('writes a reading at every position, each superseding what was there', () => {
+    const d = placeSoundings(emptyDraft(), ledge, 12, NOW)
+    expect(d.soundings).toHaveLength(3)
+    expect(d.soundings.map(s => s.supersedes)).toEqual(['lat:0:0', 'lat:1:0', 'lat:2:0'])
+    for (const s of d.soundings) {
+      expect(s).toMatchObject({
+        depth_m: 12, datum: 'instantaneous', observed_at: NOW, source: 'diver',
+      })
+    }
+    expect(d.soundings.map(s => s.at)).toEqual(ledge.map(p => p.at))
+  })
+
+  it('counts as what it is: three readings, not one', () => {
+    expect(contributionCount(placeSoundings(emptyDraft(), ledge, 12, NOW))).toBe(3)
+  })
+
+  it('does nothing at all when nothing is selected', () => {
+    const before = emptyDraft()
+    expect(placeSoundings(before, [], 12, NOW)).toBe(before)
+  })
+
+  it('restates rather than stacks when the same stretch is set twice', () => {
+    let d = placeSoundings(emptyDraft(), ledge, 12, NOW)
+    d = placeSoundings(d, ledge, 14, NOW)
+    expect(d.soundings).toHaveLength(3)
+    expect(d.soundings.every(s => s.depth_m === 14)).toBe(true)
+  })
+
+  it('replaces only the points it names, leaving the rest of the draft alone', () => {
+    let d = placeSounding(emptyDraft(), { x: 9, y: 9 }, 30, NOW, 'lat:9:9')
+    d = placeSoundings(d, ledge, 12, NOW)
+    expect(d.soundings).toHaveLength(4)
+    expect(d.soundings.find(s => s.supersedes === 'lat:9:9')!.depth_m).toBe(30)
+  })
+
+  it('submits every point of it, each with the depth the diver stated', () => {
+    const d = placeSoundings(emptyDraft(), ledge, 12, NOW)
+    const contribution = toContribution(d, 'site-1')!
+    expect(contribution.soundings).toHaveLength(3)
+    expect(contribution.soundings.every(s => s.depth_m === 12)).toBe(true)
+  })
+})
+
+// Undo reverses an ACT. One act is now sometimes forty readings, and undoing
+// it forty times would be forty presses to take back one sentence.
+describe('undoing an act rather than a reading', () => {
+  const ledge = [
+    { id: 'lat:0:0', at: { x: 0, y: 0 } },
+    { id: 'lat:1:0', at: { x: 1, y: 0 } },
+  ]
+
+  it('takes back a whole selection in one press', () => {
+    const d = placeSoundings(emptyDraft(), ledge, 12, NOW)
+    expect(undo(d).soundings).toEqual([])
+  })
+
+  it('leaves earlier acts standing', () => {
+    let d = placeSounding(emptyDraft(), { x: 9, y: 9 }, 30, NOW, 'lat:9:9')
+    d = placeSoundings(d, ledge, 12, NOW)
+    const back = undo(d)
+    expect(back.soundings).toHaveLength(1)
+    expect(back.soundings[0]).toMatchObject({ depth_m: 30, supersedes: 'lat:9:9' })
+  })
+
+  it('still takes back one pull at a time when that is what was done', () => {
+    let d = placeSounding(emptyDraft(), { x: 0, y: 0 }, 10, NOW, 'lat:0:0')
+    d = placeSounding(d, { x: 1, y: 0 }, 11, NOW, 'lat:1:0')
+    const back = undo(d)
+    expect(back.soundings).toHaveLength(1)
+    expect(back.soundings[0].supersedes).toBe('lat:0:0')
+  })
+
+  // A correction replaces the reading it corrects, so the act that placed the
+  // dead one must not survive as an undo press that appears to do nothing.
+  it('never lands on an act with nothing left in it', () => {
+    let d = placeSounding(emptyDraft(), { x: 0, y: 0 }, 10, NOW, 'lat:0:0')
+    d = placeSounding(d, { x: 0, y: 0 }, 12, NOW, 'lat:0:0')
+    expect(d.soundings).toHaveLength(1)
+    expect(undo(d).soundings).toEqual([])
+  })
+
+  it('takes the entries back before the depths, as it always did', () => {
+    let d = placeSoundings(emptyDraft(), ledge, 12, NOW)
+    d = markEntry(d, { x: 4, y: -2 })
+    const back = undo(d)
+    expect(back.entries).toEqual([])
+    expect(back.soundings).toHaveLength(2)
   })
 })

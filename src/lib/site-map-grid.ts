@@ -51,6 +51,22 @@ export interface Bounds {
   maxY: number
 }
 
+/**
+ * A starting shape the field is laid over — a base route, in practice.
+ *
+ * A function rather than records, because the lattice it seeds is implicit: a
+ * 60 m corridor is thousands of positions, and storing a depth at each one
+ * would be thousands of rows nobody measured, sitting in the same table as
+ * readings that somebody did. `depthAt` answers for any position inside
+ * `footprint`; outside it the field stays at the surface, as it always was.
+ * Nothing here is ever written — a scaffold handle is `measured: false` and
+ * becomes a record only when a diver pulls it.
+ */
+export interface Scaffold {
+  footprint: Bounds
+  depthAt: (at: Vec2) => number
+}
+
 /** Patches added beyond what the readings themselves cover, per compass point. */
 export interface Expansion {
   north: number
@@ -75,9 +91,21 @@ export function expand(expansion: Expansion, direction: Direction, patches = 1):
  * on the site they left them. Extending grows one edge, so a site ends up the
  * shape of the dive rather than a square with the dive in one corner.
  */
-export function gridBounds(map: DiveSiteMap, expansion: Expansion = NO_EXPANSION): Bounds {
+export function gridBounds(
+  map: DiveSiteMap, expansion: Expansion = NO_EXPANSION, scaffold?: Scaffold,
+): Bounds {
   const half = PATCH_M / 2
   const bounds: Bounds = { minX: -half, maxX: half, minY: -half, maxY: half }
+
+  // A base route brings its own ground. Without this the diver picks a shape
+  // 60 m long and gets a 20 m patch of it, then presses Extend twice to reach
+  // the rest of what they already chose.
+  if (scaffold) {
+    bounds.minX = Math.min(bounds.minX, scaffold.footprint.minX)
+    bounds.maxX = Math.max(bounds.maxX, scaffold.footprint.maxX)
+    bounds.minY = Math.min(bounds.minY, scaffold.footprint.minY)
+    bounds.maxY = Math.max(bounds.maxY, scaffold.footprint.maxY)
+  }
 
   for (const s of map.soundings) {
     if (s.source === 'placeholder') continue
@@ -120,9 +148,12 @@ export function gridStep(bounds: Bounds, max = HANDLES_MAX): number {
  * them.
  */
 export function editableGrid(
-  map: DiveSiteMap, expansion: Expansion = NO_EXPANSION, max = HANDLES_MAX,
+  map: DiveSiteMap,
+  expansion: Expansion = NO_EXPANSION,
+  scaffold?: Scaffold,
+  max = HANDLES_MAX,
 ): GridHandle[] {
-  const bounds = gridBounds(map, expansion)
+  const bounds = gridBounds(map, expansion, scaffold)
   const step = gridStep(bounds, max)
 
   const byId = new Map<string, GridHandle>()
@@ -130,7 +161,7 @@ export function editableGrid(
     for (let y = bounds.minY; y <= bounds.maxY; y += step) {
       const at = snapToLattice({ x, y })
       const id = latticeId(at)
-      byId.set(id, { id, at, depth_m: BASE_DEPTH_M, measured: false })
+      byId.set(id, { id, at, depth_m: scaffoldDepth(scaffold, at), measured: false })
     }
   }
 
@@ -144,6 +175,16 @@ export function editableGrid(
   }
 
   return [...byId.values()]
+}
+
+/** Where a scaffolded field starts at a position: the shape's depth inside its
+ *  footprint, the surface everywhere else. */
+function scaffoldDepth(scaffold: Scaffold | undefined, at: Vec2): number {
+  if (!scaffold) return BASE_DEPTH_M
+  const { footprint } = scaffold
+  const inside = at.x >= footprint.minX && at.x <= footprint.maxX
+    && at.y >= footprint.minY && at.y <= footprint.maxY
+  return inside ? scaffold.depthAt(at) : BASE_DEPTH_M
 }
 
 /** The handle a grab landed on, by its lattice id. */

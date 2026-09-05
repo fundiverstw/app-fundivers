@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   editableGrid, gridBounds, gridStep, expand, handleAt,
-  PATCH_M, HANDLES_MAX, NO_EXPANSION, type Expansion,
+  PATCH_M, HANDLES_MAX, NO_EXPANSION, type Expansion, type Scaffold,
 } from './site-map-grid'
 import { latticeId, snapToLattice, LATTICE_SPACING_M, type DiveSiteMap, type Sounding } from './dive-site-map'
 import { BASE_DEPTH_M, newSiteMap } from './site-seeds'
@@ -168,5 +168,62 @@ describe('editableGrid', () => {
 
   it('finds nothing for a position nobody drew', () => {
     expect(handleAt(editableGrid(site()), 'lat:9999:9999')).toBeNull()
+  })
+})
+
+
+// A base route is a shape laid under the field, not records in the map: see
+// site-map-routes.ts. What the grid owes it is ground to cover and a depth to
+// start each handle at.
+describe('a field laid over a starting shape', () => {
+  const slope: Scaffold = {
+    footprint: { minX: -20, maxX: 20, minY: -30, maxY: 30 },
+    depthAt: at => (at.y + 30) / 5,
+  }
+
+  it("covers the shape's ground, so the diver is not asked to extend onto what they picked", () => {
+    const bounds = gridBounds(site(), NO_EXPANSION, slope)
+    expect(bounds).toEqual({ minX: -20, maxX: 20, minY: -30, maxY: 30 })
+  })
+
+  it('keeps the starting patch when the shape is smaller than it', () => {
+    const small: Scaffold = { footprint: { minX: -2, maxX: 2, minY: -2, maxY: 2 }, depthAt: () => 5 }
+    expect(gridBounds(site(), NO_EXPANSION, small)).toEqual({
+      minX: -PATCH_M / 2, maxX: PATCH_M / 2, minY: -PATCH_M / 2, maxY: PATCH_M / 2,
+    })
+  })
+
+  it('starts each handle on the shape rather than at the surface', () => {
+    const handles = editableGrid(site(), NO_EXPANSION, slope)
+    expect(handleAt(handles, latticeId({ x: 0, y: -30 }))!.depth_m).toBe(0)
+    expect(handleAt(handles, latticeId({ x: 0, y: 0 }))!.depth_m).toBe(6)
+    expect(handleAt(handles, latticeId({ x: 0, y: 30 }))!.depth_m).toBe(12)
+  })
+
+  // Nothing about a shape is a reading. A diver who picks one and submits
+  // nothing has contributed nothing, and the coverage figure must say so.
+  it('marks every point of it unmeasured', () => {
+    expect(editableGrid(site(), NO_EXPANSION, slope).every(h => !h.measured)).toBe(true)
+  })
+
+  it('leaves ground outside the shape at the surface', () => {
+    const narrow: Scaffold = {
+      footprint: { minX: -2, maxX: 2, minY: -2, maxY: 2 },
+      depthAt: () => 9,
+    }
+    const handles = editableGrid(site(), NO_EXPANSION, narrow)
+    expect(handleAt(handles, latticeId({ x: 0, y: 0 }))!.depth_m).toBe(9)
+    expect(handleAt(handles, latticeId({ x: 8, y: 8 }))!.depth_m).toBe(BASE_DEPTH_M)
+  })
+
+  it('lets a measured reading win over the shape underneath it', () => {
+    const handles = editableGrid(site({ soundings: [sounding(0, 0, 24.3)] }), NO_EXPANSION, slope)
+    expect(handleAt(handles, latticeId({ x: 0, y: 0 }))).toMatchObject({
+      depth_m: 24.3, measured: true,
+    })
+  })
+
+  it('is the flat sheet of water it always was when no shape is given', () => {
+    expect(editableGrid(site()).every(h => h.depth_m === BASE_DEPTH_M)).toBe(true)
   })
 })

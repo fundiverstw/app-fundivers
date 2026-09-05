@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   beginGrab, dragTo, setGrabDepth, cancelGrab, movedGrab, nearestWithin,
-  DEPTH_STEP_M, type ScreenPoint,
+  isTap, withinBox, DEPTH_STEP_M, TAP_SLOP_PX, type ScreenPoint,
 } from './site-map-grab'
 import { MAX_PLAUSIBLE_DEPTH_M } from './site-map-draft'
 import type { GridHandle } from './site-map-grid'
@@ -124,5 +124,46 @@ describe('finding the point under a finger', () => {
   it('ignores points the camera is facing away from', () => {
     const behind: ScreenPoint[] = [{ x: 100, y: 100, behind: true }]
     expect(nearestWithin(behind, 100, 100, 26)).toBe(-1)
+  })
+})
+
+
+describe('dragging a box around a stretch of seabed', () => {
+  const field: ScreenPoint[] = [
+    { x: 10, y: 10 },
+    { x: 50, y: 50 },
+    { x: 90, y: 90 },
+    { x: 50, y: 50, behind: true },
+  ]
+
+  it('takes everything the rectangle covers, whichever corner it was drawn from', () => {
+    const box = { x0: 0, y0: 0, x1: 60, y1: 60 }
+    expect(withinBox(field, box)).toEqual([0, 1])
+    expect(withinBox(field, { x0: 60, y0: 60, x1: 0, y1: 0 })).toEqual([0, 1])
+  })
+
+  it('counts a point on the edge as inside — a box drawn to a dot means that dot', () => {
+    expect(withinBox(field, { x0: 10, y0: 10, x1: 50, y1: 50 })).toEqual([0, 1])
+  })
+
+  // The same reason picking skips them: a point the camera faces away from
+  // projects to a plausible coordinate nowhere near where it appears, so a box
+  // over the near seabed would quietly also take in the ground behind the
+  // diver's head.
+  it('leaves out points behind the camera', () => {
+    expect(withinBox(field, { x0: 0, y0: 0, x1: 200, y1: 200 })).toEqual([0, 1, 2])
+  })
+
+  it('finds nothing in a rectangle over empty water', () => {
+    expect(withinBox(field, { x0: 200, y0: 200, x1: 300, y1: 300 })).toEqual([])
+  })
+
+  // A finger never lands perfectly still, and a two-pixel wobble that selected
+  // a rectangle of nothing would read as the tap having been swallowed.
+  it('reads a box no bigger than a fingertip wobble as a tap', () => {
+    expect(isTap({ x0: 100, y0: 100, x1: 100, y1: 100 })).toBe(true)
+    expect(isTap({ x0: 100, y0: 100, x1: 100 + TAP_SLOP_PX, y1: 100 + TAP_SLOP_PX })).toBe(true)
+    expect(isTap({ x0: 100, y0: 100, x1: 100 + TAP_SLOP_PX + 1, y1: 100 })).toBe(false)
+    expect(isTap({ x0: 100, y0: 100, x1: 100, y1: 140 })).toBe(false)
   })
 })

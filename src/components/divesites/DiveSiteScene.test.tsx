@@ -117,6 +117,17 @@ describe('DiveSiteScene — ways into the water', () => {
     expect(screen.getByText(t.siteMap.entriesMarked(1))).toBeInTheDocument()
   })
 
+  // A base route suggests where you would get in. It is drawn, faintly, and it
+  // is not somebody saying they got in there — so it is not counted as one.
+  it('does not count the entry a base route suggests as a marked one', () => {
+    const map = {
+      ...mapWith([sounding('a', 0, 0, 5)]),
+      entries: [{ ...entry('e1', 0, -30), source: 'placeholder' as const }],
+    }
+    render(<DiveSiteScene map={map} />)
+    expect(screen.queryByText(/way(s)? into the water/i)).not.toBeInTheDocument()
+  })
+
   it('counts every one of them, because a site has as many ways in as it has', () => {
     const map = {
       ...mapWith([sounding('a', 0, 0, 5)]),

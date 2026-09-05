@@ -28,6 +28,17 @@ export interface Draft {
   entries: EntryPoint[]
   /** Kind applied to the next committed feature. */
   featureKind: FeatureKind
+  /**
+   * The soundings each placement act produced, oldest act first.
+   *
+   * Undo reverses an ACT, and one act can now be forty readings: saying "this
+   * whole ledge is twelve meters" with a selection is one thing the diver did,
+   * and undoing it forty times would be forty presses to take back one
+   * sentence. Held as ids rather than counts because a correction replaces an
+   * earlier reading at the same position, so the ids in a batch outlive their
+   * ordinal positions in `soundings`.
+   */
+  batches: string[][]
 }
 
 export function emptyDraft(overrides: Partial<Draft> = {}): Draft {
@@ -38,6 +49,7 @@ export function emptyDraft(overrides: Partial<Draft> = {}): Draft {
     features: [],
     entries: [],
     featureKind: 'rock',
+    batches: [],
     ...overrides,
   }
 }
@@ -84,10 +96,64 @@ export function placeSounding(
   }
   // Correcting the same grid point twice replaces the earlier correction
   // rather than stacking two readings on one spot.
-  const kept = supersedes
-    ? draft.soundings.filter(s => s.supersedes !== supersedes)
-    : draft.soundings
-  return { ...draft, soundings: [...kept, sounding] }
+  const dropped = supersedes
+    ? draft.soundings.filter(s => s.supersedes === supersedes).map(s => s.id)
+    : []
+  const kept = draft.soundings.filter(s => !dropped.includes(s.id))
+  return {
+    ...draft,
+    soundings: [...kept, sounding],
+    batches: [...withoutIds(draft.batches, dropped), [sounding.id]],
+  }
+}
+
+/**
+ * One depth, stated over every position in a selection.
+ *
+ * The multi-point act, and the reason it is a single call rather than a loop
+ * over `placeSounding`: a diver who selects a ledge and types 12 has done ONE
+ * thing, and undo has to be able to take back the thing they did. Each position
+ * still gets its own reading, superseding whatever was at that lattice id — the
+ * depth is stated once but claimed everywhere it is written, which is exactly
+ * what the diver said.
+ */
+export function placeSoundings(
+  draft: Draft,
+  points: readonly { id: string; at: Vec2 }[],
+  depth_m: number,
+  observedAt: string,
+): Draft {
+  if (!points.length) return draft
+  const placed: Sounding[] = points.map(point => ({
+    id: nextId('draft-s'),
+    at: point.at,
+    depth_m,
+    datum: 'instantaneous',
+    observed_at: observedAt,
+    source: 'diver',
+    supersedes: point.id,
+  }))
+  const superseded = new Set(points.map(p => p.id))
+  const replaced = draft.soundings.filter(s => s.supersedes && superseded.has(s.supersedes))
+  const kept = draft.soundings.filter(s => !replaced.includes(s))
+  return {
+    ...draft,
+    soundings: [...kept, ...placed],
+    batches: [
+      ...withoutIds(draft.batches, replaced.map(s => s.id)),
+      placed.map(s => s.id),
+    ],
+  }
+}
+
+/** Batches with dead readings forgotten, and any batch emptied by that
+ *  forgetting dropped — an undo must never land on an act with nothing left in
+ *  it and appear to do nothing. */
+function withoutIds(batches: string[][], ids: string[]): string[][] {
+  if (!ids.length) return batches
+  return batches
+    .map(batch => batch.filter(id => !ids.includes(id)))
+    .filter(batch => batch.length > 0)
 }
 
 /**
@@ -164,6 +230,16 @@ export function undo(draft: Draft): Draft {
   if (draft.pending.length) return { ...draft, pending: draft.pending.slice(0, -1) }
   if (draft.features.length) return { ...draft, features: draft.features.slice(0, -1) }
   if (draft.entries.length) return { ...draft, entries: draft.entries.slice(0, -1) }
+  // A whole act at a time: the last batch, whether it was one point pulled or
+  // a hundred set at once.
+  if (draft.batches.length) {
+    const last = draft.batches[draft.batches.length - 1]
+    return {
+      ...draft,
+      soundings: draft.soundings.filter(s => !last.includes(s.id)),
+      batches: draft.batches.slice(0, -1),
+    }
+  }
   if (draft.soundings.length) return { ...draft, soundings: draft.soundings.slice(0, -1) }
   return draft
 }

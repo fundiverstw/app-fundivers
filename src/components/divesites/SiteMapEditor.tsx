@@ -1,14 +1,18 @@
-import { useCallback, useMemo, useState } from 'react'
-import type { DiveSiteMap, Vec2 } from '../../lib/dive-site-map'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { observedOnly, type DiveSiteMap, type Vec2 } from '../../lib/dive-site-map'
 import {
-  emptyDraft, placeSounding, markEntry, nameEntry, setTool, undo, contributionCount,
-  validate, toContribution, withDraft,
+  emptyDraft, placeSounding, placeSoundings, markEntry, nameEntry, setTool, undo,
+  contributionCount, validate, toContribution, withDraft,
   type Contributor, type Draft, type SiteContribution,
 } from '../../lib/site-map-draft'
 import {
   editableGrid, expand, gridStep, gridBounds, PATCH_M, NO_EXPANSION,
   type Direction, type Expansion, type GridHandle,
 } from '../../lib/site-map-grid'
+import {
+  ROUTE_TEMPLATES, routeTemplate, suggestedEntry,
+  type RouteTemplate, type RouteTemplateId,
+} from '../../lib/site-map-routes'
 import { setGrabDepth, type Grab } from '../../lib/site-map-grab'
 import { DiveSiteScene } from './DiveSiteScene'
 import { t } from '../../i18n'
@@ -42,6 +46,21 @@ import {
 // They cannot share a gesture: a drag that means "this is 12 m deep" cannot
 // also mean "this is the slipway". So the tool is switched explicitly, and the
 // view says which one is armed.
+//
+// SELECTING is the third thing a finger can do, and it is a mode of the depth
+// tool rather than a tool of its own: what it gathers is points to state a
+// depth for. Most of a real dive is flat — a sand bottom at 8 m, a ledge at
+// 12 — and pulling four hundred points to the same figure one at a time is the
+// reason nobody would fill in a site. Select the stretch, say the number once,
+// and every point in it carries that reading with the diver's name on it. The
+// depth is still stated, not interpolated: a selection is a claim about all of
+// it, which is what a diver who swam along it is entitled to make.
+//
+// A BASE ROUTE is the other half of the same problem. An empty site is a flat
+// sheet of water and a blank page; a route lays the shape a shore dive, a wall
+// or a sand flat usually has under the field, so the work starts as correcting
+// a shape rather than building one. It is scaffolding and stays scaffolding —
+// see site-map-routes.ts — and contributes nothing until points are pulled.
 
 // Module-level so the default is a stable reference. Declared inline as a
 // default parameter it was a new function on every render, which invalidated
@@ -75,30 +94,106 @@ export function SiteMapEditor({
   // rather than stored: an empty patch is not data, and once a point on it is
   // pulled the reading itself is what says the site reaches that far.
   const [expansion, setExpansion] = useState<Expansion>(NO_EXPANSION)
+  // Lattice ids gathered for one statement. Not in the draft: a selection is
+  // what the diver is looking at, not part of what they are proposing, and it
+  // must not survive into a contribution.
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set())
+  const [selecting, setSelecting] = useState(false)
+  const [routeId, setRouteId] = useState<RouteTemplateId | ''>('')
+  // The figure in the box. Its own state now rather than a read of `live`: with
+  // a selection there may be no point under the finger to read it off, and the
+  // depth is still something the diver is entitled to type.
+  const [typed, setTyped] = useState('')
 
-  const preview = useMemo(() => withDraft(map, draft), [map, draft])
-  const handles = useMemo(() => editableGrid(preview, expansion), [preview, expansion])
-  const step = gridStep(gridBounds(preview, expansion))
+  const route: RouteTemplate | null = routeTemplate(routeId)
+  // The suggested entry rides on the map the scene draws, not on the draft:
+  // it is a suggestion, and a draft is a set of claims.
+  const scaffolded = useMemo(
+    () => (route ? { ...map, entries: [...map.entries, suggestedEntry(route)] } : map),
+    [map, route],
+  )
+  const preview = useMemo(() => withDraft(scaffolded, draft), [scaffolded, draft])
+  const handles = useMemo(
+    () => editableGrid(preview, expansion, route ?? undefined),
+    [preview, expansion, route],
+  )
+  const step = gridStep(gridBounds(preview, expansion, route ?? undefined))
   const problems = validate(draft)
   const count = contributionCount(draft)
+  // A base route is a starting shape, so it is offered while there is nothing
+  // to start from. Once the site holds readings the shape would be laid under
+  // somebody else's measurements, which is not scaffolding any more.
+  const offerRoutes = observedOnly(map).soundings.length === 0
+
+  // Read through refs by the scene callbacks below, which must keep the same
+  // identity across renders: rebuilt callbacks tear the WebGL scene down and
+  // put it back up, mid-gesture.
+  const handlesRef = useRef(handles)
+  const selectedRef = useRef(selected)
+  useEffect(() => { handlesRef.current = handles }, [handles])
+  useEffect(() => { selectedRef.current = selected }, [selected])
+
+  /** The points a depth typed or pulled right now would be written to. */
+  function targets(): { id: string; at: Vec2 }[] {
+    return handlesRef.current
+      .filter(h => selectedRef.current.has(h.id))
+      .map(h => ({ id: h.id, at: h.at }))
+  }
 
   const onHandleDrag = useCallback((e: { id: string; at: Vec2; depth_m: number; done: boolean }) => {
     setLive({ id: e.id, at: e.at, depth_m: e.depth_m })
+    setTyped(String(e.depth_m))
     if (!e.done) return
-    setDraft(d => placeSounding(d, e.at, e.depth_m, now(), e.id))
+    // Pulling a point that is part of the selection states that depth for the
+    // whole of it; pulling one outside the selection is about that point alone,
+    // and leaves the selection where it was.
+    const withSelection = selectedRef.current.has(e.id)
+    setDraft(d => (withSelection
+      ? placeSoundings(d, targets(), e.depth_m, now())
+      : placeSounding(d, e.at, e.depth_m, now(), e.id)))
   }, [now])
 
   const onHandleMark = useCallback((handle: GridHandle) => {
     setDraft(d => markEntry(d, handle.at))
   }, [])
 
+  const onHandleSelect = useCallback((handle: GridHandle) => {
+    setSelected(current => {
+      const next = new Set(current)
+      if (!next.delete(handle.id)) next.add(handle.id)
+      return next
+    })
+  }, [])
+
+  // A box adds to what is held rather than replacing it: a ledge is often two
+  // or three boxes from different angles, and starting over each time would
+  // make the second box undo the first.
+  const onSelectBox = useCallback((ids: string[]) => {
+    setSelected(current => new Set([...current, ...ids]))
+  }, [])
+
   // Typing a figure corrects the point just pulled, rather than arming a value
   // for the next tap — the old behaviour, and the thing that made this tedious.
-  function retype(depth_m: number) {
+  // With points selected it states that depth for all of them at once.
+  function retype(raw: string) {
+    setTyped(raw)
+    const depth_m = Number(raw)
+    if (raw.trim() === '' || !Number.isFinite(depth_m)) return
+    const chosen = targets()
+    if (chosen.length) {
+      const corrected = setGrabDepth({ from_m: depth_m, originY: 0, depth_m } as Grab, depth_m)
+      setDraft(d => placeSoundings(d, chosen, corrected.depth_m, now()))
+      return
+    }
     if (!live) return
     const corrected = setGrabDepth({ ...live, from_m: live.depth_m, originY: 0 } as Grab, depth_m)
     setLive({ ...live, depth_m: corrected.depth_m })
     setDraft(d => placeSounding(d, live.at, corrected.depth_m, now(), live.id))
+  }
+
+  function chooseTool(tool: 'sounding' | 'entry', select = false) {
+    setDraft(d => setTool(d, tool))
+    setSelecting(tool === 'sounding' && select)
   }
 
   function submit() {
@@ -107,6 +202,8 @@ export function SiteMapEditor({
     onSubmit?.(contribution)
     setDraft(emptyDraft())
     setLive(null)
+    setSelected(new Set())
+    setTyped('')
   }
 
   return (
@@ -115,16 +212,24 @@ export function SiteMapEditor({
         <div className="flex gap-1" role="group" aria-label={t.siteMap.toolAria}>
           <button
             type="button"
-            aria-pressed={draft.tool === 'sounding'}
-            onClick={() => setDraft(d => setTool(d, 'sounding'))}
-            className={draft.tool === 'sounding' ? BTN_XS_PRIMARY : BTN_XS_GHOST}
+            aria-pressed={draft.tool === 'sounding' && !selecting}
+            onClick={() => chooseTool('sounding')}
+            className={draft.tool === 'sounding' && !selecting ? BTN_XS_PRIMARY : BTN_XS_GHOST}
           >
             {t.siteMap.toolDepths}
           </button>
           <button
             type="button"
+            aria-pressed={draft.tool === 'sounding' && selecting}
+            onClick={() => chooseTool('sounding', true)}
+            className={draft.tool === 'sounding' && selecting ? BTN_XS_PRIMARY : BTN_XS_GHOST}
+          >
+            {t.siteMap.toolSelect}
+          </button>
+          <button
+            type="button"
             aria-pressed={draft.tool === 'entry'}
-            onClick={() => setDraft(d => setTool(d, 'entry'))}
+            onClick={() => chooseTool('entry')}
             className={draft.tool === 'entry' ? BTN_XS_PRIMARY : BTN_XS_GHOST}
           >
             {t.siteMap.toolEntries}
@@ -133,18 +238,28 @@ export function SiteMapEditor({
 
         {draft.tool === 'sounding' && (
           <label className={`flex items-center gap-1 text-xs ${TEXT_MUTED}`}>
-            {t.siteMap.depthField}
+            {selected.size ? t.siteMap.depthFieldMany(selected.size) : t.siteMap.depthField}
             <input
               type="number"
               min={0}
               max={100}
               step={0.1}
-              disabled={!live}
-              value={live ? live.depth_m : ''}
-              onChange={e => retype(Number(e.target.value))}
+              disabled={!live && selected.size === 0}
+              value={typed}
+              onChange={e => retype(e.target.value)}
               className={`${INPUT} w-20 py-1 text-xs disabled:opacity-40`}
             />
           </label>
+        )}
+
+        {selected.size > 0 && (
+          <button
+            type="button"
+            className={BTN_XS_GHOST}
+            onClick={() => setSelected(new Set())}
+          >
+            {t.siteMap.clearSelection}
+          </button>
         )}
 
         <span className="flex-1" />
@@ -162,15 +277,23 @@ export function SiteMapEditor({
         height={height}
         handles={handles}
         onHandleDrag={onHandleDrag}
-        gesture={draft.tool === 'entry' ? 'mark' : 'pull'}
+        gesture={draft.tool === 'entry' ? 'mark' : selecting ? 'select' : 'pull'}
         onHandleMark={onHandleMark}
+        selected={selected}
+        onHandleSelect={onHandleSelect}
+        onSelectBox={onSelectBox}
       />
 
       <div className="space-y-1 px-4 py-3">
         <p className={`text-sm ${TEXT_HEADING}`}>{t.siteMap.draftCount(count)}</p>
         <p className={`text-xs ${TEXT_MUTED}`}>
-          {draft.tool === 'entry' ? t.siteMap.hintMarkEntry : t.siteMap.hintDrag}
+          {draft.tool === 'entry'
+            ? t.siteMap.hintMarkEntry
+            : selecting ? t.siteMap.hintSelect : t.siteMap.hintDrag}
         </p>
+        {selected.size > 0 && (
+          <p className={`text-xs ${TEXT_HEADING}`}>{t.siteMap.selectedCount(selected.size)}</p>
+        )}
         {/* Said here as well as under the view: this is the screen where a
             diver decides which point to pull, and what a point is worth is the
             thing they need to know to decide. */}
@@ -203,6 +326,35 @@ export function SiteMapEditor({
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {offerRoutes && (
+          <div className="pt-2">
+            <p className={`text-xs ${TEXT_HEADING}`}>{t.siteMap.routesHeading}</p>
+            <p className={`text-xs ${TEXT_SUBTLE}`}>{t.siteMap.routesNote}</p>
+            <div className="mt-1 flex flex-wrap gap-2" role="group" aria-label={t.siteMap.routesHeading}>
+              <button
+                type="button"
+                aria-pressed={routeId === ''}
+                className={routeId === '' ? BTN_XS_PRIMARY : BTN_XS_GHOST}
+                onClick={() => setRouteId('')}
+              >
+                {t.siteMap.routeNone}
+              </button>
+              {ROUTE_TEMPLATES.map(template => (
+                <button
+                  key={template.id}
+                  type="button"
+                  aria-pressed={routeId === template.id}
+                  className={routeId === template.id ? BTN_XS_PRIMARY : BTN_XS_GHOST}
+                  onClick={() => setRouteId(template.id)}
+                >
+                  {t.siteMap.routes[template.id]}
+                </button>
+              ))}
+            </div>
+            {route && <p className={`mt-1 text-xs ${TEXT_MUTED}`}>{t.siteMap.routeNotes[route.id]}</p>}
           </div>
         )}
 

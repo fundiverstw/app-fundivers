@@ -4,30 +4,31 @@ import userEvent from '@testing-library/user-event'
 import { SiteMapEditor } from './SiteMapEditor'
 import { newSiteMap } from '../../lib/site-seeds'
 import { t } from '../../i18n'
-import type { Vec2 } from '../../lib/dive-site-map'
+import type { DiveSiteMap, Vec2 } from '../../lib/dive-site-map'
 import { PATCH_M, type GridHandle } from '../../lib/site-map-grid'
 
 type DragEvent = { id: string; at: Vec2; depth_m: number; done: boolean }
 
+interface SceneProps {
+  map: DiveSiteMap
+  handles: readonly GridHandle[]
+  onHandleDrag: (e: DragEvent) => void
+  onHandleMark: (h: GridHandle) => void
+  gesture: 'pull' | 'mark' | 'select'
+  selected?: ReadonlySet<string>
+  onHandleSelect: (h: GridHandle) => void
+  onSelectBox: (ids: string[]) => void
+}
+
 const { sceneProps } = vi.hoisted(() => ({
-  sceneProps: { current: null as null | {
-    handles: readonly GridHandle[]
-    onHandleDrag: (e: DragEvent) => void
-    onHandleMark: (h: GridHandle) => void
-    gesture: 'pull' | 'mark'
-  } },
+  sceneProps: { current: null as null | SceneProps },
 }))
 
 // The scene is WebGL and renders nothing under happy-dom. What it contributes
-// to this component is a stream of drag events, so the stub exposes exactly
-// that and the test drives it the way a finger would.
+// to this component is a stream of drag, tap and selection events, so the stub
+// exposes exactly that and the test drives it the way a finger would.
 vi.mock('./DiveSiteScene', () => ({
-  DiveSiteScene: (props: {
-    handles: readonly GridHandle[]
-    onHandleDrag: (e: DragEvent) => void
-    onHandleMark: (h: GridHandle) => void
-    gesture: 'pull' | 'mark'
-  }) => {
+  DiveSiteScene: (props: SceneProps) => {
     sceneProps.current = props
     return <div data-testid="scene" />
   },
@@ -62,6 +63,20 @@ function tap(at: Vec2) {
   act(() => sceneProps.current!.onHandleMark({
     id: `lat:${at.x}:${at.y}`, at, depth_m: 0, measured: false,
   }))
+}
+
+/** One tap in select mode, on the handle the scene picked. */
+function tapSelect(at: Vec2) {
+  const id = `lat:${at.x}:${at.y}`
+  const handle = sceneProps.current!.handles.find(h => h.id === id)
+    ?? { id, at, depth_m: 0, measured: false }
+  act(() => sceneProps.current!.onHandleSelect(handle))
+}
+
+/** One box dragged round a stretch of seabed. Which handles it enclosed is the
+ *  scene's arithmetic (`withinBox`); what the editor does with them is here. */
+function boxSelect(...ids: string[]) {
+  act(() => sceneProps.current!.onSelectBox(ids))
 }
 
 beforeEach(() => { sceneProps.current = null })
@@ -366,5 +381,240 @@ describe('SiteMapEditor — designating a way into the water', () => {
     await armEntries()
     expect(screen.getByText(sm.hintMarkEntry)).toBeInTheDocument()
     expect(screen.queryByText(sm.hintDrag)).not.toBeInTheDocument()
+  })
+})
+
+
+// Most of a real dive is flat: a sand bottom at 8 m, a ledge at 12. Pulling
+// four hundred points to the same figure one at a time is the reason nobody
+// would fill in a site, so a diver says it once for the stretch they swam.
+describe('SiteMapEditor — setting a stretch of seabed at once', () => {
+  async function armSelect() {
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: sm.toolSelect }))
+    return user
+  }
+
+  it('tells the scene that a drag now gathers points instead of pulling one', async () => {
+    renderEditor()
+    expect(sceneProps.current!.gesture).toBe('pull')
+    await armSelect()
+    expect(sceneProps.current!.gesture).toBe('select')
+  })
+
+  it('says what the gesture does, since it changed under the diver', async () => {
+    renderEditor()
+    await armSelect()
+    expect(screen.getByText(sm.hintSelect)).toBeInTheDocument()
+    expect(screen.queryByText(sm.hintDrag)).not.toBeInTheDocument()
+  })
+
+  it('holds what a tap picks, and lets the same tap put it back', async () => {
+    renderEditor()
+    await armSelect()
+
+    tapSelect({ x: 0, y: 0 })
+    expect(screen.getByText(sm.selectedCount(1))).toBeInTheDocument()
+    expect(sceneProps.current!.selected!.has('lat:0:0')).toBe(true)
+
+    tapSelect({ x: 0, y: 0 })
+    expect(screen.queryByText(sm.selectedCount(1))).not.toBeInTheDocument()
+  })
+
+  // A ledge is often two or three boxes from different angles, and starting
+  // over each time would make the second box undo the first.
+  it('adds a box to what is already held rather than replacing it', async () => {
+    renderEditor()
+    await armSelect()
+    boxSelect('lat:0:0', 'lat:1:0')
+    boxSelect('lat:1:0', 'lat:2:0')
+
+    expect(screen.getByText(sm.selectedCount(3))).toBeInTheDocument()
+  })
+
+  it('records the typed depth at every selected point, in one act', async () => {
+    const onSubmit = renderEditor()
+    const user = await armSelect()
+    boxSelect('lat:0:0', 'lat:1:0', 'lat:2:0')
+
+    await user.type(screen.getByLabelText(sm.depthFieldMany(3)), '12')
+    expect(screen.getByText(sm.draftCount(3))).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: sm.submit }))
+    const contribution = onSubmit.mock.calls[0][0]
+    expect(contribution.soundings).toHaveLength(3)
+    expect(contribution.soundings.every((s: { depth_m: number }) => s.depth_m === 12)).toBe(true)
+    expect(contribution.soundings.map((s: { supersedes: string }) => s.supersedes))
+      .toEqual(['lat:0:0', 'lat:1:0', 'lat:2:0'])
+  })
+
+  it('offers the typed field with nothing pulled, once something is selected', async () => {
+    renderEditor()
+    await armSelect()
+    expect(screen.getByLabelText(sm.depthField)).toBeDisabled()
+    boxSelect('lat:0:0')
+    expect(screen.getByLabelText(sm.depthFieldMany(1))).toBeEnabled()
+  })
+
+  // Pulling one of them is a statement about all of them: that is what having
+  // them selected means.
+  it('carries a pull on a selected point across the whole selection', async () => {
+    renderEditor()
+    await armSelect()
+    boxSelect('lat:0:0', 'lat:1:0', 'lat:2:0')
+
+    pull('lat:1:0', { x: 1, y: 0 }, 12)
+
+    expect(screen.getByText(sm.draftCount(3))).toBeInTheDocument()
+    const handles = sceneProps.current!.handles
+    for (const id of ['lat:0:0', 'lat:1:0', 'lat:2:0']) {
+      expect(handles.find(h => h.id === id)).toMatchObject({ depth_m: 12, measured: true })
+    }
+  })
+
+  it('leaves the selection alone when a point outside it is pulled', async () => {
+    renderEditor()
+    await armSelect()
+    boxSelect('lat:0:0', 'lat:1:0')
+
+    pull('lat:9:9', { x: 9, y: 9 }, 30)
+
+    expect(screen.getByText(sm.draftCount(1))).toBeInTheDocument()
+    expect(sceneProps.current!.handles.find(h => h.id === 'lat:0:0')!.measured).toBe(false)
+  })
+
+  it('takes the whole stretch back in one undo, not one press per point', async () => {
+    renderEditor()
+    const user = await armSelect()
+    boxSelect('lat:0:0', 'lat:1:0', 'lat:2:0')
+    await user.type(screen.getByLabelText(sm.depthFieldMany(3)), '12')
+    expect(screen.getByText(sm.draftCount(3))).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: sm.undo }))
+    expect(screen.getByText(sm.draftCount(0))).toBeInTheDocument()
+  })
+
+  it('lets the selection go without touching what was recorded from it', async () => {
+    renderEditor()
+    const user = await armSelect()
+    boxSelect('lat:0:0', 'lat:1:0')
+    await user.type(screen.getByLabelText(sm.depthFieldMany(2)), '12')
+
+    await user.click(screen.getByRole('button', { name: sm.clearSelection }))
+
+    expect(screen.queryByText(sm.selectedCount(2))).not.toBeInTheDocument()
+    expect(screen.getByText(sm.draftCount(2))).toBeInTheDocument()
+  })
+
+  it('clears the selection with the draft when a submission goes', async () => {
+    renderEditor()
+    const user = await armSelect()
+    boxSelect('lat:0:0')
+    await user.type(screen.getByLabelText(sm.depthFieldMany(1)), '12')
+    await user.click(screen.getByRole('button', { name: sm.submit }))
+
+    expect(screen.queryByText(sm.selectedCount(1))).not.toBeInTheDocument()
+  })
+
+  it('puts the selecting away while entries are being marked', async () => {
+    renderEditor()
+    const user = await armSelect()
+    await user.click(screen.getByRole('button', { name: sm.toolEntries }))
+    expect(sceneProps.current!.gesture).toBe('mark')
+  })
+})
+
+// An empty site is honest and is also a blank page. A base route is the shape
+// a shore dive, a wall or a sand flat usually has, laid under the field so the
+// work starts as correcting a shape rather than building one.
+describe('SiteMapEditor — starting from a base route', () => {
+  async function choose(name: string) {
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name }))
+    return user
+  }
+
+  it('offers the shapes, and flat water as the way out of them', () => {
+    renderEditor()
+    expect(screen.getByRole('button', { name: sm.routes.shore_slope })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: sm.routes.wall })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: sm.routes.sandy_flat })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: sm.routes.gully })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: sm.routeNone })).toBeInTheDocument()
+  })
+
+  it('lays the shape under the field instead of the flat sheet of water', async () => {
+    renderEditor()
+    expect(sceneProps.current!.handles.every(h => h.depth_m === 0)).toBe(true)
+
+    await choose(sm.routes.sandy_flat)
+
+    expect(sceneProps.current!.handles.every(h => h.depth_m === 8)).toBe(true)
+  })
+
+  it('brings its own ground, so nobody extends onto a shape they already picked', async () => {
+    renderEditor()
+    await choose(sm.routes.shore_slope)
+
+    const ys = sceneProps.current!.handles.map(h => h.at.y)
+    expect(Math.min(...ys)).toBe(-30)
+    expect(Math.max(...ys)).toBe(30)
+  })
+
+  // The whole point: a shape is scaffolding. A diver who picks one and submits
+  // nothing has contributed nothing.
+  it('records nothing by being picked', async () => {
+    renderEditor()
+    await choose(sm.routes.wall)
+
+    expect(screen.getByText(sm.draftCount(0))).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: sm.submit })).toBeDisabled()
+    expect(sceneProps.current!.handles.every(h => !h.measured)).toBe(true)
+  })
+
+  it('suggests where you would get in, as a suggestion and not a record', async () => {
+    renderEditor()
+    await choose(sm.routes.shore_slope)
+
+    const entries = sceneProps.current!.map.entries
+    expect(entries).toEqual([expect.objectContaining({ source: 'placeholder' })])
+    // Nothing in the draft, so nothing in the count and nothing to submit.
+    expect(screen.getByText(sm.draftCount(0))).toBeInTheDocument()
+  })
+
+  it('takes the shape away again, back to flat water', async () => {
+    renderEditor()
+    const user = await choose(sm.routes.sandy_flat)
+    await user.click(screen.getByRole('button', { name: sm.routeNone }))
+
+    expect(sceneProps.current!.handles.every(h => h.depth_m === 0)).toBe(true)
+    expect(sceneProps.current!.map.entries).toEqual([])
+  })
+
+  it('lets a point of the shape be pulled to what was really read there', async () => {
+    const onSubmit = vi.fn()
+    render(<SiteMapEditor map={map} onSubmit={onSubmit} now={() => NOW} />)
+    await userEvent.setup().click(screen.getByRole('button', { name: sm.routes.sandy_flat }))
+
+    pull('lat:0:0', { x: 0, y: 0 }, 9.4)
+
+    expect(sceneProps.current!.handles.find(h => h.id === 'lat:0:0'))
+      .toMatchObject({ depth_m: 9.4, measured: true })
+    expect(screen.getByText(sm.draftCount(1))).toBeInTheDocument()
+  })
+
+  // A shape laid under somebody else's measurements is not scaffolding any
+  // more, so it is offered while there is nothing to start from and not after.
+  it('is not offered on a site that already holds readings', () => {
+    const measured = {
+      ...map,
+      soundings: [{
+        id: 's1', at: { x: 0, y: 0 }, depth_m: 12, datum: 'instantaneous' as const,
+        observed_at: NOW, source: 'diver' as const,
+      }],
+    }
+    render(<SiteMapEditor map={measured} onSubmit={vi.fn()} now={() => NOW} />)
+
+    expect(screen.queryByRole('button', { name: sm.routes.wall })).not.toBeInTheDocument()
   })
 })

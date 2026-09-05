@@ -5,13 +5,14 @@ import {
   buildSurface, coverageFraction, SURFACE_DEFAULTS, type SurfaceOptions,
 } from '../../lib/dive-site-surface'
 import {
-  isVolumetric, observedOnly, singleDatum,
+  isObserved, isVolumetric, observedOnly, singleDatum,
   LATTICE_SPACING_M, type DiveSiteMap, type Vec2,
 } from '../../lib/dive-site-map'
 import { BASE_DEPTH_M, SITE_EXTENT_M } from '../../lib/site-seeds'
 import type { GridHandle } from '../../lib/site-map-grid'
 import {
-  beginGrab, dragTo, movedGrab, nearestWithin, type Grab, type ScreenPoint,
+  beginGrab, dragTo, isTap, movedGrab, nearestWithin, withinBox,
+  type Box, type Grab, type ScreenPoint,
 } from '../../lib/site-map-grab'
 import {
   travelDirection, travelForKey, travelSpeed, TRAVEL_RAMP_S, type Travel,
@@ -92,13 +93,26 @@ interface DiveSiteSceneProps {
    *  mid-gesture. */
   onHandleDrag?: (e: { id: string; at: Vec2; depth_m: number; done: boolean }) => void
   /** What taking hold of a handle means. `pull` drags it to a depth; `mark`
-   *  designates the position and leaves the depth alone. A mode, and named
-   *  one, because designating where you get into the water and measuring how
-   *  deep it is there are different acts on the same point of seabed. */
+   *  designates the position and leaves the depth alone; `select` gathers
+   *  points to be set together. Modes, and named ones, because designating
+   *  where you get into the water, measuring how deep it is there and choosing
+   *  which stretch of it you are talking about are different acts on the same
+   *  point of seabed. */
   gesture?: HandleGesture
   /** A handle marked while `gesture` is `mark`. Toggling is the caller's job:
    *  the scene reports the tap, the draft decides what it means. */
   onHandleMark?: (handle: GridHandle) => void
+  /** Lattice ids the caller is holding selected. Drawn in their own color, and
+   *  pulled together: a drag on any one of them moves all of them, because the
+   *  diver stated one depth for the lot. */
+  selected?: ReadonlySet<string>
+  /** A handle tapped while `gesture` is `select`. Toggling is the caller's
+   *  job, as with `onHandleMark`. */
+  onHandleSelect?: (handle: GridHandle) => void
+  /** Every handle a dragged box enclosed. Reported as an addition to whatever
+   *  is already held: a box drawn over part of a ledge must not throw away the
+   *  part selected by the last one. */
+  onSelectBox?: (ids: string[]) => void
   /** Vertical exaggeration. A dive site is tens of meters deep across hundreds
    *  of meters wide, so at true scale the relief that matters to a diver — the
    *  drop-off, the ridge, the gully — flattens into nothing. Exaggerating is
@@ -108,7 +122,7 @@ interface DiveSiteSceneProps {
 }
 
 /** What taking hold of a handle does. */
-export type HandleGesture = 'pull' | 'mark'
+export type HandleGesture = 'pull' | 'mark' | 'select'
 
 /**
  * How far down the depth rings go on a site with nothing measured on it.
@@ -194,11 +208,15 @@ function clearGroup(group: THREE.Group) {
 
 export function DiveSiteScene({
   map, options, height = 420, verticalExaggeration = 3, handles, onHandleDrag,
-  gesture = 'pull', onHandleMark,
+  gesture = 'pull', onHandleMark, selected, onHandleSelect, onSelectBox,
 }: DiveSiteSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null)
   const roseRef = useRef<SVGGElement | null>(null)
   const badgeRef = useRef<HTMLDivElement | null>(null)
+  // The rubber band, as an HTML overlay rather than scene geometry: it is a
+  // rectangle on the glass, not a thing in the water, and drawing it in the
+  // scene would put it at some depth and make it obey the camera.
+  const boxRef = useRef<HTMLDivElement | null>(null)
   const rigRef = useRef<Rig | null>(null)
   // What the camera was last framed on. Reframing on any data change would
   // yank the view every time a point was pulled; reframing on nothing would
@@ -642,8 +660,13 @@ export function DiveSiteScene({
     // bottom. The drop line is what makes it legible from underneath — from
     // the seabed looking up, an entry is the one mark that says which patch of
     // bright water overhead is the one you came in through.
+    //
+    // A base route's suggested entry is drawn here too, and faintly: it is a
+    // guess about where you would get in, not a record that anybody did, and it
+    // stays scaffold until a diver taps it and makes it theirs.
     const entryRadius = Math.max(radius * 0.05, 1.2)
-    for (const entry of observed.entries) {
+    for (const entry of map.entries) {
+      const suggested = !isObserved(entry.source)
       const below = observed.soundings.reduce<{ d: number; depth: number }>((best, sd) => {
         const d = Math.hypot(sd.at.x - entry.at.x, sd.at.y - entry.at.y)
         return d < best.d ? { d, depth: sd.depth_m } : best
@@ -651,7 +674,9 @@ export function DiveSiteScene({
 
       const ring = new THREE.Mesh(
         new THREE.TorusGeometry(entryRadius, entryRadius * 0.16, 8, 24),
-        new THREE.MeshBasicMaterial({ color: ENTRY_COLOR, transparent: true, opacity: 0.95 }),
+        new THREE.MeshBasicMaterial({
+          color: ENTRY_COLOR, transparent: true, opacity: suggested ? 0.35 : 0.95,
+        }),
       )
       ring.rotation.x = -Math.PI / 2
       ring.position.set(entry.at.x, 0.05, -entry.at.y)
@@ -689,7 +714,7 @@ export function DiveSiteScene({
       controls.target.copy(center)
       controls.update()
     }
-  }, [supported, map.id, observed, surface, extent, editable, handleStep, verticalExaggeration])
+  }, [supported, map.id, map.entries, observed, surface, extent, editable, handleStep, verticalExaggeration])
 
   // The grabbable field, and the gesture that pulls it.
   //
@@ -706,7 +731,7 @@ export function DiveSiteScene({
     clearGroup(handleLayer)
 
     const field = handles ?? []
-    if (!field.length || !(onHandleDrag || onHandleMark)) return
+    if (!field.length || !(onHandleDrag || onHandleMark || onHandleSelect)) return
 
     const positions = new Float32Array(field.length * 3)
     const colors = new Float32Array(field.length * 3)
@@ -716,7 +741,15 @@ export function DiveSiteScene({
       positions[i * 3 + 2] = -h.at.y
       // Scaffold is drawn faintly and measured points brightly, so what
       // somebody actually recorded is never confused with the flat field it is
-      // sitting in.
+      // sitting in. Selected points are amber whichever they are: what the next
+      // depth is about to be written to has to be visible at a glance, and it
+      // cuts across the measured/scaffold distinction rather than replacing it.
+      if (selected?.has(h.id)) {
+        colors[i * 3] = 1
+        colors[i * 3 + 1] = 0.82
+        colors[i * 3 + 2] = 0.5
+        return
+      }
       const tone = h.measured ? 1 : 0.42
       colors[i * 3] = tone
       colors[i * 3 + 1] = tone
@@ -760,6 +793,16 @@ export function DiveSiteScene({
     let grabbedIndex = -1
     let hoveredIndex = -1
     let lastHover = 0
+    let box: Box | null = null
+
+    // Which handles a pull carries with it. Resolved once here rather than per
+    // frame: a drag runs at the frame rate over a field of thousands, and
+    // asking a Set for every point of it on every move is the one place in this
+    // file where that would show.
+    const selectedIndices = new Set<number>()
+    if (selected?.size) {
+      field.forEach((h, i) => { if (selected.has(h.id)) selectedIndices.add(i) })
+    }
 
     function projectField() {
       const rect = dom.getBoundingClientRect()
@@ -812,12 +855,47 @@ export function DiveSiteScene({
 
     function moveHandle(index: number, depth_m: number) {
       positions[index * 3 + 1] = -depth_m * verticalExaggeration
+      // A pull on a selected point is a statement about all of them, so they
+      // travel together under the finger. Watching one dot move and the other
+      // thirty jump on release reads as the gesture having missed them.
+      if (selectedIndices.has(index)) {
+        for (const i of selectedIndices) positions[i * 3 + 1] = positions[index * 3 + 1]
+      }
       geom.attributes.position.needsUpdate = true
       marker.position.y = positions[index * 3 + 1]
     }
 
+    function drawBox(current: Box | null) {
+      const el = boxRef.current
+      if (!el) return
+      if (!current) {
+        el.hidden = true
+        return
+      }
+      el.hidden = false
+      el.style.left = `${Math.min(current.x0, current.x1)}px`
+      el.style.top = `${Math.min(current.y0, current.y1)}px`
+      el.style.width = `${Math.abs(current.x1 - current.x0)}px`
+      el.style.height = `${Math.abs(current.y1 - current.y0)}px`
+    }
+
     function onPointerDown(e: PointerEvent) {
       const { px, py } = pointerAt(e)
+
+      // Selecting takes the whole canvas, handle or not: the gesture is a box
+      // drawn over an area, and an area is mostly the water between points.
+      // The camera is not stranded by that — the pad and the keys still fly it,
+      // and the mode is one press away from the one that orbits.
+      if (gesture === 'select') {
+        box = { x0: px, y0: py, x1: px, y1: py }
+        drawBox(box)
+        e.stopPropagation()
+        e.preventDefault()
+        controls.enabled = false
+        dom.setPointerCapture(e.pointerId)
+        return
+      }
+
       projectField()
       const index = nearestWithin(screen, px, py, PICK_RADIUS_PX)
       if (index < 0) return
@@ -849,6 +927,13 @@ export function DiveSiteScene({
     function onPointerMove(e: PointerEvent) {
       const { px, py } = pointerAt(e)
 
+      if (box) {
+        box = { ...box, x1: px, y1: py }
+        drawBox(box)
+        e.stopPropagation()
+        return
+      }
+
       if (grab && grabbedIndex >= 0) {
         const rect = dom.getBoundingClientRect()
         grabbedPoint.set(
@@ -873,9 +958,32 @@ export function DiveSiteScene({
       hoveredIndex = index
       showMarker(index, false)
       dom.style.cursor = index < 0 ? '' : gesture === 'mark' ? 'crosshair' : 'grab'
+      if (gesture === 'select') dom.style.cursor = 'crosshair'
+    }
+
+    function endSelect(e: PointerEvent) {
+      if (!box) return
+      const finished = box
+      box = null
+      drawBox(null)
+      controls.enabled = true
+      if (dom.hasPointerCapture(e.pointerId)) dom.releasePointerCapture(e.pointerId)
+      projectField()
+      // A box a finger's width across is a tap, and a tap on a point means
+      // that point: dragging a rectangle around a single dot is not something
+      // anybody does deliberately, and a wobble that selected nothing would
+      // read as the tap having been swallowed.
+      if (isTap(finished)) {
+        const index = nearestWithin(screen, finished.x1, finished.y1, PICK_RADIUS_PX)
+        if (index >= 0) onHandleSelect?.(field[index])
+        return
+      }
+      const ids = withinBox(screen, finished).map(i => field[i].id)
+      if (ids.length) onSelectBox?.(ids)
     }
 
     function endGrab(e: PointerEvent) {
+      endSelect(e)
       if (!grab || grabbedIndex < 0) return
       const finished = grab
       const index = grabbedIndex
@@ -920,9 +1028,13 @@ export function DiveSiteScene({
       controls.enabled = true
       dom.style.cursor = ''
       hideBadge()
+      drawBox(null)
       clearGroup(handleLayer)
     }
-  }, [supported, handles, onHandleDrag, onHandleMark, gesture, verticalExaggeration])
+  }, [
+    supported, handles, onHandleDrag, onHandleMark, onHandleSelect, onSelectBox,
+    gesture, selected, verticalExaggeration,
+  ])
 
   return (
     <figure className={`${CARD} overflow-hidden`}>
@@ -934,6 +1046,12 @@ export function DiveSiteScene({
             hidden
             aria-hidden="true"
             className={`pointer-events-none absolute left-0 top-0 ${BADGE_READOUT}`}
+          />
+          <div
+            ref={boxRef}
+            hidden
+            aria-hidden="true"
+            className="pointer-events-none absolute rounded-sm border border-amber-300/80 bg-amber-200/15"
           />
           {/* Named in one word each, with the sentence in the label. Spelled
               out — "From the seabed" — the pair ran under the compass rose at
