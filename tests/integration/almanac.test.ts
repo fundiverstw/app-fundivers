@@ -7,6 +7,8 @@
 //   3. A pending record is visible to its author and to staff, and to nobody
 //      else — approved ones are visible to all.
 //   4. The review queue and the ruling RPC are staff/admin only.
+//   4b. withdraw_almanac_record deletes the caller's OWN PENDING record and
+//      nothing else — not somebody else's, not one staff have ruled on.
 //   5. Records hang off the dive_sites catalog: a site with observations
 //      cannot be deleted out from under them, and only admins curate it.
 import { describe, it, expect, afterAll, beforeAll } from 'vitest'
@@ -227,6 +229,89 @@ describe('almanac trash readings', () => {
     const mine = (rows ?? []).find(r => r.id === id)!
     expect(mine.trash_band).toBe('minimal')
     expect(mine.trash_kinds).toEqual(['styrofoam'])
+  })
+})
+
+describe('withdrawing your own observation', () => {
+  async function fileOne(user: TestUser, obs_date = YESTERDAY) {
+    const client = await userClient(user.email, user.password)
+    const { data, error } = await client.rpc('submit_almanac_record', {
+      p_site_id: siteId, p_obs_date: obs_date, p_water_temp_c: 26,
+    })
+    expect(error).toBeNull()
+    return { client, id: data as string }
+  }
+
+  it('takes a pending record of the caller\'s back out of the queue entirely', async () => {
+    await clearRecords()
+    const { client, id } = await fileOne(diver)
+
+    const { error } = await client.rpc('withdraw_almanac_record', { p_record_id: id })
+    expect(error).toBeNull()
+    expect((await recordRow(id)).data).toBeNull()
+  })
+
+  // An approved reading is part of what the crowd has been shown. One its
+  // author could delete afterwards would make every published figure
+  // provisional on its author's continued agreement with it.
+  it('refuses one staff have already ruled on', async () => {
+    await clearRecords()
+    const { client, id } = await fileOne(diver)
+    const staffClient = await userClient(staff.email, staff.password)
+    await staffClient.rpc('moderate_almanac_record', {
+      p_record_id: id, p_status: 'approved',
+    })
+
+    const { error } = await client.rpc('withdraw_almanac_record', { p_record_id: id })
+    expect(error?.message).toContain('almanac_record_already_reviewed')
+    expect((await recordRow(id)).data).not.toBeNull()
+  })
+
+  it('refuses a rejected one too — the ruling is part of the record', async () => {
+    await clearRecords()
+    const { client, id } = await fileOne(diver)
+    const staffClient = await userClient(staff.email, staff.password)
+    await staffClient.rpc('moderate_almanac_record', {
+      p_record_id: id, p_status: 'rejected', p_staff_notes: 'Wrong site.',
+    })
+
+    const { error } = await client.rpc('withdraw_almanac_record', { p_record_id: id })
+    expect(error).not.toBeNull()
+    expect((await recordRow(id)).data).not.toBeNull()
+  })
+
+  // `security definer` runs past RLS, so ownership is the function's own job.
+  it('refuses somebody else\'s record, and leaves it standing', async () => {
+    await clearRecords()
+    const { id } = await fileOne(diver)
+    const intruder = await userClient(otherDiver.email, otherDiver.password)
+
+    const { error } = await intruder.rpc('withdraw_almanac_record', { p_record_id: id })
+    expect(error?.message).toContain('almanac_record_not_yours')
+    expect((await recordRow(id)).data).not.toBeNull()
+  })
+
+  // Same answer for "no such record" and "not yours": separating them would
+  // let somebody probe which ids exist.
+  it('answers a record that does not exist the same way as one that is not yours', async () => {
+    const client = await userClient(diver.email, diver.password)
+    const { error } = await client.rpc('withdraw_almanac_record', {
+      p_record_id: '00000000-0000-0000-0000-000000000000',
+    })
+    expect(error?.message).toContain('almanac_record_not_yours')
+  })
+
+  it('frees the day up to be filed again', async () => {
+    await clearRecords()
+    const { client, id } = await fileOne(diver)
+    await client.rpc('withdraw_almanac_record', { p_record_id: id })
+
+    const { data: refiled, error } = await client.rpc('submit_almanac_record', {
+      p_site_id: siteId, p_obs_date: YESTERDAY, p_water_temp_c: 28,
+    })
+    expect(error).toBeNull()
+    expect(refiled).not.toBe(id)
+    expect((await recordRow(refiled as string)).data!.water_temp_c).toBe(28)
   })
 })
 

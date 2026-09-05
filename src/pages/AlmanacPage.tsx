@@ -27,18 +27,20 @@ import {
   type AlmanacCoralHealth,
   type AlmanacRouteCondition,
   type AlmanacTrashBand,
-  type AlmanacTrashKind,
   type AlmanacStatus,
+  type AlmanacOwnRecord,
   type AlmanacEventRecord,
   type AlmanacPendingRecord,
   type DiveSite,
   type SiteKind,
 } from '../types/database'
 import { hasTerrainConditions, SITE_CONDITION_KINDS, type EventKind } from '../lib/event-kinds'
+import {
+  blankForm, formStateFrom, submitArgs, type AlmanacFormState,
+} from '../lib/almanac-form'
 import { EVENT_KIND_LABELS } from '../lib/event-kind-labels'
 import { fetchDiveSites, siteName } from '../lib/dive-sites'
 import { todayIso, addIsoDays, parseIsoDate } from '../lib/dates'
-import { numOrNull } from '../lib/num'
 import { supabase } from '../lib/supabase'
 import {
   CARD,
@@ -70,67 +72,10 @@ const PILL = 'px-3 py-1.5 rounded-lg text-sm font-semibold'
 
 const TRASH_HINT_ID = 'almanac-trash-amount-hint'
 
-/** A submission of the signed-in diver's that the crowd cannot see yet. */
-interface OwnSubmission {
-  id: string
-  site_id: string
-  obs_date: string
-  status: AlmanacStatus
-  staff_notes: string | null
-}
-
-interface AlmanacFormState {
-  kind: EventKind
-  site_id: string
-  obs_date: string
-  air_temp_c: string
-  water_temp_c: string
-  visibility_m: string
-  current_strength: AlmanacCurrentStrength | ''
-  wave_height_m: string
-  wave_period_s: string
-  weather: AlmanacWeather | ''
-  wildlife: string
-  coral_health: AlmanacCoralHealth | ''
-  elevation_m: string
-  route_condition: AlmanacRouteCondition | ''
-  summit_visible: boolean
-  trash_band: AlmanacTrashBand | ''
-  trash_kinds: AlmanacTrashKind[]
-}
-
-// The date defaults to today: without an outing to derive it from, "when were
-// you there" is nearly always today or a day or two back, and a diver who was
-// somewhere else edits one field instead of filling one from blank.
-const blankForm = (): AlmanacFormState => ({ ...emptyForm, obs_date: todayIso() })
-
-const emptyForm: AlmanacFormState = {
-  kind: SITE_CONDITION_KINDS[0],
-  site_id: '',
-  obs_date: '',
-  air_temp_c: '',
-  water_temp_c: '',
-  visibility_m: '',
-  current_strength: '',
-  wave_height_m: '',
-  wave_period_s: '',
-  weather: '',
-  wildlife: '',
-  coral_health: '',
-  elevation_m: '',
-  route_condition: '',
-  summit_visible: false,
-  trash_band: '',
-  trash_kinds: [],
-}
 
 /** A `date` column rendered as the day it stores, not a UTC-shifted one. */
 function formatObsDate(iso: string): string {
   return format(parseIsoDate(iso), 'MMM d, yyyy')
-}
-
-function parseWildlife(raw: string): string[] {
-  return raw.split(',').map(s => s.trim()).filter(Boolean)
 }
 
 // ─── Approved history ────────────────────────────────────────────────────────
@@ -327,14 +272,21 @@ function AlmanacForm({
   sites,
   onSubmit,
   onSitesChanged,
+  initial,
+  onCancelEdit,
 }: {
   sites: DiveSite[]
   onSubmit: (form: AlmanacFormState) => Promise<void>
   /** Re-read the catalog after a diver adds to it, so the place they just
    *  entered is in the picker they are standing in front of. */
   onSitesChanged: () => Promise<void>
+  /** An entry of the diver's own, opened for correction. Its presence is what
+   *  puts the form in edit mode; the caller remounts on a change of target. */
+  initial?: AlmanacFormState
+  onCancelEdit?: () => void
 }) {
-  const [form, setForm] = useState<AlmanacFormState>(blankForm)
+  const editing = !!initial
+  const [form, setForm] = useState<AlmanacFormState>(initial ?? blankForm)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [addingPlace, setAddingPlace] = useState(false)
@@ -362,7 +314,8 @@ function AlmanacForm({
   }
 
   // Retired sites keep their history but stop being offered.
-  const kindSites = sites.filter(site => site.active && site.kind === form.kind)
+  const kindSites = sites.filter(site =>
+    site.kind === form.kind && (site.active || site.id === form.site_id))
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -378,7 +331,10 @@ function AlmanacForm({
     setError(null)
     try {
       await onSubmit(form)
-      setForm(blankForm())
+      // A correction leaves the form as the diver just saved it — blanking it
+      // would read as the edit having been thrown away. A new observation
+      // clears, ready for the next one.
+      if (!editing) setForm(blankForm())
     } catch (err) {
       setError(err instanceof Error ? err.message : t.almanac.submitFailed)
     } finally {
@@ -388,7 +344,19 @@ function AlmanacForm({
 
   return (
     <form onSubmit={handleSubmit} className={`${CARD} p-4`}>
-      <h2 className={`text-sm ${TEXT_HEADING}`}>{t.almanac.submit}</h2>
+      <h2 className={`text-sm ${TEXT_HEADING}`}>{editing ? t.almanac.editHeading : t.almanac.submit}</h2>
+      {editing && (
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          {/* Which place and which day are what identify the record, so an edit
+              cannot move them: a changed date would file a second observation
+              and leave the first standing. A diver who filed against the wrong
+              day withdraws it and files again, which the list offers. */}
+          <p className={`text-xs ${TEXT_SUBTLE}`}>{t.almanac.editNote}</p>
+          <button type="button" className={BTN_XS_GHOST} onClick={onCancelEdit}>
+            {t.almanac.editCancel}
+          </button>
+        </div>
+      )}
 
       <div className="mt-3">
         <span className={INPUT_LABEL}>{t.almanac.kind}</span>
@@ -397,8 +365,9 @@ function AlmanacForm({
             <button
               key={kind}
               type="button"
+              disabled={editing}
               aria-pressed={form.kind === kind}
-              className={form.kind === kind ? BTN_XS_PRIMARY : BTN_XS_GHOST}
+              className={`${form.kind === kind ? BTN_XS_PRIMARY : BTN_XS_GHOST} disabled:opacity-40`}
               onClick={() => selectKind(kind)}
             >
               {EVENT_KIND_LABELS[kind]}
@@ -420,8 +389,16 @@ function AlmanacForm({
         <>
           <label className="mt-3 block">
             <span className={INPUT_LABEL}>{SITE_LABEL[form.kind]}</span>
-            <select className={INPUT} value={form.site_id} onChange={e => updateField('site_id', e.target.value)}>
+            <select
+              className={`${INPUT} disabled:opacity-60`}
+              disabled={editing}
+              value={form.site_id}
+              onChange={e => updateField('site_id', e.target.value)}
+            >
               <option value="">{t.almanac.sitePlaceholder}</option>
+              {/* An edit keeps its own place in the list even if the shop has
+                  since retired it, or the picker would come up empty on the
+                  record it is meant to be correcting. */}
               {kindSites.map(site => (
                 <option key={site.id} value={site.id}>
                   {site.region ? `${siteName(site)} — ${site.region}` : siteName(site)}
@@ -435,9 +412,11 @@ function AlmanacForm({
           {/* Beside the picker, not buried in an admin screen: the diver who
               needs this is the one looking at a list that does not contain
               where they were. */}
-          <button type="button" className={`mt-1 ${BTN_XS_GHOST}`} onClick={() => setAddingPlace(true)}>
-            {t.sites.addHeading}
-          </button>
+          {!editing && (
+            <button type="button" className={`mt-1 ${BTN_XS_GHOST}`} onClick={() => setAddingPlace(true)}>
+              {t.sites.addHeading}
+            </button>
+          )}
         </>
       )}
 
@@ -445,7 +424,8 @@ function AlmanacForm({
         <span className={INPUT_LABEL}>{t.almanac.obsDate}</span>
         <input
           type="date"
-          className={INPUT}
+          className={`${INPUT} disabled:opacity-60`}
+          disabled={editing}
           max={todayIso()}
           value={form.obs_date}
           onChange={e => updateField('obs_date', e.target.value)}
@@ -633,27 +613,140 @@ function AlmanacForm({
 
       <div className="mt-4 flex gap-2">
         <button type="submit" disabled={submitting} className={`flex-1 ${BTN_PRIMARY}`}>
-          {submitting ? t.almanac.submitting : t.almanac.submitRecord}
+          {submitting
+            ? t.almanac.submitting
+            : editing ? t.almanac.saveEdit : t.almanac.submitRecord}
         </button>
         <button
           type="button"
           className={`px-4 ${BTN_SECONDARY}`}
-          onClick={() => { setForm(blankForm()); setError(null) }}
+          onClick={() => {
+            // Editing, "clear" is "put it back the way it was filed": a blank
+            // form under an edit would be a save away from erasing the record
+            // it is standing on.
+            setForm(initial ?? blankForm())
+            setError(null)
+          }}
         >
-          {t.almanac.clearForm}
+          {editing ? t.almanac.revertEdit : t.almanac.clearForm}
         </button>
       </div>
     </form>
   )
 }
 
-// ─── Page ────────────────────────────────────────────────────────────────────
+// ─── A diver's own entries ───────────────────────────────────────────────────
 
 const STATUS_LABEL: Record<AlmanacStatus, string> = {
   pending: t.almanac.statusPending,
   approved: t.almanac.statusApproved,
   rejected: t.almanac.statusRejected,
 }
+
+/**
+ * Everything the signed-in diver has filed, and what can still be done to it.
+ *
+ * A submission stops being editable the moment staff rule on it — the RPC
+ * refuses, and it refuses for a reason: an approved record is part of what the
+ * crowd has been shown, and a reading that its author could quietly rewrite
+ * afterwards would make every published figure provisional. So the row says
+ * which state it is in rather than offering an Edit that would fail, and a
+ * diver who needs a ruled-on record changed is told to ask staff.
+ *
+ * Every reading is written out, not just the site and the day. The list exists
+ * to be checked against what the diver remembers, and a row that names only
+ * where and when cannot be checked against anything.
+ */
+function OwnEntries({
+  records, siteNames, onEdit, onWithdraw,
+}: {
+  records: AlmanacOwnRecord[]
+  siteNames: Map<string, string>
+  onEdit: (record: AlmanacOwnRecord) => void
+  onWithdraw: (record: AlmanacOwnRecord) => Promise<void>
+}) {
+  // Which row is asking "are you sure". Inline rather than a dialog: the row
+  // is the thing being withdrawn, and a confirmation that covers the page
+  // makes the diver check the id of what they are about to lose.
+  const [confirming, setConfirming] = useState<string | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  if (records.length === 0) {
+    return <p className={`${CARD} p-4 text-center text-sm ${TEXT_SUBTLE}`}>{t.almanac.noOwnEntries}</p>
+  }
+
+  const withdraw = async (record: AlmanacOwnRecord) => {
+    setBusyId(record.id)
+    try {
+      await onWithdraw(record)
+    } finally {
+      setBusyId(null)
+      setConfirming(null)
+    }
+  }
+
+  return (
+    <ul className="space-y-2">
+      {records.map(record => (
+        <li key={record.id} className={`${CARD} p-3`}>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className={`text-sm ${TEXT_BODY}`}>{siteNames.get(record.site_id) ?? '—'}</p>
+              <p className={`text-xs ${TEXT_SUBTLE}`}>{formatObsDate(record.obs_date)}</p>
+            </div>
+            <span className={`shrink-0 text-[10px] uppercase tracking-wide ${TEXT_SUBTLE}`}>
+              {STATUS_LABEL[record.status]}
+            </span>
+          </div>
+
+          <ReadingGrid readings={readingsOf(record)} />
+
+          {record.staff_notes && (
+            <p className={`mt-2 text-xs ${TEXT_SUBTLE}`}>
+              {t.almanac.staffNoteLabel}: {record.staff_notes}
+            </p>
+          )}
+
+          {record.status === 'pending' ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button type="button" className={BTN_XS_PRIMARY} onClick={() => onEdit(record)}>
+                {t.almanac.editEntry}
+              </button>
+              {confirming === record.id ? (
+                <>
+                  <span className={`text-xs ${TEXT_SUBTLE}`}>{t.almanac.withdrawConfirm}</span>
+                  <button
+                    type="button"
+                    className={BTN_XS_DANGER}
+                    disabled={busyId === record.id}
+                    onClick={() => withdraw(record)}
+                  >
+                    {t.almanac.withdrawYes}
+                  </button>
+                  <button type="button" className={BTN_XS_GHOST} onClick={() => setConfirming(null)}>
+                    {t.almanac.withdrawNo}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className={BTN_XS_DANGER}
+                  onClick={() => setConfirming(record.id)}
+                >
+                  {t.almanac.withdrawEntry}
+                </button>
+              )}
+            </div>
+          ) : (
+            <p className={`mt-2 text-xs ${TEXT_SUBTLE}`}>{t.almanac.reviewedLocked}</p>
+          )}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────────
 
 function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
   return (
@@ -671,7 +764,11 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 
 export function AlmanacPage() {
   const { user, profile, loading: authLoading } = useAuth()
-  const [tab, setTab] = useState<'enter' | 'view'>('enter')
+  const [tab, setTab] = useState<'enter' | 'view' | 'mine'>('enter')
+  // The entry being corrected, if any. Held here rather than in the form so
+  // that picking one from the list can also carry the diver to the form.
+  const [editing, setEditing] = useState<AlmanacOwnRecord | null>(null)
+  const [ownError, setOwnError] = useState<string | null>(null)
   // The site/date lookup on the View tab. Both have to be answered before
   // there is a day to read, so an unfinished pair leaves the browse list up.
   const [lookupSite, setLookupSite] = useState('')
@@ -681,7 +778,7 @@ export function AlmanacPage() {
   const [dayError, setDayError] = useState<string | null>(null)
   const [sites, setSites] = useState<DiveSite[]>([])
   const [records, setRecords] = useState<AlmanacEventRecord[]>([])
-  const [ownSubmissions, setOwnSubmissions] = useState<OwnSubmission[]>([])
+  const [ownSubmissions, setOwnSubmissions] = useState<AlmanacOwnRecord[]>([])
   const [pending, setPending] = useState<AlmanacPendingRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -701,15 +798,16 @@ export function AlmanacPage() {
     setPending(data ?? [])
   }, [isStaff])
 
+  // Everything the diver has filed, in full: the pending ones they can still
+  // correct, and the ruled-on ones they cannot but are entitled to see. Whole
+  // rows rather than a summary, because an edit is seeded from the record and a
+  // form filled from half of one would blank the other half on save.
   const loadOwnSubmissions = useCallback(async () => {
     if (!userId) return
-    // Approved records already show in the history below; this list exists to
-    // tell a diver about the ones the crowd cannot see yet.
     const { data, error } = await supabase
       .from('almanac_records')
-      .select('id, site_id, obs_date, status, staff_notes')
+      .select('*')
       .eq('diver_id', userId)
-      .neq('status', 'approved')
       .order('obs_date', { ascending: false })
     if (error) {
       console.error('Failed to load your almanac submissions:', error)
@@ -783,32 +881,41 @@ export function AlmanacPage() {
   }, [lookupSite, lookupDate])
 
   const handleSubmit = async (form: AlmanacFormState) => {
-    const terrain = hasTerrainConditions(form.kind)
-    const { error } = await supabase.rpc('submit_almanac_record', {
-      p_site_id: form.site_id,
-      p_obs_date: form.obs_date,
-      p_air_temp_c: numOrNull(form.air_temp_c),
-      p_water_temp_c: numOrNull(form.water_temp_c),
-      p_visibility_m: numOrNull(form.visibility_m),
-      p_current_strength: form.current_strength || null,
-      p_wave_height_m: numOrNull(form.wave_height_m),
-      p_wave_period_s: numOrNull(form.wave_period_s),
-      p_weather: form.weather || null,
-      p_wildlife: parseWildlife(form.wildlife),
-      p_trash_band: form.trash_band || null,
-      p_trash_kinds: form.trash_kinds,
-      p_coral_health: form.coral_health || null,
-      p_elevation_m: terrain ? numOrNull(form.elevation_m) : null,
-      p_route_condition: terrain ? form.route_condition || null : null,
-      p_summit_visible: terrain ? form.summit_visible : null,
-    })
+    const { error } = await supabase.rpc('submit_almanac_record', submitArgs(form))
     if (error) {
       console.error('Failed to submit the almanac record:', error)
       throw new Error(error.message.includes('almanac_record_already_reviewed')
         ? t.almanac.submitAlreadyReviewed
         : t.almanac.submitFailed)
     }
-    setSubmitStatus(t.almanac.submitted)
+    setSubmitStatus(editing ? t.almanac.editSaved : t.almanac.submitted)
+    setEditing(null)
+    await loadOwnSubmissions()
+  }
+
+  const startEdit = (record: AlmanacOwnRecord) => {
+    setEditing(record)
+    setSubmitStatus(null)
+    setOwnError(null)
+    setTab('enter')
+  }
+
+  const handleWithdraw = async (record: AlmanacOwnRecord) => {
+    setOwnError(null)
+    const { error } = await supabase.rpc('withdraw_almanac_record', { p_record_id: record.id })
+    if (error) {
+      console.error('Failed to withdraw the almanac record:', error)
+      // The one failure a diver can actually hit: staff ruled on it between
+      // the page loading and the button being pressed.
+      setOwnError(error.message.includes('almanac_record_already_reviewed')
+        ? t.almanac.withdrawAlreadyReviewed
+        : t.almanac.withdrawFailed)
+      await loadOwnSubmissions()
+      return
+    }
+    // Editing the thing that has just been withdrawn would be a form standing
+    // on a record that is gone.
+    if (editing?.id === record.id) setEditing(null)
     await loadOwnSubmissions()
   }
 
@@ -832,6 +939,12 @@ export function AlmanacPage() {
 
   const days = daysOf(records)
   const siteNames = new Map(sites.map(site => [site.id, site.name]))
+  // A record does not carry a kind: the almanac's kinds are a property of the
+  // place, and the form reads one off the site to decide whether to ask the
+  // terrain questions. A site no longer in the catalog falls back to the first
+  // kind rather than crashing the edit it was opened for.
+  const siteKindOf = (siteId: string): EventKind =>
+    (sites.find(site => site.id === siteId)?.kind as EventKind | undefined) ?? SITE_CONDITION_KINDS[0]
   // Half a lookup is no lookup — and clearing one empties the fields a render
   // before the effect drops the day it had loaded, so the report has to key off
   // the fields rather than off the records still in hand.
@@ -848,9 +961,10 @@ export function AlmanacPage() {
 
       {isStaff && !loadError && <ModerationQueue records={pending} onModerate={handleModerate} />}
 
-      <div className="flex gap-2" role="tablist" aria-label={t.almanac.sectionsAria}>
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label={t.almanac.sectionsAria}>
         <TabButton active={tab === 'enter'} onClick={() => setTab('enter')}>{t.almanac.tabEnter}</TabButton>
         <TabButton active={tab === 'view'} onClick={() => setTab('view')}>{t.almanac.tabView}</TabButton>
+        <TabButton active={tab === 'mine'} onClick={() => setTab('mine')}>{t.almanac.tabMine}</TabButton>
       </div>
 
       {tab === 'enter' ? (
@@ -860,7 +974,17 @@ export function AlmanacPage() {
               could add one and is exactly backwards now: a diver looking at a
               list that does not contain where they were is the person this
               feature is for. */}
-          <AlmanacForm sites={sites} onSubmit={handleSubmit} onSitesChanged={loadSites} />
+          {/* Remounted per target: the form owns its fields, and seeding an
+              existing instance would leave the previous entry's answers in
+              whichever ones the new record does not fill. */}
+          <AlmanacForm
+            key={editing?.id ?? 'new'}
+            sites={sites}
+            onSubmit={handleSubmit}
+            onSitesChanged={loadSites}
+            initial={editing ? formStateFrom(editing, siteKindOf(editing.site_id)) : undefined}
+            onCancelEdit={() => setEditing(null)}
+          />
 
           {submitStatus && (
             <p className="rounded-lg bg-emerald-500/15 p-2 text-center text-xs text-emerald-200">
@@ -868,30 +992,30 @@ export function AlmanacPage() {
             </p>
           )}
 
+          {/* The list itself is a tab of its own now; this is the pointer to
+              it, so a diver who has just filed something knows where it went. */}
           {ownSubmissions.length > 0 && (
-            <section>
-              <h2 className={`mb-2 text-sm ${TEXT_HEADING}`}>{t.almanac.yourSubmissions}</h2>
-              <ul className="space-y-2">
-                {ownSubmissions.map(sub => (
-                  <li key={sub.id} className={`${CARD} flex items-center justify-between gap-2 p-3`}>
-                    <div>
-                      <div className={`text-sm ${TEXT_BODY}`}>
-                        {siteNames.get(sub.site_id) ?? '—'}
-                      </div>
-                      <div className={`text-xs ${TEXT_SUBTLE}`}>
-                        {formatObsDate(sub.obs_date)}
-                        {sub.staff_notes ? ` · ${sub.staff_notes}` : ''}
-                      </div>
-                    </div>
-                    <span className={`text-[10px] uppercase tracking-wide ${TEXT_SUBTLE}`}>
-                      {STATUS_LABEL[sub.status]}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
+            <button
+              type="button"
+              className={`self-start ${BTN_XS_GHOST}`}
+              onClick={() => setTab('mine')}
+            >
+              {t.almanac.seeYourEntries(ownSubmissions.length)}
+            </button>
           )}
         </>
+      ) : tab === 'mine' ? (
+        <section>
+          <h2 className={`mb-2 text-sm ${TEXT_HEADING}`}>{t.almanac.yourSubmissions}</h2>
+          <p className={`mb-2 text-xs ${TEXT_SUBTLE}`}>{t.almanac.yourSubmissionsNote}</p>
+          {ownError && <p className={ERROR_NOTE_LIGHT}>{ownError}</p>}
+          <OwnEntries
+            records={ownSubmissions}
+            siteNames={siteNames}
+            onEdit={startEdit}
+            onWithdraw={handleWithdraw}
+          />
+        </section>
       ) : (
         <>
           <section className={`${CARD} p-4`}>

@@ -500,6 +500,13 @@ export interface Database {
         }
         Returns: string
       }
+      // Almanac: a diver takes back an observation staff have not ruled on yet.
+      // Pending only, and the caller's own — the function checks both, since
+      // `security definer` runs past RLS. Defined in 20260905110000.
+      withdraw_almanac_record: {
+        Args: { p_record_id: string }
+        Returns: void
+      }
       // Almanac: staff/admin ruling on one submission.
       moderate_almanac_record: {
         Args: {
@@ -2139,19 +2146,19 @@ export interface Database {
           air_temp_c: number | null
           water_temp_c: number | null
           visibility_m: number | null
-          current_strength: 'calm' | 'light' | 'moderate' | 'strong' | 'very_strong' | null
+          current_strength: AlmanacCurrentStrength | null
           wave_height_m: number | null
           wave_period_s: number | null
-          weather: 'clear' | 'partly_cloudy' | 'cloudy' | 'overcast' | 'rain' | 'thunderstorm' | 'windy' | 'fog' | 'typhoon' | null
+          weather: AlmanacWeather | null
           wildlife: string[] | null
-          coral_health: 'excellent' | 'good' | 'fair' | 'poor' | 'bleaching' | null
+          coral_health: AlmanacCoralHealth | null
           elevation_m: number | null
-          route_condition: 'dry' | 'wet' | 'muddy' | 'icy' | 'snow' | 'rockfall' | null
+          route_condition: AlmanacRouteCondition | null
           summit_visible: boolean | null
-          trash_band: 'none' | 'minimal' | 'noticeable' | 'heavy' | 'severe' | null
+          trash_band: AlmanacTrashBand | null
           trash_count: number | null
-          trash_kinds: string[]
-          status: 'pending' | 'approved' | 'rejected'
+          trash_kinds: AlmanacTrashKind[]
+          status: AlmanacStatus
           approved_by: string | null
           approved_at: string | null
           staff_notes: string | null
@@ -2166,19 +2173,19 @@ export interface Database {
           air_temp_c?: number | null
           water_temp_c?: number | null
           visibility_m?: number | null
-          current_strength?: 'calm' | 'light' | 'moderate' | 'strong' | 'very_strong' | null
+          current_strength?: AlmanacCurrentStrength | null
           wave_height_m?: number | null
           wave_period_s?: number | null
-          weather?: 'clear' | 'partly_cloudy' | 'cloudy' | 'overcast' | 'rain' | 'thunderstorm' | 'windy' | 'fog' | 'typhoon' | null
+          weather?: AlmanacWeather | null
           wildlife?: string[] | null
-          coral_health?: 'excellent' | 'good' | 'fair' | 'poor' | 'bleaching' | null
+          coral_health?: AlmanacCoralHealth | null
           elevation_m?: number | null
-          route_condition?: 'dry' | 'wet' | 'muddy' | 'icy' | 'snow' | 'rockfall' | null
+          route_condition?: AlmanacRouteCondition | null
           summit_visible?: boolean | null
-          trash_band?: 'none' | 'minimal' | 'noticeable' | 'heavy' | 'severe' | null
+          trash_band?: AlmanacTrashBand | null
           trash_count?: number | null
-          trash_kinds?: string[]
-          status?: 'pending' | 'approved' | 'rejected'
+          trash_kinds?: AlmanacTrashKind[]
+          status?: AlmanacStatus
           approved_by?: string | null
           approved_at?: string | null
           staff_notes?: string | null
@@ -2583,6 +2590,12 @@ export type AlmanacTrashBand = typeof ALMANAC_TRASH_BANDS[number]
 // question from either side of the wire, so they must not drift.
 export const SITE_KINDS = ['dive', 'adventure'] as const
 export type SiteKind = typeof SITE_KINDS[number]
+
+/** A diver's own row, straight from the table — what the "Your entries" list
+ *  reads back and what an edit is seeded from. Wider than the published
+ *  `AlmanacEventRecord`: it carries `status` and `staff_notes`, which are about
+ *  the submission rather than about the water. */
+export type AlmanacOwnRecord = Database['public']['Tables']['almanac_records']['Row']
 
 export const ALMANAC_STATUSES = ['pending', 'approved', 'rejected'] as const
 

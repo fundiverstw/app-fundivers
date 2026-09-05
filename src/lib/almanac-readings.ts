@@ -1,11 +1,15 @@
 /**
  * One almanac record reduced to label/value pairs.
  *
- * Shared by the day-by-day history, the staff review queue and the site/date
- * report, so a reading is worded and formatted the same wherever it is read.
+ * Shared by the day-by-day history, the staff review queue, the site/date
+ * report and a diver's own entries, so a reading is worded and formatted the
+ * same wherever it is read — including on the screen where the diver checks
+ * their own submission against what they remember.
  */
 import { t } from '../i18n'
-import type { AlmanacEventRecord, AlmanacPendingRecord } from '../types/database'
+import type {
+  AlmanacEventRecord, AlmanacOwnRecord, AlmanacPendingRecord,
+} from '../types/database'
 
 export function formatNum(v: number | null, decimals = 1): string {
   return v === null ? '—' : v.toFixed(decimals)
@@ -14,7 +18,9 @@ export function formatNum(v: number | null, decimals = 1): string {
 /** The readings a record carries, as label/value pairs — blank ones dropped. */
 export type Reading = { label: string; value: string }
 
-export function readingsOf(record: AlmanacEventRecord | AlmanacPendingRecord): Reading[] {
+export function readingsOf(
+  record: AlmanacEventRecord | AlmanacPendingRecord | AlmanacOwnRecord,
+): Reading[] {
   const readings: Reading[] = []
   const push = (label: string, value: string | null) => {
     if (value !== null) readings.push({ label, value })

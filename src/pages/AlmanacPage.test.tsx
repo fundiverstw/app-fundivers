@@ -35,6 +35,40 @@ vi.mock('../lib/dive-sites', async importOriginal => ({
 const rpc = vi.fn()
 const from = vi.fn(() => mockQueryBuilder({ data: [], error: null }))
 
+/** The diver's own rows, as the table hands them back. */
+const ownRecord = {
+  id: 'own-1',
+  created_at: '2026-08-02T00:00:00Z',
+  updated_at: '2026-08-02T00:00:00Z',
+  diver_id: 'diver-1',
+  site_id: 'site-1',
+  obs_date: '2026-08-01',
+  air_temp_c: 30,
+  water_temp_c: 26.5,
+  visibility_m: 12,
+  current_strength: 'light',
+  wave_height_m: null,
+  wave_period_s: null,
+  weather: 'clear',
+  wildlife: ['turtle'],
+  coral_health: 'good',
+  elevation_m: null,
+  route_condition: null,
+  summit_visible: null,
+  trash_band: 'noticeable',
+  trash_count: null,
+  trash_kinds: ['plastic'],
+  status: 'pending' as 'pending' | 'approved' | 'rejected',
+  approved_by: null,
+  approved_at: null,
+  staff_notes: null,
+}
+
+/** What `from('almanac_records')` hands back — the diver's own entries. */
+function mockOwn(records: unknown[]) {
+  from.mockImplementation(() => mockQueryBuilder({ data: records, error: null }))
+}
+
 vi.mock('../lib/supabase', () => ({
   supabase: {
     rpc: (...args: unknown[]) => rpc(...args),
@@ -374,5 +408,180 @@ describe('AlmanacPage — adding a place', () => {
     await user.click(screen.getByRole('button', { name: t.sites.addHeading }))
     await user.click(screen.getByRole('button', { name: t.sites.cancel }))
     expect(screen.getByLabelText(t.almanac.siteDive)).toBeInTheDocument()
+  })
+})
+
+
+// A diver's own work, listed back to them. Filing into a queue and never
+// seeing what became of it is the shape this feature exists to fix.
+describe('AlmanacPage — your own entries', () => {
+  const sm = t.almanac
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    authState.role = 'diver'
+    mockRpc()
+  })
+
+  async function openMine() {
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('tab', { name: sm.tabMine }))
+    return user
+  }
+
+  it('lists every entry the diver filed, whatever staff have done with it', async () => {
+    mockOwn([
+      ownRecord,
+      { ...ownRecord, id: 'own-2', site_id: 'site-2', obs_date: '2026-07-30', status: 'approved' },
+      { ...ownRecord, id: 'own-3', obs_date: '2026-07-28', status: 'rejected', staff_notes: 'Wrong site.' },
+    ])
+    renderPage()
+    await openMine()
+
+    expect(screen.getByText('Dragon Head')).toBeInTheDocument()
+    expect(screen.getAllByText('Bat Cave')).toHaveLength(2)
+    expect(screen.getByText(sm.statusApproved)).toBeInTheDocument()
+    expect(screen.getByText(sm.statusRejected)).toBeInTheDocument()
+    expect(screen.getByText(/Wrong site\./)).toBeInTheDocument()
+  })
+
+  // The list is there to be checked against what the diver remembers, and a
+  // row naming only where and when cannot be checked against anything.
+  it('writes out the readings, not just where and when', async () => {
+    mockOwn([ownRecord])
+    renderPage()
+    await openMine()
+
+    expect(screen.getByText(sm.waterTemp)).toBeInTheDocument()
+    expect(screen.getByText('26.5°C')).toBeInTheDocument()
+    expect(screen.getByText(sm.trashBands.noticeable)).toBeInTheDocument()
+  })
+
+  it('says so plainly when nothing has been filed', async () => {
+    mockOwn([])
+    renderPage()
+    await openMine()
+
+    expect(screen.getByText(sm.noOwnEntries)).toBeInTheDocument()
+  })
+
+  it('opens a pending entry in the form, filled in as it was filed', async () => {
+    mockOwn([ownRecord])
+    renderPage()
+    const user = await openMine()
+
+    await user.click(screen.getByRole('button', { name: sm.editEntry }))
+
+    expect(screen.getByRole('tab', { name: sm.tabEnter })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText(sm.editHeading)).toBeInTheDocument()
+    expect((screen.getByLabelText(sm.waterTemp) as HTMLInputElement).value).toBe('26.5')
+    expect((screen.getByLabelText(sm.wildlife) as HTMLInputElement).value).toBe('turtle')
+    expect((screen.getByLabelText(sm.trashAmount) as HTMLSelectElement).value).toBe('noticeable')
+    expect(screen.getByLabelText(sm.trashKinds.plastic)).toBeChecked()
+  })
+
+  // Place and date are what identify the record. A changed date would file a
+  // second observation and leave the first standing.
+  it('holds the place and the date still while an entry is being corrected', async () => {
+    mockOwn([ownRecord])
+    renderPage()
+    const user = await openMine()
+    await user.click(screen.getByRole('button', { name: sm.editEntry }))
+
+    expect(screen.getByLabelText(sm.siteDive)).toBeDisabled()
+    expect(screen.getByLabelText(sm.obsDate)).toBeDisabled()
+    expect(screen.getByText(sm.editNote)).toBeInTheDocument()
+  })
+
+  // The RPC writes every column, so anything the form did not carry back would
+  // be blanked by the save.
+  it('sends the readings it did not touch back unchanged', async () => {
+    mockOwn([ownRecord])
+    renderPage()
+    const user = await openMine()
+    await user.click(screen.getByRole('button', { name: sm.editEntry }))
+
+    const visibility = screen.getByLabelText(sm.visibility)
+    await user.clear(visibility)
+    await user.type(visibility, '18')
+    await user.click(screen.getByRole('button', { name: sm.saveEdit }))
+
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('submit_almanac_record',
+      expect.objectContaining({
+        p_site_id: 'site-1',
+        p_obs_date: '2026-08-01',
+        p_visibility_m: 18,
+        p_water_temp_c: 26.5,
+        p_weather: 'clear',
+        p_wildlife: ['turtle'],
+        p_coral_health: 'good',
+        p_trash_band: 'noticeable',
+        p_trash_kinds: ['plastic'],
+      })))
+    expect(await screen.findByText(sm.editSaved)).toBeInTheDocument()
+  })
+
+  it('leaves the edit behind when the diver stops correcting', async () => {
+    mockOwn([ownRecord])
+    renderPage()
+    const user = await openMine()
+    await user.click(screen.getByRole('button', { name: sm.editEntry }))
+    await user.click(screen.getByRole('button', { name: sm.editCancel }))
+
+    expect(screen.queryByText(sm.editHeading)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: sm.submitRecord })).toBeInTheDocument()
+  })
+
+  // An approved reading its author could quietly rewrite would make every
+  // published figure provisional, so the RPC refuses — and the row says why
+  // rather than offering a button that fails.
+  it('offers no edit on an entry staff have already ruled on', async () => {
+    mockOwn([{ ...ownRecord, status: 'approved' }])
+    renderPage()
+    await openMine()
+
+    expect(screen.queryByRole('button', { name: sm.editEntry })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: sm.withdrawEntry })).not.toBeInTheDocument()
+    expect(screen.getByText(sm.reviewedLocked)).toBeInTheDocument()
+  })
+
+  it('withdraws a pending entry, once the diver has confirmed it', async () => {
+    mockOwn([ownRecord])
+    renderPage()
+    const user = await openMine()
+
+    await user.click(screen.getByRole('button', { name: sm.withdrawEntry }))
+    expect(rpc).not.toHaveBeenCalledWith('withdraw_almanac_record', expect.anything())
+    expect(screen.getByText(sm.withdrawConfirm)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: sm.withdrawYes }))
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('withdraw_almanac_record',
+      { p_record_id: 'own-1' }))
+  })
+
+  it('takes back the question when the diver decides to keep it', async () => {
+    mockOwn([ownRecord])
+    renderPage()
+    const user = await openMine()
+
+    await user.click(screen.getByRole('button', { name: sm.withdrawEntry }))
+    await user.click(screen.getByRole('button', { name: sm.withdrawNo }))
+
+    expect(screen.queryByText(sm.withdrawConfirm)).not.toBeInTheDocument()
+    expect(rpc).not.toHaveBeenCalledWith('withdraw_almanac_record', expect.anything())
+  })
+
+  it('says what happened when staff ruled on it first', async () => {
+    mockOwn([ownRecord])
+    rpc.mockImplementation(async (name: string) => (name === 'withdraw_almanac_record'
+      ? { data: null, error: { message: 'almanac_record_already_reviewed' } }
+      : { data: [], error: null }))
+    renderPage()
+    const user = await openMine()
+
+    await user.click(screen.getByRole('button', { name: sm.withdrawEntry }))
+    await user.click(screen.getByRole('button', { name: sm.withdrawYes }))
+
+    expect(await screen.findByText(sm.withdrawAlreadyReviewed)).toBeInTheDocument()
   })
 })
