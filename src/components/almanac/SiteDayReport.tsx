@@ -16,6 +16,7 @@ import {
   ALMANAC_CURRENT_STRENGTHS,
   ALMANAC_CORAL_HEALTHS,
   ALMANAC_ROUTE_CONDITIONS,
+  ALMANAC_TRASH_BANDS,
   type AlmanacEventRecord,
 } from '../../types/database'
 import { CARD, TEXT_BODY, TEXT_HEADING, TEXT_SUBTLE } from '../../styles/tokens'
@@ -54,7 +55,6 @@ export function SiteDayReport({
     { label: t.almanac.waveHeight, summary: summarize(valuesOf(records, r => r.wave_height_m)), format: v => `${formatNum(v)}m` },
     { label: t.almanac.wavePeriod, summary: summarize(valuesOf(records, r => r.wave_period_s)), format: v => `${formatNum(v)}s` },
     { label: t.almanac.elevation, summary: summarize(valuesOf(records, r => r.elevation_m)), format: v => `${formatNum(v, 0)}m` },
-    { label: t.almanac.trashCount, summary: summarize(valuesOf(records, r => r.trash_count)), format: v => formatNum(v, 0) },
   ]
   const plotted = metrics.filter((m): m is Metric & { summary: NumericSummary } => m.summary !== null)
 
@@ -63,6 +63,7 @@ export function SiteDayReport({
   const routes = tallyOrdered(records.map(r => r.route_condition), ALMANAC_ROUTE_CONDITIONS)
   const weathers = tallyByCount(records.map(r => r.weather))
   const wildlife = tallyByCount(records.flatMap(r => r.wildlife ?? []))
+  const trashAmounts = tallyOrdered(records.map(r => r.trash_band), ALMANAC_TRASH_BANDS)
   const trash = tallyByCount(records.flatMap(r => r.trash_kinds ?? []))
   const summits = tallyByCount(records.map(r =>
     r.summit_visible === null ? null : r.summit_visible ? 'yes' : 'no'))
@@ -122,6 +123,10 @@ export function SiteDayReport({
         <TallyBars
           label={t.almanac.wildlife} entries={wildlife}
           labelOf={v => v}
+        />
+        <TallyBars
+          label={t.almanac.trashAmount} entries={trashAmounts} ordered
+          labelOf={v => t.almanac.trashBands[v]}
         />
         <TallyBars
           label={t.almanac.trashKindsLabel} entries={trash}

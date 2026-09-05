@@ -5,6 +5,7 @@ import { AlmanacPage } from './AlmanacPage'
 import { mockQueryBuilder } from '../../tests/test-utils'
 import { t } from '../i18n'
 import { EVENT_KIND_LABELS } from '../lib/event-kind-labels'
+import { ALMANAC_TRASH_BANDS } from '../types/database'
 
 const authState = { role: 'diver' as 'diver' | 'staff' }
 
@@ -217,26 +218,26 @@ describe('AlmanacPage', () => {
     expect(await screen.findByText(t.almanac.submitted)).toBeInTheDocument()
   })
 
-  it('files the trash count and the materials alongside it', async () => {
+  it('files the trash band and the materials alongside it', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByRole('button', { name: t.almanac.submitRecord })
 
     await user.selectOptions(screen.getByLabelText(t.almanac.siteDive), 'site-1')
-    await user.type(screen.getByLabelText(t.almanac.trashCount), '12')
+    await user.selectOptions(screen.getByLabelText(t.almanac.trashAmount), 'noticeable')
     await user.click(screen.getByLabelText(t.almanac.trashKinds.plastic))
     await user.click(screen.getByLabelText(t.almanac.trashKinds.fishing_gear))
     await user.click(screen.getByRole('button', { name: t.almanac.submitRecord }))
 
     await waitFor(() => expect(rpc).toHaveBeenCalledWith('submit_almanac_record',
       expect.objectContaining({
-        p_trash_count: 12,
+        p_trash_band: 'noticeable',
         p_trash_kinds: ['plastic', 'fishing_gear'],
       })))
   })
 
-  // A blank count is "did not look". Left as-is it must reach the RPC as null.
-  it('sends null for a count the diver never touched', async () => {
+  // A blank band is "did not look". Left as-is it must reach the RPC as null.
+  it('sends null for an amount the diver never touched', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByRole('button', { name: t.almanac.submitRecord })
@@ -245,22 +246,32 @@ describe('AlmanacPage', () => {
     await user.click(screen.getByRole('button', { name: t.almanac.submitRecord }))
 
     await waitFor(() => expect(rpc).toHaveBeenCalledWith('submit_almanac_record',
-      expect.objectContaining({ p_trash_count: null })))
+      expect.objectContaining({ p_trash_band: null })))
   })
 
-  // 0 is "looked, saw none" — the reading a clean site produces, and the one
-  // that must survive the trip to the RPC as a number rather than a blank.
-  it('sends a zero count as the reading it is, not as no answer', async () => {
+  // "None" is "looked, saw none" — the reading a clean site produces, and the
+  // one that must survive the trip to the RPC as an answer rather than a blank.
+  it('sends "none" as the reading it is, not as no answer', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByRole('button', { name: t.almanac.submitRecord })
 
     await user.selectOptions(screen.getByLabelText(t.almanac.siteDive), 'site-1')
-    await user.type(screen.getByLabelText(t.almanac.trashCount), '0')
+    await user.selectOptions(screen.getByLabelText(t.almanac.trashAmount), 'none')
     await user.click(screen.getByRole('button', { name: t.almanac.submitRecord }))
 
     await waitFor(() => expect(rpc).toHaveBeenCalledWith('submit_almanac_record',
-      expect.objectContaining({ p_trash_count: 0 })))
+      expect.objectContaining({ p_trash_band: 'none' })))
+  })
+
+  it('offers every band the almanac knows about', async () => {
+    renderPage()
+    await screen.findByRole('button', { name: t.almanac.submitRecord })
+
+    const field = screen.getByLabelText(t.almanac.trashAmount)
+    for (const band of ALMANAC_TRASH_BANDS) {
+      expect(within(field).getByRole('option', { name: t.almanac.trashBands[band] })).toBeInTheDocument()
+    }
   })
 
   it('stops asking what kind once the diver says there was none', async () => {
@@ -269,7 +280,7 @@ describe('AlmanacPage', () => {
     await screen.findByRole('button', { name: t.almanac.submitRecord })
 
     expect(screen.getByLabelText(t.almanac.trashKinds.plastic)).not.toBeDisabled()
-    await user.type(screen.getByLabelText(t.almanac.trashCount), '0')
+    await user.selectOptions(screen.getByLabelText(t.almanac.trashAmount), 'none')
     expect(screen.getByLabelText(t.almanac.trashKinds.plastic)).toBeDisabled()
   })
 

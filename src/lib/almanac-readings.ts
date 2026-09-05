@@ -33,11 +33,13 @@ export function readingsOf(record: AlmanacEventRecord | AlmanacPendingRecord): R
   push(t.almanac.summitVisible, record.summit_visible === null
     ? null
     : record.summit_visible ? t.almanac.yes : t.almanac.no)
-  // A zero count is a reading, not a blank, so it is written out in words
-  // rather than as "0" beside kinds that cannot exist.
-  push(t.almanac.trashCount, record.trash_count === null
+  // The band is the answer; a count, where a pre-band record carries one, is
+  // extra precision printed beside it rather than a reading of its own.
+  push(t.almanac.trashAmount, record.trash_band === null
     ? null
-    : record.trash_count === 0 ? t.almanac.trashNone : String(record.trash_count))
+    : record.trash_count === null || record.trash_count === 0
+      ? t.almanac.trashBands[record.trash_band]
+      : `${t.almanac.trashBands[record.trash_band]} (${t.almanac.trashCounted(record.trash_count)})`)
   push(t.almanac.trashKindsLabel, record.trash_kinds?.length
     ? record.trash_kinds.map(k => t.almanac.trashKinds[k]).join(', ')
     : null)

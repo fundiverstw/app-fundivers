@@ -21,10 +21,12 @@ import {
   ALMANAC_WEATHERS,
   ALMANAC_CORAL_HEALTHS,
   ALMANAC_ROUTE_CONDITIONS,
+  ALMANAC_TRASH_BANDS,
   type AlmanacCurrentStrength,
   type AlmanacWeather,
   type AlmanacCoralHealth,
   type AlmanacRouteCondition,
+  type AlmanacTrashBand,
   type AlmanacTrashKind,
   type AlmanacStatus,
   type AlmanacEventRecord,
@@ -66,7 +68,7 @@ const LOOKBACK_DAYS = 90
 
 const PILL = 'px-3 py-1.5 rounded-lg text-sm font-semibold'
 
-const TRASH_HINT_ID = 'almanac-trash-count-hint'
+const TRASH_HINT_ID = 'almanac-trash-amount-hint'
 
 /** A submission of the signed-in diver's that the crowd cannot see yet. */
 interface OwnSubmission {
@@ -93,7 +95,7 @@ interface AlmanacFormState {
   elevation_m: string
   route_condition: AlmanacRouteCondition | ''
   summit_visible: boolean
-  trash_count: string
+  trash_band: AlmanacTrashBand | ''
   trash_kinds: AlmanacTrashKind[]
 }
 
@@ -118,7 +120,7 @@ const emptyForm: AlmanacFormState = {
   elevation_m: '',
   route_condition: '',
   summit_visible: false,
-  trash_count: '',
+  trash_band: '',
   trash_kinds: [],
 }
 
@@ -559,27 +561,31 @@ function AlmanacForm({
       </h3>
       <div className="mt-3">
         <label className="block">
-          <span className={INPUT_LABEL}>{t.almanac.trashCount}</span>
-          <input
-            type="number" step="1" min="0" className={INPUT}
-            placeholder={t.almanac.trashCountPh}
+          <span className={INPUT_LABEL}>{t.almanac.trashAmount}</span>
+          <select
+            className={INPUT}
             aria-describedby={TRASH_HINT_ID}
-            value={form.trash_count}
-            onChange={e => updateField('trash_count', e.target.value)}
-          />
+            value={form.trash_band}
+            onChange={e => updateField('trash_band', e.target.value as AlmanacTrashBand | '')}
+          >
+            <option value="">{t.almanac.trashAmountPh}</option>
+            {ALMANAC_TRASH_BANDS.map(band => (
+              <option key={band} value={band}>{t.almanac.trashBands[band]}</option>
+            ))}
+          </select>
         </label>
         {/* Outside the label, described into it: inside, the hint became part
             of the field's accessible name and a screen reader announced the
-            whole paragraph as the label. Blank and 0 are different answers and
-            the form has to say so, or a clean site reads as an unsurveyed one
-            in every average. */}
-        <p id={TRASH_HINT_ID} className={`mt-1 text-xs ${TEXT_SUBTLE}`}>{t.almanac.trashCountHint}</p>
+            whole paragraph as the label. Blank and "none" are different
+            answers and the form has to say so, or a clean site reads as an
+            unsurveyed one in every tally. */}
+        <p id={TRASH_HINT_ID} className={`mt-1 text-xs ${TEXT_SUBTLE}`}>{t.almanac.trashAmountHint}</p>
       </div>
       <div className="mt-3">
         <TrashKindPicker
           selected={form.trash_kinds}
           onChange={next => updateField('trash_kinds', next)}
-          disabled={form.trash_count.trim() === '0'}
+          disabled={form.trash_band === 'none'}
         />
       </div>
 
@@ -789,7 +795,7 @@ export function AlmanacPage() {
       p_wave_period_s: numOrNull(form.wave_period_s),
       p_weather: form.weather || null,
       p_wildlife: parseWildlife(form.wildlife),
-      p_trash_count: numOrNull(form.trash_count),
+      p_trash_band: form.trash_band || null,
       p_trash_kinds: form.trash_kinds,
       p_coral_health: form.coral_health || null,
       p_elevation_m: terrain ? numOrNull(form.elevation_m) : null,

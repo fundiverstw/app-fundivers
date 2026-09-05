@@ -5,7 +5,7 @@
  * once — plastic and fishing line and a styrofoam float — and picking one
  * would make the diver choose which of the things they saw counts.
  *
- * Disabled, not hidden, when the count is zero: "none" answers this question
+ * Disabled, not hidden, when the amount is "none": that answers this question
  * already, and a picker that vanished would read as the form losing a field
  * rather than as the answer being settled.
  */

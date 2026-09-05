@@ -23,6 +23,7 @@ const base: AlmanacEventRecord = {
   elevation_m: null,
   route_condition: null,
   summit_visible: null,
+  trash_band: null,
   trash_count: null,
   trash_kinds: [],
   diver_display: 'Mei',
@@ -39,42 +40,55 @@ function renderReport(records: AlmanacEventRecord[]) {
 }
 
 describe('SiteDayReport', () => {
-  it('plots the trash count and tallies what it was made of', () => {
+  it('tallies how much trash the day saw and what it was made of', () => {
     renderReport([
-      { ...base, trash_count: 12, trash_kinds: ['plastic', 'fishing_gear'] },
-      { ...base, id: 'record-2', diver_display: 'Jun', trash_count: 4, trash_kinds: ['plastic'] },
+      { ...base, trash_band: 'noticeable', trash_kinds: ['plastic', 'fishing_gear'] },
+      { ...base, id: 'record-2', diver_display: 'Jun', trash_band: 'noticeable', trash_kinds: ['plastic'] },
+      { ...base, id: 'record-3', diver_display: 'Ana', trash_band: 'minimal', trash_kinds: ['glass'] },
     ])
 
-    const readings = screen.getByText(t.almanac.measured).closest('section')!
-    const trash = within(readings).getByText(t.almanac.trashCount).closest('div')!.parentElement!
-    expect(within(trash).getByText('8')).toBeInTheDocument()
-
     const conditions = screen.getByText(t.almanac.called).closest('section')!
+    const amounts = within(conditions).getByText(t.almanac.trashAmount).closest('div')!
+    expect(within(amounts).getByText(t.almanac.trashBands.noticeable).parentElement).toHaveTextContent('2')
+    expect(within(amounts).getByText(t.almanac.trashBands.minimal).parentElement).toHaveTextContent('1')
+
     const kinds = within(conditions).getByText(t.almanac.trashKindsLabel).closest('div')!
     expect(within(kinds).getByText(t.almanac.trashKinds.plastic).parentElement).toHaveTextContent('2')
     expect(within(kinds).getByText(t.almanac.trashKinds.fishing_gear).parentElement).toHaveTextContent('1')
   })
 
   // "Nobody looked" and "everyone looked and it was clean" are different
-  // findings, and averaging one as the other is the failure this feature
-  // exists to avoid.
-  it('reads a day of zeroes as a clean site, not as an unsurveyed one', () => {
+  // findings, and reading one as the other is the failure this feature exists
+  // to avoid.
+  it('reads a day of "none" as a clean site, not as an unsurveyed one', () => {
     renderReport([
-      { ...base, trash_count: 0 },
-      { ...base, id: 'record-2', diver_display: 'Jun', trash_count: 0 },
+      { ...base, trash_band: 'none' },
+      { ...base, id: 'record-2', diver_display: 'Jun', trash_band: 'none' },
     ])
 
-    const readings = screen.getByText(t.almanac.measured).closest('section')!
-    expect(within(readings).getByText(t.almanac.trashCount)).toBeInTheDocument()
+    const conditions = screen.getByText(t.almanac.called).closest('section')!
+    const amounts = within(conditions).getByText(t.almanac.trashAmount).closest('div')!
+    expect(within(amounts).getByText(t.almanac.trashBands.none).parentElement).toHaveTextContent('2')
     const who = screen.getByText(t.almanac.whoReported).closest('section')!
-    expect(within(who).getAllByText(t.almanac.trashNone)).toHaveLength(2)
+    expect(within(who).getAllByText(t.almanac.trashBands.none)).toHaveLength(2)
+  })
+
+  // A record filed before the bands counted pieces. The band is what the day
+  // tallies on, and the number it counted is not thrown away with the field.
+  it('prints the exact count a pre-band record carries beside its band', () => {
+    renderReport([{ ...base, trash_band: 'noticeable', trash_count: 12 }])
+
+    const who = screen.getByText(t.almanac.whoReported).closest('section')!
+    expect(within(who).getByText(
+      `${t.almanac.trashBands.noticeable} (${t.almanac.trashCounted(12)})`,
+    )).toBeInTheDocument()
   })
 
   it('leaves trash out entirely when nobody answered', () => {
     renderReport([base])
 
-    const readings = screen.getByText(t.almanac.measured).closest('section')!
-    expect(within(readings).queryByText(t.almanac.trashCount)).not.toBeInTheDocument()
+    const conditions = screen.getByText(t.almanac.called).closest('section')!
+    expect(within(conditions).queryByText(t.almanac.trashAmount)).not.toBeInTheDocument()
   })
 
   it('leads with how much data the day is and who filed it', () => {

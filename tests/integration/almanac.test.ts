@@ -142,26 +142,26 @@ describe('almanac_records writes', () => {
 })
 
 describe('almanac trash readings', () => {
-  it('files a count with the materials beside it', async () => {
+  it('files a band with the materials beside it', async () => {
     await clearRecords()
     const client = await userClient(diver.email, diver.password)
 
     const { data, error } = await client.rpc('submit_almanac_record', {
       p_site_id: siteId,
       p_obs_date: YESTERDAY,
-      p_trash_count: 12,
+      p_trash_band: 'noticeable',
       p_trash_kinds: ['plastic', 'fishing_gear'],
     })
     expect(error).toBeNull()
 
     const row = await recordRow(data as string)
-    expect(row.data!.trash_count).toBe(12)
+    expect(row.data!.trash_band).toBe('noticeable')
     expect(row.data!.trash_kinds).toEqual(['plastic', 'fishing_gear'])
   })
 
   // The distinction the whole feature rests on: a blank field is "did not
-  // look", a zero is "looked, and it was clean". Stored as the same thing,
-  // every average would quietly be taken over the dirty days only.
+  // look", "none" is "looked, and it was clean". Stored as the same thing, a
+  // clean site would be indistinguishable from an unsurveyed one.
   it('keeps "did not look" and "looked, saw none" apart', async () => {
     await clearRecords()
     const client = await userClient(diver.email, diver.password)
@@ -169,42 +169,42 @@ describe('almanac trash readings', () => {
     const blank = await client.rpc('submit_almanac_record', {
       p_site_id: siteId, p_obs_date: YESTERDAY,
     })
-    expect((await recordRow(blank.data as string)).data!.trash_count).toBeNull()
+    expect((await recordRow(blank.data as string)).data!.trash_band).toBeNull()
 
-    const zero = await client.rpc('submit_almanac_record', {
-      p_site_id: siteId, p_obs_date: YESTERDAY, p_trash_count: 0,
+    const none = await client.rpc('submit_almanac_record', {
+      p_site_id: siteId, p_obs_date: YESTERDAY, p_trash_band: 'none',
     })
-    expect(zero.error).toBeNull()
-    expect((await recordRow(zero.data as string)).data!.trash_count).toBe(0)
+    expect(none.error).toBeNull()
+    expect((await recordRow(none.data as string)).data!.trash_band).toBe('none')
   })
 
-  it('drops materials the diver left behind after correcting the count to zero', async () => {
+  it('drops materials the diver left behind after correcting the amount to none', async () => {
     await clearRecords()
     const client = await userClient(diver.email, diver.password)
 
     const { data, error } = await client.rpc('submit_almanac_record', {
       p_site_id: siteId,
       p_obs_date: YESTERDAY,
-      p_trash_count: 0,
+      p_trash_band: 'none',
       p_trash_kinds: ['plastic'],
     })
     expect(error).toBeNull()
     expect((await recordRow(data as string)).data!.trash_kinds).toEqual([])
   })
 
-  it('refuses a negative count and a material outside the vocabulary', async () => {
+  it('refuses a band and a material outside the vocabulary', async () => {
     await clearRecords()
     const client = await userClient(diver.email, diver.password)
 
-    const negative = await client.rpc('submit_almanac_record', {
-      p_site_id: siteId, p_obs_date: YESTERDAY, p_trash_count: -3,
-    })
-    expect(negative.error).not.toBeNull()
-
     const invented = await client.rpc('submit_almanac_record', {
-      p_site_id: siteId, p_obs_date: YESTERDAY, p_trash_kinds: ['unobtainium'],
+      p_site_id: siteId, p_obs_date: YESTERDAY, p_trash_band: 'catastrophic',
     })
     expect(invented.error).not.toBeNull()
+
+    const unobtainium = await client.rpc('submit_almanac_record', {
+      p_site_id: siteId, p_obs_date: YESTERDAY, p_trash_kinds: ['unobtainium'],
+    })
+    expect(unobtainium.error).not.toBeNull()
   })
 
   it('publishes both through the read RPC once approved', async () => {
@@ -213,7 +213,7 @@ describe('almanac trash readings', () => {
     const { data: id } = await client.rpc('submit_almanac_record', {
       p_site_id: siteId,
       p_obs_date: YESTERDAY,
-      p_trash_count: 7,
+      p_trash_band: 'minimal',
       p_trash_kinds: ['styrofoam'],
     })
     const staffClient = await userClient(staff.email, staff.password)
@@ -225,7 +225,7 @@ describe('almanac trash readings', () => {
       p_from: YESTERDAY, p_to: TODAY,
     })
     const mine = (rows ?? []).find(r => r.id === id)!
-    expect(mine.trash_count).toBe(7)
+    expect(mine.trash_band).toBe('minimal')
     expect(mine.trash_kinds).toEqual(['styrofoam'])
   })
 })
