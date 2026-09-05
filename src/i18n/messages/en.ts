@@ -1587,7 +1587,7 @@ export const en = {
       payUrlPh: 'https://paypal.me/yourshop',
       notesLabel: 'Extra instructions',
       notesPh: 'One line per instruction, e.g. Put your full name in the transfer memo.',
-      collectsInvoiceEmailLabel: 'Ask the diver for an invoice email',
+      collectsInvoiceEmailLabel: 'Ask the diver where to send the invoice',
       collectsInvoiceEmailHint: 'For methods where you send an invoice or payment link afterwards.',
       showsShopContactLabel: "Show the shop's phone, address and map",
       showsShopContactHint: 'For paying in person. The details come from the shop config, so they stay correct in one place.',

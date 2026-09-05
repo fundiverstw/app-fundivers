@@ -1575,7 +1575,7 @@ export const zhTW: Messages = {
       payUrlPh: 'https://paypal.me/yourshop',
       notesLabel: '補充說明',
       notesPh: '一行一則，例如：請在匯款備註填寫你的全名。',
-      collectsInvoiceEmailLabel: '向潛水員索取帳單信箱',
+      collectsInvoiceEmailLabel: '詢問潛水員帳單要寄到哪個信箱',
       collectsInvoiceEmailHint: '適用於事後寄送帳單或付款連結的方式。',
       showsShopContactLabel: '顯示店家電話、地址與地圖',
       showsShopContactHint: '適用於到店付款。資料來自店家設定，因此只需在一處維護。',
