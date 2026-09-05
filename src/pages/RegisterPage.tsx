@@ -185,9 +185,17 @@ function LockedConfirmation({ event, booking, alreadyExisting = false }: { event
       ) : (
         <WhatHappensNext waitlisted={isWaitlisted} />
       )}
-      <Link to="/records/bookings" className="inline-block bg-brand-900 hover:bg-brand-950 text-white font-semibold px-5 py-2 rounded-lg">
-        {rp.viewMyBookings}
-      </Link>
+      <div className="flex flex-col sm:flex-row sm:justify-center gap-2">
+        <Link to="/records/bookings" className="inline-block bg-brand-900 hover:bg-brand-950 text-white font-semibold px-5 py-2 rounded-lg">
+          {rp.viewMyBookings}
+        </Link>
+        {/* The way back to the event list. This page is the end of the
+            standalone funnel — without it a diver who wants a second event has
+            to find /register again themselves. */}
+        <Link to="/register" className="inline-block border border-surface-300 text-brand-900 hover:bg-surface-100 font-semibold px-5 py-2 rounded-lg transition-colors">
+          {t.register.done.registerAnother}
+        </Link>
+      </div>
     </div>
   )
 }

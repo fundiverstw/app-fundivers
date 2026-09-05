@@ -61,9 +61,13 @@ interface Props {
    *  next" panel inside the modal (and defer onBooked until the diver taps
    *  Done) instead of closing silently. Off for admin / edit flows. */
   inlineConfirmation?: boolean
+  /** Offer "Register for another event" beside Done on that panel. Takes the
+   *  booking the same way onBooked does — the diver is finished with this
+   *  event either way — and leaves the parent to decide where "another" goes. */
+  onRegisterAnother?: (booking: unknown) => void
 }
 
-export function RegisterForm({ event, profile, userId, onClose, onBooked, existingBooking, inlineConfirmation }: Props) {
+export function RegisterForm({ event, profile, userId, onClose, onBooked, existingBooking, inlineConfirmation, onRegisterAnother }: Props) {
   return (
     <div className="fixed inset-0 bg-brand-900/60 backdrop-blur-sm flex items-start justify-center z-50 px-4 pt-8 pb-4 overflow-y-auto" onClick={onClose}>
       <div
@@ -78,6 +82,7 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked, existi
           onCancel={onClose}
           existingBooking={existingBooking}
           inlineConfirmation={inlineConfirmation}
+          onRegisterAnother={onRegisterAnother}
         />
       </div>
     </div>
@@ -206,6 +211,8 @@ export interface RegisterFormBodyProps {
    *  until the diver dismisses it. The standalone /register page leaves this
    *  off — it has its own LockedConfirmation success screen. */
   inlineConfirmation?: boolean
+  /** Renders "Register for another event" on the confirmation panel. */
+  onRegisterAnother?: (booking: unknown) => void
 }
 
 // Outer wrapper around the multi-step form. Adds an optional "Who is this
@@ -450,7 +457,7 @@ interface RegisterFormBodyInnerProps extends RegisterFormBodyProps {
   leadPayerId?: string | null
 }
 
-function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCancel, onBackBeforeStepOne, existingBooking, actingOnBehalfOf, pickerHeader, additionalTargets = [], leadPayerId = null, inlineConfirmation = false }: RegisterFormBodyInnerProps) {
+function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCancel, onBackBeforeStepOne, existingBooking, actingOnBehalfOf, pickerHeader, additionalTargets = [], leadPayerId = null, inlineConfirmation = false, onRegisterAnother }: RegisterFormBodyInnerProps) {
   const isGuest = !userId && !actingOnBehalfOf
   const isEdit = !!existingBooking
   // Read at render (not module load) so tests can stub it per-case. A guest
@@ -1463,6 +1470,11 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // closes the modal and refreshes its bookings).
   if (doneInline) {
     const waitlisted = doneInline.status === 'waitlisted'
+    // What the parent gets back. The id and status alone can't be matched to an
+    // event, so a calendar left open behind the modal went on offering the
+    // event it had just booked; carrying the pair the row is keyed by lets it
+    // mark the event booked straight away.
+    const bookedRow = { ...doneInline, event_id: event.id, user_id: userId ?? null }
     return (
       <div className="space-y-4">
         <header className="space-y-1">
@@ -1484,9 +1496,17 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           </p>
         )}
         <WhatHappensNext waitlisted={waitlisted} />
-        <div className="flex justify-end">
+        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+          {onRegisterAnother && (
+            <button
+              onClick={() => onRegisterAnother(bookedRow)}
+              className="border border-surface-300 text-brand-900 hover:bg-surface-100 text-sm font-semibold py-2 px-5 rounded-lg transition-colors"
+            >
+              {t.register.done.registerAnother}
+            </button>
+          )}
           <button
-            onClick={() => onSubmitSuccess(doneInline)}
+            onClick={() => onSubmitSuccess(bookedRow)}
             className="bg-brand-900 hover:bg-brand-950 text-white text-sm font-semibold py-2 px-5 rounded-lg"
           >
             {t.register.done.done}

@@ -307,6 +307,36 @@ describe('CalendarPage', () => {
     await waitFor(() => expect(heading.textContent).not.toBe(initial))
   })
 
+  it('"Register for another event" records the booking and opens the calendar in multi mode', async () => {
+    const ev = buildEvent({ id: 'dive_xyz', type: 'dive', title: 'Green Island Dive' })
+    fetchEventsInRange.mockResolvedValue([ev])
+    setupBookings([])
+    invoke.mockResolvedValue({ data: { booking_id: 'b-new', status: 'pending' }, error: null })
+
+    const user = userEvent.setup()
+    renderWithRouter(<CalendarPage />)
+    await screen.findAllByText(ev.title)
+    await user.click(screen.getAllByText(ev.title)[0])
+    await user.click(screen.getByRole('button', { name: 'Register' }))
+
+    // Walk the single-event form to the confirmation panel.
+    await screen.findByText(/step 1 of 4/i)
+    await user.click(screen.getByRole('button', { name: /^next ›$/i }))
+    await user.click(screen.getByRole('button', { name: /^next ›$/i }))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByRole('button', { name: /^next ›$/i }))
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+    await screen.findByText(/what happens next/i)
+
+    await user.click(screen.getByRole('button', { name: /register for another event/i }))
+
+    // The form is gone, the cart bar is up, and the event just booked reads as
+    // booked rather than addable.
+    expect(screen.queryByText(/what happens next/i)).not.toBeInTheDocument()
+    expect(await screen.findByText(/0 events selected/i)).toBeInTheDocument()
+    expect(screen.getByText(/^booked$/i)).toBeInTheDocument()
+  })
+
   it('multi-event registration: cart submits one create-registration call per event with a shared group_id', async () => {
     const evA = buildEvent({ id: 'dive_aa', type: 'dive', title: 'Green Island Dive' })
     const evB = buildEvent({ id: 'dive_bb', type: 'dive', title: 'Long Dong Bay' })

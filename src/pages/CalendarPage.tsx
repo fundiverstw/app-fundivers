@@ -110,6 +110,16 @@ export function CalendarPage() {
     setRegistering(null)
   }
 
+  /** "Register for another event" on the confirmation panel. The booking just
+   *  made is recorded exactly as Done records it; the calendar then opens in
+   *  multi mode, so the next events are a tap each rather than another trip
+   *  through the modal. */
+  function handleRegisterAnother(booking: unknown) {
+    handleBooked(booking)
+    setCart([])
+    setMode('multi')
+  }
+
   function toggleCart(ev: AppEvent) {
     setCart(prev => prev.some(e => e.id === ev.id)
       ? prev.filter(e => e.id !== ev.id)
@@ -277,6 +287,7 @@ export function CalendarPage() {
           onClose={() => setRegistering(null)}
           onBooked={handleBooked}
           inlineConfirmation
+          onRegisterAnother={handleRegisterAnother}
         />
       )}
 

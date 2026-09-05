@@ -400,6 +400,7 @@ export const ja: Messages = {
       submittedTitle: '申し込みを送信しました',
       creditApplied: (currency: string, amount: string) => `この予約に ${currency} ${amount} のアカウントクレジットを適用しました。`,
       creditNotApplied: '予約は成立しましたが、アカウントクレジットを今回適用できませんでした。クレジットはアカウントに残っていますので、お支払いページから適用してください。',
+      registerAnother: '他のイベントに申し込む',
       done: '完了',
     },
     header: {

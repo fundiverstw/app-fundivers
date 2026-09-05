@@ -110,6 +110,23 @@ describe('RegisterPage', () => {
     expect(screen.getByText(/confirmed/i)).toBeInTheDocument()
   })
 
+  it('offers a way back to the event list from the confirmation screen', async () => {
+    useAuthMock.mockReturnValue({ user: { id: 'u1' }, profile: {}, loading: false })
+    fetchEventsForBookings.mockResolvedValue(new Map([['dive-a', testEvent]]))
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({
+        data: { id: 'b1', status: 'confirmed', user_id: 'u1', event_id: 'dive-a' },
+      })
+      return mockQueryBuilder({ data: null })
+    })
+
+    renderAt('/register/dive-a')
+    await screen.findByText(/already registered/i)
+    // The funnel ends here, so it has to say where the next event lives.
+    expect(screen.getByRole('link', { name: /register for another event/i }))
+      .toHaveAttribute('href', '/register')
+  })
+
   it('shows the form body when authed and not yet booked', async () => {
     useAuthMock.mockReturnValue({ user: { id: 'u1' }, profile: {}, loading: false })
     fetchEventsForBookings.mockResolvedValue(new Map([['dive-a', testEvent]]))

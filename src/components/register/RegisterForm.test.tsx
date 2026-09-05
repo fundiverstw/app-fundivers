@@ -1585,7 +1585,55 @@ describe('RegisterForm', () => {
     expect(onBooked).not.toHaveBeenCalled()
 
     await user.click(screen.getByRole('button', { name: /^done$/i }))
-    expect(onBooked).toHaveBeenCalledWith({ id: expect.any(String), status: 'pending' })
+    expect(onBooked).toHaveBeenCalledWith({
+      id: expect.any(String), status: 'pending', event_id: sampleEvent.id, user_id: 'u1',
+    })
+  })
+
+  it('offers "Register for another event" beside Done, handing the booking over the same way', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    const onBooked = vi.fn()
+    const onRegisterAnother = vi.fn()
+    render(
+      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={onBooked} inlineConfirmation
+        onRegisterAnother={onRegisterAnother} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+    await screen.findByText(/what happens next/i)
+    await user.click(screen.getByRole('button', { name: /register for another event/i }))
+
+    // The booking still reaches the parent — leaving for the next event is not
+    // abandoning this one.
+    expect(onRegisterAnother).toHaveBeenCalledWith({
+      id: expect.any(String), status: 'pending', event_id: sampleEvent.id, user_id: 'u1',
+    })
+    expect(onBooked).not.toHaveBeenCalled()
+  })
+
+  it('leaves the confirmation panel with Done alone when the caller offers nowhere else to go', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} inlineConfirmation />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i have all the required gear/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+    await screen.findByText(/what happens next/i)
+    expect(screen.queryByRole('button', { name: /register for another event/i })).not.toBeInTheDocument()
   })
 
   it('shows the admin-set deadline summary on step 4 and hides the deposit-only block when paying full', async () => {
