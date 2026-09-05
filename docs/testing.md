@@ -148,8 +148,8 @@ expect(...)                                    // what the shop would see
 ```
 
 `tests/scenario/world.ts` holds the vocabulary — people, dives, series,
-bookings, payments, availability, duties, waivers, terms links — and a
-ledger so one `afterAll` tears the whole world down. Add a step there
+bookings, payments, prices, availability, duties, waivers, terms links —
+and a ledger so one `afterAll` tears the whole world down. Add a step there
 rather than reaching for raw inserts in a test, so the next scenario
 gets it for free. `tests/integration/scenario.ts` is the older,
 money-only version of the same idea and is still used by
@@ -168,7 +168,11 @@ Journeys covered today:
 - **ride seats** — filling a van, guides taking seats from divers, two
   dives sharing one van as a single run;
 - **family booking** — a parent paying for the group with one transfer,
-  who may be named as payer, what the family can read of each other.
+  who may be named as payer, what the family can read of each other;
+- **registration routes** — a diver books one event, then a cart of
+  three, through the real create-registration handler against the real
+  schema: the shop's prices overwrite the browser's, the group shares an
+  id, and a stranger cannot join it.
 
 ## Running tests
 

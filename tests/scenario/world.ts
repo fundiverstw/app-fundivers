@@ -30,10 +30,11 @@ export interface Ledger {
   series: string[]
   waivers: string[]
   vehicles: string[]
+  prices: string[]
 }
 
 export function ledger(): Ledger {
-  return { users: [], events: [], series: [], waivers: [], vehicles: [] }
+  return { users: [], events: [], series: [], waivers: [], vehicles: [], prices: [] }
 }
 
 export async function teardownWorld(l: Ledger, admin: DB = adminClient()) {
@@ -46,6 +47,8 @@ export async function teardownWorld(l: Ledger, admin: DB = adminClient()) {
   // Events before vehicles: deleting an event cascades its event_vehicles rows,
   // and a lingering allocation would block the vehicle delete.
   for (const id of l.events) await deleteTestDive(admin, id)
+  // Prices after the events that reference them.
+  for (const id of l.prices) await admin.from('prices').delete().eq('id', id)
   for (const id of l.vehicles) await admin.from('vehicles').delete().eq('id', id)
   for (const code of l.waivers) await admin.from('waivers').delete().eq('code', code)
   for (const id of l.users) await deleteTestUser(admin, id)
@@ -128,6 +131,25 @@ export class World {
     const seriesId = (row as { series_id: string }).series_id
     this.ledger.series.push(seriesId)
     return { seriesId, eventIds, dates }
+  }
+
+  /**
+   * A price tier in the catalog, for `world.dive({ price })`. What the shop
+   * charges lives here and nowhere else — the registration route reads these
+   * figures itself rather than believing the ones the browser posts.
+   */
+  async price(args: { startingAt: number; deposit?: number; transport?: number }): Promise<string> {
+    const id = crypto.randomUUID()
+    const { error } = await this.admin.from('prices').insert({
+      id,
+      admin_title: `Scenario price ${args.startingAt}`,
+      starting_at: args.startingAt,
+      deposit_amount: args.deposit ?? null,
+      transport: args.transport ?? null,
+    } as never)
+    if (error) throw new Error(`world.price: ${error.message}`)
+    this.ledger.prices.push(id)
+    return id
   }
 
   async cancelEvent(eventId: string): Promise<this> {
