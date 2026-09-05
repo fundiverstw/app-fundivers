@@ -2,9 +2,6 @@ import { describe, it, expect } from 'vitest'
 import {
   paymentInstructionsFor,
   paymentConfirmationReminder,
-  SHOP_ADDRESS,
-  SHOP_PHONE,
-  SHOP_MAPS_URL,
 } from './payment-instructions'
 import type { PaymentMethodDetails } from './payment-method-format'
 import { siteConfig } from '../config/site'
@@ -93,14 +90,27 @@ describe('paymentInstructionsFor', () => {
     expect(i.lines).toContain(p.payOnline('https://paypal.me/example'))
   })
 
-  it('appends the shop contact from config when the method is paid in person', () => {
-    const i = paymentInstructionsFor(method({ key: 'cash', label: 'Cash', shows_shop_contact: true }))
+  // The shop's own details are passed in — they are a row an admin edits, not
+  // a config literal — so a caller that has them prints them.
+  it('appends the shop contact the caller supplies when the method is paid in person', () => {
+    const shop = { phone: '+886 900-000-000', address: '1 Test St', mapsUrl: 'https://maps.example/x' }
+    const i = paymentInstructionsFor(
+      method({ key: 'cash', label: 'Cash', shows_shop_contact: true }), { shop },
+    )
     const body = i.lines.join(' ')
-    expect(body).toContain(SHOP_PHONE)
-    expect(body).toContain(SHOP_ADDRESS)
-    expect(body).toContain(SHOP_MAPS_URL)
+    expect(body).toContain(shop.phone)
+    expect(body).toContain(shop.address)
+    expect(body).toContain(shop.mapsUrl)
     // Paying at the counter needs no bank account, so it must not nag for one.
     expect(i.lines).not.toContain(p.bankDetailsPending)
+  })
+
+  // A shop that has published none of its details prints none of them, rather
+  // than a labelled empty line where the address should be.
+  it('prints no contact lines at all when the shop has published none', () => {
+    const i = paymentInstructionsFor(method({ key: 'cash', label: 'Cash', shows_shop_contact: true }))
+    expect(i.lines.join(' ')).not.toContain(p.address(''))
+    expect(i.lines).toHaveLength(0)
   })
 
   it('falls back to the registered-email wording with no invoice email', () => {

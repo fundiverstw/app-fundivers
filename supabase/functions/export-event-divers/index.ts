@@ -33,6 +33,7 @@ import { Buffer } from "node:buffer"
 import { buildEventDiversXlsxBase64, type EventDiverRow } from "../_shared/event-divers-xlsx.ts"
 import { roleToZh } from "../_shared/event-divers-manifest.ts"
 import { corsOk, jsonResponse, safeError, bearerToken } from "../_shared/responses.ts"
+import { shopEmail } from "../_shared/shop-contact.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 import { isEventKind, usesDateEnvelope, EVENT_KINDS } from "../../../src/lib/event-kinds.ts"
 
@@ -70,7 +71,6 @@ function toManifestRow(p: ManifestProfile, remark: string | null = null): EventD
 
 const XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
-const COMPANY_EMAIL = siteConfig.contact.email
 
 Deno.serve(async (req) => {
   const json = (body: unknown, status = 200) => jsonResponse(req, body, status)
@@ -232,12 +232,16 @@ Deno.serve(async (req) => {
     const staffPart = staff.length ? ` + ${staff.length} staff` : ""
     const text = `Boat manifest for ${eventTitle} (${stamp}). ${divers.length} diver${divers.length === 1 ? "" : "s"}${staffPart}.`
 
+    // The shop's published address, falling back to the mailbox this is
+    // authenticated as: a manifest that goes nowhere because nobody filled in
+    // the field is worse than one that lands in the shop's Gmail.
+    const shopMail = await shopEmail(admin, GMAIL_USER!)
     await transporter.sendMail({
       from:    { name: siteConfig.identity.shopName, address: GMAIL_USER },
-      to:      COMPANY_EMAIL,
+      to:      shopMail,
       // BCC the requesting admin (if they have an email on file and it's
       // not the company address itself) so they get a copy in their inbox.
-      bcc:     callerEmail && callerEmail.toLowerCase() !== COMPANY_EMAIL ? callerEmail : undefined,
+      bcc:     callerEmail && callerEmail.toLowerCase() !== shopMail.toLowerCase() ? callerEmail : undefined,
       subject,
       text,
       attachments: [{ filename, content: xlsxBuffer, contentType: XLSX_CONTENT_TYPE }],

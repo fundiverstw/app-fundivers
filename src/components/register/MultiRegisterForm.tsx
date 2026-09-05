@@ -12,6 +12,7 @@ import { supabase } from '../../lib/supabase'
 import { invokeWithRetry } from '../../lib/edge-invoke'
 import { formatEventSpan, isPastEvent } from '../../lib/events'
 import { paymentInstructionsFor, paymentConfirmationReminder } from '../../lib/payment-instructions'
+import { useShopContact } from '../../hooks/useShopContact'
 import { fetchRideSeats, canRequestRide, type RideSeats } from '../../lib/event-vehicles'
 import { missingWaivers, fetchEventWaiverOverrides, fetchDiverSignatures, fetchWaivers, type WaiverEventRef } from '../../lib/waivers'
 import { WaiverSignDialog } from '../waivers/WaiverSignDialog'
@@ -977,7 +978,8 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
 }
 
 function PaymentInstructionsBlock({ method }: { method: PaymentMethod }) {
-  const instr = paymentInstructionsFor(method)
+  const { contact } = useShopContact()
+  const instr = paymentInstructionsFor(method, { shop: contact })
   const reminder = paymentConfirmationReminder()
   return (
     <>

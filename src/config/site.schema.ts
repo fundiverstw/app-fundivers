@@ -25,14 +25,6 @@ export const siteConfigSchema = z.object({
     description: z.string().min(1),
     logoAlt: z.string().min(1),
   }),
-  contact: z.object({
-    email: z.string().regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, 'must be an email'),
-    phone: z.string().min(1),
-    address: z.string().min(1),
-    mapsUrl: url,
-    lineUrl: url,
-    whatsappUrl: url,
-  }),
   urls: z.object({
     site: origin,
     app: origin,

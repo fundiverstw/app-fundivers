@@ -9,6 +9,7 @@ import { jsPDF } from "npm:jspdf@2.5.1"
 import { Buffer } from "node:buffer"
 import { needsCjkFont, payloadNeedsCjkFont } from "./pdf-fonts.ts"
 import { paymentInstructionsFor, paymentConfirmationReminder } from "./payment-instructions.ts"
+import type { ShopContact } from "../../../src/lib/payment-method-format.ts"
 import { paymentMethodLabel, type PaymentMethodDetails } from "../../../src/lib/payment-method-format.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 import { t } from "./i18n.ts"
@@ -124,6 +125,11 @@ export interface RegistrationPdfPayload {
    *  renders "Included with base price" instead of yes/no. */
   transportIncluded: boolean
   notes: string | null
+  /** The shop's own phone / address / map, for a method that prints them.
+   *  Carried on the payload rather than read here: they are a database row now
+   *  (`shop_contact`), and the handler that builds this payload is the thing
+   *  holding an admin client. */
+  shop: ShopContact
   /** The shop's payment_methods row for the key on the booking. Null when the
    *  key no longer resolves — the Method row and the "How to pay" block are
    *  then omitted rather than guessed at. */
@@ -388,6 +394,7 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   // for credit card).
   const instr = paymentInstructionsFor(p.paymentMethod, {
     invoiceEmail: p.creditCardInvoiceEmail ?? p.email,
+    shop: p.shop,
   })
   if (instr) {
     y += 6
@@ -530,6 +537,8 @@ export interface GroupRegistrationPdfPayload {
   /** Lead booker the summary is addressed to. */
   generatedFor: string
   leadEmail: string
+  /** The shop's own phone / address / map — see `RegistrationPdfPayload.shop`. */
+  shop: ShopContact
   /** The shop's payment_methods row the group settles through. */
   paymentMethod: PaymentMethodDetails | null
   creditCardInvoiceEmail: string | null
@@ -675,6 +684,7 @@ export async function buildGroupPdfBase64(p: GroupRegistrationPdfPayload): Promi
   // How to pay — the group shares one payment method (the lead settles once).
   const instr = paymentInstructionsFor(p.paymentMethod, {
     invoiceEmail: p.creditCardInvoiceEmail ?? p.leadEmail,
+    shop: p.shop,
   })
   if (instr) {
     y += 4

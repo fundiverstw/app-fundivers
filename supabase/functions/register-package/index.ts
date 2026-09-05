@@ -21,6 +21,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
 import { corsOk, jsonResponse, safeError, bearerToken } from "../_shared/responses.ts"
 import { takeActionSlot, rateLimitedBody } from "../_shared/rate-limit.ts"
+import { shopEmail } from "../_shared/shop-contact.ts"
 import {
   parseRegisterPackageInput,
   buildPackageRegistrationEmail,
@@ -33,7 +34,6 @@ import {
 } from "../_shared/registration-estimate.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 
-const COMPANY_EMAIL = siteConfig.contact.email
 
 const labelOf = (r: { display_title?: string | null; admin_title?: string | null } | null, fallback: string) =>
   r?.display_title || r?.admin_title || fallback
@@ -209,12 +209,13 @@ Deno.serve(async (req) => {
         host: "smtp.gmail.com", port: 465, secure: true,
         auth: { user: GMAIL_USER, pass: GMAIL_PASS },
       })
+      const shopMail = await shopEmail(admin, GMAIL_USER!)
       await transporter.sendMail({
         from: { name: siteConfig.identity.shopName, address: GMAIL_USER },
-        to: partner.contact_email, cc: COMPANY_EMAIL, replyTo: diverEmail,
+        to: partner.contact_email, cc: shopMail, replyTo: diverEmail,
         subject: partnerSubject, text: partnerText,
       })
-      if (diverEmail.toLowerCase().trim() !== COMPANY_EMAIL.toLowerCase()) {
+      if (diverEmail.toLowerCase().trim() !== shopMail.toLowerCase()) {
         await transporter.sendMail({
           from: { name: siteConfig.identity.shopName, address: GMAIL_USER },
           to: diverEmail, subject: diverSubject, text: diverText,

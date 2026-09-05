@@ -18,11 +18,7 @@ describe('siteConfig', () => {
   })
 
   it('uses absolute http(s) URLs', () => {
-    const urls = [
-      siteConfig.urls.site, siteConfig.urls.app,
-      siteConfig.contact.mapsUrl, siteConfig.contact.lineUrl,
-      siteConfig.contact.whatsappUrl,
-    ]
+    const urls = [siteConfig.urls.site, siteConfig.urls.app]
     for (const u of urls) expect(u).toMatch(/^https?:\/\//)
   })
 

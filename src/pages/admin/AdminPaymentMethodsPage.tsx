@@ -5,6 +5,7 @@ import {
   fetchPaymentMethods, savePaymentMethod, deletePaymentMethod,
 } from '../../lib/payment-methods'
 import { paymentInstructionsFor } from '../../lib/payment-instructions'
+import { useShopContact } from '../../hooks/useShopContact'
 import { paymentMethodLabel } from '../../lib/payment-method-format'
 import type { PaymentMethod, PaymentMethodInsert } from '../../types/database'
 import { t } from '../../i18n'
@@ -164,6 +165,9 @@ function MethodForm({
   const [submitting, setSubmitting] = useState(false)
 
   const surchargePercent = Number(surcharge)
+  // The preview prints the shop's own phone / address for a cash method, so it
+  // has to read them from where they live now: Manage -> Contact.
+  const { contact } = useShopContact()
 
   // What a diver will read on the register form and the PDF, rebuilt as the
   // admin types — the point of this page is the details being right.
@@ -181,7 +185,7 @@ function MethodForm({
     notes,
     collects_invoice_email: collectsInvoiceEmail,
     shows_shop_contact: showsShopContact,
-  })
+  }, { shop: contact })
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()

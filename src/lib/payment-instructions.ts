@@ -17,15 +17,9 @@ import {
 
 export type { PaymentInstructions } from './payment-method-format'
 
-export const SHOP_PHONE    = siteConfig.contact.phone
-export const SHOP_ADDRESS  = siteConfig.contact.address
-export const SHOP_MAPS_URL = siteConfig.contact.mapsUrl
-
-const SHOP: ShopContact = {
-  phone:    SHOP_PHONE,
-  address:  SHOP_ADDRESS,
-  mapsUrl:  SHOP_MAPS_URL,
-}
+/** The details a cash method prints, when the shop has published none. Empty
+ *  rather than absent so the renderer's own "omit a blank row" rule applies. */
+export const NO_SHOP: ShopContact = { phone: '', address: '', mapsUrl: null }
 
 export function paymentMethodLabels(): PaymentMethodLabels {
   const p = t.paymentInstructions
@@ -47,13 +41,21 @@ export function paymentMethodLabels(): PaymentMethodLabels {
   }
 }
 
+/**
+ * The block for one method.
+ *
+ * The shop's phone / address / map are passed in rather than imported: they are
+ * shop-authored now (`shop_contact`), and a module constant read at import time
+ * would print whatever was true when the tab was opened. Callers hold them
+ * already — `useShopContact()` — and the edge function reads its own copy.
+ */
 export function paymentInstructionsFor(
   method: PaymentMethodDetails,
-  opts: { invoiceEmail?: string | null } = {},
+  opts: { invoiceEmail?: string | null; shop?: ShopContact } = {},
 ): PaymentInstructions {
   return paymentMethodInstructions(method, {
     labels: paymentMethodLabels(),
-    shop: SHOP,
+    shop: opts.shop ?? NO_SHOP,
     invoiceEmail: opts.invoiceEmail,
   })
 }

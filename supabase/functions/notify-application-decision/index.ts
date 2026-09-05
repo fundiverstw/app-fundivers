@@ -18,9 +18,9 @@
 import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
 import { corsOk, jsonResponse, safeError, bearerToken } from "../_shared/responses.ts"
+import { shopEmail } from "../_shared/shop-contact.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 
-const COMPANY_EMAIL = siteConfig.contact.email
 
 interface DecisionBody {
   user_id:  string
@@ -122,12 +122,13 @@ Deno.serve(async (req) => {
         : `Hi,\n\nYour ${siteConfig.identity.shopName} account has been closed.${
             body.reason ? `\n\nReason: ${body.reason}` : ""
           }\n\nIf you believe this is a mistake, reply to this email and we'll take another look.\n\n— ${siteConfig.identity.shopName}`
+      const shopMail = await shopEmail(admin)
       await transporter.sendMail({
         from: { name: siteConfig.identity.shopName, address: GMAIL_USER },
         to:      targetEmail,
         // Copy the company on closures only — a reinstatement is routine and
         // doesn't need a business-side notification.
-        ...(body.decision === "reject" ? { bcc: COMPANY_EMAIL } : {}),
+        ...(body.decision === "reject" && shopMail ? { bcc: shopMail } : {}),
         subject,
         text,
       })

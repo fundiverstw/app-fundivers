@@ -12,7 +12,7 @@ never touch it — that's what keeps upstream updates conflict-free.
 
 | Seam file | What you put there |
 | --- | --- |
-| `fundive.config.ts` | Shop name, contact details, URLs, locale (timezone/currency/language/units), PWA manifest colors, asset paths, feature toggles, gear list/prices, calendar trip keywords, weather-baseline region. Copy `fundive.config.example.ts` to start. |
+| `fundive.config.ts` | Shop name, URLs, locale (timezone/currency/language/units), PWA manifest colors, asset paths, feature toggles, gear list/prices, calendar trip keywords, weather-baseline region. Copy `fundive.config.example.ts` to start. |
 | `src/index.css` (`@theme` block) | Your **brand colors** — see [Colors](#colors) below. |
 | `src/config/terms.tsx` | Your Terms of Use / privacy text (`TermsContent`). |
 | `public/…` (the paths in `assets`) | Your logo, favicon, PWA icons. |

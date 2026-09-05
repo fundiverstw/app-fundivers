@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { PendingPage } from './PendingPage'
+import { ShopContactContext } from '../hooks/shop-contact-context'
 import { t } from '../i18n'
 
 const { useAuthMock, signOut } = vi.hoisted(() => ({
@@ -18,10 +19,16 @@ beforeEach(() => {
   signOut.mockReset()
 })
 
-function renderPage() {
+const SHOP = { email: 'shop@example.com', phone: '', address: '', mapsUrl: null }
+
+function renderPage(contact = SHOP) {
   return render(
     <MemoryRouter>
-      <PendingPage />
+      <ShopContactContext.Provider
+        value={{ contact, channels: [], loading: false, refresh: vi.fn() }}
+      >
+        <PendingPage />
+      </ShopContactContext.Provider>
     </MemoryRouter>
   )
 }
@@ -53,9 +60,18 @@ describe('PendingPage', () => {
     for (const status of ['pending', 'rejected'] as const) {
       useAuthMock.mockReturnValue({ profile: { status }, signOut })
       const { unmount } = renderPage()
-      expect(screen.getByRole('link', { name: /@/ })).toHaveAttribute('href', expect.stringMatching(/^mailto:/))
+      expect(screen.getByRole('link', { name: /@/ })).toHaveAttribute('href', 'mailto:shop@example.com')
       unmount()
     }
+  })
+
+  // The shop's email is shop-authored, so it can be unset. The sentence stands
+  // without it rather than ending in "write to .".
+  it('says its piece without an address when the shop has published none', () => {
+    useAuthMock.mockReturnValue({ profile: { status: 'pending' }, signOut })
+    renderPage({ ...SHOP, email: '' })
+    expect(screen.getByRole('heading', { name: t.pending.holdTitle })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /@/ })).not.toBeInTheDocument()
   })
 
   // Signup no longer lands anyone here, so the page must not imply that

@@ -25,8 +25,7 @@ import {
   buildWalkInAccountEmail, termsConsentUrl, TERMS_CONSENT_TOKEN_DAYS,
 } from "../_shared/terms-consent-email.ts"
 import { siteConfig } from "../../../fundive.config.ts"
-
-const COMPANY_EMAIL = siteConfig.contact.email
+import { fetchShopContact } from "../_shared/shop-contact.ts"
 
 interface Body {
   email:         string
@@ -138,10 +137,13 @@ Deno.serve(async (req) => {
       const { subject, text } = buildWalkInAccountEmail({
         name: fullName, email, eventTitle, acceptUrl,
       })
+      // Blind copy to whatever address the shop has published for itself; no
+      // bcc at all rather than a stale literal when it has published none.
+      const shop = await fetchShopContact(admin)
       await transporter.sendMail({
         from: { name: siteConfig.identity.shopName, address: GMAIL_USER },
         to:   email,
-        bcc:  COMPANY_EMAIL,
+        ...(shop.email ? { bcc: shop.email } : {}),
         subject,
         text,
       })

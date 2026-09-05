@@ -18,9 +18,9 @@ import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
 import { corsOk, jsonResponse, safeError, bearerToken } from "../_shared/responses.ts"
 import { takeActionSlot, rateLimitedBody } from "../_shared/rate-limit.ts"
+import { shopEmail } from "../_shared/shop-contact.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 
-const COMPANY_EMAIL = siteConfig.contact.email
 
 // Keep in step with trg_profiles_child_account_cap, which is the authority.
 const MAX_CHILD_ACCOUNTS = 10
@@ -161,10 +161,11 @@ Deno.serve(async (req) => {
         host: "smtp.gmail.com", port: 465, secure: true,
         auth: { user: GMAIL_USER, pass: GMAIL_PASS },
       })
+      const shopMail = await shopEmail(admin)
       await transporter.sendMail({
         from: { name: siteConfig.identity.shopName, address: GMAIL_USER },
         to:      email,
-        bcc:     COMPANY_EMAIL,
+        ...(shopMail ? { bcc: shopMail } : {}),
         subject: `${siteConfig.identity.shopName} — account created for you`,
         text:
           `Hi ${fullName},\n\n` +

@@ -46,7 +46,9 @@ export interface PaymentMethodLabels {
 export interface ShopContact {
   phone: string
   address: string
-  mapsUrl: string
+  /** Nullable, because the shop authors it and a shop with no map link is an
+   *  ordinary shop rather than a misconfigured one. */
+  mapsUrl: string | null
 }
 
 export interface PaymentInstructions {
@@ -125,8 +127,15 @@ export function paymentMethodInstructions(
     lines.push(l.bankDetailsPending)
   }
 
+  // A blank detail prints nothing rather than a labelled empty line: a shop
+  // that has published no address should not have "Address:" in its emails.
   if (method.shows_shop_contact) {
-    lines.push(l.phone(shop.phone), l.address(shop.address), l.map(shop.mapsUrl))
+    const details: Array<[string | null, (v: string) => string]> = [
+      [filled(shop.phone), l.phone],
+      [filled(shop.address), l.address],
+      [filled(shop.mapsUrl), l.map],
+    ]
+    for (const [value, label] of details) if (value) lines.push(label(value))
   }
 
   if (method.collects_invoice_email) {

@@ -14,9 +14,8 @@ import { todayIso } from './dates'
 // refuses to publish nothing, but it cannot know a TODO is unanswered — see the
 // disclaimer at the top of the template, which is meant to be deleted.
 
-export function starterTermsTemplate(): string {
+export function starterTermsTemplate(email = ''): string {
   const { shopName } = siteConfig.identity
-  const { email } = siteConfig.contact
   const today = todayIso()
 
   return `> **Delete this block before publishing.** This is a starting point, not

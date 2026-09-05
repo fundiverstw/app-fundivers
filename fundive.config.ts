@@ -20,7 +20,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const siteConfig = {
-  configVersion: 10,
+  configVersion: 11,
 
   identity: {
     appName: 'FunDive',
@@ -31,14 +31,6 @@ export const siteConfig = {
     logoAlt: 'FunDivers Taiwan',
   },
 
-  contact: {
-    email: 'fundiverstw@gmail.com',
-    phone: '+886 909-083-683',
-    address: 'No. 8, Heping St, Yonghe District, New Taipei City, 23446',
-    mapsUrl: 'https://maps.app.goo.gl/tDgtMirMrNX9QEjAA',
-    lineUrl: 'https://line.me/R/ti/p/%40lga0216c',
-    whatsappUrl: 'https://wa.me/886909083683',
-  },
 
   // No trailing slashes.
   urls: {

@@ -70,14 +70,19 @@ function descriptionParam(event: CalendarLinkEvent): string {
  * isn't modeled and the dive site isn't the shop; kinds that run on the
  * premises get the shop address.
  */
-export function googleCalendarUrl(event: CalendarLinkEvent): string {
+export function googleCalendarUrl(
+  event: CalendarLinkEvent,
+  opts: { shopAddress?: string } = {},
+): string {
   const params = new URLSearchParams({
     action: 'TEMPLATE',
     text: event.title,
     dates: spanParam(event),
     details: descriptionParam(event),
   })
-  if (heldAtShop(event.type)) params.set('location', siteConfig.contact.address)
+  // The shop's address is shop-authored (`shop_contact`), so the caller passes
+  // it: a module-level read would bake in whatever it was at import time.
+  if (heldAtShop(event.type) && opts.shopAddress) params.set('location', opts.shopAddress)
   // URLSearchParams serializes a space as '+', which only decodes back to a
   // space under form-encoding rules. '%20' reads the same either way, so the
   // title can't land in Google's compose box with plus signs in it.

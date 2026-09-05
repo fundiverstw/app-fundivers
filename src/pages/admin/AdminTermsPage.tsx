@@ -5,6 +5,7 @@ import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
 import { fetchTerms, invalidateTerms, type Terms } from '../../lib/terms'
 import { starterTermsTemplate } from '../../lib/terms-template'
+import { useShopContact } from '../../hooks/useShopContact'
 import { Markdown } from '../../components/Markdown'
 import { t } from '../../i18n'
 import { siteConfig } from '../../config/site'
@@ -26,6 +27,7 @@ export function AdminTermsPage() {
   const toast = useToast()
   const [row, setRow] = useState<Terms | null>(null)
   const [loading, setLoading] = useState(true)
+  const { contact } = useShopContact()
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [material, setMaterial] = useState(false)
@@ -45,7 +47,7 @@ export function AdminTermsPage() {
 
   function loadTemplate() {
     if (body.trim() && !window.confirm(tm.overwriteConfirm)) return
-    setBody(starterTermsTemplate())
+    setBody(starterTermsTemplate(contact.email))
   }
 
   async function save() {

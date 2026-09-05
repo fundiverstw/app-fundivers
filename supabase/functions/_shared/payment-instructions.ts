@@ -1,5 +1,5 @@
 // Edge-function binding of the shared "How to pay" renderer. Mirror of
-// src/lib/payment-instructions.ts — same shop config, same message catalog,
+// src/lib/payment-instructions.ts — same shop details, same message catalog,
 // same src/lib/payment-method-format.ts renderer — so the PDF cannot drift
 // from what the diver saw on the register form.
 
@@ -15,15 +15,8 @@ import {
 
 export type { PaymentInstructions, PaymentMethodDetails }
 
-export const SHOP_PHONE    = siteConfig.contact.phone
-export const SHOP_ADDRESS  = siteConfig.contact.address
-export const SHOP_MAPS_URL = siteConfig.contact.mapsUrl
-
-const SHOP: ShopContact = {
-  phone:   SHOP_PHONE,
-  address: SHOP_ADDRESS,
-  mapsUrl: SHOP_MAPS_URL,
-}
+/** What a cash method prints when the shop has published no details. */
+export const NO_SHOP: ShopContact = { phone: "", address: "", mapsUrl: null }
 
 function labels(): PaymentMethodLabels {
   const p = t.paymentInstructions
@@ -52,12 +45,12 @@ function labels(): PaymentMethodLabels {
  */
 export function paymentInstructionsFor(
   method: PaymentMethodDetails | null | undefined,
-  opts: { invoiceEmail?: string | null } = {},
+  opts: { invoiceEmail?: string | null; shop?: ShopContact } = {},
 ): PaymentInstructions | null {
   if (!method) return null
   return paymentMethodInstructions(method, {
     labels: labels(),
-    shop: SHOP,
+    shop: opts.shop ?? NO_SHOP,
     invoiceEmail: opts.invoiceEmail,
   })
 }

@@ -15,12 +15,12 @@
 import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
 import { corsOk, jsonResponse, safeError, bearerToken } from "../_shared/responses.ts"
+import { shopEmail } from "../_shared/shop-contact.ts"
 import {
   buildTermsRequestEmail, termsConsentUrl, TERMS_CONSENT_TOKEN_DAYS,
 } from "../_shared/terms-consent-email.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 
-const COMPANY_EMAIL = siteConfig.contact.email
 
 Deno.serve(async (req) => {
   const json = (body: unknown, status = 200) => jsonResponse(req, body, status)
@@ -79,10 +79,11 @@ Deno.serve(async (req) => {
       host: "smtp.gmail.com", port: 465, secure: true,
       auth: { user: GMAIL_USER, pass: GMAIL_PASS },
     })
+    const shopMail = await shopEmail(admin)
     await transporter.sendMail({
       from: { name: siteConfig.identity.shopName, address: GMAIL_USER },
       to,
-      bcc: COMPANY_EMAIL,
+      ...(shopMail ? { bcc: shopMail } : {}),
       subject,
       text,
     })

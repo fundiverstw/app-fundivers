@@ -2135,6 +2135,56 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['dive_site_aliases']['Insert']>
         Relationships: []
       }
+      // The shop's own contact details — one row, admin-edited, replacing what
+      // used to be siteConfig.contact (20260905120000).
+      shop_contact: {
+        Row: {
+          singleton: boolean
+          email: string
+          phone: string
+          address: string
+          maps_url: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          singleton?: boolean
+          email?: string
+          phone?: string
+          address?: string
+          maps_url?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['shop_contact']['Insert']>
+        Relationships: []
+      }
+      // The ways a diver can reach the shop, in the order the Contact page
+      // lists them (20260905120000).
+      contact_channels: {
+        Row: {
+          id: string
+          created_at: string
+          created_by: string | null
+          kind: ContactChannelKind
+          label: string | null
+          url: string
+          sort_order: number
+          active: boolean
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          created_by?: string | null
+          kind: ContactChannelKind
+          label?: string | null
+          url: string
+          sort_order?: number
+          active?: boolean
+        }
+        Update: Partial<Database['public']['Tables']['contact_channels']['Insert']>
+        Relationships: []
+      }
       almanac_records: {
         Row: {
           id: string
@@ -2556,6 +2606,26 @@ export type ScheduledTripStatus = typeof SCHEDULED_TRIP_STATUSES[number]
 export const WAITLIST_OFFER_STATUSES = ['pending', 'accepted', 'expired'] as const
 export type WaitlistOfferStatus = typeof WAITLIST_OFFER_STATUSES[number]
 export type WaitlistOffer = Database['public']['Tables']['waitlist_offers']['Row']
+
+// How a diver reaches the shop. Pinned to the DB's contact_channels_kind_check
+// (20260905120000), and the reason the vocabulary is closed rather than free
+// text: each kind carries a glyph and the brand color divers recognise, and
+// both live in code — shop-authored markup rendered into the page is the shape
+// of an XSS bug. `other` takes any link with a neutral glyph, so a service
+// nobody thought of still gets a button.
+//
+// `phone` and `sms` hold a bare phone number rather than a URL; `channelHref`
+// in src/lib/contact.ts is what turns each kind into an href.
+export const CONTACT_CHANNEL_KINDS = [
+  'line', 'whatsapp', 'telegram', 'messenger', 'instagram',
+  'wechat', 'signal', 'phone', 'sms', 'other',
+] as const
+export type ContactChannelKind = typeof CONTACT_CHANNEL_KINDS[number]
+export type ContactChannel = Database['public']['Tables']['contact_channels']['Row']
+// `ShopContactRow`, not `ShopContact`: payment-method-format.ts already owns
+// that name for the structural {phone, address, mapsUrl} it renders from, and
+// this is the whole database row.
+export type ShopContactRow = Database['public']['Tables']['shop_contact']['Row']
 
 // Almanac: crowdsourced environmental observations
 export const ALMANAC_CURRENT_STRENGTHS = ['calm', 'light', 'moderate', 'strong', 'very_strong'] as const

@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { Logo } from '../components/Logo'
 import { Markdown } from '../components/Markdown'
 import { siteConfig } from '../config/site'
+import { useShopContact } from '../hooks/useShopContact'
 import { useTerms } from '../lib/use-terms'
 import { termsTokenState, acceptTermsWithToken, type TermsTokenState } from '../lib/terms'
 import { t } from '../i18n'
@@ -24,6 +25,7 @@ const at = t.acceptTerms
 type Phase = TermsTokenState | 'loading' | 'accepted'
 
 export function AcceptTermsPage() {
+  const { contact } = useShopContact()
   const [params] = useSearchParams()
   const token = params.get('token') ?? ''
   const { terms, loading: termsLoading } = useTerms()
@@ -99,9 +101,9 @@ export function AcceptTermsPage() {
         ) : phase === 'used' ? (
           <Notice tone="warn" title={at.usedTitle} body={at.usedBody} />
         ) : phase === 'expired' ? (
-          <Notice tone="warn" title={at.expiredTitle} body={at.expiredBody(siteConfig.contact.email)} />
+          <Notice tone="warn" title={at.expiredTitle} body={at.expiredBody(contact.email)} />
         ) : (
-          <Notice tone="warn" title={at.unknownTitle} body={at.unknownBody(siteConfig.contact.email)} />
+          <Notice tone="warn" title={at.unknownTitle} body={at.unknownBody(contact.email)} />
         )}
 
         <div className="text-center pt-6">

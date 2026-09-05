@@ -90,10 +90,19 @@ describe('googleCalendarUrl', () => {
 
   it('gives on-premises kinds the shop address and travelling kinds none', async () => {
     const { googleCalendarUrl } = await import('./google-calendar')
+    const shopAddress = 'No. 8, Heping St'
 
-    expect(param(googleCalendarUrl(event({ type: 'course' })), 'location')).toBe('No. 8, Heping St')
-    expect(param(googleCalendarUrl(event({ type: 'dive' })), 'location')).toBeNull()
-    expect(param(googleCalendarUrl(event({ type: 'adventure' })), 'location')).toBeNull()
+    expect(param(googleCalendarUrl(event({ type: 'course' }), { shopAddress }), 'location'))
+      .toBe(shopAddress)
+    expect(param(googleCalendarUrl(event({ type: 'dive' }), { shopAddress }), 'location')).toBeNull()
+    expect(param(googleCalendarUrl(event({ type: 'adventure' }), { shopAddress }), 'location')).toBeNull()
+  })
+
+  // The address is shop-authored, so a shop that has published none gets a
+  // calendar entry with no location rather than one saying "undefined".
+  it('leaves the location off when the shop has published no address', async () => {
+    const { googleCalendarUrl } = await import('./google-calendar')
+    expect(param(googleCalendarUrl(event({ type: 'course' })), 'location')).toBeNull()
   })
 
   it('describes the event with its overview and a link back to the app', async () => {

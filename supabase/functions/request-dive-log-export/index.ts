@@ -22,9 +22,9 @@ import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
 import nodemailer from "npm:nodemailer@6.9.14"
 import { buildDiveLogCsv, DIVE_LOG_CSV_COLUMNS, type DiveLogCsvRow } from "../_shared/dive-log-csv.ts"
 import { corsHeaders, corsOk, jsonResponse, safeError, bearerToken } from "../_shared/responses.ts"
+import { shopEmail } from "../_shared/shop-contact.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 
-const COMPANY_EMAIL = siteConfig.contact.email
 const COOLDOWN_HOURS = 24
 
 Deno.serve(async (req) => {
@@ -108,10 +108,11 @@ Deno.serve(async (req) => {
     const filename = `${siteConfig.identity.shortName.toLowerCase()}-dive-log-${stamp}.csv`
     const subject  = `${siteConfig.identity.shopName} — your dive log export`
     const text     = `Hi,\n\nAttached is a CSV export of your ${rows.length} logged dive${rows.length === 1 ? "" : "s"} from ${siteConfig.identity.shopName}.\n\nYou can request another export 24 hours from now.\n\n— ${siteConfig.identity.shopName}`
+    const shopMail = await shopEmail(admin)
     await transporter.sendMail({
       from: { name: siteConfig.identity.shopName, address: GMAIL_USER },
       to:      userEmail,
-      bcc:     COMPANY_EMAIL,
+      ...(shopMail ? { bcc: shopMail } : {}),
       subject,
       text,
       attachments: [{ filename, content: csv, contentType: "text/csv; charset=utf-8" }],

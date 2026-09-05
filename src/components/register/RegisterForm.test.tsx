@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
+import { ShopContactContext } from '../../hooks/shop-contact-context'
 import { RegisterForm, RegisterFormBody } from './RegisterForm'
 import { mockQueryBuilder } from '../../../tests/test-utils'
 import {
@@ -1523,9 +1524,25 @@ describe('RegisterForm', () => {
   it('step 4 renders a per-method "How to pay" block that updates with the selected method', async () => {
     setupFrom()
     const user = userEvent.setup()
+    // The shop's own phone / address are a row an admin edits now, so the cash
+    // method prints whatever the provider is holding.
     render(
-      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
-        onClose={() => {}} onBooked={() => {}} />
+      <ShopContactContext.Provider
+        value={{
+          contact: {
+            email: 'shop@example.com',
+            phone: '+886 909-083-683',
+            address: 'No. 8, Heping St',
+            mapsUrl: 'https://maps.example/x',
+          },
+          channels: [],
+          loading: false,
+          refresh: vi.fn(),
+        }}
+      >
+        <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+          onClose={() => {}} onBooked={() => {}} />
+      </ShopContactContext.Provider>
     )
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))

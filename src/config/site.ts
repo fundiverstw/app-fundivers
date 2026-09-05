@@ -25,15 +25,6 @@ export interface SiteIdentity {
   logoAlt: string
 }
 
-export interface SiteContact {
-  email: string
-  phone: string
-  address: string
-  mapsUrl: string
-  lineUrl: string
-  whatsappUrl: string
-}
-
 export interface SiteUrls {
   /** Public marketing site, no trailing slash. */
   site: string
@@ -147,7 +138,9 @@ export interface SiteConfig {
   /** Pairs with CONFIG_CONTRACT_VERSION; bump when this contract changes. */
   configVersion: number
   identity: SiteIdentity
-  contact: SiteContact
+  // No `contact` block: how a diver reaches the shop is shop-authored now
+  // (`shop_contact` + `contact_channels`, 20260905120000), because an email
+  // address that needs a developer and a redeploy to change is not a setting.
   urls: SiteUrls
   locale: SiteLocale
   theme: SiteTheme
@@ -160,6 +153,6 @@ export interface SiteConfig {
 // Bump when the SiteConfig contract changes in a way that requires forks to
 // migrate their fundive.config.ts. The build compares this against
 // siteConfig.configVersion and fails loudly on a mismatch.
-export const CONFIG_CONTRACT_VERSION = 10
+export const CONFIG_CONTRACT_VERSION = 11
 
 export const siteConfig: SiteConfig = raw

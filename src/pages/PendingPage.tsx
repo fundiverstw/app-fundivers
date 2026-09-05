@@ -1,7 +1,7 @@
 import { useAuth } from '../hooks/useAuth'
 import { Logo } from '../components/Logo'
 import { CARD_ELEVATED, BTN_PRIMARY, TEXT_MUTED } from '../styles/tokens'
-import { siteConfig } from '../config/site'
+import { useShopContact } from '../hooks/useShopContact'
 import { t } from '../i18n'
 
 // Where a diver lands when their profile is not 'active'.
@@ -19,6 +19,7 @@ import { t } from '../i18n'
 // one useful action for a suspended account is talking to a human — a profile
 // form would only imply that filling it in changes something.
 export function PendingPage() {
+  const { contact } = useShopContact()
   const { profile, signOut } = useAuth()
   const rejected = profile?.status === 'rejected'
 
@@ -32,10 +33,15 @@ export function PendingPage() {
             {rejected ? t.pending.rejectedTitle : t.pending.holdTitle}
           </h1>
           <p className={`${TEXT_MUTED} text-sm mb-5`}>
-            {rejected ? t.pending.rejectedBodyPrefix : t.pending.holdBodyPrefix}{' '}
-            <a href={`mailto:${siteConfig.contact.email}`} className="underline">
-              {siteConfig.contact.email}
-            </a>{t.pending.rejectedBodySuffix}
+            {rejected ? t.pending.rejectedBodyPrefix : t.pending.holdBodyPrefix}
+            {contact.email && (
+              <>
+                {' '}
+                <a href={`mailto:${contact.email}`} className="underline">
+                  {contact.email}
+                </a>
+              </>
+            )}{t.pending.rejectedBodySuffix}
           </p>
           <button onClick={signOut} className={`w-full ${BTN_PRIMARY}`}>
             {t.common.signOut}

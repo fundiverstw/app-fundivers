@@ -10,6 +10,7 @@ import { PendingPage } from './pages/PendingPage'
 import { Logo } from './components/Logo'
 import { ToastProvider } from './components/Toast'
 import { AuthProvider } from './hooks/AuthProvider'
+import { ShopContactProvider } from './hooks/ShopContactProvider'
 import { UpdateBannerHost } from './components/install/UpdateBannerHost'
 import { AppShell } from './components/layout/AppShell'
 import { AdminShell } from './components/layout/AdminShell'
@@ -67,6 +68,7 @@ import { AdminWaiversPage } from './pages/admin/AdminWaiversPage'
 import { AdminTermsPage } from './pages/admin/AdminTermsPage'
 import { AdminCancellationPoliciesPage } from './pages/admin/AdminCancellationPoliciesPage'
 import { AdminPaymentMethodsPage } from './pages/admin/AdminPaymentMethodsPage'
+import { AdminContactPage } from './pages/admin/AdminContactPage'
 import { AdminDiveSitesPage } from './pages/admin/AdminDiveSitesPage'
 
 // Almanac page
@@ -97,6 +99,11 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+      {/* Outside the auth guards on purpose: the pages that show the shop's
+          email include the ones a diver reaches before approval, and the
+          terms-acceptance page, which runs from an emailed link with no
+          session at all. */}
+      <ShopContactProvider>
       <ToastProvider>
       <UpdateBannerHost />
       <Routes>
@@ -205,6 +212,7 @@ export default function App() {
                 <Route path="/admin/terms" element={<AdminTermsPage />} />
                 <Route path="/admin/cancellation-policies" element={<AdminCancellationPoliciesPage />} />
                 <Route path="/admin/payment-methods" element={<AdminPaymentMethodsPage />} />
+                <Route path="/admin/contact" element={<AdminContactPage />} />
                 <Route path="/admin/dive-sites" element={<AdminDiveSitesPage />} />
                 <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
                 <Route path="/admin/refunds" element={<AdminRefundsPage />} />
@@ -218,6 +226,7 @@ export default function App() {
         <Route path="*" element={<HomeRedirect />} />
       </Routes>
       </ToastProvider>
+      </ShopContactProvider>
       </AuthProvider>
     </BrowserRouter>
   )

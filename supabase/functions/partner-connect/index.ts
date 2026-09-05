@@ -20,8 +20,7 @@ import { corsOk, jsonResponse, safeError, bearerToken } from "../_shared/respons
 import { takeActionSlot, rateLimitedBody } from "../_shared/rate-limit.ts"
 import { parsePartnerConnectInput, buildPartnerConnectEmail } from "../_shared/partner-connect.ts"
 import { siteConfig } from "../../../fundive.config.ts"
-
-const COMPANY_EMAIL = siteConfig.contact.email
+import { fetchShopContact } from "../_shared/shop-contact.ts"
 
 Deno.serve(async (req) => {
   const json = (body: unknown, status = 200) => jsonResponse(req, body, status)
@@ -86,9 +85,14 @@ Deno.serve(async (req) => {
       host: "smtp.gmail.com", port: 465, secure: true,
       auth: { user: GMAIL_USER, pass: GMAIL_PASS },
     })
+    // Where the shop reads its mail is a row an admin edits, not a config
+    // literal. With none published the enquiry goes to the mailbox this is
+    // authenticated as, which is the shop's own — an enquiry must not be
+    // dropped because nobody has filled the field in yet.
+    const shop = await fetchShopContact(admin)
     await transporter.sendMail({
       from:     { name: siteConfig.identity.shopName, address: GMAIL_USER },
-      to:       COMPANY_EMAIL,
+      to:       shop.email || GMAIL_USER,
       replyTo:  userEmail,
       subject,
       text,

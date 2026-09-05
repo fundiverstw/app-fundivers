@@ -6,6 +6,7 @@ import { formatEventSpan, eventIsFull, isPastEvent } from '../../lib/events'
 import { useAuth } from '../../hooks/useAuth'
 import { computeEffectiveFullPaymentDeadline } from '../../lib/payment-deadlines'
 import { paymentInstructionsFor } from '../../lib/payment-instructions'
+import { useShopContact } from '../../hooks/useShopContact'
 import { RENTAL_GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_RENTAL_GEAR_ALTERNATIVES, HAS_OWNED_ONLY_GEAR, FULL_GEAR_SET, isGearIncludedCourse, defaultRentalItems, needsRental, toggleGearSelection } from '../../lib/gear'
 import { needsShoeSize } from '../../lib/logistics'
 import { usesCourseDays } from '../../lib/event-kinds'
@@ -2446,7 +2447,11 @@ function PaymentInstructionsBlock({
   method: PaymentMethodRow
   invoiceEmail?: string | null
 }) {
-  const instr = paymentInstructionsFor(method, { invoiceEmail })
+  // The shop's phone / address / map, for a method that prints them. Read from
+  // the shop's own row rather than a config literal, so an admin who moves the
+  // shop changes what the next diver is told to walk to.
+  const { contact } = useShopContact()
+  const instr = paymentInstructionsFor(method, { invoiceEmail, shop: contact })
   return (
     <div className="text-xs text-brand-950 font-medium bg-white/70 border border-surface-200 rounded-lg p-3 space-y-1">
       <p className="font-semibold text-brand-900">{instr.title}</p>

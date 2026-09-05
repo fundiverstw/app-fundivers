@@ -26,9 +26,9 @@ import nodemailer from "npm:nodemailer@6.9.14"
 import { corsOk, jsonResponse, safeError, bearerToken } from "../_shared/responses.ts"
 import { takeActionSlot, rateLimitedBody } from "../_shared/rate-limit.ts"
 import { parseContactPartnerInput, buildTrustedPartnerEmail } from "../_shared/trusted-partners.ts"
+import { shopEmail } from "../_shared/shop-contact.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 
-const COMPANY_EMAIL = siteConfig.contact.email
 
 Deno.serve(async (req) => {
   const json = (body: unknown, status = 200) => jsonResponse(req, body, status)
@@ -104,10 +104,11 @@ Deno.serve(async (req) => {
       host: "smtp.gmail.com", port: 465, secure: true,
       auth: { user: GMAIL_USER, pass: GMAIL_PASS },
     })
+    const shopMail = await shopEmail(admin)
     await transporter.sendMail({
       from:    { name: siteConfig.identity.shopName, address: GMAIL_USER },
       to:      partnerEmail,
-      cc:      COMPANY_EMAIL,
+      ...(shopMail ? { cc: shopMail } : {}),
       replyTo: userEmail,
       subject,
       text,
