@@ -99,8 +99,10 @@ export function AdminContactPage() {
               <div className="min-w-0">
                 <p className="font-medium text-brand-900 text-sm truncate">
                   {channelLabel(channel)}
-                  <span className="ml-2 text-xs text-brand-900/60">{ac.kinds[channel.kind]}</span>
-                  {!channel.active && <span className="ml-2 text-xs text-brand-900/60">{wv.inactive}</span>}
+                  {/* /70 rather than /60: the contrast sweep reads 2.72:1 for
+                      brand-900/60 on this card, which is under the gate. */}
+                  <span className="ml-2 text-xs text-brand-900/70">{ac.kinds[channel.kind]}</span>
+                  {!channel.active && <span className="ml-2 text-xs text-brand-900/70">{wv.inactive}</span>}
                 </p>
                 {/* The href, not the stored value: what a phone number turns
                     into is the thing worth checking before a diver taps it. */}
