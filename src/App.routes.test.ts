@@ -84,6 +84,12 @@ describe('route guards', () => {
     }
   })
 
+  // The catalog decides what every diver's sightings are counted as, so
+  // curating it is staff work even though filing against it is not.
+  it('keeps the wildlife catalog behind AdminRoute', () => {
+    expect(guardsFor('/admin/wildlife')).toContain('AdminRoute')
+  })
+
   it('leaves nothing on a path the parser cannot find, which would pass vacuously', () => {
     expect(guardsFor('/site-maps').length).toBeGreaterThan(0)
     expect(guardsFor('/no-such-route')).toEqual([])

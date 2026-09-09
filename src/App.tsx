@@ -70,6 +70,7 @@ import { AdminCancellationPoliciesPage } from './pages/admin/AdminCancellationPo
 import { AdminPaymentMethodsPage } from './pages/admin/AdminPaymentMethodsPage'
 import { AdminContactPage } from './pages/admin/AdminContactPage'
 import { AdminDiveSitesPage } from './pages/admin/AdminDiveSitesPage'
+import { AdminWildlifePage } from './pages/admin/AdminWildlifePage'
 
 // Almanac page
 // Lazy like its neighbours, and more so: this page pulls in the WebGL scene,
@@ -214,6 +215,7 @@ export default function App() {
                 <Route path="/admin/payment-methods" element={<AdminPaymentMethodsPage />} />
                 <Route path="/admin/contact" element={<AdminContactPage />} />
                 <Route path="/admin/dive-sites" element={<AdminDiveSitesPage />} />
+                <Route path="/admin/wildlife" element={<AdminWildlifePage />} />
                 <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
                 <Route path="/admin/refunds" element={<AdminRefundsPage />} />
                 <Route path="/admin/audits" element={<AdminAuditsPage />} />

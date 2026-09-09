@@ -8,6 +8,7 @@ import { PlusCircleIcon } from '../../components/icons/PlusCircleIcon'
 import { ScheduledTripsIcon } from '../../components/icons/ScheduledTripsIcon'
 import { PackagesIcon } from '../../components/icons/PackagesIcon'
 import { MapPinIcon } from '../../components/icons/MapPinIcon'
+import { FishIcon } from '../../components/icons/FishIcon'
 import { LayoutIcon } from '../../components/icons/LayoutIcon'
 import { TagIcon } from '../../components/icons/TagIcon'
 import { CreditCardIcon } from '../../components/icons/CreditCardIcon'
@@ -69,6 +70,7 @@ const GROUPS: ManageGroup[] = [
     title: m.groups.catalogLogistics,
     cards: [
       { to: '/admin/dive-sites', icon: <MapPinIcon />, ...m.diveSites },
+      { to: '/admin/wildlife', icon: <FishIcon />, ...m.wildlife },
       { to: '/admin/prices', icon: <TagIcon />, ...m.prices },
       { to: '/admin/payment-methods', icon: <CreditCardIcon />, ...m.paymentMethods },
       { to: '/admin/rooms', icon: <BedIcon />, ...m.rooms },
