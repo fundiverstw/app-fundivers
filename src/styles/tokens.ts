@@ -91,6 +91,23 @@ export const BTN_XS_DANGER  = `${BTN_XS_BASE} bg-red-500/15 hover:bg-red-500/25 
  *  scene it sits on. */
 export const BADGE_READOUT = 'rounded-md px-2 py-0.5 text-xs font-semibold bg-reef-500 text-slate-950'
 
+/** One chosen thing in a list of them — a wildlife sighting, and whatever
+ *  comes next that reads the same way. Filled and outlined so a set of them
+ *  scans as items rather than as a run of words. */
+export const CHIP = 'flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-1'
+
+/** The same shape for something nobody has vouched for: outlined, unfilled,
+ *  dashed. It has to be legible without reading as an equal of the ones the
+ *  catalog stands behind. */
+export const CHIP_UNVERIFIED = 'flex items-center gap-2 rounded-lg border border-dashed border-white/15 px-2 py-1'
+
+/** A block of form inside a form — a sub-question opened inline, marked off by
+ *  its own outline rather than by a modal. */
+export const PANEL_INSET = 'rounded-lg border border-white/15 p-3'
+
+/** A row that is a button: the whole line highlights under the pointer. */
+export const ROW_HOVER = 'hover:bg-white/10'
+
 /** A tray of controls floating over a rendered scene. The scene paints its own
  *  colors and they are not the app's, so the tray brings a ground of its own
  *  rather than trusting whatever the camera happens to be pointing at. */

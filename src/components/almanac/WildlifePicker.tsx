@@ -24,8 +24,8 @@ import {
 } from '../../lib/taxa'
 import { TAXON_RANKS, type Taxon, type TaxonRank } from '../../types/database'
 import {
-  BTN_XS_GHOST, BTN_XS_PRIMARY, ERROR_NOTE_LIGHT, INPUT, INPUT_LABEL, TEXT_BODY,
-  TEXT_SUBTLE, TEXT_WARNING,
+  BTN_XS_GHOST, BTN_XS_PRIMARY, CHIP, CHIP_UNVERIFIED, ERROR_NOTE_LIGHT, INPUT,
+  INPUT_LABEL, PANEL_INSET, ROW_HOVER, TEXT_BODY, TEXT_SUBTLE, TEXT_WARNING,
 } from '../../styles/tokens'
 
 const MAX_RESULTS = 8
@@ -122,7 +122,7 @@ export function WildlifePicker({
             return (
               <li
                 key={id}
-                className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-1"
+                className={CHIP}
               >
                 <span className={`text-sm ${TEXT_BODY}`}>{label}</span>
                 {taxon && !labelIsScientific(taxon, lang) && (
@@ -147,7 +147,7 @@ export function WildlifePicker({
           {unmatched.map(label => (
             <li
               key={label}
-              className="flex items-center gap-2 rounded-lg border border-dashed border-white/15 px-2 py-1"
+              className={CHIP_UNVERIFIED}
               title={t.wildlife.unmatchedHint}
             >
               <span className={`text-sm ${TEXT_SUBTLE}`}>{label}</span>
@@ -175,7 +175,7 @@ export function WildlifePicker({
             <li key={taxon.id}>
               <button
                 type="button"
-                className="flex w-full items-baseline gap-2 rounded-lg px-2 py-1 text-left hover:bg-white/10"
+                className={`flex w-full items-baseline gap-2 rounded-lg px-2 py-1 text-left ${ROW_HOVER}`}
                 onClick={() => add(taxon.id)}
               >
                 <span className={`text-sm ${TEXT_BODY}`}>{displayName(taxon, lang)}</span>
@@ -199,7 +199,7 @@ export function WildlifePicker({
       )}
 
       {proposing && (
-        <div className="mt-2 rounded-lg border border-white/15 p-3">
+        <div className={`mt-2 ${PANEL_INSET}`}>
           <p className={`text-sm ${TEXT_BODY}`}>{t.wildlife.propose.heading}</p>
           <p className={`mt-1 text-xs ${TEXT_SUBTLE}`}>{t.wildlife.propose.blurb}</p>
 
