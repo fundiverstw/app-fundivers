@@ -34,6 +34,30 @@ const w = t.admin.wildlife
 const wv = t.admin.waivers
 
 const FIELD = 'w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900'
+
+/**
+ * What the database refused, said in words an admin can act on.
+ *
+ * The constraint names are the useful part of these errors and the rest is
+ * noise: "duplicate key value violates unique constraint
+ * taxa_scientific_name_key" is the catalog saying the animal is already in it,
+ * and that is what the page should say.
+ */
+function saveProblem(err: unknown): string {
+  const message = errorMessage(err)
+  if (message.includes('taxa_scientific_name_key')) return w.duplicateName
+  if (message.includes('taxa_scientific_name_shape_check')) return w.badShape
+  if (message.includes('taxon_parent_rank_not_above')
+    || message.includes('taxon_species_genus_mismatch')) return w.badLineage
+  return w.saveFailed
+}
+
+function deleteProblem(err: unknown): string {
+  const message = errorMessage(err)
+  if (message.includes('taxon_has_sightings')) return w.hasSightings
+  if (message.includes('taxon_has_children')) return w.hasChildren
+  return w.saveFailed
+}
 const ROW_BTN = 'text-xs font-semibold px-3 py-1 rounded-lg text-white'
 
 type Tab = 'catalog' | 'proposals' | 'unmatched'
@@ -68,8 +92,8 @@ export function AdminWildlifePage() {
           setTaxa(catalog)
           setUnmatched(loose)
         }
-      } catch (err) {
-        if (!cancelled) setLoadError(errorMessage(err))
+      } catch {
+        if (!cancelled) setLoadError(w.loadFailed)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -82,13 +106,13 @@ export function AdminWildlifePage() {
   const proposals = taxa.filter(taxon => taxon.status === 'pending')
   const shown = query.trim() ? searchTaxa(taxa, query, lang) : taxa
 
-  async function run(action: () => Promise<void>, success: string) {
+  async function run(action: () => Promise<void>, success: string, problem = saveProblem) {
     try {
       await action()
       toast.success(success)
       await reload()
     } catch (err) {
-      toast.error(errorMessage(err))
+      toast.error(problem(err))
     }
   }
 
@@ -272,6 +296,7 @@ export function AdminWildlifePage() {
             setTaxa(catalog)
             setNaming(current => current && (catalog.find(x => x.id === current.id) ?? null))
           }}
+          onSaved={message => toast.success(message)}
           onError={message => toast.error(message)}
         />
       )}
@@ -295,7 +320,7 @@ export function AdminWildlifePage() {
           onConfirm={async () => {
             const target = confirmDelete
             setConfirmDelete(null)
-            await run(() => deleteTaxon(target.id), w.deleted)
+            await run(() => deleteTaxon(target.id), w.deleted, deleteProblem)
           }}
         />
       )}
@@ -368,7 +393,7 @@ function TaxonForm({ taxon, taxa, onClose, onSaved, onError }: {
       await saveTaxon(draft, taxon?.id)
       await onSaved()
     } catch (err) {
-      onError(errorMessage(err))
+      onError(saveProblem(err))
     } finally {
       setSubmitting(false)
     }
@@ -440,10 +465,11 @@ function TaxonForm({ taxon, taxa, onClose, onSaved, onError }: {
  * BCP-47 tag, and a shop whose divers speak something this app has no catalog
  * for still has a word for the fish.
  */
-function NamesModal({ taxon, onClose, onChanged, onError }: {
+function NamesModal({ taxon, onClose, onChanged, onSaved, onError }: {
   taxon: Taxon
   onClose: () => void
   onChanged: () => Promise<void>
+  onSaved: (message: string) => void
   onError: (message: string) => void
 }) {
   const [lang, setLang] = useState(siteConfig.locale.language as string)
@@ -458,8 +484,11 @@ function NamesModal({ taxon, onClose, onChanged, onError }: {
       await setTaxonName(taxon.id, lang.trim(), name.trim(), !commonName(taxon, lang.trim()))
       setName('')
       await onChanged()
-    } catch {
-      onError(w.nameTaken)
+      onSaved(w.nameSaved)
+    } catch (err) {
+      onError(errorMessage(err).includes('taxon_names_unique_per_lang')
+        ? w.nameTaken
+        : w.nameFailed)
     } finally {
       setBusy(false)
     }
@@ -470,8 +499,9 @@ function NamesModal({ taxon, onClose, onChanged, onError }: {
     try {
       await deleteTaxonName(nameId)
       await onChanged()
-    } catch (err) {
-      onError(errorMessage(err))
+      onSaved(w.nameDeleted)
+    } catch {
+      onError(w.nameFailed)
     } finally {
       setBusy(false)
     }

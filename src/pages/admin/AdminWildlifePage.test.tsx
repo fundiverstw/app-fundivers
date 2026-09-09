@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AdminWildlifePage } from './AdminWildlifePage'
 import { t } from '../../i18n'
@@ -46,8 +46,8 @@ const fetchTaxa = vi.fn(async () => catalog)
 const fetchUnmatchedWildlife = vi.fn(async () => unmatched)
 const moderateTaxon = vi.fn(async () => {})
 const mapUnmatchedWildlife = vi.fn(async () => 4)
-const saveTaxon = vi.fn(async () => 'taxon-new')
-const deleteTaxon = vi.fn(async () => {})
+const saveTaxon = vi.fn<() => Promise<string>>(async () => 'taxon-new')
+const deleteTaxon = vi.fn<() => Promise<void>>(async () => {})
 
 vi.mock('../../lib/wildlife', () => ({
   fetchTaxa: (...a: unknown[]) => fetchTaxa(...(a as [])),
@@ -124,6 +124,32 @@ describe('AdminWildlifePage', () => {
 
     const options = [...(screen.getByLabelText(w.mergePick) as HTMLSelectElement).options]
     expect(options.map(o => o.value)).toEqual(['', 'taxon-turtle'])
+  })
+
+  // The constraint name is the useful part of a Postgres error and the rest is
+  // noise the admin can do nothing with.
+  it('says the animal is already in the catalog, not what Postgres said', async () => {
+    const user = userEvent.setup()
+    saveTaxon.mockRejectedValueOnce(new Error(
+      'duplicate key value violates unique constraint "taxa_scientific_name_key"',
+    ))
+    render(<AdminWildlifePage />)
+    await user.click(await screen.findByRole('button', { name: w.newEntry }))
+    await user.type(screen.getByLabelText(w.scientificLabel), 'Chelonia mydas')
+    await user.click(screen.getByRole('button', { name: t.admin.waivers.save }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(w.duplicateName))
+  })
+
+  it('refuses to delete an entry that carries sightings, in words', async () => {
+    const user = userEvent.setup()
+    deleteTaxon.mockRejectedValueOnce(new Error('taxon_has_sightings'))
+    render(<AdminWildlifePage />)
+    await user.click((await screen.findAllByRole('button', { name: t.admin.waivers.delete }))[0])
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: t.admin.waivers.delete }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(w.hasSightings))
   })
 
   it('refuses to send a common name as a scientific one', async () => {

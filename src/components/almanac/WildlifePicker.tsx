@@ -129,7 +129,9 @@ export function WildlifePicker({
                   <span className={`text-xs italic ${TEXT_SUBTLE}`}>{taxon.scientific_name}</span>
                 )}
                 {taxon?.status === 'pending' && (
-                  <span className={`text-xs ${TEXT_WARNING}`}>{t.wildlife.pendingBadge}</span>
+                  <span className={`text-xs ${TEXT_WARNING}`} title={t.wildlife.pendingHint}>
+                    {t.wildlife.pendingBadge}
+                  </span>
                 )}
                 <button
                   type="button"
