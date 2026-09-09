@@ -14,6 +14,7 @@ into source.
 | [admin.md](./admin.md)                                 | Admin routes, event memos, user search, role-view toggle |
 | [shutdown.md](./shutdown.md)                           | Closing down: settle up, take the data out, and switch the app, the services and the accounts off in an order that strands nothing |
 | [dive-site-maps.md](./dive-site-maps.md)               | Diver-contributed 3D seafloor maps: the implicit 1 m lattice, honest-gap surfacing, contribution model. Admin-only, not yet persisted |
+| [wildlife-taxa.md](./wildlife-taxa.md)                 | The wildlife catalog: sightings keyed on scientific name, every language's name hung off that one row, diver proposals, synonym merges |
 | [coral-surveys.md](./coral-surveys.md)                 | Crowdsourced coral monitoring against the CoralWatch Coral Health Chart: survey plus colony rows, RPC-only writes, staff moderation, the bleaching arithmetic |
 | [packages.md](./packages.md)                           | Partner-shop registration network: product tiers, add-on/room estimate, recommendation email, kickback ledger |
 | [push-notifications.md](./push-notifications.md)       | Web Push: VAPID, service worker, Cloudflare cron sender, `/admin-broadcast`, `/notify-duty`, CORS |
