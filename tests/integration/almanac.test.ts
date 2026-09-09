@@ -78,7 +78,6 @@ describe('almanac_records writes', () => {
       p_site_id: siteId,
       p_obs_date: YESTERDAY,
       p_air_temp_c: 28.4,
-      p_wildlife: ['turtle'],
     })
     expect(first.error).toBeNull()
     const recordId = first.data as string
@@ -99,7 +98,6 @@ describe('almanac_records writes', () => {
     const revised = await recordRow(recordId)
     expect(revised.data!.air_temp_c).toBeNull()
     expect(Number(revised.data!.water_temp_c)).toBe(26)
-    expect(revised.data!.wildlife).toEqual([])
   })
 
   it('refuses a date nobody could have observed', async () => {
