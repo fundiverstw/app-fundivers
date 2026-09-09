@@ -33,7 +33,10 @@ const MAX_RESULTS = 8
 export interface TaxonProposal {
   rank: TaxonRank
   scientific_name: string
-  common_name: string
+  /** Every name the diver knows the animal by, in the app's language. Several,
+   *  because a fish is a lionfish and a turkeyfish and a firefish, and the one
+   *  they leave out is the one the next diver searches for. */
+  common_names: string[]
 }
 
 interface Props {
@@ -57,7 +60,7 @@ export function WildlifePicker({
   const [proposing, setProposing] = useState(false)
   const [rank, setRank] = useState<TaxonRank>('species')
   const [scientific, setScientific] = useState('')
-  const [common, setCommon] = useState('')
+  const [names, setNames] = useState([''])
   const [problem, setProblem] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -82,8 +85,11 @@ export function WildlifePicker({
     setProposing(false)
     setProblem(null)
     setScientific('')
-    setCommon('')
+    setNames([''])
   }
+
+  const setNameAt = (index: number, value: string) =>
+    setNames(prev => prev.map((name, i) => (i === index ? value : name)))
 
   const submitProposal = async () => {
     const shape = scientificNameProblem(rank, scientific)
@@ -99,7 +105,7 @@ export function WildlifePicker({
       const id = await onPropose({
         rank,
         scientific_name: scientific.trim(),
-        common_name: common.trim(),
+        common_names: [...new Set(names.map(name => name.trim()).filter(Boolean))],
       })
       add(id)
       closeProposal()
@@ -227,16 +233,39 @@ export function WildlifePicker({
             />
           </label>
 
-          <label className="mt-2 block">
-            <span className={INPUT_LABEL}>{t.wildlife.propose.common}</span>
-            <input
-              type="text"
-              className={INPUT}
-              placeholder={t.wildlife.propose.commonPh}
-              value={common}
-              onChange={e => setCommon(e.target.value)}
-            />
-          </label>
+          <div className="mt-2">
+            <span className={INPUT_LABEL}>{t.wildlife.propose.otherNames}</span>
+            {names.map((name, index) => (
+              <div key={index} className="mt-1 flex items-center gap-2">
+                <input
+                  type="text"
+                  className={INPUT}
+                  aria-label={t.wildlife.propose.otherName(index + 1)}
+                  placeholder={t.wildlife.propose.otherNamesPh}
+                  value={name}
+                  onChange={e => setNameAt(index, e.target.value)}
+                />
+                {names.length > 1 && (
+                  <button
+                    type="button"
+                    className={BTN_XS_GHOST}
+                    aria-label={t.wildlife.propose.removeName(index + 1)}
+                    onClick={() => setNames(prev => prev.filter((_, i) => i !== index))}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              className={`${BTN_XS_GHOST} mt-1`}
+              onClick={() => setNames(prev => [...prev, ''])}
+            >
+              {t.wildlife.propose.addName}
+            </button>
+            <p className={`mt-1 text-xs ${TEXT_SUBTLE}`}>{t.wildlife.propose.namesHint}</p>
+          </div>
 
           {problem && <p className={`mt-2 ${ERROR_NOTE_LIGHT}`}>{problem}</p>}
 

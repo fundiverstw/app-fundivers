@@ -82,7 +82,12 @@ target to be accepted itself, so resolution is one hop and cannot loop.
 ## Divers propose; staff rule
 
 A diver who cannot find their animal supplies a **scientific name** —
-`propose_taxon` — and files the sighting against the proposal straight away.
+`propose_taxon` — plus as many **other names** as they know it by, and files
+the sighting against the proposal straight away. Several names rather than one:
+a fish is a lionfish and a turkeyfish and a firefish, and the one a single box
+made them drop is the one the next diver would have searched for. A name that
+already belongs to another taxon in that language is skipped rather than
+stolen — the taxon is still created and still usable.
 The proposal is `pending`: nobody else's picker offers it and no crowd tally
 counts it until staff rule.
 
@@ -108,7 +113,7 @@ blocked — throwing a record out does not need its wildlife adjudicated first.
 
 | Function | Who | What |
 | --- | --- | --- |
-| `propose_taxon` | any signed-in diver | Get-or-propose a taxon by scientific name, with an optional common name in one language. |
+| `propose_taxon` | any signed-in diver | Get-or-propose a taxon by scientific name, with any number of common names in one language. |
 | `save_taxon` | staff / admin | Create or edit a catalog entry. |
 | `moderate_taxon` | staff / admin | Approve or reject a proposal. With `p_accepted_id` it **merges**: every sighting moves to that taxon, colliding ones are dropped, and the rejected name becomes a synonym of it. |
 | `delete_taxon` | staff / admin | Remove an entry nothing stands on. Refuses one with sightings or children — those are merged. |
@@ -184,10 +189,28 @@ purpose: that ambiguity is what the schema exists to surface.
 The column is then dropped. Leaving it would leave two answers to "what did
 this record say was in the water", one of which nothing updates any more.
 
+## The labels that were left
+
+The backfill placed what it could and left four strings for a person to judge,
+mapped by `20260909150000` — shop data repair, so that migration lives in the
+deployment repo rather than in the app:
+
+| Label | Filed as | Why |
+| --- | --- | --- |
+| `lionfish` | *Pterois* (genus) | Somebody who writes "lionfish" has not said which one, and filing it as *P. volitans* would invent an identification they did not make |
+| `Box Fish` | Ostraciidae | Already in the catalog as "boxfish" — one space apart |
+| `batfish` | Ephippidae | In this ocean that is *Platax*, and every diver who says batfish means one |
+| `small schools of fish` | Actinopterygii (class) | Not an identification of anything, but not nothing: fish were seen and nothing more was claimed. The rank says exactly how coarse that is |
+
+The three taxa those needed are catalog additions, not shop content, so they
+ship in both repos (`20260909130000`). *Pterois volitans* moves under its new
+genus at the same time.
+
 ## Surfaces
 
 - `/almanac` — `WildlifePicker` replaces the text box: search, chips, and an
-  inline propose form. Pre-catalog labels on an entry being corrected are shown
+  inline propose form that takes a scientific name and any number of other
+  names. Pre-catalog labels on an entry being corrected are shown
   read-only, because mapping them is staff's call.
 - `/admin/wildlife` — the catalog, the proposal queue, and the unmatched-label
   queue, in the order the work arrives.

@@ -101,13 +101,13 @@ describe('proposing an animal the catalog does not have', () => {
     const { onChange, onPropose, user } = setup()
     await user.click(screen.getByRole('button', { name: t.wildlife.propose.open }))
     await user.type(screen.getByLabelText(t.wildlife.propose.scientific), 'Pterois volitans')
-    await user.type(screen.getByLabelText(t.wildlife.propose.common), 'lionfish')
+    await user.type(screen.getByLabelText(t.wildlife.propose.otherName(1)), 'lionfish')
     await user.click(screen.getByRole('button', { name: t.wildlife.propose.submit }))
 
     expect(onPropose).toHaveBeenCalledWith({
       rank: 'species',
       scientific_name: 'Pterois volitans',
-      common_name: 'lionfish',
+      common_names: ['lionfish'],
     })
     expect(onChange).toHaveBeenCalledWith(['taxon-new'])
   })
@@ -122,6 +122,46 @@ describe('proposing an animal the catalog does not have', () => {
 
     expect(screen.getByText(t.wildlife.propose.binomial)).toBeInTheDocument()
     expect(onPropose).not.toHaveBeenCalled()
+  })
+
+  // A fish is a lionfish and a turkeyfish and a firefish. The name a one-box
+  // form made the diver drop is the one the next diver would have searched for.
+  it('takes every name the diver knows it by', async () => {
+    const { onPropose, user } = setup()
+    await user.click(screen.getByRole('button', { name: t.wildlife.propose.open }))
+    await user.type(screen.getByLabelText(t.wildlife.propose.scientific), 'Pterois volitans')
+    await user.type(screen.getByLabelText(t.wildlife.propose.otherName(1)), 'lionfish')
+    await user.click(screen.getByRole('button', { name: t.wildlife.propose.addName }))
+    await user.type(screen.getByLabelText(t.wildlife.propose.otherName(2)), 'turkeyfish')
+    await user.click(screen.getByRole('button', { name: t.wildlife.propose.submit }))
+
+    expect(onPropose).toHaveBeenCalledWith(expect.objectContaining({
+      common_names: ['lionfish', 'turkeyfish'],
+    }))
+  })
+
+  it('drops the blanks and the repeats rather than sending them', async () => {
+    const { onPropose, user } = setup()
+    await user.click(screen.getByRole('button', { name: t.wildlife.propose.open }))
+    await user.type(screen.getByLabelText(t.wildlife.propose.scientific), 'Pterois volitans')
+    await user.type(screen.getByLabelText(t.wildlife.propose.otherName(1)), 'lionfish')
+    await user.click(screen.getByRole('button', { name: t.wildlife.propose.addName }))
+    await user.click(screen.getByRole('button', { name: t.wildlife.propose.addName }))
+    await user.type(screen.getByLabelText(t.wildlife.propose.otherName(3)), ' lionfish ')
+    await user.click(screen.getByRole('button', { name: t.wildlife.propose.submit }))
+
+    expect(onPropose).toHaveBeenCalledWith(expect.objectContaining({
+      common_names: ['lionfish'],
+    }))
+  })
+
+  it('takes a name row back off again', async () => {
+    const { user } = setup()
+    await user.click(screen.getByRole('button', { name: t.wildlife.propose.open }))
+    await user.click(screen.getByRole('button', { name: t.wildlife.propose.addName }))
+    await user.click(screen.getByRole('button', { name: t.wildlife.propose.removeName(2) }))
+
+    expect(screen.queryByLabelText(t.wildlife.propose.otherName(2))).not.toBeInTheDocument()
   })
 
   it('carries what was searched for into the form, so it is not typed twice', async () => {

@@ -183,7 +183,7 @@ describe('a diver proposing an animal', () => {
     const client = await userClient(diver.email, diver.password)
     const name = uniqueBinomial()
     const { data, error } = await client.rpc('propose_taxon', {
-      p_rank: 'species', p_scientific_name: name, p_common_name: 'test fish', p_lang: 'en',
+      p_rank: 'species', p_scientific_name: name, p_common_names: ['test fish'], p_lang: 'en',
     })
     expect(error).toBeNull()
     const taxonId = data as string
@@ -214,6 +214,47 @@ describe('a diver proposing an animal', () => {
       p_rank: 'species', p_scientific_name: name.toLowerCase(),
     })
     expect(second.data).toBe(first.data)
+  })
+
+  // A fish is a lionfish and a turkeyfish. One box would have made the diver
+  // pick a favorite, and the rest are what the next diver searches for.
+  it('keeps every name given, and raises one of them as the one to print', async () => {
+    const client = await userClient(diver.email, diver.password)
+    const suffix = crypto.randomUUID().slice(0, 8)
+    const { data } = await client.rpc('propose_taxon', {
+      p_rank: 'species',
+      p_scientific_name: uniqueBinomial(),
+      p_common_names: [`lionfish ${suffix}`, `turkeyfish ${suffix}`, '  ', `lionfish ${suffix}`],
+      p_lang: 'en',
+    })
+    const taxonId = data as string
+    madeTaxa.push(taxonId)
+
+    const { data: names } = await admin
+      .from('taxon_names').select('name, is_primary').eq('taxon_id', taxonId)
+    expect((names ?? []).map(n => n.name).sort())
+      .toEqual([`lionfish ${suffix}`, `turkeyfish ${suffix}`])
+    expect((names ?? []).filter(n => n.is_primary)).toHaveLength(1)
+  })
+
+  // Within a language a name means one animal, and a proposal is not where
+  // that gets overturned. The taxon is still created and still usable.
+  it('leaves a name that already belongs to another animal where it is', async () => {
+    const taken = `sea unicorn ${crypto.randomUUID().slice(0, 8)}`
+    const owner = await makeTaxon({ rank: 'species', scientific_name: uniqueBinomial() })
+    await admin.from('taxon_names').insert({ taxon_id: owner, lang: 'en', name: taken } as never)
+
+    const client = await userClient(diver.email, diver.password)
+    const { data, error } = await client.rpc('propose_taxon', {
+      p_rank: 'species', p_scientific_name: uniqueBinomial(),
+      p_common_names: [taken], p_lang: 'en',
+    })
+    expect(error).toBeNull()
+    madeTaxa.push(data as string)
+
+    const { data: owned } = await admin
+      .from('taxon_names').select('taxon_id').eq('name', taken).single()
+    expect(owned!.taxon_id).toBe(owner)
   })
 
   it('follows a synonym to the name the catalog actually files under', async () => {

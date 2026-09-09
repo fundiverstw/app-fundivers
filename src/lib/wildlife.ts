@@ -46,14 +46,14 @@ export async function fetchTaxa(): Promise<Taxon[]> {
 export async function proposeTaxon(
   rank: TaxonRank,
   scientificName: string,
-  commonName: string,
+  commonNames: string[],
   lang: string,
 ): Promise<string> {
   const { data, error } = await supabase.rpc('propose_taxon', {
     p_rank: rank,
     p_scientific_name: scientificName,
-    p_common_name: commonName || null,
-    p_lang: commonName ? lang : null,
+    p_common_names: commonNames.length ? commonNames : null,
+    p_lang: commonNames.length ? lang : null,
   })
   if (error) throw error
   return data as string

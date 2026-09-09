@@ -534,7 +534,7 @@ export interface Database {
           p_rank: TaxonRank
           p_scientific_name: string
           p_parent_id?: string | null
-          p_common_name?: string | null
+          p_common_names?: string[] | null
           p_lang?: string | null
         }
         Returns: string

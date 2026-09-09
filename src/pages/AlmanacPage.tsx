@@ -935,7 +935,7 @@ export function AlmanacPage() {
     const id = await proposeTaxon(
       proposal.rank,
       proposal.scientific_name,
-      proposal.common_name,
+      proposal.common_names,
       siteConfig.locale.language,
     )
     await loadTaxa()
