@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { blankForm, emptyForm, formStateFrom, parseWildlife, submitArgs } from './almanac-form'
+import { blankForm, emptyForm, formStateFrom, submitArgs } from './almanac-form'
 import { todayIso } from './dates'
 import type { AlmanacOwnRecord } from '../types/database'
 
@@ -17,7 +17,8 @@ const record = (over: Partial<AlmanacOwnRecord> = {}): AlmanacOwnRecord => ({
   wave_height_m: 0.5,
   wave_period_s: 8,
   weather: 'clear',
-  wildlife: ['turtle', 'manta'],
+  wildlife_taxa: ['taxon-turtle', 'taxon-manta'],
+  wildlife_unmatched: [],
   coral_health: 'good',
   elevation_m: null,
   route_condition: null,
@@ -58,7 +59,7 @@ describe('opening a filed record for correction', () => {
       wave_height_m: '0.5',
       wave_period_s: '8',
       weather: 'clear',
-      wildlife: 'turtle, manta',
+      taxon_ids: ['taxon-turtle', 'taxon-manta'],
       coral_health: 'good',
       trash_band: 'noticeable',
       trash_kinds: ['plastic'],
@@ -100,7 +101,7 @@ describe('opening a filed record for correction', () => {
       p_wave_height_m: filed.wave_height_m,
       p_wave_period_s: filed.wave_period_s,
       p_weather: filed.weather,
-      p_wildlife: filed.wildlife,
+      p_taxon_ids: filed.wildlife_taxa,
       p_coral_health: filed.coral_health,
       p_trash_band: filed.trash_band,
       p_trash_kinds: filed.trash_kinds,
@@ -122,7 +123,7 @@ describe('the arguments a form is filed with', () => {
     expect(args.p_air_temp_c).toBeNull()
     expect(args.p_current_strength).toBeNull()
     expect(args.p_trash_band).toBeNull()
-    expect(args.p_wildlife).toEqual([])
+    expect(args.p_taxon_ids).toEqual([])
   })
 
   // A summit-visible flag on a boat dive is not a false reading; it is a
@@ -143,15 +144,22 @@ describe('the arguments a form is filed with', () => {
   })
 })
 
-describe('wildlife, as a diver writes it', () => {
-  it('splits on commas and drops the whitespace around each name', () => {
-    expect(parseWildlife(' turtle ,manta ray,  whale shark ')).toEqual([
-      'turtle', 'manta ray', 'whale shark',
-    ])
+describe('wildlife, now that it is a set of taxa', () => {
+  // The old form held one comma-separated string; the record holds ids. A
+  // correction that dropped them would silently empty the sightings of an
+  // entry the diver opened only to fix the visibility.
+  it('carries the filed taxa back into the form and out again unchanged', () => {
+    const filed = record({ wildlife_taxa: ['taxon-a', 'taxon-b'] })
+    expect(submitArgs(formStateFrom(filed, 'dive')).p_taxon_ids)
+      .toEqual(['taxon-a', 'taxon-b'])
   })
 
-  it('reads an empty box as nothing seen rather than as one blank name', () => {
-    expect(parseWildlife('')).toEqual([])
-    expect(parseWildlife(' , ')).toEqual([])
+  // Loose pre-catalog labels are not on the form, so a save says nothing about
+  // them. The RPC leaves them where they are; the form must not pretend to.
+  it('does not carry the unmatched labels into the submission', () => {
+    const filed = record({ wildlife_taxa: [], wildlife_unmatched: ['turtle'] })
+    const args = submitArgs(formStateFrom(filed, 'dive'))
+    expect(args.p_taxon_ids).toEqual([])
+    expect(Object.keys(args)).not.toContain('p_wildlife')
   })
 })

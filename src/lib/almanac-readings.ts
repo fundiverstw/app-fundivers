@@ -7,8 +7,10 @@
  * their own submission against what they remember.
  */
 import { t } from '../i18n'
+import { siteConfig } from '../config/site'
+import { displayName } from './taxa'
 import type {
-  AlmanacEventRecord, AlmanacOwnRecord, AlmanacPendingRecord,
+  AlmanacEventRecord, AlmanacOwnRecord, AlmanacPendingRecord, Taxon,
 } from '../types/database'
 
 export function formatNum(v: number | null, decimals = 1): string {
@@ -18,8 +20,16 @@ export function formatNum(v: number | null, decimals = 1): string {
 /** The readings a record carries, as label/value pairs — blank ones dropped. */
 export type Reading = { label: string; value: string }
 
+/**
+ * Wildlife arrives as taxon ids, so the catalog comes with the record: the id
+ * is the identity and the label is a lookup, which is the separation that
+ * stopped one animal being counted under four names. An id the catalog does
+ * not hold is skipped rather than printed raw — a diver reading their own
+ * entry should not be shown a UUID.
+ */
 export function readingsOf(
   record: AlmanacEventRecord | AlmanacPendingRecord | AlmanacOwnRecord,
+  byId: Map<string, Taxon>,
 ): Reading[] {
   const readings: Reading[] = []
   const push = (label: string, value: string | null) => {
@@ -33,7 +43,14 @@ export function readingsOf(
   push(t.almanac.waveHeight, record.wave_height_m === null ? null : `${formatNum(record.wave_height_m)}m`)
   push(t.almanac.wavePeriod, record.wave_period_s === null ? null : `${formatNum(record.wave_period_s)}s`)
   push(t.almanac.coralHealth, record.coral_health && t.almanac.coralHealths[record.coral_health])
-  push(t.almanac.wildlife, record.wildlife?.length ? record.wildlife.join(', ') : null)
+  const seen = (record.wildlife_taxa ?? [])
+    .map(id => byId.get(id))
+    .filter((taxon): taxon is Taxon => taxon !== undefined)
+    .map(taxon => displayName(taxon, siteConfig.locale.language))
+  push(t.wildlife.label, seen.length ? seen.join(', ') : null)
+  push(t.wildlife.unmatchedBadge, record.wildlife_unmatched?.length
+    ? record.wildlife_unmatched.join(', ')
+    : null)
   push(t.almanac.elevation, record.elevation_m === null ? null : `${record.elevation_m}m`)
   push(t.almanac.routeCondition, record.route_condition && t.almanac.routeConditions[record.route_condition])
   push(t.almanac.summitVisible, record.summit_visible === null

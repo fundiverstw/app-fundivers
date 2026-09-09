@@ -18,11 +18,14 @@ import {
   ALMANAC_ROUTE_CONDITIONS,
   ALMANAC_TRASH_BANDS,
   type AlmanacEventRecord,
+  type Taxon,
 } from '../../types/database'
 import { CARD, TEXT_BODY, TEXT_HEADING, TEXT_SUBTLE } from '../../styles/tokens'
 import { ReadingStrip } from './ReadingStrip'
 import { TallyBars } from './TallyBars'
 import { formatNum, readingsOf } from '../../lib/almanac-readings'
+import { displayName } from '../../lib/taxa'
+import { siteConfig } from '../../config/site'
 import { ReadingGrid } from './ReadingGrid'
 
 interface Metric {
@@ -32,11 +35,14 @@ interface Metric {
 }
 
 export function SiteDayReport({
-  siteName, dateLabel, records,
+  siteName, dateLabel, records, taxa,
 }: {
   siteName: string
   dateLabel: string
   records: AlmanacEventRecord[]
+  /** The wildlife catalog, so a day's sightings tally by animal and print in
+   *  the app's language rather than as the ids the records carry. */
+  taxa: Map<string, Taxon>
 }) {
   if (records.length === 0) {
     return (
@@ -62,7 +68,8 @@ export function SiteDayReport({
   const corals = tallyOrdered(records.map(r => r.coral_health), ALMANAC_CORAL_HEALTHS)
   const routes = tallyOrdered(records.map(r => r.route_condition), ALMANAC_ROUTE_CONDITIONS)
   const weathers = tallyByCount(records.map(r => r.weather))
-  const wildlife = tallyByCount(records.flatMap(r => r.wildlife ?? []))
+  const wildlife = tallyByCount(records.flatMap(r => r.wildlife_taxa ?? []))
+  const unmatched = tallyByCount(records.flatMap(r => r.wildlife_unmatched ?? []))
   const trashAmounts = tallyOrdered(records.map(r => r.trash_band), ALMANAC_TRASH_BANDS)
   const trash = tallyByCount(records.flatMap(r => r.trash_kinds ?? []))
   const summits = tallyByCount(records.map(r =>
@@ -121,7 +128,14 @@ export function SiteDayReport({
           labelOf={v => (v === 'yes' ? t.almanac.yes : t.almanac.no)}
         />
         <TallyBars
-          label={t.almanac.wildlife} entries={wildlife}
+          label={t.wildlife.label} entries={wildlife}
+          labelOf={id => {
+            const taxon = taxa.get(id)
+            return taxon ? displayName(taxon, siteConfig.locale.language) : id
+          }}
+        />
+        <TallyBars
+          label={t.wildlife.unmatchedBadge} entries={unmatched}
           labelOf={v => v}
         />
         <TallyBars
@@ -142,7 +156,7 @@ export function SiteDayReport({
               {record.diver_display && (
                 <span className={`text-xs ${TEXT_SUBTLE}`}>{t.almanac.recordsFrom(record.diver_display)}</span>
               )}
-              <ReadingGrid readings={readingsOf(record)} />
+              <ReadingGrid readings={readingsOf(record, taxa)} />
             </li>
           ))}
         </ul>

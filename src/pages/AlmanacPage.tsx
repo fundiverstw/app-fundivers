@@ -33,6 +33,7 @@ import {
   type AlmanacPendingRecord,
   type DiveSite,
   type SiteKind,
+  type Taxon,
 } from '../types/database'
 import { hasTerrainConditions, SITE_CONDITION_KINDS, type EventKind } from '../lib/event-kinds'
 import {
@@ -42,6 +43,7 @@ import { EVENT_KIND_LABELS } from '../lib/event-kind-labels'
 import { fetchDiveSites, siteName } from '../lib/dive-sites'
 import { todayIso, addIsoDays, parseIsoDate } from '../lib/dates'
 import { supabase } from '../lib/supabase'
+import { siteConfig } from '../config/site'
 import {
   CARD,
   TEXT_BODY,
@@ -55,7 +57,11 @@ import {
   BTN_XS_GHOST,
   BTN_XS_DANGER,
   ERROR_NOTE_LIGHT,
+  TEXT_WARNING,
 } from '../styles/tokens'
+import { ownRecordsFrom, taxonIndex } from '../lib/taxa'
+import { fetchTaxa, proposeTaxon } from '../lib/wildlife'
+import { WildlifePicker, type TaxonProposal } from '../components/almanac/WildlifePicker'
 import { ReadingGrid } from '../components/almanac/ReadingGrid'
 import { formatNum, readingsOf, type Reading } from '../lib/almanac-readings'
 import { SiteDayReport } from '../components/almanac/SiteDayReport'
@@ -105,7 +111,7 @@ function daysOf(records: AlmanacEventRecord[]): ObservationDay[] {
     .sort((a, b) => b.date.localeCompare(a.date))
 }
 
-function ObservationRow({ record }: { record: AlmanacEventRecord }) {
+function ObservationRow({ record, taxa }: { record: AlmanacEventRecord; taxa: Map<string, Taxon> }) {
   return (
     <div className="rounded-lg border border-white/10 p-3">
       <div className="flex items-center justify-between gap-2">
@@ -114,7 +120,7 @@ function ObservationRow({ record }: { record: AlmanacEventRecord }) {
           {t.almanac.recordsFrom(record.diver_display ?? '—')}
         </span>
       </div>
-      <ReadingGrid readings={readingsOf(record)} />
+      <ReadingGrid readings={readingsOf(record, taxa)} />
     </div>
   )
 }
@@ -149,7 +155,7 @@ function ObservationSummary({ records }: { records: AlmanacEventRecord[] }) {
   )
 }
 
-function DayCard({ day }: { day: ObservationDay }) {
+function DayCard({ day, taxa }: { day: ObservationDay; taxa: Map<string, Taxon> }) {
   const [expanded, setExpanded] = useState(false)
 
   return (
@@ -174,7 +180,7 @@ function DayCard({ day }: { day: ObservationDay }) {
       {expanded && (
         <div className="space-y-2 border-t border-white/10 px-3 pt-3 pb-3">
           <ObservationSummary records={day.records} />
-          {day.records.map(r => <ObservationRow key={r.id} record={r} />)}
+          {day.records.map(r => <ObservationRow key={r.id} record={r} taxa={taxa} />)}
         </div>
       )}
     </div>
@@ -185,9 +191,11 @@ function DayCard({ day }: { day: ObservationDay }) {
 
 function ModerationQueue({
   records,
+  taxa,
   onModerate,
 }: {
   records: AlmanacPendingRecord[]
+  taxa: Map<string, Taxon>
   onModerate: (id: string, status: 'approved' | 'rejected', notes: string) => Promise<void>
 }) {
   const [notes, setNotes] = useState<Record<string, string>>({})
@@ -199,8 +207,10 @@ function ModerationQueue({
     setError(null)
     try {
       await onModerate(id, status, notes[id] ?? '')
-    } catch {
-      setError(t.almanac.moderationFailed)
+    } catch (err) {
+      setError(err instanceof Error && err.message === t.almanac.approveBlockedByTaxa
+        ? err.message
+        : t.almanac.moderationFailed)
     } finally {
       setBusyId(null)
     }
@@ -222,7 +232,14 @@ function ModerationQueue({
               <div className={`text-xs ${TEXT_SUBTLE}`}>
                 {formatObsDate(record.obs_date)} · {t.almanac.recordsFrom(record.diver_display ?? '—')}
               </div>
-              <ReadingGrid readings={readingsOf(record)} />
+              <ReadingGrid readings={readingsOf(record, taxa)} />
+              {record.unreviewed_taxa.length > 0 && (
+                <p className={`mt-2 text-xs ${TEXT_WARNING}`}>
+                  {t.almanac.unreviewedTaxa(record.unreviewed_taxa
+                    .map(id => taxa.get(id)?.scientific_name ?? '—')
+                    .join(', '))}
+                </p>
+              )}
               <label className="mt-3 block">
                 <span className={INPUT_LABEL}>{t.almanac.staffNotes}</span>
                 <input
@@ -270,19 +287,28 @@ const SITE_LABEL: Record<EventKind, string> = {
 
 function AlmanacForm({
   sites,
+  taxa,
   onSubmit,
   onSitesChanged,
+  onPropose,
   initial,
+  unmatched,
   onCancelEdit,
 }: {
   sites: DiveSite[]
+  taxa: Taxon[]
   onSubmit: (form: AlmanacFormState) => Promise<void>
   /** Re-read the catalog after a diver adds to it, so the place they just
    *  entered is in the picker they are standing in front of. */
   onSitesChanged: () => Promise<void>
+  /** Files a taxon a diver could not find and hands back the id to select. */
+  onPropose: (proposal: TaxonProposal) => Promise<string>
   /** An entry of the diver's own, opened for correction. Its presence is what
    *  puts the form in edit mode; the caller remounts on a change of target. */
   initial?: AlmanacFormState
+  /** Loose pre-catalog labels on the entry being corrected. Read-only: mapping
+   *  them onto a taxon is staff's call, not the diver's. */
+  unmatched?: string[]
   onCancelEdit?: () => void
 }) {
   const editing = !!initial
@@ -526,15 +552,13 @@ function AlmanacForm({
         </select>
       </label>
 
-      <label className="mt-3 block">
-        <span className={INPUT_LABEL}>{t.almanac.wildlife}</span>
-        <input
-          type="text" className={INPUT}
-          placeholder={t.almanac.wildlifePh}
-          value={form.wildlife}
-          onChange={e => updateField('wildlife', e.target.value)}
-        />
-      </label>
+      <WildlifePicker
+        taxa={taxa}
+        selected={form.taxon_ids}
+        onChange={ids => updateField('taxon_ids', ids)}
+        onPropose={onPropose}
+        unmatched={unmatched}
+      />
 
       <h3 className={`mt-4 border-t border-white/10 pt-3 text-xs ${TEXT_HEADING}`}>
         {t.almanac.trashHeading}
@@ -658,10 +682,11 @@ const STATUS_LABEL: Record<AlmanacStatus, string> = {
  * where and when cannot be checked against anything.
  */
 function OwnEntries({
-  records, siteNames, onEdit, onWithdraw,
+  records, siteNames, taxa, onEdit, onWithdraw,
 }: {
   records: AlmanacOwnRecord[]
   siteNames: Map<string, string>
+  taxa: Map<string, Taxon>
   onEdit: (record: AlmanacOwnRecord) => void
   onWithdraw: (record: AlmanacOwnRecord) => Promise<void>
 }) {
@@ -699,7 +724,7 @@ function OwnEntries({
             </span>
           </div>
 
-          <ReadingGrid readings={readingsOf(record)} />
+          <ReadingGrid readings={readingsOf(record, taxa)} />
 
           {record.staff_notes && (
             <p className={`mt-2 text-xs ${TEXT_SUBTLE}`}>
@@ -777,6 +802,7 @@ export function AlmanacPage() {
   const [dayLoading, setDayLoading] = useState(false)
   const [dayError, setDayError] = useState<string | null>(null)
   const [sites, setSites] = useState<DiveSite[]>([])
+  const [taxa, setTaxa] = useState<Taxon[]>([])
   const [records, setRecords] = useState<AlmanacEventRecord[]>([])
   const [ownSubmissions, setOwnSubmissions] = useState<AlmanacOwnRecord[]>([])
   const [pending, setPending] = useState<AlmanacPendingRecord[]>([])
@@ -804,6 +830,9 @@ export function AlmanacPage() {
   // form filled from half of one would blank the other half on save.
   const loadOwnSubmissions = useCallback(async () => {
     if (!userId) return
+    // The records and their sightings in two reads rather than one per entry:
+    // what a record says was seen is a set of rows now, and RLS lets a diver
+    // read their own either way round.
     const { data, error } = await supabase
       .from('almanac_records')
       .select('*')
@@ -813,8 +842,25 @@ export function AlmanacPage() {
       console.error('Failed to load your almanac submissions:', error)
       return
     }
-    setOwnSubmissions(data ?? [])
+    const rows = data ?? []
+    const { data: sightings, error: sightingError } = await supabase
+      .from('almanac_sightings')
+      .select('record_id, taxon_id, raw_label')
+      .in('record_id', rows.map(row => row.id))
+    if (sightingError) {
+      console.error('Failed to load your almanac sightings:', sightingError)
+      return
+    }
+    setOwnSubmissions(ownRecordsFrom(rows, sightings ?? []))
   }, [userId])
+
+  // The catalog, once, for the whole page: the picker searches it, and every
+  // reading surface resolves the ids it holds against the same rows. A diver's
+  // own pending proposals come back too — RLS decides that — so an entry they
+  // filed reads back with the animal they named on it.
+  const loadTaxa = useCallback(async () => {
+    setTaxa(await fetchTaxa())
+  }, [])
 
   const loadSites = useCallback(async () => {
     setSites(await fetchDiveSites())
@@ -837,7 +883,9 @@ export function AlmanacPage() {
       setLoading(true)
       setLoadError(null)
       try {
-        await Promise.all([loadSites(), loadRecords(), loadOwnSubmissions(), loadQueue()])
+        await Promise.all([
+          loadSites(), loadTaxa(), loadRecords(), loadOwnSubmissions(), loadQueue(),
+        ])
       } catch (err) {
         console.error('Failed to load the almanac:', err)
         if (!cancelled) setLoadError(t.almanac.recordsFailed)
@@ -847,7 +895,7 @@ export function AlmanacPage() {
     }
     load()
     return () => { cancelled = true }
-  }, [userId, loadSites, loadRecords, loadOwnSubmissions, loadQueue])
+  }, [userId, loadSites, loadTaxa, loadRecords, loadOwnSubmissions, loadQueue])
 
   // One day at a time, straight from the range RPC with both ends on the same
   // date: a lookup can reach further back than the page's own window, and a
@@ -879,6 +927,20 @@ export function AlmanacPage() {
     load()
     return () => { cancelled = true }
   }, [lookupSite, lookupDate])
+
+  // A proposal is filed and the catalog re-read before the id comes back, so
+  // the chip the diver sees is a row that exists rather than an optimistic
+  // label the next render would have nothing to resolve.
+  const handlePropose = async (proposal: TaxonProposal): Promise<string> => {
+    const id = await proposeTaxon(
+      proposal.rank,
+      proposal.scientific_name,
+      proposal.common_name,
+      siteConfig.locale.language,
+    )
+    await loadTaxa()
+    return id
+  }
 
   const handleSubmit = async (form: AlmanacFormState) => {
     const { error } = await supabase.rpc('submit_almanac_record', submitArgs(form))
@@ -925,7 +987,13 @@ export function AlmanacPage() {
       p_status: status,
       p_staff_notes: notes.trim() || null,
     })
-    if (error) throw error
+    if (error) {
+      // The one refusal a staff member can hit by pressing a button they were
+      // offered: the record names an animal still waiting on its own ruling.
+      throw new Error(error.message.includes('almanac_record_has_unreviewed_taxa')
+        ? t.almanac.approveBlockedByTaxa
+        : error.message)
+    }
     await Promise.all([loadQueue(), loadRecords()])
   }
 
@@ -938,6 +1006,7 @@ export function AlmanacPage() {
   }
 
   const days = daysOf(records)
+  const taxaById = taxonIndex(taxa)
   const siteNames = new Map(sites.map(site => [site.id, site.name]))
   // A record does not carry a kind: the almanac's kinds are a property of the
   // place, and the form reads one off the site to decide whether to ask the
@@ -959,7 +1028,9 @@ export function AlmanacPage() {
 
       {loadError && <p className={ERROR_NOTE_LIGHT}>{loadError}</p>}
 
-      {isStaff && !loadError && <ModerationQueue records={pending} onModerate={handleModerate} />}
+      {isStaff && !loadError && (
+        <ModerationQueue records={pending} taxa={taxaById} onModerate={handleModerate} />
+      )}
 
       <div className="flex flex-wrap gap-2" role="tablist" aria-label={t.almanac.sectionsAria}>
         <TabButton active={tab === 'enter'} onClick={() => setTab('enter')}>{t.almanac.tabEnter}</TabButton>
@@ -980,9 +1051,12 @@ export function AlmanacPage() {
           <AlmanacForm
             key={editing?.id ?? 'new'}
             sites={sites}
+            taxa={taxa}
             onSubmit={handleSubmit}
             onSitesChanged={loadSites}
+            onPropose={handlePropose}
             initial={editing ? formStateFrom(editing, siteKindOf(editing.site_id)) : undefined}
+            unmatched={editing?.wildlife_unmatched}
             onCancelEdit={() => setEditing(null)}
           />
 
@@ -1012,6 +1086,7 @@ export function AlmanacPage() {
           <OwnEntries
             records={ownSubmissions}
             siteNames={siteNames}
+            taxa={taxaById}
             onEdit={startEdit}
             onWithdraw={handleWithdraw}
           />
@@ -1069,6 +1144,7 @@ export function AlmanacPage() {
               siteName={siteNames.get(lookupSite) ?? '—'}
               dateLabel={formatObsDate(lookupDate)}
               records={dayRecords}
+              taxa={taxaById}
             />
           )}
 
@@ -1079,7 +1155,7 @@ export function AlmanacPage() {
                 <p className={`${CARD} p-4 text-center text-sm ${TEXT_SUBTLE}`}>{t.almanac.noRecordsYet}</p>
               ) : (
                 <div className="space-y-2">
-                  {days.map(day => <DayCard key={day.date} day={day} />)}
+                  {days.map(day => <DayCard key={day.date} day={day} taxa={taxaById} />)}
                 </div>
               )}
             </section>

@@ -368,7 +368,11 @@ export interface Database {
           wave_height_m: number | null
           wave_period_s: number | null
           weather: AlmanacWeather | null
-          wildlife: string[] | null
+          /** Taxon ids, resolved against the catalog the page already holds. */
+          wildlife_taxa: string[]
+          /** Free text filed before the catalog existed, still awaiting a
+           *  staff mapping. Rendered as what it is: a label nobody vouched for. */
+          wildlife_unmatched: string[]
           coral_health: AlmanacCoralHealth | null
           elevation_m: number | null
           route_condition: AlmanacRouteCondition | null
@@ -467,7 +471,8 @@ export interface Database {
           wave_height_m: number | null
           wave_period_s: number | null
           weather: AlmanacWeather | null
-          wildlife: string[] | null
+          wildlife_taxa: string[]
+          wildlife_unmatched: string[]
           coral_health: AlmanacCoralHealth | null
           elevation_m: number | null
           route_condition: AlmanacRouteCondition | null
@@ -476,6 +481,10 @@ export interface Database {
           trash_count: number | null
           trash_kinds: AlmanacTrashKind[] | null
           diver_display: string | null
+          /** The record's animals that are themselves still proposals. A record
+           *  cannot be approved while any are, so the queue says so before the
+           *  button is pressed. */
+          unreviewed_taxa: string[]
         }>
       }
       // Almanac: submit or revise the caller's own pending observation.
@@ -490,7 +499,7 @@ export interface Database {
           p_wave_height_m?: number | null
           p_wave_period_s?: number | null
           p_weather?: AlmanacWeather | null
-          p_wildlife?: string[] | null
+          p_taxon_ids?: string[] | null
           p_coral_health?: AlmanacCoralHealth | null
           p_elevation_m?: number | null
           p_route_condition?: AlmanacRouteCondition | null
@@ -515,6 +524,82 @@ export interface Database {
           p_staff_notes?: string | null
         }
         Returns: void
+      }
+      // Wildlife: get-or-propose a taxon by scientific name. A diver whose
+      // animal is not in the catalog names it in Latin and files against the
+      // proposal straight away; staff rule on it before anyone else sees it.
+      // A name already known comes back as itself rather than as a duplicate.
+      propose_taxon: {
+        Args: {
+          p_rank: TaxonRank
+          p_scientific_name: string
+          p_parent_id?: string | null
+          p_common_name?: string | null
+          p_lang?: string | null
+        }
+        Returns: string
+      }
+      // Wildlife: create or edit a catalog entry. Staff/admin.
+      save_taxon: {
+        Args: {
+          p_id: string | null
+          p_rank: TaxonRank
+          p_scientific_name: string
+          p_authority?: string | null
+          p_worms_aphia_id?: number | null
+          p_parent_id?: string | null
+        }
+        Returns: string
+      }
+      // Wildlife: rule on a proposal, or merge it into the entry it
+      // duplicates. `p_accepted_id` moves every sighting across and marks the
+      // rejected name a synonym of it — the one operation that undoes a
+      // duplicate after the fact. Staff/admin.
+      moderate_taxon: {
+        Args: {
+          p_taxon_id: string
+          p_status: Extract<TaxonStatus, 'approved' | 'rejected'>
+          p_accepted_id?: string | null
+          p_staff_notes?: string | null
+        }
+        Returns: void
+      }
+      // Wildlife: remove a catalog entry nothing stands on. Refuses one with
+      // sightings or children — those are merged, not deleted. Staff/admin.
+      delete_taxon: {
+        Args: { p_taxon_id: string }
+        Returns: void
+      }
+      // Wildlife: add or edit one vernacular name. Staff/admin.
+      set_taxon_name: {
+        Args: {
+          p_taxon_id: string
+          p_lang: string
+          p_name: string
+          p_is_primary?: boolean
+          p_name_id?: string | null
+        }
+        Returns: string
+      }
+      delete_taxon_name: {
+        Args: { p_name_id: string }
+        Returns: void
+      }
+      // Wildlife: the loose labels the backfill could not match, grouped by
+      // the string itself. Staff/admin.
+      almanac_unmatched_wildlife: {
+        Args: Record<string, never>
+        Returns: Array<{
+          label: string
+          sightings: number
+          records: number
+        }>
+      }
+      // Wildlife: point every sighting carrying one label at a taxon. Returns
+      // how many moved. Staff/admin.
+      map_unmatched_wildlife: {
+        Args: { p_label: string; p_taxon_id: string }
+        Returns: number
       }
       // Coral surveys (20260822000000). A CoralWatch Coral Health Chart
       // survey: a header row plus its colony observations, moderated as a
@@ -2200,7 +2285,6 @@ export interface Database {
           wave_height_m: number | null
           wave_period_s: number | null
           weather: AlmanacWeather | null
-          wildlife: string[] | null
           coral_health: AlmanacCoralHealth | null
           elevation_m: number | null
           route_condition: AlmanacRouteCondition | null
@@ -2227,7 +2311,6 @@ export interface Database {
           wave_height_m?: number | null
           wave_period_s?: number | null
           weather?: AlmanacWeather | null
-          wildlife?: string[] | null
           coral_health?: AlmanacCoralHealth | null
           elevation_m?: number | null
           route_condition?: AlmanacRouteCondition | null
@@ -2241,6 +2324,92 @@ export interface Database {
           staff_notes?: string | null
         }
         Update: Partial<Database['public']['Tables']['almanac_records']['Insert']>
+        Relationships: []
+      }
+      // The organisms the almanac can record. Keyed by `scientific_name` —
+      // the only name that is unique worldwide and defined by somebody other
+      // than this project. Every language's name for the animal is a row in
+      // taxon_names pointing here. See 20260909100000_wildlife_taxa.sql.
+      taxa: {
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          rank: TaxonRank
+          scientific_name: string
+          authority: string | null
+          worms_aphia_id: number | null
+          parent_id: string | null
+          /** Set when this name is a synonym: the taxon that owns the
+           *  sightings. Filing against a synonym files against its target. */
+          accepted_id: string | null
+          status: TaxonStatus
+          proposed_by: string | null
+          reviewed_by: string | null
+          reviewed_at: string | null
+          staff_notes: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          rank: TaxonRank
+          scientific_name: string
+          authority?: string | null
+          worms_aphia_id?: number | null
+          parent_id?: string | null
+          accepted_id?: string | null
+          status?: TaxonStatus
+          proposed_by?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          staff_notes?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['taxa']['Insert']>
+        Relationships: []
+      }
+      // A taxon's vernacular names, one row per language. Unique on
+      // (lang, name) across the whole table: within one language a common name
+      // means exactly one animal.
+      taxon_names: {
+        Row: {
+          id: string
+          created_at: string
+          taxon_id: string
+          lang: string
+          name: string
+          is_primary: boolean
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          taxon_id: string
+          lang: string
+          name: string
+          is_primary?: boolean
+        }
+        Update: Partial<Database['public']['Tables']['taxon_names']['Insert']>
+        Relationships: []
+      }
+      // What an almanac record says was seen. Exactly one of `taxon_id` and
+      // `raw_label` is set; the label is pre-catalog free text waiting to be
+      // mapped, and nothing the app writes today fills it.
+      almanac_sightings: {
+        Row: {
+          id: string
+          created_at: string
+          record_id: string
+          taxon_id: string | null
+          raw_label: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          record_id: string
+          taxon_id?: string | null
+          raw_label?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['almanac_sightings']['Insert']>
         Relationships: []
       }
       travel_destinations: {
@@ -2661,11 +2830,16 @@ export type AlmanacTrashBand = typeof ALMANAC_TRASH_BANDS[number]
 export const SITE_KINDS = ['dive', 'adventure'] as const
 export type SiteKind = typeof SITE_KINDS[number]
 
-/** A diver's own row, straight from the table — what the "Your entries" list
- *  reads back and what an edit is seeded from. Wider than the published
- *  `AlmanacEventRecord`: it carries `status` and `staff_notes`, which are about
- *  the submission rather than about the water. */
-export type AlmanacOwnRecord = Database['public']['Tables']['almanac_records']['Row']
+export type AlmanacRecordRow = Database['public']['Tables']['almanac_records']['Row']
+
+/** A diver's own row — what the "Your entries" list reads back and what an edit
+ *  is seeded from. Wider than the published `AlmanacEventRecord`: it carries
+ *  `status` and `staff_notes`, which are about the submission rather than about
+ *  the water. */
+export interface AlmanacOwnRecord extends AlmanacRecordRow {
+  wildlife_taxa: string[]
+  wildlife_unmatched: string[]
+}
 
 export const ALMANAC_STATUSES = ['pending', 'approved', 'rejected'] as const
 
@@ -2705,6 +2879,37 @@ export type DiveSiteInsert = Database['public']['Tables']['dive_sites']['Insert'
 // Almanac RPC return types
 export type AlmanacEventRecord = Database['public']['Functions']['almanac_records_in_range']['Returns'][number]
 export type AlmanacPendingRecord = Database['public']['Functions']['almanac_pending_records']['Returns'][number]
+
+// The ranks a sighting can be filed at, coarsest first. `taxon_rank_depth()`
+// in the database holds the same ladder and compares two ranks with it, so a
+// parent has to sit strictly above its child. Pinned to `taxa_rank_check`.
+//
+// Subclass and superorder are here because the two nodes divers reach for most
+// are exactly there: "a shark" is the superorder Selachimorpha and "a ray" is
+// Batoidea. Without them both sightings would have to climb to a rung that
+// covers the pair.
+export const TAXON_RANKS = [
+  'phylum', 'class', 'subclass', 'superorder', 'order', 'family', 'genus', 'species',
+] as const
+export type TaxonRank = typeof TAXON_RANKS[number]
+
+export const TAXON_STATUSES = ['pending', 'approved', 'rejected'] as const
+export type TaxonStatus = typeof TAXON_STATUSES[number]
+
+export type TaxonRow = Database['public']['Tables']['taxa']['Row']
+export type TaxonNameRow = Database['public']['Tables']['taxon_names']['Row']
+export type AlmanacSightingRow = Database['public']['Tables']['almanac_sightings']['Row']
+
+/** A catalog entry with its names attached, as the picker and every reading
+ *  surface use it. The names arrive embedded from PostgREST. */
+export interface Taxon extends TaxonRow {
+  taxon_names: TaxonNameRow[]
+}
+
+/** One loose label still waiting to be mapped, with how much of the almanac
+ *  is standing on it. */
+export type UnmatchedWildlife =
+  Database['public']['Functions']['almanac_unmatched_wildlife']['Returns'][number]
 /** Privacy-projected row used by the UI. title/details are NULL for any
  *  entry not owned by the calling user. owner_display_name comes from the
  *  joined profiles row in staff_availability_view. */

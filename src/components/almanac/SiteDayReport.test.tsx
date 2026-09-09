@@ -2,7 +2,33 @@ import { describe, it, expect } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import { SiteDayReport } from './SiteDayReport'
 import { t } from '../../i18n'
-import type { AlmanacEventRecord } from '../../types/database'
+import type { AlmanacEventRecord, Taxon } from '../../types/database'
+
+const taxon = (id: string, scientific: string, english: string): Taxon => ({
+  id,
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+  rank: 'species',
+  scientific_name: scientific,
+  authority: null,
+  worms_aphia_id: null,
+  parent_id: null,
+  accepted_id: null,
+  status: 'approved',
+  proposed_by: null,
+  reviewed_by: null,
+  reviewed_at: null,
+  staff_notes: null,
+  taxon_names: [{
+    id: `name-${id}`, created_at: '2026-01-01T00:00:00Z', taxon_id: id,
+    lang: 'en', name: english, is_primary: true,
+  }],
+})
+
+const catalog = new Map([
+  ['taxon-turtle', taxon('taxon-turtle', 'Chelonia mydas', 'green sea turtle')],
+  ['taxon-manta', taxon('taxon-manta', 'Mobula alfredi', 'reef manta ray')],
+])
 
 const base: AlmanacEventRecord = {
   id: 'record-1',
@@ -18,7 +44,8 @@ const base: AlmanacEventRecord = {
   wave_height_m: null,
   wave_period_s: null,
   weather: 'clear',
-  wildlife: ['turtle'],
+  wildlife_taxa: ['taxon-turtle'],
+  wildlife_unmatched: [],
   coral_health: null,
   elevation_m: null,
   route_condition: null,
@@ -31,15 +58,28 @@ const base: AlmanacEventRecord = {
 
 const day: AlmanacEventRecord[] = [
   base,
-  { ...base, id: 'record-2', water_temp_c: 27, visibility_m: 8, current_strength: 'moderate', weather: 'rain', wildlife: ['turtle', 'manta'], diver_display: 'Jun' },
-  { ...base, id: 'record-3', water_temp_c: 29, visibility_m: 15, current_strength: 'light', weather: 'clear', wildlife: [], diver_display: 'Ana' },
+  { ...base, id: 'record-2', water_temp_c: 27, visibility_m: 8, current_strength: 'moderate', weather: 'rain', wildlife_taxa: ['taxon-turtle', 'taxon-manta'], diver_display: 'Jun' },
+  { ...base, id: 'record-3', water_temp_c: 29, visibility_m: 15, current_strength: 'light', weather: 'clear', wildlife_taxa: [], diver_display: 'Ana' },
 ]
 
 function renderReport(records: AlmanacEventRecord[]) {
-  return render(<SiteDayReport siteName="Bat Cave" dateLabel="Aug 1, 2026" records={records} />)
+  return render(
+    <SiteDayReport siteName="Bat Cave" dateLabel="Aug 1, 2026" records={records} taxa={catalog} />,
+  )
 }
 
 describe('SiteDayReport', () => {
+  // The whole point of the taxon key: three divers who each know the animal by
+  // a different name still add up to one row with a count of three.
+  it('tallies wildlife by taxon and names it in the app\u2019s language', () => {
+    renderReport(day)
+
+    const conditions = screen.getByText(t.almanac.called).closest('section')!
+    const seen = within(conditions).getByText(t.wildlife.label).closest('div')!
+    expect(within(seen).getByText('green sea turtle').parentElement).toHaveTextContent('2')
+    expect(within(seen).getByText('reef manta ray').parentElement).toHaveTextContent('1')
+  })
+
   it('tallies how much trash the day saw and what it was made of', () => {
     renderReport([
       { ...base, trash_band: 'noticeable', trash_kinds: ['plastic', 'fishing_gear'] },

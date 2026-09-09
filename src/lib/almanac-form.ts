@@ -31,7 +31,7 @@ export interface AlmanacFormState {
   wave_height_m: string
   wave_period_s: string
   weather: AlmanacWeather | ''
-  wildlife: string
+  taxon_ids: string[]
   coral_health: AlmanacCoralHealth | ''
   elevation_m: string
   route_condition: AlmanacRouteCondition | ''
@@ -51,7 +51,7 @@ export const emptyForm: AlmanacFormState = {
   wave_height_m: '',
   wave_period_s: '',
   weather: '',
-  wildlife: '',
+  taxon_ids: [],
   coral_health: '',
   elevation_m: '',
   route_condition: '',
@@ -64,10 +64,6 @@ export const emptyForm: AlmanacFormState = {
 // you there" is nearly always today or a day or two back, and a diver who was
 // somewhere else edits one field instead of filling one from blank.
 export const blankForm = (): AlmanacFormState => ({ ...emptyForm, obs_date: todayIso() })
-
-export function parseWildlife(raw: string): string[] {
-  return raw.split(',').map(s => s.trim()).filter(Boolean)
-}
 
 /** A number in an input box: absent, not zero, when nothing was recorded. */
 function fieldOf(value: number | null): string {
@@ -93,7 +89,7 @@ export function formStateFrom(record: AlmanacOwnRecord, kind: EventKind): Almana
     wave_height_m: fieldOf(record.wave_height_m),
     wave_period_s: fieldOf(record.wave_period_s),
     weather: record.weather ?? '',
-    wildlife: (record.wildlife ?? []).join(', '),
+    taxon_ids: record.wildlife_taxa,
     coral_health: record.coral_health ?? '',
     elevation_m: fieldOf(record.elevation_m),
     route_condition: record.route_condition ?? '',
@@ -113,7 +109,7 @@ export interface AlmanacSubmitArgs {
   p_wave_height_m: number | null
   p_wave_period_s: number | null
   p_weather: AlmanacWeather | null
-  p_wildlife: string[]
+  p_taxon_ids: string[]
   p_trash_band: AlmanacTrashBand | null
   p_trash_kinds: AlmanacTrashKind[]
   p_coral_health: AlmanacCoralHealth | null
@@ -142,7 +138,7 @@ export function submitArgs(form: AlmanacFormState): AlmanacSubmitArgs {
     p_wave_height_m: numOrNull(form.wave_height_m),
     p_wave_period_s: numOrNull(form.wave_period_s),
     p_weather: form.weather || null,
-    p_wildlife: parseWildlife(form.wildlife),
+    p_taxon_ids: form.taxon_ids,
     p_trash_band: form.trash_band || null,
     p_trash_kinds: form.trash_kinds,
     p_coral_health: form.coral_health || null,

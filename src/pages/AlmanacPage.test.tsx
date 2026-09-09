@@ -33,7 +33,35 @@ vi.mock('../lib/dive-sites', async importOriginal => ({
 }))
 
 const rpc = vi.fn()
-const from = vi.fn(() => mockQueryBuilder({ data: [], error: null }))
+
+/** The wildlife catalog the page loads once and every surface resolves against. */
+const taxa = [
+  {
+    id: 'taxon-turtle', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+    rank: 'species', scientific_name: 'Chelonia mydas', authority: null, worms_aphia_id: null,
+    parent_id: null, accepted_id: null, status: 'approved', proposed_by: null,
+    reviewed_by: null, reviewed_at: null, staff_notes: null,
+  },
+  {
+    id: 'taxon-manta', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+    rank: 'species', scientific_name: 'Mobula alfredi', authority: null, worms_aphia_id: null,
+    parent_id: null, accepted_id: null, status: 'approved', proposed_by: null,
+    reviewed_by: null, reviewed_at: null, staff_notes: null,
+  },
+]
+
+const taxonNames = [
+  { id: 'name-1', created_at: '2026-01-01T00:00:00Z', taxon_id: 'taxon-turtle', lang: 'en', name: 'green sea turtle', is_primary: true },
+  { id: 'name-2', created_at: '2026-01-01T00:00:00Z', taxon_id: 'taxon-turtle', lang: 'ja', name: 'アオウミガメ', is_primary: true },
+  { id: 'name-3', created_at: '2026-01-01T00:00:00Z', taxon_id: 'taxon-manta', lang: 'en', name: 'reef manta ray', is_primary: true },
+]
+
+/** What each table hands back. Keyed by name because the page reads four of
+ *  them and a single stub would answer "the diver's records" to every one. */
+const tables: Record<string, unknown[]> = {}
+
+const from = vi.fn((table: string) =>
+  mockQueryBuilder({ data: tables[table] ?? [], error: null }))
 
 /** The diver's own rows, as the table hands them back. */
 const ownRecord = {
@@ -50,7 +78,6 @@ const ownRecord = {
   wave_height_m: null,
   wave_period_s: null,
   weather: 'clear',
-  wildlife: ['turtle'],
   coral_health: 'good',
   elevation_m: null,
   route_condition: null,
@@ -64,10 +91,15 @@ const ownRecord = {
   staff_notes: null,
 }
 
-/** What `from('almanac_records')` hands back — the diver's own entries. */
-function mockOwn(records: unknown[]) {
-  from.mockImplementation(() => mockQueryBuilder({ data: records, error: null }))
+/** What `from('almanac_records')` hands back — the diver's own entries, with
+ *  the sightings that say what each of them saw. */
+function mockOwn(records: unknown[], sightings: unknown[] = []) {
+  tables.almanac_records = records
+  tables.almanac_sightings = sightings
 }
+
+/** The sighting rows for the fixture record: one green sea turtle. */
+const ownSightings = [{ record_id: 'own-1', taxon_id: 'taxon-turtle', raw_label: null }]
 
 vi.mock('../lib/supabase', () => ({
   supabase: {
@@ -90,7 +122,8 @@ const approvedRecord = {
   wave_height_m: null,
   wave_period_s: null,
   weather: 'clear',
-  wildlife: ['turtle'],
+  wildlife_taxa: ['taxon-turtle'],
+  wildlife_unmatched: [],
   coral_health: null,
   elevation_m: null,
   route_condition: null,
@@ -98,7 +131,7 @@ const approvedRecord = {
   diver_display: 'Mei',
 }
 
-const pendingRecord = { ...approvedRecord, id: 'record-2' }
+const pendingRecord = { ...approvedRecord, id: 'record-2', unreviewed_taxa: [] }
 
 function mockRpc(overrides: Record<string, unknown[]> = {}) {
   rpc.mockImplementation(async (name: string) => ({
@@ -115,6 +148,10 @@ describe('AlmanacPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     authState.role = 'diver'
+    tables.taxa = taxa
+    tables.taxon_names = taxonNames
+    tables.almanac_records = []
+    tables.almanac_sightings = []
     mockRpc()
   })
 
@@ -232,14 +269,17 @@ describe('AlmanacPage', () => {
     expect([...picker.options].map(o => o.value)).toContain('site-4')
   })
 
-  it('submits the form through the RPC, parsing numbers and wildlife', async () => {
+  // Wildlife goes as ids, and the diver never types one: they search a name in
+  // whatever language they know it by and the picker files the taxon.
+  it('submits the form through the RPC, parsing numbers and filing taxa', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByRole('button', { name: t.almanac.submitRecord })
 
     await user.selectOptions(screen.getByLabelText(t.almanac.siteDive), 'site-1')
     await user.type(screen.getByLabelText(t.almanac.airTemp), '29.5')
-    await user.type(screen.getByLabelText(t.almanac.wildlife), 'turtle, manta ray')
+    await user.type(screen.getByPlaceholderText(t.wildlife.searchPh), 'turtle')
+    await user.click(await screen.findByRole('button', { name: /green sea turtle/ }))
     await user.click(screen.getByRole('button', { name: t.almanac.submitRecord }))
 
     await waitFor(() => expect(rpc).toHaveBeenCalledWith('submit_almanac_record',
@@ -247,9 +287,59 @@ describe('AlmanacPage', () => {
         p_site_id: 'site-1',
         p_air_temp_c: 29.5,
         p_water_temp_c: null,
-        p_wildlife: ['turtle', 'manta ray'],
+        p_taxon_ids: ['taxon-turtle'],
       })))
     expect(await screen.findByText(t.almanac.submitted)).toBeInTheDocument()
+  })
+
+  // Every language the catalog carries, not just the one the app renders in:
+  // a diver who knows the animal as アオウミガメ has to be able to find it.
+  it('finds an animal by its name in another language', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByRole('button', { name: t.almanac.submitRecord })
+
+    await user.type(screen.getByPlaceholderText(t.wildlife.searchPh), 'アオウミガメ')
+
+    expect(await screen.findByRole('button', { name: /green sea turtle/ })).toBeInTheDocument()
+  })
+
+  // The escape hatch: a scientific name is something staff can check, which a
+  // fifth spelling of "turtle" is not.
+  it('files a proposal for an animal the catalog does not have', async () => {
+    const user = userEvent.setup()
+    mockRpc({ propose_taxon: [] })
+    rpc.mockImplementation(async (name: string) => ({
+      data: name === 'propose_taxon' ? 'taxon-new' : [],
+      error: null,
+    }))
+    renderPage()
+    await screen.findByRole('button', { name: t.almanac.submitRecord })
+
+    await user.click(screen.getByRole('button', { name: t.wildlife.propose.open }))
+    await user.type(screen.getByLabelText(t.wildlife.propose.scientific), 'Pterois volitans')
+    await user.click(screen.getByRole('button', { name: t.wildlife.propose.submit }))
+
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('propose_taxon',
+      expect.objectContaining({
+        p_rank: 'species',
+        p_scientific_name: 'Pterois volitans',
+      })))
+  })
+
+  // The form catches the shape before the round trip, because "lionfish" is
+  // exactly the input this whole change exists to stop being stored.
+  it('refuses a common name where a scientific one was asked for', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByRole('button', { name: t.almanac.submitRecord })
+
+    await user.click(screen.getByRole('button', { name: t.wildlife.propose.open }))
+    await user.type(screen.getByLabelText(t.wildlife.propose.scientific), 'lionfish')
+    await user.click(screen.getByRole('button', { name: t.wildlife.propose.submit }))
+
+    expect(await screen.findByText(t.wildlife.propose.binomial)).toBeInTheDocument()
+    expect(rpc).not.toHaveBeenCalledWith('propose_taxon', expect.anything())
   })
 
   it('files the trash band and the materials alongside it', async () => {
@@ -420,6 +510,10 @@ describe('AlmanacPage — your own entries', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     authState.role = 'diver'
+    tables.taxa = taxa
+    tables.taxon_names = taxonNames
+    tables.almanac_records = []
+    tables.almanac_sightings = []
     mockRpc()
   })
 
@@ -448,7 +542,7 @@ describe('AlmanacPage — your own entries', () => {
   // The list is there to be checked against what the diver remembers, and a
   // row naming only where and when cannot be checked against anything.
   it('writes out the readings, not just where and when', async () => {
-    mockOwn([ownRecord])
+    mockOwn([ownRecord], ownSightings)
     renderPage()
     await openMine()
 
@@ -466,7 +560,7 @@ describe('AlmanacPage — your own entries', () => {
   })
 
   it('opens a pending entry in the form, filled in as it was filed', async () => {
-    mockOwn([ownRecord])
+    mockOwn([ownRecord], ownSightings)
     renderPage()
     const user = await openMine()
 
@@ -475,7 +569,7 @@ describe('AlmanacPage — your own entries', () => {
     expect(screen.getByRole('tab', { name: sm.tabEnter })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByText(sm.editHeading)).toBeInTheDocument()
     expect((screen.getByLabelText(sm.waterTemp) as HTMLInputElement).value).toBe('26.5')
-    expect((screen.getByLabelText(sm.wildlife) as HTMLInputElement).value).toBe('turtle')
+    expect(screen.getByText('green sea turtle')).toBeInTheDocument()
     expect((screen.getByLabelText(sm.trashAmount) as HTMLSelectElement).value).toBe('noticeable')
     expect(screen.getByLabelText(sm.trashKinds.plastic)).toBeChecked()
   })
@@ -483,7 +577,7 @@ describe('AlmanacPage — your own entries', () => {
   // Place and date are what identify the record. A changed date would file a
   // second observation and leave the first standing.
   it('holds the place and the date still while an entry is being corrected', async () => {
-    mockOwn([ownRecord])
+    mockOwn([ownRecord], ownSightings)
     renderPage()
     const user = await openMine()
     await user.click(screen.getByRole('button', { name: sm.editEntry }))
@@ -496,7 +590,7 @@ describe('AlmanacPage — your own entries', () => {
   // The RPC writes every column, so anything the form did not carry back would
   // be blanked by the save.
   it('sends the readings it did not touch back unchanged', async () => {
-    mockOwn([ownRecord])
+    mockOwn([ownRecord], ownSightings)
     renderPage()
     const user = await openMine()
     await user.click(screen.getByRole('button', { name: sm.editEntry }))
@@ -513,7 +607,7 @@ describe('AlmanacPage — your own entries', () => {
         p_visibility_m: 18,
         p_water_temp_c: 26.5,
         p_weather: 'clear',
-        p_wildlife: ['turtle'],
+        p_taxon_ids: ['taxon-turtle'],
         p_coral_health: 'good',
         p_trash_band: 'noticeable',
         p_trash_kinds: ['plastic'],
@@ -522,7 +616,7 @@ describe('AlmanacPage — your own entries', () => {
   })
 
   it('leaves the edit behind when the diver stops correcting', async () => {
-    mockOwn([ownRecord])
+    mockOwn([ownRecord], ownSightings)
     renderPage()
     const user = await openMine()
     await user.click(screen.getByRole('button', { name: sm.editEntry }))
@@ -536,7 +630,7 @@ describe('AlmanacPage — your own entries', () => {
   // published figure provisional, so the RPC refuses — and the row says why
   // rather than offering a button that fails.
   it('offers no edit on an entry staff have already ruled on', async () => {
-    mockOwn([{ ...ownRecord, status: 'approved' }])
+    mockOwn([{ ...ownRecord, status: 'approved' }], ownSightings)
     renderPage()
     await openMine()
 
@@ -546,7 +640,7 @@ describe('AlmanacPage — your own entries', () => {
   })
 
   it('withdraws a pending entry, once the diver has confirmed it', async () => {
-    mockOwn([ownRecord])
+    mockOwn([ownRecord], ownSightings)
     renderPage()
     const user = await openMine()
 
@@ -560,7 +654,7 @@ describe('AlmanacPage — your own entries', () => {
   })
 
   it('takes back the question when the diver decides to keep it', async () => {
-    mockOwn([ownRecord])
+    mockOwn([ownRecord], ownSightings)
     renderPage()
     const user = await openMine()
 
@@ -572,7 +666,7 @@ describe('AlmanacPage — your own entries', () => {
   })
 
   it('says what happened when staff ruled on it first', async () => {
-    mockOwn([ownRecord])
+    mockOwn([ownRecord], ownSightings)
     rpc.mockImplementation(async (name: string) => (name === 'withdraw_almanac_record'
       ? { data: null, error: { message: 'almanac_record_already_reviewed' } }
       : { data: [], error: null }))
