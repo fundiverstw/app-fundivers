@@ -271,8 +271,19 @@ export function PaymentsPage() {
   // bookings plus the groups they lead. Covered-by-someone-else is excluded.
   const payable = [...ownLines, ...leadPaid]
   const totalOwed = payable.reduce((s, l) => s + l.due, 0)
-  const totalDepositDue = payable.reduce((s, l) => s + l.depositDue, 0)
-  const totalPaid = payable.reduce((s, l) => s + l.paid, 0)
+  // What is standing between the diver and a confirmed spot: the balance of
+  // every booking whose deposit has not landed yet.
+  //
+  // The balance, not the deposit amount — a booking is unconfirmed as a whole,
+  // and the figure a diver acts on is what that booking still costs. `l.event`
+  // keeps it to real event bookings, and `depositDue > 0` is both "this one
+  // takes a deposit" and "it has not been covered": a booking with no deposit
+  // scores zero, so it cannot be counted here.
+  //
+  // With nothing yet confirmed this equals Balance due, and every deposit that
+  // lands moves a booking out of it.
+  const awaitingDeposit = payable.filter(l => l.event && l.depositDue > 0)
+  const totalDepositDue = awaitingDeposit.reduce((s, l) => s + l.due, 0)
   const currency = lines.find(l => l.event)?.event?.currency ?? siteConfig.locale.currency
   // The bookings the one-tap sweep will actually visit, in the order it visits
   // them: the diver's own solo bookings with a balance, oldest first.
@@ -321,11 +332,15 @@ export function PaymentsPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <Summary label={t.payments.depositsDue} value={totalDepositDue} currency={currency} accent="text-red-600" />
-        <Summary label={t.payments.balanceDueLabel}  value={totalOwed}       currency={currency} accent="text-red-600" />
-        <Summary label={t.payments.totalPaid}   value={totalPaid}       currency={currency} accent="text-brand-900" />
+        <Summary label={t.payments.balanceDueLabel} value={totalOwed} currency={currency} accent="text-red-600" />
       </div>
+
+      {/* Why a deposit is the number that matters: until it lands the booking
+          is only held, and a diver reading "Balance due" alone has no way to
+          know that the first slice of it is what secures the spot. */}
+      <p className="text-xs text-white/80">{t.payments.depositConfirmsNote}</p>
 
       {active.length === 0 ? (
         <section>

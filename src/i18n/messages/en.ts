@@ -950,6 +950,7 @@ export const en = {
     useCreditButton: (amount: string) => `Use ${amount} credit on your balance`,
     creditOwedHint: 'We owe you this much — usually from a cancelled event. Open any booking with a balance due below to apply it.',
     depositsDue: 'Deposits due',
+    depositConfirmsNote: 'A booking is not confirmed until its deposit is paid.',
     balanceDueLabel: 'Balance due',
     totalPaid: 'Total paid',
     perBooking: 'Per booking',

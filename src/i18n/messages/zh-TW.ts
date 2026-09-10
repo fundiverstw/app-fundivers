@@ -937,6 +937,7 @@ export const zhTW: Messages = {
     useCreditButton: (amount: string) => `以 ${amount} 儲值折抵餘額`,
     creditOwedHint: '這是我們應退還給您的金額 — 通常來自已取消的活動。請開啟下方任一筆有待付餘額的預訂來折抵。',
     depositsDue: '待付訂金',
+    depositConfirmsNote: '訂金付款完成後，報名才算確認。',
     balanceDueLabel: '待付餘額',
     totalPaid: '已付總額',
     perBooking: '各筆預訂',

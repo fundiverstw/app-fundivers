@@ -79,7 +79,7 @@ describe('PaymentsPage', () => {
     expect(await screen.findByText(/no active bookings/i)).toBeInTheDocument()
   })
 
-  it('computes Balance due from booking.details.total and Total paid from matching payments', async () => {
+  it('computes Balance due from booking.details.total and payments against it', async () => {
     const bookings = [
       { id: 'b1', user_id: 'u1', event_id: 'd1', status: 'pending',   notes: null, created_at: new Date().toISOString(), details: { total: 3000 } },
       { id: 'b2', user_id: 'u1', event_id: 'd2', status: 'confirmed', notes: null, created_at: new Date().toISOString(), details: { total: 5000 } },
@@ -102,8 +102,9 @@ describe('PaymentsPage', () => {
     // Balance due summary: 3000 - 1500 = 1500 (b1) + 0 (b2 paid in full) = 1500
     // "1500" may also show per-booking line; assert summary has at least one hit.
     expect((await screen.findAllByText(/TWD\s*1,500/)).length).toBeGreaterThan(0)
-    // Total paid: 5000 (b2) + 1500 (b1) = 6500
-    expect(screen.getByText(/TWD\s*6,500/)).toBeInTheDocument()
+    // The page no longer totals what has been paid: it is history, not
+    // something owed, and it sat beside two figures that are.
+    expect(screen.queryByText(/Total paid/i)).not.toBeInTheDocument()
     // Payment history now lives inside the expanded card — assert at least the summary renders.
     expect(screen.getByText(/Dive B/)).toBeInTheDocument()
   })
@@ -160,7 +161,9 @@ describe('PaymentsPage', () => {
       renderWithRouter(<PaymentsPage />)
 
       await user.click(await screen.findByText(/Open Water Course/))
-      expect(await screen.findByText(/Total paid/i)).toBeInTheDocument()
+      // The card is open — its Paid row is showing — and says nothing about a
+      // fee, which is the point.
+      expect(await screen.findByText(/^Paid$/)).toBeInTheDocument()
       expect(screen.queryByText(/Kept as a cancellation fee/i)).not.toBeInTheDocument()
     })
 
@@ -454,5 +457,78 @@ describe('PaymentsPage', () => {
     // Two "TWD 0" summary cards show when total is zero
     const zeros = screen.getAllByText(/TWD\s*0/)
     expect(zeros.length).toBeGreaterThanOrEqual(2)
+  })
+})
+
+// A booking is only held until its deposit lands, so the top of this page has
+// to answer "what is stopping my spots being confirmed?". That is the balance
+// of every booking still waiting on its deposit — not the deposit amounts, and
+// not bookings that never asked for one.
+describe('PaymentsPage · Deposits due', () => {
+  const now = () => new Date().toISOString()
+  const booking = (id: string, event_id: string, total: number, deposit: number, status = 'pending') =>
+    ({ id, user_id: 'u1', event_id, status, notes: null, created_at: now(), details: { total, deposit } })
+  const payment = (id: string, booking_id: string, amount: number) =>
+    ({ id, user_id: 'u1', booking_id, amount, currency: 'TWD', status: 'paid', method: 'Bank', note: null, created_at: now(), recorded_by: null })
+  const events = (...ids: string[]) =>
+    new Map<string, AppEvent>(ids.map(id => [id, event({ id, type: 'dive', title: `Dive ${id}` })]))
+
+  async function summaryFor(bookings: unknown[], payments: unknown[] = []) {
+    setupFrom(bookings, payments)
+    fetchEventsForBookings.mockResolvedValue(events(...bookings.map(b => (b as { event_id: string }).event_id)))
+    renderWithRouter(<PaymentsPage />)
+    const label = await screen.findByText(/Deposits due/i)
+    return label.parentElement!.textContent ?? ''
+  }
+
+  it('counts the whole balance of a booking still waiting on its deposit', async () => {
+    expect(await summaryFor([booking('b1', 'd1', 6000, 2000)])).toMatch(/6,000/)
+  })
+
+  // The sentence this was specified by: with nothing yet confirmed, the two
+  // figures are the same number.
+  it('equals Balance due when no booking has had its deposit paid', async () => {
+    setupFrom([booking('b1', 'd1', 6000, 2000), booking('b2', 'd2', 4000, 1500)], [])
+    fetchEventsForBookings.mockResolvedValue(events('d1', 'd2'))
+    renderWithRouter(<PaymentsPage />)
+
+    const deposits = (await screen.findByText(/Deposits due/i)).parentElement!.textContent ?? ''
+    const balance = screen.getByText(/Balance due/i).parentElement!.textContent ?? ''
+    expect(deposits).toMatch(/10,000/)
+    expect(deposits.replace(/Deposits due/i, '')).toBe(balance.replace(/Balance due/i, ''))
+  })
+
+  it('drops a booking once its deposit is covered, while the balance stays', async () => {
+    const text = await summaryFor(
+      [booking('b1', 'd1', 6000, 2000), booking('b2', 'd2', 4000, 1500)],
+      [payment('p1', 'b2', 1500)],
+    )
+    // b2's deposit landed, so only b1's balance is still blocking a spot…
+    expect(text).toMatch(/6,000/)
+    // …while Balance due still carries b2's remaining 2,500.
+    expect(screen.getByText(/Balance due/i).parentElement!.textContent).toMatch(/8,500/)
+  })
+
+  it('ignores a booking that asks for no deposit at all', async () => {
+    const text = await summaryFor([booking('b1', 'd1', 6000, 0)])
+    expect(text).toMatch(/TWD\s*0\b/)
+    expect(screen.getByText(/Balance due/i).parentElement!.textContent).toMatch(/6,000/)
+  })
+
+  it('is nothing once every deposit is in', async () => {
+    const text = await summaryFor(
+      [booking('b1', 'd1', 6000, 2000, 'confirmed')],
+      [payment('p1', 'b1', 2000)],
+    )
+    expect(text).toMatch(/TWD\s*0\b/)
+  })
+
+  // A diver reading "Balance due" alone has no way to know the first slice of
+  // it is what secures the spot.
+  it('tells the diver what a deposit actually buys', async () => {
+    setupFrom([booking('b1', 'd1', 6000, 2000)], [])
+    fetchEventsForBookings.mockResolvedValue(events('d1'))
+    renderWithRouter(<PaymentsPage />)
+    expect(await screen.findByText(/not confirmed until its deposit is paid/i)).toBeInTheDocument()
   })
 })

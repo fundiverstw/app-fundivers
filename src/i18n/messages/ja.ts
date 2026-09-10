@@ -936,6 +936,7 @@ export const ja: Messages = {
     useCreditButton: (amount: string) => `${amount} のクレジットを残高に充当`,
     creditOwedHint: 'これはお客様への返金額です — 通常はキャンセルされたイベントによるものです。下の残高が残る予約を開いて充当してください。',
     depositsDue: '未払いの内金',
+    depositConfirmsNote: '内金のお支払いが確認できるまで、お申し込みは確定しません。',
     balanceDueLabel: '未払い残額',
     totalPaid: '支払い総額',
     perBooking: '予約ごと',
