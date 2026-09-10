@@ -5,6 +5,8 @@
 
 import { t } from "./i18n.ts"
 
+const p = t.emails.partnerConnect
+
 export const PARTNER_CONNECT_MAX = { destination: 200, note: 2000 } as const
 
 export interface PartnerConnectInput {
@@ -42,14 +44,14 @@ export interface PartnerConnectEmailParts {
 export function buildPartnerConnectEmail(parts: PartnerConnectEmailParts): { subject: string; text: string } {
   const { diverName, diverEmail, destination, note } = parts
   const who = diverName.trim() || diverEmail
-  const subject = `Partner Connect — ${who} wants a rec for ${destination}`
+  const subject = p.subject(who, destination)
   const lines = [
-    `${who} is looking for a vetted dive-shop recommendation.`,
+    p.intro(who),
     '',
-    `Diver: ${who}`,
-    `Email: ${diverEmail}`,
-    `Destination: ${destination}`,
-    `Note: ${note || '(none)'}`,
+    p.diver(who),
+    p.email(diverEmail),
+    p.destination(destination),
+    p.note(note),
   ]
   return { subject, text: lines.join('\n') }
 }

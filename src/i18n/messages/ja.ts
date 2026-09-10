@@ -1935,6 +1935,15 @@ export const ja: Messages = {
       failed: (msg: string) => `バックアップに失敗しました：${msg}`,
       empty: 'バックアップの中身が空でした。',
       lastRun: (tables: number, rows: number, at: string) => `前回のダウンロード ${at} — ${tables} テーブル、${rows.toLocaleString()} 行。`,
+      readme: {
+        heading: (shop: string) => `${shop} — データベースのバックアップ`,
+        taken: (at: string) => `取得日時：${at}`,
+        contents: (tables: number, rows: number) =>
+          `内容：${tables} テーブル、${rows} 行、テーブルごとに CSV 1 ファイル（manifest.csv を参照）。`,
+        snapshot: 'ショップのデータの複製で、表計算ソフトでそのまま開けます。これはスナップショットであり、動作するシステムではありません。データベース構造を含まないため、復元するには対応するテーブルがすでにあるデータベースへ CSV を取り込む必要があります。',
+        notIncluded: '含まれないもの：サインイン情報（ショップのテーブルの外にあり書き出せません）と、アップロードされたファイル（認定カード、署名済み免責同意書の PDF、ダイブサイトの地図）。これらは行ではなくファイルとして保存されています。',
+        personalData: '個人情報は含まれます。氏名、生年月日、連絡先、緊急連絡先、支払い記録、免責同意書の署名です。同じ内容の紙のファイルキャビネットを置いてよい場所に保管してください。',
+      },
     },
     accounting: {
       title: '売上と書類',
@@ -3229,6 +3238,20 @@ export const ja: Messages = {
     diverN: (n: number) => `ダイバー ${n}`,
     diversRange: (from: number, to: number) => `ダイバー ${from}–${to}`,
     groupTotal: (divers: number, cur: string) => `グループ合計（${divers}名）（${cur}）`,
+    acknowledgedByDiver: (date: string) => `ダイバー同意日時：${date}`,
+    waiverRecord: {
+      signedBy: '署名者',
+      account: 'アカウント',
+      signedAt: '署名日時',
+      method: '署名方法',
+      waiverVersion: '免責同意書バージョン',
+      contentSha256: '内容 SHA-256',
+      notArchived: '（未保存）',
+      methodInPerson: '記入済みの紙の用紙を現地で受け取りスタッフが記録',
+      methodElectronic: 'アプリ内で電子署名',
+      uploadedFormNote: 'この免責同意書はアップロードされた PDF 用紙です。署名済みの原本は本記録とあわせて書き出しに含まれています。',
+      noContentNote: 'この免責同意書は署名時に内容が保存されていません（内容スナップショット機能の導入前に署名されたものです）。本記録は署名の事実を証明するものであり、文書は上記のバージョンで識別されます。',
+    },
     event: 'イベント',
     date: '日付',
     dateRange: (from: string, to: string) => `${from} 〜 ${to}`,
@@ -3328,6 +3351,8 @@ export const ja: Messages = {
       notesTooLong: '備考が長すぎます。',
       pickTrip: 'まずツアーを選択してください。',
       prereqNotMet: 'このイベントには認定ランクまたは経験本数の条件があり、現在は満たしていません。続けるには要件を確認して同意してください。',
+      registrationClosed: 'お申し込みは締め切られています。このイベントはすでに終了しました。',
+      alreadyBooked: (status: string) => `このダイバーはこのイベントに有効な申し込みがすでにあります（状態：${status}）。`,
     },
     common: {
       none: 'なし',
@@ -3454,6 +3479,20 @@ export const ja: Messages = {
     boatManifest: {
       body: (event: string, date: string, divers: number, staff: number) =>
         `${event}（${date}）の乗船者名簿です。ダイバー ${divers} 名${staff ? `、スタッフ ${staff} 名` : ''}。`,
+    },
+    groupSummary: {
+      shopSummaryAttached: 'グループ申込のまとめを添付しています。',
+      diverThanks: 'グループでのお申し込みありがとうございます。全員分をまとめた控えを添付しています。',
+      diverConfirmPayment: 'お支払いが済みましたら、メール・LINE・WhatsApp のいずれかでお知らせください。連絡先は添付の PDF に記載しています。',
+      signoff: (shop: string) => `— ${shop}`,
+    },
+    partnerConnect: {
+      subject: (who: string, destination: string) => `提携ショップ紹介 — ${who} さんが ${destination} の推薦を希望`,
+      intro: (who: string) => `${who} さんが、審査済みのダイビングショップの紹介を希望しています。`,
+      diver: (who: string) => `ダイバー：${who}`,
+      email: (email: string) => `メール：${email}`,
+      destination: (destination: string) => `目的地：${destination}`,
+      note: (note: string) => `備考：${note || '（なし）'}`,
     },
   },
 }

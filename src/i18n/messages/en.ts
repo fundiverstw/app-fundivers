@@ -1957,6 +1957,18 @@ export const en = {
       failed: (msg: string) => `Backup failed: ${msg}`,
       empty: 'The backup came back empty.',
       lastRun: (tables: number, rows: number, at: string) => `Last downloaded ${at} — ${tables} tables, ${rows.toLocaleString()} rows.`,
+      // The README inside the ZIP. Whole paragraphs, not pre-wrapped lines:
+      // a translation wraps at different widths, and CJK does not wrap on
+      // spaces at all.
+      readme: {
+        heading: (shop: string) => `${shop} — database backup`,
+        taken: (at: string) => `Taken:  ${at}`,
+        contents: (tables: number, rows: number) =>
+          `Holds:  ${tables} tables, ${rows} rows, one CSV each (see manifest.csv).`,
+        snapshot: "This is a copy of the shop's data, readable in any spreadsheet. It is a snapshot, not a running system: it carries no database structure, so restoring it means importing the CSVs into a database that already has the right tables.",
+        notIncluded: "Not included: sign-in credentials (they live outside the shop's own tables and cannot be exported), and uploaded files — certification cards, signed waiver PDFs, dive-site maps — which are stored as files rather than rows.",
+        personalData: 'It does include personal data: names, dates of birth, contact details, emergency contacts, payment records and waiver signatures. Keep it somewhere you would be willing to keep a filing cabinet of the same.',
+      },
     },
     accounting: {
       title: 'Revenue & documents',
@@ -3280,6 +3292,21 @@ export const en = {
     diverN: (n: number) => `Diver ${n}`,
     diversRange: (from: number, to: number) => `DIVERS ${from}–${to}`,
     groupTotal: (divers: number, cur: string) => `Group total (${divers} divers) (${cur})`,
+    acknowledgedByDiver: (date: string) => `Acknowledged by diver: ${date}`,
+    // The per-signature attestation page in a diver's signed-waiver export.
+    waiverRecord: {
+      signedBy: 'Signed by',
+      account: 'Account',
+      signedAt: 'Signed at',
+      method: 'Method',
+      waiverVersion: 'Waiver version',
+      contentSha256: 'Content SHA-256',
+      notArchived: '(not archived)',
+      methodInPerson: 'Recorded in person from a completed paper form (logged by staff)',
+      methodElectronic: 'Signed electronically in the app',
+      uploadedFormNote: 'This waiver was an uploaded PDF form. The original signed form is included alongside this record in the export.',
+      noContentNote: 'The content of this waiver was not archived at signing time (it was signed before content snapshotting was enabled). This record attests the signature; the version above identifies the document.',
+    },
     event: 'Event',
     date: 'Date',
     dateRange: (from: string, to: string) => `${from} to ${to}`,
@@ -3383,6 +3410,8 @@ export const en = {
       notesTooLong: 'Notes are too long.',
       pickTrip: 'Pick a trip first.',
       prereqNotMet: "This event has a certification or logged-dive prerequisite you don't meet yet. Please acknowledge the requirement to continue.",
+      registrationClosed: 'Registration is closed — this event has already taken place.',
+      alreadyBooked: (status: string) => `This diver already has an active booking for this event (status: ${status}).`,
     },
     common: {
       none: 'none',
@@ -3528,6 +3557,23 @@ export const en = {
     boatManifest: {
       body: (event: string, date: string, divers: number, staff: number) =>
         `Boat manifest for ${event} (${date}). ${divers} diver${divers === 1 ? '' : 's'}${staff ? ` + ${staff} staff` : ''}.`,
+    },
+    // One summary covering a whole group, sent to the lead who settles for it.
+    groupSummary: {
+      shopSummaryAttached: 'Group registration summary attached.',
+      diverThanks: 'Thanks for registering your group — a single summary covering everyone is attached.',
+      diverConfirmPayment: "Once you've sent payment, please let us know via email, LINE, or WhatsApp so we can confirm receipt — contact details are in the attached PDF.",
+      signoff: (shop: string) => `— ${shop}`,
+    },
+    // Lands in the shop's own inbox — a diver asking for a vetted
+    // recommendation somewhere the shop does not run trips.
+    partnerConnect: {
+      subject: (who: string, destination: string) => `Partner Connect — ${who} wants a rec for ${destination}`,
+      intro: (who: string) => `${who} is looking for a vetted dive-shop recommendation.`,
+      diver: (who: string) => `Diver: ${who}`,
+      email: (email: string) => `Email: ${email}`,
+      destination: (destination: string) => `Destination: ${destination}`,
+      note: (note: string) => `Note: ${note || '(none)'}`,
     },
   },
 }

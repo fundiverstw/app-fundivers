@@ -501,10 +501,9 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
       y += 2
       y = ensureY(doc, y, 6)
       doc.setTextColor(...C.gray)
-      doc.text(
-        `Acknowledged by diver: ${new Date(p.cancellationPolicyAckedAt).toUTCString()}`,
-        ML + 2, y,
-      )
+      const acked = d.acknowledgedByDiver(new Date(p.cancellationPolicyAckedAt).toUTCString())
+      setFontFor(doc, acked, "normal")
+      doc.text(acked, ML + 2, y)
       doc.setTextColor(...C.dark)
     }
   }

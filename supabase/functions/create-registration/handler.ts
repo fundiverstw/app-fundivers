@@ -287,7 +287,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     // Guests can never book a past event — reject before burning a MAU on
     // createUser.
     if (await eventHasPassed(admin, body.event_type, body.event_id)) {
-      return json({ error: "Registration is closed — this event has already taken place." }, 403)
+      return json({ error: t.emails.errors.registrationClosed }, 403)
     }
 
     const { data, error } = await admin.auth.admin.createUser({
@@ -379,7 +379,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
   // Past-event guard for the authed self + parent-on-behalf paths (the guest
   // path already checked before createUser). Admins/staff bypass.
   if (!callerIsPrivileged && await eventHasPassed(admin, body.event_type, body.event_id)) {
-    return json({ error: "Registration is closed — this event has already taken place." }, 403)
+    return json({ error: t.emails.errors.registrationClosed }, 403)
   }
 
   // 1b. Eligibility gate — a diver registering themselves (or via guest) must
@@ -470,7 +470,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     .neq("status", "cancelled")
     .maybeSingle()
   if (existing) {
-    return rollback(`This diver already has an active booking for this event (status: ${existing.status}).`)
+    return rollback(t.emails.errors.alreadyBooked(existing.status))
   }
 
   // A group is whatever set of bookings shares a client-generated group_id, and

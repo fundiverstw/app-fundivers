@@ -11,6 +11,9 @@
 import { jsPDF } from "npm:jspdf@2.5.1";
 import { Buffer } from "node:buffer";
 import { needsCjkFont } from "./pdf-fonts.ts";
+import { t } from "./i18n.ts";
+
+const w = t.pdf.waiverRecord;
 
 const CJK_FONT_PATH = new URL("./pdf-cjk.ttf", import.meta.url);
 const CJK_FAMILY = "NotoCJK";
@@ -73,14 +76,12 @@ export async function buildWaiverRecordPdfBase64(r: WaiverRecord): Promise<strin
 
   // Attestation block.
   const rows: [string, string][] = [
-    ["Signed by", r.signedName],
-    ["Account", r.diverLabel],
-    ["Signed at", new Date(r.signedAt).toISOString().replace("T", " ").slice(0, 19) + " UTC"],
-    ["Method", r.method === "in_person"
-      ? "Recorded in person from a completed paper form (logged by staff)"
-      : "Signed electronically in the app"],
-    ["Waiver version", String(r.version)],
-    ["Content SHA-256", r.sha256 ?? "(not archived)"],
+    [w.signedBy, r.signedName],
+    [w.account, r.diverLabel],
+    [w.signedAt, new Date(r.signedAt).toISOString().replace("T", " ").slice(0, 19) + " UTC"],
+    [w.method, r.method === "in_person" ? w.methodInPerson : w.methodElectronic],
+    [w.waiverVersion, String(r.version)],
+    [w.contentSha256, r.sha256 ?? w.notArchived],
   ];
   doc.setFontSize(10);
   for (const [label, value] of rows) {
@@ -104,8 +105,8 @@ export async function buildWaiverRecordPdfBase64(r: WaiverRecord): Promise<strin
   const content = r.body
     ? r.body
     : r.pdfPath
-    ? "This waiver was an uploaded PDF form. The original signed form is included alongside this record in the export."
-    : "The content of this waiver was not archived at signing time (it was signed before content snapshotting was enabled). This record attests the signature; the version above identifies the document.";
+    ? w.uploadedFormNote
+    : w.noContentNote;
   for (const para of content.replace(/\r\n?/g, "\n").split("\n")) {
     if (!para.trim()) { y += 4; continue; }
     font(para, "normal");

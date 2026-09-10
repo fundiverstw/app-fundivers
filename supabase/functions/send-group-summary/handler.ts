@@ -187,7 +187,7 @@ export async function handleGroupSummary(req: Request, deps: Deps): Promise<Resp
       certOrg:     (profile?.cert_agency as string | null) ?? null,
       nitrox:      !!profile?.nitrox_certified,
       gearLabel:   gearLabel(details),
-      ride:        details.transportation ? "Riding with the shop" : "Driving themselves",
+      ride:        details.transportation ? t.pdf.ridingWithShop : t.pdf.drivingThemselves,
       room,
       addons,
       status:      b.status,
@@ -225,18 +225,23 @@ export async function handleGroupSummary(req: Request, deps: Deps): Promise<Resp
       const buf = Buffer.from(base64, "base64")
       const subject = `group registration--${divers.length} divers--${payload.generatedFor}`
       const attach = { filename: "group-registration.pdf", content: buf, contentType: "application/pdf" }
+      const g = t.emails.groupSummary
       const fromHeader = { name: deps.env.mailFromName, address: deps.env.mailFromAddress }
       await deps.transporter.sendMail({
         from: fromHeader, subject, to: deps.env.companyEmail,
-        text: "Group registration summary attached.",
+        text: g.shopSummaryAttached,
         attachments: [attach],
       })
       if (callerEmail && callerEmail.toLowerCase().trim() !== deps.env.companyEmail) {
         await deps.transporter.sendMail({
           from: fromHeader, subject, to: callerEmail,
-          text:
-            "Thanks for registering your group — a single summary covering everyone is attached.\n\n" +
-            `Once you've sent payment, please let us know via email, LINE, or WhatsApp so we can confirm receipt — contact details are in the attached PDF.\n\n— ${siteConfig.identity.shopName}`,
+          text: [
+            g.diverThanks,
+            '',
+            g.diverConfirmPayment,
+            '',
+            g.signoff(siteConfig.identity.shopName),
+          ].join('\n'),
           attachments: [attach],
         })
       }

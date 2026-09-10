@@ -1936,6 +1936,15 @@ export const zhTW: Messages = {
       failed: (msg: string) => `備份失敗：${msg}`,
       empty: '備份內容是空的。',
       lastRun: (tables: number, rows: number, at: string) => `上次下載於 ${at} — ${tables} 張資料表、${rows.toLocaleString()} 筆資料。`,
+      readme: {
+        heading: (shop: string) => `${shop} — 資料庫備份`,
+        taken: (at: string) => `備份時間：${at}`,
+        contents: (tables: number, rows: number) =>
+          `內容：${tables} 個資料表、${rows} 筆資料，每個資料表一份 CSV（詳見 manifest.csv）。`,
+        snapshot: '這是潛店資料的副本，任何試算表軟體都能開啟。它是一份快照，而非可直接運行的系統：其中不含資料庫結構，因此還原時需將這些 CSV 匯入一個已具備對應資料表的資料庫。',
+        notIncluded: '未包含：登入憑證（存放於潛店資料表之外，無法匯出），以及上傳的檔案——證照卡、已簽署的免責同意書 PDF、潛點地圖——這些以檔案而非資料列的形式儲存。',
+        personalData: '其中確實含有個人資料：姓名、出生日期、聯絡方式、緊急聯絡人、付款紀錄與免責同意書簽署。請存放在您願意擺放同等紙本檔案櫃的地方。',
+      },
     },
     accounting: {
       title: '營收與文件',
@@ -3230,6 +3239,20 @@ export const zhTW: Messages = {
     diverN: (n: number) => `潛水員 ${n}`,
     diversRange: (from: number, to: number) => `潛水員 ${from}–${to}`,
     groupTotal: (divers: number, cur: string) => `團體總額（${divers} 位潛水員）（${cur}）`,
+    acknowledgedByDiver: (date: string) => `潛水員確認時間：${date}`,
+    waiverRecord: {
+      signedBy: '簽署人',
+      account: '帳號',
+      signedAt: '簽署時間',
+      method: '簽署方式',
+      waiverVersion: '免責同意書版本',
+      contentSha256: '內容 SHA-256',
+      notArchived: '（未存檔）',
+      methodInPerson: '現場繳交紙本並由工作人員登錄',
+      methodElectronic: '於 App 內電子簽署',
+      uploadedFormNote: '此份免責同意書為上傳的 PDF 表單。原始簽署表單已與本紀錄一併收錄於匯出檔中。',
+      noContentNote: '此份免責同意書於簽署時未保存內容快照（簽署時間早於內容快照功能上線）。本紀錄證明簽署行為；上方版本編號即為該份文件的識別。',
+    },
     event: '活動',
     date: '日期',
     dateRange: (from: string, to: string) => `${from} 至 ${to}`,
@@ -3329,6 +3352,8 @@ export const zhTW: Messages = {
       notesTooLong: '備註太長了。',
       pickTrip: '請先選擇行程。',
       prereqNotMet: '這個活動有證照或潛水次數的先決條件，你目前尚未符合。請確認並同意該要求後繼續。',
+      registrationClosed: '報名已關閉——此活動已經結束。',
+      alreadyBooked: (status: string) => `此潛水員已有一筆此活動的有效報名（狀態：${status}）。`,
     },
     common: {
       none: '無',
@@ -3455,6 +3480,20 @@ export const zhTW: Messages = {
     boatManifest: {
       body: (event: string, date: string, divers: number, staff: number) =>
         `${event}（${date}）的出海人員名冊。潛水員 ${divers} 位${staff ? `，工作人員 ${staff} 位` : ''}。`,
+    },
+    groupSummary: {
+      shopSummaryAttached: '團體報名摘要見附件。',
+      diverThanks: '感謝您為團體報名——所有人的報名摘要已彙整於附件。',
+      diverConfirmPayment: '匯款完成後，請透過 Email、LINE 或 WhatsApp 告知我們，以便確認款項——聯絡方式列於附件 PDF。',
+      signoff: (shop: string) => `— ${shop}`,
+    },
+    partnerConnect: {
+      subject: (who: string, destination: string) => `合作潛店推薦 — ${who} 想詢問 ${destination}`,
+      intro: (who: string) => `${who} 正在尋找經過審核的合作潛店推薦。`,
+      diver: (who: string) => `潛水員：${who}`,
+      email: (email: string) => `Email：${email}`,
+      destination: (destination: string) => `目的地：${destination}`,
+      note: (note: string) => `備註：${note || '（無）'}`,
     },
   },
 }

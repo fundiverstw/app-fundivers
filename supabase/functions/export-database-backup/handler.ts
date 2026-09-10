@@ -18,6 +18,7 @@ import { buildTableCsv } from "../_shared/csv.ts"
 import { corsHeaders, safeError } from "../_shared/responses.ts"
 import { takeActionSlot, rateLimitedBody, type RpcClient } from "../_shared/rate-limit.ts"
 import { siteConfig } from "../../../fundive.config.ts"
+import { t } from "../_shared/i18n.ts"
 
 // PostgREST caps a request at 1000 rows, so every table is read a page at a
 // time, ordered by its primary key to keep the page boundaries stable.
@@ -155,24 +156,18 @@ export async function handleDatabaseBackup(req: Request, deps: Deps): Promise<Re
 }
 
 function readme(generatedAt: string, tableCount: number, rowCount: number): string {
+  const r = t.admin.backup.readme
   return [
-    `${siteConfig.identity.shopName} — database backup`,
+    r.heading(siteConfig.identity.shopName),
     ``,
-    `Taken:  ${generatedAt}`,
-    `Holds:  ${tableCount} tables, ${rowCount} rows, one CSV each (see manifest.csv).`,
+    r.taken(generatedAt),
+    r.contents(tableCount, rowCount),
     ``,
-    `This is a copy of the shop's data, readable in any spreadsheet. It is a`,
-    `snapshot, not a running system: it carries no database structure, so`,
-    `restoring it means importing the CSVs into a database that already has the`,
-    `right tables.`,
+    r.snapshot,
     ``,
-    `Not included: sign-in credentials (they live outside the shop's own tables`,
-    `and cannot be exported), and uploaded files — certification cards, signed`,
-    `waiver PDFs, dive-site maps — which are stored as files rather than rows.`,
+    r.notIncluded,
     ``,
-    `It does include personal data: names, dates of birth, contact details,`,
-    `emergency contacts, payment records and waiver signatures. Keep it`,
-    `somewhere you would be willing to keep a filing cabinet of the same.`,
+    r.personalData,
     ``,
   ].join("\n")
 }
