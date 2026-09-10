@@ -3404,5 +3404,57 @@ export const zhTW: Messages = {
       expiryNote: (days: number) => `此連結僅能使用一次，並於 ${days} 天後失效——若需要新連結，請回覆這封信。`,
       signoff: (shop: string) => `— ${shop}`,
     },
+    registration: {
+      shopWaitlisted: (who: string, event: string) => `${who} 已加入 ${event} 的候補名單。`,
+      shopSummaryAttached: '報名摘要見附件。',
+      diverWaitlisted: (event: string) =>
+        `感謝您的報名——${event} 目前已額滿，我們已將您加入候補名單。若有空位釋出，您會收到通知，並有 24 小時的時間確認。在此之前無需付款。`,
+      diverWaitlistWatch: (shop: string) => `請留意 ${shop} App，以掌握候補狀態與活動提醒。`,
+      diverThanks: '感謝您的報名——報名摘要見附件。',
+      diverConfirmPayment: '匯款完成後，請透過 Email、LINE 或 WhatsApp 告知我們，以便確認款項——聯絡方式列於附件 PDF。銀行或 PayPal 轉帳我們並非即時看到，先告知一聲可避免您的名額被誤放。',
+      diverWatchApp: (shop: string) => `請留意 ${shop} App，以掌握報名狀態、付款確認與活動提醒。`,
+      signoff: (shop: string) => `— ${shop}`,
+    },
+    waitlistOffer: {
+      eventWithDate: (event: string, date: string) => `${event}（${date}）`,
+      goodNews: (event: string) => `好消息——${event} 剛釋出空位，而您正是下一位。`,
+      acceptBy: (app: string, deadline: string, tz: string) =>
+        `請開啟 ${app} App，在 ${deadline}（${tz}）前於您的報名上點選「接受此名額」。若屆時未收到回覆，此名額將順延給候補名單上的下一位。`,
+      signoff: (shop: string) => `— ${shop}`,
+    },
+    accountDecision: {
+      reinstatedSubject: (shop: string) => `${shop} — 您的帳號已重新啟用`,
+      closedSubject: (shop: string) => `${shop} — 您的帳號已關閉`,
+      reinstated: (url: string) => `好消息——您的帳號已重新啟用。您可以在 ${url} 登入，並照常報名活動。`,
+      greeting: '您好，',
+      closed: (shop: string) => `您的 ${shop} 帳號已關閉。`,
+      closedReason: (reason: string) => `原因：${reason}`,
+      closedAppeal: '若您認為這是誤判，請回覆這封信，我們會再次確認。',
+      signoff: (shop: string) => `— ${shop}`,
+    },
+    childAccount: {
+      fallbackParent: '另一位潛水員',
+      subject: (shop: string) => `${shop} — 已為您建立帳號`,
+      greeting: (who: string) => `${who} 您好，`,
+      intro: (parent: string, shop: string) =>
+        `${parent} 已為您建立 ${shop} App 的潛水員帳號，以便替您報名活動。該帳號由對方代為管理。`,
+      takeOver: '若您想自行使用這個帳號、體驗 App 的各項功能（潛水記錄、快速報名、推播通知等），請回覆這封信或傳訊息給我們，我們會提供臨時帳號與密碼供您登入。',
+      unknownParent: (parent: string) =>
+        `若您並不認識 ${parent}，或並未預期收到這封信，請回覆這封信，我們會移除該帳號。`,
+      noFurtherAction: '否則您無需採取任何動作。',
+      signoff: (shop: string) => `— ${shop}`,
+    },
+    diveLogExport: {
+      subject: (shop: string) => `${shop} — 您的潛水記錄匯出檔`,
+      greeting: '您好，',
+      body: (dives: number, shop: string) =>
+        `附件是您在 ${shop} 的 ${dives} 筆潛水記錄 CSV 匯出檔。`,
+      retryNote: '24 小時後可再次申請匯出。',
+      signoff: (shop: string) => `— ${shop}`,
+    },
+    boatManifest: {
+      body: (event: string, date: string, divers: number, staff: number) =>
+        `${event}（${date}）的出海人員名冊。潛水員 ${divers} 位${staff ? `，工作人員 ${staff} 位` : ''}。`,
+    },
   },
 }

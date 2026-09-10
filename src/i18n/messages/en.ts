@@ -3466,6 +3466,69 @@ export const en = {
       expiryNote: (days: number) => `The link works once and expires in ${days} days — reply to this email if you need a fresh one.`,
       signoff: (shop: string) => `— ${shop}`,
     },
+    // The registration confirmation and its waitlisted variant. The shop's copy
+    // is translated alongside the diver's — the shop reads its own language too.
+    // Subjects keep their `registration--` / `waitlist--` token: shops filter on
+    // it, so it is an identifier rather than prose and stays out of the catalog.
+    registration: {
+      shopWaitlisted: (who: string, event: string) => `${who} has been added to the waitlist for ${event}.`,
+      shopSummaryAttached: 'Registration summary attached.',
+      diverWaitlisted: (event: string) =>
+        `Thanks for signing up — ${event} is currently full, so we've added you to the waitlist. If a spot opens up, you'll receive a notification with 24 hours to claim it. No payment is needed unless and until that happens.`,
+      diverWaitlistWatch: (shop: string) => `Keep an eye on the ${shop} app for waitlist updates and event reminders.`,
+      diverThanks: "Thanks for registering — your registration summary is attached.",
+      diverConfirmPayment: "Once you've sent your payment, please let us know via email, LINE, or WhatsApp so we can confirm receipt — contact details are in the attached PDF. We don't always see bank or PayPal transfers in real time, and a quick heads-up keeps your spot from falling through the cracks.",
+      diverWatchApp: (shop: string) => `Keep an eye on the ${shop} app for updates to your registration status, payment confirmations, and event reminders.`,
+      signoff: (shop: string) => `— ${shop}`,
+    },
+    // The automatic "a seat freed up, claim it" email. Unlike waitlistConfirmed
+    // this one is a time-limited offer, so it leads with the deadline.
+    waitlistOffer: {
+      eventWithDate: (event: string, date: string) => `${event} (${date})`,
+      goodNews: (event: string) => `Good news — a spot just opened up for ${event}, and you're next in line.`,
+      acceptBy: (app: string, deadline: string, tz: string) =>
+        `Open the ${app} app and tap "Accept this spot" on your booking before ${deadline} (${tz}). If we don't hear from you by then, the offer rolls to the next person on the waitlist.`,
+      signoff: (shop: string) => `— ${shop}`,
+    },
+    // An admin putting an account back in service, or closing it for good.
+    accountDecision: {
+      reinstatedSubject: (shop: string) => `${shop} — your account is active again`,
+      closedSubject: (shop: string) => `${shop} — your account has been closed`,
+      reinstated: (url: string) => `Good news — your account is active again. You can log in at ${url} and book events as usual.`,
+      greeting: 'Hi,',
+      closed: (shop: string) => `Your ${shop} account has been closed.`,
+      closedReason: (reason: string) => `Reason: ${reason}`,
+      closedAppeal: "If you believe this is a mistake, reply to this email and we'll take another look.",
+      signoff: (shop: string) => `— ${shop}`,
+    },
+    // A parent minting an account for a child they will register on behalf of.
+    childAccount: {
+      fallbackParent: 'Another diver',
+      subject: (shop: string) => `${shop} — account created for you`,
+      greeting: (who: string) => `Hi ${who},`,
+      intro: (parent: string, shop: string) =>
+        `${parent} has created a ${shop} app diver account for you, so they can register you for events. They manage the account on your behalf.`,
+      takeOver: "If you would like to access this account for all the great features on the app (dive logs, easy event registration, push notifications, etc.) please reply to this email or message us, and we'll issue you a temporary username and password to log in with.",
+      unknownParent: (parent: string) =>
+        `If you don't know ${parent}, or you didn't expect this, please reply to this email and we'll remove the account.`,
+      noFurtherAction: 'Otherwise no further action is required.',
+      signoff: (shop: string) => `— ${shop}`,
+    },
+    // The diver's own dive log, as a CSV attachment.
+    diveLogExport: {
+      subject: (shop: string) => `${shop} — your dive log export`,
+      greeting: 'Hi,',
+      body: (dives: number, shop: string) =>
+        `Attached is a CSV export of your ${dives} logged dive${dives === 1 ? '' : 's'} from ${shop}.`,
+      retryNote: 'You can request another export 24 hours from now.',
+      signoff: (shop: string) => `— ${shop}`,
+    },
+    // The boat manifest, emailed to the shop. Shop-facing, so translated; the
+    // sheet inside stays Chinese to match the official vessel form.
+    boatManifest: {
+      body: (event: string, date: string, divers: number, staff: number) =>
+        `Boat manifest for ${event} (${date}). ${divers} diver${divers === 1 ? '' : 's'}${staff ? ` + ${staff} staff` : ''}.`,
+    },
   },
 }
 

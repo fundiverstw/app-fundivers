@@ -20,6 +20,7 @@ import { corsOk, jsonResponse, safeError, bearerToken } from "../_shared/respons
 import { takeActionSlot, rateLimitedBody } from "../_shared/rate-limit.ts"
 import { shopEmail } from "../_shared/shop-contact.ts"
 import { siteConfig } from "../../../fundive.config.ts"
+import { t } from "../_shared/i18n.ts"
 
 
 // Keep in step with trg_profiles_child_account_cap, which is the authority.
@@ -153,7 +154,7 @@ Deno.serve(async (req) => {
   // reach out to the shop. It names the parent so a recipient who doesn't
   // recognize them has something to push back on.
   const parentLabel = [parentProfile.name, parentProfile.nickname ? `(${parentProfile.nickname})` : null]
-    .filter(Boolean).join(" ") || "Another diver"
+    .filter(Boolean).join(" ") || t.emails.childAccount.fallbackParent
   let emailSent = false
   if (GMAIL_USER && GMAIL_PASS) {
     try {
@@ -162,22 +163,25 @@ Deno.serve(async (req) => {
         auth: { user: GMAIL_USER, pass: GMAIL_PASS },
       })
       const shopMail = await shopEmail(admin)
+      const m = t.emails.childAccount
       await transporter.sendMail({
         from: { name: siteConfig.identity.shopName, address: GMAIL_USER },
         to:      email,
         ...(shopMail ? { bcc: shopMail } : {}),
-        subject: `${siteConfig.identity.shopName} — account created for you`,
-        text:
-          `Hi ${fullName},\n\n` +
-          `${parentLabel} has created a ${siteConfig.identity.shopName} app diver account for you, ` +
-          `so they can register you for events. They manage the account on your behalf.\n\n` +
-          `If you would like to access this account for all the great features on the app ` +
-          `(dive logs, easy event registration, push notifications, etc.) please reply to this email ` +
-          `or message us, and we'll issue you a temporary username and password to log in with.\n\n` +
-          `If you don't know ${parentLabel}, or you didn't expect this, please reply to this email ` +
-          `and we'll remove the account.\n\n` +
-          `Otherwise no further action is required.\n\n` +
-          `— ${siteConfig.identity.shopName}`,
+        subject: m.subject(siteConfig.identity.shopName),
+        text: [
+          m.greeting(fullName),
+          '',
+          m.intro(parentLabel, siteConfig.identity.shopName),
+          '',
+          m.takeOver,
+          '',
+          m.unknownParent(parentLabel),
+          '',
+          m.noFurtherAction,
+          '',
+          m.signoff(siteConfig.identity.shopName),
+        ].join('\n'),
       })
       emailSent = true
     } catch (e) {

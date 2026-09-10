@@ -3403,5 +3403,57 @@ export const ja: Messages = {
       expiryNote: (days: number) => `このリンクは1回のみ有効で、${days}日後に期限切れとなります。新しいリンクが必要な場合はこのメールに返信してください。`,
       signoff: (shop: string) => `— ${shop}`,
     },
+    registration: {
+      shopWaitlisted: (who: string, event: string) => `${who} さんを ${event} のキャンセル待ちに追加しました。`,
+      shopSummaryAttached: '申込内容の控えを添付しています。',
+      diverWaitlisted: (event: string) =>
+        `お申し込みありがとうございます。${event} は現在満席のため、キャンセル待ちに登録しました。空きが出た場合は通知をお送りし、24時間以内にお席を確保していただけます。それまでお支払いは不要です。`,
+      diverWaitlistWatch: (shop: string) => `キャンセル待ちの状況やイベントのお知らせは ${shop} アプリでご確認ください。`,
+      diverThanks: 'お申し込みありがとうございます。申込内容の控えを添付しています。',
+      diverConfirmPayment: 'お支払いが済みましたら、メール・LINE・WhatsApp のいずれかでお知らせください。連絡先は添付の PDF に記載しています。銀行振込や PayPal はこちらで即時に確認できないことがあるため、一言いただけるとお席を確実に確保できます。',
+      diverWatchApp: (shop: string) => `お申し込みの状況、入金確認、イベントのお知らせは ${shop} アプリでご確認ください。`,
+      signoff: (shop: string) => `— ${shop}`,
+    },
+    waitlistOffer: {
+      eventWithDate: (event: string, date: string) => `${event}（${date}）`,
+      goodNews: (event: string) => `${event} に空きが出ました。次の順番はあなたです。`,
+      acceptBy: (app: string, deadline: string, tz: string) =>
+        `${app} アプリを開き、${deadline}（${tz}）までにお申し込みの「この枠を受ける」をタップしてください。それまでにご返答がない場合、この枠はキャンセル待ちの次の方へ回ります。`,
+      signoff: (shop: string) => `— ${shop}`,
+    },
+    accountDecision: {
+      reinstatedSubject: (shop: string) => `${shop} — アカウントを再開しました`,
+      closedSubject: (shop: string) => `${shop} — アカウントを閉鎖しました`,
+      reinstated: (url: string) => `アカウントを再開しました。${url} からログインし、これまでどおりイベントにお申し込みいただけます。`,
+      greeting: 'こんにちは。',
+      closed: (shop: string) => `${shop} のアカウントを閉鎖しました。`,
+      closedReason: (reason: string) => `理由：${reason}`,
+      closedAppeal: '心当たりがない場合は、このメールに返信いただければ再度確認します。',
+      signoff: (shop: string) => `— ${shop}`,
+    },
+    childAccount: {
+      fallbackParent: '別のダイバー',
+      subject: (shop: string) => `${shop} — アカウントを作成しました`,
+      greeting: (who: string) => `${who} さん、こんにちは。`,
+      intro: (parent: string, shop: string) =>
+        `${parent} さんが、あなたをイベントに申し込めるように ${shop} アプリのダイバーアカウントを作成しました。アカウントは ${parent} さんが代理で管理します。`,
+      takeOver: 'ダイビングログ、かんたん申込、プッシュ通知など、アプリの機能をご自身で使いたい場合は、このメールに返信するかメッセージをお送りください。ログイン用の仮のユーザー名とパスワードをお渡しします。',
+      unknownParent: (parent: string) =>
+        `${parent} さんに心当たりがない場合、またはこのメールに思い当たる節がない場合は、このメールに返信いただければアカウントを削除します。`,
+      noFurtherAction: 'それ以外の場合、お手続きは不要です。',
+      signoff: (shop: string) => `— ${shop}`,
+    },
+    diveLogExport: {
+      subject: (shop: string) => `${shop} — ダイビングログの書き出し`,
+      greeting: 'こんにちは。',
+      body: (dives: number, shop: string) =>
+        `${shop} での ${dives} 本のダイビングログを CSV で書き出し、添付しました。`,
+      retryNote: '次回の書き出しは24時間後から可能です。',
+      signoff: (shop: string) => `— ${shop}`,
+    },
+    boatManifest: {
+      body: (event: string, date: string, divers: number, staff: number) =>
+        `${event}（${date}）の乗船者名簿です。ダイバー ${divers} 名${staff ? `、スタッフ ${staff} 名` : ''}。`,
+    },
   },
 }

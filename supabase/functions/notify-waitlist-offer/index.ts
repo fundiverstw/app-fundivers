@@ -16,6 +16,7 @@ import nodemailer from "npm:nodemailer@6.9.14"
 import { corsOk, jsonResponse, bearerToken } from "../_shared/responses.ts"
 import { shopEmail } from "../_shared/shop-contact.ts"
 import { siteConfig } from "../../../fundive.config.ts"
+import { t } from "../_shared/i18n.ts"
 import { usesDateEnvelope } from "../../../src/lib/event-kinds.ts"
 
 
@@ -99,19 +100,25 @@ Deno.serve(async (req) => {
   // Format expiry as a human-readable timestamp in Asia/Taipei (the only
   // timezone this app serves). The `Intl` formatter is built into Deno.
   const expiresAt = new Date(offer.expires_at)
-  const tpe = new Intl.DateTimeFormat("en-GB", {
+  // `en` alone would print "Sep 10, 2026"; this shop has always read the
+  // day first, so English keeps en-GB. Every other language is its own tag.
+  const dateLocale = siteConfig.locale.language === "en" ? "en-GB" : siteConfig.locale.language
+  const tpe = new Intl.DateTimeFormat(dateLocale, {
     timeZone: siteConfig.locale.timezone,
     year:  "numeric", month: "short", day: "2-digit",
     hour:  "2-digit", minute: "2-digit",
   }).format(expiresAt)
 
+  const m = t.emails.waitlistOffer
   const subject = `waitlist-offer--${eventTitle}`
-  const dateLine = startDate ? ` (${startDate})` : ""
-  const text =
-    `Good news — a spot just opened up for ${eventTitle}${dateLine}, and you're next in line.\n\n` +
-    `Open the ${siteConfig.identity.shortName} app and tap "Accept this spot" on your booking before ${tpe} (${siteConfig.locale.timezone}). ` +
-    `If we don't hear from you by then, the offer rolls to the next person on the waitlist.\n\n` +
-    `— ${siteConfig.identity.shopName}`
+  const what = startDate ? m.eventWithDate(eventTitle, startDate) : eventTitle
+  const text = [
+    m.goodNews(what),
+    '',
+    m.acceptBy(siteConfig.identity.shortName, tpe, siteConfig.locale.timezone),
+    '',
+    m.signoff(siteConfig.identity.shopName),
+  ].join('\n')
 
   try {
     const transporter = nodemailer.createTransport({

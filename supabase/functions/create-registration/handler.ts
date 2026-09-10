@@ -23,6 +23,7 @@ import { computeBookingMoney } from "../_shared/booking-charges.ts"
 import { corsHeaders, safeError } from "../_shared/responses.ts"
 import { clientIp, sha256Hex } from "../_shared/request-identity.ts"
 import { siteConfig } from "../../../fundive.config.ts"
+import { t } from "../_shared/i18n.ts"
 import type { RegistrationPdfPayload } from "../_shared/pdf.ts"
 import type { PaymentMethodDetails } from "../../../src/lib/payment-method-format.ts"
 
@@ -683,6 +684,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
       // A diver may register without ever typing a name. The email address is
       // the one identifier every registration has, so it stands in — an empty
       // subject line names nobody, and the shop has to know who booked.
+      const m = t.emails.registration
       const displayName = payload.name.trim() || registrantEmail
       const subjectName = payload.nickname
         ? `${displayName} (${payload.nickname})`
@@ -690,12 +692,14 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
       const fromHeader = { name: deps.env.mailFromName, address: deps.env.mailFromAddress }
       if (isWaitlisted) {
         const subject = `waitlist--${payload.eventTitle}--${subjectName}`
-        const companyText =
-          `${displayName} has been added to the waitlist for ${payload.eventTitle}.`
-        const diverText =
-          `Thanks for signing up — ${payload.eventTitle} is currently full, so we've added you to the waitlist. ` +
-          `If a spot opens up, you'll receive a notification with 24 hours to claim it. No payment is needed unless and until that happens.\n\n` +
-          `Keep an eye on the ${siteConfig.identity.shopName} app for waitlist updates and event reminders.\n\n— ${siteConfig.identity.shopName}`
+        const companyText = m.shopWaitlisted(displayName, payload.eventTitle)
+        const diverText = [
+          m.diverWaitlisted(payload.eventTitle),
+          '',
+          m.diverWaitlistWatch(siteConfig.identity.shopName),
+          '',
+          m.signoff(siteConfig.identity.shopName),
+        ].join('\n')
         await deps.transporter.sendMail({ from: fromHeader, subject, to: deps.env.companyEmail, text: companyText })
         if (registrantEmail.toLowerCase().trim() !== deps.env.companyEmail) {
           await deps.transporter.sendMail({ from: fromHeader, subject, to: registrantEmail, text: diverText })
@@ -707,16 +711,21 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
         const attach  = { filename: "registration.pdf", content: buf, contentType: "application/pdf" }
         await deps.transporter.sendMail({
           from: fromHeader, subject, to: deps.env.companyEmail,
-          text: "Registration summary attached.",
+          text: m.shopSummaryAttached,
           attachments: [attach],
         })
         if (registrantEmail.toLowerCase().trim() !== deps.env.companyEmail) {
           await deps.transporter.sendMail({
             from: fromHeader, subject, to: registrantEmail,
-            text:
-              "Thanks for registering — your registration summary is attached.\n\n" +
-              "Once you've sent your payment, please let us know via email, LINE, or WhatsApp so we can confirm receipt — contact details are in the attached PDF. We don't always see bank or PayPal transfers in real time, and a quick heads-up keeps your spot from falling through the cracks.\n\n" +
-              `Keep an eye on the ${siteConfig.identity.shopName} app for updates to your registration status, payment confirmations, and event reminders.\n\n— ${siteConfig.identity.shopName}`,
+            text: [
+              m.diverThanks,
+              '',
+              m.diverConfirmPayment,
+              '',
+              m.diverWatchApp(siteConfig.identity.shopName),
+              '',
+              m.signoff(siteConfig.identity.shopName),
+            ].join('\n'),
             attachments: [attach],
           })
         }

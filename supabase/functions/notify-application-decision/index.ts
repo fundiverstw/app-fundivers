@@ -20,6 +20,7 @@ import nodemailer from "npm:nodemailer@6.9.14"
 import { corsOk, jsonResponse, safeError, bearerToken } from "../_shared/responses.ts"
 import { shopEmail } from "../_shared/shop-contact.ts"
 import { siteConfig } from "../../../fundive.config.ts"
+import { t } from "../_shared/i18n.ts"
 
 
 interface DecisionBody {
@@ -114,14 +115,21 @@ Deno.serve(async (req) => {
       // Signing up needs no approval, so neither decision is ever a verdict
       // on a new application any more — both are about an account an admin put
       // on hold. The copy says so.
-      const subject = body.decision === "approve"
-        ? `${siteConfig.identity.shopName} — your account is active again`
-        : `${siteConfig.identity.shopName} — your account has been closed`
+      const m = t.emails.accountDecision
+      const shop = siteConfig.identity.shopName
+      const subject = body.decision === "approve" ? m.reinstatedSubject(shop) : m.closedSubject(shop)
       const text = body.decision === "approve"
-        ? `Good news — your account is active again. You can log in at ${siteConfig.urls.app} and book events as usual.\n\n— ${siteConfig.identity.shopName}`
-        : `Hi,\n\nYour ${siteConfig.identity.shopName} account has been closed.${
-            body.reason ? `\n\nReason: ${body.reason}` : ""
-          }\n\nIf you believe this is a mistake, reply to this email and we'll take another look.\n\n— ${siteConfig.identity.shopName}`
+        ? [m.reinstated(siteConfig.urls.app), '', m.signoff(shop)].join('\n')
+        : [
+            m.greeting,
+            '',
+            m.closed(shop),
+            ...(body.reason ? ['', m.closedReason(body.reason)] : []),
+            '',
+            m.closedAppeal,
+            '',
+            m.signoff(shop),
+          ].join('\n')
       const shopMail = await shopEmail(admin)
       await transporter.sendMail({
         from: { name: siteConfig.identity.shopName, address: GMAIL_USER },

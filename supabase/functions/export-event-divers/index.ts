@@ -35,6 +35,7 @@ import { roleToZh } from "../_shared/event-divers-manifest.ts"
 import { corsOk, jsonResponse, safeError, bearerToken } from "../_shared/responses.ts"
 import { shopEmail } from "../_shared/shop-contact.ts"
 import { siteConfig } from "../../../fundive.config.ts"
+import { t } from "../_shared/i18n.ts"
 import { isEventKind, usesDateEnvelope, EVENT_KINDS } from "../../../src/lib/event-kinds.ts"
 
 // Profile columns the manifest reads, shared by the booked-diver and
@@ -229,8 +230,7 @@ Deno.serve(async (req) => {
     const stamp = eventStartDate ?? new Date().toISOString().slice(0, 10)
     const subject  = `manifest--${eventTitle}--${stamp}`
     const filename = `manifest-${stamp}.xlsx`
-    const staffPart = staff.length ? ` + ${staff.length} staff` : ""
-    const text = `Boat manifest for ${eventTitle} (${stamp}). ${divers.length} diver${divers.length === 1 ? "" : "s"}${staffPart}.`
+    const text = t.emails.boatManifest.body(eventTitle, stamp, divers.length, staff.length)
 
     // The shop's published address, falling back to the mailbox this is
     // authenticated as: a manifest that goes nowhere because nobody filled in
