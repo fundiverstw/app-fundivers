@@ -8,6 +8,8 @@ import type { ScheduledTripItem, MyScheduledTripRegistration } from '../types/da
 import {
   CARD, PAGE_HEADING, PAGE_BODY, ON_DEEP_LINK, TEXT_HEADING, TEXT_SUBTLE,
 } from '../styles/tokens'
+import { ListingHero } from '../components/ListingHero'
+import { ScheduledTripsIcon } from '../components/icons/ScheduledTripsIcon'
 import { t } from '../i18n'
 
 const tr = t.trips
@@ -77,11 +79,8 @@ function TripCard({ trip, registration }: { trip: ScheduledTripItem; registratio
   const dates = packageDateLabel(trip.start_date, trip.end_date)
   return (
     <Link to={`/scheduled-trips/${trip.id}`} className={`${CARD} block overflow-hidden hover:bg-white/90 transition-colors h-full`}>
-      {trip.hero_image_url ? (
-        <img src={trip.hero_image_url} alt="" className="w-full h-36 object-cover" />
-      ) : (
-        <div className="w-full h-36 bg-gradient-to-br from-surface-200 to-brand-300" />
-      )}
+      <ListingHero src={trip.hero_image_url} heightClass="h-36"
+        icon={<ScheduledTripsIcon className="w-10 h-10" />} />
       <div className="p-3 space-y-1">
         <p className={`text-sm ${TEXT_HEADING} break-words`}>{trip.title}</p>
         <p className={`text-xs ${TEXT_SUBTLE} truncate`}>{trip.destination}</p>

@@ -13,6 +13,8 @@ import type { ScheduledTripItem, MyScheduledTripRegistration } from '../types/da
 import {
   CARD, BTN_PRIMARY, BTN_DANGER, PAGE_BODY, ON_DEEP_LINK, TEXT_HEADING, TEXT_BODY, TEXT_SUBTLE,
 } from '../styles/tokens'
+import { ListingHero } from '../components/ListingHero'
+import { ScheduledTripsIcon } from '../components/icons/ScheduledTripsIcon'
 import { t } from '../i18n'
 
 const tr = t.trips
@@ -95,11 +97,8 @@ export function ScheduledTripDetailPage() {
       <BackLink />
 
       <div className={`${CARD} overflow-hidden`}>
-        {trip.hero_image_url ? (
-          <img src={trip.hero_image_url} alt="" className="w-full h-48 object-cover" />
-        ) : (
-          <div className="w-full h-48 bg-gradient-to-br from-surface-200 to-brand-300" />
-        )}
+        <ListingHero src={trip.hero_image_url} heightClass="h-48"
+        icon={<ScheduledTripsIcon className="w-10 h-10" />} />
         <div className="p-4 space-y-2">
           <h1 className={`text-xl ${TEXT_HEADING}`}>{trip.title}</h1>
           <p className={`text-sm ${TEXT_SUBTLE}`}>{trip.destination}{dates ? ` · ${dates}` : ''}</p>

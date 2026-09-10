@@ -1,9 +1,14 @@
 // Lucide "parasol" glyph for the Scheduled Trips header shortcut. currentColor
 // so the parent picks the tint — red on the diver header — matching the
 // outline icons beside it.
-export function ScheduledTripsIcon() {
+//
+// `className` overrides the 24px default, so the same mark can stand in for a
+// trip's missing hero image at a size that reads as artwork rather than as a
+// stray glyph. See ListingHero.
+export function ScheduledTripsIcon({ className = '' }: { className?: string } = {}) {
   return (
     <svg
+      className={className}
       viewBox="0 0 24 24"
       width="24"
       height="24"

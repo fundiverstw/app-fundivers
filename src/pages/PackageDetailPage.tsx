@@ -13,7 +13,8 @@ import type { PackageBoardItem, PackageTierItem, MyPackageRegistration } from '.
 import {
   CARD, BTN_PRIMARY, BTN_DANGER, PAGE_BODY, TEXT_LINK, ON_DEEP_LINK, TEXT_HEADING, TEXT_BODY, TEXT_SUBTLE,
 } from '../styles/tokens'
-import { PackageHero } from '../components/PackageHero'
+import { ListingHero } from '../components/ListingHero'
+import { PackagesIcon } from '../components/icons/PackagesIcon'
 import { t } from '../i18n'
 
 const pk = t.packages
@@ -96,7 +97,8 @@ export function PackageDetailPage() {
       <BackLink />
 
       <div className={`${CARD} overflow-hidden`}>
-        <PackageHero src={pkg.hero_image_url} heightClass="h-48" />
+        <ListingHero src={pkg.hero_image_url} heightClass="h-48"
+        icon={<PackagesIcon className="w-10 h-10" />} />
         <div className="p-4 space-y-2">
           <h1 className={`text-xl ${TEXT_HEADING}`}>{pkg.title}</h1>
           <p className={`text-sm ${TEXT_SUBTLE}`}>{pkg.destination}</p>

@@ -4,7 +4,7 @@
 //
 // `className` overrides the 24px default, so the same mark can stand in for a
 // package's missing hero image at a size that reads as artwork rather than as a
-// stray glyph. See PackageHero.
+// stray glyph. See ListingHero.
 export function PackagesIcon({ className = '' }: { className?: string } = {}) {
   return (
     <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none"

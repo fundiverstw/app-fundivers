@@ -7,7 +7,8 @@ import type { PackageBoardItem, MyPackageRegistration } from '../types/database'
 import {
   CARD, PAGE_HEADING, PAGE_BODY, ON_DEEP_LINK, TEXT_HEADING, TEXT_SUBTLE,
 } from '../styles/tokens'
-import { PackageHero } from '../components/PackageHero'
+import { ListingHero } from '../components/ListingHero'
+import { PackagesIcon } from '../components/icons/PackagesIcon'
 import { t } from '../i18n'
 
 const pk = t.packages
@@ -80,7 +81,8 @@ export function PackagesPage() {
 function PackageCard({ pkg, registration }: { pkg: PackageBoardItem; registration: MyPackageRegistration | null }) {
   return (
     <Link to={`/packages/${pkg.id}`} className={`${CARD} block overflow-hidden hover:bg-white/90 transition-colors h-full`}>
-      <PackageHero src={pkg.hero_image_url} heightClass="h-36" />
+      <ListingHero src={pkg.hero_image_url} heightClass="h-36"
+        icon={<PackagesIcon className="w-10 h-10" />} />
       <div className="p-3 space-y-1">
         <p className={`text-sm ${TEXT_HEADING} truncate`}>{pkg.title}</p>
         <p className={`text-xs ${TEXT_SUBTLE} truncate`}>{pkg.destination}</p>
