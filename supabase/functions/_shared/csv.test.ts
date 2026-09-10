@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { csvCell, buildTableCsv } from './csv'
+import { csvCell, buildTableCsv, CSV_BOM } from './csv'
 
 describe('csvCell', () => {
   it('leaves an ordinary value alone', () => {
@@ -26,8 +26,14 @@ describe('csvCell', () => {
 })
 
 describe('buildTableCsv', () => {
+  // Excel reads a BOM-less UTF-8 CSV as the machine's ANSI codepage, so a
+  // backup of a Chinese-language table restores as mojibake without this.
+  it('leads with a UTF-8 BOM so Excel reads Chinese cells correctly', () => {
+    expect(buildTableCsv(['name'], [{ name: '王小明' }]).startsWith(CSV_BOM)).toBe(true)
+  })
+
   it('exports the header even when the table is empty', () => {
-    expect(buildTableCsv(['id', 'name'], [])).toBe('id,name\r\n')
+    expect(buildTableCsv(['id', 'name'], [])).toBe(CSV_BOM + 'id,name\r\n')
   })
 
   it('projects each row through the column list', () => {
@@ -35,7 +41,7 @@ describe('buildTableCsv', () => {
       { id: 'a1', name: 'Ada', notes: null },
       { id: 'b2', name: 'Grace', notes: 'first dive' },
     ])
-    expect(csv).toBe('id,name,notes\r\na1,Ada,\r\nb2,Grace,first dive\r\n')
+    expect(csv).toBe(CSV_BOM + 'id,name,notes\r\na1,Ada,\r\nb2,Grace,first dive\r\n')
   })
 
   it('holds alignment when a row is missing a column or carries an extra one', () => {
@@ -43,6 +49,6 @@ describe('buildTableCsv', () => {
       { id: 'a1' },
       { id: 'b2', name: 'Grace', dropped: 'not in the header' },
     ])
-    expect(csv).toBe('id,name\r\na1,\r\nb2,Grace\r\n')
+    expect(csv).toBe(CSV_BOM + 'id,name\r\na1,\r\nb2,Grace\r\n')
   })
 })

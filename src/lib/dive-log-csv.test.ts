@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildDiveLogCsv, csvCell, DIVE_LOG_CSV_COLUMNS } from './dive-log-csv'
+import { buildDiveLogCsv, csvCell, CSV_BOM, DIVE_LOG_CSV_COLUMNS } from './dive-log-csv'
 
 describe('csvCell', () => {
   it('passes plain strings through unchanged', () => {
@@ -38,11 +38,17 @@ describe('buildDiveLogCsv', () => {
   it('emits the canonical column header as the first row', () => {
     const csv = buildDiveLogCsv([])
     const firstLine = csv.split('\r\n')[0]
-    expect(firstLine).toBe(DIVE_LOG_CSV_COLUMNS.join(','))
+    expect(firstLine).toBe(CSV_BOM + DIVE_LOG_CSV_COLUMNS.join(','))
   })
 
   it('produces a header-only file when given no rows (empty-export case)', () => {
-    expect(buildDiveLogCsv([])).toBe(DIVE_LOG_CSV_COLUMNS.join(',') + '\r\n')
+    expect(buildDiveLogCsv([])).toBe(CSV_BOM + DIVE_LOG_CSV_COLUMNS.join(',') + '\r\n')
+  })
+
+  // Excel reads a BOM-less UTF-8 CSV as the machine's ANSI codepage, so a
+  // Chinese site name or note arrives as mojibake without this.
+  it('leads with a UTF-8 BOM so Excel reads Chinese cells correctly', () => {
+    expect(buildDiveLogCsv([{ dive_number: 1, site: '龍洞' }]).startsWith(CSV_BOM)).toBe(true)
   })
 
   it('uses CRLF line endings — Excel on Windows expects this', () => {

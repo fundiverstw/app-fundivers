@@ -10,6 +10,11 @@
 //
 // Deno-import-free so the vitest suite can exercise it from Node.
 
+/** Byte-order mark. A UTF-8 CSV without one opens in Excel as the machine's
+ *  ANSI codepage, which turns every Chinese diver name, event title and note
+ *  into mojibake. Every reader that isn't Excel skips it. */
+export const CSV_BOM = "\ufeff"
+
 /** RFC 4180 quoting: quote only when the cell needs it, double any quote. */
 export function csvCell(value: unknown): string {
   if (value === null || value === undefined) return ''
@@ -36,5 +41,5 @@ export function buildTableCsv(columns: string[], rows: Array<Record<string, unkn
     lines.push(columns.map(c => csvCell(row[c])).join(','))
   }
   // CRLF — Excel on Windows prefers it; every other reader tolerates it.
-  return lines.join('\r\n') + '\r\n'
+  return CSV_BOM + lines.join('\r\n') + '\r\n'
 }

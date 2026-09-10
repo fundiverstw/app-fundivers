@@ -8,6 +8,7 @@ import {
   buildAccountingCsvs,
   type AccountingTransaction,
 } from './accounting-export'
+import { CSV_BOM } from './dive-log-csv'
 import { siteConfig } from '../config/site'
 import type { Payment } from '../types/database'
 import { EVENT_KIND_LABELS } from './event-kind-labels'
@@ -202,6 +203,14 @@ describe('account credit is excluded from cash totals', () => {
 
   it('labels the amount column with the configured currency', () => {
     expect(buildSummaryCsv(rows, 2026).split('\r\n')[0])
-      .toBe(`Category,Item,Count,Amount (${siteConfig.locale.currency})`)
+      .toBe(`${CSV_BOM}Category,Item,Count,Amount (${siteConfig.locale.currency})`)
+  })
+
+  // Excel reads a BOM-less UTF-8 CSV as the machine's ANSI codepage, so a
+  // Chinese diver name or event title arrives as mojibake without this.
+  it('leads every sheet with a UTF-8 BOM so Excel reads Chinese correctly', () => {
+    for (const csv of Object.values(buildAccountingCsvs(rows, 2026))) {
+      expect(csv.startsWith(CSV_BOM)).toBe(true)
+    }
   })
 })

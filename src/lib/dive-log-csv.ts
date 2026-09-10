@@ -44,11 +44,16 @@ export function csvCell(v: unknown): string {
   return s
 }
 
+/** Byte-order mark. A UTF-8 CSV without one opens in Excel as the machine's
+ *  ANSI codepage, which turns every Chinese diver name, event title and note
+ *  into mojibake. Every reader that isn't Excel skips it. */
+export const CSV_BOM = '\ufeff'
+
 export function buildDiveLogCsv(rows: DiveLogCsvRow[]): string {
   const lines: string[] = [DIVE_LOG_CSV_COLUMNS.join(',')]
   for (const r of rows) {
     lines.push(DIVE_LOG_CSV_COLUMNS.map((c) => csvCell(r[c])).join(','))
   }
   // CRLF — Excel on Windows prefers it; mac/linux readers tolerate it.
-  return lines.join('\r\n') + '\r\n'
+  return CSV_BOM + lines.join('\r\n') + '\r\n'
 }

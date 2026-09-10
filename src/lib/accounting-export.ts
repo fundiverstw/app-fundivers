@@ -12,7 +12,7 @@
 // booking that generated the credit — so folding it into revenue books the
 // same money twice. It gets its own column and its own summary line instead,
 // so the export still accounts for every row.
-import { csvCell } from './dive-log-csv'
+import { csvCell, CSV_BOM } from './dive-log-csv'
 import { isExternalPayment, INTERNAL_PAYMENT_METHOD } from './payments'
 import { siteConfig } from '../config/site'
 import type { Booking, BookingDetails, Payment } from '../types/database'
@@ -148,7 +148,7 @@ export function normalizeTransactions(input: {
 function toCsv(header: readonly string[], rows: unknown[][]): string {
   const lines = [header.map(csvCell).join(',')]
   for (const r of rows) lines.push(r.map(csvCell).join(','))
-  return lines.join('\r\n') + '\r\n'
+  return CSV_BOM + lines.join('\r\n') + '\r\n'
 }
 
 const TXN_HEADER = [
