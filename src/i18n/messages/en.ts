@@ -226,8 +226,6 @@ export const en = {
     maybeExists: 'These are already in the catalog — is it one of them?',
     useThis: 'Use this one',
     unverified: 'unverified',
-    addedPlace: 'Place added. Staff will confirm it.',
-    addFailed: 'Could not add the place.',
   },
   almanac: {
     title: 'Almanac',
@@ -1504,9 +1502,7 @@ export const en = {
       latitudeLabel: 'Latitude',
       longitudeLabel: 'Longitude',
       coordsBoth: 'Give both latitude and longitude, or neither.',
-      verifiedBadge: 'verified',
       unverifiedBadge: 'unverified',
-      addedByDiver: 'Added by a diver',
       verify: 'Verify',
       unverify: 'Un-verify',
       verified: 'Site verified.',
@@ -1878,7 +1874,6 @@ export const en = {
       // `kind` is the already-localised event-kind label.
       created: (kind: string) => `${kind} created`,
       updated: (kind: string) => `${kind} updated`,
-      carAssignFailed: 'Dive created, but its car assignments could not be saved — add them on the edit page.',
       carsHeading: 'Cars for this event',
       carsBlurb: 'Cars assigned to this event feed the ride-seat limit on the registration form — a diver can only request a ride when a seat is free in one of them.',
     },
@@ -1962,7 +1957,6 @@ export const en = {
       logoChoose: 'Choose an image',
       logoSize: 'Longest side',
       logoSizeHint: (px: number) => `Scaled down to ${px}px on the longest side before upload.`,
-      logoUpload: 'Upload logo',
       logoUploading: 'Uploading…',
       logoRemove: 'Remove',
       logoRemoved: 'Logo removed — back to the one this build ships with.',
@@ -2103,7 +2097,6 @@ export const en = {
       breakdownMonths: 'By month',
       breakdownTypes: 'By type',
       close: 'Close',
-      uncategorised: '—',
     },
     applications: {
       title: 'Accounts on hold',
@@ -2717,7 +2710,6 @@ export const en = {
       previewHeading: (n: number) => `${n} events will be created:`,
       previewNote: 'Each one is a separate, independently bookable event. You can edit or cancel any of them afterwards.',
       created: (n: number) => `Created ${n} events in the series.`,
-      relationsIncomplete: (n: number) => `${n} of them could not save their rooms / add-ons / cars — open those and set them by hand.`,
       createFailed: (detail: string) => `Could not create the series: ${detail}`,
     },
     termsConsent: {
@@ -3189,7 +3181,6 @@ export const en = {
       holdingEmpty: 'Every cancelled booking is accounted for.',
       overRefundedHeading: 'Refunded more than received',
       overRefundedBlurb: 'These bookings gave back more than they ever took in. One of the two rows behind each is wrong — a payment voided that should have stood, or a refund credit issued that should not have been. The database cannot tell which; the amounts are shown so a person can.',
-      overRefundedEmpty: 'Every refund is covered by money the booking actually received.',
       colReceived: 'Received',
       colReturned: 'Given back',
       colExcess: 'Over',

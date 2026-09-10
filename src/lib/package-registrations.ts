@@ -120,7 +120,3 @@ export async function setRegistrationStatus(id: string, status: RegistrationStat
   if (error) throw error
 }
 
-export async function updateRegistrationNotes(id: string, admin_notes: string | null): Promise<void> {
-  const { error } = await supabase.from('package_registrations').update({ admin_notes }).eq('id', id)
-  if (error) throw error
-}

@@ -19,8 +19,6 @@ import { siteConfig } from '../config/site'
 
 export type UnitSystem = 'metric' | 'imperial'
 
-export const UNIT_SYSTEMS: readonly UnitSystem[] = ['metric', 'imperial']
-
 const STORAGE_KEY = 'fundive.units'
 
 const CM_PER_INCH = 2.54

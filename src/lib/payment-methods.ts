@@ -37,14 +37,3 @@ export async function deletePaymentMethod(id: string): Promise<void> {
   if (error) throw error
 }
 
-/**
- * The method a booking was made with. Falls back to null rather than the first
- * available method: a booking made under a since-deleted method must not
- * silently inherit another method's bank account.
- */
-export function findPaymentMethod(
-  methods: PaymentMethod[], key: string | null | undefined,
-): PaymentMethod | null {
-  if (!key) return null
-  return methods.find(m => m.key === key) ?? null
-}

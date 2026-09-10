@@ -64,4 +64,3 @@ export const LONGDONG_4: DiveSiteMap = newSiteMap(
   'Longdong Site 4 (Hemei Elementary)',
 )
 
-export const SITE_SEEDS: DiveSiteMap[] = [LONGDONG_4]

@@ -22,8 +22,6 @@ export type RecurrenceFreq =
   /** The same weekday-in-month as the anchor, every `interval` months. */
   | 'monthly_weekday'
 
-export const RECURRENCE_FREQS: RecurrenceFreq[] = ['daily', 'weekly', 'monthly_weekday']
-
 /** ISO weekday numbering: 1 = Monday … 7 = Sunday. Matches date-fns' getISODay. */
 export type Weekday = 1 | 2 | 3 | 4 | 5 | 6 | 7
 

@@ -119,10 +119,6 @@ export function bearerHeaders(token: string): Record<string, string> {
   return { apikey: ANON_KEY(), Authorization: `Bearer ${token}` }
 }
 
-export function serviceHeaders(): Record<string, string> {
-  return { apikey: SERVICE_ROLE_KEY(), Authorization: `Bearer ${SERVICE_ROLE_KEY()}` }
-}
-
 /**
  * Convenience: sign in a known throwaway user (from helpers.ts) and
  * return a function that builds Bearer headers for that user. Saves

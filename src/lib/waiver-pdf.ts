@@ -34,7 +34,3 @@ export async function getWaiverPdfSignedUrl(path: string): Promise<string | null
   return data.signedUrl
 }
 
-export async function deleteWaiverPdf(path: string): Promise<void> {
-  const { error } = await supabase.storage.from(WAIVER_PDF_BUCKET).remove([path])
-  if (error) throw error
-}
