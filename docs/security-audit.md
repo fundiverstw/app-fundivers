@@ -986,8 +986,8 @@ Unify on whatever Supabase project setting enforces.
 **Status: DEFERRED 2026-06-03.** Pure-hygiene item; the audit itself
 flags it as non-blocking. Renaming the Bubble-imported tables would
 ripple through every existing migration that references the
-quoted-identifier form and would breach the immutability rule
-(CLAUDE.md #1). Left as-is.
+quoted-identifier form and would breach the rule that an applied
+migration is immutable. Left as-is.
 
 `"Other_Addons"` mixed-case + double-quoted is harder to audit;
 non-blocking, just a footgun for future grep-by-table.

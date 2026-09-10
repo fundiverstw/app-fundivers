@@ -175,7 +175,8 @@ worker cache but not these. `clearAllRegistrationDrafts()` now runs on sign-out.
 
 `eventHasPassed` selected columns with `eventType === "dive"` but branched on
 `usesDateEnvelope()`. For `adventure` those disagree, so `lastDay` was null and
-every past adventure was accepted. Exactly the trap CLAUDE.md rule 6 describes.
+every past adventure was accepted. Exactly the trap the kind-branching rule
+describes: ask what a kind *does*, never `=== 'dive'`.
 
 The bug was invisible to unit tests because the mock returned all columns
 regardless of the `select()` list. The mock now projects to the requested

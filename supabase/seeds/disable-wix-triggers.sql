@@ -16,7 +16,7 @@
 --
 -- This file is listed in [db.seed].sql_paths (config.toml) so it runs
 -- after migrations on every `make reset`. Migrations are immutable once
--- pushed (CLAUDE.md rule #1), so we can't delete the triggers from the
+-- pushed, so we can't delete the triggers from the
 -- migration -- we drop them locally on every reset instead. Cloud keeps
 -- the triggers; local does not. The wix_sync_notify() function is kept.
 
