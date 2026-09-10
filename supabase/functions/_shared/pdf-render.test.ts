@@ -33,6 +33,10 @@ import type { ShopContact, PaymentMethodDetails } from '../../../src/lib/payment
     const name = raw.split('?')[0].split('/').pop()!
     return readFile(join(dirname(fileURLToPath(import.meta.url)), name))
   },
+  // Defining `Deno` at all makes `typeof Deno !== "undefined"` true, and the
+  // edge config seam takes that as licence to read `Deno.env`. Answer it the
+  // way an un-injected deployment does: nothing set, fall back to the file.
+  env: { get: () => undefined },
 }
 
 // Each test renders a real PDF: base64-ing the ~6.8MB font and laying out a
