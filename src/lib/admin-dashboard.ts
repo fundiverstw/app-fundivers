@@ -9,10 +9,13 @@
 // settles a booking without anything arriving at the shop, so summing it as
 // revenue reports the same cash twice — once when it came in, again when the
 // credit it became is spent. Credit applied is reported on its own instead.
-import { canonicalCertLevel } from './cert-level'
+import { buildCertLevelResolver, type CertLadderRow } from './cert-level'
+import { canonicalNationality } from './nationality'
+import { hasDiveFlags, usesCourseDays } from './event-kinds'
 import { isExternalPayment } from './payments'
 import { siteConfig } from '../config/site'
 import { EVENT_KIND_LABELS } from './event-kind-labels'
+import { t } from '../i18n'
 import type { Booking, Payment, EventKind } from '../types/database'
 
 export interface MoneyPoint { label: string; value: number }
@@ -52,14 +55,29 @@ export interface Dashboard {
   revenueByNationality: MoneyPoint[]
   revenueByCertLevel: MoneyPoint[]
   certLevelMix: CountPoint[]
-  topEventsByRevenue: MoneyPoint[]
+  /** Net revenue per kind of outing — shore dives, boat dives, trips, each
+   *  course. Replaces a per-event list, which split one weekly shore dive
+   *  across a dozen identically-titled rows and answered nothing. */
+  revenueByActivity: MoneyPoint[]
   upcomingFill: UpcomingFillRow[]
 }
 
 export type PaymentLite = Pick<Payment, 'user_id' | 'booking_id' | 'amount' | 'status' | 'method' | 'created_at'>
 export type BookingLite = Pick<Booking, 'id' | 'user_id' | 'event_id' | 'status' | 'created_at' | 'details'>
 export interface ProfileLite { id: string; role: string; status: string; created_at: string; nationality: string | null; cert_level: string | null }
-export interface EventLite { id: string; type: EventKind; title: string; capacity: number | null; dateKey: string | null }
+export interface EventLite {
+  id: string
+  type: EventKind
+  title: string
+  capacity: number | null
+  dateKey: string | null
+  /** Dive kinds only; false elsewhere. */
+  isBoatDive: boolean
+  isTrip: boolean
+  /** Course kinds only: the catalog title of the course being run, when the
+   *  event names one. Null elsewhere, and for a course with no catalog row. */
+  courseLabel: string | null
+}
 export interface ConfirmedCount { eventId: string; count: number }
 
 export interface DashboardInput {
@@ -69,6 +87,9 @@ export interface DashboardInput {
   profiles: ProfileLite[]
   events: EventLite[]
   confirmed: ConfirmedCount[]
+  /** The shop's whole `cert_levels` table — every agency, so a diver who typed
+   *  an SSI or CMAS rung still resolves to its PADI equivalent. */
+  certLadder: CertLadderRow[]
   pendingApplications: number
   pendingRefundRequests: number
 }
@@ -118,8 +139,30 @@ function topWithOther(entries: Array<[string, number]>, n: number): MoneyPoint[]
   return head
 }
 
+/**
+ * What kind of outing an event is, for the revenue breakdown.
+ *
+ * Branches on what the kind *does* rather than on the kind itself, so a fourth
+ * kind has to answer here instead of silently inheriting the dive branch. A
+ * trip beats a boat dive: a Green Island weekend is a trip that happens to
+ * involve boats, and reporting it as a boat dive would hide the shop's most
+ * distinct line of business inside its most ordinary one.
+ */
+function activityOf(event: EventLite): string {
+  const a = t.admin.dashboard.activities
+  if (usesCourseDays(event.type)) return event.courseLabel?.trim() || a.course
+  if (hasDiveFlags(event.type)) {
+    if (event.isTrip) return a.trip
+    if (event.isBoatDive) return a.boatDive
+    return a.shoreDive
+  }
+  return EVENT_KIND_LABELS[event.type]
+}
+
 export function computeDashboard(input: DashboardInput): Dashboard {
-  const { nowIso, payments: allPayments, bookings, profiles, events, confirmed } = input
+  const { nowIso, payments: allPayments, bookings, profiles, events, confirmed, certLadder } = input
+  const certLevel = buildCertLevelResolver(certLadder)
+  const unknown = t.admin.dashboard.unknownBucket
   // Every revenue series below reads `payments`; only the credit-applied KPI
   // reads the internal rows, so the split happens once, here.
   const payments = allPayments.filter(isExternalPayment)
@@ -164,26 +207,31 @@ export function computeDashboard(input: DashboardInput): Dashboard {
     const contrib = p.status === 'paid' ? num(p.amount) : p.status === 'refunded' ? -num(p.amount) : 0
     if (!contrib) continue
     const prof = profileById.get(p.user_id)
-    const nat = prof?.nationality?.trim() || 'Unknown'
-    const cert = canonicalCertLevel(prof?.cert_level) || 'Unknown'
+    const nat = canonicalNationality(prof?.nationality) || unknown
+    const cert = certLevel(prof?.cert_level) || unknown
     natTotals.set(nat, (natTotals.get(nat) ?? 0) + contrib)
     certTotals.set(cert, (certTotals.get(cert) ?? 0) + contrib)
   }
   const revenueByNationality = topWithOther([...natTotals.entries()], 8)
   const revenueByCertLevel = topWithOther([...certTotals.entries()], 8)
 
-  // --- Events grouped revenue (top earners) ---
-  const eventTotals = new Map<string, number>()
+  // --- Revenue per kind of outing ---
+  // Grouping by event id put one row per occurrence, so a shore dive the shop
+  // runs every weekend appeared a dozen times under the same title and the
+  // pane read as a list of duplicates. What earns money is the *kind* of
+  // outing, which the event's own flags already say.
+  const activityTotals = new Map<string, number>()
   for (const p of payments) {
     const ev = eventOfPayment(p)
     if (!ev) continue
     const contrib = p.status === 'paid' ? num(p.amount) : p.status === 'refunded' ? -num(p.amount) : 0
-    eventTotals.set(ev.id, (eventTotals.get(ev.id) ?? 0) + contrib)
+    if (!contrib) continue
+    const label = activityOf(ev)
+    activityTotals.set(label, (activityTotals.get(label) ?? 0) + contrib)
   }
-  const topEventsByRevenue = [...eventTotals.entries()]
-    .map(([id, value]) => ({ label: eventById.get(id)?.title ?? id, value }))
+  const revenueByActivity = [...activityTotals.entries()]
+    .map(([label, value]) => ({ label, value }))
     .sort((a, b) => b.value - a.value)
-    .slice(0, 8)
 
   // --- Bookings ---
   const bookingsByMonth = monthKeys.map(k => ({ label: k, value: bookings.filter(b => taipeiMonth(b.created_at) === k).length }))
@@ -199,7 +247,7 @@ export function computeDashboard(input: DashboardInput): Dashboard {
   const certMix = new Map<string, number>()
   for (const p of divers) {
     if (p.status !== 'active') continue
-    const cert = canonicalCertLevel(p.cert_level) || 'Unknown'
+    const cert = certLevel(p.cert_level) || unknown
     certMix.set(cert, (certMix.get(cert) ?? 0) + 1)
   }
   const certLevelMix = [...certMix.entries()]
@@ -240,7 +288,7 @@ export function computeDashboard(input: DashboardInput): Dashboard {
     revenueByNationality,
     revenueByCertLevel,
     certLevelMix,
-    topEventsByRevenue,
+    revenueByActivity,
     upcomingFill,
   }
 }

@@ -3108,7 +3108,16 @@ export const en = {
       revenueByNationality: 'Revenue by nationality',
       revenueByCert: 'Revenue by certification',
       diversByCert: 'Active divers by certification',
-      topEventsByRevenue: 'Top events by revenue',
+      revenueByActivity: 'Revenue by activity',
+      unknownBucket: 'Unknown',
+      // What kind of outing earned the money. A course reports under its own
+      // catalog title, so these are the fallbacks and the non-course kinds.
+      activities: {
+        shoreDive: 'Shore dives',
+        boatDive: 'Boat dives',
+        trip: 'Trips',
+        course: 'Courses',
+      },
       upcomingFill: 'Upcoming events — fill',
       colEvent: 'Event',
       colDate: 'Date',

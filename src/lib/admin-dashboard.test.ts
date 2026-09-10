@@ -1,6 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import { computeDashboard, calendarYearMonths, type DashboardInput } from './admin-dashboard'
 import { EVENT_KIND_LABELS } from './event-kind-labels'
+import type { CertLadderRow } from './cert-level'
+
+// Enough of the shop's cert ladder to exercise the resolver; the full table and
+// its cross-agency equivalences are covered in cert-level.test.ts.
+const LADDER: CertLadderRow[] = [
+  { id: 'open_water', code: 'open_water', name: 'OW', padi_equivalent_id: 'open_water' },
+  { id: 'advanced_open_water', code: 'advanced_open_water', name: 'AOW', padi_equivalent_id: 'advanced_open_water' },
+  { id: 'rescue', code: 'rescue', name: 'Rescue', padi_equivalent_id: 'rescue' },
+  { id: 'naui_advanced_scuba_diver', code: 'naui_advanced_scuba_diver', name: 'Advanced Scuba Diver', padi_equivalent_id: 'advanced_open_water' },
+]
 
 describe('calendarYearMonths', () => {
   it('returns Jan→Dec so the peak season sits in the center columns', () => {
@@ -35,10 +45,11 @@ const input: DashboardInput = {
     { id: 'a1', role: 'admin', status: 'active', created_at: '2026-06-01T00:00:00+08:00', nationality: null, cert_level: null },
   ],
   events: [
-    { id: 'dive1', type: 'dive', title: 'Long Dong', capacity: 10, dateKey: '2026-07-01' },
-    { id: 'course1', type: 'course', title: 'OW Course', capacity: 6, dateKey: '2026-06-20' },
+    { id: 'dive1', type: 'dive', title: 'Long Dong', capacity: 10, dateKey: '2026-07-01', isBoatDive: false, isTrip: false, courseLabel: null },
+    { id: 'course1', type: 'course', title: 'OW Course', capacity: 6, dateKey: '2026-06-20', isBoatDive: false, isTrip: false, courseLabel: 'Open Water Course' },
   ],
   confirmed: [{ eventId: 'dive1', count: 5 }, { eventId: 'course1', count: 3 }],
+  certLadder: LADDER,
 }
 
 describe('computeDashboard', () => {
@@ -71,14 +82,14 @@ describe('computeDashboard', () => {
       { label: 'Taiwan', value: 800 },
       { label: 'Japan', value: 500 },
     ])
-    // Cert levels are canonicalized: 'AOW' → 'Advanced Open Water', 'OW' → 'Open Water'.
+    // Cert levels resolve to the PADI rung the shop's own ladder names.
     expect(d.revenueByCertLevel).toEqual([
-      { label: 'Advanced Open Water', value: 800 },
-      { label: 'Open Water', value: 500 },
+      { label: 'AOW', value: 800 },
+      { label: 'OW', value: 500 },
     ])
-    expect(d.topEventsByRevenue).toEqual([
-      { label: 'Long Dong', value: 800 },
-      { label: 'OW Course', value: 500 },
+    expect(d.revenueByActivity).toEqual([
+      { label: 'Shore dives', value: 800 },
+      { label: 'Open Water Course', value: 500 },
     ])
   })
 
@@ -99,8 +110,8 @@ describe('computeDashboard', () => {
     expect(d.kpis.activeDivers).toBe(2) // admin excluded
     expect(d.signupsByMonth.find(p => p.label === '2026-06')).toEqual({ label: '2026-06', value: 1 }) // only d1
     expect(d.certLevelMix).toEqual([
-      { label: 'Advanced Open Water', value: 1 },
-      { label: 'Open Water', value: 1 },
+      { label: 'AOW', value: 1 },
+      { label: 'OW', value: 1 },
     ])
   })
 
@@ -120,7 +131,7 @@ describe('computeDashboard', () => {
   it('treats past-dated events as not upcoming', () => {
     const past = computeDashboard({
       ...input,
-      events: [{ id: 'dive1', type: 'dive', title: 'Old', capacity: 10, dateKey: '2026-01-01' }],
+      events: [{ id: 'dive1', type: 'dive', title: 'Old', capacity: 10, dateKey: '2026-01-01', isBoatDive: false, isTrip: false, courseLabel: null }],
       confirmed: [],
     })
     expect(past.kpis.upcomingEvents).toBe(0)
@@ -172,5 +183,137 @@ describe('account credit is reported beside revenue, never inside it', () => {
     const course = withCredit.revenueByEventType.find(p => p.label === EVENT_KIND_LABELS.course)
     expect(course?.value ?? 0).toBe(500)
     expect(withCredit.revenueByNationality.find(p => p.label === 'Japan')!.value).toBe(500)
+  })
+})
+
+// The three panes the admin reported as showing the same thing several times.
+describe('computeDashboard collapses duplicate labels', () => {
+  const at = (created_at: string) => created_at
+
+  // "USA" and "United States" stood as two bars, halving one country's takings.
+  it('reports one country however each diver spelled it', () => {
+    const d = computeDashboard({
+      ...input,
+      payments: [
+        { user_id: 'd1', booking_id: 'b1', amount: 100, status: 'paid', method: 'cash', created_at: at('2026-06-10T00:00:00+08:00') },
+        { user_id: 'd2', booking_id: 'b2', amount: 200, status: 'paid', method: 'cash', created_at: at('2026-06-10T00:00:00+08:00') },
+        { user_id: 'd3', booking_id: 'b3', amount: 300, status: 'paid', method: 'cash', created_at: at('2026-06-10T00:00:00+08:00') },
+      ],
+      profiles: [
+        { id: 'd1', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: 'USA', cert_level: 'OW' },
+        { id: 'd2', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: 'United States', cert_level: 'OW' },
+        { id: 'd3', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: 'American', cert_level: 'OW' },
+      ],
+    })
+    expect(d.revenueByNationality).toEqual([{ label: 'United States', value: 600 }])
+  })
+
+  // Every one of these is an AOW diver under a different agency's name for it.
+  it('reports one rung however each diver named their certification', () => {
+    const d = computeDashboard({
+      ...input,
+      payments: [],
+      profiles: [
+        { id: 'd1', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: null, cert_level: 'AOW' },
+        { id: 'd2', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: null, cert_level: 'Advanced Open Water' },
+        { id: 'd3', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: null, cert_level: 'Advanced Scuba Diver' },
+        { id: 'd4', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: null, cert_level: 'AOW & nitrox' },
+      ],
+    })
+    expect(d.certLevelMix).toEqual([{ label: 'AOW', value: 4 }])
+  })
+
+  it('buckets a certification the ladder cannot place on its own, not into a rung', () => {
+    const d = computeDashboard({
+      ...input,
+      payments: [],
+      profiles: [
+        { id: 'd1', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: null, cert_level: 'PE40' },
+        { id: 'd2', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: null, cert_level: null },
+      ],
+    })
+    expect(d.certLevelMix).toEqual([
+      { label: 'PE40', value: 1 },
+      { label: 'Unknown', value: 1 },
+    ])
+  })
+
+  // The weekly shore dive used to fill the pane with a dozen identical titles.
+  it('sums repeat outings of the same kind instead of listing each occurrence', () => {
+    const occurrences = ['e1', 'e2', 'e3']
+    const d = computeDashboard({
+      ...input,
+      payments: occurrences.map(id => ({
+        user_id: 'd1', booking_id: `b-${id}`, amount: 100, status: 'paid' as const,
+        method: 'cash', created_at: at('2026-06-10T00:00:00+08:00'),
+      })),
+      bookings: occurrences.map(id => ({
+        id: `b-${id}`, user_id: 'd1', event_id: id, status: 'confirmed' as const,
+        created_at: at('2026-06-09T00:00:00+08:00'), details: {},
+      })),
+      events: occurrences.map(id => ({
+        id, type: 'dive' as const, title: 'Long Dong Shore Dive', capacity: 10,
+        dateKey: '2026-06-10', isBoatDive: false, isTrip: false, courseLabel: null,
+      })),
+    })
+    expect(d.revenueByActivity).toEqual([{ label: 'Shore dives', value: 300 }])
+  })
+
+  it('tells shore dives, boat dives and trips apart', () => {
+    const kinds = [
+      { id: 'shore', isBoatDive: false, isTrip: false, amount: 100 },
+      { id: 'boat', isBoatDive: true, isTrip: false, amount: 200 },
+      { id: 'trip', isBoatDive: false, isTrip: true, amount: 400 },
+      // A liveaboard is a trip that happens to involve boats; reporting it as a
+      // boat dive would hide the shop's most distinct line of business.
+      { id: 'liveaboard', isBoatDive: true, isTrip: true, amount: 800 },
+    ]
+    const d = computeDashboard({
+      ...input,
+      payments: kinds.map(k => ({
+        user_id: 'd1', booking_id: `b-${k.id}`, amount: k.amount, status: 'paid' as const,
+        method: 'cash', created_at: at('2026-06-10T00:00:00+08:00'),
+      })),
+      bookings: kinds.map(k => ({
+        id: `b-${k.id}`, user_id: 'd1', event_id: k.id, status: 'confirmed' as const,
+        created_at: at('2026-06-09T00:00:00+08:00'), details: {},
+      })),
+      events: kinds.map(k => ({
+        id: k.id, type: 'dive' as const, title: k.id, capacity: 10, dateKey: '2026-06-10',
+        isBoatDive: k.isBoatDive, isTrip: k.isTrip, courseLabel: null,
+      })),
+    })
+    expect(d.revenueByActivity).toEqual([
+      { label: 'Trips', value: 1200 },
+      { label: 'Boat dives', value: 200 },
+      { label: 'Shore dives', value: 100 },
+    ])
+  })
+
+  it('reports a course under its catalog title, and falls back when it has none', () => {
+    const courses = [
+      { id: 'c1', courseLabel: 'Open Water Course', amount: 100 },
+      { id: 'c2', courseLabel: 'Open Water Course', amount: 200 },
+      { id: 'c3', courseLabel: null, amount: 400 },
+    ]
+    const d = computeDashboard({
+      ...input,
+      payments: courses.map(c => ({
+        user_id: 'd1', booking_id: `b-${c.id}`, amount: c.amount, status: 'paid' as const,
+        method: 'cash', created_at: at('2026-06-10T00:00:00+08:00'),
+      })),
+      bookings: courses.map(c => ({
+        id: `b-${c.id}`, user_id: 'd1', event_id: c.id, status: 'confirmed' as const,
+        created_at: at('2026-06-09T00:00:00+08:00'), details: {},
+      })),
+      events: courses.map(c => ({
+        id: c.id, type: 'course' as const, title: c.id, capacity: 6, dateKey: '2026-06-10',
+        isBoatDive: false, isTrip: false, courseLabel: c.courseLabel,
+      })),
+    })
+    expect(d.revenueByActivity).toEqual([
+      { label: 'Courses', value: 400 },
+      { label: 'Open Water Course', value: 300 },
+    ])
   })
 })

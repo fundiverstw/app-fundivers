@@ -19,6 +19,7 @@ import {
   type ProfileLite,
   type ConfirmedCount,
 } from '../../lib/admin-dashboard'
+import type { CertLadderRow } from '../../lib/cert-level'
 import { StatCard, ChartCard, BarList, ColumnChart } from '../../components/admin/dashboard-charts'
 import { fiscalYearRange } from '../../lib/accounting-export'
 
@@ -36,9 +37,21 @@ function taipeiYear(iso: string): number {
   return Number(taipeiDate(iso).slice(0, 4))
 }
 
-type DiveRow = { id: string; display_title: string | null; admin_title: string | null; capacity: number | null; start_date: string | null }
-type CourseRow = { id: string; display_title: string | null; admin_title: string | null; capacity: number | null; course_days: string[] | null }
+type DiveRow = { id: string; display_title: string | null; admin_title: string | null; capacity: number | null; start_date: string | null; is_boat_dive: boolean | null; is_trip: boolean | null }
+type CourseRow = { id: string; display_title: string | null; admin_title: string | null; capacity: number | null; course_days: string[] | null; course_name: string | null }
 type EventRowLite = DiveRow & CourseRow & { kind: EventKind }
+
+const DIVE_COLS = 'id, display_title, admin_title, capacity, start_date, is_boat_dive, is_trip'
+const COURSE_COLS = 'id, display_title, admin_title, capacity, course_days, course_name'
+
+/** `events.course_name` holds either a `prices.id` or a literal name, so a
+ *  lookup that misses is the literal rather than an error. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+function courseLabelOf(courseName: string | null, catalog: Map<string, string>): string | null {
+  const raw = (courseName ?? '').trim()
+  if (!raw) return null
+  return UUID.test(raw) ? (catalog.get(raw) ?? null) : raw
+}
 
 const titleOf = (r: { display_title: string | null; admin_title: string | null }, fallback: string) =>
   r.display_title || r.admin_title || fallback
@@ -54,7 +67,7 @@ async function loadDashboard(): Promise<Dashboard> {
   const today = taipeiDate(nowIso)
   const { startIso, endIso } = fiscalYearRange(taipeiYear(nowIso))
 
-  const [paymentsRes, bookingsRes, profilesRes, pendingRes, refundsRes, divesRes, coursesRes] = await Promise.all([
+  const [paymentsRes, bookingsRes, profilesRes, pendingRes, refundsRes, divesRes, coursesRes, certLevelsRes, pricesRes] = await Promise.all([
     supabase.from('payments').select('user_id, booking_id, amount, status, method, created_at').gte('created_at', startIso).lt('created_at', endIso),
     supabase.from('bookings').select('id, user_id, event_id, status, created_at, details').gte('created_at', startIso).lt('created_at', endIso),
     supabase.from('profiles').select('id, role, status, created_at, nationality, cert_level'),
@@ -64,8 +77,12 @@ async function loadDashboard(): Promise<Dashboard> {
     // chasing. See AdminShell for the full story.
     supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('bookings').select('id', { count: 'exact', head: true }).not('refund_requested_at', 'is', null).neq('status', 'cancelled'),
-    supabase.from('events').select('id, display_title, admin_title, capacity, start_date').eq('kind', 'dive').is('cancelled_at', null).gte('start_date', today),
-    supabase.from('events').select('id, display_title, admin_title, capacity, course_days').eq('kind', 'course').is('cancelled_at', null),
+    supabase.from('events').select(DIVE_COLS).eq('kind', 'dive').is('cancelled_at', null).gte('start_date', today),
+    supabase.from('events').select(COURSE_COLS).eq('kind', 'course').is('cancelled_at', null),
+    // Every agency's ladder, not just PADI: the cross-agency rows are what let
+    // a diver who typed "Master Diver" or "3-Star Diver" resolve at all.
+    supabase.from('cert_levels').select('id, code, name, padi_equivalent_id'),
+    supabase.from('prices').select('id, admin_title'),
   ])
   if (paymentsRes.error) throw paymentsRes.error
   if (bookingsRes.error) throw bookingsRes.error
@@ -84,21 +101,30 @@ async function loadDashboard(): Promise<Dashboard> {
   const knownIds = new Set([...upcomingDives.map(d => d.id), ...allCourses.map(c => c.id)])
   const refIds = [...new Set(bookings.map(b => b.event_id).filter(x => !knownIds.has(x)))]
   const extra = refIds.length
-    ? (await supabase.from('events').select('id, kind, display_title, admin_title, capacity, start_date, course_days').in('id', refIds)).data as EventRowLite[] ?? []
+    ? (await supabase.from('events').select(`kind, ${DIVE_COLS}, course_days, course_name`).in('id', refIds)).data as EventRowLite[] ?? []
     : []
+
+  const certLadder = (certLevelsRes.data ?? []) as CertLadderRow[]
+  const courseCatalog = new Map(
+    (pricesRes.data ?? []).map(r => [r.id as string, (r.admin_title as string | null) ?? '']),
+  )
 
   const events: EventLite[] = [
     ...upcomingDives.map((d): EventLite => ({
       id: d.id, type: 'dive', title: titleOf(d, t.calendar.typeDive), capacity: d.capacity,
       dateKey: d.start_date ? d.start_date.slice(0, 10) : null,
+      isBoatDive: !!d.is_boat_dive, isTrip: !!d.is_trip, courseLabel: null,
     })),
     ...allCourses.map((c): EventLite => ({
       id: c.id, type: 'course', title: titleOf(c, t.calendar.typeCourse), capacity: c.capacity,
       dateKey: courseDateKey(c.course_days, today),
+      isBoatDive: false, isTrip: false, courseLabel: courseLabelOf(c.course_name, courseCatalog),
     })),
     ...extra.map((e): EventLite => ({
       id: e.id, type: e.kind, title: titleOf(e, EVENT_KIND_LABELS[e.kind]), capacity: e.capacity,
       dateKey: usesCourseDays(e.kind) ? courseDateKey(e.course_days, today) : (e.start_date ? e.start_date.slice(0, 10) : null),
+      isBoatDive: !!e.is_boat_dive, isTrip: !!e.is_trip,
+      courseLabel: usesCourseDays(e.kind) ? courseLabelOf(e.course_name, courseCatalog) : null,
     })),
   ]
 
@@ -112,7 +138,7 @@ async function loadDashboard(): Promise<Dashboard> {
   for (const r of confRes.data ?? []) counts.set(r.event_id, (counts.get(r.event_id) ?? 0) + 1)
   const confirmed: ConfirmedCount[] = [...counts.entries()].map(([eventId, count]) => ({ eventId, count }))
 
-  return computeDashboard({ nowIso, payments, bookings, profiles, events, confirmed, pendingApplications, pendingRefundRequests })
+  return computeDashboard({ nowIso, payments, bookings, profiles, events, confirmed, certLadder, pendingApplications, pendingRefundRequests })
 }
 
 const TWD = (n: number) => `${siteConfig.locale.currency} ${Math.round(n).toLocaleString()}`
@@ -205,8 +231,8 @@ export function AdminDashboardPage() {
         <ChartCard title={db.diversByCert} empty={!dash.certLevelMix.length}>
           <BarList items={dash.certLevelMix} />
         </ChartCard>
-        <ChartCard title={db.topEventsByRevenue} empty={!dash.topEventsByRevenue.length}>
-          <BarList items={dash.topEventsByRevenue} kind="money" />
+        <ChartCard title={db.revenueByActivity} empty={!dash.revenueByActivity.length}>
+          <BarList items={dash.revenueByActivity} kind="money" />
         </ChartCard>
       </section>
 
