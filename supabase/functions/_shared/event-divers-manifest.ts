@@ -79,43 +79,13 @@ export function genderToZh(gender: string | null): string {
   return (gender ?? '').trim()
 }
 
-// Best-effort English-nationality → Chinese-country (國家) mapping. Keys are
-// lowercased; both the country name and the demonym are accepted. Anything
-// unrecognized (including garbage) falls through as the raw trimmed value so
-// the row still renders and the admin can correct it.
-const NATIONALITY_ZH: Record<string, string> = {
-  'taiwan': '台灣', 'taiwanese': '台灣', 'roc': '台灣',
-  'usa': '美國', 'us': '美國', 'u.s.': '美國', 'u.s.a.': '美國',
-  'united states': '美國', 'america': '美國', 'american': '美國',
-  'uk': '英國', 'u.k.': '英國', 'united kingdom': '英國', 'britain': '英國',
-  'british': '英國', 'england': '英國', 'english': '英國',
-  'poland': '波蘭', 'polish': '波蘭',
-  'croatia': '克羅埃西亞', 'croatian': '克羅埃西亞',
-  'china': '中國', 'chinese': '中國', 'prc': '中國',
-  'hong kong': '香港', 'hongkong': '香港',
-  'japan': '日本', 'japanese': '日本',
-  'korea': '韓國', 'south korea': '韓國', 'korean': '韓國',
-  'canada': '加拿大', 'canadian': '加拿大',
-  'australia': '澳洲', 'australian': '澳洲',
-  'new zealand': '紐西蘭',
-  'germany': '德國', 'german': '德國',
-  'france': '法國', 'french': '法國',
-  'italy': '義大利', 'italian': '義大利',
-  'spain': '西班牙', 'spanish': '西班牙',
-  'netherlands': '荷蘭', 'dutch': '荷蘭',
-  'philippines': '菲律賓', 'filipino': '菲律賓',
-  'malaysia': '馬來西亞', 'malaysian': '馬來西亞',
-  'singapore': '新加坡', 'singaporean': '新加坡',
-  'thailand': '泰國', 'thai': '泰國',
-  'vietnam': '越南', 'vietnamese': '越南',
-  'india': '印度', 'indian': '印度',
-}
-
-export function nationalityToZh(nationality: string | null): string {
-  const raw = (nationality ?? '').trim()
-  if (!raw) return ''
-  return NATIONALITY_ZH[raw.toLowerCase()] ?? raw
-}
+// Nationality → Chinese country name. The alias table is shared with the app's
+// BI panes (src/lib/nationality.ts), so "USA" and "United States" collapse the
+// same way on the manifest as they do on the dashboard — one table, one answer.
+// Anything unrecognized falls through as the raw trimmed value so the row still
+// renders and the admin can correct it.
+import { nationalityToZh } from "../../../src/lib/nationality.ts"
+export { nationalityToZh }
 
 // Duty role → Chinese label for the 備註 column when a staff member is on the
 // manifest. instructor → 教練, guide → 導潛, support → 支援. Unknown / empty
