@@ -3023,7 +3023,7 @@ export const ja: Messages = {
       noAddons: 'カタログにオプションがありません。',
       roomsOffered: '提供する部屋タイプ',
       noRooms: 'カタログに部屋タイプがありません。',
-      heroImageUrl: 'メイン画像の URL',
+      heroImageUrl: 'メイン画像の URL（任意）',
       highlights: 'ハイライト（1 行に 1 項目）',
       statusLabel: 'ステータス',
       createTrip: 'ツアーを作成',

@@ -3079,7 +3079,7 @@ export const en = {
       noAddons: 'No add-ons in the catalog.',
       roomsOffered: 'Room options offered',
       noRooms: 'No rooms in the catalog.',
-      heroImageUrl: 'Hero image URL',
+      heroImageUrl: 'Hero image URL (optional)',
       highlights: 'Highlights (one per line)',
       statusLabel: 'Status',
       createTrip: 'Create trip',

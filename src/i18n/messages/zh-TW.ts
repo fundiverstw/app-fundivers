@@ -3024,7 +3024,7 @@ export const zhTW: Messages = {
       noAddons: '目錄中沒有附加項目。',
       roomsOffered: '提供的房型',
       noRooms: '目錄中沒有房型。',
-      heroImageUrl: '主視覺圖片網址',
+      heroImageUrl: '主視覺圖片網址（選填）',
       highlights: '亮點（每行一項）',
       statusLabel: '狀態',
       createTrip: '建立行程',
