@@ -18,7 +18,6 @@ import type { SiteConfig } from '../config/site'
 /** The compiled-in half of `shop_profile`. Null fields mean "no preference". */
 export interface ShopProfileOverlay {
   currency: string | null
-  currencyLabel: string | null
   language: string | null
 }
 
@@ -52,12 +51,6 @@ export function applyShopProfile(
   if (currency && currency !== locale.currency) {
     changes.push({ field: 'locale.currency', from: locale.currency, to: currency })
     locale.currency = currency
-  }
-
-  const label = overlay.currencyLabel?.trim()
-  if (label && label !== locale.currencyLabel) {
-    changes.push({ field: 'locale.currencyLabel', from: locale.currencyLabel, to: label })
-    locale.currencyLabel = label
   }
 
   const language = overlay.language?.trim()
@@ -95,7 +88,7 @@ export async function fetchShopProfileOverlay(env: Record<string, string | undef
 
   const endpoint =
     `${url.replace(/\/+$/, '')}/rest/v1/shop_profile` +
-    '?select=currency,currency_label,language&limit=1'
+    '?select=currency,language&limit=1'
 
   let res: Response
   try {
@@ -135,7 +128,6 @@ export async function fetchShopProfileOverlay(env: Record<string, string | undef
 
   const rows = (await res.json()) as Array<{
     currency: string | null
-    currency_label: string | null
     language: string | null
   }>
   const row = rows[0]
@@ -143,5 +135,5 @@ export async function fetchShopProfileOverlay(env: Record<string, string | undef
   // own values are the answer.
   if (!row) return null
 
-  return { currency: row.currency, currencyLabel: row.currency_label, language: row.language }
+  return { currency: row.currency, language: row.language }
 }

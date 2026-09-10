@@ -178,7 +178,7 @@ Deno.serve(async (req) => {
       diverName,
       diverEmail,
       estimateTotal: total,
-      currencyLabel: currency,
+      currency,
     })
     try {
       const transporter = nodemailer.createTransport({

@@ -34,7 +34,7 @@ const CARD = 'bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl 
 const BTN = 'text-xs font-semibold bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg'
 const BTN_GHOST = 'text-xs font-semibold bg-brand-900 hover:bg-brand-950 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg'
 
-type Field = 'org' | 'currency' | 'currencyLabel' | 'language'
+type Field = 'org' | 'currency' | 'language'
 
 /** Longest side, in px, the uploaded logo is scaled to. */
 const LOGO_SIZES = [256, 512, 1024] as const
@@ -58,7 +58,6 @@ export function AdminShopProfilePage() {
   const saved: Record<Field, string> = {
     org: standardsOrgOf(profile),
     currency: profile.currency ?? siteConfig.locale.currency,
-    currencyLabel: profile.currencyLabel ?? siteConfig.locale.currencyLabel,
     language: profile.language ?? siteConfig.locale.language,
   }
   const value = (field: Field): string => edits[field] ?? saved[field]
@@ -125,7 +124,6 @@ export function AdminShopProfilePage() {
       await saveShopProfile({
         standardsOrg: value('org') || null,
         currency: value('currency').trim() || null,
-        currencyLabel: value('currencyLabel').trim() || null,
         language: value('language') || null,
       })
       setEdits({})
@@ -210,7 +208,6 @@ export function AdminShopProfilePage() {
           </select>
         </div>
 
-        <p className="text-xs text-brand-900/70">{sp.standardsApplies}</p>
         <Link to="/admin/cert-equivalence" className="inline-block text-xs font-semibold text-brand-700 underline">
           {sp.standardsChart}
         </Link>
@@ -226,13 +223,6 @@ export function AdminShopProfilePage() {
           <input id="currency" aria-describedby="currency-hint" className={FIELD}
             value={value('currency')} onChange={e => edit('currency', e.target.value)} />
           <span id="currency-hint" className={HINT}>{sp.currencyHint}</span>
-        </div>
-
-        <div>
-          <label className={LABEL} htmlFor="currency-label">{sp.currencyLabel}</label>
-          <input id="currency-label" aria-describedby="currency-label-hint" className={FIELD}
-            value={value('currencyLabel')} onChange={e => edit('currencyLabel', e.target.value)} />
-          <span id="currency-label-hint" className={HINT}>{sp.currencyLabelHint}</span>
         </div>
 
         <div>

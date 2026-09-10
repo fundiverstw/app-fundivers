@@ -19,7 +19,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await admin.from('shop_profile').update({
-    logo_path: null, standards_org: null, currency: null, currency_label: null, language: null,
+    logo_path: null, standards_org: null, currency: null, language: null,
   }).eq('singleton', true)
   await deleteTestUser(admin, adminUser.id)
   await deleteTestUser(admin, diver.id)
@@ -120,7 +120,7 @@ describe('cert_level_equivalences', () => {
 describe('the build-time overlay read', () => {
   it('reads the compiled-in settings with the anon key alone', async () => {
     await admin.from('shop_profile')
-      .update({ currency: 'JPY', currency_label: '¥', language: 'ja' })
+      .update({ currency: 'JPY', language: 'ja' })
       .eq('singleton', true)
 
     const { fetchShopProfileOverlay } = await import('../../src/vite/shop-profile-overlay')
@@ -129,18 +129,18 @@ describe('the build-time overlay read', () => {
       VITE_SUPABASE_ANON_KEY: process.env.ANON_KEY,
     })
 
-    expect(overlay).toEqual({ currency: 'JPY', currencyLabel: '¥', language: 'ja' })
+    expect(overlay).toEqual({ currency: 'JPY', language: 'ja' })
   })
 
   it('reports no preference when the shop has expressed none', async () => {
     await admin.from('shop_profile')
-      .update({ currency: null, currency_label: null, language: null })
+      .update({ currency: null, language: null })
       .eq('singleton', true)
 
     const { fetchShopProfileOverlay } = await import('../../src/vite/shop-profile-overlay')
     expect(await fetchShopProfileOverlay({
       VITE_SUPABASE_URL: process.env.API_URL,
       VITE_SUPABASE_ANON_KEY: process.env.ANON_KEY,
-    })).toEqual({ currency: null, currencyLabel: null, language: null })
+    })).toEqual({ currency: null, language: null })
   })
 })

@@ -885,7 +885,7 @@ function ExtrasBlock({ extras, onRecordPayment, onVoidPayment, onMarkDepositPaid
                     credit={credit}
                     charges={b.charges}
                     amendments={(extras.amendments.get(b.id) ?? []).map(a => ({ label: a.note, amount: a.amount }))}
-                    currency={b.event?.currency ?? siteConfig.locale.currencyLabel}
+                    currency={b.event?.currency ?? siteConfig.locale.currency}
                     pending={b.status === 'pending'}
                     cancelled={false}
                     readOnly={!isAdmin}

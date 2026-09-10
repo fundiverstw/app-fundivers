@@ -296,7 +296,7 @@ describe('AdminNewEventPage', () => {
     await user.click(screen.getByRole('button', { name: /new add-on/i }))
     await user.type(screen.getByLabelText('Title (required)'), 'SMB')
     await user.type(screen.getByLabelText(/display name/i), 'Surface Marker Buoy')
-    await user.type(screen.getByLabelText(new RegExp(`price \\(${siteConfig.locale.currencyLabel}\\)`, 'i')), '100')
+    await user.type(screen.getByLabelText(new RegExp(`price \\(${siteConfig.locale.currency}\\)`, 'i')), '100')
     await user.click(screen.getByRole('button', { name: /save add-on/i }))
 
     await waitFor(() => expect(addonInsert).toHaveBeenCalled())

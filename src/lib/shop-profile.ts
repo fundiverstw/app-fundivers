@@ -17,8 +17,8 @@ export interface ShopProfile {
   logoPath: string | null
   /** Agency whose vocabulary the app speaks, or null for the deployment's own. */
   standardsOrg: string | null
+  /** What the shop writes on a price, e.g. "NTD". */
   currency: string | null
-  currencyLabel: string | null
   language: string | null
 }
 
@@ -26,7 +26,6 @@ export const NO_SHOP_PROFILE: ShopProfile = {
   logoPath: null,
   standardsOrg: null,
   currency: null,
-  currencyLabel: null,
   language: null,
 }
 
@@ -104,7 +103,6 @@ interface ShopProfileRow {
   logo_path: string | null
   standards_org: string | null
   currency: string | null
-  currency_label: string | null
   language: string | null
 }
 
@@ -113,7 +111,6 @@ function fromRow(row: ShopProfileRow): ShopProfile {
     logoPath: row.logo_path,
     standardsOrg: row.standards_org,
     currency: row.currency,
-    currencyLabel: row.currency_label,
     language: row.language,
   }
 }
@@ -128,7 +125,7 @@ function fromRow(row: ShopProfileRow): ShopProfile {
 export async function fetchShopProfile(): Promise<ShopProfile> {
   const { data, error } = await supabase
     .from('shop_profile')
-    .select('logo_path, standards_org, currency, currency_label, language')
+    .select('logo_path, standards_org, currency, language')
     .maybeSingle()
   if (error || !data) return NO_SHOP_PROFILE
   return fromRow(data)
@@ -139,7 +136,6 @@ export async function saveShopProfile(patch: Partial<ShopProfile>): Promise<void
   if ('logoPath' in patch) row.logo_path = patch.logoPath ?? null
   if ('standardsOrg' in patch) row.standards_org = patch.standardsOrg ?? null
   if ('currency' in patch) row.currency = patch.currency ?? null
-  if ('currencyLabel' in patch) row.currency_label = patch.currencyLabel ?? null
   if ('language' in patch) row.language = patch.language ?? null
 
   const { error } = await supabase

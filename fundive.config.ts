@@ -20,7 +20,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const siteConfig = {
-  configVersion: 11,
+  configVersion: 12,
 
   identity: {
     appName: 'FunDive',
@@ -41,8 +41,7 @@ export const siteConfig = {
 
   locale: {
     timezone: 'Asia/Taipei',
-    currency: 'TWD',
-    currencyLabel: 'NTD',
+    currency: 'NTD',
     // The one language the whole app renders in. 'en' | 'zh-TW' | 'ja'.
     // `as const` narrows the literal to the SupportedLanguage union (this file
     // is type-checked against SiteConfig via src/config/site.ts).

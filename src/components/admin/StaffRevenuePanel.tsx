@@ -19,7 +19,7 @@ import {
 import { t } from '../../i18n'
 
 const r = t.admin.revenue
-const CUR = siteConfig.locale.currencyLabel
+const CUR = siteConfig.locale.currency
 const EVENT_COLUMNS = 'id, kind, admin_title, display_title, start_date, end_date, course_days, cancelled_at, price'
 const FIELD = 'w-full bg-white border border-surface-300 rounded-md px-3 py-2 text-sm text-brand-900 focus:outline-none focus:border-brand-900'
 

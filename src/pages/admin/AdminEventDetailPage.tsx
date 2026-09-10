@@ -401,7 +401,7 @@ export function AdminEventDetailPage() {
     try {
       const applied = await applyCreditToBooking({ bookingId: r.booking.id, amount })
       if (applied > 0) {
-        toast.success(ed.appliedCredit(event?.currency ?? siteConfig.locale.currencyLabel, applied.toLocaleString()))
+        toast.success(ed.appliedCredit(event?.currency ?? siteConfig.locale.currency, applied.toLocaleString()))
         // Credit-apply settles/splits credit rows and inserts a payment in one
         // round-trip; reload rather than mirror that locally.
         setRefreshKey(k => k + 1)
@@ -519,7 +519,7 @@ export function AdminEventDetailPage() {
       waiverState={waiverState}
       addonNames={addonNames}
       roomNames={roomNames}
-      currency={event?.currency ?? siteConfig.locale.currencyLabel}
+      currency={event?.currency ?? siteConfig.locale.currency}
       onStatusChange={updateStatus}
       onApproveRefund={approveRefund}
       onRejectRefund={rejectRefund}
@@ -702,7 +702,7 @@ export function AdminEventDetailPage() {
           )}
 
           {view === 'balances' && (
-            <BalancesView registrants={activeRegistrants} currency={event?.currency ?? siteConfig.locale.currencyLabel} />
+            <BalancesView registrants={activeRegistrants} currency={event?.currency ?? siteConfig.locale.currency} />
           )}
         </>
       )}

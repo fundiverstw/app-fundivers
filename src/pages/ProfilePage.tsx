@@ -124,7 +124,7 @@ function CreditBalanceLine({ userId }: { userId: string }) {
   if (balance <= 0) return null
   return (
     <div className="bg-emerald-50 border border-emerald-400 rounded-lg p-3 text-sm text-emerald-900">
-      {t.profile.creditPrefix} <strong>{siteConfig.locale.currencyLabel} {balance.toLocaleString()}</strong> {t.profile.creditSuffix}
+      {t.profile.creditPrefix} <strong>{siteConfig.locale.currency} {balance.toLocaleString()}</strong> {t.profile.creditSuffix}
     </div>
   )
 }

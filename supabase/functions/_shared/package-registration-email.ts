@@ -69,7 +69,7 @@ export interface PackageEmailParts {
   diverName: string
   diverEmail: string
   estimateTotal: number
-  currencyLabel: string
+  currency: string
 }
 
 const money = (n: number, label: string) => `${label} ${Math.round(n).toLocaleString('en-US')}`
@@ -88,12 +88,12 @@ export function buildPackageRegistrationEmail(
   const {
     shopName, partnerName, productTitle, tierName, addonLabels, roomLabel,
     preferredStart, preferredEnd, nights, notes, diverName, diverEmail,
-    estimateTotal, currencyLabel,
+    estimateTotal, currency,
   } = parts
 
   const d = t.emails.packageReg
   const who = diverName.trim() || diverEmail
-  const estimateLine = money(estimateTotal, currencyLabel)
+  const estimateLine = money(estimateTotal, currency)
 
   // Partner-facing values: English, always.
   const enAddons = list(addonLabels, 'none')

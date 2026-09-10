@@ -7,7 +7,7 @@ const c = t.admin.catalog
 const fields: CatalogField<EOAddon>[] = [
   { key: 'display_title', label: c.displayTitle, type: 'text', required: true, placeholder: c.addons.displayTitlePh },
   { key: 'admin_title',   label: c.adminTitle,   type: 'text', placeholder: c.addons.adminTitlePh },
-  { key: 'price',        label: c.addons.price(siteConfig.locale.currencyLabel), type: 'number', placeholder: c.addons.zeroPh },
+  { key: 'price',        label: c.addons.price(siteConfig.locale.currency), type: 'number', placeholder: c.addons.zeroPh },
   { key: 'currency',     label: c.currency, type: 'text', placeholder: siteConfig.locale.currency },
 ]
 

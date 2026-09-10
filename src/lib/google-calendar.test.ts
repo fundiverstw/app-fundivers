@@ -5,7 +5,7 @@ import type { CalendarLinkEvent } from './google-calendar'
 // rather than inheriting whatever the fork's config happens to say.
 const { config } = vi.hoisted(() => ({
   config: {
-    locale: { timezone: 'Asia/Taipei', currency: 'TWD', currencyLabel: 'NTD', language: 'en' },
+    locale: { timezone: 'Asia/Taipei', currency: 'NTD', language: 'en' },
     contact: { address: 'No. 8, Heping St' },
     urls: { app: 'https://app.test', eventPage: null as string | null },
     business: { eventDurationHours: 8 as number | undefined },

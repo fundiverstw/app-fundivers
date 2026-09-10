@@ -7,7 +7,7 @@ const c = t.admin.catalog
 const fields: CatalogField<EORoom>[] = [
   { key: 'display_title', label: c.displayTitle, type: 'text', required: true, placeholder: c.rooms.displayTitlePh },
   { key: 'admin_title',   label: c.adminTitle,   type: 'text', placeholder: c.rooms.adminTitlePh },
-  { key: 'added_price',  label: c.rooms.addedPrice(siteConfig.locale.currencyLabel), type: 'number', placeholder: c.rooms.zeroPh },
+  { key: 'added_price',  label: c.rooms.addedPrice(siteConfig.locale.currency), type: 'number', placeholder: c.rooms.zeroPh },
   { key: 'currency',     label: c.currency, type: 'text', placeholder: siteConfig.locale.currency },
 ]
 

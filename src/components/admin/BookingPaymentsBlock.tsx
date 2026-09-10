@@ -158,7 +158,7 @@ export function BookingPaymentsBlock({
       {((charges && charges.length > 0) || (amendments && amendments.length > 0)) && (
         <div className="pb-2 border-b border-surface-200 space-y-1">
           <p className="font-semibold text-brand-900">{bp.charges}</p>
-          <ChargeBreakdown lines={charges ?? []} amendments={amendments} total={owed} currency={currency ?? siteConfig.locale.currencyLabel} />
+          <ChargeBreakdown lines={charges ?? []} amendments={amendments} total={owed} currency={currency ?? siteConfig.locale.currency} />
         </div>
       )}
 
@@ -199,8 +199,8 @@ export function BookingPaymentsBlock({
             {bal.state === 'credit' && (
               <p className="text-emerald-300">
                 {creditOwnerName
-                  ? bp.shopOwesPayer(creditOwnerName, currency ?? siteConfig.locale.currencyLabel, bal.amount.toLocaleString())
-                  : bp.shopOwesDiver(currency ?? siteConfig.locale.currencyLabel, bal.amount.toLocaleString())}
+                  ? bp.shopOwesPayer(creditOwnerName, currency ?? siteConfig.locale.currency, bal.amount.toLocaleString())
+                  : bp.shopOwesDiver(currency ?? siteConfig.locale.currency, bal.amount.toLocaleString())}
               </p>
             )}
             {cancelled && cancelledAt && (

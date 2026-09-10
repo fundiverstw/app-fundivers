@@ -42,7 +42,7 @@ describe('buildPackageRegistrationEmail', () => {
     addonLabels: ['Nitrox', 'Camera'], roomLabel: 'Deluxe',
     preferredStart: '2026-08-01', preferredEnd: '2026-08-05', nights: 4,
     notes: 'vegetarian', diverName: 'Sam Diver', diverEmail: 'sam@example.com',
-    estimateTotal: 21300, currencyLabel: 'TWD',
+    estimateTotal: 21300, currency: 'TWD',
   }
 
   // The partner is a third-party shop abroad; its copy must stay English no

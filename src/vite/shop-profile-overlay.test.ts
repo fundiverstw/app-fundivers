@@ -7,7 +7,7 @@ import { SUPPORTED_LANGUAGES, type SiteConfig } from '../config/site'
 import { siteConfig } from '../config/site'
 
 const overlay = (over: Partial<ShopProfileOverlay> = {}): ShopProfileOverlay =>
-  ({ currency: null, currencyLabel: null, language: null, ...over })
+  ({ currency: null, language: null, ...over })
 
 const base = siteConfig as SiteConfig
 
@@ -33,7 +33,6 @@ describe('applyShopProfile', () => {
   it('changes nothing when the choice already matches the config', () => {
     const out = applyShopProfile(base, overlay({
       currency: base.locale.currency,
-      currencyLabel: base.locale.currencyLabel,
       language: base.locale.language,
     }), SUPPORTED_LANGUAGES)
     expect(out.config).toBe(base)
@@ -76,12 +75,10 @@ describe('applyShopProfile', () => {
   it('applies currency and language together', () => {
     const out = applyShopProfile(
       base,
-      overlay({ currency: otherCurrency, currencyLabel: 'X$', language: otherLanguage }),
+      overlay({ currency: otherCurrency, language: otherLanguage }),
       SUPPORTED_LANGUAGES,
     )
-    expect(out.changes.map(c => c.field)).toEqual([
-      'locale.currency', 'locale.currencyLabel', 'locale.language',
-    ])
+    expect(out.changes.map(c => c.field)).toEqual(['locale.currency', 'locale.language'])
   })
 })
 
@@ -109,16 +106,16 @@ describe('fetchShopProfileOverlay', () => {
   it('reads the row with the anon key', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => [{ currency: 'JPY', currency_label: '¥', language: 'ja' }],
+      json: async () => [{ currency: 'JPY', language: 'ja' }],
     }))
     const out = await fetchShopProfileOverlay({
       VITE_SUPABASE_URL: 'https://x.supabase.co/',
       VITE_SUPABASE_ANON_KEY: 'anon-key',
     })
-    expect(out).toEqual({ currency: 'JPY', currencyLabel: '¥', language: 'ja' })
+    expect(out).toEqual({ currency: 'JPY', language: 'ja' })
 
     const [url, init] = (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
-    expect(url).toBe('https://x.supabase.co/rest/v1/shop_profile?select=currency,currency_label,language&limit=1')
+    expect(url).toBe('https://x.supabase.co/rest/v1/shop_profile?select=currency,language&limit=1')
     expect((init as RequestInit).headers).toMatchObject({ apikey: 'anon-key' })
   })
 

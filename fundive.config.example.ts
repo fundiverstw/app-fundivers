@@ -15,7 +15,7 @@
 export const siteConfig = {
   // Must equal core's current CONFIG_CONTRACT_VERSION (src/config/site.ts) or
   // the build fails. Bump it whenever core's CHANGELOG.md tells you to migrate.
-  configVersion: 11,
+  configVersion: 12,
 
   identity: {
     // Printed in italics on the registration PDF. Leave blank to omit it.
@@ -39,7 +39,6 @@ export const siteConfig = {
   locale: {
     timezone: 'Asia/Taipei',
     currency: 'USD',
-    currencyLabel: 'USD',
     // The one language the whole app renders in. 'en' | 'zh-TW' | 'ja'.
     // Keep `as const` — it narrows the literal to the SupportedLanguage union.
     language: 'en' as const,

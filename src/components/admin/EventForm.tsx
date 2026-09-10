@@ -36,7 +36,7 @@ const ef = t.admin.eventForm
 const cat = t.admin.catalog
 const cxl = t.admin.cxlPolicies
 
-const CUR = siteConfig.locale.currencyLabel
+const CUR = siteConfig.locale.currency
 
 // "Standard (total: 5000 NTD / deposit: 1500 NTD)" — drops parts that
 // aren't set so a tier with only one of the two prices doesn't render an

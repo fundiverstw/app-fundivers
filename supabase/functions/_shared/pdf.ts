@@ -15,7 +15,7 @@ import { siteConfig } from "../../../fundive.config.ts"
 import { t } from "./i18n.ts"
 
 // Shop currency label shown on money rows in the PDF.
-const CUR = siteConfig.locale.currencyLabel
+const CUR = siteConfig.locale.currency
 const d = t.pdf
 
 // Bundled alongside this file in the edge function deploy. Forks replace this

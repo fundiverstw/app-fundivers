@@ -3,7 +3,7 @@ import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
 import type { EOPrice } from '../../types/database'
 
-const CUR = siteConfig.locale.currencyLabel
+const CUR = siteConfig.locale.currency
 const c = t.admin.catalog
 const ef = t.admin.eventForm
 

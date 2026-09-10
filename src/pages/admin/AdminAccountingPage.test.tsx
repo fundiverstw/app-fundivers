@@ -138,7 +138,7 @@ describe('AdminAccountingPage revenue tab', () => {
     const table = within(await screen.findByRole('table'))
     expect(table.getByText('Sam')).toBeInTheDocument()
     expect(table.getByText('Val')).toBeInTheDocument()
-    expect(table.getAllByText(`${siteConfig.locale.currencyLabel} 1,500`)).toHaveLength(2)
+    expect(table.getAllByText(`${siteConfig.locale.currency} 1,500`)).toHaveLength(2)
   })
 
   it('lets an admin pick one crew member out of the comparison', async () => {
@@ -201,7 +201,7 @@ describe('AdminAccountingPage revenue tab', () => {
     mockTables(seasonWithOneDive(new Date().getFullYear()))
     renderPage()
 
-    expect(await screen.findAllByText(`${siteConfig.locale.currencyLabel} 1,500`)).not.toHaveLength(0)
+    expect(await screen.findAllByText(`${siteConfig.locale.currency} 1,500`)).not.toHaveLength(0)
     expect(screen.queryByRole('tab')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Download ZIP' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Email manifest' })).not.toBeInTheDocument()

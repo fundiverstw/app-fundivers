@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { siteConfig } from '../../config/site'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
@@ -128,7 +129,11 @@ describe('AdminRefundsPage · cancelled bookings still holding money', () => {
     renderPage()
     expect(await screen.findByText(/cancelled bookings still holding money/i)).toBeInTheDocument()
     const item = (await screen.findAllByText('Alice Diver')).at(-1)!.closest('li')!
-    expect(within(item).getByText(/TWD\s*3,000/)).toBeInTheDocument()
+    // This booking's event carries no currency of its own, so the row falls
+    // back to the deployment's. Derived, not written down, so the assertion
+    // still means something in a fork that charges in anything else.
+    const fallback = siteConfig.locale.currency
+    expect(within(item).getByText(new RegExp(`${fallback}\\s*3,000`))).toBeInTheDocument()
   })
 
   it('records a refunded payment for the full amount when the money went back', async () => {

@@ -30,7 +30,7 @@ describe('buildScheduledTripRegistrationEmail', () => {
   const parts = {
     shopName: 'FunDivers TW', tripTitle: 'Green Island Weekend', tripDates: '2026-09-01 to 2026-09-03',
     addonLabels: ['Nitrox', 'Camera'], roomLabel: 'Deluxe', notes: 'vegetarian',
-    diverName: 'Sam Diver', diverEmail: 'sam@example.com', estimateTotal: 15400, currencyLabel: 'TWD',
+    diverName: 'Sam Diver', diverEmail: 'sam@example.com', estimateTotal: 15400, currency: 'TWD',
   }
 
   it('the shop copy carries the diver, extras, estimate and email', () => {

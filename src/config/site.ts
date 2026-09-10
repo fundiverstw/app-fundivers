@@ -54,10 +54,12 @@ export type { SupportedLanguage } from './languages'
 export interface SiteLocale {
   /** IANA timezone, e.g. "Asia/Taipei". */
   timezone: string
-  /** ISO 4217 currency code used as the code-side default, e.g. "TWD". */
+  /** What the shop writes on a price, e.g. "NTD". One field, not a code plus a
+   *  label: nothing here ever machine-reads a currency — no Intl currency
+   *  formatting, no payment processor — so a second field bought only the
+   *  chance for two screens to name the same money differently, which is
+   *  exactly what happened. Per-row `currency` columns override it. */
   currency: string
-  /** Human-facing currency label, e.g. "NTD". */
-  currencyLabel: string
   /** The single language the whole app renders in for this deployment. */
   language: SupportedLanguage
   /** Which units the height / weight fields open in. Storage is always metric
@@ -158,6 +160,6 @@ export interface SiteConfig {
 // Bump when the SiteConfig contract changes in a way that requires forks to
 // migrate their fundive.config.ts. The build compares this against
 // siteConfig.configVersion and fails loudly on a mismatch.
-export const CONFIG_CONTRACT_VERSION = 11
+export const CONFIG_CONTRACT_VERSION = 12
 
 export const siteConfig: SiteConfig = raw

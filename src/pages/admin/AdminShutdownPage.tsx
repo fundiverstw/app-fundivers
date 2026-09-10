@@ -226,7 +226,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 // the page that would resolve it — a count with nowhere to go is a nag.
 function CheckRow({ check }: { check: ReadinessCheck }) {
   const c = s.checks
-  const money = (n: number) => `${siteConfig.locale.currencyLabel} ${n.toLocaleString()}`
+  const money = (n: number) => `${siteConfig.locale.currency} ${n.toLocaleString()}`
   const copy: Record<ReadinessCheck['id'], { text: string; to?: string; label?: string }> = {
     backup: {
       text: check.level === 'ok'

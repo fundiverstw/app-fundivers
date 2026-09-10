@@ -34,7 +34,6 @@ export const siteConfigSchema = z.object({
   locale: z.object({
     timezone: z.string().min(1),
     currency: z.string().min(1),
-    currencyLabel: z.string().min(1),
     language: z.enum(SUPPORTED_LANGUAGES),
     units: z.enum(['metric', 'imperial']),
   }),

@@ -49,7 +49,7 @@ export interface ScheduledTripEmailParts {
   diverName: string
   diverEmail: string
   estimateTotal: number
-  currencyLabel: string
+  currency: string
 }
 
 const money = (n: number, label: string) => `${label} ${Math.round(n).toLocaleString('en-US')}`
@@ -65,7 +65,7 @@ export function buildScheduledTripRegistrationEmail(
 ): { subject: string; shopText: string; diverText: string } {
   const {
     shopName, tripTitle, tripDates, addonLabels, roomLabel, notes,
-    diverName, diverEmail, estimateTotal, currencyLabel,
+    diverName, diverEmail, estimateTotal, currency,
   } = parts
 
   const e = t.emails.scheduledTripReg
@@ -73,7 +73,7 @@ export function buildScheduledTripRegistrationEmail(
   const addons = list(addonLabels)
   const room = roomLabel || t.emails.common.none
   const datesLine = tripDates ? e.datesKnown(tripDates) : e.datesUnknown
-  const estimateLine = money(estimateTotal, currencyLabel)
+  const estimateLine = money(estimateTotal, currency)
   const subject = e.subject(shopName, tripTitle)
 
   const shopText = [

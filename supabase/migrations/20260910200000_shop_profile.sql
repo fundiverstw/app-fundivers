@@ -34,11 +34,10 @@ create table public.shop_profile (
   -- with no migration. Null means "use the deployment's default".
   standards_org  text,
 
-  -- What the shop charges in. ISO 4217 where the shop uses one; `currency_label`
-  -- is what a diver actually reads, which is not always the code (Taiwan writes
-  -- NTD, not TWD).
+  -- What the shop writes on a price, e.g. "NTD". One column, not a code plus a
+  -- label: nothing in the app machine-reads a currency, so a second field only
+  -- gave two screens licence to name the same money differently.
   currency       text,
-  currency_label text,
 
   -- 'en' | 'zh-TW' | 'ja'. Not checked against a list here: the set of catalogs
   -- is a property of the build, and a DB constraint would have to be migrated
