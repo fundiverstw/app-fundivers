@@ -709,6 +709,20 @@ export interface Database {
         }
         Returns: string
       }
+      // Every agency's ladder lined up against one agency's vocabulary, via
+      // the PADI hub each rung already points at (20260910200000).
+      cert_level_equivalences: {
+        Args: { p_organization?: string | null }
+        Returns: {
+          organization: string
+          rank: number
+          code: string
+          name: string
+          hub_code: string
+          hub_name: string
+          equivalent_name: string | null
+        }[]
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
@@ -2242,6 +2256,34 @@ export interface Database {
           updated_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['shop_contact']['Insert']>
+        Relationships: []
+      }
+      // The shop's logo, training agency, currency and language. One row.
+      // Logo and agency apply at runtime; currency and language are recorded
+      // here and come from fundive.config.ts until the next deploy
+      // (20260910200000).
+      shop_profile: {
+        Row: {
+          singleton: boolean
+          logo_path: string | null
+          standards_org: string | null
+          currency: string | null
+          currency_label: string | null
+          language: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          singleton?: boolean
+          logo_path?: string | null
+          standards_org?: string | null
+          currency?: string | null
+          currency_label?: string | null
+          language?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['shop_profile']['Insert']>
         Relationships: []
       }
       // The ways a diver can reach the shop, in the order the Contact page

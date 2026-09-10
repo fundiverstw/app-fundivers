@@ -11,6 +11,7 @@ import { Logo } from './components/Logo'
 import { ToastProvider } from './components/Toast'
 import { AuthProvider } from './hooks/AuthProvider'
 import { ShopContactProvider } from './hooks/ShopContactProvider'
+import { ShopProfileProvider } from './hooks/ShopProfileProvider'
 import { UpdateBannerHost } from './components/install/UpdateBannerHost'
 import { AppShell } from './components/layout/AppShell'
 import { AdminShell } from './components/layout/AdminShell'
@@ -69,6 +70,8 @@ import { AdminTermsPage } from './pages/admin/AdminTermsPage'
 import { AdminCancellationPoliciesPage } from './pages/admin/AdminCancellationPoliciesPage'
 import { AdminPaymentMethodsPage } from './pages/admin/AdminPaymentMethodsPage'
 import { AdminContactPage } from './pages/admin/AdminContactPage'
+import { AdminShopProfilePage } from './pages/admin/AdminShopProfilePage'
+import { AdminCertEquivalencePage } from './pages/admin/AdminCertEquivalencePage'
 import { AdminDiveSitesPage } from './pages/admin/AdminDiveSitesPage'
 import { AdminWildlifePage } from './pages/admin/AdminWildlifePage'
 
@@ -105,6 +108,7 @@ export default function App() {
           terms-acceptance page, which runs from an emailed link with no
           session at all. */}
       <ShopContactProvider>
+      <ShopProfileProvider>
       <ToastProvider>
       <UpdateBannerHost />
       <Routes>
@@ -214,6 +218,8 @@ export default function App() {
                 <Route path="/admin/cancellation-policies" element={<AdminCancellationPoliciesPage />} />
                 <Route path="/admin/payment-methods" element={<AdminPaymentMethodsPage />} />
                 <Route path="/admin/contact" element={<AdminContactPage />} />
+                <Route path="/admin/shop-profile" element={<AdminShopProfilePage />} />
+                <Route path="/admin/cert-equivalence" element={<AdminCertEquivalencePage />} />
                 <Route path="/admin/dive-sites" element={<AdminDiveSitesPage />} />
                 <Route path="/admin/wildlife" element={<AdminWildlifePage />} />
                 <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
@@ -228,6 +234,7 @@ export default function App() {
         <Route path="*" element={<HomeRedirect />} />
       </Routes>
       </ToastProvider>
+      </ShopProfileProvider>
       </ShopContactProvider>
       </AuthProvider>
     </BrowserRouter>

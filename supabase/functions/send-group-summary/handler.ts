@@ -13,6 +13,7 @@ import { siteConfig } from "../../../fundive.config.ts"
 import type { GroupRegistrationPdfPayload, GroupDiverColumn } from "../_shared/pdf.ts"
 import type { PaymentMethodDetails } from "../../../src/lib/payment-method-format.ts"
 import { fetchShopContact } from "../_shared/shop-contact.ts"
+import { fetchShopLogoDataUrl } from "../_shared/shop-logo.ts"
 import { t } from "../_shared/i18n.ts"
 import { usesDateEnvelope, type EventKind } from "../../../src/lib/event-kinds.ts"
 import { EVENT_KIND_LABELS } from "../_shared/event-kind-labels.ts"
@@ -211,6 +212,7 @@ export async function handleGroupSummary(req: Request, deps: Deps): Promise<Resp
     generatedFor: divers.find(d => d.name)?.name ?? "the group",
     leadEmail:    callerEmail ?? "",
     shop:         await fetchShopContact(admin),
+    logoDataUrl:  await fetchShopLogoDataUrl(admin),
     paymentMethod,
     creditCardInvoiceEmail,
     groupTotal,

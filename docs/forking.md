@@ -189,7 +189,10 @@ to force action" mechanism the app already uses for the Terms of Use and waivers
 
 1. Fork the repo; add `upstream` as above.
 2. `cp fundive.config.example.ts fundive.config.ts` and fill in every value.
-3. Drop your logo/favicon/icons into `public/` at the `assets` paths.
+3. Drop your logo/favicon/icons into `public/` at the `assets` paths. The
+   logo is the one you can change later without a developer — upload it in
+   **Manage → Shop Profile** and it overrides `assets.logo` immediately, in
+   the app and on the registration PDF.
 4. Rewrite `src/config/terms.tsx`.
 5. Set the two Worker `name`s and the push `[vars]` in the wrangler files.
 6. Provision Supabase + Cloudflare and populate secrets ([deployment.md](./deployment.md)).

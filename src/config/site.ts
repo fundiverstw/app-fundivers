@@ -1,4 +1,5 @@
 import { siteConfig as raw } from '../../fundive.config'
+import type { SupportedLanguage } from './languages'
 
 // Shop configuration contract. `fundive.config.ts` at the repo root holds the
 // values (pure data, no imports, so every runtime can read it); this file is the
@@ -44,7 +45,11 @@ export interface SiteUrls {
  * enum in site.schema.ts, plus a catalog under src/i18n/messages) to add a
  * language. See docs/i18n.md.
  */
-export type SupportedLanguage = 'en' | 'zh-TW' | 'ja'
+// The list lives in languages.ts, dependency-free, because the zod schema and
+// vite.config.ts need it as a value from outside the Vite graph. Re-exported
+// here so app code has one place to import config things from.
+export { SUPPORTED_LANGUAGES } from './languages'
+export type { SupportedLanguage } from './languages'
 
 export interface SiteLocale {
   /** IANA timezone, e.g. "Asia/Taipei". */

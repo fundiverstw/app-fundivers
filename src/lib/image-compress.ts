@@ -5,10 +5,16 @@
 export interface CompressOptions {
   /** Max of (width, height) after scaling. Defaults to 1600 px. */
   maxDimension?: number
-  /** JPEG encoder quality 0..1. Defaults to 0.82. */
+  /** Encoder quality 0..1. Defaults to 0.82. Ignored for image/png. */
   quality?: number
-  /** Output mime type. Defaults to image/jpeg. */
-  mimeType?: 'image/jpeg' | 'image/webp'
+  /**
+   * Output mime type. Defaults to image/jpeg.
+   *
+   * JPEG has no alpha channel, so a logo encoded as one arrives with a black
+   * box behind it. PNG keeps the transparency and is what jsPDF can embed —
+   * WebP keeps it too but the PDF builder cannot read that.
+   */
+  mimeType?: 'image/jpeg' | 'image/webp' | 'image/png'
 }
 
 const DEFAULT_MAX_DIM = 1600

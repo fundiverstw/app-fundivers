@@ -138,6 +138,10 @@ export interface RegistrationPdfPayload {
    *  (`shop_contact`), and the handler that builds this payload is the thing
    *  holding an admin client. */
   shop: ShopContact
+  /** The shop's uploaded logo as a PNG data URL, when it has one. Null or
+   *  absent prints the logo vendored beside pdf.ts. Same reasoning as `shop`:
+   *  the handler holds the client, so it does the read. */
+  logoDataUrl?: string | null
   /** The shop's payment_methods row for the key on the booking. Null when the
    *  key no longer resolves — the Method row and the "How to pay" block are
    *  then omitted rather than guessed at. */
@@ -217,7 +221,16 @@ function row(doc: jsPDF, y: number, label: string, value: unknown, altState: { a
   return y + blockH
 }
 
-async function loadLogoDataUrl(): Promise<{ dataUrl: string; format: "PNG" } | null> {
+/**
+ * The logo to print: the shop's uploaded one when it has one, else the file
+ * vendored beside this module.
+ *
+ * `uploaded` comes in on the payload rather than being read here, so the
+ * builders stay free of a Supabase client and the vitest render tests can drive
+ * both branches without one.
+ */
+async function loadLogoDataUrl(uploaded?: string | null): Promise<{ dataUrl: string; format: "PNG" } | null> {
+  if (uploaded) return { dataUrl: uploaded, format: "PNG" }
   try {
     const bytes = await Deno.readFile(LOGO_PATH)
     return {
@@ -238,7 +251,7 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
 
   // ── Header ────────────────────────────────────────────
   await registerCjkFont(doc, p)
-  const logo = await loadLogoDataUrl()
+  const logo = await loadLogoDataUrl(p.logoDataUrl)
   let y = 8
 
   doc.setFontSize(7.5)
@@ -546,6 +559,8 @@ export interface GroupRegistrationPdfPayload {
   leadEmail: string
   /** The shop's own phone / address / map — see `RegistrationPdfPayload.shop`. */
   shop: ShopContact
+  /** The shop's uploaded logo — see `RegistrationPdfPayload.logoDataUrl`. */
+  logoDataUrl?: string | null
   /** The shop's payment_methods row the group settles through. */
   paymentMethod: PaymentMethodDetails | null
   creditCardInvoiceEmail: string | null
@@ -618,7 +633,7 @@ export async function buildGroupPdfBase64(p: GroupRegistrationPdfPayload): Promi
   const doc = new jsPDF({ unit: "mm", format: "a4", compress: true })
 
   await registerCjkFont(doc, p)
-  const logo = await loadLogoDataUrl()
+  const logo = await loadLogoDataUrl(p.logoDataUrl)
   let y = 8
   doc.setFontSize(7.5)
   doc.setTextColor(...C.gray)

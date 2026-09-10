@@ -22,6 +22,8 @@ import { ShieldCheckIcon } from '../../components/icons/ShieldCheckIcon'
 import { TrustedPartnersIcon } from '../../components/icons/TrustedPartnersIcon'
 import { BellIcon } from '../../components/icons/BellIcon'
 import { ChatIcon } from '../../components/icons/ChatIcon'
+import { ShopProfileIcon } from '../../components/icons/ShopProfileIcon'
+import { CertEquivalenceIcon } from '../../components/icons/CertEquivalenceIcon'
 import { DownloadIcon } from '../../components/icons/DownloadIcon'
 import { AuditIcon } from '../../components/icons/AuditIcon'
 import { DatabaseIcon } from '../../components/icons/DatabaseIcon'
@@ -97,6 +99,8 @@ const GROUPS: ManageGroup[] = [
   {
     title: m.groups.partnersComms,
     cards: [
+      { to: '/admin/shop-profile', icon: <ShopProfileIcon />, ...m.shopProfile },
+      { to: '/admin/cert-equivalence', icon: <CertEquivalenceIcon />, ...m.certEquivalence },
       { to: '/admin/contact', icon: <ChatIcon />, ...m.contact },
       { to: '/admin/trusted-partners', icon: <TrustedPartnersIcon />, ...m.trustedPartners },
       { to: '/admin/notifications', icon: <BellIcon />, ...m.notifications },

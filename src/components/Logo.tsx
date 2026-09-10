@@ -1,9 +1,11 @@
 import { siteConfig } from '../config/site'
+import { useShopProfile } from '../hooks/useShopProfile'
+import { logoUrlOf } from '../lib/shop-profile'
 
-// Brand logo — wraps the shop logo (fundive.config.ts `assets.logo`) with size
-// presets so every surface that uses it picks a consistent height. FunDivers'
-// image is the dive-mask-shaped mark (red/white/black on a transparent
-// background), so it works on dark and light surfaces without modification.
+// Brand logo — the shop's uploaded mark when it has one (Manage → Shop
+// Profile), otherwise the one the build ships (`assets.logo`). Size presets so
+// every surface that uses it picks a consistent height. A transparent
+// background is what makes one image work on both the dark and light surfaces.
 //
 // Sizes (height in px): xs 24, sm 36, md 56, lg 88, xl 128.
 
@@ -22,9 +24,10 @@ export function Logo({
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
   className?: string
 }) {
+  const { profile } = useShopProfile()
   return (
     <img
-      src={siteConfig.assets.logo}
+      src={logoUrlOf(profile)}
       alt={siteConfig.identity.logoAlt}
       className={`${SIZE_CLASS[size]} w-auto ${className}`}
     />

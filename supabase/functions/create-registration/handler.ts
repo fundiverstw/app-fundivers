@@ -17,6 +17,7 @@
 import { Buffer } from "node:buffer"
 import { sanitizeProfilePatch } from "../_shared/profile-patch.ts"
 import { fetchShopContact } from "../_shared/shop-contact.ts"
+import { fetchShopLogoDataUrl } from "../_shared/shop-logo.ts"
 import { eligibilityError } from "../_shared/registration-eligibility.ts"
 import { usesDateEnvelope, usesCourseDays, type EventKind } from "../../../src/lib/event-kinds.ts"
 import { computeBookingMoney } from "../_shared/booking-charges.ts"
@@ -661,6 +662,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     transportIncluded,
     notes:           booking.notes ?? null,
     shop:            await fetchShopContact(admin),
+    logoDataUrl:     await fetchShopLogoDataUrl(admin),
     paymentMethod:   await loadPaymentMethod(admin, details.payment_method as string | null | undefined),
     creditCardInvoiceEmail: (details.credit_card_invoice_email as string | null | undefined) ?? null,
     deposit:         (details.deposit as number | null) ?? null,
