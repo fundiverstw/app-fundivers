@@ -31,3 +31,31 @@ export function payloadNeedsCjkFont(payload: unknown): boolean {
   if (payload && typeof payload === "object") return Object.values(payload).some(payloadNeedsCjkFont)
   return false
 }
+
+/** Placeholder fed to an interpolating catalog value so its literal text can be
+ *  scanned. Catalog functions take strings or numbers; "x" is harmless in both. */
+const PROBE = "x"
+
+/** True when the deployment's *own* PDF strings need the embedded face.
+ *
+ *  `payloadNeedsCjkFont` only sees the registration — it never sees the message
+ *  catalog or the shop's config prose, neither of which travels in the payload.
+ *  A zh-TW or ja deployment printing an all-Latin registration would therefore
+ *  register no font and mangle every label on the page. Catalog values that
+ *  interpolate are functions, so call them with a placeholder to reach their
+ *  literal text. */
+export function catalogNeedsCjkFont(...catalogs: unknown[]): boolean {
+  return catalogs.some(catalog => {
+    if (typeof catalog === "function") {
+      try {
+        return needsCjkFont(String((catalog as (...a: unknown[]) => string)(PROBE, PROBE, PROBE)))
+      } catch {
+        return false
+      }
+    }
+    if (catalog && typeof catalog === "object") {
+      return Object.values(catalog).some(v => catalogNeedsCjkFont(v))
+    }
+    return payloadNeedsCjkFont(catalog)
+  })
+}

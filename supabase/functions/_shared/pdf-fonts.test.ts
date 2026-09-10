@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { needsCjkFont, payloadNeedsCjkFont } from './pdf-fonts.ts'
+import { catalogNeedsCjkFont, needsCjkFont, payloadNeedsCjkFont } from './pdf-fonts.ts'
 
 // jsPDF's built-in helvetica is a standard-14 font with WinAnsi (cp1252)
 // encoding. Feeding it CJK does not throw — it silently emits mangled bytes
@@ -44,6 +44,36 @@ describe('payloadNeedsCjkFont', () => {
     expect(payloadNeedsCjkFont({
       eventTitle: 'Green Island Boat Dive', name: 'Sam Diver',
       email: 'sam@example.com', paymentMethod: 'cash', total: 5000,
+    })).toBe(false)
+  })
+})
+
+describe('catalogNeedsCjkFont', () => {
+  it('reaches the literal text behind an interpolating catalog value', () => {
+    expect(catalogNeedsCjkFont({ total: (cur: string) => `Total (${cur})` })).toBe(false)
+    expect(catalogNeedsCjkFont({ total: (cur: string) => `總額（${cur}）` })).toBe(true)
+  })
+
+  // The registration payload never carries the catalog, so a CJK deployment
+  // printing an all-Latin registration used to register no font and mangle
+  // every label on the page.
+  it('is true for a CJK catalog even when the payload is all-Latin', () => {
+    const payload = { eventTitle: 'Green Island Boat Dive', name: 'Sam Diver' }
+    const catalog = { event: '活動', date: '日期', generated: (d: string) => `製表日期：${d}` }
+    expect(payloadNeedsCjkFont(payload)).toBe(false)
+    expect(catalogNeedsCjkFont(catalog)).toBe(true)
+  })
+
+  it('walks nested namespaces and survives a value it cannot call', () => {
+    expect(catalogNeedsCjkFont({ a: { b: { c: 'さくら' } } })).toBe(true)
+    expect(catalogNeedsCjkFont({ boom: () => { throw new Error('nope') } })).toBe(false)
+  })
+
+  it('is false for an all-Latin catalog', () => {
+    expect(catalogNeedsCjkFont({
+      event: 'Event', date: 'Date',
+      generated: (d: string) => `Generated: ${d}`,
+      dash: 'How to pay — Cash',
     })).toBe(false)
   })
 })

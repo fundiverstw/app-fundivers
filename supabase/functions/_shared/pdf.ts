@@ -7,7 +7,7 @@
 
 import { jsPDF } from "npm:jspdf@2.5.1"
 import { Buffer } from "node:buffer"
-import { needsCjkFont, payloadNeedsCjkFont } from "./pdf-fonts.ts"
+import { catalogNeedsCjkFont, needsCjkFont, payloadNeedsCjkFont } from "./pdf-fonts.ts"
 import { paymentInstructionsFor, paymentConfirmationReminder } from "./payment-instructions.ts"
 import type { ShopContact } from "../../../src/lib/payment-method-format.ts"
 import { paymentMethodLabel, type PaymentMethodDetails } from "../../../src/lib/payment-method-format.ts"
@@ -53,8 +53,16 @@ function loadCjkFontB64(): Promise<string | null> {
 
 const docsWithCjk = new WeakSet<jsPDF>()
 
+// The catalog labels and the shop's config prose are drawn on every PDF but
+// never appear in the payload, so the gate has to ask about them separately.
+// Resolved once: neither can change between documents.
+const SHOP_TEXT_NEEDS_CJK =
+  catalogNeedsCjkFont(d) ||
+  needsCjkFont(siteConfig.identity.tagline ?? "") ||
+  needsCjkFont(siteConfig.identity.shopName)
+
 async function registerCjkFont(doc: jsPDF, payload: unknown): Promise<void> {
-  if (!payloadNeedsCjkFont(payload)) return
+  if (!SHOP_TEXT_NEEDS_CJK && !payloadNeedsCjkFont(payload)) return
   const b64 = await loadCjkFontB64()
   if (!b64) return
   doc.addFileToVFS(CJK_VFS_NAME, b64)
@@ -256,7 +264,7 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   // Shop's own marketing line (identity.tagline). Blank = no line, no gap.
   if (siteConfig.identity.tagline) {
     doc.setFontSize(8.5)
-    doc.setFont("helvetica", "italic")
+    setFontFor(doc, siteConfig.identity.tagline, "italic")
     doc.setTextColor(...C.ocean)
     doc.text(siteConfig.identity.tagline, 105, y, { align: "center" })
     y += 6
@@ -635,9 +643,10 @@ export async function buildGroupPdfBase64(p: GroupRegistrationPdfPayload): Promi
   doc.text(d.groupRegistration, 105, y, { align: "center" })
   y += 4
   doc.setFontSize(8.5)
-  doc.setFont("helvetica", "normal")
+  const paidBy = d.paidByGroup(p.generatedFor, p.divers.length)
+  setFontFor(doc, paidBy, "normal")
   doc.setTextColor(...C.gray)
-  doc.text(`Paid by ${p.generatedFor} · ${p.divers.length} divers`, 105, y + 4, { align: "center" })
+  doc.text(paidBy, 105, y + 4, { align: "center" })
   y += 8
   doc.setDrawColor(...C.ocean)
   doc.setLineWidth(0.5)
@@ -654,11 +663,15 @@ export async function buildGroupPdfBase64(p: GroupRegistrationPdfPayload): Promi
     doc.setFillColor(...C.ocean)
     doc.rect(0, y, 210, 8, "F")
     doc.setTextColor(...C.white)
-    doc.setFont("helvetica", "bold")
     doc.setFontSize(8.5)
-    chunk.forEach((d, c) => doc.text(`Diver ${i + c + 1}`, cols[c].x, y + 5.5))
-    doc.text(`DIVERS ${i + 1}–${i + chunk.length}`, GROUP_LABEL_X, y + 5.5)
-    doc.setFont("helvetica", "normal")
+    chunk.forEach((_col, c) => {
+      const heading = d.diverN(i + c + 1)
+      setFontFor(doc, heading, "bold")
+      doc.text(heading, cols[c].x, y + 5.5)
+    })
+    const range = d.diversRange(i + 1, i + chunk.length)
+    setFontFor(doc, range, "bold")
+    doc.text(range, GROUP_LABEL_X, y + 5.5)
     doc.setTextColor(...C.dark)
     y += 11
 
@@ -674,10 +687,12 @@ export async function buildGroupPdfBase64(p: GroupRegistrationPdfPayload): Promi
   doc.setFillColor(...C.oceanLight)
   doc.rect(0, y - 5, 210, 10, "F")
   doc.setFontSize(9)
-  doc.setFont("helvetica", "bold")
+  const groupTotalLabel = d.groupTotal(p.divers.length, CUR)
+  setFontFor(doc, groupTotalLabel, "bold")
   doc.setTextColor(...C.ocean)
-  doc.text(`Group total (${p.divers.length} divers) (${CUR})`, GROUP_LABEL_X, y + 1)
+  doc.text(groupTotalLabel, GROUP_LABEL_X, y + 1)
   doc.setFontSize(13)
+  doc.setFont("helvetica", "bold")
   doc.text(String(p.groupTotal), 130, y + 1)
   y += 10
 
@@ -690,9 +705,9 @@ export async function buildGroupPdfBase64(p: GroupRegistrationPdfPayload): Promi
     y += 4
     y = section(doc, y, instr.title)
     doc.setFontSize(8.5)
-    doc.setFont("helvetica", "normal")
     doc.setTextColor(...C.dark)
     for (const line of instr.lines) {
+      setFontFor(doc, line, "normal")
       for (const w of doc.splitTextToSize(line, MR - ML - 2)) {
         y = ensureY(doc, y, 6)
         doc.text(w, ML + 2, y)
@@ -705,9 +720,9 @@ export async function buildGroupPdfBase64(p: GroupRegistrationPdfPayload): Promi
   y += 6
   y = section(doc, y, reminder.title)
   doc.setFontSize(8.5)
-  doc.setFont("helvetica", "normal")
   doc.setTextColor(...C.dark)
   for (const line of reminder.lines) {
+    setFontFor(doc, line, "normal")
     for (const w of doc.splitTextToSize(line, MR - ML - 2)) {
       y = ensureY(doc, y, 6)
       doc.text(w, ML + 2, y)
