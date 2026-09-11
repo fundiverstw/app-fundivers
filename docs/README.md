@@ -25,6 +25,7 @@ into source.
 | [i18n.md](./i18n.md)                                   | Shop-facing language: `locale.language`, the `src/i18n` message catalogs, adding strings and languages |
 | [security-audit.md](./security-audit.md)               | Point-in-time audit (2026-06-02): findings by severity, fix priority |
 | [security-audit-2026-08.md](./security-audit-2026-08.md) | Second audit (2026-08-07): findings, what was verified clean, residual risks |
+| [security-audit-2026-09.md](./security-audit-2026-09.md) | Third audit (2026-09-11): 2 High in fundive (anon-executable RPC, baseline default privileges), 2 Medium in both |
 | [legal-brief.md](./legal-brief.md)                     | Brief for the Terms-of-Use / Privacy lawyer review: data inventory, flows, code-text alignment, open questions |
 
 ## Conventions called out across docs
