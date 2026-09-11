@@ -41,6 +41,7 @@ function baseRow(overrides: Partial<EventRow> = {}): EventRow {
     is_trip: false,
     nitrox_required: false,
     gear_rental: null,
+    gear_included: false,
     notes: null,
     trip_template_id: null,
     course_name: null,
@@ -102,6 +103,7 @@ describe('formStateFromEvent — dive', () => {
       is_trip: true,
       nitrox_required: true,
       gear_rental: 'full',
+      gear_included: true,
       cancel_date: '2026-06-20',
       cancel_policy: 'No refunds',
       trip_template_id: 'dt_ref',
@@ -132,6 +134,7 @@ describe('formStateFromEvent — dive', () => {
       roomIds: ['rm1', 'rm2'],
       nitrox_required: true,
       gear_rental: 'full',
+      gear_included: true,
       cancel_date: '2026-06-20',
       cancel_policy: 'No refunds',
       destinationIds: ['dest1'],
@@ -240,6 +243,7 @@ describe('formStateFromEvent — course', () => {
       cancel_date: '2026-06-25',
       cancel_policy: 'Policy',
       featured_image: 'https://cdn.example/course.jpg',
+      gear_included: true,
     }), rels({ addonIds: ['ca1'] }))
     expect(fs).toEqual({
       type: 'course',
@@ -273,6 +277,7 @@ describe('formStateFromEvent — course', () => {
       roomIds: [],
       nitrox_required: false,
       gear_rental: '',
+      gear_included: true,
       destinationIds: [],
       trip_template_reference: '',
     })
@@ -337,6 +342,7 @@ describe('eventPayloadFromForm — dive', () => {
       req_dives: '20',
       dive_days: '3',
       gear_rental: 'full',
+      gear_included: true,
       nitrox_required: true,
       is_boat_dive: true,
       is_trip: true,
@@ -376,6 +382,7 @@ describe('eventPayloadFromForm — dive', () => {
       notes: 'Notes',
       nitrox_required: true,
       gear_rental: 'full',
+      gear_included: true,
       trip_template_id: 'dt',
       course_name: null,
       included: null,
@@ -503,6 +510,9 @@ describe('eventPayloadFromForm — course', () => {
       notes: null,
       nitrox_required: false,
       gear_rental: null,
+      // Every kind carries the flag; a course that bundles gear is the
+      // commonest case for it, and it survives the dive-field nulling.
+      gear_included: false,
       trip_template_id: null,
       course_name: 'PADI OW',
       included: 'Manual',

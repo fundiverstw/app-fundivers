@@ -72,6 +72,7 @@ const sampleEvent: AppEvent = {
   has_rooms: true, room_type_ids: ['room-a'],
   has_addons: true, addon_ids: ['addon-a'],
   gear_rental_info: 'Full set 1500/day',
+  gear_included: false,
   has_transport: true, nitrox_required: true, dive_days: 1,
   cancelled_at: null,
   full_payment_deadline: '2027-05-08',
@@ -89,7 +90,8 @@ const noExtrasEvent: AppEvent = {
   price: 4900, deposit_amount: null, transport_price: null, currency: 'TWD',
   has_rooms: false, room_type_ids: [],
   has_addons: false, addon_ids: [],
-  gear_rental_info: null, has_transport: true, nitrox_required: false, dive_days: 0,
+  gear_rental_info: null, gear_included: true,
+  has_transport: true, nitrox_required: false, dive_days: 0,
   cancelled_at: null,
   full_payment_deadline: null,
   cancel_policy: null, cancel_date: null,
@@ -295,7 +297,7 @@ describe('RegisterForm', () => {
         ? { data: [{ capacity: 7, claimed: 7 }], error: null }
         : { data: 0, error: null }))
     const user = userEvent.setup()
-    const owCourse: AppEvent = { ...noExtrasEvent, type: 'course', title: 'Open Water Course' }
+    const owCourse: AppEvent = { ...noExtrasEvent, type: 'course', title: 'Open Water Course', dive_days: 2 }
     render(
       <RegisterForm event={owCourse} profile={sampleProfile} userId="u1"
         onClose={() => {}} onBooked={() => {}} />
@@ -719,7 +721,7 @@ describe('RegisterForm', () => {
     expect(screen.getByRole('button', { name: /next/i })).toBeEnabled()
   })
 
-  it('hides gear/room/addon/nitrox sections when the event does not offer them', async () => {
+  it('hides the rental checklist and the room/addon/nitrox sections on a gear-included event', async () => {
     setupFrom()
     const user = userEvent.setup()
     render(
@@ -730,8 +732,8 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
 
-    // Step 3 should show "no extras" copy and hide all optional sections
-    expect(await screen.findByText(/no extras/i)).toBeInTheDocument()
+    // The event bundles gear, so the diver is told so instead of being asked.
+    expect(await screen.findByText(/gear is included with this event/i)).toBeInTheDocument()
     expect(screen.queryByLabelText(/i need to rent/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/^room$/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/^add-ons$/i)).not.toBeInTheDocument()
@@ -745,21 +747,21 @@ describe('RegisterForm', () => {
   it('Open Water course bundles gear — shows the included note, no rent option', async () => {
     setupFrom()
     const user = userEvent.setup()
-    const owCourse: AppEvent = { ...noExtrasEvent, type: 'course', title: 'Open Water Course' }
+    const owCourse: AppEvent = { ...noExtrasEvent, type: 'course', title: 'Open Water Course', dive_days: 2 }
     render(
       <RegisterForm event={owCourse} profile={sampleProfile} userId="u1"
         onClose={() => {}} onBooked={() => {}} />
     )
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
-    expect(await screen.findByText(/gear is included with this course/i)).toBeInTheDocument()
+    expect(await screen.findByText(/gear is included with this event/i)).toBeInTheDocument()
     expect(screen.queryByLabelText(/i need to rent/i)).not.toBeInTheDocument()
   })
 
   it('Discover Scuba assumes a full rental set, so it asks for a shoe size', async () => {
     setupFrom()
     const user = userEvent.setup()
-    const dsd: AppEvent = { ...noExtrasEvent, type: 'course', title: 'Discover Scuba Diving (DSD)' }
+    const dsd: AppEvent = { ...noExtrasEvent, type: 'course', title: 'Discover Scuba Diving (DSD)', dive_days: 1 }
     // A try-diver owns nothing and has never given a shoe size.
     const profile: Profile = { ...sampleProfile, shoe_size: null, gear_owned: [] }
     render(
@@ -788,21 +790,42 @@ describe('RegisterForm', () => {
   it('leaves the shoe size unasked on a bundled course when the profile has one', async () => {
     setupFrom()
     const user = userEvent.setup()
-    const dsd: AppEvent = { ...noExtrasEvent, type: 'course', title: 'Try Dive' }
+    const dsd: AppEvent = { ...noExtrasEvent, type: 'course', title: 'Try Dive', dive_days: 1 }
     render(
       <RegisterForm event={dsd} profile={{ ...sampleProfile, gear_owned: [] }} userId="u1"
         onClose={() => {}} onBooked={() => {}} />
     )
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
-    expect(await screen.findByText(/gear is included with this course/i)).toBeInTheDocument()
+    expect(await screen.findByText(/gear is included with this event/i)).toBeInTheDocument()
     expect(screen.queryByText(/we need your sizes/i)).not.toBeInTheDocument()
+  })
+
+  // A non-diving outing answers the gear question the same way a bundled
+  // course does — nobody is asked, nobody is billed — but nothing is packed,
+  // so it must not tell the diver a set is coming or ask for a shoe size.
+  it('a gear-included outing that never gets wet promises no set', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    const hike: AppEvent = {
+      ...noExtrasEvent, type: 'adventure', title: 'Yangmingshan Hike', dive_days: null,
+    }
+    render(
+      <RegisterForm event={hike} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    expect(await screen.findByText(/no extras/i)).toBeInTheDocument()
+    expect(screen.queryByText(/gear is included with this event/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/i need to rent/i)).not.toBeInTheDocument()
   })
 
   it('Advanced Open Water course offers gear rental (gear is not bundled)', async () => {
     setupFrom()
     const user = userEvent.setup()
-    const aowCourse: AppEvent = { ...noExtrasEvent, type: 'course', title: 'Advanced Open Water' }
+    const aowCourse: AppEvent = { ...noExtrasEvent, type: 'course', title: 'Advanced Open Water', gear_included: false }
     render(
       <RegisterForm event={aowCourse} profile={sampleProfile} userId="u1"
         onClose={() => {}} onBooked={() => {}} />
@@ -810,7 +833,7 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
     expect(await screen.findByLabelText(/i need to rent/i)).toBeInTheDocument()
-    expect(screen.queryByText(/gear is included with this course/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/gear is included with this event/i)).not.toBeInTheDocument()
   })
 
   it('prefills a-la-carte rental list with items the diver does NOT already own', async () => {
@@ -2170,7 +2193,7 @@ describe('RegisterForm', () => {
     it('asks a size for each child on a course that packs the gear unasked', async () => {
       // No rental question is put on a gear-included course, but a full set is
       // still packed for every diver — including the ones the lead added.
-      const dsd: AppEvent = { ...noExtrasEvent, type: 'course', title: 'Discover Scuba Diving (DSD)' }
+      const dsd: AppEvent = { ...noExtrasEvent, type: 'course', title: 'Discover Scuba Diving (DSD)', dive_days: 1 }
       setupFromWithChildren([{ ...childProfile, gear_owned: [], shoe_size: null }])
       const user = userEvent.setup()
       render(

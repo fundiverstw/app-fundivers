@@ -117,7 +117,7 @@ export class World {
         kind: 'dive', admin_title: 'Scenario series dive', notes: '',
         start_date: day, end_date: day, start_time: '09:00:00',
         fully_booked: false, featured: false, is_private: false, has_transport: true,
-        is_boat_dive: false, is_trip: false, nitrox_required: false,
+        is_boat_dive: false, is_trip: false, nitrox_required: false, gear_included: false,
         ...event,
       })),
       p_series: { kind: 'dive', freq: 'weekly', interval: 1, weekdays: [1, 2, 3, 4, 5, 6, 7], label: 'Scenario series' },

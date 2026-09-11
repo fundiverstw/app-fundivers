@@ -81,6 +81,42 @@ describe('AdminNewEventPage', () => {
     expect(screen.queryByText(/dive details/i)).not.toBeInTheDocument()
   })
 
+  // The gear flag replaced a substring match on the title that the rest of the
+  // app used to read at registration time. It survives only here, as a
+  // pre-tick, so a title the matcher does not recognize costs an admin one
+  // click rather than silently billing a student for a bundled set.
+  it('pre-ticks gear-included for a course whose title usually bundles gear', async () => {
+    fakeCatalog()
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(screen.getByRole('button', { name: 'Course' }))
+    const box = screen.getByLabelText(/gear included/i) as HTMLInputElement
+    expect(box.checked).toBe(false)
+    await user.type(screen.getByLabelText(/display title/i), 'PADI Open Water Course')
+    expect((screen.getByLabelText(/gear included/i) as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('leaves the gear box alone once the admin has answered it', async () => {
+    fakeCatalog()
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(screen.getByRole('button', { name: 'Course' }))
+    await user.click(screen.getByLabelText(/gear included/i))
+    await user.click(screen.getByLabelText(/gear included/i))
+    // Unticked on purpose: a later keystroke in the title must not re-tick it.
+    await user.type(screen.getByLabelText(/display title/i), 'Open Water')
+    expect((screen.getByLabelText(/gear included/i) as HTMLInputElement).checked).toBe(false)
+  })
+
+  it('suggests nothing for a continuing-ed course, which rents like a fun dive', async () => {
+    fakeCatalog()
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(screen.getByRole('button', { name: 'Course' }))
+    await user.type(screen.getByLabelText(/display title/i), 'Advanced Open Water')
+    expect((screen.getByLabelText(/gear included/i) as HTMLInputElement).checked).toBe(false)
+  })
+
   it('blocks submit when dive title is missing', async () => {
     fakeCatalog()
     const user = userEvent.setup()

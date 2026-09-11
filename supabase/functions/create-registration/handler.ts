@@ -402,7 +402,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
   {
     const d = body.details as Record<string, unknown>
     const { data: evMoney } = await admin
-      .from("events").select("price, dive_days, has_transport").eq("id", body.event_id).maybeSingle()
+      .from("events").select("price, dive_days, has_transport, gear_included").eq("id", body.event_id).maybeSingle()
 
     // An event the shop drives nobody to puts no ride question, so a request
     // that answers one is answering a question that was never asked. Force it
@@ -441,6 +441,15 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     // The surcharge is the shop's, never the client's: read it off the
     // payment_methods row the diver named. An unknown key carries none.
     const chosenMethod = await loadPaymentMethod(admin, d.payment_method as string | null | undefined)
+
+    // An event that includes gear (or needs none) puts no gear question, so a
+    // request that answers one is answering a question that was never asked.
+    // Overwrite rather than trust the body, exactly as the ride answer above:
+    // a crafted `gear.rent` with items would otherwise bill a diver for a set
+    // the course fee already covers, and put that set on the packing list twice.
+    if ((evMoney as { gear_included?: boolean } | null)?.gear_included === true) {
+      d.gear = { rent: false, included: true }
+    }
 
     const gear = d.gear as { rent?: boolean; items?: string[] } | undefined
     const money = computeBookingMoney({

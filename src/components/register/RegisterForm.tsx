@@ -7,9 +7,8 @@ import { useAuth } from '../../hooks/useAuth'
 import { computeEffectiveFullPaymentDeadline } from '../../lib/payment-deadlines'
 import { paymentInstructionsFor } from '../../lib/payment-instructions'
 import { useShopContact } from '../../hooks/useShopContact'
-import { RENTAL_GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_RENTAL_GEAR_ALTERNATIVES, HAS_OWNED_ONLY_GEAR, FULL_GEAR_SET, isGearIncludedCourse, defaultRentalItems, needsRental, toggleGearSelection } from '../../lib/gear'
+import { RENTAL_GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_RENTAL_GEAR_ALTERNATIVES, HAS_OWNED_ONLY_GEAR, FULL_GEAR_SET, packsAGearSet, defaultRentalItems, needsRental, toggleGearSelection } from '../../lib/gear'
 import { needsShoeSize } from '../../lib/logistics'
-import { usesCourseDays } from '../../lib/event-kinds'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
 import { BTN_XS_GHOST, INPUT_REGISTER } from '../../styles/tokens'
@@ -505,14 +504,11 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const pastBlocked = !isEdit && !viewerPrivileged && isPastEvent(event)
   // Gating derived from the event
   const diveDays = Math.max(1, event.dive_days ?? 1)
-  // Open Water / DSD courses bundle gear into the fee — we record the fact
-  // in the booking but don't prompt. Every other course (AOW, EANx, Deep,
-  // Rescue, ...) lets the diver rent, same as a dive. Dives expose the rent
-  // toggle when the admin filled in gear_rental_info on the dive event.
-  const gearIncluded = usesCourseDays(event.type) && isGearIncludedCourse(event.title)
-  const showGearRentChoice =
-    (!usesCourseDays(event.type) && !!event.gear_rental_info) ||
-    (usesCourseDays(event.type) && !isGearIncludedCourse(event.title))
+  // One admin-set flag, whatever the kind: an event whose fee covers a set
+  // (Open Water, Discover Scuba) or that needs none (a dry course, a
+  // non-diving outing) puts no gear question and bills no gear.
+  const showGearRentChoice = !event.gear_included
+  const gearPacksASet = packsAGearSet(event)
   const showRooms = event.has_rooms && event.room_type_ids.length > 0
   const showAddons = event.has_addons && event.addon_ids.length > 0
   const showNitroxAddon = event.nitrox_required && !(profile?.nitrox_certified ?? false)
@@ -696,7 +692,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // there is no choice to offer -- but it still has to fit, which is the one
   // thing an unasked question can't tell us.
   const rentingGear = showGearRentChoice && gearChoice === 'rent'
-  const packedItems = gearIncluded ? FULL_GEAR_SET : (rentingGear ? gearItems : [])
+  const packedItems = gearPacksASet ? FULL_GEAR_SET : (rentingGear ? gearItems : [])
   // Height and weight are asked of everyone on step 2; shoe size is the one
   // measurement narrow enough to ask only when something goes on a foot, and
   // only when the profile hasn't already got it.
@@ -1206,7 +1202,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     }
 
     const gearDetail = (choice: GearChoice | null, items: string[], helpNote: string): BookingDetails['gear'] =>
-      gearIncluded
+      gearPacksASet
         ? { rent: false, included: true }
         : !showGearRentChoice
           ? { rent: false }
@@ -1899,11 +1895,11 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         <section className="space-y-4">
           <h2 className="text-lg font-bold text-brand-900">{t.register.extras.title}</h2>
 
-          {!gearIncluded && !showGearRentChoice && !showRooms && !showAddons && !showNitroxAddon && (
+          {!gearPacksASet && !showGearRentChoice && !showRooms && !showAddons && !showNitroxAddon && (
             <p className="text-brand-900 font-medium text-sm">{t.register.extras.none}</p>
           )}
 
-          {gearIncluded && (
+          {gearPacksASet && (
             <div className="space-y-1">
               <p className="text-sm text-brand-950 font-medium">
                 {t.register.gear.includedNote}
@@ -1959,10 +1955,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             </div>
           )}
 
-          {(showGearRentChoice || gearIncluded) && additionalTargets.map(tg => {
+          {(showGearRentChoice || gearPacksASet) && additionalTargets.map(tg => {
             const pick = gearPickFor(tg)
             const name = personName(tg.name, tg.nickname) || t.register.results.diverFallback
-            const packedForTarget = gearIncluded
+            const packedForTarget = gearPacksASet
               ? FULL_GEAR_SET
               : (pick.choice === 'rent' ? pick.items : [])
             return (

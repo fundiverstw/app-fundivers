@@ -39,7 +39,8 @@ it answers `usesDateEnvelope`. Every UI surface reads `AppEvent`, not raw
   transport_price: number | null
   currency:   string         // locale.currency
   capacity / confirmed_count / fully_booked / cancelled_at / is_private
-  has_rooms / room_type_ids / has_addons / addon_ids / gear_rental_info / nitrox_required / dive_days
+  has_rooms / room_type_ids / has_addons / addon_ids / nitrox_required / dive_days
+  gear_included / gear_rental_info
   details?: EventDetails | null   // the calendar modal's descriptive block
 }
 ```
@@ -139,15 +140,31 @@ the one who never sees a rental question. Shoe size is narrower: it is
 asked only when something goes on a foot, and only when the profile
 hasn't already got one.
 
-A gear-included course — Discover Scuba / Try Dive, Open Water, anything
-`isGearIncludedCourse` recognizes — is a diver who owns nothing, so the
-form assumes the full set (`FULL_GEAR_SET`) rather than asking, and the
-booking records `gear: { rent: false, included: true }`. That assumption
-is exactly why the size question still has to be put: nobody chose the
-items, but the shop still has to pack ones that fit. `needsShoeSize()`
-in `src/lib/logistics.ts` answers the question for both register flows,
-of the à-la-carte selection in one and of the assumed full set in the
-other.
+Whether a gear question is put at all is one admin-set column,
+`events.gear_included`, ticked on the event form. Ticked means the diver
+is neither asked nor billed for gear: the fee already covers a set (Open
+Water, Discover Scuba) or nothing goes in the water (a dry course, a
+non-diving outing). Nothing infers it — the substring match on course
+titles that used to decide this at registration time now survives only
+as `suggestsGearIncluded()` in `src/lib/gear.ts`, which pre-ticks the box
+on the event form and can be overruled. The edge function re-reads the
+column and overwrites the request's gear block, the same way it does the
+ride answer, so a crafted body cannot buy gear the event does not sell.
+
+`gear_included` alone does not say whether a set physically goes out.
+Two events answer it the same way and want opposite things from the
+logistics board: a Discover Scuba bundles a full set that still has to
+fit somebody, an EFR classroom needs none. `packsAGearSet()` separates
+them on `dive_days`, the in-water day count the admin already sets — over
+zero and the booking records `gear: { rent: false, included: true }` and
+`FULL_GEAR_SET` is packed; zero and it records plain `{ rent: false }`
+and nothing is packed.
+
+A packed set is exactly why the size question still has to be put:
+nobody chose the items, but the shop still has to pack ones that fit.
+`needsShoeSize()` in `src/lib/logistics.ts` answers that for both
+register flows, of the à-la-carte selection in one and of the assumed
+full set in the other.
 
 The same question is put for each additional diver the lead is booking,
 because they are the ones most likely to have no size on file. A shoe
@@ -160,8 +177,9 @@ it fills a blank rather than overwriting a value.
 
 ```
 total = base_price
-      + gear_cost       (0 if included; otherwise à-la-carte only:
-                         ∑ per-item × days for the chosen items)
+      + gear_cost       (0 when events.gear_included; otherwise
+                         à-la-carte only: ∑ per-item × days for the
+                         chosen items)
       + room_cost       (selected rooms.added_price)
       + addons_cost     (∑ addons.price for selected ids)
       + transport_cost  (event.transport_price if surcharge>0 and ticked;

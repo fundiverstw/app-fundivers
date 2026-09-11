@@ -35,6 +35,8 @@ export interface FormState {
   roomIds: string[]      // FK multi → rooms
   nitrox_required: boolean
   gear_rental: string
+  // Every kind: no gear question at registration, no gear in the price.
+  gear_included: boolean
   cancel_date: string
   cancel_policy: string
   destinationIds: string[]   // FK multi → travel_destinations
@@ -64,7 +66,7 @@ export const EMPTY_FORM: FormState = {
   featured_image: '',
   notes: '', featured: false, fully_booked: false, is_private: false, is_boat_dive: false, is_trip: false,
   roomIds: [],
-  nitrox_required: false, gear_rental: '',
+  nitrox_required: false, gear_rental: '', gear_included: false,
   cancel_date: '', cancel_policy: '',
   destinationIds: [], trip_template_reference: '',
   full_payment_deadline: '',
@@ -126,6 +128,7 @@ export function formStateFromEvent(e: EventRow, rels: EventRelations = NO_RELATI
     cancel_policy: e.cancel_policy ?? '',
     full_payment_deadline: e.full_payment_deadline ?? '',
     featured_image: e.featured_image ?? '',
+    gear_included: e.gear_included ?? false,
   }
 
   if (usesCourseDays(e.kind)) {
@@ -216,6 +219,9 @@ export function eventPayloadFromForm(form: FormState): Record<string, unknown> {
     notes: courseOnly ? null : form.notes,
     nitrox_required: diving ? form.nitrox_required : false,
     gear_rental: courseOnly ? null : (form.gear_rental || null),
+    // Every kind answers this one: a course bundles a set, a dry course or a
+    // non-diving outing needs none, a fun dive rents a-la-carte.
+    gear_included: form.gear_included,
     trip_template_id: courseOnly ? null : (form.trip_template_reference || null),
     // course-only
     course_name: courseOnly ? (form.course_name || null) : null,

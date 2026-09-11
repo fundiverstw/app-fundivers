@@ -1,5 +1,6 @@
-import type { Booking } from '../types/database'
+import type { AppEvent, Booking } from '../types/database'
 import { siteConfig } from '../config/site'
+import { entersTheWater, hasDiveFlags, usesCourseDays, type EventKind } from './event-kinds'
 
 // Canonical list of gear items, set per shop in fundive.config.ts. This is the
 // catalog a diver describes themselves against — the profile's "Gear I own"
@@ -151,13 +152,48 @@ export function needsRental(owned: string[] | null | undefined): boolean {
 // one diver, and a style the shop doesn't stock for rental at all.
 export const FULL_GEAR_SET = defaultRentalItems([])
 
-// Courses that don't prompt for gear rental: Open Water and Discover Scuba
-// (DSD / "Try Dive") bundle a full set into the fee (those divers don't own
-// gear yet), and EFR is a dry first-aid course that needs none. Every other
-// course (Advanced Open Water, EANx/Nitrox, Deep, Rescue, Equipment, ...) is
-// for already-certified divers, so they rent gear like a fun dive. Courses
-// carry no structured type column, so classify by the customer-facing title.
-export function isGearIncludedCourse(title: string | null | undefined): boolean {
+/**
+ * Does a bundled set actually go out with a booking on this event?
+ *
+ * `gear_included` says only that the diver is neither asked nor billed for
+ * gear, and that one answer covers events wanting opposite things from the
+ * logistics board: a Discover Scuba fee covers a full set that still has to
+ * fit somebody, while a non-diving outing covers nothing because nothing goes
+ * in the water. `entersTheWater` is what separates them.
+ *
+ * Deliberately a question about the KIND rather than about `dive_days`, which
+ * would read as the better signal and is not: the column is optional, and the
+ * shop's live Open Water courses leave it null. Packing off a null would have
+ * quietly stopped putting a set on the van for the very students who own none.
+ */
+export function packsAGearSet(event: Pick<AppEvent, 'gear_included' | 'type'>): boolean {
+  return event.gear_included && entersTheWater(event.type)
+}
+
+/**
+ * Should the event form pre-tick "gear included" for an event with this kind
+ * and title?
+ *
+ * A SUGGESTION, and nothing more. `events.gear_included` is the only thing the
+ * registration form, the price math, the edge function and the PDF ever read;
+ * this function is never consulted at any of those moments. It exists so an
+ * admin typing "PADI Open Water Course" does not have to remember that the fee
+ * covers a set — the box arrives ticked, with a line saying why, and unticking
+ * it stands.
+ *
+ * Open Water and Discover Scuba (DSD / "Try Dive") bundle a full set into the
+ * fee, because those divers own nothing yet. EFR is a dry first-aid course.
+ * An adventure is not a dive. Every other course — Advanced Open Water, EANx,
+ * Deep, Rescue, Equipment — is for already-certified divers who rent like a
+ * fun diver, so they are left alone.
+ *
+ * Course titles are shop-authored free text, which is exactly why this may only
+ * suggest: a shop that calls its try-dive something else gets no suggestion and
+ * ticks the box itself, rather than silently billing gear it does not charge for.
+ */
+export function suggestsGearIncluded(kind: EventKind, title: string | null | undefined): boolean {
+  if (!hasDiveFlags(kind) && !usesCourseDays(kind)) return true
+  if (!usesCourseDays(kind)) return false
   const t = (title ?? '').toLowerCase()
   const isOpenWater = t.includes('open water') && !t.includes('advanced')
   const isDiscoverScuba = t.includes('discover scuba') || /\bdsd\b/.test(t) || t.includes('try dive')

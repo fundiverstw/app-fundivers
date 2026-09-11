@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { personName } from '../../lib/names'
-import { RENTAL_GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_RENTAL_GEAR_ALTERNATIVES, HAS_OWNED_ONLY_GEAR, FULL_GEAR_SET, isGearIncludedCourse, defaultRentalItems, toggleGearSelection } from '../../lib/gear'
+import { RENTAL_GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_RENTAL_GEAR_ALTERNATIVES, HAS_OWNED_ONLY_GEAR, FULL_GEAR_SET, packsAGearSet, defaultRentalItems, toggleGearSelection } from '../../lib/gear'
 import { needsShoeSize } from '../../lib/logistics'
-import { usesCourseDays } from '../../lib/event-kinds'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
 import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
@@ -235,7 +234,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
       const c = choicesById[ev.id] ?? { rentGear: false, gearItems: [], needsTransport: null, addNitroxCourse: false }
       const base       = ev.price ?? 0
       const days       = Math.max(1, ev.dive_days ?? 1)
-      const gearIncluded = usesCourseDays(ev.type) && isGearIncludedCourse(ev.title)
+      const gearIncluded = ev.gear_included
       const gearCost   = (!gearIncluded && c.rentGear)
         ? c.gearItems.reduce((s, item) => s + (GEAR_ALACARTE_PRICES[item] ?? 0) * days, 0)
         : 0
@@ -297,7 +296,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   // child's profile, so a size typed here would land on the wrong diver.
   const packedForSelf = cart.flatMap(ev => {
     if ((forDiverByEvent[ev.id] ?? null) !== null) return []
-    if (usesCourseDays(ev.type) && isGearIncludedCourse(ev.title)) return [...FULL_GEAR_SET]
+    if (packsAGearSet(ev)) return [...FULL_GEAR_SET]
     const c = choicesById[ev.id]
     return c?.rentGear ? c.gearItems : []
   })
@@ -341,7 +340,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
     // circuiting on the first error.
     const calls = cart.map(async (ev) => {
       const c = choicesById[ev.id]
-      const gearIncluded = usesCourseDays(ev.type) && isGearIncludedCourse(ev.title)
+      const gearPacksASet = packsAGearSet(ev)
       // When the booking is for a linked child, look up nitrox status on
       // the child's profile (not the parent's) so we don't show / charge
       // for a nitrox course they don't need.
@@ -359,7 +358,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
       const rideWaitlisted = c.needsTransport === true && !rideAllowed
 
       const details: BookingDetails = {
-        gear: gearIncluded
+        gear: gearPacksASet
           ? { rent: false, included: true }
           : (c.rentGear ? { rent: true, items: c.gearItems } : { rent: false }),
         add_ons: [],
@@ -667,10 +666,8 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
             <div className="space-y-3">
               {cart.map(ev => {
                 const c = choicesById[ev.id]
-                const gearIncluded = usesCourseDays(ev.type) && isGearIncludedCourse(ev.title)
-                const showGearRentChoice =
-                  (!usesCourseDays(ev.type) && !!ev.gear_rental_info) ||
-                  (usesCourseDays(ev.type) && !isGearIncludedCourse(ev.title))
+                const gearPacksASet = packsAGearSet(ev)
+                const showGearRentChoice = !ev.gear_included
                 const transportSurcharge = ev.transport_price ?? 0
                 const transportIncluded = transportSurcharge <= 0
                 const evSeats = rideSeatsByEvent[ev.id]
@@ -696,7 +693,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                         <span className="ml-2 text-xs text-brand-300">{t.register.multi.forLabel(targetLabel)}</span>
                       )}
                     </p>
-                    {gearIncluded && (
+                    {gearPacksASet && (
                       <p className="text-xs text-brand-950 font-medium">{t.register.multi.gearIncluded}</p>
                     )}
                     {showGearRentChoice && (

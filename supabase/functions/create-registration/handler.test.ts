@@ -61,6 +61,8 @@ interface MockOpts {
   eventPriceId?: string | null
   eventDiveDays?: number
   eventHasTransport?: boolean
+  /** The event bundles gear (or needs none), so no gear reaches the price. */
+  eventGearIncluded?: boolean
   priceStartingAt?: number
   priceDeposit?: number
   priceTransport?: number
@@ -105,6 +107,7 @@ function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites }
             price: opts.eventPriceId ?? null,
             dive_days: opts.eventDiveDays ?? 1,
             has_transport: opts.eventHasTransport ?? true,
+            gear_included: opts.eventGearIncluded ?? false,
             ...(opts.eventPast
               ? { start_date: '2020-01-01', end_date: '2020-01-03', course_days: ['2020-01-01', '2020-01-02'] }
               : { start_date: '2030-06-01', end_date: '2030-06-03', course_days: ['2030-06-01', '2030-06-02', '2030-06-03'] }),
@@ -845,6 +848,42 @@ describe('handleRegistration — email behavior', () => {
     const details = captured.bookingInsert[0].details as { transportation: boolean; total: number }
     expect(details.transportation).toBe(false)
     expect(details.total).toBe(3200)
+  })
+
+  it('bills no gear on a gear-included event, whatever the request claims', async () => {
+    // An event whose fee covers a set puts no gear question, so a crafted
+    // `gear.rent` with items is answering one that was never asked. Billing it
+    // would charge a student for gear the course price already includes, and
+    // would put the same set on the packing list twice.
+    const { deps, captured } = makeDeps({
+      eventPriceId: 'p1', priceStartingAt: 12000, eventGearIncluded: true,
+    })
+    await handleRegistration(postJson({
+      ...goodBody,
+      email:    'g@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'tk',
+      details:  { gear: { rent: true, items: ['BCD', 'Wetsuit'] }, total: 99999 },
+    }), deps)
+    const details = captured.bookingInsert[0].details as { gear: unknown; total: number }
+    expect(details.gear).toEqual({ rent: false, included: true })
+    expect(details.total).toBe(12000)
+  })
+
+  it('still bills the gear a diver picked on an event that rents it', async () => {
+    const { deps, captured } = makeDeps({
+      eventPriceId: 'p1', priceStartingAt: 3200,
+    })
+    await handleRegistration(postJson({
+      ...goodBody,
+      email:    'g@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'tk',
+      details:  { gear: { rent: true, items: ['BCD'] }, total: 0 },
+    }), deps)
+    const details = captured.bookingInsert[0].details as { gear: { rent: boolean }; total: number }
+    expect(details.gear.rent).toBe(true)
+    expect(details.total).toBeGreaterThan(3200)
   })
 
   it('still bills the ride when the event does carry divers', async () => {

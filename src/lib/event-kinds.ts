@@ -106,6 +106,21 @@ export function hasDiveFlags(kind: EventKind): boolean {
 }
 
 /**
+ * True when the kind can put a diver in the water, so a bundled gear set is a
+ * set the shop physically packs.
+ *
+ * Its own question rather than a reuse of `hasDiveFlags`'s inverse or of
+ * `recordsSiteConditions`: a course is not flagged as diving and still sends
+ * Open Water students under, while an adventure travels overland and never
+ * does. Read by `packsAGearSet` in gear.ts — an adventure whose fee "includes
+ * gear" includes none, and treating it like a Discover Scuba would load
+ * wetsuits onto a van going up a mountain.
+ */
+export function entersTheWater(kind: EventKind): boolean {
+  return kind !== 'adventure'
+}
+
+/**
  * True when the kind travels overland, so an almanac observation for it
  * carries terrain readings — elevation, route surface, whether the summit was
  * out. Its own question rather than a reuse of `hasDiveFlags`'s inverse: a

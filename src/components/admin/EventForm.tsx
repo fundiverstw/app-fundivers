@@ -18,6 +18,7 @@ import { DATE_ENVELOPE_KINDS, COURSE_DAY_KINDS } from '../../lib/event-kinds'
 import { newestPerGroup, type PastEventOption } from '../../lib/event-preload'
 import { BTN_XS_GHOST, ERROR_NOTE } from '../../styles/tokens'
 import { keepsDepositOnCancel } from '../../lib/cancellation-policies'
+import { suggestsGearIncluded } from '../../lib/gear'
 import { t } from '../../i18n'
 
 // Shared form for creating and editing an EO_dive / EO_course. Owns all
@@ -110,6 +111,9 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
   const [addingSite, setAddingSite] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Has a person answered the gear question themselves? An edit starts true:
+  // the stored flag is their answer, whatever the title now says.
+  const [gearTouched, setGearTouched] = useState(mode === 'edit')
   // Past events for the preload picker, sorted most-recent-first.
   const [pastEvents, setPastEvents] = useState<PastEventOption[]>([])
   const [preloadId, setPreloadId] = useState<string>('')
@@ -261,6 +265,10 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
   function handlePreload(id: string) {
     setPreloadId(id)
     if (!id) return
+    // A preloaded event carries a gear answer somebody already gave. Treat it
+    // the way an edit is treated, or the suggestion below would overwrite it
+    // the moment the copied title disagrees with the shop's naming.
+    setGearTouched(true)
     const found = pastEvents.find(p => p.id === id)
     if (found) void applyPreload(found)
   }
@@ -268,6 +276,20 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm(f => ({ ...f, [key]: value }))
   }
+
+  /**
+   * Pre-tick "gear included" for the events that usually are, and stop the
+   * moment the admin says otherwise.
+   *
+   * Derived on every render rather than written into form state: a suggestion
+   * mirrored into state goes stale as soon as the title changes, and syncing it
+   * back with an effect is the cascading-render pattern React warns about. Only
+   * until the box is touched, and never on an edit — an event already in the
+   * DB carries an answer somebody gave, which no keystroke in the title may
+   * quietly overturn.
+   */
+  const suggestedGear = suggestsGearIncluded(form.type, form.display_title || form.admin_title)
+  const gearIncluded = gearTouched ? form.gear_included : suggestedGear
 
   function setCourseDay(index: number, value: string) {
     setForm(f => {
@@ -501,7 +523,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
 
     setSubmitting(true)
     try {
-      await onSubmit(sanitizeStaleRefs(form))
+      await onSubmit(sanitizeStaleRefs({ ...form, gear_included: gearIncluded }))
     } catch (err) {
       setError(errorMessage(err))
       setSubmitting(false)
@@ -743,9 +765,6 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
               <Checkbox checked={form.is_trip}         onChange={v => set('is_trip', v)}         label={ef.isTrip} />
               <Checkbox checked={form.is_private}      onChange={v => set('is_private', v)}      label={ef.isPrivate} />
             </div>
-            <Field label={ef.gearRental}>
-              <Input value={form.gear_rental} onChange={v => set('gear_rental', v)} />
-            </Field>
             <WixImageField
               label={ef.featuredImage}
               value={form.featured_image}
@@ -938,6 +957,27 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
           />
         </Section>
       )}
+
+      {/* Every kind answers the gear question, so this sits outside the
+          per-kind detail sections. The blurb below it describes the rental
+          terms and nothing more — it used to double as the on/off switch,
+          which is what `gear_included` replaced (20260911100000). */}
+      <Section title={ef.sectionGear}>
+        <Checkbox
+          checked={gearIncluded}
+          onChange={v => { setGearTouched(true); set('gear_included', v) }}
+          label={ef.gearIncluded}
+        />
+        <p className="text-xs text-white/70">{ef.gearIncludedHint}</p>
+        {suggestedGear && !gearIncluded && (
+          <p className="text-xs text-amber-200">{ef.gearIncludedSuggestion}</p>
+        )}
+        {!gearIncluded && !usesCourseDays(form.type) && (
+          <Field label={ef.gearRental}>
+            <Input value={form.gear_rental} onChange={v => set('gear_rental', v)} />
+          </Field>
+        )}
+      </Section>
 
       <Section title={ef.sectionCancellation}>
         <div className="grid grid-cols-2 gap-3">

@@ -28,7 +28,8 @@ const sampleEvent = (id: string, title: string): AppEvent => ({
   price: 2800, deposit_amount: null, transport_price: 0, currency: 'TWD',
   has_rooms: false, room_type_ids: [],
   has_addons: false, addon_ids: [],
-  gear_rental_info: null, has_transport: true, nitrox_required: false, dive_days: 1,
+  gear_rental_info: null, gear_included: false,
+  has_transport: true, nitrox_required: false, dive_days: 1,
   cancelled_at: null,
   full_payment_deadline: null,
   cancel_policy: null, cancel_date: null,
@@ -336,7 +337,7 @@ describe('MultiRegisterForm parent diver picker', () => {
   it('asks for a shoe size when the cart holds a gear-included course', async () => {
     setupFrom([])
     const user = userEvent.setup()
-    const dsd: AppEvent = { ...sampleEvent('e1', 'Discover Scuba Diving'), type: 'course' }
+    const dsd: AppEvent = { ...sampleEvent('e1', 'Discover Scuba Diving'), type: 'course', gear_included: true }
     render(
       <MultiRegisterForm
         events={[dsd]}
@@ -509,7 +510,7 @@ describe('MultiRegisterForm parent diver picker', () => {
         ? { data: [{ capacity: 4, claimed: 4 }], error: null }
         : { data: [], error: null }))
     const user = userEvent.setup()
-    const owCourse: AppEvent = { ...sampleEvent('e1', 'Open Water Course'), type: 'course' }
+    const owCourse: AppEvent = { ...sampleEvent('e1', 'Open Water Course'), type: 'course', gear_included: true }
     render(
       <MultiRegisterForm
         events={[owCourse]}
@@ -532,6 +533,7 @@ describe('MultiRegisterForm parent diver picker', () => {
     const dive: AppEvent = sampleEvent('e1', 'Kenting shore dive')
     const efr: AppEvent = {
       ...sampleEvent('e2', 'Emergency First Response (EFR)'), type: 'course', has_transport: false,
+      gear_included: true,
     }
     render(
       <MultiRegisterForm

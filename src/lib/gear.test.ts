@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  isGearIncludedCourse, gearPackList, gearSlot, gearAlternatives,
+  suggestsGearIncluded, packsAGearSet, gearPackList, gearSlot, gearAlternatives,
   defaultRentalItems, needsRental, toggleGearSelection, FULL_GEAR_SET, GEAR_ITEMS,
   GEAR_ALACARTE_PRICES, HAS_GEAR_ALTERNATIVES, RENTAL_GEAR_ITEMS,
   HAS_RENTAL_GEAR_ALTERNATIVES, HAS_OWNED_ONLY_GEAR,
@@ -45,40 +45,72 @@ describe('gearPackList', () => {
   })
 })
 
-describe('isGearIncludedCourse', () => {
-  it('treats Open Water courses as gear-included', () => {
-    expect(isGearIncludedCourse('Open Water Course')).toBe(true)
-    expect(isGearIncludedCourse('PADI Open Water Course')).toBe(true)
-    expect(isGearIncludedCourse('open water')).toBe(true)
+describe('packsAGearSet', () => {
+  // The flag alone cannot tell a Discover Scuba (a set is bundled and has to
+  // fit somebody) from a hike whose fee "includes gear" because there is none.
+  it('packs a set for a gear-included event that goes in the water', () => {
+    expect(packsAGearSet({ gear_included: true, type: 'course' })).toBe(true)
+    expect(packsAGearSet({ gear_included: true, type: 'dive' })).toBe(true)
   })
 
-  it('treats Discover Scuba / DSD / Try Dive as gear-included', () => {
-    expect(isGearIncludedCourse('Discover Scuba Diving')).toBe(true)
-    expect(isGearIncludedCourse('DSD')).toBe(true)
-    expect(isGearIncludedCourse('Try Dive')).toBe(true)
+  it('packs nothing for a gear-included outing that never gets wet', () => {
+    expect(packsAGearSet({ gear_included: true, type: 'adventure' })).toBe(false)
   })
 
-  it('treats EFR (dry first-aid course) as gear-included', () => {
-    expect(isGearIncludedCourse('EFR Course')).toBe(true)
-    expect(isGearIncludedCourse('Emergency First Response')).toBe(true)
+  it('packs nothing when gear is rented a-la-carte — the selection decides', () => {
+    expect(packsAGearSet({ gear_included: false, type: 'course' })).toBe(false)
+    expect(packsAGearSet({ gear_included: false, type: 'adventure' })).toBe(false)
+  })
+})
+
+describe('suggestsGearIncluded', () => {
+  it('suggests gear-included for Open Water courses', () => {
+    expect(suggestsGearIncluded('course', 'Open Water Course')).toBe(true)
+    expect(suggestsGearIncluded('course', 'PADI Open Water Course')).toBe(true)
+    expect(suggestsGearIncluded('course', 'open water')).toBe(true)
   })
 
-  it('does NOT bundle gear for Advanced Open Water', () => {
-    expect(isGearIncludedCourse('Advanced Open Water')).toBe(false)
-    expect(isGearIncludedCourse('PADI Advanced Open Water Course')).toBe(false)
+  it('suggests gear-included for Discover Scuba / DSD / Try Dive', () => {
+    expect(suggestsGearIncluded('course', 'Discover Scuba Diving')).toBe(true)
+    expect(suggestsGearIncluded('course', 'DSD')).toBe(true)
+    expect(suggestsGearIncluded('course', 'Try Dive')).toBe(true)
   })
 
-  it('does NOT bundle gear for other continuing-ed courses', () => {
-    expect(isGearIncludedCourse('EANx / Nitrox Course')).toBe(false)
-    expect(isGearIncludedCourse('Deep Specialty')).toBe(false)
-    expect(isGearIncludedCourse('PADI Rescue Course')).toBe(false)
-    expect(isGearIncludedCourse('Equipment Course')).toBe(false)
+  it('suggests gear-included for EFR (a dry first-aid course)', () => {
+    expect(suggestsGearIncluded('course', 'EFR Course')).toBe(true)
+    expect(suggestsGearIncluded('course', 'Emergency First Response')).toBe(true)
   })
 
-  it('handles null / empty titles', () => {
-    expect(isGearIncludedCourse(null)).toBe(false)
-    expect(isGearIncludedCourse(undefined)).toBe(false)
-    expect(isGearIncludedCourse('')).toBe(false)
+  // Not a dive and not a course: nothing goes in the water, so there is no
+  // gear question worth putting whatever it is called.
+  it('suggests gear-included for every non-diving kind', () => {
+    expect(suggestsGearIncluded('adventure', 'Yangmingshan Hike')).toBe(true)
+    expect(suggestsGearIncluded('adventure', null)).toBe(true)
+  })
+
+  it('does NOT suggest it for Advanced Open Water', () => {
+    expect(suggestsGearIncluded('course', 'Advanced Open Water')).toBe(false)
+    expect(suggestsGearIncluded('course', 'PADI Advanced Open Water Course')).toBe(false)
+  })
+
+  it('does NOT suggest it for other continuing-ed courses', () => {
+    expect(suggestsGearIncluded('course', 'EANx / Nitrox Course')).toBe(false)
+    expect(suggestsGearIncluded('course', 'Deep Specialty')).toBe(false)
+    expect(suggestsGearIncluded('course', 'PADI Rescue Course')).toBe(false)
+    expect(suggestsGearIncluded('course', 'Equipment Course')).toBe(false)
+  })
+
+  // A fun dive rents a-la-carte however it is titled — a shop that runs a
+  // "Discover Scuba" dive rather than a course still charges for the set.
+  it('does NOT suggest it for dives, whatever they are called', () => {
+    expect(suggestsGearIncluded('dive', 'Open Water Fun Dive')).toBe(false)
+    expect(suggestsGearIncluded('dive', 'Try Dive at Longdong')).toBe(false)
+  })
+
+  it('handles null / empty course titles', () => {
+    expect(suggestsGearIncluded('course', null)).toBe(false)
+    expect(suggestsGearIncluded('course', undefined)).toBe(false)
+    expect(suggestsGearIncluded('course', '')).toBe(false)
   })
 })
 

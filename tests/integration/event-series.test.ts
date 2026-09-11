@@ -331,7 +331,7 @@ describe('create_events_with_relations', () => {
   const baseEvent = (over: Record<string, unknown> = {}) => ({
     kind: 'dive', admin_title: 'atomic dive', notes: '', start_date: '2032-01-03',
     fully_booked: false, featured: false, is_private: false, has_transport: true,
-    is_boat_dive: false, is_trip: false, nitrox_required: false,
+    is_boat_dive: false, is_trip: false, nitrox_required: false, gear_included: false,
     ...over,
   })
 

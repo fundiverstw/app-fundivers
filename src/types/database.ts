@@ -1626,6 +1626,10 @@ export interface Database {
           is_trip: boolean | null
           nitrox_required: boolean
           gear_rental: string | null
+          /** True when the event puts no gear question on the registration form
+           *  and no gear in its price — the fee covers a set, or the event needs
+           *  none (20260911100000). */
+          gear_included: boolean
           notes: string | null
           trip_template_id: string | null
           course_name: string | null
@@ -1666,6 +1670,7 @@ export interface Database {
           is_trip?: boolean | null
           nitrox_required?: boolean
           gear_rental?: string | null
+          gear_included?: boolean
           notes?: string | null
           trip_template_id?: string | null
           course_name?: string | null
@@ -3023,8 +3028,15 @@ export interface AppEvent {
   room_type_ids: string[]
   has_addons: boolean
   addon_ids: string[]
-  /** Free text describing gear-rental pricing on dives; null/empty = no gear offered. */
+  /** Free text describing gear-rental pricing on dives. Describes the terms
+   *  only — whether gear is offered at all is `gear_included`. */
   gear_rental_info: string | null
+  /** Admin-set: the event asks no gear question and bills no gear, because the
+   *  fee already covers a set (Open Water, Discover Scuba) or nothing goes in
+   *  the water (a dry course, a non-diving outing). The register forms record
+   *  `gear: { rent: false, included: true }` for these and every price path
+   *  scores gear at zero. */
+  gear_included: boolean
   /** dive: nitrox_required flag; course: always false (courses handle cert separately). */
   nitrox_required: boolean
   /** Number of in-water days. Used to gate the gear section on courses. */

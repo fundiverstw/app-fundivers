@@ -66,6 +66,10 @@ function buildEvent(overrides: Partial<AppEvent> = {}): AppEvent {
     featured: overrides.featured ?? false,
     fully_booked: overrides.fully_booked ?? false,
     has_transport: overrides.has_transport ?? true,
+    // Gear bundled by default: these tests walk the register wizard to get at
+    // something else, and an event that rents gear stops on an unanswered
+    // rental question.
+    gear_included: overrides.gear_included ?? true,
     price: overrides.price ?? 1500,
     currency: overrides.currency ?? 'TWD',
   }
