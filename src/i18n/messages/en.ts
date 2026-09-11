@@ -1384,6 +1384,7 @@ export const en = {
       applications: { title: 'Accounts on hold', blurb: 'Reinstate or close an account you have put on hold. Signing up no longer needs approval, so this fills only when an admin suspends someone.' },
       dashboard: { title: 'Business performance', blurb: 'Bookings, revenue and activity charts across the shop.' },
     audits: { title: 'Audits', blurb: 'Trace a diver’s full payment history and every registration’s balance changes — payments, refunds, credits and adjustments in one time-ordered log.' },
+      refunds: { title: 'Refunds & cancellations', blurb: 'Refund requests waiting on you, and cancelled bookings whose money the shop still holds — hand it back, or keep it as store credit.' },
       newEvent: { title: 'New event', blurb: 'Create a dive or course. Edit existing events from the calendar.' },
       rooms: { title: 'Room options', blurb: 'Add, rename, reprice or delete room types offered with multi-day dives.' },
       addons: { title: 'Add-ons', blurb: 'Add, rename, reprice or delete optional items (gear, courses, transport).' },

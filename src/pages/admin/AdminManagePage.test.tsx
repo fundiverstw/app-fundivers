@@ -24,4 +24,14 @@ describe('AdminManagePage', () => {
     expect(hrefs).toContain('/admin/terms')
     expect(hrefs).toContain('/admin/accounting')
   })
+
+  // The refunds page was reachable only from badges gated on OPEN refund
+  // requests, so a cancelled booking the shop still holds money on — which
+  // raises no request — was invisible from every admin surface. This tile is
+  // the unconditional way in.
+  it('links the refunds page unconditionally', () => {
+    render(<MemoryRouter><AdminManagePage /></MemoryRouter>)
+    const link = screen.getByRole('link', { name: new RegExp(m.refunds.title) })
+    expect(link).toHaveAttribute('href', '/admin/refunds')
+  })
 })
