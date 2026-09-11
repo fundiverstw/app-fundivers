@@ -154,11 +154,14 @@ ride answer, so a crafted body cannot buy gear the event does not sell.
 `gear_included` alone does not say whether a set physically goes out.
 Two events answer it the same way and want opposite things from the
 logistics board: a Discover Scuba bundles a full set that still has to
-fit somebody, an EFR classroom needs none. `packsAGearSet()` separates
-them on `dive_days`, the in-water day count the admin already sets — over
-zero and the booking records `gear: { rent: false, included: true }` and
-`FULL_GEAR_SET` is packed; zero and it records plain `{ rent: false }`
-and nothing is packed.
+fit somebody, a hike needs none. `packsAGearSet()` separates them on
+`entersTheWater()` — an event that dives records
+`gear: { rent: false, included: true }` and has `FULL_GEAR_SET` packed;
+an overland outing records plain `{ rent: false }` and nothing is packed.
+Deliberately a question about the kind, not about `dive_days`: that
+column is optional and the shop's live Open Water courses leave it null,
+so reading it would have stopped packing sets for the students who own
+none.
 
 A packed set is exactly why the size question still has to be put:
 nobody chose the items, but the shop still has to pack ones that fit.

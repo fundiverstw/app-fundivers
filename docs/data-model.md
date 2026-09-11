@@ -88,7 +88,7 @@ collapsed into `events` and the reference tables renamed (`EO_prices` →
 | **course kinds:** `course_days` (`date[]`, max 4 — see [events-and-bookings.md](./events-and-bookings.md#course_days)), `course_name`, `included`, `schedule` | discrete session days, no envelope |
 | **dive-only:** `nitrox_required`, `is_boat_dive` | the genuinely diving-specific flags |
 | **dive / adventure:** `is_trip`, `gear_rental`, `notes` | `gear_rental` is free text describing the rental terms. It no longer decides whether gear is offered — `gear_included` does |
-| `gear_included` (NOT NULL, default false) | shared. True when the event puts no gear question and bills no gear: the fee covers a set, or nothing goes in the water. `create-registration` re-reads it and overwrites `details.gear`, the same way it forces `details.transportation`. Whether a set is physically packed is `packsAGearSet()` — this flag **and** `dive_days > 0`. Replaced a substring match on course titles (20260911100000), which now only pre-ticks the box on the admin form |
+| `gear_included` (NOT NULL, default false) | shared. True when the event puts no gear question and bills no gear: the fee covers a set, or nothing goes in the water. `create-registration` re-reads it and overwrites `details.gear`, the same way it forces `details.transportation`. Whether a set is physically packed is `packsAGearSet()` — this flag **and** `entersTheWater(kind)`, so an overland outing that bundles "gear" packs none. Replaced a substring match on course titles (20260911100000), which now only pre-ticks the box on the admin form |
 
 `series_id` groups the batch of occurrences a recurrence rule generated
 (`event_series`); each occurrence is otherwise fully independent.
