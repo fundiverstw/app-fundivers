@@ -31,17 +31,21 @@ needing a third-party dashboard login.
 **2 High (fundive only), 2 Medium, 5 Low.** Nothing found in app-fundivers
 rises above Low.
 
-| # | Sev | Finding | Repo |
-|---|-----|---------|------|
-| H1 | High | `normalize_profile_values()` executable by `anon` — unauthenticated rewrite of every profile | fundive |
-| H2 | High | Baseline default privileges grant `anon` ALL on new tables and functions | fundive |
-| M1 | Medium | Terms consent is self-stampable; `accept_current_terms`' stated guarantee does not hold | both |
-| M2 | Medium | jsPDF 2.5.1 runs server-side on diver-supplied text; 4 advisories, one critical | both |
-| L1 | Low | Shop bank account details readable by `anon` | both |
-| L2 | Low | Stray `anon` DML grants on `almanac_records` | app-fundivers |
-| L3 | Low | Storage buckets carry no size or MIME limit | both |
-| L4 | Low | `admin-set-temp-password` can silently take over another admin | both |
-| L5 | Low | `rls_auto_enable()` is never wired to an event trigger | both |
+Both Highs are fixed, in `20260911100000` and `20260911110000`, each with an
+integration test confirmed to fail against the pre-fix database. Everything
+else is open.
+
+| # | Sev | Finding | Repo | Status |
+|---|-----|---------|------|--------|
+| H1 | High | `normalize_profile_values()` executable by `anon` — unauthenticated rewrite of every profile | fundive | **FIXED** |
+| H2 | High | Baseline default privileges grant `anon` ALL on new tables and functions | fundive | **FIXED** |
+| M1 | Medium | Terms consent is self-stampable; `accept_current_terms`' stated guarantee does not hold | both | Open |
+| M2 | Medium | jsPDF 2.5.1 runs server-side on diver-supplied text; 4 advisories, one critical | both | Open |
+| L1 | Low | Shop bank account details readable by `anon` | both | Open |
+| L2 | Low | `anon` holds DML on nearly every table; RLS is the sole control | both | fundive **FIXED**; app open |
+| L3 | Low | Storage buckets carry no size or MIME limit | both | Open |
+| L4 | Low | `admin-set-temp-password` can silently take over another admin | both | Open |
+| L5 | Low | `rls_auto_enable()` is never wired to an event trigger | both | Open |
 
 The two Highs are the same root cause, and both are specific to the public
 repo. app-fundivers' squashed baseline has hardened default privileges;
@@ -53,7 +57,7 @@ one in the other — and it is inherited by every shop that forks fundive.
 
 ## Findings
 
-### H1 — `normalize_profile_values()` is callable by `anon` *(fundive)*
+### H1 — `normalize_profile_values()` is callable by `anon` *(fundive)* — FIXED
 
 `public.normalize_profile_values()` is `SECURITY DEFINER`, owned by `postgres`,
 and carries no authorization check of its own. In fundive's database, `anon`
@@ -105,43 +109,75 @@ app-fundivers: {postgres=X/postgres,service_role=X/postgres}       (safe)
 fundive:       {postgres=X/postgres,anon=X/postgres,...}           (exploitable)
 ```
 
-Fix is a forward migration adding `anon` to the revoke. Fixing H2 as well
-prevents the next occurrence.
+**Status: fixed** in `20260911100000_revoke_anon_execute_on_normalize_profile_values.sql`,
+which adds `anon` to the revoke. Re-running the exploit against the patched
+database returns `401 {"code":"42501","message":"permission denied for function
+normalize_profile_values"}`; `service_role`, the path the admin Manage page
+uses, still executes it. Guarded by a case in
+`tests/integration/anon-definer-rpc-lockdown.test.ts`, confirmed to fail before
+the fix. H2 removes the default that created the gap.
 
-### H2 — Baseline default privileges hand `anon` everything *(fundive)*
+### H2 — New objects grant `anon` write privileges *(fundive)* — FIXED
 
-The two squashed baselines disagree about what a newly created object grants.
+Settled by probe rather than by reading the baselines, because the dumps are
+easy to misread. One table and one function were created as `postgres` in each
+database, inside a rolled-back transaction:
 
-app-fundivers (`20260707230000_squashed_baseline.sql`):
-
-```sql
-ALTER DEFAULT PRIVILEGES ... GRANT ALL ON FUNCTIONS TO "postgres";
-ALTER DEFAULT PRIVILEGES ... GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLES TO "anon";
+```
+fundive:       new table -> anon S=true  I=true  U=true  D=true
+app-fundivers: new table -> anon S=false I=false U=false D=false
 ```
 
-fundive (`20260708090000_squashed_baseline.sql`):
+The cause is in the two squashed baselines:
 
 ```sql
+-- app-fundivers 20260707230000
+ALTER DEFAULT PRIVILEGES ... GRANT ALL ON FUNCTIONS TO "postgres";
+ALTER DEFAULT PRIVILEGES ... GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLES TO "anon";
+
+-- fundive 20260708090000
 ALTER DEFAULT PRIVILEGES ... GRANT ALL ON FUNCTIONS TO "anon";
 ALTER DEFAULT PRIVILEGES ... GRANT ALL ON TABLES TO "anon";
 ```
 
-app-fundivers grants `anon` no EXECUTE on new functions and no DML on new
-tables. fundive grants `anon` EXECUTE on every new function and
-SELECT/INSERT/UPDATE/DELETE on every new table, automatically, forever.
+app-fundivers tightened Supabase's stock defaults; fundive's baseline captured
+them as shipped. Every table created in fundive since therefore grants the
+logged-out role full DML, and every function grants it EXECUTE.
 
-Today nothing is exploitable through the table half: every one of the 65 tables
-has RLS enabled, and the policies are role-scoped correctly. RLS is the only
-thing holding the line, though — a table added without `enable row level
-security` is published to the internet, readable and writable, the moment the
-migration lands. There is no backstop (see L5). The function half is already
-exploitable; H1 is the instance.
+Worth separating the function half carefully, because it is not quite what it
+looks like. PostgreSQL's own built-in default grants `EXECUTE` on a new function
+to `PUBLIC`, and `anon` is in `PUBLIC` — that is true in **both** repos, and it
+is why every migration in this schema writes `revoke all on function ... from
+public, anon`. What fundive adds on top is an *explicit* `anon` grant, and an
+explicit grant is not removed by a revoke aimed at `PUBLIC`. That is exactly the
+gap H1 fell through.
 
-This matters most because fundive is what shops fork. A deployment inherits the
-baseline, and with it the requirement that every future migration remember to
-name `anon` in its revoke. app-fundivers' defaults make the safe outcome
-automatic; fundive's make it a thing to remember. Porting app-fundivers'
-default-privilege block is the fix, and it also neutralizes H1's class.
+Nothing was exploitable through the table half: all 65 tables have RLS enabled,
+and not one policy in the schema grants `anon` an INSERT, UPDATE or DELETE —
+checked explicitly, because a blanket revoke would have broken the logged-out
+register form if one did. RLS was carrying the whole load alone, and
+`rls_auto_enable()`, the event trigger that would catch a table shipped without
+RLS, is defined in the baseline but wired to nothing (L5). A forked shop that
+adds a table and forgets `enable row level security` publishes it to the
+internet, readable and writable.
+
+That is why this is rated High despite nothing being exploitable today: fundive
+is what shops fork, so the baseline's defaults become theirs.
+
+**Status: fixed** in `20260911110000_anon_holds_no_write_privileges.sql`. The
+default privileges are set to match app-fundivers exactly rather than to a third
+posture — drift between the two schemas is what produced H1, so the fix is
+parity. `anon`'s INSERT/UPDATE/DELETE are also revoked on the tables that
+already carried them (64 tables to 0), with SELECT deliberately left intact for
+the catalog tables the register form reads before sign-in. Verified after the
+migration: a new table in fundive now grants `anon` exactly what one in
+app-fundivers does, and all 64 anon-readable tables still read.
+
+Guarded by `tests/integration/anon-write-lockdown.test.ts`, which distinguishes
+the two layers by message — `permission denied for table X` (no grant) versus
+`new row violates row-level security policy` (grant present, RLS refusing). All
+16 write assertions were confirmed to fail against the pre-fix grants; a test
+that only asserted `error !== null` would have passed either way.
 
 ### M1 — Terms consent can be self-stamped *(both)*
 
@@ -241,23 +277,50 @@ convincing. Splitting the transfer columns behind an `authenticated`-only policy
 (or a view) keeps the register form working and takes the account number off the
 open web.
 
-### L2 — Stray `anon` DML grants on `almanac_records` *(app-fundivers)*
+### L2 — `anon` holds DML on nearly every table *(both)*
 
-The table grant diff between the two databases turned up exactly one row, and it
-goes against app-fundivers:
+Correcting an earlier reading of this. A relative diff of the two databases
+surfaced only `almanac_records`, which made it look like a stray grant unique to
+app-fundivers. Checked absolutely rather than as a diff, the picture reverses:
 
 ```
-app-fundivers: almanac_records | anon:siud | auth:siud
-fundive:       almanac_records | anon:---- | auth:s---
+app-fundivers:  65 of 65 tables grant anon INSERT/UPDATE/DELETE
+fundive:        64 of 65   (before 20260911110000)
 ```
 
-`anon` holds SELECT, INSERT, UPDATE and DELETE. Not exploitable: both policies
-on the table are scoped to the `authenticated` role, so `anon` matches none of
-them. Probed both directions — reads return 0 rows, and an insert raises
-`new row violates row-level security policy`. RLS is doing its job.
+`almanac_records` is not the outlier that is broken — it is the one table
+fundive got *right*, because its migration writes an explicit
+`revoke all on table public.almanac_records from anon, authenticated`. Every
+other table simply inherited the defaults. The affected list includes
+`profiles`, `payments`, `credits`, `bookings`, `admin_audit_log`,
+`waiver_signatures` and `terms_consent_tokens`.
 
-It is still a grant with no purpose, and it removes the second line of defense
-on a table holding diver-submitted observations. `revoke` it to match fundive.
+None of it is exploitable. There is not a single INSERT, UPDATE or DELETE policy
+granted to `anon` anywhere in either schema, so RLS refuses every one of these
+writes — verified by probe in both databases and over HTTP. This is the normal
+Supabase posture, where broad table grants are expected and RLS is the
+authorization layer. It is recorded because it means RLS is the *only* layer,
+across every table, in a schema whose security model is otherwise carefully
+two-layered.
+
+**Status: fixed in fundive** by `20260911110000` (64 tables to 0, SELECT
+retained). Open in app-fundivers, where the same revoke would apply cleanly.
+
+One loose end worth the owner's attention. app-fundivers' own baseline grants
+`profiles` only `REFERENCES,TRIGGER,TRUNCATE,MAINTAIN` to `anon`, and a table
+created there today gets no DML at all — yet its live local database shows
+`anon=arwdDxtm` on all 65 tables, including tables created by migrations well
+after the baseline. Its local grants therefore do not match what its own
+migrations produce, and `supabase/seed.sql` contains no GRANT statements to
+explain it. Provenance was not established. **Check production's actual grants
+read-only before assuming either state**, since that database is the one that
+matters and this audit could not reach it.
+
+Separately: these defaults leave `anon` holding `TRUNCATE`, which is exempt from
+RLS, on every table in both repos. PostgREST exposes no TRUNCATE verb so it is
+unreachable over the API, and it was deliberately left alone by the fix rather
+than changed in one repo only — but it is the one privilege in this group that
+RLS would not stop, and it belongs in a change that moves both repos together.
 
 ### L3 — Storage buckets carry no size or MIME limit *(both)*
 
