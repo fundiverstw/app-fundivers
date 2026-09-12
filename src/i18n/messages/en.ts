@@ -1391,6 +1391,8 @@ export const en = {
     },
     manage: {
       title: 'Manage',
+      waiting: (n: number) => `${n}`,
+      waitingAria: (n: number, page: string) => `${page}: ${n} waiting on you`,
       groups: {
         overview: 'Overview',
         eventsTrips: 'Events & Trips',

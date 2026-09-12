@@ -1372,6 +1372,8 @@ export const ja: Messages = {
     },
     manage: {
       title: '管理',
+      waiting: (n: number) => `${n}`,
+      waitingAria: (n: number, page: string) => `${page}：未処理 ${n} 件`,
       groups: {
         overview: '概要',
         eventsTrips: 'イベント・ツアー',

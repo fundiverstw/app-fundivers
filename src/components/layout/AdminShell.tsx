@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { personName } from '../../lib/names'
 import { NavLink, Outlet, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
-import { supabase } from '../../lib/supabase'
+import {
+  countOnHoldAccounts, countOpenRefundRequests, countOpenDiscountRequests,
+} from '../../lib/admin-pending'
 import { Logo } from '../Logo'
 import { CalendarIcon } from '../icons/CalendarIcon'
 import { CrosshairIcon } from '../icons/CrosshairIcon'
@@ -42,43 +44,26 @@ export function AdminShell() {
   const [refundCount, setRefundCount] = useState<number | null>(null)
   const [discountCount, setDiscountCount] = useState<number | null>(null)
 
-  // Refetch pending-applications and open-refund-request counts on every admin
-  // route change so the badges reflect reality after approve/reject without a
-  // global event bus. Only admins can read these rows via RLS, so we gate the
-  // fetch (and the rendered badges below) on role.
+  // Refetch on every admin route change so the badges reflect reality after an
+  // approve/reject without a global event bus. Only admins can read these rows
+  // via RLS, so we gate the fetch (and the rendered badges below) on role.
+  //
+  // The counts themselves live in src/lib/admin-pending.ts, because the Manage
+  // hub puts a chip on the same three pages. Two copies of "what counts as
+  // waiting" drift, and the first thing to go wrong is a badge that disagrees
+  // with the queue it links to.
   useEffect(() => {
     if (profile?.role !== 'admin') return
     let cancelled = false
-    // Counts every on-hold diver, exactly like the queue this badge links to
-    // (AdminApplicationsPage). Any condition added here must be added to the
-    // queue too, or the badge lies. It reads 0 in normal operation now that
-    // signing up no longer parks anyone at 'pending' — a non-zero badge means
-    // an admin has suspended someone and not yet resolved it.
-    supabase
-      .from('profiles')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'pending')
-      .then(({ count }) => { if (!cancelled) setPendingCount(count ?? 0) })
-    supabase
-      .from('bookings')
-      .select('id', { count: 'exact', head: true })
-      .not('refund_requested_at', 'is', null)
-      .neq('status', 'cancelled')
-      .then(({ count }) => { if (!cancelled) setRefundCount(count ?? 0) })
-    // Discount requests nobody has decided. Undecided is the state that costs
-    // something: the diver has been told the shop will confirm, and until it
-    // does their balance and their expectation disagree.
-    //
-    // The cancelled-booking exclusion matches the queue this badge links to
-    // (fetchOpenDiscountRequests), and has to: decide_booking_discount refuses
-    // a cancelled booking, so counting one here would be a badge pointing at a
-    // decision nobody can make.
-    supabase
-      .from('booking_discounts')
-      .select('id, bookings!inner(status)', { count: 'exact', head: true })
-      .eq('status', 'requested')
-      .neq('bookings.status', 'cancelled')
-      .then(({ count }) => { if (!cancelled) setDiscountCount(count ?? 0) })
+    countOnHoldAccounts()
+      .then(n => { if (!cancelled) setPendingCount(n) })
+      .catch(() => {})
+    countOpenRefundRequests()
+      .then(n => { if (!cancelled) setRefundCount(n) })
+      .catch(() => {})
+    countOpenDiscountRequests()
+      .then(n => { if (!cancelled) setDiscountCount(n) })
+      .catch(() => {})
     return () => { cancelled = true }
   }, [profile?.role, location.pathname])
   const displayPendingCount = profile?.role === 'admin' ? pendingCount : null

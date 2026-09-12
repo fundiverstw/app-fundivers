@@ -1373,6 +1373,8 @@ export const zhTW: Messages = {
     },
     manage: {
       title: '管理',
+      waiting: (n: number) => `${n}`,
+      waitingAria: (n: number, page: string) => `${page}：${n} 筆等待你處理`,
       groups: {
         overview: '總覽',
         eventsTrips: '活動與行程',

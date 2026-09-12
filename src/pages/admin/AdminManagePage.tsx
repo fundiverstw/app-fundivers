@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { fetchPendingCounts } from '../../lib/admin-pending'
 import { t } from '../../i18n'
 import { UserPlusIcon } from '../../components/icons/UserPlusIcon'
 import { ChartIcon } from '../../components/icons/ChartIcon'
@@ -36,6 +37,15 @@ import { PowerIcon } from '../../components/icons/PowerIcon'
 // an icon grid (two columns on a phone, three from `sm` up). Each card is an
 // icon + title; the longer description is kept as the link's hover tooltip so
 // the grid stays compact without losing the explanation.
+//
+// A handful of those pages can have somebody waiting on a decision — a refund
+// asked for, a discount asked for, an account on hold, a wildlife name
+// proposed. The grid said nothing about it, so the only way to find out was to
+// open each page and look. Those cards now carry a count, from the same
+// definitions the header badges use (src/lib/admin-pending.ts).
+//
+// A card with nothing waiting carries nothing: a row of zeroes is noise, and
+// the point of the chip is that it is rare enough to notice.
 
 interface ManageCard {
   to: string
@@ -114,6 +124,18 @@ const GROUPS: ManageGroup[] = [
 ]
 
 export function AdminManagePage() {
+  const [pending, setPending] = useState<Record<string, number>>({})
+
+  // Refetched on mount, which is every visit to the tab: an admin who has just
+  // worked a queue comes back to a grid that agrees with what they did.
+  useEffect(() => {
+    let alive = true
+    fetchPendingCounts()
+      .then(counts => { if (alive) setPending(counts) })
+      .catch(() => { /* no chips rather than no page */ })
+    return () => { alive = false }
+  }, [])
+
   return (
     <div className="max-w-3xl mx-auto space-y-8">
       <h1 className="text-2xl font-bold text-white">{m.title}</h1>
@@ -126,8 +148,16 @@ export function AdminManagePage() {
                 <Link
                   to={c.to}
                   title={c.blurb}
-                  className="flex-1 flex flex-col items-center text-center gap-2 bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 hover:bg-white/90 transition-colors"
+                  className="relative flex-1 flex flex-col items-center text-center gap-2 bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 hover:bg-white/90 transition-colors"
                 >
+                  {(pending[c.to] ?? 0) > 0 && (
+                    <span
+                      className="absolute top-1.5 right-1.5 min-w-5 h-5 px-1.5 inline-flex items-center justify-center rounded-full bg-accent text-white text-[11px] font-bold leading-none tabular-nums"
+                      aria-label={m.waitingAria(pending[c.to], c.title)}
+                    >
+                      {m.waiting(pending[c.to])}
+                    </span>
+                  )}
                   <span className="text-brand-700" aria-hidden="true">{c.icon}</span>
                   <span className="text-sm font-semibold text-brand-900 leading-tight">{c.title}</span>
                 </Link>
