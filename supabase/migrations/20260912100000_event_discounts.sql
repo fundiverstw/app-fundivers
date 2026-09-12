@@ -439,7 +439,9 @@ begin
     v_booking.user_id,
     'Discount approved',
     v_note || ' has been applied to your booking.',
-    '/payments',
+    -- The diver's payments tab is nested under /records; a bare /payments
+    -- falls through the router to the calendar.
+    '/records/payments',
     'discount',
     v_event
   );

@@ -80,9 +80,12 @@ export function BookingDiscounts({
             const d = byId.get(row.discount_id)
             const label = d?.label ?? row.discount_id
             return (
-              <li key={row.id} className="flex items-start justify-between gap-2 text-xs">
+              // Stacked below `sm`: the registrant card is already a narrow
+              // column, and two buttons beside the label leave a 320px phone
+              // enough room to render the discount's name one letter per line.
+              <li key={row.id} className="flex flex-col gap-1 text-xs sm:flex-row sm:items-start sm:justify-between sm:gap-2">
                 <span className="min-w-0 flex-1 text-brand-950 font-medium">
-                  <span className="block truncate">
+                  <span className="block break-words">
                     {label}
                     {d && <span className="ml-1 text-brand-950/70">{discountValueLabel(d, cur)}</span>}
                   </span>

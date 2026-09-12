@@ -133,10 +133,13 @@ export function AdminDiscountsPage() {
       ) : (
         <ul className="space-y-3">
           {requests.map(r => (
-            <li key={r.id} className={`${CARD_ELEVATED} p-4 flex items-center justify-between gap-3`}>
+            // Stacked below `sm`: two full-size buttons on one row leave a
+            // 320px phone about forty pixels for the diver's name, which a
+            // flex child with min-w-0 will happily render one letter per line.
+            <li key={r.id} className={`${CARD_ELEVATED} p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}>
               <div className="min-w-0 flex-1">
-                <div className="font-semibold text-brand-950 truncate">{r.diverName}</div>
-                <div className={`text-xs ${TEXT_MUTED} truncate`}>{r.eventTitle}</div>
+                <div className="font-semibold text-brand-950 break-words">{r.diverName}</div>
+                <div className={`text-xs ${TEXT_MUTED} break-words`}>{r.eventTitle}</div>
                 <div className={`text-xs ${TEXT_MUTED} mt-0.5`}>
                   {r.discount.label}
                   {' · '}
@@ -150,9 +153,9 @@ export function AdminDiscountsPage() {
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <button type="button" onClick={() => decide(r, true)} disabled={acting === r.id}
-                  className={`${BTN_PRIMARY} whitespace-nowrap`}>{dc.approve}</button>
+                  className={`${BTN_PRIMARY} flex-1 sm:flex-none whitespace-nowrap`}>{dc.approve}</button>
                 <button type="button" onClick={() => decide(r, false)} disabled={acting === r.id}
-                  className={`${BTN_GHOST} whitespace-nowrap`}>{dc.reject}</button>
+                  className={`${BTN_GHOST} flex-1 sm:flex-none whitespace-nowrap`}>{dc.reject}</button>
               </div>
             </li>
           ))}
@@ -176,9 +179,9 @@ export function AdminDiscountsPage() {
       ) : (
         <ul className="space-y-2">
           {catalog.map(d => (
-            <li key={d.id} className={`${CARD_ELEVATED} p-3 flex items-start justify-between gap-3`}>
+            <li key={d.id} className={`${CARD_ELEVATED} p-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between`}>
               <div className="min-w-0">
-                <p className="font-semibold text-brand-950 text-sm truncate">
+                <p className="font-semibold text-brand-950 text-sm break-words">
                   {d.label}
                   <span className="ml-2 font-normal tabular-nums text-brand-900">
                     {discountValueLabel(d, CURRENCY)}

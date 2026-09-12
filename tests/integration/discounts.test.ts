@@ -429,7 +429,7 @@ describe('deciding a discount', () => {
     const { data: notes } = await admin.from('notifications')
       .select('title, url, kind').eq('user_id', diver.id).eq('kind', 'discount')
     expect(notes?.length).toBeGreaterThan(0)
-    expect(notes?.[0].url).toBe('/payments')
+    expect(notes?.[0].url).toBe('/records/payments')
 
     const diverApi = await userClient(diver.email, diver.password)
     const { data: own } = await diverApi.from('booking_discounts')
