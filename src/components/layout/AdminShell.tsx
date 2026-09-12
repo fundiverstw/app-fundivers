@@ -68,10 +68,16 @@ export function AdminShell() {
     // Discount requests nobody has decided. Undecided is the state that costs
     // something: the diver has been told the shop will confirm, and until it
     // does their balance and their expectation disagree.
+    //
+    // The cancelled-booking exclusion matches the queue this badge links to
+    // (fetchOpenDiscountRequests), and has to: decide_booking_discount refuses
+    // a cancelled booking, so counting one here would be a badge pointing at a
+    // decision nobody can make.
     supabase
       .from('booking_discounts')
-      .select('id', { count: 'exact', head: true })
+      .select('id, bookings!inner(status)', { count: 'exact', head: true })
       .eq('status', 'requested')
+      .neq('bookings.status', 'cancelled')
       .then(({ count }) => { if (!cancelled) setDiscountCount(count ?? 0) })
     return () => { cancelled = true }
   }, [profile?.role, location.pathname])

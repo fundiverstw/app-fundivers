@@ -395,6 +395,30 @@ describe('deciding a discount', () => {
     expect(booking?.status).toBe('confirmed')
   })
 
+  // The admin header badge counts these with an embedded filter, and the queue
+  // it links to drops cancelled bookings. If the two ever disagree the badge
+  // points at a decision nobody can make -- decide_booking_discount refuses a
+  // cancelled booking outright.
+  it('is not counted by the header badge once its booking is cancelled', async () => {
+    const { bookingId } = await openRequest()
+    const adminApi = await userClient(adminUser.email, adminUser.password)
+
+    const countOpen = async () => {
+      const { count, error } = await adminApi
+        .from('booking_discounts')
+        .select('id, bookings!inner(status)', { count: 'exact', head: true })
+        .eq('status', 'requested')
+        .neq('bookings.status', 'cancelled')
+      expect(error).toBeNull()
+      return count ?? 0
+    }
+
+    const before = await countOpen()
+    expect(before).toBeGreaterThan(0)
+    await admin.from('bookings').update({ status: 'cancelled' }).eq('id', bookingId)
+    expect(await countOpen()).toBe(before - 1)
+  })
+
   it('tells the diver, and lets them read their own request', async () => {
     const { requestId, bookingId } = await openRequest()
     const adminApi = await userClient(adminUser.email, adminUser.password)
