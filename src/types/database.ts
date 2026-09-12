@@ -167,14 +167,31 @@ export interface Database {
         Args: { p_event_id: string }
         Returns: Array<{ seats: number; staff: number; capacity: number; claimed: number }>
       }
-      // Defined in 20260707050000_converge_functions_to_events.sql. Reconciles an
-      // event's junction rows (rooms / add-ons / destinations) in one call.
+      // Defined in 20260707050000_converge_functions_to_events.sql, widened with
+      // p_discount_ids in 20260912100000. Reconciles an event's junction rows
+      // (rooms / add-ons / destinations / offered discounts) in one call.
+      // Both defined in 20260912100000_event_discounts.sql.
+      // `request` records a diver (or an admin, on their behalf) asking for one
+      // of the event's discounts; it applies no money and returns the new
+      // booking_discounts id. `decide` is admin-only and is the only thing that
+      // turns a request into money — on approval it writes the negative
+      // booking_amendments row and returns the amount taken off, clamped to what
+      // the booking still owed; on rejection it returns 0.
+      request_booking_discount: {
+        Args: { p_booking_id: string; p_discount_id: string; p_note?: string | null }
+        Returns: string
+      }
+      decide_booking_discount: {
+        Args: { p_request_id: string; p_approve: boolean; p_note?: string | null }
+        Returns: number
+      }
       set_event_relations: {
         Args: {
           p_event_id:         string
           p_room_ids?:        string[]
           p_addon_ids?:       string[]
           p_destination_ids?: string[]
+          p_discount_ids?:    string[]
         }
         Returns: undefined
       }
@@ -329,6 +346,7 @@ export interface Database {
           p_series?: unknown
           p_series_id?: string | null
           p_created_by?: string | null
+          p_discount_ids?: string[]
         }
         Returns: string[]
       }
@@ -1361,6 +1379,89 @@ export interface Database {
           mode: 'require' | 'exempt'
         }
         Update: Partial<Database['public']['Tables']['event_waivers']['Insert']>
+        Relationships: []
+      }
+      // Shop-authored discount catalog (20260912100000). Offered per event via
+      // event_discounts, asked for per booking via booking_discounts, and worth
+      // nothing until an admin approves — the money is the negative
+      // booking_amendments row the approval writes.
+      discounts: {
+        Row: {
+          id: string
+          created_at: string
+          created_by: string | null
+          label: string
+          description: string | null
+          kind: 'percent' | 'fixed'
+          value: number
+          active: boolean
+          sort_order: number
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          created_by?: string | null
+          label: string
+          description?: string | null
+          kind: 'percent' | 'fixed'
+          value: number
+          active?: boolean
+          sort_order?: number
+        }
+        Update: Partial<Database['public']['Tables']['discounts']['Insert']>
+        Relationships: []
+      }
+      // Which discounts one event puts on its register form.
+      event_discounts: {
+        Row: {
+          id: string
+          created_at: string
+          created_by: string | null
+          event_id: string
+          discount_id: string
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          created_by?: string | null
+          event_id: string
+          discount_id: string
+        }
+        Update: Partial<Database['public']['Tables']['event_discounts']['Insert']>
+        Relationships: []
+      }
+      // One diver asking for one discount on one booking. Writes go through
+      // request_booking_discount / decide_booking_discount (or service_role, for
+      // the registration edge function) — the table has no write policy at all,
+      // so no client can mint an approval.
+      booking_discounts: {
+        Row: {
+          id: string
+          booking_id: string
+          discount_id: string
+          status: 'requested' | 'approved' | 'rejected'
+          note: string | null
+          requested_at: string
+          requested_by: string | null
+          decided_at: string | null
+          decided_by: string | null
+          amount: number | null
+          amendment_id: string | null
+        }
+        Insert: {
+          id?: string
+          booking_id: string
+          discount_id: string
+          status?: 'requested' | 'approved' | 'rejected'
+          note?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          decided_at?: string | null
+          decided_by?: string | null
+          amount?: number | null
+          amendment_id?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['booking_discounts']['Insert']>
         Relationships: []
       }
       // Shop-authored waiver catalog (moved out of src/config/waivers.ts). Stable
@@ -2780,6 +2881,10 @@ export type GearModelSize = Database['public']['Tables']['gear_model_sizes']['Ro
 export type GearModelSizeInsert = Database['public']['Tables']['gear_model_sizes']['Insert']
 export type WaiverSignature = Database['public']['Tables']['waiver_signatures']['Row']
 export type EventWaiver = Database['public']['Tables']['event_waivers']['Row']
+export type Discount = Database['public']['Tables']['discounts']['Row']
+export type DiscountInsert = Database['public']['Tables']['discounts']['Insert']
+export type EventDiscount = Database['public']['Tables']['event_discounts']['Row']
+export type BookingDiscount = Database['public']['Tables']['booking_discounts']['Row']
 export type WaiverRow = Database['public']['Tables']['waivers']['Row']
 export type WaiverInsert = Database['public']['Tables']['waivers']['Insert']
 
