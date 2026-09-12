@@ -56,6 +56,7 @@ import { AdminNotificationsPage } from './pages/admin/AdminNotificationsPage'
 import { AdminAccountingPage } from './pages/admin/AdminAccountingPage'
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage'
 import { AdminRefundsPage } from './pages/admin/AdminRefundsPage'
+import { AdminDiscountsPage } from './pages/admin/AdminDiscountsPage'
 import { AdminAuditsPage } from './pages/admin/AdminAuditsPage'
 import { AdminBackupPage } from './pages/admin/AdminBackupPage'
 import { AdminShutdownPage } from './pages/admin/AdminShutdownPage'
@@ -224,6 +225,7 @@ export default function App() {
                 <Route path="/admin/wildlife" element={<AdminWildlifePage />} />
                 <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
                 <Route path="/admin/refunds" element={<AdminRefundsPage />} />
+                <Route path="/admin/discounts" element={<AdminDiscountsPage />} />
                 <Route path="/admin/audits" element={<AdminAuditsPage />} />
                 <Route path="/admin/history" element={<AdminHistoryPage />} />
               </Route>

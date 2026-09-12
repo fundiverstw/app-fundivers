@@ -1,9 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
 import { fetchEventRelations } from '../../lib/event-relations'
 import { siteConfig } from '../../config/site'
-import type { CancellationPolicy, CertLevel, DiveSite, SiteKind, TripTemplateEntry, EOAddon, EventRow, EOPrice, EORoom, TravelDestination } from '../../types/database'
+import type { CancellationPolicy, CertLevel, Discount, DiveSite, SiteKind, TripTemplateEntry, EOAddon, EventRow, EOPrice, EORoom, TravelDestination } from '../../types/database'
 import { AddPlaceForm } from '../sites/AddPlaceForm'
 import {
   EMPTY_FORM,
@@ -19,6 +20,7 @@ import { newestPerGroup, type PastEventOption } from '../../lib/event-preload'
 import { BTN_XS_GHOST, ERROR_NOTE } from '../../styles/tokens'
 import { keepsDepositOnCancel } from '../../lib/cancellation-policies'
 import { suggestsGearIncluded } from '../../lib/gear'
+import { discountValueLabel } from '../../lib/discounts'
 import { t } from '../../i18n'
 
 // Shared form for creating and editing an EO_dive / EO_course. Owns all
@@ -35,6 +37,7 @@ type PreloadRow = Pick<EventRow, 'id' | 'kind' | 'admin_title' | 'display_title'
 
 const ef = t.admin.eventForm
 const cat = t.admin.catalog
+const ed = t.admin.eventDiscounts
 const cxl = t.admin.cxlPolicies
 
 const CUR = siteConfig.locale.currency
@@ -103,6 +106,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
   const [prices, setPrices] = useState<EOPrice[]>([])
   const [rooms, setRooms] = useState<EORoom[]>([])
   const [addons, setAddons] = useState<EOAddon[]>([])
+  const [discounts, setDiscounts] = useState<Discount[]>([])
   const [certLevels, setCertLevels] = useState<CertLevel[]>([])
   const [cancelPolicies, setCancelPolicies] = useState<CancellationPolicy[]>([])
   const [tripTemplates, setTripTemplates] = useState<TripTemplateEntry[]>([])
@@ -181,6 +185,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
         supabase.from('trip_templates').select('*').order('admin_title'),
         supabase.from('travel_destinations').select('*').order('sort_order', { nullsFirst: false }),
         supabase.from('dive_sites').select('*').eq('active', true).order('name'),
+        supabase.from('discounts').select('*').eq('active', true).order('sort_order').order('label'),
       ])
       if (cancelled) return
       const dataOf = <T,>(i: number): T[] => {
@@ -197,6 +202,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
       setTripTemplates(dataOf<TripTemplateEntry>(7))
       setDestinations(dataOf<TravelDestination>(8))
       setDiveSites(dataOf<DiveSite>(9))
+      setDiscounts(dataOf<Discount>(10))
 
       // Both lists collapse to the newest event per admin_title — the site for
       // a dive or adventure, the course type for a course. The shop returns to
@@ -317,7 +323,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
     setAddingSite(false)
   }
 
-  function toggleId(key: 'addonIds' | 'roomIds' | 'destinationIds', id: string) {
+  function toggleId(key: 'addonIds' | 'roomIds' | 'destinationIds' | 'discountIds', id: string) {
     setForm(f => {
       const list = f[key]
       const next = list.includes(id) ? list.filter(x => x !== id) : [...list, id]
@@ -1060,6 +1066,25 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
         <Field label={ef.fullPaymentDeadline}>
           <Input type="date" value={form.full_payment_deadline} onChange={v => set('full_payment_deadline', v)} />
         </Field>
+      </Section>
+
+      <Section title={ed.heading}>
+        <p className="text-xs text-white/70">{ed.blurb}</p>
+        {discounts.length === 0 ? (
+          <p className="text-sm text-brand-950 font-medium">{ed.none}</p>
+        ) : (
+          <div className="space-y-1 max-h-56 overflow-y-auto bg-white/70 backdrop-blur-md border border-surface-200 rounded-md p-2">
+            {discounts.map(d => (
+              <Checkbox
+                key={d.id}
+                checked={form.discountIds.includes(d.id)}
+                onChange={() => toggleId('discountIds', d.id)}
+                label={`${d.label} — ${discountValueLabel(d, CUR)}`}
+              />
+            ))}
+          </div>
+        )}
+        <Link to="/admin/discounts" className={`self-start ${BTN_XS_GHOST}`}>{ed.manageLink}</Link>
       </Section>
 
       <Section title={t.admin.groups.addons}>

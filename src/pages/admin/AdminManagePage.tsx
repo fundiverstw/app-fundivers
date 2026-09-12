@@ -27,6 +27,7 @@ import { CertEquivalenceIcon } from '../../components/icons/CertEquivalenceIcon'
 import { DownloadIcon } from '../../components/icons/DownloadIcon'
 import { AuditIcon } from '../../components/icons/AuditIcon'
 import { RefundIcon } from '../../components/icons/RefundIcon'
+import { DiscountIcon } from '../../components/icons/DiscountIcon'
 import { DatabaseIcon } from '../../components/icons/DatabaseIcon'
 import { PowerIcon } from '../../components/icons/PowerIcon'
 
@@ -58,6 +59,7 @@ const GROUPS: ManageGroup[] = [
       { to: '/admin/applications', icon: <ClipboardCheckIcon />, ...m.applications },
       { to: '/admin/audits', icon: <AuditIcon />, ...m.audits },
       { to: '/admin/refunds', icon: <RefundIcon />, ...m.refunds },
+      { to: '/admin/discounts', icon: <DiscountIcon />, ...m.discounts },
     ],
   },
   {
