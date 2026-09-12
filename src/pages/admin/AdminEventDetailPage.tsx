@@ -24,11 +24,15 @@ import { uniqueUuids } from '../../lib/uuid'
 import { cancelEventAndFollowUp } from '../../lib/event-cancellation'
 import { applyCreditToBooking } from '../../lib/credits'
 import { fetchAmendmentsForBookings, addAmendment, formAmount, amendmentsDelta } from '../../lib/booking-amendments'
+import {
+  fetchActiveDiscounts, fetchBookingDiscounts, requestBookingDiscount, decideBookingDiscount,
+} from '../../lib/discounts'
 import { recordPayment as recordPaymentRow, voidPayment as voidPaymentRow, recordGroupPayment } from '../../lib/booking-payments'
 import { fetchActorNames, actorLabel, type ActorNames } from '../../lib/actor-names'
 import { personName } from '../../lib/names'
 import { requestEventDiverExport } from '../../lib/admin-event-export'
 import { BookingPaymentsBlock } from '../../components/admin/BookingPaymentsBlock'
+import { BookingDiscounts } from '../../components/admin/BookingDiscounts'
 import { resolveCharges, type ChargeLine } from '../../lib/booking-charges'
 import { openCreditForBooking, cancellationKept, RETURN_SOURCES } from '../../lib/credits'
 import { bookingBalance } from '../../lib/booking-balance'
@@ -38,7 +42,7 @@ import { missingWaivers, fetchEventWaiverOverrides, fetchSignaturesForDivers, fe
 import type { WaiverDef } from '../../config/waivers'
 import { ShareEventButton } from '../../components/ShareEventButton'
 import { AddToGoogleCalendarButton } from '../../components/AddToGoogleCalendarButton'
-import type { AppEvent, Booking, BookingAmendment, BookingDetails, Credit, DiverNote, Payment, PaymentMethod, Profile, EventKind } from '../../types/database'
+import type { AppEvent, Booking, BookingAmendment, BookingDetails, BookingDiscount, Credit, Discount, DiverNote, Payment, PaymentMethod, Profile, EventKind } from '../../types/database'
 import { BTN_SECONDARY, BTN_XS_BASE, BTN_XS_GHOST, ERROR_NOTE_LIGHT } from '../../styles/tokens'
 import { t } from '../../i18n'
 
@@ -50,6 +54,8 @@ interface Registrant {
   profile: Profile | null
   payments: Payment[]
   amendments: BookingAmendment[]
+  /** Discount requests on this booking, decided or not. */
+  discounts: BookingDiscount[]
   diverNotes: DiverNote[]
   charges: ChargeLine[]
   /** Open (unsettled) credit awarded to this diver for this event. */
@@ -101,6 +107,7 @@ export function AdminEventDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const [refreshKey, setRefreshKey] = useState(0)
+  const [discountCatalog, setDiscountCatalog] = useState<Discount[]>([])
   // Cancel-event flow state. The modal opens on click; the actual update
   // runs only after the admin confirms in the modal.
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
@@ -144,7 +151,10 @@ export function AdminEventDetailPage() {
       const userIds = [...new Set(bookings.flatMap(b => [b.user_id, b.payer_id]).filter((x): x is string => !!x))]
       const bookingIds = bookings.map(b => b.id)
 
-      const [profilesRes, paymentsRes, amendmentsByBooking, diverNotesRes, creditsRes, returnedRes] = await Promise.all([
+      const [
+        profilesRes, paymentsRes, amendmentsByBooking, diverNotesRes, creditsRes, returnedRes,
+        discountsByBooking, activeDiscounts,
+      ] = await Promise.all([
         supabase.from('profiles').select('*').in('id', userIds),
         supabase.from('payments').select('*').in('booking_id', bookingIds),
         fetchAmendmentsForBookings(bookingIds),
@@ -155,8 +165,14 @@ export function AdminEventDetailPage() {
         // spends it, so the kept figure has to count settled rows too.
         supabase.from('credits').select('booking_id, amount, source')
           .in('booking_id', bookingIds).in('source', RETURN_SOURCES),
+        fetchBookingDiscounts(bookingIds),
+        // Every active discount, not just the ones this event offers: applying
+        // one to a single diver must not mean changing what the whole event is
+        // offered (booking_discounts_validate allows an admin either way).
+        fetchActiveDiscounts().catch(() => [] as Discount[]),
       ])
       if (cancelled) return
+      setDiscountCatalog(activeDiscounts)
 
       // Every open credit row for these divers (event-tied or general), so we
       // can both offset this event's balance and size the spendable pool.
@@ -222,6 +238,7 @@ export function AdminEventDetailPage() {
         profile: profileMap.get(b.user_id) ?? null,
         payments: paymentsByBooking.get(b.id) ?? [],
         amendments: amendmentsByBooking.get(b.id) ?? [],
+        discounts: discountsByBooking.get(b.id) ?? [],
         diverNotes: diverNotesByUser.get(b.user_id) ?? [],
         charges: resolveCharges({ details: b.details as BookingDetails, event: ev, roomPrices, addonPrices, paymentMethods }),
         credit: openCreditForBooking(credits, b.id),
@@ -375,6 +392,27 @@ export function AdminEventDetailPage() {
     }
   }
 
+  // Applying a discount for a diver post-registration records a REQUEST, not a
+  // grant: it lands beside the ones divers ticked themselves, with the same
+  // Approve / Reject beside it. See BookingDiscounts for why the extra click is
+  // deliberate.
+  async function requestDiscount(bookingId: string, discountId: string) {
+    await requestBookingDiscount({ bookingId, discountId })
+    setRefreshKey(k => k + 1)
+  }
+
+  // The approval is what writes the negative amendment, so the whole card is
+  // reloaded rather than patched: the charge breakdown, the balance and the
+  // booking's own status can all have moved.
+  async function decideDiscount(requestId: string, approve: boolean) {
+    const applied = await decideBookingDiscount({ requestId, approve })
+    setRefreshKey(k => k + 1)
+    toast.success(approve
+      ? t.admin.discounts.approvedToast(
+          `${event?.currency ?? siteConfig.locale.currency} ${applied.toLocaleString()}`)
+      : t.admin.discounts.rejectedToast)
+  }
+
   async function recordPayment(r: Registrant, amount: number, note: string, reference: string) {
     if (!profile?.id) return
     try {
@@ -525,6 +563,9 @@ export function AdminEventDetailPage() {
       onRejectRefund={rejectRefund}
       onEdit={() => setEditing(r)}
       onAddAmendment={submitAmendment}
+      discountCatalog={discountCatalog}
+      onRequestDiscount={(discountId) => requestDiscount(r.booking.id, discountId)}
+      onDecideDiscount={decideDiscount}
       onRecordPayment={(amount, note, reference) => recordPayment(r, amount, note, reference)}
       onApplyCredit={(amount) => applyCredit(r, amount)}
       onVoidPayment={(paymentId) => voidPayment(r, paymentId)}
@@ -1325,7 +1366,7 @@ function registrantBalance(r: Registrant) {
   return { owed, paid, bal: bookingBalance(owed, paid, r.credit, { cancelled: r.booking.status === 'cancelled' }) }
 }
 
-function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, currency, actorName, onStatusChange, onApproveRefund, onRejectRefund, onEdit, onAddAmendment, onRecordPayment, onApplyCredit, onVoidPayment, onMarkDepositPaid, onBillToDiver, onRecordGroupPayment, onMarkWaiversInPerson, readOnly }: {
+function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, currency, actorName, onStatusChange, onApproveRefund, onRejectRefund, onEdit, onAddAmendment, discountCatalog, onRequestDiscount, onDecideDiscount, onRecordPayment, onApplyCredit, onVoidPayment, onMarkDepositPaid, onBillToDiver, onRecordGroupPayment, onMarkWaiversInPerson, readOnly }: {
   r: Registrant
   waiverMissing: WaiverDef[]
   waiverState: 'loading' | 'ready' | 'error'
@@ -1337,6 +1378,9 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
   onRejectRefund: (id: string) => void
   onEdit: () => void
   onAddAmendment: (id: string, sign: '+' | '-', amount: number, note: string) => Promise<void>
+  discountCatalog: Discount[]
+  onRequestDiscount: (discountId: string) => Promise<void>
+  onDecideDiscount: (requestId: string, approve: boolean) => Promise<void>
   actorName: (id: string | null) => string
   onRecordPayment: (amount: number, note: string, reference: string) => Promise<void>
   onApplyCredit: (amount: number) => Promise<void>
@@ -1639,6 +1683,17 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
               onApply={onApplyCredit}
             />
           )}
+
+          <BookingDiscounts
+            rows={r.discounts}
+            catalog={discountCatalog}
+            currency={currency}
+            bookingTotal={Number((r.booking.details as BookingDetails).total ?? 0)}
+            readOnly={!!readOnly}
+            canDecide={r.booking.status !== 'cancelled'}
+            onRequest={onRequestDiscount}
+            onDecide={onDecideDiscount}
+          />
 
           <AmendmentsSection
             readOnly={!!readOnly}

@@ -15,8 +15,9 @@ import { netPaid } from '../lib/payments'
 import { resolveCharges, type ChargeLine } from '../lib/booking-charges'
 import { fetchChargeCatalog } from '../lib/booking-charge-catalog'
 import { fetchAmendmentsForBookings, amendmentsDelta } from '../lib/booking-amendments'
+import { fetchBookingDiscounts, fetchDiscounts } from '../lib/discounts'
 import { ChargeBreakdown, type AmendmentLine } from '../components/ChargeBreakdown'
-import type { AppEvent, Booking, BookingDetails, Credit, Payment } from '../types/database'
+import type { AppEvent, Booking, BookingDetails, BookingDiscount, Credit, Discount, Payment } from '../types/database'
 import {
   CARD, BTN_GHOST, BTN_PRIMARY, TEXT_HEADING, TEXT_BODY, TEXT_MUTED, TEXT_SUBTLE, TEXT_ERROR, PAGE_BODY,
 } from '../styles/tokens'
@@ -28,6 +29,10 @@ interface BookingLine {
   payments: Payment[]
   charges: ChargeLine[]
   amendments: AmendmentLine[]
+  /** Discounts asked for on this booking. A pending one has changed no figure
+   *  on this card -- it is shown so the diver knows the shop has it, and does
+   *  not read the undiscounted balance as the shop ignoring their request. */
+  discounts: Array<{ id: string; label: string; status: BookingDiscount['status']; amount: number | null }>
   total: number
   /** total + amendments — what the diver actually owes before payments. */
   owed: number
@@ -107,7 +112,10 @@ export function PaymentsPage() {
     const personIds = [...new Set(bookings.flatMap(b => [b.user_id, b.payer_id]).filter((x): x is string => !!x))]
 
     const eventIds = bookings.map(b => b.event_id)
-    const [paymentsRes, profilesRes, eventMap, catalog, amendmentsByBooking] = await Promise.all([
+    const [
+      paymentsRes, profilesRes, eventMap, catalog, amendmentsByBooking,
+      discountsByBooking, discountCatalog,
+    ] = await Promise.all([
       bookingIds.length
         ? supabase.from('payments').select('*').in('booking_id', bookingIds)
         : Promise.resolve({ data: [] as Payment[] }),
@@ -120,6 +128,9 @@ export function PaymentsPage() {
         : Promise.resolve(new Map<string, AppEvent>()),
       fetchChargeCatalog(bookings.map(b => b.details as BookingDetails)),
       fetchAmendmentsForBookings(bookings.map(b => b.id)),
+      fetchBookingDiscounts(bookingIds),
+      // Retired discounts included: a booking keeps the one it was granted.
+      fetchDiscounts().catch(() => [] as Discount[]),
     ])
     const payRows = (paymentsRes.data ?? []) as Payment[]
     const nameById = new Map<string, string>(
@@ -158,12 +169,19 @@ export function PaymentsPage() {
       const rows = amendmentsByBooking.get(b.id) ?? []
       const owed = total + amendmentsDelta(rows)
       const coveredByOther = !!b.payer_id && b.payer_id !== uid && b.user_id === uid
+      const discountLabels = new Map(discountCatalog.map(x => [x.id, x.label]))
       return {
         booking: b,
         event,
         payments: bookingPayments,
         charges: resolveCharges({ details: b.details as BookingDetails, event, ...catalog }),
         amendments: rows.map(a => ({ label: a.note, amount: a.amount })),
+        discounts: (discountsByBooking.get(b.id) ?? []).map(r => ({
+          id: r.id,
+          label: discountLabels.get(r.discount_id) ?? '',
+          status: r.status,
+          amount: r.amount,
+        })),
         total,
         owed,
         deposit,
@@ -495,7 +513,7 @@ function LineCard({
   onRefund: (id: string) => void
   onApplyCredit: (id: string, amount: number) => void
 }) {
-  const { booking, event, charges, amendments, total, owed, deposit, paid, credit, feeKept, due, depositDue, payments } = line
+  const { booking, event, charges, amendments, discounts, total, owed, deposit, paid, credit, feeKept, due, depositDue, payments } = line
   const label = event?.title ?? t.payments.eventFallback
   const refundRequested = !!booking.refund_requested_at
   // Mirror BookingsPage: no refund request on an already-cancelled booking —
@@ -551,6 +569,33 @@ function LineCard({
 
       {open && (
         <div className="px-4 pb-4 border-t border-surface-200 pt-3 space-y-3 text-sm">
+          {discounts.length > 0 && (
+            <div className="space-y-1">
+              <p className={`text-xs ${TEXT_MUTED} uppercase tracking-wider`}>{t.payments.discountsHeading}</p>
+              <ul className="space-y-0.5">
+                {discounts.map(d => (
+                  <li key={d.id} className={`flex justify-between gap-2 text-xs ${TEXT_BODY}`}>
+                    <span className="min-w-0 truncate">{d.label}</span>
+                    <span className="shrink-0">
+                      {d.status === 'approved'
+                        ? `${t.discounts.statusApproved} · ${currency} ${(d.amount ?? 0).toLocaleString()}`
+                        : d.status === 'rejected'
+                          ? t.discounts.statusRejected
+                          : t.discounts.statusRequested}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {/* An approved discount is already in the charge breakdown as an
+                  adjustment; a pending one is in no figure on this card at all,
+                  and saying so is the difference between a balance that looks
+                  wrong and one that is waiting. */}
+              {discounts.some(d => d.status === 'requested') && (
+                <p className={`text-xs ${TEXT_SUBTLE}`}>{t.payments.discountPending}</p>
+              )}
+            </div>
+          )}
+
           {(charges.length > 0 || amendments.length > 0)
             ? <ChargeBreakdown lines={charges} amendments={amendments} currency={currency} total={owed} />
             : total > 0 && (

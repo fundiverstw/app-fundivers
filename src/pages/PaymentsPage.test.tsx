@@ -458,6 +458,54 @@ describe('PaymentsPage', () => {
     const zeros = screen.getAllByText(/TWD\s*0/)
     expect(zeros.length).toBeGreaterThanOrEqual(2)
   })
+
+  describe('discounts', () => {
+    const bookings = [
+      { id: 'b1', user_id: 'u1', event_id: 'd1', status: 'pending', notes: null, created_at: new Date().toISOString(), details: { total: 3000 } },
+    ]
+    const catalog = [{
+      id: 'dsc1', created_at: '', created_by: null, label: 'Student',
+      description: null, kind: 'percent', value: 10, active: true, sort_order: 0,
+    }]
+
+    function setupWithRequest(status: string, amount: number | null) {
+      from.mockImplementation((table: string) => {
+        if (table === 'bookings') return mockQueryBuilder({ data: bookings })
+        if (table === 'discounts') return mockQueryBuilder({ data: catalog })
+        if (table === 'booking_discounts') return mockQueryBuilder({
+          data: [{
+            id: 'req1', booking_id: 'b1', discount_id: 'dsc1', status,
+            note: null, requested_at: new Date().toISOString(), requested_by: 'u1',
+            decided_at: null, decided_by: null, amount, amendment_id: null,
+          }],
+        })
+        return mockQueryBuilder()
+      })
+      fetchEventsForBookings.mockResolvedValue(new Map<string, AppEvent>([
+        ['d1', event({ id: 'd1', type: 'dive', title: 'Dive A', price: 3000 })],
+      ]))
+    }
+
+    it('tells the diver a requested discount is still waiting and has changed nothing', async () => {
+      setupWithRequest('requested', null)
+      const user = userEvent.setup()
+      renderWithRouter(<PaymentsPage />)
+      await user.click(await screen.findByText('Dive A'))
+      expect(await screen.findByText('Student')).toBeInTheDocument()
+      expect(screen.getAllByText(/waiting on the shop/i).length).toBeGreaterThan(0)
+      expect(screen.getByText(/nothing has come off yet/i)).toBeInTheDocument()
+    })
+
+    it('shows an approved discount with what it took off, and no waiting note', async () => {
+      setupWithRequest('approved', 300)
+      const user = userEvent.setup()
+      renderWithRouter(<PaymentsPage />)
+      await user.click(await screen.findByText('Dive A'))
+      expect(await screen.findByText('Student')).toBeInTheDocument()
+      expect(screen.getByText(/approved.*300/i)).toBeInTheDocument()
+      expect(screen.queryByText(/nothing has come off yet/i)).not.toBeInTheDocument()
+    })
+  })
 })
 
 // A booking is only held until its deposit lands, so the top of this page has
