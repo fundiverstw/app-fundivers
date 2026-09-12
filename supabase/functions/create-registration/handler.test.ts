@@ -20,6 +20,7 @@ import { handleRegistration, type Deps, type TurnstileResult } from './handler'
 interface CapturedWrites {
   profileUpdate: Array<Record<string, unknown>>
   bookingInsert: Array<Record<string, unknown>>
+  discountInsert: Array<Record<string, unknown>>
   createUserCalls: Array<Record<string, unknown>>
   deleteUserCalls: string[]
   sendMailCalls:   Array<Record<string, unknown>>
@@ -74,7 +75,7 @@ interface MockOpts {
 
 function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites } {
   const captured: CapturedWrites = {
-    profileUpdate: [], bookingInsert: [],
+    profileUpdate: [], bookingInsert: [], discountInsert: [],
     createUserCalls: [], deleteUserCalls: [], sendMailCalls: [],
     turnstileVerifyCalls: [], rpcCalls: [],
   }
@@ -150,7 +151,12 @@ function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites }
     }
     builder.insert = (row: Record<string, unknown>) => {
       if (table === 'bookings') captured.bookingInsert.push(row)
+      if (table === 'booking_discounts') captured.discountInsert.push(row)
       const ret: Record<string, unknown> = {}
+      // Awaitable on its own for the writes that do not read a row back —
+      // booking_discounts inserts are fire-and-check-the-error.
+      ret.then = (onFulfilled?: (r: unknown) => unknown) =>
+        Promise.resolve({ error: null }).then(onFulfilled)
       ret.select = () => ({
         single: () => Promise.resolve({
           data:  opts.bookingError ? null : { id: 'b1', status: opts.bookingStatus ?? 'pending', notes: null },
@@ -1232,5 +1238,41 @@ describe('handleRegistration — past-event guard', () => {
       ...goodBody, target_user_id: 'child-uid',
     }, { Authorization: 'Bearer parent-jwt' }), deps)
     expect(res.status).toBe(403)
+  })
+})
+
+describe('handleRegistration — discount requests', () => {
+  it('turns the ticked discounts into requests and keeps them out of the frozen details', async () => {
+    const { deps, captured } = makeDeps({ callerRole: 'diver', callerUserId: 'diver-uid' })
+    await handleRegistration(postJson({
+      ...goodBody,
+      details: { discount_requests: ['dsc1', 'dsc2'] },
+    }, { Authorization: 'Bearer diver-jwt' }), deps)
+
+    expect(captured.discountInsert.map(r => r.discount_id)).toEqual(['dsc1', 'dsc2'])
+    expect(captured.discountInsert[0].requested_by).toBe('diver-uid')
+    // Every request starts undecided: the handler never writes a status, an
+    // amount or an amendment, because none of those exist until an admin says so.
+    expect(captured.discountInsert[0]).not.toHaveProperty('status')
+    expect(captured.discountInsert[0]).not.toHaveProperty('amount')
+
+    // The booking's frozen details must not carry a second account of what it
+    // owes. The requests are the record; details.total stays the quoted price.
+    expect(captured.bookingInsert[0].details).not.toHaveProperty('discount_requests')
+  })
+
+  it('ignores a request body that is not a list of ids, and dedupes what is', async () => {
+    const { deps, captured } = makeDeps({ callerRole: 'diver', callerUserId: 'diver-uid' })
+    await handleRegistration(postJson({
+      ...goodBody,
+      details: { discount_requests: ['dsc1', 'dsc1', '', 7, null] },
+    }, { Authorization: 'Bearer diver-jwt' }), deps)
+    expect(captured.discountInsert.map(r => r.discount_id)).toEqual(['dsc1'])
+  })
+
+  it('writes no requests when the diver ticked nothing', async () => {
+    const { deps, captured } = makeDeps({ callerRole: 'diver', callerUserId: 'diver-uid' })
+    await handleRegistration(postJson(goodBody, { Authorization: 'Bearer diver-jwt' }), deps)
+    expect(captured.discountInsert).toEqual([])
   })
 })

@@ -2392,4 +2392,73 @@ describe('RegisterForm', () => {
       expect(screen.queryByText(/pick up where you left off/i)).not.toBeInTheDocument()
     })
   })
+
+  describe('discounts', () => {
+    const STUDENT = {
+      id: 'dsc1', created_at: '', created_by: null,
+      label: 'Student', description: 'With a valid student card',
+      kind: 'percent', value: 10, active: true, sort_order: 0,
+    }
+
+    function setupWithDiscount() {
+      from.mockImplementation((table: string) => {
+        if (table === 'payment_methods')  return mockQueryBuilder({ data: PAYMENT_METHOD_ROWS })
+        if (table === 'rooms')            return mockQueryBuilder({ data: sampleRooms })
+        if (table === 'addons')           return mockQueryBuilder({ data: sampleAddons })
+        if (table === 'event_discounts')  return mockQueryBuilder({ data: [{ discount_id: 'dsc1' }] })
+        if (table === 'discounts')        return mockQueryBuilder({ data: [STUDENT] })
+        return mockQueryBuilder()
+      })
+    }
+
+    async function toStepThree(user: ReturnType<typeof userEvent.setup>) {
+      render(
+        <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+          onClose={() => {}} onBooked={() => {}} />
+      )
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+      await user.click(screen.getByLabelText(/i have all the required gear/i))
+    }
+
+    it('offers what the event offers, and sends the ticked ones as requests', async () => {
+      setupWithDiscount()
+      const user = userEvent.setup()
+      await toStepThree(user)
+
+      await user.click(await screen.findByLabelText(/student/i))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+      await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+      const opts = invoke.mock.calls[0][1] as { body: Record<string, unknown> }
+      const details = opts.body.details as { discount_requests: string[]; total: number }
+      expect(details.discount_requests).toEqual(['dsc1'])
+      // The quote does not move. A discount is a claim until an admin approves
+      // it, and quoting the discounted price here would promise money the shop
+      // has not agreed to — and disagree with the booking's frozen total.
+      expect(details.total).toBe(2800)
+    })
+
+    it('sends an empty list when the diver ticks nothing', async () => {
+      setupWithDiscount()
+      const user = userEvent.setup()
+      await toStepThree(user)
+      await screen.findByLabelText(/student/i)
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+      await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+      const opts = invoke.mock.calls[0][1] as { body: Record<string, unknown> }
+      expect((opts.body.details as { discount_requests: string[] }).discount_requests).toEqual([])
+    })
+
+    it('shows no discount section on an event that offers none', async () => {
+      setupFrom()
+      const user = userEvent.setup()
+      await toStepThree(user)
+      expect(screen.queryByText(/with a valid student card/i)).not.toBeInTheDocument()
+    })
+  })
 })

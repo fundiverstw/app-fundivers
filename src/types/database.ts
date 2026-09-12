@@ -32,6 +32,13 @@ export interface BookingDetails {
     notes?: string | null
   }
   add_ons?: string[]
+  /** Discount ids the diver ticked at registration. Sent by the form and
+   *  consumed by create-registration, which turns each into a
+   *  `booking_discounts` row and strips the key: a discount is worth nothing
+   *  until an admin approves it, so the frozen details must not carry a second,
+   *  unapproved account of what the booking owes. Never present on a stored
+   *  booking. */
+  discount_requests?: string[]
   transportation?: boolean
   /** True when the diver opted into a ride that had no free seat at submission
    *  time — a ride-waitlist request. The booking stands; the shop is notified

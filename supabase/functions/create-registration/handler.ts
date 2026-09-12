@@ -393,6 +393,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     if (gate) return rollback(gate, 422)
   }
 
+  let requestedDiscountIds: string[]
   // 1c. Recompute the booking's money server-side and overwrite the client's
   //     figures. details.total is the amount owed (read by apply_credit_to_booking
   //     and record_group_payment) and details.deposit is the confirm-on-deposit
@@ -467,6 +468,15 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
       nitroxCourseFee: siteConfig.business.nitroxCourseFee,
       payDepositOnly: !!d.pay_deposit_only,
     })
+    // The discounts the diver asked for are intent, not money: they are lifted
+    // out of the frozen details and written as booking_discounts rows below,
+    // where an admin decides them. Leaving them in details would make the
+    // booking claim a second, unapproved version of what it owes.
+    requestedDiscountIds = Array.isArray(d.discount_requests)
+      ? [...new Set((d.discount_requests as unknown[]).filter(
+          (x): x is string => typeof x === "string" && x.length > 0))].slice(0, 10)
+      : []
+    delete d.discount_requests
     body.details = { ...d, total: money.total, deposit: money.deposit }
   }
 
@@ -547,6 +557,21 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     .single()
   if (bErr || !booking) return rollback(safeError(bErr, "booking insert failed"))
   const isWaitlisted = booking.status === "waitlisted"
+
+  // 2b. Discount requests. One row per discount the diver ticked, each worth
+  //     nothing until an admin approves it -- the amount is never computed
+  //     here, and never comes from the request body. booking_discounts_validate
+  //     refuses any id the event does not offer or the shop has retired, so a
+  //     crafted list gets the same answer the form would have given, and a
+  //     refusal is not a reason to fail a booking that already exists.
+  for (const discountId of requestedDiscountIds) {
+    const { error: dErr } = await admin.from("booking_discounts").insert({
+      booking_id:   booking.id,
+      discount_id:  discountId,
+      requested_by: callerId ?? userId,
+    })
+    if (dErr) console.error("discount request rejected:", discountId, dErr.message)
+  }
 
   // 3. Build PDF payload from data we already have or can fetch.
   const { data: profile } = await admin.from("profiles").select("*").eq("id", userId).single()

@@ -10,6 +10,7 @@ import { useShopContact } from '../../hooks/useShopContact'
 import { RENTAL_GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_RENTAL_GEAR_ALTERNATIVES, HAS_OWNED_ONLY_GEAR, FULL_GEAR_SET, packsAGearSet, defaultRentalItems, needsRental, toggleGearSelection } from '../../lib/gear'
 import { needsShoeSize } from '../../lib/logistics'
 import { siteConfig } from '../../config/site'
+import { discountValueLabel, fetchDiscountsForEvent } from '../../lib/discounts'
 import { t } from '../../i18n'
 import { BTN_XS_GHOST, INPUT_REGISTER } from '../../styles/tokens'
 import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
@@ -40,7 +41,7 @@ import {
   clearRegistrationDraft,
   type RegistrationDraft,
 } from '../../lib/registration-draft'
-import type { AppEvent, Booking, BookingDetails, CancellationPolicy, Database, EOAddon, EORoom, PaymentMethod as PaymentMethodRow, Profile } from '../../types/database'
+import type { AppEvent, Booking, BookingDetails, CancellationPolicy, Database, Discount, EOAddon, EORoom, PaymentMethod as PaymentMethodRow, Profile } from '../../types/database'
 
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
 
@@ -516,6 +517,11 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const [step, setStep] = useState<Step>(1)
   const [rooms, setRooms] = useState<EORoom[]>([])
   const [addons, setAddons] = useState<EOAddon[]>([])
+  // What this event offers, and what this diver ticked. Asking changes no
+  // figure on this form: the price the diver is quoted, and agrees to, is the
+  // undiscounted one until an admin approves the request.
+  const [discounts, setDiscounts] = useState<Discount[]>([])
+  const [discountIds, setDiscountIds] = useState<Set<string>>(new Set())
   const [cancelPolicy, setCancelPolicy] = useState<CancellationPolicy | null>(null)
   // Pre-checked when editing an existing booking that already carries an
   // ack timestamp — admins shouldn't have to re-tick to save unrelated edits.
@@ -839,6 +845,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           .in('id', event.addon_ids)
         if (!cancelled) setAddons((data ?? []) as EOAddon[])
       }
+      const offered = await fetchDiscountsForEvent(event.id).catch(() => [] as Discount[])
+      if (!cancelled) setDiscounts(offered)
       if (event.cancel_policy) {
         const { data } = await supabase
           .from('cancellation_policies' as never)
@@ -1122,6 +1130,13 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     const current = editedGearItems ?? gearItems
     setEditedGearItems(toggleGearSelection(current, item))
   }
+  function toggleDiscount(id: string) {
+    setDiscountIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
   function toggleAddon(id: string) {
     setAddonIds(prev => {
       const next = new Set(prev)
@@ -1216,6 +1231,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       gear: gearDetail(gearChoice, gearItems, gearHelpNote),
       room: (showRooms && roomId) ? { option_id: roomId, notes: roomNotes || null } : undefined,
       add_ons: showAddons ? [...addonIds] : [],
+      discount_requests: [...discountIds],
       transportation: needsTransport === true,
       ride_waitlisted: rideWaitlisted,
       payment_method: payment,
@@ -2065,6 +2081,36 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                     <input type="checkbox" checked={addonIds.has(a.id)} onChange={() => toggleAddon(a.id)} className="accent-brand-900" />
                     <span className="flex-1">{a.display_title ?? a.admin_title}</span>
                     {a.price != null && <span className="text-brand-900 font-medium">+{a.price.toLocaleString()}</span>}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {discounts.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm text-brand-950 font-medium font-semibold">{t.register.discounts.heading}</p>
+              <p className="text-xs text-brand-950/70 font-medium">{t.register.discounts.blurb}</p>
+              <div className="grid grid-cols-1 gap-1 pr-1">
+                {discounts.map(d => (
+                  <label key={d.id} className="flex items-start gap-2 text-xs text-brand-950 font-medium">
+                    <input
+                      type="checkbox"
+                      checked={discountIds.has(d.id)}
+                      onChange={() => toggleDiscount(d.id)}
+                      className="accent-brand-900 mt-0.5"
+                    />
+                    <span className="flex-1">
+                      <span className="block">
+                        {d.label}
+                        <span className="ml-1 text-brand-900">
+                          {t.discounts.worth(discountValueLabel(d, event.currency))}
+                        </span>
+                      </span>
+                      {d.description && (
+                        <span className="block text-brand-950/70">{d.description}</span>
+                      )}
+                    </span>
                   </label>
                 ))}
               </div>
