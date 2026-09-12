@@ -253,8 +253,12 @@ export async function fetchOpenDiscountRequests(labels: {
   const live = requests.filter(r => bookings.has(r.booking_id) && discounts.has(r.discount_id))
   if (live.length === 0) return []
 
-  const userIds = [...new Set(live.map(r => bookings.get(r.booking_id)!.user_id).filter(Boolean))]
-  const eventIds = [...new Set(live.map(r => bookings.get(r.booking_id)!.event_id).filter(Boolean))]
+  // Narrowed with a type guard rather than `.filter(Boolean)`, which TypeScript
+  // does not read as one. The two repos disagree about whether a booking's
+  // event_id is nullable, and this file has to compile under both.
+  const present = (x: string | null | undefined): x is string => !!x
+  const userIds = [...new Set(live.map(r => bookings.get(r.booking_id)!.user_id).filter(present))]
+  const eventIds = [...new Set(live.map(r => bookings.get(r.booking_id)!.event_id).filter(present))]
   const [profilesRes, eventsRes] = await Promise.all([
     supabase.from('profiles').select('id, name, nickname').in('id', userIds),
     supabase.from('events').select('id, display_title, admin_title').in('id', eventIds),
@@ -272,7 +276,7 @@ export async function fetchOpenDiscountRequests(labels: {
       id: r.id,
       bookingId: r.booking_id,
       diverName: names.get(booking.user_id ?? '') || labels.diverFallback,
-      eventTitle: titles.get(booking.event_id) || labels.eventFallback,
+      eventTitle: titles.get(booking.event_id ?? '') || labels.eventFallback,
       discount: discounts.get(r.discount_id)!,
       bookingTotal: Number((booking.details as { total?: number } | null)?.total ?? 0),
       note: r.note,

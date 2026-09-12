@@ -12,7 +12,7 @@ import {
 import { Spinner } from '../../components/ui/Spinner'
 import { siteConfig } from '../../config/site'
 import {
-  CARD_ELEVATED, BTN_PRIMARY, BTN_GHOST, BTN_XS_GHOST, BTN_XS_DANGER, TEXT_MUTED,
+  CARD_ELEVATED, BTN_PRIMARY, BTN_GHOST, BTN_XS_GHOST, BTN_XS_DANGER, TEXT_MUTED, PAGE_BODY,
 } from '../../styles/tokens'
 import type { Discount, DiscountInsert } from '../../types/database'
 import { t } from '../../i18n'
@@ -118,12 +118,12 @@ export function AdminDiscountsPage() {
     <div className="max-w-3xl mx-auto space-y-4">
       <header>
         <h1 className="text-xl font-bold text-white">{dc.title}</h1>
-        <p className={`text-sm ${TEXT_MUTED}`}>{dc.subtitle}</p>
+        <p className={`text-sm ${PAGE_BODY}`}>{dc.subtitle}</p>
       </header>
 
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider">{dc.queueHeading}</h2>
-        <p className={`text-xs ${TEXT_MUTED}`}>{dc.queueBlurb}</p>
+        <p className={`text-xs ${PAGE_BODY}`}>{dc.queueBlurb}</p>
       </section>
 
       {requests.length === 0 ? (
@@ -165,11 +165,15 @@ export function AdminDiscountsPage() {
       <section className="space-y-2 pt-2">
         <div className="flex items-baseline justify-between gap-3">
           <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider">{dc.catalogHeading}</h2>
-          <button type="button" onClick={() => setCreating(true)} className={BTN_XS_GHOST}>
+          {/* The page-level "new" button every other catalog page uses. A ghost
+              button here would be brand-on-brand in the light design, where the
+              page background is the navy this token's border and ink are. */}
+          <button type="button" onClick={() => setCreating(true)}
+            className="text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg shrink-0">
             {dc.newDiscount}
           </button>
         </div>
-        <p className={`text-xs ${TEXT_MUTED}`}>{dc.catalogBlurb}</p>
+        <p className={`text-xs ${PAGE_BODY}`}>{dc.catalogBlurb}</p>
       </section>
 
       {catalog.length === 0 ? (
