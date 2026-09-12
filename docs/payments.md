@@ -203,6 +203,64 @@ records an offsetting `account_credit` payment, and confirms the booking
 if that covers the deposit. It refuses a **cancelled** booking outright:
 that trip will never happen, so credit spent there would be destroyed.
 
+## Discounts
+
+A discount is **shop-authored, offered per event, asked for by the diver and
+worth nothing until an admin approves it.** Three tables, one per moment:
+
+| Table | Holds |
+| --- | --- |
+| `discounts` | What the shop offers at all — a label, who qualifies, and either a percent or a flat amount |
+| `event_discounts` | Which of them an event puts on its register form |
+| `booking_discounts` | One diver asking for one of them on one booking, and what an admin decided |
+
+**The money is not in any of them.** Approving writes a negative
+`booking_amendments` row, so the balance, the diver's statement, the deposit
+clamp, the refund queue and the accounting export pick it up with no new
+arithmetic — `owed` is still `details.total + amendments` and nothing else. A
+discount that edited `details.total` would rewrite the quote the diver
+accepted, which is the one thing that snapshot exists to prevent.
+
+So the register form quotes the **undiscounted** price and says so. A request
+changes no figure, and the diver's Payments page tells them which of theirs are
+still waiting — a balance that looks untouched is then a balance that is
+waiting, not one that ignored them.
+
+`decide_booking_discount` is the only thing in the app that turns a discount
+into money, and it is admin-only, matching the `booking_amendments` insert
+policy it writes through. It computes the amount itself: a percent of the
+booking's **frozen total** (not of what other amendments have left — "10% off"
+means 10% of the trip), rounded to whole units, then **clamped to what is still
+owed**. Never past zero: handing money back is a credit row with a reason,
+decided deliberately, not the rounding consequence of a half-price row meeting
+an already-reduced balance. It refuses a cancelled booking, for the same reason
+`apply_credit_to_booking` does.
+
+Approving can also **confirm a pending booking**: a discount lowers what is
+owed, which can cover the deposit for the first time, and there is no later
+payment to trigger the promotion. Same rule as `apply_credit_to_booking`,
+against the deposit clamped to owed.
+
+Asking is `request_booking_discount` — the diver, the parent who manages them,
+or staff. `booking_discounts_validate` is where the rules actually live, so the
+RPC and the service_role insert that `create-registration` makes cannot drift
+apart: the booking must be live, the discount active, and a diver may only ask
+for what the event offers. **An admin may apply any active discount to any
+booking** — that is the post-registration path, and requiring them to attach it
+to the event first would change what every other diver on that event is
+offered.
+
+An admin applying one this way still records a **request**, decided with the
+same Approve / Reject as one a diver ticked. The extra click is the point: two
+ways for money to come off a booking, one of them not recorded as a decision,
+is exactly what the approval step exists to prevent.
+
+A trigger notifies every admin the moment a request lands, and the badge in the
+admin header counts the undecided ones. One live request per discount per
+booking; a **rejected** one may be asked again, since the usual reason for a
+rejection is a diver who could not produce the card rather than one who is not
+a student.
+
 ## Cancellations
 
 Four of them, and only one returns money by itself.
@@ -398,6 +456,9 @@ heads, deliberately not what has been banked.
 7. `diverCreditBalance` is the only definition of account credit.
 8. Every automatic credit records its `source`.
 9. Cash-revenue sums apply `isExternalPayment`. Balance math does not.
+10. A discount is money only once an admin approves it, and only as an
+    amendment.
+
 10. A money-moving payment names its real-world transaction, and
     attribution is stamped from the act, never taken from the caller.
 11. The ledger is signed; only `admin_charge` and `admin_refund` are

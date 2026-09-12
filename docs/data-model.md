@@ -21,6 +21,9 @@ public.payments          │                   (via the event_destinations junct
     │ 1-many             └── cert_levels
     ↓
 public.credits ────────── money the shop owes a diver (see payments.md)
+public.booking_discounts  one diver asking for one discount on one booking;
+                          approving writes a booking_amendments row
+                          (discounts ── event_discounts ── the event's offer)
 
 public.admin_notes ────── event_id XOR booking_id  (operational memos)
 public.diver_notes ────── per-diver standing facts (allergies, accommodations)
@@ -30,8 +33,8 @@ public.push_subscriptions / push_notifications_sent  (cron infra)
 ```
 
 Every child of an event — `bookings`, `duties`, `event_waivers`,
-`event_vehicles`, `event_ride_groups`, `notifications` — points at it with a
-plain `event_id`. There is no `eo_dive_id` / `eo_course_id` XOR anywhere in
+`event_vehicles`, `event_ride_groups`, `event_discounts`, `notifications` —
+points at it with a plain `event_id`. There is no `eo_dive_id` / `eo_course_id` XOR anywhere in
 the schema — the only XOR left is `admin_notes`, which pins a memo to
 either an event or a booking.
 
@@ -125,6 +128,7 @@ Documented in their own docs rather than here:
 | Table | Covered by |
 | --- | --- |
 | `credits` | [payments.md](./payments.md) |
+| `discounts`, `event_discounts`, `booking_discounts` | [payments.md](./payments.md#discounts) |
 | `packages`, `package_tiers`, `package_registrations`, `package_referrals` | [packages.md](./packages.md) |
 | `trusted_partners` | [packages.md](./packages.md) (it hosts packages *and* backs the diver directory) |
 | `notifications`, `push_subscriptions`, `push_notifications_sent` | [push-notifications.md](./push-notifications.md) |
@@ -246,6 +250,11 @@ interface BookingDetails {
   }
   room?: { option_id?: string | null; notes?: string | null }
   add_ons?: string[]                // addons.id list
+  discount_requests?: string[]      // discounts.id list, IN-FLIGHT ONLY: the
+                                    //   register form sends it,
+                                    //   create-registration turns each into a
+                                    //   booking_discounts row and strips the
+                                    //   key. Never present on a stored booking
   transportation?: boolean
   payment_method?: string           // payment_methods.key the diver chose
   pay_deposit_only?: boolean        // deposit-only-at-registration flag
@@ -256,6 +265,11 @@ interface BookingDetails {
   cancellation_policy_acked_at?: string  // gate for submit when policy attached
 }
 ```
+
+`discount_requests` is the one key that never survives the write. A discount
+is worth nothing until an admin approves it, so letting the frozen details
+carry it would give the booking a second, unapproved account of what it owes —
+see [payments.md § Discounts](./payments.md#discounts).
 
 **Design note:** `total`, `deposit`, and `charges` are snapshotted into
 the booking so later catalog price changes don't retroactively alter what
