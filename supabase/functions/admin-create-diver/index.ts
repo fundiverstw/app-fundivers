@@ -26,6 +26,7 @@ import {
 } from "../_shared/terms-consent-email.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 import { fetchShopContact } from "../_shared/shop-contact.ts"
+import { t } from "../_shared/i18n.ts"
 
 interface Body {
   email:         string
@@ -84,6 +85,22 @@ Deno.serve(async (req) => {
     email_confirm: true,
   })
   if (createErr || !created.user) {
+    // `email_exists` is the one an admin hits in practice, and it is less a
+    // failure than a redirect: closing an account leaves auth.users untouched,
+    // so the address is still held by the very diver they are re-creating.
+    // Name that, and where to undo it — the AuthApiError carries a `code`,
+    // which safeError suppresses along with every SQLSTATE, so the admin was
+    // otherwise told only "createUser failed".
+    if ((createErr as { code?: string } | null)?.code === "email_exists") {
+      const { data: existing } = await admin
+        .from("profiles").select("status").eq("email", email).maybeSingle()
+      const status = (existing as { status?: string } | null)?.status
+      const ad = t.admin.addDiver
+      const message = status === "pending" || status === "rejected"
+        ? ad.emailTakenSuspended
+        : ad.emailTakenActive
+      return json({ error: message }, 409)
+    }
     return json({ error: safeError(createErr, "createUser failed") }, 400)
   }
   const newUserId = created.user.id

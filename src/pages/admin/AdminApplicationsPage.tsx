@@ -16,7 +16,7 @@ const ap = t.admin.applications
 const cm = t.admin.completeness
 import type { AppEvent, Booking, Profile } from '../../types/database'
 
-// Every account an admin has put on hold, newest first, with the diver's
+// Every suspended account, on hold or closed, newest first, with the diver's
 // first booking expanded inline so the decision is an informed one.
 //
 // This was the approval queue every new signup passed through. Accounts are
@@ -29,6 +29,13 @@ import type { AppEvent, Booking, Profile } from '../../types/database'
 //                 flips status back to 'active' + emails the diver.
 // Close account → same function with decision='reject':
 //                 flips status to 'rejected' + emails with optional reason.
+//
+// Closed accounts are listed too, and only 'rejected' rows were ever missing:
+// the query asked for 'pending' alone, so closing an account made it vanish
+// from the one screen that can reopen it. Admins read that as a delete, and
+// the next time the diver came back they reached for Create diver — which
+// fails, because closing never touched auth.users and the email is still
+// taken. The account was never gone; it was only unreachable.
 
 interface PendingExtras {
   booking: (Booking & { event: AppEvent | null }) | null
@@ -62,7 +69,7 @@ export function AdminApplicationsPage() {
       const { data } = await supabase
         .from('profiles')
         .select('*')
-        .eq('status', 'pending')
+        .in('status', ['pending', 'rejected'])
         // Completed applications first; the rest by signup date underneath.
         .order('application_submitted_at', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false })
@@ -124,89 +131,148 @@ export function AdminApplicationsPage() {
     }
   }
 
+  const onHold = users.filter(u => u.status === 'pending')
+  const closed = users.filter(u => u.status === 'rejected')
+
+  const card = (u: Profile, canClose: boolean) => (
+    <AccountCard
+      key={u.id}
+      profile={u}
+      canClose={canClose}
+      extras={extrasCache.get(u.id) ?? null}
+      expanded={expandedId === u.id}
+      acting={acting === u.id}
+      reason={rejectReasons.get(u.id) ?? ''}
+      onExpand={() => expand(u.id)}
+      onReason={value => setRejectReasons(prev => {
+        const next = new Map(prev)
+        next.set(u.id, value)
+        return next
+      })}
+      onDecide={decision => decide(u.id, decision)}
+    />
+  )
+
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <header className="flex items-baseline justify-between">
         <h1 className="text-xl font-bold text-white">{ap.title}</h1>
-        <span className={`text-sm ${TEXT_MUTED}`}>{ap.pendingCount(users.length)}</span>
+        <span className={`text-sm ${TEXT_MUTED}`}>{ap.pendingCount(onHold.length)}</span>
       </header>
 
-      {users.length === 0 && (
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider">{ap.heldHeading}</h2>
+        <p className={`text-xs ${TEXT_MUTED}`}>{ap.heldBlurb}</p>
+      </section>
+
+      {onHold.length === 0 ? (
         <div className={`${CARD_ELEVATED} p-6 text-center`}>
           <p className={TEXT_MUTED}>{ap.none}</p>
         </div>
+      ) : (
+        <ul className="space-y-3">{onHold.map(u => card(u, true))}</ul>
       )}
 
-      <ul className="space-y-3">
-        {users.map(u => {
-          const extras = extrasCache.get(u.id)
-          const isExpanded = expandedId === u.id
-          const isActing = acting === u.id
-          return (
-            <li key={u.id} className={CARD_ELEVATED}>
+      <section className="space-y-2 pt-2">
+        <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider">
+          {ap.closedHeading}
+          <span className={`ml-2 normal-case tracking-normal font-normal ${TEXT_MUTED}`}>
+            {ap.closedCount(closed.length)}
+          </span>
+        </h2>
+        <p className={`text-xs ${TEXT_MUTED}`}>{ap.closedBlurb}</p>
+      </section>
+
+      {closed.length === 0 ? (
+        <div className={`${CARD_ELEVATED} p-6 text-center`}>
+          <p className={TEXT_MUTED}>{ap.noneClosed}</p>
+        </div>
+      ) : (
+        <ul className="space-y-3">{closed.map(u => card(u, false))}</ul>
+      )}
+    </div>
+  )
+}
+
+interface AccountCardProps {
+  profile:  Profile
+  /** On-hold accounts can still be closed; a closed one has nowhere further to
+   *  go, so it offers Reinstate alone and skips the reason box with it. */
+  canClose: boolean
+  extras:   PendingExtras | null
+  expanded: boolean
+  acting:   boolean
+  reason:   string
+  onExpand: () => void
+  onReason: (value: string) => void
+  onDecide: (decision: 'approve' | 'reject') => void
+}
+
+function AccountCard({
+  profile, canClose, extras, expanded, acting, reason, onExpand, onReason, onDecide,
+}: AccountCardProps) {
+  return (
+    <li className={CARD_ELEVATED}>
+      <button
+        type="button"
+        onClick={onExpand}
+        className="w-full p-4 flex items-baseline justify-between gap-3 text-left"
+      >
+        <div className="min-w-0">
+          <div className="font-semibold text-brand-950 truncate">
+            {personName(profile.name, profile.nickname) || ap.noNameYet}
+          </div>
+          {/* The one field a suspended diver always has. Half of these rows
+              never got as far as typing a name, and the admin is looking for
+              somebody by the address they wrote to. */}
+          <div className={`text-xs ${TEXT_MUTED} truncate`}>{profile.email ?? '—'}</div>
+          <div className={`text-xs ${TEXT_MUTED}`}>
+            {ap.submittedOn(format(shopZoned(new Date(profile.created_at)), 'PP'))}
+          </div>
+          <IncompleteFlag profile={profile} />
+        </div>
+        <span className={`text-xs ${TEXT_MUTED}`}>{expanded ? '−' : '+'}</span>
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-4 text-sm">
+          <ApplicantSummary profile={profile} />
+          <FirstBooking booking={extras?.booking ?? null} />
+
+          <div className="space-y-2 pt-2 border-t border-surface-200">
+            {canClose && (
+              <textarea
+                className={`${INPUT} text-sm`}
+                rows={2}
+                placeholder={ap.rejectReasonPlaceholder}
+                value={reason}
+                onChange={e => onReason(e.target.value)}
+              />
+            )}
+            <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => expand(u.id)}
-                className="w-full p-4 flex items-baseline justify-between gap-3 text-left"
+                onClick={() => onDecide('approve')}
+                disabled={acting}
+                className={`flex-1 ${BTN_PRIMARY}`}
               >
-                <div className="min-w-0">
-                  <div className="font-semibold text-brand-950 truncate">
-                    {personName(u.name, u.nickname) || ap.noNameYet}
-                  </div>
-                  <div className={`text-xs ${TEXT_MUTED}`}>
-                    {ap.submittedOn(format(shopZoned(new Date(u.created_at)), 'PP'))}
-                  </div>
-                  <IncompleteFlag profile={u} />
-                </div>
-                <span className={`text-xs ${TEXT_MUTED}`}>{isExpanded ? '−' : '+'}</span>
+                {acting ? ap.acting : ap.approve}
               </button>
-
-              {isExpanded && (
-                <div className="px-4 pb-4 space-y-4 text-sm">
-                  <ApplicantSummary profile={u} />
-                  <FirstBooking booking={extras?.booking ?? null} />
-
-                  <div className="space-y-2 pt-2 border-t border-surface-200">
-                    <textarea
-                      className={`${INPUT} text-sm`}
-                      rows={2}
-                      placeholder={ap.rejectReasonPlaceholder}
-                      value={rejectReasons.get(u.id) ?? ''}
-                      onChange={e => {
-                        const v = e.target.value
-                        setRejectReasons(prev => {
-                          const next = new Map(prev)
-                          next.set(u.id, v)
-                          return next
-                        })
-                      }}
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => decide(u.id, 'approve')}
-                        disabled={isActing}
-                        className={`flex-1 ${BTN_PRIMARY}`}
-                      >
-                        {isActing ? ap.acting : ap.approve}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => decide(u.id, 'reject')}
-                        disabled={isActing}
-                        className={`flex-1 ${BTN_DANGER}`}
-                      >
-                        {isActing ? ap.acting : ap.reject}
-                      </button>
-                    </div>
-                  </div>
-                </div>
+              {canClose && (
+                <button
+                  type="button"
+                  onClick={() => onDecide('reject')}
+                  disabled={acting}
+                  className={`flex-1 ${BTN_DANGER}`}
+                >
+                  {acting ? ap.acting : ap.reject}
+                </button>
               )}
-            </li>
-          )
-        })}
-      </ul>
-    </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </li>
   )
 }
 

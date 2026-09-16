@@ -78,14 +78,40 @@ company inbox via Gmail SMTP. See
 `profiles.status` (`pending` | `active` | `rejected`) is a **suspension
 lever**, not a queue. Signing up no longer produces a `pending` row, so in
 normal operation nothing sits in that state. An admin can still move a live
-profile to `pending` or `rejected` from `/admin/applications` ("Accounts on
-hold"), and doing so still severs diver-side `bookings` and
+profile to `pending` or `rejected` from `/admin/applications` ("Suspended
+accounts"), and doing so still severs diver-side `bookings` and
 `push_subscriptions` inserts through the `is_active_user()` RLS helper and
 bounces the diver to `/pending`.
 
 Before migration `20260831120000` every new account started at `pending` and
 waited for a human. Divers read the wait as the site being broken, and the shop
 was approving essentially everyone, so the queue bought no safety.
+
+### Closing an account is not deleting it
+
+Nothing in the app deletes a diver. "Close account" writes
+`status = 'rejected'` and stops there: the `auth.users` row, the email address,
+the profile and every booking survive. `admin_delete_user` does delete
+(`delete from auth.users`), but it is wired to the diver directory's Delete
+user button, not to this flow.
+
+That distinction used to be invisible. `/admin/applications` listed
+`status = 'pending'` alone, so closing an account made it disappear from the
+one screen that can reopen it, and admins reasonably read the disappearance as
+a delete. When the diver came back they reached for **Create diver**, which
+calls `auth.admin.createUser` and fails with `email_exists` — the address is
+still held by the account they think they deleted.
+
+Both halves are fixed: the page lists closed accounts in a second section with
+a Reinstate button, and `admin-create-diver` answers `email_exists` with a 409
+naming the existing account's state instead of a bare "createUser failed"
+(`safeError` suppresses the message of any error carrying a `code`, and
+`AuthApiError` carries one).
+
+Reinstating runs through the same `notify-application-decision` call as
+approving an on-hold account — `decision: 'approve'` — so the diver gets the
+"your account is active again" email either way. Nothing else changes: they
+keep their own password, their history and their terms consent.
 
 ### Terms re-acceptance
 

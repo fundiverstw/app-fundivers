@@ -76,7 +76,7 @@ describe('AdminApplicationsPage', () => {
   it('lists an on-hold diver who never completed their profile', async () => {
     const calls: Array<{ method: string; args: unknown[] }> = []
     const builder: Record<string, unknown> = {}
-    for (const m of ['select', 'eq', 'not', 'is', 'order', 'limit']) {
+    for (const m of ['select', 'eq', 'in', 'not', 'is', 'order', 'limit']) {
       builder[m] = (...args: unknown[]) => { calls.push({ method: m, args }); return builder }
     }
     builder.then = (onFulfilled?: (r: unknown) => unknown) =>
@@ -163,7 +163,8 @@ describe('AdminApplicationsPage', () => {
     expect(screen.getByText('alice-line-id')).toBeInTheDocument()
     // …and the account email is its own row, whatever the preferred method.
     expect(screen.getByText(/account email/i)).toBeInTheDocument()
-    expect(screen.getByText('alice@example.com')).toBeInTheDocument()
+    // Twice: the collapsed row leads with it, the summary labels it.
+    expect(screen.getAllByText('alice@example.com')).toHaveLength(2)
   })
 
   it('falls back to a generic contact label when no method is set yet', async () => {
@@ -180,7 +181,7 @@ describe('AdminApplicationsPage', () => {
 
     // Exact match: the "still missing" line mentions the same words.
     expect(await screen.findByText('Preferred contact')).toBeInTheDocument()
-    expect(screen.getByText('leo@example.com')).toBeInTheDocument()
+    expect(screen.getAllByText('leo@example.com')).toHaveLength(2)
   })
 
   it('reinstating calls notify-application-decision and removes the row', async () => {
@@ -226,6 +227,60 @@ describe('AdminApplicationsPage', () => {
       'notify-application-decision',
       { body: { user_id: 'u1', decision: 'reject', reason: 'incomplete profile' } },
     ))
+  })
+
+  // Regression: the query was `.eq('status', 'pending')`, so closing an account
+  // dropped it off the only screen that can reopen it. Admins read that as a
+  // delete and went to Create diver, which fails — closing never touched
+  // auth.users, so the email is still taken.
+  it('lists closed accounts in their own section, reinstate-only', async () => {
+    from.mockReturnValueOnce(mockQueryBuilder({
+      data: [
+        { id: 'u1', name: 'Alice', created_at: '2026-04-30T00:00:00Z', status: 'pending' },
+        { id: 'u2', name: 'Bob', email: 'bob@example.com', created_at: '2026-04-20T00:00:00Z', status: 'rejected' },
+      ],
+    }))
+    from.mockReturnValueOnce(mockQueryBuilder({ data: [] }))
+    renderPage()
+
+    expect(await screen.findByText(ap.closedHeading)).toBeInTheDocument()
+    expect(screen.getByText(ap.closedCount(1))).toBeInTheDocument()
+    // The count in the header stays the on-hold one, matching the hub badge.
+    expect(screen.getByText(ap.pendingCount(1))).toBeInTheDocument()
+    // The address is on the collapsed row: half these rows never got a name.
+    expect(screen.getByText('bob@example.com')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Bob'))
+    expect(await screen.findByRole('button', { name: ap.approve })).toBeInTheDocument()
+    // A closed account has nowhere further to go, so no Close and no reason box.
+    expect(screen.queryByRole('button', { name: ap.reject })).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText(ap.rejectReasonPlaceholder)).not.toBeInTheDocument()
+  })
+
+  it('reinstates a closed account through the same decision endpoint', async () => {
+    from.mockReturnValueOnce(mockQueryBuilder({
+      data: [{ id: 'u2', name: 'Bob', created_at: '2026-04-20T00:00:00Z', status: 'rejected' }],
+    }))
+    from.mockReturnValueOnce(mockQueryBuilder({ data: [] }))
+    invoke.mockResolvedValue({ data: { ok: true, status: 'active', email_sent: true }, error: null })
+
+    renderPage()
+    fireEvent.click(await screen.findByText('Bob'))
+    fireEvent.click(await screen.findByRole('button', { name: ap.approve }))
+
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith(
+      'notify-application-decision',
+      { body: { user_id: 'u2', decision: 'approve' } },
+    ))
+    await waitFor(() => expect(screen.queryByText('Bob')).not.toBeInTheDocument())
+    expect(screen.getByText(ap.noneClosed)).toBeInTheDocument()
+  })
+
+  it('shows both empty states when nothing is suspended', async () => {
+    from.mockReturnValue(mockQueryBuilder({ data: [] }))
+    renderPage()
+    expect(await screen.findByText(ap.none)).toBeInTheDocument()
+    expect(screen.getByText(ap.noneClosed)).toBeInTheDocument()
   })
 
   it('shows an error toast when the function call fails', async () => {
