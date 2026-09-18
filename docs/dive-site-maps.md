@@ -257,6 +257,6 @@ found the endpoint could otherwise file into a map they cannot read.
 
 ## Dependencies
 
-`three` (~150 KB gzipped) and `delaunator`. **Not yet lazy-loaded** — three
-currently lands in the main bundle, which should become a `React.lazy` boundary
-before this ships to divers on mobile.
+`three` (~150 KB gzipped) and `delaunator`. Lazy-loaded: `SiteMapPage` is a
+`React.lazy` boundary in `App.tsx`, so both land only in the `SiteMapPage`
+chunk, not in the bundle every diver downloads to look at their bookings.

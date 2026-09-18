@@ -110,6 +110,7 @@ export async function fetchSiteMap(site: DiveSite): Promise<DiveSiteMap> {
     supabase.from('dive_site_features').select('*').eq('site_id', site.id),
     supabase.from('dive_site_entries').select('*').eq('site_id', site.id),
   ])
+  if (mapRes.error) throw mapRes.error
   if (soundingRes.error) throw soundingRes.error
   if (featureRes.error) throw featureRes.error
   if (entryRes.error) throw entryRes.error
