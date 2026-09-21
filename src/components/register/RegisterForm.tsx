@@ -27,7 +27,7 @@ import { uploadCertCard } from '../../lib/cert-card'
 import { uploadNitroxCard } from '../../lib/nitrox-card'
 import { uploadDeepCard } from '../../lib/deep-card'
 import { isHeicFile } from '../../lib/image-compress'
-import { TurnstileWidget } from './TurnstileWidget'
+import { TurnstileWidget, type TurnstileHandle } from './TurnstileWidget'
 import { WhatHappensNext } from './WhatHappensNext'
 import { TextField } from './TextField'
 import { HeightField, WeightField } from '../MeasureField'
@@ -105,12 +105,20 @@ export function RegisterForm({ event, profile, userId, onClose, onBooked, existi
 // errors (duplicate booking, event full, event passed), authored by the
 // handler as diver-facing sentences, and the duplicate-booking recovery below
 // matches on them. Those stay verbatim.
-async function readFunctionsError(error: { message: string; context?: unknown }, isGuest: boolean): Promise<string> {
+// `captchaFailed` is the one failure the form can fix by itself — the token
+// was stale or already spent, so a fresh challenge and one more attempt gets
+// the diver through without them reading anything.
+async function readFunctionsError(
+  error: { message: string; context?: unknown }, isGuest: boolean,
+): Promise<{ message: string; captchaFailed: boolean }> {
   if (isGuest) {
     const failure = await readSignupFailure(error as Error & { context?: unknown }, t.register.errors.registrationFailed)
-    return failure.emailTaken ? t.register.errors.emailExists : failure.message
+    return {
+      message: failure.emailTaken ? t.register.errors.emailExists : failure.message,
+      captchaFailed: failure.captchaFailed,
+    }
   }
-  return edgeErrorMessage(error)
+  return { message: await edgeErrorMessage(error), captchaFailed: false }
 }
 
 // Read back a diver's own active booking for an event — used to recover from a
@@ -129,6 +137,11 @@ async function fetchOwnBooking(
     .maybeSingle()
   return (data as { id: string; status: string } | null) ?? null
 }
+
+// How old a Turnstile token may be at submit before the form insists on a
+// fresh one. Cloudflare's limit is 300 seconds; this leaves room for the
+// request itself, a retry, and a slow connection.
+const FRESH_CAPTCHA_MAX_AGE_MS = 120_000
 
 type Step = 1 | 2 | 3 | 4
 type ContactMethod = 'whatsapp' | 'line' | 'phone' | 'email'
@@ -713,11 +726,21 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const [guestPassword, setGuestPassword] = useState('')
   const [guestAgreedTerms, setGuestAgreedTerms] = useState(false)
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  // Stable identity so the widget's effect doesn't tear down and re-render the
+  // challenge on every keystroke elsewhere in the form.
+  const onTurnstileToken = useCallback((token: string | null) => setTurnstileToken(token), [])
+  // Handle on the live widget, so submit can re-run the challenge rather than
+  // posting the token minted back on step 2 (300-second life, single use).
+  const turnstileRef = useRef<TurnstileHandle>(null)
   // The challenge script could not be fetched, so no token will ever arrive.
   // Without this the guest is stuck on step 2 behind a Next button that never
   // enables — same "contact us" fallback as a missing site key.
   const [captchaDead, setCaptchaDead] = useState(false)
   const onCaptchaUnavailable = useCallback(() => setCaptchaDead(true), [])
+  // Gated on step 2's Next and again on step 4's Confirm. A resumed draft
+  // restores the email but never the password, so without the second gate the
+  // last step can post an account the server cannot create.
+  const guestAccountIncomplete = guestEmail.trim() === '' || guestPassword.length < 8 || !guestAgreedTerms
 
   // Local resume: autosave the diver's in-progress answers to localStorage so a
   // dropped connection or closed tab doesn't force a restart of the four-step
@@ -765,7 +788,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   ])
 
   function applyDraft(d: RegistrationDraft) {
-    setStep(Math.min(4, Math.max(1, d.step)) as Step)
+    // A guest resumes on the account step at the latest. The password is
+    // deliberately not drafted (never persist a credential) and neither is a
+    // captcha token, so dropping them back on step 3 or 4 would hand them a
+    // Confirm button that can only fail.
+    const resumed = Math.min(4, Math.max(1, d.step))
+    setStep((isGuest ? Math.min(2, resumed) : resumed) as Step)
     setFullName(d.fullName)
     setNickname(d.nickname)
     setDob(d.dob)
@@ -1302,29 +1330,68 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     // are provided; authed callers' Bearer JWT identifies the user.
     // When actingOnBehalfOf is set, the caller (admin or parent) JWT is
     // used to authorize, but the booking lands on target_user_id.
-    const { data, error } = await invokeWithRetry<{ booking_id: string; status?: string; session: { access_token: string; refresh_token: string } | null }>(
-      'create-registration',
-      {
-        body: {
-          ...(isGuest ? {
-            email:    guestEmail.trim(),
-            password: guestPassword,
-            agreed_to_terms_at:      new Date().toISOString(),
-            turnstile_token:         turnstileToken ?? '',
-          } : {}),
-          ...(actingOnBehalfOf ? { target_user_id: actingOnBehalfOf } : {}),
-          event_type:    event.type,
-          event_id:      event.id,
-          profile_patch: profilePatch,
-          details,
-          notes:         notes || null,
-          ...(groupId ? { group_id: groupId, suppress_email: true } : {}),
-          ...(leadPays && leadPayerId ? { payer_id: leadPayerId } : {}),
+    const post = (captchaToken: string | null) =>
+      invokeWithRetry<{ booking_id: string; status?: string; session: { access_token: string; refresh_token: string } | null }>(
+        'create-registration',
+        {
+          body: {
+            ...(isGuest ? {
+              email:    guestEmail.trim(),
+              password: guestPassword,
+              agreed_to_terms_at:      new Date().toISOString(),
+              turnstile_token:         captchaToken ?? '',
+            } : {}),
+            ...(actingOnBehalfOf ? { target_user_id: actingOnBehalfOf } : {}),
+            event_type:    event.type,
+            event_id:      event.id,
+            profile_patch: profilePatch,
+            details,
+            notes:         notes || null,
+            ...(groupId ? { group_id: groupId, suppress_email: true } : {}),
+            ...(leadPays && leadPayerId ? { payer_id: leadPayerId } : {}),
+          },
         },
-      },
-    )
+      )
+
+    // The challenge was solved back on step 2, minutes and several screens ago.
+    // Cloudflare gives a token 300 seconds and one verification, so ask the
+    // live widget for one minted just now instead of posting a corpse. A null
+    // answer means the re-challenge went interactive (or never rendered) and
+    // the widget is only on screen on step 2 — so send them there rather than
+    // failing a registration they filled in correctly.
+    let captcha = turnstileToken
+    if (isGuest) {
+      captcha = await turnstileRef.current?.freshToken(FRESH_CAPTCHA_MAX_AGE_MS) ?? null
+      if (!captcha) {
+        setSaving(false)
+        setStep(2)
+        setErr(t.register.errors.captchaRecheck)
+        return
+      }
+    }
+
+    let { data, error } = await post(captcha)
+    let failure = error ? await readFunctionsError(error, isGuest) : null
+    // Cloudflare rejected the token anyway (spent, or expired between mint and
+    // arrival). One forced re-challenge and one more attempt, silently.
+    if (failure?.captchaFailed) {
+      const retryToken = await turnstileRef.current?.freshToken() ?? null
+      if (retryToken) {
+        ;({ data, error } = await post(retryToken))
+        failure = error ? await readFunctionsError(error, isGuest) : null
+      }
+    }
+    // Still rejected: the challenge wants the diver. Park them on step 2 where
+    // the widget lives, with their answers intact — never on a "reload the
+    // page" dead end that throws the form away.
+    if (failure?.captchaFailed) {
+      setSaving(false)
+      setStep(2)
+      setErr(t.register.errors.captchaRecheck)
+      return
+    }
     if (error) {
-      const msg = await readFunctionsError(error, isGuest)
+      const msg = failure?.message ?? t.register.errors.registrationFailed
       // Lost-response recovery: a retried request may have actually landed the
       // first time, so the server now reports a duplicate. For a diver booking
       // themselves we can confirm by reading the booking back and treating it
@@ -1414,7 +1481,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             },
           },
         )
-        if (e) throw new Error(await readFunctionsError(e, false))
+        if (e) throw new Error((await readFunctionsError(e, false)).message)
         if (!d?.booking_id) throw new Error(t.register.errors.registrationFailedShort)
         // Apply this diver's OWN account credit to their own booking when the
         // opt-in is on (the caller — parent or admin — is authorized by
@@ -1614,38 +1681,50 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           <p className="text-xs text-brand-900 font-medium">
             {t.register.step2.prefillHint}
           </p>
+        </section>
+      )}
 
-          {isGuest && (
-            <div className="border border-surface-200 rounded-lg p-3 space-y-3 bg-surface-50">
-              <div>
-                <p className="text-sm font-semibold text-brand-900">{t.register.account.title}</p>
-                <p className="text-xs text-brand-900 font-medium">
-                  {t.register.account.body(siteConfig.identity.shortName)}
-                </p>
-              </div>
-              <TextField label={t.register.account.emailLabel} type="email" value={guestEmail} onChange={setGuestEmail} required />
-              <TextField label={t.register.account.passwordLabel} type="password" value={guestPassword} onChange={setGuestPassword} required />
-              <label className="flex items-start gap-2 text-xs text-brand-950 font-medium">
-                <input type="checkbox" checked={guestAgreedTerms} onChange={e => setGuestAgreedTerms(e.target.checked)} className="accent-brand-900 mt-0.5" />
-                <span>
-                  {t.register.account.agreePrefix}{' '}
-                  <a href="/terms" target="_blank" rel="noreferrer" className="text-brand-700 hover:underline">{t.register.account.termsLink}</a>.
-                </span>
-              </label>
-              {turnstileSiteKey && !captchaDead ? (
-                <TurnstileWidget
-                  siteKey={turnstileSiteKey}
-                  onToken={setTurnstileToken}
-                  onUnavailable={onCaptchaUnavailable}
-                />
-              ) : (
-                <p role="alert" className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
-                  {t.register.account.unavailable}
-                </p>
-              )}
+      {/* Mounted for every step of a guest registration, shown only on step 2.
+          An unmounted Turnstile widget is a dead one: Cloudflare's own refresh
+          stops, `expired-callback` can't fire, and the token frozen in state
+          is rejected as expired by the time a diver reaches step 4. Hidden
+          rather than conditional, so submit can still re-challenge. */}
+      {isGuest && (
+        <section className={step === 2 ? 'space-y-4' : 'hidden'} hidden={step !== 2}>
+          <div className="border border-surface-200 rounded-lg p-3 space-y-3 bg-surface-50">
+            <div>
+              <p className="text-sm font-semibold text-brand-900">{t.register.account.title}</p>
+              <p className="text-xs text-brand-900 font-medium">
+                {t.register.account.body(siteConfig.identity.shortName)}
+              </p>
             </div>
-          )}
+            <TextField label={t.register.account.emailLabel} type="email" value={guestEmail} onChange={setGuestEmail} required />
+            <TextField label={t.register.account.passwordLabel} type="password" value={guestPassword} onChange={setGuestPassword} required />
+            <label className="flex items-start gap-2 text-xs text-brand-950 font-medium">
+              <input type="checkbox" checked={guestAgreedTerms} onChange={e => setGuestAgreedTerms(e.target.checked)} className="accent-brand-900 mt-0.5" />
+              <span>
+                {t.register.account.agreePrefix}{' '}
+                <a href="/terms" target="_blank" rel="noreferrer" className="text-brand-700 hover:underline">{t.register.account.termsLink}</a>.
+              </span>
+            </label>
+            {turnstileSiteKey && !captchaDead ? (
+              <TurnstileWidget
+                ref={turnstileRef}
+                siteKey={turnstileSiteKey}
+                onToken={onTurnstileToken}
+                onUnavailable={onCaptchaUnavailable}
+              />
+            ) : (
+              <p role="alert" className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                {t.register.account.unavailable}
+              </p>
+            )}
+          </div>
+        </section>
+      )}
 
+      {step === 2 && (
+        <section className="space-y-4">
           <div className="space-y-3">
             <TextField
               label={t.register.step2.nameLabel}
@@ -2405,10 +2484,13 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               ))}
             </div>
           )}
-
-          {err && <p className="text-red-600 text-sm">{err}</p>}
         </section>
       )}
+
+      {/* Outside the step sections: a submit can send the diver back a step
+          (a captcha that needs re-solving does), and an error nobody can see
+          is how a diver ends up retrying the same thing five times. */}
+      {err && <p role="alert" className="text-red-600 text-sm">{err}</p>}
 
       {saving && !isEdit && (
         <p className="text-xs text-brand-900 font-medium" role="status">
@@ -2437,7 +2519,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 prereqBlocked ||
                 (!isOnBehalfOf && nitroxBlocked) ||
                 (!isOnBehalfOf && deepBlocked) ||
-                (isGuest && (guestEmail.trim() === '' || guestPassword.length < 8 || !guestAgreedTerms || !turnstileToken))
+                (isGuest && (guestAccountIncomplete || !turnstileToken))
               )) ||
               (step === 3 && !isOnBehalfOf && event.has_transport && needsTransport === null) ||
               (step === 3 && !isOnBehalfOf && showGearRentChoice && gearChoice === null)
@@ -2447,7 +2529,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             {t.register.next}
           </button>
         ) : (
-          <button onClick={submit} disabled={saving || pastBlocked || (!isOnBehalfOf && !!cancelPolicy && !policyAcked)}
+          <button onClick={submit} disabled={saving || pastBlocked || (!isOnBehalfOf && !!cancelPolicy && !policyAcked) || (isGuest && guestAccountIncomplete)}
             className="bg-brand-900 hover:bg-brand-950 disabled:opacity-60 disabled:cursor-wait text-white text-sm font-semibold py-2 px-4 rounded-lg inline-flex items-center gap-2">
             {saving && (
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" />

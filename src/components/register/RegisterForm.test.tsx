@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { ShopContactContext } from '../../hooks/shop-contact-context'
@@ -24,12 +24,14 @@ const gearBox = (item: string) =>
 const queryGearBox = (item: string) =>
   screen.queryByLabelText((text: string) => text.includes(item))
 
-const { from, update, invoke, setSession, rpc } = vi.hoisted(() => ({
+const { from, update, invoke, setSession, rpc, freshToken } = vi.hoisted(() => ({
   from: vi.fn(),
   update: vi.fn(),
   invoke: vi.fn(),
   setSession: vi.fn(),
   rpc: vi.fn(),
+  // The widget's freshToken handle — see the TurnstileWidget stub below.
+  freshToken: vi.fn(),
 }))
 
 vi.mock('../../lib/supabase', () => ({
@@ -50,17 +52,24 @@ vi.mock('../../hooks/useAuth', () => ({
 
 // Stub the Turnstile widget so guest tests can "solve" the captcha without
 // loading Cloudflare's script: clicking the button hands a token to the form,
-// the same contract the real widget fulfils via its onToken callback.
+// the same contract the real widget fulfils via its onToken callback. The
+// `ref` handle is the other half of that contract — what submit asks for a
+// token minted just now — and `freshToken` stands in for it so a test can say
+// what Cloudflare would answer.
 vi.mock('./TurnstileWidget', () => ({
-  TurnstileWidget: ({ onToken, onUnavailable }: {
+  TurnstileWidget: ({ onToken, onUnavailable, ref }: {
     onToken: (t: string) => void
     onUnavailable?: () => void
-  }) => (
-    <>
-      <button type="button" onClick={() => onToken('test-turnstile-token')}>solve captcha</button>
-      <button type="button" onClick={() => onUnavailable?.()}>break captcha</button>
-    </>
-  ),
+    ref?: { current: { freshToken: (maxAgeMs?: number) => Promise<string | null> } | null }
+  }) => {
+    if (ref) ref.current = { freshToken: (maxAgeMs?: number) => freshToken(maxAgeMs) }
+    return (
+      <>
+        <button type="button" onClick={() => onToken('test-turnstile-token')}>solve captcha</button>
+        <button type="button" onClick={() => onUnavailable?.()}>break captcha</button>
+      </>
+    )
+  },
 }))
 
 const sampleEvent: AppEvent = {
@@ -178,6 +187,11 @@ beforeEach(() => {
   localStorage.clear()
   from.mockReset(); update.mockReset()
   invoke.mockReset(); setSession.mockReset(); rpc.mockReset()
+  // Default: the challenge re-runs instantly and answers with the same token
+  // the step-2 stub hands out, so tests that aren't about captcha freshness
+  // read exactly as they did before the widget grew a handle.
+  freshToken.mockReset()
+  freshToken.mockResolvedValue('test-turnstile-token')
   // Default: the event has assigned cars with free ride seats, so the ride
   // opt-in is offered. Ride-specific tests override this per event_ride_seats.
   rpc.mockImplementation((name: string) =>
@@ -2459,6 +2473,148 @@ describe('RegisterForm', () => {
       const user = userEvent.setup()
       await toStepThree(user)
       expect(screen.queryByText(/with a valid student card/i)).not.toBeInTheDocument()
+    })
+  })
+  // The bug these pin: a guest solved the challenge on step 2 and the token
+  // was posted from step 4, minutes later. Cloudflare gives a token 300
+  // seconds and one verification, so two divers who filled the form in at a
+  // human pace were rejected as robots, told to reload, and dropped back on a
+  // step 4 whose password the draft deliberately never saved — where every
+  // retry answered "email and password required for guest path".
+  describe('guest captcha freshness', () => {
+    const captchaRejection = () => ({
+      data: null,
+      error: Object.assign(new Error('Edge Function returned a non-2xx status code'), {
+        context: new Response(
+          JSON.stringify({ error: 'captcha verification failed' }),
+          { status: 403, headers: { 'content-type': 'application/json' } },
+        ),
+      }),
+    })
+
+    async function guestToStepFour(user: ReturnType<typeof userEvent.setup>, onBooked = vi.fn()) {
+      render(
+        <MemoryRouter>
+          <RegisterFormBody event={sampleEvent} profile={null} onSubmitSuccess={onBooked} />
+        </MemoryRouter>
+      )
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.type(screen.getByLabelText(/email \*/i), 'new@diver.test')
+      await user.type(screen.getByLabelText(/password/i, { selector: 'input' }), 'abcdefgh')
+      await user.click(screen.getByLabelText(/I agree to the/i))
+      await user.click(screen.getByRole('button', { name: /solve captcha/i }))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+      await user.click(screen.getByLabelText(/i have all the required gear/i))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      return onBooked
+    }
+
+    it('posts a token minted at confirm time, not the one solved back on step 2', async () => {
+      setupFrom()
+      freshToken.mockResolvedValue('minted-at-submit')
+      const user = userEvent.setup()
+      await guestToStepFour(user)
+      await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+      await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+      expect(freshToken).toHaveBeenCalledWith(120_000)
+      const opts = invoke.mock.calls[0][1] as { body: Record<string, unknown> }
+      expect(opts.body.turnstile_token).toBe('minted-at-submit')
+    })
+
+    it('re-challenges and tries once more when Cloudflare rejects the token', async () => {
+      setupFrom()
+      invoke.mockResolvedValueOnce(captchaRejection())
+      invoke.mockResolvedValueOnce({ data: { booking_id: 'b-after-retry', session: null }, error: null })
+      freshToken.mockResolvedValueOnce('stale-token').mockResolvedValueOnce('second-token')
+      const user = userEvent.setup()
+      const onBooked = await guestToStepFour(user)
+      await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+      await waitFor(() => expect(onBooked).toHaveBeenCalledWith({ id: 'b-after-retry', status: 'pending' }))
+      expect(invoke).toHaveBeenCalledTimes(2)
+      const tokens = invoke.mock.calls.map(c => (c[1] as { body: Record<string, unknown> }).body.turnstile_token)
+      expect(tokens).toEqual(['stale-token', 'second-token'])
+      // The diver is never shown the first rejection: it was ours to fix.
+      expect(screen.queryByText(t.auth.captchaFailed)).not.toBeInTheDocument()
+    })
+
+    it('parks the diver on the account step, answers intact, when the retry is rejected too', async () => {
+      setupFrom()
+      // A fresh Response per call: a body can only be read once, and the form
+      // reads every rejection it gets.
+      invoke.mockImplementation(() => Promise.resolve(captchaRejection()))
+      const user = userEvent.setup()
+      await guestToStepFour(user)
+      await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+      expect(await screen.findByText(t.register.errors.captchaRecheck)).toBeInTheDocument()
+      expect(screen.getByText(/step 2 of 4/i)).toBeInTheDocument()
+      expect(screen.getByDisplayValue('new@diver.test')).toBeInTheDocument()
+      // Never the old advice, which threw the whole form away.
+      expect(screen.queryByText(/reload/i)).not.toBeInTheDocument()
+    })
+
+    it('does not post at all when no token can be minted', async () => {
+      setupFrom()
+      freshToken.mockResolvedValue(null)
+      const user = userEvent.setup()
+      await guestToStepFour(user)
+      await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+      expect(await screen.findByText(t.register.errors.captchaRecheck)).toBeInTheDocument()
+      expect(invoke).not.toHaveBeenCalled()
+    })
+
+    it('keeps the challenge alive past step 2 instead of unmounting it', async () => {
+      setupFrom()
+      const user = userEvent.setup()
+      await guestToStepFour(user)
+      // The account box is still mounted on step 4 — an unmounted widget is a
+      // dead one: no refresh, no expiry callback, nothing to re-challenge.
+      expect(screen.getByDisplayValue('new@diver.test')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /confirm booking/i })).toBeInTheDocument()
+    })
+
+    it('resuming a draft saved on step 4 reopens on the account step', async () => {
+      const key = registrationDraftKey('dive', sampleEvent.id, null)
+      saveRegistrationDraft(key, {
+        savedAt: Date.now(), step: 4,
+        fullName: 'Returning Diver', nickname: '', dob: '', nationality: '',
+        gender: '', idNumber: '', contactMethod: '', contactId: '',
+        certAgency: '', certLevel: '', uncertified: false, loggedDives: 0,
+        nitroxCertified: false, deepCertified: false,
+        emergencyName: '', emergencyPhone: '',
+        guestEmail: 'back@diver.test', guestAgreedTerms: true,
+        gearChoice: null, gearHelpNote: '', editedGearItems: null,
+        shoeSize: '', heightCm: '', weightKg: '',
+        roomId: '', roomNotes: '', addonIds: [], needsTransport: null, addNitroxCourse: false,
+        payment: 'bank_transfer', creditCardInvoiceEmail: '',
+        payForEveryone: false, useAccountCredit: false, payDepositOnly: false, notes: '',
+      })
+      setupFrom()
+      const user = userEvent.setup()
+      render(
+        <MemoryRouter>
+          <RegisterFormBody event={sampleEvent} profile={null} onSubmitSuccess={() => {}} />
+        </MemoryRouter>
+      )
+      await user.click(await screen.findByRole('button', { name: /^resume$/i }))
+
+      // The password is deliberately never drafted, so step 4 could only fail.
+      expect(screen.getByText(/step 2 of 4/i)).toBeInTheDocument()
+      expect(screen.getByDisplayValue('back@diver.test')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /confirm booking/i })).not.toBeInTheDocument()
+    })
+
+    it('will not confirm a guest booking whose account has no password', async () => {
+      setupFrom()
+      const user = userEvent.setup()
+      await guestToStepFour(user)
+      fireEvent.change(screen.getByLabelText(/password/i, { selector: 'input' }), { target: { value: '' } })
+
+      expect(screen.getByRole('button', { name: /confirm booking/i })).toBeDisabled()
     })
   })
 })

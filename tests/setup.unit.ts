@@ -11,9 +11,17 @@ vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'test-anon-key')
 // "completes" with a fake token so RegisterForm's guest-path step
 // gates pass in tests. The handler unit suite separately covers the
 // real verify-token contract (handler.test.ts).
+// The `ref` handle is part of the contract now: callers ask for a token minted
+// at submit rather than posting the one they were handed on an earlier step.
+// The stub answers with the same fake token, so a test that doesn't care about
+// captcha freshness sees no difference.
 vi.mock('../src/components/register/TurnstileWidget', () => ({
-  TurnstileWidget: ({ onToken }: { onToken: (t: string | null) => void }) => {
+  TurnstileWidget: ({ onToken, ref }: {
+    onToken: (t: string | null) => void
+    ref?: { current: { freshToken: () => Promise<string | null> } | null }
+  }) => {
     onToken('test-turnstile-token')
+    if (ref) ref.current = { freshToken: () => Promise.resolve('test-turnstile-token') }
     return null
   },
 }))

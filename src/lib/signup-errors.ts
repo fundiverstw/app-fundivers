@@ -21,12 +21,22 @@ export interface SignupFailure {
   message: string
   /** The address is taken — the useful next step is signing in, not retrying. */
   emailTaken: boolean
+  /**
+   * Cloudflare rejected the captcha token: stale (they live 300 seconds) or
+   * already spent. Nothing the diver typed is wrong, so callers holding a live
+   * widget re-challenge and try again rather than reporting a failure.
+   */
+  captchaFailed: boolean
 }
 
 // Matched against the handler's `{ error }` string. Order matters only in that
 // the first match wins; the patterns are disjoint.
 const WIRE_PATTERNS: { pattern: RegExp; message: () => string }[] = [
   { pattern: /captcha/i,                             message: () => t.auth.captchaFailed },
+  // A guest submit whose email or password never made it — which is what a
+  // resumed draft used to post, since the password is deliberately not
+  // persisted. Naming the gap beats "registration failed".
+  { pattern: /email and password required/i,         message: () => t.auth.missingCredentials },
   // Deliberately not /rate.?limit/: "rate-limit check failed" is the 500 the
   // handler returns when the RPC itself broke, and telling a diver to wait a
   // few minutes for that would be a lie. A real rejection is a 429, caught by
@@ -46,7 +56,9 @@ export async function readSignupFailure(
 ): Promise<SignupFailure> {
   // The request never got a response at all — nothing was wrong with what the
   // diver typed, so don't send them back to re-check it.
-  if (isTransientInvokeError(error)) return { message: t.auth.offline, emailTaken: false }
+  if (isTransientInvokeError(error)) {
+    return { message: t.auth.offline, emailTaken: false, captchaFailed: false }
+  }
 
   const ctx = error.context
   let status: number | null = null
@@ -56,7 +68,9 @@ export async function readSignupFailure(
     status = (ctx as Response).status ?? null
     try {
       const body = await (ctx as Response).json() as { error?: string; code?: string }
-      if (body.code === 'email_exists') return { message: t.auth.emailTaken, emailTaken: true }
+      if (body.code === 'email_exists') {
+        return { message: t.auth.emailTaken, emailTaken: true, captchaFailed: false }
+      }
       wire = body.error ?? ''
     } catch { /* body wasn't JSON — status is all we have */ }
   }
@@ -64,13 +78,16 @@ export async function readSignupFailure(
   // create-registration predates the `email_exists` code and reports a taken
   // address in prose.
   if (/already (been )?registered|already exists/i.test(wire)) {
-    return { message: t.auth.emailTaken, emailTaken: true }
+    return { message: t.auth.emailTaken, emailTaken: true, captchaFailed: false }
   }
-  if (status === 429) return { message: t.auth.tooManyAttempts, emailTaken: false }
+  if (status === 429) {
+    return { message: t.auth.tooManyAttempts, emailTaken: false, captchaFailed: false }
+  }
 
+  const captchaFailed = /captcha/i.test(wire)
   for (const { pattern, message } of WIRE_PATTERNS) {
-    if (pattern.test(wire)) return { message: message(), emailTaken: false }
+    if (pattern.test(wire)) return { message: message(), emailTaken: false, captchaFailed }
   }
 
-  return { message: fallback, emailTaken: false }
+  return { message: fallback, emailTaken: false, captchaFailed }
 }
