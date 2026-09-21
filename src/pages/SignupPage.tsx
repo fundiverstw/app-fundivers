@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -8,7 +8,7 @@ import { invokeWithRetry } from '../lib/edge-invoke'
 import { readSignupFailure } from '../lib/signup-errors'
 import { Logo } from '../components/Logo'
 import { PasswordInput } from '../components/PasswordInput'
-import { TurnstileWidget } from '../components/register/TurnstileWidget'
+import { TurnstileWidget, type TurnstileHandle } from '../components/register/TurnstileWidget'
 import { useTerms } from '../lib/use-terms'
 import { CARD_ELEVATED, INPUT, INPUT_LABEL, BTN_PRIMARY, TEXT_ERROR, TEXT_LINK, TEXT_MUTED } from '../styles/tokens'
 import { t } from '../i18n'
@@ -28,6 +28,10 @@ import { t } from '../i18n'
 // application" banner until a human approved them. Accounts are active from the
 // first insert now (20260831120000), so submitting this form lands the diver on
 // the calendar.
+
+// How old a Turnstile token may be at submit before the form insists on a
+// fresh one. Cloudflare's limit is 300 seconds.
+const FRESH_CAPTCHA_MAX_AGE_MS = 120_000
 
 const schema = z.object({
   name: z.string().trim().min(1, t.auth.nameRequired),
@@ -64,6 +68,10 @@ export function SignupPage() {
   // Stable identity so TurnstileWidget's effect doesn't tear down and re-render
   // the challenge on every keystroke in the form above it.
   const onToken = useCallback((token: string | null) => setTurnstileToken(token), [])
+  // Handle on the live widget. A token lives 300 seconds and verifies once, so
+  // a form filled in slowly — or retried after any rejection — needs Cloudflare
+  // asked again rather than the same string posted twice.
+  const turnstileRef = useRef<TurnstileHandle>(null)
   const onCaptchaUnavailable = useCallback(() => setCaptchaDead(true), [])
 
   async function onSubmit(data: FormData) {
@@ -75,6 +83,13 @@ export function SignupPage() {
     // server-side, spends a per-IP budget before it will mint a user, and
     // creates the account with the address already confirmed — so there is no
     // "go and click the link in your email" step between here and diving.
+    const captcha = await turnstileRef.current?.freshToken(FRESH_CAPTCHA_MAX_AGE_MS) ?? turnstileToken
+    if (!captcha) {
+      setServerError(t.auth.captchaFailed)
+      setTurnstileToken(null)
+      return
+    }
+
     const { data: result, error } = await invokeWithRetry<CreateAccountResponse>('create-account', {
       body: {
         name:                    data.name.trim(),
@@ -82,7 +97,7 @@ export function SignupPage() {
         password:                data.password,
         agreed_to_terms_at:      new Date().toISOString(),
         agreed_to_terms_version: terms?.version,
-        turnstile_token:         turnstileToken,
+        turnstile_token:         captcha,
       },
     })
 
@@ -91,8 +106,10 @@ export function SignupPage() {
       setServerError(failure.message)
       setEmailTaken(failure.emailTaken)
       // The token is single-use — Cloudflare rejects a replay — so a retry
-      // needs a fresh challenge.
+      // needs a fresh challenge. Re-run it here: clearing the state alone
+      // leaves the widget holding a spent token and Sign up disabled for good.
       setTurnstileToken(null)
+      void turnstileRef.current?.freshToken().then(setTurnstileToken)
       return
     }
 
@@ -112,6 +129,10 @@ export function SignupPage() {
     navigate('/calendar', { replace: true })
   }
 
+  // Bound at event time rather than during render: onSubmit reads the captcha
+  // widget's ref, and a ref must not be touched while rendering.
+  const submitForm = (ev: FormEvent<HTMLFormElement>) => { void handleSubmit(onSubmit)(ev) }
+
   // Two ways the challenge can be impossible rather than merely pending: no
   // site key was built in, or its script could not be fetched. Either way no
   // token will ever arrive and every submit would be rejected server-side, so
@@ -128,7 +149,7 @@ export function SignupPage() {
         {captchaUnavailable ? (
           <p className={`${TEXT_ERROR} text-sm text-center`}>{t.auth.captchaUnavailable}</p>
         ) : (
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={submitForm} className="space-y-4">
             <div>
               <label className={INPUT_LABEL} htmlFor="signup-name">{t.auth.nameLabel}</label>
               <input
@@ -174,7 +195,7 @@ export function SignupPage() {
             {errors.agreedToTerms && <p className={`${TEXT_ERROR} text-xs`}>{errors.agreedToTerms.message}</p>}
 
             <div className="turnstile-fit">
-              <TurnstileWidget siteKey={siteKey} onToken={onToken} onUnavailable={onCaptchaUnavailable} />
+              <TurnstileWidget ref={turnstileRef} siteKey={siteKey} onToken={onToken} onUnavailable={onCaptchaUnavailable} />
             </div>
 
             {serverError && (

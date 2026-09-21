@@ -6,10 +6,12 @@ import { SignupPage } from './SignupPage'
 import { renderWithRouter, byName } from '../../tests/test-utils'
 import { t } from '../i18n'
 
-const { invokeWithRetry, setSession, signInWithPassword } = vi.hoisted(() => ({
+const { invokeWithRetry, setSession, signInWithPassword, freshToken } = vi.hoisted(() => ({
   invokeWithRetry:    vi.fn(),
   setSession:         vi.fn(),
   signInWithPassword: vi.fn(),
+  // The widget's freshToken handle — see the TurnstileWidget stub below.
+  freshToken:         vi.fn(),
 }))
 
 vi.mock('../lib/edge-invoke', async (importOriginal) => ({
@@ -26,17 +28,23 @@ vi.mock('../lib/use-terms', () => ({
 }))
 
 // Stand-in for the Turnstile challenge: a button the test can "solve", the
-// same shape RegisterForm's suite uses.
+// same shape RegisterForm's suite uses. `ref.freshToken` is the rest of the
+// contract — what the page asks for a token minted at submit, and again after
+// a rejection spends the one it held.
 vi.mock('../components/register/TurnstileWidget', () => ({
-  TurnstileWidget: ({ onToken, onUnavailable }: {
+  TurnstileWidget: ({ onToken, onUnavailable, ref }: {
     onToken: (t: string) => void
     onUnavailable?: () => void
-  }) => (
-    <>
-      <button type="button" onClick={() => onToken('test-turnstile-token')}>solve captcha</button>
-      <button type="button" onClick={() => onUnavailable?.()}>break captcha</button>
-    </>
-  ),
+    ref?: { current: { freshToken: (maxAgeMs?: number) => Promise<string | null> } | null }
+  }) => {
+    if (ref) ref.current = { freshToken: (maxAgeMs?: number) => freshToken(maxAgeMs) }
+    return (
+      <>
+        <button type="button" onClick={() => onToken('test-turnstile-token')}>solve captcha</button>
+        <button type="button" onClick={() => onUnavailable?.()}>break captcha</button>
+      </>
+    )
+  },
 }))
 
 beforeEach(() => {
@@ -44,6 +52,8 @@ beforeEach(() => {
   invokeWithRetry.mockReset()
   setSession.mockReset()
   signInWithPassword.mockReset()
+  freshToken.mockReset()
+  freshToken.mockResolvedValue('test-turnstile-token')
   invokeWithRetry.mockResolvedValue({ data: { ok: true, user_id: 'u1', session: { access_token: 'a', refresh_token: 'r' } }, error: null })
 })
 
@@ -267,16 +277,43 @@ describe('SignupPage error messages', () => {
     expect(screen.queryByText(/rate-limit check failed/i)).not.toBeInTheDocument()
   })
 
-  // A Turnstile token is single-use, so a retry needs a fresh challenge.
-  it('clears the solved captcha after a failure', async () => {
+  // A Turnstile token is single-use, so a retry needs a fresh challenge. The
+  // page used to only drop the spent token, which left Sign up disabled for
+  // good — a filled-in form and no way to send it.
+  it('re-challenges after a failure so the diver can try again', async () => {
     invokeWithRetry.mockResolvedValue(httpError(400, { error: 'nope' }))
+    freshToken.mockResolvedValueOnce('first-token').mockResolvedValueOnce('second-token')
     const user = userEvent.setup()
     renderWithCalendar()
     await fillIn(user)
     await user.click(screen.getByRole('button', { name: /create account/i }))
 
     await screen.findByText(t.auth.signupFailed)
-    expect(screen.getByRole('button', { name: /create account/i })).toBeDisabled()
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /create account/i })).toBeEnabled())
+    expect(invokeWithRetry.mock.calls[0][1].body.turnstile_token).toBe('first-token')
+
+    // And the retry posts the new token, never the one Cloudflare already spent.
+    invokeWithRetry.mockResolvedValue({ data: { ok: true, user_id: 'u1', session: { access_token: 'a', refresh_token: 'r' } }, error: null })
+    freshToken.mockResolvedValue('third-token')
+    await user.click(screen.getByRole('button', { name: /create account/i }))
+    await waitFor(() => expect(invokeWithRetry).toHaveBeenCalledTimes(2))
+    expect(invokeWithRetry.mock.calls[1][1].body.turnstile_token).toBe('third-token')
+  })
+
+  // The other half of the same problem: a token minted when the page loaded
+  // and posted after the diver spent ten minutes over the form is rejected as
+  // expired. The page asks for one minted at submit instead.
+  it('posts a token minted at submit, not the one solved on arrival', async () => {
+    freshToken.mockResolvedValue('minted-at-submit')
+    const user = userEvent.setup()
+    renderWithCalendar()
+    await fillIn(user)
+    await user.click(screen.getByRole('button', { name: /create account/i }))
+
+    await waitFor(() => expect(invokeWithRetry).toHaveBeenCalledOnce())
+    expect(freshToken).toHaveBeenCalledWith(120_000)
+    expect(invokeWithRetry.mock.calls[0][1].body.turnstile_token).toBe('minted-at-submit')
   })
 })
 

@@ -27,7 +27,7 @@ function transportError(name: 'FunctionsFetchError' | 'FunctionsRelayError') {
 describe('readSignupFailure', () => {
   it('flags a taken address by code, so the caller can offer a sign-in link', async () => {
     const f = await readSignupFailure(httpError(409, { error: 'email already registered', code: 'email_exists' }), FALLBACK)
-    expect(f).toEqual({ message: t.auth.emailTaken, emailTaken: true })
+    expect(f).toEqual({ message: t.auth.emailTaken, emailTaken: true, captchaFailed: false })
   })
 
   // create-registration predates the code and says so in prose.
@@ -41,9 +41,28 @@ describe('readSignupFailure', () => {
     expect(f.message).toBe(t.auth.emailTaken)
   })
 
-  it('translates a captcha rejection', async () => {
+  // The flag is what lets a caller holding a live widget re-challenge and try
+  // again instead of showing the diver a rejection they cannot act on — the
+  // token was stale or spent, not wrong.
+  it('translates a captcha rejection and flags it as retryable', async () => {
     const f = await readSignupFailure(httpError(403, { error: 'captcha verification failed' }), FALLBACK)
     expect(f.message).toBe(t.auth.captchaFailed)
+    expect(f.captchaFailed).toBe(true)
+  })
+
+  it('flags nothing else as a captcha failure', async () => {
+    for (const wire of ['event not found', 'too many signup attempts, try again later', 'boom']) {
+      expect((await readSignupFailure(httpError(400, { error: wire }), FALLBACK)).captchaFailed).toBe(false)
+    }
+  })
+
+  // What a resumed guest draft used to post: the password is deliberately
+  // never persisted, so the request arrived without one and the diver was told
+  // only "registration failed".
+  it('names the missing credentials instead of a generic failure', async () => {
+    const f = await readSignupFailure(
+      httpError(400, { error: 'email and password required for guest path' }), FALLBACK)
+    expect(f.message).toBe(t.auth.missingCredentials)
   })
 
   it('translates a rate-limit rejection, by body and by status alone', async () => {
@@ -62,7 +81,7 @@ describe('readSignupFailure', () => {
     'names the connection for %s, rather than blaming what the diver typed',
     async (name) => {
       const f = await readSignupFailure(transportError(name), FALLBACK)
-      expect(f).toEqual({ message: t.auth.offline, emailTaken: false })
+      expect(f).toEqual({ message: t.auth.offline, emailTaken: false, captchaFailed: false })
     },
   )
 
@@ -82,6 +101,6 @@ describe('readSignupFailure', () => {
 
   it('copes with an error carrying no context at all', async () => {
     const f = await readSignupFailure(new Error('bare') as Error & { context?: unknown }, FALLBACK)
-    expect(f).toEqual({ message: FALLBACK, emailTaken: false })
+    expect(f).toEqual({ message: FALLBACK, emailTaken: false, captchaFailed: false })
   })
 })

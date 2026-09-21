@@ -116,7 +116,15 @@ export async function handleCreateAccount(req: Request, deps: Deps): Promise<Res
 
   const remoteIp = clientIp(req)
   const turnstile = await deps.verifyTurnstile(body.turnstile_token, remoteIp)
-  if (!turnstile.success) return json({ error: "captcha verification failed" }, 403)
+  if (!turnstile.success) {
+    // Cloudflare's own reason for the rejection, which the caller must not see
+    // but the dashboard log should: `timeout-or-duplicate` is an expired or
+    // replayed token (a slow form, a retry) and says nothing is wrong with the
+    // deploy, while `invalid-input-secret` or a hostname complaint means every
+    // signup is failing and someone has to fix the configuration.
+    console.warn("turnstile rejected:", (turnstile.errorCodes ?? []).join(",") || "no error codes")
+    return json({ error: "captcha verification failed" }, 403)
+  }
 
   const ipHashHex = await sha256Hex(remoteIp ?? "unknown")
   const { data: counts, error: rlErr } = await deps.admin.rpc("record_signup_attempt", {
