@@ -138,6 +138,18 @@ describe('create-account abuse gates', () => {
     expect(deps.admin.auth.admin.createUser).not.toHaveBeenCalled()
   })
 
+  // Same reasoning as create-registration's copy of this test: the codes are
+  // how a stale token (timeout-or-duplicate) is told apart from a
+  // misconfigured deploy, and they belong in the log, not the response.
+  it('logs the Turnstile error codes without putting them in the response', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    deps = makeDeps({ verifyTurnstile: vi.fn().mockResolvedValue({ success: false, errorCodes: ['timeout-or-duplicate'] }) })
+    const res = await handleCreateAccount(post(VALID), deps)
+    expect(warn.mock.calls.flat().join(' ')).toContain('timeout-or-duplicate')
+    expect(JSON.stringify(await res.json())).not.toContain('timeout-or-duplicate')
+    warn.mockRestore()
+  })
+
   it('verifies the token against the caller IP', async () => {
     await handleCreateAccount(post(VALID), deps)
     expect(deps.verifyTurnstile).toHaveBeenCalledWith('tok', '203.0.113.7')

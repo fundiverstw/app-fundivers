@@ -973,6 +973,27 @@ describe('handleRegistration — H2 guest path gates (Turnstile, rate limit, eve
     expect(captured.createUserCalls).toEqual([])
   })
 
+  // Cloudflare's reason for the rejection is the difference between "a diver
+  // took too long over the form" (timeout-or-duplicate) and "every signup on
+  // this deploy is failing" (a bad secret or hostname). It stays out of the
+  // response and goes to the log, or a captcha outage looks identical to a
+  // slow form.
+  it('logs the Turnstile error codes without putting them in the response', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { deps } = makeDeps({
+      turnstileResult: { success: false, errorCodes: ['timeout-or-duplicate'] },
+    })
+    const res = await handleRegistration(postJson({
+      ...goodBody,
+      email:    'g@example.com',
+      password: 'hunter2hunter2',
+      turnstile_token: 'stale',
+    }), deps)
+    expect(warn.mock.calls.flat().join(' ')).toContain('timeout-or-duplicate')
+    expect(JSON.stringify(await res.json())).not.toContain('timeout-or-duplicate')
+    warn.mockRestore()
+  })
+
   it('forwards the client IP from cf-connecting-ip to verifyTurnstile', async () => {
     const { deps, captured } = makeDeps()
     await handleRegistration(postJson({

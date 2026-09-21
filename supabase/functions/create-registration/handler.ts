@@ -259,6 +259,10 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     const remoteIp = clientIp(req)
     const turnstile = await deps.verifyTurnstile(body.turnstile_token, remoteIp)
     if (!turnstile.success) {
+      // See create-account's copy of this: the codes stay out of the response
+      // and go to the dashboard log, where `timeout-or-duplicate` (stale or
+      // replayed token) reads very differently from a bad secret or hostname.
+      console.warn("turnstile rejected:", (turnstile.errorCodes ?? []).join(",") || "no error codes")
       return json({ error: "captcha verification failed" }, 403)
     }
 
