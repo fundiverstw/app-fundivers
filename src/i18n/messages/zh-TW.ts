@@ -2535,6 +2535,10 @@ export const zhTW: Messages = {
       eventsDivers: (events: number, divers: number) => `${events} 個活動 · ${divers} 位潛水員`,
       diverCount: (n: number) => `${n} 位潛水員`,
       diversOnDay: '潛水員',
+      nonDiversOnDay: '非潛水員',
+      nonDiverCount: (n: number) => `${n} 位非潛水員`,
+      nonDiverHint: '在名單上但不下水 — EFR/CPR 學員、烤肉來賓、留在岸上的人。',
+      dryEventBadge: '乾式活動 — 無人下水',
       viewProfile: (name: string) => `檢視 ${name} 的個人資料`,
       nextEventDay: (where: string) => `下一個: ${where} →`,
       stillOwe: (n: number, currency: string, amount: string) =>

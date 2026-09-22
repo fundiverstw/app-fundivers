@@ -116,6 +116,31 @@ matching the Taiwanese recreational-fishing-vessel passenger form
 - The function returns `{ diver_count, staff_count }`; the toast shows
   both (e.g. "7 divers + 2 staff").
 
+## Divers and non-divers
+
+Not everyone on a day's board is diving. EFR and CPR students, an
+equipment class and a beach BBQ all put people on the roster who never
+get wet, and the shop's insurer asks for exactly that split: of the
+people you signed up that day, how many were in the water?
+
+The kind cannot answer it — an EFR course and an Open Water course are
+both `kind='course'` — so the event form asks the admin instead
+(**Participants → "Nobody goes in the water at this event"**, writing
+`events.enters_water`). `eventEntersWater()` in
+`src/lib/participants.ts` is the only place that answer is read: it ANDs
+the column with `entersTheWater(kind)`, so an adventure stays dry
+whatever the column says, and a snapshot captured before the column
+existed degrades to "diving" rather than emptying the diver list.
+
+On the Overall board the day's roster splits into two blocks — **Divers**
+on the usual chips, **Non-divers** on orange ones — and the header counts
+both. The split is a question about the *person*, not the booking:
+somebody who takes the morning EFR class and dives in the afternoon is
+one chip, in the diver list, because any in-water booking wins. A name in
+both lists would answer nobody's question. Each dry event also carries a
+"Dry — nobody in the water" badge on its own banner and counts
+non-divers rather than divers there.
+
 ## Transport: runs, seats, riders
 
 Everything on the Logistics day view (`/admin/logistics`) is planned per

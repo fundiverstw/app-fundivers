@@ -83,6 +83,43 @@ describe('AdminLogisticsPage', () => {
     expect(screen.getByRole('group', { name: /needs ride/i })).toBeInTheDocument()
   })
 
+  it('lists a dry event\'s registrants as non-divers, apart from the divers', async () => {
+    // An EFR class and a fun dive on the same day: Ada dives, Cy does not, and
+    // Bo does both — which makes Bo a diver, counted once.
+    const dryEvent = { id: 'e2', type: 'course', title: 'EFR refresher', has_transport: false, enters_water: false, start_time: '2026-06-18T00:00:00Z', end_time: null }
+    fetchEventsInRange.mockResolvedValue([diveEvent, dryEvent])
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: [
+        { id: 'b1', user_id: 'u1', event_id: 'e1', status: 'confirmed', details: {} },
+        { id: 'b2', user_id: 'u2', event_id: 'e1', status: 'confirmed', details: {} },
+        { id: 'b3', user_id: 'u2', event_id: 'e2', status: 'confirmed', details: {} },
+        { id: 'b4', user_id: 'u3', event_id: 'e2', status: 'confirmed', details: {} },
+      ] })
+      if (table === 'profiles') return mockQueryBuilder({ data: [
+        ...profiles,
+        { id: 'u3', name: 'Cy', nickname: 'Cy', contact_id: '0902', gear_owned: [] },
+      ] })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    renderPage()
+    const overall = (await screen.findByText(/^overall/i)).closest('section')!
+    expect(within(overall).getByText(/2 events · 2 divers/i)).toBeInTheDocument()
+    expect(within(overall).getByText(/1 non-diver/i)).toBeInTheDocument()
+
+    const divers = within(overall).getByText(t.admin.logistics.diversOnDay).closest('div')!
+    expect(within(divers).getByText('Ada')).toBeInTheDocument()
+    expect(within(divers).getByText('Bo')).toBeInTheDocument()
+    expect(within(divers).queryByText('Cy')).not.toBeInTheDocument()
+
+    const nonDivers = within(overall).getByText(t.admin.logistics.nonDiversOnDay).closest('div')!
+    expect(within(nonDivers).getByText('Cy')).toBeInTheDocument()
+    expect(within(nonDivers).queryByText('Bo')).not.toBeInTheDocument()
+
+    // And the dry event's own banner says so rather than counting divers.
+    expect(screen.getByText(t.admin.logistics.dryEventBadge)).toBeInTheDocument()
+  })
+
   it('opens a sized gear chip into the sizes the day needs, and closes it again', async () => {
     const user = userEvent.setup()
     const sizedBookings = [

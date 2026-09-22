@@ -2534,6 +2534,10 @@ export const ja: Messages = {
       eventsDivers: (events: number, divers: number) => `イベント ${events} 件 · ダイバー ${divers} 名`,
       diverCount: (n: number) => `ダイバー ${n} 名`,
       diversOnDay: 'ダイバー',
+      nonDiversOnDay: 'ノンダイバー',
+      nonDiverCount: (n: number) => `ノンダイバー ${n} 名`,
+      nonDiverHint: '名簿にはいるが入水しない人 — EFR/CPR 受講者、BBQ 参加者、陸上に残る人。',
+      dryEventBadge: 'ドライ — 入水なし',
       viewProfile: (name: string) => `${name}のプロフィールを表示`,
       nextEventDay: (where: string) => `次: ${where} →`,
       stillOwe: (n: number, currency: string, amount: string) =>
