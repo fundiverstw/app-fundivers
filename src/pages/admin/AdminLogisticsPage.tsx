@@ -5,6 +5,7 @@ import { format, parseISO } from 'date-fns'
 import { siteConfig } from '../../config/site'
 import { fetchUpcomingEventDays, formatEventSpan } from '../../lib/events'
 import { gearTotals, splitByTransport, transportHeadcount, dayKeyOffset, careTotals, isCareGearItem, addonTotals, partitionByWaitlist, gearSizeBreakdown, isSizedGearItem, gearDayDiff } from '../../lib/logistics'
+import { dayRoster, eventEntersWater } from '../../lib/participants'
 import { gearPieceKey, loadPackedGear, savePackedGear, togglePackedGear } from '../../lib/gear-packed'
 import { bookingBalance, type BookingBalance } from '../../lib/booking-balance'
 import { openCreditForBooking } from '../../lib/credits'
@@ -55,11 +56,19 @@ const SUMMARY_CHIP =
 const WAITLIST_CHIP =
   'text-xs px-2 py-0.5 rounded-full border border-violet-400/40 bg-violet-500/10 text-violet-100 font-medium'
 
+// The dry roster's chip — orange, so a name that never gets in the water can
+// be picked out of the board at a glance. Its own family rather than a marker
+// appended to a neutral chip: the two lists are read as counts (how many were
+// diving, how many were not), and a count is only as quick as its color.
+const NON_DIVER_CHIP =
+  'text-xs px-2 py-0.5 rounded-full border border-orange-400/40 bg-orange-500/10 text-orange-100 font-medium'
+
 // Hover for a name chip that goes somewhere. Each chip stays in its own color
 // family — washing the violet waitlist chip in the neutral hover would leave
 // its ink on a fill from a different palette.
 const CHIP_LINK_HOVER = 'hover:border-white/40 hover:bg-white/10'
 const WAITLIST_CHIP_LINK_HOVER = 'hover:border-violet-400/70 hover:bg-violet-500/20'
+const NON_DIVER_CHIP_LINK_HOVER = 'hover:border-orange-400/70 hover:bg-orange-500/20'
 
 /**
  * A person's name on the Overall board. Anyone with a profile links through to
@@ -101,10 +110,13 @@ function PersonChip({ name, profileId, linked, className, hover, children }: {
  * carries the amber warning tone — light amber, since the label sits on the
  * dark glass rather than on the amber chips' light fill.
  */
-function SummaryLabel({ children, tone }: { children: ReactNode; tone?: 'care' | 'tentative' }) {
+function SummaryLabel({ children, tone }: { children: ReactNode; tone?: 'care' | 'tentative' | 'dry' }) {
   return (
     <h3 className={`text-[11px] font-semibold uppercase tracking-wider ${
-      tone === 'care' ? 'text-amber-300' : tone === 'tentative' ? 'text-violet-300' : 'text-brand-100/70'
+      tone === 'care' ? 'text-amber-300'
+        : tone === 'tentative' ? 'text-violet-300'
+          : tone === 'dry' ? 'text-orange-300'
+            : 'text-brand-100/70'
     }`}>
       {children}
     </h3>
@@ -538,37 +550,30 @@ export function AdminLogisticsPage() {
     if (!dayStaff[i].roles.includes(s.role)) dayStaff[i].roles.push(s.role)
   }
   const onDutyStaffCount = dayStaff.length
-  // The day's roster — every diver booked across the day's events, one entry per
-  // person (someone diving two of the day's events is still one diver to brief,
-  // count heads for, and check off). Sorted so the list reads the same on every
-  // reload. Keyed by booking when a row has no profile, since those can't merge.
-  const dayDivers: { key: string; name: string; profileId: string | null }[] = []
-  const diverKeys = new Set<string>()
-  for (const r of seatedRows) {
-    const key = r.profile?.id ?? r.booking.id
-    if (diverKeys.has(key)) continue
-    diverKeys.add(key)
-    dayDivers.push({
-      key,
-      name: personName(r.profile?.name, r.profile?.nickname) || tp.noProfile,
-      profileId: r.profile?.id ?? null,
-    })
-  }
-  dayDivers.sort((a, b) => a.name.localeCompare(b.name))
-  // The waitlisted roster — same dedupe, for the Tentative block. A person
-  // already seated (on another of the day's events) is not re-listed as waiting.
-  const waitlistDivers: { key: string; name: string; profileId: string | null }[] = []
-  for (const r of waitlistRows) {
-    const key = r.profile?.id ?? r.booking.id
-    if (diverKeys.has(key)) continue
-    diverKeys.add(key)
-    waitlistDivers.push({
-      key,
-      name: personName(r.profile?.name, r.profile?.nickname) || tp.noProfile,
-      profileId: r.profile?.id ?? null,
-    })
-  }
-  waitlistDivers.sort((a, b) => a.name.localeCompare(b.name))
+  // The day's roster — everyone booked across the day's events, one entry per
+  // person (someone on two of the day's events is still one body to brief,
+  // count heads for, and check off), split by whether they actually get in the
+  // water. A dry event (an EFR or CPR class, an equipment course, a BBQ) fills
+  // the board with people who are not divers, and "how many of them were
+  // diving" is the question the shop's insurer asks, so the board answers it
+  // instead of calling every registrant a diver.
+  const rosterGroups = (groups ?? []).map(g => ({
+    entersWater: eventEntersWater(g.event),
+    ...partitionByWaitlist(g.rows),
+  }))
+  const seatedRoster = dayRoster(
+    rosterGroups.map(g => ({ entersWater: g.entersWater, rows: g.seated })),
+    tp.noProfile,
+  )
+  const dayDivers = seatedRoster.filter(p => p.inWater)
+  const dayNonDivers = seatedRoster.filter(p => !p.inWater)
+  // The waitlisted roster, for the Tentative block. A person already seated
+  // (on another of the day's events) is not re-listed as waiting.
+  const seatedKeys = new Set(seatedRoster.map(p => p.key))
+  const waitlistDivers = dayRoster(
+    rosterGroups.map(g => ({ entersWater: g.entersWater, rows: g.waitlisted })),
+    tp.noProfile,
+  ).filter(p => !seatedKeys.has(p.key))
   // Divers who still owe — for the whole-day summary and each event's list.
   const currency = (groups ?? [])[0]?.event.currency ?? siteConfig.locale.currency
   const dueRowsFor = (rows: DiverGearRow[]) => rows.flatMap(r => {
@@ -717,7 +722,15 @@ export function AdminLogisticsPage() {
                 {/* Headcount, not bookings: someone diving two of the day's events
                     is one diver. Counting rows here would disagree with the roster
                     below, which lists that person once. */}
-                <p className={`${TEXT_MUTED} text-sm font-medium`}>{lg.eventsDivers(groups.length, dayDivers.length)}</p>
+                <p className={`${TEXT_MUTED} text-sm font-medium`}>
+                  {lg.eventsDivers(groups.length, dayDivers.length)}
+                  {/* Only when there are any: on a day of ordinary dives the
+                      count would be a permanent "0 non-divers" that says
+                      nothing. */}
+                  {dayNonDivers.length > 0 && (
+                    <> · <span className="text-orange-300 font-semibold">{lg.nonDiverCount(dayNonDivers.length)}</span></>
+                  )}
+                </p>
               </div>
               <div className="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
                 {/* Open the overlap with tomorrow without leaving the day being
@@ -791,6 +804,17 @@ export function AdminLogisticsPage() {
                       <PersonChip key={d.key} name={d.name} profileId={d.profileId} linked={isAdmin} className={SUMMARY_CHIP} hover={CHIP_LINK_HOVER} />
                     ))}
                   </div>
+                </div>
+              )}
+              {dayNonDivers.length > 0 && (
+                <div className="space-y-1">
+                  <SummaryLabel tone="dry">{lg.nonDiversOnDay}</SummaryLabel>
+                  <div className="flex flex-wrap gap-1.5">
+                    {dayNonDivers.map(d => (
+                      <PersonChip key={d.key} name={d.name} profileId={d.profileId} linked={isAdmin} className={NON_DIVER_CHIP} hover={NON_DIVER_CHIP_LINK_HOVER} />
+                    ))}
+                  </div>
+                  <p className="text-xs text-brand-100/70 font-medium">{lg.nonDiverHint}</p>
                 </div>
               )}
               <div className="space-y-1">
@@ -882,6 +906,9 @@ export function AdminLogisticsPage() {
           // and kept out of this event's gear/care/add-on/transport tallies so
           // they agree with the seated-only Overall board above.
           const { seated: eventSeated, waitlisted: eventWaitlist } = partitionByWaitlist(g.rows)
+          // Nobody on this one gets in the water, so its registrants are not
+          // divers and its banner must not call them that.
+          const eventDry = !eventEntersWater(g.event)
           return (
             <section key={g.event.id} className="space-y-2 pt-2">
               {/* Bold banner per event so the sections are obvious when
@@ -911,8 +938,14 @@ export function AdminLogisticsPage() {
                   )}
                 </div>
                 <span className="block text-xs text-white/80">
-                  {formatEventSpan(g.event, { style: 'compact' })} · {lg.diverCount(g.rows.length)}
+                  {formatEventSpan(g.event, { style: 'compact' })}
+                  {' · '}{eventDry ? lg.nonDiverCount(g.rows.length) : lg.diverCount(g.rows.length)}
                 </span>
+                {eventDry && (
+                  <span className="inline-block text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border border-orange-300/60 bg-orange-500/20 text-orange-100">
+                    {lg.dryEventBadge}
+                  </span>
+                )}
               </div>
               <EventTransport rows={eventSeated} />
               <StaffDutyGroup rows={g.staff} />

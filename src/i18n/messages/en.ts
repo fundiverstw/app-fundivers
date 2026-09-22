@@ -2503,6 +2503,9 @@ export const en = {
       isTrip: 'Trip (multi-day / liveaboard classification)',
       isPrivate: 'Private (hidden from public calendars)',
       gearRental: 'Gear rental info',
+      sectionParticipants: 'Participants',
+      dryEvent: 'Nobody goes in the water at this event',
+      dryEventHint: 'Tick for an EFR or CPR class, an equipment course, a BBQ. The logistics board then lists these registrants as non-divers instead of divers, which is the split the shop\'s insurer asks for.',
       sectionGear: 'Gear',
       gearIncluded: 'Gear included — no gear options at registration',
       gearIncludedHint: 'Tick when the fee already covers a set (Open Water, Discover Scuba) or nothing goes in the water. Divers are asked no gear question and no gear reaches the price, the invoice or the PDF.',
@@ -2574,6 +2577,13 @@ export const en = {
         `${events} event${events === 1 ? '' : 's'} · ${divers} diver${divers === 1 ? '' : 's'}`,
       diverCount: (n: number) => `${n} diver${n === 1 ? '' : 's'}`,
       diversOnDay: 'Divers',
+      // The dry half of the roster — everybody the shop signed up that day
+      // who never gets in the water. Kept as its own block rather than a
+      // marker on a diver chip: the shop's insurer asks for the two counts.
+      nonDiversOnDay: 'Non-divers',
+      nonDiverCount: (n: number) => `${n} non-diver${n === 1 ? '' : 's'}`,
+      nonDiverHint: 'On the roster, not in the water — EFR/CPR students, BBQ guests, anyone staying ashore.',
+      dryEventBadge: 'Dry — nobody in the water',
       // Every name chip on the Overall board opens that person's directory card.
       viewProfile: (name: string) => `View ${name}'s profile`,
       // `where` is already localised: the "Tomorrow" tab label, or a date key.

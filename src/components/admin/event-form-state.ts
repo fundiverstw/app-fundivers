@@ -1,5 +1,5 @@
 import type { EventRow, EventKind } from '../../types/database'
-import { usesDateEnvelope, usesCourseDays, hasDiveFlags, recordsSiteConditions } from '../../lib/event-kinds'
+import { usesDateEnvelope, usesCourseDays, hasDiveFlags, recordsSiteConditions, entersTheWater } from '../../lib/event-kinds'
 
 // Form-state shape, defaults, prefill helpers, and the FormState→DB-payload
 // converters used by the create + edit pages. Lives in its own file so the
@@ -41,6 +41,10 @@ export interface FormState {
   gear_rental: string
   // Every kind: no gear question at registration, no gear in the price.
   gear_included: boolean
+  // Dive + course: do the people who register actually get in the water? An
+  // EFR class, an equipment course and a BBQ say no, and the logistics board
+  // then counts them as non-divers. An adventure answers no by kind.
+  enters_water: boolean
   cancel_date: string
   cancel_policy: string
   destinationIds: string[]   // FK multi → travel_destinations
@@ -70,7 +74,7 @@ export const EMPTY_FORM: FormState = {
   featured_image: '',
   notes: '', featured: false, fully_booked: false, is_private: false, is_boat_dive: false, is_trip: false,
   roomIds: [],
-  nitrox_required: false, gear_rental: '', gear_included: false,
+  nitrox_required: false, gear_rental: '', gear_included: false, enters_water: true,
   cancel_date: '', cancel_policy: '',
   destinationIds: [], trip_template_reference: '',
   full_payment_deadline: '',
@@ -137,6 +141,7 @@ export function formStateFromEvent(e: EventRow, rels: EventRelations = NO_RELATI
     full_payment_deadline: e.full_payment_deadline ?? '',
     featured_image: e.featured_image ?? '',
     gear_included: e.gear_included ?? false,
+    enters_water: e.enters_water ?? true,
   }
 
   if (usesCourseDays(e.kind)) {
@@ -230,6 +235,10 @@ export function eventPayloadFromForm(form: FormState): Record<string, unknown> {
     // Every kind answers this one: a course bundles a set, a dry course or a
     // non-diving outing needs none, a fun dive rents a-la-carte.
     gear_included: form.gear_included,
+    // Unreachable on an adventure rather than merely unticked: the kind
+    // already says nobody goes under, so the form offers no box and the row
+    // says the same thing the app does — see eventEntersWater().
+    enters_water: entersTheWater(form.type) ? form.enters_water : false,
     trip_template_id: courseOnly ? null : (form.trip_template_reference || null),
     // course-only
     course_name: courseOnly ? (form.course_name || null) : null,

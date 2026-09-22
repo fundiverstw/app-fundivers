@@ -135,6 +135,7 @@ describe('formStateFromEvent — dive', () => {
       nitrox_required: true,
       gear_rental: 'full',
       gear_included: true,
+      enters_water: true,
       cancel_date: '2026-06-20',
       cancel_policy: 'No refunds',
       destinationIds: ['dest1'],
@@ -278,6 +279,7 @@ describe('formStateFromEvent — course', () => {
       nitrox_required: false,
       gear_rental: '',
       gear_included: true,
+      enters_water: true,
       destinationIds: [],
       trip_template_reference: '',
     })
@@ -383,6 +385,7 @@ describe('eventPayloadFromForm — dive', () => {
       nitrox_required: true,
       gear_rental: 'full',
       gear_included: true,
+      enters_water: true,
       trip_template_id: 'dt',
       course_name: null,
       included: null,
@@ -513,6 +516,7 @@ describe('eventPayloadFromForm — course', () => {
       // Every kind carries the flag; a course that bundles gear is the
       // commonest case for it, and it survives the dive-field nulling.
       gear_included: false,
+      enters_water: true,
       trip_template_id: null,
       course_name: 'PADI OW',
       included: 'Manual',
@@ -628,6 +632,24 @@ describe('adventure events', () => {
     // ...but "runs over several days away from the shop" does.
     expect(payload.is_trip).toBe(true)
     expect(payload.notes).toBe('bring a tent')
+  })
+
+  it('writes an adventure as dry however the form was left', () => {
+    // The kind travels overland, so the form offers no water box at all. The
+    // row says the same thing the app does rather than carrying a true that
+    // eventEntersWater() would have to keep overruling.
+    const payload = eventPayloadFromForm({
+      ...EMPTY_FORM, type: 'adventure', start_date: '2026-08-01',
+      admin_title: 'Camping weekend', enters_water: true,
+    })
+    expect(payload.enters_water).toBe(false)
+  })
+
+  it('keeps the admin answer on the kinds that could go either way', () => {
+    for (const type of ['dive', 'course'] as const) {
+      expect(eventPayloadFromForm({ ...EMPTY_FORM, type, enters_water: false }).enters_water).toBe(false)
+      expect(eventPayloadFromForm({ ...EMPTY_FORM, type, enters_water: true }).enters_water).toBe(true)
+    }
   })
 })
 
