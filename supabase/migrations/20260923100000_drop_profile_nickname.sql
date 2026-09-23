@@ -9,6 +9,12 @@
 -- Four reporting functions and one view showed "nickname, else name". They
 -- read the legal name alone now, and are recreated here before the column
 -- drop so nothing is left pointing at a column that no longer exists.
+--
+-- The divers who answered the wrong question are the ones this would hurt:
+-- a row with a nickname and no name is the whole reason the field is going,
+-- and dropping the column outright would leave them as "(unnamed)" on the
+-- manifest with nothing to look them up by. Their nickname becomes the name,
+-- to be corrected against an ID the next time they are in front of staff.
 
 create or replace view public.staff_availability_view
   with (security_invoker = 'on') as
@@ -268,5 +274,10 @@ begin
   order by s.created_at;
 end;
 $$;
+
+update public.profiles
+   set name = btrim(nickname)
+ where coalesce(btrim(name), '') = ''
+   and coalesce(btrim(nickname), '') <> '';
 
 alter table public.profiles drop column nickname;

@@ -238,6 +238,32 @@ describe('AdminEventDetailPage', () => {
     expect(await screen.findByText(/Waivers OK/i)).toBeInTheDocument()
   })
 
+  it('refuses to sign a waiver in person for a diver with no name on file', async () => {
+    window.confirm = vi.fn(() => true)
+    rpc.mockResolvedValue({ data: 'sig-new', error: null })
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
+    ]))
+    const bookings = [{
+      id: 'b1', user_id: 'u1', status: 'confirmed', created_at: '2026-04-20',
+      event_id: 'dive_x', notes: null, refund_requested_at: null, details: { gear: { rent: false } },
+    }]
+    const profiles = [{ id: 'u1', name: null, contact_method: null, contact_id: null }]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: bookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      if (table === 'waivers') return mockQueryBuilder({ data: WAIVER_ROWS })
+      return mockQueryBuilder({ data: [] })
+    })
+    const user = userEvent.setup()
+    renderAt('/admin/events/dive_x')
+    await user.click(await screen.findByRole('button', { name: /mark done in person/i }))
+
+    // The name is stored as the signature — a placeholder would attest nothing.
+    expect(window.confirm).not.toHaveBeenCalled()
+    expect(rpc.mock.calls.filter(c => c[0] === 'admin_record_paper_waiver')).toHaveLength(0)
+  })
+
   it('shows an unknown ("Waivers —") badge rather than a false OK when the waiver lookup fails', async () => {
     fetchEventsForBookings.mockResolvedValue(new Map([
       ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],

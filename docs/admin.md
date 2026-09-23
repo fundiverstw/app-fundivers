@@ -322,7 +322,7 @@ by trigger so the attribution can't be rewritten.
 
 `/admin/users` is a searchable directory:
 
-- Search matches `name`, `contact_id`, and `phone`.
+- Search matches `name` and `contact_id`.
 - Each diver renders as an expandable card showing everything in
   `profiles` except `id` / timestamps:
   personal · emergency contact · certification · sizing · medical notes.

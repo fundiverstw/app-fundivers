@@ -295,7 +295,11 @@ export function AdminEventDetailPage() {
     if (!event) return
     const missing = missingByDiver[r.booking.user_id] ?? []
     if (missing.length === 0) return
-    const diverName = r.profile?.name || t.admin.transport.noProfile
+    // The name is stored as the signature on the waiver record, so a diver
+    // with no name on file cannot be signed for — a placeholder would attest
+    // nothing. DiverWaivers refuses the same way.
+    const diverName = r.profile?.name?.trim()
+    if (!diverName) return
     if (!window.confirm(ed.markWaiversInPersonConfirm(diverName, missing.map(w => w.title).join(', ')))) return
     try {
       const ref = { id: event.id, type: event.type, title: event.title }
