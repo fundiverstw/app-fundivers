@@ -269,15 +269,30 @@ describe('AdminLogisticsPage', () => {
     expect(within(card).getByText('Not packed')).toBeInTheDocument()
   })
 
-  it('leaves one-size gear as a plain chip with nothing to open', async () => {
+  it('opens one-size gear straight onto the divers, with no rack split to read', async () => {
+    const user = userEvent.setup()
+    const regBookings = [
+      { id: 'b1', user_id: 'u1', event_id: 'e1', status: 'confirmed', details: { gear: { rent: true, items: ['Regulator'] } } },
+      { id: 'b2', user_id: 'u2', event_id: 'e1', status: 'confirmed', details: { gear: { rent: true, items: ['Regulator'] } } },
+    ]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: regBookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      return mockQueryBuilder({ data: [] })
+    })
+
     renderPage()
-    await screen.findByText(/1 event · 2 divers/i)
-    const overall = screen.getByText(/^overall/i).closest('section')!
+    const overall = (await screen.findByText(/^overall/i)).closest('section')!
     const gearSection = within(overall).getByText(/gear to pack/i).closest('div')!
-    // The default fixtures rent a BCD and a Wetsuit — both sized, both buttons.
-    expect(within(gearSection).getByRole('button', { name: /show sizes for BCD/i })).toBeInTheDocument()
-    // A regulator has no size column, so its chip is not a control at all.
-    expect(within(gearSection).queryByRole('button', { name: /regulator/i })).not.toBeInTheDocument()
+
+    // A regulator has no size column, so the chip asks about people, not sizes.
+    await user.click(within(gearSection).getByRole('button', { name: /show who needs a regulator/i }))
+    expect(within(gearSection).getByText('2 to pack')).toBeInTheDocument()
+    expect(within(gearSection).queryByText(/no size on file/i)).not.toBeInTheDocument()
+
+    // And each one ticks off the same way a sized piece does.
+    await user.click(within(gearSection).getByRole('button', { name: /mark ada's regulator as packed/i }))
+    expect(within(gearSection).getByText(/1\/2 packed/i)).toBeInTheDocument()
   })
 
   it('shows divers with no size on file rather than dropping them from the list', async () => {

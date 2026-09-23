@@ -214,10 +214,16 @@ day); grouping lives in `src/lib/ride-groups.ts`.
 
 Two ways into the same list, for the two ways staff pack a van.
 
-By item, on the Overall board: opening a sized gear chip ("BCD ×3")
-expands it into the sizes the day needs and, under each size, one
-**toggle per diver's piece**. Tapping a name flips it to packed; the size
-line then reads "1/3 packed", or "all packed" once the size is done.
+By item, on the Overall board: every gear chip opens onto who it is for.
+Sized kit ("BCD ×3") expands into the sizes the day needs and, under each
+size, one **toggle per diver's piece**; one-size kit — regulator, mask,
+computer — has no rack split to read, so it opens straight onto the
+divers. Tapping a name flips it to packed; the line above then reads
+"1/3 packed", or "all packed" once that group is done.
+
+The amber **Handle with care** band ticks the same way: delicate rentals
+(dive computers, lights, cameras) are handed out one by one, so each
+renter's name there is a toggle over the same day list.
 
 By guest, on each diver's gear card: every item on their pack list is a
 tick, and the card header carries a chip reading **Not packed → n/m

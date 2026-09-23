@@ -259,6 +259,21 @@ export function gearSizeBreakdown(rows: DiverRow[], item: string): GearSizeGroup
   return [...groups.values()].sort((a, b) => compareSizes(a.size, b.size))
 }
 
+/**
+ * For one gear item, everyone the day packs it for, in board order. The
+ * one-size kit — regulators, masks, computers — has no rack split to read, so
+ * its chip opens straight into this list and each name is ticked off the same
+ * way a sized piece is.
+ */
+export function gearItemDivers(rows: DiverRow[], item: string): Array<{ bookingId: string; name: string }> {
+  return rows
+    .filter(r => gearPackList(r.booking).items.includes(item))
+    .map(r => ({
+      bookingId: r.booking.id,
+      name: personName(r.profile?.name) || '(no profile)',
+    }))
+}
+
 /** Rack order for two size labels; an unrecorded size sorts last, because it's
  *  a to-do rather than a slot on the rack. */
 function compareSizes(a: string | null, b: string | null): number {

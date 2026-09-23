@@ -4,7 +4,8 @@ import { PageLoading } from '../../components/ui/Spinner'
 import { format, parseISO } from 'date-fns'
 import { siteConfig } from '../../config/site'
 import { fetchUpcomingEventDays, formatEventSpan } from '../../lib/events'
-import { gearTotals, splitByTransport, transportHeadcount, dayKeyOffset, careTotals, isCareGearItem, addonTotals, partitionByWaitlist, gearSizeBreakdown, isSizedGearItem, gearDayDiff } from '../../lib/logistics'
+import { gearTotals, splitByTransport, transportHeadcount, dayKeyOffset, careTotals, isCareGearItem, addonTotals, partitionByWaitlist, gearSizeBreakdown, gearItemDivers, isSizedGearItem, gearDayDiff } from '../../lib/logistics'
+import type { GearSizeGroup } from '../../lib/logistics'
 import { dayRoster, eventEntersWater } from '../../lib/participants'
 import { gearPieceKey, loadPackedGear, savePackedGear, setBookingPacked, togglePackedGear } from '../../lib/gear-packed'
 import { bookingBalance, type BookingBalance } from '../../lib/booking-balance'
@@ -124,14 +125,14 @@ function SummaryLabel({ children, tone }: { children: ReactNode; tone?: 'care' |
 }
 
 /**
- * The gear-to-pack chips, where the sized items open into what they mean on the
- * rack. "BCD ×3" tells a packer how many to carry but not which ones to pull,
- * and that detail otherwise lives one card per diver further down the page —
- * so BCD, wetsuit, fins and boots are buttons that expand to their size split.
- * Items the shop keeps in one size (regulator, mask) stay plain spans: nothing
- * to open, so nothing that looks like it opens.
+ * The gear-to-pack chips, where each item opens into who it is for. "BCD ×3"
+ * tells a packer how many to carry but not which ones to pull, and that detail
+ * otherwise lives one card per diver further down the page. Sized kit — BCD,
+ * wetsuit, fins, boots — opens on its rack split; one-size kit — regulator,
+ * mask, computer — opens straight on the divers, because there is no rack
+ * split to read but the same three pieces still have to be ticked off.
  *
- * One panel at a time. The sizes are a short list read in passing, and stacking
+ * One panel at a time. Each is a short list read in passing, and stacking
  * several open panels would push the rest of the board off a phone screen.
  *
  * Inside the panel every diver's piece is a toggle, so the person loading the
@@ -144,21 +145,32 @@ function GearChips({ totals, rows, packed, onTogglePiece }: {
   onTogglePiece: (bookingId: string, item: string) => void
 }) {
   const [openItem, setOpenItem] = useState<string | null>(null)
-  const breakdown = openItem ? gearSizeBreakdown(rows, openItem) : []
+  const sized = openItem ? isSizedGearItem(openItem) : false
+  // One group either way: a rack split for sized kit, a single unlabelled
+  // group for the rest, so the panel below renders one shape.
+  const breakdown: GearSizeGroup[] = !openItem
+    ? []
+    : sized
+      ? gearSizeBreakdown(rows, openItem)
+      : [{ size: null, divers: gearItemDivers(rows, openItem) }]
   return (
     <>
       <div className="flex flex-wrap gap-1.5">
         {totals.map(({ item, count }) => {
           const label = `${item} ×${count}`
-          if (!isSizedGearItem(item)) return <span key={item} className={SUMMARY_CHIP}>{label}</span>
           const open = openItem === item
+          const opensOnSizes = isSizedGearItem(item)
           return (
             <button
               key={item}
               type="button"
               onClick={() => setOpenItem(o => (o === item ? null : item))}
               aria-expanded={open}
-              aria-label={open ? lg.hideSizesFor(item) : lg.showSizesFor(item)}
+              aria-label={
+                opensOnSizes
+                  ? (open ? lg.hideSizesFor(item) : lg.showSizesFor(item))
+                  : (open ? lg.hideDiversFor(item) : lg.showDiversFor(item))
+              }
               className={`${SUMMARY_CHIP} transition-colors ${
                 open ? 'border-white/50 bg-white/15' : 'hover:border-white/40 hover:bg-white/10'
               }`}
@@ -170,7 +182,7 @@ function GearChips({ totals, rows, packed, onTogglePiece }: {
       </div>
       {openItem && (
         <div className="rounded-lg border border-white/15 bg-white/5 p-2 space-y-1.5">
-          <SummaryLabel>{lg.sizesFor(openItem)}</SummaryLabel>
+          <SummaryLabel>{sized ? lg.sizesFor(openItem) : lg.diversFor(openItem)}</SummaryLabel>
           <ul className="space-y-1.5">
             {breakdown.map(g => {
               const done = g.divers.filter(d => packed.has(gearPieceKey(d.bookingId, openItem))).length
@@ -179,9 +191,12 @@ function GearChips({ totals, rows, packed, onTogglePiece }: {
                   <p className="text-xs text-brand-50">
                     {/* An unrecorded size is the one line worth chasing before
                         the van leaves, so it carries the warning tone rather
-                        than reading as just another rack slot. */}
-                    <span className={`font-semibold ${g.size ? '' : 'text-amber-300'}`}>
-                      {g.size ? lg.sizeCount(g.size, g.divers.length) : lg.sizeCount(lg.sizeUnknown, g.divers.length)}
+                        than reading as just another rack slot. One-size kit has
+                        no size to miss, so its count stays neutral. */}
+                    <span className={`font-semibold ${!sized || g.size ? '' : 'text-amber-300'}`}>
+                      {sized
+                        ? lg.sizeCount(g.size ?? lg.sizeUnknown, g.divers.length)
+                        : lg.itemCount(g.divers.length)}
                     </span>
                     {done > 0 && (
                       <span className={done === g.divers.length ? 'text-emerald-300 font-semibold' : 'text-brand-100/70'}>
@@ -973,7 +988,7 @@ export function AdminLogisticsPage() {
                 createdBy={profile?.id ?? null}
                 onChanged={() => setAllocReload(k => k + 1)}
               />
-              <CareGearGroup rows={careTotals(eventSeated, addonTitles)} />
+              <CareGearGroup rows={careTotals(eventSeated, addonTitles)} packed={packedGear} onTogglePiece={togglePackedPiece} />
               <AddonSummaryGroup rows={addonTotals(eventSeated, addonTitles)} />
               {/* Payments are money owed regardless of seat, so this stays on
                   the full roster — a waitlisted diver who owes still shows. */}
