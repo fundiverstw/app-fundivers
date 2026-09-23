@@ -63,6 +63,29 @@ function pruneOldDays(): void {
   }
 }
 
+/** How many of this diver's pieces are ticked off. */
+export function packedCount(packed: Set<string>, bookingId: string, items: string[]): number {
+  return items.filter(item => packed.has(gearPieceKey(bookingId, item))).length
+}
+
+/** Tick (or untick) every piece on one diver at once, returning a new set.
+ *  The diver's card offers this as a single chip: a packer who has just
+ *  carried someone's whole kit out should not have to tap each item. */
+export function setBookingPacked(
+  packed: Set<string>,
+  bookingId: string,
+  items: string[],
+  value: boolean,
+): Set<string> {
+  const next = new Set(packed)
+  for (const item of items) {
+    const key = gearPieceKey(bookingId, item)
+    if (value) next.add(key)
+    else next.delete(key)
+  }
+  return next
+}
+
 /** Flip one piece, returning a new set — the caller owns persisting it. */
 export function togglePackedGear(packed: Set<string>, key: string): Set<string> {
   const next = new Set(packed)

@@ -2596,8 +2596,13 @@ export const en = {
       showSizesFor: (item: string) => `Show sizes for ${item}`,
       hideSizesFor: (item: string) => `Hide sizes for ${item}`,
       sizesFor: (item: string) => `${item} sizes`,
+      // One-size kit has no rack split, so its chip opens on the divers instead.
+      showDiversFor: (item: string) => `Show who needs a ${item}`,
+      hideDiversFor: (item: string) => `Hide who needs a ${item}`,
+      diversFor: (item: string) => `${item} for`,
       sizeUnknown: 'No size on file',
       sizeCount: (size: string, n: number) => `${size} ×${n}`,
+      itemCount: (n: number) => `${n} to pack`,
       // Each piece behind an opened size chip ticks off as it goes on the van.
       packedName: (name: string) => `${name} ✓`,
       markPacked: (name: string, item: string) => `Mark ${name}'s ${item} as packed`,
@@ -2930,6 +2935,13 @@ export const en = {
       save: 'Save',
       gearFlags: 'Gear flags',
       waitlisted: 'Waitlisted',
+      packedAll: 'Packed ✓',
+      packedNone: 'Not packed',
+      packedSome: (packed: number, total: number) => `${packed}/${total} packed`,
+      markAllPacked: (name: string) => `Mark all of ${name}'s gear as packed`,
+      unmarkAllPacked: (name: string) => `Mark all of ${name}'s gear as not packed`,
+      markItemPacked: (name: string, item: string) => `Mark ${name}'s ${item} as packed`,
+      unmarkItemPacked: (name: string, item: string) => `Mark ${name}'s ${item} as not packed`,
     },
     bookingPayments: {
       charges: 'Charges',

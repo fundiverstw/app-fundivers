@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { splitByTransport, transportHeadcount, gearTotals, dayKeyOffset, careItemsForBooking, careTotals, isCareGearItem, addonTotals, partitionByWaitlist, gearSizeBreakdown, isSizedGearItem, gearSizeSource, needsShoeSize, gearDayDiff, packedGearTypes } from './logistics'
+import { splitByTransport, transportHeadcount, gearTotals, dayKeyOffset, careItemsForBooking, careTotals, isCareGearItem, addonTotals, partitionByWaitlist, gearSizeBreakdown, gearItemDivers, isSizedGearItem, gearSizeSource, needsShoeSize, gearDayDiff, packedGearTypes } from './logistics'
 import type { Booking, Profile } from '../types/database'
 
 const row = (transportation: boolean | undefined, items: string[] = []) => ({
@@ -264,6 +264,35 @@ describe('boot styles as separate rack lines', () => {
     expect(gearSizeBreakdown(rows, 'Boots (felt sole)')).toEqual([
       { size: 'JP 27', divers: [{ bookingId: 'b2', name: 'Bo' }] },
     ])
+  })
+})
+
+describe('gearItemDivers', () => {
+  const renting = (id: string, name: string, items: string[]) => ({
+    booking: { id, details: { gear: { rent: true, items } } } as unknown as Booking,
+    profile: { name } as unknown as Profile,
+  })
+
+  it('lists everyone the day packs a one-size item for, in board order', () => {
+    const rows = [
+      renting('b1', 'Ada', ['Regulator', 'BCD']),
+      renting('b2', 'Bo',  ['Mask']),
+      renting('b3', 'Cy',  ['Regulator']),
+    ]
+    expect(gearItemDivers(rows, 'Regulator')).toEqual([
+      { bookingId: 'b1', name: 'Ada' },
+      { bookingId: 'b3', name: 'Cy' },
+    ])
+    expect(gearItemDivers(rows, 'Mask')).toEqual([{ bookingId: 'b2', name: 'Bo' }])
+    expect(gearItemDivers(rows, 'Dive computer')).toEqual([])
+  })
+
+  it('names a diver with no profile rather than dropping them from the list', () => {
+    const rows = [{
+      booking: { id: 'b1', details: { gear: { rent: true, items: ['Regulator'] } } } as unknown as Booking,
+      profile: null,
+    }]
+    expect(gearItemDivers(rows, 'Regulator')).toEqual([{ bookingId: 'b1', name: '(no profile)' }])
   })
 })
 

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { personName } from '../../lib/names'
 import { supabase } from '../../lib/supabase'
 import { gearPackList } from '../../lib/gear'
+import { gearPieceKey, packedCount } from '../../lib/gear-packed'
 import { packedGearTypes } from '../../lib/logistics'
 import { shoeAsJp } from '../../lib/shoe-size'
 import { useToast } from '../../hooks/useToast'
@@ -46,9 +47,15 @@ export interface DiverGearRow {
  * update_diver_gear_sizes RPC), and the gear-tagged admin notes. Shared by the
  * per-event gear map and the day-of Logistics view. Both surfaces are gated by
  * StaffOrAdminRoute and the RPC rechecks the role server-side.
+ *
+ * Given `packed`, every item becomes a tick and the header carries a
+ * packed/not-packed chip for the whole kit — the day-of view walks these cards
+ * guest by guest to answer "is this one on the van yet?". Without it the items
+ * are plain labels, which is what the per-event gear map wants: that page
+ * plans a trip rather than loading it, and has no day to tick against.
  */
 export function DiverGearCard({
-  row, onProfilePatched, linkToProfile = false, gearModels,
+  row, onProfilePatched, linkToProfile = false, gearModels, packed, onTogglePiece, onToggleAllPacked,
 }: {
   row: DiverGearRow
   onProfilePatched: (diverId: string, patch: Partial<Profile>) => void
@@ -59,6 +66,11 @@ export function DiverGearCard({
   // The shop's gear sizing charts. When supplied, a rental "which fits?" lookup
   // is shown per gear type the diver doesn't own.
   gearModels?: GearModelWithSizes[]
+  // The day's ticked pieces (`gearPieceKey`). Supplying it, with both handlers,
+  // turns the pack list into the packing checklist described above.
+  packed?: Set<string>
+  onTogglePiece?: (bookingId: string, item: string) => void
+  onToggleAllPacked?: (bookingId: string, items: string[], value: boolean) => void
 }) {
   const { profile, booking } = row
   const diverName = personName(profile?.name) || gc.unknown
@@ -71,6 +83,13 @@ export function DiverGearCard({
     profile?.weight_kg && `${profile.weight_kg}kg`,
     shoeLabel,
   ].filter(Boolean).join(' · ')
+
+  // Ticking is offered only when the caller owns the day's list and both
+  // handlers came with it — a chip that looked live but dropped its taps would
+  // read as "already packed" to the next person down the van.
+  const ticking = !!packed && !!onTogglePiece && !!onToggleAllPacked && pack.items.length > 0
+  const packedHere = packed ? packedCount(packed, booking.id, pack.items) : 0
+  const allPacked = ticking && packedHere === pack.items.length
 
   const [finSize,     setFinSize]     = useState(profile?.fin_size     ?? '')
   const [bcdSize,     setBcdSize]     = useState(profile?.bcd_size     ?? '')
@@ -129,11 +148,30 @@ export function DiverGearCard({
           </div>
           {sizing && <p className="text-xs text-brand-900 font-medium">{sizing}</p>}
         </div>
-        <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
-          pack.items.length > 0 || pack.note ? 'bg-red-100 text-red-700 border border-accent' : 'bg-surface-100 text-brand-950 font-medium'
-        }`}>
-          {pack.summary}
-        </span>
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <span className={`text-xs px-2 py-0.5 rounded-full ${
+            pack.items.length > 0 || pack.note ? 'bg-red-100 text-red-700 border border-accent' : 'bg-surface-100 text-brand-950 font-medium'
+          }`}>
+            {pack.summary}
+          </span>
+          {ticking && (
+            <button
+              type="button"
+              onClick={() => onToggleAllPacked!(booking.id, pack.items, !allPacked)}
+              aria-pressed={allPacked}
+              aria-label={allPacked ? gc.unmarkAllPacked(diverName) : gc.markAllPacked(diverName)}
+              className={`text-xs px-2 py-0.5 rounded-full border font-semibold transition-colors ${
+                allPacked
+                  ? 'border-emerald-400 bg-emerald-100 text-emerald-800'
+                  : packedHere > 0
+                    ? 'border-amber-400 bg-amber-50 text-amber-900'
+                    : 'border-surface-300 bg-surface-100 text-brand-950'
+              }`}
+            >
+              {allPacked ? gc.packedAll : packedHere > 0 ? gc.packedSome(packedHere, pack.items.length) : gc.packedNone}
+            </button>
+          )}
+        </div>
       </header>
 
       {pack.note && (
@@ -144,19 +182,34 @@ export function DiverGearCard({
 
       {pack.items.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {pack.items.map(item => (
-            <span
-              key={item}
-              className={`text-xs px-2 py-0.5 rounded-full border ${
-                owned.has(item)
+          {pack.items.map(item => {
+            const isPacked = ticking && packed!.has(gearPieceKey(booking.id, item))
+            // A packed piece answers "is it on the van?", which outranks both
+            // "the diver owns one" and "this still needs pulling" — so the
+            // green wins over the other two tones rather than layering on them.
+            const chip = `text-xs px-2 py-0.5 rounded-full border ${
+              isPacked
+                ? 'border-emerald-400 bg-emerald-100 text-emerald-800 font-semibold'
+                : owned.has(item)
                   ? 'border-brand-900/40 text-brand-950 font-medium line-through'
                   : 'border-brand-900 text-brand-900'
-              }`}
-              title={owned.has(item) ? gc.ownsItem : gc.needsPacking}
-            >
-              {item}
-            </span>
-          ))}
+            }`
+            const title = owned.has(item) ? gc.ownsItem : gc.needsPacking
+            if (!ticking) return <span key={item} className={chip} title={title}>{item}</span>
+            return (
+              <button
+                key={item}
+                type="button"
+                onClick={() => onTogglePiece!(booking.id, item)}
+                aria-pressed={isPacked}
+                aria-label={isPacked ? gc.unmarkItemPacked(diverName, item) : gc.markItemPacked(diverName, item)}
+                title={title}
+                className={`${chip} transition-colors hover:border-emerald-500`}
+              >
+                {isPacked ? `${item} ✓` : item}
+              </button>
+            )
+          })}
         </div>
       )}
 
