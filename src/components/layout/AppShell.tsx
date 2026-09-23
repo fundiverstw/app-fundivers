@@ -89,10 +89,10 @@ export function AppShell() {
           )}
           {profile?.role === 'admin' || profile?.role === 'staff' ? (
             <Link to={profile.role === 'admin' ? '/admin' : '/admin/events'} className={`text-sm ${ON_DEEP_BODY} hover:text-white`}>
-              {personName(profile.name, profile.nickname)}
+              {personName(profile.name)}
             </Link>
           ) : (
-            <span className={`text-sm ${ON_DEEP_BODY}`}>{personName(profile?.name, profile?.nickname)}</span>
+            <span className={`text-sm ${ON_DEEP_BODY}`}>{personName(profile?.name)}</span>
           )}
           <button onClick={handleSignOut} className={BTN_XS_GHOST}>
             {t.common.signOut}

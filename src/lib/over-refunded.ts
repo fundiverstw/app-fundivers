@@ -38,7 +38,7 @@ export interface OverRefunded {
   currency: string
 }
 
-type ProfileLite = { id: string; name: string | null; nickname: string | null }
+type ProfileLite = { id: string; name: string | null }
 
 /** Pure selector: which bookings gave back more than they received? */
 export function selectOverRefunded(input: {
@@ -57,7 +57,7 @@ export function selectOverRefunded(input: {
     if (!(RETURN_SOURCES as readonly string[]).includes(c.source)) continue
     returnedBy.set(c.booking_id, (returnedBy.get(c.booking_id) ?? 0) + Number(c.amount))
   }
-  const nameById = new Map(input.profiles.map(p => [p.id, personName(p.name, p.nickname)]))
+  const nameById = new Map(input.profiles.map(p => [p.id, personName(p.name)]))
 
   return input.bookings
     .map(b => {
@@ -105,7 +105,7 @@ export async function fetchOverRefunded(labels: {
 
   const userIds = [...new Set(bookings.map(b => b.user_id).filter((id): id is string => !!id))]
   const { data: profiles } = await supabase
-    .from('profiles').select('id, name, nickname').in('id', userIds)
+    .from('profiles').select('id, name').in('id', userIds)
 
   const events = await fetchEventsForBookings(
     [...new Set(bookings.map(b => b.event_id).filter((id): id is string => !!id))],

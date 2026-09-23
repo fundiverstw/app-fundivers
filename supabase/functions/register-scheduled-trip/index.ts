@@ -160,8 +160,8 @@ Deno.serve(async (req) => {
   const registrationId = inserted.id
 
   const { data: profile } = await admin
-    .from("profiles").select("name, nickname").eq("id", diverId).maybeSingle()
-  const diverName = [profile?.name, profile?.nickname ? `(${profile.nickname})` : null].filter(Boolean).join(" ")
+    .from("profiles").select("name").eq("id", diverId).maybeSingle()
+  const diverName = profile?.name?.trim() ?? ""
   const tripDates = trip.start_date
     ? (trip.end_date && trip.end_date !== trip.start_date ? `${trip.start_date} to ${trip.end_date}` : trip.start_date)
     : null

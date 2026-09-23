@@ -33,7 +33,7 @@ function registration(over: Partial<AdminRegistration> = {}): AdminRegistration 
     preferred_start: null, preferred_end: null, estimated_cost: 55000, estimated_currency: 'TWD',
     details: {} as AdminRegistration['details'], notes: null, status: 'registered',
     kickback_rate: 0.05, kickback_amount: 3000, kickback_status: 'expected', paid_at: null, admin_notes: null,
-    diver: { id: 'u1', name: 'Ada Lovelace', nickname: 'Ada', email: 'ada@x.test', contact_id: '0900111222' },
+    diver: { id: 'u1', name: 'Ada Lovelace', email: 'ada@x.test', contact_id: '0900111222' },
     package_title: 'Raja Ampat Liveaboard', tier_name: 'Package A',
     ...over,
   }
@@ -62,7 +62,7 @@ describe('AdminRegistrationsTab', () => {
   it('shows a registration card with its diver, tier and estimate', async () => {
     render(<AdminRegistrationsTab />)
     expect(await screen.findByText('Raja Ampat Liveaboard')).toBeInTheDocument()
-    expect(screen.getByText(/Ada Lovelace \(Ada\) · Package A/)).toBeInTheDocument()
+    expect(screen.getByText(/Ada Lovelace · Package A/)).toBeInTheDocument()
     expect(screen.getByText(/Est\. 55,000 TWD/)).toBeInTheDocument()
   })
 
@@ -89,7 +89,7 @@ describe('AdminRegistrationsTab', () => {
       registration(),
       registration({
         id: 'reg2', package_title: 'Anilao Macro Week', tier_name: 'Package B',
-        diver: { id: 'u2', name: 'Bo', nickname: null, email: null, contact_id: null },
+        diver: { id: 'u2', name: 'Bo', email: null, contact_id: null },
       }),
     ])
     render(<AdminRegistrationsTab />)

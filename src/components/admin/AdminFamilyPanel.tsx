@@ -61,7 +61,7 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
     const q = filter.trim().toLowerCase()
     if (!q) return eligibleChildren.slice(0, 20)
     return eligibleChildren
-      .filter(u => `${u.name ?? ''} ${u.nickname ?? ''}`.toLowerCase().includes(q))
+      .filter(u => (u.name ?? '').toLowerCase().includes(q))
       .slice(0, 20)
   }, [filter, eligibleChildren])
 
@@ -104,7 +104,7 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
   // and offer an Unlink-from-parent control. No add-child UI here — the
   // one-level rule means a child can't have children.
   if (user.parent_account) {
-    const parentName = currentParent?.name ?? currentParent?.nickname ?? fm.unknownParent
+    const parentName = currentParent?.name ?? fm.unknownParent
     return (
       <Disclosure card title={fm.heading} titleClassName="text-sm font-semibold text-brand-700 uppercase tracking-wider">
         <p className="text-sm text-brand-900">
@@ -135,9 +135,6 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
             <li key={c.id} className="flex items-center justify-between gap-2 bg-surface-50 border border-surface-200 rounded-lg px-3 py-2">
               <span className="text-sm text-brand-900 font-medium">
                 {c.name ?? fm.unnamed}
-                {c.nickname && c.nickname !== c.name && (
-                  <span className="text-brand-900/80"> ({c.nickname})</span>
-                )}
               </span>
               <button
                 type="button"
@@ -173,9 +170,6 @@ export function AdminFamilyPanel({ user, allUsers, onChanged }: Props) {
               <li key={c.id} className="flex items-center justify-between gap-2 bg-white border border-surface-200 rounded-lg px-3 py-1.5">
                 <span className="text-sm text-brand-900 font-medium">
                   {c.name ?? fm.unnamed}
-                  {c.nickname && c.nickname !== c.name && (
-                    <span className="text-brand-900/80"> ({c.nickname})</span>
-                  )}
                 </span>
                 <button
                   type="button"

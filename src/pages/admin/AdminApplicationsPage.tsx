@@ -220,7 +220,7 @@ function AccountCard({
       >
         <div className="min-w-0">
           <div className="font-semibold text-brand-950 truncate">
-            {personName(profile.name, profile.nickname) || ap.noNameYet}
+            {personName(profile.name) || ap.noNameYet}
           </div>
           {/* The one field a suspended diver always has. Half of these rows
               never got as far as typing a name, and the admin is looking for

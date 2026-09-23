@@ -108,7 +108,7 @@ const noExtrasEvent: AppEvent = {
 
 const sampleProfile: Profile = {
   id: 'u1', created_at: '', updated_at: '',
-  name: 'Ada', nickname: 'Ada',
+  name: 'Ada', 
   date_of_birth: '1987-05-03', nationality: 'British', id_number: null,
   emergency_contact_name: null, emergency_contact_phone: null,
   cert_agency: 'PADI', cert_level: 'Advanced Open Water',
@@ -472,7 +472,7 @@ describe('RegisterForm', () => {
   })
 
   it('offers and applies each diver\'s own account credit for a family group', async () => {
-    const child: Profile = { ...sampleProfile, id: 'kid1', name: 'Kid', nickname: null, parent_account: 'u1' }
+    const child: Profile = { ...sampleProfile, id: 'kid1', name: 'Kid', parent_account: 'u1' }
     const openCredit = {
       id: 'c1', user_id: 'u1', booking_id: null, amount: 2000, currency: 'TWD',
       reason: 'Cancelled trip', status: 'open', created_by: null,
@@ -517,7 +517,7 @@ describe('RegisterForm', () => {
   })
 
   it('lets an admin/parent apply the target diver\'s credit when booking on their behalf', async () => {
-    const target: Profile = { ...sampleProfile, id: 'diver-99', name: 'Reef Kid', nickname: null }
+    const target: Profile = { ...sampleProfile, id: 'diver-99', name: 'Reef Kid' }
     const openCredit = {
       id: 'c1', user_id: 'diver-99', booking_id: null, amount: 2000, currency: 'TWD',
       reason: 'Cancelled trip', status: 'open', created_by: null,
@@ -1961,11 +1961,11 @@ describe('RegisterForm', () => {
   describe('parent diver picker', () => {
     const childProfile: Profile = {
       ...sampleProfile, id: 'child-1', name: 'Bee Junior',
-      nickname: 'Bee Jr', cert_level: null, cert_card_path: null,
+      cert_level: null, cert_card_path: null,
     }
     const childTwoProfile: Profile = {
       ...sampleProfile, id: 'child-2', name: 'Bee The Second',
-      nickname: 'Bee II', cert_level: null, cert_card_path: null,
+      cert_level: null, cert_card_path: null,
     }
 
     function setupFromWithChildren(children: Profile[]) {
@@ -2143,14 +2143,14 @@ describe('RegisterForm', () => {
       await user.click(screen.getByLabelText(/i have all the required gear/i))
 
       // The child gets their own gear question, headed by their name.
-      expect(screen.getByText(/gear for bee junior \(bee jr\)/i)).toBeInTheDocument()
+      expect(screen.getByText(/gear for bee junior/i)).toBeInTheDocument()
       const fullSet = FULL_GEAR_SET.reduce((s, i) => s + (GEAR_ALACARTE_PRICES[i] ?? 0), 0)
 
       await user.click(screen.getByRole('button', { name: /next/i }))
 
       // Totals differ, so the summary drops the "per diver" claim and itemizes.
       expect(screen.queryByText('Per diver')).not.toBeInTheDocument()
-      const childRow = screen.getByText('Bee Junior (Bee Jr)').closest('div')!
+      const childRow = screen.getByText('Bee Junior').closest('div')!
       expect(childRow).toHaveTextContent(`TWD ${(2800 + fullSet).toLocaleString()}`)
       const groupRow = screen.getByText(/group total \(2 divers\)/i).closest('div')!
       expect(groupRow).toHaveTextContent(`TWD ${(2800 + 2800 + fullSet).toLocaleString()}`)
@@ -2222,7 +2222,7 @@ describe('RegisterForm', () => {
       await user.click(screen.getByRole('button', { name: /next/i }))
       await user.click(screen.getByLabelText(/no, i don't need a ride/i))
       // The lead already has a size on file; the child's is the one asked for.
-      expect(screen.getByText(/gear for bee junior \(bee jr\)/i)).toBeInTheDocument()
+      expect(screen.getByText(/gear for bee junior/i)).toBeInTheDocument()
       expect(screen.queryByText(/they have all the required gear/i)).not.toBeInTheDocument()
       await user.selectOptions(screen.getByLabelText('Shoe size value'), '36')
 
@@ -2322,8 +2322,8 @@ describe('RegisterForm', () => {
 
       await waitFor(() => expect(screen.getByText(/some divers could not be registered/i)).toBeInTheDocument())
       // Per-diver block shows BOTH outcomes.
-      expect(screen.getByText(/Bee Jr.*registered/i)).toBeInTheDocument()
-      expect(screen.getByText(/Bee II.*failed/i)).toBeInTheDocument()
+      expect(screen.getByText(/Bee Junior.*registered/i)).toBeInTheDocument()
+      expect(screen.getByText(/Bee The Second.*failed/i)).toBeInTheDocument()
       // onBooked is only fired when every call succeeded.
       expect(onBooked).not.toHaveBeenCalled()
     })
@@ -2351,7 +2351,7 @@ describe('RegisterForm', () => {
       const key = registrationDraftKey('dive', sampleEvent.id, 'u1')
       const draft: RegistrationDraft = {
         savedAt: Date.now(), step: 2,
-        fullName: 'Restored Diver', nickname: '', dob: '', nationality: 'Testland',
+        fullName: 'Restored Diver', dob: '', nationality: 'Testland',
         gender: 'other', idNumber: '', contactMethod: 'line', contactId: 'restored-id',
         certAgency: '', certLevel: '', uncertified: false, loggedDives: 7,
         nitroxCertified: false, deepCertified: false,
@@ -2581,7 +2581,7 @@ describe('RegisterForm', () => {
       const key = registrationDraftKey('dive', sampleEvent.id, null)
       saveRegistrationDraft(key, {
         savedAt: Date.now(), step: 4,
-        fullName: 'Returning Diver', nickname: '', dob: '', nationality: '',
+        fullName: 'Returning Diver', dob: '', nationality: '',
         gender: '', idNumber: '', contactMethod: '', contactId: '',
         certAgency: '', certLevel: '', uncertified: false, loggedDives: 0,
         nitroxCertified: false, deepCertified: false,

@@ -98,8 +98,6 @@ export interface RegistrationPdfPayload {
   endDate: string | null
   /** Legal name, exactly as on the diver's passport / ID. */
   name: string
-  /** Informal nickname (optional). Rendered as its own row when present. */
-  nickname: string | null
   email: string
   dob: string | null
   nationality: string | null
@@ -308,7 +306,6 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
   altState.alt = false
   y = section(doc, y, d.personalDetails)
   y = row(doc, y, d.name, p.name, altState)
-  y = row(doc, y, d.nickname, p.nickname, altState)
   y = row(doc, y, d.email, p.email, altState)
   y = row(doc, y, d.dob, p.dob, altState)
   y = row(doc, y, d.nationality, p.nationality, altState)
@@ -533,7 +530,6 @@ export async function buildPdfBase64(p: RegistrationPdfPayload): Promise<string>
 
 export interface GroupDiverColumn {
   name: string
-  nickname: string | null
   eventTitle: string
   dateStr: string | null
   dob: string | null
@@ -576,7 +572,6 @@ const GROUP_FIELDS: Array<{ label: string; get: (d: GroupDiverColumn) => string 
   { label: d.event,        get: c => c.eventTitle },
   { label: d.date,         get: c => c.dateStr ?? "" },
   { label: d.name,         get: c => c.name },
-  { label: d.nickname,     get: c => c.nickname ?? "" },
   { label: d.dob,          get: c => c.dob ?? "" },
   { label: d.nationality,  get: c => c.nationality ?? "" },
   { label: d.certLevel,    get: c => c.certLevel ?? "" },

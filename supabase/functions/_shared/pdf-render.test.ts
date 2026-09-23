@@ -148,7 +148,6 @@ function registration(over: Partial<RegistrationPdfPayload> = {}): RegistrationP
     startDate: '2026-09-12',
     endDate: null,
     name: 'Sam Diver',
-    nickname: null,
     email: 'sam@example.com',
     dob: '1990-01-01',
     nationality: 'British',
@@ -206,13 +205,13 @@ function group(over: Partial<GroupRegistrationPdfPayload> = {}): GroupRegistrati
     divers: [
       {
         eventTitle: 'Green Island Boat Dive', dateStr: '2026-09-12', name: 'Sam Diver',
-        nickname: null, dob: '1990-01-01', nationality: 'British', certLevel: 'AOW',
+        dob: '1990-01-01', nationality: 'British', certLevel: 'AOW',
         certOrg: 'PADI', nitrox: true, gearLabel: 'Own', ride: 'Yes', room: null,
         addons: [], status: 'pending', deposit: 2000, total: 6000,
       },
       {
         eventTitle: 'Green Island Boat Dive', dateStr: '2026-09-12', name: 'Ada Lovelace',
-        nickname: null, dob: '1991-02-02', nationality: 'British', certLevel: 'OW',
+        dob: '1991-02-02', nationality: 'British', certLevel: 'OW',
         certOrg: 'SSI', nitrox: false, gearLabel: 'A-la-carte', ride: 'No', room: null,
         addons: [], status: 'pending', deposit: 2000, total: 6000,
       },
@@ -225,7 +224,6 @@ function group(over: Partial<GroupRegistrationPdfPayload> = {}): GroupRegistrati
 const CJK_OVERRIDES: Partial<RegistrationPdfPayload> = {
   eventTitle: '綠島船潛',
   name: '王小明',
-  nickname: '小明',
   nationality: '台灣',
   certLevel: '進階開放水域',
   certOrg: '國際潛水教練協會',

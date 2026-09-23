@@ -60,14 +60,12 @@ Deno.serve(async (req) => {
   }
   const { data: profile, error: pErr } = await admin
     .from("profiles")
-    .select("name, nickname")
+    .select("name")
     .eq("id", userId)
     .maybeSingle()
   if (pErr) return json({ error: safeError(pErr, "profile lookup failed") }, 500)
 
-  const diverName = [profile?.name, profile?.nickname ? `(${profile.nickname})` : null]
-    .filter(Boolean)
-    .join(" ")
+  const diverName = profile?.name?.trim() ?? ""
 
   if (!GMAIL_USER || !GMAIL_PASS) {
     return json({ error: "email not configured" }, 500)

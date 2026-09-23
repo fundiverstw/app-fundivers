@@ -74,7 +74,7 @@ export function careTotals(
 ): Array<{ item: string; divers: Array<{ bookingId: string; name: string }> }> {
   const byItem = new Map<string, Array<{ bookingId: string; name: string }>>()
   for (const r of rows) {
-    const name = personName(r.profile?.name, r.profile?.nickname) || '(no profile)'
+    const name = personName(r.profile?.name) || '(no profile)'
     for (const item of careItemsForBooking(r.booking, addonTitleById)) {
       const arr = byItem.get(item) ?? []
       arr.push({ bookingId: r.booking.id, name })
@@ -252,7 +252,7 @@ export function gearSizeBreakdown(rows: DiverRow[], item: string): GearSizeGroup
     const group = groups.get(key) ?? { size: label || null, divers: [] }
     group.divers.push({
       bookingId: r.booking.id,
-      name: personName(r.profile?.name, r.profile?.nickname) || '(no profile)',
+      name: personName(r.profile?.name) || '(no profile)',
     })
     groups.set(key, group)
   }
@@ -301,7 +301,7 @@ function gearUnitsByItem(rows: DiverRow[]): Map<string, Map<string, GearUnits>> 
         unknownSize: false,
         divers: rows
           .filter(r => gearPackList(r.booking).items.includes(item))
-          .map(r => personName(r.profile?.name, r.profile?.nickname) || '(no profile)'),
+          .map(r => personName(r.profile?.name) || '(no profile)'),
       })
     }
     byItem.set(item, bucket)

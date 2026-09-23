@@ -30,7 +30,7 @@ export function TrustedPartnersPage() {
   const [submitting, setSubmitting] = useState(false)
   const [sent, setSent] = useState(false)
 
-  const diverName = personName(profile?.name, profile?.nickname)
+  const diverName = personName(profile?.name)
 
   useEffect(() => {
     let cancelled = false

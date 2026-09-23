@@ -69,7 +69,6 @@ export interface RevenueBooking {
 export interface RevenuePerson {
   id: string
   name: string | null
-  nickname: string | null
 }
 
 /** True when someone working `role` on a `kind` event earns a share of it. */
@@ -184,7 +183,7 @@ export interface BuildStaffRevenueInput {
 }
 
 function displayName(p: RevenuePerson): string {
-  return p.nickname || p.name || p.id
+  return p.name || p.id
 }
 
 /** First and last calendar day of an event, whichever columns carry them. */
@@ -320,7 +319,7 @@ export function buildStaffRevenue(input: BuildStaffRevenueInput): StaffRevenueRe
 
     return {
       personId,
-      name: displayName(personById.get(personId) ?? { id: personId, name: null, nickname: null }),
+      name: displayName(personById.get(personId) ?? { id: personId, name: null }),
       months: [...months.values()].sort((a, b) => a.month.localeCompare(b.month)),
       groups,
       events: sorted,

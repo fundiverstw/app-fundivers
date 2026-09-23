@@ -183,8 +183,8 @@ Deno.serve(async (req) => {
   const { data: partner } = await admin
     .from("trusted_partners").select("name, contact_email, active").eq("id", pkg.trusted_partner_id).maybeSingle()
   const { data: profile } = await admin
-    .from("profiles").select("name, nickname").eq("id", diverId).maybeSingle()
-  const diverName = [profile?.name, profile?.nickname ? `(${profile.nickname})` : null].filter(Boolean).join(" ")
+    .from("profiles").select("name").eq("id", diverId).maybeSingle()
+  const diverName = profile?.name?.trim() ?? ""
 
   let emailed = false
   if (GMAIL_USER && GMAIL_PASS && partner?.active && partner.contact_email) {

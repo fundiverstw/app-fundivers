@@ -32,7 +32,7 @@ vi.mock('../ProfilePage', () => ({
 const cd = t.admin.createDiver
 const pf = t.profile.family
 
-const newProfile = { id: 'd1', name: 'Jane Diver', nickname: null } as unknown as Profile
+const newProfile = { id: 'd1', name: 'Jane Diver' } as unknown as Profile
 
 beforeEach(() => {
   invoke.mockReset()

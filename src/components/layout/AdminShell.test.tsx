@@ -46,7 +46,7 @@ function routedRender(start = '/admin') {
 describe('AdminShell pending badge', () => {
   it('shows pending count for admin when > 0', async () => {
     useAuthMock.mockReturnValue({
-      profile: { id: 'a1', role: 'admin', nickname: 'Ada' },
+      profile: { id: 'a1', role: 'admin' },
       signOut: vi.fn(),
     })
     from.mockReturnValue(buildPendingCountQuery(3))
@@ -56,7 +56,7 @@ describe('AdminShell pending badge', () => {
 
   it('hides badge when count is 0', async () => {
     useAuthMock.mockReturnValue({
-      profile: { id: 'a1', role: 'admin', nickname: 'Ada' },
+      profile: { id: 'a1', role: 'admin' },
       signOut: vi.fn(),
     })
     from.mockReturnValue(buildPendingCountQuery(0))
@@ -68,7 +68,7 @@ describe('AdminShell pending badge', () => {
 
   it('shows a refund-requests badge linking to /admin/refunds', async () => {
     useAuthMock.mockReturnValue({
-      profile: { id: 'a1', role: 'admin', nickname: 'Ada' },
+      profile: { id: 'a1', role: 'admin' },
       signOut: vi.fn(),
     })
     // Distinct counts per table: no pending applications, two open refunds.
@@ -86,7 +86,7 @@ describe('AdminShell pending badge', () => {
   // them from the approvals queue itself.
   it('counts every pending diver, including ones with an unfinished profile', async () => {
     useAuthMock.mockReturnValue({
-      profile: { id: 'a1', role: 'admin', nickname: 'Ada' },
+      profile: { id: 'a1', role: 'admin' },
       signOut: vi.fn(),
     })
     const calls: Array<{ method: string; args: unknown[] }> = []
@@ -115,7 +115,7 @@ describe('AdminShell pending badge', () => {
 
   it('does not query for staff users', async () => {
     useAuthMock.mockReturnValue({
-      profile: { id: 's1', role: 'staff', nickname: 'Sam' },
+      profile: { id: 's1', role: 'staff' },
       signOut: vi.fn(),
     })
     routedRender()
@@ -126,7 +126,7 @@ describe('AdminShell pending badge', () => {
 
   it('shows the Logistics tab to staff (and admins)', async () => {
     useAuthMock.mockReturnValue({
-      profile: { id: 's1', role: 'staff', nickname: 'Sam' },
+      profile: { id: 's1', role: 'staff' },
       signOut: vi.fn(),
     })
     routedRender()

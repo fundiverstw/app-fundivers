@@ -112,7 +112,7 @@ export function AdminShell() {
             </Link>
           )}
           <Link to="/calendar" className="text-sm font-semibold text-amber-300 hover:text-amber-200">
-            {personName(profile?.name, profile?.nickname)}
+            {personName(profile?.name)}
           </Link>
           <button onClick={handleSignOut} className={`text-xs ${ON_DEEP_MUTED} hover:text-white`}>
             {t.common.signOut}

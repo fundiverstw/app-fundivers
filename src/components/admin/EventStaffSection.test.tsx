@@ -40,8 +40,8 @@ describe('EventStaffSection course day selection', () => {
     from.mockImplementation((table: string) => {
       if (table === 'duties')   return mockQueryBuilder({ data: [] })
       if (table === 'profiles') return mockQueryBuilder({ data: [
-        { id: 'admin-1', role: 'admin', nickname: 'Ada',   name: 'Ada Lovelace' },
-        { id: 'admin-2', role: 'admin', nickname: 'Grace', name: 'Grace Hopper' },
+        { id: 'admin-1', role: 'admin', name: 'Ada Lovelace' },
+        { id: 'admin-2', role: 'admin', name: 'Grace Hopper' },
       ] })
       if (table === 'events') return mockQueryBuilder({
         data: { course_days: ['2030-02-10', '2030-02-12', '2030-02-15'] },
@@ -99,7 +99,7 @@ describe('EventStaffSection course day selection', () => {
       from.mockImplementation((table: string) => {
         if (table === 'duties')   return mockQueryBuilder({ data: [] })
         if (table === 'profiles') return mockQueryBuilder({ data: [
-          { id: 'admin-1', role: 'admin', nickname: 'Ada', name: 'Ada Lovelace' },
+          { id: 'admin-1', role: 'admin', name: 'Ada Lovelace' },
         ] })
         return mockQueryBuilder({ data: [] })
       })
@@ -126,7 +126,7 @@ describe('EventStaffSection course day selection', () => {
     from.mockImplementation((table: string) => {
       if (table === 'duties')   return mockQueryBuilder({ data: [] })
       if (table === 'profiles') return mockQueryBuilder({ data: [
-        { id: 'admin-1', role: 'admin', nickname: 'Ada', name: 'Ada Lovelace' },
+        { id: 'admin-1', role: 'admin', name: 'Ada Lovelace' },
       ] })
       return mockQueryBuilder({ data: [] })
     })

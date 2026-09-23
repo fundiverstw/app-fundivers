@@ -28,7 +28,7 @@ const HINT = 'block text-xs text-brand-900/70'
 // step before registering for one specific event; this page is the
 // no-event-yet entry point for onboarding a walk-in or a diver who never
 // wants to sign up themselves. Two phases:
-//   1. Create the account — email + name (+ optional nickname) → the
+//   1. Create the account — email + name → the
 //      admin-create-diver edge function provisions the auth user, promotes the
 //      profile out of pending, and sends a courtesy email.
 //   2. Fill in the rest — the same ProfileForm the diver would use, writing
@@ -60,7 +60,6 @@ function CreateAccountForm({ onCreated }: { onCreated: (profile: Profile) => voi
   const toast = useToast()
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
-  const [nickname, setNickname] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -77,7 +76,6 @@ function CreateAccountForm({ onCreated }: { onCreated: (profile: Profile) => voi
       const { profile, emailSent } = await createDiverAccount({
         email,
         name: fullName,
-        nickname,
       })
       const tail = emailSent ? pf.emailSent : pf.emailSkipped
       toast.success(cd.createdTitle(trimmedName) + tail)
@@ -112,16 +110,6 @@ function CreateAccountForm({ onCreated }: { onCreated: (profile: Profile) => voi
         />
         <span className={HINT}>{pf.nameHint}</span>
       </label>
-      <label className="block space-y-1">
-        <span className={LABEL}>{pf.nicknameLabel}</span>
-        <input
-          type="text"
-          value={nickname} onChange={e => setNickname(e.target.value)}
-          placeholder={pf.nicknamePlaceholder}
-          className={FIELD}
-        />
-      </label>
-
       {error && <p className="text-sm text-red-700 bg-red-50 border border-accent rounded px-2 py-1">{error}</p>}
 
       <button
@@ -142,7 +130,7 @@ function CreatedPanel({ profile, onCreateAnother }: {
   // ProfileForm saves with .eq('id', profile.id); it needs a signed-in user
   // for the guard + card-upload attribution, so we pass the acting admin.
   const { user } = useAuth()
-  const name = personName(profile.name, profile.nickname) || t.admin.family.diverFallback
+  const name = personName(profile.name) || t.admin.family.diverFallback
 
   return (
     <div className="space-y-4">

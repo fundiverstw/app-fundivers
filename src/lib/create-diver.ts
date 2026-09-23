@@ -8,7 +8,6 @@ const ad = t.admin.addDiver
 export interface CreateDiverAccountInput {
   email: string
   name: string
-  nickname?: string
   /** When registering the diver for a specific event in the same flow, the
    *  title threads into the courtesy email's copy. Omitted by the standalone
    *  Create-diver page, which has no event yet. */
@@ -34,7 +33,6 @@ export async function createDiverAccount(
     body: {
       email,
       name,
-      nickname:    input.nickname?.trim() || undefined,
       event_title: input.eventTitle,
     },
   })

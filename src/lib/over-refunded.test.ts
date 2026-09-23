@@ -21,7 +21,7 @@ function run(over: Partial<Parameters<typeof selectOverRefunded>[0]> = {}) {
     payments: [],
     credits: [],
     eventTitles: new Map([['ev-b1', 'Green Island']]),
-    profiles: [{ id: 'u1', name: 'Ada Lovelace', nickname: null }],
+    profiles: [{ id: 'u1', name: 'Ada Lovelace' }],
     eventFallback: '(event)',
     diverFallback: '(diver)',
     ...over,

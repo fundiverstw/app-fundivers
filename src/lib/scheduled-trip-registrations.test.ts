@@ -16,7 +16,7 @@ describe('fetchRegistrationsWithDivers', () => {
       { id: 'reg2', scheduled_trip_id: 's2', diver_id: 'u2', status: 'completed', estimated_cost: 60000 },
     ]
     const profiles = [
-      { id: 'u1', name: 'Ada Lovelace', nickname: 'Ada', email: 'ada@x.test', contact_id: '0900111222' },
+      { id: 'u1', name: 'Ada Lovelace', email: 'ada@x.test', contact_id: '0900111222' },
     ]
     const trips = [{ id: 's1', title: 'Palau Liveaboard' }]
 

@@ -260,11 +260,11 @@ export async function fetchOpenDiscountRequests(labels: {
   const userIds = [...new Set(live.map(r => bookings.get(r.booking_id)!.user_id).filter(present))]
   const eventIds = [...new Set(live.map(r => bookings.get(r.booking_id)!.event_id).filter(present))]
   const [profilesRes, eventsRes] = await Promise.all([
-    supabase.from('profiles').select('id, name, nickname').in('id', userIds),
+    supabase.from('profiles').select('id, name').in('id', userIds),
     supabase.from('events').select('id, display_title, admin_title').in('id', eventIds),
   ])
   const names = new Map(
-    (profilesRes.data ?? []).map(p => [p.id, personName(p.name, p.nickname)]),
+    (profilesRes.data ?? []).map(p => [p.id, personName(p.name)]),
   )
   const titles = new Map(
     (eventsRes.data ?? []).map(e => [e.id, e.display_title || e.admin_title || '']),

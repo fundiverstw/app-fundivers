@@ -59,7 +59,7 @@ describe('ProfilePage', () => {
       user: { id: 'u1' },
       // Every column of a freshly-signed-up row is NULL.
       profile: {
-        id: 'u1', name: 'Ada Lovelace', nickname: null, date_of_birth: null,
+        id: 'u1', name: 'Ada Lovelace', date_of_birth: null,
         nationality: null, gender: null, contact_method: null, contact_id: null,
         cert_agency: null, cert_level: null, logged_dives: null,
       },
@@ -101,7 +101,6 @@ describe('ProfilePage', () => {
       profile: {
         id: 'u1',
         name: 'Ada',
-        nickname: 'Ada',
         date_of_birth: '1815-12-10',
         gender: 'female',
         contact_method: 'email',
@@ -151,7 +150,6 @@ describe('ProfilePage', () => {
       profile: {
         id: 'u1',
         name: 'Ada',
-        nickname: 'Ada',
         date_of_birth: '1815-12-10',
         nationality: 'British',
         gender: 'female',
@@ -187,7 +185,6 @@ describe('ProfilePage', () => {
       profile: {
         id: 'u1',
         name: 'Ada',
-        nickname: 'Ada',
         date_of_birth: '1815-12-10',
         nationality: 'British',
         gender: 'female',
@@ -238,7 +235,6 @@ describe('ProfilePage', () => {
       profile: {
         id: 'u1',
         name: 'Ada',
-        nickname: 'Ada',
         date_of_birth: '1815-12-10',
         nationality: 'British',
         gender: 'female',
@@ -278,7 +274,7 @@ describe('ProfilePage', () => {
     useAuthMock.mockReturnValue({
       user: { id: 'u1' },
       profile: {
-        id: 'u1', name: 'Ada', nickname: 'Ada', date_of_birth: '1815-12-10',
+        id: 'u1', name: 'Ada', date_of_birth: '1815-12-10',
         nationality: 'British', gender: 'female', contact_method: 'email',
         contact_id: 'ada@example.com', cert_level: 'Open Water',
         cert_card_path: 'u1/existing.jpg', logged_dives: 0, gear_owned: [],
@@ -293,7 +289,7 @@ describe('ProfilePage', () => {
     useAuthMock.mockReturnValue({
       user: { id: 'u1' },
       profile: {
-        id: 'u1', name: 'Ada', nickname: 'Ada', date_of_birth: '1815-12-10',
+        id: 'u1', name: 'Ada', date_of_birth: '1815-12-10',
         nationality: 'British', gender: 'female',
         contact_method: 'email', contact_id: 'ada@example.com', logged_dives: 0,
       },
@@ -372,7 +368,6 @@ describe('ProfilePage', () => {
       profile: {
         id: 'u1',
         name: 'Ada',
-        nickname: 'Ada',
         date_of_birth: '1815-12-10',
         contact_method: 'email',
         contact_id: 'ada@example.com',
@@ -391,7 +386,7 @@ describe('ProfilePage', () => {
     // Save is disabled only because nothing has changed yet — touching any
     // field enables it, card or no card.
     expect(screen.getByRole('button', { name: /save changes/i })).toBeDisabled()
-    await user.type(input('nickname'), 'x')
+    await user.type(input('id_number'), 'x')
     expect(screen.getByRole('button', { name: /save changes/i })).toBeEnabled()
   })
 

@@ -61,7 +61,7 @@ export function DiverGearCard({
   gearModels?: GearModelWithSizes[]
 }) {
   const { profile, booking } = row
-  const diverName = personName(profile?.name, profile?.nickname) || gc.unknown
+  const diverName = personName(profile?.name) || gc.unknown
   const pack = gearPackList(booking)
   const toast = useToast()
   const owned = new Set(profile?.gear_owned ?? [])
@@ -102,7 +102,7 @@ export function DiverGearCard({
       bcd_size:     bcdSize     || null,
       wetsuit_size: wetsuitSize || null,
     })
-    toast.success(gc.savedSizesFor(personName(profile.name, profile.nickname) || t.admin.family.diverFallback))
+    toast.success(gc.savedSizesFor(personName(profile.name) || t.admin.family.diverFallback))
   }
 
   return (

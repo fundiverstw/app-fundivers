@@ -64,7 +64,7 @@ export function AdminScheduledTripRegistrationsTab() {
   const shown = q
     ? regs.filter(r =>
         (r.trip_title?.toLowerCase().includes(q) ?? false) ||
-        (r.diver && personName(r.diver.name, r.diver.nickname).toLowerCase().includes(q)))
+        (r.diver && personName(r.diver.name).toLowerCase().includes(q)))
     : regs
 
   if (loading) return <p className="text-sm text-white/70">{ar.loading}</p>
@@ -105,7 +105,7 @@ function RegistrationCard({ reg, onSetStatus }: {
   onSetStatus: (s: RegistrationStatus) => void
 }) {
   const [showContact, setShowContact] = useState(false)
-  const diverLabel = reg.diver ? personName(reg.diver.name, reg.diver.nickname) : ar.unknownDiver
+  const diverLabel = reg.diver ? personName(reg.diver.name) : ar.unknownDiver
   const currency = reg.estimated_currency ?? siteConfig.locale.currency
 
   return (

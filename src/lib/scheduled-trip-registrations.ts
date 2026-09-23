@@ -11,7 +11,6 @@ import type { ScheduledTripRegistration, RegistrationStatus } from '../types/dat
 export interface RegistrationDiver {
   id: string
   name: string | null
-  nickname: string | null
   email: string | null
   contact_id: string | null
 }
@@ -35,7 +34,7 @@ export async function fetchRegistrationsWithDivers(): Promise<AdminScheduledTrip
   // The two label lookups are independent — run them in one round-trip.
   const [diversRes, tripsRes] = await Promise.all([
     diverIds.length
-      ? supabase.from('profiles').select('id, name, nickname, email, contact_id').in('id', diverIds)
+      ? supabase.from('profiles').select('id, name, email, contact_id').in('id', diverIds)
       : Promise.resolve({ data: [], error: null }),
     tripIds.length
       ? supabase.from('scheduled_trips').select('id, title').in('id', tripIds)

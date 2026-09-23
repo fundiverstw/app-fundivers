@@ -70,7 +70,6 @@ describe('sanitizeProfilePatch — allowed keys (SPA registration-form contract)
   // profile_patch, add it both here AND in PROFILE_PATCH_ALLOW.
   const SPA_PATCH_FIELDS: ReadonlyArray<string> = [
     'name',
-    'nickname',
     'date_of_birth',
     'nationality',
     'gender',
@@ -103,8 +102,8 @@ describe('sanitizeProfilePatch — allowed keys (SPA registration-form contract)
   })
 
   it('preserves null values (SPA uses null to clear a column)', () => {
-    expect(sanitizeProfilePatch({ name: null, nickname: null }))
-      .toEqual({ name: null, nickname: null })
+    expect(sanitizeProfilePatch({ name: null, nationality: null }))
+      .toEqual({ name: null, nationality: null })
   })
 
   it('preserves numeric and boolean values verbatim', () => {

@@ -103,8 +103,8 @@ matching the Taiwanese recreational-fishing-vessel passenger form
 - Columns are the official Chinese form (編號 / 姓名 / 身分證字號 / 出生
   年月日 / 性別 / 潛水執照等級 / 潛水總支數 / 國家 / 備註). The sheet is
   Unicode, so no font embedding is needed. The 姓名 column is the diver's
-  legal `name` (exactly as on their ID) — the informal nickname is omitted,
-  since the manifest must match identity documents.
+  legal `name`, exactly as on their ID, since the manifest must match
+  identity documents.
 - A staff member's role is written into the 備註 (remark) column,
   localized to Chinese (`instructor`→`教練`, `guide`→`導潛`,
   `support`→`支援`); booked divers leave 備註 blank.
@@ -322,7 +322,7 @@ by trigger so the attribution can't be rewritten.
 
 `/admin/users` is a searchable directory:
 
-- Search matches `name`, `nickname`, `contact_id`, and `phone`.
+- Search matches `name` and `contact_id`.
 - Each diver renders as an expandable card showing everything in
   `profiles` except `id` / timestamps:
   personal · emergency contact · certification · sizing · medical notes.

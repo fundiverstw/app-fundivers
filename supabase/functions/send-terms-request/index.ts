@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
   if (callerProfile?.role !== "admin") return json({ error: "forbidden" }, 403)
 
   const { data: target } = await admin
-    .from("profiles").select("email, name, nickname").eq("id", userId).maybeSingle()
+    .from("profiles").select("email, name").eq("id", userId).maybeSingle()
   if (!target) return json({ error: "diver not found" }, 404)
   const to = (target as { email: string | null }).email
   if (!to) return json({ error: "that diver has no email address on file" }, 400)
@@ -69,9 +69,9 @@ Deno.serve(async (req) => {
   // Mail is the whole point here, unlike the courtesy email where the account
   // was the deliverable — so a send failure is this endpoint's failure.
   if (!GMAIL_USER || !GMAIL_PASS) return json({ error: "email is not configured" }, 500)
-  const who = target as { name: string | null; nickname: string | null }
+  const who = target as { name: string | null }
   const { subject, text } = buildTermsRequestEmail({
-    name: who.name || who.nickname || to,
+    name: who.name || to,
     acceptUrl: termsConsentUrl((tokenRow as { token: string }).token),
   })
   try {

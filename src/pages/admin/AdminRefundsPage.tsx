@@ -66,7 +66,7 @@ async function loadRefundRequests(): Promise<RefundRow[]> {
   const eventIds = [...new Set(bookings.map(b => b.event_id))]
 
   const [profilesRes, paymentsRes, eventMap] = await Promise.all([
-    supabase.from('profiles').select('id, name, nickname').in('id', userIds),
+    supabase.from('profiles').select('id, name').in('id', userIds),
     supabase.from('payments').select('booking_id, amount, status').in('booking_id', bookingIds),
     fetchEventsForBookings(eventIds),
   ])
@@ -74,7 +74,7 @@ async function loadRefundRequests(): Promise<RefundRow[]> {
   if (paymentsRes.error) throw paymentsRes.error
 
   const nameById = new Map(
-    (profilesRes.data ?? []).map(p => [p.id, personName(p.name, p.nickname)]),
+    (profilesRes.data ?? []).map(p => [p.id, personName(p.name)]),
   )
   // Net paid, matching the accounting export: paid positive, refunded
   // negative, voided excluded.

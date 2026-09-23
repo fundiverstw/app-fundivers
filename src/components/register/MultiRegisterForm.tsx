@@ -531,10 +531,10 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                         aria-label={t.register.multi.diverForAria(ev.title)}
                         className="w-full bg-white border border-surface-300 rounded-lg px-2 py-1.5 text-sm text-brand-900"
                       >
-                        <option value="">{t.register.multi.myselfOption(personName(profile?.name, profile?.nickname) || t.register.multi.meFallback)}</option>
+                        <option value="">{t.register.multi.myselfOption(personName(profile?.name) || t.register.multi.meFallback)}</option>
                         {children.map(c => (
                           <option key={c.id} value={c.id}>
-                            {c.name ?? t.register.picker.noName}{c.nickname ? ` (${c.nickname})` : ''}
+                            {c.name ?? t.register.picker.noName}
                           </option>
                         ))}
                       </select>
@@ -683,7 +683,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                   : profile
                 const showNitroxAddon = ev.nitrox_required && !(targetProfile?.nitrox_certified ?? false)
                 const targetLabel = targetForDiverId
-                  ? (personName(targetProfile?.name, targetProfile?.nickname) || t.register.multi.childFallback)
+                  ? (personName(targetProfile?.name) || t.register.multi.childFallback)
                   : null
                 return (
                   <div key={ev.id} className="bg-surface-50 border border-surface-200 rounded-lg p-3 space-y-2">

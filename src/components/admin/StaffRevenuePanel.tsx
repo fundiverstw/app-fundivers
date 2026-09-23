@@ -85,7 +85,7 @@ async function loadSeason(
   const [dutyRes, bookingRes, peopleRes, priceRes] = await Promise.all([
     supabase.from('duties').select('event_id, assignee_id, role').in('event_id', eventIds),
     supabase.from('bookings').select('id, event_id, status, details').in('event_id', eventIds).eq('status', 'confirmed'),
-    supabase.from('profiles').select('id, name, nickname').in('role', ['admin', 'staff']),
+    supabase.from('profiles').select('id, name').in('role', ['admin', 'staff']),
     priceIds.length
       ? supabase.from('prices').select('id, starting_at').in('id', priceIds)
       : Promise.resolve({ data: [] as Array<{ id: string; starting_at: number | null }>, error: null }),
@@ -311,7 +311,7 @@ export function StaffRevenuePanel({ selfOnlyPersonId }: StaffRevenuePanelProps) 
     : []
   const self = selfOnlyPersonId ? people[0] ?? null : null
   const roster = [...(current?.roster ?? [])].sort((a, b) =>
-    (a.nickname || a.name || '').localeCompare(b.nickname || b.name || ''))
+    (a.name || '').localeCompare(b.name || ''))
   const picked = pickedPersonId ? people.find(p => p.personId === pickedPersonId) ?? null : null
 
   return (
@@ -345,7 +345,7 @@ export function StaffRevenuePanel({ selfOnlyPersonId }: StaffRevenuePanelProps) 
               >
                 <option value="">{r.allCrew}</option>
                 {roster.map(p => (
-                  <option key={p.id} value={p.id}>{p.nickname || p.name || p.id}</option>
+                  <option key={p.id} value={p.id}>{p.name || p.id}</option>
                 ))}
               </select>
             </label>

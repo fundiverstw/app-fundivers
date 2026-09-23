@@ -121,8 +121,8 @@ function seasonWithOneDive(year: number) {
     // the two rostered guides.
     bookings: [{ id: 'b1', event_id: 'd1', status: 'confirmed', details: { charges: [{ kind: 'base', amount: 3000 }] } }],
     profiles: [
-      { id: 'staff-1', name: 'Sam Reef', nickname: 'Sam' },
-      { id: 'staff-2', name: 'Val Kelp', nickname: 'Val' },
+      { id: 'staff-1', name: 'Sam Reef' },
+      { id: 'staff-2', name: 'Val Kelp' },
     ],
   }
 }
@@ -136,8 +136,8 @@ describe('AdminAccountingPage revenue tab', () => {
     // Two rostered guides, so the dive's takings halve between them. Scoped to
     // the table — the crew picker lists the same names as <option>s.
     const table = within(await screen.findByRole('table'))
-    expect(table.getByText('Sam')).toBeInTheDocument()
-    expect(table.getByText('Val')).toBeInTheDocument()
+    expect(table.getByText('Sam Reef')).toBeInTheDocument()
+    expect(table.getByText('Val Kelp')).toBeInTheDocument()
     expect(table.getAllByText(`${siteConfig.locale.currency} 1,500`)).toHaveLength(2)
   })
 
@@ -149,14 +149,14 @@ describe('AdminAccountingPage revenue tab', () => {
     const crew = await screen.findByLabelText('Crew')
     // Every admin/staff profile is offered, not only those with revenue.
     expect(within(crew).getAllByRole('option').map(o => o.textContent))
-      .toEqual(['All crew', 'Sam', 'Val'])
+      .toEqual(['All crew', 'Sam Reef', 'Val Kelp'])
 
     fireEvent.change(crew, { target: { value: 'staff-1' } })
     // Narrowed to one person: their month breakdown replaces the crew table,
     // so Val survives only as an option in the picker.
     expect(await screen.findByText('By month')).toBeInTheDocument()
-    expect(screen.getAllByText('Val')).toHaveLength(1)
-    expect(screen.getByText('Val').tagName).toBe('OPTION')
+    expect(screen.getAllByText('Val Kelp')).toHaveLength(1)
+    expect(screen.getByText('Val Kelp').tagName).toBe('OPTION')
   })
 
   it('expands a month row into the events behind it', async () => {
@@ -187,7 +187,7 @@ describe('AdminAccountingPage revenue tab', () => {
 
   it('says so plainly when the picked person earned nothing that season', async () => {
     const season = seasonWithOneDive(new Date().getFullYear())
-    season.profiles.push({ id: 'staff-3', name: 'Nia Shoal', nickname: 'Nia' })
+    season.profiles.push({ id: 'staff-3', name: 'Nia Shoal' })
     mockTables(season)
     renderPage()
     fireEvent.click(screen.getByRole('tab', { name: 'Revenue' }))

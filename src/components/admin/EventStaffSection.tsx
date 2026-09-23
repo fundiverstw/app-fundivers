@@ -166,14 +166,14 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
             return (
               <li key={d.id} className="flex items-center justify-between text-xs bg-surface-50 rounded p-2">
                 <span className="min-w-0">
-                  <span className="font-medium text-brand-900">{personName(p?.name, p?.nickname) || t.admin.gearCard.unknown}</span>
+                  <span className="font-medium text-brand-900">{personName(p?.name) || t.admin.gearCard.unknown}</span>
                   <span className="text-brand-900 font-medium"> · <span className="capitalize">{d.role}</span> · {span}</span>
                 </span>
                 {!readOnly && (
                   <button
                     onClick={() => remove(d.id)}
                     className="text-brand-950 font-medium hover:text-red-600 ml-2"
-                    aria-label={st.removeDutyAria(personName(p?.name, p?.nickname) || st.adminFallback)}
+                    aria-label={st.removeDutyAria(personName(p?.name) || st.adminFallback)}
                   >
                     ✕
                   </button>
@@ -194,7 +194,7 @@ export function EventStaffSection({ eventType, eventId, eventStartDate, eventEnd
           >
             <option value="">{st.pickAdminStaff}</option>
             {admins.map(a => (
-              <option key={a.id} value={a.id}>{personName(a.name, a.nickname) || a.id}</option>
+              <option key={a.id} value={a.id}>{personName(a.name) || a.id}</option>
             ))}
           </select>
           <select

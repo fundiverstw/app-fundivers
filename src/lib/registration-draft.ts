@@ -15,7 +15,6 @@ export interface RegistrationDraft {
   step: number
   // Step 2 — diver profile
   fullName: string
-  nickname: string
   dob: string
   nationality: string
   gender: string
@@ -169,7 +168,6 @@ function normalizeDraft(v: Partial<RegistrationDraft>): RegistrationDraft {
     savedAt: typeof v.savedAt === 'number' ? v.savedAt : 0,
     step: typeof v.step === 'number' && v.step >= 1 && v.step <= 4 ? v.step : 1,
     fullName: str(v.fullName),
-    nickname: str(v.nickname),
     dob: str(v.dob),
     nationality: str(v.nationality),
     gender: str(v.gender),

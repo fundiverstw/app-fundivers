@@ -26,7 +26,7 @@ const parent = { id: 'p1', parent_account: null, status: 'active' } as unknown a
 function childRow(over: Partial<Profile>): Profile {
   return {
     id: 'c1', parent_account: 'p1', status: 'active',
-    name: 'Kid One', nickname: null, cert_agency: null, cert_level: null,
+    name: 'Kid One', cert_agency: null, cert_level: null,
     ...over,
   } as unknown as Profile
 }

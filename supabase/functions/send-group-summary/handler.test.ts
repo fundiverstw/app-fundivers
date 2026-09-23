@@ -51,8 +51,8 @@ function makeDeps(opts: Opts = {}) {
   const tables: Record<string, TableSpec> = {
     bookings: { rows: opts.bookingsError ? [] : bookings },
     profiles: { rows: [
-      { id: 'u1', name: 'Ada', nickname: null, date_of_birth: '1990-01-01', nationality: 'TW', cert_level: 'AOW', cert_agency: 'PADI', nitrox_certified: true },
-      { id: 'c1', name: 'Bee Jr', nickname: 'Bee', date_of_birth: '2012-05-05', nationality: 'TW', cert_level: null, cert_agency: null, nitrox_certified: false },
+      { id: 'u1', name: 'Ada', date_of_birth: '1990-01-01', nationality: 'TW', cert_level: 'AOW', cert_agency: 'PADI', nitrox_certified: true },
+      { id: 'c1', name: 'Bee Jr', date_of_birth: '2012-05-05', nationality: 'TW', cert_level: null, cert_agency: null, nitrox_certified: false },
     ] },
     events: { rows: [
       { id: 'd1', kind: 'dive', display_title: 'Green Island', admin_title: null, calendar_title: null, start_date: '2030-06-12', end_date: null, course_days: null },

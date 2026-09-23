@@ -128,7 +128,7 @@ export async function handleGroupSummary(req: Request, deps: Deps): Promise<Resp
   for (const b of bookings) {
     const { data: profile } = await admin
       .from("profiles")
-      .select("name, nickname, date_of_birth, nationality, cert_level, cert_agency, nitrox_certified")
+      .select("name, date_of_birth, nationality, cert_level, cert_agency, nitrox_certified")
       .eq("id", b.user_id)
       .maybeSingle()
 
@@ -179,7 +179,6 @@ export async function handleGroupSummary(req: Request, deps: Deps): Promise<Resp
 
     divers.push({
       name:        (profile?.name as string | null) ?? "",
-      nickname:    (profile?.nickname as string | null) ?? null,
       eventTitle,
       dateStr,
       dob:         (profile?.date_of_birth as string | null) ?? null,

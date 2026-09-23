@@ -166,7 +166,7 @@ function DutyRow({ enriched, highlight }: { enriched: Enriched; highlight?: bool
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium text-brand-900 truncate">
-            {personName(assignee?.name, assignee?.nickname) || dy.unknownAdmin}
+            {personName(assignee?.name) || dy.unknownAdmin}
           </p>
           <p className="text-xs text-brand-900 font-medium">{dateSpan}</p>
         </div>

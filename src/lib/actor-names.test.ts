@@ -12,7 +12,7 @@ describe('fetchActorNames', () => {
   it('looks up each distinct id once and maps it to a display name', async () => {
     const inSpy = vi.fn()
     const builder = mockQueryBuilder({
-      data: [{ id: 'a1', name: 'Ada Admin', nickname: 'Ada' }],
+      data: [{ id: 'a1', name: 'Ada Admin' }],
       error: null,
     })
     builder.in = (col: string, vals: string[]) => { inSpy(col, vals); return builder }
@@ -22,7 +22,7 @@ describe('fetchActorNames', () => {
     const names = await fetchActorNames(['a1', 'a1', null, undefined, 'a2'])
 
     expect(inSpy).toHaveBeenCalledWith('id', ['a1', 'a2'])
-    expect(names.get('a1')).toBe('Ada Admin (Ada)')
+    expect(names.get('a1')).toBe('Ada Admin')
   })
 
   it('does not query at all when there is nothing to resolve', async () => {

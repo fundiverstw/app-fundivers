@@ -57,8 +57,8 @@ describe('AdminDutyPage', () => {
       },
     ]
     const admins = [
-      { id: 'admin-1', nickname: 'Ada', name: 'Ada Lovelace', role: 'admin' },
-      { id: 'admin-2', nickname: 'Grace', name: 'Grace Hopper', role: 'admin' },
+      { id: 'admin-1', name: 'Ada Lovelace', role: 'admin' },
+      { id: 'admin-2', name: 'Grace Hopper', role: 'admin' },
     ]
     const events = [
       { id: 'dive-a',   type: 'dive',   title: 'Kenting Dive',  start_time: '2099-01-10T09:00:00Z', end_time: null, fully_booked: false, price: null, deposit_amount: null, currency: 'TWD', featured: false },
@@ -89,7 +89,7 @@ describe('AdminDutyPage', () => {
 
     // All-upcoming section still lists both duty rows.
     expect(screen.getByText('All upcoming duties')).toBeInTheDocument()
-    expect(screen.getByText('Grace Hopper (Grace)')).toBeInTheDocument()
+    expect(screen.getByText('Grace Hopper')).toBeInTheDocument()
     expect(screen.getByText(/Teaching OW batch/)).toBeInTheDocument()
   })
 
@@ -97,7 +97,7 @@ describe('AdminDutyPage', () => {
     useAuthMock.mockReturnValue({ user: { id: 'admin-1' } })
     from.mockImplementation((table: string) => {
       if (table === 'duties')   return mockQueryBuilder({ data: [] })
-      if (table === 'profiles') return mockQueryBuilder({ data: [{ id: 'admin-1', role: 'admin', nickname: 'Ada', name: 'Ada Lovelace' }] })
+      if (table === 'profiles') return mockQueryBuilder({ data: [{ id: 'admin-1', role: 'admin', name: 'Ada Lovelace' }] })
       return mockQueryBuilder({ data: [] })
     })
     fetchEventsInRange.mockResolvedValue([])

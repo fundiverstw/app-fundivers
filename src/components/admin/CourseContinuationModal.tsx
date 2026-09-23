@@ -124,10 +124,10 @@ export function CourseContinuationModal({ event, onClose, onAdded }: {
 
   const visible = profiles.filter(p => {
     if (!filter) return true
-    const haystack = [p.name, p.nickname, p.contact_id].filter(Boolean).join(' ').toLowerCase()
+    const haystack = [p.name, p.contact_id].filter(Boolean).join(' ').toLowerCase()
     return haystack.includes(filter.toLowerCase())
   })
-  const targetName = target ? personName(target.name, target.nickname) || pf.noName : ''
+  const targetName = target ? personName(target.name) || pf.noName : ''
 
   return (
     <div
@@ -167,7 +167,7 @@ export function CourseContinuationModal({ event, onClose, onAdded }: {
                     onClick={() => { setCourses(null); setTarget(p) }}
                     className="w-full text-left bg-white/70 hover:bg-surface-100 border border-surface-200 rounded-lg px-3 py-2"
                   >
-                    <p className="text-sm font-medium text-brand-900">{personName(p.name, p.nickname) || pf.noName}</p>
+                    <p className="text-sm font-medium text-brand-900">{personName(p.name) || pf.noName}</p>
                     <p className="text-xs text-brand-900/70">{p.contact_id ?? ''}</p>
                   </button>
                 </li>

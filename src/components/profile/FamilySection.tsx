@@ -71,7 +71,6 @@ function FamilyPanel({ parent }: { parent: Profile }) {
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-brand-900">
                     {c.name ?? t.profile.family.noName}
-                    {c.nickname && <span className="text-brand-900/80"> ({c.nickname})</span>}
                   </p>
                   <p className="text-xs text-brand-900/70">
                     {c.cert_agency && c.cert_level ? `${c.cert_agency} ${c.cert_level}` : t.profile.family.uncertified}
@@ -133,7 +132,6 @@ function CreateChildForm({
   const toast = useToast()
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
-  const [nickname, setNickname] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -156,7 +154,6 @@ function CreateChildForm({
         body: {
           email:        trimmedEmail,
           name:    trimmedName,
-          nickname: nickname.trim() || undefined,
         },
       })
       if (invokeErr) throw new Error(invokeErr.message)
@@ -195,15 +192,6 @@ function CreateChildForm({
         <span className="block text-xs text-brand-900/70 mt-1">
           {t.profile.family.nameHint}
         </span>
-      </label>
-      <label className="block">
-        <span className="text-xs font-medium text-brand-900">{t.profile.family.nicknameLabel}</span>
-        <input
-          type="text"
-          value={nickname} onChange={e => setNickname(e.target.value)}
-          placeholder={t.profile.family.nicknamePlaceholder}
-          className="w-full bg-white border border-surface-300 rounded-lg px-3 py-2 text-brand-900 text-sm focus:outline-none focus:border-brand-900"
-        />
       </label>
 
       {error && <p className="text-sm text-red-700 bg-red-50 border border-accent rounded px-2 py-1">{error}</p>}

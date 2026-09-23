@@ -122,7 +122,7 @@ export function PaymentsPage() {
       // parent_account decides whether this viewer may read a booking owner's
       // credits at all (the "credits: parent select children" policy), which is
       // what separates "nothing was returned" from "I cannot see it".
-      supabase.from('profiles').select('id, name, nickname, parent_account').in('id', personIds),
+      supabase.from('profiles').select('id, name, parent_account').in('id', personIds),
       eventIds.length
         ? fetchEventsForBookings(eventIds)
         : Promise.resolve(new Map<string, AppEvent>()),
@@ -134,7 +134,7 @@ export function PaymentsPage() {
     ])
     const payRows = (paymentsRes.data ?? []) as Payment[]
     const nameById = new Map<string, string>(
-      (profilesRes.data ?? []).map(p => [p.id, personName(p.name, p.nickname) || '(diver)']),
+      (profilesRes.data ?? []).map(p => [p.id, personName(p.name) || '(diver)']),
     )
     const parentOf = new Map<string, string | null>(
       (profilesRes.data ?? []).map(p => [p.id, p.parent_account]),

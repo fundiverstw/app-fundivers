@@ -21,7 +21,7 @@ vi.mock('../lib/site-map-store', () => ({
 }))
 vi.mock('../hooks/useToast', () => ({ useToast: () => toast }))
 vi.mock('../hooks/useAuth', () => ({
-  useAuth: () => ({ profile: { id: 'd1', name: 'Ada Lovelace', nickname: null } }),
+  useAuth: () => ({ profile: { id: 'd1', name: 'Ada Lovelace' } }),
 }))
 // The scene is WebGL and the editor is a canvas; neither renders under
 // happy-dom, and neither is what this page is responsible for.

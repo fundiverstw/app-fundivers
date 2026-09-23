@@ -95,7 +95,7 @@ function booking(o: Partial<Booking>): Booking {
   } as Booking
 }
 
-const profile = { id: 'u1', name: 'Ada Diver', nickname: null } as Profile
+const profile = { id: 'u1', name: 'Ada Diver' } as Profile
 const event = { id: 'e1', title: 'Green Island', currency: 'TWD' } as AppEvent
 
 describe('paymentEntries', () => {

@@ -15,9 +15,8 @@ import type { Profile } from '../types/database'
 // one-way latch and it can't see the `uncertified` flag — a Discover diver who
 // legitimately has no cert_level never earns it — so it's a poor thing to drive
 // UI from. The admin screens ask this module instead. Fields nobody chases —
-// nickname, ID number, emergency contact, sizing, medical notes — are absent by
-// design: a blank one is not a gap, and flagging it would make the indicator
-// noise.
+// ID number, emergency contact, sizing, medical notes — are absent by design:
+// a blank one is not a gap, and flagging it would make the indicator noise.
 
 export type ProfileGap =
   | 'name'

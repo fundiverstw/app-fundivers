@@ -199,7 +199,7 @@ function DiverTrail({ trail, actorName }: DiverTrailProps) {
     <div className="space-y-4">
       <div className={`${CARD_ELEVATED} p-4 space-y-3`}>
         <div className="flex items-baseline justify-between gap-2">
-          <h2 className={`text-lg ${TEXT_HEADING}`}>{personName(trail.profile.name, trail.profile.nickname)}</h2>
+          <h2 className={`text-lg ${TEXT_HEADING}`}>{personName(trail.profile.name)}</h2>
           <span className={`text-sm ${TEXT_MUTED}`}>
             {au.accountCredit}: <span className="tabular-nums text-reef-300 font-semibold">{money(trail.accountCreditBalance, cur)}</span>
           </span>
@@ -287,7 +287,7 @@ export function AdminAuditsPage() {
   }, [deepLinkId])
 
   const nameById = useMemo(
-    () => new Map(profiles.map(p => [p.id, personName(p.name, p.nickname)])),
+    () => new Map(profiles.map(p => [p.id, personName(p.name)])),
     [profiles],
   )
   const actorName = (id: string | null): string =>
@@ -325,7 +325,7 @@ export function AdminAuditsPage() {
   const q = filter.trim().toLowerCase()
   const matches = q
     ? profiles.filter(p =>
-        [p.name, p.nickname, p.contact_id].some(v => (v ?? '').toLowerCase().includes(q)))
+        [p.name, p.contact_id].some(v => (v ?? '').toLowerCase().includes(q)))
     : profiles
 
   return (
@@ -361,7 +361,7 @@ export function AdminAuditsPage() {
                   onClick={() => select(p.id)}
                   className={`${CARD} w-full text-left p-3 flex items-baseline justify-between gap-3`}
                 >
-                  <span className={`font-medium ${TEXT_BODY} truncate`}>{personName(p.name, p.nickname)}</span>
+                  <span className={`font-medium ${TEXT_BODY} truncate`}>{personName(p.name)}</span>
                   <span className={`text-xs ${TEXT_SUBTLE} shrink-0`}>{p.contact_id ?? ''}</span>
                 </button>
               </li>

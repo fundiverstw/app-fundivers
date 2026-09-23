@@ -247,7 +247,7 @@ export function AdminEventDetailPage() {
           .filter(c => c.user_id === b.user_id && c.booking_id !== b.id)
           .reduce((s, c) => s + Number(c.amount), 0),
         payerName: (b.payer_id && b.payer_id !== b.user_id)
-          ? (personName(profileMap.get(b.payer_id)?.name, profileMap.get(b.payer_id)?.nickname) || t.admin.logistics.leadBooker)
+          ? (personName(profileMap.get(b.payer_id)?.name) || t.admin.logistics.leadBooker)
           : null,
       })))
       setLoading(false)
@@ -295,7 +295,11 @@ export function AdminEventDetailPage() {
     if (!event) return
     const missing = missingByDiver[r.booking.user_id] ?? []
     if (missing.length === 0) return
-    const diverName = r.profile?.name || r.profile?.nickname || t.admin.transport.noProfile
+    // The name is stored as the signature on the waiver record, so a diver
+    // with no name on file cannot be signed for — a placeholder would attest
+    // nothing. DiverWaivers refuses the same way.
+    const diverName = r.profile?.name?.trim()
+    if (!diverName) return
     if (!window.confirm(ed.markWaiversInPersonConfirm(diverName, missing.map(w => w.title).join(', ')))) return
     try {
       const ref = { id: event.id, type: event.type, title: event.title }
@@ -1460,14 +1464,6 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
           >
             {diverName}
           </span>
-          {r.profile?.nickname && (
-            <span
-              className="text-brand-900/80 font-medium select-text cursor-text"
-              onClick={e => e.stopPropagation()}
-            >
-              {' '}({r.profile.nickname})
-            </span>
-          )}
           {r.diverNotes.length > 0 && (
             <span className="ml-2 text-xs font-semibold text-red-300">
               {ed.diverNoteCount(r.diverNotes.length)}
@@ -1874,9 +1870,6 @@ function BalancesView({ registrants, currency }: { registrants: Registrant[]; cu
             <li key={r.booking.id} className="py-1.5 flex items-baseline justify-between gap-3">
               <span className="text-sm text-brand-900 font-medium min-w-0">
                 {r.profile?.name ?? t.admin.transport.noProfile}
-                {r.profile?.nickname && r.profile.nickname !== r.profile.name && (
-                  <span className="text-brand-900/80 font-medium"> ({r.profile.nickname})</span>
-                )}
                 {r.payerName && (
                   <span className="text-xs text-violet-300 font-semibold">{ed.paidByInline(r.payerName)}</span>
                 )}

@@ -72,7 +72,6 @@ trigger on every `auth.users` insert. Columns relevant for privacy:
 | --- | --- | --- | --- |
 | `id` | uuid | n/a | matches `auth.users.id` |
 | `name` | text | identifier | legal name, exactly as on passport / ID |
-| `nickname` | text | low | optional informal name (English name, alias, shop-floor name) |
 | `date_of_birth` | date | sensitive | required for adult-only events / insurance |
 | `nationality` | text | sensitive | required for dive-permit submission |
 | `id_number` | text | **highly sensitive** | passport / ARC; required for dive-permit submission; purged at 12 months inactive |
@@ -250,8 +249,8 @@ The diver rows in it are reduced before they are written. A staff
 device does **not** hold `medical_notes`, `id_number`,
 `date_of_birth`, `nationality`, `emergency_contact_name`,
 `emergency_contact_phone`, `email`, or certification-card paths. It
-holds name, nickname, equipment sizes, gear owned, certification level
-and agency, logged dives, and contact method + handle.
+holds name, equipment sizes, gear owned, certification level and
+agency, logged dives, and contact method + handle.
 
 Two consequences worth the reviewer's attention: a lost or stolen staff
 device exposes that reduced set for up to 10 days forward, and a

@@ -70,19 +70,17 @@ end$$;
 
 -- Patch the auto-created profiles. The handle_new_user trigger gave
 -- everyone role='diver' by default; lift two so role-gating in the SPA
--- can be exercised. nickname is a person-style nickname (not the
--- role label) so surfaces that show "another user's display name" —
--- e.g. the staff_availability overlay — read as a real name in dev.
+-- can be exercised.
 update public.profiles
-set role = 'admin', name = 'Test Admin', nickname = 'Ada'
+set role = 'admin', name = 'Test Admin'
 where id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 
 update public.profiles
-set role = 'staff', name = 'Test Staff', nickname = 'Sam'
+set role = 'staff', name = 'Test Staff'
 where id = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 
 update public.profiles
-set name = 'Test Diver', nickname = 'Dee'
+set name = 'Test Diver'
 where id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
 
@@ -159,7 +157,6 @@ begin
     -- this account isn't treated as a fresh signup.
     update public.profiles
        set name        = first_names[i] || ' ' || last_names[i],
-           nickname     = case when i % 4 = 0 then null else first_names[i] end,
            cert_agency      = agencies[1 + (i % array_length(agencies, 1))],
            cert_level       = levels[1 + (i % array_length(levels, 1))],
            nitrox_certified = (i % 3 = 0),

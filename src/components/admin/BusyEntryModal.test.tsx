@@ -36,8 +36,8 @@ const baseEntry: StaffBusyEntry = {
 }
 
 const OWNERS = [
-  { id: 'u1', name: 'Ada Lovelace', nickname: 'Ada' },
-  { id: 'u2', name: 'Grace Hopper', nickname: null },
+  { id: 'u1', name: 'Ada Lovelace' },
+  { id: 'u2', name: 'Grace Hopper' },
 ]
 
 describe('BusyEntryModal (create)', () => {

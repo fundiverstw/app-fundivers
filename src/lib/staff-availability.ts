@@ -62,7 +62,6 @@ export async function deleteStaffAvailability(id: string): Promise<void> {
 export interface AvailabilityOwner {
   id: string
   name: string | null
-  nickname: string | null
 }
 
 /**
@@ -73,7 +72,7 @@ export interface AvailabilityOwner {
 export async function fetchAvailabilityOwners(): Promise<AvailabilityOwner[]> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, name, nickname')
+    .select('id, name')
     .in('role', ['admin', 'staff'])
     .order('name')
   if (error) throw error

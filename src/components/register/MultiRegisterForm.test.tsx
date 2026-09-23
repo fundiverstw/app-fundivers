@@ -37,7 +37,7 @@ const sampleEvent = (id: string, title: string): AppEvent => ({
 
 const parentProfile: Profile = {
   id: 'p1', created_at: '', updated_at: '',
-  name: 'Parent Pat', nickname: 'Pat',
+  name: 'Parent Pat', 
   date_of_birth: '1987-05-03', nationality: 'Taiwanese', id_number: null,
   emergency_contact_name: null, emergency_contact_phone: null,
   cert_agency: 'PADI', cert_level: 'AOW',
@@ -51,7 +51,7 @@ const parentProfile: Profile = {
 }
 
 const childProfile: Profile = {
-  ...parentProfile, id: 'c1', name: 'Kid Junior', nickname: 'KJ',
+  ...parentProfile, id: 'c1', name: 'Kid Junior', 
   cert_level: null, cert_card_path: null,
 }
 

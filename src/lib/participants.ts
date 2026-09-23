@@ -67,7 +67,7 @@ export function dayRoster(groups: RosterGroup[], noProfileLabel: string): DayPer
       }
       byKey.set(key, {
         key,
-        name: personName(r.profile?.name, r.profile?.nickname) || noProfileLabel,
+        name: personName(r.profile?.name) || noProfileLabel,
         profileId: r.profile?.id ?? null,
         inWater: group.entersWater,
       })

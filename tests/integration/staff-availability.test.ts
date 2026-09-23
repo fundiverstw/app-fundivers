@@ -103,8 +103,8 @@ describe('staff_availability RLS', () => {
   // Admins manage everyone's availability, so they read the content too --
   // an editor that cannot see the title would silently blank it on save.
   it("an admin reading via the view sees another user's title, details and owner name", async () => {
-    // A recognizable nickname on the owner proves the profiles join lands.
-    await admin.from('profiles').update({ nickname: 'Owner-Ada' }).eq('id', staffUser.id)
+    // A recognizable name on the owner proves the profiles join lands.
+    await admin.from('profiles').update({ name: 'Owner-Ada' }).eq('id', staffUser.id)
     const { data: row } = await admin.from('staff_availability').insert({
       user_id: staffUser.id,
       start_date: '2030-02-25', start_time: '09:00:00', end_date: '2030-02-26',
