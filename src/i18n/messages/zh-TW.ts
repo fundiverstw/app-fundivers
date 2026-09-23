@@ -2874,6 +2874,13 @@ export const zhTW: Messages = {
       save: '儲存',
       gearFlags: '裝備注意事項',
       waitlisted: '候補',
+      packedAll: '已裝車 ✓',
+      packedNone: '未裝車',
+      packedSome: (packed: number, total: number) => `已裝 ${packed}/${total}`,
+      markAllPacked: (name: string) => `將 ${name} 的所有裝備標記為已裝車`,
+      unmarkAllPacked: (name: string) => `將 ${name} 的所有裝備改回未裝車`,
+      markItemPacked: (name: string, item: string) => `將 ${name} 的${item}標記為已裝車`,
+      unmarkItemPacked: (name: string, item: string) => `將 ${name} 的${item}改回未裝車`,
     },
     bookingPayments: {
       charges: '費用明細',

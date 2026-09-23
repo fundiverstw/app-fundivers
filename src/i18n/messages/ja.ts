@@ -2873,6 +2873,13 @@ export const ja: Messages = {
       save: '保存',
       gearFlags: '器材の注意点',
       waitlisted: 'キャンセル待ち',
+      packedAll: '積込済み ✓',
+      packedNone: '未積込',
+      packedSome: (packed: number, total: number) => `${packed}/${total} 積込済み`,
+      markAllPacked: (name: string) => `${name}さんの器材をすべて積込済みにする`,
+      unmarkAllPacked: (name: string) => `${name}さんの器材をすべて未積込に戻す`,
+      markItemPacked: (name: string, item: string) => `${name}さんの${item}を積込済みにする`,
+      unmarkItemPacked: (name: string, item: string) => `${name}さんの${item}を未積込に戻す`,
     },
     bookingPayments: {
       charges: '料金内訳',

@@ -212,10 +212,21 @@ day); grouping lives in `src/lib/ride-groups.ts`.
 
 ## Gear: the packed tick list
 
-Opening a sized gear chip on the Overall board ("BCD ×3") expands it into
-the sizes the day needs and, under each size, one **toggle per diver's
-piece**. Tapping a name flips it to packed; the size line then reads
-"1/3 packed", or "all packed" once the size is done.
+Two ways into the same list, for the two ways staff pack a van.
+
+By item, on the Overall board: opening a sized gear chip ("BCD ×3")
+expands it into the sizes the day needs and, under each size, one
+**toggle per diver's piece**. Tapping a name flips it to packed; the size
+line then reads "1/3 packed", or "all packed" once the size is done.
+
+By guest, on each diver's gear card: every item on their pack list is a
+tick, and the card header carries a chip reading **Not packed → n/m
+packed → Packed ✓**. The chip is also the control — one tap marks the
+whole kit, which is what a packer who just carried someone's set out to
+the van wants. Walking the cards down the page is the check that no
+guest was missed; the per-event gear map shows the same cards without
+the ticks, because it plans a trip rather than loads one and has no day
+to tick against.
 
 State is device-local (`localStorage`, `src/lib/gear-packed.ts`), stored
 one entry per day and expired after the newest 14 days. That is a
@@ -228,9 +239,10 @@ feature.
 
 A piece is keyed `${bookingId}|${item}`; the size is **not** in the key,
 so correcting a diver's size on their gear card doesn't lose the tick.
-The set lives on `AdminLogisticsPage` rather than inside `GearChips`
-because the seated and waitlist chip sets share one day's list — two
-owners would clobber each other's writes.
+The set lives on `AdminLogisticsPage` rather than inside `GearChips` or
+`DiverGearCard` because the item chips, the guest cards and the waitlist
+all share one day's list — several owners would clobber each other's
+writes.
 
 ## Reading the board with no signal
 

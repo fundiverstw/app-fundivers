@@ -6,7 +6,7 @@ import { siteConfig } from '../../config/site'
 import { fetchUpcomingEventDays, formatEventSpan } from '../../lib/events'
 import { gearTotals, splitByTransport, transportHeadcount, dayKeyOffset, careTotals, isCareGearItem, addonTotals, partitionByWaitlist, gearSizeBreakdown, isSizedGearItem, gearDayDiff } from '../../lib/logistics'
 import { dayRoster, eventEntersWater } from '../../lib/participants'
-import { gearPieceKey, loadPackedGear, savePackedGear, togglePackedGear } from '../../lib/gear-packed'
+import { gearPieceKey, loadPackedGear, savePackedGear, setBookingPacked, togglePackedGear } from '../../lib/gear-packed'
 import { bookingBalance, type BookingBalance } from '../../lib/booking-balance'
 import { openCreditForBooking } from '../../lib/credits'
 import { amendmentsDelta } from '../../lib/booking-amendments'
@@ -493,6 +493,13 @@ export function AdminLogisticsPage() {
     savePackedGear(dayKey, next)
   }
 
+  // The whole of one diver's kit in a single tap, from the chip on their card.
+  function toggleAllPackedFor(bookingId: string, items: string[], value: boolean) {
+    const next = setBookingPacked(packedGear, bookingId, items, value)
+    setPackedGear(next)
+    savePackedGear(dayKey, next)
+  }
+
   // Keep a diver's displayed sizes in sync after an inline save, across every
   // event group they appear in that day.
   function patchProfile(diverId: string, patch: Partial<Profile>) {
@@ -975,7 +982,16 @@ export function AdminLogisticsPage() {
                 <p className="text-xs text-brand-950/70 font-medium italic pl-1">{tp.noActiveRegistrants}</p>
               ) : (
                 eventSeated.map(r => (
-                  <DiverGearCard key={r.booking.id} row={r} onProfilePatched={patchProfile} linkToProfile={isAdmin} gearModels={gearModels} />
+                  <DiverGearCard
+                    key={r.booking.id}
+                    row={r}
+                    onProfilePatched={patchProfile}
+                    linkToProfile={isAdmin}
+                    gearModels={gearModels}
+                    packed={packedGear}
+                    onTogglePiece={togglePackedPiece}
+                    onToggleAllPacked={toggleAllPackedFor}
+                  />
                 ))
               )}
               {eventWaitlist.length > 0 && (
@@ -984,7 +1000,16 @@ export function AdminLogisticsPage() {
                     {lg.waitlistHeading(eventWaitlist.length)}
                   </p>
                   {eventWaitlist.map(r => (
-                    <DiverGearCard key={r.booking.id} row={r} onProfilePatched={patchProfile} linkToProfile={isAdmin} gearModels={gearModels} />
+                    <DiverGearCard
+                      key={r.booking.id}
+                      row={r}
+                      onProfilePatched={patchProfile}
+                      linkToProfile={isAdmin}
+                      gearModels={gearModels}
+                      packed={packedGear}
+                      onTogglePiece={togglePackedPiece}
+                      onToggleAllPacked={toggleAllPackedFor}
+                    />
                   ))}
                 </>
               )}

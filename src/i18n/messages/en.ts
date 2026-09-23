@@ -2930,6 +2930,13 @@ export const en = {
       save: 'Save',
       gearFlags: 'Gear flags',
       waitlisted: 'Waitlisted',
+      packedAll: 'Packed ✓',
+      packedNone: 'Not packed',
+      packedSome: (packed: number, total: number) => `${packed}/${total} packed`,
+      markAllPacked: (name: string) => `Mark all of ${name}'s gear as packed`,
+      unmarkAllPacked: (name: string) => `Mark all of ${name}'s gear as not packed`,
+      markItemPacked: (name: string, item: string) => `Mark ${name}'s ${item} as packed`,
+      unmarkItemPacked: (name: string, item: string) => `Mark ${name}'s ${item} as not packed`,
     },
     bookingPayments: {
       charges: 'Charges',

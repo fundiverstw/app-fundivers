@@ -234,6 +234,41 @@ describe('AdminLogisticsPage', () => {
       .toHaveAttribute('aria-pressed', 'false')
   })
 
+  it("packs a whole guest's kit from the chip on their card, and agrees with the size panel", async () => {
+    const user = userEvent.setup()
+    const sizedBookings = [
+      { id: 'b1', user_id: 'u1', event_id: 'e1', status: 'confirmed', details: { gear: { rent: true, items: ['BCD', 'Wetsuit'] } } },
+    ]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: sizedBookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: [{ ...profiles[0], bcd_size: 'M', wetsuit_size: 'M' }] })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    renderPage()
+    const card = (await screen.findByRole('button', { name: /mark all of ada's gear as packed/i })).closest('article')!
+    expect(within(card).getByText('Not packed')).toBeInTheDocument()
+
+    // One piece from the card's own chips: the header keeps the running count.
+    await user.click(within(card).getByRole('button', { name: /mark ada's bcd as packed/i }))
+    expect(within(card).getByText('1/2 packed')).toBeInTheDocument()
+
+    // The rest of the kit in one tap.
+    await user.click(within(card).getByRole('button', { name: /mark all of ada's gear as packed/i }))
+    expect(within(card).getByText(/^Packed/)).toBeInTheDocument()
+
+    // Same state the van's size panel reads — one list, two ways in.
+    const overall = screen.getByText(/^overall/i).closest('section')!
+    const gearSection = within(overall).getByText(/gear to pack/i).closest('div')!
+    await user.click(within(gearSection).getByRole('button', { name: /show sizes for BCD/i }))
+    expect(within(gearSection).getByRole('button', { name: /mark ada's bcd as not packed/i }))
+      .toHaveAttribute('aria-pressed', 'true')
+
+    // And back off the van again.
+    await user.click(within(card).getByRole('button', { name: /mark all of ada's gear as not packed/i }))
+    expect(within(card).getByText('Not packed')).toBeInTheDocument()
+  })
+
   it('leaves one-size gear as a plain chip with nothing to open', async () => {
     renderPage()
     await screen.findByText(/1 event · 2 divers/i)
