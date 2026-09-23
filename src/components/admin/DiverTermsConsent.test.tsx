@@ -26,7 +26,7 @@ vi.mock('../../lib/use-terms', () => ({
 }))
 
 const profile = (over: Partial<Profile>): Profile => ({
-  id: 'u1', email: 'jane@example.com', name: 'Jane Diver', nickname: null, role: 'diver',
+  id: 'u1', email: 'jane@example.com', name: 'Jane Diver', role: 'diver',
   agreed_to_terms_at: null, agreed_to_terms_version: null,
   ...over,
 } as Profile)

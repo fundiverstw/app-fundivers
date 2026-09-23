@@ -60,7 +60,7 @@ beforeEach(() => {
       case 'booking_discounts': return query({ data: requests, error: null })
       case 'discounts':         return query({ data: discounts, error: null })
       case 'bookings':          return query({ data: bookings, error: null })
-      case 'profiles':          return query({ data: [{ id: 'd1', name: 'Alice Diver', nickname: null }], error: null })
+      case 'profiles':          return query({ data: [{ id: 'd1', name: 'Alice Diver' }], error: null })
       case 'events':            return query({ data: [{ id: 'ev1', display_title: 'Green Island Trip', admin_title: null }], error: null })
       default:                  return query({ data: [], error: null })
     }

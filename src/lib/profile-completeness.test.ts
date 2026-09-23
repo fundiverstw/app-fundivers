@@ -42,7 +42,7 @@ describe('profileGaps', () => {
 
   // Optional fields are silent: flagging them would drown the real gaps.
   it('ignores optional fields', () => {
-    const bare = { ...complete, nickname: null, id_number: null, emergency_contact_name: null, medical_notes: null }
+    const bare = { ...complete, id_number: null, emergency_contact_name: null, medical_notes: null }
     expect(profileGaps(bare as Partial<Profile>)).toEqual([])
   })
 

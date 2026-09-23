@@ -15,7 +15,7 @@
 //      the standard password-reset flow (the throwaway password set here is
 //      never shared) — the email walks them through it.
 //
-// Body: { email, name, nickname?, event_title? }
+// Body: { email, name, event_title? }
 // Returns: { ok: true, user_id, email_sent }
 
 import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
@@ -31,7 +31,6 @@ import { t } from "../_shared/i18n.ts"
 interface Body {
   email:         string
   name:     string
-  nickname?: string
   event_title?:  string
 }
 
@@ -112,7 +111,6 @@ Deno.serve(async (req) => {
     .from("profiles")
     .update({
       name:                fullName,
-      nickname:             body.nickname?.trim() || null,
       status:                   "active",
       application_submitted_at: new Date().toISOString(),
     } as never)

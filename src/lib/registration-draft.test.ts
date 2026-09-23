@@ -15,7 +15,6 @@ function makeDraft(over: Partial<RegistrationDraft> = {}): RegistrationDraft {
     savedAt: Date.now(),
     step: 2,
     fullName: 'Ada Lovelace',
-    nickname: 'Ace',
     dob: '1990-12-10',
     nationality: 'UK',
     gender: 'female',

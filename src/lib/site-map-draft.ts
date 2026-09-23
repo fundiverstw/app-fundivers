@@ -263,7 +263,7 @@ export function isEmpty(draft: Draft): boolean {
  */
 export interface Contributor {
   id: string
-  /** Name or nickname as the shop already shows it elsewhere. */
+  /** Name as the shop already shows it elsewhere. */
   name: string
 }
 

@@ -25,13 +25,13 @@ function query(result: Record<string, unknown>) {
 }
 
 const profiles = [
-  { id: 'd1', name: 'Alice Diver', nickname: null, contact_id: 'LINE-alice' },
-  { id: 'd2', name: 'Carol Diver', nickname: null, contact_id: null },
-  { id: 'admin1', name: 'Bob Admin', nickname: null, contact_id: null },
+  { id: 'd1', name: 'Alice Diver', contact_id: 'LINE-alice' },
+  { id: 'd2', name: 'Carol Diver', contact_id: null },
+  { id: 'admin1', name: 'Bob Admin', contact_id: null },
 ]
 
 const trail: DiverAuditTrail = {
-  profile: { id: 'd1', name: 'Alice Diver', nickname: null } as DiverAuditTrail['profile'],
+  profile: { id: 'd1', name: 'Alice Diver' } as DiverAuditTrail['profile'],
   registrations: [{
     booking: { id: 'b1', status: 'confirmed', event_id: 'ev1', user_id: 'd1', details: { total: 4000 } } as DiverAuditTrail['registrations'][number]['booking'],
     event: { id: 'ev1', title: 'Green Island', currency: 'TWD', start_time: '2026-08-01T00:00:00Z', end_time: null, start_time_hhmm: null } as DiverAuditTrail['registrations'][number]['event'],

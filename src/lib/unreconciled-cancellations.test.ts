@@ -14,7 +14,7 @@ const LABELS = { eventFallback: 'Event', diverFallback: 'Diver' }
 const events = new Map<string, AppEvent>([
   ['ev1', { id: 'ev1', title: 'Green Island Trip' } as AppEvent],
 ])
-const profiles = [{ id: 'd1', name: 'Alice Diver', nickname: null }]
+const profiles = [{ id: 'd1', name: 'Alice Diver' }]
 
 type B = Pick<Booking, 'id' | 'user_id' | 'event_id' | 'status' | 'cancellation_settled_at'>
 type P = Pick<Payment, 'booking_id' | 'amount' | 'status'>

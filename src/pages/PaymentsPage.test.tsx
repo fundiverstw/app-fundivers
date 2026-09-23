@@ -154,7 +154,7 @@ describe('PaymentsPage', () => {
         [cancelled({ payer_id: 'mum' })],
         paid15400,
         [],
-        [{ id: 'mum', name: 'A Parent', nickname: null, parent_account: null }],
+        [{ id: 'mum', name: 'A Parent', parent_account: null }],
       )
       fetchEventsForBookings.mockResolvedValue(evMap())
       const user = userEvent.setup()
@@ -172,7 +172,7 @@ describe('PaymentsPage', () => {
         [cancelled({ user_id: 'kid', payer_id: 'u1' })],
         [{ ...paid15400[0], user_id: 'kid' }],
         [{ ...returned10400[0], user_id: 'kid' }],
-        [{ id: 'kid', name: 'Kid Diver', nickname: null, parent_account: 'u1' }],
+        [{ id: 'kid', name: 'Kid Diver', parent_account: 'u1' }],
       )
       fetchEventsForBookings.mockResolvedValue(evMap())
       const user = userEvent.setup()
@@ -285,8 +285,8 @@ describe('PaymentsPage', () => {
       { id: 'p1', user_id: 'u1', booking_id: 'b1', amount: 3000, currency: 'TWD', status: 'paid', method: 'Bank', note: null, created_at: new Date().toISOString(), recorded_by: null },
     ]
     const profiles = [
-      { id: 'u1', name: 'Parent Pat', nickname: null },
-      { id: 'c1', name: 'Kid Casey', nickname: null },
+      { id: 'u1', name: 'Parent Pat' },
+      { id: 'c1', name: 'Kid Casey' },
     ]
     setupFrom(bookings, payments, [], profiles)
     fetchEventsForBookings.mockResolvedValue(new Map([
@@ -314,8 +314,8 @@ describe('PaymentsPage', () => {
       { id: 'b1', user_id: 'c1', payer_id: 'u1', group_id: 'g1', event_id: 'd1', status: 'confirmed', notes: null, created_at: new Date().toISOString(), details: { total: 3000 } },
     ]
     const profiles = [
-      { id: 'c1', name: 'Kid Casey', nickname: null },
-      { id: 'u1', name: 'Parent Pat', nickname: null },
+      { id: 'c1', name: 'Kid Casey' },
+      { id: 'u1', name: 'Parent Pat' },
     ]
     setupFrom(bookings, [], [], profiles)
     fetchEventsForBookings.mockResolvedValue(new Map([

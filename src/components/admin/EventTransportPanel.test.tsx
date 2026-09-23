@@ -33,7 +33,7 @@ const booking = (id: string, transportation: boolean | undefined, status = 'conf
   id, user_id: id, status, event_id: 'dive_x',
   details: transportation === undefined ? {} : { transportation },
 } as unknown as Booking)
-const profile = (id: string, name: string): Profile => ({ id, name, nickname: name } as unknown as Profile)
+const profile = (id: string, name: string): Profile => ({ id, name } as unknown as Profile)
 
 const registrants: TransportRegistrant[] = [
   { booking: booking('u1', true),      profile: profile('u1', 'Ada') },

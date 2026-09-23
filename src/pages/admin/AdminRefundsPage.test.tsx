@@ -38,7 +38,7 @@ function query(result: Record<string, unknown>) {
 const bookings = [
   { id: 'b1', user_id: 'd1', event_id: 'ev1', status: 'confirmed', refund_requested_at: '2026-07-10T02:00:00Z', details: { total: 3000 } },
 ]
-const profiles = [{ id: 'd1', name: 'Alice Diver', nickname: null }]
+const profiles = [{ id: 'd1', name: 'Alice Diver' }]
 const payments = [
   { booking_id: 'b1', amount: 3000, status: 'paid' },
   { booking_id: 'b1', amount: 500, status: 'refunded' },

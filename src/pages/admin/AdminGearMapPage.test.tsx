@@ -33,7 +33,7 @@ const sampleBooking = {
   details: { gear: { rent: true, items: ['BCD', 'Wetsuit'] } },
 }
 const sampleProfile = {
-  id: 'u1', nickname: 'Ada Lovelace',
+  id: 'u1', 
   height_cm: 170, weight_kg: 65, shoe_size: null,
   fin_size: 'M', bcd_size: 'L', wetsuit_size: null,
   gear_owned: [],
@@ -67,7 +67,7 @@ describe('AdminGearMapPage waitlist split', () => {
       details: { gear: { rent: true, items: ['Wetsuit'] } } }
     const twoProfiles = [
       sampleProfile,
-      { id: 'u2', nickname: 'Bo', gear_owned: [] },
+      { id: 'u2', gear_owned: [] },
     ]
     from.mockImplementation((table: string) => {
       if (table === 'bookings') return mockQueryBuilder({ data: [seated, waiting] })

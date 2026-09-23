@@ -23,7 +23,7 @@ function registration(over: Partial<AdminScheduledTripRegistration> = {}): Admin
     id: 'reg1', created_at: '2026-06-10T00:00:00Z', scheduled_trip_id: 's1', diver_id: 'u1',
     estimated_cost: 82000, estimated_currency: 'TWD', details: {} as AdminScheduledTripRegistration['details'],
     notes: null, status: 'registered', admin_notes: null,
-    diver: { id: 'u1', name: 'Ada Lovelace', nickname: 'Ada', email: 'ada@x.test', contact_id: '0900111222' },
+    diver: { id: 'u1', name: 'Ada Lovelace', email: 'ada@x.test', contact_id: '0900111222' },
     trip_title: 'Palau Liveaboard',
     ...over,
   }
@@ -39,7 +39,7 @@ describe('AdminScheduledTripRegistrationsTab', () => {
   it('shows a registration card with its diver, trip and estimate', async () => {
     render(<AdminScheduledTripRegistrationsTab />)
     expect(await screen.findByText('Palau Liveaboard')).toBeInTheDocument()
-    expect(screen.getByText(/Ada Lovelace \(Ada\)/)).toBeInTheDocument()
+    expect(screen.getByText(/Ada Lovelace/)).toBeInTheDocument()
     expect(screen.getByText(/Est\. 82,000 TWD/)).toBeInTheDocument()
   })
 
@@ -66,7 +66,7 @@ describe('AdminScheduledTripRegistrationsTab', () => {
       registration(),
       registration({
         id: 'reg2', trip_title: 'Green Island Weekend',
-        diver: { id: 'u2', name: 'Bo', nickname: null, email: null, contact_id: null },
+        diver: { id: 'u2', name: 'Bo', email: null, contact_id: null },
       }),
     ])
     render(<AdminScheduledTripRegistrationsTab />)

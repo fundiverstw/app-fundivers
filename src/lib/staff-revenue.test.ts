@@ -33,9 +33,9 @@ function build(over: Partial<BuildStaffRevenueInput> = {}) {
     duties: [],
     bookings: [],
     people: [
-      { id: 'billy', name: 'Billy Evalt', nickname: 'Billy' },
-      { id: 'dennis', name: 'Dennis Wong', nickname: 'Dennis' },
-      { id: 'eric', name: 'Eric Odle', nickname: null },
+      { id: 'billy', name: 'Billy Evalt' },
+      { id: 'dennis', name: 'Dennis Wong' },
+      { id: 'eric', name: 'Eric Odle' },
     ],
     ...over,
   })
@@ -383,11 +383,11 @@ describe('buildStaffRevenue breakdowns', () => {
     expect(r.people.map(p => p.personId)).toEqual(['dennis', 'billy'])
   })
 
-  it('names a person by nickname, falling back to their full name', () => {
+  it('names a person by their full name', () => {
     const r = build({
       people: [
-        { id: 'billy', name: 'Billy Evalt', nickname: 'Billy' },
-        { id: 'wessel', name: 'Wessel Jacobus Herbst', nickname: null },
+        { id: 'billy', name: 'Billy Evalt' },
+        { id: 'wessel', name: 'Wessel Jacobus Herbst' },
       ],
       events: [dive(), dive({ id: 'd2' })],
       duties: [
@@ -396,6 +396,6 @@ describe('buildStaffRevenue breakdowns', () => {
       ],
       bookings: [...heads('d1', 1), ...heads('d2', 1)],
     })
-    expect(r.people.map(p => p.name).sort()).toEqual(['Billy', 'Wessel Jacobus Herbst'])
+    expect(r.people.map(p => p.name).sort()).toEqual(['Billy Evalt', 'Wessel Jacobus Herbst'])
   })
 })

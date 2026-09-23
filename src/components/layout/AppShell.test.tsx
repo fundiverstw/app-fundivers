@@ -39,18 +39,9 @@ function routedRender(start = '/calendar') {
 }
 
 describe('AppShell', () => {
-  it('shows the name with the nickname in parentheses', () => {
+  it("shows the diver's name", () => {
     useAuthMock.mockReturnValue({
-      profile: { nickname: 'Ada', name: 'Ada Lovelace' },
-      signOut,
-    })
-    routedRender()
-    expect(screen.getByText('Ada Lovelace (Ada)')).toBeInTheDocument()
-  })
-
-  it('falls back to name when nickname is absent', () => {
-    useAuthMock.mockReturnValue({
-      profile: { nickname: null, name: 'Grace Hopper' },
+      profile: { name: 'Grace Hopper' },
       signOut,
     })
     routedRender()
@@ -119,17 +110,17 @@ describe('AppShell', () => {
 
   it("renders the admin's name as a link to /admin (the view-toggle affordance)", () => {
     useAuthMock.mockReturnValue({
-      profile: { nickname: 'Admin', name: 'Eric', role: 'admin' },
+      profile: { name: 'Eric', role: 'admin' },
       signOut,
     })
     routedRender()
-    const link = screen.getByRole('link', { name: 'Eric (Admin)' })
+    const link = screen.getByRole('link', { name: 'Eric' })
     expect(link).toHaveAttribute('href', '/admin')
   })
 
   it("renders a diver's name as plain text, not a link", () => {
     useAuthMock.mockReturnValue({
-      profile: { nickname: 'Alice', name: 'Alice', role: 'diver' },
+      profile: { name: 'Alice', role: 'diver' },
       signOut,
     })
     routedRender()

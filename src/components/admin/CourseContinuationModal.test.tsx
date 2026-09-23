@@ -47,7 +47,7 @@ beforeEach(() => {
   from.mockImplementation((table: string) =>
     stub(table === 'events'
       ? { data: { course_days: targetDays }, error: null }
-      : { data: [{ id: 'u1', name: 'Ada Chen', nickname: null, contact_id: 'ada-line' }], error: null }))
+      : { data: [{ id: 'u1', name: 'Ada Chen', contact_id: 'ada-line' }], error: null }))
   fetchContinuableCourses.mockResolvedValue([sourceCourse])
   createCourseContinuation.mockResolvedValue('new-booking')
 })

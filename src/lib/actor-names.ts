@@ -25,10 +25,10 @@ export async function fetchActorNames(
   if (!unique.length) return new Map()
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, name, nickname')
+    .select('id, name')
     .in('id', unique)
   if (error) throw error
-  return new Map((data ?? []).map(p => [p.id, personName(p.name, p.nickname)]))
+  return new Map((data ?? []).map(p => [p.id, personName(p.name)]))
 }
 
 /**

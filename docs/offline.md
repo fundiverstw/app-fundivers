@@ -63,7 +63,7 @@ carry:
 - `emergency_contact_name`, `emergency_contact_phone`
 - `email`, `avatar_url`, and every certification-card path
 
-It keeps name, nickname, sizes, gear owned, certification level and agency, the
+It keeps name, sizes, gear owned, certification level and agency, the
 nitrox/deep flags, logged dives, and contact method + handle — enough to pack a
 van and call a roster.
 

@@ -13,7 +13,6 @@ const profile = (over: Partial<Profile> = {}): Profile => ({
   updated_at: '2026-01-01T00:00:00Z',
   email: 'ada@example.com',
   name: 'Ada Lovelace',
-  nickname: 'Ada',
   date_of_birth: '1990-04-02',
   nationality: 'British',
   id_number: 'A123456789',
@@ -70,7 +69,6 @@ describe('redactProfileForOffline', () => {
     const out = redactProfileForOffline(profile())
     expect(out.id).toBe('p1')
     expect(out.name).toBe('Ada Lovelace')
-    expect(out.nickname).toBe('Ada')
     expect(out.shoe_size).toBe('JP 25')
     expect(out.fin_size).toBe('M')
     expect(out.bcd_size).toBe('S')

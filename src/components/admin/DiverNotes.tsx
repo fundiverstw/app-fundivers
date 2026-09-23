@@ -12,8 +12,8 @@ import { BTN_XS_GHOST } from '../../styles/tokens'
 const dn = t.admin.diverNotes
 
 type NoteWithAuthor = DiverNote & {
-  author: Pick<Profile, 'id' | 'nickname' | 'name'> | null
-  editor: Pick<Profile, 'id' | 'nickname' | 'name'> | null
+  author: Pick<Profile, 'id' | 'name'> | null
+  editor: Pick<Profile, 'id' | 'name'> | null
 }
 
 interface Props {
@@ -41,11 +41,11 @@ export function DiverNotes({ profileId, title = dn.title }: Props) {
       ...(rows ?? []).map(r => r.created_by),
       ...(rows ?? []).map(r => r.edited_by).filter((x): x is string => !!x),
     ]
-    let profMap = new Map<string, Pick<Profile, 'id' | 'nickname' | 'name'>>()
+    let profMap = new Map<string, Pick<Profile, 'id' | 'name'>>()
     if (ids.length) {
       const { data: profs } = await supabase
         .from('profiles')
-        .select('id, nickname, name')
+        .select('id, name')
         .in('id', [...new Set(ids)])
       profMap = new Map((profs ?? []).map(p => [p.id, p]))
     }
@@ -149,14 +149,14 @@ export function DiverNotes({ profileId, title = dn.title }: Props) {
                     <div className="flex gap-2 shrink-0">
                       <button
                         onClick={() => startEdit(n)}
-                        aria-label={dn.editNoteFromAria(personName(n.author?.name, n.author?.nickname) || t.admin.notes.unknownAuthor)}
+                        aria-label={dn.editNoteFromAria(personName(n.author?.name) || t.admin.notes.unknownAuthor)}
                         className="text-xs text-brand-900 font-semibold hover:text-brand-700"
                       >
                         {dn.edit}
                       </button>
                       <button
                         onClick={() => deleteNote(n.id)}
-                        aria-label={dn.deleteNoteFromAria(personName(n.author?.name, n.author?.nickname) || t.admin.notes.unknownAuthor)}
+                        aria-label={dn.deleteNoteFromAria(personName(n.author?.name) || t.admin.notes.unknownAuthor)}
                         className="text-xs text-red-300 font-semibold hover:text-red-200"
                       >
                         {dn.delete}
@@ -165,9 +165,9 @@ export function DiverNotes({ profileId, title = dn.title }: Props) {
                   )}
                 </div>
                 <p className="text-xs text-brand-950 font-medium">
-                  {personName(n.author?.name, n.author?.nickname) || t.admin.notes.unknownAuthor} · {format(shopZoned(new Date(n.created_at)), 'MMM d, yyyy · HH:mm')}
+                  {personName(n.author?.name) || t.admin.notes.unknownAuthor} · {format(shopZoned(new Date(n.created_at)), 'MMM d, yyyy · HH:mm')}
                   {n.edited_at && (
-                    <>{dn.edited}{n.editor && dn.editedBy(personName(n.editor.name, n.editor.nickname))} {format(shopZoned(new Date(n.edited_at)), 'MMM d')}</>
+                    <>{dn.edited}{n.editor && dn.editedBy(personName(n.editor.name))} {format(shopZoned(new Date(n.edited_at)), 'MMM d')}</>
                   )}
                 </p>
               </>

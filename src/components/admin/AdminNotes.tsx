@@ -22,8 +22,8 @@ const TAG_STYLES: Record<NoteTag, string> = {
 }
 
 type NoteWithAuthors = AdminNote & {
-  author: Pick<Profile, 'id' | 'nickname' | 'name'> | null
-  resolver: Pick<Profile, 'id' | 'nickname' | 'name'> | null
+  author: Pick<Profile, 'id' | 'name'> | null
+  resolver: Pick<Profile, 'id' | 'name'> | null
 }
 
 // Which column the note hangs off. The event kinds used to be spelled out
@@ -83,11 +83,11 @@ export function AdminNotes({ target, tagFilter, title = nt.title, compact = fals
       ...(rows ?? []).map(r => r.created_by),
       ...(rows ?? []).map(r => r.resolved_by).filter((x): x is string => !!x),
     ]
-    let profMap = new Map<string, Pick<Profile, 'id' | 'nickname' | 'name'>>()
+    let profMap = new Map<string, Pick<Profile, 'id' | 'name'>>()
     if (ids.length) {
       const { data: profs } = await supabase
         .from('profiles')
-        .select('id, nickname, name')
+        .select('id, name')
         .in('id', [...new Set(ids)])
       profMap = new Map((profs ?? []).map(p => [p.id, p]))
     }
@@ -232,7 +232,7 @@ function NoteCard({ note, onResolve, onUnresolve }: {
   onResolve?: () => void
   onUnresolve?: () => void
 }) {
-  const author = personName(note.author?.name, note.author?.nickname) || nt.unknownAuthor
+  const author = personName(note.author?.name) || nt.unknownAuthor
   return (
     <div className={`bg-surface-50 rounded-lg p-3 text-sm ${note.resolved ? 'opacity-60' : ''}`}>
       <div className="flex items-start gap-2">
@@ -250,7 +250,7 @@ function NoteCard({ note, onResolve, onUnresolve }: {
       <p className="text-xs text-brand-950 font-medium mt-1">
         {author} · {format(shopZoned(new Date(note.created_at)), 'MMM d · HH:mm')}
         {note.resolved && note.resolved_at && (
-          <> · resolved by {personName(note.resolver?.name, note.resolver?.nickname) || 'unknown'} {format(shopZoned(new Date(note.resolved_at)), 'MMM d')}</>
+          <> · resolved by {personName(note.resolver?.name) || 'unknown'} {format(shopZoned(new Date(note.resolved_at)), 'MMM d')}</>
         )}
       </p>
     </div>

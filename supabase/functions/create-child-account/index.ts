@@ -11,7 +11,7 @@
 // the trigger is the source of truth; the function pre-check gives a
 // nicer error message before we burn a createUser call.
 //
-// Body: { email, name, nickname? }
+// Body: { email, name }
 // Returns: { ok: true, user_id, email_sent }
 
 import { createClient } from "jsr:@supabase/supabase-js@2.103.2"
@@ -29,7 +29,6 @@ const MAX_CHILD_ACCOUNTS = 10
 interface Body {
   email:         string
   name:     string
-  nickname?: string
 }
 
 function randomTempPassword(): string {
@@ -70,7 +69,7 @@ Deno.serve(async (req) => {
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } })
   const { data: parentProfile, error: pErr } = await admin
     .from("profiles")
-    .select("id, status, parent_account, name, nickname")
+    .select("id, status, parent_account, name")
     .eq("id", parentId)
     .maybeSingle()
   if (pErr || !parentProfile) return json({ error: "profile not found" }, 403)
@@ -123,7 +122,6 @@ Deno.serve(async (req) => {
     .from("profiles")
     .update({
       name:                fullName,
-      nickname:             body.nickname?.trim() || null,
       status:                   "active",
       parent_account:           parentId,
       application_submitted_at: new Date().toISOString(),
@@ -153,8 +151,7 @@ Deno.serve(async (req) => {
   // we don't expose credentials. If the child wants direct app access they
   // reach out to the shop. It names the parent so a recipient who doesn't
   // recognize them has something to push back on.
-  const parentLabel = [parentProfile.name, parentProfile.nickname ? `(${parentProfile.nickname})` : null]
-    .filter(Boolean).join(" ") || t.emails.childAccount.fallbackParent
+  const parentLabel = (parentProfile.name as string | null)?.trim() || t.emails.childAccount.fallbackParent
   let emailSent = false
   if (GMAIL_USER && GMAIL_PASS) {
     try {

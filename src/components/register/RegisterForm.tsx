@@ -350,7 +350,7 @@ function formatSelectionLabel(selection: Profile[], selfId: string | null): stri
   const names = selection.map(p =>
     (selfId && p.id === selfId)
       ? t.register.picker.myself
-      : (personName(p.name, p.nickname) || t.register.picker.unnamed)
+      : (personName(p.name) || t.register.picker.unnamed)
   )
   return names.join(', ')
 }
@@ -419,13 +419,12 @@ function DiverPickerStep({
                     {isSelf ? t.register.picker.myself : (
                       <>
                         {p.name ?? t.register.picker.noName}
-                        {p.nickname && <span className="text-brand-900/80"> ({p.nickname})</span>}
                       </>
                     )}
                   </p>
                   <p className="text-xs text-brand-900/70">
                     {isSelf
-                      ? (personName(p.name, p.nickname) || t.register.picker.yourAccount)
+                      ? (personName(p.name) || t.register.picker.yourAccount)
                       : (p.cert_agency && p.cert_level ? `${p.cert_agency} ${p.cert_level}` : t.register.picker.uncertified)}
                     {!isSelf && p.status && p.status !== 'active' && (
                       <span className="ml-2 uppercase tracking-wider text-red-300">{p.status}</span>
@@ -506,7 +505,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // Whose credit — a name to show on the apply control when it isn't the
   // signed-in diver's own (on-behalf / parent-for-child). Null ⇒ "my".
   const creditOwnerName = isOnBehalfOf
-    ? (personName(profile?.name, profile?.nickname) || t.register.results.diverFallback)
+    ? (personName(profile?.name) || t.register.results.diverFallback)
     : null
   const initialDetails = existingBooking?.details as BookingDetails | undefined
   // Registration is closed for events that have already happened — but admins
@@ -645,7 +644,6 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // changes back to profiles so a Wix visitor who fills these in the first
   // time has them pre-filled for every future registration.
   const [fullName, setFullName]  = useState(profile?.name  ?? '')
-  const [nickname, setNickname]  = useState(profile?.nickname  ?? '')
   const [dob, setDob]            = useState(profile?.date_of_birth ?? '')
   const [nationality, setNationality] = useState(profile?.nationality ?? '')
   const [gender, setGender]      = useState(profile?.gender     ?? '')
@@ -764,7 +762,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     const draft: RegistrationDraft = {
       savedAt: Date.now(),
       step,
-      fullName, nickname, dob, nationality, gender, idNumber,
+      fullName, dob, nationality, gender, idNumber,
       contactMethod, contactId, certAgency, certLevel, uncertified, loggedDives,
       nitroxCertified, deepCertified, emergencyName, emergencyPhone,
       guestEmail, guestAgreedTerms,
@@ -778,7 +776,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     const t = setTimeout(() => saveRegistrationDraft(draftKey, draft), 400)
     return () => clearTimeout(t)
   }, [
-    draftKey, step, fullName, nickname, dob, nationality, gender, idNumber,
+    draftKey, step, fullName, dob, nationality, gender, idNumber,
     contactMethod, contactId, certAgency, certLevel, uncertified, loggedDives,
     nitroxCertified, deepCertified, emergencyName, emergencyPhone,
     guestEmail, guestAgreedTerms, gearChoice, gearHelpNote, editedGearItems,
@@ -795,7 +793,6 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     const resumed = Math.min(4, Math.max(1, d.step))
     setStep((isGuest ? Math.min(2, resumed) : resumed) as Step)
     setFullName(d.fullName)
-    setNickname(d.nickname)
     setDob(d.dob)
     setNationality(d.nationality)
     setGender(d.gender)
@@ -1114,7 +1111,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           .filter(tg => (additionalCredits[tg.id] ?? 0) > 0)
           .map(tg => ({
             id: tg.id,
-            name: personName(tg.name, tg.nickname) || t.register.results.diverFallback,
+            name: personName(tg.name) || t.register.results.diverFallback,
             amount: additionalCredits[tg.id],
           })),
       ]
@@ -1224,7 +1221,6 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       height_cm:               resolvedHeight,
       weight_kg:               resolvedWeight,
       shoe_size:               resolvedShoe,
-      nickname:                nullish(nickname),
       date_of_birth:           nullish(dob),
       nationality:             nullish(nationality),
       gender:                  nullish(gender),
@@ -1494,7 +1490,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       })
       const settled = await Promise.allSettled(calls)
       const results = settled.map((res, i) => ({
-        targetName: personName(additionalTargets[i].name, additionalTargets[i].nickname) || t.register.results.diverFallback,
+        targetName: personName(additionalTargets[i].name) || t.register.results.diverFallback,
         ok:    res.status === 'fulfilled',
         error: res.status === 'rejected'
           ? (res.reason instanceof Error ? res.reason.message : String(res.reason))
@@ -1731,12 +1727,6 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               value={fullName}
               onChange={setFullName}
               hint={t.register.step2.nameHint}
-            />
-            <TextField
-              label={t.register.step2.nicknameLabel}
-              value={nickname}
-              onChange={setNickname}
-              placeholder={t.register.step2.nicknamePlaceholder}
             />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <TextField label={t.register.step2.dobLabel} type="date" value={dob} onChange={setDob} />
@@ -2052,7 +2042,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
           {(showGearRentChoice || gearPacksASet) && additionalTargets.map(tg => {
             const pick = gearPickFor(tg)
-            const name = personName(tg.name, tg.nickname) || t.register.results.diverFallback
+            const name = personName(tg.name) || t.register.results.diverFallback
             const packedForTarget = gearPacksASet
               ? FULL_GEAR_SET
               : (pick.choice === 'rent' ? pick.items : [])
@@ -2332,11 +2322,11 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               <div className="border-t border-surface-200 pt-1 mt-1 space-y-0.5">
                 {!uniformGroup && (
                   <>
-                    <Row label={personName(profile?.name, profile?.nickname) || t.register.results.diverFallback} value={total} currency={event.currency} />
+                    <Row label={personName(profile?.name) || t.register.results.diverFallback} value={total} currency={event.currency} />
                     {additionalMoney.map(m => (
                       <Row
                         key={m.target.id}
-                        label={personName(m.target.name, m.target.nickname) || t.register.results.diverFallback}
+                        label={personName(m.target.name) || t.register.results.diverFallback}
                         value={m.total}
                         currency={event.currency}
                       />

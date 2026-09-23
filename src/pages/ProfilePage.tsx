@@ -41,7 +41,6 @@ import { t } from '../i18n'
 // every empty field.
 const schema = z.object({
   name: z.string().nullish(),
-  nickname: z.string().nullish(),
   date_of_birth: z.string().nullish(),
   nationality: z.string().nullish(),
   id_number: z.string().nullish(),
@@ -265,7 +264,6 @@ export function ProfileForm({ user, profile, onSaved }: {
     // RLS check and 403s even when only updating an existing row.
     const { error } = await supabase.from('profiles').update({
       name: strOrNull(data.name),
-      nickname: strOrNull(data.nickname),
       date_of_birth: strOrNull(data.date_of_birth),
       nationality: strOrNull(data.nationality),
       id_number: strOrNull(data.id_number),
@@ -307,13 +305,6 @@ export function ProfileForm({ user, profile, onSaved }: {
             <p className="text-xs text-brand-900/70 mt-1">
               {t.profile.nameHint}
             </p>
-          </Field>
-          <Field label={t.profile.nicknameLabel}>
-            <input
-              {...register('nickname')}
-              className={inputClass}
-              placeholder={t.profile.nicknamePlaceholder}
-            />
           </Field>
           <Field label={t.profile.dobLabel}>
             <Controller

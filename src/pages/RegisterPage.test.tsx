@@ -146,7 +146,7 @@ describe('RegisterPage', () => {
     // A draft exists (for this viewer) only for dive-a.
     saveRegistrationDraft(registrationDraftKey('dive', 'dive-a', 'u1'), {
       savedAt: Date.now(), step: 2,
-      fullName: 'Ada', nickname: '', dob: '', nationality: '', gender: '', idNumber: '',
+      fullName: 'Ada', dob: '', nationality: '', gender: '', idNumber: '',
       contactMethod: '', contactId: '', certAgency: '', certLevel: '', uncertified: false, loggedDives: 0,
       nitroxCertified: false, deepCertified: false, emergencyName: '', emergencyPhone: '',
       guestEmail: '', guestAgreedTerms: false, gearChoice: null, gearHelpNote: '',

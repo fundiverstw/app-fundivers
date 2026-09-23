@@ -46,8 +46,8 @@ const bookings = [
     details: { transportation: false, gear: { rent: true, items: ['Wetsuit'] } } },
 ]
 const profiles = [
-  { id: 'u1', name: 'Ada', nickname: 'Ada', contact_id: '0900', gear_owned: [] },
-  { id: 'u2', name: 'Bo',  nickname: 'Bo',  contact_id: '0901', gear_owned: [] },
+  { id: 'u1', name: 'Ada', contact_id: '0900', gear_owned: [] },
+  { id: 'u2', name: 'Bo',  contact_id: '0901', gear_owned: [] },
 ]
 
 beforeEach(() => {
@@ -97,7 +97,7 @@ describe('AdminLogisticsPage', () => {
       ] })
       if (table === 'profiles') return mockQueryBuilder({ data: [
         ...profiles,
-        { id: 'u3', name: 'Cy', nickname: 'Cy', contact_id: '0902', gear_owned: [] },
+        { id: 'u3', name: 'Cy', contact_id: '0902', gear_owned: [] },
       ] })
       return mockQueryBuilder({ data: [] })
     })
@@ -470,7 +470,7 @@ describe('AdminLogisticsPage', () => {
     const duties = [
       { id: 'd1', assignee_id: 's1', role: 'guide', event_id: 'e1', start_date: '2026-06-18', end_date: null },
     ]
-    const withStaff = [...profiles, { id: 's1', name: 'Dana', nickname: 'Dana', contact_id: '0999', gear_owned: [] }]
+    const withStaff = [...profiles, { id: 's1', name: 'Dana', contact_id: '0999', gear_owned: [] }]
     from.mockImplementation((table: string) => {
       if (table === 'bookings') return mockQueryBuilder({ data: bookings })
       if (table === 'profiles') return mockQueryBuilder({ data: withStaff })
@@ -557,7 +557,7 @@ describe('AdminLogisticsPage', () => {
       { id: 'b3', user_id: 'u3', event_id: 'e2', status: 'pending',
         details: { transportation: true, gear: { rent: false, items: [] } } },
     ]
-    const threeProfiles = [...profiles, { id: 'u3', name: 'Cy', nickname: 'Cy', contact_id: '0902', gear_owned: [] }]
+    const threeProfiles = [...profiles, { id: 'u3', name: 'Cy', contact_id: '0902', gear_owned: [] }]
     return { twoBookings, threeProfiles }
   }
 
@@ -744,8 +744,8 @@ describe('AdminLogisticsPage', () => {
     const sizedProfiles = [
       { ...profiles[0], bcd_size: 'M' },
       { ...profiles[1], bcd_size: 'S' },
-      { id: 'u3', name: 'Cy', nickname: 'Cy', gear_owned: [], bcd_size: 'M' },
-      { id: 'u4', name: 'Di', nickname: 'Di', gear_owned: [], bcd_size: 'XL' },
+      { id: 'u3', name: 'Cy', gear_owned: [], bcd_size: 'M' },
+      { id: 'u4', name: 'Di', gear_owned: [], bcd_size: 'XL' },
     ]
     from.mockImplementation((table: string) => {
       if (table === 'bookings') {
@@ -823,7 +823,7 @@ describe('AdminLogisticsPage', () => {
     const duties = [
       { id: 'd1', assignee_id: 's1', role: 'guide', event_id: 'e1', start_date: '2026-06-18', end_date: null },
     ]
-    const withStaff = [...profiles, { id: 's1', name: 'Dana', nickname: 'Dana', contact_id: '0999', gear_owned: [] }]
+    const withStaff = [...profiles, { id: 's1', name: 'Dana', contact_id: '0999', gear_owned: [] }]
     from.mockImplementation((table: string) => {
       if (table === 'bookings') return mockQueryBuilder({ data: bookings })
       if (table === 'profiles') return mockQueryBuilder({ data: withStaff })
@@ -875,8 +875,8 @@ describe('AdminLogisticsPage', () => {
     ]
     const allProfiles = [
       ...profiles,
-      { id: 's1', name: 'Dana', nickname: 'Dana', gear_owned: [] },
-      { id: 'u3', name: 'Eve',  nickname: 'Eve',  gear_owned: [] },
+      { id: 's1', name: 'Dana', gear_owned: [] },
+      { id: 'u3', name: 'Eve',  gear_owned: [] },
     ]
     from.mockImplementation((table: string) => {
       if (table === 'bookings') return mockQueryBuilder({ data: withWaitlist })
@@ -902,7 +902,7 @@ describe('AdminLogisticsPage', () => {
     ]
     from.mockImplementation((table: string) => {
       if (table === 'bookings') return mockQueryBuilder({ data: bookings })
-      if (table === 'profiles') return mockQueryBuilder({ data: [...profiles, { id: 's1', name: 'Dana', nickname: 'Dana', gear_owned: [] }] })
+      if (table === 'profiles') return mockQueryBuilder({ data: [...profiles, { id: 's1', name: 'Dana', gear_owned: [] }] })
       if (table === 'duties') return mockQueryBuilder({ data: duties })
       return mockQueryBuilder({ data: [] })
     })

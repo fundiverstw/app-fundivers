@@ -61,7 +61,7 @@ describe('child-account cap', () => {
     // rename of an existing child has to keep working.
     const someChild = children[0]
     const { error } = await admin
-      .from('profiles').update({ nickname: 'renamed' } as never).eq('id', someChild)
+      .from('profiles').update({ name: 'Renamed Child' } as never).eq('id', someChild)
     expect(error).toBeNull()
   })
 })

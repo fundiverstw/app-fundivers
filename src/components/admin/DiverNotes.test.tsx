@@ -39,7 +39,7 @@ describe('DiverNotes', () => {
         content: 'Severe shellfish allergy', created_at: '2026-05-01T10:00:00Z',
         edited_by: null, edited_at: null,
       }],
-      [{ id: 'staff-1', nickname: 'Ada', name: 'Ada Lovelace' }],
+      [{ id: 'staff-1', name: 'Ada Lovelace' }],
     )
 
     render(<DiverNotes profileId="diver-1" />)
@@ -55,8 +55,8 @@ describe('DiverNotes', () => {
         edited_by: 'admin-1', edited_at: '2026-05-02T11:00:00Z',
       }],
       [
-        { id: 'staff-1', nickname: 'Ada',   name: 'Ada Lovelace' },
-        { id: 'admin-1', nickname: 'Admin', name: 'Admin User' },
+        { id: 'staff-1', name: 'Ada Lovelace' },
+        { id: 'admin-1', name: 'Admin User' },
       ],
     )
 
@@ -97,7 +97,7 @@ describe('DiverNotes', () => {
         content: 'mine', created_at: '2026-05-01T10:00:00Z',
         edited_by: null, edited_at: null,
       }],
-      [{ id: 'staff-1', nickname: 'Ada', name: 'Ada Lovelace' }],
+      [{ id: 'staff-1', name: 'Ada Lovelace' }],
     )
 
     render(<DiverNotes profileId="diver-1" />)
@@ -113,7 +113,7 @@ describe('DiverNotes', () => {
         content: 'theirs', created_at: '2026-05-01T10:00:00Z',
         edited_by: null, edited_at: null,
       }],
-      [{ id: 'staff-2', nickname: 'Grace', name: 'Grace Hopper' }],
+      [{ id: 'staff-2', name: 'Grace Hopper' }],
     )
 
     render(<DiverNotes profileId="diver-1" />)
@@ -133,7 +133,7 @@ describe('DiverNotes', () => {
         content: 'someone else wrote this', created_at: '2026-05-01T10:00:00Z',
         edited_by: null, edited_at: null,
       }],
-      [{ id: 'staff-2', nickname: 'Grace', name: 'Grace Hopper' }],
+      [{ id: 'staff-2', name: 'Grace Hopper' }],
     )
 
     render(<DiverNotes profileId="diver-1" />)
@@ -161,7 +161,7 @@ describe('DiverNotes', () => {
         return b
       }
       if (table === 'profiles') return mockQueryBuilder({
-        data: [{ id: 'staff-1', nickname: 'Ada', name: 'Ada Lovelace' }],
+        data: [{ id: 'staff-1', name: 'Ada Lovelace' }],
       })
       return mockQueryBuilder({ data: [] })
     })
@@ -200,7 +200,7 @@ describe('DiverNotes', () => {
         return b
       }
       if (table === 'profiles') return mockQueryBuilder({
-        data: [{ id: 'staff-1', nickname: 'Ada', name: 'Ada Lovelace' }],
+        data: [{ id: 'staff-1', name: 'Ada Lovelace' }],
       })
       return mockQueryBuilder({ data: [] })
     })

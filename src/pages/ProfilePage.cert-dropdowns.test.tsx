@@ -34,7 +34,6 @@ describe('ProfilePage cert dropdown display', () => {
       profile: {
         id: 'u1',
         name: 'Ada',
-        nickname: 'Ada',
         date_of_birth: '1815-12-10',
         contact_method: 'email',
         contact_id: 'ada@example.com',
@@ -79,7 +78,6 @@ describe('ProfilePage cert dropdown display', () => {
       profile: {
         id: 'u1',
         name: 'Ada',
-        nickname: 'Ada',
         date_of_birth: '1815-12-10',
         contact_method: 'email',
         contact_id: 'ada@example.com',
@@ -117,7 +115,6 @@ describe('ProfilePage cert dropdown display', () => {
       profile: {
         id: 'u1',
         name: 'Ada',
-        nickname: 'Ada',
         date_of_birth: '1815-12-10',
         contact_method: 'email',
         contact_id: 'ada@example.com',

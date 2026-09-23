@@ -40,8 +40,8 @@ vi.mock('../../lib/credits', () => ({
 }))
 
 const profiles = [
-  { id: 'u1', name: 'Ada', nickname: 'Ada', role: 'diver', email: 'a@x.io', logged_dives: 0, gear_owned: [] },
-  { id: 'u2', name: 'Bo',  nickname: 'Bo',  role: 'diver', email: 'b@x.io', logged_dives: 0, gear_owned: [] },
+  { id: 'u1', name: 'Ada', role: 'diver', email: 'a@x.io', logged_dives: 0, gear_owned: [] },
+  { id: 'u2', name: 'Bo',  role: 'diver', email: 'b@x.io', logged_dives: 0, gear_owned: [] },
 ]
 
 beforeEach(() => {
@@ -107,7 +107,7 @@ describe('AdminUsersPage deep link', () => {
     )
     from.mockImplementation((table: string) => {
       if (table === 'profiles') {
-        return mockQueryBuilder({ data: [...profiles, { id: 'admin-2', name: 'Bea Boss', nickname: null }] })
+        return mockQueryBuilder({ data: [...profiles, { id: 'admin-2', name: 'Bea Boss' }] })
       }
       if (table === 'bookings') {
         return mockQueryBuilder({ data: [{
@@ -211,7 +211,7 @@ describe('AdminUsersPage profile completeness', () => {
   // unfinished diver saw a tidy card and no hint of what was missing.
   it('names the gaps and marks each missing required field', async () => {
     const partial = [{
-      id: 'u2', name: 'Bo', nickname: 'Bo', role: 'diver', email: 'b@x.io',
+      id: 'u2', name: 'Bo', role: 'diver', email: 'b@x.io',
       logged_dives: 0, gear_owned: [],
       date_of_birth: '1990-01-01', contact_method: 'line', contact_id: 'bo-line',
       cert_level: 'OW', cert_agency: 'PADI',
@@ -235,7 +235,7 @@ describe('AdminUsersPage profile completeness', () => {
 
   it('shows no incomplete flag once every required field is filled', async () => {
     const full = [{
-      id: 'u2', name: 'Bo', nickname: 'Bo', role: 'diver', email: 'b@x.io',
+      id: 'u2', name: 'Bo', role: 'diver', email: 'b@x.io',
       logged_dives: 0, gear_owned: [],
       date_of_birth: '1990-01-01', nationality: 'TW', gender: 'female',
       contact_method: 'line', contact_id: 'bo-line', cert_level: 'OW', cert_agency: 'PADI',
@@ -303,7 +303,7 @@ describe('AdminUsersPage role promotion', () => {
   })
 
   it('offers no temp-password control for the admin’s own row', async () => {
-    const self = [{ id: 'admin-1', name: 'Me', nickname: 'Me', role: 'admin', email: 'me@x.io', logged_dives: 0, gear_owned: [] }]
+    const self = [{ id: 'admin-1', name: 'Me', role: 'admin', email: 'me@x.io', logged_dives: 0, gear_owned: [] }]
     from.mockImplementation((table: string) =>
       table === 'profiles' ? mockQueryBuilder({ data: self }) : mockQueryBuilder({ data: [] }),
     )
@@ -315,7 +315,7 @@ describe('AdminUsersPage role promotion', () => {
   it('offers no role control for the admin’s own row', async () => {
     // admin-1 is the signed-in admin; expanding their own card must not let
     // them change their own role (guards against self-lockout).
-    const self = [{ id: 'admin-1', name: 'Me', nickname: 'Me', role: 'admin', email: 'me@x.io', logged_dives: 0, gear_owned: [] }]
+    const self = [{ id: 'admin-1', name: 'Me', role: 'admin', email: 'me@x.io', logged_dives: 0, gear_owned: [] }]
     from.mockImplementation((table: string) =>
       table === 'profiles' ? mockQueryBuilder({ data: self }) : mockQueryBuilder({ data: [] }),
     )

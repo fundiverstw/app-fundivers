@@ -157,7 +157,7 @@ export function SiteMapPage() {
             <SiteMapEditor
               map={map}
               contributor={profile
-                ? { id: profile.id, name: personName(profile.name, profile.nickname) }
+                ? { id: profile.id, name: personName(profile.name) }
                 : undefined}
               onSubmit={accept}
             />

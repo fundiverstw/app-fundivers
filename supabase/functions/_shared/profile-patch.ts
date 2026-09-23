@@ -27,7 +27,6 @@ export const PROFILE_PATCH_ALLOW: ReadonlySet<string> = new Set<string>([
   'height_cm',
   'weight_kg',
   'shoe_size',
-  'nickname',
   'date_of_birth',
   'nationality',
   'gender',

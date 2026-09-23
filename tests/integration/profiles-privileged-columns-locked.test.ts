@@ -162,18 +162,18 @@ describe('profiles: legitimate paths still work', () => {
     await admin.from('profiles').update({ status: 'pending' as never }).eq('id', loneDiver.id)
   })
 
-  it('diver can still edit allowed columns (regression — nickname)', async () => {
+  it('diver can still edit allowed columns (regression — emergency contact)', async () => {
     const sb = await userClient(diverA.email, diverA.password)
-    const r = await sb.from('profiles').update({ nickname: 'A-self-edit' }).eq('id', diverA.id).select().single()
+    const r = await sb.from('profiles').update({ emergency_contact_name: 'A-self-edit' }).eq('id', diverA.id).select().single()
     expect(r.error).toBeNull()
-    expect(r.data?.nickname).toBe('A-self-edit')
+    expect(r.data?.emergency_contact_name).toBe('A-self-edit')
   })
 
-  it('parent can still edit allowed child columns (regression — nickname on child)', async () => {
+  it('parent can still edit allowed child columns (regression — emergency contact on child)', async () => {
     const sb = await userClient(diverA.email, diverA.password)
-    const r = await sb.from('profiles').update({ nickname: 'Child-edit' }).eq('id', childB.id).select().single()
+    const r = await sb.from('profiles').update({ emergency_contact_name: 'Child-edit' }).eq('id', childB.id).select().single()
     expect(r.error).toBeNull()
-    expect(r.data?.nickname).toBe('Child-edit')
+    expect(r.data?.emergency_contact_name).toBe('Child-edit')
   })
 
   it('no-op update (same value) does not trip the trigger', async () => {

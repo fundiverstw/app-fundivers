@@ -67,7 +67,7 @@ export function AdminRegistrationsTab() {
     ? regs.filter(r =>
         (r.package_title?.toLowerCase().includes(q) ?? false) ||
         (r.tier_name?.toLowerCase().includes(q) ?? false) ||
-        (r.diver && personName(r.diver.name, r.diver.nickname).toLowerCase().includes(q)))
+        (r.diver && personName(r.diver.name).toLowerCase().includes(q)))
     : regs
 
   if (loading) return <p className="text-sm text-white/70">{ar.loading}</p>
@@ -126,7 +126,7 @@ function RegistrationCard({
   onSetStatus: (s: RegistrationStatus) => void
 }) {
   const [showContact, setShowContact] = useState(false)
-  const diverLabel = reg.diver ? personName(reg.diver.name, reg.diver.nickname) : ar.unknownDiver
+  const diverLabel = reg.diver ? personName(reg.diver.name) : ar.unknownDiver
   const dates = packageDateLabel(reg.preferred_start, reg.preferred_end)
   const currency = reg.estimated_currency ?? siteConfig.locale.currency
 

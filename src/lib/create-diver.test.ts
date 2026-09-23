@@ -24,16 +24,15 @@ describe('createDiverAccount', () => {
     invoke.mockResolvedValueOnce({ data: { ok: true, user_id: 'd1', email_sent: true }, error: null })
     from.mockImplementation(() => mockQueryBuilder({ data: profileRow }))
 
-    const result = await createDiverAccount({ email: ' Jane@Example.com ', name: ' Jane Diver ', nickname: ' JD ' })
+    const result = await createDiverAccount({ email: ' Jane@Example.com ', name: ' Jane Diver ' })
 
     expect(result).toEqual({ profile: profileRow, emailSent: true })
     const [fn, opts] = invoke.mock.calls[0]
     expect(fn).toBe('admin-create-diver')
-    // Email is normalized, name trimmed, blank nickname collapses to undefined.
+    // Email is normalized and the name trimmed.
     expect((opts as { body: Record<string, unknown> }).body).toMatchObject({
       email: 'jane@example.com',
       name: 'Jane Diver',
-      nickname: 'JD',
     })
   })
 

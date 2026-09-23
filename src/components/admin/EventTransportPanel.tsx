@@ -115,9 +115,6 @@ function RideChoiceRow({ row, onRideChanged }: {
     <li className="py-2 flex items-center justify-between gap-3">
       <span className="text-sm text-brand-900 font-medium min-w-0">
         {row.profile?.name ?? tp.noProfile}
-        {row.profile?.nickname && row.profile.nickname !== row.profile.name && (
-          <span className="text-brand-900/80 font-medium"> ({row.profile.nickname})</span>
-        )}
         {error && <span className="text-xs text-red-600 font-medium">{tp.saveFailedInline}</span>}
       </span>
       <span className="shrink-0 inline-flex rounded-lg overflow-hidden border border-surface-300">

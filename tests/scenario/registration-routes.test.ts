@@ -148,7 +148,7 @@ describe('scenario: a diver registers for one event', () => {
     const res = await register({
       event_type:    'dive',
       event_id:      eventId,
-      profile_patch: { name: 'Scenario Diver', nickname: 'Scen' },
+      profile_patch: { name: 'Scenario Diver', emergency_contact_name: 'Scenario Kin' },
       details:       details(),
       notes:         null,
     }, token)
@@ -172,8 +172,8 @@ describe('scenario: a diver registers for one event', () => {
 
     // Step 2 of the form writes through to the diver's profile.
     const { data: profile } = await w.admin.from('profiles')
-      .select('name, nickname').eq('id', diver.id).single()
-    expect(profile).toMatchObject({ name: 'Scenario Diver', nickname: 'Scen' })
+      .select('name, emergency_contact_name').eq('id', diver.id).single()
+    expect(profile).toMatchObject({ name: 'Scenario Diver', emergency_contact_name: 'Scenario Kin' })
 
     expect(await balanceOf(bookingId, booking.details.total!))
       .toEqual({ net: 3000, amount: 3000, state: 'due' })

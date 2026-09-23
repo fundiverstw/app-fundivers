@@ -164,7 +164,7 @@ Deno.serve(async (req) => {
   }
 
   // Sort by name for a predictable manifest order. Profiles missing
-  // a name fall back to nickname → '(unnamed)' so they still appear.
+  // a name fall back to '(unnamed)' so they still appear.
   const divers: EventDiverRow[] = profiles
     .map(p => toManifestRow(p))
     .sort((a, b) => a.name.localeCompare(b.name))

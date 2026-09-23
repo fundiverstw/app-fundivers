@@ -19,8 +19,8 @@ vi.mock('../register/RegisterForm', () => ({
 const ad = t.admin.addDiver
 const event = { id: 'ev1', title: 'Green Island Fun Dive' } as unknown as AppEvent
 const roster = [
-  { id: 'd1', name: 'Jane Diver', nickname: null },
-  { id: 'd2', name: 'John Diver', nickname: null },
+  { id: 'd1', name: 'Jane Diver' },
+  { id: 'd2', name: 'John Diver' },
 ] as unknown as Profile[]
 
 beforeEach(() => {

@@ -44,27 +44,27 @@ describe('profiles RLS', () => {
     expect(data?.length).toBeGreaterThanOrEqual(3)
   })
 
-  it('diver can update own nickname, not another diver', async () => {
+  it('diver can update own emergency contact, not another diver', async () => {
     const sb = await userClient(diverA.email, diverA.password)
-    const ok = await sb.from('profiles').update({ nickname: 'A-self' }).eq('id', diverA.id).select().single()
+    const ok = await sb.from('profiles').update({ emergency_contact_name: 'A-self' }).eq('id', diverA.id).select().single()
     expect(ok.error).toBeNull()
-    expect(ok.data?.nickname).toBe('A-self')
-    const fail = await sb.from('profiles').update({ nickname: 'hacked' }).eq('id', diverB.id).select()
+    expect(ok.data?.emergency_contact_name).toBe('A-self')
+    const fail = await sb.from('profiles').update({ emergency_contact_name: 'hacked' }).eq('id', diverB.id).select()
     // RLS silently filters the row out — update touches zero rows.
     expect(fail.data ?? []).toEqual([])
-    const after = await admin.from('profiles').select('nickname').eq('id', diverB.id).single()
-    expect(after.data?.nickname).not.toBe('hacked')
+    const after = await admin.from('profiles').select('emergency_contact_name').eq('id', diverB.id).single()
+    expect(after.data?.emergency_contact_name).not.toBe('hacked')
   })
 
   it('admin can update any diver profile (full edit control)', async () => {
     const sb = await userClient(adminUser.email, adminUser.password)
     const ok = await sb.from('profiles').update({
-      nickname: 'Admin-edited',
+      emergency_contact_name: 'Admin-edited',
       nationality: 'Atlantean',
       cert_level: 'Rescue Diver',
     }).eq('id', diverB.id).select().single()
     expect(ok.error).toBeNull()
-    expect(ok.data?.nickname).toBe('Admin-edited')
+    expect(ok.data?.emergency_contact_name).toBe('Admin-edited')
     expect(ok.data?.nationality).toBe('Atlantean')
     expect(ok.data?.cert_level).toBe('Rescue Diver')
   })

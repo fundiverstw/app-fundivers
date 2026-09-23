@@ -196,7 +196,7 @@ export function AdminUsersPage() {
     const credits    = changed.credits    ?? cur.credits
     const amendments = changed.amendments ?? cur.amendments
     const actorNames = new Map(cur.actorNames)
-    if (profile?.id) actorNames.set(profile.id, personName(profile.name, profile.nickname))
+    if (profile?.id) actorNames.set(profile.id, personName(profile.name))
     return {
       ...cur,
       bookings, payments, credits, amendments,
@@ -368,7 +368,7 @@ export function AdminUsersPage() {
   }
 
   async function handleDeleteUser(target: Profile) {
-    const name = target.name || target.nickname || target.contact_id || target.id
+    const name = target.name || target.contact_id || target.id
     const confirmed = window.confirm(us.deleteConfirm(name))
     if (!confirmed) return
     try {
@@ -394,7 +394,7 @@ export function AdminUsersPage() {
   // be left without an admin.
   async function handleChangeRole(target: Profile, newRole: Profile['role']) {
     if (newRole === target.role) return
-    const name = target.name || target.nickname || target.contact_id || target.id
+    const name = target.name || target.contact_id || target.id
     try {
       const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', target.id)
       if (error) throw error
@@ -410,7 +410,7 @@ export function AdminUsersPage() {
   // server-side (admin-set-temp-password edge function); we never see or store
   // an existing password. Rethrows so the card can skip revealing on failure.
   async function handleIssueTempPassword(target: Profile): Promise<string> {
-    const name = target.name || target.nickname || target.contact_id || target.id
+    const name = target.name || target.contact_id || target.id
     try {
       const password = await issueTempPassword(target.id)
       toast.success(us.tempPasswordIssued(name))
@@ -465,7 +465,7 @@ export function AdminUsersPage() {
   const visible = users.filter(u => {
     if (deepLinkId && u.id === deepLinkId) return true
     if (!searching) return false
-    const haystack = [u.name, u.nickname, u.contact_id]
+    const haystack = [u.name, u.contact_id]
       .filter(Boolean).join(' ').toLowerCase()
     return haystack.includes(query)
   })
@@ -565,7 +565,7 @@ function UserCard({
   const gaps = profileGapLabels(user)
 
   async function handleIssue() {
-    const name = user.name || user.nickname || user.contact_id || user.id
+    const name = user.name || user.contact_id || user.id
     if (!window.confirm(us.tempPasswordConfirm(name))) return
     setIssuing(true)
     try {
@@ -596,7 +596,6 @@ function UserCard({
         <div className="flex-1 min-w-0">
           <p className="font-medium text-brand-900 text-sm">
             {user.name ?? t.admin.family.unnamed}
-            {user.nickname && <span className="text-brand-900 font-medium"> ({user.nickname})</span>}
           </p>
           <p className="text-xs text-brand-900 font-medium">
             {user.cert_agency && user.cert_level ? `${user.cert_agency} ${user.cert_level}` : t.profile.family.uncertified}
@@ -721,11 +720,9 @@ function UserCard({
               )}
               <ProfileDetails user={user} />
               <DiverTermsConsent user={user} />
-              {/* The legal name alone, never "Name (nickname)": this string is
-                  stored as the signature on the waiver record. */}
               <DiverWaivers
                 diverId={user.id}
-                diverName={user.name || user.nickname || user.email}
+                diverName={user.name || user.email}
               />
               <DiverNotes profileId={user.id} />
               {isAdmin && (
@@ -785,7 +782,7 @@ function ProfileDetails({ user }: { user: Profile }) {
 
       <Section title={us.secPersonal}>
         <Row k={us.rowEmail} v={user.email} />
-        <Row k={us.rowName} v={personName(user.name, user.nickname) || null} required />
+        <Row k={us.rowName} v={personName(user.name) || null} required />
         <Row k={us.rowPreferredContact} v={contact} required />
         <Row k={us.rowDob} v={user.date_of_birth ? format(parseIsoDate(user.date_of_birth), 'MMM d, yyyy') : null} required />
         <Row k={us.rowNationality} v={user.nationality} required />

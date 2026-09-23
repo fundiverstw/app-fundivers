@@ -28,9 +28,6 @@ export function StaffDutyGroup({ rows }: { rows: StaffDutyRow[] }) {
           <li key={r.dutyId} className="py-1.5 flex items-baseline justify-between gap-3">
             <span className="text-sm text-brand-900 font-medium">
               {r.profile?.name ?? t.admin.transport.noProfile}
-              {r.profile?.nickname && r.profile.nickname !== r.profile.name && (
-                <span className="text-brand-900 font-medium"> ({r.profile.nickname})</span>
-              )}
               <span className="text-xs text-brand-950 font-medium"> · {r.role}</span>
             </span>
             {r.profile?.contact_id && (

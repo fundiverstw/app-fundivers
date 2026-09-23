@@ -22,7 +22,7 @@ vi.mock('../lib/trusted-partners', () => ({
 
 beforeEach(() => {
   useAuthMock.mockReset()
-  useAuthMock.mockReturnValue({ profile: { name: 'Ada Lovelace', nickname: null } })
+  useAuthMock.mockReturnValue({ profile: { name: 'Ada Lovelace' } })
   sendMock.mockReset()
   fetchPartnersMock.mockReset(); fetchPartnersMock.mockResolvedValue([])
   contactMock.mockReset()

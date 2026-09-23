@@ -82,10 +82,8 @@ Deno.serve(async (req) => {
   const partnerEmail = partner.contact_email
 
   const { data: profile } = await admin
-    .from("profiles").select("name, nickname").eq("id", userId).maybeSingle()
-  const diverName = [profile?.name, profile?.nickname ? `(${profile.nickname})` : null]
-    .filter(Boolean)
-    .join(" ")
+    .from("profiles").select("name").eq("id", userId).maybeSingle()
+  const diverName = profile?.name?.trim() ?? ""
 
   if (!GMAIL_USER || !GMAIL_PASS) {
     return json({ error: "email not configured" }, 500)

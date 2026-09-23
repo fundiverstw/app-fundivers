@@ -15,12 +15,12 @@ beforeEach(() => {
 
 interface Row {
   id: string
-  nickname: string | null
+  title: string | null
   price: number | null
 }
 
 const FIELDS: CatalogField<Row>[] = [
-  { key: 'nickname', label: 'Display name', type: 'text', required: true },
+  { key: 'title', label: 'Display name', type: 'text', required: true },
   { key: 'price',        label: 'Price', type: 'number' },
 ]
 
@@ -58,7 +58,7 @@ function renderManager(seed: Row[]) {
       table="things"
       noun="thing"
       fields={FIELDS}
-      rowLabel={r => r.nickname ?? r.id}
+      rowLabel={r => r.title ?? r.id}
       rowDetail={r => r.price != null ? `${r.price}` : null}
     />
   )
@@ -69,8 +69,8 @@ function renderManager(seed: Row[]) {
 describe('CatalogManager', () => {
   it('lists existing rows with display name + detail', async () => {
     renderManager([
-      { id: 'a', nickname: 'Twin', price: 1000 },
-      { id: 'b', nickname: 'Single', price: 500 },
+      { id: 'a', title: 'Twin', price: 1000 },
+      { id: 'b', title: 'Single', price: 500 },
     ])
 
     expect(await screen.findByText('Twin')).toBeInTheDocument()
@@ -98,14 +98,14 @@ describe('CatalogManager', () => {
     const payload = inserts[0] as Record<string, unknown>
     expect(typeof payload.id).toBe('string')
     expect(payload.id).toMatch(/[0-9a-f-]{36}/)
-    expect(payload.nickname).toBe('Suite')
+    expect(payload.title).toBe('Suite')
     expect(payload.price).toBe(7500)
     // List grew by one optimistically without a refetch.
     expect(screen.getByText('Suite')).toBeInTheDocument()
   })
 
   it('opens the edit form prefilled and updates by id without sending id in the payload', async () => {
-    const { updates } = renderManager([{ id: 'r-1', nickname: 'Twin', price: 1000 }])
+    const { updates } = renderManager([{ id: 'r-1', title: 'Twin', price: 1000 }])
     const user = userEvent.setup()
 
     await user.click(await screen.findByRole('button', { name: /edit/i }))
@@ -119,12 +119,12 @@ describe('CatalogManager', () => {
     await waitFor(() => expect(updates).toHaveLength(1))
     const { payload, eq } = updates[0]
     expect(eq).toEqual(['id', 'r-1'])
-    expect((payload as Record<string, unknown>).nickname).toBe('Twin Ocean View')
+    expect((payload as Record<string, unknown>).title).toBe('Twin Ocean View')
     expect((payload as Record<string, unknown>).id).toBeUndefined()
   })
 
   it('deletes after confirmation and removes the row from the list', async () => {
-    const { deletes } = renderManager([{ id: 'r-1', nickname: 'Twin', price: 1000 }])
+    const { deletes } = renderManager([{ id: 'r-1', title: 'Twin', price: 1000 }])
     const user = userEvent.setup()
 
     await user.click(await screen.findByRole('button', { name: /^delete$/i }))

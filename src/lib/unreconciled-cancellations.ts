@@ -61,7 +61,7 @@ export interface UnreconciledCancellation {
   cancelledBy: string | null
 }
 
-type ProfileLite = { id: string; name: string | null; nickname: string | null }
+type ProfileLite = { id: string; name: string | null }
 
 /**
  * Pure selector: which cancelled bookings still hold money?
@@ -92,7 +92,7 @@ export function selectUnreconciled(input: {
   const paidByBooking = netPaidByBooking(input.payments)
   const outstanding = (id: string) =>
     cancellationKept(paidByBooking.get(id) ?? 0, input.credits, id)
-  const nameById = new Map(input.profiles.map(p => [p.id, personName(p.name, p.nickname)]))
+  const nameById = new Map(input.profiles.map(p => [p.id, personName(p.name)]))
 
   return input.bookings
     .filter(b =>
@@ -132,7 +132,7 @@ export async function fetchUnreconciledCancellations(labels: {
   const [paymentsRes, creditsRes, profilesRes, events] = await Promise.all([
     supabase.from('payments').select('booking_id, amount, status').in('booking_id', bookingIds),
     supabase.from('credits').select('booking_id, source, amount').in('booking_id', bookingIds),
-    supabase.from('profiles').select('id, name, nickname').in('id', userIds),
+    supabase.from('profiles').select('id, name').in('id', userIds),
     fetchEventsForBookings(eventIds),
   ])
   if (paymentsRes.error) throw paymentsRes.error

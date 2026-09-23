@@ -146,7 +146,7 @@ export function BusyEntryModal(props: BusyEntryModalProps) {
               >
                 <option value="">{bz.pickOwner}</option>
                 {owners.map(o => (
-                  <option key={o.id} value={o.id}>{personName(o.name, o.nickname) || o.id}</option>
+                  <option key={o.id} value={o.id}>{personName(o.name) || o.id}</option>
                 ))}
               </select>
             </div>

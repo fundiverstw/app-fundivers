@@ -671,7 +671,6 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     startDate,
     endDate,
     name:            profile?.name ?? "",
-    nickname:        profile?.nickname ?? null,
     email:           registrantEmail,
     dob:             profile?.date_of_birth ?? null,
     nationality:     profile?.nationality ?? null,
@@ -726,12 +725,9 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
       // subject line names nobody, and the shop has to know who booked.
       const m = t.emails.registration
       const displayName = payload.name.trim() || registrantEmail
-      const subjectName = payload.nickname
-        ? `${displayName} (${payload.nickname})`
-        : displayName
       const fromHeader = { name: deps.env.mailFromName, address: deps.env.mailFromAddress }
       if (isWaitlisted) {
-        const subject = `waitlist--${payload.eventTitle}--${subjectName}`
+        const subject = `waitlist--${payload.eventTitle}--${displayName}`
         const companyText = m.shopWaitlisted(displayName, payload.eventTitle)
         const diverText = [
           m.diverWaitlisted(payload.eventTitle),
@@ -747,7 +743,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
       } else {
         const base64  = await deps.buildPdfBase64(payload)
         const buf     = Buffer.from(base64, "base64")
-        const subject = `registration--${payload.eventTitle}--${subjectName}`
+        const subject = `registration--${payload.eventTitle}--${displayName}`
         const attach  = { filename: "registration.pdf", content: buf, contentType: "application/pdf" }
         await deps.transporter.sendMail({
           from: fromHeader, subject, to: deps.env.companyEmail,

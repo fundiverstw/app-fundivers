@@ -13,7 +13,7 @@ const ad = t.admin.addDiver
 const pf = t.profile.family
 
 // Three-step "register a diver on behalf" modal:
-//   1. pick which diver — search profiles by name / nickname / contact,
+//   1. pick which diver — search profiles by name / contact,
 //      or click "Create new diver account" to mint a fresh profile.
 //   2. (optional) create-new-account form — admin fills minimal identity,
 //      edge function provisions the auth user + emails a one-time link
@@ -65,13 +65,13 @@ export function AdminAddDiverModal({
 
   const visible = profiles.filter(p => {
     if (!filter) return true
-    const haystack = [p.name, p.nickname, p.contact_id]
+    const haystack = [p.name, p.contact_id]
       .filter(Boolean).join(' ').toLowerCase()
     return haystack.includes(filter.toLowerCase())
   })
 
   const title = target
-    ? ad.registerFor(personName(target.name, target.nickname) || t.admin.family.diverFallback)
+    ? ad.registerFor(personName(target.name) || t.admin.family.diverFallback)
     : creatingNew
       ? ad.createNewAccountTitle
       : ad.addDiverToEvent
@@ -151,7 +151,6 @@ export function AdminAddDiverModal({
                   >
                     <p className="text-sm font-medium text-brand-900">
                       {p.name ?? pf.noName}
-                      {p.nickname && <span className="text-brand-900/80"> ({p.nickname})</span>}
                     </p>
                     <p className="text-xs text-brand-900/70">
                       {p.cert_agency && p.cert_level && `${p.cert_agency} ${p.cert_level}`}
@@ -187,7 +186,6 @@ function CreateNewDiverForm({
   const toast = useToast()
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
-  const [nickname, setNickname] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -207,7 +205,6 @@ function CreateNewDiverForm({
       const { profile, emailSent } = await createDiverAccount({
         email:      trimmedEmail,
         name:       trimmedName,
-        nickname,
         eventTitle,
       })
       const tail = emailSent ? pf.emailSent : pf.emailSkipped
@@ -247,15 +244,6 @@ function CreateNewDiverForm({
           className={`${INPUT} text-sm`}
         />
         <span className="block text-xs text-brand-900/70 mt-1">{pf.nameHint}</span>
-      </label>
-      <label className="block">
-        <span className={INPUT_LABEL}>{pf.nicknameLabel}</span>
-        <input
-          type="text"
-          value={nickname} onChange={e => setNickname(e.target.value)}
-          placeholder={ad.nicknamePlaceholder}
-          className={`${INPUT} text-sm`}
-        />
       </label>
 
       {error && <p className="text-sm text-red-700 bg-red-50 border border-accent rounded px-2 py-1">{error}</p>}
