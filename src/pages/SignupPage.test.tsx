@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { SignupPage } from './SignupPage'
 import { renderWithRouter, byName } from '../../tests/test-utils'
+import { CAPTCHA_REUSE_MAX_AGE_MS } from '../lib/turnstile'
 import { t } from '../i18n'
 
 const { invokeWithRetry, setSession, signInWithPassword, freshToken } = vi.hoisted(() => ({
@@ -301,6 +302,24 @@ describe('SignupPage error messages', () => {
     expect(invokeWithRetry.mock.calls[1][1].body.turnstile_token).toBe('third-token')
   })
 
+  // A request that never reached the server never spent its token. Re-running
+  // the check there costs anyone Cloudflare challenges interactively a second
+  // checkbox for nothing, so the retry posts the same token.
+  it('keeps the token when the request never reached the server', async () => {
+    const error = new Error('Failed to send a request to the Edge Function') as Error & { context?: unknown }
+    error.name = 'FunctionsFetchError'
+    invokeWithRetry.mockResolvedValue({ data: null, error })
+    const user = userEvent.setup()
+    renderWithCalendar()
+    await fillIn(user)
+    await user.click(screen.getByRole('button', { name: /create account/i }))
+
+    await screen.findByText(t.auth.offline)
+    expect(freshToken).toHaveBeenCalledTimes(1)
+    expect(freshToken).toHaveBeenCalledWith(CAPTCHA_REUSE_MAX_AGE_MS)
+    expect(screen.getByRole('button', { name: /create account/i })).toBeEnabled()
+  })
+
   // The other half of the same problem: a token minted when the page loaded
   // and posted after the diver spent ten minutes over the form is rejected as
   // expired. The page asks for one minted at submit instead.
@@ -312,7 +331,7 @@ describe('SignupPage error messages', () => {
     await user.click(screen.getByRole('button', { name: /create account/i }))
 
     await waitFor(() => expect(invokeWithRetry).toHaveBeenCalledOnce())
-    expect(freshToken).toHaveBeenCalledWith(120_000)
+    expect(freshToken).toHaveBeenCalledWith(CAPTCHA_REUSE_MAX_AGE_MS)
     expect(invokeWithRetry.mock.calls[0][1].body.turnstile_token).toBe('minted-at-submit')
   })
 })

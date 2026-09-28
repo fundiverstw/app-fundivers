@@ -27,6 +27,11 @@ export interface SignupFailure {
    * widget re-challenge and try again rather than reporting a failure.
    */
   captchaFailed: boolean
+  /**
+   * The request never got a response, so the server never saw it — and never
+   * spent its captcha token. A retry can post the same one.
+   */
+  transient: boolean
 }
 
 // Matched against the handler's `{ error }` string. Order matters only in that
@@ -57,7 +62,7 @@ export async function readSignupFailure(
   // The request never got a response at all — nothing was wrong with what the
   // diver typed, so don't send them back to re-check it.
   if (isTransientInvokeError(error)) {
-    return { message: t.auth.offline, emailTaken: false, captchaFailed: false }
+    return { message: t.auth.offline, emailTaken: false, captchaFailed: false, transient: true }
   }
 
   const ctx = error.context
@@ -69,7 +74,7 @@ export async function readSignupFailure(
     try {
       const body = await (ctx as Response).json() as { error?: string; code?: string }
       if (body.code === 'email_exists') {
-        return { message: t.auth.emailTaken, emailTaken: true, captchaFailed: false }
+        return { message: t.auth.emailTaken, emailTaken: true, captchaFailed: false, transient: false }
       }
       wire = body.error ?? ''
     } catch { /* body wasn't JSON — status is all we have */ }
@@ -78,16 +83,16 @@ export async function readSignupFailure(
   // create-registration predates the `email_exists` code and reports a taken
   // address in prose.
   if (/already (been )?registered|already exists/i.test(wire)) {
-    return { message: t.auth.emailTaken, emailTaken: true, captchaFailed: false }
+    return { message: t.auth.emailTaken, emailTaken: true, captchaFailed: false, transient: false }
   }
   if (status === 429) {
-    return { message: t.auth.tooManyAttempts, emailTaken: false, captchaFailed: false }
+    return { message: t.auth.tooManyAttempts, emailTaken: false, captchaFailed: false, transient: false }
   }
 
   const captchaFailed = /captcha/i.test(wire)
   for (const { pattern, message } of WIRE_PATTERNS) {
-    if (pattern.test(wire)) return { message: message(), emailTaken: false, captchaFailed }
+    if (pattern.test(wire)) return { message: message(), emailTaken: false, captchaFailed, transient: false }
   }
 
-  return { message: fallback, emailTaken: false, captchaFailed }
+  return { message: fallback, emailTaken: false, captchaFailed, transient: false }
 }
