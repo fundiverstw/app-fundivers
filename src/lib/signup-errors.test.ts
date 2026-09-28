@@ -27,7 +27,7 @@ function transportError(name: 'FunctionsFetchError' | 'FunctionsRelayError') {
 describe('readSignupFailure', () => {
   it('flags a taken address by code, so the caller can offer a sign-in link', async () => {
     const f = await readSignupFailure(httpError(409, { error: 'email already registered', code: 'email_exists' }), FALLBACK)
-    expect(f).toEqual({ message: t.auth.emailTaken, emailTaken: true, captchaFailed: false })
+    expect(f).toEqual({ message: t.auth.emailTaken, emailTaken: true, captchaFailed: false, transient: false })
   })
 
   // create-registration predates the code and says so in prose.
@@ -81,7 +81,7 @@ describe('readSignupFailure', () => {
     'names the connection for %s, rather than blaming what the diver typed',
     async (name) => {
       const f = await readSignupFailure(transportError(name), FALLBACK)
-      expect(f).toEqual({ message: t.auth.offline, emailTaken: false, captchaFailed: false })
+      expect(f).toEqual({ message: t.auth.offline, emailTaken: false, captchaFailed: false, transient: true })
     },
   )
 
@@ -101,6 +101,6 @@ describe('readSignupFailure', () => {
 
   it('copes with an error carrying no context at all', async () => {
     const f = await readSignupFailure(new Error('bare') as Error & { context?: unknown }, FALLBACK)
-    expect(f).toEqual({ message: FALLBACK, emailTaken: false, captchaFailed: false })
+    expect(f).toEqual({ message: FALLBACK, emailTaken: false, captchaFailed: false, transient: false })
   })
 })

@@ -1,10 +1,16 @@
-import { useCallback, useEffect, useImperativeHandle, useRef, type Ref } from 'react'
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
+import { isTurnstileConfigError } from '../../lib/turnstile'
+import { BTN_XS_GHOST, TEXT_MUTED, TEXT_WARNING } from '../../styles/tokens'
+import { t } from '../../i18n'
 
 // Cloudflare Turnstile widget for the guest signup path.
 //
 // Renders an invisible-by-default challenge. Callback fires once the
 // challenge succeeds (usually within a few hundred ms with no
 // interaction); on token-expire we wipe state so submit re-challenges.
+// A line under the box says what it is waiting for — a click, when
+// Cloudflare wants one, or a retry, when the check errors — because
+// Cloudflare's own box does not say enough for a diver to act on.
 //
 // A token is good for 300 seconds and verifies exactly once, which is
 // shorter than a diver takes over a four-step form — so callers don't
@@ -29,8 +35,11 @@ declare global {
       render: (container: HTMLElement, opts: {
         sitekey: string
         callback: (token: string) => void
-        'expired-callback'?: () => void
-        'error-callback'?:   () => void
+        'expired-callback'?:            () => void
+        'error-callback'?:              (code: string) => boolean | void
+        'before-interactive-callback'?: () => void
+        'after-interactive-callback'?:  () => void
+        'unsupported-callback'?:        () => void
         theme?: 'light' | 'dark' | 'auto'
       }) => string
       remove: (widgetId: string) => void
@@ -112,6 +121,14 @@ export interface TurnstileWidgetProps {
   onUnavailable?: () => void
 }
 
+// What the challenge is doing, for the line under it. Cloudflare's own box
+// says little, and "checking your browser" is wrong once it wants a click.
+type Status =
+  | { kind: 'checking' }
+  | { kind: 'interactive' }
+  | { kind: 'solved' }
+  | { kind: 'error'; code: string }
+
 export function TurnstileWidget({ siteKey, onToken, onUnavailable, ref }: TurnstileWidgetProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const widgetIdRef  = useRef<string | null>(null)
@@ -121,6 +138,7 @@ export function TurnstileWidget({ siteKey, onToken, onUnavailable, ref }: Turnst
   const mintedAtRef = useRef(0)
   // Resolver for a freshToken() call waiting on the next challenge result.
   const pendingRef  = useRef<((token: string | null) => void) | null>(null)
+  const [status, setStatus] = useState<Status>({ kind: 'checking' })
 
   const record = useCallback((token: string | null) => {
     tokenRef.current = token
@@ -131,14 +149,20 @@ export function TurnstileWidget({ siteKey, onToken, onUnavailable, ref }: Turnst
     onToken(token)
   }, [onToken])
 
+  const rerun = useCallback(() => {
+    const widgetId = widgetIdRef.current
+    if (!widgetId || !window.turnstile) return false
+    setStatus({ kind: 'checking' })
+    try { window.turnstile.reset(widgetId); return true } catch { return false }
+  }, [])
+
   useImperativeHandle(ref, () => ({
     freshToken: (maxAgeMs = 0) => {
       const held = tokenRef.current
       if (held && maxAgeMs > 0 && Date.now() - mintedAtRef.current < maxAgeMs) {
         return Promise.resolve(held)
       }
-      const widgetId = widgetIdRef.current
-      if (!widgetId || !window.turnstile) return Promise.resolve(null)
+      if (!widgetIdRef.current || !window.turnstile) return Promise.resolve(null)
       return new Promise<string | null>(resolve => {
         pendingRef.current?.(null)
         let timer = 0
@@ -151,10 +175,10 @@ export function TurnstileWidget({ siteKey, onToken, onUnavailable, ref }: Turnst
         pendingRef.current = settle
         tokenRef.current = null
         mintedAtRef.current = 0
-        try { window.turnstile!.reset(widgetId) } catch { settle(null) }
+        if (!rerun()) settle(null)
       })
     },
-  }), [])
+  }), [rerun])
 
   useEffect(() => {
     let cancelled = false
@@ -168,14 +192,50 @@ export function TurnstileWidget({ siteKey, onToken, onUnavailable, ref }: Turnst
       if (!cancelled && !rendered) onUnavailable?.()
     }, LOAD_TIMEOUT_MS)
 
+    // A caller waiting in freshToken gets its answer now rather than at the
+    // timeout: nobody can tick a box they are not looking at, and the caller's
+    // job is to put them in front of it.
+    const releasePending = () => {
+      const pending = pendingRef.current
+      pendingRef.current = null
+      pending?.(null)
+    }
+
     loadScript().then(() => {
       if (cancelled || !containerRef.current || !window.turnstile) return
       rendered = true
       widgetIdRef.current = window.turnstile.render(containerRef.current, {
         sitekey: siteKey,
-        callback:           (token) => { if (!cancelled) record(token) },
-        'expired-callback': ()      => { if (!cancelled) record(null) },
-        'error-callback':   ()      => { if (!cancelled) record(null) },
+        callback: (token) => {
+          if (cancelled) return
+          setStatus({ kind: 'solved' })
+          record(token)
+        },
+        'expired-callback': () => {
+          if (cancelled) return
+          setStatus({ kind: 'checking' })
+          record(null)
+        },
+        'error-callback': (code) => {
+          if (cancelled) return true
+          // A wrong or disabled site key, or a hostname the widget does not
+          // allow: every retry fails the same way, so say sign-up is down.
+          if (isTurnstileConfigError(code)) { onUnavailable?.(); return true }
+          setStatus({ kind: 'error', code })
+          record(null)
+          return true
+        },
+        'before-interactive-callback': () => {
+          if (cancelled) return
+          setStatus({ kind: 'interactive' })
+          releasePending()
+        },
+        'after-interactive-callback': () => {
+          if (!cancelled) setStatus({ kind: 'checking' })
+        },
+        'unsupported-callback': () => {
+          if (!cancelled) onUnavailable?.()
+        },
         theme: 'light',
       })
     }).catch(() => {
@@ -185,9 +245,7 @@ export function TurnstileWidget({ siteKey, onToken, onUnavailable, ref }: Turnst
     return () => {
       cancelled = true
       clearTimeout(timer)
-      const pending = pendingRef.current
-      pendingRef.current = null
-      pending?.(null)
+      releasePending()
       tokenRef.current = null
       mintedAtRef.current = 0
       if (widgetIdRef.current && window.turnstile) {
@@ -197,5 +255,25 @@ export function TurnstileWidget({ siteKey, onToken, onUnavailable, ref }: Turnst
     }
   }, [siteKey, record, onUnavailable])
 
-  return <div ref={containerRef} className="cf-turnstile" />
+  return (
+    <div className="space-y-1.5">
+      <div className="turnstile-box">
+        <div ref={containerRef} className="cf-turnstile" />
+      </div>
+      <div aria-live="polite">
+        {status.kind === 'checking' && (
+          <p className={`${TEXT_MUTED} text-xs text-center`}>{t.auth.captchaPending}</p>
+        )}
+        {status.kind === 'interactive' && (
+          <p className={`${TEXT_WARNING} text-xs text-center`}>{t.auth.captchaInteractive}</p>
+        )}
+        {status.kind === 'error' && (
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <p className={`${TEXT_WARNING} text-xs`}>{t.auth.captchaError(status.code)}</p>
+            <button type="button" onClick={rerun} className={BTN_XS_GHOST}>{t.auth.captchaRetry}</button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }

@@ -9,6 +9,7 @@ import { readSignupFailure } from '../lib/signup-errors'
 import { Logo } from '../components/Logo'
 import { PasswordInput } from '../components/PasswordInput'
 import { TurnstileWidget, type TurnstileHandle } from '../components/register/TurnstileWidget'
+import { CAPTCHA_REUSE_MAX_AGE_MS } from '../lib/turnstile'
 import { useTerms } from '../lib/use-terms'
 import { CARD_ELEVATED, INPUT, INPUT_LABEL, BTN_PRIMARY, TEXT_ERROR, TEXT_LINK, TEXT_MUTED } from '../styles/tokens'
 import { t } from '../i18n'
@@ -28,10 +29,6 @@ import { t } from '../i18n'
 // application" banner until a human approved them. Accounts are active from the
 // first insert now (20260831120000), so submitting this form lands the diver on
 // the calendar.
-
-// How old a Turnstile token may be at submit before the form insists on a
-// fresh one. Cloudflare's limit is 300 seconds.
-const FRESH_CAPTCHA_MAX_AGE_MS = 120_000
 
 const schema = z.object({
   name: z.string().trim().min(1, t.auth.nameRequired),
@@ -83,7 +80,7 @@ export function SignupPage() {
     // server-side, spends a per-IP budget before it will mint a user, and
     // creates the account with the address already confirmed — so there is no
     // "go and click the link in your email" step between here and diving.
-    const captcha = await turnstileRef.current?.freshToken(FRESH_CAPTCHA_MAX_AGE_MS) ?? turnstileToken
+    const captcha = await turnstileRef.current?.freshToken(CAPTCHA_REUSE_MAX_AGE_MS) ?? turnstileToken
     if (!captcha) {
       setServerError(t.auth.captchaFailed)
       setTurnstileToken(null)
@@ -105,7 +102,11 @@ export function SignupPage() {
       const failure = await readSignupFailure(error, t.auth.signupFailed)
       setServerError(failure.message)
       setEmailTaken(failure.emailTaken)
-      // The token is single-use — Cloudflare rejects a replay — so a retry
+      // A request that never reached the server never spent its token, so the
+      // retry posts the same one. Re-running the check there would hand anyone
+      // Cloudflare challenges interactively a second checkbox for nothing.
+      if (failure.transient) return
+      // Otherwise the token is spent — Cloudflare rejects a replay — so a retry
       // needs a fresh challenge. Re-run it here: clearing the state alone
       // leaves the widget holding a spent token and Sign up disabled for good.
       setTurnstileToken(null)
@@ -217,10 +218,6 @@ export function SignupPage() {
             >
               {isSubmitting ? t.auth.creatingAccount : t.auth.createAccount}
             </button>
-
-            {!turnstileToken && !serverError && (
-              <p className={`${TEXT_MUTED} text-xs text-center`}>{t.auth.captchaPending}</p>
-            )}
 
             <p className={`${TEXT_MUTED} text-xs text-center`}>{t.auth.profileLater}</p>
           </form>

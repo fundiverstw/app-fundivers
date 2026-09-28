@@ -28,6 +28,7 @@ import { uploadNitroxCard } from '../../lib/nitrox-card'
 import { uploadDeepCard } from '../../lib/deep-card'
 import { isHeicFile } from '../../lib/image-compress'
 import { TurnstileWidget, type TurnstileHandle } from './TurnstileWidget'
+import { CAPTCHA_REUSE_MAX_AGE_MS } from '../../lib/turnstile'
 import { WhatHappensNext } from './WhatHappensNext'
 import { TextField } from './TextField'
 import { HeightField, WeightField } from '../MeasureField'
@@ -137,11 +138,6 @@ async function fetchOwnBooking(
     .maybeSingle()
   return (data as { id: string; status: string } | null) ?? null
 }
-
-// How old a Turnstile token may be at submit before the form insists on a
-// fresh one. Cloudflare's limit is 300 seconds; this leaves room for the
-// request itself, a retry, and a slow connection.
-const FRESH_CAPTCHA_MAX_AGE_MS = 120_000
 
 type Step = 1 | 2 | 3 | 4
 type ContactMethod = 'whatsapp' | 'line' | 'phone' | 'email'
@@ -1357,7 +1353,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     // failing a registration they filled in correctly.
     let captcha = turnstileToken
     if (isGuest) {
-      captcha = await turnstileRef.current?.freshToken(FRESH_CAPTCHA_MAX_AGE_MS) ?? null
+      captcha = await turnstileRef.current?.freshToken(CAPTCHA_REUSE_MAX_AGE_MS) ?? null
       if (!captcha) {
         setSaving(false)
         setStep(2)

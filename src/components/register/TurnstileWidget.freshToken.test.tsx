@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { act, createRef } from 'react'
 
 // tests/setup.unit.ts swaps this widget out globally for a stub; this file
@@ -7,6 +7,7 @@ import { act, createRef } from 'react'
 vi.unmock('./TurnstileWidget')
 
 import { TurnstileWidget, type TurnstileHandle } from './TurnstileWidget'
+import { t } from '../../i18n'
 
 // The regression these tests exist for: a token solved on step 2 of the
 // register form was still being posted from step 4, minutes later. Cloudflare
@@ -30,6 +31,8 @@ const SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render
 /** Callbacks handed to us by the widget on render, so a test can act as Cloudflare. */
 let solve: (token: string) => void
 let expire: () => void
+/** Everything the widget handed Cloudflare on render. */
+let opts: Record<string, unknown>
 let resets: number
 let tokenSeq: number
 
@@ -45,9 +48,10 @@ beforeEach(() => {
   script.src = SCRIPT_URL
   document.head.appendChild(script)
   const fake: FakeTurnstile = {
-    render: (_el, opts) => {
-      solve  = opts.callback as (token: string) => void
-      expire = opts['expired-callback'] as () => void
+    render: (_el, o) => {
+      opts   = o
+      solve  = o.callback as (token: string) => void
+      expire = o['expired-callback'] as () => void
       // First solve is automatic, exactly as the invisible challenge behaves.
       solve(`token-${++tokenSeq}`)
       return 'widget-1'
@@ -69,9 +73,14 @@ afterEach(() => {
 async function mount() {
   const ref = createRef<TurnstileHandle>()
   const onToken = vi.fn()
-  await act(async () => { render(<TurnstileWidget ref={ref} siteKey="k" onToken={onToken} />) })
-  return { ref, onToken }
+  const onUnavailable = vi.fn()
+  await act(async () => {
+    render(<TurnstileWidget ref={ref} siteKey="k" onToken={onToken} onUnavailable={onUnavailable} />)
+  })
+  return { ref, onToken, onUnavailable }
 }
+
+const callback = (name: string) => opts[name] as (...a: unknown[]) => unknown
 
 describe('TurnstileWidget.freshToken', () => {
   it('hands back the token it holds while it is younger than the caller allows', async () => {
@@ -130,5 +139,57 @@ describe('TurnstileWidget.freshToken', () => {
     unmount()
 
     await expect(handle.freshToken(60_000)).resolves.toBeNull()
+  })
+})
+
+describe('TurnstileWidget status line', () => {
+  it('says nothing once the invisible check has passed', async () => {
+    await mount()
+    expect(screen.queryByText(t.auth.captchaPending)).not.toBeInTheDocument()
+    expect(screen.queryByText(t.auth.captchaInteractive)).not.toBeInTheDocument()
+  })
+
+  it('asks for the click when Cloudflare wants one, and lets a waiting caller go at once', async () => {
+    const { ref } = await mount()
+    ;(window as unknown as { turnstile: FakeTurnstile }).turnstile.reset = () => {
+      resets++
+      callback('before-interactive-callback')()
+    }
+
+    // No ten-second wait: the answer is null the moment the box needs a human.
+    let answer: string | null | undefined
+    await act(async () => { answer = await ref.current!.freshToken() })
+    expect(answer).toBeNull()
+    expect(screen.getByText(t.auth.captchaInteractive)).toBeInTheDocument()
+
+    // Ticking it clears the prompt and hands the token over as usual.
+    await act(async () => { callback('after-interactive-callback')(); solve('token-ticked') })
+    expect(screen.queryByText(t.auth.captchaInteractive)).not.toBeInTheDocument()
+    await expect(ref.current!.freshToken(60_000)).resolves.toBe('token-ticked')
+  })
+
+  it('shows the error code with a retry that re-runs the check', async () => {
+    const { onToken } = await mount()
+    await act(async () => { callback('error-callback')('600010') })
+    expect(onToken).toHaveBeenLastCalledWith(null)
+    expect(screen.getByText(t.auth.captchaError('600010'))).toBeInTheDocument()
+
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: t.auth.captchaRetry })) })
+    expect(resets).toBe(1)
+    expect(onToken).toHaveBeenLastCalledWith('token-2')
+    expect(screen.queryByText(t.auth.captchaError('600010'))).not.toBeInTheDocument()
+  })
+
+  it('reports unavailable for a site-key or hostname error no retry can fix', async () => {
+    const { onUnavailable } = await mount()
+    await act(async () => { callback('error-callback')('110200') })
+    expect(onUnavailable).toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: t.auth.captchaRetry })).not.toBeInTheDocument()
+  })
+
+  it('reports unavailable on a browser Turnstile does not support', async () => {
+    const { onUnavailable } = await mount()
+    await act(async () => { callback('unsupported-callback')() })
+    expect(onUnavailable).toHaveBeenCalled()
   })
 })
