@@ -1,10 +1,11 @@
 import { addIsoDays } from './dates'
-import { EMPTY_DAY_BOARD, type DayBoardData, type DayTransportData } from './day-board'
+import type { DayBoardData, DayTransportData } from './day-board'
 import type { GearModelWithSizes } from './gear-sizing'
 import type { Profile, Vehicle } from '../types/database'
 
-/** How many days ahead the board is kept available with no signal. */
-export const OFFLINE_DAYS = 10
+// Only today is kept on the device. The capture used to hold ten days, which
+// cost ~90 requests every fifteen minutes on every staff page and slowed the
+// app down; the board is read with no signal on the day itself, on the boat.
 
 /** Bumped when the stored shape changes. A snapshot from an older build is
  *  discarded rather than migrated — it is a cache, and the next sync refills
@@ -20,7 +21,7 @@ export interface OfflineSnapshot {
   userId: string
   /** ISO instant the capture finished — what the board's "synced at" reads. */
   capturedAt: string
-  /** The days covered, ascending, starting from the capture's today. */
+  /** The days covered — today's date at capture time. */
   days: string[]
   /** Days with events for the "Other day" picker, over its own longer window. */
   upcomingDays: string[]
@@ -77,11 +78,6 @@ function redactBoard(board: DayBoardData): DayBoardData {
   return { ...board, profiles: board.profiles.map(redactProfileForOffline) }
 }
 
-/** The ten day keys a capture starting on `today` covers, ascending. */
-export function offlineDays(today: string): string[] {
-  return Array.from({ length: OFFLINE_DAYS }, (_, i) => addIsoDays(today, i))
-}
-
 /** The reads a capture makes. Injected so the builder is testable without a
  *  network, and so the caller owns the query shapes. */
 export interface SnapshotSources {
@@ -93,18 +89,12 @@ export interface SnapshotSources {
 }
 
 /**
- * Capture the next ten days.
+ * Capture today's board.
  *
- * Days are fetched one at a time rather than in parallel: this runs in the
- * background behind whatever the user is actually looking at, and ten
- * simultaneous multi-query days would contend with the page's own reads on a
- * phone's connection for no benefit — nobody is waiting on it.
- *
- * A day that fails is stored as an empty board and the capture continues. The
- * alternative — abandoning the whole snapshot because day seven timed out — is
- * how staff end up on a boat with nothing. `capturedAt` still stamps the
- * attempt, and the board shows it, so a stale day is visible as stale rather
- * than presented as an empty one.
+ * A board read that fails throws, so the caller keeps the copy it already has:
+ * with one day stored, an empty board written over a good one is how staff end
+ * up on a boat with nothing. A transport, fleet or chart read that fails is
+ * stored empty instead — the roster is the part that has to be there.
  */
 export async function buildSnapshot(
   userId: string,
@@ -113,29 +103,11 @@ export async function buildSnapshot(
   sources: SnapshotSources,
   lookaheadDays: number,
 ): Promise<OfflineSnapshot> {
-  const days = offlineDays(today)
-  const boards: Record<string, DayBoardData> = {}
-  const transport: Record<string, DayTransportData> = {}
-
-  for (const day of days) {
-    let board: DayBoardData
-    try {
-      board = await sources.fetchDayBoard(day)
-    } catch {
-      boards[day] = { ...EMPTY_DAY_BOARD }
-      transport[day] = { allocations: [], rideGroups: [] }
-      continue
-    }
-    boards[day] = redactBoard(board)
-    try {
-      transport[day] = await sources.fetchDayTransport(day, board.events.map(e => e.id))
-    } catch {
-      transport[day] = { allocations: [], rideGroups: [] }
-    }
-  }
-
-  const [upcomingDays, vehicles, gearModels] = await Promise.all([
-    sources.fetchUpcomingDays(today, addIsoDays(today, lookaheadDays)).catch(() => days),
+  const board = redactBoard(await sources.fetchDayBoard(today))
+  const [transport, upcomingDays, vehicles, gearModels] = await Promise.all([
+    sources.fetchDayTransport(today, board.events.map(e => e.id))
+      .catch((): DayTransportData => ({ allocations: [], rideGroups: [] })),
+    sources.fetchUpcomingDays(today, addIsoDays(today, lookaheadDays)).catch(() => [today]),
     sources.fetchVehicles().catch(() => [] as Vehicle[]),
     sources.fetchGearModels().catch(() => [] as GearModelWithSizes[]),
   ])
@@ -144,12 +116,12 @@ export async function buildSnapshot(
     version: SNAPSHOT_VERSION,
     userId,
     capturedAt: now,
-    days,
+    days: [today],
     upcomingDays,
     vehicles,
     gearModels,
-    boards,
-    transport,
+    boards: { [today]: board },
+    transport: { [today]: transport },
   }
 }
 

@@ -105,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Clearing the SW cache but leaving those behind would be a strange place
     // to stop.
     clearAllRegistrationDrafts()
-    // Third store, same reasoning: a staff device holds ten days of rosters and
+    // Third store, same reasoning: a staff device holds today's roster and
     // gear lists in IndexedDB. Those rows were read under this user's RLS
     // scope, so they leave with them.
     await clearStoredSnapshot()

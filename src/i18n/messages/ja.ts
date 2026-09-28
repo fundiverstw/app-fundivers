@@ -2520,7 +2520,7 @@ export const ja: Messages = {
         showingSaved: (when: string) => `オフラインです — この端末に ${when} に保存されたデータを表示しています。`,
         savedAt: (when: string) => `${when} にこの端末へ保存`,
         neverSaved: 'この端末にはまだ保存されていません',
-        savedDays: (days: number) => `今後 ${days} 日分`,
+        savedToday: '今日の分のみ',
         saveNow: '今すぐ保存',
         saving: '保存中…',
         saveFailed: '前回の保存に失敗したため、この端末のデータはこれより古い可能性があります。',

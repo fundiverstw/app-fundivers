@@ -2562,7 +2562,7 @@ export const en = {
         showingSaved: (when: string) => `No connection — showing the copy saved on this device at ${when}.`,
         savedAt: (when: string) => `Saved on this device at ${when}`,
         neverSaved: 'Not saved on this device yet',
-        savedDays: (days: number) => `Next ${days} days`,
+        savedToday: 'Today only',
         saveNow: 'Save now',
         saving: 'Saving…',
         saveFailed: 'The last save failed, so the copy on this device is older than this.',

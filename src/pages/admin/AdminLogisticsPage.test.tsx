@@ -804,6 +804,43 @@ describe('AdminLogisticsPage with no signal', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
+  // A background save lands every half hour at most. It used to throw a live
+  // board back to the spinner and fetch the whole day again.
+  it('leaves a live board alone when a background save lands', async () => {
+    const ctx = offlineCtx({ online: true, snapshot: snapshotWith({ [todayKey]: storedBoard }) })
+    const view = renderOffline(ctx)
+    await screen.findByRole('article', { name: 'Ada' })
+    const calls = fetchEventsInRange.mock.calls.length
+
+    view.rerender(
+      <MemoryRouter>
+        <OfflineContext.Provider value={{ ...ctx, snapshot: { ...ctx.snapshot!, capturedAt: '2026-08-15T09:00:00Z' } }}>
+          <AdminLogisticsPage />
+        </OfflineContext.Provider>
+      </MemoryRouter>,
+    )
+    await new Promise(r => setTimeout(r, 50))
+    expect(fetchEventsInRange.mock.calls.length).toBe(calls)
+    expect(screen.getByRole('article', { name: 'Ada' })).toBeInTheDocument()
+  })
+
+  // Opened with no signal before the device's copy was read: the copy arriving
+  // a moment later has to reach the screen.
+  it('shows the saved day once the copy arrives, when the board had nothing', async () => {
+    const ctx = offlineCtx({ online: false, snapshot: null })
+    const view = renderOffline(ctx)
+    expect(await screen.findByText(t.admin.logistics.offline.unavailable)).toBeInTheDocument()
+
+    view.rerender(
+      <MemoryRouter>
+        <OfflineContext.Provider value={{ ...ctx, snapshot: snapshotWith({ [todayKey]: storedBoard }) }}>
+          <AdminLogisticsPage />
+        </OfflineContext.Provider>
+      </MemoryRouter>,
+    )
+    expect(await screen.findByRole('article', { name: 'Ada' })).toBeInTheDocument()
+  })
+
   it('plans rides off the stored fleet when the vehicles read fails', async () => {
     const user = userEvent.setup()
     renderOffline(offlineCtx({

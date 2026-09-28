@@ -1,7 +1,6 @@
 import { format } from 'date-fns'
 import type { OfflineContextValue } from '../../hooks/offline-context'
 import type { DayBoardSource } from '../../lib/day-board-source'
-import { OFFLINE_DAYS } from '../../lib/offline-snapshot'
 import { BTN_XS_GHOST, TEXT_MUTED } from '../../styles/tokens'
 import { t } from '../../i18n'
 
@@ -61,7 +60,7 @@ export function OfflineBoardStatus({
     <div className="flex flex-wrap items-center gap-2 text-xs">
       <span className={`${TEXT_MUTED} font-medium`}>
         {snapshot ? lo.savedAt(stamp(snapshot.capturedAt)) : lo.neverSaved}
-        {snapshot && ` · ${lo.savedDays(OFFLINE_DAYS)}`}
+        {snapshot && ` · ${lo.savedToday}`}
       </span>
       <button
         type="button"

@@ -9,10 +9,17 @@ import { readStoredSnapshot, writeStoredSnapshot } from '../lib/offline-db'
 import { buildSnapshot, isUsableSnapshot, type OfflineSnapshot } from '../lib/offline-snapshot'
 import { OfflineContext, type OfflineSyncStatus } from './offline-context'
 
-/** How often a capture is retried while the app stays open and online. Long
- *  enough that it costs nothing on a phone, short enough that a roster edited
- *  at the shop is on the van before it leaves. */
+/** How old today's stored copy may get before a background capture replaces
+ *  it. The timer, the online event and sign-in all ask; a copy younger than
+ *  this answers them without a single request. */
+const FRESH_FOR_MS = 30 * 60 * 1000
+
+/** How often the background capture checks while the app stays open. */
 const RESYNC_INTERVAL_MS = 15 * 60 * 1000
+
+/** How long after sign-in the first background capture waits. The page the
+ *  user landed on loads first; the capture is never on the critical path. */
+const FIRST_CAPTURE_DELAY_MS = 10 * 1000
 
 /** How far the "Other day" picker looks ahead — beyond the ten captured days,
  *  so the picker still lists the days that exist even though their boards are
@@ -20,7 +27,7 @@ const RESYNC_INTERVAL_MS = 15 * 60 * 1000
 const LOOKAHEAD_DAYS = 30
 
 /**
- * Keeps the next ten days on this device for whoever runs the shop.
+ * Keeps today's board on this device for whoever runs the shop.
  *
  * Mounted around the staff/admin chrome rather than around a single page: a
  * snapshot that only refreshes while somebody happens to have the logistics
@@ -41,6 +48,10 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
   // Guards against a second capture starting while one is in flight — the
   // interval, the online event and the manual button can all fire at once.
   const running = useRef(false)
+  // The copy on hand, for the freshness check. A ref rather than a dependency
+  // so a finished capture does not re-create `capture` and restart the timer.
+  const snapshotRef = useRef<OfflineSnapshot | null>(null)
+  useEffect(() => { snapshotRef.current = snapshot }, [snapshot])
 
   useEffect(() => {
     const up = () => setOnline(true)
@@ -67,8 +78,13 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true }
   }, [userId, isStaff])
 
-  const refresh = useCallback(async () => {
+  const capture = useCallback(async (force: boolean) => {
     if (!userId || !isStaff || running.current) return
+    const held = snapshotRef.current
+    if (
+      !force && held && held.userId === userId && held.days.includes(todayIso())
+      && Date.now() - Date.parse(held.capturedAt) < FRESH_FOR_MS
+    ) return
     running.current = true
     setStatus('syncing')
     try {
@@ -98,16 +114,17 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
     }
   }, [userId, isStaff])
 
-  // Capture on sign-in, whenever the connection comes back, and on a timer.
+  // The Save now button: always captures, however fresh the copy on hand.
+  const refresh = useCallback(() => capture(true), [capture])
+
+  // In the background: shortly after sign-in, whenever the connection comes
+  // back, and on a timer — each skipped while today's copy is still fresh.
   useEffect(() => {
     if (!userId || !isStaff || !online) return
-    // Kicking off a network capture is what this effect is for; the status
-    // setState inside it is the subscription reporting back, not a render loop.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void refresh()
-    const id = setInterval(() => { void refresh() }, RESYNC_INTERVAL_MS)
-    return () => clearInterval(id)
-  }, [userId, isStaff, online, refresh])
+    const first = setTimeout(() => { void capture(false) }, FIRST_CAPTURE_DELAY_MS)
+    const id = setInterval(() => { void capture(false) }, RESYNC_INTERVAL_MS)
+    return () => { clearTimeout(first); clearInterval(id) }
+  }, [userId, isStaff, online, capture])
 
   // Gate on the id rather than clearing state when the user changes: React
   // state from the previous session would otherwise stay readable for the tick

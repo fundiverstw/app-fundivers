@@ -2521,7 +2521,7 @@ export const zhTW: Messages = {
         showingSaved: (when: string) => `目前沒有網路連線 — 顯示的是本裝置在 ${when} 儲存的副本。`,
         savedAt: (when: string) => `已於 ${when} 儲存在本裝置`,
         neverSaved: '尚未儲存在本裝置',
-        savedDays: (days: number) => `未來 ${days} 天`,
+        savedToday: '僅限今天',
         saveNow: '立即儲存',
         saving: '儲存中…',
         saveFailed: '上次儲存失敗，本裝置上的副本比這個時間更舊。',
