@@ -2548,7 +2548,7 @@ export const zhTW: Messages = {
       transportNotSpecified: '交通方式未指定',
       leadBooker: '（主揪）',
       staffFallback: '（工作人員）',
-      packedHint: '勾選只存在這支裝置上 — 其他手機各自有自己的清單。',
+      packedHint: '勾選會即時同步給所有工作人員的手機。',
       pack: {
         sectionsAria: '看板分區',
         gear: '裝備',
@@ -2585,6 +2585,7 @@ export const zhTW: Messages = {
         sizeMissing: '未登記尺寸',
         addOn: '加購',
         ownsOne: '自備',
+        unsentTicks: (n: number) => `有 ${n} 個勾選尚未送出 — 連線恢復後會同步給其他工作人員。`,
       },
     },
     family: {

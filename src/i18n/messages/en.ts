@@ -2592,7 +2592,7 @@ export const en = {
       selfTransportCount: (n: number) => `${n} self-transport`,
       unspecifiedCount: (n: number) => `${n} unspecified`,
       nothingToPack: "Nothing to pack — everyone's on own gear.",
-      packedHint: 'Ticks are kept on this device only — another phone keeps its own list.',
+      packedHint: 'Ticks are shared with the whole crew and update live on every phone.',
       transportNotSpecified: 'Transport not specified',
       leadBooker: '(lead booker)',
       staffFallback: '(staff)',
@@ -2634,6 +2634,7 @@ export const en = {
         sizeMissing: 'No size on file',
         addOn: 'Add-on',
         ownsOne: 'Owns one',
+        unsentTicks: (n: number) => `${n} tick${n === 1 ? '' : 's'} not sent yet — ${n === 1 ? 'it goes' : 'they go'} to the rest of the crew when the connection is back.`,
       },
     },
     family: {

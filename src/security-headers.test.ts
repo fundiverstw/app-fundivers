@@ -18,9 +18,10 @@ describe('CSP_HEADER', () => {
     expect(CSP_HEADER).toMatch(/script-src 'self' https:\/\/challenges\.cloudflare\.com/)
   })
 
-  it('connect-src allows self + Supabase + Turnstile + Open-Meteo', () => {
+  // wss:// is Supabase Realtime — the logistics board's shared pack list.
+  it('connect-src allows self + Supabase (REST and Realtime) + Turnstile + Open-Meteo', () => {
     expect(CSP_HEADER).toMatch(
-      /connect-src 'self' https:\/\/\*\.supabase\.co https:\/\/challenges\.cloudflare\.com https:\/\/\*\.open-meteo\.com/,
+      /connect-src 'self' https:\/\/\*\.supabase\.co wss:\/\/\*\.supabase\.co https:\/\/challenges\.cloudflare\.com https:\/\/\*\.open-meteo\.com/,
     )
   })
 

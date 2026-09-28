@@ -1,11 +1,15 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   GEAR_PACKED_PREFIX,
+  GEAR_PENDING_PREFIX,
+  applyPending,
   gearPieceKey,
   loadPackedGear,
+  loadPendingPacks,
   savePackedGear,
+  savePendingPacks,
   setPiecesPacked,
-  togglePackedGear,
+  splitPieceKey,
 } from './gear-packed'
 
 beforeEach(() => localStorage.clear())
@@ -71,16 +75,6 @@ describe('savePackedGear / loadPackedGear', () => {
   })
 })
 
-describe('togglePackedGear', () => {
-  it('adds a missing piece and removes a present one, without mutating the input', () => {
-    const start = new Set(['b1|BCD'])
-    const added = togglePackedGear(start, 'b2|Fins')
-    expect(added).toEqual(new Set(['b1|BCD', 'b2|Fins']))
-    expect(start).toEqual(new Set(['b1|BCD']))
-    expect(togglePackedGear(added, 'b1|BCD')).toEqual(new Set(['b2|Fins']))
-  })
-})
-
 describe('setPiecesPacked', () => {
   it('ticks every piece asked for without touching anyone else', () => {
     const start = new Set(['b2|BCD'])
@@ -98,5 +92,40 @@ describe('setPiecesPacked', () => {
   it('is a no-op for a guest with nothing to pack', () => {
     const start = new Set(['b1|BCD'])
     expect(setPiecesPacked(start, [], true)).toEqual(start)
+  })
+})
+
+describe('splitPieceKey', () => {
+  it('reads the booking and item back out of a key, even when the item has a bar in it', () => {
+    expect(splitPieceKey(gearPieceKey('b1', 'BCD'))).toEqual({ bookingId: 'b1', item: 'BCD' })
+    expect(splitPieceKey(gearPieceKey('b1', 'Light | 2 days'))).toEqual({ bookingId: 'b1', item: 'Light | 2 days' })
+  })
+})
+
+describe('loadPendingPacks / savePendingPacks', () => {
+  it('round-trips the unsent ticks for one day, packed and unpacked alike', () => {
+    savePendingPacks('2026-08-15', new Map([['b1|BCD', true], ['b2|Fins', false]]))
+    expect(loadPendingPacks('2026-08-15')).toEqual(new Map([['b1|BCD', true], ['b2|Fins', false]]))
+    expect(loadPendingPacks('2026-08-16').size).toBe(0)
+  })
+
+  it('removes the entry once nothing is waiting', () => {
+    savePendingPacks('2026-08-15', new Map([['b1|BCD', true]]))
+    savePendingPacks('2026-08-15', new Map())
+    expect(localStorage.getItem(`${GEAR_PENDING_PREFIX}:2026-08-15`)).toBeNull()
+  })
+
+  it('reads a corrupt entry as nothing waiting', () => {
+    localStorage.setItem(`${GEAR_PENDING_PREFIX}:2026-08-15`, '{nope')
+    expect(loadPendingPacks('2026-08-15').size).toBe(0)
+  })
+})
+
+describe('applyPending', () => {
+  it("lays this device's unsent ticks and unticks over the server's list", () => {
+    const server = new Set(['b1|BCD', 'b2|Fins'])
+    const out = applyPending(server, new Map([['b2|Fins', false], ['b3|Mask', true]]))
+    expect(out).toEqual(new Set(['b1|BCD', 'b3|Mask']))
+    expect(server).toEqual(new Set(['b1|BCD', 'b2|Fins']))
   })
 })

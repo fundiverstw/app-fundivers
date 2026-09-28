@@ -13,7 +13,8 @@
 //
 // Wildcards on *.supabase.co are deliberate: the SPA only ever talks
 // to one project today, but rotating the project ref shouldn't be a
-// CSP change. The blast radius of "any Supabase project" is small
+// CSP change. The wss:// entry is Supabase Realtime, which carries the
+// logistics board's shared pack list between crew phones. The blast radius of "any Supabase project" is small
 // because the anon key is what scopes access, not the URL.
 //
 // 'unsafe-inline' on style-src is required because Tailwind components
@@ -26,7 +27,7 @@ const CSP_DIRECTIVES: Record<string, string[]> = {
   'style-src':       ["'self'", "'unsafe-inline'"],
   'img-src':         ["'self'", 'data:', 'blob:', 'https://*.supabase.co'],
   'font-src':        ["'self'"],
-  'connect-src':     ["'self'", 'https://*.supabase.co', 'https://challenges.cloudflare.com', 'https://*.open-meteo.com'],
+  'connect-src':     ["'self'", 'https://*.supabase.co', 'wss://*.supabase.co', 'https://challenges.cloudflare.com', 'https://*.open-meteo.com'],
   'frame-src':       ['https://challenges.cloudflare.com'],
   'worker-src':      ["'self'"],
   'manifest-src':    ["'self'"],
