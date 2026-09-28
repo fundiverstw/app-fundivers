@@ -1,21 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { liveOrStored, loadDayBoard, loadDayGearRows, loadDayTransport } from './day-board-source'
+import { liveOrStored, loadDayBoard, loadDayTransport } from './day-board-source'
 import { EMPTY_DAY_BOARD, type DayBoardData } from './day-board'
 import { SNAPSHOT_VERSION, type OfflineSnapshot } from './offline-snapshot'
-import type { Booking, Profile } from '../types/database'
+import type { Booking } from '../types/database'
 
-const { fetchDayBoardMock, fetchDayTransportMock, fetchDayGearRowsMock } = vi.hoisted(() => ({
+const { fetchDayBoardMock, fetchDayTransportMock } = vi.hoisted(() => ({
   fetchDayBoardMock: vi.fn(),
   fetchDayTransportMock: vi.fn(),
-  fetchDayGearRowsMock: vi.fn(),
 }))
 vi.mock('./day-board', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./day-board')>()),
   fetchDayBoard: (...a: unknown[]) => fetchDayBoardMock(...a),
   fetchDayTransport: (...a: unknown[]) => fetchDayTransportMock(...a),
-}))
-vi.mock('./logistics-day', () => ({
-  fetchDayGearRows: (...a: unknown[]) => fetchDayGearRowsMock(...a),
 }))
 
 const board = (over: Partial<DayBoardData> = {}): DayBoardData => ({ ...EMPTY_DAY_BOARD, ...over })
@@ -37,7 +33,6 @@ function snapshotWith(boards: Record<string, DayBoardData>, days = Object.keys(b
 beforeEach(() => {
   fetchDayBoardMock.mockReset()
   fetchDayTransportMock.mockReset()
-  fetchDayGearRowsMock.mockReset()
 })
 
 describe('liveOrStored', () => {
@@ -133,37 +128,5 @@ describe('loadDayTransport', () => {
     fetchDayTransportMock.mockRejectedValue(new Error('network'))
     expect(await loadDayTransport('2026-08-15', ['e1'], null, true))
       .toEqual({ allocations: [], rideGroups: [] })
-  })
-})
-
-describe('loadDayGearRows', () => {
-  it('reads live when it can', async () => {
-    fetchDayGearRowsMock.mockResolvedValue([{ booking: { id: 'b1' }, profile: null }])
-    const out = await loadDayGearRows('2026-08-16', null, true)
-    expect(out).toHaveLength(1)
-  })
-
-  it('pairs stored bookings with their stored divers', async () => {
-    const snap = snapshotWith({
-      '2026-08-16': board({
-        bookings: [{ id: 'b1', user_id: 'p1' }, { id: 'b2', user_id: 'ghost' }] as Booking[],
-        profiles: [{ id: 'p1', name: 'Ada' }] as Profile[],
-      }),
-    })
-    const out = await loadDayGearRows('2026-08-16', snap, false)
-    expect(out).toHaveLength(2)
-    expect(out[0].profile?.name).toBe('Ada')
-    // A booking whose diver was not captured reads as "no size on file", the
-    // same as it would online — never dropped, which would hide a diver.
-    expect(out[1].profile).toBeNull()
-  })
-
-  // Diffing against a silently empty next day reads as a real answer —
-  // everything comes home to the shop — and sends a van back half-loaded.
-  it('throws rather than returning an empty day it cannot vouch for', async () => {
-    fetchDayGearRowsMock.mockRejectedValue(new Error('network'))
-    await expect(loadDayGearRows('2026-08-16', null, true)).rejects.toThrow()
-    const snap = snapshotWith({ '2026-08-15': board() })
-    await expect(loadDayGearRows('2026-08-16', snap, false)).rejects.toThrow()
   })
 })

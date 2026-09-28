@@ -15,7 +15,7 @@ import { adminClient, userClient, createTestUser, deleteTestUser, type TestUser 
 import { supabase } from '../../src/lib/supabase'
 import { fetchDayBoard, amendmentsByBooking } from '../../src/lib/day-board'
 import { redactProfileForOffline } from '../../src/lib/offline-snapshot'
-import { gearTotals } from '../../src/lib/logistics'
+import { guestPieces } from '../../src/lib/pack-list'
 
 const admin = adminClient()
 
@@ -129,7 +129,7 @@ describe('fetchDayBoard', () => {
   it('leaves cancelled bookings off the board entirely', async () => {
     const board = await fetchDayBoard(DAY)
     expect(board.bookings.every(b => b.status !== 'cancelled')).toBe(true)
-    expect(gearTotals(board.bookings.map(booking => ({ booking }))).map(g => g.item))
+    expect(board.bookings.flatMap(booking => guestPieces({ booking, profile: null }, new Map())).map(p => p.item))
       .not.toContain('Wetsuit')
   })
 

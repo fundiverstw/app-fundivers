@@ -3,9 +3,8 @@ import {
   GEAR_PACKED_PREFIX,
   gearPieceKey,
   loadPackedGear,
-  packedCount,
   savePackedGear,
-  setBookingPacked,
+  setPiecesPacked,
   togglePackedGear,
 } from './gear-packed'
 
@@ -82,33 +81,22 @@ describe('togglePackedGear', () => {
   })
 })
 
-describe('packedCount', () => {
-  it('counts only this diver\'s pieces, and only the items asked about', () => {
-    const packed = new Set(['b1|BCD', 'b1|Fins', 'b2|BCD'])
-    expect(packedCount(packed, 'b1', ['BCD', 'Fins', 'Mask'])).toBe(2)
-    expect(packedCount(packed, 'b2', ['BCD', 'Fins'])).toBe(1)
-    expect(packedCount(packed, 'b3', ['BCD'])).toBe(0)
-    // An item the diver no longer rents stops counting, ticked or not.
-    expect(packedCount(packed, 'b1', ['Mask'])).toBe(0)
-  })
-})
-
-describe('setBookingPacked', () => {
-  it('ticks every piece on one diver without touching anyone else', () => {
+describe('setPiecesPacked', () => {
+  it('ticks every piece asked for without touching anyone else', () => {
     const start = new Set(['b2|BCD'])
-    const next = setBookingPacked(start, 'b1', ['BCD', 'Fins'], true)
+    const next = setPiecesPacked(start, ['b1|BCD', 'b1|Fins'], true)
     expect(next).toEqual(new Set(['b2|BCD', 'b1|BCD', 'b1|Fins']))
     expect(start).toEqual(new Set(['b2|BCD']))
   })
 
-  it('unticks every piece on one diver, leaving their other items alone', () => {
+  it('unticks only the pieces asked for', () => {
     const start = new Set(['b1|BCD', 'b1|Fins', 'b1|Mask', 'b2|BCD'])
-    expect(setBookingPacked(start, 'b1', ['BCD', 'Fins'], false))
+    expect(setPiecesPacked(start, ['b1|BCD', 'b1|Fins'], false))
       .toEqual(new Set(['b1|Mask', 'b2|BCD']))
   })
 
-  it('is a no-op for a diver with nothing to pack', () => {
+  it('is a no-op for a guest with nothing to pack', () => {
     const start = new Set(['b1|BCD'])
-    expect(setBookingPacked(start, 'b2', [], true)).toEqual(start)
+    expect(setPiecesPacked(start, [], true)).toEqual(start)
   })
 })

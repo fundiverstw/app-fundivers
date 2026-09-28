@@ -16,7 +16,7 @@ admin):
 | --- | --- | --- |
 | `/admin`                                | —                       | Redirects to `/admin/logistics`, the day board |
 | `/admin/home`                           | `DashboardPage`         | Shared home page (divers see the same one at `/dashboard`) — welcome banner, featured trips, and the shortcut tiles, including the admin-only dive-site map. Where the header logo points |
-| `/admin/logistics`                      | `AdminLogisticsPage`    | The day board: runs, seats, riders, gear — see [Transport](#transport-runs-seats-riders) |
+| `/admin/logistics`                      | `AdminLogisticsPage`    | The day board: the gear checklist, rides, people and payments — see [Gear](#gear-the-pack-checklist) and [Transport](#transport-runs-seats-riders) |
 | `/admin/events`                         | `AdminEventsPage`       | Month view of every event with registration counts |
 | `/admin/events/:id`               | `AdminEventDetailPage`  | Registrants, memos, status controls for one event |
 | `/admin/events/:id/gear-map`      | `AdminGearMapPage`      | Per-registrant gear/sizing checklist for the event |
@@ -132,13 +132,12 @@ the column with `entersTheWater(kind)`, so an adventure stays dry
 whatever the column says, and a snapshot captured before the column
 existed degrades to "diving" rather than emptying the diver list.
 
-On the Overall board the day's roster splits into two blocks — **Divers**
-on the usual chips, **Non-divers** on orange ones — and the header counts
-both. The split is a question about the *person*, not the booking:
-somebody who takes the morning EFR class and dives in the afternoon is
-one chip, in the diver list, because any in-water booking wins. A name in
-both lists would answer nobody's question. Each dry event also carries a
-"Dry — nobody in the water" badge on its own banner and counts
+The board's **People** section counts both at the top — "2 events · 20
+divers · 3 non-divers" — and lists each event's guests under it, a dry
+event's on orange chips. The count is a question about the *person*, not
+the booking: somebody who takes the morning EFR class and dives in the
+afternoon is one diver, because any in-water booking wins. Each dry event
+also carries a "Dry — nobody in the water" badge on its banner and counts
 non-divers rather than divers there.
 
 ## Transport: runs, seats, riders
@@ -147,7 +146,7 @@ Everything on the Logistics day view (`/admin/logistics`) is planned per
 **run** — the set of events that travel together. Two dives at the same
 site share a van; a course at the pool and a dive at Bat Cave cannot,
 and no field in the schema can tell them apart. So the shop states it:
-the **Shared transport** picker in the day's Overall board writes
+the **Shared transport** picker in the board's Rides section writes
 `event_ride_groups` rows (one per `(ride_day, event_id)`; events sharing
 a `group_id` ride together). An event with no row rides alone.
 
@@ -210,45 +209,74 @@ The planner itself is pure and unit-tested in
 `src/lib/vehicle-planning.ts` (`planFleet` for one run, `planRuns` for a
 day); grouping lives in `src/lib/ride-groups.ts`.
 
-## Gear: the packed tick list
+## Gear: the pack checklist
 
-Two ways into the same list, for the two ways staff pack a van.
+The day board opens on **Gear**, one of four sections picked from a row
+of big tabs (Gear, Rides, People, Payments) so only one job is on screen
+at a time. Each tab carries its own count: pieces packed, riders, heads,
+balances due.
 
-By item, on the Overall board: every gear chip opens onto who it is for.
-Sized kit ("BCD ×3") expands into the sizes the day needs and, under each
-size, one **toggle per diver's piece**; one-size kit — regulator, mask,
-computer — has no rack split to read, so it opens straight onto the
-divers. Tapping a name flips it to packed; the line above then reads
-"1/3 packed", or "all packed" once that group is done.
+Gear is a checklist of **guests**, not of items. Every guest renting
+anything gets a card under the event they are booked on, and every
+physical thing the shop brings for them is a toggle on that card:
 
-The amber **Handle with care** band ticks the same way: delicate rentals
-(dive computers, lights, cameras) are handed out one by one, so each
-renter's name there is a toggle over the same day list.
+- **Dive bag** — whatever the booking rents, each piece reading the size
+  to pull ("BCD · Size M"). A sized piece with nothing on file says
+  **No size on file** in amber, and the card's **Add missing size**
+  button opens the size editor in place.
+- **Handle with care** — dive computers, lights and cameras, in amber.
+  Lights and cameras are add-ons, classified by catalog title
+  (`careLabelForAddon`) since add-ons have no category column.
+- **Add-ons** — every other add-on the guest bought (SMBs, nitrox
+  tanks, …), by catalog title.
 
-By guest, on each diver's gear card: every item on their pack list is a
-tick, and the card header carries a chip reading **Not packed → n/m
-packed → Packed ✓**. The chip is also the control — one tap marks the
-whole kit, which is what a packer who just carried someone's set out to
-the van wants. Walking the cards down the page is the check that no
-guest was missed; the per-event gear map shows the same cards without
-the ticks, because it plans a trip rather than loads one and has no day
-to tick against.
+Tap a piece as it goes on the van; it turns green. Once every piece on a
+guest is ticked their card folds to one green line, so the list shrinks
+as the van fills and what is left stays at the top of the screen. A bar
+above the list counts pieces packed and guests finished. Guests with
+nothing to pack are still named, on one line under the cards, so a packer
+can see they were counted. Waitlisted guests sit under their own heading
+per event and stay out of the day's count until they get a seat.
+
+The list was reorganized around guests after an item-first board let two
+guests' kit be missed: the old "next-day gear" panel told the shop which
+BCDs and wetsuits to keep out for tomorrow as anonymous size counts, and
+nothing tied "also pack" to the two people who needed it. Now the answer
+to "what goes in the van tomorrow" is tomorrow's own checklist, and a
+guest can't be satisfied without their name on every piece.
+
+**By item** turns the same list rack-side for whoever is pulling kit:
+per item, per size in rack order, one toggle per guest. It ticks the same
+list, so a piece pulled there reads as packed on its guest's card.
+
+The pieces come from `guestPieces()` in `src/lib/pack-list.ts` (pure,
+unit-tested); `piecesByItem()` builds the rack view from them.
 
 State is device-local (`localStorage`, `src/lib/gear-packed.ts`), stored
 one entry per day and expired after the newest 14 days. That is a
-deliberate limit, and the panel says so in the hint text: **the list does
-not sync between phones.** It's a scratchpad for the person loading the
+deliberate limit, and the page says so under the list: **ticks do not
+sync between phones.** It's a scratchpad for the person loading the
 van during one packing session, not a record anyone reads back later, and
 a checkbox that needed a round trip per tap would be worse at that job.
 Making it shared would mean a table, RLS and realtime — a different
 feature.
 
 A piece is keyed `${bookingId}|${item}`; the size is **not** in the key,
-so correcting a diver's size on their gear card doesn't lose the tick.
-The set lives on `AdminLogisticsPage` rather than inside `GearChips` or
-`DiverGearCard` because the item chips, the guest cards and the waitlist
-all share one day's list — several owners would clobber each other's
-writes.
+so correcting a diver's size on their card doesn't lose the tick. The set
+lives on `AdminLogisticsPage` rather than inside `GuestPackCard` because
+the guest cards, the by-item view and the waitlist all share one day's
+list — several owners would clobber each other's writes.
+
+An item the shop stocks in more than one style is its own piece, because
+they are separate racks: a felt-soled boot does not cover a diver who
+asked for rubber. FunDivers rents felt soles only, which is what grips
+the algae-covered rock on our shore entries; rubber soles stay in the
+catalog so a diver can record that they own a pair. Nothing the shop
+doesn't rent can be booked, so `Boots (rubber sole)` should never reach
+a pack list; if it does, it is a row that predates
+`20260817000000_rent_felt_soled_boots_only.sql`. See
+[forking.md](./forking.md#gear-catalog) for how the catalog declares
+styles.
 
 ## Reading the board with no signal
 
@@ -257,56 +285,6 @@ still reads on a boat. It is read-only there, it says on screen when what
 you are looking at came off the device rather than the network, and a
 diver's medical notes, ID number, date of birth and emergency contacts are
 never written to a device at all. See [offline.md](./offline.md).
-
-## Gear: the next-day diff
-
-A shop running back-to-back weekend days doesn't want to haul every set
-back to base to dry only to load it again the next morning. The Overall
-board's **Next-day gear** button opens the overlap between the day on
-screen and the one after it: what stays on the van, what still has to
-come off the rack, and what goes home to dry.
-
-The unit of reuse is the **size**, not the item — three BCDs out today
-only cover tomorrow if they are the sizes tomorrow wears — so the diff
-is computed per `(item, size)` via the same `gearSizeBreakdown` the
-size-expanding chips use. One-size kit (regulators, masks, computers)
-matches on quantity alone.
-
-An item the shop stocks in more than one style is a separate line per
-style, because they are separate racks: a felt-soled boot does not cover
-a diver who asked for rubber. Both styles still size off the same profile
-column (boots off `shoe_size`), so `Boots (felt sole) · JP 26` and
-`Boots (rubber sole) · JP 26` are two rack slots, not one. See
-[forking.md](./forking.md#gear-catalog) for how the catalog declares them.
-
-FunDivers rents one of those two: the rack is felt soles, which is what
-grips the algae-covered rock on our shore entries. Rubber soles stay in
-the catalog so a diver can record that they own a pair — the board reads
-that as a filled slot and packs them no boots, and they can still ask for
-felt ones on a dive that wants the grip. Nothing the shop doesn't rent
-can be booked, so `Boots (rubber sole)` should never reach a packing
-total; if it does, it is a row that predates
-`20260817000000_rent_felt_soled_boots_only.sql`.
-
-Two rules keep it honest:
-
-- **Only back-to-back days.** The button is offered when the *very next
-  calendar day* has events. Across a gap the kit would be dried and
-  racked anyway, so a carry-over suggestion would be unactionable.
-- **An unknown size never carries over, and never enters the columns.**
-  A diver with no size on file can't be promised a match, so their
-  pieces are held out of all three columns and listed once under
-  **Sizes to confirm** with the names to ask. Counting them as "also
-  pack" *and* "back to the shop" was the first attempt, and it read as
-  a broken diff: one unsized diver puts a line in every sized item they
-  rent (BCD, wetsuit, fins, boots at once), and because everyone who IS
-  sized quietly cancels out into "Stays out", the unsized minority was
-  the only thing left visible.
-
-Both sides count **seated** rows only, matching every other prep total:
-a waitlisted diver's gear isn't packed today, so it can't be kept out
-for tomorrow. `gearDayDiff` in `src/lib/logistics.ts` is pure and
-unit-tested; the panel is `src/components/admin/NextDayGearDiff.tsx`.
 
 ## Event memos (`admin_notes`)
 
@@ -348,9 +326,9 @@ by trigger so the attribution can't be rewritten.
   (paid vs pending totals).
 - Badge next to the name shows `diver` / `admin`.
 - **Deep link:** `/admin/users?diver=<id>` opens (and scrolls to) that
-  diver's card. Every name chip on the Logistics board — the day's
-  divers, the on-duty staff, the tentative waitlist — links here, as
-  does each diver gear card, so a name read while packing can be
+  diver's card. Every name on the Logistics board's People section —
+  seated and waitlisted alike — links here, as does the name on each
+  guest's pack card and diver gear card, so a name read while packing can be
   followed to sizes and contact without retyping it into the search.
   Staff see plain text instead: the directory is admin-only, so the
   link would only bounce them.

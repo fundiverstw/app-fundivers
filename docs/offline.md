@@ -115,15 +115,12 @@ browser reporting a connection can still be behind a captive portal or one bar o
 signal, so a *failed* live read falls back exactly like a declared offline does.
 Nobody standing on a boat gets to toggle a flag first.
 
-Three distinctions the board depends on:
+Two distinctions the board depends on:
 
 - **null is not an empty board.** Null means "no connection and this day was
   never captured" and renders as exactly that. An empty board means "captured,
   and that day is quiet" and renders as "no events scheduled". Collapsing the two
   would show a confident wrong answer.
-- **The next-day gear diff throws rather than returning an empty day.** Diffing
-  against a silently empty tomorrow reads as a real answer — everything comes
-  home to the shop — and would send a van back half-loaded.
 - **Transport returns empty rather than null.** A car plan is advisory next to
   the roster; a board without one is still the board.
 
