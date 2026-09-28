@@ -1,13 +1,21 @@
 # Offline: the day board on a boat
 
 The logistics day board is the surface staff read while loading a van or
-standing on a dock, which is exactly where the signal goes. Ten days of it are
+standing on a dock, which is exactly where the signal goes. Today's board is
 kept on the device so it still reads with no connection.
 
-**Read-only.** Nothing queues for later sync — no marking gear packed, no
-recording a payment, no editing sizes. Those controls fail as they always have
-when a write can't reach the server. Offline is for *referring* to the board,
-not running it.
+**Only today.** The capture used to hold ten days. That cost about ninety
+requests on sign-in and every fifteen minutes after, on every staff page, and
+it slowed the app down for a case — reading next week's roster on a boat —
+nobody had. A day other than today reads with no signal only while it is still
+on screen: losing the connection keeps the loaded board rather than replacing
+it with a "not saved" notice.
+
+**Read-only, except the pack list.** Nothing else queues for later — no
+recording a payment, no editing sizes; those fail as they always have when a
+write can't reach the server. Ticking gear onto the van keeps working: each
+tick is queued on the device and sent when the connection comes back (see
+[admin.md](./admin.md#gear-the-pack-checklist)).
 
 **Staff and admin only.** A diver's phone never captures anything; their
 surfaces stay online-only.
@@ -37,7 +45,7 @@ explicit capture covers a stated window and can say *when* it was taken.
 ## What is stored
 
 One record, in IndexedDB (`fundive-offline` → `snapshots` → `day-board`), holding
-the next `OFFLINE_DAYS` (10) days:
+today:
 
 | | |
 | --- | --- |
@@ -47,10 +55,9 @@ the next `OFFLINE_DAYS` (10) days:
 | `vehicles`, `gearModels` | the fleet and the sizing charts, identical every day |
 | `userId`, `capturedAt`, `version` | who captured it, when, and against which shape |
 
-IndexedDB rather than `localStorage`: a ten-day capture is hundreds of rows, past
-the ~5 MB ceiling a quota error would blow through silently, and `localStorage`
-is synchronous — writing it on the main thread would jank the board it exists to
-serve.
+IndexedDB rather than `localStorage`: a busy day is hundreds of rows, and
+`localStorage` is synchronous — writing it on the main thread would jank the
+board it exists to serve.
 
 ### What is deliberately not stored
 
@@ -85,19 +92,25 @@ and admin page passes through and no diver page does. A snapshot that only
 refreshed while somebody happened to have the logistics board open would be
 missing the moment it mattered.
 
-It captures on sign-in, whenever `online` fires, every 15 minutes, and on the
-board's **Save now** button. One capture at a time; the interval, the online
-event and the button can all fire at once.
+It captures in the background ten seconds after sign-in — the page the user
+landed on loads first — then whenever `online` fires and on a fifteen-minute
+timer. Each of those is **skipped while today's copy is under thirty minutes
+old**, so most of them cost nothing. The board's **Save now** button always
+captures. One capture at a time; the timer, the online event and the button can
+all fire at once.
 
-`buildSnapshot()` fetches days **one at a time**, not in parallel: it runs behind
-whatever the user is actually looking at, and ten simultaneous multi-query days
-would contend with the page's own reads on a phone's connection for no benefit —
-nobody is waiting on it.
+A capture whose board read fails throws, and the provider keeps the copy it
+already had: with one day stored, an empty board written over a good one is how
+staff end up on a boat with nothing. Stale beats none, and the board labels it.
+A failed transport, fleet or sizing-chart read is stored empty instead — the
+roster is the part that has to be there.
 
-A day that fails is stored as an empty board and the capture continues.
-Abandoning the whole snapshot because day seven timed out is how staff end up on
-a boat with nothing. A capture that fails outright keeps the previous snapshot
-rather than discarding it: stale beats none, and the board labels it.
+**A finished capture never reloads the board.** The page reads the saved copy
+through a ref, so a background save landing on a board that came off the network
+changes nothing on screen. A new copy replaces what is shown only when the board
+is showing the previous copy, or showing nothing because there was none. Before
+this, every capture threw the live board back to the spinner and fetched the
+whole day again.
 
 ## How a read resolves
 

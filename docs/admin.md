@@ -252,20 +252,32 @@ list, so a piece pulled there reads as packed on its guest's card.
 The pieces come from `guestPieces()` in `src/lib/pack-list.ts` (pure,
 unit-tested); `piecesByItem()` builds the rack view from them.
 
-State is device-local (`localStorage`, `src/lib/gear-packed.ts`), stored
-one entry per day and expired after the newest 14 days. That is a
-deliberate limit, and the page says so under the list: **ticks do not
-sync between phones.** It's a scratchpad for the person loading the
-van during one packing session, not a record anyone reads back later, and
-a checkbox that needed a round trip per tap would be worse at that job.
-Making it shared would mean a table, RLS and realtime — a different
-feature.
+**Ticks are shared with the whole crew.** Two people loading one van used to
+keep two separate lists, so a piece one had packed still read as unpacked on
+the other's phone — the setup for packing it twice. The list is now the
+`packed_pieces` table (`20260928100000`): a row per piece on the van, keyed by
+day, booking and item, so a tick is an insert and an untick a delete, and two
+phones ticking the same piece at once land on one row. Every open board hears a
+colleague's tick through Supabase Realtime within about a second, and reads the
+list again in full on reconnect and whenever the page comes back into view (a
+phone asleep in a pocket misses live updates). Staff and admins read and write
+it; a tick is stamped `packed_by` the person who made it; divers and anonymous
+visitors cannot see it.
+
+A tick shows at once and is also queued on the device
+(`src/lib/gear-packed.ts`), so ticking keeps working with no signal. The queue
+is sent when the connection comes back, and until then the board says how many
+ticks the rest of the crew cannot see yet. An unsent tick outranks whatever
+arrives from the server for the same piece, because it is newer. The reads,
+writes and live channel are `src/lib/packed-sync.ts`; `usePackedGear`
+(`src/hooks/usePackedGear.ts`) ties them to the page.
 
 A piece is keyed `${bookingId}|${item}`; the size is **not** in the key,
-so correcting a diver's size on their card doesn't lose the tick. The set
-lives on `AdminLogisticsPage` rather than inside `GuestPackCard` because
-the guest cards, the by-item view and the waitlist all share one day's
-list — several owners would clobber each other's writes.
+so correcting a diver's size on their card doesn't lose the tick. The day
+is, because a multi-day course is one booking packed afresh each morning.
+The list lives on `AdminLogisticsPage` rather than inside `GuestPackCard`
+because the guest cards, the by-item view and the waitlist all tick the same
+day's list.
 
 An item the shop stocks in more than one style is its own piece, because
 they are separate racks: a felt-soled boot does not cover a diver who
@@ -280,8 +292,8 @@ styles.
 
 ## Reading the board with no signal
 
-The next ten days of this board are kept on staff and admin devices, so it
-still reads on a boat. It is read-only there, it says on screen when what
+Today's board is kept on staff and admin devices, so it still reads on a
+boat. It is read-only there, it says on screen when what
 you are looking at came off the device rather than the network, and a
 diver's medical notes, ID number, date of birth and emergency contacts are
 never written to a device at all. See [offline.md](./offline.md).

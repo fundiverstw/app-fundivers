@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import {
-  OFFLINE_DAYS, SNAPSHOT_VERSION, buildSnapshot, coversDay, isUsableSnapshot,
-  offlineDays, redactProfileForOffline, selectDayBoard, selectDayTransport,
+  SNAPSHOT_VERSION, buildSnapshot, coversDay, isUsableSnapshot,
+  redactProfileForOffline, selectDayBoard, selectDayTransport,
   type OfflineSnapshot, type SnapshotSources,
 } from './offline-snapshot'
 import { EMPTY_DAY_BOARD, type DayBoardData } from './day-board'
@@ -120,26 +120,14 @@ describe('redactProfileForOffline', () => {
   })
 })
 
-describe('offlineDays', () => {
-  it('covers today plus the following nine days', () => {
-    const days = offlineDays('2026-08-15')
-    expect(days).toHaveLength(OFFLINE_DAYS)
-    expect(days[0]).toBe('2026-08-15')
-    expect(days.at(-1)).toBe('2026-08-24')
-  })
-
-  it('crosses a month boundary in calendar space', () => {
-    expect(offlineDays('2026-08-28')).toContain('2026-09-01')
-  })
-})
-
 describe('buildSnapshot', () => {
-  it('captures every day in the window', async () => {
+  it('captures today and nothing else', async () => {
     const src = sources()
     const snap = await buildSnapshot('u1', '2026-08-15', '2026-08-15T07:14:00Z', src, 30)
-    expect(snap.days).toHaveLength(OFFLINE_DAYS)
-    expect(src.fetchDayBoard).toHaveBeenCalledTimes(OFFLINE_DAYS)
-    expect(Object.keys(snap.boards)).toHaveLength(OFFLINE_DAYS)
+    expect(snap.days).toEqual(['2026-08-15'])
+    expect(src.fetchDayBoard).toHaveBeenCalledOnce()
+    expect(src.fetchDayBoard).toHaveBeenCalledWith('2026-08-15')
+    expect(Object.keys(snap.boards)).toEqual(['2026-08-15'])
     expect(snap.version).toBe(SNAPSHOT_VERSION)
     expect(snap.userId).toBe('u1')
     expect(snap.capturedAt).toBe('2026-08-15T07:14:00Z')
@@ -154,17 +142,11 @@ describe('buildSnapshot', () => {
     expect(snap.boards['2026-08-15'].profiles[0].name).toBe('Ada Lovelace')
   })
 
-  // A capture abandoned because day seven timed out is how staff end up on a
-  // boat with nothing at all.
-  it('stores an empty board for a day that fails and keeps going', async () => {
-    const fetchDayBoard = vi.fn(async (day: string) => {
-      if (day === '2026-08-18') throw new Error('timeout')
-      return board({ profiles: [profile()] })
-    })
-    const snap = await buildSnapshot('u1', '2026-08-15', 'now', sources({ fetchDayBoard }), 30)
-    expect(snap.boards['2026-08-18']).toEqual(EMPTY_DAY_BOARD)
-    expect(snap.boards['2026-08-19'].profiles).toHaveLength(1)
-    expect(Object.keys(snap.boards)).toHaveLength(OFFLINE_DAYS)
+  // With one day stored, an empty board written over a good one is how staff
+  // end up on a boat with nothing — so the caller must keep what it has.
+  it('throws when the board cannot be read, rather than storing it empty', async () => {
+    const src = sources({ fetchDayBoard: vi.fn(async () => { throw new Error('timeout') }) })
+    await expect(buildSnapshot('u1', '2026-08-15', 'now', src, 30)).rejects.toThrow()
   })
 
   it('survives a transport read failing without losing that day\'s roster', async () => {
@@ -177,13 +159,13 @@ describe('buildSnapshot', () => {
     expect(snap.boards['2026-08-15'].profiles).toHaveLength(1)
   })
 
-  it('falls back to the captured days when the picker list cannot be read', async () => {
+  it('falls back to today when the picker list cannot be read', async () => {
     const src = sources({ fetchUpcomingDays: vi.fn(async () => { throw new Error('nope') }) })
     const snap = await buildSnapshot('u1', '2026-08-15', 'now', src, 30)
-    expect(snap.upcomingDays).toEqual(snap.days)
+    expect(snap.upcomingDays).toEqual(['2026-08-15'])
   })
 
-  it('asks the picker for its own longer window, not just the ten days', async () => {
+  it('asks the picker for its own longer window, not just today', async () => {
     const src = sources()
     await buildSnapshot('u1', '2026-08-15', 'now', src, 30)
     expect(src.fetchUpcomingDays).toHaveBeenCalledWith('2026-08-15', '2026-09-14')

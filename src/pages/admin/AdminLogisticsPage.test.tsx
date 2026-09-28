@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { AdminLogisticsPage } from './AdminLogisticsPage'
@@ -10,6 +10,7 @@ import { OfflineContext, type OfflineContextValue } from '../../hooks/offline-co
 import { EMPTY_DAY_BOARD, type DayBoardData } from '../../lib/day-board'
 import { SNAPSHOT_VERSION, type OfflineSnapshot } from '../../lib/offline-snapshot'
 import { t } from '../../i18n'
+import { fakePackedServer, resetFakePackedServer } from '../../../tests/fake-packed-sync'
 
 // Mirror the page's own day maths (shop timezone, not the runner's) so the
 // jump-button tests line up with the tabs it drives.
@@ -37,6 +38,8 @@ vi.mock('../../lib/events', () => ({
 }))
 
 vi.mock('../../components/admin/AdminNotes', () => ({ AdminNotes: () => null }))
+// The shared pack list, played in memory so a test can be a colleague's phone.
+vi.mock('../../lib/packed-sync', async () => (await import('../../../tests/fake-packed-sync')).packedSyncModule)
 
 const diveEvent = { id: 'e1', type: 'dive', title: 'Kenting fun dive', has_transport: true, start_time: '2026-06-18T00:00:00Z', end_time: null }
 const bookings = [
@@ -51,8 +54,10 @@ const profiles = [
 ]
 
 beforeEach(() => {
-  // The packed-gear tick list lives in localStorage, so it would leak across tests.
+  // The device keeps a copy of the tick list, and the fake server keeps the
+  // shared one; both would leak across tests.
   localStorage.clear()
+  resetFakePackedServer()
   from.mockReset(); rpc.mockReset(); fetchEventsInRange.mockReset(); fetchUpcomingEventDays.mockReset()
   useAuthMock.mockReset()
   useAuthMock.mockReturnValue({ profile: { id: 'admin-1', role: 'admin' } })
@@ -181,6 +186,35 @@ describe('AdminLogisticsPage — gear checklist', () => {
     await user.click(screen.getByRole('tab', { name: /tomorrow/i }))
     expect(await screen.findByRole('button', { name: /mark bo's wetsuit as packed/i }))
       .toHaveAttribute('aria-pressed', 'false')
+  })
+
+  // Two people loading one van: a piece a colleague has packed must read as
+  // packed here too, or it gets packed twice.
+  it("shows a colleague's tick on the guest's card as it happens", async () => {
+    renderPage()
+    await loaded()
+    await waitFor(() => expect(screen.getByRole('button', { name: /mark bo's wetsuit as packed/i })).toBeInTheDocument())
+
+    act(() => { fakePackedServer.remote(todayKey, 'b2|Wetsuit', true) })
+    expect(within(screen.getByRole('article', { name: 'Bo' })).getByText(/all 1 packed/i)).toBeInTheDocument()
+    expect(screen.getByText('1 of 2 pieces packed')).toBeInTheDocument()
+  })
+
+  it("sends this phone's ticks to the shared list", async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await loaded()
+    await user.click(screen.getByRole('button', { name: /mark ada's bcd as packed/i }))
+    await waitFor(() => expect(fakePackedServer.list(todayKey)).toEqual(new Set(['b1|BCD'])))
+  })
+
+  it('says how many ticks have not reached the crew yet', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await loaded()
+    fakePackedServer.setUnreachable(true)
+    await user.click(screen.getByRole('button', { name: /mark ada's bcd as packed/i }))
+    expect(await screen.findByText(t.admin.logistics.pack.unsentTicks(1))).toBeInTheDocument()
   })
 
   it('folds a finished guest to one line, and opens it again on request', async () => {
@@ -802,6 +836,69 @@ describe('AdminLogisticsPage with no signal', () => {
     await screen.findByText(/Kenting fun dive/)
     expect(fetchEventsInRange).toHaveBeenCalled()
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  // A background save lands every half hour at most. It used to throw a live
+  // board back to the spinner and fetch the whole day again.
+  it('leaves a live board alone when a background save lands', async () => {
+    const ctx = offlineCtx({ online: true, snapshot: snapshotWith({ [todayKey]: storedBoard }) })
+    const view = renderOffline(ctx)
+    await screen.findByRole('article', { name: 'Ada' })
+    const calls = fetchEventsInRange.mock.calls.length
+
+    view.rerender(
+      <MemoryRouter>
+        <OfflineContext.Provider value={{ ...ctx, snapshot: { ...ctx.snapshot!, capturedAt: '2026-08-15T09:00:00Z' } }}>
+          <AdminLogisticsPage />
+        </OfflineContext.Provider>
+      </MemoryRouter>,
+    )
+    await new Promise(r => setTimeout(r, 50))
+    expect(fetchEventsInRange.mock.calls.length).toBe(calls)
+    expect(screen.getByRole('article', { name: 'Ada' })).toBeInTheDocument()
+  })
+
+  // Only today is saved on the device, so for any other day the board already
+  // on screen is the only copy there is. Losing signal must not throw it away.
+  it('keeps a loaded board on screen when the connection drops, and refreshes when it returns', async () => {
+    const ctx = offlineCtx({ online: true, snapshot: null })
+    const at = (online: boolean) => (
+      <MemoryRouter>
+        <OfflineContext.Provider value={{ ...ctx, online }}>
+          <AdminLogisticsPage />
+        </OfflineContext.Provider>
+      </MemoryRouter>
+    )
+    const view = render(at(true))
+    await screen.findByRole('article', { name: 'Ada' })
+    const calls = fetchEventsInRange.mock.calls.length
+
+    view.rerender(at(false))
+    await new Promise(r => setTimeout(r, 50))
+    expect(screen.getByRole('article', { name: 'Ada' })).toBeInTheDocument()
+    expect(screen.queryByText(t.admin.logistics.offline.unavailable)).not.toBeInTheDocument()
+    expect(fetchEventsInRange.mock.calls.length).toBe(calls)
+
+    view.rerender(at(true))
+    await waitFor(() => expect(fetchEventsInRange.mock.calls.length).toBeGreaterThan(calls))
+    expect(await screen.findByRole('article', { name: 'Ada' })).toBeInTheDocument()
+  })
+
+  // Opened with no signal before the device's copy was read: the copy arriving
+  // a moment later has to reach the screen.
+  it('shows the saved day once the copy arrives, when the board had nothing', async () => {
+    const ctx = offlineCtx({ online: false, snapshot: null })
+    const view = renderOffline(ctx)
+    expect(await screen.findByText(t.admin.logistics.offline.unavailable)).toBeInTheDocument()
+
+    view.rerender(
+      <MemoryRouter>
+        <OfflineContext.Provider value={{ ...ctx, snapshot: snapshotWith({ [todayKey]: storedBoard }) }}>
+          <AdminLogisticsPage />
+        </OfflineContext.Provider>
+      </MemoryRouter>,
+    )
+    expect(await screen.findByRole('article', { name: 'Ada' })).toBeInTheDocument()
   })
 
   it('plans rides off the stored fleet when the vehicles read fails', async () => {

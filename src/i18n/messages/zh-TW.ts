@@ -2521,7 +2521,7 @@ export const zhTW: Messages = {
         showingSaved: (when: string) => `目前沒有網路連線 — 顯示的是本裝置在 ${when} 儲存的副本。`,
         savedAt: (when: string) => `已於 ${when} 儲存在本裝置`,
         neverSaved: '尚未儲存在本裝置',
-        savedDays: (days: number) => `未來 ${days} 天`,
+        savedToday: '僅限今天',
         saveNow: '立即儲存',
         saving: '儲存中…',
         saveFailed: '上次儲存失敗，本裝置上的副本比這個時間更舊。',
@@ -2548,7 +2548,7 @@ export const zhTW: Messages = {
       transportNotSpecified: '交通方式未指定',
       leadBooker: '（主揪）',
       staffFallback: '（工作人員）',
-      packedHint: '勾選只存在這支裝置上 — 其他手機各自有自己的清單。',
+      packedHint: '勾選會即時同步給所有工作人員的手機。',
       pack: {
         sectionsAria: '看板分區',
         gear: '裝備',
@@ -2585,6 +2585,7 @@ export const zhTW: Messages = {
         sizeMissing: '未登記尺寸',
         addOn: '加購',
         ownsOne: '自備',
+        unsentTicks: (n: number) => `有 ${n} 個勾選尚未送出 — 連線恢復後會同步給其他工作人員。`,
       },
     },
     family: {

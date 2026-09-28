@@ -1322,6 +1322,26 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['event_ride_groups']['Insert']>
         Relationships: []
       }
+      // The day board's shared pack list (20260928100000): a row per piece on
+      // the van, so every crew phone reads the same ticks.
+      packed_pieces: {
+        Row: {
+          pack_day: string
+          booking_id: string
+          item: string
+          packed_by: string | null
+          packed_at: string
+        }
+        Insert: {
+          pack_day: string
+          booking_id: string
+          item: string
+          packed_by?: string | null
+          packed_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['packed_pieces']['Insert']>
+        Relationships: []
+      }
       waiver_signatures: {
         Row: {
           id: string
@@ -2881,6 +2901,7 @@ export type EventVehicle = Database['public']['Tables']['event_vehicles']['Row']
 export type EventVehicleInsert = Database['public']['Tables']['event_vehicles']['Insert']
 export type EventRideGroup = Database['public']['Tables']['event_ride_groups']['Row']
 export type EventRideGroupInsert = Database['public']['Tables']['event_ride_groups']['Insert']
+export type PackedPiece = Database['public']['Tables']['packed_pieces']['Row']
 // Gear sizing charts — per-shop wetsuit/BCD/fins models + size bands
 export const GEAR_TYPES = ['wetsuit', 'bcd', 'fins'] as const
 export type GearType = typeof GEAR_TYPES[number]

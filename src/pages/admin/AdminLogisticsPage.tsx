@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { PageLoading } from '../../components/ui/Spinner'
 import { format, parseISO } from 'date-fns'
@@ -6,7 +6,6 @@ import { siteConfig } from '../../config/site'
 import { fetchUpcomingEventDays, formatEventSpan } from '../../lib/events'
 import { splitByTransport, transportHeadcount, dayKeyOffset, partitionByWaitlist } from '../../lib/logistics'
 import { dayRoster, eventEntersWater } from '../../lib/participants'
-import { loadPackedGear, savePackedGear, setPiecesPacked, togglePackedGear } from '../../lib/gear-packed'
 import { guestPieces, packProgress, piecesByItem, type PackGuest, type PackPiece } from '../../lib/pack-list'
 import { gearPackList } from '../../lib/gear'
 import { bookingBalance, type BookingBalance } from '../../lib/booking-balance'
@@ -34,6 +33,7 @@ import { amendmentsByBooking } from '../../lib/day-board'
 import { liveOrStored, loadDayBoard, loadDayTransport, type DayBoardSource } from '../../lib/day-board-source'
 import { useAuth } from '../../hooks/useAuth'
 import { useOffline } from '../../hooks/useOffline'
+import { usePackedGear } from '../../hooks/usePackedGear'
 import type { AppEvent, BookingDetails, EventRideGroup, EventVehicle, Profile, Vehicle } from '../../types/database'
 import { t } from '../../i18n'
 
@@ -109,6 +109,27 @@ export function AdminLogisticsPage() {
   const { profile } = useAuth()
   const offline = useOffline()
   const isAdmin = profile?.role === 'admin'
+  const online = offline?.online ?? true
+  // The copy saved on this device, read through a ref. A background save lands
+  // every half hour at most; if the board depended on it directly, each one
+  // would throw a board that came off the network back to the spinner and
+  // fetch it all again.
+  const snapshotRef = useRef(offline?.snapshot ?? null)
+  useEffect(() => { snapshotRef.current = offline?.snapshot ?? null }, [offline?.snapshot])
+  // Bumped when a new saved copy should replace what is on screen: the board
+  // is showing the old copy, or showing nothing because there was none.
+  const [deviceReload, setDeviceReload] = useState(0)
+  // The loads read the connection through a ref and reload only when it comes
+  // back. Losing signal must not throw away a board already on screen: what
+  // was loaded a moment ago is as good as any saved copy, and for any day but
+  // today it is the only copy there is.
+  const onlineRef = useRef(online)
+  const [reconnects, setReconnects] = useState(0)
+  useEffect(() => {
+    const cameBack = online && !onlineRef.current
+    onlineRef.current = online
+    if (cameBack) setReconnects(k => k + 1)
+  }, [online])
   const [tab, setTab] = useState<Tab>('today')
   const [otherDay, setOtherDay] = useState('')
   const [section, setSection] = useState<Section>('gear')
@@ -117,11 +138,11 @@ export function AdminLogisticsPage() {
   const [gearModels, setGearModels] = useState<GearModelWithSizes[]>([])
   useEffect(() => {
     void liveOrStored(
-      offline?.online ?? true,
+      onlineRef.current,
       fetchGearModelsWithSizes,
-      () => offline?.snapshot?.gearModels ?? [],
+      () => snapshotRef.current?.gearModels ?? [],
     ).then(setGearModels)
-  }, [offline?.snapshot, offline?.online])
+  }, [reconnects, deviceReload])
   // null = not loaded yet; [] = loaded, no event-days in range.
   const [upcomingDays, setUpcomingDays] = useState<string[] | null>(null)
   // null = loading; [] = loaded, no events that day.
@@ -143,10 +164,6 @@ export function AdminLogisticsPage() {
   const [rideGroups, setRideGroups] = useState<EventRideGroup[]>([])
   const [ridesBusy, setRidesBusy] = useState(false)
   const [rideError, setRideError] = useState<string | null>(null)
-  // Pieces already on the van. Held here rather than in a card because the
-  // guest cards, the by-item view and the waitlist all tick the same day's
-  // list — several owners would clobber each other's writes.
-  const [packedGear, setPackedGear] = useState<Set<string>>(new Set())
   // Where the day on screen came from. null while loading; 'unavailable' means
   // no network AND nothing captured for this day, which is the one case the
   // board must not render as an empty day.
@@ -163,6 +180,11 @@ export function AdminLogisticsPage() {
       : tab === 'tomorrow' ? tomorrowKey
         : otherDay
 
+  // Pieces already on the van, shared with every crew phone. Held here rather
+  // than in a card because the guest cards, the by-item view and the waitlist
+  // all tick the same day's list.
+  const { packed: packedGear, toggle: togglePiece, setPieces, pending: unsentTicks } = usePackedGear(dayKey, online)
+
   // Load the transport fleet once — it's the same across every day.
   useEffect(() => {
     let cancelled = false
@@ -170,14 +192,14 @@ export function AdminLogisticsPage() {
       // Off the device when the network can't answer; an empty fleet just
       // means rides aren't planned, and logistics still works without them.
       const v = await liveOrStored(
-        offline?.online ?? true,
+        onlineRef.current,
         fetchVehicles,
-        () => offline?.snapshot?.vehicles ?? [],
+        () => snapshotRef.current?.vehicles ?? [],
       )
       if (!cancelled) setVehicles(v)
     })()
     return () => { cancelled = true }
-  }, [offline?.snapshot, offline?.online])
+  }, [reconnects, deviceReload])
 
   // Car allocations for the day's events — refetched when the events change or
   // after an assign/unassign (allocReload). Allocations are keyed by event now,
@@ -193,14 +215,14 @@ export function AdminLogisticsPage() {
     let cancelled = false
     ;(async () => {
       const { allocations: alloc, rideGroups: rides } = await loadDayTransport(
-        dayKey, eventIds, offline?.snapshot ?? null, offline?.online ?? true,
+        dayKey, eventIds, snapshotRef.current, onlineRef.current,
       )
       if (cancelled) return
       setAllocations(alloc)
       setRideGroups(rides)
     })()
     return () => { cancelled = true }
-  }, [groups, allocReload, dayKey, offline?.snapshot, offline?.online])
+  }, [groups, allocReload, dayKey])
 
   // Populate the "Other day" dropdown with upcoming days that actually have
   // events, so the admin never picks a dead day.
@@ -210,14 +232,14 @@ export function AdminLogisticsPage() {
       // Without the picker there is no way to reach day three from a boat, so
       // it falls back to the captured list like everything else.
       const days = await liveOrStored(
-        offline?.online ?? true,
+        onlineRef.current,
         () => fetchUpcomingEventDays(todayKey, dayKeyOffset(todayKey, LOOKAHEAD_DAYS)),
-        () => offline?.snapshot?.upcomingDays ?? [],
+        () => snapshotRef.current?.upcomingDays ?? [],
       )
       if (!cancelled) setUpcomingDays(days)
     })()
     return () => { cancelled = true }
-  }, [todayKey, offline?.snapshot, offline?.online])
+  }, [todayKey, reconnects, deviceReload])
 
   // Entering "Other day" with nothing chosen yet → default to the first
   // upcoming day beyond tomorrow (those two have their own tabs).
@@ -255,7 +277,7 @@ export function AdminLogisticsPage() {
     ;(async () => {
       // Live when the network can supply it, off this device when it can't.
       // See docs/offline.md — everything below is shape-identical either way.
-      const result = await loadDayBoard(dayKey, offline?.snapshot ?? null, offline?.online ?? true)
+      const result = await loadDayBoard(dayKey, snapshotRef.current, onlineRef.current)
       if (cancelled) return
       if (!result) { setGroups(null); setBoardSource('unavailable'); return }
       setBoardSource(result.source)
@@ -322,25 +344,21 @@ export function AdminLogisticsPage() {
       })))
     })()
     return () => { cancelled = true }
-  }, [dayKey, offline?.snapshot, offline?.online])
+  }, [dayKey, reconnects, deviceReload])
 
+  // A new saved copy only matters to a board that is not live: one showing the
+  // previous copy, one that found nothing, or one still loading with no
+  // connection to load from.
+  const savedStamp = offline?.snapshot?.capturedAt ?? null
+  const lastSavedStamp = useRef(savedStamp)
   useEffect(() => {
-    if (!dayKey) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPackedGear(loadPackedGear(dayKey))
-  }, [dayKey])
-
-  function togglePiece(key: string) {
-    const next = togglePackedGear(packedGear, key)
-    setPackedGear(next)
-    savePackedGear(dayKey, next)
-  }
-
-  function setPieces(keys: string[], value: boolean) {
-    const next = setPiecesPacked(packedGear, keys, value)
-    setPackedGear(next)
-    savePackedGear(dayKey, next)
-  }
+    if (savedStamp === lastSavedStamp.current) return
+    lastSavedStamp.current = savedStamp
+    if (boardSource === 'snapshot' || boardSource === 'unavailable' || (boardSource === null && !online)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setDeviceReload(k => k + 1)
+    }
+  }, [savedStamp, boardSource, online])
 
   // Keep a diver's displayed sizes in sync after an inline save, across every
   // event group they appear in that day.
@@ -600,7 +618,11 @@ export function AdminLogisticsPage() {
                   onToggle={togglePiece}
                 />
               )}
-              <p className="text-xs text-brand-100/60 font-medium">{lg.packedHint}</p>
+              {unsentTicks > 0 ? (
+                <p role="status" className="text-xs text-amber-300 font-semibold">{pk.unsentTicks(unsentTicks)}</p>
+              ) : (
+                <p className="text-xs text-brand-100/60 font-medium">{lg.packedHint}</p>
+              )}
             </div>
           )}
 

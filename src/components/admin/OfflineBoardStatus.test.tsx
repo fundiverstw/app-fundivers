@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { format } from 'date-fns'
 import { OfflineBoardStatus } from './OfflineBoardStatus'
 import type { OfflineContextValue } from '../../hooks/offline-context'
-import { SNAPSHOT_VERSION, OFFLINE_DAYS, type OfflineSnapshot } from '../../lib/offline-snapshot'
+import { SNAPSHOT_VERSION, type OfflineSnapshot } from '../../lib/offline-snapshot'
 import { t } from '../../i18n'
 
 const lo = t.admin.logistics.offline
@@ -80,7 +80,7 @@ describe('OfflineBoardStatus', () => {
 
   it('names the window it keeps', () => {
     render(<OfflineBoardStatus offline={ctx({ snapshot: snapshot('2026-08-15T07:14:00Z') })} source="live" />)
-    expect(screen.getByText(new RegExp(lo.savedDays(OFFLINE_DAYS)))).toBeInTheDocument()
+    expect(screen.getByText(new RegExp(lo.savedToday))).toBeInTheDocument()
   })
 
   it('saves on demand', async () => {

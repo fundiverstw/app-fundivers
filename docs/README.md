@@ -18,7 +18,7 @@ into source.
 | [coral-surveys.md](./coral-surveys.md)                 | Crowdsourced coral monitoring against the CoralWatch Coral Health Chart: survey plus colony rows, RPC-only writes, staff moderation, the bleaching arithmetic |
 | [packages.md](./packages.md)                           | Partner-shop registration network: product tiers, add-on/room estimate, recommendation email, kickback ledger |
 | [push-notifications.md](./push-notifications.md)       | Web Push: VAPID, service worker, Cloudflare cron sender, `/admin-broadcast`, `/notify-duty`, CORS |
-| [offline.md](./offline.md)                             | Ten days of the logistics day board kept on staff devices: what is stored, what is deliberately redacted, how a read falls back |
+| [offline.md](./offline.md)                             | Today's logistics day board kept on staff devices: what is stored, what is deliberately redacted, how a read falls back |
 | [testing.md](./testing.md)                             | Unit vs integration conventions, `mockQueryBuilder`, Makefile surface |
 | [deployment.md](./deployment.md)                       | Env vars (which secret lives where), Cloudflare deploy (local `make deploy` via `.env.production`), Supabase link / push / pull / verify, edge functions |
 | [forking.md](./forking.md)                             | Running your own shop: the `fundive.config.ts` seam, brand assets, feature gates, and how to pull core updates without conflicts |

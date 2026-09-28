@@ -2520,7 +2520,7 @@ export const ja: Messages = {
         showingSaved: (when: string) => `オフラインです — この端末に ${when} に保存されたデータを表示しています。`,
         savedAt: (when: string) => `${when} にこの端末へ保存`,
         neverSaved: 'この端末にはまだ保存されていません',
-        savedDays: (days: number) => `今後 ${days} 日分`,
+        savedToday: '今日の分のみ',
         saveNow: '今すぐ保存',
         saving: '保存中…',
         saveFailed: '前回の保存に失敗したため、この端末のデータはこれより古い可能性があります。',
@@ -2547,7 +2547,7 @@ export const ja: Messages = {
       transportNotSpecified: '交通手段が未指定',
       leadBooker: '（幹事）',
       staffFallback: '（スタッフ）',
-      packedHint: 'チェックはこの端末にのみ保存されます — 他の端末には共有されません。',
+      packedHint: 'チェックはクルー全員の端末にすぐ共有されます。',
       pack: {
         sectionsAria: 'ボードの区分',
         gear: '器材',
@@ -2584,6 +2584,7 @@ export const ja: Messages = {
         sizeMissing: 'サイズ未登録',
         addOn: 'オプション',
         ownsOne: '自前あり',
+        unsentTicks: (n: number) => `${n} 件のチェックが未送信です — 接続が戻るとクルー全員に共有されます。`,
       },
     },
     family: {
