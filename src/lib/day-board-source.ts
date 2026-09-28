@@ -2,7 +2,6 @@ import {
   fetchDayBoard, fetchDayTransport,
   type DayBoardData, type DayTransportData,
 } from './day-board'
-import { fetchDayGearRows, type DayGearRow } from './logistics-day'
 import { coversDay, selectDayBoard, selectDayTransport, type OfflineSnapshot } from './offline-snapshot'
 
 /**
@@ -71,33 +70,6 @@ export async function loadDayBoard(
   if (!snapshot || !coversDay(snapshot, day)) return null
   const stored = selectDayBoard(snapshot, day)
   return stored ? { data: stored, source: 'snapshot' } : null
-}
-
-/**
- * The next day's roster for the carry-over gear diff, same fallback.
- *
- * Throws when neither source can answer, because the caller needs to say the
- * read failed. Diffing against a silently empty next day reads as a real
- * answer — everything comes home to the shop — and would send a van back
- * half-loaded.
- */
-export async function loadDayGearRows(
-  day: string,
-  snapshot: OfflineSnapshot | null,
-  online: boolean,
-): Promise<DayGearRow[]> {
-  if (online) {
-    try {
-      return await fetchDayGearRows(day)
-    } catch {
-      // fall through to the device
-    }
-  }
-  if (!snapshot || !coversDay(snapshot, day)) throw new Error(`no data for ${day}`)
-  const board = selectDayBoard(snapshot, day)
-  if (!board) throw new Error(`no data for ${day}`)
-  const profiles = new Map(board.profiles.map(p => [p.id, p]))
-  return board.bookings.map(b => ({ booking: b, profile: profiles.get(b.user_id) ?? null }))
 }
 
 /** Cars and ride groupings, same fallback. Transport is advisory next to the

@@ -4,91 +4,72 @@ import { PageLoading } from '../../components/ui/Spinner'
 import { format, parseISO } from 'date-fns'
 import { siteConfig } from '../../config/site'
 import { fetchUpcomingEventDays, formatEventSpan } from '../../lib/events'
-import { gearTotals, splitByTransport, transportHeadcount, dayKeyOffset, careTotals, isCareGearItem, addonTotals, partitionByWaitlist, gearSizeBreakdown, gearItemDivers, isSizedGearItem, gearDayDiff } from '../../lib/logistics'
-import type { GearSizeGroup } from '../../lib/logistics'
+import { splitByTransport, transportHeadcount, dayKeyOffset, partitionByWaitlist } from '../../lib/logistics'
 import { dayRoster, eventEntersWater } from '../../lib/participants'
-import { gearPieceKey, loadPackedGear, savePackedGear, setBookingPacked, togglePackedGear } from '../../lib/gear-packed'
+import { loadPackedGear, savePackedGear, setPiecesPacked, togglePackedGear } from '../../lib/gear-packed'
+import { guestPieces, packProgress, piecesByItem, type PackGuest, type PackPiece } from '../../lib/pack-list'
+import { gearPackList } from '../../lib/gear'
 import { bookingBalance, type BookingBalance } from '../../lib/booking-balance'
 import { openCreditForBooking } from '../../lib/credits'
 import { amendmentsDelta } from '../../lib/booking-amendments'
 import { netPaidByBooking } from '../../lib/payments'
 import { personName } from '../../lib/names'
-import { DiverGearCard, type DiverGearRow } from '../../components/admin/DiverGearCard'
+import type { DiverGearRow } from '../../components/admin/DiverGearCard'
+import { GuestPackCard } from '../../components/admin/GuestPackCard'
 import { TransportGroup } from '../../components/admin/TransportGroup'
 import { StaffDutyGroup, type StaffDutyRow } from '../../components/admin/StaffDutyGroup'
-import { CareGearGroup } from '../../components/admin/CareGearGroup'
-import { AddonSummaryGroup } from '../../components/admin/AddonSummaryGroup'
 import { PaymentsDueGroup } from '../../components/admin/PaymentsDueGroup'
 import { TransportFleetPlan } from '../../components/admin/TransportFleetPlan'
 import { EventVehicleGroup } from '../../components/admin/EventVehicleGroup'
 import { SharedTransportPicker } from '../../components/admin/SharedTransportPicker'
-import { NextDayGearDiff } from '../../components/admin/NextDayGearDiff'
 import { OfflineBoardStatus } from '../../components/admin/OfflineBoardStatus'
 import { fetchVehicles } from '../../lib/vehicles'
 import { fetchGearModelsWithSizes } from '../../lib/gear-models'
 import type { GearModelWithSizes } from '../../lib/gear-sizing'
-import { TEXT_HEADING, TEXT_MUTED, BTN_XS_GHOST } from '../../styles/tokens'
+import { BTN_XS_GHOST } from '../../styles/tokens'
 import { availableVehicles, allocationEventId } from '../../lib/event-vehicles'
 import { planRuns, type Rider, type RunInput, type RunPlan, type FleetVehicle } from '../../lib/vehicle-planning'
 import { groupIdByEvent, buildRuns, shareRideWith, rideAlone } from '../../lib/ride-groups'
 import { amendmentsByBooking } from '../../lib/day-board'
-import { liveOrStored, loadDayBoard, loadDayGearRows, loadDayTransport, type DayBoardSource } from '../../lib/day-board-source'
+import { liveOrStored, loadDayBoard, loadDayTransport, type DayBoardSource } from '../../lib/day-board-source'
 import { useAuth } from '../../hooks/useAuth'
 import { useOffline } from '../../hooks/useOffline'
 import type { AppEvent, BookingDetails, EventRideGroup, EventVehicle, Profile, Vehicle } from '../../types/database'
 import { t } from '../../i18n'
 
 const lg = t.admin.logistics
+const pk = lg.pack
 const gr = t.admin.groups
+const gc = t.admin.gearCard
 const tp = t.admin.transport
 
 // Per-booking outstanding balance + the lead responsible for it (if covered).
 interface BookingBalanceRow { bal: BookingBalance; payerName: string | null }
 
-// One look for every chip on the Overall board. A faint white hairline on the
-// glass — NOT `border-brand-900`, which the dark retrofit (index.css) leaves as
-// navy while flipping the text to near-white, rendering the pill's outline
-// invisible and the chips as loose floating text.
-const SUMMARY_CHIP =
-  'text-xs px-2 py-0.5 rounded-full border border-white/20 bg-white/5 text-brand-50 font-medium'
-
-// The tentative roster's chip — violet, matching the waitlist tone used for
-// every "no seat yet" surface on the board.
-const WAITLIST_CHIP =
-  'text-xs px-2 py-0.5 rounded-full border border-violet-400/40 bg-violet-500/10 text-violet-100 font-medium'
-
-// The dry roster's chip — orange, so a name that never gets in the water can
-// be picked out of the board at a glance. Its own family rather than a marker
-// appended to a neutral chip: the two lists are read as counts (how many were
-// diving, how many were not), and a count is only as quick as its color.
+// A name on the People roster. A faint white hairline on the glass — NOT
+// `border-brand-900`, which the dark retrofit (index.css) leaves as navy while
+// flipping the text to near-white, so the outline would vanish.
+const NAME_CHIP =
+  'text-sm px-2.5 py-1 rounded-full border border-white/20 bg-white/5 text-brand-50 font-medium'
+// Someone on a dry event — orange, so the people who never get in the water
+// can be counted at a glance; that count is what the shop's insurer asks for.
 const NON_DIVER_CHIP =
-  'text-xs px-2 py-0.5 rounded-full border border-orange-400/40 bg-orange-500/10 text-orange-100 font-medium'
-
-// Hover for a name chip that goes somewhere. Each chip stays in its own color
-// family — washing the violet waitlist chip in the neutral hover would leave
-// its ink on a fill from a different palette.
-const CHIP_LINK_HOVER = 'hover:border-white/40 hover:bg-white/10'
-const WAITLIST_CHIP_LINK_HOVER = 'hover:border-violet-400/70 hover:bg-violet-500/20'
-const NON_DIVER_CHIP_LINK_HOVER = 'hover:border-orange-400/70 hover:bg-orange-500/20'
+  'text-sm px-2.5 py-1 rounded-full border border-orange-400/40 bg-orange-500/10 text-orange-100 font-medium'
+// No seat yet — violet, the waitlist tone everywhere on the board.
+const WAITLIST_CHIP =
+  'text-sm px-2.5 py-1 rounded-full border border-violet-400/40 bg-violet-500/10 text-violet-100 font-medium'
 
 /**
- * A person's name on the Overall board. Anyone with a profile links through to
- * their card in the directory, so a name read off the board can be followed to
- * sizes, contact and history without retyping it into a search. Staff get plain
- * text: `/admin/users` is admin-only (App.tsx), so the link would only bounce
- * them. A row with no profile — a booking whose account was removed — has
+ * A person's name on the People roster. Admins can follow it to the person's
+ * directory card; staff get plain text because `/admin/users` is admin-only
+ * (App.tsx) and the link would only bounce them. A row with no profile has
  * nothing to point at, so it stays plain for everyone.
- *
- * `name` is the accessible name even when the chip renders more (a staff
- * member's roles), so the link announces who it opens rather than reading out
- * the duty list.
  */
-function PersonChip({ name, profileId, linked, className, hover, children }: {
+function PersonChip({ name, profileId, linked, className, children }: {
   name: string
   profileId: string | null
   linked: boolean
   className: string
-  hover: string
   children?: ReactNode
 }) {
   const body = children ?? name
@@ -97,146 +78,10 @@ function PersonChip({ name, profileId, linked, className, hover, children }: {
     <Link
       to={`/admin/users?diver=${profileId}`}
       aria-label={lg.viewProfile(name)}
-      className={`${className} ${hover} transition-colors hover:underline select-text`}
+      className={`${className} hover:underline select-text`}
     >
       {body}
     </Link>
-  )
-}
-
-/**
- * The eyebrow label above each Overall block. Small, dim and letter-spaced by
- * design: it must sit clearly *below* the section's <h2> in the hierarchy, so
- * it deliberately shares none of the heading's size, color or case. `care`
- * carries the amber warning tone — light amber, since the label sits on the
- * dark glass rather than on the amber chips' light fill.
- */
-function SummaryLabel({ children, tone }: { children: ReactNode; tone?: 'care' | 'tentative' | 'dry' }) {
-  return (
-    <h3 className={`text-[11px] font-semibold uppercase tracking-wider ${
-      tone === 'care' ? 'text-amber-300'
-        : tone === 'tentative' ? 'text-violet-300'
-          : tone === 'dry' ? 'text-orange-300'
-            : 'text-brand-100/70'
-    }`}>
-      {children}
-    </h3>
-  )
-}
-
-/**
- * The gear-to-pack chips, where each item opens into who it is for. "BCD ×3"
- * tells a packer how many to carry but not which ones to pull, and that detail
- * otherwise lives one card per diver further down the page. Sized kit — BCD,
- * wetsuit, fins, boots — opens on its rack split; one-size kit — regulator,
- * mask, computer — opens straight on the divers, because there is no rack
- * split to read but the same three pieces still have to be ticked off.
- *
- * One panel at a time. Each is a short list read in passing, and stacking
- * several open panels would push the rest of the board off a phone screen.
- *
- * Inside the panel every diver's piece is a toggle, so the person loading the
- * van ticks each one off as it goes in — see `packedGear` on the page.
- */
-function GearChips({ totals, rows, packed, onTogglePiece }: {
-  totals: Array<{ item: string; count: number }>
-  rows: DiverGearRow[]
-  packed: Set<string>
-  onTogglePiece: (bookingId: string, item: string) => void
-}) {
-  const [openItem, setOpenItem] = useState<string | null>(null)
-  const sized = openItem ? isSizedGearItem(openItem) : false
-  // One group either way: a rack split for sized kit, a single unlabelled
-  // group for the rest, so the panel below renders one shape.
-  const breakdown: GearSizeGroup[] = !openItem
-    ? []
-    : sized
-      ? gearSizeBreakdown(rows, openItem)
-      : [{ size: null, divers: gearItemDivers(rows, openItem) }]
-  return (
-    <>
-      <div className="flex flex-wrap gap-1.5">
-        {totals.map(({ item, count }) => {
-          const label = `${item} ×${count}`
-          const open = openItem === item
-          const opensOnSizes = isSizedGearItem(item)
-          return (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setOpenItem(o => (o === item ? null : item))}
-              aria-expanded={open}
-              aria-label={
-                opensOnSizes
-                  ? (open ? lg.hideSizesFor(item) : lg.showSizesFor(item))
-                  : (open ? lg.hideDiversFor(item) : lg.showDiversFor(item))
-              }
-              className={`${SUMMARY_CHIP} transition-colors ${
-                open ? 'border-white/50 bg-white/15' : 'hover:border-white/40 hover:bg-white/10'
-              }`}
-            >
-              {label}
-            </button>
-          )
-        })}
-      </div>
-      {openItem && (
-        <div className="rounded-lg border border-white/15 bg-white/5 p-2 space-y-1.5">
-          <SummaryLabel>{sized ? lg.sizesFor(openItem) : lg.diversFor(openItem)}</SummaryLabel>
-          <ul className="space-y-1.5">
-            {breakdown.map(g => {
-              const done = g.divers.filter(d => packed.has(gearPieceKey(d.bookingId, openItem))).length
-              return (
-                <li key={g.size ?? 'unknown'} className="space-y-1">
-                  <p className="text-xs text-brand-50">
-                    {/* An unrecorded size is the one line worth chasing before
-                        the van leaves, so it carries the warning tone rather
-                        than reading as just another rack slot. One-size kit has
-                        no size to miss, so its count stays neutral. */}
-                    <span className={`font-semibold ${!sized || g.size ? '' : 'text-amber-300'}`}>
-                      {sized
-                        ? lg.sizeCount(g.size ?? lg.sizeUnknown, g.divers.length)
-                        : lg.itemCount(g.divers.length)}
-                    </span>
-                    {done > 0 && (
-                      <span className={done === g.divers.length ? 'text-emerald-300 font-semibold' : 'text-brand-100/70'}>
-                        {' · '}{done === g.divers.length ? lg.allPacked : lg.packedProgress(done, g.divers.length)}
-                      </span>
-                    )}
-                  </p>
-                  <ul className="flex flex-wrap gap-1.5">
-                    {g.divers.map(d => {
-                      const isPacked = packed.has(gearPieceKey(d.bookingId, openItem))
-                      return (
-                        <li key={d.bookingId}>
-                          <button
-                            type="button"
-                            onClick={() => onTogglePiece(d.bookingId, openItem)}
-                            aria-pressed={isPacked}
-                            aria-label={isPacked ? lg.unmarkPacked(d.name, openItem) : lg.markPacked(d.name, openItem)}
-                            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
-                              isPacked
-                                ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-100 font-semibold'
-                                : 'border-white/25 text-brand-100 font-medium hover:border-white/50 hover:bg-white/10'
-                            }`}
-                          >
-                            {isPacked ? lg.packedName(d.name) : d.name}
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </li>
-              )
-            })}
-          </ul>
-          {/* Says both what the chips do and how far the state travels — a tick
-              list that silently lives on one phone would mislead a second
-              packer into thinking their colleague hadn't started. */}
-          <p className="text-[11px] text-brand-100/60 font-medium">{lg.packedHint}</p>
-        </div>
-      )}
-    </>
   )
 }
 
@@ -251,12 +96,23 @@ const LOOKAHEAD_DAYS = 30
 
 type Tab = 'today' | 'tomorrow' | 'other'
 
+// One thing on screen at a time. The board used to stack packing, rides,
+// rosters and money on one long page, and the packing list — the part a crew
+// works from with gear in their hands — was the easiest to lose track of in it.
+type Section = 'gear' | 'rides' | 'people' | 'payments'
+
+// Two ways into the same tick list: guest by guest (the default, and the check
+// that nobody was missed) or item by item (pulling kit off the rack).
+type PackView = 'guest' | 'item'
+
 export function AdminLogisticsPage() {
   const { profile } = useAuth()
   const offline = useOffline()
   const isAdmin = profile?.role === 'admin'
   const [tab, setTab] = useState<Tab>('today')
   const [otherDay, setOtherDay] = useState('')
+  const [section, setSection] = useState<Section>('gear')
+  const [packView, setPackView] = useState<PackView>('guest')
   // The shop's gear sizing charts, loaded once for the rental fit lookup.
   const [gearModels, setGearModels] = useState<GearModelWithSizes[]>([])
   useEffect(() => {
@@ -270,8 +126,8 @@ export function AdminLogisticsPage() {
   const [upcomingDays, setUpcomingDays] = useState<string[] | null>(null)
   // null = loading; [] = loaded, no events that day.
   const [groups, setGroups] = useState<EventGroup[] | null>(null)
-  // add-on _id → catalog title, for classifying "handle with care" rentals
-  // (dive lights, cameras) that have no category column.
+  // add-on _id → catalog title, for naming each guest's add-ons and picking
+  // out the delicate ones (lights, cameras), which have no category column.
   const [addonTitles, setAddonTitles] = useState<Map<string, string>>(new Map())
   // booking id → outstanding balance, for the day's "who still owes" view.
   const [balances, setBalances] = useState<Map<string, BookingBalanceRow>>(new Map())
@@ -287,14 +143,9 @@ export function AdminLogisticsPage() {
   const [rideGroups, setRideGroups] = useState<EventRideGroup[]>([])
   const [ridesBusy, setRidesBusy] = useState(false)
   const [rideError, setRideError] = useState<string | null>(null)
-  // The next-day gear diff is opt-in — it costs an extra round trip and most
-  // days aren't back-to-back. null = open but the next day is still loading.
-  const [diffOpen, setDiffOpen] = useState(false)
-  const [nextDayRows, setNextDayRows] = useState<DiverGearRow[] | null>(null)
-  const [nextDayFailed, setNextDayFailed] = useState(false)
-  // Pieces already loaded onto the van, ticked off behind the size chips. Held
-  // here rather than inside GearChips because the seated and waitlist chip sets
-  // share one day's list — two owners would clobber each other's writes.
+  // Pieces already on the van. Held here rather than in a card because the
+  // guest cards, the by-item view and the waitlist all tick the same day's
+  // list — several owners would clobber each other's writes.
   const [packedGear, setPackedGear] = useState<Set<string>>(new Set())
   // Where the day on screen came from. null while loading; 'unavailable' means
   // no network AND nothing captured for this day, which is the one case the
@@ -385,31 +236,6 @@ export function AdminLogisticsPage() {
     [upcomingDays, dayKey],
   )
 
-  // Carrying gear over only makes sense on consecutive days: put a gap between
-  // them and the kit is dried and racked anyway, so the diff would be advice
-  // nobody can act on. The button is offered on back-to-back days only.
-  const nextDayKey = dayKey ? dayKeyOffset(dayKey, 1) : ''
-  const backToBack = !!nextDayKey && nextEventDay === nextDayKey
-
-  useEffect(() => {
-    if (!diffOpen || !backToBack) return
-    let cancelled = false
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setNextDayRows(null)
-    setNextDayFailed(false)
-    ;(async () => {
-      try {
-        const rows = await loadDayGearRows(nextDayKey, offline?.snapshot ?? null, offline?.online ?? true)
-        if (!cancelled) setNextDayRows(rows)
-      } catch {
-        // Say the read failed rather than diffing against an empty next day,
-        // which would look like a real answer: everything back to the shop.
-        if (!cancelled) setNextDayFailed(true)
-      }
-    })()
-    return () => { cancelled = true }
-  }, [diffOpen, backToBack, nextDayKey, offline?.snapshot, offline?.online])
-
   // Land on whichever control owns that day, so the tabs keep matching what's
   // displayed: today/tomorrow have their own tabs, anything else is "Other day".
   function goToDay(day: string) {
@@ -436,8 +262,6 @@ export function AdminLogisticsPage() {
       const { events: uniqueEvents, bookings, duties } = result.data
       if (!uniqueEvents.length) { setGroups([]); return }
 
-      // Resolve catalog titles for the day's add-ons so we can pick out the
-      // delicate ones (lights, cameras) for the care inventory.
       setAddonTitles(new Map(
         result.data.addons.map(a => [a.id, a.display_title || a.admin_title || a.id]),
       ))
@@ -476,6 +300,10 @@ export function AdminLogisticsPage() {
         arr.push({ booking: b, profile: profMap.get(b.user_id) ?? null })
         byEvent.set(eid, arr)
       }
+      // Alphabetical, so a packer looking for one guest finds them where
+      // they'd expect instead of in booking order.
+      const byName = (a: DiverGearRow, b: DiverGearRow) =>
+        (personName(a.profile?.name) || '').localeCompare(personName(b.profile?.name) || '')
 
       const staffByEvent = new Map<string, StaffDutyRow[]>()
       for (const d of duties) {
@@ -489,7 +317,7 @@ export function AdminLogisticsPage() {
       if (cancelled) return
       setGroups(uniqueEvents.map(ev => ({
         event: ev,
-        rows: byEvent.get(ev.id) ?? [],
+        rows: (byEvent.get(ev.id) ?? []).sort(byName),
         staff: staffByEvent.get(ev.id) ?? [],
       })))
     })()
@@ -502,15 +330,14 @@ export function AdminLogisticsPage() {
     setPackedGear(loadPackedGear(dayKey))
   }, [dayKey])
 
-  function togglePackedPiece(bookingId: string, item: string) {
-    const next = togglePackedGear(packedGear, gearPieceKey(bookingId, item))
+  function togglePiece(key: string) {
+    const next = togglePackedGear(packedGear, key)
     setPackedGear(next)
     savePackedGear(dayKey, next)
   }
 
-  // The whole of one diver's kit in a single tap, from the chip on their card.
-  function toggleAllPackedFor(bookingId: string, items: string[], value: boolean) {
-    const next = setBookingPacked(packedGear, bookingId, items, value)
+  function setPieces(keys: string[], value: boolean) {
+    const next = setPiecesPacked(packedGear, keys, value)
     setPackedGear(next)
     savePackedGear(dayKey, next)
   }
@@ -528,74 +355,36 @@ export function AdminLogisticsPage() {
   }
 
   const allRows = (groups ?? []).flatMap(g => g.rows)
-  // Waitlisted divers have no confirmed seat, so their gear/rides are tentative:
-  // every prep total below is computed from `seatedRows`, and the waitlist load
-  // is surfaced on its own "Tentative" block so the shop packs for the boat it
-  // actually has, then knows the extra if the waitlist clears.
-  const { seated: seatedRows, waitlisted: waitlistRows } = partitionByWaitlist(allRows)
-  // Care items (dive computers, lights, cameras) are issued and tracked
-  // separately, so drop them from the dive-bag "Gear to pack" chips.
-  const overallGear = gearTotals(seatedRows).filter(g => !isCareGearItem(g.item))
-  const overallCare = careTotals(seatedRows, addonTitles)
-  // Whole-day add-on tally (SMBs, nitrox tanks, course upgrades, lights, …) so
-  // the shop's prep list sits next to gear + handle-with-care in the summary.
-  const overallAddons = addonTotals(seatedRows, addonTitles)
+  // Waitlisted divers have no confirmed seat, so their gear and rides are
+  // tentative: every prep total is computed from the seated rows, and the
+  // waitlist is listed on its own so the shop packs for the boat it has.
+  const { seated: seatedRows } = partitionByWaitlist(allRows)
+  const piecesFor = new Map<string, PackPiece[]>(
+    allRows.map(r => [r.booking.id, guestPieces(r, addonTitles)]),
+  )
+  const pieces = (r: DiverGearRow) => piecesFor.get(r.booking.id) ?? []
+  const dayPack = packProgress(seatedRows.flatMap(pieces), packedGear)
+  const packingGuests = seatedRows.filter(r => pieces(r).length > 0)
+  const guestsReady = packingGuests.filter(r => {
+    const p = packProgress(pieces(r), packedGear)
+    return p.packed === p.total
+  }).length
+
   // Headcounts, not booking rows: a diver on two of the day's events is one
   // body to seat, and their most demanding answer wins.
   const transport = transportHeadcount(seatedRows)
-  // The tentative load — one combined heads-up list (all pack items, incl. care,
-  // plus add-ons) of what the waitlisted divers would add if they get a seat.
-  const waitlistGear = gearTotals(waitlistRows)
-  const waitlistAddons = addonTotals(waitlistRows, addonTitles)
-  // Seated rows on both sides, matching every other prep total: a waitlisted
-  // diver's gear isn't packed today, so it can't be kept out for tomorrow.
-  const nextDayDiff = nextDayRows
-    ? gearDayDiff(seatedRows, partitionByWaitlist(nextDayRows).seated)
-    : null
-  // Day-wide on-duty staff for the overall board — one entry per person even
-  // when they cover several of the day's events, with all the roles they hold.
-  const dayStaff: { key: string; name: string; profileId: string | null; roles: string[] }[] = []
-  const staffIndex = new Map<string, number>()
-  for (const s of (groups ?? []).flatMap(g => g.staff)) {
-    const key = s.profile?.id ?? s.dutyId
-    let i = staffIndex.get(key)
-    if (i === undefined) {
-      i = dayStaff.length
-      staffIndex.set(key, i)
-      dayStaff.push({
-        key,
-        name: personName(s.profile?.name) || lg.staffFallback,
-        profileId: s.profile?.id ?? null,
-        roles: [],
-      })
-    }
-    if (!dayStaff[i].roles.includes(s.role)) dayStaff[i].roles.push(s.role)
-  }
-  const onDutyStaffCount = dayStaff.length
-  // The day's roster — everyone booked across the day's events, one entry per
-  // person (someone on two of the day's events is still one body to brief,
-  // count heads for, and check off), split by whether they actually get in the
-  // water. A dry event (an EFR or CPR class, an equipment course, a BBQ) fills
-  // the board with people who are not divers, and "how many of them were
-  // diving" is the question the shop's insurer asks, so the board answers it
-  // instead of calling every registrant a diver.
-  const rosterGroups = (groups ?? []).map(g => ({
-    entersWater: eventEntersWater(g.event),
-    ...partitionByWaitlist(g.rows),
-  }))
+  // Day-wide on-duty staff, one entry per person even across several events.
+  const dayStaffIds = new Set((groups ?? []).flatMap(g => g.staff).map(s => s.profile?.id ?? s.dutyId))
+  const onDutyStaffCount = dayStaffIds.size
+  // The day's roster, one entry per person, split by whether they actually
+  // get in the water. "How many of them were diving" is the question the
+  // shop's insurer asks, so dry-event registrants are not called divers.
   const seatedRoster = dayRoster(
-    rosterGroups.map(g => ({ entersWater: g.entersWater, rows: g.seated })),
+    (groups ?? []).map(g => ({ entersWater: eventEntersWater(g.event), rows: partitionByWaitlist(g.rows).seated })),
     tp.noProfile,
   )
-  const dayDivers = seatedRoster.filter(p => p.inWater)
-  const dayNonDivers = seatedRoster.filter(p => !p.inWater)
-  // The waitlisted roster, for the Tentative block. A person already seated
-  // (on another of the day's events) is not re-listed as waiting.
-  const seatedKeys = new Set(seatedRoster.map(p => p.key))
-  const waitlistDivers = dayRoster(
-    rosterGroups.map(g => ({ entersWater: g.entersWater, rows: g.waitlisted })),
-    tp.noProfile,
-  ).filter(p => !seatedKeys.has(p.key))
+  const dayDiverCount = seatedRoster.filter(p => p.inWater).length
+  const dayNonDiverCount = seatedRoster.length - dayDiverCount
   // Divers who still owe — for the whole-day summary and each event's list.
   const currency = (groups ?? [])[0]?.event.currency ?? siteConfig.locale.currency
   const dueRowsFor = (rows: DiverGearRow[]) => rows.flatMap(r => {
@@ -668,7 +457,7 @@ export function AdminLogisticsPage() {
   })
   const fleetPlan = planRuns(runInputs)
   // Each event's run, so its own Cars block reports the run's seats and riders
-  // rather than a per-event slice that would contradict the board above.
+  // rather than a per-event slice that would contradict the plan above it.
   const runByEventId = new Map<string, RunPlan>()
   for (const run of fleetPlan.runs) {
     for (const ev of run.events) runByEventId.set(ev.id, run)
@@ -687,6 +476,7 @@ export function AdminLogisticsPage() {
   }
 
   const promptForDay = tab === 'other' && !otherDay
+  const banner = (g: EventGroup) => <EventBanner event={g.event} headcount={g.rows.length} isAdmin={isAdmin} />
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
@@ -716,6 +506,13 @@ export function AdminLogisticsPage() {
               </select>
             )
           )}
+          {/* Jump to the next day that has events, labelled with where it
+              lands — "Tomorrow" when that's it, the date otherwise. */}
+          {nextEventDay && !promptForDay && (
+            <button type="button" onClick={() => goToDay(nextEventDay)} className={`ml-auto ${BTN_XS_GHOST}`}>
+              {lg.nextEventDay(nextEventDay === tomorrowKey ? lg.tomorrow : nextEventDay)}
+            </button>
+          )}
         </div>
         <OfflineBoardStatus offline={offline} source={boardSource} />
       </header>
@@ -732,115 +529,84 @@ export function AdminLogisticsPage() {
         <p className="text-brand-950 font-medium text-sm">{lg.noEventsOn(dayKey)}</p>
       ) : (
         <>
-          <section className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4">
-            {/* The section header owns the identity: large, white, sentence-case,
-                with a rule beneath it. Every block label below is deliberately
-                its opposite — tiny, dim, uppercase — so the two tiers can never
-                be mistaken for each other. They used to differ only by one step
-                of size and weight, which is why the hierarchy read as flat. */}
-            <header className="border-b border-surface-300 pb-2 mb-3 space-y-2 sm:space-y-0 sm:flex sm:items-start sm:justify-between sm:gap-3">
-              <div className="min-w-0">
-                <h2 className={`${TEXT_HEADING} text-lg`}>{lg.overall(dayKey)}</h2>
-                {/* Headcount, not bookings: someone diving two of the day's events
-                    is one diver. Counting rows here would disagree with the roster
-                    below, which lists that person once. */}
-                <p className={`${TEXT_MUTED} text-sm font-medium`}>
-                  {lg.eventsDivers(groups.length, dayDivers.length)}
-                  {/* Only when there are any: on a day of ordinary dives the
-                      count would be a permanent "0 non-divers" that says
-                      nothing. */}
-                  {dayNonDivers.length > 0 && (
-                    <> · <span className="text-orange-300 font-semibold">{lg.nonDiverCount(dayNonDivers.length)}</span></>
-                  )}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
-                {/* Open the overlap with tomorrow without leaving the day being
-                    packed — the whole point is reading both at once. */}
-                {backToBack && (
-                  <button
-                    type="button"
-                    onClick={() => setDiffOpen(o => !o)}
-                    aria-expanded={diffOpen}
-                    aria-label={diffOpen ? lg.hideNextDayDiff : lg.showNextDayDiff}
-                    className={BTN_XS_GHOST}
-                  >
-                    {lg.nextDayDiff}
-                  </button>
-                )}
-                {/* Jump to the next day that has events. Labelled with the
-                    destination — "Tomorrow" when that's where it lands, the date
-                    otherwise — so it says where it goes rather than just "next". */}
-                {nextEventDay && (
-                  <button
-                    type="button"
-                    onClick={() => goToDay(nextEventDay)}
-                    className={BTN_XS_GHOST}
-                  >
-                    {lg.nextEventDay(nextEventDay === tomorrowKey ? lg.tomorrow : nextEventDay)}
-                  </button>
-                )}
-              </div>
-            </header>
-            {/* Opens directly under the button that asks for it. Anywhere further
-                down and a phone would show no visible response to the tap. */}
-            {backToBack && diffOpen && (
-              <div className="mb-4">
-                <NextDayGearDiff day={nextDayKey} diff={nextDayDiff} failed={nextDayFailed} />
-              </div>
-            )}
-            {/* Two columns from sm up — the blocks are short, so one column left
-                half the board empty on anything wider than a phone. items-start
-                keeps a tall block (the fleet plan) from stretching its neighbor. */}
-            <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2 items-start">
-              {allRows.length > 0 && (
-                <div className="space-y-1">
-                  <SummaryLabel>{t.payments.title}</SummaryLabel>
-                  {dayOutstanding > 0 ? (
-                    <p className="text-sm font-semibold text-red-300">
-                      {lg.stillOwe(dayDue.length, currency, dayOutstanding.toLocaleString())}
-                    </p>
-                  ) : (
-                    <p className="text-sm text-brand-900 font-medium">{lg.allSettled}</p>
-                  )}
+          <div role="tablist" aria-label={pk.sectionsAria} className="grid grid-cols-4 gap-1 p-1 rounded-xl border border-white/15 bg-white/5">
+            <SectionTab label={pk.gear}
+              count={dayPack.total > 0 ? pk.fraction(dayPack.packed, dayPack.total) : null}
+              countLabel={pk.dayProgress(dayPack.packed, dayPack.total)}
+              done={dayPack.total > 0 && dayPack.packed === dayPack.total}
+              active={section === 'gear'} onClick={() => setSection('gear')} />
+            <SectionTab label={pk.rides}
+              count={transport.needsRide > 0 ? String(transport.needsRide) : null}
+              countLabel={pk.rideCount(transport.needsRide)}
+              active={section === 'rides'} onClick={() => setSection('rides')} />
+            <SectionTab label={pk.people}
+              count={String(seatedRoster.length)}
+              countLabel={pk.headCount(seatedRoster.length)}
+              active={section === 'people'} onClick={() => setSection('people')} />
+            <SectionTab label={pk.payments}
+              count={dayDue.length > 0 ? String(dayDue.length) : null}
+              countLabel={pk.dueCount(dayDue.length)}
+              alert={dayDue.length > 0}
+              active={section === 'payments'} onClick={() => setSection('payments')} />
+          </div>
+
+          {section === 'gear' && (
+            <div role="tabpanel" aria-label={pk.gear} className="space-y-4">
+              <PackSummary pack={dayPack} ready={guestsReady} guests={packingGuests.length} />
+              {dayPack.total > 0 && (
+                <div role="radiogroup" aria-label={pk.viewAria} className="flex gap-2">
+                  <ViewToggle label={pk.byGuest} active={packView === 'guest'} onClick={() => setPackView('guest')} />
+                  <ViewToggle label={pk.byItem}  active={packView === 'item'}  onClick={() => setPackView('item')} />
                 </div>
               )}
-              {dayStaff.length > 0 && (
-                <div className="space-y-1">
-                  <SummaryLabel>{gr.onDutyStaff}</SummaryLabel>
-                  <div className="flex flex-wrap gap-1.5">
-                    {dayStaff.map(s => (
-                      <PersonChip key={s.key} name={s.name} profileId={s.profileId} linked={isAdmin} className={SUMMARY_CHIP} hover={CHIP_LINK_HOVER}>
-                        {s.name}
-                        {s.roles.length > 0 && <span className="font-normal text-brand-100/70"> · {s.roles.join(', ')}</span>}
-                      </PersonChip>
-                    ))}
-                  </div>
-                </div>
+              {packView === 'guest' || dayPack.total === 0 ? (
+                groups.map(g => {
+                  const { seated, waitlisted } = partitionByWaitlist(g.rows)
+                  return (
+                    <section key={g.event.id} className="space-y-2">
+                      {banner(g)}
+                      {g.rows.length === 0 ? (
+                        <p className="text-xs text-brand-950/70 font-medium italic pl-1">{tp.noActiveRegistrants}</p>
+                      ) : (
+                        <GuestList
+                          rows={seated} pieces={pieces} packed={packedGear}
+                          onToggle={togglePiece} onSetAll={setPieces}
+                          linkToProfile={isAdmin} gearModels={gearModels} onProfilePatched={patchProfile}
+                        />
+                      )}
+                      {waitlisted.length > 0 && (
+                        <div className="space-y-2 border-t border-violet-400/30 pt-2">
+                          <h3 className="text-xs font-semibold uppercase tracking-wider text-violet-300 pl-1">
+                            {pk.waitlistHeading(waitlisted.length)}
+                          </h3>
+                          <GuestList
+                            rows={waitlisted} pieces={pieces} packed={packedGear}
+                            onToggle={togglePiece} onSetAll={setPieces}
+                            linkToProfile={isAdmin} gearModels={gearModels} onProfilePatched={patchProfile}
+                          />
+                        </div>
+                      )}
+                    </section>
+                  )
+                })
+              ) : (
+                <ItemPackList
+                  guests={seatedRows.map((r): PackGuest => ({
+                    bookingId: r.booking.id,
+                    name: personName(r.profile?.name) || tp.noProfile,
+                    pieces: pieces(r),
+                  }))}
+                  packed={packedGear}
+                  onToggle={togglePiece}
+                />
               )}
-              {dayDivers.length > 0 && (
-                <div className="space-y-1">
-                  <SummaryLabel>{lg.diversOnDay}</SummaryLabel>
-                  <div className="flex flex-wrap gap-1.5">
-                    {dayDivers.map(d => (
-                      <PersonChip key={d.key} name={d.name} profileId={d.profileId} linked={isAdmin} className={SUMMARY_CHIP} hover={CHIP_LINK_HOVER} />
-                    ))}
-                  </div>
-                </div>
-              )}
-              {dayNonDivers.length > 0 && (
-                <div className="space-y-1">
-                  <SummaryLabel tone="dry">{lg.nonDiversOnDay}</SummaryLabel>
-                  <div className="flex flex-wrap gap-1.5">
-                    {dayNonDivers.map(d => (
-                      <PersonChip key={d.key} name={d.name} profileId={d.profileId} linked={isAdmin} className={NON_DIVER_CHIP} hover={NON_DIVER_CHIP_LINK_HOVER} />
-                    ))}
-                  </div>
-                  <p className="text-xs text-brand-100/70 font-medium">{lg.nonDiverHint}</p>
-                </div>
-              )}
-              <div className="space-y-1">
-                <SummaryLabel>{t.bookings.breakdown.transportation}</SummaryLabel>
+              <p className="text-xs text-brand-100/60 font-medium">{lg.packedHint}</p>
+            </div>
+          )}
+
+          {section === 'rides' && (
+            <div role="tabpanel" aria-label={pk.rides} className="space-y-4">
+              <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-2">
                 <p className="text-sm text-brand-900 font-medium">
                   <span className="text-red-300 font-semibold">{transport.needsRide}</span>{lg.needARide}
                   {onDutyStaffCount > 0 && (
@@ -864,173 +630,300 @@ export function AdminLogisticsPage() {
                     day: dayKey, eventId, rows: rideGroups,
                   }))}
                 />
-                {rideError && <p className="text-sm font-semibold text-red-600">{rideError}</p>}
+                {rideError && <p className="text-sm font-semibold text-red-300">{rideError}</p>}
               </div>
-              <div className="space-y-1">
-                <SummaryLabel>{lg.gearToPack}</SummaryLabel>
-                {overallGear.length === 0 ? (
-                  <p className="text-sm text-brand-950/70 font-medium italic">{lg.nothingToPack}</p>
-                ) : (
-                  <GearChips totals={overallGear} rows={seatedRows} packed={packedGear} onTogglePiece={togglePackedPiece} />
-                )}
-              </div>
-              {overallCare.length > 0 && (
-                <div className="space-y-1">
-                  <SummaryLabel tone="care">{gr.handleWithCare}</SummaryLabel>
-                  <div className="flex flex-wrap gap-1.5">
-                    {overallCare.map(({ item, divers }) => (
-                      // Amber keeps a real light fill, so its dark ink is correct here.
-                      <span key={item} className="text-xs px-2 py-0.5 rounded-full border border-amber-500 bg-amber-50 text-amber-900 font-semibold">
-                        {item} ×{divers.length}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {overallAddons.length > 0 && (
-                <div className="space-y-1">
-                  <SummaryLabel>{gr.addons}</SummaryLabel>
-                  <div className="flex flex-wrap gap-1.5">
-                    {overallAddons.map(({ title, count }) => (
-                      <span key={title} className={SUMMARY_CHIP}>{title} ×{count}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {waitlistRows.length > 0 && (
-                // Full-width so the "if the waitlist clears" load reads as a
-                // block apart from the confirmed prep lists above it.
-                <div className="space-y-1.5 sm:col-span-2 border-t border-violet-400/30 pt-3">
-                  <SummaryLabel tone="tentative">{lg.tentativeWaitlist(waitlistRows.length)}</SummaryLabel>
-                  <p className="text-xs text-brand-100/70 font-medium">{lg.tentativeHint}</p>
-                  {waitlistDivers.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {waitlistDivers.map(d => (
-                        <PersonChip key={d.key} name={d.name} profileId={d.profileId} linked={isAdmin} className={WAITLIST_CHIP} hover={WAITLIST_CHIP_LINK_HOVER} />
-                      ))}
-                    </div>
-                  )}
-                  {waitlistGear.length > 0 && <GearChips totals={waitlistGear} rows={waitlistRows} packed={packedGear} onTogglePiece={togglePackedPiece} />}
-                  {waitlistAddons.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {waitlistAddons.map(({ title, count }) => (
-                        <span key={`a-${title}`} className={SUMMARY_CHIP}>{title} ×{count}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </section>
-
-          {groups.map(g => {
-          // Seated divers pack/plan for real; waitlisted ones are grouped last
-          // and kept out of this event's gear/care/add-on/transport tallies so
-          // they agree with the seated-only Overall board above.
-          const { seated: eventSeated, waitlisted: eventWaitlist } = partitionByWaitlist(g.rows)
-          // Nobody on this one gets in the water, so its registrants are not
-          // divers and its banner must not call them that.
-          const eventDry = !eventEntersWater(g.event)
-          return (
-            <section key={g.event.id} className="space-y-2 pt-2">
-              {/* Bold banner per event so the sections are obvious when
-                  scrolling a tall phone screen. */}
-              <div className="bg-brand-900 text-white rounded-xl px-4 py-2.5 space-y-0.5">
-                <div className="flex items-start justify-between gap-3">
-                  {/* The title goes to the event itself; the Edit button beside
-                      it goes to the editor. Staff get the link too — unlike the
-                      editor, /admin/events/:id is theirs to read (App.tsx), and
-                      the old isAdmin gate here existed only because the title
-                      used to point at the admin-only edit page. */}
-                  <h2 className="text-base font-semibold break-words">
-                    <Link
-                      to={`/admin/events/${g.event.id}`}
-                      className="hover:underline"
-                    >
-                      {g.event.title}
-                    </Link>
-                  </h2>
-                  {isAdmin && (
-                    <Link
-                      to={`/admin/events/${g.event.id}/edit`}
-                      className="shrink-0 text-xs bg-white/15 hover:bg-white/25 text-white px-2.5 py-1 rounded-lg font-medium"
-                    >
-                      {t.admin.catalog.edit}
-                    </Link>
-                  )}
-                </div>
-                <span className="block text-xs text-white/80">
-                  {formatEventSpan(g.event, { style: 'compact' })}
-                  {' · '}{eventDry ? lg.nonDiverCount(g.rows.length) : lg.diverCount(g.rows.length)}
-                </span>
-                {eventDry && (
-                  <span className="inline-block text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border border-orange-300/60 bg-orange-500/20 text-orange-100">
-                    {lg.dryEventBadge}
-                  </span>
-                )}
-              </div>
-              <EventTransport rows={eventSeated} />
-              <StaffDutyGroup rows={g.staff} />
-              <EventVehicleGroup
-                event={g.event}
-                allocations={allocByEvent.get(g.event.id) ?? []}
-                available={availableVehicles(
-                  activeVehicles,
-                  new Set((allocByEvent.get(g.event.id) ?? []).map(a => a.vehicle_id)),
-                )}
-                vehicleMap={vehicleMap}
-                riders={runByEventId.get(g.event.id)?.riders ?? 0}
-                runSeats={runByEventId.get(g.event.id)?.fleetSeats ?? 0}
-                sharedWith={(runByEventId.get(g.event.id)?.events ?? [])
-                  .filter(e => e.id !== g.event.id)
-                  .map(e => e.title)}
-                isAdmin={isAdmin}
-                createdBy={profile?.id ?? null}
-                onChanged={() => setAllocReload(k => k + 1)}
-              />
-              <CareGearGroup rows={careTotals(eventSeated, addonTitles)} packed={packedGear} onTogglePiece={togglePackedPiece} />
-              <AddonSummaryGroup rows={addonTotals(eventSeated, addonTitles)} />
-              {/* Payments are money owed regardless of seat, so this stays on
-                  the full roster — a waitlisted diver who owes still shows. */}
-              <PaymentsDueGroup rows={dueRowsFor(g.rows)} currency={currency} />
-              {g.rows.length === 0 ? (
-                <p className="text-xs text-brand-950/70 font-medium italic pl-1">{tp.noActiveRegistrants}</p>
-              ) : (
-                eventSeated.map(r => (
-                  <DiverGearCard
-                    key={r.booking.id}
-                    row={r}
-                    onProfilePatched={patchProfile}
-                    linkToProfile={isAdmin}
-                    gearModels={gearModels}
-                    packed={packedGear}
-                    onTogglePiece={togglePackedPiece}
-                    onToggleAllPacked={toggleAllPackedFor}
+              {groups.map(g => (
+                <section key={g.event.id} className="space-y-2">
+                  {banner(g)}
+                  <EventTransport rows={partitionByWaitlist(g.rows).seated} />
+                  <EventVehicleGroup
+                    event={g.event}
+                    allocations={allocByEvent.get(g.event.id) ?? []}
+                    available={availableVehicles(
+                      activeVehicles,
+                      new Set((allocByEvent.get(g.event.id) ?? []).map(a => a.vehicle_id)),
+                    )}
+                    vehicleMap={vehicleMap}
+                    riders={runByEventId.get(g.event.id)?.riders ?? 0}
+                    runSeats={runByEventId.get(g.event.id)?.fleetSeats ?? 0}
+                    sharedWith={(runByEventId.get(g.event.id)?.events ?? [])
+                      .filter(e => e.id !== g.event.id)
+                      .map(e => e.title)}
+                    isAdmin={isAdmin}
+                    createdBy={profile?.id ?? null}
+                    onChanged={() => setAllocReload(k => k + 1)}
                   />
-                ))
-              )}
-              {eventWaitlist.length > 0 && (
-                <>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-violet-300 pt-1 pl-1">
-                    {lg.waitlistHeading(eventWaitlist.length)}
+                </section>
+              ))}
+            </div>
+          )}
+
+          {section === 'people' && (
+            <div role="tabpanel" aria-label={pk.people} className="space-y-4">
+              <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-1">
+                {/* Heads, not bookings: someone on two of the day's events is
+                    one person to brief and count. */}
+                <p className="text-sm text-brand-900 font-semibold">
+                  {lg.eventsDivers(groups.length, dayDiverCount)}
+                  {dayNonDiverCount > 0 && (
+                    <> · <span className="text-orange-300">{lg.nonDiverCount(dayNonDiverCount)}</span></>
+                  )}
+                  {onDutyStaffCount > 0 && <> · {pk.staffCount(onDutyStaffCount)}</>}
+                </p>
+                {dayNonDiverCount > 0 && <p className="text-xs text-brand-100/70 font-medium">{lg.nonDiverHint}</p>}
+              </div>
+              {groups.map(g => {
+                const { seated, waitlisted } = partitionByWaitlist(g.rows)
+                const dry = !eventEntersWater(g.event)
+                return (
+                  <section key={g.event.id} className="space-y-2">
+                    {banner(g)}
+                    <StaffDutyGroup rows={g.staff} />
+                    {seated.length > 0 && (
+                      <div role="group" aria-label={dry ? lg.nonDiversOnDay : lg.diversOnDay} className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-2">
+                        <h3 className={`text-sm font-bold ${dry ? 'text-orange-300' : 'text-brand-900'}`}>
+                          {dry ? lg.nonDiversOnDay : lg.diversOnDay}
+                        </h3>
+                        <div className="flex flex-wrap gap-1.5">
+                          {seated.map(r => (
+                            <PersonChip
+                              key={r.booking.id}
+                              name={personName(r.profile?.name) || tp.noProfile}
+                              profileId={r.profile?.id ?? null}
+                              linked={isAdmin}
+                              className={dry ? NON_DIVER_CHIP : NAME_CHIP}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {waitlisted.length > 0 && (
+                      <div role="group" aria-label={pk.waitlist} className="bg-white/70 backdrop-blur-md border border-violet-400/40 rounded-xl p-4 space-y-2">
+                        <h3 className="text-sm font-bold text-violet-300">{pk.waitlist}</h3>
+                        <div className="flex flex-wrap gap-1.5">
+                          {waitlisted.map(r => (
+                            <PersonChip
+                              key={r.booking.id}
+                              name={personName(r.profile?.name) || tp.noProfile}
+                              profileId={r.profile?.id ?? null}
+                              linked={isAdmin}
+                              className={WAITLIST_CHIP}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </section>
+                )
+              })}
+            </div>
+          )}
+
+          {section === 'payments' && (
+            <div role="tabpanel" aria-label={pk.payments} className="space-y-4">
+              <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4">
+                {dayOutstanding > 0 ? (
+                  <p className="text-sm font-semibold text-red-300">
+                    {lg.stillOwe(dayDue.length, currency, dayOutstanding.toLocaleString())}
                   </p>
-                  {eventWaitlist.map(r => (
-                    <DiverGearCard
-                      key={r.booking.id}
-                      row={r}
-                      onProfilePatched={patchProfile}
-                      linkToProfile={isAdmin}
-                      gearModels={gearModels}
-                      packed={packedGear}
-                      onTogglePiece={togglePackedPiece}
-                      onToggleAllPacked={toggleAllPackedFor}
-                    />
-                  ))}
-                </>
-              )}
-            </section>
-          )})}
+                ) : (
+                  <p className="text-sm text-brand-900 font-medium">{lg.allSettled}</p>
+                )}
+              </div>
+              {/* Money owed regardless of seat, so a waitlisted diver who owes
+                  still shows. An event where everyone has settled is left out. */}
+              {groups.filter(g => dueRowsFor(g.rows).length > 0).map(g => (
+                <section key={g.event.id} className="space-y-2">
+                  {banner(g)}
+                  <PaymentsDueGroup rows={dueRowsFor(g.rows)} currency={currency} />
+                </section>
+              ))}
+            </div>
+          )}
         </>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The guests of one event on the pack list. Anyone with something to bring
+ * gets a card; everyone else is still named, on one line underneath, so a
+ * packer can see they were counted rather than wonder whether they were missed.
+ */
+function GuestList({ rows, pieces, packed, onToggle, onSetAll, linkToProfile, gearModels, onProfilePatched }: {
+  rows: DiverGearRow[]
+  pieces: (r: DiverGearRow) => PackPiece[]
+  packed: Set<string>
+  onToggle: (key: string) => void
+  onSetAll: (keys: string[], value: boolean) => void
+  linkToProfile: boolean
+  gearModels: GearModelWithSizes[]
+  onProfilePatched: (diverId: string, patch: Partial<Profile>) => void
+}) {
+  const withGear = rows.filter(r => pieces(r).length > 0 || gearPackList(r.booking).note)
+  const without = rows.filter(r => !withGear.includes(r))
+  return (
+    <>
+      {withGear.map(r => (
+        <GuestPackCard
+          key={r.booking.id}
+          row={r}
+          pieces={pieces(r)}
+          packed={packed}
+          onToggle={onToggle}
+          onSetAll={onSetAll}
+          linkToProfile={linkToProfile}
+          gearModels={gearModels}
+          onProfilePatched={onProfilePatched}
+        />
+      ))}
+      {without.length > 0 && (
+        <p className="text-sm text-brand-100/70 font-medium pl-1">
+          <span className="font-semibold text-brand-100/80">{pk.noGearFor} </span>
+          <span className="select-text">{without.map(r => personName(r.profile?.name) || tp.noProfile).join(', ')}</span>
+        </p>
+      )}
+    </>
+  )
+}
+
+/** The whole day's packing at a glance: pieces on the van, guests finished. */
+function PackSummary({ pack, ready, guests }: { pack: { packed: number; total: number }; ready: number; guests: number }) {
+  if (pack.total === 0) {
+    return (
+      <div className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4">
+        <p className="text-sm text-brand-900 font-medium">{lg.nothingToPack}</p>
+      </div>
+    )
+  }
+  const done = pack.packed === pack.total
+  const pct = Math.round((pack.packed / pack.total) * 100)
+  return (
+    <div className={`backdrop-blur-md rounded-xl p-4 space-y-2 border ${done ? 'bg-emerald-500/10 border-emerald-400/50' : 'bg-white/70 border-surface-200'}`}>
+      <div className="flex items-baseline justify-between gap-3 flex-wrap">
+        <p className={`text-lg font-bold ${done ? 'text-emerald-200' : 'text-brand-900'}`}>
+          {done ? pk.everythingPacked : pk.dayProgress(pack.packed, pack.total)}
+        </p>
+        <p className="text-sm text-brand-100/70 font-medium">{pk.guestsReady(ready, guests)}</p>
+      </div>
+      <div
+        role="progressbar"
+        aria-label={pk.dayProgress(pack.packed, pack.total)}
+        aria-valuemin={0}
+        aria-valuemax={pack.total}
+        aria-valuenow={pack.packed}
+        className="h-2.5 rounded-full bg-white/10 overflow-hidden"
+      >
+        <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The rack-side view: per item, per size, one toggle per guest. The same ticks
+ * as the guest cards — a piece pulled here reads as packed on its guest's card.
+ */
+function ItemPackList({ guests, packed, onToggle }: {
+  guests: PackGuest[]
+  packed: Set<string>
+  onToggle: (key: string) => void
+}) {
+  return (
+    <ul className="space-y-3">
+      {piecesByItem(guests).map(group => {
+        const entries = group.sizes.flatMap(s => s.entries)
+        const done = entries.filter(e => packed.has(e.key)).length
+        const sized = group.sizes.some(s => s.size || s.sizeMissing)
+        const care = group.kind === 'care'
+        return (
+          <li
+            key={group.item}
+            aria-label={group.item}
+            className={`rounded-xl border p-3 space-y-2 backdrop-blur-md ${
+              care ? 'bg-amber-500/10 border-amber-400/50' : 'bg-white/70 border-surface-200'
+            }`}
+          >
+            <div className="flex items-baseline justify-between gap-3">
+              <h3 className={`text-base font-semibold ${care ? 'text-amber-100' : 'text-brand-900'}`}>
+                {group.item}
+                {care && <span className="text-xs font-medium text-amber-200"> · {gr.handleWithCare}</span>}
+              </h3>
+              <span className={`text-xs font-semibold ${done === entries.length ? 'text-emerald-300' : 'text-brand-100/70'}`}>
+                {done === entries.length ? gc.packedAll : gc.packedSome(done, entries.length)}
+              </span>
+            </div>
+            <ul className="space-y-1.5">
+              {group.sizes.map(s => (
+                <li key={`${s.size ?? ''}|${s.sizeMissing}`} className="flex items-start gap-2">
+                  {sized && (
+                    <span className={`w-16 shrink-0 pt-2 text-xs font-semibold break-words ${s.sizeMissing ? 'text-amber-300' : 'text-brand-100/80'}`}>
+                      {s.size ?? pk.sizeMissing}
+                    </span>
+                  )}
+                  <ul className="flex flex-wrap gap-1.5 min-w-0">
+                    {s.entries.map(e => {
+                      const on = packed.has(e.key)
+                      const label = s.size ? `${group.item} ${s.size}` : group.item
+                      return (
+                        <li key={e.key}>
+                          <button
+                            type="button"
+                            onClick={() => onToggle(e.key)}
+                            aria-pressed={on}
+                            aria-label={on ? gc.unmarkItemPacked(e.name, label) : gc.markItemPacked(e.name, label)}
+                            className={`min-h-10 px-3 rounded-full border text-sm transition-colors ${
+                              on
+                                ? 'border-emerald-400/70 bg-emerald-500/20 text-emerald-50 font-semibold'
+                                : 'border-white/25 bg-white/5 text-brand-50 font-medium hover:border-white/50'
+                            }`}
+                          >
+                            {on && <span aria-hidden>✓ </span>}{e.name}
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+/** One event's banner, the same in every section so a crew always knows which
+ *  trip the list under it belongs to. */
+function EventBanner({ event, headcount, isAdmin }: { event: AppEvent; headcount: number; isAdmin: boolean }) {
+  const dry = !eventEntersWater(event)
+  return (
+    <div className="bg-brand-900 text-white rounded-xl px-4 py-2.5 space-y-0.5">
+      <div className="flex items-start justify-between gap-3">
+        {/* The title goes to the event itself, which staff can read too; the
+            Edit button goes to the admin-only editor. */}
+        <h2 className="text-base font-semibold break-words">
+          <Link to={`/admin/events/${event.id}`} className="hover:underline">{event.title}</Link>
+        </h2>
+        {isAdmin && (
+          <Link
+            to={`/admin/events/${event.id}/edit`}
+            className="shrink-0 text-xs bg-white/15 hover:bg-white/25 text-white px-2.5 py-1 rounded-lg font-medium"
+          >
+            {t.admin.catalog.edit}
+          </Link>
+        )}
+      </div>
+      <span className="block text-xs text-white/80">
+        {formatEventSpan(event, { style: 'compact' })}
+        {' · '}{dry ? lg.nonDiverCount(headcount) : lg.diverCount(headcount)}
+      </span>
+      {dry && (
+        <span className="inline-block text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border border-orange-300/60 bg-orange-500/20 text-orange-100">
+          {lg.dryEventBadge}
+        </span>
       )}
     </div>
   )
@@ -1047,6 +940,58 @@ function DayTab({ label, active, onClick }: { label: string; active: boolean; on
         active
           ? 'bg-brand-900 text-white font-semibold'
           : 'bg-surface-100 text-brand-900 hover:bg-surface-200'
+      }`}
+    >
+      {label}
+    </button>
+  )
+}
+
+// A phone gives each of the four tabs about 80px, so the tab shows a bare
+// number under its label and says the whole phrase to a screen reader.
+function SectionTab({ label, count, countLabel, active, done = false, alert = false, onClick }: {
+  label: string
+  count: string | null
+  countLabel: string
+  active: boolean
+  done?: boolean
+  alert?: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      aria-label={count ? `${label}, ${countLabel}` : label}
+      onClick={onClick}
+      className={`min-h-12 min-w-0 rounded-lg px-0.5 py-1.5 flex flex-col items-center justify-center transition-colors ${
+        active ? 'bg-reef-500 text-slate-950' : 'text-brand-50 hover:bg-white/10'
+      }`}
+    >
+      <span className="text-[11px] sm:text-sm font-semibold leading-tight tracking-tight truncate max-w-full">{label}</span>
+      {count && (
+        <span className={`text-xs font-bold leading-tight truncate max-w-full ${
+          active ? 'text-slate-900' : done ? 'text-emerald-300' : alert ? 'text-red-300' : 'text-brand-100/70'
+        }`}>
+          {count}
+        </span>
+      )}
+    </button>
+  )
+}
+
+function ViewToggle({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={active}
+      onClick={onClick}
+      className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+        active
+          ? 'border-reef-400 bg-reef-500/20 text-reef-100 font-semibold'
+          : 'border-white/20 text-brand-50 font-medium hover:bg-white/10'
       }`}
     >
       {label}
