@@ -73,7 +73,7 @@ separate mechanism (baked into the manifest + `index.html` at build).
 
 `business.gearItems` is the one list behind three surfaces: the profile's "Gear
 I own" checklist, the à-la-carte rental checklist at registration, and the
-logistics packing totals.
+logistics pack checklist.
 
 **`gearPrices` decides what the shop rents.** Its keys are the subset of
 `gearItems` that appears in the rental checklist, each with its daily price. An
