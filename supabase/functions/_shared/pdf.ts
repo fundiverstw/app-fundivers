@@ -5,7 +5,7 @@
 //
 // Uses jsPDF directly (Deno 2 edge runtime supports `npm:` specifiers).
 
-import { jsPDF } from "npm:jspdf@2.5.1"
+import { jsPDF } from "npm:jspdf@4.2.1"
 import { Buffer } from "node:buffer"
 import { catalogNeedsCjkFont, needsCjkFont, payloadNeedsCjkFont } from "./pdf-fonts.ts"
 import { paymentInstructionsFor, paymentConfirmationReminder } from "./payment-instructions.ts"
