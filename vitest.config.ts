@@ -30,7 +30,7 @@ export default defineConfig({
     // pdf.ts imports jspdf with Deno's `npm:` specifier, which Vite cannot
     // resolve. Aliasing it to the devDependency of the same pinned version is
     // what lets pdf-render.test.ts drive the real renderer — see that file.
-    alias: { 'npm:jspdf@2.5.1': 'jspdf' },
+    alias: { 'npm:jspdf@4.2.1': 'jspdf' },
   },
   test: {
     projects: [

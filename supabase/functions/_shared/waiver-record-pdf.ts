@@ -8,7 +8,7 @@
 // Server-side because the embedded CJK font is too large for the SPA bundle —
 // same reason the registration PDF lives here. Mirrors pdf.ts's font handling.
 
-import { jsPDF } from "npm:jspdf@2.5.1";
+import { jsPDF } from "npm:jspdf@4.2.1";
 import { Buffer } from "node:buffer";
 import { needsCjkFont } from "./pdf-fonts.ts";
 import { t } from "./i18n.ts";

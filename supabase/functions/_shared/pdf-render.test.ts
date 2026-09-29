@@ -19,7 +19,7 @@ import type { ShopContact, PaymentMethodDetails } from '../../../src/lib/payment
 // in the shop tagline.
 //
 // So drive the real renderer and record what font each draw actually used.
-// jsPDF resolves through the `npm:jspdf@2.5.1` → `jspdf` alias in
+// jsPDF resolves through the `npm:jspdf@4.2.1` → `jspdf` alias in
 // vitest.config.ts, and pdf.ts's two `Deno.readFile` calls (the font, the logo)
 // go through the shim below.
 //
@@ -56,7 +56,7 @@ let recorder: Draw[] = []
 // than putting them on the prototype, so the only place to intercept is
 // construction. Wrapping the constructor keeps the real renderer intact — every
 // measurement, page break and font metric is jsPDF's own.
-vi.mock('npm:jspdf@2.5.1', async () => {
+vi.mock('npm:jspdf@4.2.1', async () => {
   const actual = await vi.importActual<typeof import('jspdf')>('jspdf')
   function Recording(this: unknown, ...args: ConstructorParameters<typeof actual.jsPDF>) {
     const doc = new actual.jsPDF(...args)
