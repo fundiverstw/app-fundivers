@@ -42,7 +42,7 @@ either an event or a booking.
 
 | Table | Key columns | Notes |
 | --- | --- | --- |
-| `profiles` | `id` (= `auth.users.id`), `role` | `role in ('diver','staff','admin')`. Row auto-created by `handle_new_user()` on signup. Personal + cert + sizing + emergency contact + gear-owned + gear sizes + `agreed_to_terms_at`. |
+| `profiles` | `id` (= `auth.users.id`), `role` | `role in ('diver','staff','admin')`. Row auto-created by `handle_new_user()` on signup. Personal + cert (`cert_level_code`, see [below](#a-divers-certification)) + sizing + emergency contact + gear-owned + gear sizes + `agreed_to_terms_at`. |
 | `bookings` | `id`, `user_id`, `event_id`, `status`, `details` (jsonb), `refund_requested_at`, `group_id`, `payer_id`, `continues_booking_id`, `attend_days` | `event_id` → `events(id)`. `details` shape enforced app-side by `BookingDetails` in `src/types/database.ts`. One live booking per (user, event). After insert, most columns are immutable for divers — the `bookings_diver_immutable` trigger in the baseline. `continues_booking_id` / `attend_days` carry a course finished across two scheduled courses (see [events-and-bookings.md](./events-and-bookings.md#one-course-several-scheduled-courses)). |
 | `payments` | `id`, `user_id`, `booking_id`, `amount`, `status`, `method`, `recorded_by` | Ledger entries, staff-inserted. `status in ('pending','paid','refunded')`. |
 | `diver_notes` | `id`, `profile_id`, `created_by`, `content`, `edited_*` | Per-diver standing facts (allergies, accommodations) — staff/admin can read+insert under their own attribution; admin or own-author can update/delete. `profile_id`/`created_by`/`created_at` frozen by trigger so RLS can't be sidestepped. |
@@ -122,6 +122,26 @@ Normalization into the uniform `AppEvent` shape lives in
 `src/lib/events.ts` — `fetchEventsInRange`, `fetchEventsForBookings`,
 `fetchUpcomingEventDays`. Use `AppEvent` everywhere in the UI rather than
 reading raw `events` rows.
+
+## A diver's certification
+
+`profiles.cert_level_code` is the level a diver holds: a foreign key to `cert_levels.code` (`'ssi_advanced_open_water'`), picked in the profile page and both register forms through `CertLevelPicker`. Read it whenever code needs to *know* the level — its row carries `rank` and `padi_equivalent_id` for comparing across agencies.
+
+- **`cert_agency` / `cert_level` are a copy.** `profiles_cert_level_mirror_trg` writes the picked row's `organization` / `name` into them on every insert and update, and `cert_levels_refresh_profile_copies_trg` rewrites them when an admin renames a level. They exist so screens, exports and emails can print "SSI Advanced Open Water Diver" without a join; never write them from the app.
+- **Null code, text present = a legacy value nobody has placed.** `backfill_profile_cert_level_codes()` (migration `20260929100000`, re-runnable) matched the old free text against the ladder and left anything ambiguous alone. Those divers are asked to pick again on their profile and at registration, and show as missing a certification on the admin screens. To list them:
+
+  ```sql
+  select id, name, cert_agency, cert_level
+    from profiles
+   where cert_level_code is null and not uncertified
+     and coalesce(btrim(cert_level), '') <> ''
+   order by name;
+  ```
+
+  Fix one by setting its code (`update profiles set cert_level_code = 'sdi_rescue' where id = …`); the trigger writes the text.
+- **Null code, no text** is a diver who hasn't answered; `uncertified = true` is "I hold nothing" (the two can't both be set — `profiles_cert_level_or_uncertified`).
+- `application_submitted_at` is stamped only once a code is picked.
+- One level per diver: the highest they hold. Nitrox and Deep stay separate flags with their own card photos.
 
 ## Other app-owned tables
 

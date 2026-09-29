@@ -67,9 +67,16 @@ function setupFrom(children: Profile[]) {
     if (table === 'profiles') return mockQueryBuilder({ data: children })
     if (table === 'waivers') return mockQueryBuilder({ data: WAIVER_ROWS })
     if (table === 'payment_methods') return mockQueryBuilder({ data: PAYMENT_METHOD_ROWS })
+    if (table === 'cert_levels') return mockQueryBuilder({ data: CERT_LEVEL_ROWS })
     return mockQueryBuilder()
   })
 }
+
+const CERT_LEVEL_ROWS = [
+  { id: 'l1', code: 'open_water', name: 'OW', organization: 'PADI', rank: 1, padi_equivalent_id: 'l1' },
+  { id: 'l2', code: 'advanced_open_water', name: 'AOW', organization: 'PADI', rank: 2, padi_equivalent_id: 'l2' },
+  { id: 'l3', code: 'ssi_advanced_open_water', name: 'Advanced Open Water Diver', organization: 'SSI', rank: 2, padi_equivalent_id: 'l2' },
+]
 
 // The shop's payment methods, read from the DB rather than a hardcoded union.
 const PAYMENT_METHOD_ROWS = [
@@ -377,6 +384,31 @@ describe('MultiRegisterForm parent diver picker', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
     expect(screen.queryByText(t.register.gear.sizesTitle)).not.toBeInTheDocument()
+  })
+
+  it('saves the picked level as a cert_levels code', async () => {
+    setupFrom([])
+    const user = userEvent.setup()
+    render(
+      <MultiRegisterForm
+        events={[sampleEvent('e1', 'Kenting')]}
+        profile={parentProfile} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await waitFor(() => expect(screen.getByRole('option', { name: 'SSI' })).toBeInTheDocument())
+    await user.selectOptions(screen.getByLabelText(/cert agency/i), 'SSI')
+    await user.selectOptions(screen.getByLabelText(/cert level/i), 'ssi_advanced_open_water')
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/No, I'll get there myself/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /confirm/i }))
+    await waitFor(() => expect(invoke).toHaveBeenCalled())
+    const body = (invoke.mock.calls[0][1] as { body: { profile_patch: Record<string, unknown> } }).body
+    expect(body.profile_patch.cert_level_code).toBe('ssi_advanced_open_water')
+    expect(body.profile_patch).not.toHaveProperty('cert_level')
   })
 
   it('saves the height and weight typed on the about-you step', async () => {

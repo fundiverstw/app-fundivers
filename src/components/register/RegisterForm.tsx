@@ -31,6 +31,8 @@ import { TurnstileWidget, type TurnstileHandle } from './TurnstileWidget'
 import { CAPTCHA_REUSE_MAX_AGE_MS } from '../../lib/turnstile'
 import { WhatHappensNext } from './WhatHappensNext'
 import { TextField } from './TextField'
+import { CertLevelPicker } from '../CertLevelPicker'
+import { useCertLevels } from '../../hooks/useCertLevels'
 import { HeightField, WeightField } from '../MeasureField'
 import { MeasureRow } from './MeasureRow'
 import { numOrNullStr } from '../../lib/units'
@@ -647,7 +649,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const [contactMethod, setContactMethod] = useState<ContactMethod | ''>(profile?.contact_method ?? '')
   const [contactId, setContactId] = useState(profile?.contact_id ?? '')
   const [certAgency, setCertAgency] = useState(profile?.cert_agency ?? '')
-  const [certLevel, setCertLevel] = useState(profile?.cert_level ?? '')
+  const [certLevelCode, setCertLevelCode] = useState(profile?.cert_level_code ?? '')
+  const certLevels = useCertLevels()
   const [loggedDives, setLoggedDives] = useState(profile?.logged_dives ?? 0)
   const [nitroxCertified, setNitroxCertified] = useState(profile?.nitrox_certified ?? false)
   // Holds a freshly-picked nitrox card until submit, when it gets uploaded
@@ -685,7 +688,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // costs is evidence: name a level and the photo is deferrable only by
   // acknowledging you'll bring the physical card (or be turned away, no
   // refund).
-  const needsCertPhoto = !uncertified && certLevel.trim() !== '' && !hasCertCardOnFile && !certFile
+  const needsCertPhoto = !uncertified && certLevelCode.trim() !== '' && !hasCertCardOnFile && !certFile
   const certPhotoBlocked = !isOnBehalfOf && needsCertPhoto && !certCardAck
 
   // Event prerequisites resolved from the catalog row (a required cert and/or a
@@ -759,7 +762,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       savedAt: Date.now(),
       step,
       fullName, dob, nationality, gender, idNumber,
-      contactMethod, contactId, certAgency, certLevel, uncertified, loggedDives,
+      contactMethod, contactId, certAgency, certLevelCode, uncertified, loggedDives,
       nitroxCertified, deepCertified, emergencyName, emergencyPhone,
       guestEmail, guestAgreedTerms,
       gearChoice, gearHelpNote, editedGearItems,
@@ -773,7 +776,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     return () => clearTimeout(t)
   }, [
     draftKey, step, fullName, dob, nationality, gender, idNumber,
-    contactMethod, contactId, certAgency, certLevel, uncertified, loggedDives,
+    contactMethod, contactId, certAgency, certLevelCode, uncertified, loggedDives,
     nitroxCertified, deepCertified, emergencyName, emergencyPhone,
     guestEmail, guestAgreedTerms, gearChoice, gearHelpNote, editedGearItems,
     shoeSize, heightCm, weightKg, roomId, roomNotes, addonIds,
@@ -796,7 +799,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     setContactMethod(d.contactMethod as ContactMethod | '')
     setContactId(d.contactId)
     setCertAgency(d.certAgency)
-    setCertLevel(d.certLevel)
+    setCertLevelCode(d.certLevelCode)
     setUncertified(d.uncertified)
     setLoggedDives(d.loggedDives)
     setNitroxCertified(d.nitroxCertified)
@@ -1223,8 +1226,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       id_number:               nullish(idNumber),
       contact_method:          (contactMethod || null) as ContactMethod | null,
       contact_id:              nullish(contactId),
-      cert_agency:             uncertified ? null : nullish(certAgency),
-      cert_level:              uncertified ? null : nullish(certLevel),
+      // cert_agency / cert_level follow from this in the database.
+      cert_level_code:         uncertified ? null : nullish(certLevelCode),
       uncertified,
       logged_dives:            Number.isFinite(loggedDives) ? loggedDives : 0,
       nitrox_certified:        nitroxCertified,
@@ -1791,7 +1794,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                     onChange={e => {
                       const v = e.target.checked
                       setUncertified(v)
-                      if (v) { setCertAgency(''); setCertLevel(''); setCertFile(null); setCertCardAck(false) }
+                      if (v) { setCertAgency(''); setCertLevelCode(''); setCertFile(null); setCertCardAck(false) }
                     }}
                     className="accent-brand-900"
                   />
@@ -1799,12 +1802,21 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 </label>
               )}
               {!uncertified && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <TextField label={t.register.certAgency} placeholder={t.register.certAgencyPlaceholder} value={certAgency} onChange={setCertAgency} />
-                  <TextField label={t.register.certLevel} placeholder={t.register.certLevelPlaceholder} value={certLevel} onChange={setCertLevel} />
-                </div>
+                <CertLevelPicker
+                  levels={certLevels}
+                  agency={certAgency}
+                  code={certLevelCode}
+                  onAgencyChange={setCertAgency}
+                  onCodeChange={setCertLevelCode}
+                  agencyLabel={t.register.certAgency}
+                  levelLabel={t.register.certLevel}
+                  labelClassName="block text-xs text-brand-900 font-medium mb-1"
+                  selectClassName={INPUT_REGISTER}
+                  legacyText={profile?.cert_level_code ? null : [profile?.cert_agency, profile?.cert_level].filter(Boolean).join(' ')}
+                  className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+                />
               )}
-              {!uncertified && certLevel.trim() !== '' && !hasCertCardOnFile && !isOnBehalfOf && (
+              {!uncertified && certLevelCode.trim() !== '' && !hasCertCardOnFile && !isOnBehalfOf && (
                 <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
                   <p className="text-xs font-semibold text-amber-900">
                     {t.register.cert.addProof}
@@ -1848,7 +1860,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                   )}
                 </div>
               )}
-              {!uncertified && certLevel.trim() !== '' && hasCertCardOnFile && (
+              {!uncertified && certLevelCode.trim() !== '' && hasCertCardOnFile && (
                 <p className="text-xs text-brand-950 font-medium">
                   {t.register.cert.onFile}
                 </p>

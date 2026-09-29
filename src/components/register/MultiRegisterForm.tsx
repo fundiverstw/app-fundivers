@@ -16,6 +16,8 @@ import { fetchRideSeats, canRequestRide, type RideSeats } from '../../lib/event-
 import { missingWaivers, fetchEventWaiverOverrides, fetchDiverSignatures, fetchWaivers, type WaiverEventRef } from '../../lib/waivers'
 import { WaiverSignDialog } from '../waivers/WaiverSignDialog'
 import { TextField } from './TextField'
+import { CertLevelPicker } from '../CertLevelPicker'
+import { useCertLevels } from '../../hooks/useCertLevels'
 import { HeightField, WeightField } from '../MeasureField'
 import { MeasureRow } from './MeasureRow'
 import { INPUT_REGISTER } from '../../styles/tokens'
@@ -190,7 +192,8 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   const [contactMethod, setContactMethod]     = useState<ContactMethod | ''>(profile?.contact_method ?? '')
   const [contactId, setContactId]             = useState(profile?.contact_id ?? '')
   const [certAgency, setCertAgency]           = useState(profile?.cert_agency ?? '')
-  const [certLevel, setCertLevel]             = useState(profile?.cert_level ?? '')
+  const [certLevelCode, setCertLevelCode]     = useState(profile?.cert_level_code ?? '')
+  const certLevels = useCertLevels()
   const [uncertified, setUncertified]         = useState(profile?.uncertified ?? false)
   const [nitroxCertified, setNitroxCertified] = useState(profile?.nitrox_certified ?? false)
   const [deepCertified, setDeepCertified]     = useState(profile?.deep_certified ?? false)
@@ -321,8 +324,8 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
       gender:                  nullish(gender),
       contact_method:          (contactMethod || null) as ContactMethod | null,
       contact_id:              nullish(contactId),
-      cert_agency:             uncertified ? null : nullish(certAgency),
-      cert_level:              uncertified ? null : nullish(certLevel),
+      // cert_agency / cert_level follow from this in the database.
+      cert_level_code:         uncertified ? null : nullish(certLevelCode),
       uncertified,
       nitrox_certified:        nitroxCertified,
       deep_certified:          deepCertified,
@@ -624,17 +627,26 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                   onChange={e => {
                     const v = e.target.checked
                     setUncertified(v)
-                    if (v) { setCertAgency(''); setCertLevel('') }
+                    if (v) { setCertAgency(''); setCertLevelCode('') }
                   }}
                   className="accent-brand-900"
                 />
                 {t.register.notCertified}
               </label>
               {!uncertified && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <TextField label={t.register.certAgency} placeholder={t.register.certAgencyPlaceholder} value={certAgency} onChange={setCertAgency} />
-                  <TextField label={t.register.certLevel} placeholder={t.register.certLevelPlaceholder} value={certLevel} onChange={setCertLevel} />
-                </div>
+                <CertLevelPicker
+                  levels={certLevels}
+                  agency={certAgency}
+                  code={certLevelCode}
+                  onAgencyChange={setCertAgency}
+                  onCodeChange={setCertLevelCode}
+                  agencyLabel={t.register.certAgency}
+                  levelLabel={t.register.certLevel}
+                  labelClassName="block text-xs text-brand-900 font-medium mb-1"
+                  selectClassName={INPUT_REGISTER}
+                  legacyText={profile?.cert_level_code ? null : [profile?.cert_agency, profile?.cert_level].filter(Boolean).join(' ')}
+                  className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+                />
               )}
               <div className="grid grid-cols-2 gap-3">
                 <label className="flex items-center gap-2 text-sm text-brand-950 font-medium">

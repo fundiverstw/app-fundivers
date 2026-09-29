@@ -796,6 +796,11 @@ export interface Database {
           emergency_contact_phone: string | null
           cert_agency: string | null
           cert_level: string | null
+          /** `cert_levels.code` of the level the diver holds — the source of truth.
+           *  cert_agency / cert_level are a trigger-maintained copy of that row's
+           *  organization / name; with this null they hold a legacy free-text value
+           *  the backfill could not place (or nothing). */
+          cert_level_code: string | null
           cert_card_path: string | null
           nitrox_card_path: string | null
           deep_card_path: string | null
@@ -855,6 +860,7 @@ export interface Database {
           emergency_contact_phone?: string | null
           cert_agency?: string | null
           cert_level?: string | null
+          cert_level_code?: string | null
           cert_card_path?: string | null
           nitrox_card_path?: string | null
           deep_card_path?: string | null
@@ -891,6 +897,7 @@ export interface Database {
           emergency_contact_phone?: string | null
           cert_agency?: string | null
           cert_level?: string | null
+          cert_level_code?: string | null
           cert_card_path?: string | null
           nitrox_card_path?: string | null
           deep_card_path?: string | null

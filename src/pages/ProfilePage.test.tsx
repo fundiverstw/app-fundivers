@@ -312,7 +312,10 @@ describe('ProfilePage', () => {
     await waitFor(() => expect(update).toHaveBeenCalledOnce())
     const payload = update.mock.calls[0][0] as Record<string, unknown>
     expect(payload.uncertified).toBe(true)
-    expect(payload.cert_level).toBeNull()
+    expect(payload.cert_level_code).toBeNull()
+    // The text copy is the database's to write, never the form's.
+    expect(payload).not.toHaveProperty('cert_level')
+    expect(payload).not.toHaveProperty('cert_agency')
     // Still no cert-card section after choosing uncertified.
     expect(screen.queryByLabelText('Upload certification card')).not.toBeInTheDocument()
   })

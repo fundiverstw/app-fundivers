@@ -9,7 +9,7 @@ const complete = {
   gender: 'female',
   contact_method: 'line',
   contact_id: 'ada-line',
-  cert_level: 'AOW',
+  cert_level_code: 'advanced_open_water',
   uncertified: false,
 } as unknown as Partial<Profile>
 
@@ -33,11 +33,17 @@ describe('profileGaps', () => {
   // "I'm not certified yet" is an answer, not an omission — the DB trigger
   // can't tell the difference, which is why the UI asks this module instead.
   it('accepts an uncertified diver with no cert level', () => {
-    expect(profileGaps({ ...complete, cert_level: null, uncertified: true })).toEqual([])
+    expect(profileGaps({ ...complete, cert_level_code: null, uncertified: true })).toEqual([])
   })
 
   it('flags a certified diver with no cert level', () => {
-    expect(profileGaps({ ...complete, cert_level: null, uncertified: false })).toEqual(['certification'])
+    expect(profileGaps({ ...complete, cert_level_code: null, uncertified: false })).toEqual(['certification'])
+  })
+
+  // Legacy free text the backfill couldn't place is not a level on file.
+  it('flags free text with no picked level', () => {
+    expect(profileGaps({ ...complete, cert_level_code: null, cert_agency: 'PSAI', cert_level: 'PE40' }))
+      .toEqual(['certification'])
   })
 
   // Optional fields are silent: flagging them would drown the real gaps.

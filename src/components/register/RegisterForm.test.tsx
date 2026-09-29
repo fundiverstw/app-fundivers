@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { ShopContactContext } from '../../hooks/shop-contact-context'
@@ -112,7 +112,7 @@ const sampleProfile: Profile = {
   name: 'Ada', 
   date_of_birth: '1987-05-03', nationality: 'British', id_number: null,
   emergency_contact_name: null, emergency_contact_phone: null,
-  cert_agency: 'PADI', cert_level: 'Advanced Open Water',
+  cert_agency: 'PADI', cert_level: 'AOW', cert_level_code: 'advanced_open_water',
   cert_number: null, cert_date: null,
   cert_card_path: 'u1/existing-card.jpg',
   nitrox_card_path: null, medical_notes: null,
@@ -157,12 +157,19 @@ const PAYMENT_METHOD_ROWS = [
   ...m,
 }))
 
+const CERT_LEVEL_ROWS = [
+  { id: 'l1', code: 'open_water', name: 'OW', organization: 'PADI', rank: 1, padi_equivalent_id: 'l1' },
+  { id: 'l2', code: 'advanced_open_water', name: 'AOW', organization: 'PADI', rank: 2, padi_equivalent_id: 'l2' },
+  { id: 'l3', code: 'sdi_rescue', name: 'Rescue Diver', organization: 'SDI', rank: 3, padi_equivalent_id: null },
+]
+
 function setupFrom(updated: unknown = { id: 'b-existing' }) {
   from.mockImplementation((table: string) => {
     if (table === 'payment_methods') return mockQueryBuilder({ data: PAYMENT_METHOD_ROWS })
     if (table === 'rooms')     return mockQueryBuilder({ data: sampleRooms })
     if (table === 'addons') return mockQueryBuilder({ data: sampleAddons })
     if (table === 'waivers') return mockQueryBuilder({ data: WAIVER_ROWS })
+    if (table === 'cert_levels') return mockQueryBuilder({ data: CERT_LEVEL_ROWS })
     if (table === 'bookings') {
       // New bookings now go through the create-registration edge function;
       // only the admin-edit path still hits bookings.update directly.
@@ -1089,7 +1096,7 @@ describe('RegisterForm', () => {
     const blankProfile: Profile = {
       ...sampleProfile,
       name: null, date_of_birth: null, nationality: null, gender: null,
-      cert_level: null, cert_agency: null, cert_card_path: null, uncertified: false,
+      cert_level: null, cert_agency: null, cert_level_code: null, cert_card_path: null, uncertified: false,
     }
     render(
       <RegisterForm event={sampleEvent} profile={blankProfile} userId="u1"
@@ -1107,7 +1114,7 @@ describe('RegisterForm', () => {
     const blankProfile: Profile = {
       ...sampleProfile,
       name: null, date_of_birth: null, nationality: null, gender: null,
-      cert_level: null, cert_agency: null, cert_card_path: null, uncertified: false,
+      cert_level: null, cert_agency: null, cert_level_code: null, cert_card_path: null, uncertified: false,
       shoe_size: null, height_cm: null, weight_kg: null,
     }
     render(
@@ -1127,8 +1134,47 @@ describe('RegisterForm', () => {
     const { body } = invoke.mock.calls[0][1] as { body: { profile_patch: Record<string, unknown> } }
     expect(body.profile_patch).toMatchObject({
       name: null, date_of_birth: null, nationality: null, gender: null,
-      cert_level: null, shoe_size: null,
+      cert_level_code: null, shoe_size: null,
     })
+  })
+
+  it('saves the picked agency + level as a cert_levels code, not typed text', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))  // 1 → 2
+    const agency = await screen.findByLabelText(/cert agency/i)
+    await waitFor(() => expect(within(agency).getByRole('option', { name: 'SDI' })).toBeInTheDocument())
+    await user.selectOptions(agency, 'SDI')
+    // Changing agency drops the PADI level: it belongs to the other ladder.
+    expect((screen.getByLabelText(/cert level/i) as HTMLSelectElement).value).toBe('')
+    await user.selectOptions(screen.getByLabelText(/cert level/i), 'sdi_rescue')
+    await user.click(screen.getByRole('button', { name: /next/i }))  // 2 → 3
+    await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+    await user.click(screen.getByLabelText(/i need to rent/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))  // 3 → 4
+    await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+    const { body } = invoke.mock.calls[0][1] as { body: { profile_patch: Record<string, unknown> } }
+    expect(body.profile_patch.cert_level_code).toBe('sdi_rescue')
+    expect(body.profile_patch).not.toHaveProperty('cert_level')
+    expect(body.profile_patch).not.toHaveProperty('cert_agency')
+  })
+
+  it('asks a diver with an unplaced legacy certification to pick again', async () => {
+    setupFrom()
+    const user = userEvent.setup()
+    const legacy: Profile = { ...sampleProfile, cert_agency: 'PSAI', cert_level: 'PE40', cert_level_code: null }
+    render(
+      <RegisterForm event={sampleEvent} profile={legacy} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))  // 1 → 2
+    expect(screen.getByText(/PSAI PE40.*isn’t on our list/i)).toBeInTheDocument()
   })
 
   it('drops the required marker from every step-2 label', async () => {
@@ -1147,7 +1193,7 @@ describe('RegisterForm', () => {
   it('step 2 defers the cert photo behind the bring-your-card disclaimer', async () => {
     setupFrom()
     const user = userEvent.setup()
-    const noCardProfile: Profile = { ...sampleProfile, cert_level: 'Open Water', cert_card_path: null }
+    const noCardProfile: Profile = { ...sampleProfile, cert_level: 'OW', cert_level_code: 'open_water', cert_card_path: null }
     render(
       <RegisterForm event={sampleEvent} profile={noCardProfile} userId="u1"
         onClose={() => {}} onBooked={() => {}} />
@@ -1165,7 +1211,7 @@ describe('RegisterForm', () => {
   it('step 2 takes no answer to the certification question at all', async () => {
     setupFrom()
     const user = userEvent.setup()
-    const blankCert: Profile = { ...sampleProfile, cert_level: null, cert_card_path: null }
+    const blankCert: Profile = { ...sampleProfile, cert_level: null, cert_level_code: null, cert_card_path: null }
     render(
       <RegisterForm event={sampleEvent} profile={blankCert} userId="u1"
         onClose={() => {}} onBooked={() => {}} />
@@ -1209,7 +1255,7 @@ describe('RegisterForm', () => {
   it('step 2 Next is allowed when a cert level is filled AND a cert card is already on file', async () => {
     setupFrom()
     const user = userEvent.setup()
-    // sampleProfile already has cert_level + cert_card_path set, so this is
+    // sampleProfile already has cert_level_code + cert_card_path set, so this is
     // the default-path assertion: gate stays open, "on file" copy shown.
     render(
       <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
@@ -1962,11 +2008,11 @@ describe('RegisterForm', () => {
   describe('parent diver picker', () => {
     const childProfile: Profile = {
       ...sampleProfile, id: 'child-1', name: 'Bee Junior',
-      cert_level: null, cert_card_path: null,
+      cert_level: null, cert_level_code: null, cert_card_path: null,
     }
     const childTwoProfile: Profile = {
       ...sampleProfile, id: 'child-2', name: 'Bee The Second',
-      cert_level: null, cert_card_path: null,
+      cert_level: null, cert_level_code: null, cert_card_path: null,
     }
 
     function setupFromWithChildren(children: Profile[]) {
