@@ -56,8 +56,13 @@ interface MockOpts {
   profileCertLevel?: string | null
   profileUncertified?: boolean
   profileLoggedDives?: number
+  /** A LADDER code; defaults to AOW. */
+  profileCertLevelCode?: string | null
+  profileNitroxCertified?: boolean
+  /** A LADDER id ('cl-aow'). */
   prereqCertId?: string | null
   reqDives?: number | string | null
+  nitroxRequired?: boolean
   // Money-recompute inputs: the event's linked prices row + dive_days.
   eventPriceId?: string | null
   eventDiveDays?: number
@@ -72,6 +77,15 @@ interface MockOpts {
   paymentMethodSurcharge?: number
   paymentMethodMissing?: boolean
 }
+
+// Enough of cert_levels to grade against: three PADI levels and SSI's AOW,
+// which resolves to PADI's.
+const LADDER = [
+  { id: 'cl-ow',      code: 'open_water',              rank: 1, padi_equivalent_id: 'cl-ow' },
+  { id: 'cl-aow',     code: 'advanced_open_water',     rank: 2, padi_equivalent_id: 'cl-aow' },
+  { id: 'cl-rescue',  code: 'rescue',                  rank: 3, padi_equivalent_id: 'cl-rescue' },
+  { id: 'cl-ssi-aow', code: 'ssi_advanced_open_water', rank: 2, padi_equivalent_id: 'cl-aow' },
+]
 
 function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites } {
   const captured: CapturedWrites = {
@@ -97,6 +111,8 @@ function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites }
             cert_level: opts.profileCertLevel === undefined ? 'AOW' : opts.profileCertLevel,
             uncertified: opts.profileUncertified ?? false,
             logged_dives: opts.profileLoggedDives ?? 25,
+            cert_level_code: opts.profileCertLevelCode === undefined ? 'advanced_open_water' : opts.profileCertLevelCode,
+            nitrox_certified: opts.profileNitroxCertified ?? false,
           }
         case 'bookings':
           return { id: 'b1', status: opts.bookingStatus ?? 'pending', notes: null }
@@ -105,6 +121,7 @@ function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites }
             id: 'd1', kind: 'dive', display_title: 'Test Dive',
             prereq_cert_id: opts.prereqCertId ?? null,
             req_dives: opts.reqDives ?? null,
+            nitrox_required: opts.nitroxRequired ?? false,
             price: opts.eventPriceId ?? null,
             dive_days: opts.eventDiveDays ?? 1,
             has_transport: opts.eventHasTransport ?? true,
@@ -125,6 +142,8 @@ function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites }
             surcharge_percent: opts.paymentMethodSurcharge ?? 0,
             collects_invoice_email: true, shows_shop_contact: false,
           }
+        case 'cert_levels':
+          return LADDER as unknown as Record<string, unknown>
         default:           return null
       }
     })()
@@ -468,39 +487,76 @@ describe('handleRegistration — eligibility gate', () => {
     expect(res.status).toBe(200)
   })
 
-  it('blocks an uncertified diver from a prereq-cert dive unless acknowledged', async () => {
-    const optsUncertPrereq = { profileCertLevel: null as string | null, profileUncertified: true, prereqCertId: 'cl-aow' }
-    const blocked = await handleRegistration(
-      postJson({ ...goodBody, details: {} }, authedSelf),
-      makeDeps(optsUncertPrereq).deps,
-    )
-    expect(blocked.status).toBe(422)
-    expect((await blocked.json()).error).toMatch(/prerequisite/i)
-
-    const acked = await handleRegistration(
+  it('blocks a diver below the required level, with nothing to acknowledge', async () => {
+    const short = { profileCertLevelCode: 'open_water', prereqCertId: 'cl-aow' }
+    const res = await handleRegistration(
+      // A stale acknowledgment from an old client no longer gets anyone in.
       postJson({ ...goodBody, details: { prereq_acked_at: '2026-07-05T00:00:00Z' } }, authedSelf),
-      makeDeps(optsUncertPrereq).deps,
+      makeDeps(short).deps,
     )
-    expect(acked.status).toBe(200)
+    expect(res.status).toBe(422)
+    expect((await res.json()).error).toMatch(/prerequisite/i)
   })
 
-  it('blocks when logged dives fall short of req_dives unless acknowledged', async () => {
-    const shortDives = { profileCertLevel: 'OW', profileLoggedDives: 3, reqDives: 20 }
-    const blocked = await handleRegistration(
-      postJson({ ...goodBody, details: {} }, authedSelf),
-      makeDeps(shortDives).deps,
-    )
-    expect(blocked.status).toBe(422)
-
-    const acked = await handleRegistration(
-      postJson({ ...goodBody, details: { prereq_acked_at: '2026-07-05T00:00:00Z' } }, authedSelf),
-      makeDeps(shortDives).deps,
-    )
-    expect(acked.status).toBe(200)
+  it('lets another agency’s equivalent level through', async () => {
+    const { deps, captured } = makeDeps({ profileCertLevelCode: 'ssi_advanced_open_water', prereqCertId: 'cl-aow' })
+    const res = await handleRegistration(postJson({ ...goodBody }, authedSelf), deps)
+    expect(res.status).toBe(200)
+    expect(captured.bookingInsert).toHaveLength(1)
   })
 
-  it('skips the gate for on-behalf-of bookings (admin can register an uncertified, undeclared diver)', async () => {
-    const { deps } = makeDeps({ callerRole: 'admin', profileCertLevel: null, profileUncertified: false })
+  it('blocks an uncertified diver, and one with no level picked, from a level-gated dive', async () => {
+    for (const opts of [
+      { profileUncertified: true, profileCertLevelCode: null, prereqCertId: 'cl-ow' },
+      { profileCertLevelCode: null, prereqCertId: 'cl-ow' },
+    ]) {
+      const res = await handleRegistration(postJson({ ...goodBody }, authedSelf), makeDeps(opts).deps)
+      expect(res.status).toBe(422)
+    }
+  })
+
+  it('blocks when logged dives fall short of req_dives', async () => {
+    const res = await handleRegistration(
+      postJson({ ...goodBody }, authedSelf),
+      makeDeps({ profileLoggedDives: 3, reqDives: 20 }).deps,
+    )
+    expect(res.status).toBe(422)
+  })
+
+  it('blocks a nitrox dive unless the diver is nitrox certified or buys the course', async () => {
+    const blocked = await handleRegistration(postJson({ ...goodBody }, authedSelf), makeDeps({ nitroxRequired: true }).deps)
+    expect(blocked.status).toBe(422)
+
+    const certified = await handleRegistration(
+      postJson({ ...goodBody }, authedSelf),
+      makeDeps({ nitroxRequired: true, profileNitroxCertified: true }).deps,
+    )
+    expect(certified.status).toBe(200)
+
+    const course = await handleRegistration(
+      postJson({ ...goodBody, details: { nitrox_course_addon: true } }, authedSelf),
+      makeDeps({ nitroxRequired: true }).deps,
+    )
+    expect(course.status).toBe(200)
+  })
+
+  it('grades a child booked by their parent on the child’s profile', async () => {
+    const { deps, captured } = makeDeps({
+      callerRole: 'diver', callerUserId: 'parent-uid', targetParentAccount: 'parent-uid',
+      profileCertLevelCode: 'open_water', prereqCertId: 'cl-aow',
+    })
+    const res = await handleRegistration(postJson({
+      ...goodBody, target_user_id: 'child-uid',
+    }, { Authorization: 'Bearer parent-jwt' }), deps)
+    expect(res.status).toBe(422)
+    expect(captured.bookingInsert).toHaveLength(0)
+  })
+
+  it('skips the gate for an admin booking on someone’s behalf', async () => {
+    const { deps } = makeDeps({
+      callerRole: 'admin', profileUncertified: true, profileCertLevelCode: null,
+      prereqCertId: 'cl-rescue', reqDives: 50, nitroxRequired: true,
+    })
     const res = await handleRegistration(postJson({
       ...goodBody,
       target_user_id: 'some-target-uid',

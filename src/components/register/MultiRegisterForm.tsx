@@ -23,6 +23,8 @@ import { MeasureRow } from './MeasureRow'
 import { INPUT_REGISTER } from '../../styles/tokens'
 import { numOrNullStr } from '../../lib/units'
 import { ShoeSizeField } from '../ShoeSizeField'
+import { anyShortfall, prereqShortfall, type EligibilityEvent, type PrereqShortfall } from '../../lib/prereq-shortfall'
+import { PrereqBlock, PrereqShortfallLines } from './PrereqBlock'
 import type { WaiverDef } from '../../config/waivers'
 import type { AppEvent, Booking, BookingDetails, Database, PaymentMethod, Profile } from '../../types/database'
 
@@ -287,8 +289,9 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   // Step gates — same spirit as solo flow, only the multi-applicable ones.
   // No personal detail is one of them: name, date of birth, nationality,
   // gender and certification are all optional here and on the server, and the
-  // cart moves on whatever the diver chose to type. A past event in the cart
-  // is the only thing left that stops step 2, and it stops step 1 too.
+  // cart moves on whatever the diver chose to type. What stops step 2 is a
+  // past event in the cart (which stops step 1 too) or an event prerequisite
+  // the diver falls short of (below).
   // (Card photos aren't collected in the cart flow — the diver uploads from
   // /profile or brings the physical card; the solo flow carries the photo
   // disclaimer.)
@@ -304,7 +307,67 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
     return c?.rentGear ? c.gearItems : []
   })
   const askShoe = needsShoeSize(packedForSelf) && !profile?.shoe_size
-  const submitBlocked = cart.length === 0 || hasBlockedPast
+
+  // Event prerequisites, per cart row, on the rule the server refuses on
+  // (src/lib/prereq-shortfall.ts). A row for a linked child is graded on the
+  // child's profile; the diver's own rows on what step 2 holds. Only an
+  // admin/staff booking for someone else is exempt, as on the server.
+  // Certification and logged dives block step 2; nitrox blocks step 3, where
+  // the nitrox course can be added.
+  const [prereqByEvent, setPrereqByEvent] = useState<Record<string, EligibilityEvent>>({})
+  const cartIdsKey = cart.map(ev => ev.id).join(',')
+  useEffect(() => {
+    const ids = cartIdsKey ? cartIdsKey.split(',') : []
+    if (ids.length === 0) return
+    let cancelled = false
+    supabase
+      .from('events' as never)
+      .select('id, prereq_cert_id, req_dives, nitrox_required')
+      .in('id', ids)
+      .then(({ data }) => {
+        if (cancelled || !Array.isArray(data)) return
+        const rows = data as Array<EligibilityEvent & { id: string }>
+        setPrereqByEvent(Object.fromEntries(rows.map(r => [r.id, r])))
+      })
+    return () => { cancelled = true }
+  }, [cartIdsKey])
+
+  const prereqRows = cart.flatMap(ev => {
+    const child = childById.get(forDiverByEvent[ev.id] ?? '') ?? null
+    if (child && viewerPrivileged) return []
+    const diver = child ?? {
+      uncertified, logged_dives: profile?.logged_dives ?? 0,
+      cert_level_code: certLevelCode || null, nitrox_certified: nitroxCertified,
+    }
+    // Exactly the nitrox_course_addon submit() posts for this row.
+    const addon = ev.nitrox_required && !((child ?? profile)?.nitrox_certified ?? false)
+      && (choicesById[ev.id]?.addNitroxCourse ?? false)
+    const short = prereqShortfall(diver, prereqByEvent[ev.id] ?? null, addon, certLevels)
+    return anyShortfall(short) ? [{ ev, short, diver, child }] : []
+  })
+  const certOrDives = (s: PrereqShortfall) => s.cert !== null || s.dives
+  const prereqBlockedStep2 = prereqRows.some(r => certOrDives(r.short))
+  const prereqBlockedStep3 = prereqRows.some(r => r.short.nitrox)
+  const prereqPanel = (keep: (s: PrereqShortfall) => PrereqShortfall) => (
+    <PrereqBlock>
+      {prereqRows.filter(r => anyShortfall(keep(r.short))).map(({ ev, short, diver, child }) => (
+        <li key={ev.id}>
+          <span className="font-semibold">
+            {ev.title}
+            {child && ` · ${personName(child.name) || t.register.multi.childFallback}`}
+          </span>
+          <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
+            <PrereqShortfallLines
+              short={keep(short)} prereqs={prereqByEvent[ev.id]} levels={certLevels}
+              certLevelCode={diver.cert_level_code} loggedDives={diver.logged_dives ?? 0}
+            />
+          </ul>
+        </li>
+      ))}
+    </PrereqBlock>
+  )
+
+  const submitBlocked = cart.length === 0 || hasBlockedPast || prereqBlockedStep2 || prereqBlockedStep3
 
   async function submit() {
     setSaving(true)
@@ -666,6 +729,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                 </div>
               </div>
             </div>
+            {prereqBlockedStep2 && prereqPanel(s => ({ ...s, nitrox: false }))}
           </section>
         )}
 
@@ -808,6 +872,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                 <p className="text-[11px] text-brand-950/70 font-medium">{t.register.gear.savedForNext}</p>
               </div>
             )}
+            {prereqBlockedStep3 && prereqPanel(s => ({ cert: null, dives: false, nitrox: s.nitrox }))}
           </section>
         )}
 
@@ -948,8 +1013,8 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
               onClick={() => setStep((step + 1) as Step)}
               disabled={
                 (step === 1 && (cart.length === 0 || hasBlockedPast)) ||
-                (step === 2 && hasBlockedPast) ||
-                (step === 3 && step3Blocked)
+                (step === 2 && (hasBlockedPast || prereqBlockedStep2)) ||
+                (step === 3 && (step3Blocked || prereqBlockedStep3))
               }
               className="bg-brand-900 hover:bg-brand-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
             >

@@ -411,6 +411,57 @@ describe('MultiRegisterForm parent diver picker', () => {
     expect(body.profile_patch).not.toHaveProperty('cert_level')
   })
 
+  it('blocks a cart row the diver falls short of until their level reaches it', async () => {
+    setupFrom([])
+    const base = from.getMockImplementation()!
+    from.mockImplementation((table: string) => table === 'events'
+      ? mockQueryBuilder({ data: [{ id: 'e1', prereq_cert_id: 'l2', req_dives: null, nitrox_required: false }] })
+      : base(table))
+    const user = userEvent.setup()
+    render(
+      <MultiRegisterForm
+        events={[sampleEvent('e1', 'Kenting')]}
+        profile={{ ...parentProfile, cert_level: 'OW', cert_level_code: 'open_water' }} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    const panel = await screen.findByRole('alert')
+    expect(panel).toHaveTextContent(/Kenting/)
+    expect(panel).toHaveTextContent(/requires AOW\. your profile says PADI OW/i)
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+
+    // SSI's AOW reaches PADI's.
+    await user.selectOptions(screen.getByLabelText(/cert agency/i), 'SSI')
+    await user.selectOptions(screen.getByLabelText(/cert level/i), 'ssi_advanced_open_water')
+    expect(screen.queryByText(/requires AOW/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
+  })
+
+  it('grades a row booked for a linked child on the child’s own profile', async () => {
+    setupFrom([childProfile])
+    const base = from.getMockImplementation()!
+    from.mockImplementation((table: string) => table === 'events'
+      ? mockQueryBuilder({ data: [{ id: 'e1', prereq_cert_id: 'l1', req_dives: null, nitrox_required: false }] })
+      : base(table))
+    const user = userEvent.setup()
+    render(
+      <MultiRegisterForm
+        events={[sampleEvent('e1', 'Kenting')]}
+        profile={{ ...parentProfile, cert_level_code: 'advanced_open_water' }} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(screen.getByLabelText(/diver for kenting/i)).toBeInTheDocument())
+    await user.selectOptions(screen.getByLabelText(/diver for kenting/i), 'c1')
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    const panel = await screen.findByRole('alert')
+    expect(panel).toHaveTextContent(/Kenting · Kid Junior/)
+    expect(panel).toHaveTextContent(/doesn't say which certification/i)
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+  })
+
   it('saves the height and weight typed on the about-you step', async () => {
     setupFrom([])
     const user = userEvent.setup()

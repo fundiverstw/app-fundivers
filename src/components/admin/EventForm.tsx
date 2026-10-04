@@ -748,8 +748,8 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
           <Select value={form.prereq_cert_id} onChange={v => set('prereq_cert_id', v)}>
             <option value="">{ef.none}</option>
             {/* Prereqs are encoded as PADI ranks; agency-specific levels carry
-                 a padi_equivalent_id so a CMAS 2-Star diver still satisfies a
-                 PADI Rescue prereq when that comparison gets wired up. */}
+                 a padi_equivalent_id so an SSI Stress & Rescue diver still
+                 satisfies a PADI Rescue prereq (src/lib/prereq-shortfall.ts). */}
             {certLevels.filter(c => c.organization === 'PADI').map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}

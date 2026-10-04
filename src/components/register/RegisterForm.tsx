@@ -25,6 +25,8 @@ import { WaiverSignDialog } from '../waivers/WaiverSignDialog'
 import type { WaiverDef } from '../../config/waivers'
 import { uploadCertCard } from '../../lib/cert-card'
 import { uploadNitroxCard } from '../../lib/nitrox-card'
+import { anyShortfall, prereqShortfall, type EligibilityEvent } from '../../lib/prereq-shortfall'
+import { PrereqBlock, PrereqCertAndDives } from './PrereqBlock'
 import { uploadDeepCard } from '../../lib/deep-card'
 import { isHeicFile } from '../../lib/image-compress'
 import { TurnstileWidget, type TurnstileHandle } from './TurnstileWidget'
@@ -691,17 +693,29 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const needsCertPhoto = !uncertified && certLevelCode.trim() !== '' && !hasCertCardOnFile && !certFile
   const certPhotoBlocked = !isOnBehalfOf && needsCertPhoto && !certCardAck
 
-  // Event prerequisites resolved from the catalog row (a required cert and/or a
-  // minimum logged-dive count). When the diver's self-reported profile falls
-  // short we warn and let them acknowledge (bring proof) rather than hard-block
-  // — the server applies the same rule via the prereq_acked_at stamp.
-  const [prereqCertName, setPrereqCertName] = useState<string | null>(null)
-  const [prereqReqDives, setPrereqReqDives] = useState<number | null>(null)
-  const [prereqAck, setPrereqAck] = useState(false)
-  const prereqCertMismatch = !isOnBehalfOf && !!prereqCertName && uncertified
-  const prereqDivesMismatch = !isOnBehalfOf && prereqReqDives != null && loggedDives < prereqReqDives
-  const prereqMismatch = prereqCertMismatch || prereqDivesMismatch
-  const prereqBlocked = prereqMismatch && !prereqAck
+  // Event prerequisites (a required certification level, nitrox, a minimum
+  // logged-dive count). A diver who falls short cannot book; the server
+  // refuses on the same rule (src/lib/prereq-shortfall.ts). Graded on what
+  // this form holds, not the profile as loaded — the diver may be fixing their
+  // certification right here. Every diver in the submit is graded, a child
+  // booked by a parent included; only admin/staff booking on someone's behalf
+  // is exempt, which is the shop deciding.
+  const [prereqEvent, setPrereqEvent] = useState<EligibilityEvent | null>(null)
+  const gradedEvent = isOnBehalfOf && viewerPrivileged ? null : prereqEvent
+  const nitroxCourseAddon = showNitroxAddon && addNitroxCourse
+  const prereqShort = prereqShortfall(
+    { uncertified, logged_dives: loggedDives, cert_level_code: certLevelCode || null, nitrox_certified: nitroxCertified },
+    gradedEvent, nitroxCourseAddon, certLevels,
+  )
+  const prereqShortOthers = additionalTargets.flatMap(tg => {
+    const short = prereqShortfall(tg, gradedEvent, nitroxCourseAddon, certLevels)
+    return anyShortfall(short) ? [{ target: tg, short }] : []
+  })
+  // Certification and logged dives are fixed on step 2; nitrox on step 3,
+  // where the nitrox course can be added.
+  const prereqBlockedStep2 = [prereqShort, ...prereqShortOthers.map(o => o.short)]
+    .some(s => s.cert !== null || s.dives)
+  const prereqBlockedStep3 = [prereqShort, ...prereqShortOthers.map(o => o.short)].some(s => s.nitrox)
 
   // What the shop will pack for this diver. A gear-included course (DSD, Open
   // Water) is a diver who owns nothing, so the full set is the assumption and
@@ -922,41 +936,18 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     return () => { cancelled = true }
   }, [event.id, event.has_transport])
 
-  // Resolve the event's prerequisites (required cert name + minimum logged
-  // dives) so step 2 can warn a diver who doesn't meet them. Best-effort: on
-  // failure no warning shows (the server still enforces the ack).
+  // The event's prerequisite columns; the ladder they are graded on is
+  // `certLevels`, already loaded for the picker.
   useEffect(() => {
-    if (isOnBehalfOf) return
     let cancelled = false
-    ;(async () => {
-      const { data } = await supabase
-        .from('events' as never)
-        .select('prereq_cert_id, req_dives')
-        .eq('id', event.id)
-        .maybeSingle()
-      if (cancelled || !data) return
-      const row = data as { prereq_cert_id: string | null; req_dives: number | string | null }
-      let certName: string | null = null
-      if (row.prereq_cert_id) {
-        const { data: cl } = await supabase
-          .from('cert_levels' as never)
-          .select('name')
-          .eq('id', row.prereq_cert_id)
-          .maybeSingle()
-        certName = (cl as { name?: string } | null)?.name ?? t.register.prereq.higherCertFallback
-      }
-      const digits = typeof row.req_dives === 'number'
-        ? row.req_dives
-        : (typeof row.req_dives === 'string' && row.req_dives.replace(/\D/g, '') !== ''
-            ? Number(row.req_dives.replace(/\D/g, ''))
-            : null)
-      if (!cancelled) {
-        setPrereqCertName(certName)
-        setPrereqReqDives(digits != null && Number.isFinite(digits) ? digits : null)
-      }
-    })()
+    supabase
+      .from('events' as never)
+      .select('prereq_cert_id, req_dives, nitrox_required')
+      .eq('id', event.id)
+      .maybeSingle()
+      .then(({ data }) => { if (!cancelled) setPrereqEvent((data ?? null) as EligibilityEvent | null) })
     return () => { cancelled = true }
-  }, [event.type, event.id, isOnBehalfOf])
+  }, [event.id])
 
   // Waivers the diver still needs for this event. Only computed for a diver
   // registering themselves (the e-signature is signed as auth.uid(), so it
@@ -1281,10 +1272,6 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       cert_card_ack_at: (needsCertPhoto && certCardAck)
         ? new Date().toISOString()
         : initialDetails?.cert_card_ack_at,
-      // Diver acknowledged an event prerequisite they don't currently meet.
-      prereq_acked_at: (prereqMismatch && prereqAck)
-        ? new Date().toISOString()
-        : initialDetails?.prereq_acked_at,
     }
 
     // Each additional diver's booking differs from the lead's in exactly the
@@ -1952,25 +1939,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               )}
             </div>
 
-            {prereqMismatch && (
-              <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
-                <p className="text-xs font-semibold text-amber-900">{t.register.prereq.title}</p>
-                <ul className="text-xs text-amber-900 font-medium list-disc pl-4 space-y-0.5">
-                  {prereqCertMismatch && <li>{t.register.prereq.certMismatch(prereqCertName ?? '')}</li>}
-                  {prereqDivesMismatch && <li>{t.register.prereq.divesMismatch(prereqReqDives ?? 0, loggedDives)}</li>}
-                </ul>
-                <label className="flex items-start gap-2 text-xs text-amber-900 font-medium border-t border-amber-300 pt-2">
-                  <input
-                    type="checkbox"
-                    checked={prereqAck}
-                    onChange={e => setPrereqAck(e.target.checked)}
-                    className="accent-brand-900 mt-0.5"
-                  />
-                  <span>
-                    {t.register.prereq.ack(siteConfig.identity.shortName)}
-                  </span>
-                </label>
-              </div>
+            {prereqBlockedStep2 && (
+              <PrereqCertAndDives
+                short={prereqShort} others={prereqShortOthers}
+                prereqs={prereqEvent} levels={certLevels}
+                certLevelCode={certLevelCode} loggedDives={loggedDives}
+              />
             )}
 
             <div className="border-t border-surface-200 pt-3 space-y-3">
@@ -2234,6 +2208,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               </span>
             </label>
           </fieldset>
+          )}
+
+          {prereqBlockedStep3 && (
+            <PrereqBlock>
+              <li>{t.register.prereq.nitroxMismatch}</li>
+            </PrereqBlock>
           )}
 
           {showNitroxAddon && (
@@ -2514,11 +2494,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               pastBlocked ||
               (step === 2 && (
                 certPhotoBlocked ||
-                prereqBlocked ||
+                prereqBlockedStep2 ||
                 (!isOnBehalfOf && nitroxBlocked) ||
                 (!isOnBehalfOf && deepBlocked) ||
                 (isGuest && (guestAccountIncomplete || !turnstileToken))
               )) ||
+              (step === 3 && prereqBlockedStep3) ||
               (step === 3 && !isOnBehalfOf && event.has_transport && needsTransport === null) ||
               (step === 3 && !isOnBehalfOf && showGearRentChoice && gearChoice === null)
             }

@@ -1228,28 +1228,65 @@ describe('RegisterForm', () => {
     expect(screen.queryByLabelText(/cert level/i)).not.toBeInTheDocument()
   })
 
-  it('warns and gates on an event logged-dive prerequisite until acknowledged', async () => {
-    from.mockImplementation((table: string) => {
-      if (table === 'events')     return mockQueryBuilder({ data: { prereq_cert_id: null, req_dives: 20 } })
-      if (table === 'payment_methods') return mockQueryBuilder({ data: PAYMENT_METHOD_ROWS })
-      if (table === 'rooms')     return mockQueryBuilder({ data: sampleRooms })
-      if (table === 'addons') return mockQueryBuilder({ data: sampleAddons })
-      return mockQueryBuilder()
-    })
+  function setupPrereqs(prereqs: { prereq_cert_id?: string | null; req_dives?: number | null; nitrox_required?: boolean }) {
+    setupFrom()
+    const base = from.getMockImplementation()!
+    from.mockImplementation((table: string) => table === 'events'
+      ? mockQueryBuilder({ data: { prereq_cert_id: null, req_dives: null, nitrox_required: false, ...prereqs } })
+      : base(table))
+  }
+
+  it('blocks an event logged-dive prerequisite, with nothing to acknowledge, until the count is met', async () => {
+    setupPrereqs({ req_dives: 20 })
     const user = userEvent.setup()
-    // sampleProfile has a cert + card on file (declaration passes) but only 12
-    // logged dives — short of the event's 20.
+    // sampleProfile has 12 logged dives — short of the event's 20.
     render(
       <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
         onClose={() => {}} onBooked={() => {}} />
     )
     await user.click(screen.getByRole('button', { name: /next/i }))  // step 1 → 2
-    expect(await screen.findByText(/this event has a prerequisite/i)).toBeInTheDocument()
+    expect(await screen.findByText(/you don't meet this event's prerequisites/i)).toBeInTheDocument()
     expect(screen.getByText(/at least 20 logged dives/i)).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: /understand/i })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
 
-    await user.click(screen.getByLabelText(/i understand this requirement/i))
+    const dives = screen.getByLabelText(/logged dives/i)
+    await user.clear(dives)
+    await user.type(dives, '20')
+    expect(screen.queryByText(/you don't meet this event's prerequisites/i)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
+  })
+
+  it('blocks a diver below the required level until they pick one that reaches it', async () => {
+    setupPrereqs({ prereq_cert_id: 'l2' })  // PADI AOW
+    const user = userEvent.setup()
+    const ow: Profile = { ...sampleProfile, cert_level: 'OW', cert_level_code: 'open_water', logged_dives: 30 }
+    render(
+      <RegisterForm event={sampleEvent} profile={ow} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    expect(await screen.findByText(/requires AOW\. your profile says PADI OW/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+
+    await user.selectOptions(screen.getByLabelText(/cert level/i), 'advanced_open_water')
+    expect(screen.queryByText(/requires AOW/i)).not.toBeInTheDocument()
+  })
+
+  it('blocks a nitrox event on step 3 until the nitrox course is added', async () => {
+    setupPrereqs({ nitrox_required: true })
+    const user = userEvent.setup()
+    render(
+      <RegisterForm event={sampleEvent} profile={{ ...sampleProfile, logged_dives: 30 }} userId="u1"
+        onClose={() => {}} onBooked={() => {}} />
+    )
+    await user.click(screen.getByRole('button', { name: /next/i }))  // → 2
+    await waitFor(() => expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled())
+    await user.click(screen.getByRole('button', { name: /next/i }))  // → 3
+    expect(await screen.findByText(/requires a nitrox certification/i)).toBeInTheDocument()
+
+    await user.click(screen.getByLabelText(/add nitrox course/i))
+    expect(screen.queryByText(/requires a nitrox certification/i)).not.toBeInTheDocument()
   })
 
   it('step 2 Next is allowed when a cert level is filled AND a cert card is already on file', async () => {

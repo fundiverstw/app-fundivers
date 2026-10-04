@@ -81,10 +81,6 @@ export interface BookingDetails {
    *  participation, no refund" terms. Set only when a cert level was named but
    *  no card was uploaded / on file. */
   cert_card_ack_at?: string
-  /** ISO timestamp of when the diver acknowledged an event prerequisite they
-   *  don't yet meet on their self-reported profile (e.g. a boat dive requiring
-   *  a higher cert or more logged dives). Gates submit + server-verified. */
-  prereq_acked_at?: string
 }
 
 /**
@@ -1854,7 +1850,7 @@ export interface Database {
           name: string
           name_zh: string | null
           rank: number
-          /** 'PADI' / 'BSAC' / 'CMAS' / 'SSI' / 'NAUI' / 'SAA' / 'SDI' / 'TDI'. */
+          /** 'PADI' / 'BSAC' / 'SSI' / 'NAUI' / 'SAA' / 'SDI'. */
           organization: string
           /** PADI rank this level resolves to for prereq comparisons.
            *  Self-id for PADI rows; closest PADI rank for agency rows. */

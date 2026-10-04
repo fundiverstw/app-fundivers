@@ -118,8 +118,8 @@ describe('what the column refuses', () => {
 
   it('deleting a level a diver holds', async () => {
     const u = await diver()
-    await admin.from('profiles').update({ cert_level_code: 'cmas_3_star_diver' }).eq('id', u.id)
-    expect(() => sql(`delete from public.cert_levels where code = 'cmas_3_star_diver'`)).toThrow(/foreign key/)
+    await admin.from('profiles').update({ cert_level_code: 'naui_master_scuba_diver' }).eq('id', u.id)
+    expect(() => sql(`delete from public.cert_levels where code = 'naui_master_scuba_diver'`)).toThrow(/foreign key/)
   })
 })
 
@@ -134,6 +134,7 @@ describe('backfill_profile_cert_level_codes', () => {
       ['SSI', 'Rescue', null],                             // Stress & Rescue or Master Diver: unknowable
       [null, 'Master Scuba Diver', null],                  // SDI's or NAUI's: unknowable
       ['PSAI', 'Open Water', null],                        // agency not on the ladder
+      ['CMAS', '2 Star', null],                            // agency is on the ladder, but "2 Star" is not a level's name
       ['PADI', 'PE40', null],                              // not a level
     ]
     const ids: string[] = []

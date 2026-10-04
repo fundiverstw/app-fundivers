@@ -18,7 +18,13 @@ import { Buffer } from "node:buffer"
 import { sanitizeProfilePatch } from "../_shared/profile-patch.ts"
 import { fetchShopContact } from "../_shared/shop-contact.ts"
 import { fetchShopLogoDataUrl } from "../_shared/shop-logo.ts"
-import { eligibilityError } from "../_shared/registration-eligibility.ts"
+import {
+  eligibilityError,
+  LADDER_COLUMNS,
+  type EligibilityEvent,
+  type EligibilityProfile,
+  type LadderRung,
+} from "../_shared/registration-eligibility.ts"
 import { usesDateEnvelope, usesCourseDays, type EventKind } from "../../../src/lib/event-kinds.ts"
 import { computeBookingMoney } from "../_shared/booking-charges.ts"
 import { corsHeaders, safeError } from "../_shared/responses.ts"
@@ -355,20 +361,24 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
   // Reads the effective (post-patch) profile + event prereqs and defers to the
   // shared eligibilityError rules. Returns a user-facing message or null.
   async function checkEligibility(uid: string): Promise<string | null> {
-    const { data: prof } = await admin
-      .from("profiles")
-      .select("uncertified, logged_dives")
-      .eq("id", uid)
-      .single()
-    const { data: ev } = await admin
-      .from("events")
-      .select("prereq_cert_id, req_dives")
-      .eq("id", body.event_id)
-      .maybeSingle()
+    const [{ data: prof }, { data: ev }, { data: ladder }] = await Promise.all([
+      admin
+        .from("profiles")
+        .select("uncertified, logged_dives, cert_level_code, nitrox_certified")
+        .eq("id", uid)
+        .single(),
+      admin
+        .from("events")
+        .select("prereq_cert_id, req_dives, nitrox_required")
+        .eq("id", body.event_id)
+        .maybeSingle(),
+      admin.from("cert_levels").select(LADDER_COLUMNS),
+    ])
     return eligibilityError(
-      prof as { uncertified: boolean | null; logged_dives: number | null } | null,
-      ev as { prereq_cert_id: string | null; req_dives: number | string | null } | null,
+      prof as EligibilityProfile | null,
+      ev as EligibilityEvent | null,
       body.details as Record<string, unknown> | undefined,
+      (ladder ?? []) as LadderRung[],
     )
   }
 
@@ -387,12 +397,11 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     return json({ error: t.emails.errors.registrationClosed }, 403)
   }
 
-  // 1b. Eligibility gate — a diver registering themselves (or via guest) must
-  //     have declared a certification (level or uncertified) and acknowledged
-  //     any event prerequisite they don't meet on their own profile. Mirrors
-  //     the form gates so a crafted request can't slip past them. On-behalf-of
-  //     bookings (target_user_id) relax the same way the form does.
-  if (!body.target_user_id) {
+  // 1b. Eligibility gate — the diver being booked must meet the event's
+  //     prerequisites on their own profile. That includes a child booked by a
+  //     parent (userId is the child here). Only an admin or staff member
+  //     booking on someone's behalf skips it: that is the shop deciding.
+  if (!(body.target_user_id && callerIsPrivileged)) {
     const gate = await checkEligibility(userId)
     if (gate) return rollback(gate, 422)
   }

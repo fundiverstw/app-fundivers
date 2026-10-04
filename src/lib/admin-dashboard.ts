@@ -88,7 +88,7 @@ export interface DashboardInput {
   events: EventLite[]
   confirmed: ConfirmedCount[]
   /** The shop's whole `cert_levels` table — every agency, so a diver who typed
-   *  an SSI or CMAS rung still resolves to its PADI equivalent. */
+   *  an SSI or NAUI rung still resolves to its PADI equivalent. */
   certLadder: CertLadderRow[]
   pendingApplications: number
   pendingRefundRequests: number

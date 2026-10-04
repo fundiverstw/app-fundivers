@@ -28,6 +28,17 @@
 -- Nothing is guessed. A null `cert_level_code` means "we do not know", never
 -- "uncertified" — that remains `profiles.uncertified`.
 
+-- ── The agencies the shop supports ─────────────────────────────────────────
+-- TDI (technical) is not supported yet, so a diver cannot pick it and the
+-- backfill cannot place anyone on it. Adding it back later is an insert. CMAS
+-- stays: its rows already carry a `padi_equivalent_id` (1-Star = OW, 2-Star =
+-- Rescue, 3-Star = DM), and FunDivers is a PADI shop, so PADI's reciprocity is
+-- the guideline. Nitrox is not a rung: it is the `nitrox_certified` checkbox.
+-- Event prerequisites only ever point at PADI rows, and the shop's standards
+-- agency is only checked when saved, so clear it if it named TDI.
+delete from public.cert_levels where organization = 'TDI';
+update public.shop_profile set standards_org = null where standards_org = 'TDI';
+
 -- ── The column ──────────────────────────────────────────────────────────────
 -- `on delete restrict`: deleting a rung divers hold would silently decertify
 -- them. Re-point them first. `on update cascade` so a code can be corrected
