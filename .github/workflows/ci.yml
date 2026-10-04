@@ -4,7 +4,10 @@
 #
 # Runs on:
 #   - direct push to main (direct commits / fast-forwards)
-#   - PR targeting main (before merge)
+#   - PR targeting main (before merge), unless it is a draft or carries the
+#     "DO NOT MERGE" label. Every job repeats that condition in its `if`
+#     (Actions has no shared job-level condition); the run re-evaluates when the
+#     PR is marked ready or the label is removed.
 #
 # Integration + security probe suites are NOT in this workflow — they
 # require the local Supabase stack (Docker). When CI grows a Supabase
@@ -25,6 +28,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    # The defaults (opened, synchronize, reopened) plus the three events that
+    # change whether a PR is eligible: marking it ready, and adding or removing
+    # the "DO NOT MERGE" label.
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
 
 permissions:
   contents: read
@@ -36,6 +43,7 @@ concurrency:
 jobs:
   lint:
     name: ESLint
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && !contains(github.event.pull_request.labels.*.name, 'DO NOT MERGE'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -48,6 +56,7 @@ jobs:
 
   typecheck:
     name: tsc
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && !contains(github.event.pull_request.labels.*.name, 'DO NOT MERGE'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -60,6 +69,7 @@ jobs:
 
   unit:
     name: Unit tests
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && !contains(github.event.pull_request.labels.*.name, 'DO NOT MERGE'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -74,6 +84,7 @@ jobs:
 
   edge:
     name: Edge functions (deno check)
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && !contains(github.event.pull_request.labels.*.name, 'DO NOT MERGE'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
