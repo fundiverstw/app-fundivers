@@ -123,13 +123,29 @@ block the booking — the shop chases what it still needs later, and
   blank. The ride question is skipped whole on an event whose
   `has_transport` is false (a dry course held at the shop): a question
   that was never put can't be left unanswered, and nothing gates on it.
-- **Acknowledgments.** Event prerequisites the diver doesn't meet, and
-  the cancellation policy.
+- **The cancellation policy**, acknowledged.
+- **The event's prerequisites, met.** A diver short of any of them cannot
+  book; there is nothing to acknowledge. `src/lib/prereq-shortfall.ts` is
+  the rule, shared by both forms and the server:
+  - *Certification:* the diver's `cert_level_code` and the event's
+    `prereq_cert_id` are each resolved through `padi_equivalent_id`, and
+    the PADI ranks compared — SSI Advanced Open Water clears an AOW
+    requirement. Uncertified, or no level picked, falls short.
+  - *Logged dives:* at least `req_dives`.
+  - *Nitrox:* `nitrox_certified`, or the nitrox course added to the
+    booking.
+
+  Certification and logged dives block step 2, where they are entered;
+  nitrox blocks step 3, where the course is offered. Every diver in a
+  submit is graded, a child booked by a parent included (on the child's
+  own profile). Exempt (`prereqExempt` in `src/lib/prereq-shortfall.ts`):
+  an admin or staff member booking on someone's behalf, and an admin
+  editing an existing booking.
 
 `supabase/functions/_shared/registration-eligibility.ts` is the
-server-side mirror, so a crafted request is held to the same short list.
-The on-behalf-of paths (admin, parent) relax the first three further
-still.
+server-side mirror. The on-behalf-of paths (admin, parent) relax the
+evidence and booking-decision gates above; prerequisites relax for
+admin and staff only.
 
 ### Gear sizes
 

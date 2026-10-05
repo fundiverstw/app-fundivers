@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
 import { useForm, useWatch, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { AuthContext } from '../hooks/auth-context'
 import { useToast } from '../hooks/useToast'
 import { pushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
 import { HAS_GEAR_ALTERNATIVES } from '../lib/gear'
@@ -19,7 +20,10 @@ import { MyWaivers } from '../components/profile/MyWaivers'
 import { siteConfig } from '../config/site'
 import { DateField } from '../components/DateField'
 import { BTN_DANGER } from '../styles/tokens'
-import type { Profile, CertLevel } from '../types/database'
+import type { Profile } from '../types/database'
+import { useCertLevels } from '../hooks/useCertLevels'
+import { CertLevelPicker } from '../components/CertLevelPicker'
+import { certLevelCodePatch, legacyCertText } from '../lib/cert-text'
 import { ShoeSizeField } from '../components/ShoeSizeField'
 import { HeightField, WeightField } from '../components/MeasureField'
 import { PasswordInput } from '../components/PasswordInput'
@@ -47,8 +51,9 @@ const schema = z.object({
   emergency_contact_name: z.string().nullish(),
   emergency_contact_phone: z.string().nullish(),
   cert_status: z.enum(['certified', 'uncertified']).nullish(),
+  // Only steers the level picker; the stored agency is the picked level's.
   cert_agency: z.string().nullish(),
-  cert_level: z.string().nullish(),
+  cert_level_code: z.string().nullish(),
   medical_notes: z.string().nullish(),
   gender: z.string().nullish(),
   contact_method: z.string().nullish(),
@@ -137,16 +142,21 @@ export function ProfileForm({ user, profile, onSaved }: {
   onSaved?: () => void
 }) {
   const toast = useToast()
+  // Read directly: ProfileForm is also rendered for a child or by an admin,
+  // in places that don't all sit under the auth provider.
+  const auth = useContext(AuthContext)
   const { register, handleSubmit, reset, control, setValue, formState: { isSubmitting, isDirty } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       ...(profile as unknown as FormData),
       // Derive the cert-status choice: an explicit uncertified flag wins;
-      // otherwise an existing cert_level means certified; a fresh profile
-      // (neither) starts unchosen so the diver is forced to pick.
+      // otherwise a level on file — picked, or legacy text still waiting to be
+      // picked — means certified; a fresh profile (neither) starts unchosen so
+      // the diver is forced to pick.
       cert_status: profile.uncertified
         ? 'uncertified'
-        : (profile.cert_level ? 'certified' : undefined),
+        : (profile.cert_level_code || profile.cert_level ? 'certified' : undefined),
+      cert_level_code: profile.cert_level_code ?? '',
     },
   })
 
@@ -164,29 +174,12 @@ export function ProfileForm({ user, profile, onSaved }: {
   // must be on file. Initial value comes from the profile so a diver who
   // has already uploaded one isn't blocked the moment they open the page.
   const [certCardPath, setCertCardPath] = useState<string | null>(profile.cert_card_path ?? null)
-  // Agency + cert level dropdowns both pull from public.cert_levels (RLS
-  // public-read). Each row carries an `organization` ('PADI' | 'BSAC' | …)
-  // so we can derive the agency list and filter the level list by the
-  // currently-selected agency. Fetched once on mount.
-  const [certLevels, setCertLevels] = useState<CertLevel[]>([])
-  useEffect(() => {
-    let cancelled = false
-    supabase
-      .from('cert_levels')
-      .select('*')
-      .order('rank')
-      .then(({ data }) => {
-        if (cancelled) return
-        // Defensive: tests mock supabase.from with a single shared builder that
-        // can return shapes other than an array. Narrow before using map().
-        setCertLevels(Array.isArray(data) ? (data as CertLevel[]) : [])
-      })
-    return () => { cancelled = true }
-  }, [])
+  const certLevels = useCertLevels()
 
   // useWatch (not the watch() function from useForm) — useWatch is the
   // React-Compiler-safe API for reading a live form value.
   const selectedAgency = useWatch({ control, name: 'cert_agency' }) ?? ''
+  const selectedCode = useWatch({ control, name: 'cert_level_code' }) ?? ''
   const nitroxCertifiedWatched = useWatch({ control, name: 'nitrox_certified' }) ?? false
   const nitroxCardMissing = !!nitroxCertifiedWatched && !nitroxCardPath
   const deepCertifiedWatched = useWatch({ control, name: 'deep_certified' }) ?? false
@@ -197,47 +190,6 @@ export function ProfileForm({ user, profile, onSaved }: {
   // uncertified one has nothing to show. Only ever a reminder — it does not
   // gate the save.
   const certCardMissing = isCertified && !certCardPath
-  // Distinct orgs in the order returned by the rank-sorted query (PADI rows
-  // come first because they're the seed; agency rows follow). Always
-  // include the saved agency so the dropdown can render it even before the
-  // cert_levels fetch completes — and so the option's React key stays
-  // stable across the fetch transition. Without the dedup-and-prepend,
-  // the saved agency would briefly render as a no-key legacy fallback
-  // then get remounted as a keyed orgs.map child, and the brief absence
-  // of a matching <option> drops the (uncontrolled) select's value to "".
-  const orgs = useMemo(() => {
-    const seen = new Set<string>()
-    const out: string[] = []
-    for (const c of certLevels) {
-      if (!seen.has(c.organization)) { seen.add(c.organization); out.push(c.organization) }
-    }
-    if (profile.cert_agency && !seen.has(profile.cert_agency)) {
-      out.unshift(profile.cert_agency)
-    }
-    return out
-  }, [certLevels, profile.cert_agency])
-  // Same stable-key story as `orgs`: include the saved level when it
-  // matches the selected agency. Dedup against the real list so the
-  // dropdown doesn't show two "Rescue"s. The synthetic id satisfies the
-  // CertLevel type and is otherwise unused — the <option>'s React key
-  // is the level *name* (unique within a single-agency filter), and
-  // keying by name is what keeps the DOM node stable across the
-  // empty → fetched transition.
-  const filteredLevels = useMemo(() => {
-    const matched = certLevels.filter(c => c.organization === selectedAgency)
-    const saved = profile.cert_level
-    if (
-      saved
-      && profile.cert_agency === selectedAgency
-      && !matched.some(c => c.name === saved)
-    ) {
-      return [
-        { id: '__saved_level__', organization: selectedAgency, name: saved, rank: -1 },
-        ...matched,
-      ] as CertLevel[]
-    }
-    return matched
-  }, [certLevels, selectedAgency, profile.cert_agency, profile.cert_level])
 
   // Canonical shoe size ('' = unset); the ShoeSizeField below owns the
   // unit/gender/value picker and reports the canonical string up.
@@ -270,8 +222,9 @@ export function ProfileForm({ user, profile, onSaved }: {
       emergency_contact_name: strOrNull(data.emergency_contact_name),
       emergency_contact_phone: strOrNull(data.emergency_contact_phone),
       uncertified: data.cert_status === 'uncertified',
-      cert_agency: data.cert_status === 'uncertified' ? null : strOrNull(data.cert_agency),
-      cert_level: data.cert_status === 'uncertified' ? null : strOrNull(data.cert_level),
+      // cert_agency / cert_level follow from this in the database. A code the
+      // ladder no longer lists is left off rather than failing the whole save.
+      ...certLevelCodePatch(data.cert_level_code ?? '', data.cert_status === 'uncertified', certLevels),
       medical_notes: strOrNull(data.medical_notes),
       height_cm: heightCm,
       weight_kg: weightKg,
@@ -293,6 +246,9 @@ export function ProfileForm({ user, profile, onSaved }: {
     reset(data)
     setDirtyExtras(false)
     toast.success(t.profile.saved)
+    // The signed-in profile is cached from sign-in, and the register forms
+    // start from it; refresh it when this was the diver's own.
+    if (auth?.user?.id === profile.id) void auth.refreshProfile()
     onSaved?.()
   }
 
@@ -413,39 +369,19 @@ export function ProfileForm({ user, profile, onSaved }: {
           </Field>
 
           {isCertified && (
-            <>
-              <Field label={t.profile.agencyLabel}>
-                <select
-                  // Clearing cert_level on agency change keeps the user from
-                  // saving a cert level that belongs to a different org. We do
-                  // it here on the register-level onChange (not via watch())
-                  // so it only fires for user-initiated edits — not for the
-                  // initial defaultValues hydration.
-                  {...register('cert_agency', {
-                    onChange: () => setValue('cert_level', '', { shouldDirty: true }),
-                  })}
-                  className={inputClass}
-                >
-                  <option value="">{t.profile.selectAgency}</option>
-                  {orgs.map(o => (
-                    <option key={o} value={o}>{o}</option>
-                  ))}
-                </select>
-              </Field>
-              <Field label={t.profile.levelLabel}>
-                <select {...register('cert_level')} className={inputClass} disabled={!selectedAgency}>
-                  <option value="">{selectedAgency ? t.profile.selectLevel : t.profile.pickAgencyFirst}</option>
-                  {/* Keyed by name (unique inside a single-agency filter), not
-                       by row id. The id swaps from the synthetic __saved_level__
-                       to the real DB id once cert_levels fetches, and a key swap
-                       would remount the option mid-transition — see filteredLevels
-                       comment above. */}
-                  {filteredLevels.map(c => (
-                    <option key={c.name} value={c.name}>{c.name}</option>
-                  ))}
-                </select>
-              </Field>
-            </>
+            <CertLevelPicker
+              levels={certLevels}
+              agency={selectedAgency}
+              code={selectedCode}
+              onAgencyChange={v => setValue('cert_agency', v, { shouldDirty: true })}
+              onCodeChange={v => setValue('cert_level_code', v, { shouldDirty: true })}
+              agencyLabel={t.profile.agencyLabel}
+              levelLabel={t.profile.levelLabel}
+              labelClassName="block text-xs text-brand-900 font-medium mb-1 uppercase tracking-wide"
+              selectClassName={inputClass}
+              legacyText={legacyCertText(profile)}
+              className="space-y-3"
+            />
           )}
           <Field label={t.profile.loggedDives}>
             <input {...register('logged_dives')} type="number" min="0" className={inputClass} />

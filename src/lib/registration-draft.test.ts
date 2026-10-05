@@ -22,7 +22,7 @@ function makeDraft(over: Partial<RegistrationDraft> = {}): RegistrationDraft {
     contactMethod: 'line',
     contactId: 'ada_dives',
     certAgency: 'PADI',
-    certLevel: 'AOW',
+    certLevelCode: 'advanced_open_water',
     uncertified: false,
     loggedDives: 42,
     nitroxCertified: true,

@@ -33,8 +33,9 @@ export const PROFILE_PATCH_ALLOW: ReadonlySet<string> = new Set<string>([
   'id_number',
   'contact_method',
   'contact_id',
-  'cert_agency',
-  'cert_level',
+  // The picked cert_levels.code. cert_agency / cert_level are a copy the
+  // database writes from it, so the form never sends them.
+  'cert_level_code',
   'uncertified',
   'logged_dives',
   'nitrox_certified',

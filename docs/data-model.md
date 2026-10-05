@@ -42,7 +42,7 @@ either an event or a booking.
 
 | Table | Key columns | Notes |
 | --- | --- | --- |
-| `profiles` | `id` (= `auth.users.id`), `role` | `role in ('diver','staff','admin')`. Row auto-created by `handle_new_user()` on signup. Personal + cert + sizing + emergency contact + gear-owned + gear sizes + `agreed_to_terms_at`. |
+| `profiles` | `id` (= `auth.users.id`), `role` | `role in ('diver','staff','admin')`. Row auto-created by `handle_new_user()` on signup. Personal + cert (`cert_level_code`, see [below](#a-divers-certification)) + sizing + emergency contact + gear-owned + gear sizes + `agreed_to_terms_at`. |
 | `bookings` | `id`, `user_id`, `event_id`, `status`, `details` (jsonb), `refund_requested_at`, `group_id`, `payer_id`, `continues_booking_id`, `attend_days` | `event_id` → `events(id)`. `details` shape enforced app-side by `BookingDetails` in `src/types/database.ts`. One live booking per (user, event). After insert, most columns are immutable for divers — the `bookings_diver_immutable` trigger in the baseline. `continues_booking_id` / `attend_days` carry a course finished across two scheduled courses (see [events-and-bookings.md](./events-and-bookings.md#one-course-several-scheduled-courses)). |
 | `payments` | `id`, `user_id`, `booking_id`, `amount`, `status`, `method`, `recorded_by` | Ledger entries, staff-inserted. `status in ('pending','paid','refunded')`. |
 | `diver_notes` | `id`, `profile_id`, `created_by`, `content`, `edited_*` | Per-diver standing facts (allergies, accommodations) — staff/admin can read+insert under their own attribution; admin or own-author can update/delete. `profile_id`/`created_by`/`created_at` frozen by trigger so RLS can't be sidestepped. |
@@ -58,7 +58,7 @@ either an event or a booking.
 | `event_waivers` | `id`, `event_id`, `waiver_code`, `mode` | Per-event override of a waiver's default rule: `mode` `require` adds it, `exempt` drops it for one event. `event_id` → `events`; one override per `(event_id, waiver_code)`. Read by any authenticated user (the registration form needs it); admin write. Edited on the admin Edit-event form. |
 | `scheduled_trips` | `id`, `title`, `destination`, `status`, `price`, `addon_ids`, `room_type_ids` | The shop's own curated, dated trips shown on the diver Scheduled Trips tab. Admin-managed base table (admin-only RLS); divers read published rows via `list_scheduled_trips()`. Carries `addon_ids`/`room_type_ids` (into the shop `addons`/`rooms` catalog) so divers register self-contained for a cost estimate — same flow as `packages`, minus tiers/partner. Distinct from `packages` (travel abroad) and the `events.is_trip` Wix flag. See [packages.md](./packages.md). |
 | `scheduled_trip_registrations` | `id`, `scheduled_trip_id`, `diver_id`, `estimated_cost`, `details`, `status` | One row per diver-registration for a scheduled trip; frozen estimate snapshot in `details`. No kickback (the shop's own trip). Admin-only base table; divers create via the `register-scheduled-trip` edge fn and read their own via `list_my_scheduled_trip_registrations()`. Partial unique index keeps one live registration per diver per trip. |
-| `cert_levels` | `id`, `code`, `name`, `name_zh`, `rank`, `organization`, `padi_equivalent_id` | Reference data for the certification picker. Events point at one via `events.prereq_cert_id`, and the admin form offers **PADI levels only** — prereqs are encoded as PADI ranks, with `padi_equivalent_id` mapping an agency-specific level onto its PADI peer for the cross-agency comparison (mapping is populated; the comparison isn't wired up yet). |
+| `cert_levels` | `id`, `code`, `name`, `name_zh`, `rank`, `organization`, `padi_equivalent_id` | Reference data for the certification picker. Events point at one via `events.prereq_cert_id`, and the admin form offers **PADI levels only** — prereqs are encoded as PADI ranks, with `padi_equivalent_id` mapping an agency-specific level onto its PADI peer, which is how registration compares a diver's level against the event's (`src/lib/prereq-shortfall.ts`). |
 | `cancellation_policies` | `id`, `title`, `cancellation_policy`, `language`, `active` | Reference data linked from `events.cancel_policy`; the text a diver has to acknowledge at registration. Admin-managed at `/admin/cancellation-policies`. |
 | `shop_contact` | `singleton`, `email`, `phone`, `address`, `maps_url`, `updated_at/_by` | The shop's own contact details. **Exactly one row** (`check (singleton)`), seeded by 20260905120000 with what used to be `siteConfig.contact`. Publicly readable — the pages that print the shop's email include ones a diver reaches before approval, and the terms-acceptance page, which runs from an emailed link with no session — and admin-updatable; no insert or delete policy exists, so the row cannot be removed. Empty strings mean "not published yet" and every surface handles that; a malformed email or map URL is refused by a check constraint. Read by the app through `ShopContactProvider`, and per request by the edge functions that mail the shop (`_shared/shop-contact.ts`). Admin-managed at `/admin/contact`. |
 | `contact_channels` | `id`, `kind`, `label`, `url`, `sort_order`, `active` | The ways a diver can reach the shop, in the order the Contact tab lists them. `kind` is a closed vocabulary (`line`, `whatsapp`, `telegram`, `messenger`, `instagram`, `wechat`, `signal`, `phone`, `sms`, `other`) pinned to `CONTACT_CHANNEL_KINDS` — each carries a glyph and brand color that live in code, because shop-authored markup rendered into the page is an XSS hole; `other` takes any link with a neutral glyph. `url` holds an https link for a chat service and a **bare phone number** for `phone` / `sms` (a check constraint enforces which), and `channelHref` adds the `tel:` / `sms:` scheme. A null `label` uses the deployment's own translated wording for that service. Publicly readable, admin-written. |
@@ -122,6 +122,28 @@ Normalization into the uniform `AppEvent` shape lives in
 `src/lib/events.ts` — `fetchEventsInRange`, `fetchEventsForBookings`,
 `fetchUpcomingEventDays`. Use `AppEvent` everywhere in the UI rather than
 reading raw `events` rows.
+
+## A diver's certification
+
+`profiles.cert_level_code` is the level a diver holds: a foreign key to `cert_levels.code` (`'ssi_advanced_open_water'`), picked in the profile page and both register forms through `CertLevelPicker`. Read it whenever code needs to *know* the level — its row carries `rank` and `padi_equivalent_id` for comparing across agencies.
+
+The supported agencies are PADI, SSI, SDI, NAUI, BSAC, SAA and CMAS. CMAS rows rank through `padi_equivalent_id` (PADI's reciprocity). TDI was removed from `cert_levels` in the same migration and is a future addition, which is an insert; nitrox is the `nitrox_certified` checkbox, not a rung.
+
+- **`cert_agency` / `cert_level` are a copy.** `profiles_cert_level_mirror_trg` writes the picked row's `organization` / `name` into them on every insert and update, and `cert_levels_refresh_profile_copies_trg` rewrites them when an admin renames a level. They exist so screens, exports and emails can print "SSI Advanced Open Water Diver" without a join; never write them from the app.
+- **Null code, text present = a legacy value nobody has placed.** `backfill_profile_cert_level_codes()` (migration `20260929100000`, re-runnable) matched the old free text against the ladder and left anything ambiguous alone. Those divers are asked to pick again on their profile and at registration, and show as missing a certification on the admin screens. To list them:
+
+  ```sql
+  select id, name, cert_agency, cert_level
+    from profiles
+   where cert_level_code is null and not uncertified
+     and coalesce(btrim(cert_level), '') <> ''
+   order by name;
+  ```
+
+  Fix one by setting its code (`update profiles set cert_level_code = 'sdi_rescue' where id = …`); the trigger writes the text.
+- **Null code, no text** is a diver who hasn't answered; `uncertified = true` is "I hold nothing" (the two can't both be set — `profiles_cert_level_or_uncertified`).
+- `application_submitted_at` is stamped only once a code is picked.
+- One level per diver: the highest they hold. Nitrox and Deep stay separate flags with their own card photos.
 
 ## Other app-owned tables
 

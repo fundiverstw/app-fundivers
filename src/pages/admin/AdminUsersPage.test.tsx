@@ -214,7 +214,7 @@ describe('AdminUsersPage profile completeness', () => {
       id: 'u2', name: 'Bo', role: 'diver', email: 'b@x.io',
       logged_dives: 0, gear_owned: [],
       date_of_birth: '1990-01-01', contact_method: 'line', contact_id: 'bo-line',
-      cert_level: 'OW', cert_agency: 'PADI',
+      cert_level: 'OW', cert_agency: 'PADI', cert_level_code: 'open_water',
       nationality: null, gender: null,
     }]
     from.mockImplementation((table: string) =>
@@ -238,7 +238,7 @@ describe('AdminUsersPage profile completeness', () => {
       id: 'u2', name: 'Bo', role: 'diver', email: 'b@x.io',
       logged_dives: 0, gear_owned: [],
       date_of_birth: '1990-01-01', nationality: 'TW', gender: 'female',
-      contact_method: 'line', contact_id: 'bo-line', cert_level: 'OW', cert_agency: 'PADI',
+      contact_method: 'line', contact_id: 'bo-line', cert_level: 'OW', cert_agency: 'PADI', cert_level_code: 'open_water',
     }]
     from.mockImplementation((table: string) =>
       table === 'profiles' ? mockQueryBuilder({ data: full }) : mockQueryBuilder({ data: [] }),

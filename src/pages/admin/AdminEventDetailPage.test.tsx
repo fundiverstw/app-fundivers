@@ -85,7 +85,7 @@ describe('AdminEventDetailPage', () => {
     }]
     const profiles = [{
       id: 'u1', name: 'Ada Lovelace', 
-      cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: true,
+      cert_agency: 'PADI', cert_level: 'AOW', cert_level_code: 'advanced_open_water', nitrox_certified: true,
       logged_dives: 20, height_cm: 165, weight_kg: 60, shoe_size: 'EU 41 M',
       contact_method: null, contact_id: null,
     }]
@@ -139,7 +139,7 @@ describe('AdminEventDetailPage', () => {
     }]
     const profiles = [{
       id: 'u1', name: 'Ada Lovelace', 
-      cert_agency: 'PADI', cert_level: 'AOW', contact_method: null, contact_id: null,
+      cert_agency: 'PADI', cert_level: 'AOW', cert_level_code: 'advanced_open_water', contact_method: null, contact_id: null,
     }]
     from.mockImplementation((table: string) => {
       if (table === 'bookings') return mockQueryBuilder({ data: bookings })
@@ -300,7 +300,7 @@ describe('AdminEventDetailPage', () => {
     }]
     const profiles = [{
       id: 'u1', name: 'Ada Lovelace', 
-      cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: true,
+      cert_agency: 'PADI', cert_level: 'AOW', cert_level_code: 'advanced_open_water', nitrox_certified: true,
       logged_dives: 20, height_cm: 165, weight_kg: 60, shoe_size: 'EU 41 M',
       contact_method: null, contact_id: null,
     }]
@@ -485,7 +485,7 @@ describe('AdminEventDetailPage', () => {
     }]
     const profiles = [{
       id: 'u1', name: 'Ada Lovelace', 
-      cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false,
+      cert_agency: 'PADI', cert_level: 'AOW', cert_level_code: 'advanced_open_water', nitrox_certified: false,
       logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null,
       contact_method: null, contact_id: null,
     }]
@@ -527,11 +527,11 @@ describe('AdminEventDetailPage', () => {
 
     const profiles = [
       { id: 'u-ada',  name: 'Ada Lovelace',     
-        cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false,
+        cert_agency: 'PADI', cert_level: 'AOW', cert_level_code: 'advanced_open_water', nitrox_certified: false,
         logged_dives: 0, contact_method: null, contact_id: null,
         height_cm: null, weight_kg: null, shoe_size: null, status: 'active' },
       { id: 'u-bob',  name: 'Bob Roberts',      
-        cert_agency: 'PADI', cert_level: 'OW', nitrox_certified: false,
+        cert_agency: 'PADI', cert_level: 'OW', cert_level_code: 'open_water', nitrox_certified: false,
         logged_dives: 0, contact_method: null, contact_id: null,
         height_cm: null, weight_kg: null, shoe_size: null, status: 'active' },
     ]
@@ -576,7 +576,7 @@ describe('AdminEventDetailPage', () => {
     }]
     const profiles = [{
       id: 'u1', name: 'Ada Lovelace', 
-      cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false,
+      cert_agency: 'PADI', cert_level: 'AOW', cert_level_code: 'advanced_open_water', nitrox_certified: false,
       logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null,
       contact_method: null, contact_id: null,
     }]
@@ -736,7 +736,7 @@ describe('AdminEventDetailPage', () => {
     }]
     const profiles = [{
       id: 'u1', name: 'Ada Lovelace', 
-      cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false,
+      cert_agency: 'PADI', cert_level: 'AOW', cert_level_code: 'advanced_open_water', nitrox_certified: false,
       logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null,
       contact_method: null, contact_id: null,
     }]
@@ -965,7 +965,7 @@ describe('AdminEventDetailPage', () => {
     }]
     const profiles = [{
       id: 'u1', name: 'Ada Lovelace', 
-      cert_agency: 'PADI', cert_level: 'AOW', nitrox_certified: false,
+      cert_agency: 'PADI', cert_level: 'AOW', cert_level_code: 'advanced_open_water', nitrox_certified: false,
       logged_dives: 0, height_cm: null, weight_kg: null, shoe_size: null,
       contact_method: null, contact_id: null,
     }]

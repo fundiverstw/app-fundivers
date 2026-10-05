@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { personName } from '../../lib/names'
 import { RENTAL_GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_RENTAL_GEAR_ALTERNATIVES, HAS_OWNED_ONLY_GEAR, FULL_GEAR_SET, packsAGearSet, defaultRentalItems, toggleGearSelection } from '../../lib/gear'
 import { needsShoeSize } from '../../lib/logistics'
@@ -16,13 +16,21 @@ import { fetchRideSeats, canRequestRide, type RideSeats } from '../../lib/event-
 import { missingWaivers, fetchEventWaiverOverrides, fetchDiverSignatures, fetchWaivers, type WaiverEventRef } from '../../lib/waivers'
 import { WaiverSignDialog } from '../waivers/WaiverSignDialog'
 import { TextField } from './TextField'
+import { CertLevelPicker } from '../CertLevelPicker'
+import { legacyCertText } from '../../lib/cert-text'
+import { useCertLevels } from '../../hooks/useCertLevels'
 import { HeightField, WeightField } from '../MeasureField'
 import { MeasureRow } from './MeasureRow'
 import { INPUT_REGISTER } from '../../styles/tokens'
 import { numOrNullStr } from '../../lib/units'
 import { ShoeSizeField } from '../ShoeSizeField'
+import { anyShortfall, needsNitroxCourse, nitroxAnswered, prereqExempt, prereqShortfall, shortfallForStep, type PrereqStep } from '../../lib/prereq-shortfall'
+import { PrereqRows } from './PrereqBlock'
+import { formDiver, prereqRowsForCart } from './prereq-rows'
 import type { WaiverDef } from '../../config/waivers'
 import type { AppEvent, Booking, BookingDetails, Database, PaymentMethod, Profile } from '../../types/database'
+import { usePrereqEvents } from '../../hooks/usePrereqEvents'
+import { AuthContext } from '../../hooks/auth-context'
 
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
 
@@ -190,10 +198,37 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   const [contactMethod, setContactMethod]     = useState<ContactMethod | ''>(profile?.contact_method ?? '')
   const [contactId, setContactId]             = useState(profile?.contact_id ?? '')
   const [certAgency, setCertAgency]           = useState(profile?.cert_agency ?? '')
-  const [certLevel, setCertLevel]             = useState(profile?.cert_level ?? '')
+  const [certLevelCode, setCertLevelCode]     = useState(profile?.cert_level_code ?? '')
+  const certLevels = useCertLevels()
   const [uncertified, setUncertified]         = useState(profile?.uncertified ?? false)
+  const [loggedDives, setLoggedDives]         = useState(profile?.logged_dives ?? 0)
   const [nitroxCertified, setNitroxCertified] = useState(profile?.nitrox_certified ?? false)
+  // Read directly rather than through useAuth(), which insists on a provider.
+  const auth = useContext(AuthContext)
   const [deepCertified, setDeepCertified]     = useState(profile?.deep_certified ?? false)
+  // The cart takes no card photos, so a fresh "Nitrox certified" tick answers
+  // the prerequisite only with a card already on file or a profile that
+  // already said so — as in the single-event form, where it needs a card too.
+  // Otherwise the course is offered.
+  const nitroxHeld = nitroxAnswered({
+    ticked: nitroxCertified, storedCertified: profile?.nitrox_certified, cardOnFile: !!profile?.nitrox_card_path,
+  })
+  // Whether a cart row offers the nitrox course: the event needs nitrox and the
+  // diver it books doesn't hold it. A linked child is read off their profile;
+  // the diver filling the form off what step 2 says now, so unticking a lapsed
+  // card brings the course back. One rule for the price, the checkbox, the
+  // prerequisite gate and what submit posts.
+  //
+  // The event's own prerequisite columns, per cart row (fetched below), are the
+  // row the gate grades on; the cart's copy stands in until they load.
+  const prereqByEvent = usePrereqEvents(cart.map(ev => ev.id))
+  const offersNitroxCourse = useCallback((ev: AppEvent) => {
+    const childId = forDiverByEvent[ev.id] ?? null
+    // A child whose profile isn't loaded is read as not certified: offering
+    // the course is the safe side.
+    const certified = childId ? childById.get(childId)?.nitrox_certified : nitroxHeld
+    return needsNitroxCourse(prereqByEvent[ev.id] ?? ev, certified)
+  }, [forDiverByEvent, childById, nitroxHeld, prereqByEvent])
   const [emergencyName, setEmergencyName]     = useState(profile?.emergency_contact_name ?? '')
   const [emergencyPhone, setEmergencyPhone]   = useState(profile?.emergency_contact_phone ?? '')
 
@@ -240,12 +275,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
         : 0
       const transportSurcharge = ev.transport_price ?? 0
       const transportCost = transportSurcharge > 0 && c.needsTransport === true ? transportSurcharge : 0
-      const targetForDiverId = forDiverByEvent[ev.id] ?? null
-      const targetProfile = targetForDiverId
-        ? (childById.get(targetForDiverId) ?? profile)
-        : profile
-      const showNitroxAddon = ev.nitrox_required && !(targetProfile?.nitrox_certified ?? false)
-      const nitroxFee = showNitroxAddon && c.addNitroxCourse ? NITROX_COURSE_FEE : 0
+      const nitroxFee = offersNitroxCourse(ev) && c.addNitroxCourse ? NITROX_COURSE_FEE : 0
       const subTotal = base + gearCost + transportCost + nitroxFee
       const surchargeCost = Math.round(subTotal * surcharge)
       const total = subTotal + surchargeCost
@@ -263,7 +293,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
       })
       return { base, gearCost, transportCost, nitroxFee, surchargeCost, total, charges }
     })
-  }, [cart, choicesById, selectedMethod, profile, forDiverByEvent, childById])
+  }, [cart, choicesById, selectedMethod, offersNitroxCourse])
 
   const grandTotal = eventBreakdowns.reduce((s, b) => s + b.total, 0)
 
@@ -284,8 +314,9 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   // Step gates — same spirit as solo flow, only the multi-applicable ones.
   // No personal detail is one of them: name, date of birth, nationality,
   // gender and certification are all optional here and on the server, and the
-  // cart moves on whatever the diver chose to type. A past event in the cart
-  // is the only thing left that stops step 2, and it stops step 1 too.
+  // cart moves on whatever the diver chose to type. What stops step 2 is a
+  // past event in the cart (which stops step 1 too) or an event prerequisite
+  // the diver falls short of (below).
   // (Card photos aren't collected in the cart flow — the diver uploads from
   // /profile or brings the physical card; the solo flow carries the photo
   // disclaimer.)
@@ -301,7 +332,42 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
     return c?.rentGear ? c.gearItems : []
   })
   const askShoe = needsShoeSize(packedForSelf) && !profile?.shoe_size
-  const submitBlocked = cart.length === 0 || hasBlockedPast
+
+  // Event prerequisites, per cart row, on the rule the server refuses on
+  // (src/lib/prereq-shortfall.ts). A row for a linked child is graded on the
+  // child's profile; the diver's own rows on what step 2 holds. Only an
+  // admin/staff booking for someone else is exempt, as on the server.
+  // Certification and logged dives block step 2; nitrox blocks step 3, where
+  // the nitrox course can be added.
+
+  const { certCodePatch, diver: selfDiver, legacyText: selfLegacyText } = formDiver(
+    { uncertified, loggedDives, certLevelCode, nitroxCertified: nitroxHeld }, profile, certLevels,
+  )
+  const prereqRows = cart.flatMap(ev => {
+    const childId = forDiverByEvent[ev.id] ?? null
+    const child = childId ? childById.get(childId) ?? null : null
+    if (prereqExempt({ privileged: viewerPrivileged, forSomeoneElse: !!childId })) return []
+    // Booked for a child whose profile isn't loaded: there is nothing here to
+    // grade them on, and the diver's own answers are not theirs. The server
+    // grades the child's stored profile.
+    if (childId && !child) return []
+    const diver = child ?? selfDiver
+    // Exactly the nitrox_course_addon submit() posts for this row.
+    const addon = offersNitroxCourse(ev) && (choicesById[ev.id]?.addNitroxCourse ?? false)
+    const short = prereqShortfall(diver, prereqByEvent[ev.id] ?? null, addon, certLevels)
+    return anyShortfall(short) ? [{ ev, short, diver, child }] : []
+  })
+  const blocksStep = (step: PrereqStep) => prereqRows.some(r => anyShortfall(shortfallForStep(r.short, step)))
+  const prereqBlockedStep2 = blocksStep(2)
+  const prereqBlockedStep3 = blocksStep(3)
+  const prereqPanel = (step: PrereqStep) => (
+    <PrereqRows
+      step={step} levels={certLevels}
+      rows={prereqRowsForCart(prereqRows, prereqByEvent, selfLegacyText)}
+    />
+  )
+
+  const submitBlocked = cart.length === 0 || hasBlockedPast || prereqBlockedStep2 || prereqBlockedStep3
 
   async function submit() {
     setSaving(true)
@@ -321,9 +387,13 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
       gender:                  nullish(gender),
       contact_method:          (contactMethod || null) as ContactMethod | null,
       contact_id:              nullish(contactId),
-      cert_agency:             uncertified ? null : nullish(certAgency),
-      cert_level:              uncertified ? null : nullish(certLevel),
-      uncertified,
+      // cert_agency / cert_level follow from this in the database.
+      ...certCodePatch,
+      // Like the level, only when the diver changed it (see formDiver).
+      ...(uncertified !== (profile?.uncertified ?? false) ? { uncertified } : {}),
+      // Only when changed here, like the level: the signed-in profile is a
+      // cached copy, and an untouched value must not overwrite a newer one.
+      ...(loggedDives !== (profile?.logged_dives ?? 0) ? { logged_dives: loggedDives } : {}),
       nitrox_certified:        nitroxCertified,
       deep_certified:          deepCertified,
       emergency_contact_name:  nullish(emergencyName),
@@ -341,14 +411,8 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
     const calls = cart.map(async (ev) => {
       const c = choicesById[ev.id]
       const gearPacksASet = packsAGearSet(ev)
-      // When the booking is for a linked child, look up nitrox status on
-      // the child's profile (not the parent's) so we don't show / charge
-      // for a nitrox course they don't need.
       const targetForDiverId = forDiverByEvent[ev.id] ?? null
-      const targetProfile = targetForDiverId
-        ? (childById.get(targetForDiverId) ?? profile)
-        : profile
-      const showNitroxAddon = ev.nitrox_required && !(targetProfile?.nitrox_certified ?? false)
+      const showNitroxAddon = offersNitroxCourse(ev)
 
       const evSeats = rideSeatsByEvent[ev.id]
       const rideAllowed = !evSeats
@@ -437,6 +501,27 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
     })
 
     setSubmitResults(results)
+
+    // Every row was for a linked child, so no booking carried the patch. Once
+    // something is booked, save to the diver's own profile what they changed
+    // on step 2 — only those fields, so values left as loaded can't overwrite
+    // an edit made elsewhere since. Best-effort: the bookings stand either way.
+    if (userId && successes.length > 0 && cart.every(ev => (forDiverByEvent[ev.id] ?? null) !== null)) {
+      const stored = (profile ?? {}) as Record<string, unknown>
+      const changed = Object.fromEntries(
+        Object.entries(profilePatch)
+          .filter(([k, v]) => JSON.stringify(stored[k] ?? null) !== JSON.stringify(v ?? null)),
+      ) as ProfileUpdate
+      if (Object.keys(changed).length > 0) {
+        const { error } = await supabase.from('profiles').update(changed).eq('id', userId)
+        if (error) console.error('saving own profile from a child-only cart failed:', error)
+      }
+    }
+
+    // Both paths above patched the diver's own profile (the self rows' calls,
+    // or the child-only save, awaited); refresh the cached signed-in copy the
+    // next form this session starts from.
+    if (successes.length > 0) void auth?.refreshProfile()
 
     if (successes.length === cart.length) {
       // The per-booking emails were suppressed for a multi-booking group;
@@ -624,18 +709,32 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                   onChange={e => {
                     const v = e.target.checked
                     setUncertified(v)
-                    if (v) { setCertAgency(''); setCertLevel('') }
+                    if (v) { setCertAgency(''); setCertLevelCode('') }
                   }}
                   className="accent-brand-900"
                 />
                 {t.register.notCertified}
               </label>
               {!uncertified && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <TextField label={t.register.certAgency} placeholder={t.register.certAgencyPlaceholder} value={certAgency} onChange={setCertAgency} />
-                  <TextField label={t.register.certLevel} placeholder={t.register.certLevelPlaceholder} value={certLevel} onChange={setCertLevel} />
-                </div>
+                <CertLevelPicker
+                  levels={certLevels}
+                  agency={certAgency}
+                  code={certLevelCode}
+                  onAgencyChange={setCertAgency}
+                  onCodeChange={setCertLevelCode}
+                  agencyLabel={t.register.certAgency}
+                  levelLabel={t.register.certLevel}
+                  labelClassName="block text-xs text-brand-900 font-medium mb-1"
+                  selectClassName={INPUT_REGISTER}
+                  legacyText={legacyCertText(profile)}
+                  className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+                />
               )}
+              <TextField
+                label={t.register.loggedDives} type="number" min={0}
+                value={loggedDives === 0 ? '' : String(loggedDives)}
+                onChange={v => setLoggedDives(Math.max(0, Math.floor(Number(v)) || 0))}
+              />
               <div className="grid grid-cols-2 gap-3">
                 <label className="flex items-center gap-2 text-sm text-brand-950 font-medium">
                   <input type="checkbox" checked={nitroxCertified} onChange={e => setNitroxCertified(e.target.checked)} className="accent-brand-900" />
@@ -654,6 +753,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                 </div>
               </div>
             </div>
+            {prereqBlockedStep2 && prereqPanel(2)}
           </section>
         )}
 
@@ -681,7 +781,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                 const targetProfile = targetForDiverId
                   ? (childById.get(targetForDiverId) ?? profile)
                   : profile
-                const showNitroxAddon = ev.nitrox_required && !(targetProfile?.nitrox_certified ?? false)
+                const showNitroxAddon = offersNitroxCourse(ev)
                 const targetLabel = targetForDiverId
                   ? (personName(targetProfile?.name) || t.register.multi.childFallback)
                   : null
@@ -796,12 +896,16 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                 <p className="text-[11px] text-brand-950/70 font-medium">{t.register.gear.savedForNext}</p>
               </div>
             )}
+            {prereqBlockedStep3 && prereqPanel(3)}
           </section>
         )}
 
         {step === 4 && (
           <section className="space-y-3">
             <h2 className="text-lg font-bold text-brand-900">{t.register.payment.title}</h2>
+            {/* The cart's prerequisites or the ladder can land after the diver
+                has passed steps 2 and 3; say why Confirm is off. */}
+            {(prereqBlockedStep2 || prereqBlockedStep3) && prereqPanel('all')}
             {paymentMethods === null ? (
               <p className="text-sm text-brand-900/70">{t.register.payment.methodsLoading}</p>
             ) : paymentMethods.length === 0 ? (
@@ -936,8 +1040,8 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
               onClick={() => setStep((step + 1) as Step)}
               disabled={
                 (step === 1 && (cart.length === 0 || hasBlockedPast)) ||
-                (step === 2 && hasBlockedPast) ||
-                (step === 3 && step3Blocked)
+                (step === 2 && (hasBlockedPast || prereqBlockedStep2)) ||
+                (step === 3 && (step3Blocked || prereqBlockedStep3))
               }
               className="bg-brand-900 hover:bg-brand-950 disabled:opacity-40 text-white text-sm font-semibold py-2 px-4 rounded-lg"
             >
