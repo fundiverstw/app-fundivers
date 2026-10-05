@@ -70,7 +70,7 @@ describe('ProfilePage cert dropdowns', () => {
 
     await waitFor(() => expect(screen.getByRole('option', { name: 'SSI' })).toBeInTheDocument())
     expect((screen.getByLabelText('Agency') as HTMLSelectElement).value).toBe('')
-    expect(screen.getByText('Your saved certification “PSAI PE40” isn’t on our list. Pick the matching agency and level.')).toBeInTheDocument()
+    expect(screen.getByText('The saved certification “PSAI PE40” isn’t on our list. Pick the matching agency and level.')).toBeInTheDocument()
   })
 
   it('saves the picked level as its code, and changing agency clears the level', async () => {

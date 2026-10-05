@@ -45,10 +45,12 @@ vi.mock('../../lib/supabase', () => ({
 }))
 
 // The form reads the viewer's role to decide whether to block past-event
-// registration. Default to a diver; the sample events are future-dated so the
-// block stays off for the existing flow tests.
+// registration and who is exempt from prerequisites. Default to a diver; the
+// sample events are future-dated so the block stays off for the existing flow
+// tests. A test that needs staff sets `viewer.role` and resets it after.
+const viewer = vi.hoisted(() => ({ role: 'diver' }))
 vi.mock('../../hooks/useAuth', () => ({
-  useAuth: () => ({ profile: { role: 'diver' } }),
+  useAuth: () => ({ profile: { role: viewer.role } }),
 }))
 
 // Stub the Turnstile widget so guest tests can "solve" the captcha without
@@ -1133,9 +1135,11 @@ describe('RegisterForm', () => {
     await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
     const { body } = invoke.mock.calls[0][1] as { body: { profile_patch: Record<string, unknown> } }
     expect(body.profile_patch).toMatchObject({
-      name: null, date_of_birth: null, nationality: null, gender: null,
-      cert_level_code: null, shoe_size: null,
+      name: null, date_of_birth: null, nationality: null, gender: null, shoe_size: null,
     })
+    // No level picked and none stored: nothing changed, so nothing is sent —
+    // a cached profile can't clear a level saved since.
+    expect(body.profile_patch).not.toHaveProperty('cert_level_code')
   })
 
   it('saves the picked agency + level as a cert_levels code, not typed text', async () => {
@@ -1211,7 +1215,7 @@ describe('RegisterForm', () => {
   it('step 2 takes no answer to the certification question at all', async () => {
     setupFrom()
     const user = userEvent.setup()
-    const blankCert: Profile = { ...sampleProfile, cert_level: null, cert_level_code: null, cert_card_path: null }
+    const blankCert: Profile = { ...sampleProfile, cert_agency: null, cert_level: null, cert_level_code: null, cert_card_path: null }
     render(
       <RegisterForm event={sampleEvent} profile={blankCert} userId="u1"
         onClose={() => {}} onBooked={() => {}} />
@@ -1232,7 +1236,7 @@ describe('RegisterForm', () => {
     setupFrom()
     const base = from.getMockImplementation()!
     from.mockImplementation((table: string) => table === 'events'
-      ? mockQueryBuilder({ data: { prereq_cert_id: null, req_dives: null, nitrox_required: false, ...prereqs } })
+      ? mockQueryBuilder({ data: [{ id: sampleEvent.id, prereq_cert_id: null, req_dives: null, nitrox_required: false, ...prereqs }] })
       : base(table))
   }
 
@@ -2430,6 +2434,193 @@ describe('RegisterForm', () => {
     })
   })
 
+  describe('prerequisite exemptions and the per-diver nitrox course', () => {
+    const child: Profile = {
+      ...sampleProfile, id: 'child-1', name: 'Bee Junior',
+      cert_level: null, cert_level_code: null, cert_card_path: null,
+      nitrox_certified: false, nitrox_card_path: null,
+    }
+
+    afterEach(() => { viewer.role = 'diver' })
+
+    function setupGated(
+      prereqs: { prereq_cert_id?: string | null; req_dives?: number | null; nitrox_required?: boolean },
+      children: Profile[] = [],
+    ) {
+      setupFrom()
+      const base = from.getMockImplementation()!
+      from.mockImplementation((table: string) => {
+        if (table === 'events') return mockQueryBuilder({ data: [{ id: sampleEvent.id, prereq_cert_id: null, req_dives: null, nitrox_required: false, ...prereqs }] })
+        if (table === 'profiles') return mockQueryBuilder({ data: children })
+        return base(table)
+      })
+    }
+
+    it('lets an admin save an edit to a booking whose diver falls short of the prerequisites', async () => {
+      setupGated({ prereq_cert_id: 'l2' })  // PADI AOW
+      const user = userEvent.setup()
+      // No level on the profile: a new booking would be blocked as unstated.
+      const unplaced: Profile = { ...sampleProfile, cert_level: null, cert_level_code: null }
+      const existing = {
+        id: 'b-existing', user_id: 'u1', status: 'pending', notes: null,
+        details: { gear: { rent: false }, add_ons: [], transportation: false, payment_method: 'cash', total: 2800 },
+      } as unknown as Parameters<typeof RegisterForm>[0]['existingBooking']
+      render(
+        <RegisterForm event={sampleEvent} profile={unplaced} userId="u1"
+          onClose={() => {}} onBooked={() => {}} existingBooking={existing} />
+      )
+      await user.click(screen.getByRole('button', { name: /next/i }))  // → 2
+      await waitFor(() => expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled())
+      expect(screen.queryByText(/you don't meet this event's prerequisites/i)).not.toBeInTheDocument()
+    })
+
+    it('does not grade a child that staff book alongside themselves, as the server does not', async () => {
+      viewer.role = 'staff'
+      setupGated({ prereq_cert_id: 'l2' }, [child])  // the child has no level
+      const user = userEvent.setup()
+      render(
+        <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+          onClose={() => {}} onBooked={() => {}} />
+      )
+      await waitFor(() => expect(screen.getByText(/who is this booking for/i)).toBeInTheDocument())
+      await user.click(screen.getByRole('checkbox', { name: /bee junior/i }))
+      await user.click(screen.getByRole('button', { name: /continue/i }))
+      await user.click(screen.getByRole('button', { name: /next/i }))  // → 2
+      await waitFor(() => expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled())
+      expect(screen.queryByText(/you don't meet this event's prerequisites/i)).not.toBeInTheDocument()
+    })
+
+    it('offers the nitrox course for a child a nitrox-certified parent books, names them, and charges only them', async () => {
+      setupGated({ nitrox_required: true }, [child])
+      const user = userEvent.setup()
+      const nitroxParent: Profile = { ...sampleProfile, nitrox_certified: true, nitrox_card_path: 'u1/nitrox.jpg' }
+      render(
+        <RegisterForm event={sampleEvent} profile={nitroxParent} userId="u1"
+          onClose={() => {}} onBooked={() => {}} />
+      )
+      await waitFor(() => expect(screen.getByText(/who is this booking for/i)).toBeInTheDocument())
+      await user.click(screen.getByRole('checkbox', { name: /bee junior/i }))
+      await user.click(screen.getByRole('button', { name: /continue/i }))
+      await user.click(screen.getByRole('button', { name: /next/i }))  // → 2
+      await waitFor(() => expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled())
+      await user.click(screen.getByRole('button', { name: /next/i }))  // → 3
+
+      const panel = await screen.findByRole('alert')
+      expect(panel).toHaveTextContent(/bee junior/i)
+      expect(panel).toHaveTextContent(/requires a nitrox certification/i)
+      await user.click(screen.getByLabelText(/add nitrox course/i))
+      expect(screen.queryByText(/requires a nitrox certification/i)).not.toBeInTheDocument()
+
+      await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+      await user.click(screen.getByLabelText(/i have all the required gear/i))
+      await user.click(screen.getByRole('button', { name: /next/i }))  // → 4
+      await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+      await waitFor(() => expect(invoke.mock.calls.filter(c => c[0] === 'create-registration')).toHaveLength(2))
+      const bodies = invoke.mock.calls
+        .filter(c => c[0] === 'create-registration')
+        .map(c => (c[1] as { body: { target_user_id?: string; details: { nitrox_course_addon: boolean; total: number } } }).body)
+      const selfBody = bodies.find(b => !b.target_user_id)!
+      const childBody = bodies.find(b => b.target_user_id === 'child-1')!
+      expect(selfBody.details.nitrox_course_addon).toBe(false)
+      expect(childBody.details.nitrox_course_addon).toBe(true)
+      expect(childBody.details.total).toBeGreaterThan(selfBody.details.total)
+    })
+
+    it('offers the course to a diver who unticks a lapsed nitrox card on step 2', async () => {
+      setupGated({ nitrox_required: true })
+      const user = userEvent.setup()
+      const lapsed: Profile = { ...sampleProfile, logged_dives: 30, nitrox_certified: true, nitrox_card_path: 'u1/nitrox.jpg' }
+      render(
+        <RegisterForm event={sampleEvent} profile={lapsed} userId="u1"
+          onClose={() => {}} onBooked={() => {}} />
+      )
+      await user.click(screen.getByRole('button', { name: /next/i }))  // → 2
+      await user.click(screen.getByLabelText(/nitrox certified/i))     // untick
+      await waitFor(() => expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled())
+      await user.click(screen.getByRole('button', { name: /next/i }))  // → 3
+      expect(await screen.findByText(/requires a nitrox certification/i)).toBeInTheDocument()
+      await user.click(screen.getByLabelText(/add nitrox course/i))
+      expect(screen.queryByText(/requires a nitrox certification/i)).not.toBeInTheDocument()
+    })
+
+    it('lets a parent booking a child correct a stale "not certified" on a level-gated event', async () => {
+      setupGated({ prereq_cert_id: 'l2' }, [{ ...child, uncertified: true }])
+      const user = userEvent.setup()
+      render(
+        <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+          onClose={() => {}} onBooked={() => {}} />
+      )
+      await waitFor(() => expect(screen.getByText(/who is this booking for/i)).toBeInTheDocument())
+      await user.click(screen.getByRole('checkbox', { name: /^myself$/i }))
+      await user.click(screen.getByRole('checkbox', { name: /bee junior/i }))
+      await user.click(screen.getByRole('button', { name: /continue/i }))
+      await user.click(screen.getByRole('button', { name: /next/i }))  // → 2
+      expect(await screen.findByText(/marked yourself as not certified/i)).toBeInTheDocument()
+      // The child is named: the parent isn't the one who falls short.
+      expect(screen.getByRole('alert')).toHaveTextContent(/bee junior/i)
+      await user.click(screen.getByLabelText(/not certified yet/i))  // untick
+      await user.selectOptions(screen.getByLabelText(/cert level/i), 'advanced_open_water')
+      expect(screen.queryByText(/you don't meet this event's prerequisites/i)).not.toBeInTheDocument()
+    })
+
+    it('keeps the nitrox course an existing booking carries when an admin edits it', async () => {
+      setupFrom()
+      const user = userEvent.setup()
+      // Certified now — by the course this booking bought.
+      const certifiedSince: Profile = { ...sampleProfile, nitrox_certified: true, nitrox_card_path: 'u1/nitrox.jpg' }
+      const existing = {
+        id: 'b-existing', user_id: 'u1', status: 'pending', notes: null,
+        details: {
+          gear: { rent: false }, add_ons: [], transportation: false, payment_method: 'cash',
+          nitrox_course_addon: true, total: 8800,
+        },
+      } as unknown as Parameters<typeof RegisterForm>[0]['existingBooking']
+      render(
+        <RegisterForm event={sampleEvent} profile={certifiedSince} userId="u1"
+          onClose={() => {}} onBooked={() => {}} existingBooking={existing} />
+      )
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      expect((screen.getByLabelText(/add nitrox course/i) as HTMLInputElement).checked).toBe(true)
+      await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+      await user.click(screen.getByLabelText(/i have all the required gear/i))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /save changes/i }))
+      await waitFor(() => expect(update).toHaveBeenCalledOnce())
+      const payload = update.mock.calls[0][0] as { details: { nitrox_course_addon: boolean } }
+      expect(payload.details.nitrox_course_addon).toBe(true)
+    })
+
+    it('stops counting legacy text as a claim once the diver moves to a listed agency', async () => {
+      setupFrom()
+      const user = userEvent.setup()
+      const legacy: Profile = { ...sampleProfile, cert_agency: 'PSAI', cert_level: 'PE40', cert_level_code: null, cert_card_path: null }
+      render(
+        <RegisterForm event={sampleEvent} profile={legacy} userId="u1"
+          onClose={() => {}} onBooked={() => {}} />
+      )
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      expect(screen.getByText(/add proof of your certification/i)).toBeInTheDocument()
+      await waitFor(() => expect(screen.getByRole('option', { name: 'SDI' })).toBeInTheDocument())
+      await user.selectOptions(screen.getByLabelText(/cert agency/i), 'SDI')
+      expect(screen.queryByText(/add proof of your certification/i)).not.toBeInTheDocument()
+    })
+
+    it('still asks for proof of a legacy level the backfill could not place', async () => {
+      setupFrom()
+      const user = userEvent.setup()
+      const legacy: Profile = { ...sampleProfile, cert_level: 'PE40', cert_level_code: null, cert_card_path: null }
+      render(
+        <RegisterForm event={sampleEvent} profile={legacy} userId="u1"
+          onClose={() => {}} onBooked={() => {}} />
+      )
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      expect(screen.getByText(/add proof of your certification/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+    })
+  })
+
   describe('resume draft', () => {
     function seedDraft(over: Partial<RegistrationDraft> = {}) {
       const key = registrationDraftKey('dive', sampleEvent.id, 'u1')
@@ -2463,6 +2654,54 @@ describe('RegisterForm', () => {
       await user.click(await screen.findByRole('button', { name: /^resume$/i }))
       // Draft jumped to step 2 and restored the (draft) full name over the profile value.
       expect(await screen.findByDisplayValue('Restored Diver')).toBeInTheDocument()
+    })
+
+    // A draft saved before the level picker carries no code. Restoring '' would
+    // post cert_level_code: null, which the mirror trigger reads as clearing it.
+    it('keeps the profile\'s level when the draft has no level code', async () => {
+      seedDraft()
+      setupFrom()
+      const user = userEvent.setup()
+      render(
+        <MemoryRouter>
+          <RegisterFormBody event={sampleEvent} profile={sampleProfile} userId="u1" onSubmitSuccess={() => {}} />
+        </MemoryRouter>
+      )
+      await user.click(await screen.findByRole('button', { name: /^resume$/i }))
+      await screen.findByDisplayValue('Restored Diver')
+      expect((screen.getByLabelText(/cert level/i) as HTMLSelectElement).value).toBe('advanced_open_water')
+    })
+
+    it('restores an agency switch left part-way, rather than the profile\'s level', async () => {
+      seedDraft({ certAgency: 'SDI', certLevelCode: '' })
+      setupFrom()
+      const user = userEvent.setup()
+      render(
+        <MemoryRouter>
+          <RegisterFormBody event={sampleEvent} profile={sampleProfile} userId="u1" onSubmitSuccess={() => {}} />
+        </MemoryRouter>
+      )
+      await waitFor(() => expect(from).toHaveBeenCalledWith('cert_levels'))
+      await user.click(await screen.findByRole('button', { name: /^resume$/i }))
+      await screen.findByDisplayValue('Restored Diver')
+      expect((screen.getByLabelText(/cert agency/i) as HTMLSelectElement).value).toBe('SDI')
+      expect((screen.getByLabelText(/cert level/i) as HTMLSelectElement).value).toBe('')
+    })
+
+    it('restores "not certified" without the profile\'s level waiting underneath it', async () => {
+      seedDraft({ uncertified: true })
+      setupFrom()
+      const user = userEvent.setup()
+      render(
+        <MemoryRouter>
+          <RegisterFormBody event={sampleEvent} profile={sampleProfile} userId="u1" onSubmitSuccess={() => {}} />
+        </MemoryRouter>
+      )
+      await user.click(await screen.findByRole('button', { name: /^resume$/i }))
+      await screen.findByDisplayValue('Restored Diver')
+      expect(screen.queryByLabelText(/cert level/i)).not.toBeInTheDocument()
+      await user.click(screen.getByLabelText(/not certified yet/i))  // untick
+      expect((screen.getByLabelText(/cert level/i) as HTMLSelectElement).value).toBe('')
     })
 
     it('clears the draft and hides the banner on Start fresh', async () => {

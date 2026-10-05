@@ -829,7 +829,7 @@ export interface Database {
            *  consented. */
           agreed_to_terms_version: number | null
           /** Stamped by the maybe_set_application_submitted_at trigger the
-           *  first time name, date_of_birth, cert_level, contact_method and
+           *  first time name, date_of_birth, cert_level_code, contact_method and
            *  contact_id are all populated — i.e. "this diver has filled the
            *  application in". Null means they signed up and stopped short,
            *  which is a profile to flag, never a reason to hide them from the
@@ -1850,10 +1850,11 @@ export interface Database {
           name: string
           name_zh: string | null
           rank: number
-          /** 'PADI' / 'BSAC' / 'SSI' / 'NAUI' / 'SAA' / 'SDI'. */
+          /** 'PADI' / 'BSAC' / 'SSI' / 'NAUI' / 'SAA' / 'SDI' / 'CMAS'. */
           organization: string
           /** PADI rank this level resolves to for prereq comparisons.
-           *  Self-id for PADI rows; closest PADI rank for agency rows. */
+           *  Self-id (or null) for PADI rows; closest PADI rank for agency
+           *  rows, and null on an agency row means no equivalent. */
           padi_equivalent_id: string | null
           created_at: string
           updated_at: string

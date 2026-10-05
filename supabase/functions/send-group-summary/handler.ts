@@ -16,6 +16,7 @@ import { fetchShopContact } from "../_shared/shop-contact.ts"
 import { fetchShopLogoDataUrl } from "../_shared/shop-logo.ts"
 import { t } from "../_shared/i18n.ts"
 import { usesDateEnvelope, type EventKind } from "../../../src/lib/event-kinds.ts"
+import { printedCert, type CertTextFields } from "../../../src/lib/cert-text.ts"
 import { EVENT_KIND_LABELS } from "../_shared/event-kind-labels.ts"
 
 export interface GroupSummaryBody {
@@ -128,7 +129,7 @@ export async function handleGroupSummary(req: Request, deps: Deps): Promise<Resp
   for (const b of bookings) {
     const { data: profile } = await admin
       .from("profiles")
-      .select("name, date_of_birth, nationality, cert_level, cert_agency, nitrox_certified")
+      .select("name, date_of_birth, nationality, cert_level, cert_agency, cert_level_code, uncertified, nitrox_certified")
       .eq("id", b.user_id)
       .maybeSingle()
 
@@ -177,14 +178,15 @@ export async function handleGroupSummary(req: Request, deps: Deps): Promise<Resp
     if (total != null) groupTotal += total
     if (deposit != null) groupDeposit += deposit; else allHaveDeposit = false
 
+    const printed = printedCert(profile as CertTextFields | null, t.profile.certNotPlaced)
     divers.push({
       name:        (profile?.name as string | null) ?? "",
       eventTitle,
       dateStr,
       dob:         (profile?.date_of_birth as string | null) ?? null,
       nationality: (profile?.nationality as string | null) ?? null,
-      certLevel:   (profile?.cert_level as string | null) ?? null,
-      certOrg:     (profile?.cert_agency as string | null) ?? null,
+      certLevel:   printed.level,
+      certOrg:     printed.org,
       nitrox:      !!profile?.nitrox_certified,
       gearLabel:   gearLabel(details),
       ride:        details.transportation ? t.pdf.ridingWithShop : t.pdf.drivingThemselves,

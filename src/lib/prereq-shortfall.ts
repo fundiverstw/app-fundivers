@@ -11,7 +11,8 @@ export function parseReqDives(v: unknown): number | null {
   // Course rows store req_dives as free text ("20", "20 dives"); pull the
   // leading digit run, matching how the SPA's courseDetails() coerces it.
   if (typeof v === 'string') {
-    const digits = v.replace(/\D/g, '')
+    // The first run only: "10-20" is 10, not 1020.
+    const digits = v.match(/\d+/)?.[0]
     if (!digits) return null
     const n = Number(digits)
     return Number.isFinite(n) ? n : null
@@ -23,6 +24,7 @@ export function parseReqDives(v: unknown): number | null {
 export interface LadderRung {
   id: string
   code: string
+  organization: string
   rank: number
   padi_equivalent_id: string | null
 }
@@ -44,9 +46,10 @@ export interface EligibilityEvent {
 /**
  * Why a diver doesn't reach the level an event asks for; null when they do or
  * the event asks for none. Carried rather than re-derived so the form can say
- * the right thing: "you said you hold nothing" and "pick your level" differ.
+ * the right thing: "you said you hold nothing", "pick your level" and "the
+ * level you picked has no PADI equivalent to compare" all differ.
  */
-export type CertShortfall = null | 'uncertified' | 'unstated' | 'below'
+export type CertShortfall = null | 'uncertified' | 'unstated' | 'unranked' | 'below'
 
 export interface PrereqShortfall {
   cert: CertShortfall
@@ -54,14 +57,76 @@ export interface PrereqShortfall {
   nitrox: boolean
 }
 
+/**
+ * Whether a diver must add the nitrox course to book an event: it requires
+ * nitrox and they don't hold the certification. The forms offer and price the
+ * course on this, and the gate below refuses on it.
+ */
+export function needsNitroxCourse(
+  event: Pick<EligibilityEvent, 'nitrox_required'> | null | undefined,
+  nitroxCertified: boolean | null | undefined,
+): boolean {
+  return event?.nitrox_required === true && nitroxCertified !== true
+}
+
+/**
+ * Whether a register form's "Nitrox certified" tick answers a nitrox
+ * prerequisite: a fresh claim needs a card behind it — on file, or being
+ * uploaded with this submit — unless the profile already said so. Otherwise
+ * the nitrox course is offered instead.
+ */
+export function nitroxAnswered({ ticked, storedCertified, cardOnFile, cardPending = false }: {
+  ticked: boolean
+  storedCertified: boolean | null | undefined
+  cardOnFile: boolean
+  cardPending?: boolean
+}): boolean {
+  return ticked && (storedCertified === true || cardOnFile || cardPending)
+}
+
 export function anyShortfall(s: PrereqShortfall): boolean {
   return s.cert !== null || s.dives || s.nitrox
 }
 
-/** A level's PADI equivalent — itself for a PADI level. */
-export function padiRungOf(ladder: readonly LadderRung[], row: LadderRung | undefined): LadderRung | undefined {
+/**
+ * The register forms ask about certification and logged dives on step 2 and
+ * offer the nitrox course on step 3, so each step blocks on its own part of a
+ * shortfall. 'all' is both, for the final step's summary.
+ */
+export type PrereqStep = 2 | 3 | 'all'
+
+export function shortfallForStep(s: PrereqShortfall, step: PrereqStep): PrereqShortfall {
+  if (step === 2) return { ...s, nitrox: false }
+  if (step === 3) return { cert: null, dives: false, nitrox: s.nitrox }
+  return s
+}
+
+/**
+ * Whether a booking skips the prerequisite gate: an admin or staff member
+ * booking someone other than themselves (the shop deciding), or an admin
+ * editing a booking that already exists. The register forms and the server
+ * all ask this, so they agree on who is let through.
+ */
+export function prereqExempt({ privileged, forSomeoneElse, isEdit = false }: {
+  privileged: boolean
+  forSomeoneElse: boolean
+  isEdit?: boolean
+}): boolean {
+  return isEdit || (privileged && forSomeoneElse)
+}
+
+type Rung = Pick<LadderRung, 'id' | 'organization' | 'padi_equivalent_id'>
+
+/**
+ * A level's PADI equivalent — itself for a PADI level, whether or not its row
+ * points at itself. Another agency's level with no equivalent recorded has
+ * none: its own rank is on that agency's ladder, not PADI's, so reading it as
+ * a PADI rank would pass a diver for a level they may not hold.
+ */
+export function padiRungOf<R extends Rung>(ladder: readonly R[], row: R | undefined): R | undefined {
   if (!row) return undefined
-  return ladder.find(r => r.id === (row.padi_equivalent_id ?? row.id))
+  if (row.padi_equivalent_id) return ladder.find(r => r.id === row.padi_equivalent_id)
+  return row.organization === 'PADI' ? row : undefined
 }
 
 /**
@@ -86,9 +151,7 @@ export function prereqShortfall(
   const reqDives = parseReqDives(event.req_dives)
   const dives = reqDives != null && loggedDives < reqDives
 
-  const nitrox = event.nitrox_required === true
-    && profile?.nitrox_certified !== true
-    && !nitroxCourseAddon
+  const nitrox = needsNitroxCourse(event, profile?.nitrox_certified) && !nitroxCourseAddon
 
   return { cert: certShortfall(profile, event.prereq_cert_id, ladder), dives, nitrox }
 }
@@ -103,7 +166,9 @@ function certShortfall(
   // Not on the ladder (or the ladder hasn't loaded): nothing to grade against.
   if (!required) return null
   if (profile?.uncertified === true) return 'uncertified'
-  const held = padiRungOf(ladder, ladder.find(r => r.code === profile?.cert_level_code))
-  if (!held) return 'unstated'
+  const picked = ladder.find(r => r.code === profile?.cert_level_code)
+  if (!picked) return 'unstated'
+  const held = padiRungOf(ladder, picked)
+  if (!held) return 'unranked'
   return held.rank < required.rank ? 'below' : null
 }

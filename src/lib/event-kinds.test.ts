@@ -2,8 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   EVENT_KINDS,
   usesDateEnvelope, usesCourseDays, heldAtShop, usesTripTemplate, hasDiveFlags, isEventKind,
-  DATE_ENVELOPE_KINDS, COURSE_DAY_KINDS, NON_COURSE_KINDS,
-} from './event-kinds'
+  DATE_ENVELOPE_KINDS, COURSE_DAY_KINDS, NON_COURSE_KINDS } from './event-kinds'
 
 describe('event kind helpers', () => {
   it('splits the temporal shape: courses run on a day list, everything else on an envelope', () => {

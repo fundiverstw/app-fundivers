@@ -579,9 +579,13 @@ export const en = {
       certMismatch: (cert: string) => `Requires ${cert}, but you've marked yourself as not certified.`,
       certBelow: (cert: string, have: string) => `Requires ${cert}. Your profile says ${have}.`,
       certUnknown: (cert: string) => `Requires ${cert}, and your profile doesn't say which certification you hold.`,
-      nitroxMismatch: 'Requires a Nitrox certification, which your profile doesn\'t list.',
+      certLegacy: (cert: string, saved: string) => `Requires ${cert}. The saved certification “${saved}” isn’t on our list, so pick the level from it.`,
+      certUnranked: (cert: string, have: string) => `Requires ${cert}. Your profile says ${have}, which isn't matched to a PADI level yet, so it can't be checked here.`,
+      nitroxMismatch: 'Requires a Nitrox certification, with a Nitrox card on file.',
       divesMismatch: (req: number, have: number) => `Requires at least ${req} logged dives (you've entered ${have}).`,
-      blocked: (shop: string) => `You can't book this event. If your profile is out of date, correct it above; otherwise contact ${shop}.`,
+      blocked: (shop: string) => `You can't book this event. If your own details are out of date, correct them above. For anyone else on the booking, or if your details are right, contact ${shop}.`,
+      blockedGoBack: (step: string, shop: string) => `You can't book this event. If your own details are out of date, go back to “${step}” and correct them. For anyone else on the booking, or if your details are right, contact ${shop}.`,
+      blockedNitrox: (shop: string) => `You can't book this event yet. Add the Nitrox course to the booking for each diver who needs it. If you already hold a Nitrox card, add a photo of it to your profile first; for anyone else on the booking, contact ${shop}.`,
       higherCertFallback: 'a higher certification',
     },
     extras: {
@@ -839,7 +843,8 @@ export const en = {
     levelLabel: 'Level',
     selectLevel: '— select level —',
     pickAgencyFirst: '— pick agency first —',
-    certNotOnList: (saved: string) => `Your saved certification “${saved}” isn’t on our list. Pick the matching agency and level.`,
+    certNotOnList: (saved: string) => `The saved certification “${saved}” isn’t on our list. Pick the matching agency and level.`,
+    certNotPlaced: (typed: string) => `${typed} (not on the list)`,
     loggedDives: 'Logged dives',
     lastDive: 'Last dive',
     nitroxCertified: 'Nitrox certified',
@@ -2407,6 +2412,7 @@ export const en = {
       rowName: 'Name',
       rowPhone: 'Phone',
       rowAgencyLevel: 'Agency + level',
+      rowLegacyCert: 'Typed earlier (not on the list)',
       rowLoggedDives: 'Logged dives',
       rowLastDive: 'Last dive',
       rowNitrox: 'Nitrox',
@@ -3207,6 +3213,7 @@ export const en = {
       diversByCert: 'Active divers by certification',
       revenueByActivity: 'Revenue by activity',
       unknownBucket: 'Unknown',
+      notPlacedBucket: 'Not on the list',
       // What kind of outing earned the money. A course reports under its own
       // catalog title, so these are the fallbacks and the non-course kinds.
       activities: {

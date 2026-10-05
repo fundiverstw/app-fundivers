@@ -25,8 +25,9 @@ import { WaiverSignDialog } from '../waivers/WaiverSignDialog'
 import type { WaiverDef } from '../../config/waivers'
 import { uploadCertCard } from '../../lib/cert-card'
 import { uploadNitroxCard } from '../../lib/nitrox-card'
-import { anyShortfall, prereqShortfall, type EligibilityEvent } from '../../lib/prereq-shortfall'
-import { PrereqBlock, PrereqCertAndDives } from './PrereqBlock'
+import { anyShortfall, needsNitroxCourse, nitroxAnswered, prereqExempt, prereqShortfall, shortfallForStep, type EligibilityEvent, type PrereqStep } from '../../lib/prereq-shortfall'
+import { PrereqRows } from './PrereqBlock'
+import { formDiver, prereqRowsForDivers } from './prereq-rows'
 import { uploadDeepCard } from '../../lib/deep-card'
 import { isHeicFile } from '../../lib/image-compress'
 import { TurnstileWidget, type TurnstileHandle } from './TurnstileWidget'
@@ -34,6 +35,8 @@ import { CAPTCHA_REUSE_MAX_AGE_MS } from '../../lib/turnstile'
 import { WhatHappensNext } from './WhatHappensNext'
 import { TextField } from './TextField'
 import { CertLevelPicker } from '../CertLevelPicker'
+import { certSummary } from '../../lib/cert-display'
+import { legacyCertText } from '../../lib/cert-text'
 import { useCertLevels } from '../../hooks/useCertLevels'
 import { HeightField, WeightField } from '../MeasureField'
 import { MeasureRow } from './MeasureRow'
@@ -47,6 +50,7 @@ import {
   type RegistrationDraft,
 } from '../../lib/registration-draft'
 import type { AppEvent, Booking, BookingDetails, CancellationPolicy, Database, Discount, EOAddon, EORoom, PaymentMethod as PaymentMethodRow, Profile } from '../../types/database'
+import { usePrereqEvents } from '../../hooks/usePrereqEvents'
 
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
 
@@ -425,7 +429,7 @@ function DiverPickerStep({
                   <p className="text-xs text-brand-900/70">
                     {isSelf
                       ? (personName(p.name) || t.register.picker.yourAccount)
-                      : (p.cert_agency && p.cert_level ? `${p.cert_agency} ${p.cert_level}` : t.register.picker.uncertified)}
+                      : (certSummary(p) ?? t.register.picker.uncertified)}
                     {!isSelf && p.status && p.status !== 'active' && (
                       <span className="ml-2 uppercase tracking-wider text-red-300">{p.status}</span>
                     )}
@@ -512,7 +516,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // and staff keep full control (e.g. recording a booking after the fact) and
   // the admin edit path is always allowed. Guests (no session) are never
   // privileged, so a deep-link to a past event is blocked too.
-  const { profile: viewerProfile } = useAuth()
+  const { profile: viewerProfile, refreshProfile } = useAuth()
   const viewerPrivileged = viewerProfile?.role === 'admin' || viewerProfile?.role === 'staff'
   const pastBlocked = !isEdit && !viewerPrivileged && isPastEvent(event)
   // Gating derived from the event
@@ -524,7 +528,6 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const gearPacksASet = packsAGearSet(event)
   const showRooms = event.has_rooms && event.room_type_ids.length > 0
   const showAddons = event.has_addons && event.addon_ids.length > 0
-  const showNitroxAddon = event.nitrox_required && !(profile?.nitrox_certified ?? false)
 
   const [step, setStep] = useState<Step>(1)
   const [rooms, setRooms] = useState<EORoom[]>([])
@@ -655,6 +658,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const certLevels = useCertLevels()
   const [loggedDives, setLoggedDives] = useState(profile?.logged_dives ?? 0)
   const [nitroxCertified, setNitroxCertified] = useState(profile?.nitrox_certified ?? false)
+  // The ladder they are graded on is `certLevels`, already loaded for the picker.
+  const prereqEvent: EligibilityEvent | null = usePrereqEvents([event.id])[event.id] ?? null
+  const nitroxEvent = prereqEvent ?? event
   // Holds a freshly-picked nitrox card until submit, when it gets uploaded
   // to storage. For authed users the upload happens before the
   // create-registration call so the path lands in the profile patch; for
@@ -666,6 +672,28 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // Hard block: nitrox=true but neither an existing card nor a freshly
   // picked file → can't proceed past step 2.
   const nitroxBlocked = nitroxCertified && !hasNitroxCardOnFile && !nitroxFile
+  // The nitrox course goes on the booking of each diver who needs nitrox and
+  // doesn't hold it: the diver filling the form on what step 2 says now
+  // (unticking a lapsed card brings the course back), every other diver on
+  // their own profile. One checkbox on step 3, offered when anyone needs it;
+  // only the divers who lack the cert are charged for it. An admin editing a
+  // booking keeps a course it already carries: the diver may hold the cert
+  // now precisely because they took it, and the fee is still owed.
+  // Read off the event's own prerequisite columns, the row the gate below
+  // grades (and the server refuses) on, once they have loaded.
+  //
+  // A fresh "Nitrox certified" tick answers the prerequisite only with a card
+  // behind it — on file, being uploaded here, or a profile that already said
+  // so. On behalf of someone, where no card can be uploaded, a new tick alone
+  // leaves the course to add, as it does in the cart.
+  const nitroxHeld = nitroxAnswered({
+    ticked: nitroxCertified, storedCertified: profile?.nitrox_certified,
+    cardOnFile: hasNitroxCardOnFile, cardPending: !!nitroxFile,
+  })
+  const leadNeedsNitroxCourse = needsNitroxCourse(nitroxEvent, nitroxHeld)
+    || (isEdit && initialDetails?.nitrox_course_addon === true)
+  const targetNeedsNitroxCourse = (tg: Profile) => needsNitroxCourse(nitroxEvent, tg.nitrox_certified)
+  const showNitroxAddon = leadNeedsNitroxCourse || additionalTargets.some(targetNeedsNitroxCourse)
   // Deep (40m) cert mirrors the nitrox pattern: boolean flag + photo
   // required when claimed.
   const [deepCertified, setDeepCertified] = useState(profile?.deep_certified ?? false)
@@ -673,9 +701,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const [deepFileErr, setDeepFileErr] = useState<string | null>(null)
   const hasDeepCardOnFile = !!profile?.deep_card_path
   const deepBlocked = deepCertified && !hasDeepCardOnFile && !deepFile
-  // Same pattern for the main cert card: cert_level set ⇒ photo required.
-  // The card stays optional for divers who haven't picked a level (they
-  // can still register, e.g. for an entry-level course).
+  // Same pattern for the main cert card: a level claimed (picked, or legacy
+  // text still on the profile; see claimsCertLevel) ⇒ photo required. The
+  // card stays optional for divers who claim none (they can still register,
+  // e.g. for an entry-level course).
   const [certFile, setCertFile] = useState<File | null>(null)
   const [certFileErr, setCertFileErr] = useState<string | null>(null)
   // Diver explicitly holds no certification (Discover / trial diver). Mutually
@@ -689,8 +718,18 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // registers all the same, and the shop asks at the counter. What a *claim*
   // costs is evidence: name a level and the photo is deferrable only by
   // acknowledging you'll bring the physical card (or be turned away, no
-  // refund).
-  const needsCertPhoto = !uncertified && certLevelCode.trim() !== '' && !hasCertCardOnFile && !certFile
+  // refund). A level typed before the picker existed that the backfill
+  // couldn't place is still a claim, and the one most in need of the card.
+  // A code the ladder doesn't list (a draft from before its level was renamed
+  // or removed) is not a claim: the picker shows nothing picked, and submit
+  // leaves it off the profile.
+  const pickedListedLevel = certLevelCode.trim() !== '' && certLevels.some(l => l.code === certLevelCode)
+  // Legacy text stays a claim only while the diver hasn't moved off its
+  // agency: switching to a listed one starts a replacement, not a claim.
+  const claimsCertLevel = !uncertified && (
+    pickedListedLevel || (legacyCertText(profile) !== null && certAgency === (profile?.cert_agency ?? ''))
+  )
+  const needsCertPhoto = claimsCertLevel && !hasCertCardOnFile && !certFile
   const certPhotoBlocked = !isOnBehalfOf && needsCertPhoto && !certCardAck
 
   // Event prerequisites (a required certification level, nitrox, a minimum
@@ -698,24 +737,39 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // refuses on the same rule (src/lib/prereq-shortfall.ts). Graded on what
   // this form holds, not the profile as loaded — the diver may be fixing their
   // certification right here. Every diver in the submit is graded, a child
-  // booked by a parent included; only admin/staff booking on someone's behalf
-  // is exempt, which is the shop deciding.
-  const [prereqEvent, setPrereqEvent] = useState<EligibilityEvent | null>(null)
-  const gradedEvent = isOnBehalfOf && viewerPrivileged ? null : prereqEvent
-  const nitroxCourseAddon = showNitroxAddon && addNitroxCourse
-  const prereqShort = prereqShortfall(
-    { uncertified, logged_dives: loggedDives, cert_level_code: certLevelCode || null, nitrox_certified: nitroxCertified },
-    gradedEvent, nitroxCourseAddon, certLevels,
+  // booked by a parent included. Exempt, as on the server: a booking an admin
+  // or staff member posts for someone else (on their behalf, or a child they
+  // add alongside themselves, both sent with target_user_id), which is the
+  // shop deciding; and the admin edit path, which never reaches the server's
+  // gate and, like the past-event block, leaves edits alone.
+  const leadGradedEvent = prereqExempt({ privileged: viewerPrivileged, forSomeoneElse: isOnBehalfOf, isEdit }) ? null : prereqEvent
+  const othersGradedEvent = prereqExempt({ privileged: viewerPrivileged, forSomeoneElse: true, isEdit }) ? null : prereqEvent
+  const leadNitroxCourseAddon = leadNeedsNitroxCourse && addNitroxCourse
+  const targetNitroxCourseAddon = (tg: Profile) => targetNeedsNitroxCourse(tg) && addNitroxCourse
+  const { certCodePatch, diver: selfDiver, legacyText: selfLegacyText } = formDiver(
+    { uncertified, loggedDives, certLevelCode, nitroxCertified: nitroxHeld }, profile, certLevels,
   )
+  const prereqShort = prereqShortfall(selfDiver, leadGradedEvent, leadNitroxCourseAddon, certLevels)
   const prereqShortOthers = additionalTargets.flatMap(tg => {
-    const short = prereqShortfall(tg, gradedEvent, nitroxCourseAddon, certLevels)
+    const short = prereqShortfall(tg, othersGradedEvent, targetNitroxCourseAddon(tg), certLevels)
     return anyShortfall(short) ? [{ target: tg, short }] : []
   })
+  // The red box for one step, over every diver in the submit.
+  const prereqPanel = (step: PrereqStep) => (
+    <PrereqRows
+      step={step} levels={certLevels}
+      rows={prereqRowsForDivers({
+        short: prereqShort, others: prereqShortOthers, prereqs: prereqEvent,
+        certLevelCode: selfDiver.cert_level_code, loggedDives, legacyText: selfLegacyText,
+        selfLabel: isOnBehalfOf ? (personName(profile?.name) || t.register.results.diverFallback) : null,
+      })}
+    />
+  )
   // Certification and logged dives are fixed on step 2; nitrox on step 3,
   // where the nitrox course can be added.
-  const prereqBlockedStep2 = [prereqShort, ...prereqShortOthers.map(o => o.short)]
-    .some(s => s.cert !== null || s.dives)
-  const prereqBlockedStep3 = [prereqShort, ...prereqShortOthers.map(o => o.short)].some(s => s.nitrox)
+  const allShortfalls = [prereqShort, ...prereqShortOthers.map(o => o.short)]
+  const prereqBlockedStep2 = allShortfalls.some(s => anyShortfall(shortfallForStep(s, 2)))
+  const prereqBlockedStep3 = allShortfalls.some(s => anyShortfall(shortfallForStep(s, 3)))
 
   // What the shop will pack for this diver. A gear-included course (DSD, Open
   // Water) is a diver who owns nothing, so the full set is the assumption and
@@ -812,9 +866,26 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     setIdNumber(d.idNumber)
     setContactMethod(d.contactMethod as ContactMethod | '')
     setContactId(d.contactId)
-    setCertAgency(d.certAgency)
-    setCertLevelCode(d.certLevelCode)
+    // The certification answer is restored as one thing. "Not certified"
+    // clears the level, as ticking it does. A picked level comes back with its
+    // agency. No code with a listed agency other than the profile's is a diver
+    // part-way through switching agency (which clears the level): that comes
+    // back as they left it. Otherwise no code means nothing was picked — or a
+    // draft saved before the picker existed, whose agency was free text — so
+    // the profile's level stands: restoring '' would post a null
+    // cert_level_code, which the mirror trigger reads as clearing it.
     setUncertified(d.uncertified)
+    const switchedAgency = d.certAgency !== ''
+      && d.certAgency !== (profile?.cert_agency ?? '')
+      && certLevels.some(l => l.organization === d.certAgency)
+    if (d.uncertified) {
+      setCertLevelCode('')
+    } else if (d.certLevelCode || switchedAgency) {
+      setCertAgency(d.certAgency)
+      setCertLevelCode(d.certLevelCode)
+    } else if (!profile?.cert_level_code) {
+      setCertAgency(d.certAgency)
+    }
     setLoggedDives(d.loggedDives)
     setNitroxCertified(d.nitroxCertified)
     setDeepCertified(d.deepCertified)
@@ -936,18 +1007,6 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     return () => { cancelled = true }
   }, [event.id, event.has_transport])
 
-  // The event's prerequisite columns; the ladder they are graded on is
-  // `certLevels`, already loaded for the picker.
-  useEffect(() => {
-    let cancelled = false
-    supabase
-      .from('events' as never)
-      .select('prereq_cert_id, req_dives, nitrox_required')
-      .eq('id', event.id)
-      .maybeSingle()
-      .then(({ data }) => { if (!cancelled) setPrereqEvent((data ?? null) as EligibilityEvent | null) })
-    return () => { cancelled = true }
-  }, [event.id])
 
   // Waivers the diver still needs for this event. Only computed for a diver
   // registering themselves (the e-signature is signed as auth.uid(), so it
@@ -1024,9 +1083,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const rideWaitlisted = needsTransport === true && !rideAllowed
   const payingDepositOnly = hasDeposit && payDepositOnly
   // Everything on this booking that costs the same whoever is diving: the event
-  // fee, the room, the add-ons, the ride and the nitrox course. Gear is the one
-  // line that turns on the individual diver, so it stays out of here.
-  const sharedCost = base + roomCost + addonsCost + transportCost + ((showNitroxAddon && addNitroxCourse) ? NITROX_COURSE_FEE : 0)
+  // fee, the room, the add-ons and the ride. Gear and the nitrox course turn on
+  // the individual diver, so they stay out of here.
+  const sharedCost = base + roomCost + addonsCost + transportCost
 
   // Every money figure one booking resolves to, given what that diver rents.
   //
@@ -1034,8 +1093,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // *now*: the deposit when the diver pays deposit-only, otherwise the whole
   // subtotal. Charging 5% of the full amount when only the deposit is on the
   // card over-charges — the remainder is paid later, off the card.
-  function moneyFor(gearAmount: number) {
-    const subTotal = sharedCost + gearAmount
+  function moneyFor(gearAmount: number, nitroxCourse: boolean) {
+    const subTotal = sharedCost + gearAmount + (nitroxCourse ? NITROX_COURSE_FEE : 0)
     const depositFace = hasDeposit ? Math.min(event.deposit_amount ?? 0, subTotal) : 0
     const fullSurcharge    = Math.round(subTotal * paymentSurcharge)
     const depositSurcharge = Math.round(depositFace * paymentSurcharge)
@@ -1049,7 +1108,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     }
   }
 
-  const { subTotal, total, fullNow, depositNow, remainderLater } = moneyFor(gearCost)
+  const { subTotal, total, fullNow, depositNow, remainderLater } = moneyFor(gearCost, leadNitroxCourseAddon)
 
   // What each of the other divers costs, priced off their own gear answer. The
   // lead owes the sum of the bookings, not their own figure times a headcount —
@@ -1059,7 +1118,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     const cost = (showGearRentChoice && pick.choice === 'rent')
       ? pick.items.reduce((s, item) => s + (GEAR_ALACARTE_PRICES[item] ?? 0) * diveDays, 0)
       : 0
-    return { target: tg, pick, ...moneyFor(cost) }
+    const nitroxCourse = targetNitroxCourseAddon(tg)
+    return { target: tg, pick, nitroxCourse, ...moneyFor(cost, nitroxCourse) }
   })
 
   const groupCount       = 1 + additionalTargets.length
@@ -1110,7 +1170,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // Itemized breakdown of every charge that makes up `total`. Drives both the
   // on-screen summary and the snapshot written into details.charges, so what
   // the diver sees is exactly what gets frozen onto the booking.
-  function chargesFor(rentedItems: string[], money: { total: number; subTotal: number }) {
+  function chargesFor(rentedItems: string[], nitroxCourse: boolean, money: { total: number; subTotal: number }) {
     const room = (showRooms && roomId) ? rooms.find(r => r.id === roomId) ?? null : null
     return buildCharges({
       base,
@@ -1124,7 +1184,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           })
         : [],
       transport: transportCost,
-      nitroxCourse: (showNitroxAddon && addNitroxCourse) ? NITROX_COURSE_FEE : 0,
+      nitroxCourse: nitroxCourse ? NITROX_COURSE_FEE : 0,
       surcharge: paymentSurcharge > 0 && selectedMethod
         ? {
             label: t.chargeLines.surcharge(selectedMethod.label, Number(selectedMethod.surcharge_percent), payingDepositOnly),
@@ -1136,6 +1196,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
   const charges = chargesFor(
     (showGearRentChoice && gearChoice === 'rent') ? gearItems : [],
+    leadNitroxCourseAddon,
     { total, subTotal },
   )
 
@@ -1218,8 +1279,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       contact_method:          (contactMethod || null) as ContactMethod | null,
       contact_id:              nullish(contactId),
       // cert_agency / cert_level follow from this in the database.
-      cert_level_code:         uncertified ? null : nullish(certLevelCode),
-      uncertified,
+      ...certCodePatch,
+      // Like the level, only when the diver changed it (see formDiver).
+      ...(uncertified !== (profile?.uncertified ?? false) ? { uncertified } : {}),
       logged_dives:            Number.isFinite(loggedDives) ? loggedDives : 0,
       nitrox_certified:        nitroxCertified,
       ...(nitroxCardPath !== undefined ? { nitrox_card_path: nitroxCardPath } : {}),
@@ -1253,7 +1315,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         ? creditCardInvoiceEmail.trim()
         : undefined,
       pay_deposit_only: hasDeposit ? payDepositOnly : false,
-      nitrox_course_addon: showNitroxAddon && addNitroxCourse,
+      nitrox_course_addon: leadNitroxCourseAddon,
       charges,
       total,
       // Surcharge-inclusive when paying by card/PayPal — the actual amount due
@@ -1281,7 +1343,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     const detailsForTarget = (m: typeof additionalMoney[number]): BookingDetails => ({
       ...details,
       gear: gearDetail(m.pick.choice, m.pick.items, m.pick.helpNote),
-      charges: chargesFor((showGearRentChoice && m.pick.choice === 'rent') ? m.pick.items : [], m),
+      nitrox_course_addon: m.nitroxCourse,
+      charges: chargesFor((showGearRentChoice && m.pick.choice === 'rent') ? m.pick.items : [], m.nitroxCourse, m),
       total: m.total,
       deposit: hasDeposit ? m.depositNow : undefined,
     })
@@ -1514,6 +1577,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     }
 
     setSaving(false)
+    // The lead's booking landed, so the submit patched the diver's own
+    // profile — even if another diver's then failed. The signed-in copy is
+    // cached, and the next form opened this session starts from it.
+    if (!isOnBehalfOf) void refreshProfile?.()
     if (!allOk) { setErr(t.register.errors.someDiversFailed); return }
     // Booking landed — the resume draft has served its purpose; drop it so a
     // return visit doesn't re-offer a stale in-progress form.
@@ -1773,21 +1840,22 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
             <div className="border-t border-surface-200 pt-3 space-y-3">
               <p className="text-xs text-brand-900 font-medium uppercase tracking-wider">{t.register.diving}</p>
-              {!isOnBehalfOf && (
-                <label className="flex items-center gap-2 text-sm text-brand-950 font-medium">
-                  <input
-                    type="checkbox"
-                    checked={uncertified}
-                    onChange={e => {
-                      const v = e.target.checked
-                      setUncertified(v)
-                      if (v) { setCertAgency(''); setCertLevelCode(''); setCertFile(null); setCertCardAck(false) }
-                    }}
-                    className="accent-brand-900"
-                  />
-                  {t.register.notCertified}
-                </label>
-              )}
+              {/* Offered on behalf too: a parent booking a child must be able
+                  to correct a stale "not certified", or the prerequisite gate
+                  blocks them with nothing to change. */}
+              <label className="flex items-center gap-2 text-sm text-brand-950 font-medium">
+                <input
+                  type="checkbox"
+                  checked={uncertified}
+                  onChange={e => {
+                    const v = e.target.checked
+                    setUncertified(v)
+                    if (v) { setCertAgency(''); setCertLevelCode(''); setCertFile(null); setCertCardAck(false) }
+                  }}
+                  className="accent-brand-900"
+                />
+                {t.register.notCertified}
+              </label>
               {!uncertified && (
                 <CertLevelPicker
                   levels={certLevels}
@@ -1799,11 +1867,11 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                   levelLabel={t.register.certLevel}
                   labelClassName="block text-xs text-brand-900 font-medium mb-1"
                   selectClassName={INPUT_REGISTER}
-                  legacyText={profile?.cert_level_code ? null : [profile?.cert_agency, profile?.cert_level].filter(Boolean).join(' ')}
+                  legacyText={legacyCertText(profile)}
                   className="grid grid-cols-1 sm:grid-cols-2 gap-3"
                 />
               )}
-              {!uncertified && certLevelCode.trim() !== '' && !hasCertCardOnFile && !isOnBehalfOf && (
+              {claimsCertLevel && !hasCertCardOnFile && !isOnBehalfOf && (
                 <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
                   <p className="text-xs font-semibold text-amber-900">
                     {t.register.cert.addProof}
@@ -1847,7 +1915,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                   )}
                 </div>
               )}
-              {!uncertified && certLevelCode.trim() !== '' && hasCertCardOnFile && (
+              {claimsCertLevel && hasCertCardOnFile && (
                 <p className="text-xs text-brand-950 font-medium">
                   {t.register.cert.onFile}
                 </p>
@@ -1856,7 +1924,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
                 <TextField
                   label={t.register.loggedDives} type="number" min={0}
                   value={loggedDives === 0 ? '' : String(loggedDives)}
-                  onChange={v => setLoggedDives(Number(v) || 0)}
+                  onChange={v => setLoggedDives(Math.max(0, Math.floor(Number(v)) || 0))}
                 />
                 <label className="flex items-center sm:items-end gap-2 text-sm text-brand-950 font-medium sm:pb-2">
                   <input type="checkbox" checked={nitroxCertified} onChange={e => setNitroxCertified(e.target.checked)} className="accent-brand-900" />
@@ -1939,13 +2007,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               )}
             </div>
 
-            {prereqBlockedStep2 && (
-              <PrereqCertAndDives
-                short={prereqShort} others={prereqShortOthers}
-                prereqs={prereqEvent} levels={certLevels}
-                certLevelCode={certLevelCode} loggedDives={loggedDives}
-              />
-            )}
+            {prereqBlockedStep2 && prereqPanel(2)}
 
             <div className="border-t border-surface-200 pt-3 space-y-3">
               <p className="text-xs text-brand-900 font-medium uppercase tracking-wider">{t.register.emergencyContact}</p>
@@ -2210,11 +2272,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           </fieldset>
           )}
 
-          {prereqBlockedStep3 && (
-            <PrereqBlock>
-              <li>{t.register.prereq.nitroxMismatch}</li>
-            </PrereqBlock>
-          )}
+          {prereqBlockedStep3 && prereqPanel(3)}
 
           {showNitroxAddon && (
             <label className="flex gap-2 text-sm text-brand-950 font-medium items-start">
@@ -2476,6 +2534,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         </p>
       )}
 
+      {/* A resumed draft lands here without passing steps 2 and 3, and the
+          event's prerequisites load after it; say why Confirm is off. */}
+      {step === 4 && (prereqBlockedStep2 || prereqBlockedStep3) && prereqPanel('all')}
+
       <footer className="flex items-center justify-between gap-2 pt-2">
         <button
           onClick={() => {
@@ -2508,7 +2570,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
             {t.register.next}
           </button>
         ) : (
-          <button onClick={submit} disabled={saving || pastBlocked || (!isOnBehalfOf && !!cancelPolicy && !policyAcked) || (isGuest && guestAccountIncomplete)}
+          <button onClick={submit} disabled={saving || pastBlocked || prereqBlockedStep2 || prereqBlockedStep3 || (!isOnBehalfOf && !!cancelPolicy && !policyAcked) || (isGuest && guestAccountIncomplete)}
             className="bg-brand-900 hover:bg-brand-950 disabled:opacity-60 disabled:cursor-wait text-white text-sm font-semibold py-2 px-4 rounded-lg inline-flex items-center gap-2">
             {saving && (
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" />

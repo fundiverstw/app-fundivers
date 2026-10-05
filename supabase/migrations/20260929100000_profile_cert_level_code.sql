@@ -36,8 +36,42 @@
 -- the guideline. Nitrox is not a rung: it is the `nitrox_certified` checkbox.
 -- Event prerequisites only ever point at PADI rows, and the shop's standards
 -- agency is only checked when saved, so clear it if it named TDI.
+--
+-- `events.prereq_cert_id` is ON DELETE SET NULL, so deleting a rung an event
+-- requires would quietly lift the requirement. Move any such event onto the
+-- PADI rung the TDI row corresponds to, and stop if one has none.
+update public.events e
+   set prereq_cert_id = c.padi_equivalent_id
+  from public.cert_levels c
+ where e.prereq_cert_id = c.id
+   and c.organization = 'TDI'
+   and c.padi_equivalent_id is not null;
+do $$
+begin
+  if exists (
+    select 1 from public.events e
+      join public.cert_levels c on c.id = e.prereq_cert_id
+     where c.organization = 'TDI'
+  ) then
+    raise exception 'an event requires a TDI level with no PADI equivalent; re-point it before this migration';
+  end if;
+end;
+$$;
 delete from public.cert_levels where organization = 'TDI';
 update public.shop_profile set standards_org = null where standards_org = 'TDI';
+
+-- ── nitrox_required is a dive flag ─────────────────────────────────────────
+-- The event form only offers it on a dive and saves false for every other
+-- kind, but a row imported, or whose kind was changed outside the form, can
+-- still carry it — and the booking gate now hard-blocks on it. Clear it once
+-- here and hold it there, so no reader has to filter by kind.
+update public.events set nitrox_required = false
+ where kind <> 'dive' and nitrox_required;
+alter table public.events
+  drop constraint if exists events_nitrox_required_dive_only;
+alter table public.events
+  add constraint events_nitrox_required_dive_only
+    check (kind = 'dive' or not coalesce(nitrox_required, false));
 
 -- ── The column ──────────────────────────────────────────────────────────────
 -- `on delete restrict`: deleting a rung divers hold would silently decertify
@@ -67,6 +101,15 @@ language plpgsql
 set search_path = public
 as $$
 begin
+  -- Nothing cert-related changed (a contact edit, a gear size): leave the
+  -- copy as it is rather than look the row up again.
+  if tg_op = 'UPDATE'
+     and new.cert_level_code is not distinct from old.cert_level_code
+     and new.cert_agency     is not distinct from old.cert_agency
+     and new.cert_level      is not distinct from old.cert_level
+     and new.uncertified     is not distinct from old.uncertified then
+    return new;
+  end if;
   if new.cert_level_code is not null then
     select c.organization, c.name
       into new.cert_agency, new.cert_level
@@ -90,7 +133,36 @@ create trigger profiles_cert_level_mirror_trg
   before insert or update on public.profiles
   for each row execute function public.profiles_mirror_cert_level();
 
--- An admin renaming a rung (or its agency) updates every copy of it.
+-- An admin renaming a rung (or its agency) updates every copy of it, and an
+-- admin correcting a code has the FK's ON UPDATE CASCADE rewrite every
+-- holder's profile. Neither is a diver completing their profile, so both run
+-- with `fundivers.suppress_application_latch` set: without it the latch below
+-- would stamp any complete-but-never-stamped profile today, and it would
+-- surface as a fresh application. The flag is transaction-local, set before
+-- any row changes (the RI cascade fires among the row AFTER triggers) and
+-- cleared once the whole statement is done.
+create or replace function public.cert_levels_suppress_application_latch()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  perform set_config('fundivers.suppress_application_latch', 'on', true);
+  return case when tg_level = 'ROW' then new else null end;
+end;
+$$;
+
+create or replace function public.cert_levels_release_application_latch()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  perform set_config('fundivers.suppress_application_latch', '', true);
+  return null;
+end;
+$$;
+
 create or replace function public.cert_levels_refresh_profile_copies()
 returns trigger
 language plpgsql
@@ -98,6 +170,8 @@ security definer
 set search_path = public
 as $$
 begin
+  -- The mirror trigger re-derives the same text from the code; writing it
+  -- here is what tells it the copy changed.
   update public.profiles
      set cert_agency = new.organization,
          cert_level  = new.name
@@ -106,12 +180,22 @@ begin
 end;
 $$;
 
+drop trigger if exists cert_levels_suppress_latch_trg on public.cert_levels;
+create trigger cert_levels_suppress_latch_trg
+  before update of code, name, organization on public.cert_levels
+  for each row execute function public.cert_levels_suppress_application_latch();
+
 drop trigger if exists cert_levels_refresh_profile_copies_trg on public.cert_levels;
 create trigger cert_levels_refresh_profile_copies_trg
   after update of name, organization on public.cert_levels
   for each row
   when (old.name is distinct from new.name or old.organization is distinct from new.organization)
   execute function public.cert_levels_refresh_profile_copies();
+
+drop trigger if exists cert_levels_release_latch_trg on public.cert_levels;
+create trigger cert_levels_release_latch_trg
+  after update of code, name, organization on public.cert_levels
+  for each statement execute function public.cert_levels_release_application_latch();
 
 -- ── The application latch reads the pick, not the text ──────────────────────
 -- A legacy string the ladder cannot place is not a certification on file.
@@ -122,6 +206,11 @@ security definer
 set search_path = public
 as $$
 begin
+  -- A system pass over many profiles — a rung renamed or recoded under them,
+  -- the backfill, the normalize pass — is not a diver submitting anything.
+  if current_setting('fundivers.suppress_application_latch', true) = 'on' then
+    return new;
+  end if;
   if new.application_submitted_at is null
      and new.name           is not null and length(btrim(new.name))       > 0
      and new.date_of_birth   is not null
@@ -154,6 +243,12 @@ $$;
 -- agency's; a name several agencies share goes to PADI's rung if PADI has one,
 -- else is left alone.
 --
+-- A value listing several certifications ("OW/AOW", "AOW & nitrox", "OW,
+-- Rescue") that doesn't match whole is matched part by part, and the highest
+-- level any part names is taken: the diver holds each one they listed, and
+-- the first is usually the lowest, so taking it would block an AOW holder
+-- from AOW dives. Parts that name no rung ("nitrox") drop out.
+--
 -- An agency the ladder does not hold ("PSAI", "123132") matches nothing.
 create or replace function public.cert_level_code_of(p_agency text, p_level text)
 returns text
@@ -184,14 +279,13 @@ begin
     end if;
   end if;
 
-  -- Whole string first, then its leading segment ("AOW & nitrox" → "AOW").
-  foreach v_reading in array array[
-    btrim(p_level),
-    btrim((regexp_split_to_array(p_level, '[&/,+]'))[1])
-  ]
-  loop
+  -- The whole string first; a list of several is split up after this block.
+  -- `exit whole` gives up on the whole-string reading and falls through.
+  v_reading := btrim(p_level);
+  <<whole>>
+  begin
     v_key := public.cert_match_key(v_reading);
-    continue when v_key is null;
+    exit whole when v_key is null;
 
     -- 1. By name or code.
     if v_org is not null then
@@ -222,10 +316,11 @@ begin
 
     -- Several agencies use this name and none of them is PADI: which one the
     -- diver meant is exactly what we don't know. Don't let step 2 pick PADI.
-    continue when v_org is null and v_orgs is not null;
+    exit whole when v_org is null and v_orgs is not null;
 
-    -- 2. Via the PADI rung.
-    v_padi := public.padi_equivalent_of(v_reading);
+    -- 2. Via the PADI rung. Not for a list: padi_equivalent_of falls back to
+    -- its first part, which is the guess the part-by-part match below avoids.
+    v_padi := case when v_reading ~ '[&/,+]' then null else public.padi_equivalent_of(v_reading) end;
     if v_padi is not null then
       if v_org is null or v_org = 'PADI' then
         select c.code into v_code
@@ -244,7 +339,27 @@ begin
         return v_code;
       end if;
     end if;
-  end loop;
+  end whole;
+
+  -- Each part on its own (no separator left, so this recurses one level),
+  -- highest PADI-equivalent rank first. Only a PADI rung, or a rung that
+  -- names one, has a PADI rank (as padiRungOf in src/lib/prereq-shortfall.ts
+  -- reads it); an unmapped agency rung's own rank is on another ladder, so it
+  -- sorts last rather than outranking a mapped part.
+  if p_level ~ '[&/,+]' then
+    select m.code into v_code
+      from unnest(regexp_split_to_array(p_level, '[&/,+]')) as part(s)
+      cross join lateral (select public.cert_level_code_of(p_agency, btrim(part.s)) as code) m
+      join public.cert_levels c on c.code = m.code
+      left join public.cert_levels padi
+        on padi.id = case
+                       when c.padi_equivalent_id is not null then c.padi_equivalent_id
+                       when c.organization = 'PADI' then c.id
+                     end
+     order by padi.rank desc nulls last, c.rank desc
+     limit 1;
+    return v_code;
+  end if;
 
   return null;
 end;
@@ -270,7 +385,10 @@ alter table public.profile_value_normalizations
 --     Scuba Diver" rewritten to "Rescue" is SDI rung 4, and matching the
 --     rewritten "Rescue" would place them a rung too low. If the diver has
 --     since edited the field, their edit wins and the log is ignored.
---   * The stored text as it is now.
+--   * The stored text as it is now — but only when that pass didn't write
+--     it. Its rewrite is a reading of the original, so when the original
+--     couldn't be placed (ambiguous, or an agency now dropped), placing the
+--     rewrite instead would be the very guess the original was left for.
 --
 -- Returns (matched, unmatched). Rows it cannot place are left untouched.
 create or replace function public.backfill_profile_cert_level_codes()
@@ -284,23 +402,15 @@ declare
   v_candidate text;
   v_code      text;
   v_new       record;
-  v_gate      boolean;
 begin
   matched   := 0;
   unmatched := 0;
 
-  -- Same reason as normalize_profile_values(): setting cert_level_code would
-  -- otherwise stamp application_submitted_at today on a profile that became
-  -- complete long ago. A failure rolls this back, DDL included.
-  v_gate := exists (
-    select 1 from pg_trigger
-     where tgrelid = 'public.profiles'::regclass
-       and tgname  = 'profiles_maybe_set_submitted_at_trg'
-       and not tgisinternal
-  );
-  if v_gate then
-    execute 'alter table public.profiles disable trigger profiles_maybe_set_submitted_at_trg';
-  end if;
+  -- Setting cert_level_code would otherwise stamp application_submitted_at
+  -- today on a profile that became complete long ago. A flag the latch reads,
+  -- not ALTER TABLE ... DISABLE TRIGGER: that would hold an exclusive lock on
+  -- profiles for the whole loop. Transaction-local, cleared at the end.
+  perform set_config('fundivers.suppress_application_latch', 'on', true);
 
   for v_row in
     select p.id, p.cert_agency, p.cert_level
@@ -320,6 +430,12 @@ begin
         order by n.applied_at)
       union all
       select v_row.cert_level
+       where not exists (
+         select 1 from public.profile_value_normalizations n
+          where n.profile_id = v_row.id
+            and n.field      = 'cert_level'
+            and n.new_value  = v_row.cert_level
+       )
     loop
       v_code := public.cert_level_code_of(v_row.cert_agency, v_candidate);
       exit when v_code is not null;
@@ -345,9 +461,7 @@ begin
     matched := matched + 1;
   end loop;
 
-  if v_gate then
-    execute 'alter table public.profiles enable trigger profiles_maybe_set_submitted_at_trg';
-  end if;
+  perform set_config('fundivers.suppress_application_latch', '', true);
 
   return next;
 end;
@@ -360,7 +474,8 @@ grant execute on function public.backfill_profile_cert_level_codes() to service_
 -- Its cert pass rewrites text to the PADI rung's name. On a placed row the copy
 -- trigger would write the agency's name straight back, and every call would log
 -- a change that never happened. Identical to the 20260910 body apart from the
--- `cert_level_code is null` filter.
+-- `cert_level_code is null` filter, and the latch flag in place of disabling
+-- the trigger with DDL.
 create or replace function public.normalize_profile_values()
 returns integer
 language plpgsql
@@ -370,17 +485,9 @@ as $$
 declare
   v_changed integer := 0;
   v_row     record;
-  v_gate    boolean;
 begin
-  v_gate := exists (
-    select 1 from pg_trigger
-     where tgrelid = 'public.profiles'::regclass
-       and tgname  = 'profiles_maybe_set_submitted_at_trg'
-       and not tgisinternal
-  );
-  if v_gate then
-    execute 'alter table public.profiles disable trigger profiles_maybe_set_submitted_at_trg';
-  end if;
+  -- See backfill_profile_cert_level_codes(): no latch stamps from a cleanup.
+  perform set_config('fundivers.suppress_application_latch', 'on', true);
 
   for v_row in
     select id, cert_level, public.padi_equivalent_of(cert_level) as canonical
@@ -409,9 +516,7 @@ begin
     end if;
   end loop;
 
-  if v_gate then
-    execute 'alter table public.profiles enable trigger profiles_maybe_set_submitted_at_trg';
-  end if;
+  perform set_config('fundivers.suppress_application_latch', '', true);
 
   return v_changed;
 end;

@@ -129,6 +129,9 @@ describe('backfill_profile_cert_level_codes', () => {
       ['SDI', 'Rescue', 'sdi_rescue'],                     // the agency's own name for it
       ['SSI', 'AOW', 'ssi_advanced_open_water'],           // PADI shorthand, back to SSI's one AOW-level card
       ['Padi', 'AOW & nitrox', 'advanced_open_water'],     // agency spelling, specialty noise
+      ['PADI', 'OW/AOW', 'advanced_open_water'],           // several listed: the highest, not the first
+      ['PADI', 'OW, Rescue', 'rescue'],                    // likewise
+      ['SSI', 'AOW/Rescue', 'ssi_advanced_open_water'],    // the ambiguous part drops out
       ['padi', 'owsi', 'instructor'],                      // shorthand no agency spells out
       [null, 'Advance Adventure Diver', 'sdi_advanced_adventure'], // one agency uses the name
       ['SSI', 'Rescue', null],                             // Stress & Rescue or Master Diver: unknowable

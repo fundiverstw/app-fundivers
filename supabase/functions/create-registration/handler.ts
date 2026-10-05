@@ -21,11 +21,14 @@ import { fetchShopLogoDataUrl } from "../_shared/shop-logo.ts"
 import {
   eligibilityError,
   LADDER_COLUMNS,
+  pickEligibilityFields,
+  prereqExempt,
   type EligibilityEvent,
   type EligibilityProfile,
   type LadderRung,
 } from "../_shared/registration-eligibility.ts"
 import { usesDateEnvelope, usesCourseDays, type EventKind } from "../../../src/lib/event-kinds.ts"
+import { printedCert } from "../../../src/lib/cert-text.ts"
 import { computeBookingMoney } from "../_shared/booking-charges.ts"
 import { corsHeaders, safeError } from "../_shared/responses.ts"
 import { clientIp, sha256Hex } from "../_shared/request-identity.ts"
@@ -163,6 +166,11 @@ async function loadPaymentMethod(
   return (data ?? null) as PaymentMethodDetails | null
 }
 
+/** What a brand-new account's profile holds before any patch: nothing stated. */
+const NEW_PROFILE: EligibilityProfile = {
+  uncertified: null, logged_dives: null, cert_level_code: null, nitrox_certified: null,
+}
+
 async function eventHasPassed(admin: SupabaseAdminClient, eventType: EventKind, eventId: string): Promise<boolean> {
   const cols  = usesDateEnvelope(eventType) ? "start_date, end_date" : "course_days"
   const { data } = await admin.from("events").select(cols).eq("id", eventId).maybeSingle()
@@ -195,6 +203,10 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
   }
 
   const admin = deps.admin
+  // The profile patch, column allowlist applied (security audit C2). Read by
+  // the eligibility gate — for a guest before their account exists — and
+  // written to the profile once the gate has passed.
+  const safePatch = sanitizeProfilePatch(body.profile_patch)
 
   // Resolve the user — guest creates, target_user_id acts on behalf, or
   // self-auth via Bearer. createdGuest tracked so we can roll back the
@@ -301,6 +313,11 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
       return json({ error: t.emails.errors.registrationClosed }, 403)
     }
 
+    // Nor one they fall short of. A new account's profile is only what this
+    // request patches in, so it can be graded before there is an account.
+    const guestGate = await checkEligibility(null, safePatch)
+    if (guestGate) return json({ error: guestGate }, 422)
+
     const { data, error } = await admin.auth.admin.createUser({
       email:         body.email.trim(),
       password:      body.password,
@@ -358,15 +375,24 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     return json({ error: reason }, status)
   }
 
-  // Reads the effective (post-patch) profile + event prereqs and defers to the
-  // shared eligibilityError rules. Returns a user-facing message or null.
-  async function checkEligibility(uid: string): Promise<string | null> {
+  // Grades the profile as it will be once `patch` lands (stored row, then the
+  // patch's eligibility fields over it) against the event's prereqs, via the
+  // shared eligibilityError rules. Runs before the patch is written, so a
+  // refused booking leaves the diver's profile as it was. A null `uid` is a
+  // guest with no account yet: the patch is the whole profile. Returns a
+  // user-facing message or null.
+  async function checkEligibility(uid: string | null, patch: Record<string, unknown>): Promise<string | null> {
+    // The ladder is fetched alongside rather than after the event says it
+    // needs one: it is a few dozen rows, and waiting would add a round trip to
+    // every level-gated booking.
     const [{ data: prof }, { data: ev }, { data: ladder }] = await Promise.all([
-      admin
-        .from("profiles")
-        .select("uncertified, logged_dives, cert_level_code, nitrox_certified")
-        .eq("id", uid)
-        .single(),
+      uid
+        ? admin
+          .from("profiles")
+          .select("uncertified, logged_dives, cert_level_code, nitrox_certified")
+          .eq("id", uid)
+          .single()
+        : Promise.resolve({ data: NEW_PROFILE }),
       admin
         .from("events")
         .select("prereq_cert_id, req_dives, nitrox_required")
@@ -374,37 +400,43 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
         .maybeSingle(),
       admin.from("cert_levels").select(LADDER_COLUMNS),
     ])
+    const effective = prof
+      ? { ...(prof as EligibilityProfile), ...pickEligibilityFields(patch) }
+      : null
     return eligibilityError(
-      prof as EligibilityProfile | null,
+      effective,
       ev as EligibilityEvent | null,
       body.details as Record<string, unknown> | undefined,
       (ladder ?? []) as LadderRung[],
     )
   }
 
-  // 1. Profile update — column allowlist (security audit C2).
-  const safePatch = sanitizeProfilePatch(body.profile_patch)
+  // 1. Profile update.
   if (createdGuest) safePatch.status = "pending"
+
+  // Past-event guard for the authed self + parent-on-behalf paths (the guest
+  // path already checked before createUser). Admins/staff bypass. Ahead of the
+  // eligibility gate, so a closed event says it is closed rather than asking
+  // the diver to fix their profile for it.
+  if (!createdGuest && !callerIsPrivileged && await eventHasPassed(admin, body.event_type, body.event_id)) {
+    return json({ error: t.emails.errors.registrationClosed }, 403)
+  }
+
+  // 1a. Eligibility gate — the diver being booked must meet the event's
+  //     prerequisites on their own profile. That includes a child booked by a
+  //     parent (userId is the child here). Only an admin or staff member
+  //     booking on someone's behalf skips it: that is the shop deciding. A
+  //     guest was graded before their account was created.
+  if (!createdGuest && !prereqExempt({ privileged: callerIsPrivileged, forSomeoneElse: !!body.target_user_id })) {
+    const gate = await checkEligibility(userId, safePatch)
+    if (gate) return rollback(gate, 422)
+  }
+
   const { error: profErr } = await admin
     .from("profiles")
     .update(safePatch)
     .eq("id", userId)
   if (profErr) return rollback(safeError(profErr, "profile update failed"))
-
-  // Past-event guard for the authed self + parent-on-behalf paths (the guest
-  // path already checked before createUser). Admins/staff bypass.
-  if (!callerIsPrivileged && await eventHasPassed(admin, body.event_type, body.event_id)) {
-    return json({ error: t.emails.errors.registrationClosed }, 403)
-  }
-
-  // 1b. Eligibility gate — the diver being booked must meet the event's
-  //     prerequisites on their own profile. That includes a child booked by a
-  //     parent (userId is the child here). Only an admin or staff member
-  //     booking on someone's behalf skips it: that is the shop deciding.
-  if (!(body.target_user_id && callerIsPrivileged)) {
-    const gate = await checkEligibility(userId)
-    if (gate) return rollback(gate, 422)
-  }
 
   let requestedDiscountIds: string[]
   // 1c. Recompute the booking's money server-side and overwrite the client's
@@ -675,6 +707,7 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     (event?.calendar_title as string | null | undefined) ||
     "Event"
 
+  const printed = printedCert(profile, t.profile.certNotPlaced)
   const payload: RegistrationPdfPayload = {
     eventTitle: titleFallback,
     startDate,
@@ -686,8 +719,8 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     idNumber:        profile?.id_number ?? null,
     contactMethod:   profile?.contact_method ?? null,
     contactId:       profile?.contact_id ?? null,
-    certLevel:       profile?.cert_level ?? null,
-    certOrg:         profile?.cert_agency ?? null,
+    certLevel:       printed.level,
+    certOrg:         printed.org,
     diverNitrox:     !!profile?.nitrox_certified,
     diverDeep:       !!(profile as { deep_certified?: boolean })?.deep_certified,
     addNitroxCourse: !!details.nitrox_course_addon,

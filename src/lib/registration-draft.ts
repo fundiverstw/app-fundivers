@@ -23,7 +23,8 @@ export interface RegistrationDraft {
   contactId: string
   certAgency: string
   /** A `cert_levels.code`. A draft saved before the picker existed carries a
-   *  free-text `certLevel` instead; it reads as '' and the diver picks again. */
+   *  free-text `certLevel` instead; it reads as '', and applyDraft leaves the
+   *  profile's level in place rather than restoring an empty pick. */
   certLevelCode: string
   uncertified: boolean
   loggedDives: number

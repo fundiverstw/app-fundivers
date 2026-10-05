@@ -1,6 +1,7 @@
 import { useId, useMemo } from 'react'
 import { t } from '../i18n'
 import type { CertLevel } from '../types/database'
+import { certLevelName } from '../lib/cert-display'
 
 // Agency, then level: the one way a diver names their certification. The value
 // is a `cert_levels.code`, never typed text, so whatever reads it knows exactly
@@ -75,7 +76,7 @@ export function CertLevelPicker({
           disabled={!selectedAgency}
         >
           <option value="">{selectedAgency ? t.profile.selectLevel : t.profile.pickAgencyFirst}</option>
-          {agencyLevels.map(l => <option key={l.code} value={l.code}>{l.name}</option>)}
+          {agencyLevels.map(l => <option key={l.code} value={l.code}>{certLevelName(l)}</option>)}
         </select>
       </div>
       {showLegacy && (

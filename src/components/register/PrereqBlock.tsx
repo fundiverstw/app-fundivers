@@ -1,15 +1,16 @@
 // The "you can't book this — you don't meet its prerequisites" panel, shared by
 // the single-event and cart registration forms so both name the same things.
 
+import { Fragment } from 'react'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
-import { parseReqDives, type EligibilityEvent, type PrereqShortfall } from '../../lib/prereq-shortfall'
-import { personName } from '../../lib/names'
-import type { CertLevel, Profile } from '../../types/database'
+import { anyShortfall, parseReqDives, shortfallForStep, type EligibilityEvent, type PrereqShortfall, type PrereqStep } from '../../lib/prereq-shortfall'
+import type { CertLevel } from '../../types/database'
+import { certLevelName } from '../../lib/cert-display'
 
 /** The lines naming what a diver falls short of, without the surrounding box. */
-export function PrereqShortfallLines({
-  short, prereqs, levels, certLevelCode, loggedDives,
+function PrereqShortfallLines({
+  short, prereqs, levels, certLevelCode, loggedDives, legacyText = null,
 }: {
   short: PrereqShortfall
   /** The event's prerequisite columns the shortfall was computed against. */
@@ -18,8 +19,12 @@ export function PrereqShortfallLines({
   /** The level the diver holds, for naming it back to them. */
   certLevelCode: string | null
   loggedDives: number
+  /** Saved free text the backfill couldn't place, when no level is picked:
+   *  the diver has said something, it just isn't on the list. */
+  legacyText?: string | null
 }) {
-  const requiredName = levels.find(l => l.id === prereqs?.prereq_cert_id)?.name
+  const required = levels.find(l => l.id === prereqs?.prereq_cert_id)
+  const requiredName = (required && certLevelName(required))
     ?? t.register.prereq.higherCertFallback
   const held = levels.find(l => l.code === certLevelCode)
   return (
@@ -29,8 +34,12 @@ export function PrereqShortfallLines({
           {short.cert === 'uncertified'
             ? t.register.prereq.certMismatch(requiredName)
             : short.cert === 'unstated' || !held
-              ? t.register.prereq.certUnknown(requiredName)
-              : t.register.prereq.certBelow(requiredName, `${held.organization} ${held.name}`)}
+              ? (legacyText
+                ? t.register.prereq.certLegacy(requiredName, legacyText)
+                : t.register.prereq.certUnknown(requiredName))
+              : short.cert === 'unranked'
+                ? t.register.prereq.certUnranked(requiredName, `${held.organization} ${certLevelName(held)}`)
+                : t.register.prereq.certBelow(requiredName, `${held.organization} ${certLevelName(held)}`)}
         </li>
       )}
       {short.nitrox && <li>{t.register.prereq.nitroxMismatch}</li>}
@@ -42,9 +51,12 @@ export function PrereqShortfallLines({
 }
 
 /** The red box: a title, the lines, and what to do about it. Nothing to tick. */
-export function PrereqBlock({ children }: {
+function PrereqBlock({ children, step = 2 }: {
   /** One or more <li> — `PrereqShortfallLines`, or a row-per-event list. */
   children: React.ReactNode
+  /** Which form step the box sits on. The diver's own details are edited on
+   *  step 2, so only there are they "above"; elsewhere the box says go back. */
+  step?: PrereqStep
 }) {
   return (
     <div role="alert" className="bg-red-50 border border-red-200 rounded-lg p-3 space-y-2">
@@ -53,46 +65,62 @@ export function PrereqBlock({ children }: {
         {children}
       </ul>
       <p className="text-xs text-red-700 font-medium border-t border-red-200 pt-2">
-        {t.register.prereq.blocked(siteConfig.identity.shortName)}
+        {step === 2
+          ? t.register.prereq.blocked(siteConfig.identity.shortName)
+          : step === 3
+            ? t.register.prereq.blockedNitrox(siteConfig.identity.shortName)
+            : t.register.prereq.blockedGoBack(t.register.aboutYou, siteConfig.identity.shortName)}
       </p>
     </div>
   )
 }
 
-/**
- * The single-event form's step-2 panel: certification and logged dives, for
- * the diver filling it in and each other diver booked alongside (graded on
- * their own profile). Nitrox is left to step 3, where the course can be added.
- */
-export function PrereqCertAndDives({
-  short, others, prereqs, levels, certLevelCode, loggedDives,
-}: {
+/** One diver's (or one cart row's) shortfall, as the red box lists it. */
+export interface PrereqRow {
+  key: string
+  /** Heads the row's lines; null for the diver filling the form, whose lines
+   *  are listed bare. */
+  label: string | null
   short: PrereqShortfall
-  others: ReadonlyArray<{ target: Profile; short: PrereqShortfall }>
+  /** The event's prerequisite columns the shortfall was graded against. */
   prereqs: EligibilityEvent | null | undefined
-  levels: readonly CertLevel[]
-  certLevelCode: string
+  certLevelCode: string | null
   loggedDives: number
+  /** Saved free text the backfill couldn't place, when no level is picked. */
+  legacyText: string | null
+}
+
+/**
+ * The red box for one form step, over every row it grades: certification and
+ * logged dives on step 2, nitrox on step 3 (where the course can be added),
+ * everything on the final step. Rows with nothing to say for the step are
+ * left out. Shared by the single-event form (one row per diver) and the cart
+ * (one row per event, labelled with the child it books when it does).
+ */
+export function PrereqRows({ step, rows, levels }: {
+  step: PrereqStep
+  rows: readonly PrereqRow[]
+  levels: readonly CertLevel[]
 }) {
-  const certAndDives = (s: PrereqShortfall) => ({ ...s, nitrox: false })
-  const listed = others.filter(o => o.short.cert !== null || o.short.dives)
+  const listed = rows
+    .map(r => ({ ...r, short: shortfallForStep(r.short, step) }))
+    .filter(r => anyShortfall(r.short))
+  const lines = (r: PrereqRow) => (
+    <PrereqShortfallLines
+      short={r.short} prereqs={r.prereqs} levels={levels}
+      certLevelCode={r.certLevelCode} loggedDives={r.loggedDives} legacyText={r.legacyText}
+    />
+  )
   return (
-    <PrereqBlock>
-      <PrereqShortfallLines
-        short={certAndDives(short)} prereqs={prereqs} levels={levels}
-        certLevelCode={certLevelCode} loggedDives={loggedDives}
-      />
-      {listed.map(({ target, short: s }) => (
-        <li key={target.id}>
-          <span className="font-semibold">{personName(target.name) || t.register.results.diverFallback}</span>
-          <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
-            <PrereqShortfallLines
-              short={certAndDives(s)} prereqs={prereqs} levels={levels}
-              certLevelCode={target.cert_level_code} loggedDives={target.logged_dives ?? 0}
-            />
-          </ul>
-        </li>
-      ))}
+    <PrereqBlock step={step}>
+      {listed.map(r => r.label === null
+        ? <Fragment key={r.key}>{lines(r)}</Fragment>
+        : (
+          <li key={r.key}>
+            <span className="font-semibold">{r.label}</span>
+            <ul className="list-disc pl-4 mt-0.5 space-y-0.5">{lines(r)}</ul>
+          </li>
+        ))}
     </PrereqBlock>
   )
 }

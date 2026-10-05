@@ -138,8 +138,9 @@ block the booking — the shop chases what it still needs later, and
   Certification and logged dives block step 2, where they are entered;
   nitrox blocks step 3, where the course is offered. Every diver in a
   submit is graded, a child booked by a parent included (on the child's
-  own profile). Only an admin or staff member booking on someone's behalf
-  is exempt.
+  own profile). Exempt (`prereqExempt` in `src/lib/prereq-shortfall.ts`):
+  an admin or staff member booking on someone's behalf, and an admin
+  editing an existing booking.
 
 `supabase/functions/_shared/registration-eligibility.ts` is the
 server-side mirror. The on-behalf-of paths (admin, parent) relax the

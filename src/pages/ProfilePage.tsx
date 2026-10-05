@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
 import { useForm, useWatch, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { AuthContext } from '../hooks/auth-context'
 import { useToast } from '../hooks/useToast'
 import { pushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
 import { HAS_GEAR_ALTERNATIVES } from '../lib/gear'
@@ -22,6 +23,7 @@ import { BTN_DANGER } from '../styles/tokens'
 import type { Profile } from '../types/database'
 import { useCertLevels } from '../hooks/useCertLevels'
 import { CertLevelPicker } from '../components/CertLevelPicker'
+import { certLevelCodePatch, legacyCertText } from '../lib/cert-text'
 import { ShoeSizeField } from '../components/ShoeSizeField'
 import { HeightField, WeightField } from '../components/MeasureField'
 import { PasswordInput } from '../components/PasswordInput'
@@ -140,6 +142,9 @@ export function ProfileForm({ user, profile, onSaved }: {
   onSaved?: () => void
 }) {
   const toast = useToast()
+  // Read directly: ProfileForm is also rendered for a child or by an admin,
+  // in places that don't all sit under the auth provider.
+  const auth = useContext(AuthContext)
   const { register, handleSubmit, reset, control, setValue, formState: { isSubmitting, isDirty } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -217,8 +222,9 @@ export function ProfileForm({ user, profile, onSaved }: {
       emergency_contact_name: strOrNull(data.emergency_contact_name),
       emergency_contact_phone: strOrNull(data.emergency_contact_phone),
       uncertified: data.cert_status === 'uncertified',
-      // cert_agency / cert_level follow from this in the database.
-      cert_level_code: data.cert_status === 'uncertified' ? null : strOrNull(data.cert_level_code),
+      // cert_agency / cert_level follow from this in the database. A code the
+      // ladder no longer lists is left off rather than failing the whole save.
+      ...certLevelCodePatch(data.cert_level_code ?? '', data.cert_status === 'uncertified', certLevels),
       medical_notes: strOrNull(data.medical_notes),
       height_cm: heightCm,
       weight_kg: weightKg,
@@ -240,6 +246,9 @@ export function ProfileForm({ user, profile, onSaved }: {
     reset(data)
     setDirtyExtras(false)
     toast.success(t.profile.saved)
+    // The signed-in profile is cached from sign-in, and the register forms
+    // start from it; refresh it when this was the diver's own.
+    if (auth?.user?.id === profile.id) void auth.refreshProfile()
     onSaved?.()
   }
 
@@ -370,7 +379,7 @@ export function ProfileForm({ user, profile, onSaved }: {
               levelLabel={t.profile.levelLabel}
               labelClassName="block text-xs text-brand-900 font-medium mb-1 uppercase tracking-wide"
               selectClassName={inputClass}
-              legacyText={profile.cert_level_code ? null : [profile.cert_agency, profile.cert_level].filter(Boolean).join(' ')}
+              legacyText={legacyCertText(profile)}
               className="space-y-3"
             />
           )}

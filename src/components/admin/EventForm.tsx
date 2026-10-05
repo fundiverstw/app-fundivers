@@ -1,10 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { useCertLevels } from '../../hooks/useCertLevels'
 import { errorMessage } from '../../lib/errors'
 import { fetchEventRelations } from '../../lib/event-relations'
 import { siteConfig } from '../../config/site'
-import type { CancellationPolicy, CertLevel, Discount, DiveSite, SiteKind, TripTemplateEntry, EOAddon, EventRow, EOPrice, EORoom, TravelDestination } from '../../types/database'
+import type { CancellationPolicy, Discount, DiveSite, SiteKind, TripTemplateEntry, EOAddon, EventRow, EOPrice, EORoom, TravelDestination } from '../../types/database'
 import { AddPlaceForm } from '../sites/AddPlaceForm'
 import {
   EMPTY_FORM,
@@ -107,7 +108,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
   const [rooms, setRooms] = useState<EORoom[]>([])
   const [addons, setAddons] = useState<EOAddon[]>([])
   const [discounts, setDiscounts] = useState<Discount[]>([])
-  const [certLevels, setCertLevels] = useState<CertLevel[]>([])
+  const certLevels = useCertLevels()
   const [cancelPolicies, setCancelPolicies] = useState<CancellationPolicy[]>([])
   const [tripTemplates, setTripTemplates] = useState<TripTemplateEntry[]>([])
   const [destinations, setDestinations] = useState<TravelDestination[]>([])
@@ -180,7 +181,6 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
         mode === 'create'
           ? supabase.from('events').select(PRELOAD_COLS).in('kind', COURSE_DAY_KINDS).limit(200)
           : Promise.resolve({ data: [] as PreloadRow[] }),
-        supabase.from('cert_levels').select('*').order('rank'),
         supabase.from('cancellation_policies').select('*').order('title'),
         supabase.from('trip_templates').select('*').order('admin_title'),
         supabase.from('travel_destinations').select('*').order('sort_order', { nullsFirst: false }),
@@ -197,12 +197,11 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
       setPrices(dataOf<EOPrice>(0))
       setRooms(dataOf<EORoom>(1))
       setAddons(dataOf<EOAddon>(2))
-      setCertLevels(dataOf<CertLevel>(5))
-      setCancelPolicies(dataOf<CancellationPolicy>(6))
-      setTripTemplates(dataOf<TripTemplateEntry>(7))
-      setDestinations(dataOf<TravelDestination>(8))
-      setDiveSites(dataOf<DiveSite>(9))
-      setDiscounts(dataOf<Discount>(10))
+      setCancelPolicies(dataOf<CancellationPolicy>(5))
+      setTripTemplates(dataOf<TripTemplateEntry>(6))
+      setDestinations(dataOf<TravelDestination>(7))
+      setDiveSites(dataOf<DiveSite>(8))
+      setDiscounts(dataOf<Discount>(9))
 
       // Both lists collapse to the newest event per admin_title — the site for
       // a dive or adventure, the course type for a course. The shop returns to

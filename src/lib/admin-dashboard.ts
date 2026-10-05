@@ -9,14 +9,15 @@
 // settles a booking without anything arriving at the shop, so summing it as
 // revenue reports the same cash twice — once when it came in, again when the
 // credit it became is spent. Credit applied is reported on its own instead.
-import { buildCertLevelResolver, type CertLadderRow } from './cert-level'
+import { legacyCertText } from './cert-text'
+import { padiRungOf } from './prereq-shortfall'
 import { canonicalNationality } from './nationality'
 import { hasDiveFlags, usesCourseDays } from './event-kinds'
 import { isExternalPayment } from './payments'
 import { siteConfig } from '../config/site'
 import { EVENT_KIND_LABELS } from './event-kind-labels'
 import { t } from '../i18n'
-import type { Booking, Payment, EventKind } from '../types/database'
+import type { Booking, CertLevel, Payment, EventKind } from '../types/database'
 
 export interface MoneyPoint { label: string; value: number }
 export interface CountPoint { label: string; value: number }
@@ -64,7 +65,10 @@ export interface Dashboard {
 
 export type PaymentLite = Pick<Payment, 'user_id' | 'booking_id' | 'amount' | 'status' | 'method' | 'created_at'>
 export type BookingLite = Pick<Booking, 'id' | 'user_id' | 'event_id' | 'status' | 'created_at' | 'details'>
-export interface ProfileLite { id: string; role: string; status: string; created_at: string; nationality: string | null; cert_level: string | null }
+/** The `cert_levels` columns the dashboard reads. */
+export type DashboardLadderRow = Pick<CertLevel, 'id' | 'code' | 'name' | 'organization' | 'padi_equivalent_id'>
+
+export interface ProfileLite { id: string; role: string; status: string; created_at: string; nationality: string | null; cert_level: string | null; cert_level_code: string | null; uncertified: boolean | null }
 export interface EventLite {
   id: string
   type: EventKind
@@ -87,9 +91,9 @@ export interface DashboardInput {
   profiles: ProfileLite[]
   events: EventLite[]
   confirmed: ConfirmedCount[]
-  /** The shop's whole `cert_levels` table — every agency, so a diver who typed
-   *  an SSI or NAUI rung still resolves to its PADI equivalent. */
-  certLadder: CertLadderRow[]
+  /** The shop's whole `cert_levels` table — every agency, so a diver on an SSI
+   *  or NAUI rung is reported under its PADI equivalent. */
+  certLadder: DashboardLadderRow[]
   pendingApplications: number
   pendingRefundRequests: number
 }
@@ -161,7 +165,17 @@ function activityOf(event: EventLite): string {
 
 export function computeDashboard(input: DashboardInput): Dashboard {
   const { nowIso, payments: allPayments, bookings, profiles, events, confirmed, certLadder } = input
-  const certLevel = buildCertLevelResolver(certLadder)
+  // A diver's level is the rung their `cert_level_code` names, reported under
+  // its PADI equivalent — the same reading the booking gate makes. A profile
+  // the backfill couldn't place has no code. Its legacy text is often already
+  // a PADI rung's name (the 20260910 pass rewrote it), so bucketing it as
+  // typed would count it as holding that rung; it gets a bucket of its own.
+  const ladderByCode = new Map(certLadder.map(row => [row.code, row]))
+  const certLevel = (p: ProfileLite | undefined): string => {
+    const row = p?.cert_level_code ? ladderByCode.get(p.cert_level_code) : undefined
+    if (row) return padiRungOf(certLadder, row)?.name ?? row.name
+    return legacyCertText(p) ? t.admin.dashboard.notPlacedBucket : ''
+  }
   const unknown = t.admin.dashboard.unknownBucket
   // Every revenue series below reads `payments`; only the credit-applied KPI
   // reads the internal rows, so the split happens once, here.
@@ -208,7 +222,7 @@ export function computeDashboard(input: DashboardInput): Dashboard {
     if (!contrib) continue
     const prof = profileById.get(p.user_id)
     const nat = canonicalNationality(prof?.nationality) || unknown
-    const cert = certLevel(prof?.cert_level) || unknown
+    const cert = certLevel(prof) || unknown
     natTotals.set(nat, (natTotals.get(nat) ?? 0) + contrib)
     certTotals.set(cert, (certTotals.get(cert) ?? 0) + contrib)
   }
@@ -247,7 +261,7 @@ export function computeDashboard(input: DashboardInput): Dashboard {
   const certMix = new Map<string, number>()
   for (const p of divers) {
     if (p.status !== 'active') continue
-    const cert = certLevel(p.cert_level) || unknown
+    const cert = certLevel(p) || unknown
     certMix.set(cert, (certMix.get(cert) ?? 0) + 1)
   }
   const certLevelMix = [...certMix.entries()]

@@ -17,12 +17,25 @@ import {
   type LadderRung,
 } from "../../../src/lib/prereq-shortfall.ts"
 
-export { parseReqDives } from "../../../src/lib/prereq-shortfall.ts"
+export { prereqExempt } from "../../../src/lib/prereq-shortfall.ts"
 export type { EligibilityEvent, EligibilityProfile, LadderRung }
 
 /** The `cert_levels` columns prereqShortfall reads. */
-export const LADDER_COLUMNS = "id, code, rank, padi_equivalent_id"
+export const LADDER_COLUMNS = "id, code, organization, rank, padi_equivalent_id"
 
+/**
+ * The fields of a profile patch the prerequisite rule reads, typed and only
+ * when present — so a patch can be laid over the stored profile to grade the
+ * diver as they will be once it is saved.
+ */
+export function pickEligibilityFields(patch: Record<string, unknown>): Partial<EligibilityProfile> {
+  const out: Partial<EligibilityProfile> = {}
+  if ("uncertified" in patch) out.uncertified = patch.uncertified === true
+  if ("logged_dives" in patch) out.logged_dives = typeof patch.logged_dives === "number" ? patch.logged_dives : null
+  if ("cert_level_code" in patch) out.cert_level_code = typeof patch.cert_level_code === "string" ? patch.cert_level_code : null
+  if ("nitrox_certified" in patch) out.nitrox_certified = patch.nitrox_certified === true
+  return out
+}
 /**
  * Returns a user-facing error string when the registration must be blocked, or
  * null when it may proceed.

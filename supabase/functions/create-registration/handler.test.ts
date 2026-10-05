@@ -81,10 +81,10 @@ interface MockOpts {
 // Enough of cert_levels to grade against: three PADI levels and SSI's AOW,
 // which resolves to PADI's.
 const LADDER = [
-  { id: 'cl-ow',      code: 'open_water',              rank: 1, padi_equivalent_id: 'cl-ow' },
-  { id: 'cl-aow',     code: 'advanced_open_water',     rank: 2, padi_equivalent_id: 'cl-aow' },
-  { id: 'cl-rescue',  code: 'rescue',                  rank: 3, padi_equivalent_id: 'cl-rescue' },
-  { id: 'cl-ssi-aow', code: 'ssi_advanced_open_water', rank: 2, padi_equivalent_id: 'cl-aow' },
+  { id: 'cl-ow',      code: 'open_water',              organization: 'PADI', rank: 1, padi_equivalent_id: 'cl-ow' },
+  { id: 'cl-aow',     code: 'advanced_open_water',     organization: 'PADI', rank: 2, padi_equivalent_id: 'cl-aow' },
+  { id: 'cl-rescue',  code: 'rescue',                  organization: 'PADI', rank: 3, padi_equivalent_id: 'cl-rescue' },
+  { id: 'cl-ssi-aow', code: 'ssi_advanced_open_water', organization: 'SSI',  rank: 2, padi_equivalent_id: 'cl-aow' },
 ]
 
 function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites } {
@@ -498,6 +498,27 @@ describe('handleRegistration — eligibility gate', () => {
     expect((await res.json()).error).toMatch(/prerequisite/i)
   })
 
+  it('refuses before saving the profile patch, so a refused booking changes nothing', async () => {
+    const { deps, captured } = makeDeps({ profileCertLevelCode: 'advanced_open_water', prereqCertId: 'cl-aow' })
+    const res = await handleRegistration(
+      postJson({ ...goodBody, profile_patch: { name: 'Ana', cert_level_code: 'open_water' } }, authedSelf),
+      deps,
+    )
+    expect(res.status).toBe(422)
+    expect(captured.profileUpdate).toHaveLength(0)
+    expect(captured.bookingInsert).toHaveLength(0)
+  })
+
+  it('grades the level the patch is about to save, not only the stored one', async () => {
+    const { deps, captured } = makeDeps({ profileCertLevelCode: 'open_water', prereqCertId: 'cl-aow' })
+    const res = await handleRegistration(
+      postJson({ ...goodBody, profile_patch: { cert_level_code: 'ssi_advanced_open_water' } }, authedSelf),
+      deps,
+    )
+    expect(res.status).toBe(200)
+    expect(captured.profileUpdate[0]).toMatchObject({ cert_level_code: 'ssi_advanced_open_water' })
+  })
+
   it('lets another agency’s equivalent level through', async () => {
     const { deps, captured } = makeDeps({ profileCertLevelCode: 'ssi_advanced_open_water', prereqCertId: 'cl-aow' })
     const res = await handleRegistration(postJson({ ...goodBody }, authedSelf), deps)
@@ -513,6 +534,14 @@ describe('handleRegistration — eligibility gate', () => {
       const res = await handleRegistration(postJson({ ...goodBody }, authedSelf), makeDeps(opts).deps)
       expect(res.status).toBe(422)
     }
+  })
+
+  it('says a past event is closed before grading prerequisites', async () => {
+    const res = await handleRegistration(
+      postJson({ ...goodBody }, authedSelf),
+      makeDeps({ eventPast: true, profileCertLevelCode: 'open_water', prereqCertId: 'cl-aow' }).deps,
+    )
+    expect(res.status).toBe(403)
   })
 
   it('blocks when logged dives fall short of req_dives', async () => {
@@ -1288,6 +1317,19 @@ describe('handleRegistration — past-event guard', () => {
     const res = await handleRegistration(postJson(goodBody, { Authorization: 'Bearer self-jwt' }), deps)
     expect(res.status).toBe(403)
     expect(captured.bookingInsert).toHaveLength(0)
+  })
+
+  it('refuses a guest short of the prerequisites before creating the user', async () => {
+    const guest = { ...goodBody, email: 'g@example.com', password: 'hunter2hunter2', turnstile_token: 'tk' }
+    const short = makeDeps({ prereqCertId: 'cl-aow' })
+    const res = await handleRegistration(postJson({ ...guest, profile_patch: { cert_level_code: 'open_water' } }), short.deps)
+    expect(res.status).toBe(422)
+    expect(short.captured.createUserCalls).toHaveLength(0)
+
+    const enough = makeDeps({ prereqCertId: 'cl-aow' })
+    const ok = await handleRegistration(postJson({ ...guest, profile_patch: { cert_level_code: 'advanced_open_water' } }), enough.deps)
+    expect(ok.status).toBe(200)
+    expect(enough.captured.createUserCalls).toHaveLength(1)
   })
 
   it('rejects a guest registering for a past event before creating the user', async () => {
