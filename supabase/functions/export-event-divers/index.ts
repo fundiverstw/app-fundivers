@@ -37,11 +37,12 @@ import { shopEmail } from "../_shared/shop-contact.ts"
 import { siteConfig } from "../../../fundive.config.ts"
 import { t } from "../_shared/i18n.ts"
 import { isEventKind, usesDateEnvelope, EVENT_KINDS } from "../../../src/lib/event-kinds.ts"
+import { printedCertLevel } from "../../../src/lib/cert-text.ts"
 
 // Profile columns the manifest reads, shared by the booked-diver and
 // on-duty-staff fetches.
 const PROFILE_COLS =
-  "id, name, date_of_birth, nationality, id_number, gender, cert_level, logged_dives"
+  "id, name, date_of_birth, nationality, id_number, gender, cert_level, cert_level_code, uncertified, logged_dives"
 
 interface ManifestProfile {
   id: string
@@ -51,6 +52,8 @@ interface ManifestProfile {
   id_number: string | null
   gender: string | null
   cert_level: string | null
+  cert_level_code: string | null
+  uncertified: boolean | null
   logged_dives: number | null
 }
 
@@ -64,7 +67,7 @@ function toManifestRow(p: ManifestProfile, remark: string | null = null): EventD
     nationality: p.nationality?.trim() || null,
     idNumber:    p.id_number?.trim() || null,
     gender:      p.gender?.trim() || null,
-    certLevel:   p.cert_level?.trim() || null,
+    certLevel:   printedCertLevel(p, t.profile.certNotPlaced),
     loggedDives: p.logged_dives ?? null,
     remark,
   }

@@ -4,6 +4,8 @@ import { BTN_XS_PRIMARY, BTN_XS_GHOST, BTN_XS_DANGER } from '../../styles/tokens
 import { siteConfig } from '../../config/site'
 import { Spinner } from '../../components/ui/Spinner'
 import { format } from 'date-fns'
+import { certSummary } from '../../lib/cert-display'
+import { legacyCertText } from '../../lib/cert-text'
 import { shopZoned, parseIsoDate } from '../../lib/dates'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -598,7 +600,7 @@ function UserCard({
             {user.name ?? t.admin.family.unnamed}
           </p>
           <p className="text-xs text-brand-900 font-medium">
-            {user.cert_agency && user.cert_level ? `${user.cert_agency} ${user.cert_level}` : t.profile.family.uncertified}
+            {certSummary(user) ?? t.profile.family.uncertified}
             {user.logged_dives > 0 && us.loggedSuffix(user.logged_dives)}
             {user.nitrox_certified && us.nitroxSuffix}
             {user.deep_certified && us.deepSuffix}
@@ -797,12 +799,15 @@ function ProfileDetails({ user }: { user: Profile }) {
 
       <Section title={t.profile.certification}>
         {/* Not required of a diver who ticked "not certified yet" — for them
-            the blank is the answer, not a gap. */}
+            the blank is the answer, not a gap. Only a picked level fills it:
+            legacy text the backfill couldn't place is shown on its own row,
+            and the field still reads as missing, as profileGaps counts it. */}
         <Row
           k={us.rowAgencyLevel}
-          v={user.cert_level ? `${user.cert_agency ?? ''} ${user.cert_level}`.trim() : null}
+          v={user.cert_level_code ? certSummary(user) : null}
           required={!user.uncertified}
         />
+        <Row k={us.rowLegacyCert} v={legacyCertText(user)} />
         <Row k={us.rowLoggedDives} v={String(user.logged_dives ?? 0)} />
         <Row k={us.rowLastDive} v={user.last_dive_date ? format(parseIsoDate(user.last_dive_date), 'MMM d, yyyy') : null} />
         <Row k={us.rowNitrox} v={user.nitrox_certified ? us.certifiedYes : us.certifiedNo} />

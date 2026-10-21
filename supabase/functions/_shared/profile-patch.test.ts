@@ -76,8 +76,7 @@ describe('sanitizeProfilePatch — allowed keys (SPA registration-form contract)
     'id_number',
     'contact_method',
     'contact_id',
-    'cert_agency',
-    'cert_level',
+    'cert_level_code',
     'uncertified',
     'logged_dives',
     'nitrox_certified',
@@ -125,11 +124,12 @@ describe('sanitizeProfilePatch — mixed attack + legit', () => {
       role:       'admin',           // dropped
       status:     'active',          // dropped
       name:  'Mallory',         // kept
-      cert_level: 'Open Water',      // kept
+      cert_level_code: 'open_water', // kept
+      cert_level: 'Open Water',      // dropped: the database writes it from the code
       fin_size:   'XL',              // dropped
     })).toEqual({
       name:  'Mallory',
-      cert_level: 'Open Water',
+      cert_level_code: 'open_water',
     })
   })
 })

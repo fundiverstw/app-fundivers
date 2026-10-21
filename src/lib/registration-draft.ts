@@ -22,7 +22,10 @@ export interface RegistrationDraft {
   contactMethod: string
   contactId: string
   certAgency: string
-  certLevel: string
+  /** A `cert_levels.code`. A draft saved before the picker existed carries a
+   *  free-text `certLevel` instead; it reads as '', and applyDraft leaves the
+   *  profile's level in place rather than restoring an empty pick. */
+  certLevelCode: string
   uncertified: boolean
   loggedDives: number
   nitroxCertified: boolean
@@ -175,7 +178,7 @@ function normalizeDraft(v: Partial<RegistrationDraft>): RegistrationDraft {
     contactMethod: str(v.contactMethod),
     contactId: str(v.contactId),
     certAgency: str(v.certAgency),
-    certLevel: str(v.certLevel),
+    certLevelCode: str(v.certLevelCode),
     uncertified: bool(v.uncertified),
     loggedDives: typeof v.loggedDives === 'number' && Number.isFinite(v.loggedDives) ? v.loggedDives : 0,
     nitroxCertified: bool(v.nitroxCertified),

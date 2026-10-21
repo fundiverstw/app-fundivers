@@ -18,8 +18,8 @@ import {
   type BookingLite,
   type ProfileLite,
   type ConfirmedCount,
+  type DashboardLadderRow,
 } from '../../lib/admin-dashboard'
-import type { CertLadderRow } from '../../lib/cert-level'
 import { StatCard, ChartCard, BarList, ColumnChart } from '../../components/admin/dashboard-charts'
 import { fiscalYearRange } from '../../lib/accounting-export'
 
@@ -70,7 +70,7 @@ async function loadDashboard(): Promise<Dashboard> {
   const [paymentsRes, bookingsRes, profilesRes, pendingRes, refundsRes, divesRes, coursesRes, certLevelsRes, pricesRes] = await Promise.all([
     supabase.from('payments').select('user_id, booking_id, amount, status, method, created_at').gte('created_at', startIso).lt('created_at', endIso),
     supabase.from('bookings').select('id, user_id, event_id, status, created_at, details').gte('created_at', startIso).lt('created_at', endIso),
-    supabase.from('profiles').select('id, role, status, created_at, nationality, cert_level'),
+    supabase.from('profiles').select('id, role, status, created_at, nationality, cert_level, cert_level_code, uncertified'),
     // Every pending diver — same condition as the approvals queue and the nav
     // badge. Filtering on application_submitted_at here hid the divers who
     // never completed their profile, which is most of the ones who need
@@ -79,9 +79,9 @@ async function loadDashboard(): Promise<Dashboard> {
     supabase.from('bookings').select('id', { count: 'exact', head: true }).not('refund_requested_at', 'is', null).neq('status', 'cancelled'),
     supabase.from('events').select(DIVE_COLS).eq('kind', 'dive').is('cancelled_at', null).gte('start_date', today),
     supabase.from('events').select(COURSE_COLS).eq('kind', 'course').is('cancelled_at', null),
-    // Every agency's ladder, not just PADI: the cross-agency rows are what let
-    // a diver who typed "Master Diver" or "3-Star Diver" resolve at all.
-    supabase.from('cert_levels').select('id, code, name, padi_equivalent_id'),
+    // Every agency's ladder, not just PADI: a diver's code may name any
+    // agency's rung, reported under the PADI rung it points at.
+    supabase.from('cert_levels').select('id, code, name, organization, padi_equivalent_id'),
     supabase.from('prices').select('id, admin_title'),
   ])
   if (paymentsRes.error) throw paymentsRes.error
@@ -104,7 +104,7 @@ async function loadDashboard(): Promise<Dashboard> {
     ? (await supabase.from('events').select(`kind, ${DIVE_COLS}, course_days, course_name`).in('id', refIds)).data as EventRowLite[] ?? []
     : []
 
-  const certLadder = (certLevelsRes.data ?? []) as CertLadderRow[]
+  const certLadder = (certLevelsRes.data ?? []) as DashboardLadderRow[]
   const courseCatalog = new Map(
     (pricesRes.data ?? []).map(r => [r.id as string, (r.admin_title as string | null) ?? '']),
   )

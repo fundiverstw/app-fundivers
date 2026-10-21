@@ -11,9 +11,9 @@ import type { Profile } from '../types/database'
 //
 // The DB has its own version of this: the maybe_set_application_submitted_at
 // trigger stamps profiles.application_submitted_at once name, date_of_birth,
-// cert_level, contact_method and contact_id are all filled. That stamp is a
+// cert_level_code, contact_method and contact_id are all filled. That stamp is a
 // one-way latch and it can't see the `uncertified` flag — a Discover diver who
-// legitimately has no cert_level never earns it — so it's a poor thing to drive
+// legitimately has no cert level never earns it — so it's a poor thing to drive
 // UI from. The admin screens ask this module instead. Fields nobody chases —
 // ID number, emergency contact, sizing, medical notes — are absent by design:
 // a blank one is not a gap, and flagging it would make the indicator noise.
@@ -41,8 +41,10 @@ export function profileGaps(p: Partial<Profile>): ProfileGap[] {
   if (!p.contact_method) gaps.push('contact_method')
   if (!filled(p.contact_id)) gaps.push('contact_id')
   // "I'm not certified yet" is a complete answer to the certification
-  // question, so it closes this gap without a level.
-  if (!p.uncertified && !filled(p.cert_level)) gaps.push('certification')
+  // question, so it closes this gap without a level. Otherwise the answer is a
+  // level picked from cert_levels: legacy free text the backfill couldn't
+  // place ("PE40") is still a gap, and this is where an admin sees it.
+  if (!p.uncertified && !filled(p.cert_level_code)) gaps.push('certification')
   return gaps
 }
 

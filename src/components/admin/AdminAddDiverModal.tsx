@@ -8,6 +8,7 @@ import { RegisterFormBody } from '../register/RegisterForm'
 import type { AppEvent, Profile } from '../../types/database'
 import { MODAL_BACKDROP, TEXT_HEADING, TEXT_BODY, INPUT, INPUT_LABEL, BTN_PRIMARY, BTN_SECONDARY, BTN_XS_GHOST } from '../../styles/tokens'
 import { t } from '../../i18n'
+import { certSummary } from '../../lib/cert-display'
 
 const ad = t.admin.addDiver
 const pf = t.profile.family
@@ -153,9 +154,7 @@ export function AdminAddDiverModal({
                       {p.name ?? pf.noName}
                     </p>
                     <p className="text-xs text-brand-900/70">
-                      {p.cert_agency && p.cert_level && `${p.cert_agency} ${p.cert_level}`}
-                      {(p.cert_agency || p.cert_level) && p.contact_id && ' · '}
-                      {p.contact_id ?? ''}
+                      {[certSummary(p), p.contact_id].filter(Boolean).join(' · ')}
                       {p.status && p.status !== 'active' && (
                         <span className="ml-2 uppercase tracking-wider text-red-300">{p.status}</span>
                       )}

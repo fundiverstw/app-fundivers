@@ -15,6 +15,7 @@ import { t } from '../../i18n'
 const ap = t.admin.applications
 const cm = t.admin.completeness
 import type { AppEvent, Booking, Profile } from '../../types/database'
+import { certSummary } from '../../lib/cert-display'
 
 // Every suspended account, on hold or closed, newest first, with the diver's
 // first booking expanded inline so the decision is an informed one.
@@ -57,7 +58,7 @@ export function AdminApplicationsPage() {
       // This used to also require `application_submitted_at is not null`, on
       // the reasoning that a diver who has typed nothing yet isn't an
       // application worth showing. But that column is stamped by a trigger
-      // only once name, date_of_birth, cert_level, contact_method AND
+      // only once name, date_of_birth, cert_level_code, contact_method AND
       // contact_id are all populated, and a diver who signs up and stops short
       // of that never gets it. They were then invisible here — the one screen
       // that can approve them — so they sat on /pending permanently with no
@@ -303,7 +304,7 @@ function ApplicantSummary({ profile }: { profile: Profile }) {
           it), and it's how the approve/reject mail reaches them. */}
       <Row k={contactMethodLabel(profile.contact_method)} v={profile.contact_id ?? '—'} />
       <Row k={ap.accountEmail} v={profile.email ?? '—'} />
-      <Row k={ap.cert}  v={profile.cert_level ? `${profile.cert_agency ?? ''} ${profile.cert_level}`.trim() : '—'} />
+      <Row k={ap.cert}  v={certSummary(profile) ?? '—'} />
       <Row k={ap.loggedDives} v={String(profile.logged_dives ?? 0)} />
       <Row k={ap.nationality} v={profile.nationality ?? '—'} />
       <Row k={ap.dob} v={profile.date_of_birth ?? '—'} />

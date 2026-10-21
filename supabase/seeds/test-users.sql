@@ -115,8 +115,9 @@ declare
     'Khan','Lin','Martinez','Nguyen','Olsen','Park','Quinn','Reyes','Singh','Tan',
     'Urbano','Vasquez','Wong','Xu','Yamada'
   ];
-  agencies text[] := array['PADI','SSI','SDI','PADI','PADI'];
-  levels   text[] := array['OW','AOW','Rescue','Divemaster','OW'];
+  -- cert_levels codes; the profiles_cert_level_mirror_trg trigger writes the
+  -- matching cert_agency / cert_level text.
+  cert_codes text[] := array['open_water','ssi_advanced_open_water','sdi_rescue','divemaster','open_water'];
   methods  text[] := array['line','whatsapp','phone','email'];
 begin
   for i in 1..25 loop
@@ -157,8 +158,7 @@ begin
     -- this account isn't treated as a fresh signup.
     update public.profiles
        set name        = first_names[i] || ' ' || last_names[i],
-           cert_agency      = agencies[1 + (i % array_length(agencies, 1))],
-           cert_level       = levels[1 + (i % array_length(levels, 1))],
+           cert_level_code  = cert_codes[1 + (i % array_length(cert_codes, 1))],
            nitrox_certified = (i % 3 = 0),
            deep_certified   = (i % 5 = 0),
            contact_method   = (methods[1 + (i % array_length(methods, 1))])::text,

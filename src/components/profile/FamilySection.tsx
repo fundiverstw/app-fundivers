@@ -6,6 +6,7 @@ import { ProfileForm } from '../../pages/ProfilePage'
 import type { Profile } from '../../types/database'
 import { BTN_SECONDARY } from '../../styles/tokens'
 import { t } from '../../i18n'
+import { certSummary } from '../../lib/cert-display'
 
 // Diver-facing "Family" panel on /profile. Lets a top-level diver (one
 // whose own parent_account is null) see + create child accounts they
@@ -73,7 +74,7 @@ function FamilyPanel({ parent }: { parent: Profile }) {
                     {c.name ?? t.profile.family.noName}
                   </p>
                   <p className="text-xs text-brand-900/70">
-                    {c.cert_agency && c.cert_level ? `${c.cert_agency} ${c.cert_level}` : t.profile.family.uncertified}
+                    {certSummary(c) ?? t.profile.family.uncertified}
                     {c.status && c.status !== 'active' && (
                       <span className="ml-2 uppercase tracking-wider text-red-300">{c.status}</span>
                     )}

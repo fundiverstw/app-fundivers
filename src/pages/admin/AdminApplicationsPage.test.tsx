@@ -119,7 +119,7 @@ describe('AdminApplicationsPage', () => {
         id: 'u2', name: 'Ada', created_at: '2026-04-30T00:00:00Z', status: 'pending',
         application_submitted_at: '2026-04-30T01:00:00Z',
         date_of_birth: '1990-01-01', nationality: 'TW', gender: 'female',
-        contact_method: 'line', contact_id: 'ada-line', cert_level: 'AOW',
+        contact_method: 'line', contact_id: 'ada-line', cert_level: 'AOW', cert_level_code: 'advanced_open_water',
       }],
     }))
     renderPage()
@@ -127,7 +127,7 @@ describe('AdminApplicationsPage', () => {
     expect(screen.queryByText(/profile incomplete/i)).not.toBeInTheDocument()
   })
 
-  // The DB trigger that stamps application_submitted_at requires a cert_level,
+  // The DB trigger that stamps application_submitted_at requires a picked cert level,
   // which a Discover diver will never have — driving the badge off that stamp
   // branded them incomplete forever.
   it('does not flag an uncertified diver who filled everything else in', async () => {

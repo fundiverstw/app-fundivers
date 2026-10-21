@@ -45,6 +45,7 @@ import { AddToGoogleCalendarButton } from '../../components/AddToGoogleCalendarB
 import type { AppEvent, Booking, BookingAmendment, BookingDetails, BookingDiscount, Credit, Discount, DiverNote, Payment, PaymentMethod, Profile, EventKind } from '../../types/database'
 import { BTN_SECONDARY, BTN_XS_BASE, BTN_XS_GHOST, ERROR_NOTE_LIGHT } from '../../styles/tokens'
 import { t } from '../../i18n'
+import { certSummary } from '../../lib/cert-display'
 
 const ed = t.admin.eventDetail
 const us = t.admin.users
@@ -1411,6 +1412,7 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
   // kept distinct from 'credit' so a plain overpayment is never mislabelled as
   // an awarded account credit.
   const { owed: adjusted, paid: totalPaid, bal } = registrantBalance(r)
+  const certText = r.profile ? certSummary(r.profile) : null
   const paymentStatus = bal.state === 'due'
     ? (totalPaid === 0 && r.credit === 0 ? 'none' : 'partial')
     : bal.state
@@ -1555,9 +1557,9 @@ function RegistrantCard({ r, waiverMissing, waiverState, addonNames, roomNames, 
         <div className="border-t border-surface-200 px-3 pb-3 pt-2 space-y-2">
           {r.profile && (
             <div className="space-y-1">
-              {(r.profile.cert_agency || r.profile.cert_level || r.profile.nitrox_certified || r.profile.deep_certified) && (
+              {(certText || r.profile.nitrox_certified || r.profile.deep_certified) && (
                 <p className="text-xs text-brand-900 font-medium select-text">
-                  {r.profile.cert_agency && r.profile.cert_level && `${r.profile.cert_agency} ${r.profile.cert_level}`}
+                  {certText}
                   {r.profile.nitrox_certified && us.nitroxSuffix}
                   {r.profile.deep_certified && us.deepSuffix}
                 </p>

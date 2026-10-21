@@ -15,9 +15,11 @@
 //     "PE40" and the admin can see there is a profile to fix. Folding it into
 //     the nearest-looking rung would report a diver as qualified for something
 //     they are not.
-//   - Gate anything. This is display-only, for the dashboard. Booking
-//     eligibility runs off `events.prereq_cert_id` → `cert_levels.id`, a
-//     structured reference that never touches this text.
+//   - Gate or report anything. Profiles now carry `cert_level_code`, which the
+//     booking gate and the dashboard both read; this is the TS statement of
+//     how SQL's padi_equivalent_of() (and so the backfill) reads legacy text,
+//     kept so tests/integration/profile-normalization.test.ts can hold the two
+//     to the same answers.
 
 export interface CertLadderRow {
   id: string

@@ -81,10 +81,6 @@ export interface BookingDetails {
    *  participation, no refund" terms. Set only when a cert level was named but
    *  no card was uploaded / on file. */
   cert_card_ack_at?: string
-  /** ISO timestamp of when the diver acknowledged an event prerequisite they
-   *  don't yet meet on their self-reported profile (e.g. a boat dive requiring
-   *  a higher cert or more logged dives). Gates submit + server-verified. */
-  prereq_acked_at?: string
 }
 
 /**
@@ -796,6 +792,11 @@ export interface Database {
           emergency_contact_phone: string | null
           cert_agency: string | null
           cert_level: string | null
+          /** `cert_levels.code` of the level the diver holds — the source of truth.
+           *  cert_agency / cert_level are a trigger-maintained copy of that row's
+           *  organization / name; with this null they hold a legacy free-text value
+           *  the backfill could not place (or nothing). */
+          cert_level_code: string | null
           cert_card_path: string | null
           nitrox_card_path: string | null
           deep_card_path: string | null
@@ -828,7 +829,7 @@ export interface Database {
            *  consented. */
           agreed_to_terms_version: number | null
           /** Stamped by the maybe_set_application_submitted_at trigger the
-           *  first time name, date_of_birth, cert_level, contact_method and
+           *  first time name, date_of_birth, cert_level_code, contact_method and
            *  contact_id are all populated — i.e. "this diver has filled the
            *  application in". Null means they signed up and stopped short,
            *  which is a profile to flag, never a reason to hide them from the
@@ -855,6 +856,7 @@ export interface Database {
           emergency_contact_phone?: string | null
           cert_agency?: string | null
           cert_level?: string | null
+          cert_level_code?: string | null
           cert_card_path?: string | null
           nitrox_card_path?: string | null
           deep_card_path?: string | null
@@ -891,6 +893,7 @@ export interface Database {
           emergency_contact_phone?: string | null
           cert_agency?: string | null
           cert_level?: string | null
+          cert_level_code?: string | null
           cert_card_path?: string | null
           nitrox_card_path?: string | null
           deep_card_path?: string | null
@@ -1847,10 +1850,11 @@ export interface Database {
           name: string
           name_zh: string | null
           rank: number
-          /** 'PADI' / 'BSAC' / 'CMAS' / 'SSI' / 'NAUI' / 'SAA' / 'SDI' / 'TDI'. */
+          /** 'PADI' / 'BSAC' / 'SSI' / 'NAUI' / 'SAA' / 'SDI' / 'CMAS'. */
           organization: string
           /** PADI rank this level resolves to for prereq comparisons.
-           *  Self-id for PADI rows; closest PADI rank for agency rows. */
+           *  Self-id (or null) for PADI rows; closest PADI rank for agency
+           *  rows, and null on an agency row means no equivalent. */
           padi_equivalent_id: string | null
           created_at: string
           updated_at: string

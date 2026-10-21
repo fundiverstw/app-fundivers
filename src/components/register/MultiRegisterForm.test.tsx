@@ -52,7 +52,7 @@ const parentProfile: Profile = {
 
 const childProfile: Profile = {
   ...parentProfile, id: 'c1', name: 'Kid Junior', 
-  cert_level: null, cert_card_path: null,
+  cert_agency: null, cert_level: null, cert_level_code: null, cert_card_path: null,
 }
 
 // The waiver catalog rows the app fetches (was src/config/waivers.ts).
@@ -67,9 +67,16 @@ function setupFrom(children: Profile[]) {
     if (table === 'profiles') return mockQueryBuilder({ data: children })
     if (table === 'waivers') return mockQueryBuilder({ data: WAIVER_ROWS })
     if (table === 'payment_methods') return mockQueryBuilder({ data: PAYMENT_METHOD_ROWS })
+    if (table === 'cert_levels') return mockQueryBuilder({ data: CERT_LEVEL_ROWS })
     return mockQueryBuilder()
   })
 }
+
+const CERT_LEVEL_ROWS = [
+  { id: 'l1', code: 'open_water', name: 'OW', organization: 'PADI', rank: 1, padi_equivalent_id: 'l1' },
+  { id: 'l2', code: 'advanced_open_water', name: 'AOW', organization: 'PADI', rank: 2, padi_equivalent_id: 'l2' },
+  { id: 'l3', code: 'ssi_advanced_open_water', name: 'Advanced Open Water Diver', organization: 'SSI', rank: 2, padi_equivalent_id: 'l2' },
+]
 
 // The shop's payment methods, read from the DB rather than a hardcoded union.
 const PAYMENT_METHOD_ROWS = [
@@ -377,6 +384,156 @@ describe('MultiRegisterForm parent diver picker', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await user.click(screen.getByRole('button', { name: /next/i }))
     expect(screen.queryByText(t.register.gear.sizesTitle)).not.toBeInTheDocument()
+  })
+
+  it('saves the picked level as a cert_levels code', async () => {
+    setupFrom([])
+    const user = userEvent.setup()
+    render(
+      <MultiRegisterForm
+        events={[sampleEvent('e1', 'Kenting')]}
+        profile={parentProfile} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await waitFor(() => expect(screen.getByRole('option', { name: 'SSI' })).toBeInTheDocument())
+    await user.selectOptions(screen.getByLabelText(/cert agency/i), 'SSI')
+    await user.selectOptions(screen.getByLabelText(/cert level/i), 'ssi_advanced_open_water')
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByLabelText(/No, I'll get there myself/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /confirm/i }))
+    await waitFor(() => expect(invoke).toHaveBeenCalled())
+    const body = (invoke.mock.calls[0][1] as { body: { profile_patch: Record<string, unknown> } }).body
+    expect(body.profile_patch.cert_level_code).toBe('ssi_advanced_open_water')
+    expect(body.profile_patch).not.toHaveProperty('cert_level')
+  })
+
+  it('blocks a cart row the diver falls short of until their level reaches it', async () => {
+    setupFrom([])
+    const base = from.getMockImplementation()!
+    from.mockImplementation((table: string) => table === 'events'
+      ? mockQueryBuilder({ data: [{ id: 'e1', prereq_cert_id: 'l2', req_dives: null, nitrox_required: false }] })
+      : base(table))
+    const user = userEvent.setup()
+    render(
+      <MultiRegisterForm
+        events={[sampleEvent('e1', 'Kenting')]}
+        profile={{ ...parentProfile, cert_level: 'OW', cert_level_code: 'open_water' }} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    const panel = await screen.findByRole('alert')
+    expect(panel).toHaveTextContent(/Kenting/)
+    expect(panel).toHaveTextContent(/requires AOW\. your profile says PADI OW/i)
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+
+    // SSI's AOW reaches PADI's.
+    await user.selectOptions(screen.getByLabelText(/cert agency/i), 'SSI')
+    await user.selectOptions(screen.getByLabelText(/cert level/i), 'ssi_advanced_open_water')
+    expect(screen.queryByText(/requires AOW/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled()
+  })
+
+  it('grades a row booked for a linked child on the child’s own profile', async () => {
+    setupFrom([childProfile])
+    const base = from.getMockImplementation()!
+    from.mockImplementation((table: string) => table === 'events'
+      ? mockQueryBuilder({ data: [{ id: 'e1', prereq_cert_id: 'l1', req_dives: null, nitrox_required: false }] })
+      : base(table))
+    const user = userEvent.setup()
+    render(
+      <MultiRegisterForm
+        events={[sampleEvent('e1', 'Kenting')]}
+        profile={{ ...parentProfile, cert_level_code: 'advanced_open_water' }} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(screen.getByLabelText(/diver for kenting/i)).toBeInTheDocument())
+    await user.selectOptions(screen.getByLabelText(/diver for kenting/i), 'c1')
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    const panel = await screen.findByRole('alert')
+    expect(panel).toHaveTextContent(/Kenting · Kid Junior/)
+    expect(panel).toHaveTextContent(/doesn't say which certification/i)
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+  })
+
+  it('still asks for the nitrox course when the box is ticked with no card behind it', async () => {
+    setupFrom([])
+    const base = from.getMockImplementation()!
+    from.mockImplementation((table: string) => table === 'events'
+      ? mockQueryBuilder({ data: [{ id: 'e1', prereq_cert_id: null, req_dives: null, nitrox_required: true }] })
+      : base(table))
+    const user = userEvent.setup()
+    render(
+      <MultiRegisterForm
+        events={[{ ...sampleEvent('e1', 'Kenting'), nitrox_required: true }]}
+        profile={{ ...parentProfile, nitrox_certified: false, nitrox_card_path: null }} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
+    await user.click(screen.getByRole('button', { name: /next/i }))  // → 2
+    await user.click(screen.getByLabelText(/nitrox certified/i))     // tick, no card on file
+    await user.click(screen.getByRole('button', { name: /next/i }))  // → 3
+    expect(await screen.findByText(/requires a nitrox certification/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/add nitrox course/i)).toBeInTheDocument()
+  })
+
+  it('saves the diver\'s own step-2 answers when every row is booked for a child', async () => {
+    setupFrom([childProfile])
+    const base = from.getMockImplementation()!
+    const profiles = mockQueryBuilder({ data: [childProfile] })
+    const update = vi.spyOn(profiles as unknown as { update: (row: unknown) => unknown }, 'update')
+    from.mockImplementation((table: string) => table === 'profiles' ? profiles : base(table))
+    const user = userEvent.setup()
+    render(
+      <MultiRegisterForm
+        events={[sampleEvent('e1', 'Kenting')]}
+        profile={parentProfile} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(screen.getByLabelText(/diver for kenting/i)).toBeInTheDocument())
+    await user.selectOptions(screen.getByLabelText(/diver for kenting/i), 'c1')
+    await user.click(screen.getByRole('button', { name: /next/i }))  // → 2
+    const dives = screen.getByLabelText(/logged dives/i)
+    await user.clear(dives)
+    await user.type(dives, '77')
+    await user.click(screen.getByRole('button', { name: /next/i }))  // → 3
+    await user.click(screen.getByLabelText(/No, I'll get there myself/i))
+    await user.click(screen.getByRole('button', { name: /next/i }))  // → 4
+    await user.click(screen.getByRole('button', { name: /confirm/i }))
+    await waitFor(() => expect(invoke).toHaveBeenCalled())
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ logged_dives: 77 }))
+  })
+
+  it('offers the nitrox course on a row once the diver unticks a lapsed nitrox card', async () => {
+    setupFrom([])
+    const base = from.getMockImplementation()!
+    from.mockImplementation((table: string) => table === 'events'
+      ? mockQueryBuilder({ data: [{ id: 'e1', prereq_cert_id: null, req_dives: null, nitrox_required: true }] })
+      : base(table))
+    const user = userEvent.setup()
+    render(
+      <MultiRegisterForm
+        events={[{ ...sampleEvent('e1', 'Kenting'), nitrox_required: true }]}
+        profile={{ ...parentProfile, nitrox_certified: true, nitrox_card_path: 'p1/nitrox.jpg' }} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}}
+      />
+    )
+    await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
+    await user.click(screen.getByRole('button', { name: /next/i }))  // → 2
+    await user.click(screen.getByLabelText(/nitrox certified/i))     // untick
+    await user.click(screen.getByRole('button', { name: /next/i }))  // → 3
+    const panel = await screen.findByRole('alert')
+    expect(panel).toHaveTextContent(/requires a nitrox certification/i)
+    await user.click(screen.getByLabelText(/add nitrox course/i))
+    expect(screen.queryByText(/requires a nitrox certification/i)).not.toBeInTheDocument()
   })
 
   it('saves the height and weight typed on the about-you step', async () => {

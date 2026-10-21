@@ -1,15 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { computeDashboard, calendarYearMonths, type DashboardInput } from './admin-dashboard'
+import { computeDashboard, calendarYearMonths, type DashboardLadderRow, type DashboardInput } from './admin-dashboard'
 import { EVENT_KIND_LABELS } from './event-kind-labels'
-import type { CertLadderRow } from './cert-level'
 
-// Enough of the shop's cert ladder to exercise the resolver; the full table and
-// its cross-agency equivalences are covered in cert-level.test.ts.
-const LADDER: CertLadderRow[] = [
-  { id: 'open_water', code: 'open_water', name: 'OW', padi_equivalent_id: 'open_water' },
-  { id: 'advanced_open_water', code: 'advanced_open_water', name: 'AOW', padi_equivalent_id: 'advanced_open_water' },
-  { id: 'rescue', code: 'rescue', name: 'Rescue', padi_equivalent_id: 'rescue' },
-  { id: 'naui_advanced_scuba_diver', code: 'naui_advanced_scuba_diver', name: 'Advanced Scuba Diver', padi_equivalent_id: 'advanced_open_water' },
+// Enough of the shop's cert ladder to follow a code to its PADI rung, across
+// agencies.
+const LADDER: DashboardLadderRow[] = [
+  { id: 'open_water', code: 'open_water', name: 'OW', organization: 'PADI', padi_equivalent_id: 'open_water' },
+  { id: 'advanced_open_water', code: 'advanced_open_water', name: 'AOW', organization: 'PADI', padi_equivalent_id: 'advanced_open_water' },
+  { id: 'rescue', code: 'rescue', name: 'Rescue', organization: 'PADI', padi_equivalent_id: null },
+  { id: 'naui_advanced_scuba_diver', code: 'naui_advanced_scuba_diver', name: 'Advanced Scuba Diver', organization: 'NAUI', padi_equivalent_id: 'advanced_open_water' },
 ]
 
 describe('calendarYearMonths', () => {
@@ -40,9 +39,9 @@ const input: DashboardInput = {
     { id: 'b2', user_id: 'd2', event_id: 'course1', status: 'pending', created_at: '2026-06-04T00:00:00+08:00', details: { total: 500 } },
   ],
   profiles: [
-    { id: 'd1', role: 'diver', status: 'active', created_at: '2026-06-02T00:00:00+08:00', nationality: 'Taiwan', cert_level: 'AOW' },
-    { id: 'd2', role: 'diver', status: 'active', created_at: '2026-05-02T00:00:00+08:00', nationality: 'Japan', cert_level: 'OW' },
-    { id: 'a1', role: 'admin', status: 'active', created_at: '2026-06-01T00:00:00+08:00', nationality: null, cert_level: null },
+    { id: 'd1', role: 'diver', status: 'active', created_at: '2026-06-02T00:00:00+08:00', nationality: 'Taiwan', cert_level: 'AOW', cert_level_code: 'advanced_open_water', uncertified: false },
+    { id: 'd2', role: 'diver', status: 'active', created_at: '2026-05-02T00:00:00+08:00', nationality: 'Japan', cert_level: 'OW', cert_level_code: 'open_water', uncertified: false },
+    { id: 'a1', role: 'admin', status: 'active', created_at: '2026-06-01T00:00:00+08:00', nationality: null, cert_level: null, cert_level_code: null, uncertified: false },
   ],
   events: [
     { id: 'dive1', type: 'dive', title: 'Long Dong', capacity: 10, dateKey: '2026-07-01', isBoatDive: false, isTrip: false, courseLabel: null },
@@ -147,7 +146,7 @@ describe('computeDashboard', () => {
       })),
       profiles: Array.from({ length: 10 }, (_, i) => ({
         id: `u${i}`, role: 'diver', status: 'active', created_at: '2026-06-10T00:00:00+08:00',
-        nationality: `Country${i}`, cert_level: null,
+        nationality: `Country${i}`, cert_level: null, cert_level_code: null, uncertified: false,
       })),
     })
     expect(many.revenueByNationality).toHaveLength(9) // top 8 + Other
@@ -200,41 +199,46 @@ describe('computeDashboard collapses duplicate labels', () => {
         { user_id: 'd3', booking_id: 'b3', amount: 300, status: 'paid', method: 'cash', created_at: at('2026-06-10T00:00:00+08:00') },
       ],
       profiles: [
-        { id: 'd1', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: 'USA', cert_level: 'OW' },
-        { id: 'd2', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: 'United States', cert_level: 'OW' },
-        { id: 'd3', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: 'American', cert_level: 'OW' },
+        { id: 'd1', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: 'USA', cert_level: 'OW', cert_level_code: 'open_water', uncertified: false },
+        { id: 'd2', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: 'United States', cert_level: 'OW', cert_level_code: 'open_water', uncertified: false },
+        { id: 'd3', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: 'American', cert_level: 'OW', cert_level_code: 'open_water', uncertified: false },
       ],
     })
     expect(d.revenueByNationality).toEqual([{ label: 'United States', value: 600 }])
   })
 
-  // Every one of these is an AOW diver under a different agency's name for it.
-  it('reports one rung however each diver named their certification', () => {
+  // Every one of these is an AOW diver, on PADI's rung or another agency's.
+  it('reports each diver under the PADI rung their level code names', () => {
     const d = computeDashboard({
       ...input,
       payments: [],
       profiles: [
-        { id: 'd1', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: null, cert_level: 'AOW' },
-        { id: 'd2', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: null, cert_level: 'Advanced Open Water' },
-        { id: 'd3', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: null, cert_level: 'Advanced Scuba Diver' },
-        { id: 'd4', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: null, cert_level: 'AOW & nitrox' },
+        { id: 'd1', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: null, cert_level: 'AOW', cert_level_code: 'advanced_open_water', uncertified: false },
+        { id: 'd2', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: null, cert_level: 'Advanced Open Water', cert_level_code: 'advanced_open_water', uncertified: false },
+        { id: 'd3', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: null, cert_level: 'Advanced Scuba Diver', cert_level_code: 'naui_advanced_scuba_diver', uncertified: false },
       ],
     })
-    expect(d.certLevelMix).toEqual([{ label: 'AOW', value: 4 }])
+    expect(d.certLevelMix).toEqual([{ label: 'AOW', value: 3 }])
   })
 
-  it('buckets a certification the ladder cannot place on its own, not into a rung', () => {
+  // No code is a level the backfill couldn't place. The booking gate reads it
+  // as unstated, so the dashboard must not count it as a rung either — even
+  // when its text is a rung's name.
+  it('buckets every legacy level with no code together, apart from the rungs', () => {
     const d = computeDashboard({
       ...input,
       payments: [],
       profiles: [
-        { id: 'd1', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: null, cert_level: 'PE40' },
-        { id: 'd2', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: null, cert_level: null },
+        { id: 'd1', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: null, cert_level: 'PE40', cert_level_code: null, uncertified: false },
+        { id: 'd2', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: null, cert_level: 'AOW', cert_level_code: null, uncertified: false },
+        { id: 'd3', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: null, cert_level: null, cert_level_code: null, uncertified: false },
+        { id: 'd4', role: 'diver', status: 'active', created_at: at('2026-01-01T00:00:00+08:00'), nationality: null, cert_level: 'AOW', cert_level_code: 'advanced_open_water', uncertified: false },
       ],
     })
     expect(d.certLevelMix).toEqual([
-      { label: 'PE40', value: 1 },
+      { label: 'Not on the list', value: 2 },
       { label: 'Unknown', value: 1 },
+      { label: 'AOW', value: 1 },
     ])
   })
 
