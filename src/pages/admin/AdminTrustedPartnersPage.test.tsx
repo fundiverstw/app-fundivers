@@ -40,6 +40,21 @@ describe('AdminTrustedPartnersPage', () => {
     expect(screen.getByText(/Anilao · bm@x\.io/)).toBeInTheDocument()
   })
 
+  it('sorts partners A–Z by location (falling back to country), no-location last', async () => {
+    const row = (id: string, name: string, location: string | null, country: string | null): TrustedPartnerRow =>
+      ({ ...partners[0], id, name, location, country })
+    fetchAll.mockResolvedValue([
+      row('a', 'Zed Divers', 'Raja Ampat', 'Indonesia'),
+      row('b', 'Nowhere Co', null, null),
+      row('c', 'Abyss', null, 'Japan'),
+      row('d', 'Blue Manta', 'Anilao', 'Philippines'),
+    ])
+    renderPage()
+    await screen.findByText('Zed Divers')
+    const names = screen.getAllByRole('listitem').map(li => li.querySelector('p')?.textContent)
+    expect(names).toEqual(['Blue Manta', 'Abyss', 'Zed Divers', 'Nowhere Co'])
+  })
+
   it('requires a name, rejects an invalid email, and saves the unified fields', async () => {
     const user = userEvent.setup()
     renderPage()
