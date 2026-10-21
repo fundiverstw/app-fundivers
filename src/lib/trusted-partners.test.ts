@@ -25,6 +25,21 @@ describe('trusted-partners lib', () => {
     expect(res).toEqual([{ id: 'p1', name: 'Blue Manta', region: 'Anilao', blurb: null }])
   })
 
+  it('fetchTrustedPartners sorts by location A–Z, then name, with no-location partners last', async () => {
+    rpc.mockResolvedValue({
+      data: [
+        { id: 'a', name: 'Zed Divers', region: 'bali', blurb: null },
+        { id: 'b', name: 'No Place', region: null, blurb: null },
+        { id: 'c', name: 'Blue Manta', region: 'Anilao', blurb: null },
+        { id: 'd', name: 'Abyss', region: 'Bali', blurb: null },
+        { id: 'e', name: 'Coral Co', region: 'Raja Ampat', blurb: null },
+      ],
+      error: null,
+    })
+    const res = await fetchTrustedPartners()
+    expect(res.map(p => p.id)).toEqual(['c', 'd', 'a', 'e', 'b'])
+  })
+
   it('contactTrustedPartner invokes the edge function with partner_id + message', async () => {
     invoke.mockResolvedValue({ data: { ok: true }, error: null })
     await contactTrustedPartner({ partnerId: 'p1', message: 'hi' })

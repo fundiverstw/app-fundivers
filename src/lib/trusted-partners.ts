@@ -11,11 +11,23 @@ import type { TrustedPartner, TrustedPartnerRow, TrustedPartnerInsert } from '..
 // Diver-facing: every active partner — name/region/blurb/website only (no
 // email/kickback), plus `contactable`, which says whether the shop holds an
 // address the message form can reach. Marked active means shown to divers, with
-// or without an email (20260827000000).
+// or without an email (20260827000000). Sorted A–Z by location (region), then
+// name; partners with no location go last.
 export async function fetchTrustedPartners(): Promise<TrustedPartner[]> {
   const { data, error } = await supabase.rpc('list_trusted_partners')
   if (error) throw error
-  return (data ?? []) as TrustedPartner[]
+  return sortByLocation((data ?? []) as TrustedPartner[])
+}
+
+const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true })
+
+export function sortByLocation(partners: TrustedPartner[]): TrustedPartner[] {
+  return [...partners].sort((a, b) => {
+    const ra = a.region?.trim() ?? ''
+    const rb = b.region?.trim() ?? ''
+    if (!ra !== !rb) return ra ? -1 : 1
+    return collator.compare(ra, rb) || collator.compare(a.name ?? '', b.name ?? '')
+  })
 }
 
 // Diver-facing: send a message to one partner. The edge function emails the
